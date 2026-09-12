@@ -1,0 +1,4 @@
+interface:
+  display_name: "Geochora Architecture Refactor"
+  short_description: "Refactor Core ownership and provider boundaries"
+  default_prompt: "Use $geochora-architecture-refactor to audit this Geochora ownership change."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Geochora Public API Governance"
+  short_description: "Govern TaskEnv public APIs and contracts"
+  default_prompt: "Use $geochora-public-api-governance to review this TaskEnv API change."

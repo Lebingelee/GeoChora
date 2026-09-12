@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Env Experiment Evidence"
+  short_description: "Build reproducible TaskEnv experiment evidence"
+  default_prompt: "Use $task-env-experiment-evidence to package this TaskEnv run reproducibly."

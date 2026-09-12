@@ -1,0 +1,4 @@
+interface:
+  display_name: "Geochora Test Governance"
+  short_description: "Select qualification evidence for Core changes"
+  default_prompt: "Use $geochora-test-governance to select evidence for this Geochora change."

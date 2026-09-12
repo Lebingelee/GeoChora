@@ -1,0 +1,4 @@
+interface:
+  display_name: "Geochora Doc Governance"
+  short_description: "Keep Geochora docs canonical and evidence-based"
+  default_prompt: "Use $geochora-doc-governance to update this Geochora documentation contract."

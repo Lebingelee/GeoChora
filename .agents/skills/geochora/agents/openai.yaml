@@ -1,0 +1,4 @@
+interface:
+  display_name: "Geochora"
+  short_description: "Apply Geochora repository boundaries and workflow"
+  default_prompt: "Use $geochora to scope and validate this Geochora repository change."
