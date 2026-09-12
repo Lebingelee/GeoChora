@@ -1,0 +1,6 @@
+[submodule "GeoPhys"]
+	path = GeoPhys
+	url = git@github.com:SCAILab-USTC/GeoPhys.git
+[submodule "asset/external/mujoco_menagerie"]
+	path = asset/external/mujoco_menagerie
+	url = https://github.com/google-deepmind/mujoco_menagerie.git

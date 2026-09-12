@@ -1,0 +1,78 @@
+profile_id: unitree_go2_debug
+
+# This file is the learner contract for the 46D deploy-height experiment.
+# ``policy`` is the deployable actor input.  ``critic_privileged`` is
+# simulator-only and must never be exported to the robot policy.
+action:
+  policy_low: -100.0
+  policy_high: 100.0
+  native_low: -100.0
+  native_high: 100.0
+  scale: 1.0
+  bias: 0.0
+
+observation:
+  actor_groups: [policy]
+  critic_groups: [policy, critic_privileged]
+  groups:
+    policy:
+      # Exact actor input: 46 values, all available on the deployed robot.
+      source: task_observation.state.proprioception
+      dimension: 46
+      deployable: true
+      fields:
+        - name: base_ang_vel
+          source: base_ang_vel_body
+          offset: 0
+          shape: [3]
+          scale: 0.25
+          deployable: true
+          description: body-frame angular velocity
+        - name: projected_gravity
+          source: projected_gravity_body
+          offset: 3
+          shape: [3]
+          scale: 1.0
+          deployable: true
+          description: gravity direction in the body frame
+        - name: command
+          source: command_xy_yaw_height
+          offset: 6
+          shape: [4]
+          scale: [1.0, 1.0, 0.25, 1.0]
+          deployable: true
+          description: commanded vx, vy, yaw rate, and base-height target
+        - name: dof_pos_error
+          source: joint_position_minus_default
+          offset: 10
+          shape: [12]
+          scale: 1.0
+          deployable: true
+          description: twelve joint position errors in Unitree order
+        - name: dof_vel
+          source: joint_velocity
+          offset: 22
+          shape: [12]
+          scale: 0.05
+          deployable: true
+          description: twelve joint velocities in Unitree order
+        - name: previous_action
+          source: previous_policy_action
+          offset: 34
+          shape: [12]
+          scale: 1.0
+          deployable: true
+          description: previous twelve-dimensional action
+    critic_privileged:
+      source: base_lin_vel_body
+      dimension: 3
+      privileged: true
+      deployable: false
+      fields:
+        - name: base_lin_vel
+          source: base_lin_vel_body
+          offset: 0
+          shape: [3]
+          scale: 2.0
+          deployable: false
+          description: simulator-only body-frame base linear velocity

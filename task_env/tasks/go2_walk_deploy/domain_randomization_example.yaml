@@ -1,0 +1,14 @@
+runtime:
+  world_randomization:
+    profile: go2_episode_randomization_v1
+    friction:
+      enabled: true
+      range: [0.1, 1.25]
+    push:
+      enabled: true
+      interval_s: 5.0
+      max_vel_xy: 1.5
+    base_mass:
+      enabled: true
+      range: [-1.0, 3.0]
+      inertia_policy: reference_mass_only

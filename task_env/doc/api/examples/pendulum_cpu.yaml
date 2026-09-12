@@ -1,0 +1,6 @@
+# Public TaskEnv configuration used by the Stage 14 file-based examples.
+runtime:
+  backend: cpu
+  prewarm: false
+episode:
+  horizon: 200

@@ -1,0 +1,9 @@
+profile_id: unitree_go2_reference
+# unitree_rl_gym clips the sampled policy action at normalization.clip_actions=100
+# before applying target = default_joint_angle + 0.25 * action.
+policy_low: -100.0
+policy_high: 100.0
+native_low: -100.0
+native_high: 100.0
+scale: 1.0
+bias: 0.0

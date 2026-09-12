@@ -1,0 +1,41 @@
+"""Go2 robot variants and the canonical public binding."""
+
+from .go2 import (
+    GO2_ACTION_CONTRACT,
+    GO2_ACTION_CLIP,
+    GO2_ACTION_SCALE,
+    GO2_ACTUATOR_NAMES,
+    GO2_ASSET_ROOT,
+    GO2_BASE_BODY_NAME,
+    GO2_BODY_NAMES,
+    GO2_DEFAULT_JOINT_ANGLES,
+    GO2_FOOT_GEOM_NAMES,
+    GO2_JOINT_NAMES,
+    GO2_KD,
+    GO2_KP,
+    GO2_MJCF_PATH,
+    GO2_SITE_NAMES,
+    Go2ActionAdapter,
+    Go2Agent,
+    Go2Entity,
+)
+
+__all__ = [
+    "GO2_ACTION_CONTRACT",
+    "GO2_ACTION_CLIP",
+    "GO2_ACTION_SCALE",
+    "GO2_ACTUATOR_NAMES",
+    "GO2_ASSET_ROOT",
+    "GO2_BASE_BODY_NAME",
+    "GO2_BODY_NAMES",
+    "GO2_DEFAULT_JOINT_ANGLES",
+    "GO2_FOOT_GEOM_NAMES",
+    "GO2_JOINT_NAMES",
+    "GO2_KD",
+    "GO2_KP",
+    "GO2_MJCF_PATH",
+    "GO2_SITE_NAMES",
+    "Go2ActionAdapter",
+    "Go2Agent",
+    "Go2Entity",
+]

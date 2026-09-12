@@ -1,0 +1,1 @@
+"""Headless camera observation examples."""

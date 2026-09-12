@@ -1,0 +1,13 @@
+# Keep the empty task on the same public render configuration surface.
+render:
+  backend: raytracer
+  width: 960
+  height: 720
+  parallel:
+    num: 256
+    columns: 16
+    cell_width: 1.0
+    cell_depth: 1.0
+    padding: 0.0
+  training:
+    every: 1

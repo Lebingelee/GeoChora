@@ -1,0 +1,17 @@
+# Generated experiment and diagnostic artifacts.
+workspace/
+temp_outputs/
+
+# Python caches and local tooling state.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local environment and editor files.
+.env
+.venv/
+.idea/
+.vscode/

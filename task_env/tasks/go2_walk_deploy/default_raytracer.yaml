@@ -1,0 +1,44 @@
+runtime:
+  physics_dt: 0.005
+  control_substeps: 4
+  backend: cuda
+  batch_physics_layout: static_template
+  static_template:
+    profile: articulated_fused_ground_contact_v1
+    kinematics_backend: taichi
+    contact_precision: f32
+    cuda_graph: true
+    contact:
+      response_backend: active_slot_cholesky_f32_v1
+      fixed_topology_child_schur: true
+      root_factor_6x6: true
+  enable_ground_contact: true
+  enable_domain_boundary_contact: false
+  integrator: implicitfast
+  world_randomization:
+    profile: go2_episode_randomization_v1
+    friction:
+      enabled: true
+      range: [0.1, 1.25]
+    push:
+      enabled: true
+      interval_s: 2.0
+      max_vel_xy: 0.7
+    base_mass:
+      enabled: false
+observation:
+  include_privileged_state: false
+episode:
+  horizon: 1000
+render:
+  backend: raytracer
+  width: 1920
+  height: 1080
+  parallel:
+    num: 256
+    columns: 16
+    cell_width: 1.5
+    cell_depth: 1.5
+    padding: 0.0
+  training:
+    every: 1

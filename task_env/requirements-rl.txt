@@ -1,0 +1,9 @@
+# 可选的并行/SB3/RL 依赖。
+# 本文件会包含基础 TaskEnv requirements。
+# 从仓库根目录安装：
+#   python -m pip install -r test/task_env/requirements-rl.txt
+
+-r requirements.txt
+stable-baselines3
+torch
+rsl-rl-lib==5.4.2

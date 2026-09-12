@@ -1,0 +1,24 @@
+# Opt-in Stage C curriculum profile for go2-walk-deploy-height-v1.
+# The default.yaml profile is intentionally unchanged.
+runtime:
+  world_randomization:
+    profile: go2_episode_curriculum_randomization
+    curriculum:
+      start_fraction: 0.10
+      end_fraction: 0.60
+    friction:
+      enabled: true
+      mode: curriculum
+      nominal: 1.0
+      range: [0.1, 1.25]
+    push:
+      enabled: false
+      mode: end
+      interval_s: 5.0
+      max_vel_xy: 1.5
+    base_mass:
+      enabled: true
+      mode: curriculum
+      nominal: 0.0
+      range: [-1.0, 3.0]
+      inertia_policy: reference_mass_only
