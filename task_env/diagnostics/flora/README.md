@@ -1,6 +1,6 @@
 # Flora diagnostics
 
-Run from the GeoPhys repository root with `PYTHONPATH=GeoPhys/src:.`:
+Run from the Geochora repository root with `PYTHONPATH=GeoPhys/src:.`:
 
 ```bash
 python -m task_env.diagnostics.flora.runtime_probe \

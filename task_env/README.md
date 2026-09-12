@@ -1,6 +1,6 @@
-# GeoPhys TaskEnv
+# Geochora TaskEnv
 
-TaskEnv 为 GeoPhys 提供单环境、同构并行环境、相机/渲染、强化学习和轨迹采集入口。所有示例均从 GeoPhys 仓库根目录执行。
+TaskEnv 为 Geochora 提供单环境、同构并行环境、相机/渲染、强化学习和轨迹采集入口。所有示例均从 Geochora 仓库根目录执行。
 
 ## 项目结构
 

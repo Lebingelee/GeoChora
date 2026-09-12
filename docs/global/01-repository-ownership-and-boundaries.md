@@ -102,7 +102,7 @@ Future MuJoCo/SAPIEN physics-provider integration is in the Core owner's scope, 
 Development layout:
 
 ```text
-Geochora/geophys  # git submodule tracking GeoPhys main
+Geochora/GeoPhys  # git submodule tracking GeoPhys main
 ```
 
 Long-term preferred dependency:
