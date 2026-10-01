@@ -7,7 +7,7 @@ description: "Create and operate TaskEnv Task Artifacts, Experiments, evaluation
 
 Use this skill when an Agent, human, or Codex constructs a task, validates an
 expert route, collects data, trains/evaluates a policy, or packages results for
-reproduction. This is an operational skill for using Core; it is not Part B's
+reproduction. This is an operational skill for using Core; it is not PhysPi's
 experience distillation or Skill-promotion implementation.
 
 ## Authority
@@ -129,5 +129,5 @@ Keep approved/frozen artifacts and evidence needed by promoted knowledge or
 Skills. Remove redundant drafts or caches only under the retention policy, and
 protect historical evidence through stable IDs such as task ID, artifact
 version/hash, experiment ID, and Core version. Producing Evidence does not
-automatically create or validate a Part B Skill; Part B owns retention,
-distillation, validation, and promotion.
+automatically create or validate a PhysPi Skill; PhysPi owns retention,
+distillation, validation, and promotion of Agent experience.

@@ -1,7 +1,7 @@
 # Task Artifact, Experiment, and Evidence Contract
 
-> Status: canonical artifact contract, v0.1  
-> Date: 2026-09-12
+> Status: canonical artifact contract, v0.2
+> Date: 2026-10-01
 
 ## 1. Three distinct first-class objects
 
@@ -17,7 +17,7 @@ Defines **how a frozen task version is used for data generation, learning, rollo
 
 ### Experiment Evidence
 
-Records **what happened** and provides structured evidence for Judge, Part B, and Core improvement proposals.
+Records **what happened** and provides structured evidence for Judge, PhysPi or other external experience consumers, and reviewed Core improvement proposals.
 
 Cardinality:
 
@@ -260,7 +260,7 @@ The Experiment stores stable references, identifiers, versions, and hashes where
 
 Task Artifacts and Experiment workspaces are not committed to Git.
 
-Part B memory/skill documents may be committed to Git according to the Part B team's policy.
+PhysPi experience and Skill documents follow PhysPi's own repository and retention policy; they are not owned by a Geochora Experiment workspace.
 
 ## 10. Evaluation report vs Judge decision
 
@@ -318,22 +318,22 @@ It references:
 - Judge decision;
 - agent/tool/simulation resource usage when available.
 
-Experiment produces Evidence. Experiment does **not** directly create a validated Part B Skill.
+Experiment produces Evidence. Experiment does **not** directly create a validated PhysPi Skill or authorize a Core change.
 
-Part B decides how Evidence is retained, distilled, validated, and promoted.
+PhysPi decides how evidence is retained, distilled, validated, and promoted into its experience or Skills. Geochora maintainers separately govern Core changes.
 
 ## 12. Retention, cleanup, and durable references
 
-Part A is task-local and may be periodically cleaned/archived.
+A Task Artifact is task-local and may be periodically cleaned/archived.
 
 Recommended retention:
 
 - keep approved/frozen final artifacts;
 - keep key rejected/failure versions when they provide useful evidence;
 - delete redundant temporary drafts/caches after policy-defined retention windows;
-- keep Experiment Evidence required by promoted Part B knowledge/skills.
+- keep Experiment Evidence required by promoted PhysPi knowledge/Skills or accepted Core changes.
 
-Part B references to historical evidence must not rely only on fragile relative paths. At minimum retain identifiers such as:
+PhysPi or other external references to historical evidence must not rely only on fragile relative paths. At minimum retain identifiers such as:
 
 ```text
 task_id
@@ -343,4 +343,4 @@ experiment_id
 core_version
 ```
 
-If Part B promotes a skill based on specific evidence, that evidence must be protected from cleanup or copied to a durable evidence store.
+If PhysPi promotes a Skill based on specific evidence, that evidence must be protected from cleanup or copied to a durable evidence store.

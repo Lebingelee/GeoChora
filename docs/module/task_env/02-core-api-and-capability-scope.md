@@ -1,17 +1,19 @@
 # Geochora Core API and Capability Scope
 
-> Status: canonical Core scope, v0.1  
-> Date: 2026-09-12
+> Status: canonical Core scope, v0.2
+> Date: 2026-10-01
 
 ## 1. Core mission
 
 `Geochora/task_env` must provide the minimum complete embodied-experiment capability even when the following are absent:
 
-- Agent orchestration;
-- Part B Memory/Skills;
+- PhysPi or other Agent orchestration;
+- external memory, experience, or Agent Skills;
 - external Asset Library.
 
 A human developer or Codex must be able to complete both stages manually through documented Core APIs.
+
+Core's primary mission is a reliable provider-neutral hub for multi-simulator execution and multi-renderer/UI presentation. LLM reasoning and accumulated experience belong to PhysPi or another external consumer.
 
 ## 2. Minimum standalone capability
 
@@ -89,7 +91,7 @@ Manipulation already has action/control conversions such as:
 Rules:
 
 - public/default robot controllers may be registered in Core;
-- unsupported robot-specific controllers may begin as task-private Part A implementation;
+- unsupported robot-specific controllers may begin as task-private Task Artifact implementation;
 - validated reusable controllers may later be promoted to Core;
 - locomotion is not forced through manipulation controller conversion.
 
@@ -199,6 +201,18 @@ evaluation_report.json / report.md   # facts and metrics
 judge_decision.yaml                  # approve/reject + reasons + required changes
 ```
 
+### 3.10 Rendering and UI presentation APIs
+
+Core owns provider-neutral contracts for:
+
+- camera and render requests;
+- frame and presentation metadata;
+- viewports and overlays;
+- interaction events needed by UI clients;
+- renderer capability reporting and fail-closed admission.
+
+Core does not require one desktop toolkit, browser stack, or renderer. OpenUSD is a candidate future interchange/composition layer, not a committed canonical format.
+
 ## 4. Experiment Evidence construction skill documentation
 
 In addition to the public API documentation, `task_env` must include an internal skill/how-to document that explicitly teaches an Agent or Codex:
@@ -212,9 +226,9 @@ In addition to the public API documentation, `task_env` must include an internal
 - how to create/consume `judge_decision.yaml`;
 - how to finalize `evidence.json`;
 - which artifacts are eligible for cleanup/archive;
-- which facts must be retained for Part B.
+- which facts an external consumer such as PhysPi needs for durable experience.
 
-This document is an operational skill for using Core; it is not Part B's skill-distillation implementation.
+This document is an operational skill for using Core; it is not PhysPi's experience or Skill-distillation implementation.
 
 ## 5. Provider scope
 
@@ -224,12 +238,13 @@ This document is an operational skill for using Core; it is not Part B's skill-d
 - renderer on Linux: GeoPhys default renderer;
 - Flora: provider integration later/when platform allows;
 - MuJoCo/SAPIEN: future provider adapters.
+- OpenUSD: candidate scene interchange/composition integration; not required.
 
 Do not create a UniversalSolver abstraction. Maintain Runtime Port/provider boundaries and capability admission.
 
 ## 6. Reference paths
 
-### Primary feature-development route
+### Primary qualification route
 
 Manipulation / IL:
 
@@ -245,16 +260,18 @@ Locomotion / RL:
 Go2 walk / RSL
 ```
 
-The Core must preserve the existing qualified Go2 route while expanding manipulation capability.
+These reference paths qualify Core contracts and providers; they do not define Geochora's complete product boundary. The Core must preserve the existing qualified Go2 route while expanding manipulation capability.
 
 ## 7. Explicit non-goals for first milestone
 
-- Part B storage/retrieval implementation;
-- automatic skill distillation;
-- automatic Core patch generation;
+- PhysPi memory, experience, or Skill implementation;
+- automatic Skill distillation in Geochora;
+- automatic Core patch generation or recursive self-improvement;
+- mandatory OpenUSD adoption;
 - soft-body tasks;
 - phone-video-to-digital-twin;
 - 3DGS real-to-sim-to-real;
 - large-scale VLA/WAM training;
 - mandatory real-robot deployment;
 - immediate MuJoCo/SAPIEN/Flora full support.
+- a repository-wide claim of complete real -> sim -> policy -> real support.

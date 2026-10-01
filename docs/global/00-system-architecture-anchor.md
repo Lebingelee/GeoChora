@@ -1,303 +1,153 @@
 # Geochora System Architecture Anchor
 
-> Status: canonical architecture anchor, v0.1  
-> Date: 2026-09-12  
-> Scope: defines the stable system-level concepts and lifecycle that other Geochora documents must follow.
+> Status: canonical architecture anchor, v0.2
+> Date: 2026-10-01
+> Scope: defines the stable system-level concepts, ownership boundaries, and lifecycle that other Geochora documents must follow.
 
 ## 1. What Geochora is
 
-Geochora is an **agentic embodied experimentation infrastructure**. It does not replace the simulator, controller, planner, learner, or agent. It organizes them into a reproducible workflow that turns a user requirement into a validated task, executable expert data, learned policy, evaluation evidence, and eventually reusable system improvements.
+Geochora is a long-lived, provider-neutral API and tool hub for embodied task construction, multi-simulator execution, multi-renderer presentation, evaluation, and evidence capture.
+
+Its first priority is reliability: one coherent task and lifecycle contract should work across simulator and renderer providers without leaking provider internals into task definitions. Geochora is directly usable by humans, scripts, CI, and other agents; PhysPi is the intended higher-level Agent consumer, but it is not required to use Geochora.
 
 A concise positioning is:
 
-- **Simulator / solver**: decides how the physical world evolves.
-- **Renderer**: produces visual observations.
-- **Controller / planner / expert route**: generates executable behavior or references.
-- **Policy / learner**: learns how to act from observations.
-- **Agent**: reasons about the requirement and calls tools.
-- **Geochora**: governs the whole task-construction, experiment, evaluation, evidence, and improvement lifecycle.
+- PhysPi: a pi-based Agent and LLM orchestration project that owns reasoning, experience, memory, skills, tool selection, and retry strategy.
+- Geochora: stable executable APIs and tools for constructing, running, rendering, recording, evaluating, and qualifying embodied tasks.
+- Simulator / solver provider: decides how the physical world evolves.
+- Renderer / presentation provider: produces visual observations and UI-facing presentation data.
+- Controller / planner / expert route: generates executable behavior or references.
+- Policy / learner: learns how to act from observations.
+- Task Artifact: declares one reproducible task.
+- Experiment Evidence: records what ran, under which configuration, and with what result.
+
+Geochora is not the Agent, not an autonomous self-improvement system, and not a replacement for simulator, renderer, controller, planner, or learner implementations.
 
 ## 2. Canonical architecture
 
-The current architecture is anchored by `整体架构.png`.
-
-```text
-User Requirement (Human / LLM)
-        |
-        v
-Agent Orchestrator
-        |
-        +-------------------+-------------------+
-        |                   |                   |
-        v                   v                   v
-Part B Memory Layer     Asset Library       Geochora Core
-adaptive memory         passive resources   executable shared capability
-        |                   |                   |
-        +--------- retrieval / composition ----+
-                            |
-                            v
-                    Part A: Task Artifact
-                            |
-                    validate + judge + freeze
-                            |
-                            v
-                    Experiment Engine
-                            |
-                            v
-                    Experiment Evidence
-```
-
-`Geochora Core` consumes solver and renderer providers through explicit provider boundaries:
-
-```text
-Geochora Core
-   |-- physics/runtime provider --> GeoPhys (canonical now), future MuJoCo/SAPIEN/... adapters
-   `-- render provider          --> GeoPhys default renderer now, Flora optional/future primary visual provider
-```
-
-### 2.1 Part B — Memory Layer
-
-Part B answers: **“What did we learn from previous tasks that can make the next task easier or more reliable?”**
-
-It is external persistent adaptive state, not Core source code. It may contain:
-
-- Experience evidence references;
-- distilled knowledge;
-- validated skills;
-- workflow / improvement skills (enabled later, after manual validation of Part A / Part B behavior).
-
-Part B is maintained by other project owners. Geochora Core exposes interfaces and evidence contracts for Part B, but must not depend on Part B implementation internals.
-
-### 2.2 Asset Library
-
-The Asset Library answers: **“Which robot and object resources are available?”**
-
-It contains passive resources and metadata such as:
-
-- URDF / MJCF / XML;
-- meshes and textures;
-- robot assets;
-- object / articulated-object assets;
-- asset metadata and references.
-
-Controllers, planners, training algorithms, and runtime logic are not Asset Library contents; they are executable capabilities and belong to Core or external algorithm packages.
-
-For simple task-local geometry, an asset may be created inside a Task Artifact. More complex or reusable assets should be resolved through `Geochora/asset`.
-
-### 2.3 Geochora Core
-
-`Geochora/task_env` is the canonical Core implementation. It evolves from the previous `task_env` implementation developed on the GeoPhys `env_task_design` branch.
-
-Core is the stable software capability layer and includes or integrates:
-
-- registry / config / composition;
-- environment and task lifecycle;
-- runtime ports and provider adapters;
-- observation / action contracts;
-- controllers and action conversions;
-- planning / expert-route capabilities;
-- validators;
-- recorder / replay;
-- learner integration;
-- `runner(env, policy)` style rollout execution;
-- evaluation and reporting;
-- experiment and evidence infrastructure.
-
-Core must be usable **without Agent, Part B, or Asset Library**. A human or Codex must be able to construct and validate a task, collect simulated data, train/evaluate a policy, and generate a final report using only Core APIs plus local/default assets.
-
-### 2.4 Part A — Task Artifact
-
-Part A answers: **“What exactly is this task?”**
-
-It is a task-specific, versioned, non-Git artifact. It contains the concrete task definition needed by Stage 1 and referenced by Stage 2. The artifact includes, at minimum:
-
-- embodiment / robot setup;
-- task-local assets or asset references;
-- scene/world construction;
-- task semantics;
-- observation/action requirements;
-- controller/action-mode configuration where needed;
-- reset and domain-randomization contract;
-- evaluation contract;
-- validated expert-route configuration/provenance after Stage 1 validation.
-
-Task Artifact is a fast-changing task-level object. Drafts may be cleaned periodically; validated/frozen versions and key evidence are archived.
-
-### 2.5 Experiment Engine
-
-Experiment answers: **“How did this specific task/data/policy configuration actually perform?”**
-
-An Experiment references a frozen Task Artifact version and binds:
-
-- Core version;
-- Task Artifact version;
-- expert/data-generation configuration;
-- learner/policy configuration;
-- seeds and budgets;
-- provider/runtime capability snapshot;
-- outputs and evaluation contract.
-
-One Task Artifact may be referenced by many Experiments.
-
-## 3. Canonical one-task workflow
-
-The current workflow is anchored by `一次工作流.png`.
-
-### Stage 1 — Task Construction & Validation
-
-```text
+~~~text
 User Requirement
-   |
-   v
-Agent or Human/Codex
-   |
-   v
-Task Artifact Candidate
-   |-- 1. embodiment/control-subject construction
-   |-- 2. environment/world construction
-   `-- 3. task construction
-   |
-   v
-Automatic Validator
-   |  config / asset / runtime / reset / controller / schema
-   |  fail -> revise Part A
-   v
-Expert Route & Feasibility
-   |  current manipulation reference:
-   |  IK / trajectory optimizer -> controller conversion -> randomized expert rollout
-   |  output: success / failure / unknown report
-   v
-Human/Agent Judge #1
-   |  reject -> revise Part A or expert route
-   v
-Freeze Task Artifact vN
-```
-
-Important semantics:
-
-- Automatic Validator checks **definition/runtime validity**.
-- Expert Route checks **current executable feasibility**.
-- Judge checks **acceptability and alignment with the user requirement**.
-- Planner failure is not automatically equivalent to intrinsic task infeasibility.
-
-### Stage 2 — Data Collection / Learning / Evaluation
-
-```text
-Frozen Task Artifact vN + validated expert route
-   |
-   v
-Expert Dataset Generation
-   |  randomized training reset
-   |  validated expert rollout
-   |  recorder / replay
-   |  lightweight data checks
-   v
-Oracle-State Policy Verification
-   |  state + privileged_state
-   |  Diffusion Policy / Flow Matching reference route
-   |  closed-loop simulation
-   v
-Visuomotor Policy Verification
-   |  RGB + proprioception
-   |  policy learner
-   |  closed-loop simulation
-   v
-Closed-loop Evaluation
-   |  frozen evaluation contract
-   |  ID / OOD
-   |  success / failure
-   |  oracle-state <-> RGB gap
-   |  robustness / failure cases
-   v
-Human/Agent Judge #2
-   v
-Experiment Evidence
-```
-
-Stage 2 may tune training parameters and permitted randomization parameters, but it may not silently change the Stage 1 task/evaluation contract.
-
-## 4. Domain-randomization ownership rule
-
-This is a hard architectural rule.
-
-### Stage 1 / Task Artifact owns
-
-- which quantities may be randomized;
-- randomization schema;
-- hard bounds / allowed envelope;
-- nominal/default training range;
-- evaluation distribution/range;
-- randomization semantics required for feasibility validation.
-
-A randomized reset probe is mandatory for the first release of Stage 1.
-
-### Stage 2 / Experiment may
-
-- tune training randomization parameters **inside the allowed envelope**;
-- choose curricula or schedules that stay inside the Stage 1 contract.
-
-Stage 2 may not, without a new Task Artifact version and Judge approval:
-
-- add/remove a randomization dimension;
-- change hard bounds;
-- change the frozen evaluation distribution;
-- change task success/failure semantics.
-
-## 5. Three-timescale improvement model
-
-The current improvement architecture is anchored by `改进方案.png`.
-
-```text
-Part A (fast): Task Artifact
-  construct / correct current task
         |
-        | useful task-level experience
         v
-Part B (medium): Adaptive Memory
-  retain, distill, validate, improve cross-task knowledge/skills
+PhysPi Agent / Human / Other Client
         |
-        | repeated/systemic evidence + Part A systemic evidence
+        | public Geochora APIs and tools
         v
-Core (slow): governed package update
-  candidate patch -> qualification -> judge -> Core v(t+1)
-        |
-        `---- stronger shared capability ----> future Part A
-```
+Geochora Core
+   |-- Task Artifact loading and validation
+   |-- task/runtime lifecycle
+   |-- observation, action, and controller contracts
+   |-- experiment, recording, replay, evaluation, and evidence
+   |-- unified render and UI presentation contracts
+   |
+   +-- physics/runtime provider --> GeoPhys now; MuJoCo, SAPIEN, and others later
+   +-- render provider          --> GeoPhys now; Flora and others when qualified
+   +-- asset resolver           --> task-local and reusable asset libraries
+   +-- planner/controller       --> provider-neutral integration
+   +-- learner/policy           --> agent_factory or other qualified integrations
+   +-- optional interchange     --> OpenUSD candidate; not yet a committed dependency
+~~~
 
-The key promotion hierarchy is:
+The figure docs/figures/整体架构.png illustrates the broader product context. Its Agent and Part B blocks belong to PhysPi or another external consumer, not to Geochora Core. Where the older figure conflicts with this document, this v0.2 anchor is authoritative.
 
-```text
-task-local solution
-   -> repeated usefulness
-validated Part B skill
-   -> repeated structural need
-Core capability
-```
+## 3. PhysPi boundary
 
-Part A is periodically cleaned/archived. Part B is long-lived but continuously distilled/refined. Core changes are low-frequency and governed.
+PhysPi may use its accumulated experience to choose Geochora tools, compose Task Artifacts, diagnose failures, retry safely, and interpret evidence. The dependency direction is one-way:
 
-## 6. Current project focus
+~~~text
+PhysPi -> Geochora public API -> qualified providers
+~~~
 
-The near-term product/research focus is rigid and articulated rigid-body manipulation.
+Geochora must not import PhysPi internals or depend on a particular memory, prompt, model, or skill implementation. This boundary allows stronger models to establish validated procedures that can later help weaker models achieve comparable acceptance quality through reviewed PhysPi experience and stable Geochora interfaces.
 
-Primary development line:
+If Geochora is later placed beneath a PhysPi project path, that packaging choice does not transfer ownership of Geochora Core contracts to PhysPi.
 
-```text
-PickCube -> NutAssembly -> agent-generated similar unseen manipulation task
-```
+## 4. Geochora Core capabilities
 
-Locomotion remains a reference/regression capability. The existing Go2 walk/RSL path should remain functional while manipulation becomes the main feature-development route.
+Core owns the reusable contracts and lifecycle required across tasks:
 
-Soft-body simulation, direct phone-video-to-digital-twin, 3DGS real-to-sim-to-real, and large VLA/WAM training are explicitly outside the first Core milestone.
+- Task Artifact schema, loader, and validation;
+- simulator-independent task and runtime lifecycle;
+- provider admission, discovery, and capability reporting;
+- observation, action, controller, planner, and expert-route interfaces;
+- recorder, replay, runner, and environment-policy execution;
+- learner integration and training/evaluation orchestration;
+- deterministic configuration, seeding, and provenance capture;
+- Experiment and Experiment Evidence contracts;
+- render-frame, camera, viewport, overlay, and UI-facing presentation contracts;
+- qualification and regression evidence for public capability claims.
 
-## 7. Evidence basis
+Provider-specific code stays behind adapters. A task may request a capability, but it must not reach into provider-private scene, physics, or renderer state.
 
-This document is anchored to:
+## 5. Rendering, UI, and OpenUSD
 
-- `整体架构.png`
-- `一次工作流.png`
-- `改进方案.png`
-- `task_env_capability_audit_2026-09-07.md`
-- the previously completed runtime/provider audits (`01`–`07` audit documents)
+Geochora owns the provider-neutral presentation contract, not one mandatory desktop or web application. Render providers produce qualified frames and metadata; UI clients consume those contracts consistently.
 
-The current capability audit establishes that the TaskEnv framework already has registry/config/task semantics, runtime/provider boundaries, recording/replay infrastructure, and learner integration; Go2 CUDA/RSL is the strongest currently qualified route, while Panda PickCube/NutAssembly still require full physics execution qualification.
+OpenUSD is a candidate future layer for scene interchange, composition, and visualization. It is not yet an adopted canonical representation and must not become a required first-milestone dependency without a separate design decision and qualification plan.
+
+## 6. Assets
+
+The Asset Library answers which robot and object resources are available. It may contain URDF, MJCF, XML, meshes, textures, metadata, and conversion recipes.
+
+Simple task-local assets may live inside a Task Artifact. Reusable or complex assets should be resolved through an explicit asset interface. Asset formats do not define the Core scene API.
+
+## 7. Task Artifact
+
+A Task Artifact is a frozen, reproducible declaration of one task. It owns task-local scene composition, success and failure criteria, initialization, action/observation selections, allowed controller routes, evaluation configuration, and local assets.
+
+Reference tasks are qualification vehicles for Core and providers. They demonstrate contracts and regression coverage; they do not define the full product boundary.
+
+## 8. Experiment and evidence lifecycle
+
+The canonical lifecycle is:
+
+~~~text
+requirement
+  -> construct Task Artifact
+  -> validate schema and requested capabilities
+  -> instantiate qualified providers
+  -> run controller, planner, expert, or policy route
+  -> record observations, actions, events, metrics, and provenance
+  -> judge acceptance criteria
+  -> freeze Experiment Evidence
+~~~
+
+Evidence must distinguish implemented, tested, qualified, planned, and aspirational capability. Passing one reference task does not prove general support for a provider, robot, scene format, or real-world transfer route.
+
+## 9. Governed evolution, not current RSI
+
+Evidence may be reviewed and distilled into:
+
+- improved PhysPi experience, memory, and skills;
+- clearer Task Artifact templates;
+- additional provider qualification cases;
+- reviewed Geochora API or implementation changes.
+
+These are governed software and knowledge updates. Autonomous recursive self-improvement is not a current Geochora objective, and Experiment Evidence alone never authorizes a Core source change.
+
+The figure docs/figures/改进方案.png should therefore be read as a long-term, review-gated feedback loop rather than an implemented RSI mechanism.
+
+## 10. Roadmap priorities
+
+Current priority:
+
+1. establish reliable public contracts for multi-simulator execution and multi-renderer presentation;
+2. qualify the GeoPhys path and reference tasks end to end;
+3. make evidence and capability claims reproducible;
+4. keep provider boundaries strict enough to admit additional backends.
+
+Next priorities include additional simulator/render providers, better UI clients, richer assets, learning integrations, and a decision on OpenUSD.
+
+Long-term goals include faster task construction and full or partial real -> sim -> policy -> real acceptance workflows. Those goals are directional until their interfaces and evidence routes are implemented and qualified.
+
+## 11. Authority and conflict resolution
+
+For architecture claims, use this order:
+
+1. current implementation and reproducible evidence;
+2. this canonical anchor and the repository ownership contract;
+3. module documentation;
+4. README summaries and figures;
+5. historical migration notes.
+
+When they conflict, update the lower-authority material or explicitly label it historical.

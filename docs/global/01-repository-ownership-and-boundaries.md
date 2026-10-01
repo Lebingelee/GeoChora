@@ -1,171 +1,127 @@
 # Geochora Repository Ownership and Boundaries
 
-> Status: canonical ownership contract, v0.1  
-> Date: 2026-09-12
+> Status: canonical ownership contract, v0.2
+> Date: 2026-10-01
 
 ## 1. Repository intent
 
-A new `Geochora` repository is the canonical project repository.
+This repository is the canonical owner of Geochora: a reusable multi-simulator, multi-renderer, embodied-task API and tool hub.
 
-The previous `task_env` implementation was developed on the GeoPhys `env_task_design` branch. GeoPhys **main** does not contain `task_env`. After migration, `Geochora/task_env` becomes the sole canonical owner of Core task/environment code.
+Historical task environment code and documents may have originated on branches of other projects. They are migration context, not continuing architectural authority. There must not be two actively maintained canonical copies of Geochora Core or task_env.
 
-There must not be two actively maintained canonical copies of `task_env`.
+PhysPi is a separate pi-based Agent project and an intended consumer of Geochora. Geochora may later be checked out or referenced beneath a PhysPi project path, but that location does not merge ownership: PhysPi owns Agent behavior and experience; Geochora owns executable simulation, rendering, task, experiment, and evidence contracts.
 
 ## 2. Target repository shape
 
-The exact names of Agent/Memory/Skill team-owned directories may evolve, but the ownership model is fixed.
-
-```text
+~~~text
 Geochora/
-├── task_env/              # Geochora Core; owned primarily by Core/API maintainer
-├── asset/                 # asset import/resolution interface; separate owner(s)
-├── ...                    # Agent / Memory / Skill team-owned directories
-├── GeoPhys/               # GeoPhys git submodule provider for development
-├── docs/
-└── workspace/             # task artifacts / experiments; NOT committed to Git
-```
+|-- task_env/              # Geochora Core implementation
+|-- asset/                 # reusable asset import/resolution interface
+|   +-- external/mujoco_menagerie/  # external asset link/submodule
+|-- GeoPhys/               # development provider link/submodule
+|-- docs/                  # canonical and module documentation
+|-- .agents/skills/        # repository workflow and governance skills
++-- workspace/             # generated task artifacts/experiments; not committed
+~~~
 
-`agent_factory` is an existing algorithm library used for baseline imitation-learning algorithms. Geochora Core integrates with it; Core does not need to duplicate its algorithm implementations.
+External providers remain external dependencies. Their source is linked, installed, or resolved; it is not vendored into Geochora merely to make a public review branch self-contained.
 
 ## 3. Canonical ownership
 
-### 3.1 `Geochora/task_env`
+### 3.1 Geochora Core and task_env
 
-Primary owner: Core/API maintainer.
+Geochora owns:
 
-Responsibilities:
-
-- public environment/task APIs;
+- public environment and task APIs;
 - task/runtime lifecycle;
-- runtime/provider boundary;
-- controller/action conversion infrastructure;
-- planning/expert-route integration points;
-- validator infrastructure;
-- recorder/replay;
-- runner/environment-policy execution;
+- simulator and renderer provider boundaries;
+- provider discovery, capability reporting, and admission;
+- observation, action, controller, and planner contracts;
+- recorder, replay, runner, and environment-policy execution;
 - learner integration and training/evaluation orchestration;
-- Experiment / Evidence infrastructure;
-- Task Artifact contract and loader;
-- Core qualification and regression.
+- Task Artifact, Experiment, and Experiment Evidence contracts;
+- provider-neutral render and UI presentation contracts;
+- Core and provider qualification and regression.
 
-### 3.2 Agent / Part B / Skill implementation
+Reference tasks in task_env are maintained as qualification routes. Task-local implementation belongs to its Task Artifact unless it proves reusable across tasks and is deliberately promoted into Core.
 
-Primary owner: Agent/Memory/Skill team.
+### 3.2 PhysPi
 
-Responsibilities:
+PhysPi owns:
 
-- Agent reasoning/orchestration logic;
-- Part B storage;
-- retrieval / RAG;
-- experience-to-knowledge distillation;
-- skill generation/validation/promotion logic;
-- workflow/improvement-skill logic when later enabled.
+- Agent and LLM orchestration;
+- prompt and model strategy;
+- tool selection, sequencing, recovery, and retry behavior;
+- persistent experience, memory, retrieval, and knowledge distillation;
+- reusable Agent skills and their validation/promotion process;
+- reasoning over Geochora evidence.
 
-Core owner responsibilities here are limited to:
+Geochora exposes stable APIs, tools, capability metadata, and evidence for PhysPi. Geochora must not import PhysPi internals or require a particular PhysPi model, memory store, or skill format.
 
-- defining directory/API boundaries;
-- exposing stable Core tools/capabilities;
-- emitting structured Experiment Evidence;
-- reviewing proposed Core changes.
+The intended dependency is:
 
-Core must not import or depend on internal Part B storage/retrieval implementation.
+~~~text
+PhysPi -> Geochora public API -> provider public API
+~~~
 
-### 3.3 Asset interface
+### 3.3 Assets and OpenUSD
 
-`Geochora/asset` owns reusable asset import/resolution APIs.
+Geochora owns the reusable asset resolution interface. Simple assets may be local to a Task Artifact; reusable robot and object resources should be resolved through that interface.
 
-Simple task-local assets may live inside a Task Artifact. Reusable/complex robot or object assets should be resolved through the asset interface.
+OpenUSD may later support scene interchange, composition, or visualization. Until a design is accepted, it is a candidate integration rather than a canonical repository format or required dependency.
 
-### 3.4 GeoPhys
+### 3.4 Providers
 
-GeoPhys is a solver/physics dependency and remains independently owned by the GeoPhys development team.
+GeoPhys is the currently qualified physics/runtime and default rendering provider. Additional providers such as MuJoCo, SAPIEN, and Flora must enter through explicit adapters and capability declarations.
 
-Boundary:
+Core and task code may depend on provider public APIs. They must not depend on provider-private internals, mutable singleton state, or undeclared backend-specific behavior.
 
-```text
-Geochora/task_env -> GeoPhys public/runtime-facing API
-GeoPhys           -X-> Geochora/task_env
-```
+Provider repositories and large external asset collections should remain links, submodules, or installation dependencies. Public Geochora branches should publish the reference and setup contract, not duplicate their source.
 
-Core defines required behavior and conformance tests. GeoPhys owns numerical implementation, storage/kernel ABI, contact implementation, and other solver internals.
+### 3.5 Rendering and UI
 
-### 3.5 Renderer providers
+Geochora owns the provider-neutral boundary for render frames, cameras, viewports, overlays, interaction events, and presentation metadata. Render backends and UI clients implement or consume that boundary.
 
-Near-term Linux development uses the GeoPhys default renderer.
+A specific renderer, desktop toolkit, browser stack, or future OpenUSD integration does not own the Core presentation contract.
 
-Flora is an external renderer provider, currently mainly used on Windows. Flora integration is a provider-boundary task, not a Core-internal rendering reimplementation.
+### 3.6 agent_factory and learning libraries
 
-Future MuJoCo/SAPIEN physics-provider integration is in the Core owner's scope, but not part of the first implementation milestone.
+Existing algorithm libraries may provide baseline imitation-learning or policy implementations. Geochora integrates them through explicit learner/policy boundaries instead of duplicating their algorithms.
 
-## 4. GeoPhys dependency resolution
+## 4. Change classification
 
-Development layout:
+Classify every proposed change before implementation:
 
-```text
-Geochora/GeoPhys  # git submodule tracking GeoPhys main
-```
+1. Task-local: belongs in one Task Artifact and does not change shared contracts.
+2. PhysPi experience or skill: changes how an Agent chooses or combines existing Geochora capabilities.
+3. Geochora Core: adds or changes reusable APIs, lifecycle, schemas, provider boundaries, UI/render contracts, or evidence semantics.
+4. Provider: changes backend-specific simulation or rendering behavior behind an existing boundary.
 
-Long-term preferred dependency:
+Do not promote a task workaround into Core merely because it solved one scenario. Do not encode Agent reasoning or accumulated experience in Geochora APIs. Do not solve a missing Core capability with undocumented provider-private access.
 
-1. use a released/installable `geophys` Python package when a compatible stable package exists;
-2. otherwise use the repository submodule for development.
+## 5. Capability and evidence governance
 
-The exact packaging/bootstrap mechanism may evolve, but these rules are invariant:
+Claims must be labeled accurately:
 
-- dependency version/capability must be explicit and inspectable;
-- no silent fallback to an incompatible GeoPhys version;
-- Core provider admission/qualification decides whether a requested route is supported;
-- GeoPhys does not import Geochora.
+- implemented: code exists;
+- tested: automated checks exercise it;
+- qualified: an agreed acceptance route and evidence pass;
+- planned: design direction only;
+- aspirational: long-term objective without a committed interface.
 
-## 5. Core vs provider responsibilities
+Real -> sim -> policy -> real support may be qualified incrementally and by partial routes. It is not a present repository-wide capability claim.
 
-### Geochora Core owns
+Experiment Evidence can motivate a PhysPi skill update, a new regression, or a reviewed Core proposal. It cannot directly rewrite Core or bypass review. Recursive self-improvement is not a current Geochora responsibility.
 
-- task semantics;
-- reset/step transaction and lifecycle;
-- public state/action contracts;
-- controller/planner orchestration;
-- named capability requirements;
-- experiment/evidence/reporting;
-- provider admission and conformance tests.
+## 6. Dependency and public-review rules
 
-### Physics provider owns
+For the public review repository:
 
-- physics state storage;
-- solver numerical algorithm;
-- contact workspace;
-- solver-specific caching/graph lifecycle;
-- provider-specific realization of randomization;
-- physics-facing render source contract where applicable.
+- Geochora-owned source, docs, tests, and skills may be published;
+- GeoPhys, mujoco_menagerie, PhysPi, and other external projects remain references or links unless their own distribution policy explicitly says otherwise;
+- generated workspaces, experiments, caches, credentials, and large local artifacts remain untracked;
+- README setup instructions must state which external dependencies are required for each qualified route.
 
-### Render provider owns
+## 7. Conflict resolution
 
-- rendering implementation;
-- device/backend-specific render resources;
-- source consumption according to Core render contract.
-
-Core must not repair missing provider behavior by reading private solver/renderer internals.
-
-## 6. Change governance
-
-Changes fall into three categories:
-
-### Task-local change
-
-Belongs in Part A Task Artifact. No Core patch is required.
-
-### Reusable knowledge/skill change
-
-Belongs in Part B and is owned by the Agent/Memory/Skill team.
-
-### Core capability change
-
-Requires:
-
-1. evidence-backed proposal;
-2. Core code review;
-3. Core qualification/regression;
-4. approve/reject decision;
-5. versioned Core update.
-
-Part B may propose Core changes but cannot directly mutate canonical Core without review.
+Use current implementation and reproducible evidence first, followed by docs/global, module documentation, README summaries, and historical notes. If packaging, old figures, or previous branch history implies different ownership, this contract governs until deliberately revised.

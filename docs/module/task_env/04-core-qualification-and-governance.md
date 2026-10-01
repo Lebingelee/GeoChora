@@ -1,13 +1,15 @@
 # Geochora Core Qualification and Governance
 
-> Status: canonical Core validation policy, v0.1  
-> Date: 2026-09-12
+> Status: canonical Core validation policy, v0.2
+> Date: 2026-10-01
 
 ## 1. Purpose
 
 Every Geochora Core update must preserve existing qualified capability while adding new capability deliberately.
 
 Qualification is evidence-based. A registered task, importable provider, or existing class does not by itself count as an end-to-end supported capability.
+
+Reference tasks are qualification vehicles for the multi-simulator, multi-renderer hub. They do not define the full product scope.
 
 ## 2. Qualification layers
 
@@ -48,6 +50,7 @@ Verify the default end-to-end integration envelope:
 
 - runtime smoke;
 - default render smoke;
+- render/UI presentation-contract smoke;
 - recorder/replay smoke;
 - learning smoke;
 - runner closed-loop smoke;
@@ -128,7 +131,7 @@ reject         promote
 rollback       Core v(t+1)
 ```
 
-Core is intentionally slower-moving than Part A and Part B.
+Core is intentionally slower-moving than task-local artifacts and PhysPi experience/Skills.
 
 ## 6. Provider integration governance
 
@@ -184,9 +187,11 @@ Future Agent Judge may use the same contract, but must emit explicit `approve/re
 
 Core updates may be proposed from:
 
-- Part A systemic/repeated issues;
-- Part B validated skills or repeated bottlenecks;
+- systemic/repeated Task Artifact issues;
+- PhysPi-validated Skills or repeated bottlenecks supported by evidence;
 - provider/API integration requirements;
 - qualification failures revealing a Core defect.
 
-Single task-local inconvenience should normally remain in Part A. Reusable behavior should first be validated as Part B skill or otherwise supported by repeated evidence before being promoted to Core.
+Single task-local inconvenience should normally remain in its Task Artifact. Reusable Agent behavior belongs in PhysPi. A shared executable capability should be promoted to Core only when repeated evidence supports it and the public contract, provider implications, and regressions are reviewed.
+
+Evidence may motivate a proposal but cannot autonomously patch Core or bypass review. RSI is not a current Geochora qualification objective.

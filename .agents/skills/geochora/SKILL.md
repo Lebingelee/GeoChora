@@ -38,8 +38,9 @@ Choose one primary owner before editing:
 
 - **Task-local**: the change belongs in a Task Artifact and does not alter
   shared Core behavior.
-- **Reusable experience or Skill**: the change belongs to Part B and must not
-  be implemented by importing Part B internals into Core.
+- **Reusable Agent experience or Skill**: the change belongs to PhysPi (or
+  another external Agent consumer) and must not be implemented by importing
+  that consumer's internals into Core.
 - **Core capability**: the change alters reusable task/environment behavior,
   contracts, providers, recording, learning, evaluation, or qualification and
   requires Core review and regression evidence.
