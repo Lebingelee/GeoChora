@@ -1,153 +1,153 @@
-# Geochora System Architecture Anchor
+# Geochora 系统架构基准
 
-> Status: canonical architecture anchor, v0.2
-> Date: 2026-10-01
-> Scope: defines the stable system-level concepts, ownership boundaries, and lifecycle that other Geochora documents must follow.
+> 状态：canonical 架构基准，v0.2
+> 日期：2026-10-01
+> 范围：定义其他 Geochora 文档必须遵循的稳定系统级概念、所有权边界和生命周期。
 
-## 1. What Geochora is
+## 1. Geochora 是什么
 
-Geochora is a long-lived, provider-neutral API and tool hub for embodied task construction, multi-simulator execution, multi-renderer presentation, evaluation, and evidence capture.
+Geochora 是一个长期演进、与 provider 无关的 API 与工具中枢，面向具身任务构造、多仿真器执行、多渲染器展示、评估和 Evidence 采集。
 
-Its first priority is reliability: one coherent task and lifecycle contract should work across simulator and renderer providers without leaking provider internals into task definitions. Geochora is directly usable by humans, scripts, CI, and other agents; PhysPi is the intended higher-level Agent consumer, but it is not required to use Geochora.
+它的首要目标是可靠性：一套统一的任务与生命周期 contract 应当能够跨仿真器和渲染器 provider 工作，同时不把 provider 内部实现泄漏到任务定义中。人、脚本、CI 和其他 Agent 都可以直接使用 Geochora；PhysPi 是预期的上层 Agent 消费者，但使用 Geochora 并不要求必须存在 PhysPi。
 
-A concise positioning is:
+各组成部分可简要定位为：
 
-- PhysPi: a pi-based Agent and LLM orchestration project that owns reasoning, experience, memory, skills, tool selection, and retry strategy.
-- Geochora: stable executable APIs and tools for constructing, running, rendering, recording, evaluating, and qualifying embodied tasks.
-- Simulator / solver provider: decides how the physical world evolves.
-- Renderer / presentation provider: produces visual observations and UI-facing presentation data.
-- Controller / planner / expert route: generates executable behavior or references.
-- Policy / learner: learns how to act from observations.
-- Task Artifact: declares one reproducible task.
-- Experiment Evidence: records what ran, under which configuration, and with what result.
+- PhysPi：基于 pi 的 Agent 与 LLM 编排项目，负责推理、经验、记忆、Skills、工具选择和重试策略。
+- Geochora：为具身任务的构造、运行、渲染、记录、评估和资格验证提供稳定的可执行 API 与工具。
+- Simulator / solver provider：决定物理世界如何演化。
+- Renderer / presentation provider：产生视觉观测和面向 UI 的展示数据。
+- Controller / planner / expert route：生成可执行行为或参考轨迹。
+- Policy / learner：学习如何根据观测采取动作。
+- Task Artifact：声明一个可复现任务。
+- Experiment Evidence：记录执行了什么、使用了什么配置，以及得到什么结果。
 
-Geochora is not the Agent, not an autonomous self-improvement system, and not a replacement for simulator, renderer, controller, planner, or learner implementations.
+Geochora 不是 Agent，也不是自治式自我改进系统，更不会替代仿真器、渲染器、控制器、规划器或 learner 的实现。
 
-## 2. Canonical architecture
+## 2. Canonical 架构
 
 ~~~text
-User Requirement
+用户需求
         |
         v
-PhysPi Agent / Human / Other Client
+PhysPi Agent / 人 / 其他客户端
         |
-        | public Geochora APIs and tools
+        | Geochora 公共 API 与工具
         v
 Geochora Core
-   |-- Task Artifact loading and validation
-   |-- task/runtime lifecycle
-   |-- observation, action, and controller contracts
-   |-- experiment, recording, replay, evaluation, and evidence
-   |-- unified render and UI presentation contracts
+   |-- Task Artifact 加载与验证
+   |-- 任务/runtime 生命周期
+   |-- observation、action 与 controller contract
+   |-- Experiment、记录、回放、评估与 Evidence
+   |-- 统一 render 与 UI presentation contract
    |
-   +-- physics/runtime provider --> GeoPhys now; MuJoCo, SAPIEN, and others later
-   +-- render provider          --> GeoPhys now; Flora and others when qualified
-   +-- asset resolver           --> task-local and reusable asset libraries
-   +-- planner/controller       --> provider-neutral integration
-   +-- learner/policy           --> agent_factory or other qualified integrations
-   +-- optional interchange     --> OpenUSD candidate; not yet a committed dependency
+   +-- physics/runtime provider --> 当前为 GeoPhys；未来包括 MuJoCo、SAPIEN 等
+   +-- render provider          --> 当前为 GeoPhys；Flora 等在资格验证后接入
+   +-- asset resolver           --> 任务局部和可复用资产库
+   +-- planner/controller       --> provider-neutral 集成
+   +-- learner/policy           --> agent_factory 或其他已资格化集成
+   +-- 可选交换层               --> OpenUSD 候选方案；尚未成为确定依赖
 ~~~
 
-The figure docs/figures/整体架构.png illustrates the broader product context. Its Agent and Part B blocks belong to PhysPi or another external consumer, not to Geochora Core. Where the older figure conflicts with this document, this v0.2 anchor is authoritative.
+图片 docs/figures/整体架构.png 展示了更广泛的产品上下文。其中的 Agent 和 Part B 属于 PhysPi 或其他外部消费方，而不属于 Geochora Core。如果旧图片与本文冲突，以本 v0.2 架构基准为准。
 
-## 3. PhysPi boundary
+## 3. PhysPi 边界
 
-PhysPi may use its accumulated experience to choose Geochora tools, compose Task Artifacts, diagnose failures, retry safely, and interpret evidence. The dependency direction is one-way:
+PhysPi 可以利用积累的经验选择 Geochora 工具、组合 Task Artifact、诊断失败、安全重试并解释 Evidence。依赖方向是单向的：
 
 ~~~text
-PhysPi -> Geochora public API -> qualified providers
+PhysPi -> Geochora 公共 API -> 已资格化 provider
 ~~~
 
-Geochora must not import PhysPi internals or depend on a particular memory, prompt, model, or skill implementation. This boundary allows stronger models to establish validated procedures that can later help weaker models achieve comparable acceptance quality through reviewed PhysPi experience and stable Geochora interfaces.
+Geochora 不得导入 PhysPi 内部实现，也不得依赖特定的记忆、prompt、模型或 Skill 实现。通过这一边界，较强模型建立的已验证流程可以经由受审查的 PhysPi 经验和稳定的 Geochora 接口，帮助较弱模型达到可比的验收质量。
 
-If Geochora is later placed beneath a PhysPi project path, that packaging choice does not transfer ownership of Geochora Core contracts to PhysPi.
+即使以后将 Geochora 放在 PhysPi 项目路径之下，这种打包位置也不会把 Geochora Core contract 的所有权转移给 PhysPi。
 
-## 4. Geochora Core capabilities
+## 4. Geochora Core 能力
 
-Core owns the reusable contracts and lifecycle required across tasks:
+Core 负责跨任务复用所需的 contract 和生命周期：
 
-- Task Artifact schema, loader, and validation;
-- simulator-independent task and runtime lifecycle;
-- provider admission, discovery, and capability reporting;
-- observation, action, controller, planner, and expert-route interfaces;
-- recorder, replay, runner, and environment-policy execution;
-- learner integration and training/evaluation orchestration;
-- deterministic configuration, seeding, and provenance capture;
-- Experiment and Experiment Evidence contracts;
-- render-frame, camera, viewport, overlay, and UI-facing presentation contracts;
-- qualification and regression evidence for public capability claims.
+- Task Artifact schema、loader 与 validation；
+- 与仿真器无关的任务和 runtime 生命周期；
+- provider 准入、发现和 capability reporting；
+- observation、action、controller、planner 与 expert-route 接口；
+- recorder、replay、runner 与 environment-policy execution；
+- learner 集成及训练/评估编排；
+- 确定性配置、seed 和 provenance 采集；
+- Experiment 与 Experiment Evidence contract；
+- render frame、camera、viewport、overlay 和面向 UI 的 presentation contract；
+- 支撑公共能力声明的资格验证与回归 Evidence。
 
-Provider-specific code stays behind adapters. A task may request a capability, but it must not reach into provider-private scene, physics, or renderer state.
+provider 特定代码必须留在 adapter 后方。任务可以请求某项 capability，但不得访问 provider 私有的 scene、physics 或 renderer 状态。
 
-## 5. Rendering, UI, and OpenUSD
+## 5. Rendering、UI 与 OpenUSD
 
-Geochora owns the provider-neutral presentation contract, not one mandatory desktop or web application. Render providers produce qualified frames and metadata; UI clients consume those contracts consistently.
+Geochora 负责 provider-neutral 的 presentation contract，而不是某个强制的桌面或 Web 应用。Render provider 产生经过资格验证的 frame 和 metadata；UI client 以一致方式消费这些 contract。
 
-OpenUSD is a candidate future layer for scene interchange, composition, and visualization. It is not yet an adopted canonical representation and must not become a required first-milestone dependency without a separate design decision and qualification plan.
+OpenUSD 是未来用于 scene interchange、composition 和 visualization 的候选层。它尚未成为已采用的 canonical representation；如果没有独立设计决策和资格验证计划，不得将其变成首个 milestone 的必选依赖。
 
 ## 6. Assets
 
-The Asset Library answers which robot and object resources are available. It may contain URDF, MJCF, XML, meshes, textures, metadata, and conversion recipes.
+Asset Library 回答“有哪些机器人和物体资源可用”。其中可以包含 URDF、MJCF、XML、mesh、texture、metadata 和 conversion recipe。
 
-Simple task-local assets may live inside a Task Artifact. Reusable or complex assets should be resolved through an explicit asset interface. Asset formats do not define the Core scene API.
+简单的任务局部资产可以放在 Task Artifact 内。可复用或复杂资产应通过明确的 asset interface 解析。资产格式不定义 Core scene API。
 
 ## 7. Task Artifact
 
-A Task Artifact is a frozen, reproducible declaration of one task. It owns task-local scene composition, success and failure criteria, initialization, action/observation selections, allowed controller routes, evaluation configuration, and local assets.
+Task Artifact 是对一个任务进行冻结、可复现的声明。它负责任务局部的 scene composition、成功与失败条件、初始化、action/observation 选择、允许的 controller route、评估配置和本地资产。
 
-Reference tasks are qualification vehicles for Core and providers. They demonstrate contracts and regression coverage; they do not define the full product boundary.
+参考任务是 Core 与 provider 的资格验证载体。它们用于展示 contract 和回归覆盖，不定义完整产品边界。
 
-## 8. Experiment and evidence lifecycle
+## 8. Experiment 与 Evidence 生命周期
 
-The canonical lifecycle is:
+Canonical 生命周期如下：
 
 ~~~text
-requirement
-  -> construct Task Artifact
-  -> validate schema and requested capabilities
-  -> instantiate qualified providers
-  -> run controller, planner, expert, or policy route
-  -> record observations, actions, events, metrics, and provenance
-  -> judge acceptance criteria
-  -> freeze Experiment Evidence
+需求
+  -> 构造 Task Artifact
+  -> 验证 schema 和请求的 capability
+  -> 实例化已资格化 provider
+  -> 执行 controller、planner、expert 或 policy route
+  -> 记录 observation、action、event、metric 与 provenance
+  -> 根据验收标准进行 Judge
+  -> 冻结 Experiment Evidence
 ~~~
 
-Evidence must distinguish implemented, tested, qualified, planned, and aspirational capability. Passing one reference task does not prove general support for a provider, robot, scene format, or real-world transfer route.
+Evidence 必须区分 implemented、tested、qualified、planned 和 aspirational。一个参考任务通过，并不能证明某个 provider、机器人、scene format 或真实世界迁移路线已经获得通用支持。
 
-## 9. Governed evolution, not current RSI
+## 9. 受治理的演进，而非当前 RSI
 
-Evidence may be reviewed and distilled into:
+Evidence 经审查后可以沉淀为：
 
-- improved PhysPi experience, memory, and skills;
-- clearer Task Artifact templates;
-- additional provider qualification cases;
-- reviewed Geochora API or implementation changes.
+- 改进后的 PhysPi 经验、记忆和 Skills；
+- 更清晰的 Task Artifact template；
+- 更多 provider 资格验证案例；
+- 经过审查的 Geochora API 或实现修改。
 
-These are governed software and knowledge updates. Autonomous recursive self-improvement is not a current Geochora objective, and Experiment Evidence alone never authorizes a Core source change.
+这些属于受治理的软件和知识更新。自治式递归自我改进不是当前 Geochora 的目标，Experiment Evidence 本身也绝不授权修改 Core 源码。
 
-The figure docs/figures/改进方案.png should therefore be read as a long-term, review-gated feedback loop rather than an implemented RSI mechanism.
+因此，图片 docs/figures/改进方案.png 应理解为长期、带审查门槛的反馈闭环，而不是已实现的 RSI 机制。
 
-## 10. Roadmap priorities
+## 10. Roadmap 优先级
 
-Current priority:
+当前优先级：
 
-1. establish reliable public contracts for multi-simulator execution and multi-renderer presentation;
-2. qualify the GeoPhys path and reference tasks end to end;
-3. make evidence and capability claims reproducible;
-4. keep provider boundaries strict enough to admit additional backends.
+1. 为多仿真器执行和多渲染器展示建立可靠的公共 contract；
+2. 对 GeoPhys 路线和参考任务进行端到端资格验证；
+3. 使 Evidence 与 capability claim 可复现；
+4. 维持严格的 provider 边界，以便接纳更多 backend。
 
-Next priorities include additional simulator/render providers, better UI clients, richer assets, learning integrations, and a decision on OpenUSD.
+后续优先事项包括更多 simulator/render provider、更完善的 UI client、更丰富的资产、learning integration，以及对 OpenUSD 作出决策。
 
-Long-term goals include faster task construction and full or partial real -> sim -> policy -> real acceptance workflows. Those goals are directional until their interfaces and evidence routes are implemented and qualified.
+长期目标包括更快速的任务构造，以及完整或部分的 real -> sim -> policy -> real 验收工作流。在相应接口和 Evidence 路线完成实现与资格验证前，这些只代表方向。
 
-## 11. Authority and conflict resolution
+## 11. 权威顺序与冲突处理
 
-For architecture claims, use this order:
+架构声明按以下顺序判断：
 
-1. current implementation and reproducible evidence;
-2. this canonical anchor and the repository ownership contract;
-3. module documentation;
-4. README summaries and figures;
-5. historical migration notes.
+1. 当前实现和可复现 Evidence；
+2. 本 canonical 架构基准与仓库所有权 contract；
+3. module 文档；
+4. README 摘要与图片；
+5. 历史迁移说明。
 
-When they conflict, update the lower-authority material or explicitly label it historical.
+出现冲突时，应更新较低权威层级的材料，或明确将其标记为历史内容。

@@ -1,277 +1,277 @@
-# Geochora Core API and Capability Scope
+# Geochora Core API 与能力范围
 
-> Status: canonical Core scope, v0.2
-> Date: 2026-10-01
+> 状态：canonical Core 范围，v0.2
+> 日期：2026-10-01
 
-## 1. Core mission
+## 1. Core 使命
 
-`Geochora/task_env` must provide the minimum complete embodied-experiment capability even when the following are absent:
+即使缺少以下组成部分，Geochora/task_env 也必须提供最小但完整的具身 Experiment 能力：
 
-- PhysPi or other Agent orchestration;
-- external memory, experience, or Agent Skills;
-- external Asset Library.
+- PhysPi 或其他 Agent 编排；
+- 外部记忆、经验或 Agent Skills；
+- 外部 Asset Library。
 
-A human developer or Codex must be able to complete both stages manually through documented Core APIs.
+人类开发者或 Codex 必须能够通过有文档说明的 Core API，手动完成两个阶段。
 
-Core's primary mission is a reliable provider-neutral hub for multi-simulator execution and multi-renderer/UI presentation. LLM reasoning and accumulated experience belong to PhysPi or another external consumer.
+Core 的首要使命是成为可靠、provider-neutral 的多仿真器执行与多渲染器/UI 展示中枢。LLM 推理和积累的经验属于 PhysPi 或其他外部消费方。
 
-## 2. Minimum standalone capability
+## 2. 最小独立能力
 
-### Stage 1 — Task Construction & Physical/Feasibility Validation
+### Stage 1 — 任务构造与物理/可行性验证
 
-Core must support:
+Core 必须支持：
 
-```text
-local/default asset or explicit asset path
-   -> robot/scene construction
+~~~text
+本地/默认资产或显式资产路径
+   -> 机器人/scene 构造
    -> task semantics
    -> observation/action contract
    -> controller/action mode
    -> reset/randomization contract
    -> Automatic Validator
    -> expert route
-   -> randomized feasibility probe
+   -> 随机化可行性探测
    -> report
    -> Judge decision
-   -> frozen Task Artifact
-```
+   -> 冻结的 Task Artifact
+~~~
 
-For the first manipulation reference route, expert generation may use the existing IK + trajectory optimizer + controller/action conversion pipeline.
+首条 manipulation 参考路线可以使用现有的 IK + trajectory optimizer + controller/action conversion pipeline 生成 expert。
 
-The expert abstraction must not be frozen around manipulator-specific IK semantics; future locomotion expert routes may use different solvers/controllers/policies.
+Expert abstraction 不得固化为 manipulator 特定的 IK 语义；未来 locomotion expert route 可以使用不同的 solver、controller 或 policy。
 
-### Stage 2 — Data / Learning / Simulation Evaluation
+### Stage 2 — 数据、学习与仿真评估
 
-Core must support:
+Core 必须支持：
 
-```text
-Frozen Task Artifact
-   -> expert dataset generation
-   -> recorder/replay/data checks
-   -> baseline learner integration
+~~~text
+冻结的 Task Artifact
+   -> expert dataset 生成
+   -> recorder/replay/data check
+   -> baseline learner 集成
    -> runner(env, policy)
-   -> closed-loop simulation evaluation
+   -> closed-loop 仿真评估
    -> evaluation report
    -> Judge decision
    -> Experiment Evidence
-```
+~~~
 
-## 3. Public API capability groups
+## 3. 公共 API 能力组
 
-Exact Python class/function names may evolve. The capability groups below are normative.
+具体 Python class/function 名称可以演进，以下能力组属于规范要求。
 
-### 3.1 Construction APIs
+### 3.1 构造 API
 
-- create/load robot embodiment;
-- create/import task-local assets;
-- compose scene/environment;
-- define task semantics;
-- define reset/randomization contract;
-- select runtime/provider profile;
-- define observations and actions.
+- 创建/加载 robot embodiment；
+- 创建/导入 task-local asset；
+- 组合 scene/environment；
+- 定义 task semantics；
+- 定义 reset/randomization contract；
+- 选择 runtime/provider profile；
+- 定义 observation 与 action。
 
-### 3.2 Task semantics APIs
+### 3.2 Task semantics API
 
-- success/failure;
-- reward/metrics;
-- termination/truncation;
-- reset parameters;
-- task-level evaluation contract;
-- state/privileged-state/camera observation requirements.
+- success/failure；
+- reward/metric；
+- termination/truncation；
+- reset parameter；
+- task-level evaluation contract；
+- state/privileged-state/camera observation requirement。
 
-### 3.3 Controller/action APIs
+### 3.3 Controller/action API
 
-Manipulation already has action/control conversions such as:
+Manipulation 已有如下 action/control conversion：
 
-- `absolute_pose` in world/base frames;
-- `delta_pose` in EE/world frames;
-- `absolute_joint`;
-- trajectory conversion and replay validation.
+- world/base frame 下的 absolute_pose；
+- EE/world frame 下的 delta_pose；
+- absolute_joint；
+- trajectory conversion 与 replay validation。
 
-Rules:
+规则：
 
-- public/default robot controllers may be registered in Core;
-- unsupported robot-specific controllers may begin as task-private Task Artifact implementation;
-- validated reusable controllers may later be promoted to Core;
-- locomotion is not forced through manipulation controller conversion.
+- 公共/默认 robot controller 可以注册在 Core；
+- 不受支持的 robot-specific controller 可以先作为 Task Artifact 私有实现；
+- 通过验证的可复用 controller 之后可以提升到 Core；
+- locomotion 不强制经过 manipulation controller conversion。
 
-### 3.4 Planning / expert-route APIs
+### 3.4 Planning / expert-route API
 
-Core provides documented entry points for expert-route execution and provenance.
+Core 为 expert-route execution 与 provenance 提供有文档的入口。
 
-Current manipulation reference:
+当前 manipulation 参考路线：
 
-```text
+~~~text
 IK -> trajectory optimizer -> controller/action conversion -> executable rollout
-```
+~~~
 
-Core must preserve the distinction between:
+Core 必须区分：
 
-- task feasibility evidence;
-- current expert solver success/failure.
+- task feasibility Evidence；
+- 当前 expert solver 的成功或失败。
 
-A solver failure is not automatically labeled task infeasibility.
+Solver 失败不能自动标记为任务不可行。
 
-### 3.5 Validator APIs
+### 3.5 Validator API
 
-Automatic validation includes, at minimum:
+Automatic validation 至少包括：
 
-- config/schema validity;
-- asset/reference validity;
-- runtime/provider capability admission;
-- reset/initial-state validity;
-- controller/action compatibility;
-- observation contract validity;
-- finite/sanity checks required before expert rollout.
+- config/schema 有效性；
+- asset/reference 有效性；
+- runtime/provider capability admission；
+- reset/initial-state 有效性；
+- controller/action 兼容性；
+- observation contract 有效性；
+- expert rollout 前所需的 finite/sanity check。
 
-### 3.6 Recorder / replay APIs
+### 3.6 Recorder / replay API
 
-Reuse and stabilize the existing recording infrastructure rather than replacing it.
+应复用并稳定现有 recording infrastructure，而不是替换它。
 
-Core must support:
+Core 必须支持：
 
-- transition/trajectory recording;
-- vector provenance where applicable;
-- H5 or equivalent canonical dataset representation;
-- replay;
-- action/observation metadata;
-- trajectory/video references for Evidence.
+- transition/trajectory recording；
+- 适用时记录 vector provenance；
+- H5 或等效的 canonical dataset representation；
+- replay；
+- action/observation metadata；
+- Evidence 所需的 trajectory/video reference。
 
-Each major reference task must eventually have a collection -> save -> load -> replay oracle.
+每个主要参考任务最终都必须具备 collection -> save -> load -> replay oracle。
 
-### 3.7 Learning integration
+### 3.7 Learning 集成
 
-Baseline imitation-learning algorithms live in the existing `agent_factory` library.
+Baseline imitation-learning algorithm 位于现有 agent_factory 库中。
 
-Core owns:
+Core 负责：
 
-- learner integration/adapters;
-- training configuration binding;
-- dataset/policy provenance;
-- evaluation invocation;
-- Experiment integration.
+- learner integration/adapter；
+- training configuration binding；
+- dataset/policy provenance；
+- evaluation invocation；
+- Experiment 集成。
 
-Core does **not** need to duplicate algorithm implementation from `agent_factory`.
+Core 不需要复制 agent_factory 的算法实现。
 
-First manipulation learning route:
+首条 manipulation learning route：
 
-1. oracle/state route: `state + privileged_state`;
-2. visuomotor route: `RGB + proprioception`.
+1. oracle/state route：state + privileged_state；
+2. visuomotor route：RGB + proprioception。
 
-Diffusion Policy is the primary initial IL route; Flow Matching may be supported as another reference route through `agent_factory`.
+Diffusion Policy 是初始主要 IL 路线；Flow Matching 可以通过 agent_factory 作为另一条参考路线。
 
-Locomotion remains an RL route and may use the existing Go2/RSL reference path.
+Locomotion 仍是 RL 路线，可以使用现有 Go2/RSL 参考路径。
 
 ### 3.8 Runner API
 
-`runner(env, policy)` is the common rollout executor.
+runner(env, policy) 是公共 rollout executor。
 
-Expected usage is conceptually:
+概念用法：
 
-```python
+~~~python
 runner = Runner(env=env, policy=policy, ...)
 result = runner.run()
-```
+~~~
 
-Runner unifies **closed-loop rollout execution**, not learning algorithms.
+Runner 统一的是 closed-loop rollout execution，而不是 learning algorithm。
 
-Runner must depend on stable environment and policy contracts rather than on GeoPhys/Taichi/robot-SDK internals.
+Runner 必须依赖稳定的 environment 与 policy contract，不得依赖 GeoPhys/Taichi/robot-SDK 内部实现。
 
-Long-term target:
+长期目标：
 
-```text
+~~~text
 SimulationEnv -> GeoPhys/MuJoCo/... provider
 RealRobotEnv  -> robot SDK
-                  
-Both satisfy the Geochora environment contract used by Runner.
-```
 
-Real-robot deployment is not required for the first milestone.
+二者都满足 Runner 使用的 Geochora environment contract。
+~~~
 
-### 3.9 Evaluation and reporting APIs
+首个 milestone 不要求 real-robot deployment。
 
-Core owns structured evaluation execution and report production.
+### 3.9 Evaluation 与 reporting API
 
-Core produces facts; Judge produces acceptance decisions.
+Core 负责结构化 evaluation execution 与 report production。
 
-Required split:
+Core 产生事实；Judge 产生验收决策。
 
-```text
-evaluation_report.json / report.md   # facts and metrics
-judge_decision.yaml                  # approve/reject + reasons + required changes
-```
+必须分离：
 
-### 3.10 Rendering and UI presentation APIs
+~~~text
+evaluation_report.json / report.md   # 事实与 metric
+judge_decision.yaml                  # approve/reject + 原因 + 必需修改
+~~~
 
-Core owns provider-neutral contracts for:
+### 3.10 Rendering 与 UI presentation API
 
-- camera and render requests;
-- frame and presentation metadata;
-- viewports and overlays;
-- interaction events needed by UI clients;
-- renderer capability reporting and fail-closed admission.
+Core 负责以下 provider-neutral contract：
 
-Core does not require one desktop toolkit, browser stack, or renderer. OpenUSD is a candidate future interchange/composition layer, not a committed canonical format.
+- camera 与 render request；
+- frame 与 presentation metadata；
+- viewport 与 overlay；
+- UI client 所需的 interaction event；
+- renderer capability reporting 与 fail-closed admission。
 
-## 4. Experiment Evidence construction skill documentation
+Core 不要求特定桌面 toolkit、browser stack 或 renderer。OpenUSD 是未来 interchange/composition 层候选方案，尚不是确定的 canonical format。
 
-In addition to the public API documentation, `task_env` must include an internal skill/how-to document that explicitly teaches an Agent or Codex:
+## 4. Experiment Evidence 构造 Skill 文档
 
-- where Task Artifacts are created;
-- where Experiments are created;
-- how a frozen Task Artifact is referenced;
-- how to record trajectories and videos;
-- how to store external dataset/checkpoint references;
-- how to create `evaluation_report.json` and `report.md`;
-- how to create/consume `judge_decision.yaml`;
-- how to finalize `evidence.json`;
-- which artifacts are eligible for cleanup/archive;
-- which facts an external consumer such as PhysPi needs for durable experience.
+除公共 API 文档之外，task_env 还必须包含一份内部 Skill/how-to 文档，明确教会 Agent 或 Codex：
 
-This document is an operational skill for using Core; it is not PhysPi's experience or Skill-distillation implementation.
+- 在何处创建 Task Artifact；
+- 在何处创建 Experiment；
+- 如何引用冻结的 Task Artifact；
+- 如何记录 trajectory 与 video；
+- 如何保存外部 dataset/checkpoint reference；
+- 如何创建 evaluation_report.json 和 report.md；
+- 如何创建/消费 judge_decision.yaml；
+- 如何完成 evidence.json；
+- 哪些 artifact 可以 cleanup/archive；
+- PhysPi 等外部消费方需要保留哪些事实，才能形成持久经验。
 
-## 5. Provider scope
+这是一份使用 Core 的操作 Skill，不是 PhysPi 的经验或 Skill-distillation 实现。
 
-### First milestone
+## 5. Provider 范围
 
-- physics: GeoPhys;
-- renderer on Linux: GeoPhys default renderer;
-- Flora: provider integration later/when platform allows;
-- MuJoCo/SAPIEN: future provider adapters.
-- OpenUSD: candidate scene interchange/composition integration; not required.
+### 首个 milestone
 
-Do not create a UniversalSolver abstraction. Maintain Runtime Port/provider boundaries and capability admission.
+- physics：GeoPhys；
+- Linux renderer：GeoPhys 默认 renderer；
+- Flora：平台条件允许时再进行 provider 集成；
+- MuJoCo/SAPIEN：未来 provider adapter；
+- OpenUSD：scene interchange/composition 候选集成，不是必选项。
 
-## 6. Reference paths
+不得创建 UniversalSolver abstraction。应维持 Runtime Port/provider 边界与 capability admission。
 
-### Primary qualification route
+## 6. 参考路径
 
-Manipulation / IL:
+### 主要资格验证路线
 
-```text
-PickCube -> NutAssembly -> agent-generated similar unseen manipulation task
-```
+Manipulation / IL：
 
-### Regression/reference route
+~~~text
+PickCube -> NutAssembly -> Agent 生成的相似但未见过的 manipulation task
+~~~
 
-Locomotion / RL:
+### Regression/reference 路线
 
-```text
+Locomotion / RL：
+
+~~~text
 Go2 walk / RSL
-```
+~~~
 
-These reference paths qualify Core contracts and providers; they do not define Geochora's complete product boundary. The Core must preserve the existing qualified Go2 route while expanding manipulation capability.
+这些参考路径用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。Core 在扩展 manipulation capability 时，必须保留现有已资格化的 Go2 路线。
 
-## 7. Explicit non-goals for first milestone
+## 7. 首个 milestone 的明确非目标
 
-- PhysPi memory, experience, or Skill implementation;
-- automatic Skill distillation in Geochora;
-- automatic Core patch generation or recursive self-improvement;
-- mandatory OpenUSD adoption;
-- soft-body tasks;
-- phone-video-to-digital-twin;
-- 3DGS real-to-sim-to-real;
-- large-scale VLA/WAM training;
-- mandatory real-robot deployment;
-- immediate MuJoCo/SAPIEN/Flora full support.
-- a repository-wide claim of complete real -> sim -> policy -> real support.
+- PhysPi memory、experience 或 Skill 实现；
+- 在 Geochora 内自动提炼 Skill；
+- 自动生成 Core patch 或递归自我改进；
+- 强制采用 OpenUSD；
+- soft-body task；
+- phone-video-to-digital-twin；
+- 3DGS real-to-sim-to-real；
+- 大规模 VLA/WAM 训练；
+- 强制 real-robot deployment；
+- 立即完整支持 MuJoCo/SAPIEN/Flora；
+- 对完整 real -> sim -> policy -> real 支持作出仓库级声明。

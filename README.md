@@ -270,6 +270,10 @@ Geochora 后续可以位于 PhysPi 项目的路径下供其调用，但目录位
 | Core API 与能力范围 | [`docs/module/task_env/02-core-api-and-capability-scope.md`](docs/module/task_env/02-core-api-and-capability-scope.md) |
 | Task Artifact、Experiment、Evidence 契约 | [`docs/module/task_env/03-task-artifact-experiment-evidence-contract.md`](docs/module/task_env/03-task-artifact-experiment-evidence-contract.md) |
 | Core 资格验证与治理 | [`docs/module/task_env/04-core-qualification-and-governance.md`](docs/module/task_env/04-core-qualification-and-governance.md) |
+| Phase I 多仿真器实施蓝图（proposed） | [`docs/module/task_env/05-phase-1-multi-simulator-blueprint.md`](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) |
+| Phase I contract 与 provider 边界（proposed） | [`docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md`](docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md) |
+| Phase I smoke 与验收规范（proposed） | [`docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md`](docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md) |
+| Phase I 调试与恢复手册（proposed） | [`docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md`](docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md) |
 | TaskEnv API、脚本和 quickstart | [`task_env/README.md`](task_env/README.md) |
 | GeoPhys provider | [`GeoPhys/README.md`](GeoPhys/README.md) |
 
