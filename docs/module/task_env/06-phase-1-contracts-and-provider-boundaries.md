@@ -1,9 +1,10 @@
 # Geochora Phase I Contract 与 Provider 边界
 
-> 状态：proposed Phase I contract specification，v0.1
+> 状态：active Phase-I contract specification，v0.2
 > 日期：2026-10-04
 > 范围：定义 Phase I 多仿真器实施蓝图所需的最小 provider-neutral contract。
 > 相关文档：05-phase-1-multi-simulator-blueprint.md
+> 权威关系：作为 Phase-I 实施计划采纳，从属于 [系统架构基准](../../global/00-system-architecture-anchor.md)、[仓库所有权](../../global/01-repository-ownership-and-boundaries.md) 与 canonical TaskEnv contract。active 表示文档用于指导实施，不表示 capability 已实现、测试通过、qualified 或任何子阶段已获准。
 
 ## 1. 设计原则
 
@@ -203,9 +204,10 @@ tested
 qualified
 planned
 unsupported
+unknown
 ~~~
 
-Config enum 或可 import dependency 不能证明 capability 已资格化。
+这些词使用 [仓库 Capability 与 Evidence 治理](../../global/01-repository-ownership-and-boundaries.md#5-capability-与-evidence-治理) 的定义。Config enum 或可 import dependency 不能证明 capability 已资格化；安装 MuJoCo package 也不证明统一 provider 已 implemented。
 
 ## 5. ResetSample 与 EvaluationSampleSet
 

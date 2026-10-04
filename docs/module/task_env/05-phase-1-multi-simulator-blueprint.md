@@ -1,9 +1,9 @@
 # Geochora Phase I 多仿真器实施蓝图
 
-> 状态：proposed 实施蓝图，v0.1
+> 状态：active Phase-I 实施蓝图，v0.2
 > 日期：2026-10-04
 > 范围：定义 Phase I 多仿真器资格验证的实施顺序、阶段 gate、Evidence 位置和完成标准。
-> 权威关系：从属于 docs/global/00-system-architecture-anchor.md、docs/global/01-repository-ownership-and-boundaries.md 和 canonical TaskEnv contract。正式采纳后，必须显式更新旧 module 文档中与其冲突的首个 milestone 表述。
+> 权威关系：作为 Phase-I 实施计划采纳，从属于 [系统架构基准](../../global/00-system-architecture-anchor.md)、[仓库所有权](../../global/01-repository-ownership-and-boundaries.md) 与 canonical TaskEnv contract。active 表示文档用于指导实施，不表示 capability 已实现、测试通过、qualified 或任何子阶段已获准。
 
 ## 1. 目的
 
@@ -23,13 +23,13 @@ Phase I 目标：
     -> machine-readable qualification Evidence
 ~~~
 
-Phase I 使用：
+Phase I 实施目标（provider 角色为 planned，不是当前 capability claim）：
 
 - 主要 physics provider：GeoPhys 与 MuJoCo。
 - 边界验证 physics provider：SAPIEN 与 Genesis。
 - 主要 manipulation task：PickCube。
 - 精密/contact regression task：NutAssemblySquare。
-- 必须保持可用的 regression route：适用时保留已资格化的 Go2/RSL 路线。
+- 必须保护的 regression route：Go2 CUDA/static/RSL 历史路线；current-HEAD qualification 在 P1.0 baseline 中重新确认。
 
 Phase I 不要求 PhysPi。人类开发者或 Codex 必须能够通过 Geochora 公共 API、已记录的 Skills、Task Artifact、Experiment 与 Evidence 执行该路线。
 
@@ -184,15 +184,17 @@ Experiment Evidence + Phase Qualification
 
 ## 5. 实施子阶段
 
-Phase I 分为九个实施子阶段。每个子阶段都应独立审查，并在下一阶段成为权威工作前留下事实性 acceptance record。
+Phase I 的正式 architecture/implementation subphase 为 P1.0–P1.8，共九个。每个子阶段都应独立审查，并在下一阶段成为权威工作前留下自己的 acceptance package。
 
 ### P1.0 — 冻结 baseline 并采纳计划
 
 目标：在改变 provider 边界前冻结当前仓库与 Evidence baseline。
 
+推荐 operator workflow：audit → documentation adoption → baseline smoke → evidence freeze。P1.0-A/B/C/D 仅是这一流程的执行 checkpoint，不新增正式 architecture subphase；文档采纳不能替代 baseline smoke 或授权进入 P1.1。
+
 工作：
 
-- 记录起始 Git commit 与当前已资格化路线；
+- 记录起始 Git commit、历史 Evidence 路线与待重新确认的 current-HEAD qualification；
 - 记录 PickCube/NutAssembly 当前实现状态；
 - 记录不得破坏的 Go2/RSL regression route；
 - 采纳 Phase I 文档；
@@ -457,7 +459,7 @@ Evidence：workspace/qualification/phase1/p1_8_closure/
 
 Phase-level implementation Evidence 不得提交到 docs/，而应放在 workspace/qualification/phase1/，并引用而非复制 task/experiment Evidence。
 
-推荐布局：
+推荐布局（每个目录均有自己的 acceptance package）：
 
 ~~~text
 workspace/qualification/phase1/
@@ -470,13 +472,15 @@ workspace/qualification/phase1/
 ├── p1_6_state_policy/
 ├── p1_7_visuomotor/
 └── p1_8_closure/
-    ├── acceptance_report.md
-    ├── acceptance.json
-    ├── phase_decision.yaml
-    ├── smoke/
-    ├── qualification/
-    ├── failures/
-    └── refs/
+
+每个 <subphase>/（p1_0_baseline 至 p1_8_closure）内部：
+├── acceptance_report.md
+├── acceptance.json
+├── phase_decision.yaml
+├── smoke/
+├── qualification/
+├── failures/
+└── refs/
 ~~~
 
 每个子阶段：
@@ -562,19 +566,21 @@ Phase I 的每个 code change 必须指出：
 
 Provider-private workaround、静默放宽 tolerance 或隐藏的 task-specific branch 都不是可接受恢复方式。
 
-## 10. 采纳时必须同步更新
+## 10. 文档采纳与能力状态
 
-当前 canonical 文档早于此次 Phase-I 扩展。本蓝图被采纳为 active work 后，必须更新旧 canonical 页面，不能保留相互矛盾的权威来源。
+本蓝图与 06–08 作为 active Phase-I 实施文档采纳；其要求是后续实施与验收目标，不是当前 capability Evidence。Canonical 00/01/02/04 已对齐目标范围、所有权、当前 implementation 和 qualification 边界。
 
-至少审查：
+权威分工：
 
 - docs/global/00-system-architecture-anchor.md：
-  - roadmap 应指出 Phase I 是 active multi-simulator qualification；
-  - GeoPhys/MuJoCo 的主要角色和 SAPIEN/Genesis 的边界角色，在资格化之前必须标记为 planned。
+  - roadmap 定义 active multi-simulator 实施目标；
+  - GeoPhys/MuJoCo 的主要角色和 SAPIEN/Genesis 的边界角色是 planned，不授予 capability status。
+- docs/global/01-repository-ownership-and-boundaries.md：
+  - 定义 capability 词义与具名 qualification intersection。
 - docs/module/task_env/02-core-api-and-capability-scope.md：
-  - 现有“首个 milestone”仍将 physics 描述为仅 GeoPhys，将 MuJoCo/SAPIEN 描述为未来；
-  - 关于不立即支持 MuJoCo/SAPIEN 的非目标必须与已采纳的 Phase-I scope 对齐。
+  - 区分 required canonical capability 与当前 implementation；
+  - 当前 scalar GeoPhys materialization、batch 内部 route 和 MuJoCo oracle/probe 不等于统一 multi-provider execution。
 - docs/module/task_env/04-core-qualification-and-governance.md：
-  - 增加 Phase-I provider conformance ladder，并链接本蓝图。
+  - 定义 Phase-I qualification ladder、S0–S4 映射及历史/current-HEAD provenance 要求。
 
 不得改写历史 Evidence 来暗示这些 capability 已存在。在某个子阶段通过前，应按实际情况标记为 planned 或 implemented/tested but not qualified。

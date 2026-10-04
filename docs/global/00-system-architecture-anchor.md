@@ -1,7 +1,7 @@
 # Geochora 系统架构基准
 
-> 状态：canonical 架构基准，v0.2
-> 日期：2026-10-01
+> 状态：canonical 架构基准，v0.3
+> 日期：2026-10-04
 > 范围：定义其他 Geochora 文档必须遵循的稳定系统级概念、所有权边界和生命周期。
 
 ## 1. Geochora 是什么
@@ -40,22 +40,24 @@ Geochora Core
    |-- Experiment、记录、回放、评估与 Evidence
    |-- 统一 render 与 UI presentation contract
    |
-   +-- physics/runtime provider --> 当前为 GeoPhys；未来包括 MuJoCo、SAPIEN 等
+   +-- physics/runtime provider --> 当前实现为 GeoPhys；Phase-I 目标见第 10 节
    +-- render provider          --> 当前为 GeoPhys；Flora 等在资格验证后接入
    +-- asset resolver           --> 任务局部和可复用资产库
    +-- planner/controller       --> provider-neutral 集成
-   +-- learner/policy           --> agent_factory 或其他已资格化集成
+   +-- learner/policy           --> learner 集成边界；具体实现和资格状态见 Core 范围
    +-- 可选交换层               --> OpenUSD 候选方案；尚未成为确定依赖
 ~~~
 
-图片 docs/figures/整体架构.png 展示了更广泛的产品上下文。其中的 Agent 和 Part B 属于 PhysPi 或其他外部消费方，而不属于 Geochora Core。如果旧图片与本文冲突，以本 v0.2 架构基准为准。
+图片 docs/figures/整体架构.png 展示了更广泛的产品上下文。其中的 Agent 和 Part B 属于 PhysPi 或其他外部消费方，而不属于 Geochora Core。如果旧图片与本文冲突，以本 canonical 架构基准为准。
+
+此图表达规范所有权，不表示所有能力均已实现。当前 scalar production materialization 仍绑定 GeoPhys；统一 Task Artifact schema、Validator、Runner 和多 provider materialization 等实现边界见 [Core API 与能力范围](../module/task_env/02-core-api-and-capability-scope.md)。
 
 ## 3. PhysPi 边界
 
 PhysPi 可以利用积累的经验选择 Geochora 工具、组合 Task Artifact、诊断失败、安全重试并解释 Evidence。依赖方向是单向的：
 
 ~~~text
-PhysPi -> Geochora 公共 API -> 已资格化 provider
+PhysPi -> Geochora 公共 API -> provider 公共 API
 ~~~
 
 Geochora 不得导入 PhysPi 内部实现，也不得依赖特定的记忆、prompt、模型或 Skill 实现。通过这一边界，较强模型建立的已验证流程可以经由受审查的 PhysPi 经验和稳定的 Geochora 接口，帮助较弱模型达到可比的验收质量。
@@ -77,7 +79,7 @@ Core 负责跨任务复用所需的 contract 和生命周期：
 - render frame、camera、viewport、overlay 和面向 UI 的 presentation contract；
 - 支撑公共能力声明的资格验证与回归 Evidence。
 
-provider 特定代码必须留在 adapter 后方。任务可以请求某项 capability，但不得访问 provider 私有的 scene、physics 或 renderer 状态。
+provider 特定代码必须留在 adapter 后方。任务可以请求某项 capability，但不得访问 provider 私有的 scene、physics 或 renderer 状态。不得创建 UniversalSolver abstraction；physics provider 与 render provider 保持独立边界。
 
 ## 5. Rendering、UI 与 OpenUSD
 
@@ -105,14 +107,14 @@ Canonical 生命周期如下：
 需求
   -> 构造 Task Artifact
   -> 验证 schema 和请求的 capability
-  -> 实例化已资格化 provider
+  -> 实例化获准的 provider/runtime intersection
   -> 执行 controller、planner、expert 或 policy route
   -> 记录 observation、action、event、metric 与 provenance
   -> 根据验收标准进行 Judge
   -> 冻结 Experiment Evidence
 ~~~
 
-Evidence 必须区分 implemented、tested、qualified、planned 和 aspirational。一个参考任务通过，并不能证明某个 provider、机器人、scene format 或真实世界迁移路线已经获得通用支持。
+Evidence 必须区分 implemented、tested、qualified、planned 和 unsupported/unknown，含义以 [Capability 与 Evidence 治理](01-repository-ownership-and-boundaries.md#5-capability-与-evidence-治理) 为准。资格声明必须绑定 provider × backend/profile × task × lifecycle；一个参考任务通过，不能证明整个 provider 或其他路线已获得通用支持。
 
 ## 9. 受治理的演进，而非当前 RSI
 
@@ -129,12 +131,15 @@ Evidence 经审查后可以沉淀为：
 
 ## 10. Roadmap 优先级
 
-当前优先级：
+当前 roadmap 采纳 [Phase I 多仿真器实施蓝图](../module/task_env/05-phase-1-multi-simulator-blueprint.md)：
 
-1. 为多仿真器执行和多渲染器展示建立可靠的公共 contract；
-2. 对 GeoPhys 路线和参考任务进行端到端资格验证；
-3. 使 Evidence 与 capability claim 可复现；
-4. 维持严格的 provider 边界，以便接纳更多 backend。
+- Primary target：GeoPhys、MuJoCo。
+- Boundary-validation target：SAPIEN、Genesis。
+- PickCube 为主要 manipulation route，NutAssemblySquare 为 precision/contact regression；保留 Go2 CUDA/static/RSL 的历史 regression route，并在 P1.0 baseline smoke 中重新确认 current-HEAD 状态。
+
+这些 provider 角色是当前实施目标（planned），不是 capability acceptance。GeoPhys 是当前/default implementation provider；MuJoCo 目前仅有独立 oracle/probe，尚非统一 Task Artifact 的 production provider；SAPIEN/Genesis 也不能因计划采纳被称为 implemented、tested 或 qualified。
+
+实施优先级是冻结可信 baseline，建立 provider-neutral contract，逐步执行 conformance、expert/replay 和 policy route，并以完整 provenance 的 Evidence 验收具名 intersection。文档采纳本身不产生 runtime qualification。
 
 后续优先事项包括更多 simulator/render provider、更完善的 UI client、更丰富的资产、learning integration，以及对 OpenUSD 作出决策。
 

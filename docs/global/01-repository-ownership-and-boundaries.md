@@ -1,11 +1,13 @@
 # Geochora 仓库所有权与边界
 
-> 状态：canonical 所有权 contract，v0.2
-> 日期：2026-10-01
+> 状态：canonical 所有权 contract，v0.3
+> 日期：2026-10-04
 
 ## 1. 仓库意图
 
 本仓库是 Geochora 的 canonical owner。Geochora 是可复用的多仿真器、多渲染器具身任务 API 与工具中枢。
+
+Canonical repository 为 [Lebingelee/GeoChora](https://github.com/Lebingelee/GeoChora)，canonical branch 为 `main`。P1.0-A 审查的起始 HEAD 为 `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`；本地 checkout 的工作分支名不定义 canonical branch。
 
 历史任务环境代码和文档可能起源于其他项目的分支。它们只构成迁移背景，不再具有持续的架构权威。Geochora Core 或 task_env 不得存在两份同时主动维护的 canonical 副本。
 
@@ -72,7 +74,11 @@ OpenUSD 以后可能用于 scene interchange、composition 或 visualization。�
 
 ### 3.4 Providers
 
-GeoPhys 是当前已资格化的 physics/runtime provider 和默认 rendering provider。MuJoCo、SAPIEN、Flora 等其他 provider 必须通过明确的 adapter 和 capability declaration 接入。
+GeoPhys 是当前/default implementation physics/runtime provider，并提供默认 rendering 路径。Qualification 必须绑定到有 Evidence 的 provider × backend/profile × task × lifecycle intersection，不能对整个 provider 作无范围的资格声明。
+
+Go2 CUDA/static/RSL 是历史 Evidence 最强的具名 regression route；其 current-HEAD qualification 仍需在 P1.0 baseline smoke 中重新确认，不能外推到 PickCube、NutAssembly 或其他 GeoPhys 路线。
+
+Phase-I primary target 为 GeoPhys/MuJoCo，boundary-validation target 为 SAPIEN/Genesis。这些目标不构成实现或资格证明；MuJoCo 当前独立 oracle/probe 也不等于统一 production provider。其他 simulator/render provider（包括 Flora）须经明确 adapter、capability declaration 和具名 acceptance route 接入。Physics 与 render provider 始终是不同边界。
 
 Core 和 task 代码可以依赖 provider 公共 API，但不得依赖 provider 私有内部实现、可变 singleton state 或未声明的 backend 特定行为。
 
@@ -104,9 +110,10 @@ Geochora 负责 render frame、camera、viewport、overlay、interaction event �
 Capability claim 必须准确标记：
 
 - implemented：代码已存在；
-- tested：自动检查已覆盖；
-- qualified：约定的验收路线和 Evidence 已通过；
-- planned：仅为设计方向；
+- tested：有测试执行 Evidence；仅有测试代码不构成 tested；
+- qualified：通过已声明 acceptance route，并且 Evidence/provenance 足够；
+- planned：Phase-I 计划目标，但尚未实现或资格化；
+- unsupported/unknown：当前无足够支持或证据；已确认不支持与尚未确认须分别记录；
 - aspirational：尚无确定接口的长期目标。
 
 real -> sim -> policy -> real 支持可以按部分路线逐步获得资格验证，但目前不能作为仓库级完整能力声明。

@@ -1,9 +1,10 @@
 # Geochora Phase I Smoke Testing 与验收
 
-> 状态：proposed test/qualification plan，v0.1
+> 状态：active Phase-I test/qualification plan，v0.2
 > 日期：2026-10-04
 > 范围：定义 Phase I 的成本感知 smoke 选择、smoke record、子阶段 acceptance Evidence 与昂贵 qualification gate。
 > 相关文档：05-phase-1-multi-simulator-blueprint.md、06-phase-1-contracts-and-provider-boundaries.md
+> 权威关系：作为 Phase-I 实施计划采纳，从属于 [系统架构基准](../../global/00-system-architecture-anchor.md)、[仓库所有权](../../global/01-repository-ownership-and-boundaries.md) 与 canonical TaskEnv contract。active 表示文档用于指导实施，不表示 capability 已实现、测试通过、qualified 或任何子阶段已获准。
 
 ## 1. 测试目标
 
@@ -27,6 +28,8 @@ Phase I 测试必须最大化单位运行和工程成本对应的缺陷敏感度
 ## 2. Evidence 层级
 
 必须区分以下层级。
+
+与 canonical Layer A/B/C 的范围映射见 [04 qualification ladder](04-core-qualification-and-governance.md#phase-i-qualification-ladder-与-smoke-映射)。S0–S3 smoke 不等价于 qualification；S4 才是正式 subphase qualification evidence，且 qualified 仍须满足已声明 acceptance route、足够 Evidence/provenance 和独立 decision。
 
 ### S0 — Static/import/schema smoke
 
@@ -215,7 +218,7 @@ One-off diagnostic script 不能仅因为曾有帮助就提升为公共 regressi
 
 ## 7. 子阶段 acceptance package
 
-每个 Phase-I 子阶段必须在 workspace/qualification/phase1/<subphase>/ 下产生：
+P1.0–P1.8 的每个 Phase-I 子阶段都必须在自己的 workspace/qualification/phase1/<subphase>/ 下产生以下 acceptance package，不仅是 p1_8_closure：
 
 ~~~text
 acceptance_report.md
@@ -292,7 +295,9 @@ required_changes:
 
 昂贵项：
 
-- 只运行建立 baseline 所需的最小当前已资格化 regression。
+- 只运行建立 baseline 所需的最小历史 regression route，并重新确认其 current-HEAD 状态；不运行完整训练或 qualification campaign。
+
+历史 Evidence 缺少完整 commit/provider provenance 时不能自动升级为 current-HEAD qualification。缺失的既有 contract subset/detector、baseline failure 与未测试 envelope 必须保留；文档采纳不产生全绿结果。Operator workflow 为 audit → documentation adoption → baseline smoke → evidence freeze；这些是 P1.0 内执行 checkpoint，不是新 architecture subphase。
 
 ### P1.1 contracts
 

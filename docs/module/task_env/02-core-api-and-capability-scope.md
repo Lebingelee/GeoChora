@@ -1,7 +1,7 @@
 # Geochora Core API 与能力范围
 
-> 状态：canonical Core 范围，v0.2
-> 日期：2026-10-01
+> 状态：canonical Core 范围，v0.3
+> 日期：2026-10-04
 
 ## 1. Core 使命
 
@@ -14,6 +14,19 @@
 人类开发者或 Codex 必须能够通过有文档说明的 Core API，手动完成两个阶段。
 
 Core 的首要使命是成为可靠、provider-neutral 的多仿真器执行与多渲染器/UI 展示中枢。LLM 推理和积累的经验属于 PhysPi 或其他外部消费方。
+
+### Required capability 与当前 implementation
+
+本文的“必须支持”及概念 API 定义 required canonical capability，不是 implemented/tested/qualified 声明。能力词义以 [仓库 Capability 与 Evidence 治理](../../global/01-repository-ownership-and-boundaries.md#5-capability-与-evidence-治理) 为准。
+
+经人工审查的 P1.0-A baseline（起始 HEAD `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`）确认：
+
+- Scalar production materialization 仍绑定 GeoPhys。
+- Batch factory 的 `merged_scene`/`static` 是内部 runtime/layout route，不是 GeoPhys/MuJoCo/SAPIEN/Genesis selector。
+- MuJoCo 只有独立 oracle/probe 等路径，尚非统一 Task Artifact 的 production provider；multi-provider materialization 是 planned。
+- Task Artifact/Experiment/Evidence 的规范存在，但统一 Task Artifact schema/loader、Validator、Runner 等尚未形成完整实现。
+- RSL/SB3 learner adapter 和部分 IL script 入口存在；统一 learner integration 及 manipulation IL acceptance 不能据此称为 qualified。
+- PickCube/NutAssembly 尚无完整 current-HEAD manipulation qualification；Go2 CUDA/static/RSL 是历史 Evidence 最强的 regression route，current-HEAD qualification 待 P1.0 baseline smoke 确认。
 
 ## 2. 最小独立能力
 
@@ -36,7 +49,7 @@ Core 必须支持：
    -> 冻结的 Task Artifact
 ~~~
 
-首条 manipulation 参考路线可以使用现有的 IK + trajectory optimizer + controller/action conversion pipeline 生成 expert。
+首条 manipulation 参考路线可复用现有 Cartesian primitive planning、controller 内在线 IK 与 action conversion；通用 trajectory optimizer pipeline 及完整 feasibility acceptance 仍需独立实现/证据。
 
 Expert abstraction 不得固化为 manipulator 特定的 IK 语义；未来 locomotion expert route 可以使用不同的 solver、controller 或 policy。
 
@@ -99,10 +112,10 @@ Manipulation 已有如下 action/control conversion：
 
 Core 为 expert-route execution 与 provenance 提供有文档的入口。
 
-当前 manipulation 参考路线：
+当前 manipulation 实现入口：
 
 ~~~text
-IK -> trajectory optimizer -> controller/action conversion -> executable rollout
+Cartesian primitive planning -> controller/action conversion（含在线 IK）-> executable rollout
 ~~~
 
 Core 必须区分：
@@ -111,6 +124,8 @@ Core 必须区分：
 - 当前 expert solver 的成功或失败。
 
 Solver 失败不能自动标记为任务不可行。
+
+此执行入口不证明 expert qualification；trajectory optimizer 集成属于待验证的规范目标。
 
 ### 3.5 Validator API
 
@@ -123,6 +138,8 @@ Automatic validation 至少包括：
 - controller/action 兼容性；
 - observation contract 有效性；
 - expert rollout 前所需的 finite/sanity check。
+
+上述是统一 Validator 的规范要求。当前校验分散在 config、asset、runtime admission、controller 和 observation 路径中，不能将它们称为已完成并资格化的统一 Validator。
 
 ### 3.6 Recorder / replay API
 
@@ -141,7 +158,7 @@ Core 必须支持：
 
 ### 3.7 Learning 集成
 
-Baseline imitation-learning algorithm 位于现有 agent_factory 库中。
+Baseline imitation-learning 计划通过外部 agent_factory 库集成；当前已有部分 script 调用入口，不构成完整 learner route 的资格证明。
 
 Core 负责：
 
@@ -158,15 +175,15 @@ Core 不需要复制 agent_factory 的算法实现。
 1. oracle/state route：state + privileged_state；
 2. visuomotor route：RGB + proprioception。
 
-Diffusion Policy 是初始主要 IL 路线；Flow Matching 可以通过 agent_factory 作为另一条参考路线。
+Diffusion Policy 是 planned 初始主要 IL 路线；Flow Matching 可以通过 agent_factory 作为另一条参考路线。两者仍需 dataset、learner 和 closed-loop evaluation Evidence。
 
 Locomotion 仍是 RL 路线，可以使用现有 Go2/RSL 参考路径。
 
 ### 3.8 Runner API
 
-runner(env, policy) 是公共 rollout executor。
+runner(env, policy) 是 required 公共 rollout executor；统一实现尚未形成。
 
-概念用法：
+概念用法（不是当前可直接调用的已资格化 API）：
 
 ~~~python
 runner = Runner(env=env, policy=policy, ...)
@@ -174,6 +191,8 @@ result = runner.run()
 ~~~
 
 Runner 统一的是 closed-loop rollout execution，而不是 learning algorithm。
+
+当前 `alg/runner.py` 选择 PPO training route，script 中另有 rollout loop；它们不等于上述通用 Runner 已实现。
 
 Runner 必须依赖稳定的 environment 与 policy contract，不得依赖 GeoPhys/Taichi/robot-SDK 内部实现。
 
@@ -186,7 +205,7 @@ RealRobotEnv  -> robot SDK
 二者都满足 Runner 使用的 Geochora environment contract。
 ~~~
 
-首个 milestone 不要求 real-robot deployment。
+Phase I 不要求 real-robot deployment。
 
 ### 3.9 Evaluation 与 reporting API
 
@@ -232,15 +251,18 @@ Core 不要求特定桌面 toolkit、browser stack 或 renderer。OpenUSD 是未
 
 ## 5. Provider 范围
 
-### 首个 milestone
+### 当前实现与 Phase-I 目标
 
-- physics：GeoPhys；
+- current/default physics implementation：GeoPhys；具体 qualification 绑定具名 intersection；
+- primary Phase-I providers：GeoPhys、MuJoCo；
+- boundary-validation providers：SAPIEN、Genesis；
 - Linux renderer：GeoPhys 默认 renderer；
 - Flora：平台条件允许时再进行 provider 集成；
-- MuJoCo/SAPIEN：未来 provider adapter；
 - OpenUSD：scene interchange/composition 候选集成，不是必选项。
 
 不得创建 UniversalSolver abstraction。应维持 Runtime Port/provider 边界与 capability admission。
+
+Phase-I provider 角色是 planned 实施范围，不代表已 supported。安装 MuJoCo package、存在独立 oracle 或采纳 [05–08 实施文档](05-phase-1-multi-simulator-blueprint.md)，均不能证明统一 provider 已 implemented、tested 或 qualified。Physics provider 与 render provider 保持独立选择与资格边界。
 
 ## 6. 参考路径
 
@@ -260,9 +282,9 @@ Locomotion / RL：
 Go2 walk / RSL
 ~~~
 
-这些参考路径用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。Core 在扩展 manipulation capability 时，必须保留现有已资格化的 Go2 路线。
+这些参考路径用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。Core 在扩展 manipulation capability 时，必须保留 Go2 CUDA/static/RSL 的历史 regression route，并以 current-HEAD Evidence 确认其状态。
 
-## 7. 首个 milestone 的明确非目标
+## 7. Phase I 的明确非目标
 
 - PhysPi memory、experience 或 Skill 实现；
 - 在 Geochora 内自动提炼 Skill；
@@ -273,5 +295,6 @@ Go2 walk / RSL
 - 3DGS real-to-sim-to-real；
 - 大规模 VLA/WAM 训练；
 - 强制 real-robot deployment；
-- 立即完整支持 MuJoCo/SAPIEN/Flora；
+- 在已声明 Phase-I acceptance envelope 外宣称 MuJoCo/SAPIEN/Genesis 的完整支持；
+- 在 SAPIEN/Genesis 上进行完整 policy training，或强制 Flora 集成；
 - 对完整 real -> sim -> policy -> real 支持作出仓库级声明。

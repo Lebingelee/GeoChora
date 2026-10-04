@@ -1,9 +1,10 @@
 # Geochora Phase I 调试与恢复手册
 
-> 状态：proposed diagnostic/recovery playbook，v0.1
+> 状态：active Phase-I diagnostic/recovery playbook，v0.2
 > 日期：2026-10-04
 > 范围：规定 Phase-I 实施或资格验证反复失败时如何处理，特别针对 coding Agent 过度聚焦单个局部 hypothesis 的情况。
 > 相关文档：05-phase-1-multi-simulator-blueprint.md、07-phase-1-smoke-testing-and-acceptance.md
+> 权威关系：作为 Phase-I 实施计划采纳，从属于 [系统架构基准](../../global/00-system-architecture-anchor.md)、[仓库所有权](../../global/01-repository-ownership-and-boundaries.md) 与 canonical TaskEnv contract。active 表示文档用于指导实施，不表示 capability 已实现、测试通过、qualified 或任何子阶段已获准。
 
 ## 1. 目的
 

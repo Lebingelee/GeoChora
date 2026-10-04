@@ -1,7 +1,7 @@
 # Geochora Core 资格验证与治理
 
-> 状态：canonical Core validation policy，v0.2
-> 日期：2026-10-01
+> 状态：canonical Core validation policy，v0.3
+> 日期：2026-10-04
 
 ## 1. 目的
 
@@ -56,6 +56,30 @@ Stage-1 manipulation golden path 还必须包含 randomized feasibility。
 - runner closed-loop smoke；
 - provider capability snapshot/report。
 
+### Phase-I qualification ladder 与 smoke 映射
+
+Phase I 按以下关系积累并审查 Evidence：
+
+~~~text
+API/contract
+ -> conformance microprobe
+ -> golden path
+ -> provider/system regression
+ -> phase qualification
+~~~
+
+Layer A/B/C 描述保护的 contract/route 范围；[07 的 S0–S4](07-phase-1-smoke-testing-and-acceptance.md#2-evidence-层级) 描述 smoke 成本与 acceptance gate，两者不是一一对应关系。
+
+| 本文范围 | targeted smoke | 正式 qualification |
+| --- | --- | --- |
+| Layer A：API/contract | S0 基本 wiring；S1 contract boundary | 相关 contract Evidence 纳入 S4 declared gate |
+| Provider conformance microprobe | S2 最小 provider execution/probe | S4 验收声明的 probe set 与 tolerance |
+| Layer B：golden path | S3 短 expert、record/replay 或 policy route | S4 完整 declared golden path，适用时含 randomized feasibility |
+| Layer C：provider/system regression | 按风险选择 S1–S3 | S4 验收 declared integration/regression envelope |
+| Phase/subphase acceptance | 引用上述 smoke 与 qualification records | S4 subphase qualification Evidence，加独立 phase decision |
+
+S0–S3 smoke 不等价于 qualification；S4 才是正式 subphase qualification evidence。执行 S4 本身也不自动授予 qualified：必须通过已声明 acceptance route，具备足够 Evidence/provenance，并保留独立 Judge/maintainer decision。资格范围始终是 provider × backend/profile × task × lifecycle，不能从一个 intersection 外推到整个 provider。
+
 ## 3. 参考资格验证矩阵
 
 ### 3.1 PickCube — 主要 manipulation MVP
@@ -89,7 +113,7 @@ Stage-1 manipulation golden path 还必须包含 randomized feasibility。
 
 目的：
 
-- 保留当前最强的已资格化 training/runtime 路线；
+- 保留历史 Evidence 最强的 Go2 CUDA/static/RSL training/runtime regression route；
 - 确保 Core refactor 不破坏 device/RSL capability；
 - 作为以后把 locomotion 适配到其他机器人时的参考。
 
@@ -97,15 +121,19 @@ Go2 路线是一项 regression/reference capability，而不是 manipulation 的
 
 ## 4. 当前状态注意事项
 
-2026-09-07 capability audit 确认：
+历史 2026-09-07 capability audit 记录：
 
-- Go2 CUDA/static/RSL 是当前最强的 production/qualification 路线；
+- Go2 CUDA/static/RSL 是当时最强的 production/qualification 路线；
 - Pendulum/TwoWheel 有 host batch Evidence；
 - PickCube/NutAssembly 已有 task semantics，但完整 physics execution path 尚未资格化；
 - recorder/replay infrastructure 已存在，但仍需逐任务完成 collection/save/load/replay oracle；
 - 一个 task/backend 的资格验证不能推广到无关的 task/backend 组合。
 
-Roadmap claim 必须遵守这些 Evidence 边界。
+P1.0-A（起始 HEAD `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`）已通过人工审查；这是 repository/architecture audit，不是 runtime qualification。当前 PickCube/NutAssembly 没有完整 current-HEAD manipulation qualification；Go2 CUDA/static/RSL 的 current-HEAD qualification 必须在 P1.0 baseline 执行中重新确认。
+
+历史 Evidence 若缺少完整 Core commit、provider revision/version 或执行 profile/task/lifecycle provenance，不能自动视为 current-HEAD qualification。保留其原始通过/失败事实及证据限制，不追补虚构 identity，不把历史运行或已安装 dependency 当作当前验收。
+
+Roadmap claim 必须遵守这些 Evidence 边界，implemented/tested/qualified/planned/unsupported/unknown 使用 [仓库治理定义](../../global/01-repository-ownership-and-boundaries.md#5-capability-与-evidence-治理)。
 
 ## 5. Core update gate
 
@@ -135,7 +163,7 @@ Core 有意保持比 task-local artifact 和 PhysPi experience/Skills 更慢的�
 
 ## 6. Provider 集成治理
 
-针对 GeoPhys、Flora 和未来 provider change：
+针对 GeoPhys、Phase-I planned MuJoCo/SAPIEN/Genesis 以及 Flora 等 render provider change：
 
 ### Core 团队定义
 
@@ -169,6 +197,8 @@ Core 不得通过增加私有内部 workaround 来让 provider 通过资格验�
 - artifact/experiment provenance。
 
 Smoke suite 不能证明 policy convergence；convergence/performance evaluation 属于另一 Evidence 层级。
+
+P1.0 baseline 应先运行最小 defect-sensitive detector，再考虑昂贵 workflow。缺失的 contract test、失效的历史 detector 或未执行的 envelope 必须记录为 unsupported/unknown 或 coverage gap；不能以 import/demo 替代后宣布全绿。P1.0 operator checkpoint 与 Evidence 布局见 [05](05-phase-1-multi-simulator-blueprint.md#5-实施子阶段) 和 [07](07-phase-1-smoke-testing-and-acceptance.md#7-子阶段-acceptance-package)。
 
 ## 8. Judge 与 reporting 治理
 
