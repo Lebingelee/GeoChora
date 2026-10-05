@@ -122,13 +122,16 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 | GeoPhys physics/runtime | 当前 canonical provider，持续进行资格验证 |
 | Linux 默认渲染 | GeoPhys 默认 renderer |
 | Flora | provider 接入路径，主要面向 Windows，尚非首个 Core milestone 的主路线 |
-| MuJoCo / SAPIEN physics provider | 后续 adapter 方向 |
+| Phase-I primary physics targets | GeoPhys + MuJoCo（roadmap roles） |
+| Phase-I boundary-validation targets | SAPIEN + Genesis（roadmap roles） |
 | 统一 UI 展示 | provider-neutral 契约方向，具体客户端仍在演进 |
 | OpenUSD | 场景交换、组合与可视化的候选方案，尚未确定为 canonical 格式或必选依赖 |
 
+Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 qualified；具体计划以 [Phase I 蓝图](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) 为准。
+
 能力声明必须以实际执行证据为准。当前 Go2 CUDA/static/RSL 路线是最强的已资格化路径；PickCube 和 NutAssembly 已有任务语义与相关入口，但完整 physics execution、随机化可行性、采集/保存/加载/回放 oracle 仍在完善，不能仅因任务注册或类可导入就宣称端到端支持。
 
-首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及 MuJoCo/SAPIEN/Flora 的完整支持。
+首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 
 完整或部分的 real -> sim -> policy -> real 验收是长期方向；只有在对应接口、provider 路线和证据完成后，才能声明具体能力已经获得资格验证。
 
@@ -270,10 +273,10 @@ Geochora 后续可以位于 PhysPi 项目的路径下供其调用，但目录位
 | Core API 与能力范围 | [`docs/module/task_env/02-core-api-and-capability-scope.md`](docs/module/task_env/02-core-api-and-capability-scope.md) |
 | Task Artifact、Experiment、Evidence 契约 | [`docs/module/task_env/03-task-artifact-experiment-evidence-contract.md`](docs/module/task_env/03-task-artifact-experiment-evidence-contract.md) |
 | Core 资格验证与治理 | [`docs/module/task_env/04-core-qualification-and-governance.md`](docs/module/task_env/04-core-qualification-and-governance.md) |
-| Phase I 多仿真器实施蓝图（proposed） | [`docs/module/task_env/05-phase-1-multi-simulator-blueprint.md`](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) |
-| Phase I contract 与 provider 边界（proposed） | [`docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md`](docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md) |
-| Phase I smoke 与验收规范（proposed） | [`docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md`](docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md) |
-| Phase I 调试与恢复手册（proposed） | [`docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md`](docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md) |
+| Phase I 多仿真器实施蓝图（active plan，非 capability claim） | [`docs/module/task_env/05-phase-1-multi-simulator-blueprint.md`](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) |
+| Phase I contract 与 provider 边界（active plan，非 capability claim） | [`docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md`](docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md) |
+| Phase I smoke 与验收规范（active plan，非 capability claim） | [`docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md`](docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md) |
+| Phase I 调试与恢复手册（active plan，非 capability claim） | [`docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md`](docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md) |
 | TaskEnv API、脚本和 quickstart | [`task_env/README.md`](task_env/README.md) |
 | GeoPhys provider | [`GeoPhys/README.md`](GeoPhys/README.md) |
 
