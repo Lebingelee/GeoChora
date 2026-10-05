@@ -11,8 +11,8 @@ import hashlib
 import json
 import math
 import re
-from types import MappingProxyType
-from typing import get_type_hints, get_origin, get_args
+from types import MappingProxyType, UnionType
+from typing import Union, get_type_hints, get_origin, get_args
 
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.:/-]*\Z")
@@ -22,6 +22,10 @@ CAPABILITY_NAMES = frozenset({
     'depth_camera', 'contact_detection', 'contact_impulse',
 })
 SUPPORTED_STATUSES = frozenset({'implemented', 'tested', 'qualified'})
+# Eight float32 epsilons cover normalization and four-component norm-squared
+# rounding. Adapters normalize before output; this is representation sanity,
+# never a task/physics tolerance. The codec preserves values for roundtrip.
+QUATERNION_NORM_SQ_ATOL = 8 * 2**-23
 
 
 def _name(value: str) -> None:
@@ -41,6 +45,10 @@ def _nonempty(values, label):
 
 def _decode(annotation, value):
     origin, args = get_origin(annotation), get_args(annotation)
+    if origin in (UnionType, Union) and len(args) == 2 and type(None) in args:
+        if value is None:
+            return None
+        return _decode(next(t for t in args if t is not type(None)), value)
     if isinstance(annotation, type) and issubclass(annotation, Contract):
         return value if isinstance(value, annotation) else annotation.from_mapping(value)
     if origin is tuple:
@@ -114,9 +122,8 @@ class PoseWorld(Contract):
     quaternion_wxyz: tuple[float, float, float, float]
 
     def validate(self):
-        # Representation validation, not a physics comparison tolerance.
-        if abs(sum(v * v for v in self.quaternion_wxyz) - 1.0) > 1e-12:
-            raise ValueError('quaternion_wxyz must be unit length')
+        if abs(sum(v * v for v in self.quaternion_wxyz) - 1.0) > QUATERNION_NORM_SQ_ATOL:
+            raise ValueError('quaternion_wxyz must be normalized before canonical output')
 
 
 @dataclass(frozen=True)
@@ -145,13 +152,19 @@ class EntityDefinition(Contract):
 @dataclass(frozen=True)
 class ActionIntent(Contract):
     mode: str
-    reference: str
+    reference: str | None
     rotation_representation: str
     controller_target: str
 
     def validate(self):
         _choice(self.mode, {'absolute_pose', 'delta_pose', 'absolute_joint'}, 'action mode')
-        _choice(self.reference, {'world', 'base'}, 'action reference')
+        # Compatibility source: Core ActionModeSpec.__post_init__.
+        allowed_references = {
+            'absolute_joint': {None},
+            'absolute_pose': {'world', 'base'},
+            'delta_pose': {'world', 'base', 'ee'},
+        }
+        _choice(self.reference, allowed_references[self.mode], 'action reference')
         _choice(self.rotation_representation, {'quaternion_wxyz', 'rotvec', 'none'}, 'rotation')
         if self.mode == 'absolute_joint' and self.rotation_representation != 'none':
             raise ValueError('joint action has no rotation representation')

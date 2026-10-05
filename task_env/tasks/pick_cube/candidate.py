@@ -4,6 +4,7 @@ from ...artifacts import (
     RequiredCapabilitySet, TaskArtifact, Timebase, UniformDimension, WorldDefinition,
 )
 from ...environment.configuration import load_yaml_mapping, overlay_public_env_config
+from ...robots.panda import PandaAgent
 from .assets import (
     CUBE_HALF_SIZE, CUBE_MASS, CUBE_DIAG_INERTIA, CUBE_CONTACT_MARGIN,
     TABLE_TOP_Z, TABLE_HALF_SIZE,
@@ -19,6 +20,10 @@ def build_candidate() -> TaskArtifact:
         PickCubeEnv.default_config(), load_yaml_mapping(PickCubeEnv.default_config_path())
     )
     rt = config.runtime
+    initial_joints = {
+        f'panda-v1/{name}': value
+        for name, value in PandaAgent().initial_state_spec().joint_positions
+    }
     center = tuple(float(v) for v in PickCubeResetSampler.table_center_xy)
     extent = PickCubeResetSampler.half_extent_m
     dimensions = tuple(
@@ -53,8 +58,8 @@ def build_candidate() -> TaskArtifact:
         initialization=InitializationContract(
             schema_version='initialization-v0',
             poses_world={'cube-v1': PoseWorld((center[0], center[1], TABLE_TOP_Z + CUBE_HALF_SIZE + CUBE_CONTACT_MARGIN), (1., 0., 0., 0.))},
-            joint_position={}, randomization=dimensions,
-            inherited_state_policy='preserve_referenced_initial_non_cube_qpos_and_all_qvel_qacc_ctrl_act',
+            joint_position=initial_joints, randomization=dimensions,
+            inherited_state_policy='zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open',
             reset_validity='cube_free_pose_in_declared_xy_envelope_fixed_z_identity_wxyz',
             settle_steps=0,
         ),

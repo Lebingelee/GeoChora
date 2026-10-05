@@ -18,7 +18,7 @@ import time
 from types import SimpleNamespace
 
 from ...artifacts import (
-    CanonicalStateView, CapabilityClaim, CapabilityAdmissionError, ExecutionSpec,
+    ActionIntent, CanonicalStateView, CapabilityClaim, CapabilityAdmissionError, ExecutionSpec,
     PoseWorld, ProviderCapabilityManifest, RequiredCapabilitySet, TaskArtifact, Timebase,
     admit_capabilities,
 )
@@ -150,6 +150,33 @@ def run():
         import yaml
         _assert(TaskArtifact.from_mapping(yaml.safe_load(yaml.safe_dump(mapping))) == candidate)
     check('yaml_roundtrip', 'schema', yaml_roundtrip)
+    def action_references(mode, references, valid):
+        import yaml
+        from ...environment import ActionModeSpec
+        # Build valid Core schemas through its factory, then replace only the
+        # reference: the authoritative validator independently judges each case.
+        from ...environment.config import RobotControllerConfig
+        core = ActionModeSpec.from_controller_config(RobotControllerConfig(
+            kind=mode, reference=None if mode == 'absolute_joint' else 'world'))
+        rotation = 'none' if mode == 'absolute_joint' else 'quaternion_wxyz'
+        for reference in references:
+            construct = lambda: ActionIntent(mode, reference, rotation, 'arm_joint_position_and_gripper')
+            if valid:
+                _assert(replace(core, reference=reference).reference == reference)
+                intent = construct()
+                _assert(ActionIntent.from_mapping(json.loads(json.dumps(intent.to_mapping()))) == intent)
+                _assert(ActionIntent.from_mapping(yaml.safe_load(yaml.safe_dump(intent.to_mapping()))) == intent)
+            else:
+                _reject(construct)
+                _reject(lambda: replace(core, reference=reference))
+    check('absolute_joint_none_reference_pass', 'action', lambda: action_references('absolute_joint', (None,), True))
+    check('absolute_joint_world_base_reference_rejected', 'action', lambda: action_references('absolute_joint', ('world', 'base'), False))
+    check('absolute_pose_world_base_reference_pass', 'action', lambda: action_references('absolute_pose', ('world', 'base'), True))
+    check('absolute_pose_ee_none_reference_rejected', 'action', lambda: action_references('absolute_pose', ('ee', None), False))
+    check('delta_pose_world_base_ee_reference_pass', 'action', lambda: action_references('delta_pose', ('world', 'base', 'ee'), True))
+    check('delta_pose_none_reference_rejected', 'action', lambda: action_references('delta_pose', (None,), False))
+    check('nullable_reference_wrong_type_rejected', 'schema', lambda: _reject(
+        lambda: ActionIntent('absolute_pose', 7, 'quaternion_wxyz', 'arm_joint_position_and_gripper')))
     check('unknown_top_level_rejected', 'schema', lambda: _reject(lambda: TaskArtifact.from_mapping({**mapping, 'typo': 1})))
     def nested_rejections():
         paths = [('world',), ('world', 'entities', 0), ('world', 'action'), ('initialization',),
@@ -211,6 +238,24 @@ def run():
         _reject(lambda: evaluate(replace(state, pose_world={})), contains='missing semantic state')
         _reject(lambda: evaluate(object()))
     check('canonical_state_name_finite_convention_validation', 'canonical_state', state_validation)
+    def quaternion_float32_representation():
+        import numpy as np
+        q = np.asarray((.35, -.2, .3, .8), dtype=np.float32)
+        q /= np.linalg.norm(q)
+        values = tuple(float(v) for v in q)
+        norm_error = abs(sum(v * v for v in values) - 1.)
+        _assert(norm_error > 1e-12, 'fixture must exercise float32 rounding')
+        pose = PoseWorld((0., 0., 0.), values)
+        state = replace(_fixture(), pose_world={CUBE: pose, EEF: pose})
+        _assert(CanonicalStateView.from_mapping(state.to_mapping()) == state)
+        _assert(PoseWorld.from_mapping(json.loads(json.dumps(pose.to_mapping()))) == pose)
+        return {'normalization_dtype': 'float32', 'norm_squared_error': norm_error}
+    check('float32_normalized_quaternion_pass', 'representation', quaternion_float32_representation)
+    def nonunit_quaternions():
+        for q in ((0., 0., 0., 0.), (2., 0., 0., 0.), (1.001, 0., 0., 0.),
+                  (float('nan'), 0., 0., 0.)):
+            _reject(lambda: PoseWorld((0., 0., 0.), q))
+    check('nonunit_quaternion_fail_closed', 'representation', nonunit_quaternions)
     check('provider_free_contract_import', 'import_boundary', lambda: _provider_free('task_env.artifacts'))
     check('provider_free_candidate_import_load', 'import_boundary', lambda: _provider_free('task_env.tasks.pick_cube.candidate'))
     check('fresh_task_env_import', 'import_boundary', lambda: _provider_free('task_env'))
@@ -229,6 +274,21 @@ def run():
         for d in candidate.initialization.randomization:
             _assert(d.training_bounds == d.feasibility_bounds == d.evaluation_bounds == d.hard_bounds)
     check('reset_and_resolved_default_facts', 'candidate', reset_default_facts)
+    def canonical_panda_initialization():
+        from ...robots.panda import PandaAgent
+        expected = {f'panda-v1/{name}': value for name, value in PandaAgent().initial_state_spec().joint_positions}
+        _assert(len(expected) == 9)
+        _assert(dict(candidate.initialization.joint_position) == expected)
+        _assert(set(expected) == candidate.world.joint_names)
+        _assert(candidate.initialization.inherited_state_policy ==
+                'zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open')
+        # Token scan, not substring scan: e.g. 'actuation' is legitimate intent.
+        import re
+        tokens = set(re.findall(r'[A-Za-z]+', json.dumps(candidate.initialization.to_mapping())))
+        _assert(not tokens & {'qpos', 'qvel', 'qacc', 'ctrl', 'act'})
+        return {'named_joint_count': len(expected), 'joint_positions': expected,
+                'initial_velocity_policy': 'zero_named_joint_and_entity_velocities'}
+    check('canonical_panda_initialization', 'initialization', canonical_panda_initialization)
     check('loaded_module_boundary', 'import_boundary', lambda: _assert(not FORBIDDEN & {n.split('.')[0] for n in sys.modules}))
     return {
         'schema': 'geochora.p1_1_contract_smoke.v1',

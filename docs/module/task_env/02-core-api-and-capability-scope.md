@@ -26,7 +26,7 @@ Core 的首要使命是成为可靠、provider-neutral 的多仿真器执行与�
 - MuJoCo 只有独立 oracle/probe 等路径，尚非统一 Task Artifact 的 production provider；multi-provider materialization 是 planned。
 - Task Artifact/Experiment/Evidence 的规范存在。P1.1 新增 `task_env.artifacts` 的 strict TaskArtifact v0 mapping contract skeleton（见 [06](06-phase-1-contracts-and-provider-boundaries.md#14-p11-additive-contract-route)）；production provider materialization、完整 Validator、Runner 与 Experiment/Evidence loader 仍未形成完整统一实现。
 - RSL/SB3 learner adapter 和部分 IL script 入口存在；统一 learner integration 及 manipulation IL acceptance 不能据此称为 qualified。
-- PickCube/NutAssembly 尚无完整 current-HEAD manipulation qualification；Go2 CUDA/static/RSL 是历史 Evidence 最强的 regression route，current-HEAD qualification 待 P1.0 baseline smoke 确认。
+- PickCube/NutAssembly 尚无完整 current-HEAD manipulation qualification；bounded current-HEAD Go2 CUDA/static/RSL regression 已在 P1.0 重新测试，没有因此产生新的 qualified intersection（qualified_intersections = []）。
 
 ## 2. 最小独立能力
 

@@ -119,7 +119,7 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 
 | 能力 | 当前状态 |
 | --- | --- |
-| GeoPhys physics/runtime | 当前 canonical provider，持续进行资格验证 |
+| GeoPhys physics/runtime | current/default physics implementation provider；qualification 绑定具体 intersection |
 | Linux 默认渲染 | GeoPhys 默认 renderer |
 | Flora | provider 接入路径，主要面向 Windows，尚非首个 Core milestone 的主路线 |
 | Phase-I primary physics targets | GeoPhys + MuJoCo（roadmap roles） |
@@ -129,7 +129,7 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 
 Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 qualified；具体计划以 [Phase I 蓝图](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) 为准。
 
-能力声明必须以实际执行证据为准。当前 Go2 CUDA/static/RSL 路线是最强的已资格化路径；PickCube 和 NutAssembly 已有任务语义与相关入口，但完整 physics execution、随机化可行性、采集/保存/加载/回放 oracle 仍在完善，不能仅因任务注册或类可导入就宣称端到端支持。
+能力声明必须以实际执行证据为准。Go2 CUDA/static/RSL 是当前最强的 current-HEAD tested regression route；P1.0 bounded evidence 未将其提升为 formal qualification；PickCube 和 NutAssembly 已有任务语义与相关入口，但完整 physics execution、随机化可行性、采集/保存/加载/回放 oracle 仍在完善，不能仅因任务注册或类可导入就宣称端到端支持。
 
 首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 
