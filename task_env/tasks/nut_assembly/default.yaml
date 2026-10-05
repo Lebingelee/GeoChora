@@ -7,10 +7,8 @@ observation:
 episode:
   horizon: 1000
 runtime:
-  # NutAssembly combines Panda generalized joints with a free nut.  Keep the
-  # main-branch mixed row-PGS route out of this task until its trajectory
-  # semantics are qualified; this is an explicit task-owned safe backend.
-  rigid_solver_backend: soft_efc
+  # Use the mixed articulated/free row-PGS route as the task default.
+  rigid_solver_backend: row_pgs
 robot:
   controller:
     kind: delta_pose
