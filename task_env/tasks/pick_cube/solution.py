@@ -20,7 +20,10 @@ from .assets import CUBE_HALF_SIZE
 
 
 _ABOVE_CLEARANCE = 0.12
-_DESCEND_DISTANCE = 0.13
+# Nominal EE-site clearance above the cube top for this PickCube expert.
+# The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
+# 20 mm leaves a small geometry margin, not contact-precision qualification.
+_GRASP_CLEARANCE_ABOVE_CUBE_TOP = 0.020
 _LIFT_DISTANCE = 0.16
 _COLLECTION_LIFT_MARGIN = 0.105
 _POSITION_TOLERANCE = 0.150
@@ -330,7 +333,11 @@ class PickCubeSolution:
         start = self._ee_pose(observation)
         target = start.copy()
         target[:3] = self._cube_position(observation) + np.array(
-            [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE - _DESCEND_DISTANCE],
+            [
+                0.0,
+                0.0,
+                CUBE_HALF_SIZE + _GRASP_CLEARANCE_ABOVE_CUBE_TOP,
+            ],
             dtype=np.float32,
         )
         return SegmentPlan(
