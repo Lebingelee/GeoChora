@@ -36,3 +36,11 @@ legacy/current checkpoint 转换必须从 `diagnostics/go2` 启动，避免兼�
 
 Stage 17/18/19/19d 与 Stage A–F 是有报告和 smoke 覆盖的 runtime 证据链；运行命令见
 `task_env/README.md` 和对应 `doc/task_env/update_log/features/`。
+
+## Phase-I P1.1 contract detector
+
+```text
+python -m task_env.diagnostics.phase1.p1_1_contracts --output workspace/qualification/phase1/p1_1_contracts/smoke/p1_1_contracts/report.json
+```
+
+使用 TaskEnv 已配置 Python 环境。`phase1/` 的此 detector 只运行 S0/S1 strict schema、roundtrip、capability admission、CanonicalStateView 和 PickCube pure semantic fixtures。Fresh subprocess import guard 与 sys.modules 检查禁止四个 simulator/Taichi/Torch import，不构造 runtime。Manifest 为 synthetic fixture；这些结果不授予 provider 或 PickCube qualification。Report 绑定执行 commit、changed tree、command 与 candidate identity。
