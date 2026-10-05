@@ -314,19 +314,17 @@ class PickCubeSceneComposer:
     adapter_name = "task_env_pickcube_owned_builder_v1"
     source_label = "task-env-pick-cube"
 
-    def build_scene_source(self, composition, agents):
-        del composition, agents
-        from scene import SceneSource
+    def build_source_description(self):
+        from ...assembly.source import TaskSceneSource
 
         xml, base_dir = build_pick_cube_model_xml()
-        return (
-            SceneSource.mjcf_string(
-                xml,
-                base_dir=base_dir,
-                label=self.source_label,
-            ),
-            self.adapter_name,
-        )
+        return TaskSceneSource(xml, base_dir, self.source_label)
+
+    def build_scene_source(self, composition, agents):
+        # Compatibility for existing scalar compiler; conversion belongs to provider.
+        from ...runtime.sessions.geophys_source import native_scene_source
+
+        return native_scene_source(self.build_source_description()), self.adapter_name
 
     def build_scene_model(self, imported_scene, composition):
         del composition

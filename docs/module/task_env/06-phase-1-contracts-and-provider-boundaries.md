@@ -548,3 +548,35 @@ Canonical convention 为 SI / right-handed Z-up / wxyz unit quaternion。Timebas
 P1.1 Human Review 修正：ActionIntent.reference 按 Core ActionModeSpec 表达 absolute_joint=None、absolute_pose=world/base、delta_pose=world/base/ee；strict codec 支持 nullable union，mapping 的 null 保持 roundtrip。PickCube candidate 显式记录 Panda initial_state_spec 的九个 semantic joint positions；initialization policy 指定 named joint/entity velocities 为零、arm target 等于初始 joints、gripper open，均为 canonical intent，不使用 legacy storage vocabulary。该 policy 尚未由 provider runtime apply。
 
 Quaternion representation：未来 canonical provider adapter 在输出前 normalize wxyz quaternion；contract 保留 norm-squared sanity validation，abs(norm_sq - 1) <= 8 * 2^-23（约 9.54e-7），覆盖 float32 normalization/四分量 rounding。Contract 不静默 normalize，保持 deterministic roundtrip；zero/non-finite/明显非单位 quaternion 仍拒绝。这是 representation bound，不是 physics qualification tolerance；P1.1 没有新增 adapter。
+
+## 15. P1.2 bounded runtime review route
+
+新增 opt-in `task_env.runtime.sessions.materialize(artifact, execution, source=...)`
+入口，admission 在 native materialization 前执行。`source` 为 task-local Phase-I
+MJCF migration bridge：TaskSceneSource 与 semantic-to-source-name bindings；
+MJCF representation 不决定 physics provider，也不进入 Artifact identity。
+PickCube source conversion 位于 GeoPhys adapter；原 scalar compiler 兼容入口保留。
+该路由当前仅实现 default PickCube、CPU、render=none、zero-settle intersection，
+不替换生产 RuntimeSnapshot / TaskStateView 或现有 batch layout/profile factory。
+
+`task_env.artifacts.execution.ResetSample` 是 immutable execution value，具有
+self-excluding SHA256 sample identity 和 strict JSON/YAML mapping。
+`task_env.tasks.pick_cube.reset.sample_reset` 使用 versioned NumPy PCG64 sampler，
+从 Artifact ±0.10 m XY distribution 生成一次请求；九个 Panda joints、fixed Z、
+identity wxyz 与 zero velocity/open gripper policy 保留。Provider 不采样或修改请求。
+会话公开 reset / snapshot / step / close，仅返回 measured RealizedInitialState 与
+semantic CanonicalStateView。Native IDs、地址与数组仅存在于 private adapters。
+
+Adapters normalize measured wxyz rotation，然后进行 representation validation。
+P1.2 reset smoke bounds 为 joint / cube position / quaternion component max_abs
+各 1e-5（position 单位 m），不用于 physics qualification。MuJoCo 读 data.time；
+GeoPhys 没有 native simulation-time API，读现有 boundary 的 completed-step clock，
+并校验 source timestep。GeoPhys close 依赖 Taichi process-global ownership：
+reusable detector 以 isolated subprocess 执行各 provider，close 后退出回收资源。
+
+`python -m task_env.diagnostics.phase1.p1_2_runtime --output <report.json>` 检查
+seed 31/73 的 same serialized reset、重复 reset、requested/measured state、canonical
+semantics wiring 和一步时间，以及 admission negative/fresh provider-free import。
+Manifest 仅声明 implemented；测试结论与 provenance 位于 P1.2 Evidence。
+该 review route 不产生 qualification、physics/contact/controller equivalence
+或 PickCube success parity claim，P1.3+ 保持 deferred，Human Judge decision 尚未创建。
