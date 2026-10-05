@@ -536,3 +536,11 @@ Task Artifact、task semantics、learner-facing code、recorder contract 与 pub
 - 为适配 provider 而静默改变 task semantics。
 
 不支持的 capability 必须 fail closed，并提供足够 metadata 供诊断。
+
+## 14. P1.1 additive contract route
+
+`task_env.artifacts` 提供 Phase-I advanced data contract：TaskArtifact v0、WorldDefinition、InitializationContract、SemanticDefinition、Timebase、ExecutionSpec、RequiredCapabilitySet、ProviderCapabilityManifest 与 CanonicalStateView。它们支持 strict mapping validation 和 deterministic roundtrip；TaskArtifact SHA-256 identity 只包含 artifact mapping，不接受 execution field。
+
+Canonical convention 为 SI / right-handed Z-up / wxyz unit quaternion。Timebase 允许至多一个 ULP 的浮点 representation difference。未知字段、schema、capability、非 finite 值和未声明 semantic references 均拒绝。Capability admission 只接受 implemented/tested/qualified claim，planned/unknown/unsupported 或缺失 claim fail closed；该检查本身不授予 qualification。
+
+这些 contract 为 additive skeleton，保留 RuntimeSnapshot / TaskStateView。Production runtime 不会自动输出 CanonicalStateView；provider materialization、ResetSample realization 与 production state conversion 仍属于 P1.2。可复用 S0/S1 detector 入口为 `python -m task_env.diagnostics.phase1.p1_1_contracts --output <workspace-report.json>`；纯 fixture Evidence 不代表 simulator execution 或 provider qualification。

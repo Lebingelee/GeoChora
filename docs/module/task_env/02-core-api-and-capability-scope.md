@@ -24,7 +24,7 @@ Core 的首要使命是成为可靠、provider-neutral 的多仿真器执行与�
 - Scalar production materialization 仍绑定 GeoPhys。
 - Batch factory 的 `merged_scene`/`static` 是内部 runtime/layout route，不是 GeoPhys/MuJoCo/SAPIEN/Genesis selector。
 - MuJoCo 只有独立 oracle/probe 等路径，尚非统一 Task Artifact 的 production provider；multi-provider materialization 是 planned。
-- Task Artifact/Experiment/Evidence 的规范存在，但统一 Task Artifact schema/loader、Validator、Runner 等尚未形成完整实现。
+- Task Artifact/Experiment/Evidence 的规范存在。P1.1 新增 `task_env.artifacts` 的 strict TaskArtifact v0 mapping contract skeleton（见 [06](06-phase-1-contracts-and-provider-boundaries.md#14-p11-additive-contract-route)）；production provider materialization、完整 Validator、Runner 与 Experiment/Evidence loader 仍未形成完整统一实现。
 - RSL/SB3 learner adapter 和部分 IL script 入口存在；统一 learner integration 及 manipulation IL acceptance 不能据此称为 qualified。
 - PickCube/NutAssembly 尚无完整 current-HEAD manipulation qualification；Go2 CUDA/static/RSL 是历史 Evidence 最强的 regression route，current-HEAD qualification 待 P1.0 baseline smoke 确认。
 
