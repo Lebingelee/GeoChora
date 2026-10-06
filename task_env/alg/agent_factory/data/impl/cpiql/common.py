@@ -1,0 +1,953 @@
+import json
+from pathlib import Path
+import re
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+import time
+import warnings
+import h5py
+import numpy as np
+import torch
+
+from agent_factory.control import (
+    build_action_transform_meta,
+    canonicalize_control_mode,
+    extract_arm_pose_map_from_flat_state,
+    inverse_transform_action,
+    is_absolute_mode,
+)
+from agent_factory.data.base import BaseTrajectoryDataset, TrajectoryRef, traj_sort_key
+
+# Hard-coded global switch for CPIQL RGB loading behavior.
+# - "all":  preload full RGB trajectories into memory during dataset init
+# - "lazy": keep state/action/meta preloaded, but fetch RGB on demand
+#           inside __getitem__ for the requested obs_horizon window
+#
+# This is intentionally not exposed as a config field for now.
+CPIQL_RGB_LOAD_MODE = "lazy"  # "all"
+
+if CPIQL_RGB_LOAD_MODE not in {"all", "lazy"}:
+    raise ValueError(
+        f"Unsupported CPIQL_RGB_LOAD_MODE={CPIQL_RGB_LOAD_MODE!r}. Expected 'all' or 'lazy'."
+    )
+
+
+SEGMENT_TYPE_TO_ID = {
+    "failure": 0,
+    "success": 1,
+    "intervention": 2,
+    "unknown": 3,
+    "rollout_failure": 4,
+    "boundary_failure": 5,
+    "post_intervention_failure": 6,
+}
+
+
+def cfg_get(cfg: Any, path: str, default: Any) -> Any:
+    cur = cfg
+    for part in path.split("."):
+        if cur is None:
+            return default
+        if isinstance(cur, dict):
+            cur = cur.get(part, default)
+        else:
+            cur = getattr(cur, part, default)
+    return cur
+
+
+def resolve_cpiql_step_gamma(cfg: Any) -> float:
+    raw_gamma = cfg_get(cfg, "env.gamma", 0.99)
+    if isinstance(raw_gamma, str):
+        raw_gamma = raw_gamma.strip().lower()
+    if raw_gamma == "default":
+        mode = str(cfg_get(cfg, "critic.gamma_default_mode", "one_minus_margin_over_max_episode_steps"))
+        if mode != "one_minus_margin_over_max_episode_steps":
+            raise ValueError(f"Unsupported CPIQL gamma_default_mode={mode!r}.")
+        max_steps = max(float(cfg_get(cfg, "env.max_episode_steps", 1) or 1), 1.0)
+        margin = float(cfg_get(cfg, "critic.gamma_default_margin", 2.0))
+        gamma = max(0.0, min(1.0, 1.0 - margin / max_steps))
+        try:
+            cfg.env.gamma = gamma
+        except Exception:
+            pass
+        return gamma
+    return float(raw_gamma)
+
+
+def compute_pad_vec(act_seq: torch.Tensor, is_abs_mode: bool, pad_action_arm: Optional[torch.Tensor] = None):
+    if is_abs_mode:
+        return act_seq[-1]
+    if pad_action_arm is not None:
+        return torch.cat([pad_action_arm, act_seq[-1, -1:]])
+    return act_seq[-1]
+
+
+def compute_progress_gammas(
+    length: int,
+    max_episode_steps: int,
+    gamma_floor: float = 1e-4,
+    terminal_idx: Optional[int] = None,
+    gamma: Optional[float] = None,
+    mode: str = "constant",
+) -> np.ndarray:
+    if length <= 0:
+        return np.zeros(0, dtype=np.float32)
+    terminal_idx = length - 1 if terminal_idx is None else int(np.clip(terminal_idx, 0, length - 1))
+    mode = str(mode or "constant").strip().lower()
+    gammas = np.ones(length, dtype=np.float32)
+    if mode in {"constant", "fixed", "uniform"}:
+        if gamma is None:
+            max_steps = max(float(max_episode_steps), 1.0)
+            gamma = max(0.0, min(1.0, 1.0 - 2.0 / max_steps))
+        step_gamma = max(float(gamma), float(gamma_floor))
+        gammas[:] = step_gamma
+        gammas[terminal_idx:] = 0.0
+        return gammas
+
+    horizon = max(terminal_idx + 1, 1)
+    max_steps = max(int(max_episode_steps), horizon)
+    for t in range(length):
+        if t >= terminal_idx:
+            gammas[t] = 0.0
+            continue
+        numerator = max_steps - horizon + t
+        denom = numerator + 1
+        gamma = numerator / denom if denom > 0 else 0.0
+        gammas[t] = max(float(gamma), float(gamma_floor))
+    return gammas
+
+
+def compute_progress_returns(rewards: np.ndarray, gammas: np.ndarray) -> np.ndarray:
+    returns = np.zeros(len(rewards), dtype=np.float32)
+    running = 0.0
+    for t in reversed(range(len(rewards))):
+        running = float(rewards[t]) + float(gammas[t]) * running
+        returns[t] = running
+    return returns
+
+
+def compute_n_step_progress_signals(
+    rewards: np.ndarray,
+    gammas: np.ndarray,
+    terminals: np.ndarray,
+    start_idx: int,
+    n: int,
+) -> Tuple[torch.Tensor, float, bool]:
+    length = len(rewards)
+    if len(gammas) != length or len(terminals) != length:
+        raise ValueError(
+            "CPIQL n-step rewards, gammas, and terminals must have the same length, "
+            f"got rewards={length}, gammas={len(gammas)}, terminals={len(terminals)}."
+        )
+    start_idx = int(np.clip(start_idx, 0, max(length - 1, 0)))
+    end_idx = min(start_idx + int(n), length)
+    running_discount = 1.0
+    n_step_reward = 0.0
+    for idx in range(start_idx, end_idx):
+        n_step_reward += running_discount * float(rewards[idx])
+        running_discount *= float(gammas[idx])
+    terminated = bool(np.any(np.asarray(terminals, dtype=bool)[start_idx:end_idx]))
+    return torch.tensor(n_step_reward, dtype=torch.float32), float(running_discount), terminated
+
+
+def _read_json_dataset(dataset) -> Dict[str, Any]:
+    value = dataset[()]
+    if isinstance(value, bytes):
+        value = value.decode("utf-8")
+    elif isinstance(value, np.ndarray) and value.shape == ():
+        value = value.item()
+        if isinstance(value, bytes):
+            value = value.decode("utf-8")
+    return json.loads(value)
+
+
+def _ordered_group_keys(group: h5py.Group, meta: Optional[Dict[str, Any]], section: str, subtype: Optional[str] = None) -> List[str]:
+    if meta:
+        try:
+            node = meta[section] if subtype is None else meta[section][subtype]
+            if isinstance(node, dict):
+                keys = [key for key in sorted(node.keys()) if key in group]
+                if keys:
+                    return keys
+        except Exception:
+            pass
+    return sorted(group.keys())
+
+
+def _concat_group_leaves(group: h5py.Group, keys: Sequence[str]) -> np.ndarray:
+    arrays = []
+    for key in keys:
+        data = group[key][()]
+        arrays.append(data.reshape(data.shape[0], -1) if data.ndim > 2 else data)
+    if not arrays:
+        raise KeyError(f"No datasets found under group {group.name}")
+    return np.concatenate(arrays, axis=-1).astype(np.float32)
+
+
+def _concat_rgb_group(group: h5py.Group, keys: Sequence[str]) -> np.ndarray:
+    arrays = [group[key][()] for key in keys]
+    if not arrays:
+        raise KeyError(f"No rgb datasets found under group {group.name}")
+    return np.concatenate(arrays, axis=1)
+
+
+def _describe_rgb_source(group: h5py.Group, meta: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if "rgb" not in group:
+        return None
+    rgb_node = group["rgb"]
+    if isinstance(rgb_node, h5py.Dataset):
+        return {"mode": "dataset", "source_length": int(rgb_node.shape[0])}
+    rgb_keys = _ordered_group_keys(rgb_node, meta, "obs", "rgb")
+    if not rgb_keys:
+        raise KeyError(f"No rgb datasets found under group {rgb_node.name}")
+    lengths = {int(rgb_node[key].shape[0]) for key in rgb_keys}
+    if len(lengths) != 1:
+        raise ValueError(
+            f"CPIQL RGB datasets under {rgb_node.name} must have equal lengths, got {sorted(lengths)}."
+        )
+    return {
+        "mode": "group",
+        "keys": list(rgb_keys),
+        "source_length": lengths.pop(),
+    }
+
+
+def _read_rgb_frames(obs_group: h5py.Group, rgb_source: Dict[str, Any], indices: Sequence[int]) -> np.ndarray:
+    rgb_node = obs_group["rgb"]
+    if rgb_source.get("mode") == "dataset":
+        return np.stack([rgb_node[int(idx)][()] for idx in indices], axis=0)
+
+    arrays = []
+    rgb_keys = rgb_source.get("keys", [])
+    for key in rgb_keys:
+        ds = rgb_node[key]
+        arrays.append(np.stack([ds[int(idx)][()] for idx in indices], axis=0))
+    if not arrays:
+        raise KeyError(f"No rgb datasets found under group {rgb_node.name}")
+    return np.concatenate(arrays, axis=1)
+
+
+def _read_meta(h5_file: h5py.File, traj_group: h5py.Group) -> Dict[str, Any]:
+    if "meta" in traj_group and isinstance(traj_group["meta"], h5py.Group) and "env_meta" in traj_group["meta"]:
+        return _read_json_dataset(traj_group["meta"]["env_meta"])
+    if "meta" in h5_file and "env_meta" in h5_file["meta"]:
+        return _read_json_dataset(h5_file["meta"]["env_meta"])
+    if "meta_keys" in traj_group:
+        return _read_json_dataset(traj_group["meta_keys"])
+    return {}
+
+
+def _is_external_intervention_boundary(reason: Any) -> bool:
+    if reason is None:
+        return False
+    return str(reason).strip().lower() in {"teleop_start"}
+
+
+def _is_success_segment_type(segment_type: str) -> bool:
+    return segment_type == "success"
+
+
+def _is_intervention_segment_type(segment_type: str) -> bool:
+    return segment_type == "intervention"
+
+
+def _is_failure_segment_type(segment_type: str) -> bool:
+    return segment_type in {"failure", "rollout_failure", "boundary_failure", "post_intervention_failure"}
+
+
+def _trajectory_freshness_key(file_path: str, traj_key: Optional[str], fallback_index: int) -> Tuple[int, int, int]:
+    """
+    Sort failures from old to new using filename timestamp first, then traj id.
+    Higher tuple means newer.
+    """
+    name = Path(file_path).stem
+    timestamp_match = re.search(r"_(\d{4})_(\d{4})(?:$|_)", name)
+    if timestamp_match:
+        return (2, int(timestamp_match.group(1)) * 10000 + int(timestamp_match.group(2)), fallback_index)
+
+    candidates = [name]
+    if traj_key:
+        candidates.append(str(traj_key))
+    for candidate in candidates:
+        traj_match = re.search(r"traj_(\d+)", candidate)
+        if traj_match:
+            return (1, int(traj_match.group(1)), fallback_index)
+    return (0, int(fallback_index), fallback_index)
+
+
+def load_flatten_trajectory(
+    h5_file: h5py.File,
+    traj_group: h5py.Group,
+    include_rgb: bool = True,
+    lazy_rgb: bool = False,
+) -> Dict[str, np.ndarray]:
+    if "obs" not in traj_group or "action" not in traj_group:
+        raise KeyError(f"CPIQL trajectory {traj_group.name} requires 'obs' and 'action' keys.")
+    for key in ("success", "terminated", "truncated"):
+        if key not in traj_group:
+            raise KeyError(f"CPIQL trajectory {traj_group.name} requires '{key}' key.")
+
+    meta = _read_meta(h5_file, traj_group)
+    obs_group = traj_group["obs"]
+    action_node = traj_group["action"]
+
+    if isinstance(action_node, h5py.Dataset):
+        action = action_node[()].astype(np.float32)
+    else:
+        action_keys = _ordered_group_keys(action_node, meta, "action")
+        action = _concat_group_leaves(action_node, action_keys)
+
+    obs: Dict[str, np.ndarray] = {}
+    rgb_source = None
+    if include_rgb and "rgb" in obs_group:
+        rgb_source = _describe_rgb_source(obs_group, meta)
+        if not lazy_rgb:
+            if isinstance(obs_group["rgb"], h5py.Dataset):
+                obs["rgb"] = obs_group["rgb"][()]
+            else:
+                rgb_keys = _ordered_group_keys(obs_group["rgb"], meta, "obs", "rgb")
+                obs["rgb"] = _concat_rgb_group(obs_group["rgb"], rgb_keys)
+    if "state" in obs_group:
+        if isinstance(obs_group["state"], h5py.Dataset):
+            obs["state"] = obs_group["state"][()].astype(np.float32)
+        else:
+            state_keys = _ordered_group_keys(obs_group["state"], meta, "obs", "state")
+            obs["state"] = _concat_group_leaves(obs_group["state"], state_keys)
+    if not obs:
+        raise KeyError(f"CPIQL trajectory {traj_group.name} has no usable obs/rgb or obs/state data.")
+
+    length = action.shape[0]
+    if length <= 0:
+        raise ValueError(f"CPIQL trajectory {traj_group.name} must contain at least one action.")
+
+    obs_lengths = {key: int(value.shape[0]) for key, value in obs.items()}
+    if rgb_source is not None and lazy_rgb:
+        obs_lengths["rgb"] = int(rgb_source["source_length"])
+    unique_obs_lengths = set(obs_lengths.values())
+    if len(unique_obs_lengths) != 1:
+        raise ValueError(
+            f"CPIQL trajectory {traj_group.name} observation modalities must have equal lengths, "
+            f"got {obs_lengths}."
+        )
+
+    obs_length = unique_obs_lengths.pop()
+    legacy_terminal_observation_padded = False
+    if obs_length == length:
+        legacy_terminal_observation_padded = True
+        obs = {
+            key: np.concatenate([value, value[-1:]], axis=0)
+            for key, value in obs.items()
+        }
+    elif obs_length != length + 1:
+        raise ValueError(
+            f"CPIQL trajectory {traj_group.name} must satisfy len(obs) == len(action) + 1. "
+            f"Legacy len(obs) == len(action) is also supported by repeating the final observation; "
+            f"got obs={obs_length}, action={length}."
+        )
+
+    if rgb_source is not None:
+        rgb_source = {
+            **rgb_source,
+            "observation_length": length + 1,
+            "legacy_terminal_observation_padded": legacy_terminal_observation_padded,
+        }
+
+    return {
+        "obs": obs,
+        "action": action,
+        "env_meta": meta,
+        "success": np.asarray(traj_group["success"][()], dtype=bool).reshape(-1)[:length],
+        "terminated": np.asarray(traj_group["terminated"][()], dtype=bool).reshape(-1)[:length],
+        "truncated": np.asarray(traj_group["truncated"][()], dtype=bool).reshape(-1)[:length],
+        "boundary_reason": traj_group.attrs.get("boundary_reason", ""),
+        "rgb_source": rgb_source,
+        "legacy_terminal_observation_padded": legacy_terminal_observation_padded,
+    }
+
+
+class CPIQLTrajectoryDataset(BaseTrajectoryDataset):
+    """
+    Shared CPIQL trajectory slicing and progress-signal construction.
+    """
+
+    def __init__(
+        self,
+        cfg,
+        h5_path: Optional[str] = None,
+        folder_path: Optional[str] = None,
+        num_traj: Optional[int] = None,
+        required_keys: Optional[Sequence[str]] = None,
+        require_intervention: bool = False,
+    ):
+        start_time = time.time()
+        self.cfg = cfg
+        self.obs_horizon = int(cfg.env.obs_horizon)
+        self.pred_horizon = int(cfg.env.pred_horizon)
+        self.act_horizon = int(cfg.env.act_horizon)
+        self.include_rgb = bool(cfg_get(cfg, "dataset.include_rgb", True))
+        self.rgb_load_mode = CPIQL_RGB_LOAD_MODE
+        self.lazy_rgb = self.include_rgb and self.rgb_load_mode == "lazy"
+        self.require_intervention = require_intervention
+
+        super().__init__(h5_path=h5_path, folder_path=folder_path, num_traj=num_traj)
+        if not self.trajectory_refs:
+            raise ValueError("No CPIQL trajectories found.")
+
+        self.k_grid = [float(v) for v in cfg_get(cfg, "critic.k_grid", [0.0, 0.2, 0.4, 0.6, 0.8, 1.0])]
+        self.gamma_floor = float(cfg_get(cfg, "critic.gamma_floor", 1e-4))
+        self.gamma_mode = str(cfg_get(cfg, "critic.gamma_mode", "constant"))
+        self.step_gamma = resolve_cpiql_step_gamma(cfg)
+        self.intervention_terminal_reward = float(cfg_get(cfg, "critic.intervention_terminal_reward", 0.2))
+
+        # 下面所有按轨迹存储的 list，索引单位都是“拆分后的子轨迹”，不是原始 H5 轨迹。
+        # 例如一条原始轨迹 intervention=[0,0,0,1,1,0,0,0,1,0,0,0]，
+        # 会被拆成 5 条子轨迹：[0:2], [3:4], [5:7], [8:8], [9:11]。
+        self.obs_data: List[Dict[str, np.ndarray]] = []  # 每条子轨迹的观测字典，如 {"rgb": [T,C,H,W], "state": [T,D]}。
+        self.rgb_sources: List[Optional[Dict[str, Any]]] = []  # 懒加载 RGB 的源描述与原始轨迹切片信息。
+        self.action_data: List[torch.Tensor] = []  # 每条子轨迹的动作序列，形状通常为 [T, action_dim]。
+        self.success: List[np.ndarray] = []  # 每条子轨迹逐帧成功标记；专家接管后直接成功时，专家段末帧可为 True。
+        self.terminated: List[np.ndarray] = []  # 每条子轨迹逐帧自然终止标记，用于关闭 bootstrap。
+        self.truncated: List[np.ndarray] = []  # 每条子轨迹逐帧截断标记，如超时、人工停止或失败截断。
+        self.intervention: List[np.ndarray] = []  # 每条子轨迹逐帧专家接管标记；专家段通常全 True，自主段通常全 False。
+        self.rewards: List[np.ndarray] = []  # 每条子轨迹逐帧 reward；通常只有末帧非零。
+        self.gammas: List[np.ndarray] = []  # 每条子轨迹逐帧折扣 gamma；默认使用一致 gamma，可通过 critic.gamma_mode 切换旧进度 gamma。
+        self.progress_returns: List[np.ndarray] = []  # 每条子轨迹逐帧进度回报；成功段末帧为 1.0，早期逐步变小。
+        self.progress_masks: List[np.ndarray] = []  # progress anchor 默认参与掩码；具体权重在 critic 中按样本语义计算。
+        self.progress_weights: List[np.ndarray] = []  # progress anchor 默认附加权重；具体 success/failure/boundary 缩放在 critic 中计算。
+        self.segment_type_ids: List[int] = []  # 子轨迹类型的整数编码，对应 SEGMENT_TYPE_TO_ID。
+        self.segment_type_names: List[str] = []  # 子轨迹类型名，如 "failure"、"intervention"、"success"。
+        self.segment_freshness_keys: List[Tuple[int, int, int]] = []  # 用于把失败/风险 segment 从旧到新排序。
+        self.failure_ranks: List[float] = []  # 失败/风险 segment 的新旧 rank，旧=0，新=1；非失败段默认 1。
+        self.segment_terminal_rewards: List[float] = []  # 子轨迹末帧 reward；如介入边界自主段 0.2，专家成功段 1.0。
+        self.segment_terminal_indices: List[int] = []  # 子轨迹终点在子轨迹内部的索引，当前通常为 len(segment)-1。
+        self.segment_source_refs: List[Tuple[str, Optional[str], int, int]] = []  # 子轨迹来源：(文件路径, H5轨迹key, 原始起点, 原始终点)。
+        self.segment_end_is_intervention_boundary: List[bool] = []  # 自主段是否结束于下一帧专家接管；例如 [0:2] 后接 [3:4] 专家段则为 True。
+        self.slices_all: List[Tuple[int, int, int, int]] = []  # 所有训练样本切片：(子轨迹idx, start, action_end, 全局样本idx)。
+        self.slices_success: List[Tuple[int, int, int, int]] = []  # 只来自成功子轨迹的训练样本切片，用于按需切换 success-only 训练。
+        self.env_metas: List[Dict[str, Any]] = []
+        cache_start_time = time.time()
+
+        self._cache_trajectories()
+        self._assign_failure_ranks()
+        self.slices = self.slices_all
+        self.mode = "all"
+
+        self.available_keys = {
+            "observations",
+            "next_observations",
+            "action",
+            "reward",
+            "discount",
+            "value",
+            "terminated",
+            "truncated",
+            "success",
+            "progress_return",
+            "progress_mask",
+            "progress_weight",
+            "segment_type",
+            "segment_terminal_reward",
+            "segment_end_is_intervention_boundary",
+            "failure_rank",
+            "is_success_segment",
+            "is_failure_segment",
+            "k",
+            "cond",
+        }
+        if self.require_intervention:
+            self.available_keys.add("intervention")
+            self.available_keys.add("intervention_segment")
+        self.required_keys = set(required_keys) if required_keys is not None else set(self.available_keys)
+        if "actions" in self.required_keys:
+            self.required_keys.remove("actions")
+            self.required_keys.add("action")
+        self.conds = torch.zeros(len(self.slices_all), dtype=torch.float32) if "cond" in self.required_keys else None
+
+        self.agent_control_mode = canonicalize_control_mode(
+            getattr(cfg, "agent_control_mode", getattr(cfg.env, "env_control_mode", getattr(cfg.env, "control_mode", "delta_pose")))
+        )
+        self.env_control_mode = canonicalize_control_mode(
+            getattr(cfg.env, "env_control_mode", getattr(cfg.env, "control_mode", "delta_pose"))
+        )
+        self.is_abs_mode = is_absolute_mode(self.agent_control_mode)
+        self.pad_action_arm = torch.zeros((self.action_data[0].shape[1] - 1,)) if not self.is_abs_mode else None
+        end_time = time.time()
+        segment_summary = self.segment_counts_by_type()
+        print(
+            f"time: loaded and processed {len(self.slices_all)} CPIQL trajectory slices \n"
+            f" from {len(self.trajectory_refs)} trajectories in {end_time - start_time:.2f} seconds "
+            f"(caching took {end_time - cache_start_time:.2f} seconds), rgb_load_mode={self.rgb_load_mode}, "
+            f"with agent_control_mode={self.agent_control_mode}, "
+            f"env_control_mode={self.env_control_mode}, is_abs_mode={self.is_abs_mode}."
+        )
+        print(f"[CPIQLDataset] segment summary: {segment_summary}")
+
+
+    def _normalize_env_meta(self, env_meta: Dict[str, Any]) -> Dict[str, Any]:
+        env_meta = dict(env_meta or {})
+        env_meta.setdefault("obs", {})
+        env_meta.setdefault("action", {})
+        env_meta["env_control_mode"] = canonicalize_control_mode(
+            env_meta.get("env_control_mode") or getattr(self.cfg.env, "env_control_mode", getattr(self.cfg.env, "control_mode", "delta_pose"))
+        )
+        env_meta.setdefault("controller_backend", getattr(self.cfg.env, "controller_backend", ""))
+        env_meta.setdefault("control", {})
+        return env_meta
+
+    def _collect_h5_files(self) -> List[str]:
+        if not self.folder_path:
+            return super()._collect_h5_files()
+        folder = Path(self.folder_path)
+        if not folder.exists():
+            raise FileNotFoundError(f"H5 folder not found: {self.folder_path}")
+        traj_files = sorted(folder.glob("traj_*.h5"), key=lambda p: traj_sort_key(p.stem))
+        if not traj_files:
+            traj_files = sorted(folder.glob("*.h5"))
+        return [str(path) for path in traj_files]
+
+    def _cache_trajectories(self):
+        global_count = 0
+        legacy_terminal_observation_refs = []
+        for ref in self.trajectory_refs:
+            with h5py.File(ref.file_path, "r") as h5_file:
+                group = h5_file if ref.traj_key is None else h5_file[ref.traj_key]
+                traj = load_flatten_trajectory(
+                    h5_file,
+                    group,
+                    include_rgb=self.include_rgb,
+                    lazy_rgb=self.lazy_rgb,
+                )
+                intervention = self._load_intervention(group, len(traj["action"]))
+                if traj["legacy_terminal_observation_padded"]:
+                    legacy_terminal_observation_refs.append(
+                        f"{ref.file_path}:{ref.traj_key or '/'}"
+                    )
+
+            for start_idx, end_idx, segment_type in self._execution_segments(traj, intervention):
+                traj_idx = len(self.action_data)
+                end_is_intervention_boundary = (
+                    not _is_intervention_segment_type(segment_type)
+                    and end_idx + 1 < len(intervention)
+                    and bool(intervention[end_idx + 1])
+                )
+                if (
+                    not end_is_intervention_boundary
+                    and not _is_intervention_segment_type(segment_type)
+                    and start_idx == 0
+                    and end_idx == len(intervention) - 1
+                    and _is_external_intervention_boundary(traj.get("boundary_reason", ""))
+                ):
+                    end_is_intervention_boundary = True
+                self._append_segment(
+                    ref,
+                    traj,
+                    intervention,
+                    start_idx,
+                    end_idx,
+                    segment_type,
+                    end_is_intervention_boundary=end_is_intervention_boundary,
+                )
+
+                length = len(self.action_data[traj_idx])
+                is_success = _is_success_segment_type(self.segment_type_names[traj_idx])
+                pad_before = self.obs_horizon - 1
+                for start in range(-pad_before, length):
+                    sl = (traj_idx, start, start + self.pred_horizon, global_count)
+                    self.slices_all.append(sl)
+                    if is_success:
+                        self.slices_success.append(sl)
+                    global_count += 1
+
+        if legacy_terminal_observation_refs:
+            preview = ", ".join(legacy_terminal_observation_refs[:3])
+            if len(legacy_terminal_observation_refs) > 3:
+                preview += f", ... (+{len(legacy_terminal_observation_refs) - 3} more)"
+            warnings.warn(
+                "CPIQLDataset loaded legacy trajectories with len(obs) == len(action). "
+                "The final observation was repeated to construct a terminal state so loading can continue. "
+                f"affected={len(legacy_terminal_observation_refs)}; examples={preview}",
+                UserWarning,
+                stacklevel=2,
+            )
+
+    def _append_segment(
+        self,
+        ref: TrajectoryRef,
+        traj: Dict[str, np.ndarray],
+        intervention: np.ndarray,
+        start_idx: int,
+        end_idx: int,
+        segment_type: str,
+        end_is_intervention_boundary: bool = False,
+    ):
+        obs = {key: value[start_idx:end_idx + 2] for key, value in traj["obs"].items()}
+        rgb_source = None
+        if self.include_rgb and self.lazy_rgb and traj.get("rgb_source") is not None:
+            rgb_source = {
+                **dict(traj["rgb_source"]),
+                "segment_start_idx": int(start_idx),
+                "segment_end_idx": int(end_idx + 1),
+            }
+        action = traj["action"][start_idx:end_idx + 1]
+        success = traj["success"][start_idx:end_idx + 1].copy()
+        terminated = traj["terminated"][start_idx:end_idx + 1].copy()
+        truncated = traj["truncated"][start_idx:end_idx + 1].copy()
+        local_intervention = intervention[start_idx:end_idx + 1].copy()
+        env_meta = self._normalize_env_meta(traj.get("env_meta", {}))
+
+        if end_is_intervention_boundary:
+            success[:] = False
+            terminated[:] = False
+            truncated[:] = False
+            terminated[-1] = True
+            terminal_reward = self.intervention_terminal_reward
+        elif _is_intervention_segment_type(segment_type):
+            terminal_reward = 1.0 if np.any(success) else 0.0
+            if terminal_reward > 0.0:
+                success[-1] = True
+                terminated[-1] = True
+            elif not np.any(terminated | truncated):
+                truncated[-1] = True
+        elif _is_success_segment_type(segment_type):
+            success[-1] = True
+            terminated[-1] = True
+            terminal_reward = 1.0
+        else:
+            success[:] = False
+            if not np.any(terminated | truncated):
+                truncated[-1] = True
+            terminal_reward = 0.0
+
+        self.obs_data.append(obs)
+        self.rgb_sources.append(rgb_source)
+        self.action_data.append(torch.from_numpy(action).float())
+        self.success.append(success)
+        self.terminated.append(terminated)
+        self.truncated.append(truncated)
+        self.intervention.append(local_intervention)
+        self.segment_type_names.append(segment_type)
+        self.segment_type_ids.append(SEGMENT_TYPE_TO_ID[segment_type])
+        self.segment_freshness_keys.append(_trajectory_freshness_key(ref.file_path, ref.traj_key, len(self.segment_type_names) - 1))
+        self.failure_ranks.append(1.0)
+        self.segment_terminal_rewards.append(float(terminal_reward))
+        self.segment_terminal_indices.append(len(action) - 1)
+        self.segment_source_refs.append((ref.file_path, ref.traj_key, int(start_idx), int(end_idx)))
+        self.segment_end_is_intervention_boundary.append(bool(end_is_intervention_boundary))
+        self.env_metas.append(env_meta)
+        self._build_progress_signals(len(self.action_data) - 1)
+
+    def _is_success_side_segment(self, traj_idx: int) -> bool:
+        segment_type = self.segment_type_names[traj_idx]
+        return _is_success_segment_type(segment_type) or (
+            _is_intervention_segment_type(segment_type)
+            and float(self.segment_terminal_rewards[traj_idx]) > 0.0
+        )
+
+    def _is_failure_side_segment(self, traj_idx: int) -> bool:
+        return _is_failure_segment_type(self.segment_type_names[traj_idx])
+
+    def _assign_failure_ranks(self):
+        failure_indices = [idx for idx in range(len(self.segment_type_names)) if self._is_failure_side_segment(idx)]
+        self.failure_ranks = [1.0 for _ in self.segment_type_names]
+        if not failure_indices:
+            return
+        if len(failure_indices) == 1:
+            self.failure_ranks[failure_indices[0]] = 1.0
+            return
+
+        ordered = sorted(failure_indices, key=lambda idx: (self.segment_freshness_keys[idx], idx))
+        denom = max(len(ordered) - 1, 1)
+        for rank_idx, segment_idx in enumerate(ordered):
+            self.failure_ranks[segment_idx] = float(rank_idx) / float(denom)
+
+    def _execution_segments(self, traj: Dict[str, np.ndarray], intervention: np.ndarray) -> List[Tuple[int, int, str]]:
+        length = len(traj["action"])
+        if length <= 0:
+            return []
+        if not self.require_intervention:
+            segment_type = "success" if np.any(traj["success"]) else "failure"
+            return [(0, length - 1, segment_type)]
+        if not np.any(intervention):
+            segment_type = "success" if np.any(traj["success"]) else "rollout_failure"
+            return [(0, length - 1, segment_type)]
+
+        segments: List[Tuple[int, int, str]] = []
+        start_idx = 0
+        current_flag = bool(intervention[0])
+        for idx in range(1, length):
+            flag = bool(intervention[idx])
+            if flag == current_flag:
+                continue
+            segment_type = self._segment_type_for_range(traj, intervention, start_idx, idx - 1)
+            segments.append((start_idx, idx - 1, segment_type))
+            start_idx = idx
+            current_flag = flag
+        segment_type = self._segment_type_for_range(traj, intervention, start_idx, length - 1)
+        segments.append((start_idx, length - 1, segment_type))
+        return segments
+
+    @staticmethod
+    def _segment_type_for_range(
+        traj: Dict[str, np.ndarray],
+        intervention: np.ndarray,
+        start_idx: int,
+        end_idx: int,
+    ) -> str:
+        if bool(intervention[start_idx]):
+            return "intervention"
+        if np.any(traj["success"][start_idx:end_idx + 1]):
+            return "success"
+        if end_idx + 1 < len(intervention) and bool(intervention[end_idx + 1]):
+            return "boundary_failure"
+        if np.any(intervention):
+            return "post_intervention_failure"
+        return "rollout_failure" if len(intervention) > 0 else "failure"
+
+    def _load_intervention(self, traj_group: h5py.Group, length: int) -> np.ndarray:
+        if "intervention" not in traj_group:
+            if self.require_intervention:
+                raise KeyError(f"CPIQL replay trajectory {traj_group.name} requires 'intervention' key.")
+            return np.zeros(length, dtype=bool)
+        return np.asarray(traj_group["intervention"][()], dtype=bool).reshape(-1)[:length]
+
+    def _terminal_index(self, traj_idx: int) -> int:
+        boundary = self.success[traj_idx] | self.terminated[traj_idx] | self.truncated[traj_idx]
+        indices = np.flatnonzero(boundary)
+        return int(indices[0]) if len(indices) else len(self.action_data[traj_idx]) - 1
+
+    def _build_progress_signals(self, traj_idx: int):
+        length = len(self.action_data[traj_idx])
+        terminal_idx = self.segment_terminal_indices[traj_idx]
+        segment_type = self.segment_type_names[traj_idx]
+
+        rewards = np.zeros(length, dtype=np.float32)
+        rewards[terminal_idx] = float(self.segment_terminal_rewards[traj_idx])
+        gammas = compute_progress_gammas(
+            length=length,
+            max_episode_steps=self.cfg.env.max_episode_steps,
+            gamma_floor=self.gamma_floor,
+            terminal_idx=terminal_idx,
+            gamma=self.step_gamma,
+            mode=self.gamma_mode,
+        )
+        returns = compute_progress_returns(rewards, gammas)
+        progress_mask = np.ones(length, dtype=np.float32)
+        progress_weight = np.ones(length, dtype=np.float32)
+
+        if traj_idx < len(self.rewards):
+            self.rewards[traj_idx] = rewards
+            self.gammas[traj_idx] = gammas
+            self.progress_returns[traj_idx] = returns
+            self.progress_masks[traj_idx] = progress_mask
+            self.progress_weights[traj_idx] = progress_weight.astype(np.float32)
+        else:
+            self.rewards.append(rewards)
+            self.gammas.append(gammas)
+            self.progress_returns.append(returns)
+            self.progress_masks.append(progress_mask)
+            self.progress_weights.append(progress_weight.astype(np.float32))
+
+    def refresh_progress_signals(self, segment_indices: Optional[Sequence[int]] = None):
+        if segment_indices is None:
+            segment_indices = list(range(len(self.action_data)))
+        for segment_idx in segment_indices:
+            segment_idx = int(segment_idx)
+            self._build_progress_signals(segment_idx)
+
+    def set_segment_terminal_rewards(
+        self,
+        rewards: Sequence[float],
+        segment_indices: Optional[Sequence[int]] = None,
+        refresh: bool = True,
+    ):
+        if segment_indices is None:
+            segment_indices = list(range(len(self.segment_terminal_rewards)))
+        else:
+            segment_indices = list(segment_indices)
+        if len(rewards) != len(segment_indices):
+            raise ValueError(f"Expected {len(segment_indices)} terminal rewards, got {len(rewards)}.")
+        for segment_idx, reward in zip(segment_indices, rewards):
+            self.segment_terminal_rewards[int(segment_idx)] = float(reward)
+        if refresh:
+            self.refresh_progress_signals(segment_indices)
+
+    def segment_indices_by_type(self, segment_type: str) -> List[int]:
+        return [
+            idx for idx, current_type in enumerate(self.segment_type_names)
+            if current_type == segment_type
+        ]
+
+    def segment_counts_by_type(self) -> Dict[str, int]:
+        counts: Dict[str, int] = {}
+        for segment_type in self.segment_type_names:
+            counts[segment_type] = counts.get(segment_type, 0) + 1
+        return counts
+
+    def intervention_boundary_segment_indices(self) -> List[int]:
+        return [
+            idx for idx, is_boundary in enumerate(self.segment_end_is_intervention_boundary)
+            if is_boundary
+        ]
+
+    def set_terminal_rewards_for_type(
+        self,
+        segment_type: str,
+        rewards: Sequence[float],
+        refresh: bool = True,
+    ):
+        segment_indices = self.segment_indices_by_type(segment_type)
+        self.set_segment_terminal_rewards(rewards, segment_indices, refresh=refresh)
+
+    def set_intervention_terminal_rewards(
+        self,
+        rewards: Sequence[float],
+        segment_indices: Optional[Sequence[int]] = None,
+        refresh: bool = True,
+    ):
+        if segment_indices is None:
+            segment_indices = self.intervention_boundary_segment_indices()
+        else:
+            segment_indices = list(segment_indices)
+        invalid = [idx for idx in segment_indices if not self.segment_end_is_intervention_boundary[int(idx)]]
+        if invalid:
+            raise ValueError(f"Segments do not end at intervention boundaries: {invalid}")
+        self.set_segment_terminal_rewards(rewards, segment_indices, refresh=refresh)
+
+    def switch(self, mode: str = "all"):
+        self.mode = mode
+        self.slices = self.slices_success if mode == "success" else self.slices_all
+
+    def get_all_actions(self):
+        if self.mode == "success":
+            action_data = [
+                action
+                for idx, action in enumerate(self.action_data)
+                if self._is_success_side_segment(idx)
+            ]
+            if not action_data:
+                return torch.empty((0, self.action_data[0].shape[-1]), dtype=torch.float32)
+            return torch.cat(action_data, dim=0)
+        return torch.cat(self.action_data, dim=0)
+
+    def _load_rgb_sequence(self, traj_idx: int, indices: Sequence[int]) -> np.ndarray:
+        rgb_source = self.rgb_sources[traj_idx]
+        if rgb_source is None:
+            raise KeyError(f"Lazy RGB source is not available for traj_idx={traj_idx}.")
+        file_path, traj_key, _segment_start, _segment_end = self.segment_source_refs[traj_idx]
+        absolute_start = int(rgb_source["segment_start_idx"])
+        source_last_idx = int(rgb_source["source_length"]) - 1
+        absolute_indices = [
+            min(absolute_start + int(idx), source_last_idx)
+            for idx in indices
+        ]
+        h5_file = self._get_handle(file_path)
+        traj_group = h5_file if traj_key is None else h5_file[traj_key]
+        return _read_rgb_frames(traj_group["obs"], rgb_source, absolute_indices)
+
+    def _get_obs_sequence(self, traj_idx: int, start_idx: int, horizon: int) -> Dict[str, torch.Tensor]:
+        obs_traj = self.obs_data[traj_idx]
+        length = len(next(iter(obs_traj.values())))
+        indices = [max(0, min(start_idx - (horizon - 1) + i, length - 1)) for i in range(horizon)]
+        obs = {key: torch.from_numpy(value[indices]) for key, value in obs_traj.items()}
+        if self.include_rgb:
+            if "rgb" in obs_traj:
+                obs["rgb"] = torch.from_numpy(obs_traj["rgb"][indices])
+            elif self.lazy_rgb:
+                obs["rgb"] = torch.from_numpy(self._load_rgb_sequence(traj_idx, indices))
+        return obs
+
+    def _transform_action_sequence(self, traj_idx: int, start: int, act_seq: torch.Tensor) -> torch.Tensor:
+        if self.agent_control_mode == self.env_metas[traj_idx]["env_control_mode"]:
+            return act_seq
+        state_idx = min(max(0, start), len(self.obs_data[traj_idx]["state"]) - 1)
+        current_poses = extract_arm_pose_map_from_flat_state(
+            self.obs_data[traj_idx]["state"][state_idx],
+            self.env_metas[traj_idx],
+        )
+        meta = build_action_transform_meta(current_poses=current_poses, env_meta=self.env_metas[traj_idx])
+        transformed = inverse_transform_action(
+            obs=None,
+            next_obs=None,
+            env_action=act_seq.detach().cpu().numpy(),
+            env_control_mode=self.env_metas[traj_idx]["env_control_mode"],
+            agent_control_mode=self.agent_control_mode,
+            meta=meta,
+        )
+        return torch.from_numpy(transformed).float()
+
+    def __getitem__(self, index):
+        traj_idx, start, end, global_idx = self.slices[index]
+        length = len(self.action_data[traj_idx])
+        idx = min(max(0, start), length - 1)
+        next_idx = min(idx + self.act_horizon, length - 1)
+
+        data: Dict[str, Any] = {}
+        if "observations" in self.required_keys:
+            data["observations"] = self._get_obs_sequence(traj_idx, start, self.obs_horizon)
+        if "next_observations" in self.required_keys:
+            data["next_observations"] = self._get_obs_sequence(traj_idx, min(start + self.act_horizon, length), self.obs_horizon)
+        if "action" in self.required_keys:
+            act_seq = self.action_data[traj_idx][max(0, start):end]
+            if start < 0:
+                act_seq = torch.cat([act_seq[0].repeat(-start, 1), act_seq], dim=0)
+            if self.agent_control_mode != self.env_metas[traj_idx]["env_control_mode"]:
+                act_seq = self._transform_action_sequence(traj_idx, start, act_seq)
+            if len(act_seq) < self.pred_horizon:
+                pad_vec = compute_pad_vec(act_seq, self.is_abs_mode, self.pad_action_arm)
+                act_seq = torch.cat(
+                    [act_seq, pad_vec.unsqueeze(0).repeat(self.pred_horizon - len(act_seq), 1)],
+                    dim=0,
+                )
+            data["action"] = act_seq
+
+        terminal_flags = self.success[traj_idx] | self.terminated[traj_idx] | self.truncated[traj_idx]
+        reward, discount, terminated = compute_n_step_progress_signals(
+            self.rewards[traj_idx],
+            self.gammas[traj_idx],
+            terminal_flags,
+            idx,
+            self.act_horizon,
+        )
+
+        if "reward" in self.required_keys:
+            data["reward"] = reward.reshape(1)
+        if "discount" in self.required_keys:
+            data["discount"] = torch.tensor([discount], dtype=torch.float32)
+        if "value" in self.required_keys:
+            data["value"] = torch.tensor([self.progress_returns[traj_idx][idx]], dtype=torch.float32)
+        if "terminated" in self.required_keys:
+            data["terminated"] = torch.tensor([terminated], dtype=torch.float32)
+        if "truncated" in self.required_keys:
+            data["truncated"] = torch.tensor([self.truncated[traj_idx][next_idx]], dtype=torch.float32)
+        if "success" in self.required_keys:
+            data["success"] = torch.tensor([self.success[traj_idx][next_idx]], dtype=torch.float32)
+        if "progress_return" in self.required_keys:
+            data["progress_return"] = torch.tensor([self.progress_returns[traj_idx][idx]], dtype=torch.float32)
+        if "progress_mask" in self.required_keys:
+            data["progress_mask"] = torch.tensor([self.progress_masks[traj_idx][idx]], dtype=torch.float32)
+        if "progress_weight" in self.required_keys:
+            data["progress_weight"] = torch.tensor([self.progress_weights[traj_idx][idx]], dtype=torch.float32)
+        if "segment_type" in self.required_keys:
+            data["segment_type"] = torch.tensor([self.segment_type_ids[traj_idx]], dtype=torch.long)
+        if "segment_terminal_reward" in self.required_keys:
+            data["segment_terminal_reward"] = torch.tensor([self.segment_terminal_rewards[traj_idx]], dtype=torch.float32)
+        if "segment_end_is_intervention_boundary" in self.required_keys:
+            data["segment_end_is_intervention_boundary"] = torch.tensor([self.segment_end_is_intervention_boundary[traj_idx]], dtype=torch.float32)
+        if "failure_rank" in self.required_keys:
+            data["failure_rank"] = torch.tensor([self.failure_ranks[traj_idx]], dtype=torch.float32)
+        if "is_success_segment" in self.required_keys:
+            data["is_success_segment"] = torch.tensor([self._is_success_side_segment(traj_idx)], dtype=torch.float32)
+        if "is_failure_segment" in self.required_keys:
+            data["is_failure_segment"] = torch.tensor([self._is_failure_side_segment(traj_idx)], dtype=torch.float32)
+        if "cond" in self.required_keys and self.conds is not None:
+            data["cond"] = self.conds[global_idx].reshape(1)
+        if "intervention" in self.required_keys:
+            data["intervention"] = torch.tensor([self.intervention[traj_idx][idx]], dtype=torch.float32)
+        if "intervention_segment" in self.required_keys:
+            data["intervention_segment"] = torch.tensor(
+                [_is_intervention_segment_type(self.segment_type_names[traj_idx])],
+                dtype=torch.float32,
+            )
+        return data
+
+    def __len__(self):
+        return len(self.slices)
