@@ -631,3 +631,34 @@ Reusable `task_env.diagnostics.phase1.p1_5_control_expert` 消费锁定的 evalu
 独立 `CanonicalControlFeedback` 使用 semantic gripper opening 与非负 closing-direction force magnitude，并要求 step/time/opening 与同一 CanonicalStateView 一致。Force 表示最近完成的 native actuation interval；reset 时使用初始化后的 native force。Native force sign/index 只在 adapters 内转换，MuJoCo 在既有 post-forward refresh 前保存 completed-interval force。当前实现仅支持已审计的 positive-open Panda tendon binding，以及 deadband 小于 force limit 的 experimental profile；不声明通用 force-sensor/control support。canonical-state-v0、TaskArtifact v0、P1.2 no-control behavior 保持不变。
 
 `task_env.diagnostics.phase1.p1_5_r1_recovery` 只执行 provider-free state machine、resolved-profile free-space gripper、旧 C1-A 和 versioned settled C1-B prerequisites。R1 使用独立 oracle/lock；C1-B 完整旧 40 targets（包括其 archival 5N open gripper 和 controller identity）保持不变，最后完整 target 再 hold 1 秒。该 arm replay 不是由 R1 controller 重新生成的 expert sequence；new gripper 的 contact/expert integration 尚未测试。旧 moving-end failure、旧 160-tick gripper failure 与 R0 diagnostics 均保留。R1 不运行 C2、不创建 qualification decision；结果由 Human Review 判断。
+
+## 20. P1.5-R4 versioned stage readiness
+
+Advanced `PickCubeReadinessSolution` / `PickCubeReadinessConfig` (`pick-cube-readiness-v1`)
+are additive public expert clients. Historical `PickCubeSolution` remains unchanged.
+The versioned route reuses its geometric/planner primitives and separates plan
+exhaustion, physical readiness, and task outcome. `StageCompletionPolicy` supports
+pose_ready, gripper_ready, task_outcome; exhausted plans repeat the exact final
+public action, and traces mark readiness holds.
+
+Pose thresholds come from resolved ActionConfig controller deadbands, with a
+1-second timeout mechanically converted through Artifact control_dt. Read-only
+`ProductionCanonicalPandaController.readiness(state, feedback)` produces
+`CanonicalControlReadiness`: same-boundary semantic close readiness and physical
+force/error. Expert consumers receive only `ExpertExecutionInfo`, separately
+from task metrics; they never inspect controller memory or native force signs.
+The controller compute profile and identity are unchanged.
+
+Experimental close horizon follows R1: max(full opening range/opening step,
+full range/force adjustment step), rounded up, plus common 0.2-second dynamics
+margin. The 20 transition actions count within that total horizon. Planned budget
+120 excludes readiness holds; deterministic global cap sums planned budget and
+all stage hold budgets. Identity includes planner, resolved profile/thresholds,
+timebase, policies and derivation. Lift completes immediately at measured task
+success plus the unchanged 0.105m collection endpoint, even before plan exhaustion;
+final EE pose readiness is diagnostic only. If exhausted, final lift action may
+hold for at most 1 second, then explicit lift_outcome_timeout.
+
+`p1_5_readiness` is a locked production readiness smoke, not final P1.5 C2
+qualification. No task-artifact-v0, task-success, controller behavior, native
+physics, prior expert identity or older Evidence is revised.

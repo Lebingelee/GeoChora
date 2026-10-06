@@ -7,3 +7,5 @@ __all__=['RequestedAction','CanonicalAction','GripperControlTarget','CanonicalCo
 from .feedback import CanonicalControlFeedback, CanonicalGripperFeedback
 from .production import ProductionCanonicalPandaController
 __all__ += ["CanonicalControlFeedback", "CanonicalGripperFeedback", "ProductionCanonicalPandaController"]
+from .readiness import CanonicalControlReadiness, GripperReadiness
+__all__ += ["CanonicalControlReadiness", "GripperReadiness"]

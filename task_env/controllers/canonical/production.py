@@ -62,6 +62,20 @@ class ProductionCanonicalPandaController:
         return CanonicalGripperMemory(self._desired, self._commanded,
             self.gripper_config.force_limit_N, self._force_mode, self._force_initialized)
 
+    def readiness(self, state, feedback):
+        """Read-only projection at reset or the completed compute/step boundary."""
+        from .readiness import CanonicalControlReadiness, GripperReadiness
+        self._feedback(state, feedback)
+        if self._expected_step is None or state.control_step != self._expected_step:
+            raise ValueError('readiness requires current observed controller boundary')
+        force = feedback.gripper.closing_force_N
+        error = self.gripper_config.force_limit_N - force
+        ready = self._force_mode and self._force_initialized and error <= self.gripper_config.force_deadband_N
+        return CanonicalControlReadiness('canonical-control-readiness-v1',
+            state.control_step, state.simulation_time,
+            GripperReadiness(self.gripper_semantic_id, bool(ready), force,
+                self.gripper_config.force_limit_N, error))
+
     def compute(self, state, feedback, requested):
         self._feedback(state, feedback)
         if self._expected_step is None or state.control_step != self._expected_step:
