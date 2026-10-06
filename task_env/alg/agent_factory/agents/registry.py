@@ -6,6 +6,13 @@ if TYPE_CHECKING:
     from agent_factory.agents.base_agent import BaseAgent
 
 _AGENT_REGISTRY: Dict[str, Type['BaseAgent']] = {}
+_BUILTINS = {'cpiql-rnn': 'cpiql_rnn', 'Diffusion_CPIQL_DAC': 'diffusion_cpiql_dac', 'dsrl': 'dsrl', 'tdqc-rnn': 'tdqc_rnn', 'SmolVLA': 'smolvla_vanilla', 'SmolVLA_Vanilla': 'smolvla_vanilla', 'IQL_Advantage_Only': 'iql_advantage_only', 'pi0': 'pi0_vanilla', 'CPIQL_Ratio_Only': 'cpiql_ratio_only', 'CPIQL_Only': 'cpiql_only', 'Identity': 'identity', 'Diffusion_IQL': 'diffusion_iql', 'Diffusion_Vanilla': 'diffusion_vanilla', 'Diffusion_ITQC': 'diffusion_itqc', 'tdqc-mlp': 'tdqc_mlp', 'Flow_Vanilla': 'flow_vanilla'}
+
+def ensure_agent_loaded(name):
+    if name not in _AGENT_REGISTRY and name in _BUILTINS:
+        from importlib import import_module
+        import_module("agent_factory.agents.impl." + _BUILTINS[name])
+
 
 
 def _sanitize_common_cfg_fields(cfg_obj: Any):
@@ -57,6 +64,7 @@ def iter_agent_config_mixins(agent_type: str):
     This is the single public way for config resolution to discover which mixins
     an impl actually uses; callers should not duplicate MRO traversal logic.
     """
+    ensure_agent_loaded(agent_type)
     if agent_type not in _AGENT_REGISTRY:
         raise ValueError(f"Agent '{agent_type}' not found. Available: {list(_AGENT_REGISTRY.keys())}")
     agent_cls = _AGENT_REGISTRY[agent_type]
@@ -130,6 +138,7 @@ def make_agent(agent_type: str, cfg: Any = None) -> 'BaseAgent':
     """
     if cfg is None:
         raise ValueError("make_agent requires a resolved config. Call general_resolve() first.")
+    ensure_agent_loaded(agent_type)
     if agent_type not in _AGENT_REGISTRY:
         raise ValueError(f"Agent '{agent_type}' not found. Available: {list(_AGENT_REGISTRY.keys())}")
 

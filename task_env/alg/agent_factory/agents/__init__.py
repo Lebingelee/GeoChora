@@ -1,15 +1,12 @@
-from .impl.diffusion_iql import DiffusionIQLAgent
-from .impl.diffusion_itqc import DiffusionITQCAgent
-from .impl.diffusion_vanilla import DiffusionVanillaAgent
-from .impl.flow_vanilla import FlowVanillaAgent
-from .impl.diffusion_cpiql_dac import DiffusionCPIQLDACAgent
-from .impl.cpiql_only import CPIQLOnlyAgent
-from .impl.cpiql_ratio_only import CPIQLRatioOnlyAgent
-from .impl.cpiql_rnn import CPIQLRNNAgent
-from .impl.iql_advantage_only import IQLAdvantageOnlyAgent
-from .impl.dsrl import DSRLAgent
-from .impl.identity import IdentityAgent
-from .impl.tdqc_mlp import TDQCMLPAgent
-from .impl.tdqc_rnn import TDQCRNNAgent
-from .impl.pi0_vanilla import Pi0VanillaAgent
-from .impl.smolvla_vanilla import SmolVLAVanillaAgent
+"""Lazy compatibility exports; optional algorithms load only on request."""
+from importlib import import_module
+
+_EXPORTS = {'DiffusionIQLAgent': '.impl.diffusion_iql', 'DiffusionITQCAgent': '.impl.diffusion_itqc', 'DiffusionVanillaAgent': '.impl.diffusion_vanilla', 'FlowVanillaAgent': '.impl.flow_vanilla', 'DiffusionCPIQLDACAgent': '.impl.diffusion_cpiql_dac', 'CPIQLOnlyAgent': '.impl.cpiql_only', 'CPIQLRatioOnlyAgent': '.impl.cpiql_ratio_only', 'CPIQLRNNAgent': '.impl.cpiql_rnn', 'IQLAdvantageOnlyAgent': '.impl.iql_advantage_only', 'DSRLAgent': '.impl.dsrl', 'IdentityAgent': '.impl.identity', 'TDQCMLPAgent': '.impl.tdqc_mlp', 'TDQCRNNAgent': '.impl.tdqc_rnn', 'Pi0VanillaAgent': '.impl.pi0_vanilla', 'SmolVLAVanillaAgent': '.impl.smolvla_vanilla'}
+__all__ = list(_EXPORTS)
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    value = getattr(import_module(_EXPORTS[name], __name__), name)
+    globals()[name] = value
+    return value

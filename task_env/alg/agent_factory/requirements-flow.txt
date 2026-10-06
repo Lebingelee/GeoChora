@@ -1,0 +1,8 @@
+# State-only Flow preparation; optional visual/diffusion/VLA/hardware packages excluded.
+torch>=2.6
+numpy>=1.26
+h5py>=3.10
+omegaconf==2.3.0
+einops==0.8.1
+tqdm==4.67.1
+PyYAML>=6

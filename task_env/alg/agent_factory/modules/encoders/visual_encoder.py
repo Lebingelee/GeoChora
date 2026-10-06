@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision.models as models
 from typing import List, Optional
 
 def make_mlp(in_channels, mlp_channels, act_builder=nn.ReLU, last_act=True,
@@ -71,6 +70,7 @@ class VisualEncoder(nn.Module):
             feature_map_size = 128 if pool_feature_map else 128 * 6 * 6 
 
         elif backbone_type == "resnet":
+            import torchvision.models as models
             # ResNet18 Backbone (适合更高分辨率)
             resnet = models.resnet18(pretrained=True)
             
