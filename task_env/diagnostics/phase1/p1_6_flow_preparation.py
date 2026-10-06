@@ -8,8 +8,10 @@ from .flow_preparation.prepare import run,write
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,default=Path('workspace/qualification/phase1/p1_6_flow_preparation'))
+    parser.add_argument("--output", type=Path, help="New report path for a preserved preparation attempt")
     args=parser.parse_args()
-    if (args.root/'preparation_report.json').exists():
+    output = args.output or args.root/"preparation_report.json"
+    if output.exists():
         raise FileExistsError('refusing preparation Evidence collision')
     try:
         result=run(args.root)
@@ -22,7 +24,7 @@ def main():
         result={'status':'partial_with_localized_failure','first_boundary':boundary,
                 'error':str(error),'traceback':traceback.format_exc(),
                 'full_training_executed':False,'policy_rollout_executed':False}
-    write(args.root/'preparation_report.json',result)
+    write(output,result)
     print(result['status'])
     if 'error' in result:
         raise SystemExit(1)

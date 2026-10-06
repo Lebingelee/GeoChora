@@ -33,6 +33,15 @@ def write(path, value):
     path.write_text(json.dumps(value,indent=2,sort_keys=True,allow_nan=False)+'\n')
 
 
+def write_or_verify(path, value):
+    path = Path(path)
+    if path.exists():
+        if json.loads(path.read_text()) != json.loads(json.dumps(value, allow_nan=False)):
+            raise ValueError("existing preparation identity differs: " + str(path))
+    else:
+        write(path, value)
+
+
 def summary(array):
     return {key:getattr(array,key)(axis=0).tolist() for key in ('min','max','mean','std')}
 
@@ -48,7 +57,7 @@ def dataset_manifest(root):
     nn=distances.min(axis=1)
     bounds=[d.training_bounds for d in artifact.initialization.randomization]
     occupancy,_,_=np.histogram2d(xy[:,0],xy[:,1],bins=10,range=bounds)
-    write(root/'coverage_report.json',{'xy':summary(xy),'authored_bounds':bounds,'occupancy_10x10':occupancy.astype(int).tolist(),
+    write_or_verify(root/'coverage_report.json',{'xy':summary(xy),'authored_bounds':bounds,'occupancy_10x10':occupancy.astype(int).tolist(),
           'occupied_cells':int(np.count_nonzero(occupancy)),'nearest_neighbor_m':{'min':float(nn.min()),'max':float(nn.max()),'mean':float(nn.mean()),'median':float(np.median(nn))},'diagnostic_only':True})
     report=json.loads((root/'collection_report.json').read_text());rows=report['rows']
     if len(rows)!=100 or [v['seed'] for v in rows]!=list(range(1000,1100)):
@@ -64,7 +73,7 @@ def dataset_manifest(root):
         selected=[v for v in rows if v['role']==role];stages=Counter(s for v in selected for s in v['expert_stage_sequence'])
         total=sum(v['T'] for v in selected);holds=sum(v['holds'] for v in selected)
         manifest['statistics'][role]={'trajectories':len(selected),'samples':total,'holds':holds,'planned':total-holds,'hold_fraction':holds/total,'stages':dict(stages)}
-    write(root/'training_dataset_manifest.json',manifest)
+    write_or_verify(root/'training_dataset_manifest.json',manifest)
     return manifest
 
 
@@ -73,7 +82,7 @@ def run(root):
     manifest=dataset_manifest(root)
     user=OmegaConf.load(PROFILE)
     user.dataset.expert.demo_path=str(root/'training_dataset_manifest.json')
-    user.dataset.config.allow_failed_for_smoke=True # no failed seed is discarded; start_train fails closed
+    user.dataset.config={"allow_failed_for_smoke": True} # no failed seed is discarded; start_train fails closed
     OmegaConf.save(user,root/'flow_config.yaml')
     cfg,_=general_resolve(file_config=user)
     bundle=build_training_bundle(cfg,required_keys=['observations','action'])
@@ -178,7 +187,7 @@ def run(root):
     direct=cpu.actor.sample_action(cpu._preprocess_obs(obs),initial_noise=noise)
     actual=cpu.sample_action(obs,initial_noise=noise)
     denormalized=torch.equal(actual,cpu.denormalize_action(direct))
-    good=out.shape==(1,16,8) and bool(torch.isfinite(out).all()) and cpu_load and cuda_load and denormalized
+    good=out.shape==(1,16,8) and bool(torch.isfinite(out).all()) and cpu_load and cuda_load and denormalized and metadata==cpu_meta and cpu.step==1
     if not good:raise ValueError('checkpoint/inference smoke failed')
     write(root/'cpu_smoke/report.json',{'pass':good,'input_shape':[1,2,33],'output_shape':list(out.shape),'finite':bool(torch.isfinite(out).all()),'denormalized':denormalized,'wall_time':elapsed,'cpu_load':cpu_load})
     write(root/'cuda_smoke/smoke_checkpoint_identity.json',{'checkpoint_file_sha256':file_sha,'artifact_identity':identity,'cuda_load':cuda_load,'cpu_load':cpu_load,'restored_optimizer_step':cpu.step,'metadata_preserved':metadata==cpu_meta,'purpose':metadata['purpose']})
