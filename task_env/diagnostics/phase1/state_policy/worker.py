@@ -93,7 +93,7 @@ def evaluate_policy(provider,seed,oracle,checkpoint,output):
     spec,lock=verify(oracle);artifact,source,cfg=context();sample=ResetSample.from_mapping(spec['samples'][str(seed)]);original=sample.to_mapping()
     checkpoint_hash=hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest();policy=load_checkpoint(checkpoint)
     report={'provider':provider,'seed':seed,'checkpoint_sha256':checkpoint_hash,'sample_hash':sample.identity_hash,'oracle_sha256':lock['sha256'],
-        'started_at':datetime.now(timezone.utc).isoformat(),'success':False,'steps_to_success':None,'terminated':False,'truncated':False,'clipping_count':0,'pass':False};session=None;trace=[]
+        'started_at':datetime.now(timezone.utc).isoformat(),'success':False,'steps_to_success':None,'terminated':False,'truncated':False,'clipping_count':0,'actions_issued':0,'pass':False};session=None;trace=[];max_lift=None
     try:
         session=materialize_control(artifact,execution(provider),source=source,binding=ControlBinding('panda-v1/gripper',.08));session.reset(sample)
         state=session.snapshot();feedback=session.control_feedback(state);controller=ProductionCanonicalPandaController.from_source(artifact,source);controller.reset(state,feedback)
@@ -101,19 +101,20 @@ def evaluate_policy(provider,seed,oracle,checkpoint,output):
         for _ in range(spec['policy_eval_horizon']):
             # Only current public state/feedback enter inference; no expert is constructed.
             values=policy(features(state,feedback));request=requested_action(values);canonical,target=controller.compute(state,feedback,request)
+            report['clipping_count']+=int(canonical.clipped);report['actions_issued']+=1
             applied=session.apply_control(target);before=state;state=session.step()
             if state.control_step!=before.control_step+1 or state.simulation_time<=before.simulation_time:
                 report['invalid_timebase']={'before_step':before.control_step,'after_step':state.control_step,'time_before':before.simulation_time,'time_after':state.simulation_time}
                 raise ValueError('canonical_timebase_regression: native reset/rollback during learned rollout')
             feedback=session.control_feedback(state);_,info,e=observation(state,artifact)
-            report['clipping_count']+=int(canonical.clipped);max_lift=max(max_lift,float(info['task_metrics']['cube_lift']))
+            max_lift=max(max_lift,float(info['task_metrics']['cube_lift']))
             trace.append({'state':state.to_mapping(),'feedback':feedback.to_mapping(),'requested':request.to_mapping(),'canonical':canonical.to_mapping(),'target':target.to_mapping(),'applied':applied.to_mapping(),'task_metrics':info['task_metrics'],'is_success':info['is_success']})
             if info['is_success']:report.update(success=True,steps_to_success=state.control_step);break
         report.update(steps=len(trace),max_cube_lift=max_lift,clip_rate=report['clipping_count']/max(1,len(trace)),horizon_reached=len(trace)==spec['policy_eval_horizon'],sample_unchanged=sample.to_mapping()==original,
             checkpoint_unchanged=hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest()==checkpoint_hash)
         report['pass']=report['success'] and report['sample_unchanged'] and report['checkpoint_unchanged']
         report['first_boundary']=None if report['pass'] else 'cross_provider_policy_behavior'
-    except Exception as error:report.update(first_boundary='runner_action_boundary',error=str(error),traceback=traceback.format_exc(),steps=len(trace),attempted_steps=len(trace)+1)
+    except Exception as error:report.update(first_boundary='runner_action_boundary',error=str(error),traceback=traceback.format_exc(),steps=len(trace),attempted_steps=report['actions_issued'],max_cube_lift=max_lift,clip_rate=report['clipping_count']/max(1,report['actions_issued']),checkpoint_unchanged=hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest()==checkpoint_hash,sample_unchanged=sample.to_mapping()==original)
     finally:
         if session is not None:session.close()
     write_json(output.parent/'trace.json',trace);write_json(output,report);return report
