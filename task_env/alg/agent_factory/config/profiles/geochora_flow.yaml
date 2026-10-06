@@ -18,7 +18,7 @@ dataset:
   include_depth: false
   dataset_type: geochora_canonical_flow
   expert:
-    demo_path: workspace/qualification/phase1/p1_6_flow_preparation/training_dataset_manifest.json
+    demo_path: workspace/qualification/phase1/p1_6_flow_preparation/training_dataset_manifest_v1.json
 env:
   obs_mode: state
   proprio_dim: 33

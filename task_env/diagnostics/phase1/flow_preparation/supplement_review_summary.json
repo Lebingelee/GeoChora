@@ -2547,7 +2547,10 @@
   "qualification_claim": false,
   "regressions": {
     "compileall": true,
+    "default_profile_selected_v1": true,
+    "default_profile_smoke_config_identity_unchanged": true,
     "diff_check": true,
+    "final_profile_import_alignment_checks": true,
     "flow_import_alignment_instrumentation": true,
     "frozen_lower_layer_sources": true,
     "historical_evidence_preserved": true,
