@@ -603,3 +603,13 @@ CanonicalStateView。Fixed camera 使用 native projection/rendered metric depth
 不修改生产 CameraSensor/capture contract。Contact 只 gate basic support behavior，
 不 equalize native impulses 或调节 solver 参数。全 route 结果属于 bounded review
 Evidence；没有 provider-wide qualification 或 P1.4/P1.5 capability claim。
+
+## 17. P1.4 additive camera geometry boundary
+
+`task_env.observations.canonical_camera` 提供 advanced camera-observation-v0 linked contract，引用 TaskArtifact hash，具有独立 identity；task-artifact-v0 与 approved PickCube serialization 不变。Legacy CameraSpec quaternion 继续表示 +X forward、+Z up mount/view frame；显式 lowering 需要调用者提供 semantic parent binding。Optical +X right、+Y down、+Z forward，固定旋转分别映射到 legacy mount -Y、-Z、+X。Resolved metadata 使用 `T_world_from_mount`、`T_world_from_camera`、`T_camera_from_world`，legacy extrinsic 不作为新 contract 的权威。
+
+Geochora 根据 vertical FOV 和 resolution 构造 K：fx=fy=H/2/tan(fov_y/2)，cx=W/2、cy=H/2。Image-edge pixel index center 为 (u+0.5,v+0.5)。Canonical depth 是 HxW float32、meter optical-Z；有效值 positive，0 表示 invalid/background/clipped。RGB honor HWC/CHW、float32 [0,1] 或 uint8 [0,255]。Metadata 的 capture step/time 直接来自解析 semantic parent 的同一 CanonicalStateView；同步 post-control-step。
+
+`task_env.render.camera.create_camera_session` 是 additive headless render route；独立 render admission 比较 ExecutionSpec.render_provider，当前只实现 CPU native GeoPhys/GeoPhys、MuJoCo/MuJoCo pairings，不 fallback。Source bridge 明确限于 provider-neutral static closed triangle meshes；camera attachment 可动态，scene geometry/material/texture migration 尚未覆盖。GeoPhys adapter 在已初始化的 native runtime 上拥有公开 RayCamera/FrameBuffer/MeshPipeline/RayTraceEngine，转换 ray-distance depth，不依赖 visualizer._camera；MuJoCo adapter 使用公开 Renderer。Render close 释放 session references；GeoPhys native fields 的 process-global ownership 需要 worker exit 完成 teardown。
+
+该 bounded geometry Evidence 不宣称 RGB photometric equivalence、完整任务 visuomotor portability、GPU 或 provider-wide qualification。P1.1–P1.3 detector 不因新 route 改变。

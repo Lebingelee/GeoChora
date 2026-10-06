@@ -8,6 +8,7 @@ import numpy as np
 
 from ..environment import RenderConfig, RuntimeSnapshot, SensorObservation
 from .camera import CameraSensor
+from .canonical_camera.images import normalize_rgb
 
 
 class CameraObservationProvider:
@@ -62,7 +63,7 @@ class CameraObservationProvider:
                     raise ValueError(
                         f"camera {sensor.name} RGB shape {array.shape} != {expected_shape}"
                     )
-                rgb[sensor.name] = np.ascontiguousarray(array)
+                rgb[sensor.name] = normalize_rgb(array, sensor.spec)
             if sensor.spec.depth:
                 depth_frame = self._visualizer.read_depth()
                 depth_array = np.asarray(depth_frame, dtype=np.float32)
