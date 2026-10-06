@@ -662,3 +662,13 @@ hold for at most 1 second, then explicit lift_outcome_timeout.
 `p1_5_readiness` is a locked production readiness smoke, not final P1.5 C2
 qualification. No task-artifact-v0, task-success, controller behavior, native
 physics, prior expert identity or older Evidence is revised.
+
+## 19. P1.6 additive canonical trajectory / state-policy route
+
+Advanced `task_env.trajectory.canonical` 提供 `canonical-trajectory-v0` 和独立 `task-env-canonical-trajectory-v0` H5 route；不修改 historical task-env-h5/v2。Recorder 拥有 reset boundary、每个 transition 的 post-step boundary 和 freeze，验证 T+1/T、timebase、requested/canonical/target/applied linkage、target hash、semantic names 与 metadata identities。Boundary 包含 CanonicalStateView、Feedback、Readiness 和 task outcome；planned/readiness-hold 都是完整 transitions。H5 保存 exact logical mappings 与 float64/int64/bool numeric projections，load 校验 shapes/dtypes/content；logical hash 不依赖 HDF5 container bytes。Heterogeneous expert diagnostic values losslessly encode 为每个 key 的 JSON string，不作为 learner feature。
+
+Optional `task_env.alg.state_bc` 定义 `pick-cube-state-policy-v0` 33D float32 features：arm position7/velocity7、canonical gripper opening1、EE position3/rotation columns6、cube position3/rotation columns6；rotation 顺序为 column0 然后 column1。8D public absolute_joint target 来自 desired arm positions 和 physical opening 的 inverse signed-scalar mapping，不读取 servo/native ctrl。Dataset 消费 loaded canonical files，保留全部 readiness holds，checkpoint-local normalization 只来自各 source train set。固定 CPU MLP [128,128]/ReLU/Adam route 与 validation checkpoint selection 均属于 versioned Experiment config；provider 仅是 training provenance，不参与 inference branch。
+
+`task_env.diagnostics.phase1.p1_6_state_policy` 执行冻结 spec 下的 collection、loaded-control replay、learner/checkpoint smoke、两-source training、same-checkpoint transfer matrix 与 lower-phase regressions。Learned rollout 始终经 RequestedAction -> accepted ProductionCanonicalPandaController -> provider realization；direct loaded targets 只用于 replay。Time rollback 是 runtime failure，不能作为有效 policy state继续运行。
+
+当前 bounded Evidence：八个 train/validation expert episodes 达到 collection endpoint；trajectory/roundtrip/replay/checkpoint portability 通过；EvaluationSampleSet 31/73 的 task-success matrix 为 1/8，G->MuJoCo seed73 另有 native warning/time rollback，原始失败与安全停止复查保留。整体为 partial_with_localized_failure，不宣称 state-policy transfer qualification、statistical robustness、visuomotor portability 或 P1.7。P1.5 accepted behavioral sources、TaskArtifact v0 和 GeoPhys 保持冻结。
