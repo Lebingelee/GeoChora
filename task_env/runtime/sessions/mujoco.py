@@ -70,6 +70,29 @@ class _MuJoCoSession(_SessionValues):
             poses[name] = pose(data.site_xpos[index], quaternion)
         return self._state(positions, velocities, poses, data.time)
 
+    def apply_control(self, target):
+        from .control import validate_target
+        from ...controllers.canonical.contracts import AppliedCanonicalControl
+        validate_target(self, target)
+        clipped = False
+        realized = {}
+        for name, index in self._target_actuators.items():
+            requested = target.arm_servo_position[name]
+            low, high = self._model.actuator_ctrlrange[index]
+            value = float(np.clip(requested, low, high)) if self._model.actuator_ctrllimited[index] else requested
+            self._data.ctrl[index] = value
+            realized[name] = value
+            clipped = clipped or value != requested
+        index = self._open_actuators[0]
+        low, high = self._model.actuator_ctrlrange[index]
+        opening = float(np.clip(target.gripper.servo_opening_m, 0, self._control_binding.opening_range_m))
+        self._data.ctrl[index] = low + opening/self._control_binding.opening_range_m*(high-low)
+        self._model.actuator_forcelimited[index] = 1
+        self._model.actuator_forcerange[index] = (-target.gripper.force_limit_N, target.gripper.force_limit_N)
+        return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'mujoco',
+            realized, opening, target.gripper.force_limit_N, clipped,
+            'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
+
     def step(self):
         self._require_reset()
         for _ in range(self._artifact.timebase.control_substeps):

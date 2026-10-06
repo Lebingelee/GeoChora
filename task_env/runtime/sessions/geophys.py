@@ -63,6 +63,25 @@ class _GeoPhysSession(_SessionValues):
         poses.update({name: pose(readback.site_xpos[index], readback.site_xquat[index]) for name, index in self._frames.items()})
         return self._state(positions, velocities, poses, readback.simulation_time)
 
+    def apply_control(self, target):
+        from .control import validate_target
+        from ...controllers.canonical.contracts import AppliedCanonicalControl
+        from ...environment import ControlCommand
+        validate_target(self, target)
+        ctrl = np.array(self._initial.ctrl, copy=True)
+        for name, index in self._target_actuators.items():
+            ctrl[index] = target.arm_servo_position[name]
+        index = self._open_actuators[0]
+        low, high = self._ctrl_range[index]
+        ctrl[index] = low + target.gripper.servo_opening_m / self._control_binding.opening_range_m * (high-low)
+        self._boundary.set_actuator_force_limits((index,), target.gripper.force_limit_N)
+        applied = self._boundary.apply_control(ControlCommand(ctrl, np.zeros(8), np.zeros(8), ctrl, np.zeros(8), "canonical_position"))
+        realized = {name: float(applied.applied_ctrl[i]) for name, i in self._target_actuators.items()}
+        opening = float((applied.applied_ctrl[index]-low)/(high-low)*self._control_binding.opening_range_m)
+        return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'geophys',
+            realized, opening, target.gripper.force_limit_N, applied.clipped,
+            'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
+
     def step(self):
         self._require_reset()
         self._boundary.step(substeps=self._artifact.timebase.control_substeps)
