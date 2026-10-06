@@ -580,3 +580,26 @@ semantics wiring 和一步时间，以及 admission negative/fresh provider-free
 Manifest 仅声明 implemented；测试结论与 provenance 位于 P1.2 Evidence。
 该 review route 不产生 qualification、physics/contact/controller equivalence
 或 PickCube success parity claim，P1.3+ 保持 deferred，Human Judge decision 尚未创建。
+
+## 16. P1.3 oracle-locked diagnostic route
+
+`task_env.diagnostics.phase1.p1_3_conformance` 是 opt-in diagnostic microprobe
+入口，包含 Asset/Frame、Free-fall、Joint-tracking、fixed Camera/Depth、Contact。
+Fixture 复用 provider-neutral TaskSceneSource/MJCF representation；recipe hash
+覆盖 source bytes、semantic bindings、timebase、gravity、geometry/inertial、
+actuator/camera/contact facts。Oracle YAML 与 fixture hashes 在 native execution
+前 SHA256-lock，之后不修改 tolerance。每个 provider/probe 独立运行、保留 raw
+measured series，并分别对 analytical/behavioral oracle 判定；pairwise difference
+仅用于诊断，不把 MuJoCo 当作 truth oracle。
+
+Runtime manifest provider version 由实际 import source / checkout revision 或
+installed package metadata 机械推导，不再由代码固定 GeoPhys SHA。Repository
+revision、package version、dirty build fingerprint、manifest value 在 Evidence
+中分别记录；没有可解析 build identity 时拒绝声明。该变更不改变 P1.2 API、
+ResetSample、Task Artifact identity 或 task semantics。
+
+Conformance native readback 仅存在于 diagnostics 的 private adapters，不进入
+CanonicalStateView。Fixed camera 使用 native projection/rendered metric depth，
+不修改生产 CameraSensor/capture contract。Contact 只 gate basic support behavior，
+不 equalize native impulses 或调节 solver 参数。全 route 结果属于 bounded review
+Evidence；没有 provider-wide qualification 或 P1.4/P1.5 capability claim。
