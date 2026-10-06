@@ -3,6 +3,7 @@ from dataclasses import replace
 import json,os,subprocess,sys
 from unittest.mock import patch
 import numpy as np
+from ....utils.rotation import quat_wxyz_to_matrix,rotvec_to_matrix
 from ....artifacts import CapabilityAdmissionError
 from ....controllers.canonical import RequestedAction,CanonicalAction,CanonicalControlTarget
 from ....controllers.canonical.kinematics import ARM
@@ -28,6 +29,22 @@ def checks():
         result['checks'][key+'_deterministic']=action==again[0] and target==again[1]
         result['checks'][key+'_roundtrip']=CanonicalAction.from_mapping(json.loads(json.dumps(action.to_mapping())))==action and CanonicalControlTarget.from_mapping(json.loads(json.dumps(target.to_mapping())))==target
         result['checks'][key+'_finite_semantic']=target.arm_joint_order==ARM and np.isfinite(list(target.arm_position.values())).all() and 0<=target.gripper.opening_m<=.08
+    # Independent reference-composition fixtures; the rotated base distinguishes base from world.
+    original_base=model.base_transform.copy();model.base_transform[:3,:3]=rotvec_to_matrix(np.array([0.,0.,.4]))
+    delta=np.array([.01,0.,0.]);dR=rotvec_to_matrix(np.array([0.,.01,0.]));current=state.pose_world['panda-v1/ee'];R=quat_wxyz_to_matrix(current.quaternion_wxyz);B=model.base_transform[:3,:3]
+    for ref,expected_position,expected_rotation in (
+        ('world',np.array(current.position)+delta,dR@R),
+        ('base',np.array(current.position)+B@delta,B@dR@B.T@R),
+        ('ee',np.array(current.position)+R@delta,R@dR)):
+        action,_=controller.compute(state,RequestedAction('delta_pose',ref,'rotvec',(.01,0.,0.,0.,.01,0.,1.)))
+        pose=action.resolved_world_pose
+        result['checks']['delta_'+ref+'_composition']=bool(np.max(abs(np.array(pose.position)-expected_position))<1e-12 and np.max(abs(quat_wxyz_to_matrix(pose.quaternion_wxyz)-expected_rotation))<1e-12)
+    model.base_transform=original_base
+    normalized,_=controller.compute(state,requests[1]);result['checks']['normalized_public_quaternion']=bool(abs(np.linalg.norm(normalized.interpreted_values[3:7])-1)<1e-12)
+    _,immutable=controller.compute(state,requests[0])
+    try:immutable.arm_position[ARM[0]]=0.
+    except TypeError:result['checks']['immutable_target']=True
+    else:result['checks']['immutable_target']=False
     for name,values in [('shape',(0.,)),('nonfinite',tuple([float('nan')]*8))]:
         try:RequestedAction('absolute_joint',None,'none',values)
         except (ValueError,TypeError):result['checks']['reject_'+name]=True

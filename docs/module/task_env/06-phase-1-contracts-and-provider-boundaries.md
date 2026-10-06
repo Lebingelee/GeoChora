@@ -613,3 +613,13 @@ Geochora 根据 vertical FOV 和 resolution 构造 K：fx=fy=H/2/tan(fov_y/2)，
 `task_env.render.camera.create_camera_session` 是 additive headless render route；独立 render admission 比较 ExecutionSpec.render_provider，当前只实现 CPU native GeoPhys/GeoPhys、MuJoCo/MuJoCo pairings，不 fallback。Source bridge 明确限于 provider-neutral static closed triangle meshes；camera attachment 可动态，scene geometry/material/texture migration 尚未覆盖。GeoPhys adapter 在已初始化的 native runtime 上拥有公开 RayCamera/FrameBuffer/MeshPipeline/RayTraceEngine，转换 ray-distance depth，不依赖 visualizer._camera；MuJoCo adapter 使用公开 Renderer。Render close 释放 session references；GeoPhys native fields 的 process-global ownership 需要 worker exit 完成 teardown。
 
 该 bounded geometry Evidence 不宣称 RGB photometric equivalence、完整任务 visuomotor portability、GPU 或 provider-wide qualification。P1.1–P1.3 detector 不因新 route 改变。
+
+## 18. P1.5 additive canonical control review route
+
+Advanced opt-in `task_env.controllers.canonical` 定义 RequestedAction、CanonicalAction、CanonicalControlTarget 和 AppliedCanonicalControl。Canonical action 保留原始 mode/reference/rotation 与 interpreted values、clipped、resolved world pose；target 区分七个 semantic arm desired positions 与 corrected servo positions，gripper 区分 opening_m、force_limit_N 与 servo_opening_m。Native actuator IDs/ctrl arrays 留在 adapter 内。
+
+CanonicalPandaController 从 Geochora-owned Panda source chain 计算 FK/Jacobian/DLS，不接收 provider、solver、native model 或地址。当前 bounded profile 为 stateless achieved-state one-increment DLS，显式保留 shared config 与 controller identity；不宣称复现 legacy stateful target accumulation 或 experimental gripper force-feedback mode。默认 signed gripper scalar 对应 0–0.08m，legacy physical profile 为 5N、2500N/m opening correction。Delta world/base/ee composition 有 provider-free checks。
+
+`task_env.runtime.sessions.control.materialize_control` 在 native materialization 前执行 control capability admission。ControlledRuntimeSession 添加 apply_control(target) -> AppliedCanonicalControl，step 沿用 P1.2 ZOH/control-substeps 路径；legacy controllers、RuntimeSnapshot、TaskStateView、no-control session 和 approved task-artifact-v0 均保留。
+
+Reusable `task_env.diagnostics.phase1.p1_5_control_expert` 消费锁定的 evaluation oracle。C1 使用一次生成的 semantic targets；C2 compatibility view 只来自 CanonicalStateView、canonical task evaluation 与 action metadata，调用 unchanged PickCubeSolution。该 route 目前是部分实现的 review candidate：C1-A 通过；锁定 gripper close duration 内未满足 close bound，C1-B 未满足 final tracking bound。依据 operator Goal 的 low-cost prerequisite gate，C2 未执行。没有 expert success、provider-wide qualification、P1.6 trajectory 或 policy portability claim；详细数值/provenance 属于 P1.5 Evidence 和后续 Human Review。

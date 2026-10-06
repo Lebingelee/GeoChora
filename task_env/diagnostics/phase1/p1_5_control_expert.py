@@ -21,7 +21,8 @@ def main():
             report['providers'].setdefault(provider,{})
             # C2 prerequisites are native free-space and physical gripper correctness, not optimistic rollout expansion.
             if route=='C2' and not all(report['providers'][provider][r].get('pass',False) for r in ('C1_A','gripper')):
-                report['providers'][provider][route]={'pass':False,'not_run':'free-space/gripper prerequisite failed'};continue
+                report['providers'][provider][route]={'pass':False,'not_run':'G2 free-space/gripper prerequisite failed; operator Goal forbids C2 before these pass',
+                    'rows':[{'seed':sample['task_seed'],'sample_id':sample['sample_id'],'sample_hash':sample['sample_id'].removeprefix('reset-'), 'status':'not_run'} for sample in spec['samples']]};continue
             output=root/route/provider/'report.json';output.parent.mkdir(parents=True,exist_ok=True)
             cmd=[sys.executable,'-m','task_env.diagnostics.phase1.p1_5_control_expert','--oracle',str(args.oracle),'--output',str(output),'--worker',provider,'--route',route]
             (output.parent/'command.txt').write_text('PYTHONPATH=GeoPhys/src:. PYTHONDONTWRITEBYTECODE=1 '+' '.join(cmd)+'\n')
@@ -36,6 +37,7 @@ def main():
                 joint=float(np.max(np.abs(np.array(a['final_joint'])-b['final_joint'])));ee=float(np.linalg.norm(np.array(a['final_EE'])-b['final_EE']))
                 report['pairwise'][route]={'joint_max_abs':joint,'EE_distance_m':ee,'pass':joint<=spec['bounds'][route+'_pairwise_joint'] and (route=='C1_A' or ee<=spec['bounds']['C1_B_pairwise_EE_m'])}
             else:report['pairwise'][route]={'pass':False,'not_comparable':'provider route failed before measurement'}
+    report['first_failing_boundary']=next((provider+'/'+route+'/'+str(report['providers'][provider][route].get('first_boundary') or 'gate') for route in ('C1_A','gripper','C1_B','C2') for provider in ('geophys','mujoco') if not report['providers'][provider][route].get('pass',False)),None)
     report['pass']=all(v.get('pass',False) for routes in report['providers'].values() for v in routes.values()) and all(v['pass'] for v in report['pairwise'].values())
     report['status']='ready_for_human_review' if report['pass'] else 'partial_with_localized_failure';write_json(args.output,report)
     print(json.dumps({'status':report['status'],'provider_routes':{p:{r:v.get('pass') for r,v in rows.items()} for p,rows in report['providers'].items()},'pairwise':report['pairwise']},indent=2))
