@@ -586,7 +586,11 @@ class SensorObservation:
             "rgb",
             MappingProxyType(
                 {
-                    str(name): _readonly_array(value, name=f"rgb.{name}", ndim=3)
+                    # CameraSpec owns RGB dtype; preserve its advertised uint8 mode.
+                    str(name): _readonly_array(
+                        value, name=f"rgb.{name}", ndim=3,
+                        dtype=np.uint8 if np.asarray(value).dtype == np.uint8 else np.float32,
+                    )
                     for name, value in self.rgb.items()
                 }
             ),

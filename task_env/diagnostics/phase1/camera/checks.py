@@ -61,6 +61,7 @@ def pure_checks(tolerance):
     results['missing_semantic_parent_fails']=False
     try:resolve_camera(replace(c,parent_frame='absent/parent'),state())
     except KeyError:results['missing_semantic_parent_fails']=True
+    results.update(legacy_capture_checks())
     return {k:bool(v) for k,v in results.items()}
 
 
@@ -86,3 +87,31 @@ def admission_checks():
         except CapabilityAdmissionError:rejected=True
         checks['cross_pairing']={'rejected':rejected,'native_construction_count':constructor.call_count}
     return checks
+
+
+def legacy_capture_checks():
+    """Exercise the actual compatibility capture/container, not only normalization."""
+    from types import SimpleNamespace
+    from ....environment import CameraSpec
+    from ....observations.camera import CameraSensor
+    from ....observations.capture import CameraObservationProvider
+    frame = np.linspace(0,1,8*6*3,dtype=np.float32).reshape(6,8,3)
+    class Visualizer:
+        def write_camera_pose(self, value): pass
+        def read_frame(self, **kwargs): return frame
+        def close(self): pass
+    class Source:
+        def build_visualizer(self, **kwargs): return Visualizer()
+    results = {}
+    for layout in ('HWC','CHW'):
+        for dtype in ('float32','uint8'):
+            spec = CameraSpec('legacy',width=8,height=6,rgb_layout=layout,rgb_dtype=dtype)
+            provider = CameraObservationProvider(render_source=Source(),config=SimpleNamespace(backend='raytracer'),
+                camera_sensors=(CameraSensor(spec=spec,references=None),))
+            observed = provider.capture(object()).rgb['legacy']
+            expected = frame if dtype == 'float32' else np.rint(frame*255).astype(np.uint8)
+            if layout == 'CHW': expected = expected.transpose(2,0,1)
+            results[f'legacy_capture_{layout}_{dtype}'] = bool(np.array_equal(observed,expected)
+                and observed.dtype == np.dtype(dtype) and not observed.flags.writeable)
+            provider.close()
+    return results
