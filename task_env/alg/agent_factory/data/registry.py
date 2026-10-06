@@ -61,8 +61,11 @@ def ensure_builtin_dataset_types_loaded() -> None:
 
 
 def get_dataset_type_spec(dataset_type: str) -> DatasetTypeSpec:
-    ensure_builtin_dataset_types_loaded()
     normalized = _normalize_dataset_type(dataset_type)
+    if normalized == "geochora_canonical_flow":
+        from agent_factory.data.impl import geochora_canonical
+    else:
+        ensure_builtin_dataset_types_loaded()
     if normalized not in _DATASET_REGISTRY:
         available = sorted(_DATASET_REGISTRY.keys())
         raise ValueError(f"Unknown dataset_type '{dataset_type}'. Available: {available}")
@@ -119,8 +122,6 @@ def build_training_bundle(
     cfg: Any,
     required_keys: Optional[Sequence[str]] = None,
 ):
-    ensure_builtin_dataset_types_loaded()
-
     dataset_type = getattr(cfg.dataset, "dataset_type", "") or infer_dataset_type_from_agent_type(
         getattr(cfg, "agent_type", "")
     )
@@ -144,6 +145,9 @@ def build_training_bundle(
         "expert_dataset": expert_dataset,
         "offline": expert_dataset,
     }
+
+    if dataset_type == "geochora_canonical_flow":
+        bundle["validation"] = expert_dataset.validation_dataset()
 
     dataset_key = str(getattr(cfg.train, "dataset_key", "expert_dataset"))
     valid_dataset_keys = {"expert_dataset", "replaybuffer", "expert_dataset+replaybuffer"}

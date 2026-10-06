@@ -602,7 +602,7 @@ def _infer_h5_stats(h5_path: str) -> Dict[str, int]:
 
 def _fill_inferred_env_stats(cfg: Any, user_cfg: Dict[str, Any]) -> None:
     dataset_type = str(getattr(cfg.dataset, "dataset_type", "") or "").strip().lower()
-    if dataset_type in {"tdqc", "tdqc_feature"}:
+    if dataset_type in {"tdqc", "tdqc_feature", "geochora_canonical_flow"}:
         return
     demo_path = str(cfg.dataset.expert.demo_path)
     if not demo_path or not os.path.exists(demo_path):

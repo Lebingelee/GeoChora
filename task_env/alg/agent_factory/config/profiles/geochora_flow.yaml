@@ -1,0 +1,45 @@
+agent_type: Flow_Vanilla
+agent_control_mode: absolute_joint
+seed: 2026
+train:
+  device: cuda
+  batch_size: 512
+  num_workers: 0
+  train_object: actor
+  dataset_key: expert_dataset
+  actor_iters: 0 # derived from the actual training DataLoader before future training
+  save_root: workspace/qualification/phase1/p1_6_flow_preparation/future_training
+  exp_name: flow_vanilla_geochora
+agent_sp:
+  epoch_budget: 20
+  steps_per_epoch: 0
+dataset:
+  include_rgb: false
+  include_depth: false
+  dataset_type: geochora_canonical_flow
+  expert:
+    demo_path: workspace/qualification/phase1/p1_6_flow_preparation/training_dataset_manifest.json
+env:
+  obs_mode: state
+  proprio_dim: 33
+  action_dim: 8
+  obs_horizon: 2
+  pred_horizon: 16
+  act_horizon: 8
+  num_cameras: 0
+  env_control_mode: absolute_joint
+  control_mode: absolute_joint
+actor:
+  obs_horizon: 2
+  pred_horizon: 16
+  action_dim: 8
+  norm:
+    type: min_max
+  encoder:
+    type: CNN_state_encoder
+    include_rgb: false
+    proprio_dim: 33
+    out_dim: 256
+    hidden_dims: [256]
+    num_cameras: 0
+    view_fusion: concat

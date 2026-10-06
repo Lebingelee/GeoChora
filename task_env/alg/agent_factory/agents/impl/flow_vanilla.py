@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 
 from agent_factory.agents.base_agent import BaseAgent
@@ -12,6 +12,9 @@ class AgentSpecialConfig:
     Vanilla flow matching policy config.
     """
 
+    epoch_budget: int = 20
+    steps_per_epoch: int = 0
+    artifact_identity: dict = field(default_factory=dict)
     iters: int = 100000
     save_dir: str = "run_results"
     exp_name: str = ""
@@ -40,39 +43,36 @@ class FlowVanillaAgent(MainMixin, FlowMatchingActorMixin, BaseAgent):
         exp_name = str(getattr(train_cfg, "exp_name", "") or self.cfg.agent_type)
         return os.path.join(save_root, exp_name), exp_name
 
-    def train_loop(self, dataloader, num_steps, save_dir=""):
-        from tqdm import tqdm
+    def train_loop(self, dataloader, num_steps, save_dir="", validation_loader=None):
+        from agent_factory.training.flow_metrics import train_loop
+        return train_loop(self, dataloader, num_steps, save_dir, validation_loader)
 
-        self.train()
-        run_save_interval = max(num_steps // 4, 1)
+    def save(self, path, meta=None):
+        identity = dict(self.cfg.agent_sp.artifact_identity)
+        if identity:
+            from agent_factory.training.identity import config_identity
+            if config_identity(self.cfg) != identity['resolved_config_sha256']:
+                raise ValueError('Flow config identity changed before save')
+        return super().save(path, meta={**(meta or {}), 'artifact_identity': identity})
 
-        pbar = tqdm(range(num_steps), desc="Train FLOW MATCHING (Vanilla)", leave=True)
-
-        def infinite_iterator(loader):
-            while True:
-                for batch in loader:
-                    yield batch
-
-        iterator = infinite_iterator(dataloader)
-        total_loss_actor = 0
-
-        for i in pbar:
-            batch = next(iterator)
-            batch = self._batch_to_device(batch)
-
-            loss_dict = self.update_actor(batch)
-            total_loss_actor += loss_dict["loss_actor"]
-
-            if (i + 1) % 100 == 0:
-                pbar.set_postfix({"Loss_Actor": total_loss_actor / 100})
-                total_loss_actor = 0
-
-            if save_dir and (i + 1) % run_save_interval == 0:
-                current_step = i + 1
-                save_path = os.path.join(save_dir, f"step_{current_step}.pth")
-                self.save(save_path, meta={"step": current_step, "mode": "flow_matching_bc"})
-
-            self.step += 1
+    def load(self, path):
+        import torch
+        from agent_factory.training.identity import config_identity, config_content
+        payload = torch.load(path, map_location=self.device, weights_only=False)
+        expected = dict(self.cfg.agent_sp.artifact_identity)
+        if expected:
+            if payload['meta'].get('artifact_identity') != expected:
+                raise ValueError('Flow checkpoint artifact identity mismatch')
+            if config_identity(payload['config']) != expected['resolved_config_sha256']:
+                raise ValueError('Flow checkpoint config content mismatch')
+            actual, original = config_content(self.cfg), config_content(payload['config'])
+            actual.pop('device', None); original.pop('device', None)
+            actual['train'].pop('device', None); original['train'].pop('device', None)
+            if actual != original:
+                raise ValueError('Flow checkpoint/config compatibility mismatch')
+        self.load_state_dict(payload['model'])
+        self.step = payload.get('step', 0)
+        return payload.get('meta', {})
 
     def start_train(self, dataset, additional_args=None):
         from torch.utils.data import DataLoader
@@ -96,7 +96,16 @@ class FlowVanillaAgent(MainMixin, FlowMatchingActorMixin, BaseAgent):
 
         actor_iters = int(getattr(cfg.train, "actor_iters", 0))
         print(f">>> Start Vanilla Flow Matching Policy Training ({actor_iters} steps)")
-        self.train_loop(loader, actor_iters, save_dir=checkpoint_dir)
+        validation = dataset.get("validation")
+        validation_loader = DataLoader(validation, batch_size=cfg.train.batch_size, shuffle=False,
+                                       drop_last=False, num_workers=0) if validation is not None else None
+        if cfg.dataset.dataset_type == 'geochora_canonical_flow':
+            identity = dict(cfg.agent_sp.artifact_identity)
+            if cfg.agent_sp.epoch_budget != 20 or cfg.agent_sp.steps_per_epoch != len(loader) or actor_iters != 20*len(loader):
+                raise ValueError('canonical Flow budget must equal20 actual DataLoader epochs')
+            if validation is None or expert_dataset.manifest_identity != identity.get('dataset_manifest_sha256'):
+                raise ValueError('canonical Flow requires fixed validation and dataset identity')
+        self.train_loop(loader, actor_iters, save_dir=checkpoint_dir, validation_loader=validation_loader)
 
         ckpt_path = os.path.join(checkpoint_dir, f"{exp_name}_final.pth")
         self.save(ckpt_path, meta={"phase": "flow_vanilla_train_done"})
