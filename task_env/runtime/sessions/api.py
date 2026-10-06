@@ -1,5 +1,5 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
-from importlib.metadata import version
+from .provenance import provider_build_identity
 from typing import Protocol
 
 from ...artifacts import (
@@ -26,7 +26,7 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
         raise ValueError('provider not implemented in P1.2')
     return ProviderCapabilityManifest(
         schema_version='provider-capability-v0', provider_name=provider,
-        provider_version=(version('mujoco') if provider == 'mujoco' else 'c665ce5028a12bb4d2afe49f05e015fa9b684a39'),
+        provider_version=provider_build_identity(provider)['manifest_version'],
         adapter_version='p1_2-v0', backend='cpu', physics_profile=PROFILE, render_profile='none',
         determinism_mode='strict',
         capabilities=tuple(CapabilityClaim(c, 'implemented', 'task_env/runtime/sessions') for c in CAPABILITIES),
