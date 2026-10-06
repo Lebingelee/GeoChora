@@ -113,12 +113,12 @@ class GeoPhysProbe:
         self.joint_names={joint.name:i for i,joint in enumerate(joint for link in links for joint in link.joints)}
         self.actuator_names={act.name:i for i,act in enumerate(imported.articulation.actuators)}
         self.data=self.runtime.scene_model.joint_data
-        if self.physics.n_dof:
+        if getattr(self.physics,'n_dof',0):
             self.physics.write_qvel(np.zeros_like(self.physics.read_qvel()))
         if specification['probe_id']=='joint_tracking':
             ctrl=self.physics.read_ctrl();ctrl[self.actuator_names['servo']]=specification['recipe']['inputs']['fixed_target']
             self.physics.write_ctrl(ctrl)
-        if self.physics.n_qpos:
+        if getattr(self.physics,'n_qpos',0):
             self.physics.synchronize_kinematic_state(update_site_jacobians=False)
         self.steps=0;self.visualizer=None
         self.import_notes=[{'semantic':entry.semantic,'status':entry.status.value,'action':entry.action}
@@ -132,11 +132,11 @@ class GeoPhysProbe:
                       'linear_velocity':vector(velocities[self.body_names[native]]),'angular_velocity':vector(angular[self.body_names[native]])}
                 for name,native in bindings.get('bodies',{}).items()}
         frames={}
-        if bindings.get('frames'):
+        if bindings.get('frames') and getattr(self.physics,'has_sites',False):
             pos=self.physics.read_site_world_pos();quat=self.physics.read_site_world_quat()
             frames={name:{'position':vector(pos[self.site_names[native]]),'quaternion_wxyz':vector(quat[self.site_names[native]])} for name,native in bindings['frames'].items()}
-        qpos=self.physics.read_qpos() if self.physics.n_qpos else np.zeros(0)
-        qvel=self.physics.read_qvel() if self.physics.n_dof else np.zeros(0)
+        qpos=self.physics.read_qpos() if getattr(self.physics,'n_qpos',0) else np.zeros(0)
+        qvel=self.physics.read_qvel() if getattr(self.physics,'n_dof',0) else np.zeros(0)
         joints={name:{'position':float(qpos[self.data['jnt_qposadr'][self.joint_names[native]]]),
                       'velocity':float(qvel[self.data['jnt_dofadr'][self.joint_names[native]]])}
                 for name,native in bindings.get('joints',{}).items()}
@@ -146,8 +146,18 @@ class GeoPhysProbe:
         result={'native_dt':float(self.physics.dt),'import_notes':self.import_notes}
         if self.spec['probe_id']=='asset_frame':
             body=self.runtime.scene_model.objects[self.body_names['root']]
-            geom=self.data['geom_names'].index('shape')
-            result.update(mass=float(body.body_config.mass),inertia=vector(np.diag(body.body_inertia) if np.asarray(body.body_inertia).ndim==2 else body.body_inertia),geometry=vector(self.data['geom_size'][geom]))
+            # This fixture explicitly disables collision on its authored box.
+            # Its materialized visual asset owns size; the collision-only model
+            # deliberately has no such geom. Read native compiled render bounds,
+            # not source XML or the oracle and retain collision proxy as diagnostic.
+            render=self.runtime.imported_scene.build_render_scene_desc(scene_model=self.runtime.scene_model)
+            assets=render.asset_table.records
+            if len(assets)!=1:raise ValueError('asset fixture must materialize one visual geometry')
+            bounds=np.array(assets[0].local_bounds)
+            dimensions=(bounds[3:]-bounds[:3])/2
+            result.update(mass=float(body.body_config.mass),inertia=vector(np.diag(body.body_inertia) if np.asarray(body.body_inertia).ndim==2 else body.body_inertia),geometry=vector(dimensions),
+                          geometry_readback='native materialized visual asset local bounds',
+                          collision_only_proxy_diagnostic=vector(body.geometry_fact.shape))
         return result
 
     def step(self):
