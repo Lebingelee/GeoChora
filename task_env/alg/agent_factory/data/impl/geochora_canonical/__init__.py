@@ -28,7 +28,7 @@ def window(states, actions, index):
 
 
 class CanonicalFlowDataset(Dataset):
-    def __init__(self, manifest_path, role='train'):
+    def __init__(self, manifest_path, role='train', *, allow_failed_for_smoke=False):
         self.manifest_path = str(manifest_path)
         manifest = json.loads(Path(manifest_path).read_text())
         if manifest['schema'] != 'geochora-canonical-flow-dataset-v0' or role not in ('train', 'validation'):
@@ -39,6 +39,9 @@ class CanonicalFlowDataset(Dataset):
         rows = [row for row in manifest['trajectories'] if row['role'] == role]
         if [row['seed'] for row in rows] != expected:
             raise ValueError('frozen trajectory split mismatch')
+        self.allow_failed_for_smoke = allow_failed_for_smoke
+        self.training_eligible = True
+        self.failed_seeds = []
         self.role = role
         self.manifest_identity = logical_hash(manifest)
         self.records = []
@@ -58,10 +61,14 @@ class CanonicalFlowDataset(Dataset):
                            for name in ('controller', 'expert', 'readiness'))
                     or m.task_artifact_hash != manifest['identities']['task_artifact']):
                 raise ValueError('trajectory provenance mismatch')
-            if (trajectory.stop_reason != 'expert_endpoint' or not trajectory.boundaries[-1].is_success
-                    or trajectory.boundaries[-1].task_failure
-                    or trajectory.boundaries[-1].task_metrics['cube_lift'] < .105):
-                raise ValueError('required successful expert trajectory missing')
+            eligible = (trajectory.stop_reason == 'expert_endpoint' and trajectory.boundaries[-1].is_success
+                        and not trajectory.boundaries[-1].task_failure
+                        and trajectory.boundaries[-1].task_metrics['cube_lift'] >= .105)
+            if not eligible:
+                self.training_eligible = False
+                self.failed_seeds.append(m.task_seed)
+                if not allow_failed_for_smoke:
+                    raise ValueError('required successful expert trajectory missing')
             x, y = examples(trajectory)  # frozen owner of feature/action ordering
             if len(y) != row['T'] or trajectory.hold_count != row['holds']:
                 raise ValueError('trajectory count/hold mismatch')
@@ -91,7 +98,7 @@ class CanonicalFlowDataset(Dataset):
         return torch.from_numpy(np.concatenate([x for x, y in self.records]))
 
     def validation_dataset(self):
-        return type(self)(self.manifest_path, 'validation')
+        return type(self)(self.manifest_path, 'validation', allow_failed_for_smoke=self.allow_failed_for_smoke)
 
 
 def _build(cfg, required_keys=None, expert_path=None):
@@ -102,7 +109,7 @@ def _build(cfg, required_keys=None, expert_path=None):
             or cfg.agent_control_mode != 'absolute_joint'
             or cfg.env.env_control_mode != 'absolute_joint'):
         raise ValueError('canonical Flow requires state-only absolute_joint')
-    return CanonicalFlowDataset(expert_path)
+    return CanonicalFlowDataset(expert_path, allow_failed_for_smoke=bool(cfg.dataset.config.get('allow_failed_for_smoke', False)))
 
 
 register_dataset_type('geochora_canonical_flow', _build)

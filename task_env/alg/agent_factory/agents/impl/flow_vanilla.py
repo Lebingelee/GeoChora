@@ -83,6 +83,10 @@ class FlowVanillaAgent(MainMixin, FlowMatchingActorMixin, BaseAgent):
         checkpoint_dir, exp_name = self._resolve_save_dir()
         os.makedirs(checkpoint_dir, exist_ok=True)
 
+        if cfg.dataset.dataset_type == 'geochora_canonical_flow':
+            if not expert_dataset.training_eligible or dataset.get('validation') is None or not dataset['validation'].training_eligible:
+                raise ValueError('full training forbidden: frozen expert dataset has failed episodes')
+
         self._fit_action_normalizer_from_dataset(expert_dataset)
 
         loader = DataLoader(

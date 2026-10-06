@@ -54,15 +54,12 @@ def dataset_manifest(root):
     if len(rows)!=100 or [v['seed'] for v in rows]!=list(range(1000,1100)):
         raise ValueError('100 required collection attempts not completed')
     failed=[v['seed'] for v in rows if not v.get('pass')]
-    if failed:
-        write(root/'dataset_report.json',{'pass':False,'failed_seeds':failed,'first_boundary':'expert_data_collection','training_authorized':False})
-        raise ValueError('required expert files failed: '+str(failed))
     manifest={'schema':'geochora-canonical-flow-dataset-v0','collection_manifest_sha256':lock['sha256'],
               'feature_contract':FEATURE_CONTRACT,'action_contract':ACTION_CONTRACT,'identities':spec['identities'],
               'window_contract':spec['flow_contract'],'normalizer_source':'train1000..1079 transitions only; unpadded desired canonical action8; min_max',
               'trajectories':[{'seed':v['seed'],'role':v['role'],'file':v['file'],'file_sha256':v['file_sha256'],
                                'logical_hash':v['logical_hash'],'reset_sample_hash':v['sample_hash'],'T':v['T'],'holds':v['holds']} for v in rows],
-              'split':spec['sample_sets'],'statistics':{}}
+              'split':spec['sample_sets'],'statistics':{},'failed_seeds':failed,'full_training_authorized':not failed}
     for role in ('train','validation'):
         selected=[v for v in rows if v['role']==role];stages=Counter(s for v in selected for s in v['expert_stage_sequence'])
         total=sum(v['T'] for v in selected);holds=sum(v['holds'] for v in selected)
@@ -76,11 +73,12 @@ def run(root):
     manifest=dataset_manifest(root)
     user=OmegaConf.load(PROFILE)
     user.dataset.expert.demo_path=str(root/'training_dataset_manifest.json')
+    user.dataset.config.allow_failed_for_smoke=True # no failed seed is discarded; start_train fails closed
     OmegaConf.save(user,root/'flow_config.yaml')
     cfg,_=general_resolve(file_config=user)
     bundle=build_training_bundle(cfg,required_keys=['observations','action'])
     train,val=bundle['offline'],bundle['validation']
-    report={'pass':True,'train':train.statistics,'validation':val.statistics,
+    report={'pass':True,'full_training_authorized':train.training_eligible and val.training_eligible,'failed_seeds':train.failed_seeds+val.failed_seeds,'train':train.statistics,'validation':val.statistics,
             'train_state_statistics':summary(train.get_all_states().numpy()),'validation_state_statistics':summary(val.get_all_states().numpy()),
             'train_action_statistics':summary(train.get_all_actions().numpy()),'validation_action_statistics':summary(val.get_all_actions().numpy()),
             'dataset_manifest_sha256':logical_hash(manifest),'window_checks':{}}
@@ -93,6 +91,25 @@ def run(root):
                     raise ValueError('real dataset window alignment mismatch')
             offset+=len(y)
         report['window_checks'][ds.role]=True
+    if not report['full_training_authorized']:
+        class GuardProbe:
+            cfg = cfg_placeholder = None
+            normalize_calls = 0
+            def _resolve_save_dir(self):
+                return str(root/'guard_probe_no_training'), 'guard_probe'
+            def _fit_action_normalizer_from_dataset(self, dataset):
+                self.normalize_calls += 1
+                raise AssertionError('failed corpus reached normalization/training')
+        from agent_factory.agents.impl.flow_vanilla import FlowVanillaAgent
+        probe = GuardProbe(); probe.cfg = cfg
+        rejected = False
+        try:
+            FlowVanillaAgent.start_train(probe, bundle)
+        except ValueError as error:
+            rejected = 'full training forbidden' in str(error)
+        if not rejected or probe.normalize_calls:
+            raise ValueError('failed corpus training admission did not fail closed')
+        report['failed_corpus_training_rejected_before_update'] = True
     write(root/'dataset_report.json',report)
     versions={m:importlib.metadata.version(m) for m in ['torch','numpy','h5py','omegaconf','einops','tqdm','PyYAML','antlr4-python3-runtime']}
     write(root/'dependency_report.json',{'versions':versions,'installed_only':['omegaconf2.3.0','einops0.8.1','tqdm4.67.1','antlr4-python3-runtime4.9.3'],'optional_not_installed':['diffusers','transformers','lerobot','mani_skill','pynput','agent_infra']})
@@ -119,7 +136,7 @@ def run(root):
             cuda_report={'pass':True,'gpu':torch.cuda.get_device_name(),'torch':torch.__version__,'cuda':torch.version.cuda,
                          'attempts':attempts,'selected_batch_size':batch_size,'peak_allocated':torch.cuda.max_memory_allocated(),
                          'peak_reserved':torch.cuda.max_memory_reserved(),'loss':result['loss_actor'],'wall_time':elapsed,
-                         'parameter_count':sum(p.numel() for p in agent.parameters()),'optimizer_steps':1,'precision':'float32',
+                         'parameter_count':sum(p.numel() for p in agent.parameters()),'optimizer_steps':1,'precision':'float32','full_training_authorized':report['full_training_authorized'],'dataset_mode':'all80 declared training trajectories; failed episodes retained; diagnostic only',
                          'epoch_budget':20,'steps_per_epoch':len(loader),'actor_iters':cfg.train.actor_iters}
             break
         except torch.cuda.OutOfMemoryError as e:
@@ -156,4 +173,4 @@ def run(root):
     try:cpu.load(str(file))
     except ValueError:rejected=True
     if not rejected:raise ValueError('checkpoint identity mismatch not rejected')
-    return {'status':'ready_for_remote_review','dataset':report,'cuda':cuda_report,'config_identity':identity,'checkpoint_sha256':file_sha,'identity_negative_path':True,'full_training_executed':False,'policy_rollout_executed':False}
+    return {'status':'ready_for_remote_review' if report['full_training_authorized'] else 'partial_with_localized_failure','first_boundary':None if report['full_training_authorized'] else 'expert_data_collection','dataset':report,'cuda':cuda_report,'config_identity':identity,'checkpoint_sha256':file_sha,'identity_negative_path':True,'full_training_executed':False,'policy_rollout_executed':False}
