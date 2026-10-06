@@ -43,9 +43,11 @@ class FlowVanillaAgent(MainMixin, FlowMatchingActorMixin, BaseAgent):
         exp_name = str(getattr(train_cfg, "exp_name", "") or self.cfg.agent_type)
         return os.path.join(save_root, exp_name), exp_name
 
-    def train_loop(self, dataloader, num_steps, save_dir="", validation_loader=None):
+    def train_loop(self, dataloader, num_steps, save_dir="", validation_loader=None,
+                   validation_callback=None):
         from agent_factory.training.flow_metrics import train_loop
-        return train_loop(self, dataloader, num_steps, save_dir, validation_loader)
+        return train_loop(self, dataloader, num_steps, save_dir, validation_loader,
+                          validation_callback=validation_callback)
 
     def save(self, path, meta=None):
         identity = dict(self.cfg.agent_sp.artifact_identity)

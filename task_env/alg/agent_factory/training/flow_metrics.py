@@ -52,7 +52,8 @@ def validation_loss(agent, loader, seed=2026):
 
 
 def train_loop(agent, loader, num_steps, save_dir='', validation_loader=None,
-               train_interval=100, validation_interval=1000, validation_seed=2026):
+               train_interval=100, validation_interval=1000, validation_seed=2026,
+               validation_callback=None):
     if len(loader) == 0 or num_steps <= 0:
         raise ValueError('Flow requires a nonempty loader and positive optimizer budget')
     root = Path(save_dir) if save_dir else None
@@ -69,8 +70,11 @@ def train_loop(agent, loader, num_steps, save_dir='', validation_loader=None,
     start = time.monotonic()
     def validate(step):
         if validation_loader is not None:
-            emit({'kind': 'validation', 'step': step,
-                  **validation_loss(agent, validation_loader, validation_seed)})
+            row = {'kind': 'validation', 'step': step,
+                   **validation_loss(agent, validation_loader, validation_seed)}
+            emit(row)
+            if validation_callback is not None:
+                validation_callback(agent, row)
     validate(0)
     agent.train()
     iterator = iter(loader)

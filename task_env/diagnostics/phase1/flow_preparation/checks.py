@@ -62,12 +62,16 @@ assert not any(x.split('.')[0] in {'diffusers','transformers','lerobot','mani_sk
     before=torch.get_rng_state().clone();v1=validation_loss(f,loader);after=torch.get_rng_state();v2=validation_loss(f,loader)
     checks['validation_rng_restored']=torch.equal(before,after)
     checks['validation_repeats_exactly']=v1['loss']==v2['loss'] and v1['samples']==3
-    summary=train_loop(f,loader,1001,str(root/'fake_instrumentation'),loader)
+    checkpoint_rows=[]
+    summary=train_loop(f,loader,1001,str(root/'fake_instrumentation'),loader,
+                       validation_callback=lambda agent,row: checkpoint_rows.append({'step':row['step'],'loss':row['loss']}))
     rows=[json.loads(s) for s in (root/'fake_instrumentation/training_metrics.jsonl').read_text().splitlines()]
     train=[r for r in rows if r['kind']=='train'];val=[r for r in rows if r['kind']=='validation']
     checks['train_100_and_final_partial']=len(train)==11 and train[-1]['window_steps']==1
     checks['full_validation_1000_and_final']=[v['step'] for v in val]==[0,1000,1001] and all(v['samples']==3 for v in val)
     checks['summary_schema']=summary['total_optimizer_steps']==1001 and summary['minimum_train_window_loss']==2.0
+    checks['validation_checkpoint_callback_fixed_steps']=[r['step'] for r in checkpoint_rows]==[0,1000,1001]
+    checks['validation_checkpoint_tie_selects_earliest']=min(checkpoint_rows,key=lambda r:(r['loss'],r['step']))['step']==0
     report={'schema':'flow-preparation-checks-v0','pass':all(checks.values()),'checks':checks,
             'instrumentation_updates':'fake constant loss; no model optimizer update','summary':summary}
     (root/'report.json').write_text(json.dumps(report,indent=2)+'\n')
