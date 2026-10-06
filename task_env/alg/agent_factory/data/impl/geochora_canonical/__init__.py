@@ -31,11 +31,16 @@ class CanonicalFlowDataset(Dataset):
     def __init__(self, manifest_path, role='train', *, allow_failed_for_smoke=False):
         self.manifest_path = str(manifest_path)
         manifest = json.loads(Path(manifest_path).read_text())
-        if manifest['schema'] != 'geochora-canonical-flow-dataset-v0' or role not in ('train', 'validation'):
+        if manifest['schema'] not in ('geochora-canonical-flow-dataset-v0', 'geochora-canonical-flow-dataset-v1') or role not in ('train', 'validation'):
             raise ValueError('unsupported canonical Flow dataset manifest')
         if manifest['feature_contract'] != FEATURE_CONTRACT or manifest['action_contract'] != ACTION_CONTRACT:
             raise ValueError('feature/action contract mismatch')
-        expected = list(range(1000, 1080)) if role == 'train' else list(range(1080, 1100))
+        if manifest['schema'] == 'geochora-canonical-flow-dataset-v1':
+            from .selection import validate_manifest
+            selected = validate_manifest(manifest)
+            expected = [r['seed'] for r in selected[role]]
+        else:
+            expected = list(range(1000, 1080)) if role == 'train' else list(range(1080, 1100))
         rows = [row for row in manifest['trajectories'] if row['role'] == role]
         if [row['seed'] for row in rows] != expected:
             raise ValueError('frozen trajectory split mismatch')
@@ -67,7 +72,7 @@ class CanonicalFlowDataset(Dataset):
             if not eligible:
                 self.training_eligible = False
                 self.failed_seeds.append(m.task_seed)
-                if not allow_failed_for_smoke:
+                if not allow_failed_for_smoke or manifest['schema'] == 'geochora-canonical-flow-dataset-v1':
                     raise ValueError('required successful expert trajectory missing')
             x, y = examples(trajectory)  # frozen owner of feature/action ordering
             if len(y) != row['T'] or trajectory.hold_count != row['holds']:

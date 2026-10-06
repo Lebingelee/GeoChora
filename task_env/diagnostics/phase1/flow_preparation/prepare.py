@@ -77,12 +77,16 @@ def dataset_manifest(root):
     return manifest
 
 
-def run(root):
+def run(root, *, manifest_path=None):
     root=Path(root)
-    manifest=dataset_manifest(root)
+    selected_corpus = manifest_path is not None
+    manifest = json.loads(Path(manifest_path).read_text()) if selected_corpus else dataset_manifest(root)
+    if selected_corpus:
+        from agent_factory.data.impl.geochora_canonical.selection import validate_manifest
+        validate_manifest(manifest)
     user=OmegaConf.load(PROFILE)
-    user.dataset.expert.demo_path=str(root/'training_dataset_manifest.json')
-    user.dataset.config={"allow_failed_for_smoke": True} # no failed seed is discarded; start_train fails closed
+    user.dataset.expert.demo_path=str(manifest_path or root/'training_dataset_manifest.json')
+    user.dataset.config={"allow_failed_for_smoke": not selected_corpus} # no failed seed is discarded; start_train fails closed
     OmegaConf.save(user,root/'flow_config.yaml')
     cfg,_=general_resolve(file_config=user)
     bundle=build_training_bundle(cfg,required_keys=['observations','action'])
@@ -145,7 +149,7 @@ def run(root):
             cuda_report={'pass':True,'gpu':torch.cuda.get_device_name(),'torch':torch.__version__,'cuda':torch.version.cuda,
                          'attempts':attempts,'selected_batch_size':batch_size,'peak_allocated':torch.cuda.max_memory_allocated(),
                          'peak_reserved':torch.cuda.max_memory_reserved(),'loss':result['loss_actor'],'wall_time':elapsed,
-                         'parameter_count':sum(p.numel() for p in agent.parameters()),'optimizer_steps':1,'precision':'float32','full_training_authorized':report['full_training_authorized'],'dataset_mode':'all80 declared training trajectories; failed episodes retained; diagnostic only',
+                         'parameter_count':sum(p.numel() for p in agent.parameters()),'optimizer_steps':1,'precision':'float32','batch_shape':{'state':list(batch['observations']['state'].shape),'action':list(batch['action'].shape)},'finite_gradients_and_parameters':finite,'full_training_authorized':report['full_training_authorized'],'dataset_mode':'selected successful corpus only' if selected_corpus else 'all80 declared training trajectories; failed episodes retained; diagnostic only',
                          'epoch_budget':20,'steps_per_epoch':len(loader),'actor_iters':cfg.train.actor_iters}
             break
         except torch.cuda.OutOfMemoryError as e:
