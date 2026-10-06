@@ -97,7 +97,9 @@ def run(oracle,output,*,use_collected=False):
                     checkpoint=root/'learner'/source/'checkpoint.pt';out=root/'evaluation'/f'train_{source}_eval_{p}'/f'seed{seed}/report.json'
                     r=worker_command(oracle,out,p,seed=seed,route='evaluate',input=checkpoint);r['training_source']=source;report['evaluation'].append(r)
                     write_json(output,report);print('eval',source,p,seed,r.get('success'),r.get('max_cube_lift'),r.get('error'),flush=True)
-            if not all(r.get('pass') for r in report['evaluation']):raise ValueError('frozen policy matrix task-success gate failed')
+            if not all(r.get('pass') for r in report['evaluation']):
+                stage=next(r.get('first_boundary') or 'cross_provider_policy_behavior' for r in report['evaluation'] if not r.get('pass'))
+                raise ValueError('frozen policy matrix task-success gate failed')
         except Exception as error:report.update(first_boundary=stage,error=str(error),traceback=traceback.format_exc())
         report['regressions']=regression.result()
     if report['first_boundary'] is None and not all(r['pass'] for r in report['regressions'].values()):report['first_boundary']='lower_phase_regression'

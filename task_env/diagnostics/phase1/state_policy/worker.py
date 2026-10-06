@@ -101,7 +101,11 @@ def evaluate_policy(provider,seed,oracle,checkpoint,output):
         for _ in range(spec['policy_eval_horizon']):
             # Only current public state/feedback enter inference; no expert is constructed.
             values=policy(features(state,feedback));request=requested_action(values);canonical,target=controller.compute(state,feedback,request)
-            applied=session.apply_control(target);state=session.step();feedback=session.control_feedback(state);_,info,e=observation(state,artifact)
+            applied=session.apply_control(target);before=state;state=session.step()
+            if state.control_step!=before.control_step+1 or state.simulation_time<=before.simulation_time:
+                report['invalid_timebase']={'before_step':before.control_step,'after_step':state.control_step,'time_before':before.simulation_time,'time_after':state.simulation_time}
+                raise ValueError('canonical_timebase_regression: native reset/rollback during learned rollout')
+            feedback=session.control_feedback(state);_,info,e=observation(state,artifact)
             report['clipping_count']+=int(canonical.clipped);max_lift=max(max_lift,float(info['task_metrics']['cube_lift']))
             trace.append({'state':state.to_mapping(),'feedback':feedback.to_mapping(),'requested':request.to_mapping(),'canonical':canonical.to_mapping(),'target':target.to_mapping(),'applied':applied.to_mapping(),'task_metrics':info['task_metrics'],'is_success':info['is_success']})
             if info['is_success']:report.update(success=True,steps_to_success=state.control_step);break
@@ -109,7 +113,7 @@ def evaluate_policy(provider,seed,oracle,checkpoint,output):
             checkpoint_unchanged=hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest()==checkpoint_hash)
         report['pass']=report['success'] and report['sample_unchanged'] and report['checkpoint_unchanged']
         report['first_boundary']=None if report['pass'] else 'cross_provider_policy_behavior'
-    except Exception as error:report.update(first_boundary='runner_action_boundary',error=str(error),traceback=traceback.format_exc(),steps=len(trace))
+    except Exception as error:report.update(first_boundary='runner_action_boundary',error=str(error),traceback=traceback.format_exc(),steps=len(trace),attempted_steps=len(trace)+1)
     finally:
         if session is not None:session.close()
     write_json(output.parent/'trace.json',trace);write_json(output,report);return report
