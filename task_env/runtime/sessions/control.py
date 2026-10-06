@@ -2,11 +2,13 @@
 from dataclasses import dataclass
 from typing import Protocol
 from .api import RuntimeSession
+from ...controllers.canonical.feedback import CanonicalControlFeedback
 from ...controllers.canonical.contracts import CanonicalControlTarget, AppliedCanonicalControl
 from ...artifacts import RequiredCapabilitySet,admit_capabilities
 from .api import materialize,provider_manifest
 
 class ControlledRuntimeSession(RuntimeSession, Protocol):
+    def control_feedback(self, state) -> CanonicalControlFeedback: ...
     def apply_control(self, target: CanonicalControlTarget) -> AppliedCanonicalControl: ...
 
 
@@ -39,3 +41,21 @@ def validate_target(session,target):
     if not hasattr(session,'_control_binding'):raise ValueError('control session admission required')
     if (target.task_artifact_hash!=session._artifact.identity_hash or set(target.arm_joint_order)!=set(session._target_actuators)
         or target.gripper.semantic_id!=session._control_binding.gripper_semantic_id):raise ValueError('canonical control binding mismatch')
+
+
+def feedback_value(session, state, native_force):
+    """Private adapter lowering for audited positive-open Panda tendon binding."""
+    from ...controllers.canonical.feedback import CanonicalGripperFeedback
+    from ...controllers.canonical.kinematics import FINGERS
+    session._require_reset()
+    if not hasattr(session, '_control_binding'):
+        raise ValueError('control session admission required')
+    if state.to_mapping() != session.snapshot().to_mapping():
+        raise ValueError('feedback requires the current measured canonical boundary')
+    import math
+    if not math.isfinite(float(native_force)):
+        raise ValueError('nonfinite native actuator force')
+    # Both supported sources bind positive native actuator force to opening.
+    return CanonicalControlFeedback('canonical-control-feedback-v0', state.control_step,
+        state.simulation_time, CanonicalGripperFeedback(session._control_binding.gripper_semantic_id,
+        max(0., float(sum(state.joint_position[n] for n in FINGERS))), max(0., -float(native_force))))

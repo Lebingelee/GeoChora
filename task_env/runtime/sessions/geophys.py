@@ -63,6 +63,15 @@ class _GeoPhysSession(_SessionValues):
         poses.update({name: pose(readback.site_xpos[index], readback.site_xquat[index]) for name, index in self._frames.items()})
         return self._state(positions, velocities, poses, readback.simulation_time)
 
+    def control_feedback(self, state):
+        from .control import feedback_value
+        self._require_reset()
+        if not hasattr(self, '_control_binding'):
+            raise ValueError('control session admission required')
+        native = self._boundary.read_snapshot(SnapshotRequest(qacc=False, ctrl=False,
+            body_pose=False, site_pose=False, actuator_force=True))
+        return feedback_value(self, state, native.actuator_force[self._open_actuators[0]])
+
     def apply_control(self, target):
         from .control import validate_target
         from ...controllers.canonical.contracts import AppliedCanonicalControl

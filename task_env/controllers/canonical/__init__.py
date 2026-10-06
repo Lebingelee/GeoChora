@@ -3,3 +3,7 @@ from .contracts import RequestedAction,CanonicalAction,GripperControlTarget,Cano
 from .controller import CanonicalPandaController
 from .kinematics import PandaKinematics
 __all__=['RequestedAction','CanonicalAction','GripperControlTarget','CanonicalControlTarget','AppliedCanonicalControl','CanonicalPandaController','PandaKinematics']
+
+from .feedback import CanonicalControlFeedback, CanonicalGripperFeedback
+from .production import ProductionCanonicalPandaController
+__all__ += ["CanonicalControlFeedback", "CanonicalGripperFeedback", "ProductionCanonicalPandaController"]

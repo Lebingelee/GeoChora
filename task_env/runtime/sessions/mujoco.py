@@ -56,6 +56,7 @@ class _MuJoCoSession(_SessionValues):
         for actuator in self._open_actuators:
             self._data.ctrl[actuator] = self._model.actuator_ctrlrange[actuator, 1]
         self._mj.mj_forward(self._model, self._data)
+        self._completed_actuator_force = self._data.actuator_force.copy()
         return self._realized(sample)
 
     def snapshot(self):
@@ -69,6 +70,13 @@ class _MuJoCoSession(_SessionValues):
             self._mj.mju_mat2Quat(quaternion, data.site_xmat[index])
             poses[name] = pose(data.site_xpos[index], quaternion)
         return self._state(positions, velocities, poses, data.time)
+
+    def control_feedback(self, state):
+        from .control import feedback_value
+        self._require_reset()
+        if not hasattr(self, '_control_binding'):
+            raise ValueError('control session admission required')
+        return feedback_value(self, state, self._completed_actuator_force[self._open_actuators[0]])
 
     def apply_control(self, target):
         from .control import validate_target
@@ -97,6 +105,8 @@ class _MuJoCoSession(_SessionValues):
         self._require_reset()
         for _ in range(self._artifact.timebase.control_substeps):
             self._mj.mj_step(self._model, self._data)
+            if hasattr(self, '_control_binding'):
+                self._completed_actuator_force = self._data.actuator_force.copy()
         self._mj.mj_forward(self._model, self._data)
         self._control_step += 1
         return self.snapshot()

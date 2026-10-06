@@ -14,7 +14,7 @@ class CanonicalPandaController:
         self.identity=digest({'schema':'panda-shared-dls-v0','config':asdict(self.config),'source_sha256':model.source_sha256,
             'target_basis':'achieved_joint_state_one_DLS_increment','gripper':'legacy_physical_force_limited_servo_v0'})
 
-    def compute(self,state,requested):
+    def _compute_arm(self,state,requested):
         cfg=self.config;values=np.array(requested.values,dtype=float);original=values.copy()
         values[-1]=np.clip(values[-1],-1,1);q=np.array([state.joint_position[n] for n in ARM])
         current=state.pose_world['panda-v1/ee'];world_pose=None
@@ -52,11 +52,18 @@ class CanonicalPandaController:
                 dq=J.T@np.linalg.solve(J@J.T+cfg.ik_damping**2*np.eye(6),error)
                 desired=np.clip(q+cfg.ik_position_gain*np.clip(dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
         servo=np.clip(desired+cfg.joint_position_correction_gain*(desired-q),self.model.limits[:,0],self.model.limits[:,1])
+        canonical=CanonicalAction('canonical-action-v0',requested,tuple(float(v) for v in values),not np.array_equal(original,values),world_pose)
+        return canonical,desired,servo
+
+    def compute(self,state,requested):
+        # Frozen-v0 compatibility only; production R1 owns its resolved gripper profile.
+        cfg=self.config
+        canonical,desired,servo=self._compute_arm(state,requested)
+        values=canonical.interpreted_values
         opening=.5*(values[-1]+1)*cfg.gripper_opening_range_m
         achieved=float(sum(state.joint_position[n] for n in FINGERS))
         correction=cfg.gripper_default_force_N/cfg.gripper_position_stiffness_N_per_m
         servo_opening=float(np.clip(achieved+np.clip(opening-achieved,-correction,correction),0,cfg.gripper_opening_range_m))
-        canonical=CanonicalAction('canonical-action-v0',requested,tuple(float(v) for v in values),not np.array_equal(original,values),world_pose)
         target=CanonicalControlTarget('canonical-control-v0',self.artifact_hash,self.identity,ARM,dict(zip(ARM,map(float,desired))),dict(zip(ARM,map(float,servo))),
             GripperControlTarget('panda-v1/gripper',float(opening),cfg.gripper_default_force_N,servo_opening))
         return canonical,target
