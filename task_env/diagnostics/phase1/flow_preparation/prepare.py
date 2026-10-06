@@ -129,7 +129,7 @@ def run(root):
             agent=make_agent('Flow_Vanilla',cfg)
             agent.fit_action_normalizer(train.get_all_actions().to(agent.device))
             batch=next(iter(loader));torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();start=time.monotonic()
-            result=agent.update_actor(batch);torch.cuda.synchronize();elapsed=time.monotonic()-start
+            result=agent.update_actor(batch);agent.step=1;torch.cuda.synchronize();elapsed=time.monotonic()-start
             finite=all(torch.isfinite(p).all().item() and (p.grad is None or torch.isfinite(p.grad).all().item()) for p in agent.parameters())
             if not finite or not np.isfinite(result['loss_actor']):raise ValueError('nonfinite CUDA step')
             attempts.append({'batch_size':batch_size,'pass':True})
@@ -143,6 +143,21 @@ def run(root):
             attempts.append({'batch_size':batch_size,'pass':False,'error':'CUDA OOM'})
             del agent;gc.collect();torch.cuda.empty_cache()
             if batch_size==128:raise
+    from agent_factory.training.flow_metrics import validation_loss
+    tiny_validation = DataLoader([val[0]], batch_size=1, shuffle=False)
+    rng_cpu, rng_cuda = torch.get_rng_state().clone(), torch.cuda.get_rng_state().clone()
+    validation1 = validation_loss(agent, tiny_validation)
+    validation2 = validation_loss(agent, tiny_validation)
+    validation_exact = validation1['loss'] == validation2['loss']
+    rng_restored = torch.equal(rng_cpu, torch.get_rng_state()) and torch.equal(rng_cuda, torch.cuda.get_rng_state())
+    if not validation_exact or not rng_restored:
+        raise ValueError('real Flow validation RNG isolation failed')
+    instrumentation = json.loads((root/'regression/preparation_checks/report.json').read_text())
+    instrumentation.update(real_cuda_validation_exact=validation_exact, real_cuda_rng_restored=rng_restored,
+                           real_validation_sample_count=1, validation_loss=validation1['loss'],
+                           fixture_optimizer_updates='1001 fake update events; no policy optimizer steps',
+                           full_validation_instrumentation='all fixture samples included; full20-trajectory pass deferred to future training')
+    write(root/'instrumentation_report.json', instrumentation)
     OmegaConf.save(cfg,root/'resolved_flow_config.yaml')
     write(root/'cuda_smoke/report.json',cuda_report)
     file=root/'cuda_smoke/flow_smoke_checkpoint.pth'
@@ -166,7 +181,7 @@ def run(root):
     good=out.shape==(1,16,8) and bool(torch.isfinite(out).all()) and cpu_load and cuda_load and denormalized
     if not good:raise ValueError('checkpoint/inference smoke failed')
     write(root/'cpu_smoke/report.json',{'pass':good,'input_shape':[1,2,33],'output_shape':list(out.shape),'finite':bool(torch.isfinite(out).all()),'denormalized':denormalized,'wall_time':elapsed,'cpu_load':cpu_load})
-    write(root/'cuda_smoke/smoke_checkpoint_identity.json',{'checkpoint_file_sha256':file_sha,'artifact_identity':identity,'cuda_load':cuda_load,'cpu_load':cpu_load,'metadata_preserved':metadata==cpu_meta,'purpose':metadata['purpose']})
+    write(root/'cuda_smoke/smoke_checkpoint_identity.json',{'checkpoint_file_sha256':file_sha,'artifact_identity':identity,'cuda_load':cuda_load,'cpu_load':cpu_load,'restored_optimizer_step':cpu.step,'metadata_preserved':metadata==cpu_meta,'purpose':metadata['purpose']})
     # Compatibility failure is exercised without executing a rollout or optimizer step.
     cpu.cfg.agent_sp.artifact_identity.dataset_manifest_sha256='0'*64
     rejected=False
