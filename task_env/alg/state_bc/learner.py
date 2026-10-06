@@ -33,6 +33,7 @@ def dataset(paths):
 class StatePolicy:
     def __init__(self,checkpoint):
         if checkpoint['schema']!='state-bc-checkpoint-v0' or checkpoint['feature_contract']!=FEATURE_CONTRACT or checkpoint['action_contract']!=ACTION_CONTRACT:raise ValueError('checkpoint contract mismatch')
+        if checkpoint['architecture']!={'input':33,'hidden':[128,128],'output':8,'activation':'ReLU'}:raise ValueError('checkpoint architecture metadata mismatch')
         self.checkpoint=checkpoint;self.model=network(checkpoint['learner_config']);self.model.load_state_dict(checkpoint['state_dict'],strict=True);self.model.eval()
         self.norm=checkpoint['normalization']
         for name,width in (('input_mean',33),('input_std',33),('output_mean',8),('output_std',8)):
@@ -85,3 +86,24 @@ def train(train_paths,validation_paths,config,output,*,provider_provenance,parit
     if parity>parity_tolerance:raise ValueError('checkpoint_portability: parity bound exceeded')
     return {'pass':True,'smoke':smoke,'checkpoint':str(output),'checkpoint_sha256':hashlib.sha256(output.read_bytes()).hexdigest(),'selected_epoch':selected,
         'validation_loss':best,'parity_max_abs':parity,'history':history,'training_manifest':manifest,'validation_manifest':validation}
+
+
+def learner_smoke(train_paths,validation_paths,config,output,*,provider_provenance,parity_tolerance):
+    """One optimizer step/checkpoint parity before either full training run."""
+    torch.set_num_threads(1);torch.manual_seed(config['seed'])
+    x,y,manifest=dataset(train_paths);vx,vy,validation=dataset(validation_paths)
+    n={'input_mean':torch.from_numpy(x.mean(0)),'input_std':torch.from_numpy(np.maximum(x.std(0),config['normalization_epsilon'])),
+        'output_mean':torch.from_numpy(y.mean(0)),'output_std':torch.from_numpy(np.maximum(y.std(0),config['normalization_epsilon']))}
+    batch=x[:config['batch_size']];labels=y[:config['batch_size']];model=network(config);optimizer=torch.optim.Adam(model.parameters(),lr=config['lr'])
+    loss=torch.nn.functional.mse_loss(model((torch.from_numpy(batch)-n['input_mean'])/n['input_std']),(torch.from_numpy(labels)-n['output_mean'])/n['output_std']);loss.backward()
+    if not torch.isfinite(loss) or any(p.grad is None or not torch.isfinite(p.grad).all() for p in model.parameters()):raise ValueError('learner optimizer smoke nonfinite')
+    optimizer.step()
+    if any(not torch.isfinite(p).all() for p in model.parameters()):raise ValueError('learner optimizer smoke nonfinite parameter')
+    ck={'schema':'state-bc-checkpoint-v0','architecture':{'input':33,'hidden':[128,128],'output':8,'activation':'ReLU'},'state_dict':model.state_dict(),
+        'feature_contract':FEATURE_CONTRACT,'action_contract':ACTION_CONTRACT,'normalization':n,'training_provider_provenance':provider_provenance,
+        'dataset_manifest':manifest,'validation_manifest':validation,'learner_config':config,'seed':config['seed'],'selected_epoch':0,'validation_loss':float(loss.detach())}
+    output=Path(output);output.parent.mkdir(parents=True,exist_ok=True)
+    if output.exists():raise FileExistsError('smoke checkpoint overwrite')
+    fixture=vx[:16];before=StatePolicy(ck)(fixture);torch.save(ck,output);parity=float(np.max(np.abs(before-load_checkpoint(output)(fixture))))
+    if parity>parity_tolerance:raise ValueError('checkpoint smoke parity failure')
+    return {'pass':True,'kind':'one_optimizer_step_only_not_evaluation_checkpoint','loss':float(loss.detach()),'batch_shape':list(batch.shape),'action_shape':list(labels.shape),'dtype':'float32','finite_gradients':True,'finite_parameters':True,'checkpoint_parity_max_abs':parity}
