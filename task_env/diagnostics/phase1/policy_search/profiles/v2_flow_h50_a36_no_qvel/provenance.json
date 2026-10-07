@@ -1,0 +1,11 @@
+{
+  "best_checkpoint_sha256": "d7d493a4bc6a7e88b6a887ca571cc129f51b4984d65a4067d987181526c7034a",
+  "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+  "execution_backend": "GeoPhys CUDA diagnostic route",
+  "qualification_claim": false,
+  "resolved_config_sha256": "ca715d4dc241164a59426ba21aa7bc303f05e0e1734e99275a0e6a1e9687388e",
+  "source_baseline_commit": "58c69f0300f4c0615973b9f740f7a4ba82c08e46",
+  "task_artifact_identity": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+  "training_driver_fix_commit": "7bf4238e11e9acb40f8823a61c2d1d97fcc10698",
+  "variant": "v2"
+}
