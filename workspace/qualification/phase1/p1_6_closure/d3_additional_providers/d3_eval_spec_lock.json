@@ -1,0 +1,6 @@
+{
+  "algorithm": "sha256",
+  "first_provider_rollout_after_lock": true,
+  "schema": "p1_6-d3-additional-provider-lock-v0",
+  "sha256": "33abf5d55aa2240017031c9d1f5aedddca99ef1ec35af14db4734dceddf670e3"
+}

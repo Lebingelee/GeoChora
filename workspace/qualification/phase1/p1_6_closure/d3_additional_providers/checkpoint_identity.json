@@ -1,0 +1,7 @@
+{
+  "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+  "expected_sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+  "resolved_config_sha256": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f",
+  "sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+  "task_artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4"
+}

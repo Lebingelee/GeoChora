@@ -1,0 +1,192 @@
+{
+  "schema": "geochora.p1_6_closure_manifest.v1",
+  "created_at": "2026-10-07T15:38:52.319142+00:00",
+  "self_hash_excluded": true,
+  "branch": "codex/p1.6-closure",
+  "closure_source_commit_before_final_documentation_commit": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
+  "remote_closure_head_before_closure_package": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
+  "public_main_observed_sha": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
+  "GeoPhys_gitlink": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+  "historical_lineage": {
+    "milestones": [
+      "855586c6ba1e0bb5b3d82a97b6910561770cfad8",
+      "ee39275cc906773221a5269d3e26e8ae203f9706",
+      "f53a5cb1c51e46134aa084171651dd17d2036553",
+      "6df732658c8deaa370dc15f8d5c036d358124fa9",
+      "cda511f49eb544dabe685ec1dbcc6345884d66c8",
+      "32696797b731fcaa38d67c768f89b308f46cb5ca",
+      "9d7c42b321eb24633df670a47e3261b62aab2c7b"
+    ],
+    "obsolete_experiment_branches_removed_after_ancestry_and_evidence_checks": true,
+    "branch_consolidation_review_summary": {
+      "path": "workspace/qualification/phase1/p1_6_closure/branch_consolidation_review_summary.json",
+      "bytes": 4694,
+      "sha256": "9fb726809e4ab35093d89a47829ad8ed83a567b4b614b638f74e57ce613e21fa"
+    },
+    "full_local_branch_consolidation_record_sha256": "29f9336f94a26b282fc6a8bf5de710490dbbcd1a0acb16ae0658c9f71e34a378",
+    "full_local_record_preserved_locally": true
+  },
+  "identities": {
+    "historical_default_500hz_TaskArtifact_sha256": "461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e",
+    "experimental_100hz_TaskArtifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+    "100hz_dataset_manifest": {
+      "path": "workspace/experiments/p1_6_policy_search/100hz_gpu_flow/training_dataset_manifest_100hz.json",
+      "sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd"
+    },
+    "V2a_final_checkpoint": {
+      "path": "workspace/experiments/p1_6_policy_search/100hz_gpu_flow_h50_a36_no_qvel_v2a_15000/training/checkpoints/final_step15000.pth",
+      "sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9"
+    },
+    "V2a_resolved_config": {
+      "path": "workspace/experiments/p1_6_policy_search/100hz_gpu_flow_h50_a36_no_qvel_v2a_15000/resolved_config.yaml",
+      "file_sha256": "dae01177562bf35ff9f16a9037487542ef0103cc84f21126c822bc9067f26ad8",
+      "resolved_config_identity_sha256": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f"
+    },
+    "observation_contract_identity": "be8fb4cc60b33454c9ae2a87e3e4cc9017016ccdf6770656d5ebb955d3c1c076",
+    "action_contract_identity": "4888f67cacb175ad4bf41195c1c4dc9465e653485e05b53f5ca33a61ad93eba5",
+    "historical_D0_D2_reset_sample_sha256": "fcea59824ef61219c11016f5ca5a22ba05f72d47ee4e302150e36ce8aaed7670",
+    "historical_D0_D2_trajectory_logical_sha256": "a10a579809ec80a7abd986d65e2a48d54a917ff353d2fa073d07daffcbdc3f27",
+    "D3_locked_spec_sha256": "cfa389d3e8bffce4a852e70b1b5b418efb2b6ea6f9bde739fb67e74acea7a60f",
+    "D3_evidence_manifest_sha256": "1cedbf23d7870b608810b5ad316f4ef098b365aabbd1b08371610e7f321cbaad",
+    "D3_evidence_manifest_entries": 205,
+    "supplementary_spec_sha256": "33abf5d55aa2240017031c9d1f5aedddca99ef1ec35af14db4734dceddf670e3",
+    "supplementary_evidence_manifest_sha256": "793176bf3e173ff825913ed5b0e0ab0e12401856e7e5b66dce2e824381fce689",
+    "supplementary_evidence_manifest_entries": 111,
+    "supplementary_provider_source_commit": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+    "supplementary_runtime_source_manifest_sha256": "6d39f67197123de42cfab38ce28cdefb4d0c919eacad8d725d04fda7d751d98b",
+    "supplementary_runtime_environment_sha256": "ea281a2a994c082b93319fb6f802e604c859d283ca9e539cf9877ff3de4f597e",
+    "preclosure_evidence_index_sha256": "50f60e481bfafe71b9a609e92c358829d05f95bf86ff3a23a433016b416c16ed"
+  },
+  "evidence_integrity": {
+    "core_d3": "PASS; 205/205 file manifest entries verified by presence, byte size and SHA256; no simulator episodes rerun",
+    "supplementary": "PASS; 111/111 evidence manifest entries verified by presence, byte size and SHA256; no simulator episodes rerun",
+    "historical_D0_D2": "PASS; linked report/trace/command/script hashes checked; original dirty source provenance retained; not rerun",
+    "spec_locks": "PASS for core and supplementary",
+    "V2a_checkpoint_and_dataset": "PASS"
+  },
+  "additional_provider_boundary": {
+    "Genesis": "10/10 validation seeds; version 1.4.3",
+    "SAPIEN": "9/10 validation seeds; version 3.0.3; seed 2212 failed at 0.010336924 m max lift after 2500 steps",
+    "physics": "CPU for both; policy inference CUDA",
+    "qualification_claimed": false,
+    "implementation_source_commit": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+    "implementation_source_present_in_closure_branch": false,
+    "reproducible_from_closure_branch_alone": false,
+    "copied_into_P1_6": false,
+    "same_checkpoint_bytes": true,
+    "same_reset_samples": true,
+    "simulator_frozen_finite_zero_clipping_no_runtime_errors": true
+  },
+  "closure_artifacts": {
+    "acceptance_report": {
+      "path": "workspace/qualification/phase1/p1_6_closure/acceptance_report.md",
+      "bytes": 8734,
+      "sha256": "4135bcc1e162195f13d25f0ee17f266092d65b8a14b8d44f7d768aacc2de23b2"
+    },
+    "acceptance_json": {
+      "path": "workspace/qualification/phase1/p1_6_closure/acceptance.json",
+      "bytes": 7155,
+      "sha256": "0e0eaebce367aef53ea980f94480d5e6e558fd72e48c2b50e18153ea44c0acc2"
+    },
+    "evidence_index_markdown": {
+      "path": "workspace/qualification/phase1/p1_6_closure/evidence_index.md",
+      "bytes": 5352,
+      "sha256": "e67e19066ef2b5ccc5eaba1e7424f7f5f21af0fe74926ec772097bf124c80bf7"
+    },
+    "evidence_index_json": {
+      "path": "workspace/qualification/phase1/p1_6_closure/evidence_index.json",
+      "bytes": 79206,
+      "sha256": "e8e87ddd58878605cb0b6f0494567ae908776979795e29fbbf663496ad37a1d3"
+    },
+    "closure_checks": {
+      "path": "workspace/qualification/phase1/p1_6_closure/closure_checks.json",
+      "bytes": 3443,
+      "sha256": "2829fd8834dbc22dd5a339557f15e69760a0233852f8466ceb1ffc268358a3f7"
+    },
+    "handoff": {
+      "path": "workspace/qualification/phase1/p1_6_closure/handoff.md",
+      "bytes": 1891,
+      "sha256": "1103eb7bcf14f1126e4d7396ec575b6d37bf3564794abd93c93629ce6660c817"
+    },
+    "core_d3_spec": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3/d3_eval_spec.yaml",
+      "bytes": 33648,
+      "sha256": "cfa389d3e8bffce4a852e70b1b5b418efb2b6ea6f9bde739fb67e74acea7a60f"
+    },
+    "core_d3_spec_lock": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3/d3_eval_spec_lock.json",
+      "bytes": 245,
+      "sha256": "483ef2fb224af9637d2a814626b63ae781d9de66810f8de6051661ef9b6b6b4e"
+    },
+    "core_d3_file_manifest": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3/file_manifest.json",
+      "bytes": 36563,
+      "sha256": "1cedbf23d7870b608810b5ad316f4ef098b365aabbd1b08371610e7f321cbaad"
+    },
+    "core_d3_summary_markdown": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3/d3_summary.md",
+      "bytes": 530,
+      "sha256": "7844be57d3225844b951bad1fd743898637038571852c1b0eecc47d4f2edf1e1"
+    },
+    "supplementary_spec": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3_additional_providers/d3_eval_spec.yaml",
+      "bytes": 20208,
+      "sha256": "33abf5d55aa2240017031c9d1f5aedddca99ef1ec35af14db4734dceddf670e3"
+    },
+    "supplementary_spec_lock": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3_additional_providers/d3_eval_spec_lock.json",
+      "bytes": 204,
+      "sha256": "aa8bda2ed3a8b713ba1a59ab2e0a6248472024a12378778e11d213a323edbe84"
+    },
+    "supplementary_evidence_manifest": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3_additional_providers/evidence_manifest.json",
+      "bytes": 18495,
+      "sha256": "793176bf3e173ff825913ed5b0e0ab0e12401856e7e5b66dce2e824381fce689"
+    },
+    "supplementary_provider_source_manifest": {
+      "path": "workspace/qualification/phase1/p1_6_closure/d3_additional_providers/provider_source_manifest.json",
+      "bytes": 1663,
+      "sha256": "6d39f67197123de42cfab38ce28cdefb4d0c919eacad8d725d04fda7d751d98b"
+    },
+    "canonical_doc_05": {
+      "path": "docs/module/task_env/05-phase-1-multi-simulator-blueprint.md",
+      "bytes": 21750,
+      "sha256": "269cdde0ba61d129beef4fc3744f91d139e039ca5896a379b43a02b12a74b1d2"
+    },
+    "canonical_doc_06": {
+      "path": "docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md",
+      "bytes": 31487,
+      "sha256": "58df7e360d563e49dd89962a1e3f3dfe1094c9a5300ad10d257e97bb9c28806a"
+    },
+    "canonical_doc_07": {
+      "path": "docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md",
+      "bytes": 12725,
+      "sha256": "9d696b774cafab124e4af9daa88089b5424cf6dbb8eb7ebb74c5a0e5e14bfcaa"
+    },
+    "canonical_doc_08": {
+      "path": "docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md",
+      "bytes": 13573,
+      "sha256": "1a3487bd6f9ea7c73d3c181a8b308a887b2869e2f102aacc864fe4f1965ef33c"
+    },
+    "branch_consolidation_review_summary": {
+      "path": "workspace/qualification/phase1/p1_6_closure/branch_consolidation_review_summary.json",
+      "bytes": 4694,
+      "sha256": "9fb726809e4ab35093d89a47829ad8ed83a567b4b614b638f74e57ce613e21fa"
+    }
+  },
+  "authority": {
+    "phase_decision_yaml_created": false,
+    "decision": "pending_human_review",
+    "recommended_decision": "approve_bounded_scope"
+  },
+  "scope": {
+    "P1_8_modified": false,
+    "GeoPhys_core_modified": false,
+    "MuJoCo_core_modified": false,
+    "public_main_modified": false,
+    "P1_7": "deferred",
+    "Phase_I": "not declared complete",
+    "statistical_robustness_claimed": false,
+    "provider_wide_qualification_claimed": false
+  }
+}

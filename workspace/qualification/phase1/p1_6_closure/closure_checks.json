@@ -1,0 +1,103 @@
+{
+  "schema": "p1_6-final-closure-checks-v0",
+  "audited_at": "2026-10-07T15:38:52.317724+00:00",
+  "source_revision": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
+  "d3_core_evidence": {
+    "manifest": "d3/file_manifest.json",
+    "entries": 205,
+    "hash_size_missing_or_mismatch": 0,
+    "integrity": "PASS"
+  },
+  "d3_additional_provider_evidence": {
+    "manifest": "d3_additional_providers/evidence_manifest.json",
+    "entries": 111,
+    "hash_size_missing_or_mismatch": 0,
+    "integrity": "PASS"
+  },
+  "spec_locks": {
+    "core": {
+      "sha256": "cfa389d3e8bffce4a852e70b1b5b418efb2b6ea6f9bde739fb67e74acea7a60f",
+      "lock_sha256": "cfa389d3e8bffce4a852e70b1b5b418efb2b6ea6f9bde739fb67e74acea7a60f",
+      "pass": true
+    },
+    "additional": {
+      "sha256": "33abf5d55aa2240017031c9d1f5aedddca99ef1ec35af14db4734dceddf670e3",
+      "lock_sha256": "33abf5d55aa2240017031c9d1f5aedddca99ef1ec35af14db4734dceddf670e3",
+      "pass": true
+    }
+  },
+  "identity_checks": {
+    "checkpoint_sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+    "checkpoint_pass": true,
+    "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+    "dataset_manifest_pass": true,
+    "resolved_config_identity_sha256": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f",
+    "task_artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4"
+  },
+  "historical_d0_d2": {
+    "D0": "historical_pass",
+    "D1": "historical_pass",
+    "D2": "historical_pass",
+    "linked_report_trace_command_script_hashes": "PASS",
+    "rerun": false,
+    "source_tree_dirty_preserved": true
+  },
+  "model_contract_smoke": {
+    "config_resolve": "PASS",
+    "checkpoint_load": "PASS",
+    "config_identity_sha256": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f",
+    "inference_device": "CPU shape smoke only; core D3 policy inference remained CUDA",
+    "raw_feature_shape": [
+      33
+    ],
+    "selected_feature_shape": [
+      26
+    ],
+    "observation_history_shape": [
+      1,
+      2,
+      26
+    ],
+    "flow_output_shape": [
+      1,
+      50,
+      8
+    ],
+    "finite_output": true
+  },
+  "public_action_smoke": {
+    "mode": "absolute_joint",
+    "action_dim": 8,
+    "real_canonical_transition_seed": 2200,
+    "controller_target_match_max_arm_abs": 0.0,
+    "controller_target_match_max_servo_abs": 0.0,
+    "provider_session_constructed": false,
+    "pass": true
+  },
+  "compileall": {
+    "command": "python -m compileall -q task_env/diagnostics/phase1/policy_search/d3_cross_provider.py",
+    "pass": true,
+    "Python_sources_modified_by_closure": false,
+    "interpreter": "active GeoChora Python environment"
+  },
+  "git_diff_check": "PASS",
+  "p1_8_worktrees": {
+    "modified_by_this_task": false,
+    "preexisting_dirty_worktree_paths": [
+      "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+      "task_env/diagnostics/phase1/nutassembly_recovery/control_tracking.py",
+      "task_env/diagnostics/phase1/nutassembly_recovery/rate_control_report.py"
+    ],
+    "touched": false
+  },
+  "supplementary_behavior": {
+    "same_checkpoint_bytes": true,
+    "same_reset_samples": true,
+    "simulator_frozen_checks_all_pass": true,
+    "finite_state_action_all_pass": true,
+    "total_action_clipping_count": 0,
+    "runtime_errors": 0,
+    "genesis_successes": 10,
+    "sapien_successes": 9
+  }
+}

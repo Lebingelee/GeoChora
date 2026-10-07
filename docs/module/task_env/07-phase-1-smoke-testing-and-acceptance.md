@@ -341,7 +341,9 @@ required_changes:
 - 一个 minibatch/update；
 - 一次短 policy rollout。
 
-之后再运行完整 transfer matrix。
+之后再运行锁定的 paired transfer evaluation。分别记录 software/checkpoint portability 与 task-behavior outcome；同一 checkpoint、observation/action contract、normalization、ResetSamples、controller route 和 provider provenance 必须可追溯。有限 seed 的 PASS 只能支持该 frozen task/policy/timebase/sample envelope，不得升级为 statistical robustness 或 provider-wide qualification。
+
+P1.6 closure candidate 的 D3 对 GeoPhys-trained V2a FINAL checkpoint 在 GeoPhys/MuJoCo 上各跑 10 个 train-support 与 10 个 validation-support ResetSamples，四个 provider/cohort cells 均为 10/10。该结果建议 Human Review 在 PickCube 100Hz bounded scope 内作决定；历史 state_bc `partial_with_localized_failure` 和失败 Evidence 仍需保留。Supplementary Genesis/SAPIEN 结果不能代替 primary-provider gate，也不产生 provider qualification。
 
 ### P1.7 visuomotor
 

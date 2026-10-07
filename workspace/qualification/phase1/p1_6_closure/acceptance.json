@@ -1,0 +1,208 @@
+{
+  "schema": "geochora.p1_6-closure-candidate.v1",
+  "phase": "p1_6",
+  "status": "ready_for_human_review",
+  "recommended_decision": "approve_bounded_scope",
+  "authority": {
+    "decision": "pending_human_review",
+    "phase_decision_yaml_created": false
+  },
+  "baseline": {
+    "branch": "codex/p1.6-closure",
+    "source_commit_before_final_documentation_commit": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
+    "public_main_observed": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
+    "GeoPhys_gitlink": "c665ce5028a12bb4d2afe49f05e015fa9b684a39"
+  },
+  "identities": {
+    "historical_500hz_TaskArtifact_sha256": "461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e",
+    "experimental_100hz_TaskArtifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+    "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+    "V2a_final_checkpoint_sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+    "resolved_config_identity_sha256": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f",
+    "observation_contract_identity": "be8fb4cc60b33454c9ae2a87e3e4cc9017016ccdf6770656d5ebb955d3c1c076",
+    "action_contract_identity": "4888f67cacb175ad4bf41195c1c4dc9465e653485e05b53f5ca33a61ad93eba5",
+    "D3_spec_sha256": "cfa389d3e8bffce4a852e70b1b5b418efb2b6ea6f9bde739fb67e74acea7a60f"
+  },
+  "core_result": {
+    "canonical_trajectory": {
+      "result": "pass_bounded_route_established",
+      "historical_acceptance_status_preserved": "partial_with_localized_failure"
+    },
+    "replay_D0": "pass_historical",
+    "replay_D1": "pass_historical",
+    "replay_D2": "pass_historical",
+    "source_domain_policy": "pass_bounded",
+    "V2a_historical_fixed_cohort": "6/6",
+    "checkpoint_portability_geophys_mujoco": "pass_bounded"
+  },
+  "historical_D0_D2": {
+    "seed": 1000,
+    "reset_sample_hash": "fcea59824ef61219c11016f5ca5a22ba05f72d47ee4e302150e36ce8aaed7670",
+    "trajectory_logical_hash": "a10a579809ec80a7abd986d65e2a48d54a917ff353d2fa073d07daffcbdc3f27",
+    "source_commit": "cda511f49eb544dabe685ec1dbcc6345884d66c8",
+    "source_tree_dirty": true,
+    "rerun": false
+  },
+  "temporal_profile": {
+    "physics_dt_s": 0.002,
+    "control_substeps": 5,
+    "control_dt_s": 0.01,
+    "physics_hz": 500,
+    "control_hz": 100,
+    "default_artifact_changed": false,
+    "average_control_frames_historical_to_100hz": [
+      519.1,
+      112.94
+    ],
+    "average_simulated_duration_s_historical_to_100hz": [
+      1.0382,
+      1.1294
+    ]
+  },
+  "learner": {
+    "policy": "Flow_Vanilla / ConditionalUnet1D",
+    "state_dim": 26,
+    "joint_velocity_included": false,
+    "obs_horizon": 2,
+    "pred_horizon": 50,
+    "act_horizon": 36,
+    "action_dim": 8,
+    "action_mode": "absolute_joint",
+    "training_updates": 15000,
+    "checkpoint_role": "final"
+  },
+  "core_D3": {
+    "cohort_seeds": {
+      "train_support": [
+        2000,
+        2008,
+        2018,
+        2028,
+        2038,
+        2046,
+        2055,
+        2065,
+        2075,
+        2086
+      ],
+      "validation_support": [
+        2200,
+        2202,
+        2204,
+        2206,
+        2208,
+        2210,
+        2212,
+        2214,
+        2216,
+        2219
+      ]
+    },
+    "GeoPhys": {
+      "train_support": "10/10",
+      "validation_support": "10/10",
+      "combined": "20/20",
+      "physics_backend": "diagnostic CUDA"
+    },
+    "MuJoCo": {
+      "train_support": "10/10",
+      "validation_support": "10/10",
+      "combined": "20/20",
+      "physics_backend": "CPU native"
+    },
+    "paired_outcomes": {
+      "FAIL/FAIL": 0,
+      "FAIL/PASS": 0,
+      "PASS/FAIL": 0,
+      "PASS/PASS": 20
+    },
+    "paired_agreement": "20/20 PASS/PASS",
+    "same_checkpoint_bytes": true,
+    "same_ResetSamples": true,
+    "same_observation_contract": true,
+    "same_normalization": true,
+    "same_public_action_route": true,
+    "same_ProductionCanonicalPandaController": true,
+    "policy_inference": "CUDA on both",
+    "simulator_frozen_checks": "PASS",
+    "finite_state_action": "PASS",
+    "action_clipping_count": 0,
+    "provider_specific_learner_patch": false,
+    "file_manifest": {
+      "path": "d3/file_manifest.json",
+      "verified_entries": 205,
+      "integrity": "PASS"
+    }
+  },
+  "supplementary": {
+    "genesis_validation": "10/10",
+    "genesis_version": "1.4.3",
+    "sapien_validation": "9/10",
+    "sapien_version": "3.0.3",
+    "sapien_failed_seed": 2212,
+    "failed_seed_result": {
+      "max_cube_lift_m": 0.010336924076080278,
+      "control_steps": 2500,
+      "simulated_duration_s": 25.0,
+      "runtime_error": null
+    },
+    "physics_backend": "CPU",
+    "policy_inference": "CUDA",
+    "provider_qualification_claimed": false,
+    "provider_runtime_source_commit": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+    "reproducible_from_p1_6_closure_alone": false,
+    "evidence_manifest": {
+      "path": "d3_additional_providers/evidence_manifest.json",
+      "verified_entries": 111,
+      "integrity": "PASS"
+    },
+    "same_checkpoint_bytes": true,
+    "same_ResetSamples": true,
+    "simulator_frozen_checks": "PASS",
+    "finite_state_action": "PASS",
+    "action_clipping_count": 0,
+    "runtime_errors": 0
+  },
+  "provenance_limitations": [
+    "D0-D2 historical run source tree was dirty; original source snapshot and status are preserved.",
+    "Genesis/SAPIEN supplementary episodes used a temporary runtime source snapshot from outside the P1.6 closure branch."
+  ],
+  "claims_not_made": [
+    "statistical_robustness",
+    "arbitrary_task_or_policy_portability",
+    "provider_wide_qualification",
+    "visuomotor_portability",
+    "p1_7_completion",
+    "phase_i_completion"
+  ],
+  "checks": {
+    "core_D3_manifest": "PASS 205/205",
+    "supplementary_manifest": "PASS 111/111",
+    "D3_spec_lock": "PASS",
+    "additional_provider_spec_lock": "PASS",
+    "checkpoint_sha256": "PASS",
+    "dataset_manifest_sha256": "PASS",
+    "D0_D2_linked_hashes": "PASS",
+    "V2a_config_resolve_and_checkpoint_load": "PASS",
+    "26D_feature_and_history_shape": "PASS [1,2,26]",
+    "Flow_output_shape": "PASS [1,50,8] finite",
+    "absolute_joint_public_action_smoke": "PASS; target match max abs 0.0",
+    "compileall_existing_D3_runner": "PASS",
+    "git_diff_check": "PASS",
+    "modified_Python_sources": "none; compileall of existing D3 runner passed",
+    "closure_integrity_checks_file": "2829fd8834dbc22dd5a339557f15e69760a0233852f8466ceb1ffc268358a3f7"
+  },
+  "scope": {
+    "P1_8_modified": false,
+    "GeoPhys_core_modified": false,
+    "MuJoCo_core_modified": false,
+    "CanonicalTrajectory_schema_modified": false,
+    "controller_semantics_modified": false,
+    "task_success_modified": false,
+    "public_main_modified": false,
+    "retrained": false,
+    "additional_simulator_episodes_rerun_for_closure": false
+  },
+  "allowed_claim": "The frozen V2a checkpoint is software/checkpoint portable across GeoPhys and MuJoCo under the evaluated PickCube 100Hz contract, with 10/10 validation-support success on both providers.",
+  "closure_checks_path": "closure_checks.json"
+}

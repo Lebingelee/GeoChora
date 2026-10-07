@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "first_provider_rollout_after_lock": true,
+  "locked_at": "2026-10-07T14:21:40.851497+00:00",
+  "schema": "p1_6-d3-eval-spec-lock-v0",
+  "sha256": "cfa389d3e8bffce4a852e70b1b5b418efb2b6ea6f9bde739fb67e74acea7a60f"
+}
