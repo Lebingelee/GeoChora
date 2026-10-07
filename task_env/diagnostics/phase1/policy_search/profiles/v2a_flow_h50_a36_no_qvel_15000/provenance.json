@@ -1,0 +1,15 @@
+{
+  "baseline_source_commit": "93c7c6c863307fb2c86569214608d0007982e916",
+  "claim_boundary": "exploratory source-domain result only; no provider qualification or cross-provider claim",
+  "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+  "final_checkpoint_sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+  "policy_rng_rule": "100000 + task_seed",
+  "provider": "GeoPhys CUDA diagnostic route",
+  "resolved_config_sha256": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f",
+  "rollout_policy": "final checkpoint; one governed run per seed; seeds 1020/1040/1050/1100 started only after seeds 1000 and 1010 both succeeded",
+  "rollout_spec_sha256": "3f7f01c14561390169a2b8c1194a253f97be5df6bc1747a2b161703a2356d26d",
+  "schema": "p1_6-policy-search-provenance-v0",
+  "training_checkpoint_path": "workspace/experiments/p1_6_policy_search/100hz_gpu_flow_h50_a36_no_qvel_v2a_15000/training/checkpoints/final_step15000.pth",
+  "training_spec_sha256": "456f73ebf8622f68806a636cc3a5d4ba4937a984ab473410e0a35f39fdab7628",
+  "variant": "V2a Flow h50/a36 no-qvel, 15,000 optimizer updates"
+}
