@@ -1,0 +1,35 @@
+{
+  "source_commit": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+  "source_xml_sha256": "77962d434d1dc0df0035ef42ae1ee57bb64e78ac003d760630c5ea1be73aae43",
+  "algorithm_source_sha256": "d9f2ba36c38a2a7c08c96cc834fe7195e511f8525b1929a13402b03962a72d27",
+  "authoring_tool": "unchanged NutAssemblyResetSampler via GeoPhys CPU bootstrap; kinematic alignment only, no physics settle",
+  "provider_revision": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+  "joint_position": {
+    "panda-v1/joint1": -0.7186926603317261,
+    "panda-v1/joint2": -0.3159964382648468,
+    "panda-v1/joint3": 0.4473997950553894,
+    "panda-v1/joint4": -1.8042062520980835,
+    "panda-v1/joint5": 0.13533875346183777,
+    "panda-v1/joint6": 1.5183225870132446,
+    "panda-v1/joint7": 0.4517156779766083,
+    "panda-v1/finger_joint1": 0.03999999910593033,
+    "panda-v1/finger_joint2": 0.03999999910593033
+  },
+  "nut_pose": {
+    "position": [
+      0.5084999799728394,
+      -0.07500000298023224,
+      0.4729999899864197
+    ],
+    "quaternion_wxyz": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  },
+  "task_seed": 19,
+  "sample_name": "NA-S0",
+  "seed_sensitive": false,
+  "settle_steps": 0
+}
