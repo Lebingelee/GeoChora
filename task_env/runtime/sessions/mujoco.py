@@ -1,5 +1,6 @@
 """Private MuJoCo peer adapter. No comparison/oracle or controller implementation."""
 import xml.etree.ElementTree as ET
+import math
 import numpy as np
 
 from .common import _SessionValues, pose
@@ -22,6 +23,7 @@ class _MuJoCoSession(_SessionValues):
             root.remove(element)
         self._model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
         self._data = mujoco.MjData(self._model)
+        self._native_steps = 0
         if self._model.opt.timestep != artifact.timebase.physics_dt:
             raise ValueError('MuJoCo native timestep mismatch')
         self._joint_addresses = {
@@ -44,6 +46,7 @@ class _MuJoCoSession(_SessionValues):
     def reset(self, sample):
         self._validate_sample(sample)
         self._mj.mj_resetData(self._model, self._data)
+        self._native_steps = 0
         for name, value in sample.joint_position.items():
             self._data.qpos[self._joint_addresses[name][0]] = value
         for name, requested in sample.poses_world.items():
@@ -69,7 +72,23 @@ class _MuJoCoSession(_SessionValues):
             quaternion = np.zeros(4)
             self._mj.mju_mat2Quat(quaternion, data.site_xmat[index])
             poses[name] = pose(data.site_xpos[index], quaternion)
-        return self._state(positions, velocities, poses, data.time)
+        time = data.time
+        if self._artifact.timebase.control_substeps > 1:
+            if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
+                raise ValueError('MuJoCo native/canonical step-count mismatch')
+            expected = self._native_steps * self._artifact.timebase.physics_dt
+            # Standard binary64 summation roundoff bound, not a physics tolerance.
+            nu = self._native_steps * 2.0**-53
+            if nu >= 1:
+                raise ValueError('native clock accumulation bound unavailable')
+            bound = nu / (1.0 - nu) * abs(expected) + math.ulp(expected)
+            self._native_time_audit = {'native_time_s': float(data.time),
+                'completed_native_steps': self._native_steps, 'expected_native_elapsed_s': expected,
+                'binary64_summation_roundoff_bound_s': bound}
+            if not math.isfinite(data.time) or abs(data.time - expected) > bound:
+                raise ValueError('MuJoCo measured native time/count mismatch')
+            time = self._control_step * self._artifact.timebase.control_dt
+        return self._state(positions, velocities, poses, time)
 
     def control_feedback(self, state):
         from .control import feedback_value
@@ -105,6 +124,7 @@ class _MuJoCoSession(_SessionValues):
         self._require_reset()
         for _ in range(self._artifact.timebase.control_substeps):
             self._mj.mj_step(self._model, self._data)
+            self._native_steps += 1
             if hasattr(self, '_control_binding'):
                 self._completed_actuator_force = self._data.actuator_force.copy()
         self._mj.mj_forward(self._model, self._data)
