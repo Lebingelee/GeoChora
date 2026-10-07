@@ -9,8 +9,8 @@ import torch
 import task_env.alg.agent_factory
 from agent_factory.agents.registry import make_agent
 from agent_factory.training.identity import config_identity
-from task_env.diagnostics.phase1 import flow_training_normalized as baseline
 from task_env.diagnostics.phase1.policy_search.timebase100 import context, sample_for_variant, _open_session, write_json, sha256_file
+from task_env.diagnostics.phase1.policy_search.config_utils import load_variant_config
 from task_env.diagnostics.phase1.policy_search.flow100_data import (
     select_observation_features,
     trajectory_temporal,
@@ -74,15 +74,21 @@ def rollout(seed:int, output:Path, variant_root:Path|None=None):
     cohort_seeds=spec.get('cohort_seeds',spec.get('episodes',{}).get('fixed_followup_cohort',[]))
     if seed not in cohort_seeds:
         raise ValueError('seed is not in the locked policy-search cohort')
-    checkpoint=(train_root/'checkpoints/flow_best_validation.pth' if variant_root is None
-                else Path(spec['best_checkpoint_path']))
-    if spec['best_checkpoint_sha256']!=sha256_file(checkpoint):
-        raise ValueError('best checkpoint changed after rollout protocol lock')
+    checkpoint_role=spec.get('checkpoint_role','best_validation')
+    if 'checkpoint_path' in spec:
+        checkpoint=Path(spec['checkpoint_path'])
+        expected_checkpoint_sha=spec.get('checkpoint_sha256')
+    else:
+        checkpoint=(train_root/'checkpoints/flow_best_validation.pth' if variant_root is None
+                    else Path(spec['best_checkpoint_path']))
+        expected_checkpoint_sha=spec['best_checkpoint_sha256']
+    if expected_checkpoint_sha!=sha256_file(checkpoint):
+        raise ValueError(f'{checkpoint_role} checkpoint changed after rollout protocol lock')
     frozen=spec['reset_samples'][str(seed)]
     from task_env.artifacts.execution import ResetSample
     if ResetSample.from_mapping(frozen).identity_hash!=sample.identity_hash:
         raise ValueError('reset sample differs from locked rollout manifest')
-    config=baseline.load_variant_config(resolved_config_path)
+    config=load_variant_config(resolved_config_path)
     train_spec=yaml_load(training_spec_path)
     if config_identity(config)!=train_spec['resolved_config_sha256']:
         raise ValueError('Flow resolved config mismatch')
@@ -186,6 +192,7 @@ def rollout(seed:int, output:Path, variant_root:Path|None=None):
             servo_delta.append(max(abs(a['arm_servo_position'][n]-b['arm_servo_position'][n]) for n in ARM))
             grip_delta.append(abs(a['gripper']['opening_m']-b['gripper']['opening_m']))
         result={'schema':'p1_6-100hz-flow-rollout-v0','seed':seed,'policy_rng_seed':policy_seed,
+          'checkpoint_role':checkpoint_role,
           'provider':'geophys','physics_backend':'cuda','policy_device':'cuda','diagnostic_only':True,
           'provider_qualification_claim':False,'task_artifact_sha256':artifact.identity_hash,
           'reset_sample_hash':sample.identity_hash,'checkpoint_sha256':sha256_file(checkpoint),

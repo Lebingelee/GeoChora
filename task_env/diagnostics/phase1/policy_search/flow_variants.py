@@ -24,7 +24,7 @@ import task_env.alg.agent_factory
 from agent_factory.agents.registry import make_agent
 from agent_factory.training.identity import config_identity, digest
 from task_env.alg.state_bc.features import ACTION_CONTRACT, FEATURE_CONTRACT
-from task_env.diagnostics.phase1 import flow_training_normalized as baseline
+from .config_utils import load_variant_config
 from .flow100_data import Flow100Dataset, observation_contract
 
 
@@ -55,7 +55,43 @@ VARIANTS = {
         "expected_parameter_count": 19510472,
         "display_name": "Flow h50/a36 without arm velocity",
     },
+    "v1a": {
+        "directory": "100hz_gpu_flow_h50_a36_v1a_15000",
+        "agent_type": "Flow_Vanilla",
+        "pred_horizon": 50,
+        "act_horizon": 36,
+        "excluded_fields": (),
+        "expected_parameter_count": 19512264,
+        "actor_iters": 15000,
+        "epoch_budget": None,
+        "rollout_checkpoint_role": "final",
+        "pilot_first": True,
+        "display_name": "Flow h50/a36 full 33D state, 15000 updates",
+    },
+    "v2a": {
+        "directory": "100hz_gpu_flow_h50_a36_no_qvel_v2a_15000",
+        "agent_type": "Flow_Vanilla",
+        "pred_horizon": 50,
+        "act_horizon": 36,
+        "excluded_fields": ("arm_velocity7",),
+        "expected_parameter_count": 19510472,
+        "actor_iters": 15000,
+        "epoch_budget": None,
+        "rollout_checkpoint_role": "final",
+        "pilot_first": True,
+        "display_name": "Flow h50/a36 without arm velocity, 15000 updates",
+    },
 }
+
+
+def validation_steps_for_budget(actor_iters, interval=1000):
+    actor_iters, interval = int(actor_iters), int(interval)
+    if actor_iters <= 0 or interval <= 0:
+        raise ValueError("training and validation intervals must be positive")
+    steps = [0, *range(interval, actor_iters, interval)]
+    if steps[-1] != actor_iters:
+        steps.append(actor_iters)
+    return steps
 
 
 def sha_bytes(data: bytes) -> str:
@@ -112,7 +148,7 @@ def _verify_dataset():
 
 
 def _base_config(profile, batch_size, steps_per_epoch, dataset_sha):
-    cfg = baseline.load_variant_config(V0_TRAIN / "resolved_flow_config.yaml")
+    cfg = load_variant_config(V0_TRAIN / "resolved_flow_config.yaml")
     cfg.dataset.expert.demo_path = str(MANIFEST)
     cfg.dataset.config = {"allow_failed_for_smoke": False}
     cfg.env.obs_horizon = 2
@@ -122,7 +158,7 @@ def _base_config(profile, batch_size, steps_per_epoch, dataset_sha):
     cfg.actor.obs_horizon = 2
     cfg.actor.pred_horizon = profile["pred_horizon"]
     cfg.actor.encoder.proprio_dim = cfg.env.proprio_dim
-    cfg.train.actor_iters = EPOCHS * int(steps_per_epoch)
+    cfg.train.actor_iters = int(profile.get("actor_iters", EPOCHS * int(steps_per_epoch)))
     cfg.train.batch_size = int(batch_size)
     cfg.train.device = DEVICE
     cfg.device = DEVICE
@@ -237,13 +273,13 @@ def prepare(name):
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False,
                             drop_last=False, num_workers=0)
     steps_per_epoch = len(train_loader)
-    actor_iters = EPOCHS * steps_per_epoch
+    actor_iters = int(profile.get("actor_iters", EPOCHS * steps_per_epoch))
     cfg, identities = _base_config(profile, batch_size, steps_per_epoch, manifest_sha)
     root.mkdir(parents=True, exist_ok=True)
     profile["training_root"].mkdir(parents=True, exist_ok=True)
     resolved_path = root / "resolved_config.yaml"
     OmegaConf.save(cfg, resolved_path, resolve=True)
-    config_sha = config_identity(baseline.load_variant_config(resolved_path))
+    config_sha = config_identity(load_variant_config(resolved_path))
     if config_sha != identities["resolved_config_sha256"]:
         raise ValueError("saved resolved Flow config identity mismatch")
     states = train_ds.get_all_states().float()
@@ -283,8 +319,12 @@ def prepare(name):
                                      "action": "train-only per-dimension q01-q99 to [-1,1], clipped"},
                     "inference_steps": 10, "device": "cuda", "precision": "float32",
                     "seed": SEED, "batch_size": batch_size, "batch_size_attempts": batch_attempts,
-                    "epoch_budget": EPOCHS, "steps_per_epoch": steps_per_epoch,
+                    "epoch_budget": profile.get("epoch_budget", EPOCHS),
+                    "effective_epoch_equivalents": actor_iters / steps_per_epoch,
+                    "training_budget_kind": "fixed_optimizer_updates" if "actor_iters" in profile else "epoch_equivalents",
+                    "steps_per_epoch": steps_per_epoch,
                     "actor_iters": actor_iters, "optimizer": "AdamW",
+                    "rollout_checkpoint_role": profile.get("rollout_checkpoint_role", "best_validation"),
                     "learning_rate": 1e-4, "weight_decay": 1e-6,
                     "dataloader": {"shuffle": True, "drop_last": True, "num_workers": 0,
                                    "generator_seed": SEED}},
@@ -299,7 +339,8 @@ def prepare(name):
         "training_state_statistics": state_stats,
         "training_action_statistics": action_stats,
         "checkpoint_selection": "minimum validation loss; exact tie selects earlier step",
-        "validation_schedule": [0, 1000, actor_iters],
+        "validation_interval": 1000,
+        "validation_schedule": validation_steps_for_budget(actor_iters),
         "train_loss_interval": 100,
         "no_cross_provider_evaluation": True,
     }
@@ -355,7 +396,7 @@ def train(name):
                             drop_last=False, num_workers=0)
     if len(train_loader) != int(spec["learner"]["steps_per_epoch"]):
         raise ValueError("selected training loader length differs from frozen budget")
-    cfg = baseline.load_variant_config(root / "resolved_config.yaml")
+    cfg = load_variant_config(root / "resolved_config.yaml")
     cfg.agent_sp.artifact_identity = {
         "resolved_config_sha256": spec["resolved_config_sha256"],
         "dataset_manifest_sha256": manifest_sha,
@@ -416,7 +457,7 @@ def train(name):
     wall_s = time.monotonic() - started
     if agent.step != n_steps:
         raise ValueError(f"optimizer update count mismatch: {agent.step}/{n_steps}")
-    if [x["step"] for x in candidates] != [0, 1000, n_steps]:
+    if [x["step"] for x in candidates] != validation_steps_for_budget(n_steps):
         raise ValueError(f"validation schedule mismatch: {[x['step'] for x in candidates]}")
     metrics_path = train_root / "metrics_run" / "training_metrics.jsonl"
     rows = [json.loads(line) for line in metrics_path.read_text().splitlines() if line.strip()]
@@ -435,7 +476,7 @@ def train(name):
     final_path = checkpoints / f"final_step{n_steps}.pth"
     agent.save(str(final_path), meta={"purpose": "policy_search_final_checkpoint",
                                       "variant": name, "optimizer_step": n_steps,
-                                      "epoch_equivalent": EPOCHS,
+                                      "epoch_equivalent": n_steps / len(train_loader),
                                       "normalizer_identity": normalizer_identity,
                                       "resolved_config_sha256": spec["resolved_config_sha256"],
                                       "dataset_manifest_sha256": manifest_sha})
@@ -444,8 +485,9 @@ def train(name):
         "schema": "p1_6-policy-search-flow-training-summary-v0",
         "variant": name,
         "total_optimizer_steps": n_steps,
-        "epoch_budget": EPOCHS,
+        "epoch_budget": spec["learner"].get("epoch_budget"),
         "effective_epochs": n_steps / len(train_loader),
+        "training_budget_kind": spec["learner"]["training_budget_kind"],
         "steps_per_epoch": len(train_loader),
         "batch_size": batch_size,
         "train_samples": len(train_ds),
@@ -507,9 +549,17 @@ def lock_rollout(name):
     train_root = profile["training_root"]
     spec = yaml.safe_load((train_root / "training_spec.yaml").read_text())
     summary = json.loads((train_root / "training_summary.json").read_text())
-    checkpoint = train_root / "checkpoints" / "best_validation.pth"
-    if not checkpoint.is_file() or sha(checkpoint) != summary["best_checkpoint_sha256"]:
-        raise ValueError("best-validation checkpoint identity mismatch")
+    checkpoint_role = spec["learner"].get("rollout_checkpoint_role", "best_validation")
+    if checkpoint_role == "best_validation":
+        checkpoint = train_root / "checkpoints" / "best_validation.pth"
+        expected_checkpoint_sha = summary["best_checkpoint_sha256"]
+    elif checkpoint_role == "final":
+        checkpoint = train_root / "checkpoints" / f"final_step{spec['learner']['actor_iters']}.pth"
+        expected_checkpoint_sha = summary["final_checkpoint_sha256"]
+    else:
+        raise ValueError(f"unsupported predeclared rollout checkpoint role: {checkpoint_role}")
+    if not checkpoint.is_file() or sha(checkpoint) != expected_checkpoint_sha:
+        raise ValueError(f"{checkpoint_role} rollout checkpoint identity mismatch")
     _, artifact, _, _, _, _ = context("cuda")
     seeds = [1000, 1010, 1020, 1040, 1050, 1100]
     samples = {}
@@ -526,9 +576,14 @@ def lock_rollout(name):
         "task_artifact_sha256": artifact.identity_hash,
         "dataset_manifest_sha256": spec["dataset_manifest_sha256"],
         "resolved_config_sha256": spec["resolved_config_sha256"],
-        "best_checkpoint_path": str(checkpoint),
-        "best_checkpoint_sha256": sha(checkpoint),
+        "checkpoint_role": checkpoint_role,
+        "checkpoint_path": str(checkpoint),
+        "checkpoint_sha256": sha(checkpoint),
+        "best_checkpoint_path": str(train_root / "checkpoints" / "best_validation.pth"),
+        "best_checkpoint_sha256": summary["best_checkpoint_sha256"],
         "cohort_seeds": seeds,
+        "pilot_seeds": [1000, 1010] if profile.get("pilot_first") else [],
+        "pilot_success_gate": "both pilot seeds must succeed before remaining seeds" if profile.get("pilot_first") else None,
         "policy_rng_rule": "100000 + task_seed; one inference sampling realization per episode",
         "success_gate": "cube_lift >= 0.10 m",
         "max_control_steps": 2500,
@@ -542,10 +597,12 @@ def lock_rollout(name):
     path = root / "rollout_spec.yaml"
     write_yaml_new(path, rollout)
     lock = {"schema": "p1_6-flow-search-rollout-lock-v0", "sha256": sha(path),
-            "checkpoint_sha256": rollout["best_checkpoint_sha256"],
+            "checkpoint_role": checkpoint_role,
+            "checkpoint_sha256": rollout["checkpoint_sha256"],
             "locked_before_first_rollout": True}
     write_new(root / "rollout_spec_lock.json", lock)
-    return {"rollout_spec_sha256": lock["sha256"], "best_checkpoint_sha256": sha(checkpoint),
+    return {"rollout_spec_sha256": lock["sha256"], "checkpoint_role": checkpoint_role,
+            "checkpoint_sha256": sha(checkpoint),
             "seeds": seeds, "reset_sample_hashes": {
                 seed: sample_for_variant(artifact, seed).identity_hash for seed in seeds}}
 
