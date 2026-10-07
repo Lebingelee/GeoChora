@@ -684,8 +684,9 @@ Phase-I session dispatch 显式区分 `geophys`、`mujoco`、`sapien`、`genesis
 Genesis CPU/MJCF adapter 是待审查的 bounded runtime/control implementation，
 其固定 tendon 到成员 joint PD 的 source-derived mapping 为 approximate mapping；
 不能由 manifest 的 implemented 声明推断 task replay 通过或 provider qualified。
-SAPIEN 当前只有 primitive conformance diagnostic，runtime capability admission
-保持拒绝。Render provider 独立，新增 boundary-provider camera/render 不在此范围。
+首次 P1.8 review candidate 中，SAPIEN 只有 primitive conformance diagnostic，
+runtime capability admission 拒绝；后续 recovery 状态见下一节。Render provider 独立，
+新增 boundary-provider camera/render 不在此范围。
 
 运行与失败记录归属 `workspace/qualification/phase1/p1_8_multi_backend_replay/`。
 D0 使用 recorded state/feedback 验证 public action expressivity；D1 直接执行冻结
@@ -693,3 +694,26 @@ control targets；D2 使用当前 measured canonical state/feedback 重新计算
 controller。Execution-valid 与 task-valid 分别报告，PickCube success 仍为
 cube lift >= 0.10 m。未通过 prerequisite 的 provider 不进入完整 replay；所有
 tolerance 与 semantic input 由执行前 lock 约束，失败不能通过放宽 gate 消除。
+
+### SAPIEN bounded recovery review candidate（2026-10-07）
+
+Human Review 将原 SAPIEN `native_dt` strict failure 分类为 scalar representation
+boundary。P1.8 新增独立 representation-aware exact gate：用 public timestep
+set/read 校准 native scalar representation，再要求 raw native readback exact 等于
+TaskArtifact physics_dt 的 native cast。保留 raw readback 和旧 strict failure，
+不修改 approved P1.3 evaluator、fixture 或 physical/geometric tolerances。
+
+SAPIEN CPU adapter 新增 source-derived actor/articulation lowering 与 canonical
+runtime/control lifecycle。Arm 的 source PD gains/force bounds 经 public native
+joint drives 实现，fixed tendon 经 public generalized force application/readback；
+joint equality 是 disclosed approximate native mimic mapping。Manifest 只声明
+implemented，不声明 qualified。Canonical simulation_time 由完成的 control boundary
+计数和 TaskArtifact control_dt 得出，并验证 native substep count；raw native elapsed
+另作 diagnostic，避免将 binary32 timestep representation drift 累积到 canonical time。
+
+Recovery 只复用已有 seed31/73 golden trajectories 和 frozen public actions。
+SAPIEN 四项 replay-critical probes、D1/D2 两个 seeds 均通过 bounded gates；此前
+GeoPhys/MuJoCo/Genesis Evidence 保留，追加 bounded regression spot-checks。
+这是四-provider PickCube replay slice 的 review candidate，不能推断 full P1.8
+canonical scope、provider-wide qualification 或 Phase-I closure。新增 Evidence 位于
+原 P1.8 root 下 `sapien_recovery/`，初轮 actuator realization failure 保留。
