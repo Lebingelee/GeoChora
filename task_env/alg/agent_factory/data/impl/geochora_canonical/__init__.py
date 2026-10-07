@@ -17,18 +17,18 @@ def logical_hash(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
 
-def window(states, actions, index):
+def window(states, actions, index, pred_horizon=16):
     """History ends at boundary i; targets begin at transition i; edge repetition."""
-    if not 0 <= index < len(actions) or len(states) != len(actions):
+    if not 0 <= index < len(actions) or len(states) != len(actions) or pred_horizon < 1:
         raise ValueError('invalid window index/alignment')
     history = states[[max(0, index-1), index]]
-    future = actions[np.minimum(np.arange(index, index+16), len(actions)-1)]
+    future = actions[np.minimum(np.arange(index, index+pred_horizon), len(actions)-1)]
     return {'observations': {'state': torch.from_numpy(history.copy())},
             'action': torch.from_numpy(future.copy())}
 
 
 class CanonicalFlowDataset(Dataset):
-    def __init__(self, manifest_path, role='train', *, allow_failed_for_smoke=False):
+    def __init__(self, manifest_path, role='train', *, allow_failed_for_smoke=False, pred_horizon=16):
         self.manifest_path = str(manifest_path)
         manifest = json.loads(Path(manifest_path).read_text())
         if manifest['schema'] not in ('geochora-canonical-flow-dataset-v0', 'geochora-canonical-flow-dataset-v1') or role not in ('train', 'validation'):
@@ -45,6 +45,9 @@ class CanonicalFlowDataset(Dataset):
         if [row['seed'] for row in rows] != expected:
             raise ValueError('frozen trajectory split mismatch')
         self.allow_failed_for_smoke = allow_failed_for_smoke
+        self.pred_horizon = int(pred_horizon)
+        if self.pred_horizon < 1:
+            raise ValueError('pred_horizon must be positive')
         self.training_eligible = True
         self.failed_seeds = []
         self.role = role
@@ -94,7 +97,7 @@ class CanonicalFlowDataset(Dataset):
             raise IndexError(index)
         record = bisect_right(self.ends, index)
         start = self.ends[record-1] if record else 0
-        return window(*self.records[record], index-start)
+        return window(*self.records[record], index-start, pred_horizon=self.pred_horizon)
 
     def get_all_actions(self):
         return torch.from_numpy(np.concatenate([y for x, y in self.records]))
@@ -103,18 +106,36 @@ class CanonicalFlowDataset(Dataset):
         return torch.from_numpy(np.concatenate([x for x, y in self.records]))
 
     def validation_dataset(self):
-        return type(self)(self.manifest_path, 'validation', allow_failed_for_smoke=self.allow_failed_for_smoke)
+        return type(self)(self.manifest_path, 'validation', allow_failed_for_smoke=self.allow_failed_for_smoke,
+                          pred_horizon=self.pred_horizon)
+
+
+def _validate_flow_window_config(cfg):
+    """Validate the shared state/action contract and learner-selected windows.
+
+    Prediction and execution horizons belong to the learner profile.  Keep the
+    historical 2/16/8 profile as the defaults, while allowing explicit longer
+    action chunks without changing CanonicalTrajectory v0.
+    """
+    if (int(cfg.env.proprio_dim), int(cfg.env.action_dim)) != (33, 8):
+        raise ValueError('canonical Flow requires the frozen 33D state / 8D action contract')
+    obs_horizon = int(cfg.env.obs_horizon)
+    pred_horizon = int(cfg.env.pred_horizon)
+    act_horizon = int(cfg.env.act_horizon)
+    if obs_horizon != 2 or pred_horizon < 1 or not 1 <= act_horizon <= pred_horizon:
+        raise ValueError('canonical Flow requires obs_horizon=2 and 1 <= act_horizon <= pred_horizon')
+    if (int(cfg.actor.obs_horizon), int(cfg.actor.pred_horizon)) != (obs_horizon, pred_horizon):
+        raise ValueError('canonical Flow actor and environment horizons must match')
 
 
 def _build(cfg, required_keys=None, expert_path=None):
-    if (cfg.env.proprio_dim, cfg.env.action_dim, cfg.env.obs_horizon,
-            cfg.env.pred_horizon, cfg.env.act_horizon) != (33, 8, 2, 16, 8):
-        raise ValueError('canonical Flow dimensions/horizons are frozen')
+    _validate_flow_window_config(cfg)
     if (cfg.dataset.include_rgb or cfg.dataset.include_depth
             or cfg.agent_control_mode != 'absolute_joint'
             or cfg.env.env_control_mode != 'absolute_joint'):
         raise ValueError('canonical Flow requires state-only absolute_joint')
-    return CanonicalFlowDataset(expert_path, allow_failed_for_smoke=bool(cfg.dataset.config.get('allow_failed_for_smoke', False)))
+    return CanonicalFlowDataset(expert_path, allow_failed_for_smoke=bool(cfg.dataset.config.get('allow_failed_for_smoke', False)),
+                                pred_horizon=int(cfg.env.pred_horizon))
 
 
 register_dataset_type('geochora_canonical_flow', _build)

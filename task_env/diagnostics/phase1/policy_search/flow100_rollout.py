@@ -11,7 +11,10 @@ from agent_factory.agents.registry import make_agent
 from agent_factory.training.identity import config_identity
 from task_env.diagnostics.phase1 import flow_training_normalized as baseline
 from task_env.diagnostics.phase1.policy_search.timebase100 import context, sample_for_variant, _open_session, write_json, sha256_file
-from task_env.diagnostics.phase1.policy_search.flow100_data import trajectory_temporal
+from task_env.diagnostics.phase1.policy_search.flow100_data import (
+    select_observation_features,
+    trajectory_temporal,
+)
 from task_env.alg.state_bc.features import features, requested_action
 from task_env.tasks.pick_cube.canonical_semantics import evaluate
 from task_env.diagnostics.phase1.control.worker import observation
@@ -53,28 +56,39 @@ def _close_metrics(rows):
             'max_close_xy_drift_m':float(np.max(np.linalg.norm(drift[:,:2],axis=1))),
             'max_close_single_step_displacement_m':float(np.max(np.linalg.norm(step,axis=1))) if len(step) else 0.0}
 
-def rollout(seed:int, output:Path):
+def rollout(seed:int, output:Path, variant_root:Path|None=None):
     output=Path(output)
     if output.exists(): raise FileExistsError(f'refusing to overwrite rollout evidence {output}')
+    root=Path(variant_root) if variant_root is not None else ROOT
+    train_root=root/'training' if variant_root is not None else TRAIN_ROOT
+    rollout_spec_path=root/'rollout_spec.yaml'
+    training_spec_path=train_root/'training_spec.yaml'
+    resolved_config_path=(root/'resolved_config.yaml' if variant_root is not None
+                          else train_root/'resolved_flow_config.yaml')
     hist,artifact,source,readiness,controller,expert=context('cuda')
     sample=sample_for_variant(artifact,seed)
-    spec=yaml_load(ROOT/'rollout_spec.yaml')
-    lock=json.loads((ROOT/'rollout_spec_lock.json').read_text())
-    if sha256_file(ROOT/'rollout_spec.yaml')!=lock['sha256']:
+    spec=yaml_load(rollout_spec_path)
+    lock=json.loads(root.joinpath('rollout_spec_lock.json').read_text())
+    if sha256_file(rollout_spec_path)!=lock['sha256']:
         raise ValueError('rollout spec lock mismatch')
-    if spec['best_checkpoint_sha256']!=sha256_file(TRAIN_ROOT/'checkpoints/flow_best_validation.pth'):
+    cohort_seeds=spec.get('cohort_seeds',spec.get('episodes',{}).get('fixed_followup_cohort',[]))
+    if seed not in cohort_seeds:
+        raise ValueError('seed is not in the locked policy-search cohort')
+    checkpoint=(train_root/'checkpoints/flow_best_validation.pth' if variant_root is None
+                else Path(spec['best_checkpoint_path']))
+    if spec['best_checkpoint_sha256']!=sha256_file(checkpoint):
         raise ValueError('best checkpoint changed after rollout protocol lock')
     frozen=spec['reset_samples'][str(seed)]
     from task_env.artifacts.execution import ResetSample
     if ResetSample.from_mapping(frozen).identity_hash!=sample.identity_hash:
         raise ValueError('reset sample differs from locked rollout manifest')
-    config=baseline.load_variant_config(TRAIN_ROOT/'resolved_flow_config.yaml')
-    train_spec=yaml_load(TRAIN_ROOT/'training_spec.yaml')
+    config=baseline.load_variant_config(resolved_config_path)
+    train_spec=yaml_load(training_spec_path)
     if config_identity(config)!=train_spec['resolved_config_sha256']:
         raise ValueError('Flow resolved config mismatch')
-    config.agent_sp.artifact_identity=train_spec['identities']
+    if config.agent_sp.artifact_identity != train_spec['identities']:
+        raise ValueError('Flow artifact identity does not match frozen training specification')
     agent=make_agent('Flow_Vanilla',config)
-    checkpoint=TRAIN_ROOT/'checkpoints/flow_best_validation.pth'
     checkpoint_meta=agent.load(str(checkpoint))
     if checkpoint_meta.get('artifact_identity')!=train_spec['identities']:
         raise ValueError('Flow checkpoint identity mismatch')
@@ -90,13 +104,23 @@ def rollout(seed:int, output:Path):
         state=session.snapshot(); feedback=session.control_feedback(state)
         controller.reset(state,feedback)
         obs,info,evaluation=observation(state,artifact)
-        history=[features(state,feedback)]
+        excluded_fields=spec.get('observation_contract',{}).get('excluded_fields',())
+        policy_features=lambda state,feedback: select_observation_features(
+            features(state,feedback), excluded_fields)
+        obs_horizon=int(spec.get('obs_horizon',2))
+        pred_horizon=int(spec.get('pred_horizon',config.env.pred_horizon))
+        act_horizon=int(spec.get('act_horizon',8))
+        max_control_steps=int(spec.get('max_control_steps',spec.get('max_control_steps_per_episode',MAX_CONTROL_STEPS)))
+        if (obs_horizon!=2 or pred_horizon!=int(config.env.pred_horizon)
+                or act_horizon<1 or act_horizon>pred_horizon):
+            raise ValueError('runner_action_boundary: rollout horizons disagree with Flow checkpoint')
+        history=[policy_features(state,feedback)]
         max_lift=float(info['task_metrics']['cube_lift'])
         issued=0; replans=0; clips=0; clip_dims=np.zeros(8,dtype=np.int64); max_violation=np.zeros(8,dtype=np.float64)
         finite_actions=True; simulation_unchanged_checks=0; stop_reason='control_step_budget'
-        while state.control_step < MAX_CONTROL_STEPS and not info['is_success'] and not info['task_failure']:
-            if len(history)==1: recent=[history[0],history[0]]
-            else: recent=history[-2:]
+        while state.control_step < max_control_steps and not info['is_success'] and not info['task_failure']:
+            if len(history)<obs_horizon: recent=[history[0]]*obs_horizon
+            else: recent=history[-obs_horizon:]
             cpu_obs=torch.from_numpy(np.stack(recent).astype(np.float32,copy=False)).unsqueeze(0).contiguous()
             torch.cuda.synchronize(); t0=time.perf_counter()
             gpu_obs=cpu_obs.to('cuda',non_blocking=False)
@@ -105,7 +129,7 @@ def rollout(seed:int, output:Path):
             torch.cuda.synchronize(); t0=time.perf_counter()
             action_chunk=agent.sample_action({'state':gpu_obs})
             torch.cuda.synchronize(); inference.append(time.perf_counter()-t0)
-            if tuple(action_chunk.shape)!=(1,16,8): raise ValueError(f'Flow output shape {tuple(action_chunk.shape)}')
+            if tuple(action_chunk.shape)!=(1,pred_horizon,8): raise ValueError(f'Flow output shape {tuple(action_chunk.shape)}')
             if not bool(torch.isfinite(action_chunk).all()):
                 finite_actions=False; stop_reason='nonfinite_action'; break
             # Explicit D2H synchronization completes inference before any simulation step.
@@ -114,7 +138,7 @@ def rollout(seed:int, output:Path):
             if frozen_state.control_step!=before_step or frozen_state.simulation_time!=before_time:
                 raise RuntimeError('simulator advanced during synchronous policy inference')
             simulation_unchanged_checks+=1; replans+=1
-            for row_index in range(min(8,MAX_CONTROL_STEPS-state.control_step)):
+            for row_index in range(min(act_horizon,max_control_steps-state.control_step)):
                 action=np.asarray(chunk[row_index],dtype=np.float32)
                 request=requested_action(action)
                 canonical,target=controller.compute(state,feedback,request)
@@ -147,7 +171,7 @@ def rollout(seed:int, output:Path):
                     stop_reason='nonfinite_state'; state=next_state;feedback=next_feedback;info=next_info;break
                 state,feedback,obs,info,evaluation=next_state,next_feedback,next_obs,next_info,next_eval
                 max_lift=max(max_lift,float(info['task_metrics']['cube_lift']))
-                history.append(features(state,feedback))
+                history.append(policy_features(state,feedback))
                 if info['is_success']:
                     stop_reason='task_success'; break
                 if info['task_failure']:
@@ -199,5 +223,6 @@ def yaml_load(path):
 def main():
     import argparse
     p=argparse.ArgumentParser();p.add_argument('--seed',type=int,required=True);p.add_argument('--output',type=Path,required=True)
-    a=p.parse_args();print(json.dumps(rollout(a.seed,a.output),sort_keys=True,indent=2,allow_nan=False))
+    p.add_argument('--variant-root',type=Path)
+    a=p.parse_args();print(json.dumps(rollout(a.seed,a.output,a.variant_root),sort_keys=True,indent=2,allow_nan=False))
 if __name__=='__main__':main()

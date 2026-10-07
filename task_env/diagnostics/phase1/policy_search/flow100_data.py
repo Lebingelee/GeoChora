@@ -4,6 +4,7 @@ from bisect import bisect_right
 from collections import Counter, defaultdict
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,56 @@ from torch.utils.data import Dataset
 from task_env.alg.state_bc.features import examples, features, FEATURE_CONTRACT, ACTION_CONTRACT
 from task_env.trajectory.canonical import load
 from task_env.alg.agent_factory.data.impl.geochora_canonical import window
+from agent_factory.training.identity import digest
+
+
+_RAW_FIELD_ORDER = tuple(FEATURE_CONTRACT["field_order"])
+_FIELD_WIDTHS = {}
+for _field in _RAW_FIELD_ORDER:
+    _match = re.search(r"(\d+)$", _field)
+    if _match is None:
+        raise RuntimeError(f"feature contract field has no declared width: {_field}")
+    _FIELD_WIDTHS[_field] = int(_match.group(1))
+
+
+def observation_contract(excluded_fields=()):
+    """Return a semantic state selector derived from the frozen raw contract."""
+    excluded = tuple(sorted(set(map(str, excluded_fields))))
+    unknown = set(excluded) - set(_RAW_FIELD_ORDER)
+    if unknown:
+        raise ValueError(f"unknown semantic feature fields: {sorted(unknown)}")
+    selected = tuple(name for name in _RAW_FIELD_ORDER if name not in excluded)
+    identity_payload = FEATURE_CONTRACT if not excluded else {
+        "schema": "pick-cube-state-policy-selection-v0",
+        "source_contract": FEATURE_CONTRACT,
+        "excluded_fields": list(excluded),
+        "selected_fields": list(selected),
+    }
+    return {
+        "identity": digest(identity_payload),
+        "source_contract_identity": digest(FEATURE_CONTRACT),
+        "selected_fields": list(selected),
+        "excluded_fields": list(excluded),
+        "state_dim": sum(_FIELD_WIDTHS[name] for name in selected),
+    }
+
+
+def select_observation_features(values, excluded_fields=()):
+    """Select named semantic fields from the frozen provider-neutral feature vector."""
+    contract = observation_contract(excluded_fields)
+    array = np.asarray(values)
+    if array.shape[-1] != int(FEATURE_CONTRACT["shape"][0]):
+        raise ValueError("raw canonical state feature width mismatch")
+    if not excluded_fields:
+        return array.copy()
+    columns = []
+    offset = 0
+    for name in _RAW_FIELD_ORDER:
+        width = _FIELD_WIDTHS[name]
+        if name in contract["selected_fields"]:
+            columns.extend(range(offset, offset + width))
+        offset += width
+    return array[..., columns].copy()
 
 
 def sha256(path):
@@ -132,7 +183,7 @@ def _aggregate(trajectories):
 
 class Flow100Dataset(Dataset):
     """Same feature/action/window contracts, bound to this experiment's manifest."""
-    def __init__(self, manifest_path, role, *, pred_horizon=16):
+    def __init__(self, manifest_path, role, *, pred_horizon=16, excluded_fields=()):
         self.manifest_path = Path(manifest_path)
         manifest = json.loads(self.manifest_path.read_text())
         if manifest["schema"] != "p1_6-100hz-flow-dataset-v0" or role not in ("train", "validation"):
@@ -144,6 +195,8 @@ class Flow100Dataset(Dataset):
         self.manifest_identity = manifest["logical_identity"]
         self.role = role
         self.pred_horizon = int(pred_horizon)
+        self.observation = observation_contract(excluded_fields)
+        self.observation_contract_identity = self.observation["identity"]
         self.records=[]; self.ends=[]; total=0
         rows = manifest["trajectories"][role]
         if len(rows) != (80 if role == "train" else 20):
@@ -154,6 +207,9 @@ class Flow100Dataset(Dataset):
             x,y = examples(trajectory)
             if x.dtype != np.float32 or y.dtype != np.float32 or x.shape != (len(trajectory.transitions),33) or y.shape != (len(trajectory.transitions),8):
                 raise ValueError("invalid state/action shape or dtype")
+            x = select_observation_features(x, self.observation["excluded_fields"])
+            if x.shape != (len(trajectory.transitions), self.observation["state_dim"]):
+                raise ValueError("semantic observation selection shape mismatch")
             self.records.append((x,y)); total += len(y); self.ends.append(total)
         self.statistics = manifest["dataset_statistics"][role]
     def __len__(self): return self.ends[-1]

@@ -204,6 +204,10 @@ class ConditionalUnet1D(nn.Module):
         self.up_modules = up_modules
         self.down_modules = down_modules
         self.final_conv = final_conv
+        # Each non-final down block halves temporal resolution.  Inputs that
+        # are not divisible by this factor need boundary padding so encoder
+        # skip connections align again in the decoder.
+        self.temporal_divisor = 2 ** max(0, len(down_dims) - 1)
 
         n_params = sum(p.numel() for p in self.parameters())
         print(f"number of parameters: {n_params / 1e6:.2f}M")
@@ -218,6 +222,16 @@ class ConditionalUnet1D(nn.Module):
         global_cond: (B,global_cond_dim)
         output: (B,T,input_dim)
         """
+        if sample.ndim != 3 or sample.shape[1] < 1:
+            raise ValueError("ConditionalUnet1D expects a non-empty (B,T,C) action sequence")
+        original_horizon = int(sample.shape[1])
+        padding = (-original_horizon) % self.temporal_divisor
+        if padding:
+            # Absolute-joint chunks use edge repetition at the dataset
+            # boundary. Apply the same neutral edge extension inside the U-Net
+            # so arbitrary requested horizons retain their public length.
+            edge = sample[:, -1:, :].expand(-1, padding, -1)
+            sample = torch.cat((sample, edge), dim=1)
         # (B,T,C)
         sample = sample.moveaxis(-1,-2)
         # (B,C,T)
@@ -261,4 +275,4 @@ class ConditionalUnet1D(nn.Module):
         # (B,C,T)
         x = x.moveaxis(-1,-2)
         # (B,T,C)
-        return x
+        return x[:, :original_horizon, :]
