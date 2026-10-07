@@ -1,8 +1,8 @@
-# P1.6 Final Closure Candidate
+# P1.6 Final Closure Acceptance
 
-Status: `ready_for_human_review`
-Recommended Human decision: approve within the bounded PickCube / V2a / 100Hz scope
-Formal decision: pending Human Review; no `phase_decision.yaml` was created.
+Status: `approved`
+Human decision: approved within the bounded PickCube / V2a / 100Hz scope.
+Formal decision: approved by Human Judge; see `phase_decision.yaml` (SHA256 `65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee`).
 
 ## 1. Scope
 
@@ -16,7 +16,7 @@ The first state_bc route remains `partial_with_localized_failure` (31/73 Evaluat
 
 ## 3. CanonicalTrajectory result
 
-The additive `task-env-canonical-trajectory-v0` route preserves T transitions and T+1 boundary records, including the four control layers, feedback/readiness, task outcome, and readiness-hold transitions. The historical H5 v2 route was not redefined. The original canonical trajectory acceptance remains available with its historical status and 284-file evidence index; its old partial result is not rewritten by this closure candidate.
+The additive `task-env-canonical-trajectory-v0` route preserves T transitions and T+1 boundary records, including the four control layers, feedback/readiness, task outcome, and readiness-hold transitions. The historical H5 v2 route was not redefined. The original canonical trajectory acceptance remains available with its historical status and 284-file evidence index; its old partial result remains historical and is not rewritten by this final P1.6 closure decision.
 
 ## 4. D0–D2 replay result
 
@@ -60,7 +60,7 @@ This package does not claim statistical robustness, all-policy or all-task porta
 
 ## 10. Provenance limitations
 
-The D0–D2 historical source tree was dirty; that fact and the exact recorded source snapshot are retained. Genesis/SAPIEN used a temporary source overlay from outside the P1.6 branch, so those results are not closure-branch reproducible. Core D3 was run from closure source commit `9d7c42b321eb24633df670a47e3261b62aab2c7b`; the exact report and all raw D3 files are covered by `d3/file_manifest.json`.
+The D0–D2 historical source tree was dirty; that fact and the exact recorded source snapshot are retained. Genesis/SAPIEN used a temporary source overlay from outside the P1.6 branch, so those results are not closure-branch reproducible. Core D3 was run from closure source commit `9d7c42b321eb24633df670a47e3261b62aab2c7b`; the exact report and all raw D3 files are covered by `d3/file_manifest.json`. The original reciprocal train-source matrix was not completed in all directions; the accepted bounded route is one competent frozen GeoPhys-trained policy evaluated under the same provider-neutral contract on GeoPhys and MuJoCo.
 
 ## 11. Integrity and isolation checks
 
@@ -72,6 +72,6 @@ The D0–D2 historical source tree was dirty; that fact and the exact recorded s
 - No Python source was modified for closure. `compileall` of the existing D3 runner passed as a smoke check, and `git diff --check` is recorded in the final handoff. No provider simulator episodes were rerun for closure.
 - GeoPhys and MuJoCo core, CanonicalTrajectory schema, controller semantics, task success, default PickCube Artifact, `public/main`, and P1.8 were not modified.
 
-## 12. Recommended Human decision
+## 12. Human decision
 
-Approve P1.6 closure within the bounded PickCube / V2a / 100Hz / GeoPhys–MuJoCo scope. The formal phase decision remains pending Human Review. P1.7 is deferred, P1.8 remains independent, and this result does not close Phase I.
+The Human Judge approved P1.6 closure within the bounded PickCube / V2a / 100Hz / GeoPhys–MuJoCo scope. P1.7 remains deferred, P1.8 continues independently, and this result does not close Phase I.

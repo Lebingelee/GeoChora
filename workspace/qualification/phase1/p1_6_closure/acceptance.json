@@ -1,11 +1,17 @@
 {
   "schema": "geochora.p1_6-closure-candidate.v1",
   "phase": "p1_6",
-  "status": "ready_for_human_review",
+  "status": "approved",
   "recommended_decision": "approve_bounded_scope",
   "authority": {
-    "decision": "pending_human_review",
-    "phase_decision_yaml_created": false
+    "decision": "approved",
+    "phase_decision_yaml_created": true,
+    "judge": {
+      "type": "human",
+      "decided_on": "2026-10-07"
+    },
+    "phase_decision_path": "workspace/qualification/phase1/p1_6_closure/phase_decision.yaml",
+    "phase_decision_sha256": "65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee"
   },
   "baseline": {
     "branch": "codex/p1.6-closure",

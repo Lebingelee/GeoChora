@@ -955,7 +955,6 @@
       "path": "workspace/qualification/phase1/p1_6_closure/d3/file_manifest.json",
       "sha256": "1cedbf23d7870b608810b5ad316f4ef098b365aabbd1b08371610e7f321cbaad"
     },
-    "formal_closure_decision": "pending Human Review",
     "paired_agreement_count": 20,
     "paired_counts": {
       "FAIL/FAIL": 0,
@@ -1019,7 +1018,8 @@
       "path": "workspace/qualification/phase1/p1_6_closure/d3/d3_summary.md",
       "sha256": "7844be57d3225844b951bad1fd743898637038571852c1b0eecc47d4f2edf1e1"
     },
-    "task_artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4"
+    "task_artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+    "formal_closure_decision_at_d3_execution": "pending Human Review"
   },
   "canonical_trajectory": {
     "acceptance": {
@@ -1463,12 +1463,12 @@
     "GeoPhys_core_modified": false,
     "MuJoCo_core_modified": false,
     "P1_8_modified": false,
-    "phase_decision_created": false,
+    "phase_decision_created": true,
     "public_main_modified": false,
     "retrained": false
   },
-  "status": "ready_for_human_review; formal P1.6 decision pending Human Review",
-  "updated_at": "2026-10-07T15:38:52.318494+00:00",
+  "status": "approved_within_bounded_scope",
+  "updated_at": "2026-10-07T15:50:43.120294+00:00",
   "preclosure_evidence_index_sha256": "50f60e481bfafe71a9b609e92c358829d05f95bf86ff3a23a433016b416c16ed",
   "supplementary_provider_evidence": {
     "scope": "bounded supplementary local-environment policy episodes on the frozen D3 validation cohort; not provider qualification",
@@ -1556,10 +1556,10 @@
     }
   },
   "final_closure": {
-    "status": "ready_for_human_review",
+    "status": "approved",
     "recommended_decision": "approve_bounded_scope",
-    "formal_decision": "pending_human_review",
-    "phase_decision_yaml_created": false,
+    "formal_decision": "approved_by_human",
+    "phase_decision_yaml_created": true,
     "source_commit_before_final_documentation_commit": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
     "public_main_observed": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
     "historical_500hz_artifact_sha256": "461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e",
@@ -1638,6 +1638,8 @@
       "sha256": "9fb726809e4ab35093d89a47829ad8ed83a567b4b614b638f74e57ce613e21fa",
       "raw_local_record_sha256": "29f9336f94a26b282fc6a8bf5de710490dbbcd1a0acb16ae0658c9f71e34a378",
       "machine_local_paths_omitted": true
-    }
+    },
+    "phase_decision_path": "workspace/qualification/phase1/p1_6_closure/phase_decision.yaml",
+    "phase_decision_sha256": "65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee"
   }
 }

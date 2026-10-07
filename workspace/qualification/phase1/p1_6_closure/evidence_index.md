@@ -1,6 +1,6 @@
 # P1.6 Closure Evidence Index
 
-Generated: 2026-10-07T14:36:45.397889+00:00
+Updated: 2026-10-07T15:53:27.356192+00:00
 
 Final closure addendum audited: 2026-10-07. The original branch-consolidation index digest is retained in `evidence_index.json` as the pre-addendum index SHA256.
 
@@ -42,8 +42,8 @@ The same 10 frozen validation seeds were run in an additional local environment.
 
 This is supplementary local-environment Evidence only. Its session implementation came from source commit `5e7012c70a83f26d1f6a0e51b3160efc00006c35` via a temporary source snapshot outside this P1.6 branch. No provider code was copied into P1.6; Genesis/SAPIEN are not qualified by these policy episodes, and this route is not reproducible from `codex/p1.6-closure` alone.
 
-## Final closure candidate
+## Final closure decision
 
-The core bounded result is ready for Human closure review: the same frozen V2a FINAL checkpoint passed 10/10 train-support and 10/10 validation-support seeds on both GeoPhys and MuJoCo. All 205 core D3 manifest entries and all 111 supplementary manifest entries passed integrity checks. The final recommendation is approval within the bounded PickCube / V2a / 100Hz / GeoPhys–MuJoCo scope only.
+The Human Judge approved the bounded P1.6 result: the same frozen V2a FINAL checkpoint passed 10/10 train-support and 10/10 validation-support seeds on both GeoPhys and MuJoCo. All 205 core D3 manifest entries and all 111 supplementary manifest entries passed integrity checks. Approval is limited to the PickCube / V2a / 100Hz / GeoPhys–MuJoCo scope. `phase_decision.yaml` SHA256: `65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee`.
 
-The original state_bc `partial_with_localized_failure`, failed early Flow variants, and historical dirty-source D0–D2 provenance remain part of the record. D0–D2 were not rerun. No training, public/main update, P1.8 modification, or provider-core change occurred during closure packaging. No `phase_decision.yaml` was created; formal approval remains pending Human Review. P1.7 remains deferred and Phase I is not declared complete.
+The original state_bc `partial_with_localized_failure`, failed early Flow variants, and historical dirty-source D0–D2 provenance remain part of the record. D0–D2 were not rerun. No training, public/main update, P1.8 modification, or provider-core change occurred during closure packaging. Human Judge approved the bounded P1.6 scope; `phase_decision.yaml` SHA256 is `65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee`. P1.7 remains deferred and Phase I is not declared complete.

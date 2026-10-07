@@ -1,6 +1,6 @@
 {
   "schema": "geochora.p1_6_closure_manifest.v1",
-  "created_at": "2026-10-07T15:38:52.319142+00:00",
+  "created_at": "2026-10-07T15:50:43.121149+00:00",
   "self_hash_excluded": true,
   "branch": "codex/p1.6-closure",
   "closure_source_commit_before_final_documentation_commit": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
@@ -80,23 +80,23 @@
   "closure_artifacts": {
     "acceptance_report": {
       "path": "workspace/qualification/phase1/p1_6_closure/acceptance_report.md",
-      "bytes": 8734,
-      "sha256": "4135bcc1e162195f13d25f0ee17f266092d65b8a14b8d44f7d768aacc2de23b2"
+      "bytes": 8999,
+      "sha256": "7b3d4c19cd75c23dc98ab2c7766f3b2da79d35ccad1e65efc0c2bdf01b513ba3"
     },
     "acceptance_json": {
       "path": "workspace/qualification/phase1/p1_6_closure/acceptance.json",
-      "bytes": 7155,
-      "sha256": "0e0eaebce367aef53ea980f94480d5e6e558fd72e48c2b50e18153ea44c0acc2"
+      "bytes": 7397,
+      "sha256": "eb0dee7e7582d79ffccc4f509cc1022e13a9d45abaf47b0b34a7cc61e0fd0747"
     },
     "evidence_index_markdown": {
       "path": "workspace/qualification/phase1/p1_6_closure/evidence_index.md",
-      "bytes": 5352,
-      "sha256": "e67e19066ef2b5ccc5eaba1e7424f7f5f21af0fe74926ec772097bf124c80bf7"
+      "bytes": 5465,
+      "sha256": "aba1fc17cfb93ac9e874dd5acef80f40442cd31da64fe9e116e1ddcd0c771512"
     },
     "evidence_index_json": {
       "path": "workspace/qualification/phase1/p1_6_closure/evidence_index.json",
-      "bytes": 79206,
-      "sha256": "e8e87ddd58878605cb0b6f0494567ae908776979795e29fbbf663496ad37a1d3"
+      "bytes": 79358,
+      "sha256": "e061ca0dca87cf7baed4f070a1edeb2e0f90d53d7aa00073c8e2ef7652810efe"
     },
     "closure_checks": {
       "path": "workspace/qualification/phase1/p1_6_closure/closure_checks.json",
@@ -105,8 +105,8 @@
     },
     "handoff": {
       "path": "workspace/qualification/phase1/p1_6_closure/handoff.md",
-      "bytes": 1891,
-      "sha256": "1103eb7bcf14f1126e4d7396ec575b6d37bf3564794abd93c93629ce6660c817"
+      "bytes": 1936,
+      "sha256": "9f2ff2ad503f5f97ccc4470a7c44cbd6984fbb86b817856a09ff10792e006fad"
     },
     "core_d3_spec": {
       "path": "workspace/qualification/phase1/p1_6_closure/d3/d3_eval_spec.yaml",
@@ -155,8 +155,8 @@
     },
     "canonical_doc_06": {
       "path": "docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md",
-      "bytes": 31487,
-      "sha256": "58df7e360d563e49dd89962a1e3f3dfe1094c9a5300ad10d257e97bb9c28806a"
+      "bytes": 31541,
+      "sha256": "27a1c6adb194d065c548aca74382534604ed3c7e738b3e74f4aaa9c5cf833915"
     },
     "canonical_doc_07": {
       "path": "docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md",
@@ -172,12 +172,27 @@
       "path": "workspace/qualification/phase1/p1_6_closure/branch_consolidation_review_summary.json",
       "bytes": 4694,
       "sha256": "9fb726809e4ab35093d89a47829ad8ed83a567b4b614b638f74e57ce613e21fa"
+    },
+    "phase_decision": {
+      "path": "workspace/qualification/phase1/p1_6_closure/phase_decision.yaml",
+      "bytes": 2269,
+      "sha256": "65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee"
     }
   },
   "authority": {
-    "phase_decision_yaml_created": false,
-    "decision": "pending_human_review",
-    "recommended_decision": "approve_bounded_scope"
+    "phase_decision_yaml_created": true,
+    "decision": "approve",
+    "judge_type": "human",
+    "decided_on": "2026-10-07",
+    "phase_decision": {
+      "path": "workspace/qualification/phase1/p1_6_closure/phase_decision.yaml",
+      "bytes": 2269,
+      "sha256": "65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee"
+    },
+    "scope": "bounded PickCube / V2a / experimental 100Hz / GeoPhys-MuJoCo state-policy portability",
+    "P1_7": "deferred",
+    "P1_8": "continues independently",
+    "Phase_I": "not declared complete"
   },
   "scope": {
     "P1_8_modified": false,
