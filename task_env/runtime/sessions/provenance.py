@@ -6,14 +6,14 @@ import subprocess
 
 
 def provider_build_identity(provider):
-    if provider not in ('geophys', 'mujoco'):
+    if provider not in ('geophys', 'mujoco', 'sapien', 'genesis'):
         raise ValueError('unknown provider')
     spec = util.find_spec(provider)
     if spec is None or spec.origin is None:
         raise ValueError(f'{provider} import source unavailable')
     origin = Path(spec.origin).resolve()
     try:
-        package_version = metadata.version(provider)
+        package_version = metadata.version('genesis-world' if provider == 'genesis' else provider)
     except metadata.PackageNotFoundError:
         package_version = None
     revision = None
@@ -37,6 +37,8 @@ def provider_build_identity(provider):
         except (subprocess.CalledProcessError, FileNotFoundError):
             if package_version is None:
                 raise ValueError('GeoPhys build has neither checkout nor package version')
+    if revision is None and package_version is None:
+        raise ValueError(f'{provider} build has neither checkout nor package version')
     manifest_version = ('git:' + revision + (':dirty:' + dirty if dirty else '')
                         if revision else 'package:' + package_version)
     return {'provider': provider, 'package_version': package_version,

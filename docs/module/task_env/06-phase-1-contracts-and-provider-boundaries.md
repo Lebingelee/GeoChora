@@ -672,3 +672,24 @@ Optional `task_env.alg.state_bc` 定义 `pick-cube-state-policy-v0` 33D float32 
 `task_env.diagnostics.phase1.p1_6_state_policy` 执行冻结 spec 下的 collection、loaded-control replay、learner/checkpoint smoke、两-source training、same-checkpoint transfer matrix 与 lower-phase regressions。Learned rollout 始终经 RequestedAction -> accepted ProductionCanonicalPandaController -> provider realization；direct loaded targets 只用于 replay。Time rollback 是 runtime failure，不能作为有效 policy state继续运行。
 
 当前 bounded Evidence：八个 train/validation expert episodes 达到 collection endpoint；trajectory/roundtrip/replay/checkpoint portability 通过；EvaluationSampleSet 31/73 的 task-success matrix 为 1/8，G->MuJoCo seed73 另有 native warning/time rollback，原始失败与安全停止复查保留。整体为 partial_with_localized_failure，不宣称 state-policy transfer qualification、statistical robustness、visuomotor portability 或 P1.7。P1.5 accepted behavioral sources、TaskArtifact v0 和 GeoPhys 保持冻结。
+
+## P1.8 provider-centric replay review candidate（2026-10-07）
+
+Human 已授权一个 bounded D0–D2 replay roadmap deviation。P1.6 仍为
+PARTIAL / NOT APPROVED，Flow 保留为 negative learner baseline，P1.7 为
+DEFERRED；P1.8 不豁免 P1.6/P1.7，也不自动关闭 Phase I。
+
+Phase-I session dispatch 显式区分 `geophys`、`mujoco`、`sapien`、`genesis`；
+未知 provider 拒绝执行，不回退到 MuJoCo。GeoPhys/MuJoCo 的既有 route 保留。
+Genesis CPU/MJCF adapter 是待审查的 bounded runtime/control implementation，
+其固定 tendon 到成员 joint PD 的 source-derived mapping 为 approximate mapping；
+不能由 manifest 的 implemented 声明推断 task replay 通过或 provider qualified。
+SAPIEN 当前只有 primitive conformance diagnostic，runtime capability admission
+保持拒绝。Render provider 独立，新增 boundary-provider camera/render 不在此范围。
+
+运行与失败记录归属 `workspace/qualification/phase1/p1_8_multi_backend_replay/`。
+D0 使用 recorded state/feedback 验证 public action expressivity；D1 直接执行冻结
+control targets；D2 使用当前 measured canonical state/feedback 重新计算同一 production
+controller。Execution-valid 与 task-valid 分别报告，PickCube success 仍为
+cube lift >= 0.10 m。未通过 prerequisite 的 provider 不进入完整 replay；所有
+tolerance 与 semantic input 由执行前 lock 约束，失败不能通过放宽 gate 消除。

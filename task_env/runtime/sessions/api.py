@@ -22,12 +22,24 @@ class RuntimeSession(Protocol):
 
 
 def provider_manifest(provider: str) -> ProviderCapabilityManifest:
-    if provider not in ('geophys', 'mujoco'):
-        raise ValueError('provider not implemented in P1.2')
+    if provider not in ('geophys', 'mujoco', 'sapien', 'genesis'):
+        raise ValueError(f'unknown physics provider: {provider}')
+    if provider == 'sapien':
+        # Dependency/probe execution is not runtime implementation or qualification.
+        return ProviderCapabilityManifest(
+            schema_version='provider-capability-v0', provider_name=provider,
+            provider_version=provider_build_identity(provider)['manifest_version'],
+            adapter_version='p1_8-prerequisite-v0', backend='cpu', physics_profile=PROFILE,
+            render_profile='none', determinism_mode='strict', capabilities=(),
+            known_unsupported=(*CAPABILITIES, 'rgb_camera', 'depth_camera',
+                               'contact_detection', 'contact_impulse'),
+            evidence_reference='runtime_unimplemented_prerequisite_diagnostics_only',
+        )
     return ProviderCapabilityManifest(
         schema_version='provider-capability-v0', provider_name=provider,
         provider_version=provider_build_identity(provider)['manifest_version'],
-        adapter_version='p1_2-v0', backend='cpu', physics_profile=PROFILE, render_profile='none',
+        adapter_version='p1_8-genesis-v0' if provider == 'genesis' else 'p1_2-v0',
+        backend='cpu', physics_profile=PROFILE, render_profile='none',
         determinism_mode='strict',
         capabilities=tuple(CapabilityClaim(c, 'implemented', 'task_env/runtime/sessions') for c in CAPABILITIES),
         known_unsupported=('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
@@ -62,5 +74,12 @@ def _materialize_admitted(artifact, execution, source):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
         return _GeoPhysSession(artifact, source)
-    from .mujoco import _MuJoCoSession
-    return _MuJoCoSession(artifact, source)
+    if execution.physics_provider == 'mujoco':
+        from .mujoco import _MuJoCoSession
+        return _MuJoCoSession(artifact, source)
+    if execution.physics_provider == 'sapien':
+        raise NotImplementedError('SAPIEN runtime stopped at replay prerequisites')
+    if execution.physics_provider == 'genesis':
+        from .genesis import _GenesisSession
+        return _GenesisSession(artifact, source)
+    raise ValueError(f'unknown physics provider: {execution.physics_provider}')
