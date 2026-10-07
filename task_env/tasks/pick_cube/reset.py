@@ -3,12 +3,11 @@ import numpy as np
 
 from ...artifacts import PoseWorld, TaskArtifact
 from ...artifacts.execution import ResetSample
-from .candidate import build_candidate
+from .timebase import require_timebase_family
 
 
 def sample_reset(artifact: TaskArtifact, task_seed: int) -> ResetSample:
-    if artifact.identity_hash != build_candidate().identity_hash:
-        raise ValueError('unsupported PickCube Artifact for this bounded sampler')
+    require_timebase_family(artifact)
     if type(task_seed) is not int or task_seed < 0:
         raise ValueError('task_seed must be a nonnegative integer')
     rng = np.random.Generator(np.random.PCG64(task_seed))

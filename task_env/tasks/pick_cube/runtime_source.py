@@ -6,16 +6,16 @@ from ...environment.configuration import load_yaml_mapping, overlay_public_env_c
 from ...registry import make_agent, make_object, make_scene
 from ...runtime.sessions.source import RuntimeSource
 from .assets import EE_SITE_NAME, PickCubeSceneComposer
-from .candidate import build_candidate
+from .timebase import require_timebase_family
 from .task import PickCubeEnv, PICK_CUBE_SPEC
 
 
 def build_runtime_source(artifact):
-    if artifact.identity_hash != build_candidate().identity_hash:
-        raise ValueError('source bridge only accepts the approved default candidate')
+    require_timebase_family(artifact)
     spec = PICK_CUBE_SPEC
     config = overlay_public_env_config(PickCubeEnv.default_config(), load_yaml_mapping(PickCubeEnv.default_config_path()))
-    config = replace(config, runtime=replace(config.runtime, backend='cpu', prewarm=False),
+    config = replace(config, runtime=replace(config.runtime, backend='cpu', prewarm=False,
+                     physics_dt=artifact.timebase.physics_dt, control_substeps=artifact.timebase.control_substeps),
                      render=replace(config.render, camera_obs=False))
     joints = {name: name.split('/', 1)[1] for name in artifact.initialization.joint_position}
     return RuntimeSource(

@@ -717,3 +717,32 @@ GeoPhys/MuJoCo/Genesis Evidence 保留，追加 bounded regression spot-checks�
 这是四-provider PickCube replay slice 的 review candidate，不能推断 full P1.8
 canonical scope、provider-wide qualification 或 Phase-I closure。新增 Evidence 位于
 原 P1.8 root 下 `sapien_recovery/`，初轮 actuator realization failure 保留。
+
+### P1.8-D bounded multi-rate review candidate（2026-10-07）
+
+PickCube 的 historical TB-500 default Artifact/hash 保持不变。新增显式
+`ver_p1_8_d_tb100`（physics_dt=0.002 s，control_substeps=5）和
+`ver_p1_8_d_tb50`（physics_dt=0.002 s，control_substeps=10）变体，分别为
+100 Hz / 50 Hz control boundary。仅 artifact_version 与 control_substeps/control_dt
+变化；sampler/source bridge 对完整 declared Artifact mapping/hash 做严格 family
+admission，不能仅凭 task ID 接受未知变体。相同 seed 的 physical reset request 相同，
+但 sample identity 随 Artifact hash 改变。
+
+Production controller、gripper per-tick parameters、expert/planner geometry、action
+budget、task success 和 collection endpoint 未改变。Readiness timeout 仅沿用原有
+control_dt derivation；不同频率可能产生不同 planned/hold counts 和 physical-time
+轨迹，不宣称 time-normalized controller semantics。
+
+Native control application 在全部 N 个 physics substeps 内 zero-order hold。
+Multi-substep MuJoCo adapter 验证 completed native step count 与 raw native elapsed
+的 binary64 summation representation bound，再投影 canonical control-boundary time；
+不覆盖 native time，也不修改 physics tolerance。N=1 historical native-time route 不变。
+其他 providers 保留既有 time projection，并通过 native-step audit 检查 boundary。
+
+TB-100/TB-50 各自生成 successful GeoPhys expert goldens，within-profile D0 exact
+通过，四 providers × 两 seeds × 两 profiles 的 32 个 D1/D2 cells 均通过 bounded
+execution/task gates。MuJoCo 初轮 time representation failure 及独立 infrastructure
+fix Evidence 保留。结果为 Human review candidate，限于 seeds31/73、既有 per-tick
+controller 与明确 profiles；不扩展到低于 50 Hz、NutAssembly 或 learned policy。
+Evidence 位于 `workspace/qualification/phase1/p1_8_multirate_timebase/`。
+P1.6/P1.7 不获豁免，此结果不关闭 full P1.8 或 Phase I。
