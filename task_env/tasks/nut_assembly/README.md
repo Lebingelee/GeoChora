@@ -30,3 +30,13 @@ Historical 30 Hz legacy success does not qualify this canonical candidate.
 Qualification requires six successful source trajectories, a solution lock,
 six exact D0 reconstructions, and 24 valid D1/D2 replay cells. Until those gates
 and Human review succeed, P1.8-E remains PARTIAL / NOT APPROVED.
+
+Before further task acceptance, qualify the constituent paths: physical-time
+planner sampling, unloaded EE tracking at 50/100/500 Hz, unloaded gripper
+open/close, then loaded grasp persistence under a verification lift/transport.
+The current production gripper applies fixed opening and force-correction
+steps per control boundary. Resampling a planner alone cannot establish
+closed-loop rate invariance. Existing production behavior remains frozen.
+`nutassembly_recovery.timebase_analysis` consumes preserved R0 Evidence and
+checks a provider-free sampled trajectory; it does not run physics or qualify
+tracking, grip, or task success.
