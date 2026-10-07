@@ -35,10 +35,10 @@ def context(root,profile):
     return a,source,sample
 
 
-def run(root,folder,profile,provider,solution_kind,config_path=None):
+def run(root,folder,profile,provider,solution_kind,config_path=None,scope="full"):
     root=Path(root);folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     if (folder/'report.json').exists():raise FileExistsError('recovery Evidence collision')
-    report={'profile':profile,'provider':provider,'success':False,'solution_kind':solution_kind};session=audit=None;trace=[];contacts=[];events=empty_events();phase='materialization'
+    report={'profile':profile,'provider':provider,'success':False,'solution_kind':solution_kind,'scope':scope};session=audit=None;trace=[];contacts=[];events=empty_events();phase='materialization'
     try:
         a,source,sample=context(root,profile);c=ProductionCanonicalPandaController.from_source(a,source)
         if solution_kind=='legacy':
@@ -63,7 +63,9 @@ def run(root,folder,profile,provider,solution_kind,config_path=None):
             rec.append(TransitionRecord(req,canonical,target,applied,float(e.reward),False,False,public.stage,{k:json.dumps(v,sort_keys=True) for k,v in public.diagnostics.items()},planned,not planned),after)
             events_update(events,state,info['task_metrics']);trace.append({'stage':public.stage,'state':state.to_mapping(),'feedback':feedback.to_mapping(),'controller_target':target.to_mapping(),'applied_control':applied.to_mapping(),'controller_memory':c.memory().to_mapping(),'metrics':dict(info['task_metrics']),'requested_action':req.to_mapping(),'expert_diagnostics':dict(public.diagnostics),'readiness':c.readiness(state,feedback).to_mapping()})
             contacts.append({'stage':public.stage,'control_step':state.control_step,'simulation_time_s':state.simulation_time,'native':contact_readback(session,provider)})
-        phase='trajectory_roundtrip';trajectory=rec.freeze('success' if e.success and solution.done else solution.failure_reason or 'failed');path=folder/'trajectory.h5';save(path,trajectory);loaded=load(path);assert loaded.to_mapping()==trajectory.to_mapping()
+            if scope=='grasp_lift' and public.stage=='verify_lift' and solution.stage=='raise_for_transport':
+                report['grasp_lift_gate_passed']=True;break
+        phase='trajectory_roundtrip';trajectory=rec.freeze('bounded_grasp_lift_complete' if report.get('grasp_lift_gate_passed') else 'success' if e.success and solution.done else solution.failure_reason or 'failed');path=folder/'trajectory.h5';save(path,trajectory);loaded=load(path);assert loaded.to_mapping()==trajectory.to_mapping()
         report.update(success=bool(e.success and solution.done and not solution.failed),T=len(trace),duration_s=state.simulation_time,events=events,final_metrics=dict(info['task_metrics']),failure_reason=solution.failure_reason,stage=solution.stage,holds=trajectory.hold_count,roundtrip_exact=True,artifact_hash=a.identity_hash,reset_sample_hash=sample.identity_hash,source_xml_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),controller_identity=c.identity,expert_identity=sid,logical_hash=loaded.identity_hash,h5_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),path=str(path.resolve()),max_nut_lift_m=max((x['metrics']['nut_z']-initial[2] for x in trace),default=0.))
     except Exception as error:
         if 'rec' in locals() and trace:
@@ -82,6 +84,6 @@ def run(root,folder,profile,provider,solution_kind,config_path=None):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--root',required=True);p.add_argument('--folder',required=True);p.add_argument('--profile',required=True);p.add_argument('--provider',choices=['geophys','mujoco'],required=True);p.add_argument('--solution',choices=['legacy','canonical'],default='canonical');p.add_argument('--config');args=p.parse_args();run(args.root,args.folder,args.profile,args.provider,args.solution,args.config)
+    p=argparse.ArgumentParser();p.add_argument('--root',required=True);p.add_argument('--folder',required=True);p.add_argument('--profile',required=True);p.add_argument('--provider',choices=['geophys','mujoco'],required=True);p.add_argument('--solution',choices=['legacy','canonical'],default='canonical');p.add_argument('--config');p.add_argument('--scope',choices=['full','grasp_lift'],default='full');args=p.parse_args();run(args.root,args.folder,args.profile,args.provider,args.solution,args.config,args.scope)
 
 if __name__=='__main__':main()

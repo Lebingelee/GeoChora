@@ -10,22 +10,21 @@ from pathlib import Path
 import numpy as np
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...controllers.canonical.contracts import digest
-from ...utils.rotation import normalize_quat_wxyz, rotate_vector_wxyz, quat_multiply_wxyz, quat_angle_wxyz
+from ...utils.rotation import normalize_quat_wxyz, rotate_vector_wxyz, quat_multiply_wxyz, quat_angle_wxyz, quat_wxyz_to_matrix
 from .assets import PEG_HALF_HEIGHT, NUT_HALF_HEIGHT, NUT_CONTACT_MARGIN, TABLE_TOP_Z
 from .solution import _square_yaw_correction
 
 
 @dataclass(frozen=True)
 class CanonicalNutAssemblyConfig:
-    # Historical achieved close pose: handle offset (-.020,0,+.0499).
-    # +2mm request clearance accommodates achieved-state controller equilibrium.
-    grasp_offset: tuple = (0., 0., .052)
-    grasp_quaternion_wxyz: tuple = (-.0001953937, .9996899962, .0248992145, -.000055298)
-    grasp_opening_m: float = .022
+    # Shared physical grasp geometry; every revision is archived by the detector.
+    grasp_offset: tuple = (0., 0., .050)
+    grasp_quaternion_wxyz: tuple = (.0038, .99993765, 0., .0105)
+    grasp_opening_m: float = 0.
     opening_range_m: float = .08
     approach_height_m: float = .12
-    translation_speed_m_s: float = .12
-    translation_acceleration_m_s2: float = .9
+    translation_speed_m_s: float = .04
+    translation_acceleration_m_s2: float = .15
     rotation_speed_rad_s: float = 3.
     rotation_acceleration_rad_s2: float = 27.
     settle_duration_s: float = 8./30.
@@ -37,9 +36,13 @@ class CanonicalNutAssemblyConfig:
     pose_rotation_ready_rad: float = .06
     readiness_stable_s: float = .10
     gripper_stable_speed_m_s: float = .003
+    opening_stable_range_m: float = .0005
+    grasp_min_closing_force_N: float = 3.
     max_pose_hold_s: float = 3.
     max_close_hold_s: float = 8.
     max_release_hold_s: float = 3.
+    capture_translation_slip_m: float = .008
+    capture_rotation_slip_rad: float = .15
     verify_lift_m: float = .10
     max_stage_plan_s: float = 6.
     action_budget_s: float = 60.
@@ -50,8 +53,9 @@ class CanonicalNutAssemblyConfig:
         if not all(math.isfinite(float(x)) for x in (*self.grasp_offset,*self.grasp_quaternion_wxyz)):
             raise ValueError('finite grasp geometry required')
         for k,v in asdict(self).items():
-            if k not in {'grasp_offset','grasp_quaternion_wxyz'} and (not math.isfinite(v) or v<=0):
+            if k not in {'grasp_offset','grasp_quaternion_wxyz','grasp_opening_m'} and (not math.isfinite(v) or v<=0):
                 raise ValueError('positive physical-time config required: '+k)
+        if not math.isfinite(self.grasp_opening_m) or not 0<=self.grasp_opening_m<self.opening_range_m:raise ValueError('grasp opening outside physical range')
         normalize_quat_wxyz(self.grasp_quaternion_wxyz)
 
 
@@ -96,7 +100,7 @@ class NutAssemblyCanonicalSolutionV1:
         if (schema.get('controller_kind'),schema.get('reference'),schema.get('rotation_representation'))!=('absolute_pose','world','quaternion_wxyz'):
             raise ValueError('absolute_pose/world/wxyz required')
         self._stage_index=0;self._emitted=0;self._done=bool(info.get('is_success',False));self._failed=False;self._failure_reason=None
-        self._last_opening=float(info['task_metrics']['gripper_opening']);self._plan(observation)
+        self._last_opening=float(info['task_metrics']['gripper_opening']);self._opening_history=[];self._plan(observation)
 
     def _plan(self, obs):
         c=self.config;ee=self._ee(obs);nut=self._body(obs,'square_nut_v1');peg=self._body(obs,'square_peg_v1')
@@ -105,7 +109,11 @@ class NutAssemblyCanonicalSolutionV1:
         if stage=='approach_nut':pose[:3]=handle+np.array([c.grasp_offset[0],c.grasp_offset[1],c.approach_height_m]);gripper=1.
         elif stage=='descend_to_handle':pose[:3]=handle+np.array(c.grasp_offset);gripper=1.
         elif stage=='close_gripper':pose=self._grasp_pose.copy()
-        elif stage=='verify_lift':pose[:3]=ee[:3]+np.array([0.,0.,c.verify_lift_m])
+        elif stage=='verify_lift':
+            self._captured_position=quat_wxyz_to_matrix(ee[3:]).T@(nut[:3]-ee[:3])
+            inverse=ee[3:].copy();inverse[1:]*=-1
+            self._captured_rotation=quat_multiply_wxyz(inverse,nut[3:])
+            pose[:3]=ee[:3]+np.array([0.,0.,c.verify_lift_m])
         else:
             # Achieved canonical relative pose, not assumed provider dynamics.
             nut_to_ee=nut[:3]-ee[:3];hover_nut=peg[:3]+[0.,0.,PEG_HALF_HEIGHT+.08]
@@ -118,7 +126,7 @@ class NutAssemblyCanonicalSolutionV1:
             elif stage=='open_gripper':pose=ee.copy();gripper=1.
             elif stage=='release_retreat':pose[:3]=ee[:3]+[0.,0.,.10];gripper=1.
         if stage=='descend_to_handle':self._grasp_pose=pose.copy()
-        self._goal=pose.copy();self._index=0;self._hold_ticks=0;self._stable_ticks=0
+        self._goal=pose.copy();self._index=0;self._hold_ticks=0;self._stable_ticks=0;self._opening_history=[]
         if stage=='close_gripper':self._actions=self._planner.plan_gripper_transition(pose=pose,start_gripper=1.,goal_gripper=gripper,steps=self._ticks(c.close_transition_s),settle_steps=self._ticks(c.close_settle_s))
         elif stage=='open_gripper':self._actions=self._planner.plan_gripper_transition(pose=pose,start_gripper=2*c.grasp_opening_m/c.opening_range_m-1.,goal_gripper=1.,steps=self._ticks(c.release_transition_s),settle_steps=self._ticks(c.release_settle_s))
         else:self._actions=self._planner.plan_to_pose(current_pose=ee,goal_pose=pose,gripper=gripper)
@@ -139,15 +147,22 @@ class NutAssemblyCanonicalSolutionV1:
         if terminated or truncated:self._fail('environment_terminated');return
         if self._emitted>self._ticks(self.config.action_budget_s):self._fail('canonical_solution_action_budget');return
         metrics=info['task_metrics'];opening=float(metrics['gripper_opening']);opening_speed=abs(opening-self._last_opening)/self.control_dt;self._last_opening=opening
+        self._opening_history.append(opening);self._opening_history=self._opening_history[-self._ticks(self.config.readiness_stable_s):]
         if self._index<len(self._actions):return
         ee=self._ee(obs);c=self.config;stage=self.stage
         pose_ready=np.linalg.norm(ee[:3]-self._goal[:3])<=c.pose_position_ready_m and quat_angle_wxyz(ee[3:],self._goal[3:])<=c.pose_rotation_ready_rad
         limit=c.max_pose_hold_s;ready=pose_ready
         if stage=='close_gripper':
             force_ready=bool(readiness and readiness.gripper.close_ready)
-            ready=bool(metrics['grasped_nut']) and (force_ready or opening_speed<=c.gripper_stable_speed_m_s)
+            window_stable=len(self._opening_history)==self._ticks(c.readiness_stable_s) and max(self._opening_history)-min(self._opening_history)<=c.opening_stable_range_m
+            contact_load=bool(readiness and readiness.gripper.closing_force_N>=c.grasp_min_closing_force_N)
+            ready=bool(metrics['grasped_nut']) and (force_ready or (window_stable and contact_load))
             limit=c.max_close_hold_s
-        elif stage=='verify_lift':ready=pose_ready and bool(metrics['lifted_nut'])
+        elif stage=='verify_lift':
+            nut=self._body(obs,'square_nut_v1');relative=quat_wxyz_to_matrix(ee[3:]).T@(nut[:3]-ee[:3]);inverse=ee[3:].copy();inverse[1:]*=-1
+            rotation=quat_multiply_wxyz(inverse,nut[3:])
+            capture_ready=np.linalg.norm(relative-self._captured_position)<=c.capture_translation_slip_m and quat_angle_wxyz(rotation,self._captured_rotation)<=c.capture_rotation_slip_rad
+            ready=pose_ready and bool(metrics['lifted_nut']) and capture_ready
         elif stage=='move_above_square_peg':ready=pose_ready and bool(metrics['hovered_over_peg'])
         elif stage=='lower_nut_to_table':ready=pose_ready and bool(metrics['inserted_on_peg'])
         elif stage=='open_gripper':
