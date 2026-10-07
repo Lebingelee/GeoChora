@@ -34,7 +34,8 @@ def validation_loss(agent, loader, seed=2026):
         agent.actor.eval()
         with validation_rng(seed, agent.device), torch.no_grad():
             for batch in loader:
-                obs = agent._preprocess_obs(batch['observations'])
+                prepare = getattr(agent, '_prepare_flow_observation', agent._preprocess_obs)
+                obs = prepare(batch['observations'])
                 action = agent.normalize_action(batch['action'].to(agent.device).float())
                 loss = agent.actor(obs, action)
                 if not torch.isfinite(loss):

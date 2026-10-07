@@ -1,0 +1,266 @@
+schema: p1_6-100hz-flow-training-spec-v0
+locked_before_first_optimizer_update: true
+created_at: '2026-10-07T06:59:08.086310+00:00'
+branch: codex/p1.6-policy-search-100hz-gpu
+starting_head: cda511f49eb544dabe685ec1dbcc6345884d66c8
+working_tree_status_at_lock:
+- ' M task_env/alg/agent_factory/agents/impl/flow_vanilla.py'
+- ' M task_env/alg/agent_factory/agents/mixins/actor/flow_matching.py'
+- ' M task_env/alg/agent_factory/agents/mixins/normalization_mixins.py'
+- ' M task_env/alg/agent_factory/data/impl/geochora_canonical/__init__.py'
+- ' M task_env/alg/agent_factory/data/normalization/quantile.py'
+- ' M task_env/alg/agent_factory/training/flow_metrics.py'
+- ' M task_env/diagnostics/phase1/flow_training.py'
+- ?? .codegraph/
+- ?? docs/module/task_env/goal/
+- ?? task_env/diagnostics/phase1/flow_horizon_training.py
+- ?? task_env/diagnostics/phase1/flow_training_normalized.py
+- ?? task_env/diagnostics/phase1/policy_search/
+- ?? task_env/diagnostics/phase1/test_flow_horizon_chunks.py
+- ?? task_env/diagnostics/phase1/test_flow_normalization_variant.py
+historical_profile:
+  physics_dt_s: 0.002
+  control_substeps: 1
+  control_dt_s: 0.002
+  physics_hz: 500
+  control_hz: 500
+experimental_profile:
+  task_artifact_sha256: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+  physics_dt_s: 0.002
+  control_substeps: 5
+  control_dt_s: 0.01
+  physics_hz: 500
+  control_hz: 100
+provider:
+  name: geophys
+  collection_backend: cuda
+  training_device: cuda
+  inference_device: cuda
+  diagnostic_only: true
+  provider_qualification_claim: false
+baseline_config_sha256: 6cc0bfcc35329cb9bfa1ba156f841d7b73d03f23fc1dfa785b9ce142fc28a6b6
+dataset:
+  manifest: workspace/experiments/p1_6_policy_search/100hz_gpu_flow/training_dataset_manifest_100hz.json
+  manifest_file_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+  manifest_logical_identity: f2ebc763dd98ec5c78ec77c2d988255ec112ca24e331afebeea2fe45a5bff478
+  candidate_manifest_sha256: 887118ff9b67ecf1e6d78b25ecdfaccb99b0ff9e12398b7cd955c4235849b230
+  train_trajectory_count: 80
+  validation_trajectory_count: 20
+  train_samples: 9055
+  validation_samples: 2239
+  train_seeds:
+  - 2000
+  - 2001
+  - 2002
+  - 2003
+  - 2004
+  - 2005
+  - 2006
+  - 2007
+  - 2008
+  - 2009
+  - 2010
+  - 2011
+  - 2012
+  - 2013
+  - 2014
+  - 2015
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2026
+  - 2027
+  - 2028
+  - 2029
+  - 2030
+  - 2031
+  - 2032
+  - 2033
+  - 2034
+  - 2035
+  - 2037
+  - 2038
+  - 2039
+  - 2040
+  - 2041
+  - 2042
+  - 2043
+  - 2044
+  - 2045
+  - 2046
+  - 2047
+  - 2048
+  - 2049
+  - 2050
+  - 2051
+  - 2052
+  - 2053
+  - 2054
+  - 2055
+  - 2056
+  - 2057
+  - 2058
+  - 2059
+  - 2061
+  - 2062
+  - 2063
+  - 2064
+  - 2065
+  - 2066
+  - 2067
+  - 2068
+  - 2069
+  - 2070
+  - 2071
+  - 2072
+  - 2074
+  - 2075
+  - 2076
+  - 2078
+  - 2079
+  - 2080
+  - 2081
+  - 2082
+  - 2084
+  - 2085
+  - 2086
+  validation_seeds:
+  - 2200
+  - 2201
+  - 2202
+  - 2203
+  - 2204
+  - 2205
+  - 2206
+  - 2207
+  - 2208
+  - 2209
+  - 2210
+  - 2211
+  - 2212
+  - 2213
+  - 2214
+  - 2215
+  - 2216
+  - 2217
+  - 2218
+  - 2219
+  failed_train_attempts_preserved:
+  - 2016
+  - 2025
+  - 2036
+  - 2060
+  - 2073
+  - 2077
+  - 2083
+  failed_validation_attempts_preserved: []
+  statistics: workspace/experiments/p1_6_policy_search/100hz_gpu_flow/flow_training/dataset_stats.json
+learner:
+  agent_type: Flow_Vanilla
+  backbone: ConditionalUnet1D
+  parameter_count: 19512264
+  state_dim: 33
+  includes_qvel: true
+  action_dim: 8
+  action_mode: absolute_joint
+  obs_horizon: 2
+  pred_horizon: 16
+  act_horizon: 8
+  prediction_duration_s: 0.16
+  open_loop_chunk_duration_s: 0.08
+  replan_frequency_hz: 12.5
+  observation_normalization: mean/std z-score, train-only, std uses torch.std default
+    unbiased=True
+  action_normalization: per-dimension q01-q99 mapped to [-1,1], clip=True, train-only
+  inference_steps: 10
+  device: cuda
+  precision: float32
+  seed: 2026
+  batch_size: 512
+  epoch_budget: 80
+  steps_per_epoch: 17
+  actor_iters: 1360
+  optimizer: AdamW
+  lr: 0.0001
+  weight_decay: 1.0e-06
+  dataloader:
+    shuffle: true
+    drop_last: true
+    num_workers: 0
+    generator_seed: 2026
+  deterministic_algorithms: false
+  cudnn_deterministic: false
+  cudnn_benchmark: false
+loss_instrumentation:
+  train_interval: 100
+  validation_interval: 1000
+  validation_rng_seed: 2026
+  validation_rng_isolated_and_restored: true
+  validation_steps:
+  - 0
+  - 1000
+  - 1360
+  checkpoint_selection: minimum validation loss; earlier step wins exact ties
+identities:
+  resolved_config_sha256: 77da445c4393d8dea26f88f37f8b506199eef63f63d05bb7315fc37f30b4df8d
+  dataset_manifest_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+  agent_type: Flow_Vanilla
+  feature_contract_identity: 8b2a510ba0cd549480ddc431bfeff3a9d1d87ec1f93ae6d94504e5783e89b1c2
+  action_contract_identity: 4888f67cacb175ad4bf41195c1c4dc9465e653485e05b53f5ca33a61ad93eba5
+resolved_config_file: workspace/experiments/p1_6_policy_search/100hz_gpu_flow/flow_training/resolved_flow_config.yaml
+resolved_config_sha256: 77da445c4393d8dea26f88f37f8b506199eef63f63d05bb7315fc37f30b4df8d
+dataset_manifest_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+feature_contract:
+  schema: pick-cube-state-policy-v0
+  dtype: float32
+  shape:
+  - 33
+  field_order:
+  - arm_position7
+  - arm_velocity7
+  - gripper_opening_m1
+  - EE_position3
+  - EE_rotation_column0_then_column1_6
+  - cube_position3
+  - cube_rotation_column0_then_column1_6
+  arm_order:
+  - panda-v1/joint1
+  - panda-v1/joint2
+  - panda-v1/joint3
+  - panda-v1/joint4
+  - panda-v1/joint5
+  - panda-v1/joint6
+  - panda-v1/joint7
+action_contract:
+  schema: pick-cube-state-policy-action-v0
+  dtype: float32
+  shape:
+  - 8
+  mode: absolute_joint
+  reference: null
+  rotation_representation: none
+  arm_order:
+  - panda-v1/joint1
+  - panda-v1/joint2
+  - panda-v1/joint3
+  - panda-v1/joint4
+  - panda-v1/joint5
+  - panda-v1/joint6
+  - panda-v1/joint7
+  opening_range_m: 0.08
+frozen_source_file_sha256:
+  task_env/diagnostics/phase1/policy_search/flow100_data.py: 60142d9c93fd0c24c05556640557c4c65e45f9a728a093c0f8290a20d8f542aa
+  task_env/diagnostics/phase1/policy_search/flow100_train.py: c51428302bf440441e10a33ebc876f69853c73b90a64e06a5ed7c393823da2d8
+  task_env/diagnostics/phase1/flow_training_normalized.py: eb1128d80dc9ea9cbacf0305031f67c61f81c227f3b7e67a43ceabcd588c5d31
+  task_env/alg/agent_factory/agents/impl/flow_vanilla.py: 4b9397de7b5f9b4bebbf8eca9b9f4abb729dbf09d97af603557e782f936a67ba
+  task_env/alg/agent_factory/agents/mixins/actor/flow_matching.py: 5d0cc7ef632d4da84626d6b1776616d618790fdefb51df35adafa438c83a776d
+  task_env/alg/agent_factory/agents/mixins/normalization_mixins.py: e38dd26e7cd0a251715e70434b02ea15b28e1defd8876a1a084c365208133b82
+  task_env/alg/agent_factory/data/normalization/quantile.py: 36b49e34caa8dde91eae59b2a95b2f4cdfc28add6166fde1d4f2f565284b9061
+  task_env/alg/agent_factory/training/flow_metrics.py: 9504cdae0262083fa15d2d88cd498f4ac0a091c9f0d9e74732940cf911ff198f
+scope: only 100Hz opt-in task timebase and CUDA execution route; no model/normalization/action/horizon
+  tuning

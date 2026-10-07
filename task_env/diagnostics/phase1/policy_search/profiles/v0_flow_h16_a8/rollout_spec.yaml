@@ -1,0 +1,250 @@
+action_contract_identity: 4888f67cacb175ad4bf41195c1c4dc9465e653485e05b53f5ca33a61ad93eba5
+best_checkpoint_sha256: 563f37221c20e031bd20be095a8ff34dfcc279622181a4678371ad1c53a7ea37
+checkpoint: flow_training/checkpoints/flow_best_validation.pth
+checkpoint_selection: minimum validation loss among step 0,1000,1360; earlier step
+  wins exact ties
+controller_identity: 76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9
+created_before_first_rollout: true
+dataset_manifest_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+diagnostic_only: true
+episodes:
+  cohort_decision: inspect and preserve seed1000 result before starting follow-up
+    cohort; no model/config changes
+  first_seed_only:
+  - 1000
+  fixed_followup_cohort:
+  - 1000
+  - 1010
+  - 1020
+  - 1040
+  - 1050
+  - 1100
+expert_fallback: false
+inference_rng_rule: policy_rng_seed = 100000 + task_seed; exactly one stream per episode
+max_control_steps_per_episode: 2500
+measurement:
+- H2D observation
+- GPU inference
+- D2H action
+note: The new rollout profile changes only the opt-in task timebase and execution
+  devices; P1.5 control semantics remain frozen.
+physics_backend: cuda
+policy_contract:
+  act_horizon: 8
+  action_dim: 8
+  action_mode: absolute_joint
+  includes_qvel: true
+  inference_steps: 10
+  normalization: checkpointed train-only 33D z-score and per-dimension q01-q99 [-1,1]
+    action mapping
+  obs_horizon: 2
+  pred_horizon: 16
+  state_dim: 33
+policy_device: cuda
+provider: geophys
+provider_qualification_claim: false
+replan: latest two canonical state features -> synchronous CUDA sample_action -> execute
+  first 8 of 16 -> replan
+reset_samples:
+  '1000':
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.5587771313825491
+        - 0.020768369401265918
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    sample_id: reset-8703ddb51c1a98af6bf82671caf22266e5167d92bc3693d8c25753ffc2d6c240
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    schema_version: reset-sample-v0
+    settle_steps: 0
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    task_seed: 1000
+    velocity_policy: zero_named_joint_and_entity_velocities
+  '1010':
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.4734984403798511
+        - 0.007161146247368716
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    sample_id: reset-3456cca86b4badc6d9cd39f75b3994eb78db4787fc2a430df08042e1cde9db13
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    schema_version: reset-sample-v0
+    settle_steps: 0
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    task_seed: 1010
+    velocity_policy: zero_named_joint_and_entity_velocities
+  '1020':
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.5702400323867088
+        - -0.0432649437423597
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    sample_id: reset-b6336c16a78550770617221c5252335b3470662341f6add22e779a829263c98f
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    schema_version: reset-sample-v0
+    settle_steps: 0
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    task_seed: 1020
+    velocity_policy: zero_named_joint_and_entity_velocities
+  '1040':
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.6205380354218307
+        - 0.05635512425092898
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    sample_id: reset-5412d88700546b7558cca2dfcbfacb01ca3343eaa7a81102518013072587c3e4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    schema_version: reset-sample-v0
+    settle_steps: 0
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    task_seed: 1040
+    velocity_policy: zero_named_joint_and_entity_velocities
+  '1050':
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.5544057184058665
+        - -0.040418457706150074
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    sample_id: reset-179c7d4b28f96e0c5a366d44965efb114983e35aa0557a0bf46b76e650c76957
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    schema_version: reset-sample-v0
+    settle_steps: 0
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    task_seed: 1050
+    velocity_policy: zero_named_joint_and_entity_velocities
+  '1100':
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.4932106410370436
+        - -0.05537009230169981
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    sample_id: reset-c2e30db810a47927bdcc9f9f4bd52d472d9014c429b2695de7967af69ad5b6c8
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    schema_version: reset-sample-v0
+    settle_steps: 0
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    task_seed: 1100
+    velocity_policy: zero_named_joint_and_entity_velocities
+resolved_config_sha256: 77da445c4393d8dea26f88f37f8b506199eef63f63d05bb7315fc37f30b4df8d
+schema: p1_6-100hz-gpu-flow-rollout-v0
+simulation_freeze_assertions:
+- control_step_after_inference == control_step_before_inference
+- simulation_time_after_inference == simulation_time_before_inference
+state_feature_contract_identity: 8b2a510ba0cd549480ddc431bfeff3a9d1d87ec1f93ae6d94504e5783e89b1c2
+task_artifact_id: pick-cube-v1/p1_6_experimental_100hz
+task_artifact_sha256: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+task_artifact_version: ver_p1_6_experimental_100hz
+task_success: cube_lift >= 0.10 m
+timebase:
+  control_dt_s: 0.01
+  control_frequency_hz: 100
+  control_substeps: 5
+  physics_dt_s: 0.002
+  physics_frequency_hz: 500
