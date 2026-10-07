@@ -1,0 +1,232 @@
+schema: p1_6-100hz-policy-search-rollout-spec-v0
+variant: v1a
+provider: geophys
+physics_backend: cuda
+policy_device: cuda
+synchronous_inference_simulator_frozen: true
+task_artifact_sha256: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+dataset_manifest_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+resolved_config_sha256: a889566eb2dc405e3c645838a66a4f6edca34599cc6f2c81f0a06847564ec83e
+checkpoint_role: final
+checkpoint_path: workspace/experiments/p1_6_policy_search/100hz_gpu_flow_h50_a36_v1a_15000/training/checkpoints/final_step15000.pth
+checkpoint_sha256: c212ed39c49267594ea849288c02e0d8bc063534d4816a535630f9e3b185d818
+best_checkpoint_path: workspace/experiments/p1_6_policy_search/100hz_gpu_flow_h50_a36_v1a_15000/training/checkpoints/best_validation.pth
+best_checkpoint_sha256: 92608239ac3521959e17732fb1dbcbb108182441b46b7b66aeadfba3323a62f2
+cohort_seeds:
+- 1000
+- 1010
+- 1020
+- 1040
+- 1050
+- 1100
+pilot_seeds:
+- 1000
+- 1010
+pilot_success_gate: both pilot seeds must succeed before remaining seeds
+policy_rng_rule: 100000 + task_seed; one inference sampling realization per episode
+success_gate: cube_lift >= 0.10 m
+max_control_steps: 2500
+obs_horizon: 2
+pred_horizon: 50
+act_horizon: 36
+observation_contract:
+  identity: 8b2a510ba0cd549480ddc431bfeff3a9d1d87ec1f93ae6d94504e5783e89b1c2
+  source_contract_identity: 8b2a510ba0cd549480ddc431bfeff3a9d1d87ec1f93ae6d94504e5783e89b1c2
+  selected_fields:
+  - arm_position7
+  - arm_velocity7
+  - gripper_opening_m1
+  - EE_position3
+  - EE_rotation_column0_then_column1_6
+  - cube_position3
+  - cube_rotation_column0_then_column1_6
+  excluded_fields: []
+  state_dim: 33
+reset_samples:
+  '1000':
+    schema_version: reset-sample-v0
+    sample_id: reset-8703ddb51c1a98af6bf82671caf22266e5167d92bc3693d8c25753ffc2d6c240
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    task_seed: 1000
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.5587771313825491
+        - 0.020768369401265918
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    velocity_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    settle_steps: 0
+  '1010':
+    schema_version: reset-sample-v0
+    sample_id: reset-3456cca86b4badc6d9cd39f75b3994eb78db4787fc2a430df08042e1cde9db13
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    task_seed: 1010
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.4734984403798511
+        - 0.007161146247368716
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    velocity_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    settle_steps: 0
+  '1020':
+    schema_version: reset-sample-v0
+    sample_id: reset-b6336c16a78550770617221c5252335b3470662341f6add22e779a829263c98f
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    task_seed: 1020
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.5702400323867088
+        - -0.0432649437423597
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    velocity_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    settle_steps: 0
+  '1040':
+    schema_version: reset-sample-v0
+    sample_id: reset-5412d88700546b7558cca2dfcbfacb01ca3343eaa7a81102518013072587c3e4
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    task_seed: 1040
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.6205380354218307
+        - 0.05635512425092898
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    velocity_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    settle_steps: 0
+  '1050':
+    schema_version: reset-sample-v0
+    sample_id: reset-179c7d4b28f96e0c5a366d44965efb114983e35aa0557a0bf46b76e650c76957
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    task_seed: 1050
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.5544057184058665
+        - -0.040418457706150074
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    velocity_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    settle_steps: 0
+  '1100':
+    schema_version: reset-sample-v0
+    sample_id: reset-c2e30db810a47927bdcc9f9f4bd52d472d9014c429b2695de7967af69ad5b6c8
+    task_artifact_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+    task_seed: 1100
+    joint_position:
+      panda-v1/finger_joint1: 0.04
+      panda-v1/finger_joint2: 0.04
+      panda-v1/joint1: -0.17
+      panda-v1/joint2: 0.0
+      panda-v1/joint3: 0.0
+      panda-v1/joint4: -1.57079
+      panda-v1/joint5: 0.0
+      panda-v1/joint6: 1.57079
+      panda-v1/joint7: -0.7853
+    poses_world:
+      cube-v1:
+        position:
+        - 0.4932106410370436
+        - -0.05537009230169981
+        - 0.48800000000000004
+        quaternion_wxyz:
+        - 1.0
+        - 0.0
+        - 0.0
+        - 0.0
+    velocity_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    settle_steps: 0
+no_expert_fallback: true
