@@ -43,6 +43,7 @@ VARIANTS = {
         "pred_horizon": 50,
         "act_horizon": 36,
         "excluded_fields": (),
+        "expected_parameter_count": 19512264,
         "display_name": "Flow h50/a36 full 33D state",
     },
     "v2": {
@@ -51,6 +52,7 @@ VARIANTS = {
         "pred_horizon": 50,
         "act_horizon": 36,
         "excluded_fields": ("arm_velocity7",),
+        "expected_parameter_count": 19510472,
         "display_name": "Flow h50/a36 without arm velocity",
     },
 }
@@ -366,8 +368,12 @@ def train(name):
     agent = make_agent(profile["agent_type"], cfg)
     if next(agent.actor.parameters()).device.type != "cuda":
         raise ValueError("Flow actor did not initialize on CUDA")
-    if sum(p.numel() for p in agent.actor.parameters()) != 19512264:
-        raise ValueError("Flow actor parameter count differs from V0")
+    parameter_count = sum(p.numel() for p in agent.actor.parameters())
+    if parameter_count != profile["expected_parameter_count"]:
+        raise ValueError(
+            "Flow actor parameter count differs from the selected observation profile: "
+            f"{parameter_count} != {profile['expected_parameter_count']}"
+        )
     optimizer = agent.actor_optimizer.param_groups[0]
     if (not isinstance(agent.actor_optimizer, torch.optim.AdamW)
             or optimizer["lr"] != 1e-4 or optimizer["weight_decay"] != 1e-6):

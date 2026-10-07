@@ -72,3 +72,12 @@ def test_semantic_no_qvel_selector_retains_other_fields_in_contract_order():
     assert contract["excluded_fields"] == ["arm_velocity7"]
     assert np.array_equal(selected, np.concatenate((raw[:7], raw[14:])))
     assert len(set((observation_contract()["identity"], contract["identity"]))) == 2
+
+
+def test_flow_variant_parameter_guard_tracks_selected_state_width():
+    from task_env.diagnostics.phase1.policy_search.flow_variants import VARIANTS
+
+    assert VARIANTS["v1"]["expected_parameter_count"] == 19_512_264
+    assert VARIANTS["v2"]["expected_parameter_count"] == 19_510_472
+    assert (VARIANTS["v1"]["expected_parameter_count"]
+            - VARIANTS["v2"]["expected_parameter_count"]) == 7 * 256
