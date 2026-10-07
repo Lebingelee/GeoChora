@@ -746,3 +746,29 @@ fix Evidence 保留。结果为 Human review candidate，限于 seeds31/73、既
 controller 与明确 profiles；不扩展到低于 50 Hz、NutAssembly 或 learned policy。
 Evidence 位于 `workspace/qualification/phase1/p1_8_multirate_timebase/`。
 P1.6/P1.7 不获豁免，此结果不关闭 full P1.8 或 Phase I。
+
+### P1.8-E NutAssembly multi-rate partial review candidate（2026-10-07）
+
+新增 task-local canonical NutAssembly Artifact/reset/source/semantic route，保留
+legacy TaskDefinition、ResetSampler、Solution、default.yaml 与历史 scripts。
+Canonical `nut_on_square_peg_canonical_state_v0` 明确要求 physical gripper opening
+>= 0.065 m 和 EE/nut separation >= 0.055 m；不使用 legacy native-command release
+shortcut。原 insertion geometry thresholds 不变。一次性 authoring 冻结九个 named
+Panda joints 与 nut pose，后续 GeoPhys/MuJoCo reset 直接应用同一 deterministic
+NA-S0，无 runtime IK、resampling 或 hidden settle。
+
+NA-TB500/NA-TB100/NA-TB50 使用 2 ms physics dt 与 1/5/10 native substeps。
+Synthetic semantic fixtures、strict family admission、reset/state/time/ZOH 和六条
+unsuccessful CanonicalTrajectory strict roundtrip 通过。相同 unchanged expert/config
+在三个 rates 的两个 primary providers 上均未建立 grasp，最终在 open_gripper
+报告 release_completed_without_task_success。无 successful source golden，因此
+六组 D0 与 24 个 symmetric D1/D2 cells 为 N/A，不能称为 replay PASS 或 provider
+replay failure。Native contact/opening/force Evidence 仅用于诊断，未调整 planner、
+controller、task thresholds 或 physics/contact parameters。
+
+这是 partial_with_localized_failure 的 review candidate；最早未满足的 stage goal
+为 close_gripper。三频率共同失败不足以将 control rate 确定为唯一原因，也不构成
+solver/controller defect 的资格结论。PickCube bounded regressions 保持通过。
+Evidence 位于 `workspace/qualification/phase1/p1_8_nutassembly_multirate/`。
+未声明 NutAssembly qualification，未扩展到 SAPIEN/Genesis、learned policy，
+不豁免 P1.6/P1.7，不关闭 P1.8 或 Phase I。
