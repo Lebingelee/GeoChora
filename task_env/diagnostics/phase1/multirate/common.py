@@ -120,7 +120,14 @@ class NativeAudit:
         observed=self.count-count_before
         dt=after.simulation_time-before.simulation_time
         error=abs(dt-self.timebase.control_dt)
-        bound=max(math.ulp(before.simulation_time),math.ulp(after.simulation_time),math.ulp(self.timebase.control_dt))
+        expected_boundary_time=after.control_step*self.timebase.control_dt
+        boundary_clock_error=abs(after.simulation_time-expected_boundary_time)
+        # Bound cumulative binary64 rounding from native physics_dt additions,
+        # plus the final expected-boundary multiplication. A one-ULP bound on
+        # each interval is too strict after several separately rounded steps.
+        nu=max(self.count,1)*2.0**-53
+        if nu>=1:raise ValueError('inner interval clock bound unavailable')
+        bound=nu/(1.0-nu)*abs(expected_boundary_time)+math.ulp(expected_boundary_time)
         same_arm=len(set(self._inner_arm_hashes))==1
         row={'control_step':after.control_step,'simulation_time_s':after.simulation_time,
             'observed_native_substeps':observed,'requested_native_substeps':self.timebase.control_substeps,
@@ -128,11 +135,13 @@ class NativeAudit:
             'all_substep_target_hashes_observed':self.hashes==self._inner_expected_hashes,
             'all_substep_hashes_identical':len(set(self._inner_expected_hashes))<=1,
             'arm_target_held':same_arm,'time_increment_s':dt,'time_increment_error_s':error,
-            'existing_boundary_representation_bound_s':bound}
+            'expected_boundary_time_s':expected_boundary_time,
+            'boundary_clock_error_s':boundary_clock_error,
+            'cumulative_binary64_time_bound_s':bound}
         self.boundaries.append(row)
         self._inner_start=None
         if observed!=self.timebase.control_substeps:raise ValueError('provider_native_substep_count')
-        if after.control_step!=before.control_step+1 or error>bound:raise ValueError('canonical_timebase_alignment')
+        if after.control_step!=before.control_step+1 or boundary_clock_error>bound:raise ValueError('canonical_timebase_alignment')
         if not row['all_substep_target_hashes_observed'] or not same_arm:raise ValueError('inner_target_sequence_integrity')
         return row
 

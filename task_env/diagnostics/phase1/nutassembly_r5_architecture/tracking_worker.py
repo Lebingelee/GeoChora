@@ -11,10 +11,11 @@ import numpy as np
 from ....controllers.canonical import RequestedAction
 from ....controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
 from ....controllers.canonical.kinematics import ARM
+from ....environment import SnapshotRequest
 from ....planners import AbsolutePosePlanner, AbsolutePosePlannerConfig
 from ....runtime.sessions.control import ControlBinding, materialize_control
 from ....runtime.sessions.provenance import provider_build_identity
-from ....tasks.nut_assembly.assets import TABLE_TOP_Z
+from ....tasks.nut_assembly.assets import ARM_FORCE_RANGE, TABLE_TOP_Z
 from ....tasks.nut_assembly.canonical_reset import sample_reset
 from ....utils.rotation import quat_angle_wxyz, quat_multiply_wxyz
 from ..multirate.common import NativeAudit, write
@@ -134,6 +135,8 @@ def _controller_row(controller, state, feedback, request, canonical, target, app
         "feedback": feedback.to_mapping(),
         "readiness": readiness.to_mapping(),
         "controller_memory": controller.memory().to_mapping(),
+        "controller_reference_state": (controller.persistent_state_mapping()
+                                       if hasattr(controller, "persistent_state_mapping") else None),
         "arm_trajectory_diagnostics": dict(getattr(controller, "last_arm_diagnostics", {})),
         "task_metrics": dict(metrics),
         "expert_diagnostics": dict(diagnostics),
@@ -171,9 +174,7 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
     target_hash = target.identity_hash
     inner_rows = None
     if hasattr(controller, "inner_gripper_step"):
-        native_diagnostic = None
-        if stage == "close_gripper":
-            native_diagnostic = lambda current: _contact_diagnostics(current, provider)
+        native_diagnostic = lambda current: _runtime_diagnostic_readback(current, provider, stage)
         state, applied_target, applied, inner_rows = session.step_control_interval(
             target, controller, audit=audit, diagnostic_readback=native_diagnostic
         )
@@ -191,6 +192,10 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
         row["final_inner_target_hash"] = target.identity_hash
         row["target_hash_unchanged"] = applied.target_hash == target.identity_hash
         row["gripper_inner_trace"] = inner_rows
+        row["arm_actuator_force_substeps"] = [
+            x.get("native_contact_diagnostic", {}).get("arm_actuator_force")
+            for x in inner_rows if isinstance(x.get("native_contact_diagnostic"), dict)
+        ]
         row["arm_target_held"] = all(x.get("arm_target_hash") == inner_rows[0].get("arm_target_hash")
                                       for x in inner_rows) if inner_rows else True
     else:
@@ -223,6 +228,43 @@ def _contact_diagnostics(session, provider):
     # Preserve all semantic rows because pair-level finger attribution is absent.
     return {"provider": provider, "raw": raw,
             "pair_level_contact_available": False}
+
+
+def _arm_actuator_force_diagnostic(session, provider):
+    """Native force readback for Evidence only; never passed to controller."""
+    try:
+        if provider == "geophys":
+            native = session._boundary.read_snapshot(SnapshotRequest(
+                qacc=False, ctrl=False, body_pose=False, site_pose=False, actuator_force=True))
+            forces = {name: float(native.actuator_force[index])
+                      for name, index in session._target_actuators.items()}
+            limits = {name: float(ARM_FORCE_RANGE) for name in forces}
+        elif provider == "mujoco":
+            forces = {name: float(session._data.actuator_force[index])
+                      for name, index in session._target_actuators.items()}
+            limits = {
+                name: (float(np.max(np.abs(session._model.actuator_forcerange[index])))
+                       if bool(session._model.actuator_forcelimited[index]) else None)
+                for name, index in session._target_actuators.items()
+            }
+        else:
+            return {"available": False, "reason": "unsupported diagnostic provider"}
+        saturated = {name: bool(limit is not None and abs(forces[name]) >= limit - 1e-3)
+                     for name, limit in limits.items()}
+        return {"available": True, "force_N": forces, "force_limit_N": limits,
+                "saturated": saturated, "any_saturated": any(saturated.values())}
+    except Exception as exc:
+        return {"available": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _runtime_diagnostic_readback(session, provider, stage):
+    result = {"arm_actuator_force": _arm_actuator_force_diagnostic(session, provider)}
+    if stage == "close_gripper":
+        try:
+            result["contact"] = _contact_diagnostics(session, provider)
+        except Exception as exc:
+            result["contact"] = {"available": False, "error": f"{type(exc).__name__}: {exc}"}
+    return result
 
 
 def _planner(value):
@@ -262,6 +304,53 @@ def _t0_goals(start):
     ]
 
 
+def _summary_joint_reference(rows, control_dt):
+    diagnostics = [r.get("arm_trajectory_diagnostics", {}) for r in rows]
+    leads = [np.abs(np.asarray(d.get("q_ref_minus_q_actual_rad", []), dtype=float))
+             for d in diagnostics if d.get("q_ref_minus_q_actual_rad") is not None]
+    leads = [x for x in leads if x.size]
+    if not leads:
+        return {"available": False}
+    flattened = np.concatenate(leads)
+    active = [bool(np.max(x) > 1e-9) for x in leads]
+    return {
+        "available": True,
+        "max_abs_joint_lead_rad": float(np.max(flattened)),
+        "mean_abs_joint_lead_rad": float(np.mean(flattened)),
+        "time_with_nonzero_lead_s": float(sum(active) * control_dt),
+        "boundaries_with_nonzero_lead": int(sum(active)),
+        "reference_lead_clamp_events": int(sum(bool(d.get("reference_lead_clipped")) for d in diagnostics)),
+        "joint_velocity_clipped_boundaries": int(sum(bool(d.get("joint_velocity_clipped")) for d in diagnostics)),
+        "joint_position_limit_clipped_boundaries": int(sum(bool(d.get("joint_position_limit_clipped")) for d in diagnostics)),
+        "q_ref_reset_events": int(sum(bool(d.get("q_ref_reset_event")) for d in diagnostics)),
+    }
+
+
+def _summary_arm_actuator_forces(rows, physics_dt):
+    samples = [sample for row in rows for sample in row.get("arm_actuator_force_substeps", [])
+               if isinstance(sample, dict) and sample.get("available")]
+    if not samples:
+        return {"available": False, "reason": "native arm actuator force readback unavailable"}
+    names = sorted({name for sample in samples for name in sample.get("force_N", {})})
+    max_by_joint = {name: max(abs(sample["force_N"].get(name, 0.0)) for sample in samples)
+                    for name in names}
+    saturated = [bool(sample.get("any_saturated", False)) for sample in samples]
+    longest = run = 0
+    for active in saturated:
+        run = run + 1 if active else 0
+        longest = max(longest, run)
+    return {
+        "available": True,
+        "sample_count": len(samples),
+        "max_abs_force_by_joint_N": max_by_joint,
+        "maximum_absolute_force_N": max(max_by_joint.values(), default=0.0),
+        "saturated_samples": int(sum(saturated)),
+        "saturation_fraction": float(sum(saturated) / len(saturated)),
+        "longest_continuous_saturation_s": float(longest * physics_dt),
+        "force_limits_N": samples[-1].get("force_limit_N", {}),
+    }
+
+
 def _summary_errors(rows):
     positions = np.asarray([r["position_error_m"] for r in rows if r["position_error_m"] is not None], dtype=float)
     rotations = np.asarray([r["rotation_error_rad"] for r in rows if r["rotation_error_rad"] is not None], dtype=float)
@@ -278,7 +367,7 @@ def _summary_errors(rows):
     }
 
 
-def run_t0(value, provider, folder):
+def run_t0(value, provider, folder, *, first_segment_only=False):
     session = audit = None
     trace = []
     endpoints = []
@@ -293,7 +382,10 @@ def run_t0(value, provider, folder):
         reset_state_mapping = state.to_mapping()
         planner = _planner(value)
         start = _pose_array(state.pose_world["panda-v1/ee"])
-        for name, goal in _t0_goals(start):
+        goals = _t0_goals(start)
+        selected_goals = goals[:1] if first_segment_only else goals
+        report["first_segment_only"] = bool(first_segment_only)
+        for name, goal in selected_goals:
             segment_start = state.simulation_time
             segment_start_pose = _pose_array(state.pose_world["panda-v1/ee"])
             actions = planner.plan_to_pose(current_pose=segment_start_pose, goal_pose=goal, gripper=1.0)
@@ -362,10 +454,16 @@ def run_t0(value, provider, folder):
             if not endpoint_pass:
                 report["failure_boundary"] = "T0_endpoint_pose_readiness_not_reached"
                 break
+            if first_segment_only:
+                break
+        required_endpoint_count = len(selected_goals)
         report.update(
-            pass_=bool(len(endpoints) == len(_t0_goals(start)) and all(x["pass"] for x in endpoints)),
+            pass_=bool(len(endpoints) == required_endpoint_count and all(x["pass"] for x in endpoints)),
             endpoints=endpoints,
             error_summary=_summary_errors(trace),
+            joint_reference_summary=_summary_joint_reference(trace, value["artifact"].timebase.control_dt),
+            arm_actuator_force_summary=_summary_arm_actuator_forces(
+                trace, value["artifact"].timebase.physics_dt),
             total_transitions=len(trace),
             native_substeps_observed=audit.count,
             reset_sample_hash=sample.identity_hash,
@@ -611,7 +709,8 @@ def _context(rate, profile_path, dynamic_profile_path):
     return value
 
 
-def run(root, probe, rate, provider, candidate, profile_path, dynamic_profile_path, attempt=1):
+def run(root, probe, rate, provider, candidate, profile_path, dynamic_profile_path, attempt=1,
+        first_segment_only=False):
     value = _context(rate, profile_path=profile_path, dynamic_profile_path=dynamic_profile_path)
     label = rate.lower().replace("na-", "")
     candidate_label = f"candidate-{int(candidate):02d}"
@@ -624,13 +723,13 @@ def run(root, probe, rate, provider, candidate, profile_path, dynamic_profile_pa
         raise FileExistsError("tracking Evidence collision")
     source_sha = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     if probe == "T0":
-        report = run_t0(value, provider, folder)
+        report = run_t0(value, provider, folder, first_segment_only=first_segment_only)
     elif probe in {"G0", "T1"}:
         report = run_loaded(value, provider, folder, probe)
     else:
         raise ValueError("probe must be T0, G0, or T1")
     report.update(
-        candidate_id="R5-R3-C11-REFERENCE",
+        candidate_id="R5-R3-PERSISTENT-QREF",
         tracking_worker_sha256=source_sha,
         task_artifact_hash=value["artifact"].identity_hash,
         source_recipe_hash=value["recipe_identity"],
@@ -651,12 +750,15 @@ def main():
     parser.add_argument("--provider", choices=("geophys", "mujoco"), required=True)
     parser.add_argument("--candidate", type=int, default=11)
     parser.add_argument("--attempt", type=int, default=1)
+    parser.add_argument("--first-segment-only", action="store_true",
+                        help="Run only the first vertical T0 waypoint and its readiness window.")
     parser.add_argument("--profile-path", type=Path, default=PROFILE_PATH)
     parser.add_argument("--dynamic-profile", type=Path,
                         default=EVIDENCE_ROOT / "c11_dynamic_profile.yaml")
     args = parser.parse_args()
     report = run(args.root, args.probe, args.rate, args.provider, args.candidate,
-                 args.profile_path, args.dynamic_profile, args.attempt)
+                 args.profile_path, args.dynamic_profile, args.attempt,
+                 first_segment_only=args.first_segment_only)
     print(json.dumps({key: report.get(key) for key in
                       ("probe", "candidate_id", "provider", "rate", "pass", "failure_boundary",
                        "error_summary", "close_authorization", "verify_lift_pass",
