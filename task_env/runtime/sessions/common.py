@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 
 from ...artifacts import CanonicalStateView, PoseWorld
 from ...artifacts.execution import RealizedInitialState
+from ...controllers.canonical.contracts import digest
 
 
 def pose(position, quaternion):
@@ -18,6 +19,7 @@ class _SessionValues:
     def _initialize_values(self, artifact, source, provider):
         self._artifact, self._source, self._provider = artifact, source, provider
         self._closed, self._reset_done, self._control_step = False, False, 0
+        self._inner_interval_active = False
         root = ET.fromstring(source.scene_source.xml)
         option = root.find('option')
         if option is None or float(option.get('timestep', 'nan')) != artifact.timebase.physics_dt:
@@ -49,3 +51,61 @@ class _SessionValues:
         self._reset_done, self._control_step = True, 0
         return RealizedInitialState('realized-initial-state-v0', sample.sample_id,
                                     self._provider, self.snapshot(), 0)
+
+    def step_control_interval(self, held_target, gripper_inner_servo, *, audit=None,
+                              diagnostic_readback=None):
+        """Opt-in arm-ZOH interval with a shared physics-rate gripper update.
+
+        Existing ``step()`` remains unchanged. Providers implement only
+        ``_step_physics_once``; this shared method owns the canonical feedback,
+        inner-servo, held-arm, and outer-boundary contract.
+        """
+        from dataclasses import replace
+        self._require_reset()
+        start = self.snapshot()
+        if audit is not None:
+            audit.begin_inner_interval(start)
+        substep_rows = []
+        last_target = None
+        last_applied = None
+        self._inner_interval_active = True
+        try:
+            for substep_index in range(self._artifact.timebase.control_substeps):
+                state = self.snapshot()
+                feedback = self.control_feedback(state)
+                gripper_target, diagnostics = gripper_inner_servo.inner_gripper_step(state, feedback)
+                target = replace(held_target, gripper=gripper_target)
+                last_applied = self.apply_control(target)
+                if audit is None:
+                    self._step_physics_once()
+                else:
+                    audit.execute_inner_substep(target, self._step_physics_once)
+                row = dict(diagnostics)
+                row.update({
+                    "substep_index": substep_index,
+                    "control_step": state.control_step,
+                    "simulation_time_s": state.simulation_time,
+                    "target_hash": target.identity_hash,
+                    "arm_target_hash": digest({
+                        "arm_position": dict(target.arm_position),
+                        "arm_servo_position": dict(target.arm_servo_position),
+                    }),
+                    "applied_control": last_applied.to_mapping(),
+                })
+                if diagnostic_readback is not None:
+                    try:
+                        row["native_contact_diagnostic"] = diagnostic_readback(self)
+                    except Exception as exc:  # diagnostic availability must not affect control
+                        row["native_contact_diagnostic"] = {
+                            "available": False,
+                            "error": f"{type(exc).__name__}: {exc}",
+                        }
+                substep_rows.append(row)
+                last_target = target
+        finally:
+            self._inner_interval_active = False
+        self._control_step += 1
+        final_state = self.snapshot()
+        if audit is not None:
+            audit.complete_inner_interval(final_state)
+        return final_state, last_target, last_applied, substep_rows

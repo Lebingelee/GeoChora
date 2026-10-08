@@ -73,7 +73,7 @@ class _MuJoCoSession(_SessionValues):
             self._mj.mju_mat2Quat(quaternion, data.site_xmat[index])
             poses[name] = pose(data.site_xpos[index], quaternion)
         time = data.time
-        if self._artifact.timebase.control_substeps > 1:
+        if self._artifact.timebase.control_substeps > 1 and not self._inner_interval_active:
             if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
                 raise ValueError('MuJoCo native/canonical step-count mismatch')
             expected = self._native_steps * self._artifact.timebase.physics_dt
@@ -88,6 +88,8 @@ class _MuJoCoSession(_SessionValues):
             if not math.isfinite(data.time) or abs(data.time - expected) > bound:
                 raise ValueError('MuJoCo measured native time/count mismatch')
             time = self._control_step * self._artifact.timebase.control_dt
+        elif self._inner_interval_active:
+            time = float(data.time)
         return self._state(positions, velocities, poses, time)
 
     def control_feedback(self, state):
@@ -130,6 +132,14 @@ class _MuJoCoSession(_SessionValues):
         self._mj.mj_forward(self._model, self._data)
         self._control_step += 1
         return self.snapshot()
+
+    def _step_physics_once(self):
+        self._require_reset()
+        self._mj.mj_step(self._model, self._data)
+        self._native_steps += 1
+        if hasattr(self, '_control_binding'):
+            self._completed_actuator_force = self._data.actuator_force.copy()
+        self._mj.mj_forward(self._model, self._data)
 
     def close(self):
         if not self._closed:

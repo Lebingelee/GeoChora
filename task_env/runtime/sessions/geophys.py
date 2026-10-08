@@ -97,6 +97,10 @@ class _GeoPhysSession(_SessionValues):
         self._control_step += 1
         return self.snapshot()
 
+    def _step_physics_once(self):
+        self._require_reset()
+        self._boundary.step(substeps=1)
+
     def close(self):
         if not self._closed:
             self._boundary.close()

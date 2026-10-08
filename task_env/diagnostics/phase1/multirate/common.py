@@ -50,6 +50,7 @@ class NativeAudit:
     def __init__(self,session,provider,timebase):
         self.session=session;self.provider=provider;self.timebase=timebase
         self.count=0;self.active=None;self.hashes=[];self.boundaries=[];self.restore=None
+        self._inner_start=None;self._inner_expected_hashes=[];self._inner_arm_hashes=[]
         if provider=='geophys':
             session._boundary._scheduler.add_hook(self)
         elif provider=='mujoco':
@@ -88,6 +89,52 @@ class NativeAudit:
         if after.control_step!=state.control_step+1 or error>bound:raise ValueError('canonical_timebase_alignment')
         if not row['all_substep_hashes_identical']:raise ValueError('ZOH target identity changed')
         return after
+
+    def begin_inner_interval(self, before):
+        self._inner_start=(before,self.count)
+        self.hashes=[]
+        self._inner_expected_hashes=[]
+        self._inner_arm_hashes=[]
+
+    def execute_inner_substep(self, target, step_once):
+        if self._inner_start is None:raise ValueError('inner interval audit was not started')
+        self.active=target
+        self.expected_hash=target.identity_hash
+        self._inner_expected_hashes.append(target.identity_hash)
+        from ....controllers.canonical.contracts import digest
+        self._inner_arm_hashes.append(digest({
+            'arm_position':dict(target.arm_position),
+            'arm_servo_position':dict(target.arm_servo_position),
+        }))
+        before=self.count
+        try:
+            result=step_once()
+        finally:
+            self.active=None
+        if self.count-before!=1:raise ValueError('inner interval must execute exactly one native physics step')
+        return result
+
+    def complete_inner_interval(self, after):
+        if self._inner_start is None:raise ValueError('inner interval audit was not started')
+        before,count_before=self._inner_start
+        observed=self.count-count_before
+        dt=after.simulation_time-before.simulation_time
+        error=abs(dt-self.timebase.control_dt)
+        bound=max(math.ulp(before.simulation_time),math.ulp(after.simulation_time),math.ulp(self.timebase.control_dt))
+        same_arm=len(set(self._inner_arm_hashes))==1
+        row={'control_step':after.control_step,'simulation_time_s':after.simulation_time,
+            'observed_native_substeps':observed,'requested_native_substeps':self.timebase.control_substeps,
+            'target_hashes':list(self._inner_expected_hashes),
+            'all_substep_target_hashes_observed':self.hashes==self._inner_expected_hashes,
+            'all_substep_hashes_identical':len(set(self._inner_expected_hashes))<=1,
+            'arm_target_held':same_arm,'time_increment_s':dt,'time_increment_error_s':error,
+            'existing_boundary_representation_bound_s':bound}
+        self.boundaries.append(row)
+        self._inner_start=None
+        if observed!=self.timebase.control_substeps:raise ValueError('provider_native_substep_count')
+        if after.control_step!=before.control_step+1 or error>bound:raise ValueError('canonical_timebase_alignment')
+        if not row['all_substep_target_hashes_observed'] or not same_arm:raise ValueError('inner_target_sequence_integrity')
+        return row
 
     def close(self):
         if self.restore:self.restore()
