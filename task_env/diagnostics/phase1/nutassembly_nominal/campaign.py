@@ -203,6 +203,17 @@ def verify_lock(root):
     return spec, lock
 
 
+def ensure_lock(root):
+    root = Path(root)
+    spec_path, lock_path = root / "nominal_spec.yaml", root / "nominal_spec_lock.json"
+    if spec_path.exists() and lock_path.exists():
+        return verify_lock(root)
+    if spec_path.exists() or lock_path.exists():
+        raise FileExistsError("incomplete nominal spec/lock pair; refusing provider execution")
+    create_lock(root)
+    return verify_lock(root)
+
+
 def _folder_for(root, phase, route, rate, provider, source_provider=None):
     label = rate.lower().replace("na-", "")
     base = root / phase
@@ -389,8 +400,7 @@ def _write_handoff(root, status, phase_a, phase_b, first_failure):
 
 def run(root=ROOT):
     root = Path(root)
-    lock = create_lock(root)
-    spec, lock = verify_lock(root)
+    spec, lock = ensure_lock(root)
     matrix_a, outcome_a, failures_a = _phase_matrix(root, "phase_a", ("geophys", "mujoco"), ("geophys", "mujoco"))
     phase_a = _phase_a_report(matrix_a, outcome_a, failures_a)
     phase_a["qualification_base_commit"] = spec["qualification_base_commit"]
