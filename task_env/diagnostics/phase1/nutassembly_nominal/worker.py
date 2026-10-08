@@ -27,7 +27,7 @@ from ..multirate.common import NativeAudit, write
 from ..nutassembly.common import METADATA, observation
 from ..nutassembly.native import contact_readback
 from ..p1_2_runtime import execution
-from .common import context, sha256_file
+from .common import PROFILE_PATH, context, sha256_file
 
 
 RESET_BOUND = 1.0e-5
@@ -104,14 +104,14 @@ def _make_noop_action(state):
     )
 
 
-def precheck(root, rate, provider, phase="phase_a"):
+def precheck(root, rate, provider, phase="phase_a", profile_path=PROFILE_PATH, dynamic_profile_path=None):
     root = Path(root)
     folder = root / phase / "precheck" / rate.lower().replace("na-", "") / provider
     folder.mkdir(parents=True, exist_ok=True)
     report_path = folder / "report.json"
     if report_path.exists():
         raise FileExistsError("precheck Evidence collision")
-    value = context(rate)
+    value = context(rate, profile_path=profile_path, dynamic_profile_path=dynamic_profile_path)
     artifact, source, controller = value["artifact"], value["source"], value["controller"]
     sample = sample_reset(artifact, int(value["profile"]["reset"]["seed"]))
     exec_spec = execution(provider)
@@ -210,7 +210,8 @@ def _episode_metadata(value, sample, realized, provider, controller, solution):
             "source_xml_sha256": hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
             "source_recipe_sha256": value["recipe_identity"],
             "normalized_source_xml_sha256": value["recipe"]["normalized_source_xml_sha256"],
-            "asset_profile_sha256": sha256_file("task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json"),
+            "asset_profile_sha256": value["profile_sha256"],
+            "dynamic_profile_sha256": value["dynamic_profile_sha256"],
             "semantic_bindings_json": json.dumps({key: dict(getattr(source, key)) for key in
                 ("joints", "bodies", "frames", "free_joints", "joint_targets")}, sort_keys=True),
         },
@@ -218,7 +219,7 @@ def _episode_metadata(value, sample, realized, provider, controller, solution):
         controller.identity,
         solution.identity,
         value["readiness_identity"],
-        digest({"solution_config": asdict(solution.config), "profile": "nutassembly-nominal-v1"}),
+        digest({"solution_config": asdict(solution.config), "profile": value["profile"]["profile_id"]}),
         sample.task_seed,
         "evaluation",
     )
@@ -261,13 +262,13 @@ def _verify_lift_summary(value, start, state, feedback, metrics, initial_nut_z, 
     }
 
 
-def expert(root, rate, provider, phase="phase_a"):
+def expert(root, rate, provider, phase="phase_a", profile_path=PROFILE_PATH, dynamic_profile_path=None):
     root = Path(root)
     folder = root / phase / "expert" / rate.lower().replace("na-", "") / provider
     folder.mkdir(parents=True, exist_ok=True)
     if (folder / "report.json").exists():
         raise FileExistsError("expert Evidence collision")
-    value = context(rate)
+    value = context(rate, profile_path=profile_path, dynamic_profile_path=dynamic_profile_path)
     artifact, source, controller = value["artifact"], value["source"], value["controller"]
     solution = value["solution"]
     sample = sample_reset(artifact, int(value["profile"]["reset"]["seed"]))
@@ -484,7 +485,7 @@ def _relative_orientation_drift(start_nut, start_ee, end_nut, end_ee):
     return float(quat_angle_wxyz(start_relative, end_relative))
 
 
-def d0(root, rate, source_provider, phase="phase_a"):
+def d0(root, rate, source_provider, phase="phase_a", profile_path=PROFILE_PATH, dynamic_profile_path=None):
     root = Path(root)
     source_folder = root / phase / "expert" / rate.lower().replace("na-", "") / source_provider
     ref = json.loads((source_folder / "report.json").read_text())
@@ -494,7 +495,7 @@ def d0(root, rate, source_provider, phase="phase_a"):
     trajectory = load(trajectory_path)
     if trajectory.identity_hash != ref["logical_hash"] or sha256_file(trajectory_path) != ref["h5_sha256"]:
         raise ValueError("D0 golden identity/hash mismatch")
-    value = context(rate)
+    value = context(rate, profile_path=profile_path, dynamic_profile_path=dynamic_profile_path)
     controller = value["controller"]
     controller.reset(trajectory.boundaries[0].state, trajectory.boundaries[0].feedback)
     actions = []
@@ -526,7 +527,8 @@ def d0(root, rate, source_provider, phase="phase_a"):
     return report
 
 
-def replay(root, rate, source_provider, provider, route, phase="phase_a", source_phase=None):
+def replay(root, rate, source_provider, provider, route, phase="phase_a", source_phase=None,
+           profile_path=PROFILE_PATH, dynamic_profile_path=None):
     root = Path(root)
     source_phase = source_phase or phase
     rate_label = rate.lower().replace("na-", "")
@@ -543,7 +545,7 @@ def replay(root, rate, source_provider, provider, route, phase="phase_a", source
     actions = json.loads((d0_folder / "actions.json").read_text())
     if not d0_report["pass"] or digest(actions) != d0_report["action_sequence_identity"]:
         raise ValueError("frozen D0 public action identity mismatch")
-    value = context(rate)
+    value = context(rate, profile_path=profile_path, dynamic_profile_path=dynamic_profile_path)
     artifact, source, controller = value["artifact"], value["source"], value["controller"]
     sample = sample_reset(artifact, int(value["profile"]["reset"]["seed"]))
     if sample.to_mapping() != trajectory.metadata.reset_sample.to_mapping():
@@ -662,19 +664,24 @@ def main():
     parser.add_argument("--route-name", choices=("D1", "D2"))
     parser.add_argument("--phase", default="phase_a", choices=("phase_a", "phase_b", "phase_b/primary_to_boundary"))
     parser.add_argument("--source-phase", choices=("phase_a", "phase_b"))
+    parser.add_argument("--profile-path", type=Path, default=PROFILE_PATH)
+    parser.add_argument("--dynamic-profile", type=Path)
     args = parser.parse_args()
     if args.route == "precheck":
-        result = precheck(args.root, args.rate, args.provider, args.phase)
+        result = precheck(args.root, args.rate, args.provider, args.phase,
+                          args.profile_path, args.dynamic_profile)
     elif args.route == "expert":
-        result = expert(args.root, args.rate, args.provider, args.phase)
+        result = expert(args.root, args.rate, args.provider, args.phase,
+                        args.profile_path, args.dynamic_profile)
     elif args.route == "D0":
-        result = d0(args.root, args.rate, args.source_provider or args.provider, args.phase)
+        result = d0(args.root, args.rate, args.source_provider or args.provider, args.phase,
+                    args.profile_path, args.dynamic_profile)
     else:
         source_provider = args.source_provider
         if not source_provider or not args.route_name:
             parser.error("D1/D2 requires --source-provider and --route-name")
         result = replay(args.root, args.rate, source_provider, args.provider, args.route_name,
-                        args.phase, args.source_phase)
+                        args.phase, args.source_phase, args.profile_path, args.dynamic_profile)
     print(json.dumps(result, indent=2, allow_nan=False), flush=True)
     return 0 if result.get("pass", result.get("success", result.get("execution_valid", False) and result.get("task_valid", False))) else 1
 
