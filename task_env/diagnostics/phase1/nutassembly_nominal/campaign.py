@@ -186,7 +186,7 @@ def create_lock(root):
         raise FileExistsError("nominal spec already exists; refusing to overwrite Evidence")
     spec_path.write_text(yaml.safe_dump(spec_mapping(), sort_keys=False, allow_unicode=True))
     lock = {"schema_version": "p1_8_e_r3_nominal_spec_lock_v1", "path": str(spec_path),
-            "sha256": sha256(spec_path.read_bytes()), "locked_before_first_provider_run": True}
+            "sha256": sha(spec_path.read_bytes()), "locked_before_first_provider_run": True}
     lock_path.write_text(json.dumps(lock, indent=2, sort_keys=True) + "\n")
     return lock
 
@@ -194,7 +194,7 @@ def create_lock(root):
 def verify_lock(root):
     spec_path, lock_path = root / "nominal_spec.yaml", root / "nominal_spec_lock.json"
     lock = json.loads(lock_path.read_text())
-    if sha256(spec_path.read_bytes()) != lock["sha256"]:
+    if sha(spec_path.read_bytes()) != lock["sha256"]:
         raise ValueError("nominal spec lock mismatch")
     spec = yaml.safe_load(spec_path.read_text())
     for path, expected in spec["source_hashes"].items():
