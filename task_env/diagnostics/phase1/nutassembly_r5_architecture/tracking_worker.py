@@ -10,14 +10,14 @@ import numpy as np
 
 from ....controllers.canonical import RequestedAction
 from ....controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
-from ....controllers.canonical.kinematics import ARM
+from ....controllers.canonical.kinematics import ARM, FINGERS
 from ....environment import SnapshotRequest
 from ....planners import AbsolutePosePlanner, AbsolutePosePlannerConfig
 from ....runtime.sessions.control import ControlBinding, materialize_control
 from ....runtime.sessions.provenance import provider_build_identity
 from ....tasks.nut_assembly.assets import ARM_FORCE_RANGE, TABLE_TOP_Z
 from ....tasks.nut_assembly.canonical_reset import sample_reset
-from ....utils.rotation import quat_angle_wxyz, quat_multiply_wxyz
+from ....utils.rotation import quat_angle_wxyz, quat_multiply_wxyz, quat_wxyz_to_matrix
 from ..multirate.common import NativeAudit, write
 from ..nutassembly.common import METADATA, observation
 from ..nutassembly.native import contact_readback
@@ -97,7 +97,8 @@ def _quat_rotate_inverse(quaternion, vector):
     v = np.asarray(vector, dtype=float)
     qv = q[1:]
     t = -2.0 * np.cross(qv, v)
-    return v + q[0] * t + np.cross(qv, t)
+    # qv is negated for the inverse rotation in the final cross product too.
+    return v + q[0] * t - np.cross(qv, t)
 
 
 def _relative_drift(baseline, state):
@@ -211,16 +212,24 @@ def _contact_diagnostics(session, provider):
         contacts = raw.get("contacts", [])
         def classify(row):
             names = [str(x or "").lower() for x in row.get("source_body_names", [])]
+            geoms = [str(x or "").lower() for x in row.get("source_geom_names", [])]
             nut = any("nut" in name for name in names)
-            finger = any("finger" in name for name in names)
+            finger = any("finger" in name for name in (*names, *geoms))
             hand = any("hand" in name for name in names)
             table = any("table" in name for name in names)
+            left = any("left_finger" in name or "leftfinger" in name for name in (*names, *geoms))
+            right = any("right_finger" in name or "rightfinger" in name for name in (*names, *geoms))
             return {
                 "finger_nut": bool(nut and finger),
+                "left_finger_nut": bool(nut and left),
+                "right_finger_nut": bool(nut and right),
                 "hand_nut": bool(nut and hand),
                 "finger_table": bool(table and finger),
-                "normal_contact_force_native": abs(float(row.get("contact_frame_force_native", [0])[0])),
+                "nut_table": bool(nut and table),
+                "normal_contact_force_native": abs(float(row.get("normal_force_native", 0.0))),
                 "source_body_names": row.get("source_body_names"),
+                "source_geom_names": row.get("source_geom_names"),
+                "contact_index": row.get("contact_index"),
             }
         return {"provider": provider, "raw": raw,
                 "classified_contacts": [classify(row) for row in contacts]}
@@ -228,6 +237,157 @@ def _contact_diagnostics(session, provider):
     # Preserve all semantic rows because pair-level finger attribution is absent.
     return {"provider": provider, "raw": raw,
             "pair_level_contact_available": False}
+
+
+def _native_gripper_diagnostics(session, provider, state):
+    """Read-only actuator, finger-joint, tendon and constraint telemetry."""
+    finger_state = {
+        name: {
+            "position_rad_or_m": float(state.joint_position[name]),
+            "velocity_rad_s_or_m_s": float(state.joint_velocity[name]),
+        }
+        for name in FINGERS
+    }
+    try:
+        actuator = int(session._open_actuators[0])
+        if provider == "mujoco":
+            model, data = session._model, session._data
+            qpos = {}
+            qfrc = {}
+            limits = {}
+            for name in FINGERS:
+                qpos_addr, dof_addr = session._joint_addresses[name]
+                joint_id = int(model.joint(session._source.joints[name]).id)
+                qpos[name] = float(data.qpos[qpos_addr])
+                qfrc[name] = {
+                    "actuator_N_or_Nm": float(data.qfrc_actuator[dof_addr]),
+                    "constraint_N_or_Nm": float(data.qfrc_constraint[dof_addr]),
+                    "passive_N_or_Nm": float(data.qfrc_passive[dof_addr]),
+                }
+                limited = bool(model.jnt_limited[joint_id])
+                lo, hi = (map(float, model.jnt_range[joint_id]) if limited else (None, None))
+                limits[name] = {
+                    "limited": limited,
+                    "range": [lo, hi] if limited else None,
+                    "distance_to_lower": None if lo is None else float(qpos[name] - lo),
+                    "distance_to_upper": None if hi is None else float(hi - qpos[name]),
+                    "at_limit_tolerance_1e-5": bool(limited and min(qpos[name] - lo, hi - qpos[name]) <= 1e-5),
+                }
+            tendon_count = int(model.ntendon)
+            tendons = []
+            for i in range(tendon_count):
+                name = session._mj.mj_id2name(model, session._mj.mjtObj.mjOBJ_TENDON, i)
+                tendons.append({
+                    "name": name,
+                    "length_m": float(data.ten_length[i]) if hasattr(data, "ten_length") else None,
+                    "velocity_m_s": float(data.ten_velocity[i]) if hasattr(data, "ten_velocity") else None,
+                })
+            equality_type = int(getattr(session._mj.mjtConstraint, "mjCNSTR_EQUALITY", -999))
+            equality_rows = [
+                {"constraint_index": int(i), "type_code": int(data.efc_type[i]),
+                 "force_native": float(data.efc_force[i])}
+                for i in range(int(data.nefc)) if int(data.efc_type[i]) == equality_type
+            ]
+            ctrl_low, ctrl_high = map(float, model.actuator_ctrlrange[actuator])
+            return {
+                "available": True,
+                "finger_joints": finger_state,
+                "finger_generalized_forces": qfrc,
+                "finger_joint_limits": limits,
+                "gripper_actuator": {
+                    "name": session._mj.mj_id2name(model, session._mj.mjtObj.mjOBJ_ACTUATOR, actuator),
+                    "ctrl": float(data.ctrl[actuator]),
+                    "ctrl_range": [ctrl_low, ctrl_high],
+                    "actuator_force_native": float(data.actuator_force[actuator]),
+                    "actuator_force_limit_native": (list(map(float, model.actuator_forcerange[actuator]))
+                                                    if bool(model.actuator_forcelimited[actuator]) else None),
+                },
+                "tendons": tendons,
+                "equality_constraint_forces": equality_rows,
+                "equality_constraint_force_available": True,
+                "qfrc_constraint_available": True,
+            }
+        native = session._boundary.read_snapshot(SnapshotRequest(
+            qacc=False, ctrl=True, body_pose=False, site_pose=False, actuator_force=True))
+        return {
+            "available": True,
+            "finger_joints": finger_state,
+            "gripper_actuator": {
+                "ctrl": float(native.ctrl[actuator]),
+                "actuator_force_native": float(native.actuator_force[actuator]),
+            },
+            "finger_generalized_forces": None,
+            "finger_joint_limits": None,
+            "tendons": None,
+            "equality_constraint_forces": None,
+            "constraint_force_readback_available": False,
+        }
+    except Exception as exc:
+        return {"available": False, "finger_joints": finger_state,
+                "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _geometric_grasp_diagnostics(session, provider, state):
+    ee = state.pose_world["panda-v1/ee"]
+    nut = state.pose_world["square-nut-v1"]
+    ee_p, ee_q = np.asarray(ee.position, dtype=float), np.asarray(ee.quaternion_wxyz, dtype=float)
+    nut_p, nut_q = np.asarray(nut.position, dtype=float), np.asarray(nut.quaternion_wxyz, dtype=float)
+    rotation = quat_wxyz_to_matrix(ee_q)
+    relative_nut = rotation.T @ (nut_p - ee_p)
+    handle_world = nut_p + quat_wxyz_to_matrix(nut_q) @ np.asarray([0.054, 0.0, 0.0])
+    relative_handle = rotation.T @ (handle_world - ee_p)
+    opening = float(sum(state.joint_position[name] for name in FINGERS))
+    result = {
+        "nut_pose_world": nut.to_mapping(),
+        "ee_pose_world": ee.to_mapping(),
+        "nut_com_in_ee_frame_m": relative_nut.tolist(),
+        "nut_handle_in_ee_frame_m": relative_handle.tolist(),
+        "nut_yaw_rad": float(math.atan2(quat_wxyz_to_matrix(nut_q)[1, 0],
+                                         quat_wxyz_to_matrix(nut_q)[0, 0])),
+        "finger_opening_m": opening,
+        "finger_joint_positions": {name: float(state.joint_position[name]) for name in FINGERS},
+        "finger_joint_velocities": {name: float(state.joint_velocity[name]) for name in FINGERS},
+        "finger_body_pose_readback_available": False,
+        "finger_midpoint_world_m": None,
+        "nut_center_relative_to_finger_midpoint_m": None,
+        "finger_pad_vertical_offsets_from_nut_center_m": None,
+        "nut_offset_on_finger_closing_axis_m": None,
+    }
+    # MuJoCo exposes the actual articulated link transforms. GeoPhys's canonical
+    # state contract does not include those link poses, so its geometry remains
+    # explicitly unavailable instead of substituting a source-model estimate.
+    if provider == "mujoco":
+        model, data, mj = session._model, session._data, session._mj
+        body_poses = {}
+        for name in ("left_finger", "right_finger"):
+            bid = int(model.body(name).id)
+            body_poses[name] = {
+                "position": np.asarray(data.xpos[bid], dtype=float),
+                "quaternion_wxyz": np.asarray(data.xquat[bid], dtype=float),
+            }
+        left = body_poses["left_finger"]["position"]
+        right = body_poses["right_finger"]["position"]
+        midpoint = 0.5 * (left + right)
+        axis = left - right
+        axis_norm = float(np.linalg.norm(axis))
+        axis = axis / axis_norm if axis_norm > 1e-9 else np.zeros(3)
+        result.update({
+            "finger_body_pose_readback_available": True,
+            "finger_body_poses_world": {
+                name: {"position": value["position"].tolist(),
+                       "quaternion_wxyz": value["quaternion_wxyz"].tolist()}
+                for name, value in body_poses.items()
+            },
+            "finger_midpoint_world_m": midpoint.tolist(),
+            "nut_center_relative_to_finger_midpoint_m": (nut_p - midpoint).tolist(),
+            "finger_pad_vertical_offsets_from_nut_center_m": {
+                name: float(body_poses[name]["position"][2] - nut_p[2])
+                for name in body_poses
+            },
+            "nut_offset_on_finger_closing_axis_m": float(np.dot(nut_p - midpoint, axis)),
+            "finger_closing_axis_world": axis.tolist(),
+        })
+    return result
 
 
 def _arm_actuator_force_diagnostic(session, provider):
@@ -259,11 +419,21 @@ def _arm_actuator_force_diagnostic(session, provider):
 
 def _runtime_diagnostic_readback(session, provider, stage):
     result = {"arm_actuator_force": _arm_actuator_force_diagnostic(session, provider)}
-    if stage == "close_gripper":
+    if stage in {"close_gripper", "verify_lift"}:
         try:
+            state = session.snapshot()
             result["contact"] = _contact_diagnostics(session, provider)
+            _obs, info, _evaluation = observation(state, session._artifact)
+            result["canonical_task_metrics"] = dict(info["task_metrics"])
+            result["canonical_grasped_nut"] = bool(info["task_metrics"].get("grasped_nut", False))
+            result["native_gripper"] = _native_gripper_diagnostics(session, provider, state)
+            result["geometry"] = _geometric_grasp_diagnostics(session, provider, state)
+            result["gripper_feedback_after_substep"] = {
+                "closing_force_N": float(session.control_feedback(state).gripper.closing_force_N),
+                "measured_opening_m": float(session.control_feedback(state).gripper.opening_m),
+            }
         except Exception as exc:
-            result["contact"] = {"available": False, "error": f"{type(exc).__name__}: {exc}"}
+            result["diagnostic_error"] = f"{type(exc).__name__}: {exc}"
     return result
 
 
@@ -710,13 +880,13 @@ def _context(rate, profile_path, dynamic_profile_path):
 
 
 def run(root, probe, rate, provider, candidate, profile_path, dynamic_profile_path, attempt=1,
-        first_segment_only=False):
+        first_segment_only=False, output_dir=None):
     value = _context(rate, profile_path=profile_path, dynamic_profile_path=dynamic_profile_path)
     label = rate.lower().replace("na-", "")
     candidate_label = f"candidate-{int(candidate):02d}"
     category = {"T0": "t0", "G0": "g0"}[probe]
-    folder = Path(root) / category / provider / label
-    if int(attempt) > 1:
+    folder = Path(output_dir) if output_dir is not None else Path(root) / category / provider / label
+    if output_dir is None and int(attempt) > 1:
         folder = folder / f"attempt-{int(attempt):02d}"
     folder.mkdir(parents=True, exist_ok=True)
     if (folder / "report.json").exists():
@@ -752,13 +922,15 @@ def main():
     parser.add_argument("--attempt", type=int, default=1)
     parser.add_argument("--first-segment-only", action="store_true",
                         help="Run only the first vertical T0 waypoint and its readiness window.")
+    parser.add_argument("--output-dir", type=Path,
+                        help="Write this cell to a fresh diagnostic evidence directory.")
     parser.add_argument("--profile-path", type=Path, default=PROFILE_PATH)
     parser.add_argument("--dynamic-profile", type=Path,
                         default=EVIDENCE_ROOT / "c11_dynamic_profile.yaml")
     args = parser.parse_args()
     report = run(args.root, args.probe, args.rate, args.provider, args.candidate,
                  args.profile_path, args.dynamic_profile, args.attempt,
-                 first_segment_only=args.first_segment_only)
+                 first_segment_only=args.first_segment_only, output_dir=args.output_dir)
     print(json.dumps({key: report.get(key) for key in
                       ("probe", "candidate_id", "provider", "rate", "pass", "failure_boundary",
                        "error_summary", "close_authorization", "verify_lift_pass",
