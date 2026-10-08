@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from math import isfinite
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -30,6 +31,10 @@ NUT_WORLD_POS = (
 )
 NUT_MASS = 1.0
 NUT_DIAG_INERTIA = (7.5e-4, 7.5e-4, 1.25e-3)
+NUTASSEMBLY_NOMINAL_V1_ID = "nutassembly-nominal-v1"
+NUTASSEMBLY_NOMINAL_V1_MASS = 0.1
+# Exact diagonal inertia from the Human-reviewed 0.1 kg follow-up materialization.
+NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA = (7.5e-5, 7.5e-5, 1.25e-4)
 NUT_FREEJOINT_DAMPING = 2.0
 NUT_FREEJOINT_ARMATURE = 0.03
 NUT_CONTACT_FRICTION = "1.6 0.08 0.001"
@@ -183,7 +188,12 @@ def _add_tabletop(root: ET.Element) -> None:
     )
 
 
-def _make_square_nut_body(square_nut: ET.Element) -> ET.Element:
+def _make_square_nut_body(
+    square_nut: ET.Element,
+    *,
+    mass_kg: float = NUT_MASS,
+    diagonal_inertia_kg_m2: tuple[float, float, float] = NUT_DIAG_INERTIA,
+) -> ET.Element:
     source_container = square_nut.find("worldbody/body")
     if source_container is None:
         raise KeyError("square-nut.xml must contain worldbody/body")
@@ -200,9 +210,13 @@ def _make_square_nut_body(square_nut: ET.Element) -> ET.Element:
     body.append(
         ET.Element(
             "inertial",
-            mass=f"{NUT_MASS}",
+            mass=(f"{NUT_MASS}" if mass_kg == NUT_MASS else format(float(mass_kg), ".12g")),
             pos="0 0 0",
-            diaginertia="{} {} {}".format(*NUT_DIAG_INERTIA),
+            diaginertia=(
+                "{} {} {}".format(*NUT_DIAG_INERTIA)
+                if tuple(diagonal_inertia_kg_m2) == tuple(NUT_DIAG_INERTIA)
+                else " ".join(format(float(v), ".12g") for v in diagonal_inertia_kg_m2)
+            ),
         )
     )
     body.append(
@@ -241,7 +255,12 @@ def _make_square_nut_body(square_nut: ET.Element) -> ET.Element:
     return body
 
 
-def _add_pegs_and_nut(root: ET.Element) -> None:
+def _add_pegs_and_nut(
+    root: ET.Element,
+    *,
+    nut_mass_kg: float = NUT_MASS,
+    nut_diagonal_inertia_kg_m2: tuple[float, float, float] = NUT_DIAG_INERTIA,
+) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
         raise KeyError("Panda MJCF does not contain worldbody")
@@ -295,7 +314,11 @@ def _add_pegs_and_nut(root: ET.Element) -> None:
         rgba="0.18 0.48 0.66 1",
     )
     square_nut = _load_xml(NUT_ASSET_ROOT / "square-nut.xml")
-    worldbody.append(_make_square_nut_body(square_nut))
+    worldbody.append(_make_square_nut_body(
+        square_nut,
+        mass_kg=nut_mass_kg,
+        diagonal_inertia_kg_m2=nut_diagonal_inertia_kg_m2,
+    ))
 
 
 def _ensure_positive_auxiliary_body_inertials(root: ET.Element) -> None:
@@ -429,8 +452,16 @@ class NutAssemblySceneComposer:
         return imported_scene.build_rigid_scene_model(use_imported_meshes=False)
 
 
-def build_nut_assembly_model_xml() -> tuple[str, Path]:
-    """Build the task-owned NutAssemblySquare MJCF string."""
+def build_nut_assembly_model_xml(
+    *,
+    nut_mass_kg: float = NUT_MASS,
+    nut_diagonal_inertia_kg_m2: tuple[float, float, float] = NUT_DIAG_INERTIA,
+) -> tuple[str, Path]:
+    """Build task-owned NutAssemblySquare MJCF for a declared asset profile."""
+
+    values = (float(nut_mass_kg), *(float(v) for v in nut_diagonal_inertia_kg_m2))
+    if len(values) != 4 or not all(isfinite(value) and value > 0.0 for value in values):
+        raise ValueError("nut mass and diagonal inertia must be positive")
 
     panda_xml = PANDA_ASSET_ROOT / "panda.xml"
     root = _load_xml(panda_xml)
@@ -441,7 +472,11 @@ def build_nut_assembly_model_xml() -> tuple[str, Path]:
     _strengthen_panda_arm_actuators(root)
     _strengthen_panda_gripper_actuator(root)
     _add_tabletop(root)
-    _add_pegs_and_nut(root)
+    _add_pegs_and_nut(
+        root,
+        nut_mass_kg=values[0],
+        nut_diagonal_inertia_kg_m2=tuple(values[1:]),
+    )
     _ensure_positive_auxiliary_body_inertials(root)
     _enable_scene_collision_geoms(root)
     _increase_panda_gripper_collision_friction(root)

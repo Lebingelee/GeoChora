@@ -6,7 +6,7 @@ from ...environment.configuration import overlay_public_env_config, load_yaml_ma
 from ...registry import make_agent, make_object, make_scene
 from ...runtime.sessions.source import RuntimeSource
 from .task import NutAssemblyEnv, NUT_ASSEMBLY_SQUARE_SPEC
-from .assets import build_nut_assembly_model_xml, EE_SITE_NAME
+from .assets import build_nut_assembly_model_xml, EE_SITE_NAME, NUTASSEMBLY_NOMINAL_V1_ID
 from .canonical_artifact import require_family
 
 
@@ -17,8 +17,15 @@ def build_runtime_source(artifact):
         physics_dt=artifact.timebase.physics_dt, control_substeps=artifact.timebase.control_substeps),
         render=replace(config.render, camera_obs=False), robot=replace(config.robot,
             controller=replace(config.robot.controller, kind='absolute_pose', reference='world', rotation_representation='quaternion_wxyz')))
-    xml, base = build_nut_assembly_model_xml()
-    return RuntimeSource(artifact.identity_hash, TaskSceneSource(xml, base, 'nut-assembly-square-v1/canonical-source-v0'),
+    nut = next(entity for entity in artifact.world.entities if entity.semantic_id == 'square-nut-v1')
+    parameters = nut.parameters_si
+    xml, base = build_nut_assembly_model_xml(
+        nut_mass_kg=parameters['mass'],
+        nut_diagonal_inertia_kg_m2=tuple(parameters[f'inertia_{axis}'] for axis in 'xyz'),
+    )
+    source_version = 'canonical-source-nutassembly-nominal-v1' if nut.asset_reference.endswith(NUTASSEMBLY_NOMINAL_V1_ID) else 'canonical-source-v0'
+    source_id = f'nut-assembly-square-v1/{source_version}'
+    return RuntimeSource(artifact.identity_hash, TaskSceneSource(xml, base, source_id),
         {n:n.split('/',1)[1] for n in artifact.initialization.joint_position},
         {'square-nut-v1':'SquareNut', 'square-peg-v1':'peg1', 'round-peg-v1':'peg2', 'panda-v1/base':'link0'},
         {'panda-v1/ee':EE_SITE_NAME}, {'square-nut-v1':'SquareNut_joint'},

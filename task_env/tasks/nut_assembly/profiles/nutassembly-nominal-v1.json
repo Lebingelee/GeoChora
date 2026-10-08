@@ -1,0 +1,118 @@
+{
+  "asset": {
+    "diagonal_inertia_kg_m2": [
+      7.5e-05,
+      7.5e-05,
+      0.000125
+    ],
+    "freejoint_armature": 0.03,
+    "freejoint_damping": 2.0,
+    "geometry_profile_identity": "nutassembly-nominal-v1/same-followup-compound-geometry",
+    "geometry_source": "task_env/tasks/nut_assembly/assets.py + pinned Panda/Nut assets",
+    "gripper_contact_friction": "4.0 0.20 0.01",
+    "inertial_position_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "mass_kg": 0.1,
+    "nut_contact_friction": "1.6 0.08 0.001",
+    "nut_contact_margin_m": 0.001
+  },
+  "controller": {
+    "action_overrides": {
+      "cartesian_max_position_step": 0.0025,
+      "cartesian_max_rotation_step": 0.02,
+      "ik_max_delta_q": 0.1,
+      "ik_position_deadband": 0.002,
+      "ik_position_gain": 0.9,
+      "ik_rotation_deadband": 0.01,
+      "ik_rotation_gain": 0.65
+    },
+    "controller_close_ready_semantics": "unchanged; force error <= deadband after force mode initialized",
+    "force_deadband_N": 1.0,
+    "force_limit_N": 30.0,
+    "gripper_overrides": {
+      "force_adjust_step_m": 0.0001,
+      "opening_step_m": 0.0008
+    },
+    "implementation": "ProductionCanonicalPandaController"
+  },
+  "profile_id": "nutassembly-nominal-v1",
+  "reset": {
+    "physical_request": "unchanged from canonical_initialization.json",
+    "profile": "NA-S0",
+    "seed": 19,
+    "settle_steps": 0
+  },
+  "schema_version": "nutassembly-nominal-profile-v1",
+  "solution": {
+    "close_authorization": [
+      "controller_close_ready",
+      "stable_grasp_fallback"
+    ],
+    "config": {
+      "action_budget_s": 60.0,
+      "approach_height_m": 0.12,
+      "capture_rotation_slip_rad": 0.15,
+      "capture_translation_slip_m": 0.008,
+      "close_settle_s": 0.5,
+      "close_transition_s": 0.3333333333333333,
+      "grasp_min_closing_force_N": 25.0,
+      "grasp_offset": [
+        0.0,
+        0.0,
+        0.05
+      ],
+      "grasp_opening_m": 0.0,
+      "grasp_quaternion_wxyz": [
+        0.0038,
+        0.99993765,
+        0.0,
+        0.0105
+      ],
+      "gripper_stable_speed_m_s": 0.003,
+      "max_close_hold_s": 8.0,
+      "max_pose_hold_s": 3.0,
+      "max_release_hold_s": 3.0,
+      "max_stage_plan_s": 6.0,
+      "opening_range_m": 0.08,
+      "opening_stable_range_m": 0.0005,
+      "pose_position_ready_m": 0.007,
+      "pose_rotation_ready_rad": 0.06,
+      "readiness_stable_s": 0.1,
+      "release_settle_s": 0.6666666666666666,
+      "release_transition_s": 0.3333333333333333,
+      "rotation_acceleration_rad_s2": 27.0,
+      "rotation_speed_rad_s": 3.0,
+      "settle_duration_s": 0.26666666666666666,
+      "translation_acceleration_m_s2": 0.15,
+      "translation_speed_m_s": 0.04,
+      "verify_lift_m": 0.1
+    },
+    "fallback_grasped_nut_required_through_window": true,
+    "fallback_min_closing_force_N": 25.0,
+    "fallback_opening_span_max_m": 0.0005,
+    "fallback_window_s": 0.1,
+    "fallback_window_ticks": "ceil(fallback_window_s / control_dt)",
+    "implementation": "NutAssemblyCanonicalSolutionV1",
+    "verify_lift_mandatory": true
+  },
+  "timebases": {
+    "NA-TB100": {
+      "control_dt_s": 0.01,
+      "control_substeps": 5,
+      "physics_dt_s": 0.002
+    },
+    "NA-TB50": {
+      "control_dt_s": 0.02,
+      "control_substeps": 10,
+      "physics_dt_s": 0.002
+    },
+    "NA-TB500": {
+      "control_dt_s": 0.002,
+      "control_substeps": 1,
+      "physics_dt_s": 0.002
+    }
+  }
+}
