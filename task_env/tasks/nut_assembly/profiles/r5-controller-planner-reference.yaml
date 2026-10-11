@@ -1,0 +1,31 @@
+schema_version: p1.8-e-r4-dynamic-profile-v1
+candidate_id: R4-C11
+reason: >-
+  C10's quadratic taper stabilized MuJoCo but took about 3.0 s to reach the 25 N
+  fallback. Use a linear normalized-force-error taper and 0.12 m/s shared maximum
+  rate. At 29 N, the effective rate is 0.004 m/s, giving at most 0.4 mm target
+  adjustment over the 0.1 s fallback window, while larger force errors receive
+  faster adjustment. This aims to reach controller close-ready or stable fallback
+  within 1.0 s without changing force or capture thresholds.
+controller:
+  max_cartesian_translation_rate_m_s: 0.75
+  max_cartesian_rotation_rate_rad_s: 4.5
+  max_joint_increment_rate_rad_s: 16.0
+  ik_damping: 0.02
+  ik_position_gain: 0.9
+  ik_rotation_gain: 0.65
+  ik_rotation_row_weight: 0.22
+  position_deadband_m: 0.002
+  rotation_deadband_rad: 0.01
+  joint_position_correction_rate_s: 2500.0
+  joint_position_correction_max_gain: 5.0
+gripper:
+  opening_rate_m_s: 0.24
+  force_adjust_rate_m_s: 0.12
+  force_adjust_error_exponent: 1.0
+planner:
+  translation_speed_m_s: 0.06
+  translation_acceleration_m_s2: 0.45
+  rotation_speed_rad_s: 3.0
+  rotation_acceleration_rad_s2: 27.0
+  settle_duration_s: 0.26666666666666666
