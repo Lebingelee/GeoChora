@@ -272,5 +272,12 @@
     "bundle": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/integration_report_staging.bundle",
     "reason": "unpublished raw 225MB report moved out of Git before initial integration push; no remote history rewritten"
   },
-  "historical_restore_validation": "10/10 entries prepared, hashed source and supported flags checked; no historical physics rerun"
+  "historical_restore_validation": "10/10 entries prepared, hashed source and supported flags checked; no historical physics rerun",
+  "integration_source_bundle": {
+    "path": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/integration_source.bundle",
+    "sha256": "5f414f2e3642a689aa68c12d46d6e10ec5762c9563c3e1aea7bda7846d00a720",
+    "source_checkpoint": "f019699c224c51845e7cc00a3cbbbe46306eb034",
+    "bundle_verified": true
+  },
+  "cleanup_completed": true
 }

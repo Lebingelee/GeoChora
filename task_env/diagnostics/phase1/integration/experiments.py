@@ -53,11 +53,11 @@ def main():
         argv=shlex.split(entry['arguments'].format(output=output,archive=archive))
         cmd=[sys.executable,'-m',entry['module'],*argv]
         if args.prepare_only:
-            help_result=subprocess.run([sys.executable,'-m',entry['module'],'--help'],cwd=tree,env={**os.environ,'PYTHONPATH':str(tree)+':'+str(tree/'GeoPhys')},check=True,capture_output=True,text=True)
+            help_result=subprocess.run([sys.executable,'-m',entry['module'],'--help'],cwd=tree,env={**os.environ,'PYTHONPATH':str(tree)+':'+str(tree/'GeoPhys/src')+':'+str(tree/'GeoPhys')},check=True,capture_output=True,text=True)
             for flag in [v for v in argv if v.startswith('--')]:
                 if flag not in help_result.stdout:raise ValueError('unsupported archived entry flag: '+flag)
             print(json.dumps({'experiment':entry['experiment_id'],'source_verified':True,'command':shlex.join(cmd),'environment':'same pinned packages required; physics not executed'}));return
-        env=os.environ.copy();env['PYTHONPATH']=str(tree)+':'+str(tree/'GeoPhys');env['MUJOCO_GL']='egl'
+        env=os.environ.copy();env['PYTHONPATH']=str(tree)+':'+str(tree/'GeoPhys/src')+':'+str(tree/'GeoPhys');env['MUJOCO_GL']='egl'
         rc=subprocess.call(cmd,cwd=tree,env=env)
         output.mkdir(parents=True,exist_ok=True)
         (output/'reconstruction_provenance.json').write_text(json.dumps({'experiment':entry,'command':cmd,'returncode':rc},indent=2)+'\n')

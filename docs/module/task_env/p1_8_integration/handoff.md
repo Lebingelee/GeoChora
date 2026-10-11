@@ -19,3 +19,5 @@ Review stable_grasp_integration_report.md and controller_api_summary.md for exac
 Residual risks: auxiliary collision penetration1.7–2.0mm; single NA-S0 sample only; GeoPhys10N untested; no loaded transport/full task/replay/boundary qualification; arm hold adapter still accesses canonical R3-owned reference state explicitly; snapshot/interval-stream serialization remains proposed. Dirty unrelated P1.6/detached worktrees are untouched. Main unchanged, P1.6/P1.7 unwaived, Phase I not closed.
 
 Next: Human Review, then separately authorize GeoPhys10N G0, recording/state reconstruction prerequisites, T1/full experts and frozen D0–D2 matrix. No broad tuning recommended or performed.
+
+Cleanup completed: 9 old local P1.8 branches and 5 old public remote branches deleted after tags/Evidence/regression/push verification. Nine remote annotated archive tags retained; only active P1.8 branch is integration. Old worktrees retained detached, dirty R2 files preserved. Integration source checkpoint f019699c224c51845e7cc00a3cbbbe46306eb034; final report commit is the branch HEAD.
