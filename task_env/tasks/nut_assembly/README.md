@@ -40,3 +40,41 @@ closed-loop rate invariance. Existing production behavior remains frozen.
 `nutassembly_recovery.timebase_analysis` consumes preserved R0 Evidence and
 checks a provider-free sampled trajectory; it does not run physics or qualify
 tracking, grip, or task success.
+
+## R5 stable grasp development candidate
+
+`stable_grasp_candidate.py` adds the explicitly selected
+`NutAssemblyStableGraspCandidate` and task-local `StableArmTargetHold`.
+The candidate profile is `profiles/nutassembly-r5-stable-grasp-10n-v1.json`.
+This is a development profile descriptor, not an input to the legacy nominal
+profile loader or a replacement for registered historical routes.
+
+Its resolved gripper target and actuator force limit are 10 N with a 1 N
+deadband. The close transition accepts only `controller_close_ready`
+continuously for 0.1 s; the solution has no stable-grasp force fallback.
+Inherited legacy configuration fields do not authorize this close transition.
+The procedure is:
+
+`pose_stable -> close_gripper -> authorized hold 0.1 s -> verify_lift`.
+
+The arm target is held at descent completion until the achieved pose is
+stable (minimum wait 0.5 s; continuous 0.2 s window; each position-axis span
+at most 0.1 mm; speed at most 2 mm/s). The achieved pose becomes the fixed
+close reference. The arm target remains held through the additional 0.1 s
+post-authorization window, then the underlying persistent R3 tracker resumes.
+There is no post-authorization seating displacement. The canonical grasp
+height offset is 44.895 mm and includes the shared measured static servo
+compensation from the NA-S0 investigation; this has not been qualified across
+other reset samples or geometries.
+
+MuJoCo close + verify-lift passed at equal outer/gripper rates of
+500/100/50 Hz. The physics step remained 2 ms. This evidence is scoped to G0;
+loaded transport, full task, D0-D2 and the other providers are not qualified by
+these runs. Fixed-500-Hz inner execution at slower outer rates is not part of
+this candidate's evidence. Arm R3 source, R1, legacy solution, assets, physics
+settings and historical profiles remain unchanged. The task-local hold wrapper
+is an additional stateful execution policy and needs its own future replay
+reconstruction checks.
+
+Detailed evidence and wrist-camera manifests are stored under
+`workspace/qualification/phase1/p1_8_nutassembly_r5_architecture/historical_current_crossover/stable_grasp_10n_candidate/`.
