@@ -1,0 +1,62 @@
+[
+  {
+    "id": "R1-forensic",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R1-forensic\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly.grasp_diagnosis --route r0 --prior /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_multirate --output /tmp/p18-unused-R1-forensic\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R1-final-close",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R1-final-close\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly.grasp_diagnosis --route hold --provider mujoco --prior /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_multirate --output /tmp/p18-unused-R1-final-close\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R2-history-25N",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R2-history-25N\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_recovery.worker --root /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_mass_ablation --folder /tmp/p18-unused-R2-history-25N --profile NA-TB100 --provider mujoco --solution canonical --scope grasp_lift --control-profile /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_mass_ablation_followup/profiles/NA-TB100_force25.json --nut-mass-kg 0.1\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R2-heavy-load",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R2-heavy-load\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_recovery.worker --root /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_mass_ablation --folder /tmp/p18-unused-R2-heavy-load --profile NA-TB100 --provider mujoco --solution canonical --scope grasp_lift --control-profile /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_mass_ablation_followup/profiles/NA-TB100_force25.json --nut-mass-kg 1.0\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R3-precheck",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R3-precheck\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_nominal.worker --root /tmp/p18-unused-R3-precheck --route precheck --rate NA-TB100 --provider mujoco\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R3-lower-timeout",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R3-lower-timeout\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_nominal.worker --root /tmp/p18-unused-R3-lower-timeout --route expert --rate NA-TB500 --provider geophys\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R4-C11-T0",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R4-C11-T0\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_dynamic_recovery.tracking_worker --root /tmp/p18-unused-R4-C11-T0 --probe T0 --rate NA-TB500 --provider geophys --candidate 11 --dynamic-profile /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/c11_dynamic_profile.yaml\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R4-C11-G0",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R4-C11-G0\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_dynamic_recovery.tracking_worker --root /tmp/p18-unused-R4-C11-G0 --probe G0 --rate NA-TB50 --provider mujoco --candidate 11 --dynamic-profile /home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/c11_dynamic_profile.yaml\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R5-persistent-T0",
+    "pass": true,
+    "stdout": "{\"experiment\": \"R5-persistent-T0\", \"source_verified\": true, \"command\": \"/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.nutassembly_r5_architecture.tracking_worker --root /tmp/p18-unused-R5-persistent-T0 --probe T0 --rate NA-TB500 --provider geophys --candidate 11\", \"environment\": \"same pinned packages required; physics not executed\"}\n",
+    "stderr": ""
+  },
+  {
+    "id": "R5-10N-G0",
+    "pass": true,
+    "stdout": "/home/lly/miniconda3/envs/geochora/bin/python -m task_env.diagnostics.phase1.integration.stable_grasp --rate 100 --provider mujoco --output /tmp/p18-unused-R5-10N-G0\n",
+    "stderr": ""
+  }
+]

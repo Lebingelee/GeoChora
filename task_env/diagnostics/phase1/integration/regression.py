@@ -10,7 +10,7 @@ from .stable_grasp import context
 
 FIELDS=('requested_action','actual_ee_pose','joint_target','servo_target','joint_achieved',
         'feedback','readiness','controller_memory','controller_reference_state',
-        'measured_gripper_opening_m','closing_force_N','servo_gripper_opening_m',
+        'measured_gripper_opening_m','closing_force_N','servo_gripper_opening_m','desired_gripper_opening_m',
         'simulation_time_s','control_step','task_metrics')
 
 def compare(before,after):
@@ -29,7 +29,19 @@ def compare(before,after):
         xa=dict(x['applied_control']);ya=dict(y['applied_control'])
         for k in ('target_hash','controller_identity'):xa.pop(k,None);ya.pop(k,None)
         applied.append(xa==ya)
-    return {'exact_physical_boundaries':count,'reference_boundaries':len(a),'integrated_boundaries':len(b),
+    inner_exact=True; cap_exact=True
+    for x,y in zip(a,b):
+        xx=x.get('gripper_inner_trace',[]);yy=y.get('gripper_inner_trace',[])
+        inner_exact = inner_exact and len(xx)==len(yy)
+        for u,v in zip(xx,yy):
+            for k in ('measured_opening_m','commanded_opening_m','desired_opening_m','closing_force_N',
+                      'force_mode_active','force_mode_initialized','controller_close_ready',
+                      'simulation_time_s','inner_update_performed'):
+                inner_exact = inner_exact and u.get(k)==v.get(k)
+            cap_exact = cap_exact and v['applied_control']['gripper_force_limit_N']==10.
+    old_events=json.loads((before/'solution_events.json').read_text())
+    return {'inner_physical_exact':inner_exact,'actuator_cap_10N_all_substeps':cap_exact,
+            'solution_events_exact':old_events==rb['solution_events'], 'exact_physical_boundaries':count,'reference_boundaries':len(a),'integrated_boundaries':len(b),
             'first_physical_divergence':first,'physical_exact':first is None and len(a)==len(b),
             'applied_except_target_identity_exact':all(applied),
             'identity_divergence':'source-based controller/solution and applied target hash at boundary 0',
@@ -52,6 +64,9 @@ def pure():
     value=context(100);s=value['solution'];s._stage_index=s.STAGES.index('close_gripper');s._emitted=151;s._close_gate=BoundaryWait(0.,1.5)
     s._index=0;s._actions=np.zeros((1000,8));s.observe({},0.,False,False,{},readiness=None)
     result['candidate_deadline_fail_closed_before_plan_exhaustion']=s.failed and s.failure_reason=='close_gripper_authorization_deadline'
+    s=context(100)['solution'];s._stage_index=s.STAGES.index('close_gripper');s._emitted=150;s._close_gate=BoundaryWait(0.,1.5);s._index=0;s._actions=np.zeros((1000,8))
+    s.observe({},0.,False,False,{},readiness=None)
+    result['candidate_fail_closed_at_exact_deadline']=s.failed and s.failure_reason=='close_gripper_authorization_deadline'
     protected=['task_env/controllers/canonical/production.py','task_env/controllers/canonical/production_r3.py','task_env/planners/cartesian.py',
                'task_env/tasks/nut_assembly/canonical_solution.py','task_env/tasks/nut_assembly/assets.py',
                'task_env/tasks/pick_cube/readiness_solution.py','task_env/runtime/sessions/mujoco.py']
@@ -64,6 +79,6 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--reference-root',type=Path,required=True);p.add_argument('--integrated-root',type=Path,required=True);p.add_argument('--output',type=Path,required=True);args=p.parse_args()
     result={'pure':pure(),'cells':{}}
     for hz in (500,100,50):result['cells'][str(hz)]=compare(args.reference_root/f'tb{hz}',args.integrated_root/f'integrated_tb{hz}')
-    result['pass']=result['pure']['pass'] and all(v['physical_exact'] and v['applied_except_target_identity_exact'] and v['integrated_pass'] for v in result['cells'].values())
+    result['pass']=result['pure']['pass'] and all(v['physical_exact'] and v['applied_except_target_identity_exact'] and v['integrated_pass'] and v['inner_physical_exact'] and v['actuator_cap_10N_all_substeps'] and v['solution_events_exact'] for v in result['cells'].values())
     args.output.write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2));raise SystemExit(0 if result['pass'] else 1)
 if __name__=='__main__':main()

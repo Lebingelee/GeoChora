@@ -1,0 +1,207 @@
+{
+  "public_main_start": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
+  "branches": [
+    {
+      "branch": "codex/p1.8-4h-multi-backend-replay",
+      "head": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "merge_base": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "integration_ahead": 20,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "5e7012c70a83f26d1f6a0e51b3160efc00006c35"
+    },
+    {
+      "branch": "codex/p1.8-d-multirate-timebase",
+      "head": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "merge_base": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "integration_ahead": 18,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "60b51e38ff3460da62296f73bbb93138f9d41b7f"
+    },
+    {
+      "branch": "codex/p1.8-e-nutassembly-multirate",
+      "head": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "merge_base": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "integration_ahead": 15,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba"
+    },
+    {
+      "branch": "codex/p1.8-e-r1-grasp-diagnosis",
+      "head": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+      "merge_base": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "integration_ahead": 15,
+      "branch_ahead": 1,
+      "unique_commits": [
+        "dde727ff0cbeaf7fbe9f07e53ec97346538191ce"
+      ],
+      "archive_tag": "archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [
+        "A\ttask_env/diagnostics/phase1/nutassembly/grasp_diagnosis.py"
+      ],
+      "tracked_source_coverage": true,
+      "original_remote_head": null
+    },
+    {
+      "branch": "codex/p1.8-e-r2-nutassembly-solution",
+      "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "merge_base": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "integration_ahead": 11,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "c36e759e8b3cef16147664a107422aa4650f159b"
+    },
+    {
+      "branch": "codex/p1.8-e-r2-rate-controls",
+      "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "merge_base": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "integration_ahead": 11,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c",
+      "associated_pr": [],
+      "associated_worktrees": [
+        {
+          "path": "/home/lly/.codex/worktrees/p18e-r2-recovery/Geochora",
+          "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+          "status": "M task_env/diagnostics/phase1/nutassembly_recovery/worker.py\n?? task_env/diagnostics/phase1/nutassembly_recovery/control_tracking.py\n?? task_env/diagnostics/phase1/nutassembly_recovery/rate_control_report.py",
+          "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r2-recovery/Geochora\nHEAD c36e759e8b3cef16147664a107422aa4650f159b\nbranch refs/heads/codex/p1.8-e-r2-rate-controls"
+        }
+      ],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": null
+    },
+    {
+      "branch": "codex/p1.8-e-r3-nutassembly-nominal",
+      "head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "merge_base": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "integration_ahead": 7,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49",
+      "associated_pr": [],
+      "associated_worktrees": [
+        {
+          "path": "/home/lly/.codex/worktrees/p18e-r3-nominal/Geochora",
+          "head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+          "status": "",
+          "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r3-nominal/Geochora\nHEAD 6160ba0a8b494f0cc3989d464b5ef61d83219b10\nbranch refs/heads/codex/p1.8-e-r3-nutassembly-nominal"
+        }
+      ],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10"
+    },
+    {
+      "branch": "codex/p1.8-e-r4-dynamic-retuning",
+      "head": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "merge_base": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "integration_ahead": 6,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e",
+      "associated_pr": [],
+      "associated_worktrees": [
+        {
+          "path": "/home/lly/.codex/worktrees/p1-8-e-r4-dynamic-retuning/Geochora",
+          "head": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+          "status": "",
+          "porcelain": "worktree /home/lly/.codex/worktrees/p1-8-e-r4-dynamic-retuning/Geochora\nHEAD 0f2290c9b25e590da04be82a74b0aea8b005735a\nbranch refs/heads/codex/p1.8-e-r4-dynamic-retuning"
+        }
+      ],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": null
+    },
+    {
+      "branch": "codex/p1.8-e-r5-controller-architecture",
+      "head": "8e914da87e1c1afb989b86d5e2807cfecc6d6616",
+      "merge_base": "8e914da87e1c1afb989b86d5e2807cfecc6d6616",
+      "integration_ahead": 1,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": null
+    }
+  ],
+  "all_worktrees": [
+    {
+      "path": "/home/lly/Program_Files/Geochora",
+      "head": "761f1fde7fb0d2831ab5ee780821637c0f7e6215",
+      "status": "M task_env/diagnostics/phase1/flow_training.py\n?? .codegraph/\n?? docs/module/task_env/goal/\n?? task_env/diagnostics/phase1/flow_horizon_training.py\n?? task_env/diagnostics/phase1/flow_training_normalized.py\n?? task_env/diagnostics/phase1/test_flow_horizon_chunks.py",
+      "porcelain": "worktree /home/lly/Program_Files/Geochora\nHEAD 761f1fde7fb0d2831ab5ee780821637c0f7e6215\nbranch refs/heads/codex/p1.6-closure"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/6f188a50-81f5-4e49-80ec-040d732e5797/Geochora",
+      "head": "0f0ea43c4336d5c2434368e69f49882190975ddf",
+      "status": "m GeoPhys\n M task_env/tasks/nut_assembly/default.yaml\n M task_env/tasks/pick_cube/solution.py\n?? .codegraph/",
+      "porcelain": "worktree /home/lly/.codex/worktrees/6f188a50-81f5-4e49-80ec-040d732e5797/Geochora\nHEAD 0f0ea43c4336d5c2434368e69f49882190975ddf\ndetached"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/p1-8-e-r4-dynamic-retuning/Geochora",
+      "head": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "status": "",
+      "porcelain": "worktree /home/lly/.codex/worktrees/p1-8-e-r4-dynamic-retuning/Geochora\nHEAD 0f2290c9b25e590da04be82a74b0aea8b005735a\nbranch refs/heads/codex/p1.8-e-r4-dynamic-retuning"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora",
+      "head": "6dc4074916bdc3fe4cffeef1c3937537aa1f7fba",
+      "status": "",
+      "porcelain": "worktree /home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora\nHEAD 6dc4074916bdc3fe4cffeef1c3937537aa1f7fba\nbranch refs/heads/codex/p1.8-integration"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/p18-multi-backend-replay/Geochora",
+      "head": "4db06e6f740a70b51cbf2eec87771321ba02d864",
+      "status": "",
+      "porcelain": "worktree /home/lly/.codex/worktrees/p18-multi-backend-replay/Geochora\nHEAD 4db06e6f740a70b51cbf2eec87771321ba02d864\nbranch refs/heads/codex/p1.3-4h-conformance"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/p18e-r2-historical/Geochora",
+      "head": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
+      "status": "",
+      "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r2-historical/Geochora\nHEAD f977528b9b9866c50afcf8ea9b5f5deadce60892\ndetached"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/p18e-r2-recovery/Geochora",
+      "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "status": "M task_env/diagnostics/phase1/nutassembly_recovery/worker.py\n?? task_env/diagnostics/phase1/nutassembly_recovery/control_tracking.py\n?? task_env/diagnostics/phase1/nutassembly_recovery/rate_control_report.py",
+      "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r2-recovery/Geochora\nHEAD c36e759e8b3cef16147664a107422aa4650f159b\nbranch refs/heads/codex/p1.8-e-r2-rate-controls"
+    },
+    {
+      "path": "/home/lly/.codex/worktrees/p18e-r3-nominal/Geochora",
+      "head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "status": "",
+      "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r3-nominal/Geochora\nHEAD 6160ba0a8b494f0cc3989d464b5ef61d83219b10\nbranch refs/heads/codex/p1.8-e-r3-nutassembly-nominal"
+    }
+  ],
+  "other_workflows": "P1.0-P1.7 and unrelated worktrees retained"
+}

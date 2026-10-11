@@ -118,6 +118,8 @@ class NutAssemblyStableGraspCandidate(NutAssemblyCanonicalSolutionV1):
             self._fail('close_gripper_authorization_deadline')
             return
         if self._index < len(self._actions):
+            if self._close_gate.wait_until(self._emitted*self.control_dt, False) == 'timeout':
+                self._fail('close_gripper_authorization_deadline')
             return
         ee = self._ee(obs)
         pose_ready = (np.linalg.norm(ee[:3] - self._goal[:3]) <= self.config.pose_position_ready_m and

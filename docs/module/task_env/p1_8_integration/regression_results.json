@@ -1,0 +1,597 @@
+{
+  "equivalence": {
+    "pure": {
+      "planner_move_exact": true,
+      "planner_hold_exact": true,
+      "stable_achieved_pose": true,
+      "motion_rejects_stability": true,
+      "deadline_no_bypass": true,
+      "candidate_deadline_fail_closed_before_plan_exhaustion": true,
+      "unchanged:task_env/controllers/canonical/production.py": true,
+      "unchanged:task_env/controllers/canonical/production_r3.py": true,
+      "unchanged:task_env/planners/cartesian.py": true,
+      "unchanged:task_env/tasks/nut_assembly/canonical_solution.py": true,
+      "unchanged:task_env/tasks/nut_assembly/assets.py": true,
+      "unchanged:task_env/tasks/pick_cube/readiness_solution.py": true,
+      "unchanged:task_env/runtime/sessions/mujoco.py": true,
+      "pass": true
+    },
+    "cells": {
+      "500": {
+        "inner_physical_exact": true,
+        "actuator_cap_10N_all_substeps": true,
+        "solution_events_exact": true,
+        "exact_physical_boundaries": 3500,
+        "reference_boundaries": 3500,
+        "integrated_boundaries": 3500,
+        "first_physical_divergence": null,
+        "physical_exact": true,
+        "applied_except_target_identity_exact": true,
+        "identity_divergence": "source-based controller/solution and applied target hash at boundary 0",
+        "reference_pass": true,
+        "integrated_pass": true
+      },
+      "100": {
+        "inner_physical_exact": true,
+        "actuator_cap_10N_all_substeps": true,
+        "solution_events_exact": true,
+        "exact_physical_boundaries": 700,
+        "reference_boundaries": 700,
+        "integrated_boundaries": 700,
+        "first_physical_divergence": null,
+        "physical_exact": true,
+        "applied_except_target_identity_exact": true,
+        "identity_divergence": "source-based controller/solution and applied target hash at boundary 0",
+        "reference_pass": true,
+        "integrated_pass": true
+      },
+      "50": {
+        "inner_physical_exact": true,
+        "actuator_cap_10N_all_substeps": true,
+        "solution_events_exact": true,
+        "exact_physical_boundaries": 350,
+        "reference_boundaries": 350,
+        "integrated_boundaries": 350,
+        "first_physical_divergence": null,
+        "physical_exact": true,
+        "applied_except_target_identity_exact": true,
+        "identity_divergence": "source-based controller/solution and applied target hash at boundary 0",
+        "reference_pass": true,
+        "integrated_pass": true
+      }
+    },
+    "pass": true
+  },
+  "contracts": {
+    "artifact_id": "pick-cube-v1/p1_1_candidate",
+    "artifact_version": "ver_p1_1_candidate",
+    "backend": "none",
+    "branch": "codex/p1.8-integration",
+    "candidate_identity": "461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e",
+    "changed_tree": "M task_env/tasks/nut_assembly/stable_grasp_candidate.py\n?? task_env/controllers/canonical/execution.py\n?? task_env/controllers/canonical/gripper_execution.py\n?? task_env/diagnostics/phase1/integration/\n?? task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml\n?? task_env/tasks/nut_assembly/stable_grasp_reference.py",
+    "checks": [
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "valid_artifact_load",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "mapping_roundtrip",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "json_roundtrip",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "yaml_roundtrip",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "absolute_joint_none_reference_pass",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "absolute_joint_world_base_reference_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "absolute_pose_world_base_reference_pass",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "absolute_pose_ee_none_reference_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "delta_pose_world_base_ee_reference_pass",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "delta_pose_none_reference_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "nullable_reference_wrong_type_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "unknown_top_level_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "invalid_nested_and_schema_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "invalid_timebase_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "capability_positive_admission",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "missing_capability_fail_closed",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "unknown_status_and_contradictory_capability_rejected",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "execution_excluded_from_identity",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "canonical_state_name_finite_convention_validation",
+        "result": "pass"
+      },
+      {
+        "details": {
+          "norm_squared_error": 2.560536693785309e-08,
+          "normalization_dtype": "float32"
+        },
+        "failure_category": null,
+        "name": "float32_normalized_quaternion_pass",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "nonunit_quaternion_fail_closed",
+        "result": "pass"
+      },
+      {
+        "details": {
+          "loaded_forbidden": []
+        },
+        "failure_category": null,
+        "name": "provider_free_contract_import",
+        "result": "pass"
+      },
+      {
+        "details": {
+          "loaded_forbidden": []
+        },
+        "failure_category": null,
+        "name": "provider_free_candidate_import_load",
+        "result": "pass"
+      },
+      {
+        "details": {
+          "loaded_forbidden": []
+        },
+        "failure_category": null,
+        "name": "fresh_task_env_import",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "pick_cube_non_success_fixture",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "pick_cube_success_fixture_without_grasp",
+        "result": "pass"
+      },
+      {
+        "details": {
+          "float_expression_abs_tolerance": 1e-14,
+          "success_threshold_m": 0.1,
+          "synthetic_fixtures": 120
+        },
+        "failure_category": null,
+        "name": "authoritative_pick_cube_semantic_compatibility",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "reset_and_resolved_default_facts",
+        "result": "pass"
+      },
+      {
+        "details": {
+          "initial_velocity_policy": "zero_named_joint_and_entity_velocities",
+          "joint_positions": {
+            "panda-v1/finger_joint1": 0.04,
+            "panda-v1/finger_joint2": 0.04,
+            "panda-v1/joint1": -0.17,
+            "panda-v1/joint2": 0.0,
+            "panda-v1/joint3": 0.0,
+            "panda-v1/joint4": -1.57079,
+            "panda-v1/joint5": 0.0,
+            "panda-v1/joint6": 1.57079,
+            "panda-v1/joint7": -0.7853
+          },
+          "named_joint_count": 9
+        },
+        "failure_category": null,
+        "name": "canonical_panda_initialization",
+        "result": "pass"
+      },
+      {
+        "details": null,
+        "failure_category": null,
+        "name": "loaded_module_boundary",
+        "result": "pass"
+      }
+    ],
+    "command": [
+      "/home/lly/miniconda3/envs/geochora/bin/python",
+      "-m",
+      "task_env.diagnostics.phase1.p1_1_contracts",
+      "--output",
+      "workspace/qualification/phase1/p1_8_integration/regression/contracts.json"
+    ],
+    "end_time": "2026-10-11T16:19:12.792930+00:00",
+    "failure_category": [],
+    "level": "S0/S1",
+    "provider": "none; synthetic manifests only",
+    "python": "/home/lly/miniconda3/envs/geochora/bin/python",
+    "qualification": false,
+    "repository_commit": "6dc4074916bdc3fe4cffeef1c3937537aa1f7fba",
+    "result": "pass",
+    "schema": "geochora.p1_1_contract_smoke.v1",
+    "start_time": "2026-10-11T16:19:07.494964+00:00",
+    "wall_time_s": 5.297975028865039
+  },
+  "pickcube": {
+    "provider": "mujoco",
+    "seed": 31,
+    "pass": true,
+    "path": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_integration/regression/pickcube/golden_trajectories/mujoco/seed31/trajectory.h5",
+    "h5_sha256": "9741cdfb1d355543d9c42c62076ff7ccc7da6bbf1b3b5eee309509809170689a",
+    "logical_hash": "b0af9dc2e4cc95e51dc33df768be335a56c590118b6d95d3e947755f14a79d9e",
+    "reset_sample_hash": "5fd862368b845ea7681069f9be5339bf9c07a050400180c3abfc6a15d3538c2c",
+    "T": 1091,
+    "holds": 971,
+    "roundtrip_exact": true,
+    "identities": {
+      "task_artifact": "461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e",
+      "controller": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+      "expert": "cc6b843bca4c9e72b5048033877b5141fdbce1024f9fad820723f6bff222919b",
+      "readiness": "706d2de51687c120496baec117499a53dee06a52dd0225f8348075db5828a533"
+    },
+    "final_lift": 0.10531660301603113,
+    "expert_failure": null
+  },
+  "g0": {
+    "500": {
+      "pass": true,
+      "close_authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9319999999998978,
+        "controller_close_ready": true,
+        "end_closing_force_N": 9.034263363851629,
+        "end_opening_m": 0.02858831487157742,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 9.033924719759007,
+        "fallback_opening_span_m": 1.263127658926444e-07,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 50,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": false
+      },
+      "verify_lift_pass": true,
+      "max_capture_position_drift_m": 0.005339207900179489,
+      "max_capture_rotation_drift_rad": 0.03737368208897557,
+      "failure_boundary": null,
+      "force_limit_N": 10.0,
+      "fallback_enabled": false,
+      "forced_lift": false,
+      "postclose_hold_s": 0.1,
+      "solution_events": [
+        {
+          "event": "pose_stable",
+          "maximum_speed_m_s": 0.00032816403427046037,
+          "pose": [
+            0.4544961154460907,
+            -0.07499492168426514,
+            0.5172690749168396,
+            0.0038041567895561457,
+            0.9999374151229858,
+            3.736994040082209e-05,
+            0.010523131117224693
+          ],
+          "position_span_m": [
+            9.5367431640625e-07,
+            2.9802322387695312e-08,
+            2.9087066650390625e-05
+          ],
+          "stable_height_goal_m": 0.5172267023642598,
+          "t": 3.102,
+          "wait_s": 0.5
+        },
+        {
+          "event": "close_start",
+          "stable_pose": [
+            0.4544961154460907,
+            -0.07499492168426514,
+            0.5172690749168396,
+            0.0038041567895561457,
+            0.9999374151229858,
+            3.736994040082209e-05,
+            0.010523131117224693
+          ],
+          "t": 3.102
+        },
+        {
+          "event": "controller_close_authorized",
+          "fallback_used": false,
+          "force_N": 9.034263363851629,
+          "stable_window_s": 0.1,
+          "t": 4.034
+        },
+        {
+          "duration_s": 0.1,
+          "event": "authorized_hold_start",
+          "t": 4.034
+        },
+        {
+          "event": "verify_lift_motion_start",
+          "t": 4.134
+        }
+      ],
+      "outer_rate_hz": 500,
+      "gripper_rate_hz": 500,
+      "provider_build_identity": {
+        "dirty_build_sha256": null,
+        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
+        "manifest_version": "package:3.8.1",
+        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
+        "package_version": "3.8.1",
+        "provider": "mujoco",
+        "repository_revision": null
+      },
+      "reset_sample_hash": "c83f765e54804b878fc6a53aff222531c5e0fe92a0c083e70f8ffe125ca10586",
+      "total_transitions": 3500,
+      "full_report_archive": "integration_regression/regression/integrated_tb500/report.json"
+    },
+    "100": {
+      "pass": true,
+      "close_authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9300000000000002,
+        "controller_close_ready": true,
+        "end_closing_force_N": 9.038162920428405,
+        "end_opening_m": 0.028586529722621535,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 9.037968693720146,
+        "fallback_opening_span_m": 8.622660729526443e-08,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": false
+      },
+      "verify_lift_pass": true,
+      "max_capture_position_drift_m": 0.005337381948932497,
+      "max_capture_rotation_drift_rad": 0.03734148094888545,
+      "failure_boundary": null,
+      "force_limit_N": 10.0,
+      "fallback_enabled": false,
+      "forced_lift": false,
+      "postclose_hold_s": 0.1,
+      "solution_events": [
+        {
+          "event": "pose_stable",
+          "maximum_speed_m_s": 0.00030411514076641755,
+          "pose": [
+            0.45449569821357727,
+            -0.07499586045742035,
+            0.517275333404541,
+            0.003804443869739771,
+            0.9999374151229858,
+            3.6367120628710836e-05,
+            0.010522953234612942
+          ],
+          "position_span_m": [
+            9.238719940185547e-07,
+            7.450580596923828e-09,
+            2.8371810913085938e-05
+          ],
+          "stable_height_goal_m": 0.5172267024947031,
+          "t": 3.11,
+          "wait_s": 0.5
+        },
+        {
+          "event": "close_start",
+          "stable_pose": [
+            0.45449569821357727,
+            -0.07499586045742035,
+            0.517275333404541,
+            0.003804443869739771,
+            0.9999374151229858,
+            3.6367120628710836e-05,
+            0.010522953234612942
+          ],
+          "t": 3.11
+        },
+        {
+          "event": "controller_close_authorized",
+          "fallback_used": false,
+          "force_N": 9.038162920428405,
+          "stable_window_s": 0.1,
+          "t": 4.04
+        },
+        {
+          "duration_s": 0.1,
+          "event": "authorized_hold_start",
+          "t": 4.04
+        },
+        {
+          "event": "verify_lift_motion_start",
+          "t": 4.14
+        }
+      ],
+      "outer_rate_hz": 100,
+      "gripper_rate_hz": 100,
+      "provider_build_identity": {
+        "dirty_build_sha256": null,
+        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
+        "manifest_version": "package:3.8.1",
+        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
+        "package_version": "3.8.1",
+        "provider": "mujoco",
+        "repository_revision": null
+      },
+      "reset_sample_hash": "767d56397dec41243aec445232d8d726b0891e7eeb49f655b789a86b23b5f4a2",
+      "total_transitions": 700,
+      "full_report_archive": "integration_regression/regression/integrated_tb100/report.json"
+    },
+    "50": {
+      "pass": true,
+      "close_authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9199999999999999,
+        "controller_close_ready": true,
+        "end_closing_force_N": 9.073366324428768,
+        "end_opening_m": 0.02856878539647662,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 9.073185805674008,
+        "fallback_opening_span_m": 8.051741406597812e-08,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 5,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": false
+      },
+      "verify_lift_pass": true,
+      "max_capture_position_drift_m": 0.005355479721977886,
+      "max_capture_rotation_drift_rad": 0.037207937321436554,
+      "failure_boundary": null,
+      "force_limit_N": 10.0,
+      "fallback_enabled": false,
+      "forced_lift": false,
+      "postclose_hold_s": 0.1,
+      "solution_events": [
+        {
+          "event": "pose_stable",
+          "maximum_speed_m_s": 0.00027730576549656646,
+          "pose": [
+            0.45449548959732056,
+            -0.07499611377716064,
+            0.5173176527023315,
+            0.0038050569128245115,
+            0.9999373555183411,
+            3.263863254687749e-05,
+            0.010524343699216843
+          ],
+          "position_span_m": [
+            8.642673492431641e-07,
+            1.4901161193847656e-08,
+            2.7000904083251953e-05
+          ],
+          "stable_height_goal_m": 0.5172267024947031,
+          "t": 3.12,
+          "wait_s": 0.5
+        },
+        {
+          "event": "close_start",
+          "stable_pose": [
+            0.45449548959732056,
+            -0.07499611377716064,
+            0.5173176527023315,
+            0.0038050569128245115,
+            0.9999373555183411,
+            3.263863254687749e-05,
+            0.010524343699216843
+          ],
+          "t": 3.12
+        },
+        {
+          "event": "controller_close_authorized",
+          "fallback_used": false,
+          "force_N": 9.073366324428768,
+          "stable_window_s": 0.1,
+          "t": 4.04
+        },
+        {
+          "duration_s": 0.1,
+          "event": "authorized_hold_start",
+          "t": 4.04
+        },
+        {
+          "event": "verify_lift_motion_start",
+          "t": 4.14
+        }
+      ],
+      "outer_rate_hz": 50,
+      "gripper_rate_hz": 50,
+      "provider_build_identity": {
+        "dirty_build_sha256": null,
+        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
+        "manifest_version": "package:3.8.1",
+        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
+        "package_version": "3.8.1",
+        "provider": "mujoco",
+        "repository_revision": null
+      },
+      "reset_sample_hash": "6f429c902a62e4572de6759a6b232a0190a07afe232d6039864a3b72fdbc5042",
+      "total_transitions": 350,
+      "full_report_archive": "integration_regression/regression/integrated_tb50/report.json"
+    }
+  },
+  "qualification_run": false,
+  "initial_invocation_error": "First PickCube shell invocation imported nonexistent expert; corrected to existing collect. No physics occurred in failed invocation; no production change."
+}

@@ -1,0 +1,166 @@
+{
+  "verified": true,
+  "tags": [
+    {
+      "branch": "codex/p1.8-4h-multi-backend-replay",
+      "head": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "merge_base": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "integration_ahead": 20,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-d-multirate-timebase",
+      "head": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "merge_base": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "integration_ahead": 18,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-nutassembly-multirate",
+      "head": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "merge_base": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "integration_ahead": 15,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-r1-grasp-diagnosis",
+      "head": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+      "merge_base": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "integration_ahead": 15,
+      "branch_ahead": 1,
+      "unique_commits": [
+        "dde727ff0cbeaf7fbe9f07e53ec97346538191ce"
+      ],
+      "archive_tag": "archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [
+        "A\ttask_env/diagnostics/phase1/nutassembly/grasp_diagnosis.py"
+      ],
+      "tracked_source_coverage": true,
+      "original_remote_head": null,
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-r2-nutassembly-solution",
+      "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "merge_base": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "integration_ahead": 11,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-r2-rate-controls",
+      "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "merge_base": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "integration_ahead": 11,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c",
+      "associated_pr": [],
+      "associated_worktrees": [
+        {
+          "path": "/home/lly/.codex/worktrees/p18e-r2-recovery/Geochora",
+          "head": "c36e759e8b3cef16147664a107422aa4650f159b",
+          "status": "M task_env/diagnostics/phase1/nutassembly_recovery/worker.py\n?? task_env/diagnostics/phase1/nutassembly_recovery/control_tracking.py\n?? task_env/diagnostics/phase1/nutassembly_recovery/rate_control_report.py",
+          "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r2-recovery/Geochora\nHEAD c36e759e8b3cef16147664a107422aa4650f159b\nbranch refs/heads/codex/p1.8-e-r2-rate-controls"
+        }
+      ],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": null,
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-r3-nutassembly-nominal",
+      "head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "merge_base": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "integration_ahead": 7,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49",
+      "associated_pr": [],
+      "associated_worktrees": [
+        {
+          "path": "/home/lly/.codex/worktrees/p18e-r3-nominal/Geochora",
+          "head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+          "status": "",
+          "porcelain": "worktree /home/lly/.codex/worktrees/p18e-r3-nominal/Geochora\nHEAD 6160ba0a8b494f0cc3989d464b5ef61d83219b10\nbranch refs/heads/codex/p1.8-e-r3-nutassembly-nominal"
+        }
+      ],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-r4-dynamic-retuning",
+      "head": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "merge_base": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "integration_ahead": 6,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e",
+      "associated_pr": [],
+      "associated_worktrees": [
+        {
+          "path": "/home/lly/.codex/worktrees/p1-8-e-r4-dynamic-retuning/Geochora",
+          "head": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+          "status": "",
+          "porcelain": "worktree /home/lly/.codex/worktrees/p1-8-e-r4-dynamic-retuning/Geochora\nHEAD 0f2290c9b25e590da04be82a74b0aea8b005735a\nbranch refs/heads/codex/p1.8-e-r4-dynamic-retuning"
+        }
+      ],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": null,
+      "remote_archive_verified": true
+    },
+    {
+      "branch": "codex/p1.8-e-r5-controller-architecture",
+      "head": "8e914da87e1c1afb989b86d5e2807cfecc6d6616",
+      "merge_base": "8e914da87e1c1afb989b86d5e2807cfecc6d6616",
+      "integration_ahead": 1,
+      "branch_ahead": 0,
+      "unique_commits": [],
+      "archive_tag": "archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c",
+      "associated_pr": [],
+      "associated_worktrees": [],
+      "changed_files": [],
+      "tracked_source_coverage": true,
+      "original_remote_head": null,
+      "remote_archive_verified": true
+    }
+  ],
+  "remote_readback": "bbe339975cf7542b4936d574c2178ce0cb5d84d9\trefs/tags/archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83\n5e7012c70a83f26d1f6a0e51b3160efc00006c35\trefs/tags/archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83^{}\na52ad014d46ee92bd71067b682f85d1ac0f8eae1\trefs/tags/archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34\n60b51e38ff3460da62296f73bbb93138f9d41b7f\trefs/tags/archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34^{}\nd7a7a1afdf3eca3d82056980eb199aa8e7004859\trefs/tags/archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a\n9331d1ec0d5aeafa067ea354f5d9525acf40e2ba\trefs/tags/archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a^{}\nd6c0d7185a35de7e433a4fec81b42d65dd1a7424\trefs/tags/archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe\ndde727ff0cbeaf7fbe9f07e53ec97346538191ce\trefs/tags/archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe^{}\n91638c29d16927f9066ffb93cf9c9969bc5b20a4\trefs/tags/archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c\nc36e759e8b3cef16147664a107422aa4650f159b\trefs/tags/archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c^{}\n062d23ee2c7c731acffaaf5a3aadc3ee2e93313c\trefs/tags/archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c\nc36e759e8b3cef16147664a107422aa4650f159b\trefs/tags/archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c^{}\nf060f368ed5a91dbb394fce21e4c8f8da24eb456\trefs/tags/archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49\n6160ba0a8b494f0cc3989d464b5ef61d83219b10\trefs/tags/archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49^{}\n52c8d0b0796c6d2056e5d7b5648aaab528cf1942\trefs/tags/archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e\n0f2290c9b25e590da04be82a74b0aea8b005735a\trefs/tags/archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e^{}\nf06f1fe561ac20dd1a9abe5a90bf1261f8cb7392\trefs/tags/archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c\n8e914da87e1c1afb989b86d5e2807cfecc6d6616\trefs/tags/archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c^{}\n"
+}
