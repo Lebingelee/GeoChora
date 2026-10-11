@@ -2,6 +2,7 @@
 
 ## Executed
 
+- PickCube TB500/TB100/TB50 artifact/controller/expert/config/readiness identities: exact match to archived multirate_spec.
 - Provider-free P1.1 contracts: 30 checks PASS, including contract parsing/identity/capability admission. This reuses the governed detector; no new approval inference.
 - MuJoCo PickCube, existing R1 controller, seed31: PASS; 1091 transitions/1092 boundaries, final lift 105.317 mm; strict canonical H5 logical roundtrip exact. Existing session.step path used, not inner servo.
 - MuJoCo 10N G0 equal rates 500/100/50: 3/3 PASS, controller-only authorization and mandatory verify-lift.
@@ -24,3 +25,5 @@ python -m task_env.diagnostics.phase1.p1_1_contracts --output NEW_JSON
 ```
 
 No new NutAssembly D0/D1/D2, T1, full expert or SAPIEN/Genesis qualification executed. Earlier PickCube multibackend capability remains source-preserved; bounded MuJoCo smoke does not requalify all providers/rates.
+
+Historical entry restore checks: 10/10 source hash + CLI preparation PASS. First GeoPhys bundle clone failed from pre-existing missing history; exact source snapshots resolve restore. Making archives read-only exposed a temporary overlay directory permission defect; fixed in the reconstructor only, and both affected R2 entries then passed. Failed restore logs retained in experiment_entry_validation_attempt2.json. No physics was run in these prepare checks.

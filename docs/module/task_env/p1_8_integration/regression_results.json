@@ -7,6 +7,7 @@
       "motion_rejects_stability": true,
       "deadline_no_bypass": true,
       "candidate_deadline_fail_closed_before_plan_exhaustion": true,
+      "candidate_fail_closed_at_exact_deadline": true,
       "unchanged:task_env/controllers/canonical/production.py": true,
       "unchanged:task_env/controllers/canonical/production_r3.py": true,
       "unchanged:task_env/planners/cartesian.py": true,
@@ -338,10 +339,6 @@
       "max_capture_position_drift_m": 0.005339207900179489,
       "max_capture_rotation_drift_rad": 0.03737368208897557,
       "failure_boundary": null,
-      "force_limit_N": 10.0,
-      "fallback_enabled": false,
-      "forced_lift": false,
-      "postclose_hold_s": 0.1,
       "solution_events": [
         {
           "event": "pose_stable",
@@ -394,20 +391,9 @@
           "t": 4.134
         }
       ],
-      "outer_rate_hz": 500,
-      "gripper_rate_hz": 500,
-      "provider_build_identity": {
-        "dirty_build_sha256": null,
-        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
-        "manifest_version": "package:3.8.1",
-        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
-        "package_version": "3.8.1",
-        "provider": "mujoco",
-        "repository_revision": null
-      },
-      "reset_sample_hash": "c83f765e54804b878fc6a53aff222531c5e0fe92a0c083e70f8ffe125ca10586",
-      "total_transitions": 3500,
-      "full_report_archive": "integration_regression/regression/integrated_tb500/report.json"
+      "controller_identity": "83ebe0f76c34f52186faec9dd9170e9b9f6051fcae86f1b51b495802d3eabe90",
+      "solution_identity": "b8f98edc0401a2a8ef5c96e59be3b214637f8346960219a31bf1c92eb8d38a76",
+      "full_report_archive": "integration_regression/final_regression/integrated_tb500/report.json"
     },
     "100": {
       "pass": true,
@@ -429,10 +415,6 @@
       "max_capture_position_drift_m": 0.005337381948932497,
       "max_capture_rotation_drift_rad": 0.03734148094888545,
       "failure_boundary": null,
-      "force_limit_N": 10.0,
-      "fallback_enabled": false,
-      "forced_lift": false,
-      "postclose_hold_s": 0.1,
       "solution_events": [
         {
           "event": "pose_stable",
@@ -485,20 +467,9 @@
           "t": 4.14
         }
       ],
-      "outer_rate_hz": 100,
-      "gripper_rate_hz": 100,
-      "provider_build_identity": {
-        "dirty_build_sha256": null,
-        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
-        "manifest_version": "package:3.8.1",
-        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
-        "package_version": "3.8.1",
-        "provider": "mujoco",
-        "repository_revision": null
-      },
-      "reset_sample_hash": "767d56397dec41243aec445232d8d726b0891e7eeb49f655b789a86b23b5f4a2",
-      "total_transitions": 700,
-      "full_report_archive": "integration_regression/regression/integrated_tb100/report.json"
+      "controller_identity": "839800950f8c83214e02823195973074f9916c197209d7d49021efb35358c525",
+      "solution_identity": "b8f98edc0401a2a8ef5c96e59be3b214637f8346960219a31bf1c92eb8d38a76",
+      "full_report_archive": "integration_regression/final_regression/integrated_tb100/report.json"
     },
     "50": {
       "pass": true,
@@ -520,10 +491,6 @@
       "max_capture_position_drift_m": 0.005355479721977886,
       "max_capture_rotation_drift_rad": 0.037207937321436554,
       "failure_boundary": null,
-      "force_limit_N": 10.0,
-      "fallback_enabled": false,
-      "forced_lift": false,
-      "postclose_hold_s": 0.1,
       "solution_events": [
         {
           "event": "pose_stable",
@@ -576,22 +543,12 @@
           "t": 4.14
         }
       ],
-      "outer_rate_hz": 50,
-      "gripper_rate_hz": 50,
-      "provider_build_identity": {
-        "dirty_build_sha256": null,
-        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
-        "manifest_version": "package:3.8.1",
-        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
-        "package_version": "3.8.1",
-        "provider": "mujoco",
-        "repository_revision": null
-      },
-      "reset_sample_hash": "6f429c902a62e4572de6759a6b232a0190a07afe232d6039864a3b72fdbc5042",
-      "total_transitions": 350,
-      "full_report_archive": "integration_regression/regression/integrated_tb50/report.json"
+      "controller_identity": "93f706eb739ecee1e9b07a93853abcf7e123c70791d2800879039bb86f6d6737",
+      "solution_identity": "b8f98edc0401a2a8ef5c96e59be3b214637f8346960219a31bf1c92eb8d38a76",
+      "full_report_archive": "integration_regression/final_regression/integrated_tb50/report.json"
     }
   },
   "qualification_run": false,
-  "initial_invocation_error": "First PickCube shell invocation imported nonexistent expert; corrected to existing collect. No physics occurred in failed invocation; no production change."
+  "initial_invocation_error": "First PickCube shell invocation imported nonexistent expert; corrected to existing collect. No physics occurred in failed invocation; no production change.",
+  "final_source_recheck": "1.5s deadline at exact boundary also tested; all three final source G0 cells physically exact"
 }

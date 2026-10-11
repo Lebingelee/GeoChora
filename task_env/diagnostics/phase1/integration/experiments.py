@@ -28,6 +28,12 @@ def main():
             overlay=archive/'worktrees/p18e-r2-recovery'
             subprocess.run(['git','apply',str(overlay/'tracked.diff')],cwd=tree,check=True)
             shutil.copytree(overlay/'untracked',tree,dirs_exist_ok=True)
+            # Archives are read-only; reconstructed temporary source is writable.
+            for folder in [tree, *[x for x in tree.rglob('*') if x.is_dir()]]:
+                folder.chmod(0o755)
+        module_source=tree/(entry['module'].replace('.','/')+'.py')
+        if hashlib.sha256(module_source.read_bytes()).hexdigest()!=entry['source_hash']:
+            raise ValueError('reconstructed experiment source hash differs')
         # Materialize exact pinned submodule sources; no dependence on old worktree.
         for rel,bundle in [('GeoPhys','geophys_source.bundle'),('asset/external/mujoco_menagerie','menagerie_source.bundle')]:
             expected=subprocess.check_output(['git','ls-tree','HEAD',rel],cwd=tree,text=True).split()[2]
@@ -47,7 +53,9 @@ def main():
         argv=shlex.split(entry['arguments'].format(output=output,archive=archive))
         cmd=[sys.executable,'-m',entry['module'],*argv]
         if args.prepare_only:
-            subprocess.run([sys.executable,'-m',entry['module'],'--help'],cwd=tree,env={**os.environ,'PYTHONPATH':str(tree)+':'+str(tree/'GeoPhys')},check=True,stdout=subprocess.DEVNULL)
+            help_result=subprocess.run([sys.executable,'-m',entry['module'],'--help'],cwd=tree,env={**os.environ,'PYTHONPATH':str(tree)+':'+str(tree/'GeoPhys')},check=True,capture_output=True,text=True)
+            for flag in [v for v in argv if v.startswith('--')]:
+                if flag not in help_result.stdout:raise ValueError('unsupported archived entry flag: '+flag)
             print(json.dumps({'experiment':entry['experiment_id'],'source_verified':True,'command':shlex.join(cmd),'environment':'same pinned packages required; physics not executed'}));return
         env=os.environ.copy();env['PYTHONPATH']=str(tree)+':'+str(tree/'GeoPhys');env['MUJOCO_GL']='egl'
         rc=subprocess.call(cmd,cwd=tree,env=env)
