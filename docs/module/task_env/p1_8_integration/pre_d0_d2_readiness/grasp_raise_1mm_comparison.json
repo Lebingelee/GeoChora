@@ -1,0 +1,28 @@
+[
+  {
+    "provider": "geophys",
+    "rate_hz": 100,
+    "pass": true,
+    "authorization_branch": "controller_close_ready",
+    "authorization_s": 0.929999999999898,
+    "force_N": 9.131568908691406,
+    "opening_mm": 33.467769622802734,
+    "nut_max_lift_mm": 101.52280330657959,
+    "capture_translation_mm": 0.022004056038935113,
+    "capture_rotation_rad": 0.0003176678308114124,
+    "verify_lift_pass": true
+  },
+  {
+    "provider": "mujoco",
+    "rate_hz": 100,
+    "pass": true,
+    "authorization_branch": "controller_close_ready",
+    "authorization_s": 0.9300000000000006,
+    "force_N": 9.162674544735374,
+    "opening_mm": 28.523955000936546,
+    "nut_max_lift_mm": 97.29850803181367,
+    "capture_translation_mm": 5.459275116234018,
+    "capture_rotation_rad": 0.03783911527819073,
+    "verify_lift_pass": true
+  }
+]
