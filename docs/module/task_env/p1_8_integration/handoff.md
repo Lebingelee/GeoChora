@@ -25,6 +25,6 @@ Cleanup completed: 9 old local P1.8 branches and 5 old public remote branches de
 
 ## Replay infrastructure closure (2026-10-12)
 
-Current branch checkpoint: `codex/p1.8-integration`, source checkpoint `cf5f941` (local, not pushed). Replay infrastructure is GO only for the tested canonical recording/restoration and reset-prefix replay-preparation scope. Formal D0/D1/D2 campaign remains BLOCKED pending T1, full NutAssembly experts, frozen full-task goldens, and Human Review. GeoPhys native contact-state continuation is not bitwise exact and is not qualified. No T1/full task/D0–D2 was started.
+Branch: `codex/p1.8-integration`. Replay implementation source checkpoint: `cf5f941`; the final report and documentation are committed afterward on the same local branch (not pushed). Replay infrastructure is GO only for the tested canonical recording/restoration and reset-prefix replay-preparation scope. Formal D0/D1/D2 campaign remains BLOCKED pending T1, full NutAssembly experts, frozen full-task goldens, and Human Review. GeoPhys native contact-state continuation is not bitwise exact and is not qualified. No T1/full task/D0–D2 was started.
 
 Detailed evidence and the next campaign entry plan: `workspace/qualification/phase1/p1_8_replay_infrastructure_closure/`; concise index: `replay_infrastructure_closure/README.md`. Evidence pruning is complete, but the archive has no verified off-host backup. The user asked work to stop after completion until explicitly resumed; no automatic campaign is scheduled.
