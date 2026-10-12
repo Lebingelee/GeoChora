@@ -1,0 +1,50 @@
+[
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/state_owner_inventory.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/state_owner_inventory.json",
+    "sha256": "ff8e45d0d6764cb18387885d6856e3e357eabf5866172dcaee24031e70680735",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/state_reconstruction_report.md",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/state_reconstruction_report.md",
+    "sha256": "bcd5c3edffa7c740bd4ae500649e3f8769f80309b3b4e5a76764f4b4eb60eb62",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/fresh_regression.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/fresh_regression.json",
+    "sha256": "af299ea94265064108d9cb1eb5cf2d23d1927d3fee45f7aae181eefe60fecd8f",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/recovery_verification.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/recovery_verification.json",
+    "sha256": "a99afaa2c016656c887c54bb30ea0942a77afca0be8fe2c76cac04ef1449fa3a",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/evidence_cleanup_manifest.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/evidence_cleanup_manifest.json",
+    "sha256": "b047bf6bdd999600d02a40d781207ce4cf425882228d0df8c8f3421de511d46c",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/archive_storage_audit.md",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/archive_storage_audit.md",
+    "sha256": "b15e7e8febc8f2eedd4fc449472c47442717a2137034ed6cba7b6cf4bba6b146",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/evidence_cleanup_report.md",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/evidence_cleanup_report.md",
+    "sha256": "0464f1c4912a18883563227b4d33a6997d89acb1b085c09ed5985c9cf257257c",
+    "role": "historical evidence; no claim of new physical execution"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/instrumentation_attempts.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/reused/instrumentation_attempts.json",
+    "sha256": "34b2be20f610c98cb09b941527dab885ff4f186d38851790848a9e8553d94198",
+    "role": "historical evidence; no claim of new physical execution"
+  }
+]

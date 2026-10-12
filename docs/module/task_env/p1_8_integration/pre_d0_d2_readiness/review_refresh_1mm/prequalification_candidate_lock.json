@@ -1,0 +1,324 @@
+{
+  "schema_version": "prequalification-candidate-lock-v1",
+  "qualification_lock": false,
+  "source_commit": "9ce545d4534da68d551921778298a0f74772f9d1",
+  "branch": "codex/p1.8-integration",
+  "source_dirty_status": "",
+  "source_hashes": {
+    "task_env/controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+    "task_env/controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+    "task_env/tasks/nut_assembly/stable_grasp_candidate.py": "bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423",
+    "task_env/controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+    "task_env/controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+    "task_env/runtime/sessions/mujoco.py": "fe6252fbbfdf8a0dce855e5774f084e609562b27a64334a4819e1ed400f8ba63",
+    "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json": "19037bd65e405ee5ffe2b26b13555f3724750c6c9edcb5a603c0a2249fb7a5ff",
+    "task_env/diagnostics/phase1/integration/stable_grasp.py": "6b4df56249bcb3cdd9ea893904154707cc9b9b01b8e756e4b7d9eb7098d908f7",
+    "task_env/diagnostics/phase1/integration/replay_preparation.py": "fa56652bc3e037621a40858a7c63426f7de86e5fe1995cd0f1035776e533e73d",
+    "task_env/diagnostics/phase1/integration/experiments.py": "e1b6396614191b6e467a306b3dd6e27dab1a72d515e96ac642618cfcf691e772",
+    "task_env/diagnostics/phase1/integration/readiness_synthetic.py": "30ad84683a7f9cfcbef4cc5ce79eabcac589d84633af9966aa91bcdc6706d970",
+    "task_env/diagnostics/phase1/integration/regression.py": "e6c691423c9bf0eeab9f46ca567f7fc3be473b7752a24642453d4f476df9ae0d",
+    "task_env/diagnostics/phase1/integration/height_gate_ablation.py": "8ca3cbd38d8f49b35a5c2fb9ada7fdab504d52833e3a196f14646a62ab81cd8c",
+    "task_env/diagnostics/phase1/integration/grasp_height_probe.py": "aea08ddf864d4b1a11f0af37385b73a9c4d1c2f348d6a7d97c204dc90b0d21bd"
+  },
+  "profiles": {
+    "500": {
+      "artifact_hash": "908cd3c41b6c3391e81dda2415d691dea378c7dd10138dcf8e5ebc4293dfd9f4",
+      "reset_sample_hash": "c83f765e54804b878fc6a53aff222531c5e0fe92a0c083e70f8ffe125ca10586",
+      "reset_sample_id": "reset-c83f765e54804b878fc6a53aff222531c5e0fe92a0c083e70f8ffe125ca10586",
+      "controller_identity": "b67725b8fe433b7513746112d1945c3482243a9ce7044f83112b311b2d5d7bad",
+      "solution_identity": "1e19785e4ce19d0e4b1f91c9e16c98479a488fef514fa1277a2abb7056d0feae",
+      "recipe_identity": "de7f7630fb6b2e2f5dfc2aa765d059a723e9a74012361ca197725d8b16859941",
+      "source_xml_hash": "8e64c38086ea76628c59ac0cd2918fe0f46b0dcddea32845c06cb317392173ea",
+      "timebase": {
+        "physics_dt": 0.002,
+        "control_substeps": 1,
+        "control_dt": 0.002,
+        "action_hold": "zero_order_hold",
+        "observation_sampling": "post_control_step",
+        "semantic_sampling": "post_control_step"
+      },
+      "solution_config": {
+        "grasp_offset": [
+          0.0,
+          0.0,
+          0.045895
+        ],
+        "grasp_quaternion_wxyz": [
+          0.0038,
+          0.99993765,
+          0.0,
+          0.0105
+        ],
+        "grasp_opening_m": 0.0,
+        "opening_range_m": 0.08,
+        "approach_height_m": 0.12,
+        "translation_speed_m_s": 0.06,
+        "translation_acceleration_m_s2": 0.45,
+        "rotation_speed_rad_s": 3.0,
+        "rotation_acceleration_rad_s2": 27.0,
+        "settle_duration_s": 0.26666666666666666,
+        "close_transition_s": 0.3333333333333333,
+        "close_settle_s": 0.5,
+        "release_transition_s": 0.3333333333333333,
+        "release_settle_s": 0.6666666666666666,
+        "pose_position_ready_m": 0.007,
+        "pose_rotation_ready_rad": 0.06,
+        "readiness_stable_s": 0.1,
+        "gripper_stable_speed_m_s": 0.003,
+        "opening_stable_range_m": 0.0005,
+        "grasp_min_closing_force_N": 25.0,
+        "max_pose_hold_s": 3.0,
+        "max_close_hold_s": 8.0,
+        "max_release_hold_s": 3.0,
+        "capture_translation_slip_m": 0.008,
+        "capture_rotation_slip_rad": 0.15,
+        "verify_lift_m": 0.1,
+        "max_stage_plan_s": 6.0,
+        "action_budget_s": 60.0
+      },
+      "controller_profile": {
+        "schema_version": "canonical-panda-production-r3-persistent-reference-v1",
+        "controller": {
+          "max_cartesian_translation_rate_m_s": 0.75,
+          "max_cartesian_rotation_rate_rad_s": 4.5,
+          "max_joint_increment_rate_rad_s": 16.0,
+          "ik_damping": 0.02,
+          "ik_position_gain": 0.9,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "position_deadband_m": 0.002,
+          "rotation_deadband_rad": 0.01,
+          "joint_position_correction_rate_s": 2500.0,
+          "joint_position_correction_max_gain": 5.0
+        },
+        "gripper": {
+          "opening_rate_m_s": 0.24,
+          "force_adjust_rate_m_s": 0.12,
+          "force_adjust_error_exponent": 1.0
+        }
+      },
+      "resolved_rate_parameters": {
+        "feedforward_gain": 1.0,
+        "position_feedback_s": 4.0,
+        "rotation_feedback_s": 4.0,
+        "joint_velocity_limit_rad_s": 2.0,
+        "reference_lead_limit_rad": 0.15,
+        "inner_physics_dt_s": 0.002,
+        "dls_damping": 0.02,
+        "rotation_row_weight": 0.22
+      }
+    },
+    "100": {
+      "artifact_hash": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "reset_sample_hash": "767d56397dec41243aec445232d8d726b0891e7eeb49f655b789a86b23b5f4a2",
+      "reset_sample_id": "reset-767d56397dec41243aec445232d8d726b0891e7eeb49f655b789a86b23b5f4a2",
+      "controller_identity": "789809c2be6ec5f424226ccd100322992d56647f314d3318c353fa976e456df8",
+      "solution_identity": "1e19785e4ce19d0e4b1f91c9e16c98479a488fef514fa1277a2abb7056d0feae",
+      "recipe_identity": "b8464642fb348d3d600ad599dbf5f97f33f6327def8c4a093ba750b1fae5951d",
+      "source_xml_hash": "8e64c38086ea76628c59ac0cd2918fe0f46b0dcddea32845c06cb317392173ea",
+      "timebase": {
+        "physics_dt": 0.002,
+        "control_substeps": 5,
+        "control_dt": 0.01,
+        "action_hold": "zero_order_hold",
+        "observation_sampling": "post_control_step",
+        "semantic_sampling": "post_control_step"
+      },
+      "solution_config": {
+        "grasp_offset": [
+          0.0,
+          0.0,
+          0.045895
+        ],
+        "grasp_quaternion_wxyz": [
+          0.0038,
+          0.99993765,
+          0.0,
+          0.0105
+        ],
+        "grasp_opening_m": 0.0,
+        "opening_range_m": 0.08,
+        "approach_height_m": 0.12,
+        "translation_speed_m_s": 0.06,
+        "translation_acceleration_m_s2": 0.45,
+        "rotation_speed_rad_s": 3.0,
+        "rotation_acceleration_rad_s2": 27.0,
+        "settle_duration_s": 0.26666666666666666,
+        "close_transition_s": 0.3333333333333333,
+        "close_settle_s": 0.5,
+        "release_transition_s": 0.3333333333333333,
+        "release_settle_s": 0.6666666666666666,
+        "pose_position_ready_m": 0.007,
+        "pose_rotation_ready_rad": 0.06,
+        "readiness_stable_s": 0.1,
+        "gripper_stable_speed_m_s": 0.003,
+        "opening_stable_range_m": 0.0005,
+        "grasp_min_closing_force_N": 25.0,
+        "max_pose_hold_s": 3.0,
+        "max_close_hold_s": 8.0,
+        "max_release_hold_s": 3.0,
+        "capture_translation_slip_m": 0.008,
+        "capture_rotation_slip_rad": 0.15,
+        "verify_lift_m": 0.1,
+        "max_stage_plan_s": 6.0,
+        "action_budget_s": 60.0
+      },
+      "controller_profile": {
+        "schema_version": "canonical-panda-production-r3-persistent-reference-v1",
+        "controller": {
+          "max_cartesian_translation_rate_m_s": 0.75,
+          "max_cartesian_rotation_rate_rad_s": 4.5,
+          "max_joint_increment_rate_rad_s": 16.0,
+          "ik_damping": 0.02,
+          "ik_position_gain": 0.9,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "position_deadband_m": 0.002,
+          "rotation_deadband_rad": 0.01,
+          "joint_position_correction_rate_s": 2500.0,
+          "joint_position_correction_max_gain": 5.0
+        },
+        "gripper": {
+          "opening_rate_m_s": 0.24,
+          "force_adjust_rate_m_s": 0.12,
+          "force_adjust_error_exponent": 1.0
+        }
+      },
+      "resolved_rate_parameters": {
+        "feedforward_gain": 1.0,
+        "position_feedback_s": 4.0,
+        "rotation_feedback_s": 4.0,
+        "joint_velocity_limit_rad_s": 2.0,
+        "reference_lead_limit_rad": 0.15,
+        "inner_physics_dt_s": 0.002,
+        "dls_damping": 0.02,
+        "rotation_row_weight": 0.22
+      }
+    },
+    "50": {
+      "artifact_hash": "699fc9147a07cb76f40c48decfddc350ed0ad3688beebe8b0da5268374e881e9",
+      "reset_sample_hash": "6f429c902a62e4572de6759a6b232a0190a07afe232d6039864a3b72fdbc5042",
+      "reset_sample_id": "reset-6f429c902a62e4572de6759a6b232a0190a07afe232d6039864a3b72fdbc5042",
+      "controller_identity": "db490c089f53b9e492ce88a02a9a41cfd5a3b9a6d7ed5009420f63755af115b8",
+      "solution_identity": "1e19785e4ce19d0e4b1f91c9e16c98479a488fef514fa1277a2abb7056d0feae",
+      "recipe_identity": "9d4dfb806ad24b616aa4cf31dbd2b60745a53b4d64f24beb2f8eeeb2bf1b8257",
+      "source_xml_hash": "8e64c38086ea76628c59ac0cd2918fe0f46b0dcddea32845c06cb317392173ea",
+      "timebase": {
+        "physics_dt": 0.002,
+        "control_substeps": 10,
+        "control_dt": 0.02,
+        "action_hold": "zero_order_hold",
+        "observation_sampling": "post_control_step",
+        "semantic_sampling": "post_control_step"
+      },
+      "solution_config": {
+        "grasp_offset": [
+          0.0,
+          0.0,
+          0.045895
+        ],
+        "grasp_quaternion_wxyz": [
+          0.0038,
+          0.99993765,
+          0.0,
+          0.0105
+        ],
+        "grasp_opening_m": 0.0,
+        "opening_range_m": 0.08,
+        "approach_height_m": 0.12,
+        "translation_speed_m_s": 0.06,
+        "translation_acceleration_m_s2": 0.45,
+        "rotation_speed_rad_s": 3.0,
+        "rotation_acceleration_rad_s2": 27.0,
+        "settle_duration_s": 0.26666666666666666,
+        "close_transition_s": 0.3333333333333333,
+        "close_settle_s": 0.5,
+        "release_transition_s": 0.3333333333333333,
+        "release_settle_s": 0.6666666666666666,
+        "pose_position_ready_m": 0.007,
+        "pose_rotation_ready_rad": 0.06,
+        "readiness_stable_s": 0.1,
+        "gripper_stable_speed_m_s": 0.003,
+        "opening_stable_range_m": 0.0005,
+        "grasp_min_closing_force_N": 25.0,
+        "max_pose_hold_s": 3.0,
+        "max_close_hold_s": 8.0,
+        "max_release_hold_s": 3.0,
+        "capture_translation_slip_m": 0.008,
+        "capture_rotation_slip_rad": 0.15,
+        "verify_lift_m": 0.1,
+        "max_stage_plan_s": 6.0,
+        "action_budget_s": 60.0
+      },
+      "controller_profile": {
+        "schema_version": "canonical-panda-production-r3-persistent-reference-v1",
+        "controller": {
+          "max_cartesian_translation_rate_m_s": 0.75,
+          "max_cartesian_rotation_rate_rad_s": 4.5,
+          "max_joint_increment_rate_rad_s": 16.0,
+          "ik_damping": 0.02,
+          "ik_position_gain": 0.9,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "position_deadband_m": 0.002,
+          "rotation_deadband_rad": 0.01,
+          "joint_position_correction_rate_s": 2500.0,
+          "joint_position_correction_max_gain": 5.0
+        },
+        "gripper": {
+          "opening_rate_m_s": 0.24,
+          "force_adjust_rate_m_s": 0.12,
+          "force_adjust_error_exponent": 1.0
+        }
+      },
+      "resolved_rate_parameters": {
+        "feedforward_gain": 1.0,
+        "position_feedback_s": 4.0,
+        "rotation_feedback_s": 4.0,
+        "joint_velocity_limit_rad_s": 2.0,
+        "reference_lead_limit_rad": 0.15,
+        "inner_physics_dt_s": 0.002,
+        "dls_damping": 0.02,
+        "rotation_row_weight": 0.22
+      }
+    }
+  },
+  "source_recipe_factory": "task_env.diagnostics.phase1.integration.grasp_height_probe.context",
+  "task_local_changes": {
+    "grasp_offset_z_m": 0.045895,
+    "absolute_height_gate_enabled": false,
+    "production_default_migrated": false
+  },
+  "submodules": " c665ce5028a12bb4d2afe49f05e015fa9b684a39 GeoPhys (heads/codex/static-contact-mobility-fix)\n b846dd12bc459d776cccb3dee0b1d02acbf7a9c7 asset/external/mujoco_menagerie (shadow_hand_v1-465-gb846dd1)\n",
+  "packages": {
+    "mujoco": "3.8.1",
+    "numpy": "2.2.6",
+    "scipy": "1.18.1",
+    "h5py": "3.16.0",
+    "PyYAML": "6.0.3"
+  },
+  "snapshot_schema": "p18-owner-checkpoint-prototype-v1",
+  "interval_schema": "p18-control-interval-prototype-v1",
+  "clock_policy": "existing v0 unchanged; gamma_n bound diagnostic only",
+  "scope": "NA-S0,0.1kg,10N,equal-rate G0 only",
+  "approved_replay_oracle": false,
+  "execution_overrides": {
+    "force_target_N": 10.0,
+    "physical_actuator_cap_N": 10.0,
+    "deadband_N": 1.0,
+    "force_fallback_enabled": false,
+    "minimum_pose_wait_s": 0.5,
+    "pose_window_s": 0.2,
+    "axis_span_m": 0.0001,
+    "adjacent_speed_m_s": 0.002,
+    "readiness_stable_s": 0.1,
+    "post_authorization_hold_s": 0.1,
+    "authorization_deadline_s": 1.5,
+    "capture_position_limit_m": 0.008,
+    "capture_rotation_limit_rad": 0.15,
+    "grasp_offset_z_m": 0.045895,
+    "absolute_height_gate_enabled": false,
+    "verify_lift_above_authorization_m": 0.1,
+    "midtask_qref_reset": false
+  }
+}

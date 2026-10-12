@@ -1,0 +1,73 @@
+{
+  "infrastructure_status": "NO-GO",
+  "campaign_status": "BLOCKED",
+  "overall_recommendation": "NO-GO",
+  "human_review_package_status": "READY_FOR_REVIEW",
+  "g0_prerequisite_status": "PASS",
+  "g0_pass_count": 6,
+  "source_commit": "9ce545d4534da68d551921778298a0f74772f9d1",
+  "passed_gates": [
+    "30 fresh contract checks",
+    "artifact/reset identities unchanged",
+    "new +1mm six-cell G0",
+    "fresh same-recipe synthetic 12204 positive checks and 9 negatives",
+    "real applied interval reconstruction and native counts",
+    "3576 original archive hashes reverified",
+    "10 selected historical entries preserved",
+    "fresh exact raw evidence restoration and full archived-video decode"
+  ],
+  "failed_gates": [
+    "live R5 recorder is not wired to snapshot/interval prototype",
+    "GeoPhys raw clock rejected by unchanged CanonicalTrajectory v0 one-ULP rule"
+  ],
+  "untested_gates": [
+    "live checkpoint restore-next-target with real coordinator lifecycle",
+    "T1",
+    "full NutAssembly experts",
+    "six full-task goldens",
+    "formal D0/D1/D2",
+    "SAPIEN/Genesis candidate"
+  ],
+  "required_human_decisions": [
+    "review shared 45.895mm grasp recipe and absolute-height-gate removal; default remains unmigrated",
+    "approve versioned integer-step/projected/native-clock representation",
+    "approve owner/interval sidecar recorder integration scope",
+    "disposition auxiliary-pad penetration risk (~1.7-2.0mm historical; not eliminated by G0)",
+    "approve separate T1/full-expert scope after infrastructure closure",
+    "select independent off-host backup destination"
+  ],
+  "next_actions": [
+    "implement opt-in live recorder with recipe, complete owner checkpoints and per-substep targets",
+    "prove real reset-prefix versus checkpoint-next-target equivalence, including close/hold/unlock and capture baseline",
+    "review clock representation without loosening v0 tolerances",
+    "after Human Review and infrastructure closure, separately execute T1 -> full experts -> six goldens -> formal D0(6)/D1(12)/D2(12)"
+  ],
+  "clock_failures": [
+    {
+      "provider": "geophys",
+      "rate": 100,
+      "first_failure": {
+        "boundary": 3,
+        "previous_time": 0.020000000000000004,
+        "native_time": 0.030000000000000013,
+        "delta_error": 8.673617379884035e-18,
+        "v0_bound": 3.469446951953614e-18
+      }
+    },
+    {
+      "provider": "geophys",
+      "rate": 50,
+      "first_failure": {
+        "boundary": 2,
+        "previous_time": 0.020000000000000004,
+        "native_time": 0.04000000000000002,
+        "delta_error": 1.734723475976807e-17,
+        "v0_bound": 6.938893903907228e-18
+      }
+    }
+  ],
+  "formal_qualification_executed": false,
+  "main_modified": false,
+  "pushed": false,
+  "previous_height_failure_resolved_in_this_diagnostic": true
+}

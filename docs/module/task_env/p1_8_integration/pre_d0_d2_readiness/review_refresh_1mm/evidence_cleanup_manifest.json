@@ -1,0 +1,12 @@
+{
+  "version": "p18-cleanup-dryrun-v1",
+  "operations": [],
+  "executed_operations": [],
+  "removed_files": 0,
+  "compressed_files": 0,
+  "released_bytes": 0,
+  "allocated_bytes_before": 27019628544,
+  "allocated_bytes_after": 27019628544,
+  "backup_status": "LOCAL_ONLY / NOT_REDUNDANT",
+  "reason": "No independently safe deletion candidate; original source/trace/video evidence retained"
+}

@@ -1,0 +1,450 @@
+{
+  "source_commit": "9ce545d4534da68d551921778298a0f74772f9d1",
+  "files": [
+    {
+      "path": "readiness_decision.json",
+      "size": 2842,
+      "sha256": "4682aab4b932cd790ddd88f6589981bac578f89df094d6a44777b73eb04da88a"
+    },
+    {
+      "path": "mujoco_500.log",
+      "size": 573,
+      "sha256": "3c8810f5b5f4866e85cce66d948cb34263eaeeb3f9d25941553634e83067f7ef"
+    },
+    {
+      "path": "media_manifest.json",
+      "size": 6040,
+      "sha256": "28c3beb45215e05b91b9c05216f83365faa9ed599a0194866ef3f4f92c81821f"
+    },
+    {
+      "path": "run_results.json",
+      "size": 2066,
+      "sha256": "7edf84b0d0989272fcb0e291fa0c4472e39a4b6cdcaa164b6da57f623e9265eb"
+    },
+    {
+      "path": "storage_inventory.json",
+      "size": 13311251,
+      "sha256": "b911a1de93ed9e2d6898c6b76831c6f132be5989bcbdf32650f2be89e0d20583"
+    },
+    {
+      "path": "state_owner_inventory.json",
+      "size": 4290,
+      "sha256": "ff8e45d0d6764cb18387885d6856e3e357eabf5866172dcaee24031e70680735"
+    },
+    {
+      "path": "preflight_report.md",
+      "size": 2937,
+      "sha256": "15be60a34745db8f865127e1fc7b3087e858bbe7659403befa1ccd5c2e3ed279"
+    },
+    {
+      "path": "interval_replay_report.md",
+      "size": 1377,
+      "sha256": "69410a41d7748c45ec67ad32a12b749bdab3b95c67c1d8d4e42790874306cf8c"
+    },
+    {
+      "path": "prequalification_candidate_lock.json",
+      "size": 13605,
+      "sha256": "79e34aa6923dc0b60855c825ebc5b04f83ce7104d5a380d53f28d7d7dc03ff2f"
+    },
+    {
+      "path": "g0_reuse_manifest.json",
+      "size": 7612,
+      "sha256": "e8253e50f824ff881d080fe2160c29f937e573787a1307d06c0bc0611005606e"
+    },
+    {
+      "path": "storage_summary.json",
+      "size": 1220,
+      "sha256": "c335cdecbbc06b30f9c0db565588ee7e63f07b060d106af95bd0f028a4933afe"
+    },
+    {
+      "path": "g0_prerequisite_report.md",
+      "size": 1237,
+      "sha256": "4282cc5f9b88c561bb3108bfb149ed8e4709af03e8a867dc3dec9bae94068d4f"
+    },
+    {
+      "path": "geophys_500.log",
+      "size": 1265,
+      "sha256": "badc0e926fd1fc58573289c518548ba29357e61089cc3516317b062f83a6b273"
+    },
+    {
+      "path": "mujoco_50.log",
+      "size": 572,
+      "sha256": "0d1dbbf1e8add238946340f2ff62ecc38431c91ce1dcce58b188269242299c28"
+    },
+    {
+      "path": "real_interval_validation.json",
+      "size": 2072,
+      "sha256": "599a5ce896b92c1bea38f7ac1f53de1be9f860b4b656862642483ab111c2e302"
+    },
+    {
+      "path": "archive_storage_audit.md",
+      "size": 379,
+      "sha256": "df361776d5cad439f950cf6d7151f697137d6170a3d7596afd4435e57b77222f"
+    },
+    {
+      "path": "runtime_provenance.json",
+      "size": 3226,
+      "sha256": "3c06c0d25d448a3496a3723c152e7f2431cbf5dbc7b1a903156d51cdf927b5fd"
+    },
+    {
+      "path": "contracts.json",
+      "size": 6095,
+      "sha256": "83a5fd45db020fd8a0c4c51d04dab001c754eaa5e6dbeb3db2f6e5a34fd3d24f"
+    },
+    {
+      "path": "handoff.md",
+      "size": 1212,
+      "sha256": "d9c4d377e7aba3b6498ab488391b37515f1c1890ec44a12ed7e7e77bdd50d30b"
+    },
+    {
+      "path": "g0_predicate_audit.json",
+      "size": 8939,
+      "sha256": "5422e2c4671229542258649cc3b215f58f8f77ecea0da280bf8b1f8fdfca009d"
+    },
+    {
+      "path": "run_matrix.py",
+      "size": 1544,
+      "sha256": "d941c48eb87cb1ecd84b2dc383fedec8f1371375d0bcd91bdbe9a7ce097bbb4b"
+    },
+    {
+      "path": "fresh_restore_checks.json",
+      "size": 1972,
+      "sha256": "a84e2c90b8a6ffa81fb41d7da833accca8bf18bac5ac5e742a29c5df970598af"
+    },
+    {
+      "path": "finalize.log",
+      "size": 2099,
+      "sha256": "06d3dda3949ffa4e457497caaca6c4f25313faa9dd66152992eb27c38fc9f48d"
+    },
+    {
+      "path": "recovery_verification.json",
+      "size": 12269,
+      "sha256": "ca64f10c7e8508eb2daba0669e7af107d258a91369b1db9e8b99535cc83537d0"
+    },
+    {
+      "path": "synthetic_replay_validation.json",
+      "size": 2055,
+      "sha256": "277e7f2713ac6277cbc135f4ecd53865242d6d57616952b3a3d30d2f1186cb05"
+    },
+    {
+      "path": "finalize_audit.py",
+      "size": 15490,
+      "sha256": "607d34a009096827d8f901b780e1411667a38d2bd0104d2e8f50392f739954cd"
+    },
+    {
+      "path": "evidence_cleanup_report.md",
+      "size": 500,
+      "sha256": "4181046e34b281b0b04dfae59c53d85dcc19cd18a09ad4dd7793bb977f6b2af3"
+    },
+    {
+      "path": "state_reconstruction_report.md",
+      "size": 3468,
+      "sha256": "3baa7ac87798073835befd62ffa4dca13bbbee129811d3e937922e2c60b7b2a3"
+    },
+    {
+      "path": "render.py",
+      "size": 1435,
+      "sha256": "f2d40566066a503ba9925d4ab4e18dd5093fe02ae6d37ff3e35961006723584d"
+    },
+    {
+      "path": "prepare_audit.py",
+      "size": 4277,
+      "sha256": "3ebfa82ea6993f2548c9018417b62ef1b1e18a9a83ceceb4a89842138e964244"
+    },
+    {
+      "path": "reuse_manifest.json",
+      "size": 4210,
+      "sha256": "6b83fe65454228ebfd9bcd19b4a07039bc1535d35767152edb6df0310bffb0b3"
+    },
+    {
+      "path": "evidence_cleanup_manifest.json",
+      "size": 393,
+      "sha256": "f664568e8118cf1332789dcc3b1542d7e855ccdede979d9eb707d6e8327923a0"
+    },
+    {
+      "path": "geophys_50.log",
+      "size": 1263,
+      "sha256": "0b7b1e53d78d2869083e86410e06e8ecd48a23fba34e2150f8a878fcfe2ecb47"
+    },
+    {
+      "path": "integration_integrity.json",
+      "size": 10264,
+      "sha256": "540da5dd431c2901c9a55d52e21e8fea3908e139a7f0a531e823432fb1e8b6d4"
+    },
+    {
+      "path": "reused/state_owner_inventory.json",
+      "size": 4290,
+      "sha256": "ff8e45d0d6764cb18387885d6856e3e357eabf5866172dcaee24031e70680735"
+    },
+    {
+      "path": "reused/archive_storage_audit.md",
+      "size": 1803,
+      "sha256": "b15e7e8febc8f2eedd4fc449472c47442717a2137034ed6cba7b6cf4bba6b146"
+    },
+    {
+      "path": "reused/recovery_verification.json",
+      "size": 10054,
+      "sha256": "a99afaa2c016656c887c54bb30ea0942a77afca0be8fe2c76cac04ef1449fa3a"
+    },
+    {
+      "path": "reused/instrumentation_attempts.json",
+      "size": 1550,
+      "sha256": "34b2be20f610c98cb09b941527dab885ff4f186d38851790848a9e8553d94198"
+    },
+    {
+      "path": "reused/evidence_cleanup_report.md",
+      "size": 957,
+      "sha256": "0464f1c4912a18883563227b4d33a6997d89acb1b085c09ed5985c9cf257257c"
+    },
+    {
+      "path": "reused/state_reconstruction_report.md",
+      "size": 3206,
+      "sha256": "bcd5c3edffa7c740bd4ae500649e3f8769f80309b3b4e5a76764f4b4eb60eb62"
+    },
+    {
+      "path": "reused/fresh_regression.json",
+      "size": 1525,
+      "sha256": "af299ea94265064108d9cb1eb5cf2d23d1927d3fee45f7aae181eefe60fecd8f"
+    },
+    {
+      "path": "reused/evidence_cleanup_manifest.json",
+      "size": 654,
+      "sha256": "b047bf6bdd999600d02a40d781207ce4cf425882228d0df8c8f3421de511d46c"
+    },
+    {
+      "path": "synthetic/validation.json",
+      "size": 1899,
+      "sha256": "748bd04de72867dc862260db6eb685211cb823dd835d30e225f7b2d137353650"
+    },
+    {
+      "path": "synthetic/synthetic_v0.h5",
+      "size": 56080,
+      "sha256": "1a040f09700e73e5458f5ae4d168c7ca16c35e73631ea23d4950e7c3aa67989f"
+    },
+    {
+      "path": "synthetic/intervals_tb50.json",
+      "size": 1235270,
+      "sha256": "566862c4682e354128627e2e73d1a239f8c674075faa8f7f8d5321327ea417e5"
+    },
+    {
+      "path": "synthetic/intervals_tb500.json",
+      "size": 140149,
+      "sha256": "80b5bce73335aae9a597c045918034bfecfc52e456ea3c6bd80214ccbff14469"
+    },
+    {
+      "path": "synthetic/intervals_tb100.json",
+      "size": 627574,
+      "sha256": "476d4e883f8261e99788223d05cc6468f180194a84e5cdb5fa93b3cd61d56358"
+    },
+    {
+      "path": "g0/mujoco/tb100/stage_endpoints.json",
+      "size": 2076,
+      "sha256": "eed13d3c51156e25ff4379294e131df6b9ad7716066cd017a6177c46774011b4"
+    },
+    {
+      "path": "g0/mujoco/tb100/native_audit.json",
+      "size": 622709,
+      "sha256": "a4ddc6f7e6e90951afb7794b25c81f3492449e9d574ca59c0cffb8219d56e505"
+    },
+    {
+      "path": "g0/mujoco/tb100/report.json",
+      "size": 70319538,
+      "sha256": "02d395c5608cb0ce93eef8ce1dbeb23b0035a0dce3761c1ad3b24e8763b63e1f"
+    },
+    {
+      "path": "g0/mujoco/tb100/trace.json",
+      "size": 349414502,
+      "sha256": "84fe7ca2e5550f1fe59c3aa1ee82d684fcb5bd7c094857f681e6a2cffcdab2f2"
+    },
+    {
+      "path": "g0/mujoco/tb500/stage_endpoints.json",
+      "size": 2128,
+      "sha256": "0783a3b15d301c579f9e3ef2cf063fda4c9463f97be7ba5ab9b9b4f6e0fbf700"
+    },
+    {
+      "path": "g0/mujoco/tb500/native_audit.json",
+      "size": 2191098,
+      "sha256": "a0e08a6e17a363ba0d1e1c6522c04625fe622ef4573511d7b3f4d722796e3915"
+    },
+    {
+      "path": "g0/mujoco/tb500/report.json",
+      "size": 68438855,
+      "sha256": "f1acd129d0cd69872f2d2a8691d9250288813cfe026c143446c5b7c7ebc7a2a0"
+    },
+    {
+      "path": "g0/mujoco/tb500/trace.json",
+      "size": 378982787,
+      "sha256": "fe671fbc37ac1cfff6fcf0c51a16aa68373c663298c98944f44c59ec18ad529b"
+    },
+    {
+      "path": "g0/mujoco/tb50/stage_endpoints.json",
+      "size": 2068,
+      "sha256": "408ea0dfce5b1427890486c4370295c8cb54ed2a8b08a3ddb0a18b01ee7cb87b"
+    },
+    {
+      "path": "g0/mujoco/tb50/native_audit.json",
+      "size": 440889,
+      "sha256": "dde0f1d8858b8056a4e8fe3a027296d9bb0cc35200f43edf0d94d7c4192f635e"
+    },
+    {
+      "path": "g0/mujoco/tb50/report.json",
+      "size": 70832481,
+      "sha256": "7ca9c828cfc9e932947aa493b6305a1e21a6bee3bebf3665c1685fc06cbb5087"
+    },
+    {
+      "path": "g0/mujoco/tb50/trace.json",
+      "size": 343760414,
+      "sha256": "7db27467d6ed25d50a6cac988429fcf32735e6467189971932c3e985857e583e"
+    },
+    {
+      "path": "g0/mujoco/tb100/media/media_manifest.json",
+      "size": 870,
+      "sha256": "a4f4ffe241b08daae34062f4a6f61b7da460add56789852da45845e1b88e58a7"
+    },
+    {
+      "path": "g0/mujoco/tb100/media/hand_camera_manifest.json",
+      "size": 724,
+      "sha256": "7615cc15a48a5ca61340b8c19e813e276b6e398ce9868f2edd6a5075583befdd"
+    },
+    {
+      "path": "g0/mujoco/tb100/media/hand_camera.mp4",
+      "size": 208228,
+      "sha256": "7113d9c791833cc029611d87872256a50883e7923414c9498de658c3d2f97e5f"
+    },
+    {
+      "path": "g0/mujoco/tb500/media/media_manifest.json",
+      "size": 909,
+      "sha256": "e3c59e30230cb992bde3a1e1b4cd79817c2d6683c49eeb224d1d971bfa011ba7"
+    },
+    {
+      "path": "g0/mujoco/tb500/media/hand_camera_manifest.json",
+      "size": 763,
+      "sha256": "5e79a41fed4076c254cc13778cd3255cf0f5a417983eac564e8bd5d967136700"
+    },
+    {
+      "path": "g0/mujoco/tb500/media/hand_camera.mp4",
+      "size": 207689,
+      "sha256": "c57838aa3acd939a1c20f99bf958711aa9b3fe230f51ab1ac5af5d15e5efbc3b"
+    },
+    {
+      "path": "g0/mujoco/tb50/media/media_manifest.json",
+      "size": 856,
+      "sha256": "fd1a1d772a2412a3ad0e287f362dc6d43ca092786b5bce6a765920c04005574a"
+    },
+    {
+      "path": "g0/mujoco/tb50/media/hand_camera_manifest.json",
+      "size": 710,
+      "sha256": "2277392fe0c0d7f523d186ae20148a1a05f816347d154e9175ce2799b71516c0"
+    },
+    {
+      "path": "g0/mujoco/tb50/media/hand_camera.mp4",
+      "size": 208947,
+      "sha256": "52cff734e61bad6322437ee2028774507b5dd1c14a44c3877593a126e1878c05"
+    },
+    {
+      "path": "g0/geophys/tb100/stage_endpoints.json",
+      "size": 2121,
+      "sha256": "ef4f3cf31b04cac639d16b1f0d18dba4cdfb7127db6c8f9ff3573b1452d638a3"
+    },
+    {
+      "path": "g0/geophys/tb100/native_audit.json",
+      "size": 645692,
+      "sha256": "ad664aac0b72e2f39b98fa49fc9b268133098753985edd6764a93a6cdc1fe424"
+    },
+    {
+      "path": "g0/geophys/tb100/report.json",
+      "size": 3895353,
+      "sha256": "042b83568e7a8d46f532ff13d49ddf2e09510da49054e3f231f4b79aca1ca619"
+    },
+    {
+      "path": "g0/geophys/tb100/trace.json",
+      "size": 32545147,
+      "sha256": "c844ab310633e85b28dd9a6dfb18deefbd3239d14a36ee4ad63374d291f2a16e"
+    },
+    {
+      "path": "g0/geophys/tb500/stage_endpoints.json",
+      "size": 2130,
+      "sha256": "6ccca2af3150d5e53adc138ff6cf2a7554f3e63a224dd98cb883aee66a192fed"
+    },
+    {
+      "path": "g0/geophys/tb500/native_audit.json",
+      "size": 2199865,
+      "sha256": "2beae688d1c758f9df5025555ac5a5a8de9e1749b39f8a0cd11770fbbee0aa38"
+    },
+    {
+      "path": "g0/geophys/tb500/report.json",
+      "size": 4059950,
+      "sha256": "aadc878489b48413f112d9a2f442d790a74f85d30de28bbb3e5272388c662b48"
+    },
+    {
+      "path": "g0/geophys/tb500/trace.json",
+      "size": 63384924,
+      "sha256": "8611adefb61a9ab9fe6c8af5b9d3269453351ccb5a3b7c1515f1b5287b5d65e5"
+    },
+    {
+      "path": "g0/geophys/tb50/stage_endpoints.json",
+      "size": 2111,
+      "sha256": "f41beefe4e0016b612afde9018cfc2948d78b34d60221c8c0c69e1e7c3f4d3fa"
+    },
+    {
+      "path": "g0/geophys/tb50/native_audit.json",
+      "size": 452731,
+      "sha256": "1aed2b4fc15303e3ca8dccfd85d663a10650e257821cd8cf065e233381e5fbbb"
+    },
+    {
+      "path": "g0/geophys/tb50/report.json",
+      "size": 3833278,
+      "sha256": "72b9b57a4be53854375bd646471a5f3fc913eabe0bd782d1fbf2bcdcbcee2502"
+    },
+    {
+      "path": "g0/geophys/tb50/trace.json",
+      "size": 28664677,
+      "sha256": "56e46577b9eb273b67f03aa33a8d1af26161399a3c6c6afc30463f630540b838"
+    },
+    {
+      "path": "g0/geophys/tb100/media/media_manifest.json",
+      "size": 909,
+      "sha256": "84c5a6106e074f40d798fb7f2fc5ae50f5a247adb9fb71d2c57db2f1fa6bcab4"
+    },
+    {
+      "path": "g0/geophys/tb100/media/hand_camera_manifest.json",
+      "size": 762,
+      "sha256": "66d672f77fc1a4c715998de8f5b1806373012626d318c3c5287ce7fc339e3574"
+    },
+    {
+      "path": "g0/geophys/tb100/media/hand_camera.mp4",
+      "size": 190647,
+      "sha256": "caa7e3100f8b74f3111a5d4e49d05126ce3e21347cab07835e1531a030630b2e"
+    },
+    {
+      "path": "g0/geophys/tb500/media/media_manifest.json",
+      "size": 913,
+      "sha256": "2d1ab93410a0965fde1d68adeec3399759987298610b3fffa147d9aa7e5cd186"
+    },
+    {
+      "path": "g0/geophys/tb500/media/hand_camera_manifest.json",
+      "size": 766,
+      "sha256": "79c0b2e9dfb2f64f590562533b7e7a6b0389427df63ab134f0644a2171420efa"
+    },
+    {
+      "path": "g0/geophys/tb500/media/hand_camera.mp4",
+      "size": 190420,
+      "sha256": "012e904d40a0798eb8f2ce7497416dbac31c3b7e0b05b6d759d06faf90844cbe"
+    },
+    {
+      "path": "g0/geophys/tb50/media/media_manifest.json",
+      "size": 925,
+      "sha256": "ac3fc65f100da383372b2e8a5c2544145103551bb5281b8f590358de8b0a1272"
+    },
+    {
+      "path": "g0/geophys/tb50/media/hand_camera_manifest.json",
+      "size": 778,
+      "sha256": "19d1c4d950a2ef84cc590e75378f4060ea516a41ae38b69eb731a6480544a47c"
+    },
+    {
+      "path": "g0/geophys/tb50/media/hand_camera.mp4",
+      "size": 187062,
+      "sha256": "00ed6fdf28b200dae92761f4d44788a8e83a5615dab239faa38131900030d963"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+[
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/stage_endpoints.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/stage_endpoints.json",
+    "sha256": "ef4f3cf31b04cac639d16b1f0d18dba4cdfb7127db6c8f9ff3573b1452d638a3",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/native_audit.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/native_audit.json",
+    "sha256": "ad664aac0b72e2f39b98fa49fc9b268133098753985edd6764a93a6cdc1fe424",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/report.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/report.json",
+    "sha256": "042b83568e7a8d46f532ff13d49ddf2e09510da49054e3f231f4b79aca1ca619",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/trace.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/trace.json",
+    "sha256": "c844ab310633e85b28dd9a6dfb18deefbd3239d14a36ee4ad63374d291f2a16e",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/media/media_manifest.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/media/media_manifest.json",
+    "sha256": "84c5a6106e074f40d798fb7f2fc5ae50f5a247adb9fb71d2c57db2f1fa6bcab4",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/media/hand_camera_manifest.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/media/hand_camera_manifest.json",
+    "sha256": "66d672f77fc1a4c715998de8f5b1806373012626d318c3c5287ce7fc339e3574",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/geophys/tb100/media/hand_camera.mp4",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/geophys/tb100/media/hand_camera.mp4",
+    "sha256": "caa7e3100f8b74f3111a5d4e49d05126ce3e21347cab07835e1531a030630b2e",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/stage_endpoints.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/stage_endpoints.json",
+    "sha256": "eed13d3c51156e25ff4379294e131df6b9ad7716066cd017a6177c46774011b4",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/native_audit.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/native_audit.json",
+    "sha256": "a4ddc6f7e6e90951afb7794b25c81f3492449e9d574ca59c0cffb8219d56e505",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/report.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/report.json",
+    "sha256": "02d395c5608cb0ce93eef8ce1dbeb23b0035a0dce3761c1ad3b24e8763b63e1f",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/trace.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/trace.json",
+    "sha256": "84fe7ca2e5550f1fe59c3aa1ee82d684fcb5bd7c094857f681e6a2cffcdab2f2",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/media/media_manifest.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/media/media_manifest.json",
+    "sha256": "a4f4ffe241b08daae34062f4a6f61b7da460add56789852da45845e1b88e58a7",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/media/hand_camera_manifest.json",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/media/hand_camera_manifest.json",
+    "sha256": "7615cc15a48a5ca61340b8c19e813e276b6e398ce9868f2edd6a5075583befdd",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  },
+  {
+    "source": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/grasp_raise_1mm/mujoco/tb100/media/hand_camera.mp4",
+    "copy": "/home/lly/.codex/worktrees/p1-8-e-r5-controller-architecture/Geochora/workspace/qualification/phase1/p1_8_pre_d0_d2_readiness/review_refresh_1mm/g0/mujoco/tb100/media/hand_camera.mp4",
+    "sha256": "7113d9c791833cc029611d87872256a50883e7923414c9498de658c3d2f97e5f",
+    "reason": "same +1mm diagnostic profile, equal-rate TB100"
+  }
+]
