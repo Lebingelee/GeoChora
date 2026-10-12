@@ -24,7 +24,9 @@ class ExecutionController:
         return self.inner.inner_gripper_step(*args)
 
 
-def context(hz, *, reference=False):
+def context(hz, *, reference=False, skip_absolute_height_gate=False):
+    if reference and skip_absolute_height_gate:
+        raise ValueError('frozen reference cannot use the height-gate ablation')
     value = worker._context('NA-TB'+str(hz), PROFILE, DYNAMIC)
     source = value['source']
     source = replace(source, config=replace(source.config, robot=replace(source.config.robot,
@@ -34,7 +36,11 @@ def context(hz, *, reference=False):
     config = replace(value['solution_config'], grasp_offset=(0.,0.,.044895))
     module = stable_grasp_reference if reference else stable_grasp_candidate
     holder = module.StableArmTargetHold(controller)
-    solution = module.NutAssemblyStableGraspCandidate(config=config,
+    solution_type = module.NutAssemblyStableGraspCandidate
+    if skip_absolute_height_gate:
+        from .height_gate_ablation import StableGraspWithoutHeightGate
+        solution_type = StableGraspWithoutHeightGate
+    solution = solution_type(config=config,
         control_dt=value['artifact'].timebase.control_dt, arm_hold=holder)
     # Match frozen reference identity recipe, intentionally distinct on extraction.
     controller.identity = hashlib.sha256(json.dumps({'R3_identity':controller.identity,
@@ -54,14 +60,18 @@ def main():
     p.add_argument('--provider',choices=['mujoco','geophys'],default='mujoco')
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--reference',action='store_true')
+    p.add_argument('--skip-absolute-height-gate',action='store_true',
+        help='Diagnostic only: keep measured stability, remove absolute expected-Z gate')
     args=p.parse_args(); args.output.mkdir(parents=True,exist_ok=False)
-    value=context(args.rate,reference=args.reference)
+    value=context(args.rate,reference=args.reference,
+        skip_absolute_height_gate=args.skip_absolute_height_gate)
     worker.CLOSE_TIME_LIMIT_S=1.5
     report=worker.run_loaded(value,args.provider,args.output,'G0')
     report.update(force_limit_N=10.,fallback_enabled=False,forced_lift=False,
         solution_events=value['solution'].events,postclose_hold_s=.1,
         outer_rate_hz=args.rate,gripper_rate_hz=args.rate,reference=args.reference,
         development_candidate_only=True,full_task_qualified=False)
+    report['absolute_height_gate_enabled'] = not args.skip_absolute_height_gate
     worker._write(args.output/'report.json',report)
     print(json.dumps({k:report.get(k) for k in ['pass','close_authorization','verify_lift_pass',
         'max_capture_position_drift_m','max_capture_rotation_drift_rad','failure_boundary','error']}),flush=True)

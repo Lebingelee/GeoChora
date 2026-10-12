@@ -80,6 +80,10 @@ class NutAssemblyStableGraspCandidate(NutAssemblyCanonicalSolutionV1):
             self.events.append({'event': 'verify_lift_motion_start', 't': self._emitted * self.control_dt})
         return super().act()
 
+    def _stable_height_ready(self, achieved_z, expected_z):
+        """Task-local absolute-height check; distinct from measured stability."""
+        return abs(achieved_z - expected_z) <= self.stable_height_tolerance_m
+
     def observe(self, obs, reward, terminated, truncated, info, *, readiness=None):
         if self.stage == 'descend_to_handle' and self._index >= len(self._actions):
             t = self._emitted * self.control_dt
@@ -93,7 +97,7 @@ class NutAssemblyStableGraspCandidate(NutAssemblyCanonicalSolutionV1):
                 axis_span_m=self.pose_span_m, speed_m_s=self.pose_speed_m_s)
             if stable:
                 desired_z = self._goal[2] - self.servo_height_compensation_m
-                if abs(pose[2] - desired_z) > self.stable_height_tolerance_m:
+                if not self._stable_height_ready(pose[2], desired_z):
                     self._fail('stable_height_mismatch')
                     return
                 self.events.append({'event': 'pose_stable', 't': t, 'pose': pose.tolist(),
