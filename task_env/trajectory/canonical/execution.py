@@ -11,12 +11,14 @@ import numpy as np
 from .contracts import EpisodeMetadata, BoundaryRecord, TransitionRecord
 from ...controllers.canonical.contracts import CanonicalControlTarget, AppliedCanonicalControl, digest
 
-SCHEMA = 'canonical-execution-trajectory-v1'
-FILE_SCHEMA = 'task-env-canonical-execution-v1'
+SCHEMA = 'canonical-execution-trajectory-v2'
+LEGACY_SCHEMA = 'canonical-execution-trajectory-v1'
+FILE_SCHEMA = 'task-env-canonical-execution-v2'
+LEGACY_FILE_SCHEMA = 'task-env-canonical-execution-v1'
 
 
 def validate(value):
-    if set(value) != {'schema','metadata','recipe','boundaries','transitions','blobs','stop_reason'} or value['schema'] != SCHEMA:
+    if set(value) != {'schema','metadata','recipe','boundaries','transitions','blobs','stop_reason'} or value['schema'] not in (SCHEMA, LEGACY_SCHEMA):
         raise ValueError('execution trajectory schema')
     metadata = EpisodeMetadata.from_mapping(value['metadata'])
     boundaries, transitions = value['boundaries'], value['transitions']
@@ -79,6 +81,9 @@ def validate(value):
             raise ValueError('independent native count mismatch')
         if i<len(transitions)-1 and (record.terminated or record.truncated):
             raise ValueError('after terminal')
+    if value['schema'] == SCHEMA:
+        from .clock import validate_clock
+        validate_clock(value)
     return value
 
 
@@ -97,6 +102,8 @@ class ExecutionRecorder:
     def __init__(self, metadata, recipe):
         self.value={'schema':SCHEMA,'metadata':metadata.to_mapping(),'recipe':copy.deepcopy(recipe),
                     'boundaries':[],'transitions':[],'blobs':{},'stop_reason':''}
+        from .clock import SCHEMA as CLOCK_SCHEMA
+        self.value['recipe']['clock_contract']=CLOCK_SCHEMA
         self.pending=None
         self.frozen=False
 
@@ -145,7 +152,7 @@ def save(path, value):
     raw=json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
     try:
         with h5py.File(temporary,'x') as h:
-            h.attrs['schema']=FILE_SCHEMA;h.attrs['logical_hash']=digest(value)
+            h.attrs['schema']=FILE_SCHEMA if value['schema']==SCHEMA else LEGACY_FILE_SCHEMA;h.attrs['logical_hash']=digest(value)
             h.create_dataset('logical_json_utf8',data=np.frombuffer(raw,dtype=np.uint8),compression='gzip',compression_opts=4)
             h.create_dataset('control_step',data=np.arange(len(value['boundaries']),dtype=np.int64))
             h.create_dataset('native_step_index',data=np.asarray([b['native_step_index'] for b in value['boundaries']],dtype=np.int64))
@@ -159,9 +166,11 @@ def save(path, value):
 def load(path):
     import h5py
     with h5py.File(path,'r') as h:
-        if set(h)!={'logical_json_utf8','control_step','native_step_index'} or h.attrs['schema']!=FILE_SCHEMA:
+        if set(h)!={'logical_json_utf8','control_step','native_step_index'} or h.attrs['schema'] not in (FILE_SCHEMA,LEGACY_FILE_SCHEMA):
             raise ValueError('H5 execution schema')
         value=json.loads(h['logical_json_utf8'][:].tobytes());validate(value)
+        expected_schema=FILE_SCHEMA if value['schema']==SCHEMA else LEGACY_FILE_SCHEMA
+        if h.attrs['schema']!=expected_schema:raise ValueError('H5/logical version mismatch')
         if h.attrs['logical_hash']!=digest(value):raise ValueError('logical hash')
         for name,expected in [('control_step',np.arange(len(value['boundaries']),dtype=np.int64)),('native_step_index',np.asarray([b['native_step_index'] for b in value['boundaries']],dtype=np.int64))]:
             if h[name].dtype!=expected.dtype or not np.array_equal(h[name][:],expected):raise ValueError('numeric projection')
