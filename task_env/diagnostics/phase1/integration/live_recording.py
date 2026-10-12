@@ -29,6 +29,7 @@ class LiveRecording:
             'artifact':value['artifact'].to_mapping(),'recipe_identity':value['recipe_identity'],
             'cadence':'outer-equal-rate','owner_schema':owner_schema,'stages':list(value['solution'].STAGES),'grasp_offset_z_m':.045895,'absolute_height_gate':False,
             'force_limit_N':10.,'authorization_deadline_s':1.5,'fallback':False})
+        self.recorder.value['recipe']['episode_role'] = value.get('_recording_role', 'regression')
         self.recorder.boundary(self.boundary(state,feedback,info),snapshot(value,state,provider),value['solution'].stage,info['task_metrics'],self.native_time())
 
     def native_time(self):
@@ -68,7 +69,17 @@ class LiveRecording:
         assert self.recorder.value['boundaries'][-1]['record']['readiness']==row['readiness']
 
     def finish(self, report):
-        value=self.recorder.freeze('g0_verified' if report.get('pass') else report.get('failure_boundary') or 'bounded_recording')
+        probe = report.get('probe')
+        if probe == 'FULL':
+            stop_reason = ('canonical_task_success' if report.get('pass') and report.get('canonical_task_success')
+                           else report.get('failure_boundary') or 'full_expert_incomplete')
+        elif probe == 'T1':
+            stop_reason = ('t1_loaded_transport_complete' if report.get('pass')
+                           else report.get('failure_boundary') or 't1_incomplete')
+        else:
+            stop_reason = ('g0_verified' if report.get('pass')
+                           else report.get('failure_boundary') or 'bounded_recording')
+        value=self.recorder.freeze(stop_reason)
         path=self.output/'execution.h5';save(path,value);loaded=load(path)
         if loaded!=value:raise AssertionError('H5 first logical divergence')
         return {'schema':value['schema'],'pass':True,'path':str(path),

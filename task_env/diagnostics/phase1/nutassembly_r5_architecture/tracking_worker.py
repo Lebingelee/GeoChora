@@ -1,4 +1,4 @@
-"""One isolated T0 or G0 provider/rate cell for the P1.8-E-R5 spike."""
+"""Bounded canonical NutAssembly tracking and loaded-execution diagnostics."""
 import argparse
 import hashlib
 import json
@@ -170,6 +170,7 @@ def _reset(value, provider):
 
 
 def _execute(value, provider, session, audit, controller, state, feedback, action, stage, diagnostics, info):
+    previous_state = state
     request = RequestedAction("absolute_pose", "world", "quaternion_wxyz", tuple(map(float, action)))
     recording = value.get('_live_recording')
     if recording is not None:
@@ -194,6 +195,23 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
     readiness = controller.readiness(state, feedback)
     row = _controller_row(controller, state, feedback, request, canonical, target, applied,
                           readiness, action, stage, diagnostics, info["task_metrics"])
+    if value.get("_loaded_diagnostics", False):
+        previous_nut = np.asarray(previous_state.pose_world["square-nut-v1"].position, dtype=float)
+        current_nut = np.asarray(state.pose_world["square-nut-v1"].position, dtype=float)
+        try:
+            native_contacts = _contact_diagnostics(session, provider)
+        except Exception as exc:  # diagnostics must never alter execution behavior
+            native_contacts = {"provider": provider, "available": False,
+                               "error": f"{type(exc).__name__}: {exc}"}
+        row.update(
+            nut_pose_world=state.pose_world["square-nut-v1"].to_mapping(),
+            nut_linear_velocity_estimate_world_m_s=(
+                (current_nut - previous_nut) / value["artifact"].timebase.control_dt
+            ).tolist(),
+            nut_to_ee_relative_pose=_relative_pose(state),
+            canonical_grasped_nut=bool(info["task_metrics"].get("grasped_nut", False)),
+            _native_contact_diagnostic=native_contacts,
+        )
     if inner_rows is not None:
         row["outer_target_hash"] = target_hash
         row["final_inner_target_hash"] = target.identity_hash
@@ -683,7 +701,7 @@ def _stage_endpoint(stage, rows, value):
     pose_pass = (len(window) == required and max_pos is not None and max_pos <= POSE_POSITION_LIMIT_M
                  and max_rot is not None and max_rot <= POSE_ROTATION_LIMIT_RAD)
     capture_pass = (stage not in {"verify_lift", "raise_for_transport", "move_above_square_peg",
-                                  "align_nut_yaw", "descend_to_peg_top"}
+                                  "align_nut_yaw", "descend_to_peg_top", "lower_nut_to_table"}
                     or (max_rel_pos is not None and max_rel_pos <= CAPTURE_POSITION_LIMIT_M
                         and max_rel_rot is not None and max_rel_rot <= CAPTURE_ROTATION_LIMIT_RAD))
     return {
@@ -706,6 +724,7 @@ def _stage_endpoint(stage, rows, value):
 def run_loaded(value, provider, folder, probe):
     session = audit = None
     trace = []
+    native_contact_trace = []
     stage_rows = {}
     endpoints = []
     close_rows = []
@@ -738,6 +757,7 @@ def run_loaded(value, provider, folder, probe):
         stage_plan_duration = {current_stage: len(solution._actions) * artifact.timebase.control_dt}
         t1_stages = ("verify_lift", "raise_for_transport", "move_above_square_peg",
                      "align_nut_yaw", "descend_to_peg_top")
+        capture_stages = set(t1_stages) | {"lower_nut_to_table"}
         auth_ticks = value["solution"]._ticks(value["profile"]["solution"]["fallback_window_s"])
         while not solution.done and not solution.failed:
             public = solution.act()
@@ -758,13 +778,15 @@ def run_loaded(value, provider, folder, probe):
             stage_goal_error = _pose_error(goal_before, state)
             row["stage_goal_position_error_m"] = stage_goal_error["position_error_m"]
             row["stage_goal_rotation_error_rad"] = stage_goal_error["rotation_error_rad"]
-            if capture_baseline is not None:
+            capture_active = capture_baseline is not None and before_stage in capture_stages
+            if capture_active:
                 drift = _relative_drift(capture_baseline, state)
                 row["capture_drift"] = drift
                 max_rel_pos = max(max_rel_pos, drift["position_m"])
                 max_rel_rot = max(max_rel_rot, drift["rotation_rad"])
             else:
                 row["capture_drift"] = None
+            row["capture_validity_active"] = bool(capture_active)
             if before_stage == "close_gripper":
                 inner_servo_rows.extend(row.get("gripper_inner_trace", []))
                 close_rows.append({
@@ -778,8 +800,13 @@ def run_loaded(value, provider, folder, probe):
                     "force_mode_initialized": row["force_mode_initialized"],
                     "controller_close_ready": row["controller_close_ready"],
                     "grasped_nut": bool(info["task_metrics"].get("grasped_nut", False)),
+                    "requested_ee_pose": row["requested_ee_pose"],
+                    "joint_target": row["joint_target"],
+                    "servo_target": row["servo_target"],
+                    "actual_ee_pose": row["actual_ee_pose"],
                 })
-            if grasp_authorized and not info["task_metrics"].get("grasped_nut", False):
+            if (grasp_authorized and before_stage not in {"open_gripper", "release_retreat"}
+                    and not info["task_metrics"].get("grasped_nut", False)):
                 grasp_loss = True
             row["grasp_authorized"] = grasp_authorized
             stage_rows.setdefault(before_stage, []).append(row)
@@ -787,6 +814,15 @@ def run_loaded(value, provider, folder, probe):
             solution.observe(obs, evaluation.reward, False, False, info, readiness=controller.readiness(state, feedback))
             if value.get('_live_recording') is not None:
                 value['_live_recording'].complete(state, feedback, info, evaluation, row)
+            contact_row = row.pop("_native_contact_diagnostic", None)
+            if contact_row is not None:
+                native_contact_trace.append({
+                    "control_step": state.control_step,
+                    "simulation_time_s": state.simulation_time,
+                    "stage": before_stage,
+                    "canonical_grasped_nut": bool(info["task_metrics"].get("grasped_nut", False)),
+                    "contact": contact_row,
+                })
             after_stage = solution.stage
             if value.get('recording_transition_limit') and len(trace) >= value['recording_transition_limit']:
                 break
@@ -838,15 +874,80 @@ def run_loaded(value, provider, folder, probe):
         required_endpoints_pass = all(endpoints_by_stage.get(stage, {}).get("pose_gate_pass", False)
                                       and endpoints_by_stage.get(stage, {}).get("capture_gate_pass", False)
                                       for stage in goal_stages)
+        # The frozen integration recipe authorizes only the controller's
+        # close_ready signal; the historical diagnostic fallback is not active.
+        allowed_close_branches = {"controller_close_ready"}
         close_time_ok = bool(close_authorization and close_authorization["authorization_branch"] in
-                             {"controller_close_ready", "stable_grasp_fallback"}
+                             allowed_close_branches
                              and close_authorization["authorization_time_s"] <= CLOSE_TIME_LIMIT_S
                              and close_authorization["pose_gate_at_authorization"])
         capture_ok = max_rel_pos <= CAPTURE_POSITION_LIMIT_M and max_rel_rot <= CAPTURE_ROTATION_LIMIT_RAD
-        complete = (verify_lift_pass if probe == "G0" else
-                    bool(verify_lift_pass and all(stage in endpoints_by_stage for stage in t1_stages)))
-        passed = bool(close_time_ok and verify_lift_pass and required_endpoints_pass
-                      and not grasp_loss and capture_ok and complete)
+        coordinator_stages = list(dict.fromkeys(row["stage"] for row in trace))
+        coordinator_done = bool(solution.done)
+        coordinator_failed = bool(solution.failed)
+        solution_events = list(getattr(solution, "events", []))
+        event_by_name = {item.get("event"): item for item in solution_events}
+        expected_postclose_ticks = solution._ticks(value["solution"].postclose_hold_s)
+        observed_postclose_hold_s = None
+        if (event_by_name.get("controller_close_authorized")
+                and event_by_name.get("verify_lift_motion_start")):
+            observed_postclose_hold_s = float(
+                event_by_name["verify_lift_motion_start"]["t"]
+                - event_by_name["controller_close_authorized"]["t"]
+            )
+        close_joint_targets = [row["joint_target"] for row in close_rows]
+        close_servo_targets = [row["servo_target"] for row in close_rows]
+        close_requested_poses = [row["requested_ee_pose"] for row in close_rows]
+        close_arm_target_held = bool(close_rows) and all(
+            item == close_joint_targets[0] for item in close_joint_targets
+        ) and all(item == close_servo_targets[0] for item in close_servo_targets)
+        close_requested_pose_held = bool(close_requested_poses) and all(
+            item == close_requested_poses[0] for item in close_requested_poses
+        )
+        close_sequence_pass = True
+        if probe in {"T1", "FULL"}:
+            close_sequence_pass = bool(
+                "pose_stable" in event_by_name
+                and event_by_name.get("controller_close_authorized", {}).get("fallback_used") is False
+                and close_authorization
+                and close_authorization["authorization_branch"] == "controller_close_ready"
+                and close_arm_target_held and close_requested_pose_held
+                and observed_postclose_hold_s is not None
+                and abs(observed_postclose_hold_s - expected_postclose_ticks * artifact.timebase.control_dt) <= 1e-9
+            )
+        if probe == "G0":
+            complete = verify_lift_pass
+            passed = bool(close_time_ok and verify_lift_pass and required_endpoints_pass
+                          and not grasp_loss and capture_ok and complete)
+        elif probe == "T1":
+            complete = bool(verify_lift_pass and all(stage in endpoints_by_stage for stage in t1_stages))
+            passed = bool(close_time_ok and verify_lift_pass and required_endpoints_pass
+                          and close_sequence_pass and not grasp_loss and capture_ok and complete)
+        elif probe == "FULL":
+            required_full_stages = list(solution.STAGES)
+            ordered_stages_pass = coordinator_stages == required_full_stages
+            full_endpoints = {item["stage"]: item for item in endpoints}
+            completed_stage_endpoints = all(
+                full_endpoints.get(stage, {}).get("pose_gate_pass", False)
+                and full_endpoints.get(stage, {}).get("capture_gate_pass", False)
+                for stage in required_full_stages[:-1]
+            )
+            task_success = bool(info["task_metrics"].get("task_success", False))
+            complete = bool(coordinator_done and not coordinator_failed and ordered_stages_pass
+                            and completed_stage_endpoints and task_success)
+            passed = bool(close_time_ok and verify_lift_pass and close_sequence_pass
+                          and not grasp_loss and capture_ok and complete)
+            report.update(
+                required_full_stages=required_full_stages,
+                observed_full_stage_sequence=coordinator_stages,
+                full_stage_endpoints=full_endpoints,
+                all_preterminal_stage_endpoint_gates_pass=bool(completed_stage_endpoints),
+                canonical_task_success=task_success,
+            )
+        else:
+            raise ValueError("probe must be G0, T1, or FULL")
+        first_failed_endpoint = next((item for item in endpoints
+                                      if not item.get("pose_gate_pass") or not item.get("capture_gate_pass")), None)
         report.update(
             pass_=passed,
             endpoints=endpoints,
@@ -862,13 +963,38 @@ def run_loaded(value, provider, folder, probe):
             reset_sample_hash=sample.identity_hash,
             provider_build_identity=provider_build_identity(provider),
             final_task_metrics=dict(info["task_metrics"]),
+            coordinator_done=coordinator_done,
+            coordinator_failed=coordinator_failed,
+            coordinator_failure_reason=solution.failure_reason,
+            coordinator_stage_sequence=coordinator_stages,
+            close_authorization_controller_only=bool(
+                close_authorization and close_authorization["authorization_branch"] == "controller_close_ready"),
+            close_arm_target_held=close_arm_target_held,
+            close_requested_ee_pose_held=close_requested_pose_held,
+            pose_stable_event_observed="pose_stable" in event_by_name,
+            post_authorization_hold_observed_s=observed_postclose_hold_s,
+            post_authorization_hold_expected_s=expected_postclose_ticks * artifact.timebase.control_dt,
+            post_authorization_hold_pass=(observed_postclose_hold_s is not None and abs(
+                observed_postclose_hold_s - expected_postclose_ticks * artifact.timebase.control_dt) <= 1e-9),
+            close_sequence_pass=close_sequence_pass,
+            solution_events=solution_events,
+            first_failed_stage_endpoint=first_failed_endpoint,
+            native_contact_boundary_count=len(native_contact_trace),
         )
         report["pass"] = report.pop("pass_")
         if report["pass"]:
             report["failure_boundary"] = None
         else:
-            report.setdefault("failure_boundary", "G0_close_or_verify_lift_gate" if probe == "G0"
-                              else "T1_loaded_tracking_or_capture_gate")
+            if solution.failed:
+                report.setdefault("failure_boundary", "nutassembly_solution/" + str(solution.failure_reason))
+            elif first_failed_endpoint is not None:
+                report.setdefault("failure_boundary", "stage_endpoint/" + str(first_failed_endpoint["stage"]))
+            elif probe == "FULL" and not info["task_metrics"].get("task_success", False):
+                report.setdefault("failure_boundary", "canonical_task_success_false")
+            else:
+                report.setdefault("failure_boundary", "G0_close_or_verify_lift_gate" if probe == "G0"
+                                  else "T1_loaded_tracking_or_capture_gate" if probe == "T1"
+                                  else "full_expert_acceptance_gate")
     except Exception as exc:
         report.update(failure_boundary=report.get("failure_boundary") or probe + "_execution",
                       error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
@@ -888,6 +1014,10 @@ def run_loaded(value, provider, folder, probe):
             session.close()
         _write(folder / "trace.json", trace)
         _write(folder / "stage_endpoints.json", endpoints)
+        if native_contact_trace:
+            with (folder / "contact_diagnostics.jsonl").open("x") as stream:
+                for item in native_contact_trace:
+                    stream.write(json.dumps(item, sort_keys=True, allow_nan=False) + "\n")
         _write(folder / "report.json", report)
     return report
 
