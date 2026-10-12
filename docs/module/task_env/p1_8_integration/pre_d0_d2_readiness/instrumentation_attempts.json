@@ -1,0 +1,37 @@
+{
+  "instrumentation_attempts": [
+    {
+      "attempt": "synthetic_attempt1",
+      "result": "failed",
+      "first_failure": "RequestedAction strict finite scalar decoder rejected numpy scalar; fixture converted to built-in float",
+      "production_changed": false
+    },
+    {
+      "attempt": "synthetic_attempt2",
+      "result": "failed",
+      "first_failure": "Mock contact force arrived after 50Hz closing command already saturated at zero; mock acquisition moved earlier",
+      "production_changed": false
+    },
+    {
+      "attempt": "real_interval_attempt1",
+      "result": "failed",
+      "first_failure": "Diagnostic required canonical request == realized acknowledgment; GeoPhys existing float32 acknowledgment differs",
+      "correction": "Preserve exact request and exact realized acknowledgment separately, validate identity/provider/binding/cap; no numeric tolerance introduced",
+      "production_changed": false
+    },
+    {
+      "attempt": "integrity_initial",
+      "result": "failed before output",
+      "first_failure": "GeoPhys source import unavailable with PYTHONPATH=.",
+      "correction": "Use existing documented PYTHONPATH=.:GeoPhys/src:GeoPhys",
+      "production_changed": false
+    },
+    {
+      "attempt": "recovery_video_tools",
+      "result": "decoder unavailable",
+      "first_failure": "ffprobe executable and imageio_ffmpeg module missing",
+      "correction": "Actual restored bytes SHA256 and MP4 atom structure checked; pixel decoding NOT TESTED",
+      "production_changed": false
+    }
+  ]
+}

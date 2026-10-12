@@ -1,0 +1,56 @@
+{
+  "archive_root": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012",
+  "files": 3624,
+  "logical_bytes": 27011368180,
+  "allocated_bytes": 27019628544,
+  "stats": {
+    "json": {
+      "files": 1770,
+      "bytes": 4101231258,
+      "allocated": 4105564160
+    },
+    "source_archive": {
+      "files": 17,
+      "bytes": 2612403922,
+      "allocated": 2612457472
+    },
+    "trace": {
+      "files": 379,
+      "bytes": 18650013486,
+      "allocated": 18650861568
+    },
+    "other": {
+      "files": 1074,
+      "bytes": 168729442,
+      "allocated": 170946560
+    },
+    "H5": {
+      "files": 68,
+      "bytes": 522265836,
+      "allocated": 522416128
+    },
+    "contact": {
+      "files": 121,
+      "bytes": 915162384,
+      "allocated": 915410944
+    },
+    "video": {
+      "files": 170,
+      "bytes": 38705432,
+      "allocated": 39059456
+    },
+    "image": {
+      "files": 25,
+      "bytes": 2856420,
+      "allocated": 2912256
+    }
+  },
+  "same_hash_duplicate_groups": 234,
+  "off_host_backup": false,
+  "disk": {
+    "total": 671240200192,
+    "used": 108628275200,
+    "free": 528439570432
+  },
+  "inventory_sha256": "b911a1de93ed9e2d6898c6b76831c6f132be5989bcbdf32650f2be89e0d20583"
+}

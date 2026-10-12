@@ -1,0 +1,80 @@
+[
+  {
+    "provider": "geophys",
+    "rate": 500,
+    "boundaries": 1565,
+    "target_substeps_exact": 1565,
+    "pass": true,
+    "first_divergence": null,
+    "max_clock_projection_error_s": 1.2301271112846734e-13,
+    "first_v0_one_ulp_failure": null,
+    "native_total_steps": 1565
+  },
+  {
+    "provider": "geophys",
+    "rate": 100,
+    "boundaries": 314,
+    "target_substeps_exact": 1570,
+    "pass": true,
+    "first_divergence": null,
+    "max_clock_projection_error_s": 1.2434497875801753e-13,
+    "first_v0_one_ulp_failure": {
+      "boundary": 3,
+      "previous_time": 0.020000000000000004,
+      "native_time": 0.030000000000000013,
+      "delta_error": 8.673617379884035e-18,
+      "v0_bound": 3.469446951953614e-18
+    },
+    "native_total_steps": 1570
+  },
+  {
+    "provider": "geophys",
+    "rate": 50,
+    "boundaries": 158,
+    "target_substeps_exact": 1580,
+    "pass": true,
+    "first_divergence": null,
+    "max_clock_projection_error_s": 1.2656542480726785e-13,
+    "first_v0_one_ulp_failure": {
+      "boundary": 2,
+      "previous_time": 0.020000000000000004,
+      "native_time": 0.04000000000000002,
+      "delta_error": 1.734723475976807e-17,
+      "v0_bound": 6.938893903907228e-18
+    },
+    "native_total_steps": 1580
+  },
+  {
+    "provider": "mujoco",
+    "rate": 500,
+    "boundaries": 3500,
+    "target_substeps_exact": 3500,
+    "pass": true,
+    "first_divergence": null,
+    "max_clock_projection_error_s": 5.488942633746774e-13,
+    "first_v0_one_ulp_failure": null,
+    "native_total_steps": 3500
+  },
+  {
+    "provider": "mujoco",
+    "rate": 100,
+    "boundaries": 700,
+    "target_substeps_exact": 3500,
+    "pass": true,
+    "first_divergence": null,
+    "max_clock_projection_error_s": 0,
+    "first_v0_one_ulp_failure": null,
+    "native_total_steps": 3500
+  },
+  {
+    "provider": "mujoco",
+    "rate": 50,
+    "boundaries": 350,
+    "target_substeps_exact": 3500,
+    "pass": true,
+    "first_divergence": null,
+    "max_clock_projection_error_s": 0,
+    "first_v0_one_ulp_failure": null,
+    "native_total_steps": 3500
+  }
+]
