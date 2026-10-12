@@ -41,6 +41,9 @@ def validate_clock(value):
         previous=t
     for k,t in enumerate(value['transitions']):
         interval=t['interval']
+        audit=t['native_audit']
+        if type(audit['observed_native_substeps']) is not int or type(audit['control_step']) is not int:
+            raise ValueError('integer audited count/boundary required')
         if type(interval['native_step_count']) is not int or interval['native_step_count'] != sub:
             raise ValueError('integer interval count')
         for j,s in enumerate(interval['substeps']):

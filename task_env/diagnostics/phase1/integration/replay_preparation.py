@@ -118,7 +118,11 @@ def restore(value, state, provider, record):
     integrity = record.pop('integrity_hash')
     if digest(record) != integrity:
         raise ValueError('checkpoint integrity mismatch')
-    expected = snapshot(value, state, provider)
+    expected = {'version': 'p18-owner-checkpoint-prototype-v2',
+        'controller_identity': value['controller_identity'], 'solution_identity': value['solution_identity'],
+        'artifact_hash': value['artifact'].identity_hash, 'provider': provider,
+        'control_step': state.control_step, 'simulation_time': state.simulation_time,
+        'timebase': value['artifact'].timebase.to_mapping()}
     for k in ('version', 'controller_identity', 'solution_identity', 'artifact_hash', 'provider',
               'control_step', 'simulation_time', 'timebase'):
         if record[k] != expected[k]:
@@ -133,9 +137,18 @@ def restore(value, state, provider, record):
         if set(payload['fields']) != set(FIELDS[name]):
             raise ValueError('incomplete owner fields: ' + name)
         decoded[name] = {k: (v['present'], _decode(v['value'])) for k, v in payload['fields'].items()}
+        optional = {'_captured_position', '_captured_rotation', '_close_gate', '_grasp_pose'} if name == 'coordinator' else set()
+        if any(type(v['present']) is not bool or (not v['present'] and k not in optional) for k,v in payload['fields'].items()):
+            raise ValueError('missing required owner state: ' + name)
     arm = decoded['arm_gripper']
     if arm['_expected_step'][1] != state.control_step or not arm['_joint_reference'][0]:
         raise ValueError('missing/alignment-invalid controller history')
+    stage = decoded['coordinator']['_stage_index'][1]
+    if type(stage) is not int or not 0 <= stage < len(value['solution'].STAGES):
+        raise ValueError('invalid coordinator stage')
+    for field, required_stage in (('_close_gate', 'close_gripper'), ('_grasp_pose', 'close_gripper'), ('_captured_position', 'verify_lift'), ('_captured_rotation', 'verify_lift')):
+        if stage >= value['solution'].STAGES.index(required_stage) and not decoded['coordinator'][field][0]:
+            raise ValueError('missing stage-dependent owner state: '+field)
     for name, owner in _owners(value).items():
         for k, (present, val) in decoded[name].items():
             if present:

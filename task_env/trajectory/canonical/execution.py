@@ -1,4 +1,4 @@
-"""Opt-in executed-interval trajectory v1; v0 types/readers stay unchanged.
+"""Opt-in executed-interval trajectories; original v0 types/readers stay unchanged.
 
 Provider-neutral logical data only. Owner snapshots are supplied by the
 explicit coordinator adapter. Native contact/state belongs in sidecars.
