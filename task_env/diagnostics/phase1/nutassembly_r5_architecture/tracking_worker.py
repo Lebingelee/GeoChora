@@ -171,13 +171,19 @@ def _reset(value, provider):
 
 def _execute(value, provider, session, audit, controller, state, feedback, action, stage, diagnostics, info):
     request = RequestedAction("absolute_pose", "world", "quaternion_wxyz", tuple(map(float, action)))
+    recording = value.get('_live_recording')
+    if recording is not None:
+        recording.begin(state, request, stage, diagnostics)
     canonical, target = controller.compute(state, feedback, request)
+    if recording is not None:
+        recording.canonical = canonical
     target_hash = target.identity_hash
     inner_rows = None
     if hasattr(controller, "inner_gripper_step"):
         native_diagnostic = lambda current: _runtime_diagnostic_readback(current, provider, stage)
         state, applied_target, applied, inner_rows = session.step_control_interval(
-            target, controller, audit=audit, diagnostic_readback=native_diagnostic
+            target, controller, audit=audit, diagnostic_readback=native_diagnostic,
+            interval_observer=recording.recorder.applied_substep if recording is not None else None
         )
         target = applied_target
     else:
@@ -201,6 +207,8 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
                                       for x in inner_rows) if inner_rows else True
     else:
         row["target_hash_unchanged"] = target.identity_hash == target_hash and applied.target_hash == target_hash
+    if recording is not None:
+        recording.target, recording.applied = target, applied
     return state, feedback, obs, info, evaluation, row
 
 
@@ -712,6 +720,10 @@ def run_loaded(value, provider, folder, probe):
         artifact, solution = value["artifact"], value["solution"]
         obs, info, evaluation = observation(state, artifact)
         solution.reset(obs, info, METADATA)
+        recording_factory = value.get('live_recording_factory')
+        recording = recording_factory(value, provider, session, audit, sample, realized, state, feedback, info) if recording_factory else None
+        if recording is not None:
+            value['_live_recording'] = recording
         close_start_time = None
         close_authorization = None
         capture_baseline = None
@@ -773,7 +785,11 @@ def run_loaded(value, provider, folder, probe):
             stage_rows.setdefault(before_stage, []).append(row)
             trace.append(row)
             solution.observe(obs, evaluation.reward, False, False, info, readiness=controller.readiness(state, feedback))
+            if value.get('_live_recording') is not None:
+                value['_live_recording'].complete(state, feedback, info, evaluation, row)
             after_stage = solution.stage
+            if value.get('recording_transition_limit') and len(trace) >= value['recording_transition_limit']:
+                break
             if after_stage != before_stage:
                 endpoint = _stage_endpoint(before_stage, stage_rows[before_stage], value)
                 endpoints.append(endpoint)
@@ -857,6 +873,14 @@ def run_loaded(value, provider, folder, probe):
         report.update(failure_boundary=report.get("failure_boundary") or probe + "_execution",
                       error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
     finally:
+        if value.get('_live_recording') is not None:
+            try:
+                report['live_recording'] = value['_live_recording'].finish(report)
+            except Exception as exc:
+                report['pass'] = False
+                report['recording_error'] = f'{type(exc).__name__}: {exc}'
+                report['failure_boundary'] = 'live_recording'
+            value.pop('_live_recording', None)
         if audit:
             _write(folder / "native_audit.json", audit.boundaries)
             audit.close()

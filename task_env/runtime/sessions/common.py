@@ -53,7 +53,7 @@ class _SessionValues:
                                     self._provider, self.snapshot(), 0)
 
     def step_control_interval(self, held_target, gripper_inner_servo, *, audit=None,
-                              diagnostic_readback=None):
+                              diagnostic_readback=None, interval_observer=None):
         """Opt-in arm-ZOH interval with a shared physics-rate gripper update.
 
         Existing ``step()`` remains unchanged. Providers implement only
@@ -80,6 +80,8 @@ class _SessionValues:
                     self._step_physics_once()
                 else:
                     audit.execute_inner_substep(target, self._step_physics_once)
+                if interval_observer is not None:
+                    interval_observer(substep_index, state, feedback, target, last_applied, diagnostics)
                 row = dict(diagnostics)
                 row.update({
                     "substep_index": substep_index,

@@ -31,6 +31,8 @@ FIELDS = {
 
 
 def _encode(x):
+    if isinstance(x, np.generic):
+        return {'kind': 'numpy-scalar', 'dtype': x.dtype.str, 'value': x.item()}
     if isinstance(x, np.ndarray):
         return {'kind': 'array', 'dtype': x.dtype.str, 'shape': list(x.shape), 'values': x.tolist()}
     if isinstance(x, tuple):
@@ -60,6 +62,8 @@ def _decode(x):
     if not isinstance(x, dict):
         return x
     kind = x.get('kind')
+    if kind == 'numpy-scalar':
+        return np.asarray(x['value'], dtype=x['dtype'])[()]
     if kind == 'array':
         a = np.asarray(x['values'], dtype=x['dtype'])
         if list(a.shape) != x['shape'] or not np.isfinite(a).all():
@@ -99,7 +103,7 @@ def snapshot(value, state, provider):
         owners[name] = {'version': name + '-memory-prototype-v1', 'source_sha256': _source(owner),
             'fields': {k: {'present': k in vars(owner), 'value': _encode(vars(owner).get(k))}
                        for k in FIELDS[name]}}
-    result = {'version': 'p18-owner-checkpoint-prototype-v1',
+    result = {'version': 'p18-owner-checkpoint-prototype-v2',
         'controller_identity': value['controller_identity'], 'solution_identity': value['solution_identity'],
         'artifact_hash': value['artifact'].identity_hash, 'provider': provider,
         'control_step': state.control_step, 'simulation_time': state.simulation_time,
