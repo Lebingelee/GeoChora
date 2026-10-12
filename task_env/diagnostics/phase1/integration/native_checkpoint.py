@@ -119,6 +119,8 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--provider',required=True);p.add_argument('--rate',type=int,required=True);p.add_argument('--reference',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--restore-only',action='store_true');a=p.parse_args()
     x=load(a.reference);points=checkpoints(x)
     if a.restore_only:
+        # Sidecars bind actual captured indices, including earlier selector versions.
+        points={name:int(np.load(a.output/f'{name}_native.npz',allow_pickle=False)['session_control_step'][0]) for name in points}
         captured={name:{'path':str(a.output/f'{name}_native.npz'),'sha256':hashlib.sha256((a.output/f'{name}_native.npz').read_bytes()).hexdigest()} for name in points}
         result=assess_native(x,points,captured,a.provider,a.rate)
         (a.output/'native_restoration.json').write_text(json.dumps(result,indent=2));return

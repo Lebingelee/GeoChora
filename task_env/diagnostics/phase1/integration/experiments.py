@@ -15,14 +15,10 @@ def main():
     if output.exists():raise FileExistsError('do not overwrite experiment evidence')
     archive=Path(manifest['archive_root'])
     if not (archive/'archive_complete.json').is_file():raise RuntimeError('verified archive unavailable')
-    # Current G0 goes directly through the independent integration entry.
-    if entry['experiment_id']=='R5-10N-G0':
-        cmd=[sys.executable,'-m',entry['module'],*shlex.split(entry['arguments'].format(output=output,archive=archive))]
-        if args.prepare_only:print(shlex.join(cmd));return
-        raise SystemExit(subprocess.call(cmd,cwd=REPO))
+    # Every selected historical experiment uses its immutable source commit.
     with tempfile.TemporaryDirectory(prefix='geochora-p18-experiment-') as temp:
         tree=Path(temp)/'source'
-        subprocess.run(['git','clone','--quiet','--no-checkout',str(archive/'p1_8_source.bundle'),str(tree)],check=True)
+        subprocess.run(['git','clone','--quiet','--no-checkout',str(archive/'integration_final_source.bundle'),str(tree)],check=True)
         subprocess.run(['git','checkout','--quiet','--detach',entry['source_commit']],cwd=tree,check=True)
         if entry['phase']=='R2':
             overlay=archive/'worktrees/p18e-r2-recovery'

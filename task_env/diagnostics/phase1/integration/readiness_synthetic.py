@@ -188,7 +188,7 @@ def main():
         'positive_checks':len(tests),'checks':{k:v for k,v in tests.items() if not k.startswith(('clock_accumulation','prefix_','inner_','interval_decode','owner_roundtrip','restored_next_target'))},
         'negative_cases':negative,'first_divergence':first,
         'limitations':['Opt-in diagnostics ABI; not promoted public schema',
-            'No live coordinator/interval recorder wiring or checkpointed provider state replay',
+            'This synthetic check does not itself test live recorder wiring or provider-native checkpoint restoration; those require separate real-execution evidence',
             'Mock feedback does not establish mechanical competence']}
     (args.output/'validation.json').write_text(json.dumps(result,indent=2));print(json.dumps(result,indent=2))
     raise SystemExit(0 if result['pass'] else 1)
