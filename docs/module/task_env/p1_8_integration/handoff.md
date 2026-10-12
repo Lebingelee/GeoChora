@@ -21,3 +21,10 @@ Residual risks: auxiliary collision penetration1.7–2.0mm; single NA-S0 sample 
 Next: Human Review, then separately authorize GeoPhys10N G0, recording/state reconstruction prerequisites, T1/full experts and frozen D0–D2 matrix. No broad tuning recommended or performed.
 
 Cleanup completed: 9 old local P1.8 branches and 5 old public remote branches deleted after tags/Evidence/regression/push verification. Nine remote annotated archive tags retained; only active P1.8 branch is integration. Old worktrees retained detached, dirty R2 files preserved. Integration source checkpoint f019699c224c51845e7cc00a3cbbbe46306eb034; final report commit is the branch HEAD.
+
+
+## Replay infrastructure closure (2026-10-12)
+
+Current branch checkpoint: `codex/p1.8-integration`, source checkpoint `cf5f941` (local, not pushed). Replay infrastructure is GO only for the tested canonical recording/restoration and reset-prefix replay-preparation scope. Formal D0/D1/D2 campaign remains BLOCKED pending T1, full NutAssembly experts, frozen full-task goldens, and Human Review. GeoPhys native contact-state continuation is not bitwise exact and is not qualified. No T1/full task/D0–D2 was started.
+
+Detailed evidence and the next campaign entry plan: `workspace/qualification/phase1/p1_8_replay_infrastructure_closure/`; concise index: `replay_infrastructure_closure/README.md`. Evidence pruning is complete, but the archive has no verified off-host backup. The user asked work to stop after completion until explicitly resumed; no automatic campaign is scheduled.

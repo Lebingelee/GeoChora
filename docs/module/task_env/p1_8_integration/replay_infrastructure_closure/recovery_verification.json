@@ -1,0 +1,190 @@
+{
+  "status": "PASS",
+  "post_cleanup_core_experiment_count": 10,
+  "core_experiments": [
+    {
+      "experiment": "R1-forensic",
+      "source_commit": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+      "source_sha256": "92dc2d8ec7880cecedc08171193204c4ff8649d5f88cde1e5313f339d2b50e58",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R1-final-close",
+      "source_commit": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+      "source_sha256": "92dc2d8ec7880cecedc08171193204c4ff8649d5f88cde1e5313f339d2b50e58",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R2-history-25N",
+      "source_commit": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "source_sha256": "803140772ab25bb2ca3b09df419e40195ace94eff2b2f9ac7eb880eb0e67b9f9",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R2-heavy-load",
+      "source_commit": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "source_sha256": "803140772ab25bb2ca3b09df419e40195ace94eff2b2f9ac7eb880eb0e67b9f9",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R3-precheck",
+      "source_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "source_sha256": "9b73d5828983977ed8c3d17123fedc4c102a5d6d6fcd616f6bed54e3b7989247",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R3-lower-timeout",
+      "source_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "source_sha256": "9b73d5828983977ed8c3d17123fedc4c102a5d6d6fcd616f6bed54e3b7989247",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R4-C11-T0",
+      "source_commit": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "source_sha256": "fda46bee0aefa8d6907ead7a5476f1a558ddc1f5beefbbf9bf7c0cb21a80e941",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R4-C11-G0",
+      "source_commit": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "source_sha256": "fda46bee0aefa8d6907ead7a5476f1a558ddc1f5beefbbf9bf7c0cb21a80e941",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R5-persistent-T0",
+      "source_commit": "8d9968f0070852ae707f3f635c946242d432bd59",
+      "source_sha256": "575bc2e78b4f2fa5f8999f4ac75037e43f094775cdd77ce417e5f5b0dc1ae71f",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    },
+    {
+      "experiment": "R5-10N-G0",
+      "source_commit": "73a670ddf28b1fd48a173cef6e6324c32dbfc805",
+      "source_sha256": "0836bebbb9cf0f5ef742250cf1f33ae2e06a202918c99025cf64b97c0615d8d7",
+      "source_restorable": true,
+      "cli_valid": true,
+      "references_readable": true
+    }
+  ],
+  "current_g0_live_cells": [
+    {
+      "provider": "mujoco",
+      "rate_hz": 100,
+      "g0_pass": true,
+      "T": 698,
+      "boundaries": 699,
+      "sha256": "54c7f128856525c4a156c4588cdecdb1c1464365290cd92a006d77961bf8c0ad",
+      "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/live_03/mujoco/tb100/execution.h5"
+    },
+    {
+      "provider": "geophys",
+      "rate_hz": 100,
+      "g0_pass": true,
+      "T": 700,
+      "boundaries": 701,
+      "sha256": "3a7de798b73584ba4333df22fdd0c0eb9df4b9f8d350dfe7d237a0f2a34aeeeb",
+      "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/live_03/geophys/tb100/execution.h5"
+    },
+    {
+      "provider": "mujoco",
+      "rate_hz": 500,
+      "g0_pass": true,
+      "T": 3487,
+      "boundaries": 3488,
+      "sha256": "d620ec0251c64bb32b6920a970fd93f356cbcb47e49ad4fcdfabf16dfa4b5b54",
+      "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/live_03/mujoco/tb500/execution.h5"
+    },
+    {
+      "provider": "geophys",
+      "rate_hz": 500,
+      "g0_pass": true,
+      "T": 3501,
+      "boundaries": 3502,
+      "sha256": "b317500f5c0cdb468a84efb1388a286fe2dd056cb65f7d23bcf4d35df9885dbb",
+      "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/live_03/geophys/tb500/execution.h5"
+    },
+    {
+      "provider": "mujoco",
+      "rate_hz": 50,
+      "g0_pass": true,
+      "T": 349,
+      "boundaries": 350,
+      "sha256": "10d64f1632ad40758ee2fc974dc0037d6d08f750388429d36cf1962ccc37c8e6",
+      "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/live_03/mujoco/tb50/execution.h5"
+    },
+    {
+      "provider": "geophys",
+      "rate_hz": 50,
+      "g0_pass": true,
+      "T": 350,
+      "boundaries": 351,
+      "sha256": "ddecd036d9c8bf8e9ac2d13499fbc70006b5da0c35daa6750bec0e9d9053c5e6",
+      "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/live_03/geophys/tb50/execution.h5"
+    }
+  ],
+  "current_v0_fixture": {
+    "path": "workspace/qualification/phase1/p1_8_replay_infrastructure_closure/pickcube_v0_regression.h5",
+    "exists": true,
+    "sha256": "9741cdfb1d355543d9c42c62076ff7ccc7da6bbf1b3b5eee309509809170689a"
+  },
+  "current_live_h5_count": 6,
+  "integrated_live_h5_count": 2,
+  "native_sidecar_count": 54,
+  "canonical_checkpoint_reports": 4,
+  "native_checkpoint_reports": 4,
+  "archive_sources": [
+    {
+      "path": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/integration_final_source.bundle",
+      "size": 1999101,
+      "sha256": "bc2f3f234bcf62a1ec6ca8d232c875d52536835a463a1adb60d917718d9c5f8f"
+    },
+    {
+      "path": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/geophys_source.bundle",
+      "size": 12139954,
+      "sha256": "2285308e07c61b597a4284b3bc54fe4f9747431fe85bf43fab1b6b0f0067eb5b"
+    },
+    {
+      "path": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/menagerie_source.bundle",
+      "size": 604164075,
+      "sha256": "3c9f399e5848c904e8f37dee85efcb07a766e1d8b9bcbdfc01ce13db728107df"
+    },
+    {
+      "path": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/p1_8_source.bundle",
+      "size": 18571359,
+      "sha256": "e6c6067ada628c2207017051a510f921ac6bac57f903abe0ac2e13507efa0737"
+    },
+    {
+      "path": "/home/lly/Geochora_Evidence_Archive/p1_8_integration_20261012/r5_start.diff",
+      "size": 2689,
+      "sha256": "698b11cd1501de341dfb95d58e4c6287ac750b78f594599d60a89b31c049439a"
+    }
+  ],
+  "archive_inventory_sha256": "708bf5073b764cdc5113f8573c7cbfeb6cb5cc659be66ae6a643a70c569c4bd7",
+  "off_host_backup": "not verified",
+  "selected_core_evidence_logical_bytes": 2630153728,
+  "selected_core_evidence_unique_paths": 784,
+  "current_closure_evidence_logical_bytes": 4069079038,
+  "retained_source_snapshot_bytes": 1954211840,
+  "archive_remaining_logical_bytes": 10989626950,
+  "archive_remaining_allocated_bytes": 10997338112,
+  "compressed_original_bytes": 2937880998,
+  "compressed_storage_bytes": 272781821,
+  "verified_duplicate_logical_bytes_removed": 16282769518
+}

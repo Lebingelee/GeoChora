@@ -1,0 +1,52 @@
+{
+  "branch": "codex/p1.8-integration",
+  "commit": "cf5f941",
+  "code_checkpoint_commits": [
+    "39479aa",
+    "d6016e1",
+    "78eba97",
+    "cf5f941"
+  ],
+  "recorder_schema": "canonical-execution-trajectory-v2",
+  "snapshot_schema": "p18-owner-checkpoint-prototype-v2",
+  "interval_schema": "executed-native-substeps-v1",
+  "timebase_schema": "canonical-integer-native-clock-v1",
+  "live_recorder_pass": true,
+  "clock_contract_pass": true,
+  "checkpoint_restore_pass": true,
+  "interval_reconstruction_pass": true,
+  "trajectory_roundtrip_pass": true,
+  "regression_pass": true,
+  "infrastructure_status": "REPLAY_INFRASTRUCTURE_GO",
+  "verified_scope": {
+    "canonical_real_boundary_owner_control_restore": "GeoPhys/MuJoCo 500/100/50 Hz P0-P8, 12-boundary continuation, exact",
+    "live_G0_recording": "shared +1mm 10N equal-rate six cells",
+    "native_MuJoCo": "public integration-state, nine checkpoints, 12 boundaries exact at all rates",
+    "native_GeoPhys": "tested at all rates; P0/P1 exact, contact-checkpoint native resume NOT exact or qualified"
+  },
+  "remaining_blockers": [
+    "T1 not run",
+    "full NutAssembly experts not run",
+    "frozen full-task goldens absent",
+    "formal D0/D1/D2 not run",
+    "Human Review pending",
+    "GeoPhys native contact-checkpoint bitwise continuation unsupported"
+  ],
+  "campaign_status": "D0_D2_CAMPAIGN_BLOCKED",
+  "cleanup_complete": true,
+  "cleanup_manifest_sha256": "14fe9e007c8b61d7f1ff06d1ec9dcb12b0dcb5e8291b34c7341c91c22f83d6ab",
+  "recovery_verification_sha256": "d7518a93b0515e2ce73c52b336abbf70ebd17cf492e85b5068288bd93b2ecf10",
+  "cleanup_result": {
+    "deleted_files": 559,
+    "last_link_allocated_bytes_released": 32590393344,
+    "filesystem_free_delta_bytes": 32590274560,
+    "archive_logical_bytes_before": 27011368180,
+    "archive_logical_bytes_after": 10989626950,
+    "off_host_backup": "not verified",
+    "selected_core_evidence_logical_bytes": 2630153728,
+    "current_closure_evidence_logical_bytes": 4069079038,
+    "retained_archive_logical_bytes": 10989626950,
+    "compressed_storage_bytes": 272781821,
+    "verified_duplicate_logical_bytes_removed": 16282769518
+  }
+}
