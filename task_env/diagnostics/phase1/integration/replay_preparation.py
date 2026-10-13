@@ -85,9 +85,35 @@ def _decode(x):
 
 def _owners(value):
     c = value['controller']
-    return {'arm_gripper': c.hold.controller, 'arm_hold': c.hold,
-            'stability': value['solution']._stability, 'cadence': c.inner,
-            'coordinator': value['solution']}
+    result = {'arm_gripper': c.hold.controller, 'arm_hold': c.hold,
+              'stability': value['solution']._stability, 'cadence': c.inner,
+              'coordinator': value['solution']}
+    if '_arm_schedule_memory' in value:
+        result['arm_schedule'] = value['_arm_schedule_memory']
+    return result
+
+
+def _fields(name, owner=None):
+    if name == 'arm_schedule':
+        return ('last_applied_arm',)
+    if name == 'coordinator' and owner is not None and hasattr(owner, '_lifecycle'):
+        legacy_flags = {'_done', '_failed', '_failure_reason'}
+        return tuple(field for field in FIELDS[name] if field not in legacy_flags) + ('lifecycle_state',)
+    return FIELDS[name]
+
+
+def _owner_version(name, owner=None):
+    if name == 'arm_schedule':
+        return 'arm-schedule-public-ack-memory-v2'
+    if name == 'coordinator' and owner is not None and hasattr(owner, '_lifecycle'):
+        return 'coordinator-canonical-solution-lifecycle-v1'
+    return name + '-memory-prototype-v1'
+
+
+def _checkpoint_version(value):
+    return ('p18-owner-checkpoint-prototype-v3'
+            if hasattr(value['solution'], '_lifecycle')
+            else 'p18-owner-checkpoint-prototype-v2')
 
 
 def _source(owner):
@@ -100,10 +126,16 @@ def snapshot(value, state, provider):
         raise ValueError('snapshot must align with next compute boundary')
     owners = {}
     for name, owner in _owners(value).items():
-        owners[name] = {'version': name + '-memory-prototype-v1', 'source_sha256': _source(owner),
-            'fields': {k: {'present': k in vars(owner), 'value': _encode(vars(owner).get(k))}
-                       for k in FIELDS[name]}}
-    result = {'version': 'p18-owner-checkpoint-prototype-v2',
+        fields = {}
+        for key in _fields(name, owner):
+            if key == 'lifecycle_state':
+                present, raw = True, owner._lifecycle.to_mapping()
+            else:
+                present, raw = key in vars(owner), vars(owner).get(key)
+            fields[key] = {'present': present, 'value': _encode(raw)}
+        owners[name] = {'version': _owner_version(name, owner), 'source_sha256': _source(owner),
+            'fields': fields}
+    result = {'version': _checkpoint_version(value),
         'controller_identity': value['controller_identity'], 'solution_identity': value['solution_identity'],
         'artifact_hash': value['artifact'].identity_hash, 'provider': provider,
         'control_step': state.control_step, 'simulation_time': state.simulation_time,
@@ -118,7 +150,7 @@ def restore(value, state, provider, record):
     integrity = record.pop('integrity_hash')
     if digest(record) != integrity:
         raise ValueError('checkpoint integrity mismatch')
-    expected = {'version': 'p18-owner-checkpoint-prototype-v2',
+    expected = {'version': _checkpoint_version(value),
         'controller_identity': value['controller_identity'], 'solution_identity': value['solution_identity'],
         'artifact_hash': value['artifact'].identity_hash, 'provider': provider,
         'control_step': state.control_step, 'simulation_time': state.simulation_time,
@@ -127,19 +159,24 @@ def restore(value, state, provider, record):
               'control_step', 'simulation_time', 'timebase'):
         if record[k] != expected[k]:
             raise ValueError('checkpoint identity/alignment mismatch: ' + k)
-    if set(record['owners']) != set(FIELDS):
+    owners = _owners(value)
+    if set(record['owners']) != set(owners):
         raise ValueError('missing owner history')
     decoded = {}
-    for name, owner in _owners(value).items():
+    for name, owner in owners.items():
         payload = record['owners'][name]
-        if payload['version'] != name + '-memory-prototype-v1' or payload['source_sha256'] != _source(owner):
+        if payload['version'] != _owner_version(name, owner) or payload['source_sha256'] != _source(owner):
             raise ValueError('owner version/source mismatch')
-        if set(payload['fields']) != set(FIELDS[name]):
+        if set(payload['fields']) != set(_fields(name, owner)):
             raise ValueError('incomplete owner fields: ' + name)
         decoded[name] = {k: (v['present'], _decode(v['value'])) for k, v in payload['fields'].items()}
         optional = {'_captured_position', '_captured_rotation', '_close_gate', '_grasp_pose'} if name == 'coordinator' else set()
         if any(type(v['present']) is not bool or (not v['present'] and k not in optional) for k,v in payload['fields'].items()):
             raise ValueError('missing required owner state: ' + name)
+        if name == 'coordinator' and hasattr(owner, '_lifecycle'):
+            from ....tasks.canonical_solution_lifecycle import CanonicalSolutionLifecycle
+            lifecycle_probe = CanonicalSolutionLifecycle(owner._lifecycle.completion_policy)
+            lifecycle_probe.restore_state(decoded[name]['lifecycle_state'][1])
     arm = decoded['arm_gripper']
     if arm['_expected_step'][1] != state.control_step or not arm['_joint_reference'][0]:
         raise ValueError('missing/alignment-invalid controller history')
@@ -151,6 +188,9 @@ def restore(value, state, provider, record):
             raise ValueError('missing stage-dependent owner state: '+field)
     for name, owner in _owners(value).items():
         for k, (present, val) in decoded[name].items():
+            if name == 'coordinator' and k == 'lifecycle_state':
+                owner._lifecycle.restore_state(val)
+                continue
             if present:
                 setattr(owner, k, val)
             elif k in vars(owner):

@@ -36,7 +36,8 @@ def observation(state, artifact):
         pose = state.pose_world[semantic]
         obs['privileged_state'][key + '_body_pose'] = np.array([(*pose.position, *pose.quaternion_wxyz)], dtype=np.float32)
     info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
-            'task_metrics': dict(evaluation.metrics)}
+            'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
+            'simulation_time_s': float(state.simulation_time)}
     return obs, info, evaluation
 
 

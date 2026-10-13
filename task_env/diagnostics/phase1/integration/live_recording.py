@@ -16,19 +16,27 @@ class LiveRecording:
     def __init__(self, value, provider, session, audit, sample, realized, state, feedback, info, *, output):
         self.value,self.provider,self.audit,self.output=value,provider,audit,output
         self.session=session
+        lifecycle = getattr(value['solution'], 'lifecycle', None)
+        self._lifecycle_event_cursor = len(lifecycle.events) if lifecycle is not None else 0
+        native_gripper = (getattr(value['controller'].inner, 'version', None)
+                          == 'native-gripper-500hz-v1')
+        cadence_identity = 'fixed-native-500hz-v1' if native_gripper else 'equal_rate'
         metadata=EpisodeMetadata('canonical-trajectory-metadata-v0',value['artifact'].identity_hash,
             sample,realized,execution(provider),{'build':json.dumps(worker.provider_build_identity(provider),sort_keys=True)},
             {'recipe':value['recipe_identity']},value['artifact'].timebase,value['controller_identity'],
             value['solution_identity'],digest({'controller':value['controller_identity'],'readiness':'close_only'}),
-            digest({'control':'absolute_pose/world/wxyz','interval':'equal_rate'}),sample.task_seed,'regression')
+            digest({'control':'absolute_pose/world/wxyz','interval':cadence_identity}),sample.task_seed,'regression')
         initial_snapshot=snapshot(value,state,provider)
         owner_schema={name:{'version':p['version'],'source_sha256':p['source_sha256'],'fields':list(p['fields'])} for name,p in initial_snapshot['owners'].items()}
         self.recorder=ExecutionRecorder(metadata,{'schema':'r5-execution-recipe-v1',
             'recorder_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'factory':'task_env.diagnostics.phase1.integration.grasp_height_probe.context',
             'artifact':value['artifact'].to_mapping(),'recipe_identity':value['recipe_identity'],
-            'cadence':'outer-equal-rate','owner_schema':owner_schema,'stages':list(value['solution'].STAGES),'grasp_offset_z_m':.045895,'absolute_height_gate':False,
-            'force_limit_N':10.,'authorization_deadline_s':1.5,'fallback':False})
+            'cadence':cadence_identity,'owner_schema':owner_schema,'stages':list(value['solution'].STAGES),'grasp_offset_z_m':.045895,'absolute_height_gate':False,
+            'force_limit_N':10.,'authorization_deadline_s':1.5,'fallback':False,
+            'completion_policy':(lifecycle.completion_policy.value if lifecycle is not None else 'implicit_legacy_on_success'),
+            'lifecycle_version':(lifecycle.version if lifecycle is not None else None),
+            'solution_version':getattr(value['solution'],'version',None)})
         self.recorder.value['recipe']['episode_role'] = value.get('_recording_role', 'regression')
         self.recorder.boundary(self.boundary(state,feedback,info),snapshot(value,state,provider),value['solution'].stage,info['task_metrics'],self.native_time())
 
@@ -42,7 +50,8 @@ class LiveRecording:
         readiness=self.value['controller'].readiness(state,feedback)
         metrics=info['task_metrics']
         return BoundaryRecord(state.control_step,state.simulation_time,state,feedback,readiness,
-            {k:float(v) for k,v in metrics.items()},bool(metrics.get('task_success',False)),self.value['solution'].failed)
+            {k:float(v) for k,v in metrics.items()},bool(metrics.get('task_success',False)),
+            bool(info.get('task_failure',False)))
 
     def begin(self, state, request, stage, diagnostics):
         self.request,self.stage,self.diagnostics=request,stage,dict(diagnostics)
@@ -51,9 +60,16 @@ class LiveRecording:
 
     def complete(self, state, feedback, info, evaluation, row):
         planned=not bool(self.diagnostics.get('readiness_hold',False))
+        diagnostics = dict(self.diagnostics)
+        lifecycle = getattr(self.value['solution'], 'lifecycle', None)
+        if lifecycle is not None:
+            new_events = lifecycle.events[self._lifecycle_event_cursor:]
+            if new_events:
+                diagnostics['solution_lifecycle_events'] = new_events
+            self._lifecycle_event_cursor = len(lifecycle.events)
         transition=TransitionRecord(self.request,self.canonical,self.target,self.applied,
             float(evaluation.reward),False,False,self.stage,
-            {k:json.dumps(v,sort_keys=True) for k,v in self.diagnostics.items()},planned,not planned)
+            {k:json.dumps(v,sort_keys=True) for k,v in diagnostics.items()},planned,not planned)
         self.recorder.append(transition,self.boundary(state,feedback,info),
             snapshot(self.value,state,self.provider),self.value['solution'].stage,self.audit.boundaries[-1],info['task_metrics'],self.native_time())
         # Same live values must agree; no post-hoc invention of applied inputs.
@@ -71,7 +87,8 @@ class LiveRecording:
     def finish(self, report):
         probe = report.get('probe')
         if probe == 'FULL':
-            stop_reason = ('canonical_task_success' if report.get('pass') and report.get('canonical_task_success')
+            stop_reason = (report.get('completion_reason')
+                           if report.get('pass') and report.get('completion_reason')
                            else report.get('failure_boundary') or 'full_expert_incomplete')
         elif probe == 'T1':
             stop_reason = ('t1_loaded_transport_complete' if report.get('pass')

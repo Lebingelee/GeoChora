@@ -826,7 +826,11 @@ def run_loaded(value, provider, folder, probe):
             after_stage = solution.stage
             if value.get('recording_transition_limit') and len(trace) >= value['recording_transition_limit']:
                 break
-            if after_stage != before_stage:
+            stage_entered_next = after_stage != before_stage
+            terminal_stage_completed = bool(
+                solution.done and before_stage == solution.STAGES[-1]
+            )
+            if stage_entered_next or terminal_stage_completed:
                 endpoint = _stage_endpoint(before_stage, stage_rows[before_stage], value)
                 endpoints.append(endpoint)
                 if before_stage == "close_gripper":
@@ -865,8 +869,9 @@ def run_loaded(value, provider, folder, probe):
                     break
                 if probe == "T1" and before_stage == "descend_to_peg_top":
                     break
-                stage_entry[after_stage] = state.simulation_time
-                stage_plan_duration[after_stage] = len(solution._actions) * artifact.timebase.control_dt
+                if stage_entered_next:
+                    stage_entry[after_stage] = state.simulation_time
+                    stage_plan_duration[after_stage] = len(solution._actions) * artifact.timebase.control_dt
         if solution.failed:
             report["failure_boundary"] = "nutassembly_solution/" + str(solution.failure_reason)
         goal_stages = ("verify_lift",) if probe == "G0" else t1_stages
@@ -886,7 +891,11 @@ def run_loaded(value, provider, folder, probe):
         coordinator_done = bool(solution.done)
         coordinator_failed = bool(solution.failed)
         solution_events = list(getattr(solution, "events", []))
+        lifecycle = getattr(solution, "lifecycle", None)
+        lifecycle_state = lifecycle.to_mapping() if lifecycle is not None else None
+        lifecycle_events = list(lifecycle_state["events"]) if lifecycle_state else []
         event_by_name = {item.get("event"): item for item in solution_events}
+        lifecycle_event_by_name = {item.get("event"): item for item in lifecycle_events}
         expected_postclose_ticks = solution._ticks(value["solution"].postclose_hold_s)
         observed_postclose_hold_s = None
         if (event_by_name.get("controller_close_authorized")
@@ -927,22 +936,58 @@ def run_loaded(value, provider, folder, probe):
             required_full_stages = list(solution.STAGES)
             ordered_stages_pass = coordinator_stages == required_full_stages
             full_endpoints = {item["stage"]: item for item in endpoints}
-            completed_stage_endpoints = all(
+            preterminal_stage_endpoints_pass = all(
                 full_endpoints.get(stage, {}).get("pose_gate_pass", False)
                 and full_endpoints.get(stage, {}).get("capture_gate_pass", False)
                 for stage in required_full_stages[:-1]
             )
-            task_success = bool(info["task_metrics"].get("task_success", False))
-            complete = bool(coordinator_done and not coordinator_failed and ordered_stages_pass
-                            and completed_stage_endpoints and task_success)
+            all_full_stage_endpoints_pass = all(
+                full_endpoints.get(stage, {}).get("pose_gate_pass", False)
+                and full_endpoints.get(stage, {}).get("capture_gate_pass", False)
+                for stage in required_full_stages
+            )
+            task_success = bool(info.get("is_success", False))
+            retreat_rows = stage_rows.get("release_retreat", [])
+            retreat_endpoint = full_endpoints.get("release_retreat", {})
+            retreat_endpoint_pass = bool(
+                retreat_rows
+                and retreat_endpoint.get("pose_gate_pass", False)
+                and retreat_endpoint.get("capture_gate_pass", False)
+                and retreat_endpoint.get("stable_window_ticks", 0)
+                    >= retreat_endpoint.get("required_stable_window_ticks", 1)
+            )
+            lifecycle_completed = bool(lifecycle_state and lifecycle_state["status"] == "completed")
+            lifecycle_failed = bool(lifecycle_state and lifecycle_state["status"] == "failed")
+            task_success_event = lifecycle_event_by_name.get("task_success_first_observed")
+            expert_completion_event = lifecycle_event_by_name.get("expert_sequence_completed")
+            completion_reason = lifecycle_state.get("completion_reason") if lifecycle_state else None
+            complete = bool(
+                coordinator_done and not coordinator_failed and lifecycle_completed
+                and not lifecycle_failed and ordered_stages_pass and preterminal_stage_endpoints_pass
+                and all_full_stage_endpoints_pass
+                and retreat_endpoint_pass and task_success and task_success_event
+                and expert_completion_event and completion_reason == "expert_sequence_completed"
+                and lifecycle_state.get("last_task_success")
+            )
             passed = bool(close_time_ok and verify_lift_pass and close_sequence_pass
                           and not grasp_loss and capture_ok and complete)
             report.update(
                 required_full_stages=required_full_stages,
                 observed_full_stage_sequence=coordinator_stages,
                 full_stage_endpoints=full_endpoints,
-                all_preterminal_stage_endpoint_gates_pass=bool(completed_stage_endpoints),
+                all_preterminal_stage_endpoint_gates_pass=bool(preterminal_stage_endpoints_pass),
+                all_full_stage_endpoint_gates_pass=bool(all_full_stage_endpoints_pass),
                 canonical_task_success=task_success,
+                task_success_first_observed=task_success_event,
+                expert_completion_event=expert_completion_event,
+                completion_reason=completion_reason,
+                lifecycle_completion_policy=(lifecycle_state.get("completion_policy") if lifecycle_state else None),
+                expert_complete=lifecycle_completed,
+                expert_failed=lifecycle_failed,
+                release_retreat_actions_executed=len(retreat_rows),
+                release_retreat_endpoint_pass=retreat_endpoint_pass,
+                final_task_success_valid=bool(lifecycle_state and lifecycle_state.get("last_task_success")),
+                lifecycle_state=lifecycle_state,
             )
         else:
             raise ValueError("probe must be G0, T1, or FULL")

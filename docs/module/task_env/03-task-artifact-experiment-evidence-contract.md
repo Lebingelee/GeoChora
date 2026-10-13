@@ -148,6 +148,11 @@ Judge 已批准。Stage 2 可以引用，但不得静默修改冻结语义。
 
 第一版必须执行 randomized reset probe。
 
+Canonical Solution 必须区分 Task Success、Expert Completion 与环境
+termination/truncation。对于带有任务成功后必需动作的 expert，应声明
+versioned completion policy、终端 stage 条件以及录制/replay 状态；详见
+[Canonical Solution Lifecycle Contract](canonical-solution-lifecycle-contract.md)。
+
 Report 至少必须区分：
 
 - solved；

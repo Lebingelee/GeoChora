@@ -29,7 +29,15 @@ def checkpoints(x):
 
 
 def initialized(x,hz):
-    v=context(hz);s=CanonicalStateView.from_mapping(x['boundaries'][0]['record']['state'])
+    if x['recipe'].get('completion_policy') == 'on_expert_terminal_stage':
+        from .lifecycle_full import context as lifecycle_context
+        v=lifecycle_context(hz)
+    elif x['recipe'].get('cadence') == 'fixed-native-500hz-v1':
+        from ..frequency_grasp.run import context as frequency_context
+        v=frequency_context(hz,'arm_ramp_native_grip')
+    else:
+        v=context(hz)
+    s=CanonicalStateView.from_mapping(x['boundaries'][0]['record']['state'])
     f=CanonicalControlFeedback.from_mapping(x['boundaries'][0]['record']['feedback'])
     expected=sample_reset(v['artifact'],int(v['profile']['reset']['seed']))
     recorded=x['metadata']['reset_sample']
@@ -56,13 +64,28 @@ def one(v,x,k,provider):
     expected_owners=expand_snapshot(expected['owners'],x['blobs'])
     saved_outer=_decode(expected_owners['owners']['arm_hold']['fields']['last_target']['value'])
     if outer.to_mapping()!=saved_outer.to_mapping():raise AssertionError('outer target')
-    for sub in t['interval']['substeps']:
+    substeps=t['interval']['substeps']
+    ramp_active='_arm_schedule_memory' in v and v['solution']._lift_released
+    ramp_initial=(dict(v['_arm_schedule_memory'].last_applied_arm)
+                  if ramp_active and v['_arm_schedule_memory'].last_applied_arm is not None else None)
+    if ramp_active and ramp_initial is None:
+        raise AssertionError('arm_schedule_memory_missing_before_ramp')
+    for subindex,sub in enumerate(substeps):
         ss=CanonicalStateView.from_mapping(sub['state']);ff=CanonicalControlFeedback.from_mapping(sub['feedback'])
         grip,diagnostics=v['controller'].inner_gripper_step(ss,ff)
-        actual=replace(outer,gripper=grip)
+        arm_servo=outer.arm_servo_position
+        arm_position=outer.arm_position
+        if ramp_active:
+            fraction=(subindex+1)/len(substeps)
+            arm_servo={name:ramp_initial[name]+fraction*(value-ramp_initial[name])
+                       for name,value in outer.arm_servo_position.items()}
+            arm_position=arm_servo
+        actual=replace(outer,arm_position=arm_position,arm_servo_position=arm_servo,gripper=grip)
         if actual.to_mapping()!=sub['target']:raise AssertionError('substep target')
         if diagnostics['inner_update_performed']!=sub['updated']:raise AssertionError('cadence')
         if actual.identity_hash!=sub['applied']['target_hash']:raise AssertionError('application identity')
+        if '_arm_schedule_memory' in v:
+            v['_arm_schedule_memory'].last_applied_arm=dict(sub['applied']['arm_servo_position'])
     post=CanonicalStateView.from_mapping(expected['record']['state']);pf=CanonicalControlFeedback.from_mapping(expected['record']['feedback'])
     readiness=v['controller'].readiness(post,pf)
     if readiness.to_mapping()!=expected['record']['readiness']:raise AssertionError('readiness')
