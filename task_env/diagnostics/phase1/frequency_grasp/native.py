@@ -69,7 +69,8 @@ class NativeObserver:
             bn=[m.body(b1).name,m.body(b2).name]
             has_nut=nut in [b1,b2]
             finger_table=any(b in ['left_finger','right_finger'] for b in bn) and any('table' in b for b in bn)
-            if not has_nut and not finger_table:continue
+            hand_peg=set(bn)=={'hand','peg1'}
+            if not has_nut and not finger_table and not hand_peg:continue
             w=np.zeros(6);mujoco.mj_contactForce(m,d,ci,w)
             frame=c.frame.reshape(3,3).copy();fw=frame.T@w[:3];tw=frame.T@w[3:]
             j1=np.zeros((3,m.nv));j2=np.zeros((3,m.nv));rot1=np.zeros((3,m.nv));rot2=np.zeros((3,m.nv))
@@ -99,6 +100,7 @@ class NativeObserver:
             contacts.append({'id':ci,'geom_ids':[int(c.geom1),int(c.geom2)],
                 'geom_names':[m.geom(c.geom1).name,m.geom(c.geom2).name],
                 'bodies':bn,'has_nut':has_nut,'finger_table':finger_table,
+                'hand_peg':hand_peg,
                 'position_world_m':c.pos.tolist(),'frame_world_to_contact':frame.tolist(),
                 'distance_m':float(c.dist),'dim':dim,'friction':friction.tolist(),
                 'solref':c.solref.tolist(),'solimp':c.solimp.tolist(),

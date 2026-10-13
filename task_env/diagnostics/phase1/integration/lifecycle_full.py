@@ -8,6 +8,10 @@ import importlib.metadata
 import json
 from pathlib import Path
 import subprocess
+from dataclasses import replace
+import xml.etree.ElementTree as ET
+
+import numpy as np
 
 from . import live_recording as recording_module
 from .live_recording import LiveRecording
@@ -17,6 +21,9 @@ from ..frequency_grasp.cadence import validate_native_cadence
 from ..frequency_grasp.native import AppliedStepObserver, NativeObserver
 from ..nutassembly_r5_architecture import tracking_worker as worker
 from ....tasks.nut_assembly.canonical_solution_v2 import NutAssemblyStableGraspCandidateV2
+from ....tasks.nut_assembly.clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3
+from ....tasks.nut_assembly.clearance_candidate_v4 import NutAssemblyHandClearanceCandidateV4
+from ....tasks.nut_assembly.clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5
 from ....controllers.canonical.contracts import digest
 
 
@@ -24,12 +31,113 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def context(rate: int):
-    """Build the exact NoSlip2/native-ramp/native-500Hz recipe with V2 lifecycle."""
+def _compile_contact_probe_model(xml: str):
+    """Compile the same normalized MJCF used by the MuJoCo session adapter."""
+    import mujoco
+
+    root = ET.fromstring(xml)
+    for element in root.iter("freejoint"):
+        element.tag = "joint"
+        element.set("type", "free")
+    for element in root.findall("keyframe"):
+        root.remove(element)
+    return mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"))
+
+
+def _exclude_hand_peg_pair(value: dict) -> dict:
+    """Add one diagnostic-only hand/peg body-pair exclusion.
+
+    The production TaskArtifact remains unchanged. A compiled-model guard
+    ensures the intervention changes only MuJoCo's contact exclusion table.
+    """
+    source = value["source"]
+    original_xml = source.scene_source.xml
+    root = ET.fromstring(original_xml)
+    contact = root.find("contact")
+    if contact is None:
+        contact = ET.SubElement(root, "contact")
+    for exclusion in contact.findall("exclude"):
+        if {exclusion.get("body1"), exclusion.get("body2")} == {"hand", "peg1"}:
+            raise ValueError("hand/peg diagnostic exclusion already exists")
+    ET.SubElement(contact, "exclude", body1="hand", body2="peg1")
+    variant_xml = ET.tostring(root, encoding="unicode")
+
+    base_model = _compile_contact_probe_model(original_xml)
+    variant_model = _compile_contact_probe_model(variant_xml)
+    for model in (base_model, variant_model):
+        if model.opt.timestep != 0.002 or model.opt.noslip_iterations != 2:
+            raise ValueError("hand/peg ablation requires the frozen dt=0.002 NoSlip2 model")
+    if variant_model.nexclude != base_model.nexclude + 1:
+        raise ValueError("diagnostic must add exactly one compiled body-pair exclusion")
+
+    invariant_arrays = (
+        "body_mass", "body_inertia", "body_ipos", "body_iquat", "body_parentid",
+        "geom_type", "geom_size", "geom_pos", "geom_quat", "geom_friction",
+        "geom_solref", "geom_solimp", "geom_condim", "geom_bodyid", "geom_contype",
+        "geom_conaffinity", "geom_margin", "geom_gap", "actuator_trntype",
+        "actuator_trnid", "actuator_gainprm", "actuator_biasprm", "actuator_forcerange",
+        "actuator_ctrlrange", "dof_damping", "dof_armature", "jnt_qposadr",
+        "jnt_dofadr", "jnt_range", "eq_type", "eq_data", "tendon_adr",
+        "tendon_num", "wrap_type", "wrap_objid", "wrap_prm",
+    )
+    changed_arrays = [
+        name for name in invariant_arrays
+        if not np.array_equal(getattr(base_model, name), getattr(variant_model, name))
+    ]
+    if changed_arrays:
+        raise ValueError(f"unrelated compiled model arrays changed: {changed_arrays}")
+    if base_model.ngeom != variant_model.ngeom or base_model.nbody != variant_model.nbody:
+        raise ValueError("diagnostic collision intervention changed scene geometry")
+
+    source_hash = hashlib.sha256(variant_xml.encode()).hexdigest()
+    scene = replace(
+        source.scene_source,
+        xml=variant_xml,
+        source_id=source.scene_source.source_id + "/diagnostic-hand-peg-exclusion-v1",
+    )
+    value["source"] = replace(source, scene_source=scene)
+    intervention = {
+        "id": "diagnostic-hand-peg-body-pair-exclusion-v1",
+        "body_pair": ["hand", "peg1"],
+        "scope": "all hand-body geoms versus square-peg body; finger bodies and other pairs remain enabled",
+        "production_eligible": False,
+        "base_compiled_nexclude": int(base_model.nexclude),
+        "variant_compiled_nexclude": int(variant_model.nexclude),
+        "base_ngeom": int(base_model.ngeom),
+        "variant_ngeom": int(variant_model.ngeom),
+        "base_nbody": int(base_model.nbody),
+        "variant_nbody": int(variant_model.nbody),
+        "invariant_compiled_arrays": list(invariant_arrays),
+        "changed_unrelated_compiled_arrays": changed_arrays,
+        "timestep_s": float(variant_model.opt.timestep),
+        "noslip_iterations": int(variant_model.opt.noslip_iterations),
+        "source_xml_sha256": source_hash,
+    }
+    value["_collision_intervention"] = intervention
+    value["recipe_identity"] = digest({
+        "base_recipe": value["recipe_identity"],
+        "collision_intervention": intervention["id"],
+        "source_xml_sha256": source_hash,
+    })
+    return intervention
+
+
+def context(rate: int, trajectory_candidate: str = "lifecycle-v2"):
+    """Build the fixed NoSlip2/native-ramp/native-500Hz recipe and solution."""
     value = frequency_run.context(rate, "arm_ramp_native_grip")
     old_solution_identity = value["solution_identity"]
     old_controller_identity = value["controller_identity"]
-    solution = NutAssemblyStableGraspCandidateV2(
+    solution_classes = {
+        "lifecycle-v2": NutAssemblyStableGraspCandidateV2,
+        "handle-clearance-v3": NutAssemblyHandClearanceCandidateV3,
+        "handle-clearance-v4-live-settle": NutAssemblyHandClearanceCandidateV4,
+        "handle-clearance-v5-shared-height-correction": NutAssemblyHandClearanceCandidateV5,
+    }
+    try:
+        solution_class = solution_classes[trajectory_candidate]
+    except KeyError as exc:
+        raise ValueError(f"unsupported trajectory candidate: {trajectory_candidate}") from exc
+    solution = solution_class(
         config=value["solution_config"],
         control_dt=value["artifact"].timebase.control_dt,
         arm_hold=value["controller"].hold,
@@ -55,14 +163,23 @@ def context(rate: int):
     return value
 
 
-def run(*, provider: str, rate: int, output: Path) -> dict:
+def run(*, provider: str, rate: int, output: Path,
+        collision_ablation: str = "none",
+        trajectory_candidate: str = "lifecycle-v2") -> dict:
     if provider != "mujoco":
         raise ValueError("this bounded lifecycle run is MuJoCo-only")
-    if rate != 100:
-        raise ValueError("this requested FULL lifecycle diagnostic is pinned to 100 Hz")
+    if rate not in {20, 50, 100, 500}:
+        raise ValueError("FULL lifecycle diagnostic requires a supported 20/50/100/500 Hz rate")
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
-    value = context(rate)
+    value = context(rate, trajectory_candidate)
+    if collision_ablation != "none" and trajectory_candidate != "lifecycle-v2":
+        raise ValueError("collision ablations are restricted to the frozen Lifecycle V2 baseline")
+    collision_intervention = None
+    if collision_ablation == "hand-peg-body-pair-exclude":
+        collision_intervention = _exclude_hand_peg_pair(value)
+    elif collision_ablation != "none":
+        raise ValueError(f"unsupported collision ablation: {collision_ablation}")
     value["_loaded_diagnostics"] = True
     value["_recording_role"] = "full_nutassembly_expert_lifecycle_v2"
     worker.CLOSE_TIME_LIMIT_S = 1.5
@@ -132,6 +249,9 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
                 qualification=False,
                 arm_schedule="linear-native-ramp-after-lift-v2-public-ack-memory",
                 cadence="fixed-native-500hz-v1",
+                collision_intervention=collision_intervention,
+                diagnostic_only=bool(collision_intervention),
+                trajectory_candidate=owner_value["solution"].version,
             )
 
         def finish(self, report):
@@ -157,6 +277,7 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         "provider": provider,
         "rate_hz": rate,
         "case": "arm_ramp_native_grip",
+        "trajectory_candidate": value["solution"].version,
         "contact_solver_profile": "MuJoCo NoSlip2",
         "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
         "gripper_command_rate_hz": 500,
@@ -166,6 +287,8 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         "task_artifact_hash": value["artifact"].identity_hash,
         "solution_identity": value["solution_identity"],
         "recipe_identity": value["recipe_identity"],
+        "collision_intervention": collision_intervention,
+        "trajectory_candidate": value["solution"].version,
         "completion_policy": value["solution"].completion_policy.value,
         "reset_sample": "canonical_reset seed from frozen profile",
         "qualification": False,
@@ -190,7 +313,8 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         mode="FULL",
         candidate=value["solution"].version,
         development_only=True,
-        qualification_status="REVIEW_PENDING",
+        qualification_status=("NOT_ELIGIBLE_DIAGNOSTIC_ONLY"
+                              if collision_intervention else "REVIEW_PENDING"),
         provider=provider,
         outer_rate_hz=rate,
         gripper_rate_hz=500,
@@ -224,6 +348,8 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         formal_d0_d2_status="NOT RUN; lifecycle replay readiness check only",
         source_head=head,
         dirty_status=status.strip().splitlines(),
+        collision_intervention=collision_intervention,
+        trajectory_candidate=value["solution"].version,
         package_versions={
             name: importlib.metadata.version(name)
             for name in ("numpy", "h5py", "gymnasium", "mujoco")
@@ -232,9 +358,14 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         },
     )
     result["full_expert_status"] = (
-        "FULL_EXPERT_DEVELOPMENT_PASS" if result.get("pass") else "FULL_EXPERT_FAILED"
+        "DIAGNOSTIC_ONLY_PASS" if result.get("pass") and collision_intervention
+        else "DIAGNOSTIC_ONLY_FAIL" if collision_intervention
+        else "FULL_EXPERT_DEVELOPMENT_PASS" if result.get("pass")
+        else "FULL_EXPERT_FAILED"
     )
     result["golden_acceptance_status"] = (
+        "NOT_ELIGIBLE_DIAGNOSTIC_COLLISION_INTERVENTION"
+        if collision_intervention else
         "FROZEN_GOLDEN_CANDIDATE_REVIEW_PENDING" if result.get("pass") else "NOT_ELIGIBLE"
     )
     worker._write(output / "full_expert_result.json", result)
@@ -252,6 +383,9 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         "frequency_native_cadence": Path(frequency_run.__file__).parent / "cadence.py",
         "frequency_native_observer": Path(frequency_run.__file__).parent / "native.py",
         "lifecycle_runner": Path(__file__),
+        "clearance_candidate_v3": Path("task_env/tasks/nut_assembly/clearance_candidate_v3.py"),
+        "clearance_candidate_v4": Path("task_env/tasks/nut_assembly/clearance_candidate_v4.py"),
+        "clearance_candidate_v5": Path("task_env/tasks/nut_assembly/clearance_candidate_v5.py"),
     }
     manifest = {
         "schema": "p1.8-canonical-solution-lifecycle-evidence-v1",
@@ -264,6 +398,8 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
         "task_artifact_hash": value["artifact"].identity_hash,
         "solution_identity": value["solution_identity"],
         "recipe_identity": value["recipe_identity"],
+        "collision_intervention": collision_intervention,
+        "trajectory_candidate": value["solution"].version,
         "reset_sample_hash": result.get("reset_sample_hash"),
         "source_sha256": {name: _sha(path) for name, path in source_paths.items()},
         "result_sha256": _sha(output / "full_expert_result.json"),
@@ -273,7 +409,9 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
             if result.get("live_recording", {}).get("path") else None
         ),
         "development_only": True,
-        "qualification_status": "REVIEW_PENDING",
+        "qualification_status": (
+            "NOT_ELIGIBLE_DIAGNOSTIC_ONLY" if collision_intervention else "REVIEW_PENDING"
+        ),
     }
     worker._write(output / "full_expert_evidence_manifest.json", manifest)
     return result
@@ -282,10 +420,23 @@ def run(*, provider: str, rate: int, output: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("mujoco",), default="mujoco")
-    parser.add_argument("--rate", type=int, choices=(100,), default=100)
+    parser.add_argument("--rate", type=int, choices=(20, 50, 100, 500), default=100)
+    parser.add_argument(
+        "--trajectory-candidate",
+        choices=("lifecycle-v2", "handle-clearance-v3", "handle-clearance-v4-live-settle",
+                 "handle-clearance-v5-shared-height-correction"),
+        default="lifecycle-v2",
+    )
+    parser.add_argument(
+        "--collision-ablation",
+        choices=("none", "hand-peg-body-pair-exclude"),
+        default="none",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    report = run(provider=args.provider, rate=args.rate, output=args.output)
+    report = run(provider=args.provider, rate=args.rate, output=args.output,
+                 collision_ablation=args.collision_ablation,
+                 trajectory_candidate=args.trajectory_candidate)
     print(json.dumps({key: report.get(key) for key in (
         "pass", "failure_boundary", "expert_complete", "expert_failed",
         "completion_reason", "canonical_task_success", "coordinator_stage_sequence",
