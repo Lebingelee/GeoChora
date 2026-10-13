@@ -68,5 +68,7 @@
   "module_hash_basis": "prepublication working tree, including navigation-only SUMMARY.md correction; behavioral source checkpoint unchanged",
   "working_tree_nonbehavioral_task_env_changes": [
     "task_env/diagnostics/phase1/policy_search/profiles/SUMMARY.md"
-  ]
+  ],
+  "verified_publication_source_head": "392eb7d26804d88c42e89f4a8ee5ce836ff90d56",
+  "verified_publication_tree": "8796c72d7eb4df137e9e785cb7b50eee4dc8ab44"
 }

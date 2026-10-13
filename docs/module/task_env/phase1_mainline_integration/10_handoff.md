@@ -1,6 +1,6 @@
 # Phase-I Mainline Integration Handoff
 
-开发分支：codex/p1.8-integration。源码 merge checkpoint：`be47e72fe81790813b784cb1a47c91d2f59b68ab`。发布状态与 public exact refs 见 [publication report](09_publication_report.md)；所有工程 source identities 见 [source manifest](07_mainline_source_manifest.json)。
+开发分支：codex/p1.8-integration。源码 merge checkpoint：`be47e72fe81790813b784cb1a47c91d2f59b68ab`。发布状态：**MAINLINE_PUBLISHED**。第一轮已核验的 public main/integration HEAD 为 `392eb7d26804d88c42e89f4a8ee5ce836ff90d56`；本回执后续提交只改变整合文档。最终 public exact refs 见 [publication report](09_publication_report.md)；所有工程 source identities 见 [source manifest](07_mainline_source_manifest.json)。
 
 合并能力：P1.1–P1.5 contracts/runtime/camera/R1 PickCube；P1.6 Flow/V2a/100Hz/D3 diagnostics 和原批准记录；P1.8 四 provider adapters、R3 persistent reference、10 N candidate、v0/v2 recorder、clock/owner/interval diagnostics、loaded/full runner。
 

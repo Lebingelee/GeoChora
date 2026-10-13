@@ -55,11 +55,17 @@
   "blockers": [],
   "qualification_promoted": false,
   "publication_authorized_by_user": true,
-  "final_remote_fetch_recheck_required": true,
+  "final_remote_fetch_recheck_required": false,
   "known_nonblocking_limitations": [
     "checkpoint/evidence archive local-only; off-host backup not verified",
     "historical YAML absolute config_path preserved as historical identity",
     "P1.7 deferred; P1.8 T1/full qualification incomplete",
     "GeoPhys native contact resume not bitwise qualified"
-  ]
+  ],
+  "publication_result": {
+    "status": "MAINLINE_PUBLISHED",
+    "verified_source_head": "392eb7d26804d88c42e89f4a8ee5ce836ff90d56",
+    "normal_fast_forward": true,
+    "final_receipt_commit": "documentation-only followup, same source module identities"
+  }
 }
