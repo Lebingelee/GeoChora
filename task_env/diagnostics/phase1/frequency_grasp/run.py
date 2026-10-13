@@ -30,6 +30,10 @@ ARM_RAMP_CASES={'arm_ramp_lift','arm_ramp_frozen_lift','noslip_arm_ramp_lift','a
 NATIVE_GRIP_CASES={'candidate_native500','arm_ramp_native_grip'}
 NATIVE_GRIP_EXECUTION_CASES=NATIVE_GRIP_CASES|{'damping_zero_lift','candidate_airborne_hold','grip_adjust_zero_descend'}
 LIFT_INTERVENTION_CASES={'noslip_lift','elliptic_lift','noslip_arm_ramp_lift','armature_zero_lift','damping_zero_lift'}
+NOSLIP_FROM_RESET|={'noslip_tolerance_zero_lift'}
+ARM_RAMP_CASES|={'noslip_tolerance_zero_lift'}
+NATIVE_GRIP_EXECUTION_CASES|={'noslip_tolerance_zero_lift'}
+LIFT_INTERVENTION_CASES|={'noslip_tolerance_zero_lift'}
 CANDIDATE_CASES=NOSLIP_FROM_RESET|ARM_RAMP_CASES
 
 
@@ -96,13 +100,15 @@ def context(rate,case):
         v['recipe_identity']=canonical_digest({'baseline':v['recipe_identity'],'mechanical_intervention':'nut-freejoint-damping-zero-at-lift-v1'})
     if case=='grip_adjust_zero_descend':
         v['recipe_identity']=canonical_digest({'baseline':v['recipe_identity'],'gripper_intervention':'open-loop-target-hold-from-descend-v1'})
+    if case=='noslip_tolerance_zero_lift':
+        v['recipe_identity']=canonical_digest({'baseline':v['recipe_identity'],'solver_intervention':'noslip-stop-tolerance-zero-at-lift-v1-fixed-two-sweeps'})
     v['_diagnostic_case']=case
     return v
 
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--rate',type=int,choices=[20,50,100,500],required=True)
-    p.add_argument('--mode',choices=['G0','T1'],default='G0');p.add_argument('--case',choices=['frozen','slow_lift','airborne_hold','lateral','noslip_lift','candidate_noslip2','candidate_noslip4','candidate_native500','elliptic_lift','arm_ramp_lift','arm_ramp_frozen_lift','noslip_arm_ramp_lift','armature_zero_lift','arm_ramp_native_grip','damping_zero_lift','candidate_airborne_hold','grip_adjust_zero_descend'],default='frozen')
+    p.add_argument('--mode',choices=['G0','T1'],default='G0');p.add_argument('--case',choices=['frozen','slow_lift','airborne_hold','lateral','noslip_lift','candidate_noslip2','candidate_noslip4','candidate_native500','elliptic_lift','arm_ramp_lift','arm_ramp_frozen_lift','noslip_arm_ramp_lift','armature_zero_lift','arm_ramp_native_grip','damping_zero_lift','candidate_airborne_hold','grip_adjust_zero_descend','noslip_tolerance_zero_lift'],default='frozen')
     p.add_argument('--sample',choices=['nominal','offset_a','offset_b'],default='nominal');p.add_argument('--causal-gate',type=Path);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     if a.case in CANDIDATE_CASES:
         if a.causal_gate is None:raise ValueError('StageB candidate requires explicit causal gate')
@@ -178,7 +184,9 @@ def main():
             def step():
                 nonlocal changed
                 if v['solution']._lift_released and not changed:
-                    if a.case=='damping_zero_lift':
+                    if a.case=='noslip_tolerance_zero_lift':
+                        factor='noslip_tolerance';old=float(session._model.opt.noslip_tolerance);new=0.
+                    elif a.case=='damping_zero_lift':
                         j=int(session._model.body_jntadr[session._bodies['square-nut-v1']]);adr=int(session._model.jnt_dofadr[j])
                         factor='nut_freejoint_damping';old=session._model.dof_damping[adr:adr+6].tolist();new=[0.]*6
                         session._model.dof_damping[adr:adr+6]=0.

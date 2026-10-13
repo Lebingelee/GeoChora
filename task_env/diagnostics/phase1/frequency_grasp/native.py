@@ -59,6 +59,9 @@ class NativeObserver:
         # Body velocity reference is independently available from the COM Jacobian.
         jp=np.zeros((3,m.nv));jr=np.zeros((3,m.nv));mujoco.mj_jac(m,d,jp,jr,com,nut)
         com_velocity=jp@velocity;omega=jr@velocity
+        mass=np.zeros((m.nv,m.nv));mujoco.mj_fullM(m,mass,d.qM)
+        force_acc=np.linalg.solve(mass,d.qfrc_smooth+d.qfrc_constraint)
+        predicted_velocity=velocity+m.opt.timestep*force_acc
         contacts=[];net_force=np.zeros(3);net_origin=np.zeros(3);net_com=np.zeros(3)
         q_projected=np.zeros(m.nv);normal={'left':0.,'right':0.,'table':0.}
         for ci in range(d.ncon):
@@ -102,7 +105,9 @@ class NativeObserver:
                 'solreffriction':np.asarray(getattr(c,'solreffriction',[])).tolist(),
                 'efc_address':int(c.efc_address),'wrench_contact_N_Nm':w.tolist(),
                 'force_integral_rectangle_Ns':(w[:3]*m.opt.timestep).tolist(),
-                'relative_velocity_contact_m_s':rel_velocity.tolist(),'relative_angular_velocity_contact_rad_s':(frame@((rot2-rot1)@velocity)).tolist(),
+                'relative_velocity_contact_m_s':rel_velocity.tolist(),
+                'explicit_force_predicted_end_relative_velocity_contact_m_s':(frame@((j2-j1)@predicted_velocity)).tolist(),
+                'integrated_end_relative_velocity_preframe_contact_m_s':(frame@((j2-j1)@d.qvel)).tolist(),'relative_angular_velocity_contact_rad_s':(frame@((rot2-rot1)@velocity)).tolist(),
                 'cone_utilization':utilization,'pyramidal_pair_normal_budget_N':budgets,'pyramidal_pair_axis_utilization':axis_use,
                 'force_on_nut_world_N':force.tolist(),
                 'torque_on_nut_body_origin_world_Nm':origin_torque.tolist(),
@@ -116,11 +121,16 @@ class NativeObserver:
         if any(c['wrench_contact_N_Nm'][0]<-1e-10 for c in contacts):
             self.errors.append({'time':float(d.time),'negative_normal_force':True})
         rp=r.T@(np_-p);rr=r.T@nr
-        row={'sampling_semantics':'post_forward_evaluation' if pre is None else 'integrated_step_force_preintegration_state', 'time_end_s':float(d.time), 'post_qpos':d.qpos.tolist(), 'post_qvel':d.qvel.tolist(), 'time_s':float(d.time) if pre is None else pre['time_s'],'phase':stage,'control_step':session._control_step,
+        solver_stats=[]
+        stride=len(d.solver)//len(d.solver_niter)
+        for i,n in enumerate(d.solver_niter):
+            solver_stats.append([{k:float(getattr(d.solver[i*stride+j],k)) for k in ['improvement','gradient','lineslope','neval','nupdate']} for j in range(min(int(n),stride))])
+        row={'solver_stats_active':solver_stats,'sampling_semantics':'post_forward_evaluation' if pre is None else 'integrated_step_force_preintegration_state', 'time_end_s':float(d.time), 'post_qpos':d.qpos.tolist(), 'post_qvel':d.qvel.tolist(), 'time_s':float(d.time) if pre is None else pre['time_s'],'phase':stage,'control_step':session._control_step,
              'ee_p':p.tolist(),'ee_R':r.reshape(-1).tolist(),'ee_twist_world_rot_lin':ee_v.tolist(),
              'nut_p':np_.tolist(),'nut_R':nr.reshape(-1).tolist(),'nut_COM_p':com.tolist(),
              'nut_COM_velocity_world_m_s':com_velocity.tolist(),'nut_omega_world_rad_s':omega.tolist(),
              'rel_p':rp.tolist(),'rel_R':rr.reshape(-1).tolist(),
+             'qacc_from_force_and_M':force_acc.tolist(),'explicit_predicted_end_qvel':predicted_velocity.tolist(),
              'qpos':d.qpos.tolist() if pre is None else pre['qpos'].tolist(),'qvel':velocity.tolist(),'qacc':d.qacc.tolist(),
              'ctrl':d.ctrl.tolist(),'actuator_force_completed':session._completed_actuator_force.tolist(),
              'actuator_force_current':d.actuator_force.tolist(),

@@ -72,3 +72,13 @@ def test_freebody_damping_changes_realized_passive_force():
     q=d.qpos.copy();v=d.qvel.copy();m.dof_damping[:]=0
     mujoco.mj_forward(m,d);np.testing.assert_array_equal(d.qfrc_passive,np.zeros(6))
     np.testing.assert_array_equal(d.qpos,q);np.testing.assert_array_equal(d.qvel,v)
+
+def test_force_prediction_distinguishes_implicit_damping_integration():
+    import mujoco
+    m=mujoco.MjModel.from_xml_string('<mujoco><option timestep=".002" integrator="implicitfast" gravity="0 0 0"/><worldbody><body><joint type="slide" axis="1 0 0" damping="2" armature=".03"/><geom type="sphere" size=".1" mass=".1"/></body></worldbody></mujoco>')
+    d=mujoco.MjData(m);d.qvel[0]=.1;mujoco.mj_forward(m,d);mujoco.mj_step(m,d)
+    mass=np.zeros((1,1));mujoco.mj_fullM(m,mass,d.qM)
+    predicted=.1+.002*np.linalg.solve(mass,d.qfrc_smooth+d.qfrc_constraint)[0]
+    np.testing.assert_allclose(predicted,.1-.002*.2/.13,rtol=0,atol=1e-14)
+    np.testing.assert_allclose(d.qvel[0],.1/(1+.002*2/.13),rtol=0,atol=1e-14)
+    assert abs(predicted-d.qvel[0])>1e-5
