@@ -60,7 +60,8 @@ def analyze(folder):
     for name,t0,t1 in [('initial_2p2_s',start,start+2.2),('airborne_endpoint_hold_2p2_s',6.92,9.12)]:
         ids=np.flatnonzero((ts>=t0-1e-8)&(ts<=t1+1e-8))
         if len(ids) and ts[ids[-1]]>=t1-1e-8:
-            result['fixed_time_windows'][name]={'from_lift_start_max_drift_m':float(drift[ids].max()),
+            window_name=name if s['case']=='airborne_hold' or name=='initial_2p2_s' else 'common_clock_window_6p92_9p12'
+            result['fixed_time_windows'][window_name]={'from_lift_start_max_drift_m':float(drift[ids].max()),
                 'increment_from_window_start_max_m':float(np.linalg.norm(p[ids]-p[ids[0]],axis=1).max()),
                 'max_EE_speed_m_s':float(np.linalg.norm(v[ids],axis=1).max()),
                 'max_EE_acceleration_m_s2':float(np.linalg.norm(acc[ids],axis=1).max()),

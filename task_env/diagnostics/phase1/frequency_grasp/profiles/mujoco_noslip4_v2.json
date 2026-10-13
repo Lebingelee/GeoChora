@@ -1,0 +1,29 @@
+{
+  "schema": "frequency-grasp-contact-candidate-v1",
+  "version": "mujoco-coulomb-noslip4-v2",
+  "provider": "mujoco",
+  "native_version_tested": "3.8.1",
+  "model_option_overrides": {
+    "noslip_iterations": 4
+  },
+  "activation": "at model compilation; all phases",
+  "mechanism": "Reduce soft-friction regularization creep with native Coulomb friction post-processing; retain force cap, friction coefficients, contact geometry and motion law.",
+  "source_basis": "MuJoCo3.8.1 engine_solver.c and modeling.rst, commit688209574d35555fb897be5795f1ce4ecca9f29a; StageA delayed matched-state intervention a04.",
+  "tradeoffs": [
+    "Additional native solver work",
+    "MuJoCo inverse-dynamics assumptions differ with NoSlip enabled",
+    "Finite iterations do not guarantee exact zero slip",
+    "Not a cross-provider physics qualification"
+  ],
+  "baseline": {
+    "force_target_N": 10.0,
+    "force_cap_N": 10.0,
+    "grasp_offset_z_m": 0.045895,
+    "controller": "frozen R3",
+    "capture_translation_limit_m": 0.008,
+    "production_defaults_modified": false
+  },
+  "qualification": false,
+  "status": "isolated development candidate; Human Review required for promotion",
+  "selection_basis": "Single bounded solver-convergence intervention: v1 passes canonical G0/T1, but20Hz G0=1.946mm and100Hz T1=1.475mm miss1mm research target. Double native friction sweeps2->4 at every physics step, independent of outer frequency; retain tolerance and all physical/control parameters. First validate20Hz G0 and100Hz T1 before extending matrix."
+}
