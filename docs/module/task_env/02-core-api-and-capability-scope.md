@@ -1,5 +1,7 @@
 # Geochora Core API 与能力范围
 
+> 2026-10-13 mainline consolidation：当前 implementation、历史 bounded approvals 与未完成范围统一见 [Phase-I Mainline Integration Status](phase1_mainline_integration/06_phase_acceptance_status.md)。历史阶段记录保留原时点；合并不提升 qualification。
+
 > 状态：canonical Core 范围，v0.3
 > 日期：2026-10-04
 
@@ -19,7 +21,7 @@ Core 的首要使命是成为可靠、provider-neutral 的多仿真器执行与�
 
 本文的“必须支持”及概念 API 定义 required canonical capability，不是 implemented/tested/qualified 声明。能力词义以 [仓库 Capability 与 Evidence 治理](../../global/01-repository-ownership-and-boundaries.md#5-capability-与-evidence-治理) 为准。
 
-经人工审查的 P1.0-A baseline（起始 HEAD `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`）确认：
+以下是历史 P1.0-A baseline 当时的 snapshot；当前 Phase-I session/recording/learning implementation 见上述 mainline status。经人工审查的 P1.0-A baseline（起始 HEAD `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`）确认：
 
 - Scalar production materialization 仍绑定 GeoPhys。
 - Batch factory 的 `merged_scene`/`static` 是内部 runtime/layout route，不是 GeoPhys/MuJoCo/SAPIEN/Genesis selector。
@@ -262,7 +264,7 @@ Core 不要求特定桌面 toolkit、browser stack 或 renderer。OpenUSD 是未
 
 不得创建 UniversalSolver abstraction。应维持 Runtime Port/provider 边界与 capability admission。
 
-Phase-I provider 角色是 planned 实施范围，不代表已 supported。安装 MuJoCo package、存在独立 oracle 或采纳 [05–08 实施文档](05-phase-1-multi-simulator-blueprint.md)，均不能证明统一 provider 已 implemented、tested 或 qualified。Physics provider 与 render provider 保持独立选择与资格边界。
+Phase-I provider 角色定义计划的职责，当前 session adapters 已包含 GeoPhys/MuJoCo/SAPIEN/Genesis；implemented、tested、bounded approval 的范围见 mainline status。安装 MuJoCo package、存在独立 oracle 或采纳 [05–08 实施文档](05-phase-1-multi-simulator-blueprint.md)，均不能证明统一 provider 已 implemented、tested 或 qualified。Physics provider 与 render provider 保持独立选择与资格边界。
 
 ## 6. 参考路径
 

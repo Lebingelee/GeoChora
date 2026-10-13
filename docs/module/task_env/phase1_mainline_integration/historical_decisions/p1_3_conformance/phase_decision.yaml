@@ -1,0 +1,104 @@
+schema: geochora.phase_decision.v1
+
+phase: p1_3_conformance
+decision: approve
+
+judge:
+  type: human
+
+basis:
+  - >
+    All five mandatory P1.3 conformance probes were specified with
+    provider-independent analytical or behavioral oracles and numerical
+    tolerances before native provider execution.
+  - >
+    The oracle specification was SHA256-locked before the first provider
+    execution and was not modified after provider results were observed.
+  - >
+    GeoPhys and MuJoCo both pass the locked Asset/Frame, Free-fall,
+    Joint-tracking, fixed Camera/Depth, and Contact microprobes.
+  - >
+    Provider-vs-oracle evaluation is authoritative for probe acceptance;
+    pairwise GeoPhys/MuJoCo differences are retained as diagnostic evidence
+    rather than being used as a substitute oracle.
+  - >
+    GeoPhys provider provenance is now mechanically derived from the actual
+    imported checkout/build rather than a hard-coded repository revision.
+  - >
+    Fixture/source recipe identities and provider provenance are recorded
+    independently of Task Artifact identity.
+  - >
+    P1.1 and P1.2 approved regression routes remain passing after the P1.3
+    implementation.
+  - >
+    The localized Asset/Frame and Camera implementation fixes did not change
+    the locked oracle, fixtures, or tolerances.
+
+accepted_scope:
+  - bounded GeoPhys CPU Asset/Frame conformance probe
+  - bounded MuJoCo CPU Asset/Frame conformance probe
+  - bounded GeoPhys CPU Free-fall conformance probe
+  - bounded MuJoCo CPU Free-fall conformance probe
+  - bounded GeoPhys CPU 1-DoF Joint-tracking conformance probe
+  - bounded MuJoCo CPU 1-DoF Joint-tracking conformance probe
+  - bounded GeoPhys fixed-camera projection/depth diagnostic probe
+  - bounded MuJoCo fixed-camera projection/depth diagnostic probe
+  - bounded GeoPhys basic support-contact behavioral probe
+  - bounded MuJoCo basic support-contact behavioral probe
+  - oracle-first conformance governance
+  - materialization recipe/source provenance
+  - runtime-derived provider identity
+
+not_granted:
+  - GeoPhys provider-wide qualification
+  - MuJoCo provider-wide qualification
+  - exact cross-provider solver equivalence
+  - contact impulse equivalence
+  - transient contact equivalence
+  - canonical manipulation-controller qualification
+  - PickCube expert or success parity
+  - production camera qualification
+  - dynamic attached-camera qualification
+  - RGB photometric equivalence
+  - trajectory/replay qualification
+  - policy portability
+  - GPU qualification
+  - any new provider-wide qualified intersection
+
+known_debt:
+  - >
+    The contact microprobe shows materially different transient penetration:
+    approximately 4.01 mm for GeoPhys and 18.95 mm for MuJoCo. This was a
+    pre-declared diagnostic-only metric and does not invalidate the P1.3
+    persistent-support gate, but it must remain visible for later
+    contact-rich manipulation and NutAssembly evaluation.
+  - >
+    The GeoPhys fixed-camera diagnostic accesses the native RayCamera through
+    a diagnostic-private renderer handle. This must not become the P1.4
+    production camera API.
+  - >
+    Asset/Frame validates the fixture's authored non-collision visual geometry;
+    it does not establish general collision-geometry equivalence.
+  - >
+    Current conformance probes are CPU-only and intentionally do not establish
+    GPU/backend equivalence.
+  - >
+    Actuator conformance is limited to the locked one-DOF behavioral fixture
+    and does not establish Panda/manipulation controller equivalence.
+
+required_before_p1_4:
+  - freeze the P1.3 implementation commit as the P1.4 baseline
+  - define explicit camera mount-frame versus optical-frame semantics
+  - define T_world_from_camera and inverse-transform naming
+  - freeze intrinsic-matrix and horizontal/vertical FOV conventions
+  - define metric depth semantics and back-projection convention
+  - define post-control-boundary camera timestamp semantics
+  - ensure production camera/provider integration does not depend on the
+    diagnostic-private GeoPhys RayCamera access
+
+implementation_commit:
+  geochora: 4db06e6f740a70b51cbf2eec87771321ba02d864
+
+provider_baseline:
+  geophys: c665ce5028a12bb4d2afe49f05e015fa9b684a39
+  mujoco: 3.8.1

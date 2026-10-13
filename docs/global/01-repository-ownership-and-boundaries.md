@@ -1,5 +1,7 @@
 # Geochora 仓库所有权与边界
 
+> 当前 Phase-I 工程与验收范围见 [Mainline Integration Status](../module/task_env/phase1_mainline_integration/06_phase_acceptance_status.md)。P1.6 bounded approval 保留；P1.7 deferred；P1.8 qualification 未完成。
+
 > 状态：canonical 所有权 contract，v0.3
 > 日期：2026-10-04
 
@@ -78,7 +80,7 @@ GeoPhys 是当前/default implementation physics/runtime provider，并提供默
 
 Go2 CUDA/static/RSL 是历史 Evidence 最强的具名 regression route；其 current-HEAD qualification 仍需在 P1.0 baseline smoke 中重新确认，不能外推到 PickCube、NutAssembly 或其他 GeoPhys 路线。
 
-Phase-I primary target 为 GeoPhys/MuJoCo，boundary-validation target 为 SAPIEN/Genesis。这些目标不构成实现或资格证明；MuJoCo 当前独立 oracle/probe 也不等于统一 production provider。其他 simulator/render provider（包括 Flora）须经明确 adapter、capability declaration 和具名 acceptance route 接入。Physics 与 render provider 始终是不同边界。
+Phase-I primary target 为 GeoPhys/MuJoCo，boundary-validation target 为 SAPIEN/Genesis。这些目标不构成 provider-wide qualification；Phase-I additive provider sessions 已实现，当前 tested/approved bounded intersections 见 Mainline Integration Status。其他 simulator/render provider（包括 Flora）须经明确 adapter、capability declaration 和具名 acceptance route 接入。Physics 与 render provider 始终是不同边界。
 
 Core 和 task 代码可以依赖 provider 公共 API，但不得依赖 provider 私有内部实现、可变 singleton state 或未声明的 backend 特定行为。
 

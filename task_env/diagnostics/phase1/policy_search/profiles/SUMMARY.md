@@ -33,4 +33,4 @@ V2a is a strong source-domain candidate on this fixed cohort. V1a passed only on
 
 Per instruction, ACT was not implemented after V2a's 6/6 result. No P1.8 files or provider-wide claims were modified. Checkpoint binaries and full traces remain in the local Evidence tree and are not committed.
 
-Detailed profiles: [V0](profiles/v0_flow_h16_a8/README.md), [V1](profiles/v1_flow_h50_a36/README.md), [V1a](profiles/v1a_flow_h50_a36_15000/README.md), [V2](profiles/v2_flow_h50_a36_no_qvel/README.md), and [V2a](profiles/v2a_flow_h50_a36_no_qvel_15000/README.md).
+Detailed profiles: [V0](v0_flow_h16_a8/README.md), [V1](v1_flow_h50_a36/README.md), [V1a](v1a_flow_h50_a36_15000/README.md), [V2](v2_flow_h50_a36_no_qvel/README.md), and [V2a](v2a_flow_h50_a36_no_qvel_15000/README.md).

@@ -1,5 +1,7 @@
 # Geochora 系统架构基准
 
+> 当前 Phase-I 工程与验收范围见 [Mainline Integration Status](../module/task_env/phase1_mainline_integration/06_phase_acceptance_status.md)。P1.6 bounded approval 保留；P1.7 deferred；P1.8 qualification 未完成。
+
 > 状态：canonical 架构基准，v0.3
 > 日期：2026-10-04
 > 范围：定义其他 Geochora 文档必须遵循的稳定系统级概念、所有权边界和生命周期。
@@ -137,7 +139,7 @@ Evidence 经审查后可以沉淀为：
 - Boundary-validation target：SAPIEN、Genesis。
 - PickCube 为主要 manipulation route，NutAssemblySquare 为 precision/contact regression；保留 Go2 CUDA/static/RSL 的历史 regression route，并在 P1.0 baseline smoke 中重新确认 current-HEAD 状态。
 
-这些 provider 角色是当前实施目标（planned），不是 capability acceptance。GeoPhys 是当前/default implementation provider；MuJoCo 目前仅有独立 oracle/probe，尚非统一 Task Artifact 的 production provider；SAPIEN/Genesis 也不能因计划采纳被称为 implemented、tested 或 qualified。
+这些角色不构成 provider-wide acceptance。GeoPhys 是 default provider；Phase-I additive runtime 已实现 GeoPhys/MuJoCo/SAPIEN/Genesis adapters。各 tested/approved bounded intersection 与剩余限制见 Mainline Integration Status，不能外推所有 task 或 provider。
 
 实施优先级是冻结可信 baseline，建立 provider-neutral contract，逐步执行 conformance、expert/replay 和 policy route，并以完整 provenance 的 Evidence 验收具名 intersection。文档采纳本身不产生 runtime qualification。
 

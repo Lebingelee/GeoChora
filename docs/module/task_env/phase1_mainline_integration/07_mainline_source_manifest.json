@@ -1,0 +1,72 @@
+{
+  "schema": "phase1-mainline-source-manifest-v1",
+  "source_checkpoint": "be47e72fe81790813b784cb1a47c91d2f59b68ab",
+  "checkpoint_tree": "2873b3597d9e0bfdacc335709089dfe43e437307",
+  "publication_documentation_commit": "resolved by public branch refs; same task_env module hashes",
+  "integration_parent": "1f1cd67c56ea30e7b2c14f03a9a4dc6ca7bccbdd",
+  "p1_6_parent": "761f1fde7fb0d2831ab5ee780821637c0f7e6215",
+  "old_public_main": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
+  "module_content_identities": {
+    "artifacts": {
+      "file_count": 3,
+      "content_sha256": "741b6c71325169302d2474265f5c7ff81660f6bfb6bf44a0d09fe3e3d0070d33"
+    },
+    "controllers": {
+      "file_count": 17,
+      "content_sha256": "6bdc2369725c51ca138f53978ea26fab57a097df735e9cafe4fdf0c59a3feaf5"
+    },
+    "runtime": {
+      "file_count": 49,
+      "content_sha256": "7db42619126688fa14c62e36d2f55eea4ac282f220b89399cc580ab98ec4757d"
+    },
+    "trajectory": {
+      "file_count": 13,
+      "content_sha256": "22c0c505d161869f09750d4310b630982b5274bef0246144d26d56c950d6a710"
+    },
+    "alg": {
+      "file_count": 161,
+      "content_sha256": "53b6a4a56973f51f584657ffcc47e8a5e831040ea1dd79099bf141712c231601"
+    },
+    "planners": {
+      "file_count": 6,
+      "content_sha256": "648873d075157f830d9b2a448d31d8901739a2de0db2295eb15b5c1e92185910"
+    },
+    "tasks": {
+      "file_count": 62,
+      "content_sha256": "e18b2c1eadf6aedf991d6b3cbaaf365a04e18d0b760e6f93ebda28ad62c3b294"
+    },
+    "diagnostics": {
+      "file_count": 176,
+      "content_sha256": "a5e7fbe88eed6d6012716cd34d731bcbea768833295346564e90136f91010e84"
+    }
+  },
+  "provider_versions_observed": {
+    "mujoco": "3.8.1",
+    "numpy": "2.2.6",
+    "torch": "2.14.0",
+    "h5py": "3.16.0",
+    "sapien": "unavailable in audited environment",
+    "genesis-world": "unavailable in audited environment",
+    "omegaconf": "2.3.0"
+  },
+  "gitlinks": {
+    "GeoPhys": {
+      "current": "160000 commit c665ce5028a12bb4d2afe49f05e015fa9b684a39\tGeoPhys",
+      "previous_main": "160000 commit c665ce5028a12bb4d2afe49f05e015fa9b684a39\tGeoPhys"
+    },
+    "asset/external/mujoco_menagerie": {
+      "current": "160000 commit b846dd12bc459d776cccb3dee0b1d02acbf7a9c7\tasset/external/mujoco_menagerie",
+      "previous_main": "160000 commit b846dd12bc459d776cccb3dee0b1d02acbf7a9c7\tasset/external/mujoco_menagerie"
+    }
+  },
+  "source_profile_pins": {
+    "P1.6_V2a_checkpoint": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+    "P1.6_config": "b40fdb55041c98bf0defb08aa1675ee42317a447eca8daecad360294a9699e1f",
+    "P1.8": "10N plus1mm height-disabled development recipe; identities in replay closure reports"
+  },
+  "qualification_effect": "none; historical decisions preserved; current incremental regression only",
+  "module_hash_basis": "prepublication working tree, including navigation-only SUMMARY.md correction; behavioral source checkpoint unchanged",
+  "working_tree_nonbehavioral_task_env_changes": [
+    "task_env/diagnostics/phase1/policy_search/profiles/SUMMARY.md"
+  ]
+}

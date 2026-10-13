@@ -1,5 +1,7 @@
 # Geochora Core 资格验证与治理
 
+> 2026-10-13 mainline consolidation：当前 implementation、历史 bounded approvals 与未完成范围统一见 [Phase-I Mainline Integration Status](phase1_mainline_integration/06_phase_acceptance_status.md)。历史阶段记录保留原时点；合并不提升 qualification。
+
 > 状态：canonical Core validation policy，v0.3
 > 日期：2026-10-04
 
@@ -129,7 +131,7 @@ Go2 路线是一项 regression/reference capability，而不是 manipulation 的
 - recorder/replay infrastructure 已存在，但仍需逐任务完成 collection/save/load/replay oracle；
 - 一个 task/backend 的资格验证不能推广到无关的 task/backend 组合。
 
-P1.0-A（起始 HEAD `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`）已通过人工审查；这是 repository/architecture audit，不是 runtime qualification。当前 PickCube/NutAssembly 没有完整 current-HEAD manipulation qualification；Go2 CUDA/static/RSL 的 current-HEAD qualification 必须在 P1.0 baseline 执行中重新确认。
+P1.0-A（起始 HEAD `9b4a55e8f944daa45a5d4d811ba6a02af4c1cfdc`）已通过人工审查；这是 repository/architecture audit，不是 runtime qualification。该句描述 P1.0 审查时的状态。当前 PickCube 已有 P1.5/P1.6 bounded historical approvals；NutAssembly 完整 qualification 尚未完成，具体范围见 Mainline Integration Status。
 
 历史 Evidence 若缺少完整 Core commit、provider revision/version 或执行 profile/task/lifecycle provenance，不能自动视为 current-HEAD qualification。保留其原始通过/失败事实及证据限制，不追补虚构 identity，不把历史运行或已安装 dependency 当作当前验收。
 

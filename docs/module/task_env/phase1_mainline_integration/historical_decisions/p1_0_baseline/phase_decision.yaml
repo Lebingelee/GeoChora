@@ -1,0 +1,71 @@
+schema: geochora.phase_decision.v1
+
+phase: p1_0_baseline
+decision: approve
+
+judge:
+  type: human
+
+basis:
+  - >
+    The Phase-I baseline is bound to explicit GeoChora and GeoPhys
+    repository identities with clean tracked working trees.
+  - >
+    Baseline runtime, manipulation, Go2 CUDA/static, and bounded RSL
+    integration evidence has been preserved with provenance and source
+    integrity checks.
+  - >
+    Tested, qualified, planned, unsupported, unknown, and missing-coverage
+    states are explicitly separated; bounded smoke evidence has not been
+    promoted to formal qualification.
+  - >
+    Known failures, detector incompatibilities, untested envelopes, and
+    historical evidence limitations are retained rather than hidden or
+    rewritten.
+  - >
+    The current baseline is sufficiently characterized to serve as the
+    reference state for Phase-I contract implementation.
+
+accepted_scope:
+  - repository and provider provenance baseline
+  - Phase-I documentation adoption
+  - current bounded manipulation runtime evidence
+  - bounded Go2 CUDA/static regression evidence
+  - bounded Go2 default-profile RSL integration evidence
+  - capability and coverage baseline
+  - known failure and residual-risk inventory
+
+not_granted:
+  - GeoPhys provider-wide qualification
+  - PickCube formal qualification
+  - NutAssembly formal qualification
+  - Go2 full qualification
+  - policy convergence qualification
+  - recorder/replay qualification
+  - render qualification
+  - multi-simulator qualification
+  - MuJoCo production-provider qualification
+  - SAPIEN production-provider qualification
+  - Genesis production-provider qualification
+
+known_debt:
+  - governed recorder detector
+  - unified TaskEnv contract pytest subset
+  - governed documentation checker
+  - current production render qualification
+  - randomized manipulation qualification
+  - manipulation contact-precision qualification
+  - recorder/replay qualification
+  - Go2 scale and long-horizon qualification
+  - non-vacuous multi-env sparse-reset isolation
+
+required_before_p1_1:
+  - synchronize the public README with the adopted Phase-I provider roadmap
+  - freeze the explicit P1.1 contract scope and S0/S1 acceptance route
+
+evidence:
+  baseline_manifest: baseline_manifest.yaml
+  capability_matrix: capability_matrix.yaml
+  acceptance_report: acceptance_report.md
+  acceptance_summary: acceptance.json
+  evidence_index: evidence_index.json

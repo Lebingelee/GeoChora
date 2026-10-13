@@ -1,0 +1,172 @@
+schema: geochora.phase_decision.v1
+phase: p1_5_expert
+decision: approve
+judge:
+  type: human
+  role: project_owner
+  note: Final decision draft prepared after human-requested review. Repository/source verification and the frozen
+    R5 Evidence support approval; the Human Judge remains the authority.
+decided_on: '2026-10-06'
+implementation_commit:
+  geochora: 9c5fcc26fa1164baccd72bfca450d79187b27470
+  review_branch: codex/p1.5-4h-control-expert
+  remote: public
+  approved_parent_phase_commit: d983d31c107bead06e3f0f22a0bc2085044d08d8
+  lineage:
+  - d983d31c107bead06e3f0f22a0bc2085044d08d8
+  - b9b62ef5fe0088627854cab254205316d93e5b72
+  - 69e6b4e9ffe6fd5390d87c56dcee1e84c0f97eff
+  - efe8e3684112d37f70bc7983455653fa3fe0e43a
+  - 9c5fcc26fa1164baccd72bfca450d79187b27470
+provider_baseline:
+  geophys: c665ce5028a12bb4d2afe49f05e015fa9b684a39
+  mujoco: 3.8.1
+frozen_identities:
+  task_artifact: 461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e
+  expert:
+    version: pick-cube-readiness-v1
+    identity: cc6b843bca4c9e72b5048033877b5141fdbce1024f9fad820723f6bff222919b
+  controller: 76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9
+  readiness_contract:
+    version: canonical-control-readiness-v1
+    identity: 706d2de51687c120496baec117499a53dee06a52dd0225f8348075db5828a533
+qualification_oracle:
+  r5_sha256: 02d7d53d85d51d7fd2ab38e0f827f1ef70146db780db7fe0b5235ed758e1fdb4
+  r4_readiness_oracle_sha256: 355fd85db1c09a2e95b772ce8ee4b7622b554fc4a1b1c1d9e862997fc827bbfe
+  changed_after_first_execution: false
+evaluation_sample_set:
+- seed: 31
+  sample_id: reset-5fd862368b845ea7681069f9be5339bf9c07a050400180c3abfc6a15d3538c2c
+  hash: 5fd862368b845ea7681069f9be5339bf9c07a050400180c3abfc6a15d3538c2c
+- seed: 73
+  sample_id: reset-f3e4049be64ea04b173bcbeeb8e6f278cd40f8a3ba05f3e340c11871746bad20
+  hash: f3e4049be64ea04b173bcbeeb8e6f278cd40f8a3ba05f3e340c11871746bad20
+basis:
+- Remote review branch resolves to the frozen P1.5 implementation commit 9c5fcc26fa1164baccd72bfca450d79187b27470.
+- 'R4 is additive/versioned: historical PickCubeSolution source is unchanged; PickCubeReadinessSolution/pick-cube-readiness-v1
+  is a separate expert route.'
+- StageCompletionPolicy explicitly separates pose_ready, gripper_ready, and task_outcome completion.
+- CanonicalControlReadiness is provider-neutral and reaches the expert through ExpertExecutionInfo rather than controller-private
+  memory or provider-native state.
+- ProductionCanonicalPandaController compute/profile/identity behavior is unchanged by R4; R4 adds a read-only readiness
+  projection.
+- Planned expert actions and readiness-wait actions are separately accounted; the planned action budget remains
+  120 and the provider-independent global safety cap is mechanically derived as 2500 control ticks.
+- 'Lift completion is outcome-driven: task success is cube_lift >= 0.10 m and the frozen collection endpoint is
+  cube_lift >= 0.105 m; final EE pose deadband is not an additional success requirement.'
+- R5 final C2 qualification passed all four provider x seed intersections without changing tracked source, oracle,
+  controller, expert, task semantics, provider configuration, or ResetSamples.
+- R1 prerequisites, R4 provider-free checks, P1.1-P1.4 regressions, provider-free guard, roundtrip checks, and git
+  diff --check all passed.
+final_c2:
+  status: 4/4_pass
+  task_success: cube_lift>=0.10m
+  collection_endpoint: cube_lift>=0.105m
+  planned_action_budget: 120
+  global_safety_cap_ticks: 2500
+  rows:
+  - provider: geophys
+    seed: 31
+    above_ready: true
+    descend_ready: true
+    gripper_ready: true
+    max_cube_lift_m: 0.105683
+    endpoint_tick: 716
+    planned_actions: 120
+    readiness_waits: 596
+    total_ticks: 716
+  - provider: geophys
+    seed: 73
+    above_ready: true
+    descend_ready: true
+    gripper_ready: true
+    max_cube_lift_m: 0.105102
+    endpoint_tick: 445
+    planned_actions: 120
+    readiness_waits: 325
+    total_ticks: 445
+  - provider: mujoco
+    seed: 31
+    above_ready: true
+    descend_ready: true
+    gripper_ready: true
+    max_cube_lift_m: 0.105317
+    endpoint_tick: 1091
+    planned_actions: 120
+    readiness_waits: 971
+    total_ticks: 1091
+  - provider: mujoco
+    seed: 73
+    above_ready: true
+    descend_ready: true
+    gripper_ready: true
+    max_cube_lift_m: 0.105651
+    endpoint_tick: 830
+    planned_actions: 120
+    readiness_waits: 710
+    total_ticks: 830
+accepted_scope:
+- bounded Phase-I PickCube canonical manipulation-control contract for GeoPhys and MuJoCo
+- 'four-layer control trace: requested action -> canonical action -> canonical controller target -> applied control'
+- provider-neutral canonical control feedback and readiness projection for the audited Panda gripper profile
+- C1 open-loop canonical-target replay prerequisites under locked tolerances
+- versioned readiness-aware PickCube expert semantics
+- C2 closed-loop expert qualification on the frozen EvaluationSampleSet seeds 31 and 73
+- separation of planned action completion, physical stage readiness, and task outcome completion
+- separate accounting of planned expert actions and readiness-wait control ticks
+not_granted:
+- exact cross-provider dynamics equivalence
+- provider-wide manipulation qualification beyond the frozen PickCube intersections
+- qualification of all randomized PickCube resets or statistical success-rate claims
+- canonical trajectory/dataset portability
+- state-policy or visuomotor-policy portability
+- SAPIEN or Genesis qualification
+- NutAssemblySquare precision/contact qualification
+- P1.6 or later Phase-I qualification
+known_debt:
+- The accepted C2 result is intentionally bounded to PickCube seeds 31 and 73.
+- GeoPhys and MuJoCo exhibit different readiness-wait durations, especially during gripper closure; this is retained
+  as diagnostic behavioral divergence rather than treated as a failure under the bounded task contract.
+- The R2 MuJoCo native instability is retained as historical failure Evidence but was not reproduced under the corrected
+  readiness-aware execution in R4/R5.
+- CanonicalControlReadiness is qualified only for the audited Panda experimental_rate_limited gripper/control profile,
+  not as a universal force/readiness abstraction.
+- Legacy PickCubeSolution remains preserved for historical Evidence compatibility; pick-cube-readiness-v1 is the
+  accepted P1.5 expert route.
+- Canonical trajectory schema, T+1 observation/T transition recording, dataset replay, and policy transfer remain
+  P1.6 work.
+evidence:
+  root: workspace/qualification/phase1/p1_5_expert/
+  final:
+    root: workspace/qualification/phase1/p1_5_expert/final/
+    oracle: c2_oracle.yaml
+    oracle_lock: c2_oracle_lock.json
+    acceptance_report: acceptance_report.md
+    acceptance_json: acceptance.json
+    pairwise_report: pairwise_report.md
+    evidence_index: evidence_index.json
+    handoff: handoff.md
+  historical_and_recovery_evidence_preserved: true
+  old_evidence_file_count_verified_unchanged: 1614
+required_before_p1_6_implementation:
+- Place this Human phase_decision.yaml under workspace/qualification/phase1/p1_5_expert/.
+- P1.6 implementation must start from a revision that contains approved P1.5 commit 9c5fcc26fa1164baccd72bfca450d79187b27470;
+  current main f977528b9b9866c50afcf8ea9b5f5deadce60892 alone is not an acceptable implementation baseline.
+- Treat the accepted P1.5 controller/expert/readiness contracts as frozen inputs; any behavioral modification requires
+  a separate governed recovery/requalification.
+- Freeze the P1.6 trajectory/dataset/evaluation oracle before the first governed record/replay or policy-transfer
+  execution.
+next_authority:
+  phase: p1_6_state_policy
+  planning_authorized: true
+  implementation_authorized_after_baseline_contains_p1_5: true
+  scope:
+  - canonical trajectory schema
+  - T+1 observations / T transitions
+  - record-save-load-replay
+  - state/proprioception policy vertical slice
+  - same-checkpoint GeoPhys/MuJoCo transfer matrix
+strongest_allowed_claim: GeoPhys and MuJoCo satisfy the bounded P1.5 canonical manipulation-control and closed-loop
+  expert qualification for the frozen PickCube EvaluationSampleSet. Both providers execute the same Geochora-owned
+  controller and versioned readiness-aware expert semantics, pass the locked C1 prerequisites, and reach the declared
+  PickCube collection endpoint under the same task and readiness contracts.

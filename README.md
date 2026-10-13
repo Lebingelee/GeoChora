@@ -2,6 +2,8 @@
 
 面向具身智能的统一多仿真器、多渲染器 API 与工具中枢。
 
+当前 [Phase-I mainline 状态](docs/module/task_env/phase1_mainline_integration/README.md)：四个 provider adapters 已实现；P1.6 PickCube/V2a/100Hz 为限定范围批准；P1.7 deferred；P1.8 replay infrastructure 有限定 GO，但 NutAssembly loaded/full task 与正式 D0–D2 尚未完成。Phase I 未关闭。
+
 Geochora 提供稳定、可复现、可验证的任务构造、仿真执行、渲染展示、数据记录、学习评估与证据接口。它不替代物理引擎、渲染器、控制器、规划器、学习算法或 Agent，而是让这些能力能够通过一致的公共契约组合和验收。
 
 PhysPi 是预期的上层 Agent 消费者：它基于 pi，负责 LLM 推理、工具编排、经验、记忆与 Skill；Geochora 负责可执行的仿真与渲染能力。二者通过 Geochora 公共 API 单向连接，Geochora 本身也可由人、脚本、CI 或其他 Agent 独立使用。

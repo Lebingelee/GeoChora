@@ -1,0 +1,87 @@
+schema: geochora.phase_decision.v1
+
+phase: p1_1_contracts
+decision: approve
+
+judge:
+  type: human
+
+basis:
+  - >
+    Task Artifact v0, WorldDefinition, InitializationContract,
+    SemanticDefinition, Timebase, ExecutionSpec, RequiredCapabilitySet,
+    ProviderCapabilityManifest, capability admission, and the minimal
+    CanonicalStateView are implemented as additive provider-neutral contracts.
+  - >
+    ExecutionSpec is structurally separated from Task Artifact identity,
+    and Task Artifact mapping/identity roundtrips deterministically.
+  - >
+    Capability admission fails closed for missing, planned, unknown,
+    unsupported, or execution-incompatible capability claims.
+  - >
+    CanonicalStateView exposes semantic names, SI values, and wxyz poses
+    without provider-native body/site IDs or solver storage.
+  - >
+    The PickCube P1.1 candidate loads and evaluates without importing or
+    constructing GeoPhys, MuJoCo, SAPIEN, or Genesis.
+  - >
+    PickCube canonical semantics are checked against the existing authoritative
+    evaluator on 120 synthetic boundary fixtures, preserving the 0.10 m lift
+    success rule and diagnostic-only grasp heuristic.
+  - >
+    The reusable P1.1 S0/S1 detector passes all 30 checks, including strict
+    schema rejection, action-reference compatibility, capability admission,
+    provider-free imports, canonical initialization, quaternion representation,
+    and JSON/YAML roundtrip.
+  - >
+    Human-review fixes resolved the identified ActionIntent, initialization,
+    capability-status documentation, and quaternion-representation issues.
+
+accepted_scope:
+  - Task Artifact v0 contract skeleton
+  - provider-neutral WorldDefinition
+  - provider-neutral InitializationContract skeleton
+  - provider-neutral SemanticDefinition
+  - explicit Timebase
+  - ExecutionSpec separated from artifact identity
+  - RequiredCapabilitySet
+  - ProviderCapabilityManifest
+  - fail-closed capability admission
+  - minimal CanonicalStateView
+  - provider-free PickCube candidate artifact
+  - provider-free PickCube semantic evaluator
+  - reusable P1.1 S0/S1 contract detector
+
+not_granted:
+  - production multi-provider materialization
+  - GeoPhys provider qualification
+  - MuJoCo provider implementation or qualification
+  - SAPIEN provider implementation or qualification
+  - Genesis provider implementation or qualification
+  - ResetSample generation/application qualification
+  - RealizedInitialState qualification
+  - production RuntimeSnapshot-to-CanonicalStateView conversion
+  - controller realization qualification
+  - camera qualification
+  - recorder/replay qualification
+  - PickCube formal task qualification
+  - any new qualified intersection
+
+known_debt:
+  - structured initialization-policy evolution beyond the current v0 policy identifier
+  - separation of stable asset identity from source representation/materialization
+  - production RuntimeSnapshot-to-CanonicalStateView adapter
+  - production semantic evaluator migration to the canonical evaluator
+  - complete provider-neutral asset/collision/actuator realization
+  - randomized feasibility and formal qualification
+
+required_before_p1_2:
+  - freeze this P1.1 implementation commit as the P1.2 contract baseline
+  - define the bounded P1.2 runtime/materialization scope
+  - define P1.2 S1/S2 acceptance probes before implementation
+
+implementation_commit:
+  geochora: 1fde9dcb235bf7ea4f4d31268864b2507efb7003
+
+provider_baseline:
+  geophys: c665ce5028a12bb4d2afe49f05e015fa9b684a39

@@ -1,5 +1,7 @@
 # Geochora Phase I 多仿真器实施蓝图
 
+> 2026-10-13 mainline consolidation：当前 implementation、历史 bounded approvals 与未完成范围统一见 [Phase-I Mainline Integration Status](phase1_mainline_integration/06_phase_acceptance_status.md)。历史阶段记录保留原时点；合并不提升 qualification。
+
 > 状态：active Phase-I 实施蓝图，v0.2
 > 日期：2026-10-04
 > 范围：定义 Phase I 多仿真器资格验证的实施顺序、阶段 gate、Evidence 位置和完成标准。
