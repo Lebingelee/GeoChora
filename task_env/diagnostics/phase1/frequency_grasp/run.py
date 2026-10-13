@@ -39,6 +39,9 @@ ARM_RAMP_CASES|={'euler_lift'}
 NATIVE_GRIP_EXECUTION_CASES|={'euler_lift'}
 LIFT_INTERVENTION_CASES|={'euler_lift'}
 CANDIDATE_CASES=NOSLIP_FROM_RESET|ARM_RAMP_CASES
+ARM_RAMP_CASES.add('arm_ramp_native_grip_frozen')
+NATIVE_GRIP_EXECUTION_CASES.add('arm_ramp_native_grip_frozen')
+CANDIDATE_CASES.add('arm_ramp_native_grip_frozen')
 
 
 def context(rate,case):
@@ -114,7 +117,8 @@ def context(rate,case):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--rate',type=int,choices=[20,50,100,500],required=True)
-    p.add_argument('--mode',choices=['G0','T1'],default='G0');p.add_argument('--case',choices=['frozen','slow_lift','airborne_hold','lateral','noslip_lift','candidate_noslip2','candidate_noslip4','candidate_native500','elliptic_lift','arm_ramp_lift','arm_ramp_frozen_lift','noslip_arm_ramp_lift','armature_zero_lift','arm_ramp_native_grip','damping_zero_lift','candidate_airborne_hold','grip_adjust_zero_descend','noslip_tolerance_zero_lift','euler_lift'],default='frozen')
+    p.add_argument('--mode',choices=['G0','T1'],default='G0');p.add_argument('--case',choices=['frozen','slow_lift','airborne_hold','lateral','noslip_lift','candidate_noslip2','candidate_noslip4','candidate_native500','elliptic_lift','arm_ramp_lift','arm_ramp_frozen_lift','noslip_arm_ramp_lift','armature_zero_lift','arm_ramp_native_grip','arm_ramp_native_grip_frozen','damping_zero_lift','candidate_airborne_hold','grip_adjust_zero_descend','noslip_tolerance_zero_lift','euler_lift'],default='frozen')
+    # The visual review comparator changes only NoSlip2 to frozen NoSlip0.
     p.add_argument('--sample',choices=['nominal','offset_a','offset_b'],default='nominal');p.add_argument('--causal-gate',type=Path);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     if a.case in CANDIDATE_CASES:
         if a.causal_gate is None:raise ValueError('StageB candidate requires explicit causal gate')
