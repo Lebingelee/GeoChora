@@ -99,7 +99,7 @@ Models differ in inertia, collision structure, friction/contact parameters, actu
 
 ## Regression, tradeoffs and next decisive work
 
-Diagnostic math/admission tests8PASS; Flow21PASS; P1.1 contracts30PASS; readiness synthetic checks PASS. Fresh unchanged R1/PickCube readiness+lift passes MuJoCo and GeoPhys at predetermined seeds31/73. These are development regressions, not formal qualifications. Canonical controllers, providers, assets, task semantics and thresholds remain unchanged. See09_regression_report.md.
+Diagnostic math/admission tests8PASS plus offline frame/metric tests2PASS; Flow21PASS; P1.1 contracts30PASS; readiness synthetic checks PASS. Fresh unchanged R1/PickCube readiness+lift passes MuJoCo and GeoPhys at predetermined seeds31/73. These are development regressions, not formal qualifications. Canonical controllers, providers, assets, task semantics and thresholds remain unchanged. See09_regression_report.md.
 
 Native500Hz feedback and NoSlip sweeps add CPU cost; table reports measured wall time under concurrent runs and is not a controlled performance benchmark. Arm ramp changes achieved acceleration, intentionally trading actuator discontinuity for smoother physical motion without reducing transport distance or extending deadlines. Contact safety and solver transferability still need Human Review. Generic checkpoint restoration for the new coordinator memory is not qualified.
 
@@ -109,6 +109,8 @@ Next decisive work: complete predefined held-out T1 at all rates, then isolate d
     regression='''# Development regression report
 
 Diagnostic test_native_math.py:8 PASS, covering native state preservation, force projection/frame handling, schedule admission, effective-inertia intervention calibration, disjoint intervention clocks and implicit damping oracle.
+
+Offline test_offline_windows.py:2 PASS, independently verifying world-frame invariance and a known5mm/0.1rad relative-pose drift oracle. JUnit outputs retained under regression/.
 
 Flow regression:21 PASS (flow_regression.xml). P1.1 contract runner:30 PASS (regression/p1_1). Readiness synthetic admission:PASS (regression/readiness/validation.json).
 
@@ -121,6 +123,11 @@ Frozen nominal G0 evidence is retained in a01 and c07. Candidate MuJoCo G0/T1 re
         f.write(f'\n## Final bounded handoff snapshot\n\nHEAD `{head}`; branch codex/p1.8-frequency-robust-grasp. Overall causal attribution PARTIAL (main contrasting mechanisms resolved within bounded interventions); frequency-robust grasp PARTIAL. See Causal_Diagnosis_and_Frequency_Robust_Grasp_Report.md and final_candidate_matrix.json for authoritative current results. No qualification or promotion. Time boundary is execution_time_boundary.json.\n')
     decision=json.loads((root/'07_causal_decision.json').read_text())
     decision.update(status='CAUSAL_ATTRIBUTION_PARTIAL',bounded_main_mechanisms='RESOLVED',frequency_robust_grasp_status='PARTIAL',final_report='Causal_Diagnosis_and_Frequency_Robust_Grasp_Report.md')
+    if not any(m.get('mechanism')=='fixed-native gripper feedback changes held-out acquisition under matched preclose history' for m in decision['mechanisms']):
+        decision['mechanisms'].append({'system':'GeoChora/MuJoCo candidate',
+            'mechanism':'fixed-native gripper feedback changes held-out acquisition under matched preclose history',
+            'evidence':['c18_public_ack_g0_20_offset_a','c19_public_ack_g0_20_offset_b','c24_native_grip500_ramp20_offset_a_clean_protocol','c25_native_grip500_ramp20_offset_b_clean_protocol','grasp_clock_intervention_events.json'],
+            'scope':'predeclared held-outs; 1575 native preclose physical/contact samples exact; not cross-model equivalence'})
     (root/'07_causal_decision.json').write_text(json.dumps(decision,indent=2)+'\n')
     print('final report generated',len(runs),'candidate summaries',head)
 
