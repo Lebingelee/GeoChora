@@ -1,0 +1,12 @@
+{
+  "schema":"frequency-grasp-reset-set-v1",
+  "version":"predefined-local-contact-heldouts-v1",
+  "selection":"Declared before any candidate trial; use every sample, retain all failures.",
+  "samples": {
+    "nominal":{"source":"frozen NA-S0","provenance_seed":19},
+    "offset_a":{"source":"diagnostic ResetSample","provenance_seed":101,"nut_translation_delta_m":[0.001,0.001,0.0],"nut_world_yaw_delta_rad":0.008726646259971648},
+    "offset_b":{"source":"diagnostic ResetSample","provenance_seed":102,"nut_translation_delta_m":[-0.001,-0.001,0.0],"nut_world_yaw_delta_rad":-0.008726646259971648}
+  },
+  "validation_matrix":"G0 at20/50/100/500 for all3 samples; T1 at20/50/100/500 for all3 samples if G0 prereqs pass. Main baseline19 at four rates and heldout baseline100 are paired controls.",
+  "limitation":"Frozen NA-S0 sampler ignores seed changes. These are explicit physical pose perturbations with a new diagnostic sampler identity, not artificial seed diversity or canonical qualification."
+}
