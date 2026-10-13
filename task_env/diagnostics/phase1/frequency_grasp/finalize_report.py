@@ -31,7 +31,8 @@ def finalize(root):
     (root/'final_candidate_matrix.json').write_text(json.dumps(data,indent=2)+'\n')
     table='| Run | Hz | Sample | Mode | Gate | Max drift mm | Rotation rad | Wall s | Native steps |\n|---|---:|---|---|---|---:|---:|---:|---:|\n'
     for r in runs:
-        table+=f"|{r['run']}|{r['rate']}|{r['sample']}|{r['mode']}|{'PASS' if r['pass'] else 'FAIL'}|{1000*(r['max_capture_position_drift_m'] or 0):.3f}|{r['max_capture_rotation_drift_rad'] or 0:.6f}|{r['wall_time_s'] or 0:.1f}|{r['native_samples']}|\n"
+        gate='EXCLUDED' if r.get('protocol_exclusion') else ('PASS' if r['pass'] else 'FAIL')
+        table+=f"|{r['run']}|{r['rate']}|{r['sample']}|{r['mode']}|{gate}|{1000*(r['max_capture_position_drift_m'] or 0):.3f}|{r['max_capture_rotation_drift_rad'] or 0:.6f}|{r['wall_time_s'] or 0:.1f}|{r['native_samples']}|\n"
     report=f'''# Causal Diagnosis & Frequency-Robust Grasp Report
 
 Development investigation; source HEAD `{head}` on `codex/p1.8-frequency-robust-grasp`. No production promotion, Full Expert success claim or formal D0/D1/D2 execution. The user-defined four-hour boundary is in execution_time_boundary.json. Results below are measured runs; missing matrix cells remain missing.
@@ -87,7 +88,7 @@ Selected candidate: MuJoCo NoSlip2 diagnostic solver configuration; linear nativ
 
 {table}
 
-T1 rows include verify_lift but are not independent standalone G0 trials. final_candidate_matrix.json separately records policy-observed verify_lift maxima; offline_event_windows.json uses measured native states for event windows. Do not blend the earlier equal-rate candidate with this candidate to fill missing cells. Predeclared held-outs are true ±1mm/±0.5degree Nut pose perturbations; trials are not favorable-seed selection. Full held-out T1 matrix remains incomplete unless explicitly shown above.
+T1 rows include verify_lift but are not independent standalone G0 trials. EXCLUDED rows retain invalid intervention pilots and do not count toward candidate coverage or mechanism claims. final_candidate_matrix.json separately records policy-observed verify_lift maxima; offline_event_windows.json uses measured native states for event windows. final_four_rate_summary.json reports the common native-event comparison. Do not blend the earlier equal-rate candidate with this candidate to fill missing cells. Predeclared held-outs are true ±1mm/±0.5degree Nut pose perturbations; trials are not favorable-seed selection. Full held-out T1 matrix remains incomplete unless explicitly shown above.
 
 ## Competing hypotheses and remaining uncertainty
 
