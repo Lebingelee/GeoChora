@@ -1,0 +1,6 @@
+{
+  "final_spec_sha256": "33abf5d55aa2240017031c9d1f5aedddca99ef1ec35af14db4734dceddf670e3",
+  "finalized_before_first_provider_execution": true,
+  "note": "Spec was finalized before any Genesis/SAPIEN native materialization or rollout; initial preflight lock was updated only to include the orchestration runner digest. Evaluation semantics, checkpoint, seeds, ResetSamples, provider pins, and tolerances were unchanged.",
+  "preflight_spec_sha256": "2a80d67efdd6fdcc024c9e707c12f9ec417df58299778d83b7c436f5bdec1c97"
+}

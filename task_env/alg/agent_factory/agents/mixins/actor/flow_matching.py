@@ -4,10 +4,10 @@ from agent_factory.config.structure import FlowMatchingActorConfig
 from agent_factory.modules.actors.flow_matching import VanillaFlowMatchingPolicy
 
 from ..module_builder import ModuleBuilderMixin
-from ..normalization_mixins import ActionNormMixin
+from ..normalization_mixins import ActionNormMixin, ObsNormMixin
 
 
-class FlowMatchingActorMixin(ModuleBuilderMixin, ActionNormMixin):
+class FlowMatchingActorMixin(ModuleBuilderMixin, ActionNormMixin, ObsNormMixin):
     """
     Mixin: provides vanilla flow matching actor construction, training, and inference.
     """
@@ -39,6 +39,7 @@ class FlowMatchingActorMixin(ModuleBuilderMixin, ActionNormMixin):
         cfg: FlowMatchingActorConfig = self.cfg.actor
 
         self._init_action_normalizer()
+        self._init_obs_normalizer()
 
         self.actor_encoder = self._build_encoder_from_config(cfg.encoder)
 
@@ -63,7 +64,7 @@ class FlowMatchingActorMixin(ModuleBuilderMixin, ActionNormMixin):
         )
 
     def update_actor(self, batch: dict) -> dict:
-        obs = self._preprocess_obs(batch["observations"])
+        obs = self._prepare_flow_observation(batch["observations"])
         actions = self.normalize_action(batch["action"].to(self.device).float())
 
         loss = self.actor(obs, actions)
@@ -77,7 +78,7 @@ class FlowMatchingActorMixin(ModuleBuilderMixin, ActionNormMixin):
     def sample_action(self, obs, initial_noise=None, num_inference_steps=None):
         was_training = self.actor.training
         self.actor.eval()
-        obs = self._preprocess_obs(obs)
+        obs = self._prepare_flow_observation(obs)
         try:
             with torch.no_grad():
                 if initial_noise is not None:
@@ -95,3 +96,12 @@ class FlowMatchingActorMixin(ModuleBuilderMixin, ActionNormMixin):
         finally:
             if was_training:
                 self.actor.train()
+
+    def _prepare_flow_observation(self, observation: dict) -> dict:
+        """Preprocess observations and apply the optional checkpointed state scaler."""
+        processed = self._preprocess_obs(observation)
+        if self.obs_normalizer is not None:
+            if "state" not in processed:
+                raise ValueError("Flow state normalization requires observations['state']")
+            processed["state"] = self.normalize_obs_state(processed["state"])
+        return processed

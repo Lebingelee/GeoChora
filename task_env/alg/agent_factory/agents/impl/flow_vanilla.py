@@ -90,6 +90,8 @@ class FlowVanillaAgent(MainMixin, FlowMatchingActorMixin, BaseAgent):
                 raise ValueError('full training forbidden: frozen expert dataset has failed episodes')
 
         self._fit_action_normalizer_from_dataset(expert_dataset)
+        if self.obs_normalizer is not None:
+            self._fit_obs_normalizer_from_dataset(expert_dataset)
 
         loader = DataLoader(
             expert_dataset,
@@ -107,8 +109,9 @@ class FlowVanillaAgent(MainMixin, FlowMatchingActorMixin, BaseAgent):
                                        drop_last=False, num_workers=0) if validation is not None else None
         if cfg.dataset.dataset_type == 'geochora_canonical_flow':
             identity = dict(cfg.agent_sp.artifact_identity)
-            if cfg.agent_sp.epoch_budget != 20 or cfg.agent_sp.steps_per_epoch != len(loader) or actor_iters != 20*len(loader):
-                raise ValueError('canonical Flow budget must equal20 actual DataLoader epochs')
+            epoch_budget = int(cfg.agent_sp.epoch_budget)
+            if epoch_budget <= 0 or cfg.agent_sp.steps_per_epoch != len(loader) or actor_iters != epoch_budget*len(loader):
+                raise ValueError('canonical Flow budget must equal the configured number of actual DataLoader epochs')
             if validation is None or expert_dataset.manifest_identity != identity.get('dataset_manifest_sha256'):
                 raise ValueError('canonical Flow requires fixed validation and dataset identity')
         self.train_loop(loader, actor_iters, save_dir=checkpoint_dir, validation_loader=validation_loader)

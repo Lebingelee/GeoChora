@@ -1,0 +1,73 @@
+schema: geochora.phase_decision.v1
+phase: p1_6_state_policy
+decision: approve
+
+judge:
+  type: human
+  decided_on: '2026-10-07'
+
+scope:
+  task: PickCube
+  task_artifact_profile: experimental_100hz
+  task_artifact_sha256: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+  policy: V2a Flow_Vanilla
+  checkpoint_role: final
+  checkpoint_sha256: 9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9
+  observation: 26D_no_qvel
+  action: absolute_joint
+  primary_providers:
+    - geophys
+    - mujoco
+
+basis:
+  - >
+    CanonicalTrajectory substrate is established within the bounded P1.6 route.
+  - Historical D0 target-equivalence check passed.
+  - Historical D1 exact CanonicalControlTarget replay passed.
+  - Historical D2 transformed public-action replay passed.
+  - Frozen V2a source-domain cohort passed 6/6.
+  - Frozen D3 train-support cohort passed 10/10 on GeoPhys and 10/10 on MuJoCo.
+  - >
+    Frozen D3 validation-support cohort passed 10/10 on GeoPhys and 10/10 on
+    MuJoCo.
+  - >
+    The same checkpoint, ResetSamples, observation contract, normalization,
+    public absolute_joint route, and ProductionCanonicalPandaController were
+    used across the two primary providers.
+  - >
+    D3 software/checkpoint portability passed with no provider-specific learner
+    patch.
+
+accepted_claims:
+  - bounded software/checkpoint portability across GeoPhys and MuJoCo
+  - >
+    bounded behavioral portability for the frozen PickCube/V2a/100Hz evaluation
+    envelope
+  - D0-D3 diagnostic ladder as a reusable P1.6 debugging methodology
+
+supplementary_evidence:
+  genesis_validation: '10/10'
+  sapien_validation: '9/10'
+  qualification_effect: none
+  sapien_failed_seed: 2212
+
+deviations:
+  - The original reciprocal train-source matrix was not completed in all training directions.
+  - >
+    Closure instead accepts one competent frozen GeoPhys-trained policy artifact
+    evaluated under the same provider-neutral contract on GeoPhys and MuJoCo.
+
+unsupported:
+  - statistical robustness
+  - arbitrary task portability
+  - arbitrary policy portability
+  - provider-wide qualification
+  - visuomotor portability
+  - P1.7 completion
+  - Phase-I completion
+
+required_changes: []
+
+next:
+  - keep P1.7 deferred
+  - continue P1.8 independently

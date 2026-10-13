@@ -1,0 +1,107 @@
+{
+  "schema": "p1_6-branch-consolidation-review-summary-v1",
+  "closure_branch": "codex/p1.6-closure",
+  "closure_head": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
+  "closure_remote_head": "9d7c42b321eb24633df670a47e3261b62aab2c7b",
+  "closure_base_policy_search_head": "32696797b731fcaa38d67c768f89b308f46cb5ca",
+  "closure_contains_all_observed_old_branch_commits": true,
+  "historical_branches": [
+    {
+      "branch": "codex/p1.6-4h-trajectory-state-policy",
+      "local_head": "855586c6ba1e0bb5b3d82a97b6910561770cfad8",
+      "remote_head": "855586c6ba1e0bb5b3d82a97b6910561770cfad8",
+      "ancestor_of_latest_policy_search": true,
+      "ancestor_of_closure": true,
+      "deleted_local": true,
+      "deleted_remote": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted after remote publication, evidence indexing, and ancestry/preservation checks"
+    },
+    {
+      "branch": "codex/p1.6-agent-factory-import-review",
+      "local_head": "ee39275cc906773221a5269d3e26e8ae203f9706",
+      "remote_head": "ee39275cc906773221a5269d3e26e8ae203f9706",
+      "ancestor_of_latest_policy_search": true,
+      "ancestor_of_closure": true,
+      "deleted_local": true,
+      "deleted_remote": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted after remote publication, evidence indexing, and ancestry/preservation checks"
+    },
+    {
+      "branch": "codex/p1.6-flow-integration-prep",
+      "local_head": "f53a5cb1c51e46134aa084171651dd17d2036553",
+      "remote_head": "f53a5cb1c51e46134aa084171651dd17d2036553",
+      "ancestor_of_latest_policy_search": true,
+      "ancestor_of_closure": true,
+      "deleted_local": true,
+      "deleted_remote": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted after remote publication, evidence indexing, and ancestry/preservation checks"
+    },
+    {
+      "branch": "codex/p1.6-flow-dataset-supplement",
+      "local_head": "6df732658c8deaa370dc15f8d5c036d358124fa9",
+      "remote_head": "6df732658c8deaa370dc15f8d5c036d358124fa9",
+      "ancestor_of_latest_policy_search": true,
+      "ancestor_of_closure": true,
+      "deleted_local": true,
+      "deleted_remote": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted after remote publication, evidence indexing, and ancestry/preservation checks"
+    },
+    {
+      "branch": "codex/p1.6-flow-train-dataset-support",
+      "local_head": "cda511f49eb544dabe685ec1dbcc6345884d66c8",
+      "remote_head": "cda511f49eb544dabe685ec1dbcc6345884d66c8",
+      "ancestor_of_latest_policy_search": true,
+      "ancestor_of_closure": true,
+      "deleted_local": true,
+      "deleted_remote": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted after remote publication, evidence indexing, and ancestry/preservation checks"
+    },
+    {
+      "branch": "codex/p1.6-policy-search-100hz-gpu",
+      "local_head": "32696797b731fcaa38d67c768f89b308f46cb5ca",
+      "remote_head": "32696797b731fcaa38d67c768f89b308f46cb5ca",
+      "ancestor_of_latest_policy_search": true,
+      "ancestor_of_closure": true,
+      "deleted_local": true,
+      "deleted_remote": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted after remote publication, evidence indexing, and ancestry/preservation checks"
+    }
+  ],
+  "local_aliases": [
+    {
+      "branch": "codex/p1.6-flow-train-normalized-80ep",
+      "head": "cda511f49eb544dabe685ec1dbcc6345884d66c8",
+      "ancestor_of_closure": true,
+      "checked_out_in_worktree": false,
+      "deleted_local": true,
+      "unique_commits_not_in_closure": [],
+      "deletion_status": "deleted with git branch -d after confirming ancestor of closure"
+    }
+  ],
+  "deletion_gate": {
+    "all_old_refs_deleted_and_final_refs_verified": true,
+    "branch_ancestry_verified": true,
+    "closure_remote_head_verified": true,
+    "closure_remote_published": true,
+    "delete_old_local_refs_authorized_after_remote_publish": true,
+    "delete_old_remote_refs_authorized_after_remote_publish": true,
+    "evidence_index_written": true,
+    "evidence_preservation_complete": true,
+    "final_refs_verified": true,
+    "local_deletion_completed": true,
+    "local_evidence_inventoried": true,
+    "no_unique_remote_commits": true,
+    "pre_delete_ancestry_checks_passed": true,
+    "remote_deletion_completed": true
+  },
+  "evidence_preservation_complete": true,
+  "full_local_branch_consolidation_record_sha256": "29f9336f94a26b282fc6a8bf5de710490dbbcd1a0acb16ae0658c9f71e34a378",
+  "full_local_record_preserved_locally": true,
+  "machine_local_worktree_paths_omitted_from_review_copy": true
+}

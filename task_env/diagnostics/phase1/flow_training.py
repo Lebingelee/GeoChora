@@ -364,7 +364,19 @@ def cpu_check(root):
     return result
 
 
-def _episode_worker(seed,cohort,root,output_dir=None):
+def flow_rollout_horizons(spec, cfg):
+    """Resolve the locked prediction/execution chunk against model shape."""
+    obs_horizon=int(spec.get('obs_horizon',cfg.env.obs_horizon))
+    pred_horizon=int(spec.get('pred_horizon',cfg.env.pred_horizon))
+    act_horizon=int(spec.get('act_horizon',cfg.env.act_horizon))
+    if obs_horizon!=int(cfg.env.obs_horizon) or pred_horizon!=int(cfg.env.pred_horizon):
+        raise ValueError('runner_action_boundary: rollout observation/prediction horizon mismatches checkpoint')
+    if act_horizon<1 or act_horizon>pred_horizon:
+        raise ValueError('runner_action_boundary: act_horizon must be in [1,pred_horizon]')
+    return obs_horizon,pred_horizon,act_horizon
+
+
+def _episode_worker(seed,cohort,root,output_dir=None,rollout_spec_path=None):
     from agent_factory.config.resolution import general_resolve
     from agent_factory.agents.registry import make_agent
     from agent_factory.training.identity import config_identity
@@ -375,8 +387,9 @@ def _episode_worker(seed,cohort,root,output_dir=None):
     out.mkdir(parents=True,exist_ok=True)
     if (out/'report.json').exists() or (out/'trace.json').exists():
         raise FileExistsError('rollout already exists; will not rerun seed')
-    spec=yaml.safe_load((root/'rollout_spec.yaml').read_text());lock=json.loads((root/'rollout_spec_lock.json').read_text())
-    rollout_path=root/'rollout_spec.yaml'
+    rollout_path=Path(rollout_spec_path) if rollout_spec_path else root/'rollout_spec.yaml'
+    spec=yaml.safe_load(rollout_path.read_text());lock_path=rollout_path.with_name(rollout_path.stem+'_lock.json')
+    lock=json.loads(lock_path.read_text())
     if sha(rollout_path)!=lock['sha256']:raise ValueError('rollout_spec lock mismatch')
     m=json.loads(MANIFEST.read_text());allowed=m['selected_train_seeds'] if cohort in ('pilot_train_support','full_train_support') else m['selected_validation_seeds']
     if seed not in allowed:raise ValueError('unselected rollout seed')
@@ -385,14 +398,25 @@ def _episode_worker(seed,cohort,root,output_dir=None):
     sample=ResetSample.from_mapping(sample_spec['samples'][str(seed)])
     if sample.identity_hash!=row['reset_sample_hash']:raise ValueError('rollout ResetSample identity mismatch')
     original_sample_mapping=sample.to_mapping()
-    cfg,_=general_resolve(file_config=OmegaConf.load(root/'resolved_flow_config.yaml'))
+    variant_cfg=OmegaConf.load(root/'resolved_flow_config.yaml')
+    variant_obs_norm=OmegaConf.select(variant_cfg,'actor.obs_norm',default=None)
+    if variant_obs_norm is not None:
+        OmegaConf.set_struct(variant_cfg,False)
+        del variant_cfg.actor['obs_norm']
+    cfg,_=general_resolve(file_config=variant_cfg)
+    if variant_obs_norm is not None:
+        OmegaConf.set_struct(cfg,False)
+        cfg.actor.obs_norm=variant_obs_norm
+    obs_horizon,pred_horizon,act_horizon=flow_rollout_horizons(spec,cfg)
     cfg.device='cpu';cfg.train.device='cpu';cfg.agent_sp.artifact_identity=yaml.safe_load((root/'training_spec.yaml').read_text())['resolved_config']['agent_sp']['artifact_identity']
-    agent=make_agent('Flow_Vanilla',cfg);checkpoint=root/'checkpoints/flow_best_validation.pth'
+    agent=make_agent('Flow_Vanilla',cfg)
+    checkpoint=root/spec.get('checkpoint','checkpoints/flow_best_validation.pth')
     checkpoint_hash=sha(checkpoint);meta=agent.load(str(checkpoint))
     torch.set_num_threads(4)
     gen=torch.Generator(device='cpu');gen.manual_seed(100000+seed)
     artifact,source,_=context();session=None;trace=[]
     report={'seed':seed,'cohort':cohort,'provider':'geophys','checkpoint_sha256':checkpoint_hash,
+            'obs_horizon':obs_horizon,'pred_horizon':pred_horizon,'act_horizon':act_horizon,
             'policy_rng_seed':100000+seed,'sample_hash':sample.identity_hash,'success':False,'steps_to_success':None,
             'issued_policy_action_count':0,'replanning_count':0,'action_clipping_count':0,
             'per_dimension_clipping_count':[0]*8,'max_preclamp_violation_by_dimension':[0.]*8,
@@ -409,14 +433,14 @@ def _episode_worker(seed,cohort,root,output_dir=None):
             if len(history)<2:obsarr=np.stack([history[0],history[0]])
             else:obsarr=np.stack(history[-2:])
             obs={'state':torch.from_numpy(obsarr.copy()).unsqueeze(0)}
-            noise=torch.randn((1,16,8),generator=gen)
+            noise=torch.randn((1,pred_horizon,8),generator=gen)
             agent.actor.eval()
             with torch.no_grad():values=agent.sample_action(obs,initial_noise=noise)
-            if values.shape!=(1,16,8):raise ValueError('runner_action_boundary: Flow output shape')
+            if values.shape!=(1,pred_horizon,8):raise ValueError('runner_action_boundary: Flow output shape')
             chunk=values[0].cpu().numpy();finite_action &= bool(np.isfinite(chunk).all())
             if not finite_action:raise ValueError('runner_action_boundary: nonfinite policy chunk')
             report['replanning_count']+=1
-            for action in chunk[:8]:
+            for action in chunk[:act_horizon]:
                 if control_step>=int(spec['max_control_steps_per_episode']):break
                 request=requested_action(action);canonical,target=controller.compute(state,feedback,request)
                 interpreted=np.asarray(canonical.interpreted_values,dtype=np.float64);raw=np.asarray(request.values,dtype=np.float64)
@@ -488,11 +512,11 @@ def run_cohort(root,cohort,seeds,output_root=None):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--stage',choices=['train','cpu-check','pilot','train-support','validation-support','episode'],required=True)
-    p.add_argument('--root',type=Path,default=ROOT);p.add_argument('--seed',type=int);p.add_argument('--cohort');p.add_argument('--episode-output',type=Path)
+    p.add_argument('--root',type=Path,default=ROOT);p.add_argument('--seed',type=int);p.add_argument('--cohort');p.add_argument('--episode-output',type=Path);p.add_argument('--rollout-spec',type=Path)
     a=p.parse_args();root=a.root
     if a.stage=='train':result=train(root)
     elif a.stage=='cpu-check':result=cpu_check(root)
-    elif a.stage=='episode':result=_episode_worker(a.seed,a.cohort,root,a.episode_output)
+    elif a.stage=='episode':result=_episode_worker(a.seed,a.cohort,root,a.episode_output,a.rollout_spec)
     elif a.stage in ('pilot','train-support','validation-support'):
         report=json.loads((root/'training_summary.json').read_text())
         if report.get('total_optimizer_steps')!=1620:raise ValueError('rollout cannot start before exactly1620 completed updates')

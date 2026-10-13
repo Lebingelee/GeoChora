@@ -1,0 +1,259 @@
+{
+  "dataset": {
+    "backend": "GeoPhys CUDA diagnostic route",
+    "manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+    "train_trajectories": 80,
+    "train_windows": 9055,
+    "validation_trajectories": 20,
+    "validation_windows": 2239
+  },
+  "identities": {
+    "best_checkpoint_sha256": "92608239ac3521959e17732fb1dbcbb108182441b46b7b66aeadfba3323a62f2",
+    "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+    "final_checkpoint_file_sha256": "c212ed39c49267594ea849288c02e0d8bc063534d4816a535630f9e3b185d818",
+    "final_checkpoint_sha256": "c212ed39c49267594ea849288c02e0d8bc063534d4816a535630f9e3b185d818",
+    "normalizer_identity": "a5baf3421069f21f6957ac1eeca94900a5a7d1308b2d494203fe8e57ac99c408",
+    "resolved_config_file_sha256": "5a12b1cbb3df5e4b00f30871244327d9186cbcc40ed7fca290dc4b05563a0a4e",
+    "resolved_config_sha256": "a889566eb2dc405e3c645838a66a4f6edca34599cc6f2c81f0a06847564ec83e",
+    "rollout_spec_sha256": "4f4f573ef2c08764842266ffa0db5816a30b973110f8386cca92f669f4802e91",
+    "training_spec_sha256": "6cdd39ed612c1b5a4c67e23cf283137b135a537cfe4431ec19b26e4cb9614737"
+  },
+  "interpretation": "The 15000-update final checkpoint passed seed1000 and failed seed1010, so the predeclared two-seed pilot gate did not pass and the remaining four cohort seeds were not run. This is source-domain exploratory evidence; no retries or tuning were made.",
+  "policy": {
+    "act_horizon": 36,
+    "action_dim": 8,
+    "action_mode": "absolute_joint",
+    "agent": "Flow_Vanilla",
+    "backbone": "ConditionalUnet1D",
+    "inference_device": "cuda",
+    "joint_velocity_included": true,
+    "nominal_replan_frequency_hz": 2.7777777777777777,
+    "normalization": "train-only observation mean/std; action q01/q99 mapped to [-1,1] and clipped",
+    "obs_horizon": 2,
+    "open_loop_duration_s": 0.36,
+    "parameter_count": 19512264,
+    "pred_horizon": 50,
+    "prediction_duration_s": 0.5,
+    "state_dim": 33
+  },
+  "rollout": {
+    "checkpoint_role": "final",
+    "checkpoint_sha256": "c212ed39c49267594ea849288c02e0d8bc063534d4816a535630f9e3b185d818",
+    "cohort_seeds": [
+      1000,
+      1010,
+      1020,
+      1040,
+      1050,
+      1100
+    ],
+    "episodes": [
+      {
+        "action_clipping_count": 0,
+        "all_inference_checks_pass": true,
+        "control_frames": 98,
+        "inference_p50_ms": 28.95403979346156,
+        "inference_p95_ms": 276.1424303054809,
+        "max_cube_lift_m": 0.1020904068946838,
+        "max_per_step_arm_servo_delta_rad": 0.16281187534332275,
+        "max_per_step_arm_target_delta_rad": 0.04629480838775635,
+        "max_per_step_gripper_opening_delta_m": 0.006310882568359377,
+        "report_path": "rollout/seed1000/report.json",
+        "reset_sample_hash": "8703ddb51c1a98af6bf82671caf22266e5167d92bc3693d8c25753ffc2d6c240",
+        "seed": 1000,
+        "simulated_duration_s": 0.9800000000000006,
+        "steps_to_success": 98,
+        "success": true,
+        "trace_path": "rollout/seed1000/trace.json"
+      },
+      {
+        "action_clipping_count": 0,
+        "all_inference_checks_pass": true,
+        "control_frames": 2500,
+        "inference_p50_ms": 26.648702565580606,
+        "inference_p95_ms": 27.847580215893686,
+        "max_cube_lift_m": 0.08706914234161373,
+        "max_per_step_arm_servo_delta_rad": 1.5892441272735596,
+        "max_per_step_arm_target_delta_rad": 0.45408856868743896,
+        "max_per_step_gripper_opening_delta_m": 0.04949604034423828,
+        "report_path": "rollout/seed1010/report.json",
+        "reset_sample_hash": "3456cca86b4badc6d9cd39f75b3994eb78db4787fc2a430df08042e1cde9db13",
+        "seed": 1010,
+        "simulated_duration_s": 25.00000000000111,
+        "steps_to_success": null,
+        "success": false,
+        "trace_path": "rollout/seed1010/trace.json"
+      }
+    ],
+    "full_cohort_started": false,
+    "pilot_gate_pass": false,
+    "pilot_seeds": [
+      1000,
+      1010
+    ],
+    "pilot_successes": 1
+  },
+  "schema": "p1_6-policy-search-variant-summary-v0",
+  "scope": {
+    "lower_layer_semantics_modified": false,
+    "p1_8_modified": false,
+    "public_main_modified": false,
+    "qualification_claim": false
+  },
+  "source_baseline_commit": "df6bd560ed28336fc354a32573b71d6001214291",
+  "task_artifact_identity": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+  "training": {
+    "all_losses_finite": true,
+    "batch_size": 512,
+    "best_validation_step": 10000,
+    "device": "cuda",
+    "effective_epoch_equivalents": 882.3529411764706,
+    "final_train_loss": 0.0019221336452756076,
+    "final_validation_loss": 0.011315577486700487,
+    "gpu": "NVIDIA GeForce RTX 5060",
+    "initial_train_loss": 0.5852852752804756,
+    "initial_validation_loss": 1.49452329315528,
+    "learning_rate": 0.0001,
+    "minimum_train_window_loss": 0.0019221336452756076,
+    "minimum_validation_loss": 0.010289658578932152,
+    "optimizer": "AdamW",
+    "optimizer_updates": 15000,
+    "peak_cuda_memory_allocated_bytes": 1548399104,
+    "peak_cuda_memory_reserved_bytes": 1799356416,
+    "precision": "float32",
+    "steps_per_epoch": 17,
+    "validation_rows": [
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 1.49452329315528,
+        "samples": 2239,
+        "step": 0,
+        "wall_time": 0.39836250711232424
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.020592101328424334,
+        "samples": 2239,
+        "step": 1000,
+        "wall_time": 0.13406795402988791
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.014082355660608087,
+        "samples": 2239,
+        "step": 2000,
+        "wall_time": 0.13108047097921371
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.012748894580340828,
+        "samples": 2239,
+        "step": 3000,
+        "wall_time": 0.1328473170287907
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.013353760854198418,
+        "samples": 2239,
+        "step": 4000,
+        "wall_time": 0.1307380530051887
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.011622405834346278,
+        "samples": 2239,
+        "step": 5000,
+        "wall_time": 0.13397836405783892
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.012325288029075628,
+        "samples": 2239,
+        "step": 6000,
+        "wall_time": 0.13171481620520353
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.010513708787392485,
+        "samples": 2239,
+        "step": 7000,
+        "wall_time": 0.13456092914566398
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.010642411562482286,
+        "samples": 2239,
+        "step": 8000,
+        "wall_time": 0.136344897095114
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.010638126565618486,
+        "samples": 2239,
+        "step": 9000,
+        "wall_time": 0.1314990227110684
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.010289658578932152,
+        "samples": 2239,
+        "step": 10000,
+        "wall_time": 0.1333888857625425
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.01165381760443359,
+        "samples": 2239,
+        "step": 11000,
+        "wall_time": 0.1425457731820643
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.010712376695880006,
+        "samples": 2239,
+        "step": 12000,
+        "wall_time": 0.13320766342803836
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.010868234164736642,
+        "samples": 2239,
+        "step": 13000,
+        "wall_time": 0.13224794482812285
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.012058575972066148,
+        "samples": 2239,
+        "step": 14000,
+        "wall_time": 0.13343785936012864
+      },
+      {
+        "batches": 5,
+        "kind": "validation",
+        "loss": 0.011315577486700487,
+        "samples": 2239,
+        "step": 15000,
+        "wall_time": 0.13417786033824086
+      }
+    ],
+    "wall_time_s": 1414.0693653528579,
+    "weight_decay": 1e-06
+  },
+  "variant": "v1a_flow_h50_a36_15000_final"
+}

@@ -267,6 +267,17 @@ hypotheses:
 
 在证明 replay input 等价前，不得把 provider physics 标记为错误。
 
+### 8.8 从 action 转换到 learned-policy portability 的 D0–D3 梯子
+
+PickCube state-policy 问题按以下顺序定位，并为每一层保存独立、可哈希的 Evidence：
+
+1. **D0 — target equivalence**：用记录的 canonical state/feedback 与重建的 public action 调用生产 controller，比较其 `CanonicalControlTarget` 与记录目标。
+2. **D1 — exact-target replay**：从同一个 ResetSample 直接回放记录的 canonical targets，隔离 trajectory/control target 本身是否足以执行。
+3. **D2 — transformed-action replay**：把重建的 public action 输入当前 replay state/feedback，经生产 controller 后再执行；这检查闭环 action-mode/controller 路线。
+4. **D3 — learned-policy portability**：固定 checkpoint、feature/normalization/action contract 与配对 ResetSamples，在多个 provider 上运行 policy，并分别报告 contract/software portability 与任务结果。
+
+D0–D2 通过不能替代 learned-policy task success；D3 的 seed 数有限时也不能推导 statistical robustness 或 provider-wide qualification。历史 Evidence 必须标记执行时 source provenance，包含 dirty working tree 的事实不能被事后改写。
+
 ## 9. Native-provider 诊断
 
 必要时可以使用最小 direct provider script，判断 bug 位于 Geochora adapter 还是 provider。

@@ -1,0 +1,376 @@
+schema: p1_6-100hz-flow-search-training-spec-v0
+variant: v2
+description: Flow h50/a36 without arm velocity
+baseline_commit: 58c69f0300f4c0615973b9f740f7a4ba82c08e46
+locked_before_governed_training: true
+dataset:
+  manifest_path: workspace/experiments/p1_6_policy_search/100hz_gpu_flow/training_dataset_manifest_100hz.json
+  file_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+  logical_identity: f2ebc763dd98ec5c78ec77c2d988255ec112ca24e331afebeea2fe45a5bff478
+  execution_backend: cuda
+  train_seeds:
+  - 2000
+  - 2001
+  - 2002
+  - 2003
+  - 2004
+  - 2005
+  - 2006
+  - 2007
+  - 2008
+  - 2009
+  - 2010
+  - 2011
+  - 2012
+  - 2013
+  - 2014
+  - 2015
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2026
+  - 2027
+  - 2028
+  - 2029
+  - 2030
+  - 2031
+  - 2032
+  - 2033
+  - 2034
+  - 2035
+  - 2037
+  - 2038
+  - 2039
+  - 2040
+  - 2041
+  - 2042
+  - 2043
+  - 2044
+  - 2045
+  - 2046
+  - 2047
+  - 2048
+  - 2049
+  - 2050
+  - 2051
+  - 2052
+  - 2053
+  - 2054
+  - 2055
+  - 2056
+  - 2057
+  - 2058
+  - 2059
+  - 2061
+  - 2062
+  - 2063
+  - 2064
+  - 2065
+  - 2066
+  - 2067
+  - 2068
+  - 2069
+  - 2070
+  - 2071
+  - 2072
+  - 2074
+  - 2075
+  - 2076
+  - 2078
+  - 2079
+  - 2080
+  - 2081
+  - 2082
+  - 2084
+  - 2085
+  - 2086
+  validation_seeds:
+  - 2200
+  - 2201
+  - 2202
+  - 2203
+  - 2204
+  - 2205
+  - 2206
+  - 2207
+  - 2208
+  - 2209
+  - 2210
+  - 2211
+  - 2212
+  - 2213
+  - 2214
+  - 2215
+  - 2216
+  - 2217
+  - 2218
+  - 2219
+  train_trajectory_count: 80
+  validation_trajectory_count: 20
+  train_samples: 9055
+  validation_samples: 2239
+temporal_profile:
+  physics_dt_s: 0.002
+  control_substeps: 5
+  control_dt_s: 0.01
+  physics_hz: 500
+  control_hz: 100
+learner:
+  agent_type: Flow_Vanilla
+  backbone: ConditionalUnet1D
+  state_dim: 26
+  raw_state_dim: 33
+  observation_contract:
+    identity: be8fb4cc60b33454c9ae2a87e3e4cc9017016ccdf6770656d5ebb955d3c1c076
+    source_contract_identity: 8b2a510ba0cd549480ddc431bfeff3a9d1d87ec1f93ae6d94504e5783e89b1c2
+    selected_fields:
+    - arm_position7
+    - gripper_opening_m1
+    - EE_position3
+    - EE_rotation_column0_then_column1_6
+    - cube_position3
+    - cube_rotation_column0_then_column1_6
+    excluded_fields:
+    - arm_velocity7
+    state_dim: 26
+  action_contract:
+    schema: pick-cube-state-policy-action-v0
+    dtype: float32
+    shape:
+    - 8
+    mode: absolute_joint
+    reference: null
+    rotation_representation: none
+    arm_order:
+    - panda-v1/joint1
+    - panda-v1/joint2
+    - panda-v1/joint3
+    - panda-v1/joint4
+    - panda-v1/joint5
+    - panda-v1/joint6
+    - panda-v1/joint7
+    opening_range_m: 0.08
+  action_dim: 8
+  action_mode: absolute_joint
+  obs_horizon: 2
+  pred_horizon: 50
+  act_horizon: 36
+  prediction_duration_s: 0.5
+  open_loop_duration_s: 0.36
+  replanning_hz: 2.7777777777777777
+  normalization:
+    observation: train-only mean/std z-score
+    action: train-only per-dimension q01-q99 to [-1,1], clipped
+  inference_steps: 10
+  device: cuda
+  precision: float32
+  seed: 2026
+  batch_size: 512
+  batch_size_attempts:
+  - batch_size: 512
+    result: pass
+    loss: 1.6444720029830933
+    wall_time_s: 1.4624346857890487
+    peak_allocated_bytes: 1351367168
+    peak_reserved_bytes: 1648361472
+    config_identity: ca715d4dc241164a59426ba21aa7bc303f05e0e1734e99275a0e6a1e9687388e
+  epoch_budget: 80
+  steps_per_epoch: 17
+  actor_iters: 1360
+  optimizer: AdamW
+  learning_rate: 0.0001
+  weight_decay: 1.0e-06
+  dataloader:
+    shuffle: true
+    drop_last: true
+    num_workers: 0
+    generator_seed: 2026
+resolved_config_path: workspace/experiments/p1_6_policy_search/100hz_gpu_flow_h50_a36_no_qvel_v2/resolved_config.yaml
+resolved_config_file_sha256: d0621a6d97630dd8de8b12b2e1f40d690d87e9e2ac88396ebee896a819cbd7a8
+resolved_config_sha256: ca715d4dc241164a59426ba21aa7bc303f05e0e1734e99275a0e6a1e9687388e
+dataset_manifest_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+feature_contract_identity: be8fb4cc60b33454c9ae2a87e3e4cc9017016ccdf6770656d5ebb955d3c1c076
+action_contract_identity: 4888f67cacb175ad4bf41195c1c4dc9465e653485e05b53f5ca33a61ad93eba5
+identities:
+  resolved_config_sha256: ca715d4dc241164a59426ba21aa7bc303f05e0e1734e99275a0e6a1e9687388e
+  dataset_manifest_sha256: 0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd
+  agent_type: Flow_Vanilla
+  feature_contract_identity: be8fb4cc60b33454c9ae2a87e3e4cc9017016ccdf6770656d5ebb955d3c1c076
+  action_contract_identity: 4888f67cacb175ad4bf41195c1c4dc9465e653485e05b53f5ca33a61ad93eba5
+normalization_fit_source: selected train trajectories only
+training_state_statistics:
+  min:
+  - -0.17023028433322906
+  - -0.3163430094718933
+  - -0.00023307304945774376
+  - -1.996883511543274
+  - -0.08823620527982712
+  - 1.0045225620269775
+  - -0.7857908010482788
+  - 0.05373896658420563
+  - 0.4559427797794342
+  - -0.09400515258312225
+  - 0.5251393914222717
+  - 0.16125869750976562
+  - 0.9840882420539856
+  - -0.030576158314943314
+  - 0.9806208610534668
+  - -0.17760102450847626
+  - -0.10118503868579865
+  - 0.45520487427711487
+  - -0.09276138246059418
+  - 0.48234325647354126
+  - 0.9946222305297852
+  - -0.023496143519878387
+  - -0.10319304466247559
+  - -0.0022308737970888615
+  - 0.9996665120124817
+  - -0.02398144081234932
+  max:
+  - 0.10451627522706985
+  - 0.6484721302986145
+  - 0.18087464570999146
+  - -0.4623347520828247
+  - 0.05237584933638573
+  - 1.6639727354049683
+  - -0.42923465371131897
+  - 0.07999999821186066
+  - 0.660481333732605
+  - 0.1006845161318779
+  - 0.640324592590332
+  - 0.1768840253353119
+  - 0.9866508841514587
+  - 0.021930953487753868
+  - 0.9866390228271484
+  - -0.16284853219985962
+  - 0.08314880728721619
+  - 0.6468068957328796
+  - 0.10067915171384811
+  - 0.5919744968414307
+  - 1.0
+  - 0.0010394769487902522
+  - 0.019895989447832108
+  - 0.023355187848210335
+  - 1.0
+  - 0.025534722954034805
+  mean:
+  - -0.08131492137908936
+  - 0.08118046820163727
+  - 0.07594357430934906
+  - -1.4287763833999634
+  - -0.005583800841122866
+  - 1.4848695993423462
+  - -0.6267967224121094
+  - 0.06688576936721802
+  - 0.5611106157302856
+  - -0.005971620324999094
+  - 0.5715494155883789
+  - 0.1673261970281601
+  - 0.9858834743499756
+  - -0.0036126472987234592
+  - 0.9854060411453247
+  - -0.16739940643310547
+  - -0.024590929970145226
+  - 0.5618573427200317
+  - 0.007881266064941883
+  - 0.5034518241882324
+  - 0.9997588396072388
+  - -0.0025226513389497995
+  - -0.012319505214691162
+  - 0.0024761350359767675
+  - 0.9999731183052063
+  - -0.001417968887835741
+  std_unbiased:
+  - 0.05815523862838745
+  - 0.2129981815814972
+  - 0.047977205365896225
+  - 0.32440051436424255
+  - 0.020107291638851166
+  - 0.13827818632125854
+  - 0.09859218448400497
+  - 0.011941786855459213
+  - 0.05210402235388756
+  - 0.05503765121102333
+  - 0.034927938133478165
+  - 0.0022492764983326197
+  - 0.00037507471279241145
+  - 0.004173813387751579
+  - 0.0006117032608017325
+  - 0.002202338073402643
+  - 0.018502356484532356
+  - 0.05613408610224724
+  - 0.052567481994628906
+  - 0.029589397832751274
+  - 0.0005017459625378251
+  - 0.004346746485680342
+  - 0.017463378608226776
+  - 0.004323067143559456
+  - 5.680715912603773e-05
+  - 0.00517975864931941
+training_action_statistics:
+  min:
+  - -0.1702035367488861
+  - -0.321773886680603
+  - -0.00019946671091020107
+  - -2.001675844192505
+  - -0.09243906289339066
+  - 0.9819814562797546
+  - -0.7858103513717651
+  - -1.0
+  max:
+  - 0.1129651665687561
+  - 0.6550074815750122
+  - 0.18170826137065887
+  - -0.42791643738746643
+  - 0.05315089225769043
+  - 1.677814245223999
+  - -0.42889851331710815
+  - 1.0
+  mean:
+  - -0.0784175843000412
+  - 0.08435256034135818
+  - 0.0782431811094284
+  - -1.413914442062378
+  - -0.0059088957495987415
+  - 1.47648024559021
+  - -0.621999979019165
+  - -0.04848150163888931
+  std_unbiased:
+  - 0.057537227869033813
+  - 0.21813756227493286
+  - 0.047037769109010696
+  - 0.336896687746048
+  - 0.020728280767798424
+  - 0.14653709530830383
+  - 0.09684879332780838
+  - 0.9523006677627563
+  q01:
+  - -0.17011865973472595
+  - -0.2907577455043793
+  - -8.704810898052529e-05
+  - -1.9586714506149292
+  - -0.06653094291687012
+  - 1.0378386974334717
+  - -0.785588264465332
+  - -1.0
+  q99:
+  - 0.06602350622415543
+  - 0.6194441914558411
+  - 0.16528601944446564
+  - -0.45828816294670105
+  - 0.04074934497475624
+  - 1.6638867855072021
+  - -0.43847087025642395
+  - 1.0
+checkpoint_selection: minimum validation loss; exact tie selects earlier step
+validation_schedule:
+- 0
+- 1000
+- 1360
+train_loss_interval: 100
+no_cross_provider_evaluation: true

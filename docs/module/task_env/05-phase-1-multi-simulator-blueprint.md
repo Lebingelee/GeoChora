@@ -407,6 +407,8 @@ Experiment 位于 workspace/tasks/<task_id>/experiments/<exp_id>/。
 
 Phase-level transfer summary 位于 workspace/qualification/phase1/p1_6_state_policy/。
 
+P1.6 closure candidate 的最终 bounded route 使用 GeoPhys 训练的同一个 V2a FINAL checkpoint，在冻结的 PickCube 100Hz Task Artifact 上分别通过 GeoPhys 与 MuJoCo 执行。Train-support 与 validation-support 各 10 个配对 ResetSample 均为 10/10 PASS。该结果证明的是这个特定任务、checkpoint、observation/action contract、timebase 与样本范围内的软件/checkpoint portability；它不等同于原始 reciprocal train-source matrix 的全部训练方向，也不构成 statistical robustness、provider-wide qualification 或 visuomotor portability。历史 `partial_with_localized_failure` 与较早失败 Evidence 保留；最终状态仍待 Human Judge 决定。完整 Evidence index 和 acceptance package 位于 `workspace/qualification/phase1/p1_6_closure/`。100Hz profile 是显式版本化的 P1.6 实验，不改变默认 PickCube Artifact。P1.7 保持 deferred，P1.8 独立推进。
+
 ### P1.7 — Visuomotor policy qualification
 
 目标：在 state-policy portability 建立后加入 native visual domain gap。

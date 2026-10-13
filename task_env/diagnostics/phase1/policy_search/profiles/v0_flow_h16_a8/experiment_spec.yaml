@@ -1,0 +1,327 @@
+schema: p1_6-100hz-gpu-flow-experiment-v0
+locked_at: '2026-10-07T06:03:40.400115+00:00'
+starting_branch: codex/p1.6-policy-search-100hz-gpu
+starting_head: cda511f49eb544dabe685ec1dbcc6345884d66c8
+historical_task_artifact:
+  identity_hash: 461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e
+  artifact_id: pick-cube-v1/p1_1_candidate
+  artifact_version: ver_p1_1_candidate
+  timebase:
+    physics_dt: 0.002
+    control_substeps: 1
+    control_dt: 0.002
+    action_hold: zero_order_hold
+    observation_sampling: post_control_step
+    semantic_sampling: post_control_step
+experimental_task_artifact:
+  identity_hash: fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4
+  artifact_id: pick-cube-v1/p1_6_experimental_100hz
+  artifact_version: ver_p1_6_experimental_100hz
+  timebase:
+    physics_dt: 0.002
+    control_substeps: 5
+    control_dt: 0.01
+    action_hold: zero_order_hold
+    observation_sampling: post_control_step
+    semantic_sampling: post_control_step
+  opt_in_only: true
+  semantics_source: same P1.1 PickCube candidate, with artifact identity and timebase
+    variant only
+execution:
+  provider: geophys
+  production_manifest_backend: cpu
+  provider_manifest_modified: false
+  diagnostic_only_cuda_route: existing _GeoPhysSession adapter with runtime bootstrap
+    backend override; must pass G0
+  cuda_source_recipe_sha256: 47938ca70854f42d29c2b45eba39fc56c72d1e0d7d9a98571751f7eeae3ed9b1
+  cpu_source_recipe_sha256: 8f00d06577badc5a9e7af3771ecc188fc5399e5281b1c78cb3e7cd60a959b902
+frozen_pilot:
+  manifest: pilot_manifest.yaml
+  manifest_sha256: ab569f579a0b4e6619a5e81ce0ab5d62b3d565952cb3756b54c210ae47ffe2c9
+  seeds:
+  - 1000
+  - 1005
+  - 1010
+  - 1015
+  - 1020
+  - 1025
+  - 1030
+  - 1035
+  - 1040
+  - 1045
+  - 1050
+  - 1055
+  - 1060
+  - 1065
+  - 1070
+  - 1075
+  - 1080
+  - 1085
+  - 1090
+  - 1095
+  required_successes: 18
+  total: 20
+if_pilot_passes_collection_streams:
+  train_candidates:
+  - 2000
+  - 2001
+  - 2002
+  - 2003
+  - 2004
+  - 2005
+  - 2006
+  - 2007
+  - 2008
+  - 2009
+  - 2010
+  - 2011
+  - 2012
+  - 2013
+  - 2014
+  - 2015
+  - 2016
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+  - 2026
+  - 2027
+  - 2028
+  - 2029
+  - 2030
+  - 2031
+  - 2032
+  - 2033
+  - 2034
+  - 2035
+  - 2036
+  - 2037
+  - 2038
+  - 2039
+  - 2040
+  - 2041
+  - 2042
+  - 2043
+  - 2044
+  - 2045
+  - 2046
+  - 2047
+  - 2048
+  - 2049
+  - 2050
+  - 2051
+  - 2052
+  - 2053
+  - 2054
+  - 2055
+  - 2056
+  - 2057
+  - 2058
+  - 2059
+  - 2060
+  - 2061
+  - 2062
+  - 2063
+  - 2064
+  - 2065
+  - 2066
+  - 2067
+  - 2068
+  - 2069
+  - 2070
+  - 2071
+  - 2072
+  - 2073
+  - 2074
+  - 2075
+  - 2076
+  - 2077
+  - 2078
+  - 2079
+  - 2080
+  - 2081
+  - 2082
+  - 2083
+  - 2084
+  - 2085
+  - 2086
+  - 2087
+  - 2088
+  - 2089
+  - 2090
+  - 2091
+  - 2092
+  - 2093
+  - 2094
+  - 2095
+  - 2096
+  - 2097
+  - 2098
+  - 2099
+  - 2100
+  - 2101
+  - 2102
+  - 2103
+  - 2104
+  - 2105
+  - 2106
+  - 2107
+  - 2108
+  - 2109
+  - 2110
+  - 2111
+  - 2112
+  - 2113
+  - 2114
+  - 2115
+  - 2116
+  - 2117
+  - 2118
+  - 2119
+  train_success_target: 80
+  validation_candidates:
+  - 2200
+  - 2201
+  - 2202
+  - 2203
+  - 2204
+  - 2205
+  - 2206
+  - 2207
+  - 2208
+  - 2209
+  - 2210
+  - 2211
+  - 2212
+  - 2213
+  - 2214
+  - 2215
+  - 2216
+  - 2217
+  - 2218
+  - 2219
+  - 2220
+  - 2221
+  - 2222
+  - 2223
+  - 2224
+  - 2225
+  - 2226
+  - 2227
+  - 2228
+  - 2229
+  validation_success_target: 20
+  order: ascending, stop at target; preserve every attempt; one backend only
+controller_and_expert:
+  controller_identity: 76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9
+  expert_identity: fcef1d3a9c093a1d0adfce394a44099f5bff61edae48b3dce2ff50406118cd61
+  readiness_identity: ccc3e93e1d740beaad3b0c52098c87e5830baabfa1f146df6fdbcf647b60c453
+  expert_config:
+    action_budget: 120
+    position_tolerance: 0.15
+    close_transition_steps: 20
+    planner:
+      max_translation_per_step: 0.012
+      max_translation_acceleration_per_step: 0.004
+      max_rotation_per_step: 0.1
+      max_rotation_acceleration_per_step: 0.03
+      settle_steps: 0
+      max_steps: 200
+  readiness_policies:
+  - schema_version: stage-completion-v1
+    kind: pose_ready
+    hold_ticks: 100
+    position_deadband_m: 0.006
+    rotation_deadband_rad: 0.035
+    collection_endpoint_m: 0.105
+    gripper_semantic_id: panda-v1/gripper
+    failure_reason: above_pose_readiness_timeout
+  - schema_version: stage-completion-v1
+    kind: pose_ready
+    hold_ticks: 100
+    position_deadband_m: 0.006
+    rotation_deadband_rad: 0.035
+    collection_endpoint_m: 0.105
+    gripper_semantic_id: panda-v1/gripper
+    failure_reason: descend_pose_readiness_timeout
+  - schema_version: stage-completion-v1
+    kind: gripper_ready
+    hold_ticks: 800
+    position_deadband_m: 0.006
+    rotation_deadband_rad: 0.035
+    collection_endpoint_m: 0.105
+    gripper_semantic_id: panda-v1/gripper
+    failure_reason: gripper_readiness_timeout
+  - schema_version: stage-completion-v1
+    kind: task_outcome
+    hold_ticks: 100
+    position_deadband_m: 0.006
+    rotation_deadband_rad: 0.035
+    collection_endpoint_m: 0.105
+    gripper_semantic_id: panda-v1/gripper
+    failure_reason: lift_outcome_timeout
+  readiness_timeout_derivation: '{"common_dynamics_margin_s": 0.2, "force_adjust_ticks":
+    800, "formula": "max(ceil(range/opening_step),ceil(range/force_adjust_step))+ceil(margin/control_dt)",
+    "margin_ticks": 20, "pose_timeout_s": 1.0, "rate_ticks": 40, "total_close_ticks":
+    820, "transition_ticks": 20}'
+  action_config:
+    rsl_action_profile: null
+    ik_damping: 0.02
+    ik_position_gain: 0.9
+    ik_rotation_gain: 0.65
+    ik_rotation_row_weight: 0.22
+    ik_max_delta_q: 0.1
+    ik_position_deadband: 0.006
+    ik_rotation_deadband: 0.035
+    cartesian_max_position_step: 0.025
+    cartesian_max_rotation_step: 0.2
+    cartesian_error_growth_margin: 0.004
+    cartesian_velocity_brake_gain: 0.025
+    cartesian_max_brake_step: 0.06
+    cartesian_velocity_deadband: 0.03
+    joint_position_correction_gain: 2.5
+    gripper_close_ctrl: 0.0
+    gripper_open_ctrl: 255.0
+    gripper_opening_range_m: 0.08
+    gripper_default_force_N: 5.0
+    gripper_position_stiffness_N_per_m: 2500.0
+  gripper_config:
+    kind: experimental_rate_limited
+    force_limit_N: 30.0
+    opening_step_m: 0.002
+    force_deadband_N: 1.0
+    force_adjust_step_m: 0.0001
+flow_if_authorized:
+  agent_type: Flow_Vanilla
+  backbone: ConditionalUnet1D
+  state_dim: 33
+  includes_joint_velocity: true
+  action_mode: absolute_joint
+  action_dim: 8
+  obs_horizon: 2
+  pred_horizon: 16
+  act_horizon: 8
+  flow_inference_steps: 10
+  batch_size: 512
+  optimizer: AdamW
+  learning_rate: 0.0001
+  weight_decay: 1.0e-06
+  precision: float32
+  epoch_budget: 80
+  action_normalizer: unchanged reviewed Flow baseline mechanism
+  inference_device: cuda
+  synchronous_inference_with_frozen_simulation: true
+historical_seed1000:
+  trajectory_path: workspace/qualification/phase1/p1_6_flow_preparation/trajectories/seed1000/trajectory.h5
+  trajectory_sha256: 7988162fcee8de226f3e7c56753dcf4e0800c7d1a720f041ed840734fb80ffd5
+  dataset_manifest_path: workspace/qualification/phase1/p1_6_flow_preparation/training_dataset_manifest_v1.json
+  dataset_manifest_sha256: ebddea9e70b5c4dfc2fa546ce495dca56de7c08f540e7e9edeb39d6532e459c0
+p1_8:
+  branch: codex/p1.8-4h-multi-backend-replay
+  head: 5e7012c
+  modified: false

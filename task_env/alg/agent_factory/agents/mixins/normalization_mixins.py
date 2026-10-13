@@ -13,6 +13,12 @@ class ObsNormMixin:
     def _init_obs_normalizer(self):
         norm_cfg = getattr(self.cfg.actor, "obs_norm", None)
         norm_type = getattr(norm_cfg, "type", None) if norm_cfg else None
+        if norm_type in {None, "", "none", "null", "identity"}:
+            # Do not register an identity module: old Flow checkpoints remain
+            # loadable and the default raw-state path stays byte-compatible.
+            self.obs_normalizer = None
+            print("[ObsNormMixin] State normalization disabled")
+            return
         norm_params = {}
         if norm_cfg and hasattr(norm_cfg, "params") and norm_cfg.params:
             norm_params = norm_cfg.params
@@ -27,12 +33,18 @@ class ObsNormMixin:
         print(f"[ObsNormMixin] Initialized state normalizer with type: {norm_type}")
 
     def normalize_obs_state(self, state: torch.Tensor) -> torch.Tensor:
+        if self.obs_normalizer is None:
+            return state.float()
         return self.obs_normalizer.normalize(state.float())
 
     def denormalize_obs_state(self, state: torch.Tensor) -> torch.Tensor:
+        if self.obs_normalizer is None:
+            return state.float()
         return self.obs_normalizer.denormalize(state.float())
 
     def fit_obs_normalizer(self, raw_states: torch.Tensor):
+        if self.obs_normalizer is None:
+            return
         if raw_states.ndim > 2:
             raw_states = raw_states.reshape(-1, raw_states.shape[-1])
         self.obs_normalizer.fit(raw_states.float())
