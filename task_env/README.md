@@ -2,6 +2,8 @@
 
 TaskEnv 为 Geochora 提供单环境、同构并行环境、相机/渲染、强化学习和轨迹采集入口。所有示例均从 Geochora 仓库根目录执行。
 
+当前 v1.0 scope 与能力边界见 [GeoChora v1.0 release package](../docs/releases/v1.0/README.md)。该 scoped Core baseline 不授予新的 task、provider 或 replay qualification。
+
 ## 项目结构
 
 ~~~text

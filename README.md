@@ -2,7 +2,7 @@
 
 面向具身智能的统一多仿真器、多渲染器 API 与工具中枢。
 
-当前 [Phase-I mainline 状态](docs/module/task_env/phase1_mainline_integration/README.md)：四个 provider adapters 已实现；P1.6 PickCube/V2a/100Hz 为限定范围批准；P1.7 deferred；P1.8 replay infrastructure 有限定 GO，但 NutAssembly loaded/full task 与正式 D0–D2 尚未完成。Phase I 未关闭。
+当前 [Phase-I mainline 状态](docs/module/task_env/phase1_mainline_integration/README.md)与 [v1.0 发布范围](docs/releases/v1.0/README.md)：v1.0.0 接受限定的 Phase I Core baseline；P1.0–P1.6 保留各自历史 bounded approvals；P1.7 deferred；P1.8 基础设施回归通过，但 NutAssembly GeoPhys FULL 与 formal D0–D2 尚未完成。原 Phase I blueprint 仍未完成，发布不扩大任何资格范围。
 
 Geochora 提供稳定、可复现、可验证的任务构造、仿真执行、渲染展示、数据记录、学习评估与证据接口。它不替代物理引擎、渲染器、控制器、规划器、学习算法或 Agent，而是让这些能力能够通过一致的公共契约组合和验收。
 

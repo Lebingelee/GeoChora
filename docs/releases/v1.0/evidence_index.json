@@ -1,0 +1,121 @@
+{
+  "schema": "geochora-release-evidence-index-v1",
+  "release": "GeoChora-v1.0.0",
+  "snapshot_date": "2026-10-14",
+  "public_evidence": [
+    {
+      "id": "p1.1-provider-free-contract-detector",
+      "kind": "current-head-check",
+      "result": "PASS",
+      "checks": 30,
+      "command": "PYTHONPATH=GeoPhys/src:. python -m task_env.diagnostics.phase1.p1_1_contracts --output <fresh-output-directory>"
+    },
+    {
+      "id": "p1.8-focused-regression",
+      "kind": "current-candidate-test-suite",
+      "result": "PASS",
+      "checks": 66,
+      "command": "PYTHONPATH=GeoPhys/src:. python -m pytest task_env/diagnostics/phase1/integration/test_diagnostic_shadow.py task_env/diagnostics/phase1/integration/test_diagnostic_cross_provider_replay.py task_env/diagnostics/phase1/integration/test_solution_lifecycle.py task_env/diagnostics/phase1/integration/test_guarded_transition.py task_env/diagnostics/phase1/integration/test_recording_streaming.py task_env/diagnostics/phase1/integration/test_cross_provider_full_context.py -q",
+      "result_file": "docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/consolidated_regression_results.json",
+      "result_file_sha256": "52bf9311dae843f85aaabc8ea2e6b4d98ef8b33afc5a060d6d02f505bd25c0d4"
+    },
+    {
+      "id": "readiness-synthetic-contract",
+      "kind": "current-candidate-synthetic-check",
+      "result": "PASS_SYNTHETIC_ONLY",
+      "positive_checks": 12204,
+      "formal_d0_d1_d2_executed": false,
+      "command": "PYTHONPATH=GeoPhys/src:. python -m task_env.diagnostics.phase1.integration.readiness_synthetic --output <fresh-output-directory>",
+      "limitations": ["does not exercise live recorder wiring", "does not restore provider-native checkpoints", "does not establish mechanical competence"]
+    },
+    {
+      "id": "current-head-pickcube-physical-smoke",
+      "kind": "current-candidate-GeoPhys-Taichi-CPU-smoke",
+      "result": "PASS",
+      "command": "PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory.planning.pick_cube --backend cpu --horizon 220 --seed 31",
+      "observed": {
+        "transitions": 93,
+        "task_success": true,
+        "cube_lift_m": 0.106213,
+        "mjcf_extension_light_retained": 1,
+        "mjcf_extension_light_rejected": 0
+      },
+      "limitations": ["camera rendering was not exercised", "the retained MJCF extension.light emitted a semantic-lowering warning"]
+    },
+    {
+      "id": "p1.6-recovery-evidence",
+      "kind": "historical-bounded-evidence-recovery",
+      "result": "HASH_VERIFIED",
+      "archive_id": "phase1_mainline_p16_recovery_20261013",
+      "archive_bytes": 205486080,
+      "archive_sha256": "d31b64570e951b1cd694afe105f554dd44199d3f43aba689dac5c62c804d3d93",
+      "archive_members_verified": 441,
+      "checkpoint_sha256": "9c4e073659bd4862d0ef9921f6c12b9e83beb893ad949e3d4d26fda961bd24e9",
+      "dataset_manifest_sha256": "0e13517ce9f179daf7d4c525a6fb7d33629d3bb6fdd7683b4f06ac9492cf10dd",
+      "resolved_config_sha256": "dae01177562bf35ff9f16a9037487542ef0103cc84f21126c822bc9067f26ad8",
+      "off_host_backup_verified": false
+    },
+    {
+      "id": "p1.8-final-diagnostic-report",
+      "kind": "tracked-candidate-diagnostic-report",
+      "result": "DIAGNOSTIC_ONLY_WITH_OPEN_FAILURES",
+      "path": "docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/P1.8_Final_Diagnostic_Replay_and_Branch_Integration_Report.md",
+      "sha256": "93ba6fe75b48258185afe5ce0795ebb8d676147a69bf490f750ca543154ff5b1"
+    },
+    {
+      "id": "p1.8-cross-provider-acceptance-contract",
+      "kind": "candidate-contract",
+      "result": "HUMAN_REVIEW_PENDING",
+      "path": "docs/module/task_env/p1_8_integration/cross_provider_acceptance_v2_20261014/acceptance_contract.json",
+      "sha256": "4159544f8ed562065be6992f6e4c61ca9dc25e928007116e12b5db2fc71883fe"
+    },
+    {
+      "id": "p1.8-local-development-matrix",
+      "kind": "local-only-development-evidence",
+      "result": "MUJOCO_DEVELOPMENT_MATRIX_PASS; GEOPHYS_FULL_FAILS_ORIGINAL_STABLE_HEIGHT_GATE",
+      "archive_id": "p1_8_cross_provider_final_20261014",
+      "final_status_sha256": "51b658a3a638d9e08ea1e20ac9034b94036a7a1b1cca0062af48d708fd3f72f7",
+      "d0_d1_d2_development_results_sha256": "e122d66fcc9f1a5e83aceee5509ba1966203b17c4663724b02dcd8592f34563f",
+      "full_multirate_results_sha256": "13faac99f60f2b7a369bf4c2f2011d48908774dbef5bdfad6dbb33aa200d788a",
+      "off_host_backup_verified": false
+    },
+    {
+      "id": "historical-human-decisions",
+      "kind": "historical-decision-copies",
+      "result": "SEVEN_COPIES_MATCH_INDEXED_SHA256",
+      "path": "docs/module/task_env/phase1_mainline_integration/historical_decisions/",
+      "scope": "Each original decision and its bounded scope remains unchanged.",
+      "decisions": [
+        {
+          "phase": "P1.0",
+          "sha256": "f895e4703555d490b48b3ebcda17de0e94da33d62c20aaa9a1ee5fe5e3d6d75e"
+        },
+        {
+          "phase": "P1.1",
+          "sha256": "d6aecf83e6104cead2769dcf486e07354cceac55ac9ff9712e9a76500b070960"
+        },
+        {
+          "phase": "P1.2",
+          "sha256": "dfac41a75cfc59ba9bfd90c70a4697fcce36876b65be71cf7b410a14c647e469"
+        },
+        {
+          "phase": "P1.3",
+          "sha256": "da8c917ef3987391bd2f3af191cd33475786a77f3bc0f1d04a69de77e1973e6b"
+        },
+        {
+          "phase": "P1.4",
+          "sha256": "c3a8a5ad541dcc485d006a340e95968379e124058d5e4889028738a91fcbb11a"
+        },
+        {
+          "phase": "P1.5",
+          "sha256": "ac5114399b887fd7f5ad4608199660ea5325e1a830d3f3ff697ccfa05b7561e6"
+        },
+        {
+          "phase": "P1.6",
+          "sha256": "65f64d034f73ebf26b4749891825c4fedf188d684335ba562eea0f12d2db25ee"
+        }
+      ]
+    }
+  ],
+  "qualification_boundary": "No release check, diagnostic replay, synthetic check, or publication event grants a new Human qualification decision."
+}

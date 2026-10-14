@@ -1,0 +1,47 @@
+{
+  "schema": "geochora-release-source-manifest-v1",
+  "release": "GeoChora-v1.0.0",
+  "snapshot_date": "2026-10-14",
+  "repository": "Lebingelee/GeoChora",
+  "publication_remote": "public",
+  "verified_starting_refs": {
+    "public_main": "9988cf700ac1b5f7ae9ba0a284deda4fa2141917",
+    "integration_branch": "codex/p1.8-frequency-robust-grasp",
+    "integration_head": "285aa0acc77b87f4d7d6819182315957b21a7213",
+    "integration_relation_to_public_main": {
+      "ahead": 19,
+      "behind": 0
+    },
+    "release_change_scope": "The v1.0 release package and canonical status/navigation updates are documentation-only; no runtime code or submodule gitlink is changed by this release-preparation commit."
+  },
+  "submodule_gitlinks_at_both_starting_tips": {
+    "GeoPhys": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+    "MuJoCo Menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+  },
+  "p1_8_candidate_delta": {
+    "paths_changed_from_starting_public_main": 87,
+    "insertions": 14387,
+    "deletions": 176,
+    "not_changed_from_main": [
+      "task_env/alg/agent_factory",
+      "task_env/tasks/pick_cube"
+    ]
+  },
+  "test_environment": {
+    "python": "3.12.14",
+    "pytest": "9.1.1",
+    "mujoco": "3.8.1",
+    "torch": "2.14.0+cu130",
+    "h5py": "3.16.0",
+    "numpy": "2.2.6",
+    "scipy": "1.18.1",
+    "taichi": "0.6.2",
+    "genesis_installed": false,
+    "sapien_installed": false
+  },
+  "preservation": {
+    "dirty_worktrees_and_local_experiment_data": "Preserved; see the local publication receipt for the post-cleanup branch/worktree inventory.",
+    "gitlink_changes": false,
+    "large_evidence_payloads_committed": false
+  }
+}

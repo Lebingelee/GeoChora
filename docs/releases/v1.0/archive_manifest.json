@@ -1,0 +1,97 @@
+{
+  "schema": "geochora-release-archive-manifest-v1",
+  "release": "GeoChora-v1.0.0",
+  "snapshot_date": "2026-10-14",
+  "archives": [
+    {
+      "id": "phase1_mainline_p16_recovery_20261013",
+      "kind": "local-recovery-tar",
+      "bytes": 205486080,
+      "sha256": "d31b64570e951b1cd694afe105f554dd44199d3f43aba689dac5c62c804d3d93",
+      "members": 441,
+      "verification": "Archive digest and every member path, byte count, and SHA-256 matched the recorded manifest.",
+      "off_host_backup_verified": false
+    },
+    {
+      "id": "p1_8_integration_20261012",
+      "kind": "local-extracted-evidence-archive",
+      "bytes": 10989629850,
+      "historical_file_manifest_sha256": "0eb01f44b3b3409b11c4874e5bccc06c56d35af4104e21448a5f46819532f943",
+      "verification": "Historical manifest digest matched; sampled historical and integration members, submodule bundles, and a restored H5 member matched their recorded hashes. The GeoPhys Git bundle cannot be reconstructed through Git history because a historical parent object is missing; exact source-tree snapshots are retained.",
+      "off_host_backup_verified": false
+    },
+    {
+      "id": "p1_8_final_integration_20261014",
+      "kind": "local-only-raw-run-evidence",
+      "tracked_manifest": "docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/diagnostic_source_sha256_manifest.json",
+      "tracked_manifest_sha256": "0458db283004601a6fc7cab72f77dbaa3cf8decf06b8c1c9c8e214262687987c",
+      "verification": "The tracked manifest identifies raw execution files retained outside Git. Representative H5 restore and hash checks passed; raw archive remains local-only.",
+      "off_host_backup_verified": false
+    },
+    {
+      "id": "p1_8_cross_provider_final_20261014",
+      "kind": "local-only-development-matrix",
+      "tracked_records": [
+        "workspace/qualification/phase1/p1_8_cross_provider_final_20261014/final_status.json",
+        "workspace/qualification/phase1/p1_8_cross_provider_final_20261014/d0_d1_d2_full_replay_results.json",
+        "workspace/qualification/phase1/p1_8_cross_provider_final_20261014/full_multirate_results.json"
+      ],
+      "verification": "Hashes are indexed in evidence_index.json. The data preserves development and failure outcomes and does not grant formal qualification.",
+      "off_host_backup_verified": false
+    }
+  ],
+  "archive_tags": {
+    "remote": "public",
+    "annotated_tag_refs_read_back": 9,
+    "tag_objects_and_peeled_commits_match": true,
+    "existing_v1.0.0_tag": false,
+    "refs": [
+      {
+        "name": "archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c",
+        "tag_object": "062d23ee2c7c731acffaaf5a3aadc3ee2e93313c",
+        "peeled_commit": "c36e759e8b3cef16147664a107422aa4650f159b"
+      },
+      {
+        "name": "archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e",
+        "tag_object": "52c8d0b0796c6d2056e5d7b5648aaab528cf1942",
+        "peeled_commit": "0f2290c9b25e590da04be82a74b0aea8b005735a"
+      },
+      {
+        "name": "archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83",
+        "tag_object": "bbe339975cf7542b4936d574c2178ce0cb5d84d9",
+        "peeled_commit": "5e7012c70a83f26d1f6a0e51b3160efc00006c35"
+      },
+      {
+        "name": "archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34",
+        "tag_object": "a52ad014d46ee92bd71067b682f85d1ac0f8eae1",
+        "peeled_commit": "60b51e38ff3460da62296f73bbb93138f9d41b7f"
+      },
+      {
+        "name": "archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49",
+        "tag_object": "f060f368ed5a91dbb394fce21e4c8f8da24eb456",
+        "peeled_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10"
+      },
+      {
+        "name": "archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c",
+        "tag_object": "f06f1fe561ac20dd1a9abe5a90bf1261f8cb7392",
+        "peeled_commit": "8e914da87e1c1afb989b86d5e2807cfecc6d6616"
+      },
+      {
+        "name": "archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c",
+        "tag_object": "91638c29d16927f9066ffb93cf9c9969bc5b20a4",
+        "peeled_commit": "c36e759e8b3cef16147664a107422aa4650f159b"
+      },
+      {
+        "name": "archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a",
+        "tag_object": "d7a7a1afdf3eca3d82056980eb199aa8e7004859",
+        "peeled_commit": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba"
+      },
+      {
+        "name": "archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe",
+        "tag_object": "d6c0d7185a35de7e433a4fec81b42d65dd1a7424",
+        "peeled_commit": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce"
+      }
+    ]
+  },
+  "preservation_rule": "No archive payload, old worktree, dirty worktree, or local experiment data is deleted by this release package."
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "geochora-release-capability-matrix-v1",
+  "release": "GeoChora-v1.0.0",
+  "snapshot_date": "2026-10-14",
+  "qualification_rule": "A PASS applies only to the named provider, runtime/profile, task, lifecycle, source identity, and evidence route. Release publication does not grant a qualification.",
+  "capabilities": [
+    {
+      "id": "p1.0-p1.6-historical-bounded-core",
+      "status": "APPROVED_BOUNDED_HISTORICAL",
+      "scope": "The original decisions and their exact bounded intersections remain authoritative.",
+      "evidence": "docs/module/task_env/phase1_mainline_integration/historical_decisions/ and docs/module/task_env/phase1_mainline_integration/03_phase1_evidence_index.json"
+    },
+    {
+      "id": "p1.6-pickcube-v2a-d3",
+      "status": "APPROVED_BOUNDED_HISTORICAL",
+      "scope": "PickCube; 100 Hz; Flow_Vanilla / ConditionalUnet1D V2a FINAL step 15000; 26D state; h50/a36; GeoPhys and MuJoCo D3 each 20/20.",
+      "evidence": "docs/module/task_env/phase1_mainline_integration/p1_6_recovery_manifest.json and local archive ID phase1_mainline_p16_recovery_20261013"
+    },
+    {
+      "id": "p1.7-visuomotor",
+      "status": "DEFERRED",
+      "scope": "Camera observations exist, but the camera-observation-to-policy full route and accepted visuomotor evaluation are not qualified.",
+      "evidence": "docs/roadmap/phase1_followups.md"
+    },
+    {
+      "id": "p1.8-runtime-and-recorder-infrastructure",
+      "status": "IMPLEMENTED_AND_TESTED_IN_DECLARED_SCOPE",
+      "scope": "Integer/native timebase, owner snapshots, guarded transition support, lifecycle checks, replay preparation, and v0/v2 streaming recorder contracts. The focused candidate regression suite passed 66/66.",
+      "evidence": "docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/consolidated_regression_results.json"
+    },
+    {
+      "id": "p1.8-mujoco-nutassembly-development",
+      "status": "DEVELOPMENT_ONLY",
+      "scope": "Same-provider FULL and D0/D1/D2 development results are recorded for 20/50/100/500 Hz. They are tied to their source identities and are not a formal qualification.",
+      "evidence": "local evidence ID p1_8_cross_provider_final_20261014; see the evidence index"
+    },
+    {
+      "id": "p1.8-geophys-nutassembly-full",
+      "status": "FAILED_ORIGINAL_FULL_GATE",
+      "scope": "Recorded FULL attempts at 50/100/500 Hz fail stable_height_mismatch. Later shadow predicates do not make the original Expert lifecycle valid.",
+      "evidence": "docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/P1.8_Final_Diagnostic_Replay_and_Branch_Integration_Report.md"
+    },
+    {
+      "id": "p1.8-geophys-diagnostic-replay",
+      "status": "DIAGNOSTIC_ONLY",
+      "scope": "GeoPhys-source D1 and frozen-action diagnostic D2 ran on GeoPhys and MuJoCo at 50/100/500 Hz. Representative GeoPhys D0 at 50 Hz first diverged at transition 157; 100/500 Hz D0 was not run. No symmetric valid GeoPhys FULL source is available.",
+      "evidence": "docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/ and local evidence ID p1_8_final_integration_20261014"
+    },
+    {
+      "id": "cross-provider-formal-nutassembly",
+      "status": "NOT_QUALIFIED",
+      "scope": "Formal cross-provider D0/D1/D2 and the symmetric NutAssembly FULL matrix are blocked; candidate Human review is pending.",
+      "evidence": "docs/module/task_env/p1_8_integration/cross_provider_acceptance_v2_20261014/acceptance_contract.json"
+    },
+    {
+      "id": "sapien-genesis-provider-wide-support",
+      "status": "NOT_CLAIMED",
+      "scope": "Recorded intersections are limited development evidence; provider-wide support is not established. These packages were absent from the release test environment.",
+      "evidence": "docs/roadmap/phase1_followups.md"
+    }
+  ]
+}

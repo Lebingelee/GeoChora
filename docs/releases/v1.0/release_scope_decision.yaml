@@ -1,0 +1,19 @@
+release: GeoChora-v1.0.0
+scope: Phase-I-Core-Baseline
+maintainer_scope_decision: ACCEPTED_SCOPED_CORE
+decision_source: User-authorized scoped release in the Phase I closure task
+release_publication:
+  gate: READY_TO_PUBLISH
+  ref_readback: REQUIRED_AFTER_PUBLICATION
+original_phase1_blueprint_complete: false
+qualification_promoted_by_publication: false
+non_blocking_followups:
+  - P1.7-visuomotor
+  - P1.8-formal-NutAssembly-FULL-and-D0-D2
+  - bounded-provider-qualification-gaps
+human_judge_release_decision: null
+notes:
+  - This scope decision is not a separate Human Judge signature.
+  - Historical APPROVED_BOUNDED decisions retain their exact original scope and hashes.
+  - Publication does not convert diagnostic or development evidence into formal qualification.
+  - Remote ref readback is recorded in a local/off-repository receipt to avoid source self-reference.

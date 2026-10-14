@@ -1,6 +1,6 @@
 # Geochora 仓库所有权与边界
 
-> 当前 Phase-I 工程与验收范围见 [Mainline Integration Status](../module/task_env/phase1_mainline_integration/06_phase_acceptance_status.md)。P1.6 bounded approval 保留；P1.7 deferred；P1.8 qualification 未完成。
+> v1.0 scoped Core baseline 与当前 Phase-I 工程范围见 [release package](../releases/v1.0/README.md) 和 [Mainline Integration Status](../module/task_env/phase1_mainline_integration/06_phase_acceptance_status.md)。P1.0–P1.6 的 bounded decisions 保留；P1.7 deferred；P1.8 formal qualification 未完成。发布不代表原 Phase I blueprint 完成。
 
 > 状态：canonical 所有权 contract，v0.3
 > 日期：2026-10-04

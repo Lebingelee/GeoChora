@@ -1,6 +1,6 @@
 # Phase-I Mainline Integration
 
-本目录记录 P1.6 closure 与 P1.8 integration 的工程整合、历史 Evidence 核验、增量回归和发布决定。代码进入 main 不改变历史资格范围。
+本目录记录 P1.6 closure 与 P1.8 integration 的工程整合、历史 Evidence 核验、增量回归和发布决定。当前 scoped baseline 见 [GeoChora v1.0 release package](../../../releases/v1.0/README.md)。代码发布不改变历史资格范围，也不表示原 Phase I blueprint 完成。
 
 - [当前阶段状态](06_phase_acceptance_status.md)
 - [分支 ancestry](01_branch_ancestry_report.md)
@@ -13,4 +13,4 @@
 - [发布记录](09_publication_report.md)
 - [下一阶段 handoff](10_handoff.md)
 
-P1.7 DEFERRED；P1.8 T1 PARTIAL、Full NutAssembly 无成功 golden、正式 D0–D2 NOT RUN；Phase I NOT CLOSED。
+P1.7 DEFERRED。P1.8 infrastructure 的 66 项 focused regression 通过；MuJoCo same-provider FULL/D0/D1/D2 仍是 development evidence；GeoPhys FULL 在 50/100/500 Hz 失败原 stable-height gate；GeoPhys D1/D2 与 cross-provider replay 为 diagnostic-only，GeoPhys D0 仅有 50 Hz 代表结果且在 transition 157 首次分歧。Formal P1.8 qualification 未完成；原 Phase I blueprint 保持未完成。详见 [current acceptance status](06_phase_acceptance_status.md) 与 [release package](../../../releases/v1.0/README.md)。

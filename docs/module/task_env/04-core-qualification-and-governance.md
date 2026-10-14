@@ -1,6 +1,6 @@
 # Geochora Core 资格验证与治理
 
-> 2026-10-13 mainline consolidation：当前 implementation、历史 bounded approvals 与未完成范围统一见 [Phase-I Mainline Integration Status](phase1_mainline_integration/06_phase_acceptance_status.md)。历史阶段记录保留原时点；合并不提升 qualification。
+> v1.0 scoped Core baseline 与当前 implementation、历史 bounded approvals 和未完成范围见 [release package](../../releases/v1.0/README.md) 与 [Phase-I Mainline Integration Status](phase1_mainline_integration/06_phase_acceptance_status.md)。历史阶段记录保留原时点；发布不提升 qualification，也不代表原 Phase I blueprint 完成。
 
 > 状态：canonical Core validation policy，v0.3
 > 日期：2026-10-04
