@@ -33,6 +33,13 @@ from ....tasks.nut_assembly.guarded_authorization_candidate_v2 import (
 from ....controllers.canonical.contracts import digest
 
 
+_CROSS_PROVIDER_CONTRACT_ID = "p1.8-nutassembly-cross-provider-acceptance-v2"
+_CROSS_PROVIDER_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[4] / "docs/module/task_env/p1_8_integration"
+    / "cross_provider_acceptance_v2_20261014/acceptance_contract.json"
+)
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -128,9 +135,9 @@ def _exclude_hand_peg_pair(value: dict) -> dict:
     return intervention
 
 
-def context(rate: int, trajectory_candidate: str = "lifecycle-v2"):
-    """Build the fixed NoSlip2/native-ramp/native-500Hz recipe and solution."""
-    value = frequency_run.context(rate, "arm_ramp_native_grip")
+def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: str = "mujoco"):
+    """Build the provider profile plus fixed native-ramp/native-500Hz recipe."""
+    value = frequency_run.context(rate, "arm_ramp_native_grip", provider=provider)
     old_solution_identity = value["solution_identity"]
     old_controller_identity = value["controller_identity"]
     solution_classes = {
@@ -184,19 +191,66 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2"):
     return value
 
 
+def _validate_cross_provider_contract(value: dict, contract: dict) -> None:
+    """Fail closed if the frozen runner no longer implements campaign V2."""
+    auth = contract["close_authorization"]
+    task = contract["task"]
+    physical = contract["physical_validity"]
+    expected_version = contract["frozen_execution"]["task_path"]
+    solution = value["solution"]
+    policy = solution.policy_mapping
+    gripper = value["controller"].inner.controller.gripper_config
+    checks = {
+        "task_success_semantics": task["task_success"] == "inserted_on_peg AND released_nut",
+        "solution_version": solution.version == expected_version,
+        "guard_policy": policy.get("alternative_guard", {}).get("guard_id") == auth["alternative_guard_id"],
+        "alternative_threshold": policy.get("alternative_guard", {}).get("threshold_N") == 8.0,
+        "dwell": policy.get("required_continuous_dwell_s") == auth["continuous_dwell_s"],
+        "deadline": policy.get("deadline_from_close_stage_entry_s") == auth["deadline_from_close_stage_entry_s"],
+        "sample_period": policy.get("sampling", {}).get("sample_period_s") == auth["sample_period_s"],
+        "post_authorization_hold": policy.get("post_authorization_hold_s") == auth["post_authorization_regulated_hold_s"],
+        "force_target": gripper.force_limit_N == auth["physical_force_target_N"],
+        "force_cap": value["source"].config.robot.gripper.force_limit_N == auth["physical_force_cap_N"],
+        "physics_dt": value["artifact"].timebase.physics_dt == contract["frozen_execution"]["physics_dt_s"],
+        "gripper_rate": getattr(value["controller"].inner, "version", None) == "native-gripper-500hz-v1",
+        "capture_translation": worker.CAPTURE_POSITION_LIMIT_M == physical["capture_translation_bound_m"],
+        "capture_rotation": worker.CAPTURE_ROTATION_LIMIT_RAD == physical["capture_rotation_bound_rad"],
+    }
+    failures = [name for name, passed in checks.items() if not passed]
+    if failures:
+        raise ValueError("campaign V2 contract/runtime mismatch: " + ", ".join(failures))
+
+
 def run(*, provider: str, rate: int, output: Path,
         collision_ablation: str = "none",
         trajectory_candidate: str = "lifecycle-v2",
-        recording_storage_variant: str = "owner-fields-v1") -> dict:
-    if provider != "mujoco":
-        raise ValueError("this bounded lifecycle run is MuJoCo-only")
+        recording_storage_variant: str = "owner-fields-v1",
+        acceptance_contract_id: str | None = None) -> dict:
+    if provider not in {"mujoco", "geophys"}:
+        raise ValueError("lifecycle FULL supports only GeoPhys and MuJoCo")
+    if provider == "geophys" and collision_ablation != "none":
+        raise ValueError("MuJoCo collision ablations are not available on GeoPhys")
     if rate not in {20, 50, 100, 500}:
         raise ValueError("FULL lifecycle diagnostic requires a supported 20/50/100/500 Hz rate")
+    contract_sha256 = None
+    contract = None
+    if acceptance_contract_id is not None:
+        if acceptance_contract_id != _CROSS_PROVIDER_CONTRACT_ID:
+            raise ValueError("unknown P1.8 cross-provider acceptance contract")
+        contract_bytes = _CROSS_PROVIDER_CONTRACT_PATH.read_bytes()
+        contract = json.loads(contract_bytes)
+        if contract.get("contract_id") != acceptance_contract_id:
+            raise ValueError("acceptance contract file identity mismatch")
+        contract_sha256 = hashlib.sha256(contract_bytes).hexdigest()
     recording_module.storage_policy(recording_storage_variant)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
-    value = context(rate, trajectory_candidate)
+    value = context(rate, trajectory_candidate, provider=provider)
+    if contract is not None:
+        _validate_cross_provider_contract(value, contract)
     value["recording_storage_variant"] = recording_storage_variant
+    value["cross_provider_acceptance_contract_id"] = acceptance_contract_id
+    value["cross_provider_acceptance_contract_sha256"] = contract_sha256
     if collision_ablation != "none" and trajectory_candidate != "lifecycle-v2":
         raise ValueError("collision ablations are restricted to the frozen Lifecycle V2 baseline")
     collision_intervention = None
@@ -208,11 +262,15 @@ def run(*, provider: str, rate: int, output: Path,
     value["_recording_role"] = "full_nutassembly_expert_lifecycle_v2"
     worker.CLOSE_TIME_LIMIT_S = 1.5
 
-    observer = NativeObserver(output)
+    observer = NativeObserver(output) if provider == "mujoco" else None
+    geophys_diagnostic_samples = 0
+    geophys_diagnostic_errors = []
+    geophys_unavailable_signals = set()
     original_snapshot = recording_module.snapshot
     original_native_audit = worker.NativeAudit
     original_runtime_readback = worker._runtime_diagnostic_readback
     original_reset = worker._reset
+    original_close_time_limit = worker.CLOSE_TIME_LIMIT_S
 
     def diagnostic_snapshot(owner_value, state, session_provider):
         saved = original_snapshot(owner_value, state, session_provider)
@@ -233,7 +291,53 @@ def run(*, provider: str, rate: int, output: Path,
     worker.NativeAudit = RampedArmAudit
 
     def capture_required(session, session_provider, stage):
-        del session_provider, stage
+        nonlocal geophys_diagnostic_samples
+        if session_provider == "geophys":
+            geophys_diagnostic_samples += 1
+            try:
+                readback = original_runtime_readback(session, session_provider, stage)
+                unavailable = []
+                if not readback.get("arm_actuator_force", {}).get("available", False):
+                    unavailable.append("arm_actuator_force")
+                if stage in {"close_gripper", "verify_lift"}:
+                    if readback.get("diagnostic_error"):
+                        unavailable.append("stage_diagnostic_error")
+                    contact = readback.get("contact", {})
+                    raw_contact = contact.get("raw", {})
+                    if (raw_contact.get("public_api") != "read_body_contact_state"
+                            or not raw_contact.get("bodies")):
+                        unavailable.append("native_body_contact_state")
+                    if not readback.get("native_gripper", {}).get("available", False):
+                        unavailable.append("native_gripper_state")
+                    if "gripper_feedback_after_substep" not in readback:
+                        unavailable.append("gripper_feedback")
+                if unavailable:
+                    try:
+                        time_s = float(session.snapshot().simulation_time)
+                    except Exception:
+                        time_s = None
+                    for signal in unavailable:
+                        if signal in geophys_unavailable_signals:
+                            continue
+                        geophys_unavailable_signals.add(signal)
+                        geophys_diagnostic_errors.append({
+                            "time_s": time_s,
+                            "stage": stage,
+                            "required_provider_diagnostic_unavailable": signal,
+                            "readback_error": readback.get("diagnostic_error"),
+                        })
+                return readback
+            except Exception as exc:
+                try:
+                    time_s = float(session.snapshot().simulation_time)
+                except Exception:
+                    time_s = None
+                geophys_diagnostic_errors.append({
+                    "time_s": time_s,
+                    "stage": stage,
+                    "required_provider_diagnostic_error": repr(exc),
+                })
+                return {"available": False, "error": repr(exc)}
         try:
             return session._mj.latest
         except Exception as exc:
@@ -246,9 +350,10 @@ def run(*, provider: str, rate: int, output: Path,
     def diagnostic_reset(owner_value, session_provider):
         result = original_reset(owner_value, session_provider)
         session = result[0]
-        session._mj = AppliedStepObserver(
-            session._mj, session, observer, lambda: owner_value["solution"].stage
-        )
+        if session_provider == "mujoco":
+            session._mj = AppliedStepObserver(
+                session._mj, session, observer, lambda: owner_value["solution"].stage
+            )
         session._diagnostic_arm_ramp_active = lambda: owner_value["solution"]._lift_released
         session._diagnostic_arm_ramp_memory = owner_value["_arm_schedule_memory"]
         session.step_control_interval = __import__("types").MethodType(
@@ -277,6 +382,11 @@ def run(*, provider: str, rate: int, output: Path,
                 diagnostic_only=bool(collision_intervention),
                 trajectory_candidate=owner_value["solution"].version,
             )
+            if acceptance_contract_id is not None:
+                recipe.update(
+                    cross_provider_acceptance_contract_id=acceptance_contract_id,
+                    cross_provider_acceptance_contract_sha256=contract_sha256,
+                )
 
         def finish(self, report):
             validate_native_cadence(self.recorder.value)
@@ -299,10 +409,14 @@ def run(*, provider: str, rate: int, output: Path,
         "head": head,
         "dirty_status": status.strip().splitlines(),
         "provider": provider,
+        "provider_build_identity": worker.provider_build_identity(provider),
         "rate_hz": rate,
         "case": "arm_ramp_native_grip",
         "trajectory_candidate": value["solution"].version,
-        "contact_solver_profile": "MuJoCo NoSlip2",
+        "contact_solver_profile": (
+            "MuJoCo NoSlip2" if provider == "mujoco"
+            else "GeoPhys provider-native Row-PGS; see exact provider build identity"
+        ),
         "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
         "gripper_command_rate_hz": 500,
         "gripper_rate_semantics": "fixed-native-500hz-v1",
@@ -316,20 +430,26 @@ def run(*, provider: str, rate: int, output: Path,
         "trajectory_candidate": value["solution"].version,
         "completion_policy": value["solution"].completion_policy.value,
         "reset_sample": "canonical_reset seed from frozen profile",
+        "cross_provider_acceptance_contract_id": acceptance_contract_id,
+        "cross_provider_acceptance_contract_sha256": contract_sha256,
         "qualification": False,
     })
     try:
         result = worker.run_loaded(value, provider, output, "FULL")
     finally:
-        observer.close()
+        if observer is not None:
+            observer.close()
         recording_module.snapshot = original_snapshot
         worker.NativeAudit = original_native_audit
         worker._runtime_diagnostic_readback = original_runtime_readback
         worker._reset = original_reset
+        worker.CLOSE_TIME_LIMIT_S = original_close_time_limit
     expected_native_samples = (result.get("total_transitions", 0) *
                                value["artifact"].timebase.control_substeps)
+    native_capture_count = observer.count if observer is not None else geophys_diagnostic_samples
+    native_capture_errors = observer.errors if observer is not None else geophys_diagnostic_errors
     native_capture_pass = bool(
-        not observer.errors and observer.count == expected_native_samples
+        not native_capture_errors and native_capture_count == expected_native_samples
     )
     if result.get("pass") and not native_capture_pass:
         result["pass"] = False
@@ -353,13 +473,16 @@ def run(*, provider: str, rate: int, output: Path,
         gripper_rate_hz=500,
         equal_rate=False,
         diagnostic_case="arm_ramp_native_grip",
-        contact_solver_profile="MuJoCo NoSlip2",
+        contact_solver_profile=(
+            "MuJoCo NoSlip2" if provider == "mujoco"
+            else "GeoPhys provider-native Row-PGS; see exact provider build identity"
+        ),
         arm_schedule="linear-native-ramp-after-lift-v2-public-ack-memory",
         native_gripper_cadence="fixed-native-500hz-v1",
-        native_capture_count=observer.count,
+        native_capture_count=native_capture_count,
         expected_native_capture_count=expected_native_samples,
         native_capture_pass=native_capture_pass,
-        native_capture_errors=observer.errors,
+        native_capture_errors=native_capture_errors,
         physics_dt_s=value["artifact"].timebase.physics_dt,
         control_dt_s=value["artifact"].timebase.control_dt,
         grasp_offset_m=list(value["solution_config"].grasp_offset),
@@ -390,11 +513,14 @@ def run(*, provider: str, rate: int, output: Path,
         source_head=head,
         dirty_status=status.strip().splitlines(),
         collision_intervention=collision_intervention,
+        cross_provider_acceptance_contract_id=acceptance_contract_id,
+        cross_provider_acceptance_contract_sha256=contract_sha256,
+        provider_build_identity=worker.provider_build_identity(provider),
         trajectory_candidate=value["solution"].version,
         package_versions={
             name: importlib.metadata.version(name)
-            for name in ("numpy", "h5py", "gymnasium", "mujoco")
-            if any(dist.metadata["Name"].lower() == name
+            for name in ("numpy", "h5py", "gymnasium", "mujoco", "GeoPhys")
+            if any(dist.metadata["Name"].lower() == name.lower()
                    for dist in importlib.metadata.distributions())
         },
     )
@@ -442,12 +568,15 @@ def run(*, provider: str, rate: int, output: Path,
         "branch": "codex/p1.8-frequency-robust-grasp",
         "head": head,
         "provider": provider,
+        "provider_build_identity": worker.provider_build_identity(provider),
         "rate_hz": rate,
         "physics_dt_s": value["artifact"].timebase.physics_dt,
         "control_dt_s": value["artifact"].timebase.control_dt,
         "task_artifact_hash": value["artifact"].identity_hash,
         "solution_identity": value["solution_identity"],
         "recipe_identity": value["recipe_identity"],
+        "cross_provider_acceptance_contract_id": acceptance_contract_id,
+        "cross_provider_acceptance_contract_sha256": contract_sha256,
         "collision_intervention": collision_intervention,
         "trajectory_candidate": value["solution"].version,
         "reset_sample_hash": result.get("reset_sample_hash"),
@@ -469,7 +598,7 @@ def run(*, provider: str, rate: int, output: Path,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provider", choices=("mujoco",), default="mujoco")
+    parser.add_argument("--provider", choices=("mujoco", "geophys"), default="mujoco")
     parser.add_argument("--rate", type=int, choices=(20, 50, 100, 500), default=100)
     parser.add_argument(
         "--trajectory-candidate",
@@ -486,12 +615,14 @@ def main() -> int:
     )
     parser.add_argument("--recording-storage-variant", choices=recording_module.STORAGE_VARIANTS,
                         default=recording_module.STORAGE_VARIANTS[0])
+    parser.add_argument("--acceptance-contract-id", choices=(_CROSS_PROVIDER_CONTRACT_ID,))
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run(provider=args.provider, rate=args.rate, output=args.output,
                  collision_ablation=args.collision_ablation,
                  trajectory_candidate=args.trajectory_candidate,
-                 recording_storage_variant=args.recording_storage_variant)
+                 recording_storage_variant=args.recording_storage_variant,
+                 acceptance_contract_id=args.acceptance_contract_id)
     print(json.dumps({key: report.get(key) for key in (
         "pass", "failure_boundary", "expert_complete", "expert_failed",
         "completion_reason", "canonical_task_success", "coordinator_stage_sequence",

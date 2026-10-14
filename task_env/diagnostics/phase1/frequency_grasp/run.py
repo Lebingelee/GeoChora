@@ -44,11 +44,13 @@ NATIVE_GRIP_EXECUTION_CASES.add('arm_ramp_native_grip_frozen')
 CANDIDATE_CASES.add('arm_ramp_native_grip_frozen')
 
 
-def context(rate,case):
+def context(rate,case,provider='mujoco'):
+    if provider not in {'mujoco','geophys'}:
+        raise ValueError('frequency-grasp provider must be mujoco or geophys')
     if rate==20:
         canonical_artifact.PROFILES={**canonical_artifact.PROFILES,'NA-TB20':(25,.05)}
     v=frozen_context(rate)
-    if case in NOSLIP_FROM_RESET:
+    if case in NOSLIP_FROM_RESET and provider=='mujoco':
         profile_path=Path(__file__).parent/'profiles'/('mujoco_noslip4_v2.json' if case=='candidate_noslip4' else 'mujoco_noslip2_v1.json')
         profile=json.loads(profile_path.read_text())
         xml=ET.fromstring(v['source'].scene_source.xml)
@@ -112,6 +114,7 @@ def context(rate,case):
     if case=='euler_lift':
         v['recipe_identity']=canonical_digest({'baseline':v['recipe_identity'],'integration_intervention':'Euler-at-lift-v1','physics_dt_s':.002})
     v['_diagnostic_case']=case
+    v['_execution_provider']=provider
     return v
 
 

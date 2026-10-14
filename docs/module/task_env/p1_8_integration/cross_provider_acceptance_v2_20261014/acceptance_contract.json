@@ -1,0 +1,65 @@
+{
+  "schema": "p1.8-nutassembly-cross-provider-acceptance-v2",
+  "contract_id": "p1.8-nutassembly-cross-provider-acceptance-v2",
+  "status": "candidate_review_pending",
+  "task": {
+    "task_artifact_family": "NutAssemblySquare canonical TaskArtifact",
+    "task_success": "inserted_on_peg AND released_nut",
+    "expert_completion": "task success observed AND open_gripper readiness PASS AND release_retreat readiness PASS AND final task success remains true",
+    "environment_termination_is_expert_completion": false
+  },
+  "close_authorization": {
+    "selection_policy": "primary_or_declared_alternative_guard",
+    "primary_guard_id": "primary_controller_close_ready",
+    "alternative_guard_id": "alternative_force_8n",
+    "alternative_guard_conditions": [
+      "measured closing_force_N >= 8.0",
+      "force mode active",
+      "force mode initialized",
+      "canonical Nut grasp predicate true",
+      "EE pose readiness true"
+    ],
+    "continuous_dwell_s": 0.1,
+    "deadline_from_close_stage_entry_s": 1.5,
+    "sample_clock": "native physics state and canonical controller feedback",
+    "sample_period_s": 0.002,
+    "missing_sample_policy": "break continuity; do not interpolate",
+    "post_authorization_regulated_hold_s": 0.1,
+    "physical_force_target_N": 10.0,
+    "physical_force_cap_N": 10.0,
+    "unconditional_timeout_continuation": false
+  },
+  "physical_validity": {
+    "capture_translation_bound_m": 0.008,
+    "capture_rotation_bound_rad": 0.15,
+    "stage_timeouts_action_budgets_and_endpoint_gates": "unchanged from the frozen candidate"
+  },
+  "research_target": {
+    "maximum_nut_ee_translation_drift_m": 0.002,
+    "is_hard_full_acceptance_gate": false,
+    "report_exact_value_without_rounding": true
+  },
+  "frozen_execution": {
+    "physics_dt_s": 0.002,
+    "gripper_feedback_rate_hz": 500,
+    "arm_controller": "ProductionCanonicalPandaControllerR3; existing gains",
+    "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
+    "task_path": "nutassembly-r5-v5-clearance-primary-readiness-alternative-8n-guarded-v2",
+    "collision_geometry_mass_inertia_and_task_semantics": "unchanged"
+  },
+  "provider_profiles": {
+    "geophys": "provider-native Row-PGS configuration; record exact runtime/backend identity",
+    "mujoco": "NoSlip2 for the existing MuJoCo candidate; record exact model and package identity",
+    "cross_provider_native_parameters_are_equivalent": false
+  },
+  "replay_oracles": {
+    "D0": "source-side complete canonical action/target/readiness/owner reconstruction; exact source identity and first-divergence report",
+    "D1": "frozen ordered canonical control stream and native substep/timebase fidelity; target execution validity and physical task validity reported separately",
+    "D2": "same frozen RequestedAction sequence through live target controller/coordinator; no replan or stored actuator-command substitution",
+    "cross_provider_physical_state_bitwise_equality_required": false
+  },
+  "review": {
+    "human_judge_decision": "pending",
+    "formal_p1_8_qualification": "not granted by this campaign"
+  }
+}
