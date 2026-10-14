@@ -29,7 +29,15 @@ def checkpoints(x):
 
 
 def initialized(x,hz):
-    if x['recipe'].get('completion_policy') == 'on_expert_terminal_stage':
+    if x['recipe'].get('solution_version') == 'nutassembly-r5-primary-readiness-alternative-8n-guarded-v1':
+        from .lifecycle_full import context as lifecycle_context
+        v=lifecycle_context(hz,'guarded-primary-readiness-alternative-8n-v1')
+    elif x['recipe'].get('solution_version') == (
+            'nutassembly-r5-v5-clearance-primary-readiness-'
+            'alternative-8n-guarded-v2'):
+        from .lifecycle_full import context as lifecycle_context
+        v=lifecycle_context(hz,'guarded-primary-readiness-alternative-8n-v2-v5-clearance')
+    elif x['recipe'].get('completion_policy') == 'on_expert_terminal_stage':
         from .lifecycle_full import context as lifecycle_context
         v=lifecycle_context(hz)
     elif x['recipe'].get('cadence') == 'fixed-native-500hz-v1':
@@ -70,9 +78,15 @@ def one(v,x,k,provider):
                   if ramp_active and v['_arm_schedule_memory'].last_applied_arm is not None else None)
     if ramp_active and ramp_initial is None:
         raise AssertionError('arm_schedule_memory_missing_before_ramp')
+    transition_samples=[]
     for subindex,sub in enumerate(substeps):
         ss=CanonicalStateView.from_mapping(sub['state']);ff=CanonicalControlFeedback.from_mapping(sub['feedback'])
         grip,diagnostics=v['controller'].inner_gripper_step(ss,ff)
+        if (x['boundaries'][k]['stage']=='close_gripper'
+                and callable(getattr(v['solution'],'make_native_guard_sample',None))):
+            _sample_obs,sample_info,_sample_evaluation=observation(ss,v['artifact'])
+            transition_samples.append(v['solution'].make_native_guard_sample(
+                ss,sample_info,diagnostics))
         arm_servo=outer.arm_servo_position
         arm_position=outer.arm_position
         if ramp_active:
@@ -90,7 +104,11 @@ def one(v,x,k,provider):
     readiness=v['controller'].readiness(post,pf)
     if readiness.to_mapping()!=expected['record']['readiness']:raise AssertionError('readiness')
     obs,info,evaluation=observation(post,v['artifact'])
-    v['solution'].observe(obs,evaluation.reward,False,False,info,readiness=readiness)
+    if callable(getattr(v['solution'],'observe_guarded_transition',None)):
+        v['solution'].observe(obs,evaluation.reward,False,False,info,readiness=readiness,
+                              transition_samples=transition_samples)
+    else:
+        v['solution'].observe(obs,evaluation.reward,False,False,info,readiness=readiness)
     if snapshot(v,post,provider)!=expected_owners:raise AssertionError('owner update')
     return post,pf
 

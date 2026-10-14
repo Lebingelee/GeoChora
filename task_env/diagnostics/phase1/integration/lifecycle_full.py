@@ -24,6 +24,12 @@ from ....tasks.nut_assembly.canonical_solution_v2 import NutAssemblyStableGraspC
 from ....tasks.nut_assembly.clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3
 from ....tasks.nut_assembly.clearance_candidate_v4 import NutAssemblyHandClearanceCandidateV4
 from ....tasks.nut_assembly.clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5
+from ....tasks.nut_assembly.guarded_authorization_candidate import (
+    NutAssemblyGuardedAuthorizationCandidateV1,
+)
+from ....tasks.nut_assembly.guarded_authorization_candidate_v2 import (
+    NutAssemblyGuardedAuthorizationCandidateV2,
+)
 from ....controllers.canonical.contracts import digest
 
 
@@ -132,18 +138,32 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2"):
         "handle-clearance-v3": NutAssemblyHandClearanceCandidateV3,
         "handle-clearance-v4-live-settle": NutAssemblyHandClearanceCandidateV4,
         "handle-clearance-v5-shared-height-correction": NutAssemblyHandClearanceCandidateV5,
+        "guarded-primary-readiness-alternative-8n-v1": NutAssemblyGuardedAuthorizationCandidateV1,
+        "guarded-primary-readiness-alternative-8n-v2-v5-clearance":
+            NutAssemblyGuardedAuthorizationCandidateV2,
     }
     try:
         solution_class = solution_classes[trajectory_candidate]
     except KeyError as exc:
         raise ValueError(f"unsupported trajectory candidate: {trajectory_candidate}") from exc
-    solution = solution_class(
+    solution_kwargs = dict(
         config=value["solution_config"],
         control_dt=value["artifact"].timebase.control_dt,
         arm_hold=value["controller"].hold,
     )
+    if issubclass(solution_class, NutAssemblyGuardedAuthorizationCandidateV1):
+        solution_kwargs["physics_dt_s"] = value["artifact"].timebase.physics_dt
+    solution = solution_class(**solution_kwargs)
     value["solution"] = solution
     value["solution_identity"] = solution.identity
+    if isinstance(solution, NutAssemblyGuardedAuthorizationCandidateV1):
+        value["close_authorization_policy"] = {
+            **solution.policy_mapping,
+            "identity": solution.policy_identity,
+        }
+        value["allowed_close_authorization_guards"] = [
+            solution.primary_guard_id, solution.alternative_guard_id,
+        ]
     controller = value["controller"].hold.controller
     controller.identity = digest({
         "base_controller_identity": old_controller_identity,
@@ -159,6 +179,7 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2"):
         "controller_identity": controller.identity,
         "completion_policy": solution.completion_policy.value,
         "lifecycle_version": solution.lifecycle.version,
+        "close_authorization_policy": value.get("close_authorization_policy"),
     })
     return value
 
@@ -315,6 +336,14 @@ def run(*, provider: str, rate: int, output: Path,
         development_only=True,
         qualification_status=("NOT_ELIGIBLE_DIAGNOSTIC_ONLY"
                               if collision_intervention else "REVIEW_PENDING"),
+        historical_9n_qualification_status=(
+            "NOT_PASSED_BY_ALTERNATIVE_CANDIDATE" if value.get("close_authorization_policy")
+            else "HISTORICAL_POLICY_ACTIVE"
+        ),
+        alternative_authorization_development_status=(
+            "PASS" if result.get("pass") and value.get("close_authorization_policy")
+            else "FAIL" if value.get("close_authorization_policy") else "NOT_APPLICABLE"
+        ),
         provider=provider,
         outer_rate_hz=rate,
         gripper_rate_hz=500,
@@ -334,7 +363,15 @@ def run(*, provider: str, rate: int, output: Path,
         force_target_N=10.0,
         native_force_cap_N=10.0,
         close_authorization_deadline_s=1.5,
-        close_authorization_policy="controller_close_ready_only",
+        close_authorization_policy=(value.get("close_authorization_policy")
+                                    or "controller_close_ready_only"),
+        close_authorization_acceptance_policy=(
+            "primary_or_declared_alternative_guard" if value.get("close_authorization_policy")
+            else "historical_controller_close_ready_only"
+        ),
+        allowed_close_authorization_guards=value.get(
+            "allowed_close_authorization_guards", ["controller_close_ready"]
+        ),
         fallback_enabled=False,
         forced_lift=False,
         task_success_definition="unchanged canonical NutAssembly task semantics",
@@ -360,6 +397,8 @@ def run(*, provider: str, rate: int, output: Path,
     result["full_expert_status"] = (
         "DIAGNOSTIC_ONLY_PASS" if result.get("pass") and collision_intervention
         else "DIAGNOSTIC_ONLY_FAIL" if collision_intervention
+        else "FULL_EXPERT_ALTERNATIVE_AUTHORIZATION_DEVELOPMENT_PASS"
+        if result.get("pass") and value.get("close_authorization_policy")
         else "FULL_EXPERT_DEVELOPMENT_PASS" if result.get("pass")
         else "FULL_EXPERT_FAILED"
     )
@@ -386,6 +425,11 @@ def run(*, provider: str, rate: int, output: Path,
         "clearance_candidate_v3": Path("task_env/tasks/nut_assembly/clearance_candidate_v3.py"),
         "clearance_candidate_v4": Path("task_env/tasks/nut_assembly/clearance_candidate_v4.py"),
         "clearance_candidate_v5": Path("task_env/tasks/nut_assembly/clearance_candidate_v5.py"),
+        "guarded_transition_evaluator": Path("task_env/tasks/guarded_transition.py"),
+        "guarded_authorization_candidate": Path(
+            "task_env/tasks/nut_assembly/guarded_authorization_candidate.py"),
+        "guarded_authorization_candidate_v2": Path(
+            "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py"),
     }
     manifest = {
         "schema": "p1.8-canonical-solution-lifecycle-evidence-v1",
@@ -424,7 +468,9 @@ def main() -> int:
     parser.add_argument(
         "--trajectory-candidate",
         choices=("lifecycle-v2", "handle-clearance-v3", "handle-clearance-v4-live-settle",
-                 "handle-clearance-v5-shared-height-correction"),
+                 "handle-clearance-v5-shared-height-correction",
+                 "guarded-primary-readiness-alternative-8n-v1",
+                 "guarded-primary-readiness-alternative-8n-v2-v5-clearance"),
         default="lifecycle-v2",
     )
     parser.add_argument(

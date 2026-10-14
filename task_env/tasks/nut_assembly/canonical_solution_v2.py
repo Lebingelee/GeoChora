@@ -97,7 +97,8 @@ class _LifecycleV2Mixin:
             simulation_time_s=self._last_observed_time_s,
         )
 
-    def observe(self, obs, reward, terminated, truncated, info, *, readiness=None):
+    def observe(self, obs, reward, terminated, truncated, info, *, readiness=None,
+                transition_samples=None):
         step, time_s = self._clock(info)
         self._last_observed_step, self._last_observed_time_s = step, time_s
         terminal = self._lifecycle.observe_task_outcome(
@@ -119,6 +120,13 @@ class _LifecycleV2Mixin:
         }:
             acquisition_info = dict(info)
             acquisition_info["is_success"] = False
+            guarded_observer = getattr(self, "observe_guarded_transition", None)
+            if self.stage == "close_gripper" and callable(guarded_observer):
+                guarded_observer(
+                    obs, reward, terminated, truncated, acquisition_info,
+                    readiness=readiness, transition_samples=transition_samples,
+                )
+                return
             NutAssemblyStableGraspCandidate.observe(
                 self, obs, reward, terminated, truncated, acquisition_info,
                 readiness=readiness,

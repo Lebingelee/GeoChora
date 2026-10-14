@@ -98,7 +98,11 @@ def _fields(name, owner=None):
         return ('last_applied_arm',)
     if name == 'coordinator' and owner is not None and hasattr(owner, '_lifecycle'):
         legacy_flags = {'_done', '_failed', '_failure_reason'}
-        return tuple(field for field in FIELDS[name] if field not in legacy_flags) + ('lifecycle_state',)
+        fields = tuple(field for field in FIELDS[name] if field not in legacy_flags)
+        if hasattr(owner, '_transition_guard_state'):
+            fields += ('_transition_guard_state', '_close_action_completed_at_s',
+                       '_close_authorization', '_last_guard_decision')
+        return fields + ('lifecycle_state',)
     return FIELDS[name]
 
 
@@ -106,12 +110,16 @@ def _owner_version(name, owner=None):
     if name == 'arm_schedule':
         return 'arm-schedule-public-ack-memory-v2'
     if name == 'coordinator' and owner is not None and hasattr(owner, '_lifecycle'):
+        if hasattr(owner, '_transition_guard_state'):
+            return 'coordinator-canonical-guarded-lifecycle-v2'
         return 'coordinator-canonical-solution-lifecycle-v1'
     return name + '-memory-prototype-v1'
 
 
 def _checkpoint_version(value):
-    return ('p18-owner-checkpoint-prototype-v3'
+    return ('p18-owner-checkpoint-prototype-v4'
+            if hasattr(value['solution'], '_transition_guard_state')
+            else 'p18-owner-checkpoint-prototype-v3'
             if hasattr(value['solution'], '_lifecycle')
             else 'p18-owner-checkpoint-prototype-v2')
 
@@ -177,6 +185,14 @@ def restore(value, state, provider, record):
             from ....tasks.canonical_solution_lifecycle import CanonicalSolutionLifecycle
             lifecycle_probe = CanonicalSolutionLifecycle(owner._lifecycle.completion_policy)
             lifecycle_probe.restore_state(decoded[name]['lifecycle_state'][1])
+            if hasattr(owner, '_transition_guard_state'):
+                guard_state = decoded[name]['_transition_guard_state'][1]
+                if guard_state is not None:
+                    if not decoded[name]['_close_gate'][0]:
+                        raise ValueError('guard state without close-stage clock')
+                    owner._evaluator(decoded[name]['_close_gate'][1].start_s).restore_state(
+                        guard_state
+                    )
     arm = decoded['arm_gripper']
     if arm['_expected_step'][1] != state.control_step or not arm['_joint_reference'][0]:
         raise ValueError('missing/alignment-invalid controller history')

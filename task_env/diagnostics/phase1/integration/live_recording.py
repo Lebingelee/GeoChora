@@ -24,7 +24,8 @@ class LiveRecording:
         metadata=EpisodeMetadata('canonical-trajectory-metadata-v0',value['artifact'].identity_hash,
             sample,realized,execution(provider),{'build':json.dumps(worker.provider_build_identity(provider),sort_keys=True)},
             {'recipe':value['recipe_identity']},value['artifact'].timebase,value['controller_identity'],
-            value['solution_identity'],digest({'controller':value['controller_identity'],'readiness':'close_only'}),
+            value['solution_identity'],digest({'controller':value['controller_identity'],
+                'readiness_policy':value.get('close_authorization_policy','close_only')}),
             digest({'control':'absolute_pose/world/wxyz','interval':cadence_identity}),sample.task_seed,'regression')
         initial_snapshot=snapshot(value,state,provider)
         owner_schema={name:{'version':p['version'],'source_sha256':p['source_sha256'],'fields':list(p['fields'])} for name,p in initial_snapshot['owners'].items()}
@@ -36,7 +37,10 @@ class LiveRecording:
             'force_limit_N':10.,'authorization_deadline_s':1.5,'fallback':False,
             'completion_policy':(lifecycle.completion_policy.value if lifecycle is not None else 'implicit_legacy_on_success'),
             'lifecycle_version':(lifecycle.version if lifecycle is not None else None),
-            'solution_version':getattr(value['solution'],'version',None)})
+            'solution_version':getattr(value['solution'],'version',None),
+            'close_authorization_policy':value.get('close_authorization_policy'),
+            'allowed_close_authorization_guards':value.get('allowed_close_authorization_guards',
+                ['controller_close_ready'])})
         self.recorder.value['recipe']['episode_role'] = value.get('_recording_role', 'regression')
         self.recorder.boundary(self.boundary(state,feedback,info),snapshot(value,state,provider),value['solution'].stage,info['task_metrics'],self.native_time())
 

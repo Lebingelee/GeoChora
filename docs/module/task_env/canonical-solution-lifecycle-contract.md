@@ -154,6 +154,14 @@ Restore validates the solution identity, policy, state version, event clocks,
 and terminal-state consistency before mutating the fresh owner. A historical
 snapshot without these fields is not restorable as a V2 lifecycle snapshot.
 
+When a stage has multiple evidence-based authorization routes, keep their
+evaluation in a separately versioned, provider-neutral guard policy. The
+[Canonical Solution Guarded Transitions](canonical-solution-guarded-transitions.md)
+contract defines continuous physical-time dwell, deterministic guard selection,
+recording, and replay boundaries. Guard authorization does not alter this
+lifecycle's distinction among task success, expert completion, and environment
+termination.
+
 ## Review boundary
 
 This contract is a development implementation boundary. A provider-free unit

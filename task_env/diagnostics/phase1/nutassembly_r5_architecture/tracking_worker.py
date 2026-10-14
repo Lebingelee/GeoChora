@@ -180,11 +180,27 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
         recording.canonical = canonical
     target_hash = target.identity_hash
     inner_rows = None
+    native_guard_samples = []
     if hasattr(controller, "inner_gripper_step"):
         native_diagnostic = lambda current: _runtime_diagnostic_readback(current, provider, stage)
+        def observe_substep(index, sample_state, sample_feedback, target, applied, substep_diagnostics):
+            if recording is not None:
+                recording.recorder.applied_substep(
+                    index, sample_state,
+                    sample_feedback, target, applied, substep_diagnostics,
+                )
+            solution = value["solution"]
+            if stage == "close_gripper" and callable(
+                    getattr(solution, "make_native_guard_sample", None)):
+                _sample_obs, sample_info, _sample_evaluation = observation(
+                    sample_state, value["artifact"]
+                )
+                native_guard_samples.append(solution.make_native_guard_sample(
+                    sample_state, sample_info, substep_diagnostics
+                ))
         state, applied_target, applied, inner_rows = session.step_control_interval(
             target, controller, audit=audit, diagnostic_readback=native_diagnostic,
-            interval_observer=recording.recorder.applied_substep if recording is not None else None
+            interval_observer=observe_substep,
         )
         target = applied_target
     else:
@@ -223,6 +239,8 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
         ]
         row["arm_target_held"] = all(x.get("arm_target_hash") == inner_rows[0].get("arm_target_hash")
                                       for x in inner_rows) if inner_rows else True
+    if native_guard_samples:
+        row["transition_guard_samples"] = native_guard_samples
     else:
         row["target_hash_unchanged"] = target.identity_hash == target_hash and applied.target_hash == target_hash
     if recording is not None:
@@ -729,6 +747,7 @@ def run_loaded(value, provider, folder, probe):
     endpoints = []
     close_rows = []
     inner_servo_rows = []
+    native_guard_samples = []
     report = {"probe": probe, "provider": provider, "pass": False,
               "rate": value["artifact"].timebase.to_mapping(),
               "controller_identity": value["controller_identity"],
@@ -789,6 +808,7 @@ def run_loaded(value, provider, folder, probe):
             row["capture_validity_active"] = bool(capture_active)
             if before_stage == "close_gripper":
                 inner_servo_rows.extend(row.get("gripper_inner_trace", []))
+                native_guard_samples.extend(row.get("transition_guard_samples", []))
                 close_rows.append({
                     "simulation_time_s": state.simulation_time,
                     "requested_opening_m": row["requested_gripper_opening_m"],
@@ -811,7 +831,14 @@ def run_loaded(value, provider, folder, probe):
             row["grasp_authorized"] = grasp_authorized
             stage_rows.setdefault(before_stage, []).append(row)
             trace.append(row)
-            solution.observe(obs, evaluation.reward, False, False, info, readiness=controller.readiness(state, feedback))
+            readiness = controller.readiness(state, feedback)
+            if callable(getattr(solution, "observe_guarded_transition", None)):
+                solution.observe(
+                    obs, evaluation.reward, False, False, info, readiness=readiness,
+                    transition_samples=row.get("transition_guard_samples", []),
+                )
+            else:
+                solution.observe(obs, evaluation.reward, False, False, info, readiness=readiness)
             if value.get('_live_recording') is not None:
                 value['_live_recording'].complete(state, feedback, info, evaluation, row)
             contact_row = row.pop("_native_contact_diagnostic", None)
@@ -834,33 +861,81 @@ def run_loaded(value, provider, folder, probe):
                 endpoint = _stage_endpoint(before_stage, stage_rows[before_stage], value)
                 endpoints.append(endpoint)
                 if before_stage == "close_gripper":
-                    window = close_rows[-auth_ticks:]
-                    opening_span = (max((x["measured_opening_m"] for x in window), default=math.nan)
-                                    - min((x["measured_opening_m"] for x in window), default=math.nan))
-                    minimum_force = min((x["closing_force_N"] for x in window), default=math.nan)
-                    all_grasped = len(window) == auth_ticks and all(x["grasped_nut"] for x in window)
-                    fallback = (len(window) == auth_ticks
-                                and opening_span <= value["solution_config"].opening_stable_range_m
-                                and minimum_force >= value["solution_config"].grasp_min_closing_force_N
-                                and all_grasped)
-                    ready = bool(row["controller_close_ready"])
-                    branch = "controller_close_ready" if ready else "stable_grasp_fallback" if fallback else "unclassified"
-                    auth_time = state.simulation_time - close_start_time if close_start_time is not None else None
-                    close_authorization = {
-                        "authorization_branch": branch,
-                        "authorization_time_s": auth_time,
-                        "controller_close_ready": ready,
-                        "stable_fallback_satisfied": bool(fallback),
-                        "fallback_window_ticks": auth_ticks,
-                        "fallback_window_duration_s": auth_ticks * artifact.timebase.control_dt,
-                        "fallback_minimum_force_N": minimum_force,
-                        "fallback_opening_span_m": opening_span,
-                        "fallback_grasped_nut_throughout": all_grasped,
-                        "end_opening_m": feedback.gripper.opening_m,
-                        "end_closing_force_N": feedback.gripper.closing_force_N,
-                        "pose_gate_at_authorization": endpoint["pose_gate_pass"],
-                    }
-                    grasp_authorized = branch in {"controller_close_ready", "stable_grasp_fallback"}
+                    guarded_policy = value.get("close_authorization_policy")
+                    if guarded_policy:
+                        authorization_event = next((event for event in solution.events
+                            if event.get("event") == "close_transition_authorized"), None)
+                        selected = authorization_event.get("authorization_guard_id") if authorization_event else None
+                        authorization_evidence = authorization_event or {}
+                        absolute_authorization_time = (authorization_event.get("t")
+                                                       if authorization_event else None)
+                        branch = selected or "no_guard_authorized"
+                        close_authorization = {
+                            "authorization_branch": branch,
+                            "authorization_guard_id": selected,
+                            "authorization_time_s": (
+                                absolute_authorization_time - close_start_time
+                                if absolute_authorization_time is not None and close_start_time is not None
+                                else None
+                            ),
+                            "authorization_simulation_time_s": absolute_authorization_time,
+                            "transition_consumed_at_outer_boundary_s": authorization_evidence.get(
+                                "transition_consumed_at_outer_boundary_s"),
+                            "controller_close_ready": bool(authorization_evidence.get(
+                                "controller_close_ready", False)),
+                            "solution_close_authorized": bool(authorization_event),
+                            "required_stable_duration_s": authorization_evidence.get(
+                                "required_stable_duration_s"),
+                            "observed_stable_duration_s": authorization_evidence.get(
+                                "observed_stable_duration_s"),
+                            "authorization_sample_count": authorization_evidence.get(
+                                "native_sample_count"),
+                            "authorization_sample_history_sha256": authorization_evidence.get(
+                                "sample_history_sha256"),
+                            "authorization_conditions": authorization_evidence.get("conditions"),
+                            "authorization_values": authorization_evidence.get("values"),
+                            "force_mode_active": (authorization_evidence.get("values") or {}).get(
+                                "force_mode_active"),
+                            "force_mode_initialized": (authorization_evidence.get("values") or {}).get(
+                                "force_mode_initialized"),
+                            "measured_force_N": (authorization_evidence.get("values") or {}).get(
+                                "closing_force_N"),
+                            "pose_gate_at_authorization": (authorization_evidence.get("conditions") or {}).get(
+                                "pose_ready", False),
+                            "policy_identity": guarded_policy.get("identity"),
+                            "policy_schema": guarded_policy.get("schema"),
+                            "end_opening_m": feedback.gripper.opening_m,
+                            "end_closing_force_N": feedback.gripper.closing_force_N,
+                        }
+                        grasp_authorized = bool(authorization_event)
+                    else:
+                        window = close_rows[-auth_ticks:]
+                        opening_span = (max((x["measured_opening_m"] for x in window), default=math.nan)
+                                        - min((x["measured_opening_m"] for x in window), default=math.nan))
+                        minimum_force = min((x["closing_force_N"] for x in window), default=math.nan)
+                        all_grasped = len(window) == auth_ticks and all(x["grasped_nut"] for x in window)
+                        fallback = (len(window) == auth_ticks
+                                    and opening_span <= value["solution_config"].opening_stable_range_m
+                                    and minimum_force >= value["solution_config"].grasp_min_closing_force_N
+                                    and all_grasped)
+                        ready = bool(row["controller_close_ready"])
+                        branch = "controller_close_ready" if ready else "stable_grasp_fallback" if fallback else "unclassified"
+                        auth_time = state.simulation_time - close_start_time if close_start_time is not None else None
+                        close_authorization = {
+                            "authorization_branch": branch,
+                            "authorization_time_s": auth_time,
+                            "controller_close_ready": ready,
+                            "stable_fallback_satisfied": bool(fallback),
+                            "fallback_window_ticks": auth_ticks,
+                            "fallback_window_duration_s": auth_ticks * artifact.timebase.control_dt,
+                            "fallback_minimum_force_N": minimum_force,
+                            "fallback_opening_span_m": opening_span,
+                            "fallback_grasped_nut_throughout": all_grasped,
+                            "end_opening_m": feedback.gripper.opening_m,
+                            "end_closing_force_N": feedback.gripper.closing_force_N,
+                            "pose_gate_at_authorization": endpoint["pose_gate_pass"],
+                        }
+                        grasp_authorized = branch in {"controller_close_ready", "stable_grasp_fallback"}
                     row["close_transition_authorization"] = branch
                 if before_stage == "verify_lift":
                     verify_lift_pass = bool(endpoint["pose_gate_pass"] and endpoint["capture_gate_pass"]
@@ -879,9 +954,11 @@ def run_loaded(value, provider, folder, probe):
         required_endpoints_pass = all(endpoints_by_stage.get(stage, {}).get("pose_gate_pass", False)
                                       and endpoints_by_stage.get(stage, {}).get("capture_gate_pass", False)
                                       for stage in goal_stages)
-        # The frozen integration recipe authorizes only the controller's
-        # close_ready signal; the historical diagnostic fallback is not active.
-        allowed_close_branches = {"controller_close_ready"}
+        # Each source recipe declares which close authorization edge it admits.
+        # Historical results retain the old Controller Readiness-only rule.
+        guard_policy = value.get("close_authorization_policy")
+        allowed_close_branches = (set(value.get("allowed_close_authorization_guards", ()))
+                                  if guard_policy else {"controller_close_ready"})
         close_time_ok = bool(close_authorization and close_authorization["authorization_branch"] in
                              allowed_close_branches
                              and close_authorization["authorization_time_s"] <= CLOSE_TIME_LIMIT_S
@@ -898,11 +975,11 @@ def run_loaded(value, provider, folder, probe):
         lifecycle_event_by_name = {item.get("event"): item for item in lifecycle_events}
         expected_postclose_ticks = solution._ticks(value["solution"].postclose_hold_s)
         observed_postclose_hold_s = None
-        if (event_by_name.get("controller_close_authorized")
-                and event_by_name.get("verify_lift_motion_start")):
+        authorization_event = (event_by_name.get("close_transition_authorized")
+                               or event_by_name.get("controller_close_authorized"))
+        if (authorization_event and event_by_name.get("verify_lift_motion_start")):
             observed_postclose_hold_s = float(
-                event_by_name["verify_lift_motion_start"]["t"]
-                - event_by_name["controller_close_authorized"]["t"]
+                event_by_name["verify_lift_motion_start"]["t"] - authorization_event["t"]
             )
         close_joint_targets = [row["joint_target"] for row in close_rows]
         close_servo_targets = [row["servo_target"] for row in close_rows]
@@ -915,15 +992,27 @@ def run_loaded(value, provider, folder, probe):
         )
         close_sequence_pass = True
         if probe in {"T1", "FULL"}:
-            close_sequence_pass = bool(
-                "pose_stable" in event_by_name
-                and event_by_name.get("controller_close_authorized", {}).get("fallback_used") is False
-                and close_authorization
-                and close_authorization["authorization_branch"] == "controller_close_ready"
-                and close_arm_target_held and close_requested_pose_held
-                and observed_postclose_hold_s is not None
-                and abs(observed_postclose_hold_s - expected_postclose_ticks * artifact.timebase.control_dt) <= 1e-9
-            )
+            if guard_policy:
+                close_sequence_pass = bool(
+                    "pose_stable" in event_by_name
+                    and event_by_name.get("close_transition_authorized", {}).get("fallback_used") is False
+                    and close_authorization
+                    and close_authorization.get("solution_close_authorized") is True
+                    and close_authorization["authorization_guard_id"] in allowed_close_branches
+                    and close_arm_target_held and close_requested_pose_held
+                    and observed_postclose_hold_s is not None
+                    and abs(observed_postclose_hold_s - expected_postclose_ticks * artifact.timebase.control_dt) <= 1e-9
+                )
+            else:
+                close_sequence_pass = bool(
+                    "pose_stable" in event_by_name
+                    and event_by_name.get("controller_close_authorized", {}).get("fallback_used") is False
+                    and close_authorization
+                    and close_authorization["authorization_branch"] == "controller_close_ready"
+                    and close_arm_target_held and close_requested_pose_held
+                    and observed_postclose_hold_s is not None
+                    and abs(observed_postclose_hold_s - expected_postclose_ticks * artifact.timebase.control_dt) <= 1e-9
+                )
         if probe == "G0":
             complete = verify_lift_pass
             passed = bool(close_time_ok and verify_lift_pass and required_endpoints_pass
@@ -997,6 +1086,21 @@ def run_loaded(value, provider, folder, probe):
             pass_=passed,
             endpoints=endpoints,
             close_authorization=close_authorization,
+            close_authorization_policy=value.get("close_authorization_policy",
+                                                   "controller_close_ready_only"),
+            close_authorization_acceptance_policy=value.get(
+                "close_authorization_acceptance_policy",
+                "historical_controller_close_ready_only"),
+            allowed_close_authorization_guards=sorted(allowed_close_branches),
+            native_guard_sample_count=len(native_guard_samples),
+            native_guard_sample_sha256=hashlib.sha256(json.dumps(
+                native_guard_samples, sort_keys=True, separators=(",", ":"),
+                allow_nan=False,
+            ).encode()).hexdigest() if native_guard_samples else None,
+            native_guard_sampling_semantics=(
+                "measured-left-closed-right-open-2ms-native-state"
+                if guard_policy else None
+            ),
             close_stage_trace=close_rows,
             inner_servo_trace=inner_servo_rows,
             verify_lift_pass=verify_lift_pass,
@@ -1013,7 +1117,12 @@ def run_loaded(value, provider, folder, probe):
             coordinator_failure_reason=solution.failure_reason,
             coordinator_stage_sequence=coordinator_stages,
             close_authorization_controller_only=bool(
-                close_authorization and close_authorization["authorization_branch"] == "controller_close_ready"),
+                close_authorization and close_authorization.get("authorization_guard_id",
+                    close_authorization["authorization_branch"]) in {"controller_close_ready",
+                        "primary_controller_close_ready"}),
+            solution_close_authorized=bool(close_authorization and close_authorization.get(
+                "solution_close_authorized", close_authorization.get("authorization_branch") ==
+                "controller_close_ready")),
             close_arm_target_held=close_arm_target_held,
             close_requested_ee_pose_held=close_requested_pose_held,
             pose_stable_event_observed="pose_stable" in event_by_name,
