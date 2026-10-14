@@ -1,0 +1,589 @@
+{
+  "accepted_diagnostic_sources": [
+    {
+      "boundary_count": 1194,
+      "candidate": "nutassembly-r5-v5-clearance-primary-readiness-alternative-8n-guarded-v2",
+      "control_dt_s": 0.02,
+      "control_substeps": 10,
+      "diagnostic_events": "geophys_source_50hz_attempt2/diagnostic_shadow_events.json",
+      "diagnostic_sequence_complete": true,
+      "diagnostic_sequence_stop_reason": "DIAGNOSTIC_SEQUENCE_COMPLETED",
+      "diagnostic_stage_sequence": [
+        "approach_nut",
+        "descend_to_handle",
+        "close_gripper",
+        "verify_lift",
+        "raise_for_transport",
+        "move_above_square_peg",
+        "align_nut_yaw",
+        "descend_to_peg_top",
+        "lower_nut_to_table",
+        "open_gripper",
+        "release_retreat"
+      ],
+      "environment_terminated": false,
+      "environment_truncated": false,
+      "episode_role": "DIAGNOSTIC_ACTION_SOURCE",
+      "evidence_manifest": "geophys_source_50hz_attempt2/full_expert_evidence_manifest.json",
+      "execution_h5": "geophys_source_50hz_attempt2/execution.h5",
+      "execution_h5_bytes": 10061156,
+      "execution_h5_sha256": "85e6a944e36269a66627b6295df39275c265451b44c8c80998034ccbb17dfed2",
+      "expert_complete": false,
+      "expert_failed": true,
+      "final_intermediate_task_predicates": {
+        "aligned_with_peg": true,
+        "grasped_nut": false,
+        "gripper_released": true,
+        "hovered_over_peg": false,
+        "inserted_on_peg": true,
+        "lifted_nut": false,
+        "reached_nut": false,
+        "released_nut": true,
+        "task_success": true
+      },
+      "final_nut_pose_position_m": {
+        "nut_x": 0.5802261829376221,
+        "nut_y": 0.046317338943481445,
+        "nut_z": 0.4716867208480835
+      },
+      "final_nut_yaw_rad": -3.0825264471396174,
+      "final_peg_xy_error_m": 0.0013366164191961538,
+      "final_peg_z_error_m": -0.0013132791519165354,
+      "first_original_expert_gate_failure": {
+        "control_step": 182,
+        "event": "stage_readiness_failed",
+        "expert_gate_pass": false,
+        "gate_failure_reason": "stable_height_mismatch",
+        "simulation_time_s": 3.6399999999998207,
+        "stage": "descend_to_handle"
+      },
+      "lifecycle_task_success_valid": false,
+      "logical_hash": "2bc13506170c61d39332f0d90affe1fe9a2b062042f8164cc5fc5c7b483cb8d3",
+      "logical_payload_bytes": 65349611,
+      "native_physics_steps": 11930,
+      "original_expert_gate_outcome": {
+        "expert_complete": false,
+        "expert_failed": true,
+        "failure_reason": "stable_height_mismatch",
+        "gate_failure_is_preserved": true
+      },
+      "physics_dt_s": 0.002,
+      "provider": "geophys",
+      "provider_build_identity": {
+        "dirty_build_sha256": null,
+        "import_origin": "environment-specific provider import origin redacted",
+        "manifest_version": "git:c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+        "origin_sha256": "57e772e69d39e79fb21fd23547727d7cc9738970ad307b70cd3ebbf2e0264c9e",
+        "package_version": null,
+        "provider": "geophys",
+        "repository_revision": "c665ce5028a12bb4d2afe49f05e015fa9b684a39"
+      },
+      "rate_hz": 50,
+      "raw_result": "geophys_source_50hz_attempt2/full_expert_result.json",
+      "raw_task_success_metric": true,
+      "recipe_identity": "5149b69835fe48674e7a0ee87b8c85759551a4be65e4991f7824c1b45c8ecd13",
+      "release_retreat_endpoint_pass": true,
+      "reset_sample_hash": "6f429c902a62e4572de6759a6b232a0190a07afe232d6039864a3b72fdbc5042",
+      "roundtrip_exact": true,
+      "roundtrip_verification": {
+        "byte_exact": true,
+        "chunk_bytes": 1048576,
+        "legacy_full_object_load_executed": false,
+        "logical_bytes": 65349611,
+        "logical_hash": "2bc13506170c61d39332f0d90affe1fe9a2b062042f8164cc5fc5c7b483cb8d3",
+        "read_compare_hash_s": 0.8889952730096411,
+        "version": "canonical-json-streaming-byte-roundtrip-v1"
+      },
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "source_head_at_run": "bc34b0e58b12d63ae808273e28c79b79f2272ad6",
+      "stage_action_counts": [
+        {
+          "end_control_step_exclusive": 48,
+          "entered_by": "canonical_expert",
+          "executed_control_intervals_derived_from_transition_boundaries": 48,
+          "stage": "approach_nut",
+          "start_control_step": 0
+        },
+        {
+          "end_control_step_exclusive": 182,
+          "entered_by": "canonical_expert",
+          "executed_control_intervals_derived_from_transition_boundaries": 134,
+          "stage": "descend_to_handle",
+          "start_control_step": 48
+        },
+        {
+          "end_control_step_exclusive": 229,
+          "entered_by": "diagnostic_override",
+          "executed_control_intervals_derived_from_transition_boundaries": 47,
+          "stage": "close_gripper",
+          "start_control_step": 182
+        },
+        {
+          "end_control_step_exclusive": 377,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 148,
+          "stage": "verify_lift",
+          "start_control_step": 229
+        },
+        {
+          "end_control_step_exclusive": 507,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 130,
+          "stage": "raise_for_transport",
+          "start_control_step": 377
+        },
+        {
+          "end_control_step_exclusive": 699,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 192,
+          "stage": "move_above_square_peg",
+          "start_control_step": 507
+        },
+        {
+          "end_control_step_exclusive": 722,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 23,
+          "stage": "align_nut_yaw",
+          "start_control_step": 699
+        },
+        {
+          "end_control_step_exclusive": 827,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 105,
+          "stage": "descend_to_peg_top",
+          "start_control_step": 722
+        },
+        {
+          "end_control_step_exclusive": 995,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 168,
+          "stage": "lower_nut_to_table",
+          "start_control_step": 827
+        },
+        {
+          "end_control_step_exclusive": 1050,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 55,
+          "stage": "open_gripper",
+          "start_control_step": 995
+        },
+        {
+          "end_control_step_exclusive": 1193,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 143,
+          "stage": "release_retreat",
+          "start_control_step": 1050
+        }
+      ],
+      "task_artifact_hash": "699fc9147a07cb76f40c48decfddc350ed0ad3688beebe8b0da5268374e881e9",
+      "task_success_first_observed_lifecycle_event": null,
+      "transition_count": 1193
+    },
+    {
+      "boundary_count": 2381,
+      "candidate": "nutassembly-r5-v5-clearance-primary-readiness-alternative-8n-guarded-v2",
+      "control_dt_s": 0.01,
+      "control_substeps": 5,
+      "diagnostic_events": "geophys_source_100hz/diagnostic_shadow_events.json",
+      "diagnostic_sequence_complete": true,
+      "diagnostic_sequence_stop_reason": "DIAGNOSTIC_SEQUENCE_COMPLETED",
+      "diagnostic_stage_sequence": [
+        "approach_nut",
+        "descend_to_handle",
+        "close_gripper",
+        "verify_lift",
+        "raise_for_transport",
+        "move_above_square_peg",
+        "align_nut_yaw",
+        "descend_to_peg_top",
+        "lower_nut_to_table",
+        "open_gripper",
+        "release_retreat"
+      ],
+      "environment_terminated": false,
+      "environment_truncated": false,
+      "episode_role": "DIAGNOSTIC_ACTION_SOURCE",
+      "evidence_manifest": "geophys_source_100hz/full_expert_evidence_manifest.json",
+      "execution_h5": "geophys_source_100hz/execution.h5",
+      "execution_h5_bytes": 11303039,
+      "execution_h5_sha256": "003e8bbd504884fbc37dc7f2a841f1e94c648efff185a07493f9f6748ceff24f",
+      "expert_complete": false,
+      "expert_failed": true,
+      "final_intermediate_task_predicates": {
+        "aligned_with_peg": true,
+        "grasped_nut": false,
+        "gripper_released": true,
+        "hovered_over_peg": false,
+        "inserted_on_peg": true,
+        "lifted_nut": false,
+        "reached_nut": false,
+        "released_nut": true,
+        "task_success": true
+      },
+      "final_nut_pose_position_m": {
+        "nut_x": 0.5802515745162964,
+        "nut_y": 0.04645608738064766,
+        "nut_z": 0.47185584902763367
+      },
+      "final_nut_yaw_rad": -3.0740082719363806,
+      "final_peg_xy_error_m": 0.0014776614590101508,
+      "final_peg_z_error_m": -0.0011441509723663645,
+      "first_original_expert_gate_failure": {
+        "control_step": 362,
+        "event": "stage_readiness_failed",
+        "expert_gate_pass": false,
+        "gate_failure_reason": "stable_height_mismatch",
+        "simulation_time_s": 3.619999999999823,
+        "stage": "descend_to_handle"
+      },
+      "lifecycle_task_success_valid": false,
+      "logical_hash": "ef9ca6c814fa0aba6dfa218e5d7bb9df29f38bb867b34d21853bf80ad339e350",
+      "logical_payload_bytes": 86639728,
+      "native_physics_steps": 11900,
+      "original_expert_gate_outcome": {
+        "expert_complete": false,
+        "expert_failed": true,
+        "failure_reason": "stable_height_mismatch",
+        "gate_failure_is_preserved": true
+      },
+      "physics_dt_s": 0.002,
+      "provider": "geophys",
+      "provider_build_identity": {
+        "dirty_build_sha256": null,
+        "import_origin": "environment-specific provider import origin redacted",
+        "manifest_version": "git:c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+        "origin_sha256": "57e772e69d39e79fb21fd23547727d7cc9738970ad307b70cd3ebbf2e0264c9e",
+        "package_version": null,
+        "provider": "geophys",
+        "repository_revision": "c665ce5028a12bb4d2afe49f05e015fa9b684a39"
+      },
+      "rate_hz": 100,
+      "raw_result": "geophys_source_100hz/full_expert_result.json",
+      "raw_task_success_metric": true,
+      "recipe_identity": "471ac411f8e34461ea91e254099cfa7144c8734da1de04e0e519f2e5d3322bce",
+      "release_retreat_endpoint_pass": true,
+      "reset_sample_hash": "767d56397dec41243aec445232d8d726b0891e7eeb49f655b789a86b23b5f4a2",
+      "roundtrip_exact": true,
+      "roundtrip_verification": {
+        "byte_exact": true,
+        "chunk_bytes": 1048576,
+        "legacy_full_object_load_executed": false,
+        "logical_bytes": 86639728,
+        "logical_hash": "ef9ca6c814fa0aba6dfa218e5d7bb9df29f38bb867b34d21853bf80ad339e350",
+        "read_compare_hash_s": 1.178066800988745,
+        "version": "canonical-json-streaming-byte-roundtrip-v1"
+      },
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "source_head_at_run": "bc34b0e58b12d63ae808273e28c79b79f2272ad6",
+      "stage_action_counts": [
+        {
+          "end_control_step_exclusive": 96,
+          "entered_by": "canonical_expert",
+          "executed_control_intervals_derived_from_transition_boundaries": 96,
+          "stage": "approach_nut",
+          "start_control_step": 0
+        },
+        {
+          "end_control_step_exclusive": 362,
+          "entered_by": "canonical_expert",
+          "executed_control_intervals_derived_from_transition_boundaries": 266,
+          "stage": "descend_to_handle",
+          "start_control_step": 96
+        },
+        {
+          "end_control_step_exclusive": 456,
+          "entered_by": "diagnostic_override",
+          "executed_control_intervals_derived_from_transition_boundaries": 94,
+          "stage": "close_gripper",
+          "start_control_step": 362
+        },
+        {
+          "end_control_step_exclusive": 752,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 296,
+          "stage": "verify_lift",
+          "start_control_step": 456
+        },
+        {
+          "end_control_step_exclusive": 1012,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 260,
+          "stage": "raise_for_transport",
+          "start_control_step": 752
+        },
+        {
+          "end_control_step_exclusive": 1395,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 383,
+          "stage": "move_above_square_peg",
+          "start_control_step": 1012
+        },
+        {
+          "end_control_step_exclusive": 1440,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 45,
+          "stage": "align_nut_yaw",
+          "start_control_step": 1395
+        },
+        {
+          "end_control_step_exclusive": 1649,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 209,
+          "stage": "descend_to_peg_top",
+          "start_control_step": 1440
+        },
+        {
+          "end_control_step_exclusive": 1984,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 335,
+          "stage": "lower_nut_to_table",
+          "start_control_step": 1649
+        },
+        {
+          "end_control_step_exclusive": 2094,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 110,
+          "stage": "open_gripper",
+          "start_control_step": 1984
+        },
+        {
+          "end_control_step_exclusive": 2380,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 286,
+          "stage": "release_retreat",
+          "start_control_step": 2094
+        }
+      ],
+      "task_artifact_hash": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "task_success_first_observed_lifecycle_event": null,
+      "transition_count": 2380
+    },
+    {
+      "boundary_count": 11915,
+      "candidate": "nutassembly-r5-v5-clearance-primary-readiness-alternative-8n-guarded-v2",
+      "control_dt_s": 0.002,
+      "control_substeps": 1,
+      "diagnostic_events": "geophys_source_500hz/diagnostic_shadow_events.json",
+      "diagnostic_sequence_complete": true,
+      "diagnostic_sequence_stop_reason": "DIAGNOSTIC_SEQUENCE_COMPLETED",
+      "diagnostic_stage_sequence": [
+        "approach_nut",
+        "descend_to_handle",
+        "close_gripper",
+        "verify_lift",
+        "raise_for_transport",
+        "move_above_square_peg",
+        "align_nut_yaw",
+        "descend_to_peg_top",
+        "lower_nut_to_table",
+        "open_gripper",
+        "release_retreat"
+      ],
+      "environment_terminated": false,
+      "environment_truncated": false,
+      "episode_role": "DIAGNOSTIC_ACTION_SOURCE",
+      "evidence_manifest": "geophys_source_500hz/full_expert_evidence_manifest.json",
+      "execution_h5": "geophys_source_500hz/execution.h5",
+      "execution_h5_bytes": 30193969,
+      "execution_h5_sha256": "13c160528c6f276f7280a3399b9490d9b48aaba4f2371fe0c0dfc64ade0004a3",
+      "expert_complete": false,
+      "expert_failed": true,
+      "final_intermediate_task_predicates": {
+        "aligned_with_peg": true,
+        "grasped_nut": false,
+        "gripper_released": true,
+        "hovered_over_peg": false,
+        "inserted_on_peg": true,
+        "lifted_nut": false,
+        "reached_nut": false,
+        "released_nut": true,
+        "task_success": true
+      },
+      "final_nut_pose_position_m": {
+        "nut_x": 0.5802620053291321,
+        "nut_y": 0.046377211809158325,
+        "nut_z": 0.47198083996772766
+      },
+      "final_nut_yaw_rad": -3.077229604625874,
+      "final_peg_xy_error_m": 0.0014019140416368643,
+      "final_peg_z_error_m": -0.0010191600322723704,
+      "first_original_expert_gate_failure": {
+        "control_step": 1810,
+        "event": "stage_readiness_failed",
+        "expert_gate_pass": false,
+        "gate_failure_reason": "stable_height_mismatch",
+        "simulation_time_s": 3.619999999999823,
+        "stage": "descend_to_handle"
+      },
+      "lifecycle_task_success_valid": false,
+      "logical_hash": "e96a258a98e74fdee94773b2780b16e109c118be8e6eea56c8dde62e78063a34",
+      "logical_payload_bytes": 272630484,
+      "native_physics_steps": 11914,
+      "original_expert_gate_outcome": {
+        "expert_complete": false,
+        "expert_failed": true,
+        "failure_reason": "stable_height_mismatch",
+        "gate_failure_is_preserved": true
+      },
+      "physics_dt_s": 0.002,
+      "provider": "geophys",
+      "provider_build_identity": {
+        "dirty_build_sha256": null,
+        "import_origin": "environment-specific provider import origin redacted",
+        "manifest_version": "git:c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+        "origin_sha256": "57e772e69d39e79fb21fd23547727d7cc9738970ad307b70cd3ebbf2e0264c9e",
+        "package_version": null,
+        "provider": "geophys",
+        "repository_revision": "c665ce5028a12bb4d2afe49f05e015fa9b684a39"
+      },
+      "rate_hz": 500,
+      "raw_result": "geophys_source_500hz/full_expert_result.json",
+      "raw_task_success_metric": true,
+      "recipe_identity": "73ce49a2bd87bcb32f0cd83a9ba00c0784ae08307804402e8d6ca0e8ea5b814f",
+      "release_retreat_endpoint_pass": true,
+      "reset_sample_hash": "c83f765e54804b878fc6a53aff222531c5e0fe92a0c083e70f8ffe125ca10586",
+      "roundtrip_exact": true,
+      "roundtrip_verification": {
+        "byte_exact": true,
+        "chunk_bytes": 1048576,
+        "legacy_full_object_load_executed": false,
+        "logical_bytes": 272630484,
+        "logical_hash": "e96a258a98e74fdee94773b2780b16e109c118be8e6eea56c8dde62e78063a34",
+        "read_compare_hash_s": 3.8217678220244125,
+        "version": "canonical-json-streaming-byte-roundtrip-v1"
+      },
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "source_head_at_run": "bc34b0e58b12d63ae808273e28c79b79f2272ad6",
+      "stage_action_counts": [
+        {
+          "end_control_step_exclusive": 483,
+          "entered_by": "canonical_expert",
+          "executed_control_intervals_derived_from_transition_boundaries": 483,
+          "stage": "approach_nut",
+          "start_control_step": 0
+        },
+        {
+          "end_control_step_exclusive": 1810,
+          "entered_by": "canonical_expert",
+          "executed_control_intervals_derived_from_transition_boundaries": 1327,
+          "stage": "descend_to_handle",
+          "start_control_step": 483
+        },
+        {
+          "end_control_step_exclusive": 2277,
+          "entered_by": "diagnostic_override",
+          "executed_control_intervals_derived_from_transition_boundaries": 467,
+          "stage": "close_gripper",
+          "start_control_step": 1810
+        },
+        {
+          "end_control_step_exclusive": 3760,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 1483,
+          "stage": "verify_lift",
+          "start_control_step": 2277
+        },
+        {
+          "end_control_step_exclusive": 5063,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 1303,
+          "stage": "raise_for_transport",
+          "start_control_step": 3760
+        },
+        {
+          "end_control_step_exclusive": 6982,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 1919,
+          "stage": "move_above_square_peg",
+          "start_control_step": 5063
+        },
+        {
+          "end_control_step_exclusive": 7209,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 227,
+          "stage": "align_nut_yaw",
+          "start_control_step": 6982
+        },
+        {
+          "end_control_step_exclusive": 8256,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 1047,
+          "stage": "descend_to_peg_top",
+          "start_control_step": 7209
+        },
+        {
+          "end_control_step_exclusive": 9931,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 1675,
+          "stage": "lower_nut_to_table",
+          "start_control_step": 8256
+        },
+        {
+          "end_control_step_exclusive": 10481,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 550,
+          "stage": "open_gripper",
+          "start_control_step": 9931
+        },
+        {
+          "end_control_step_exclusive": 11914,
+          "entered_by": "diagnostic_shadow_readiness",
+          "executed_control_intervals_derived_from_transition_boundaries": 1433,
+          "stage": "release_retreat",
+          "start_control_step": 10481
+        }
+      ],
+      "task_artifact_hash": "908cd3c41b6c3391e81dda2415d691dea378c7dd10138dcf8e5ebc4293dfd9f4",
+      "task_success_first_observed_lifecycle_event": null,
+      "transition_count": 11914
+    }
+  ],
+  "attempts": [
+    {
+      "attempt": 1,
+      "diagnostic_sequence_complete": false,
+      "error": "TypeError: cannot pickle 'mappingproxy' object",
+      "evidence_preserved": true,
+      "path": "geophys_source_50hz",
+      "rate_hz": 50,
+      "source_h5_sha256": "12e930df5d5523639d9f5bc98a3a71b395eb8a71cc3d6300b497fb88a40b3bd3",
+      "status": "INCOMPLETE_RUNTIME_ERROR",
+      "transition_count": null
+    },
+    {
+      "attempt": 2,
+      "logical_hash": "2bc13506170c61d39332f0d90affe1fe9a2b062042f8164cc5fc5c7b483cb8d3",
+      "path": "geophys_source_50hz_attempt2",
+      "rate_hz": 50,
+      "source_h5_sha256": "85e6a944e36269a66627b6295df39275c265451b44c8c80998034ccbb17dfed2",
+      "status": "COMPLETE_DIAGNOSTIC_ACTION_SOURCE",
+      "transition_count": 1193
+    },
+    {
+      "attempt": 1,
+      "logical_hash": "ef9ca6c814fa0aba6dfa218e5d7bb9df29f38bb867b34d21853bf80ad339e350",
+      "path": "geophys_source_100hz",
+      "rate_hz": 100,
+      "source_h5_sha256": "003e8bbd504884fbc37dc7f2a841f1e94c648efff185a07493f9f6748ceff24f",
+      "status": "COMPLETE_DIAGNOSTIC_ACTION_SOURCE",
+      "transition_count": 2380
+    },
+    {
+      "attempt": 1,
+      "logical_hash": "e96a258a98e74fdee94773b2780b16e109c118be8e6eea56c8dde62e78063a34",
+      "path": "geophys_source_500hz",
+      "rate_hz": 500,
+      "source_h5_sha256": "13c160528c6f276f7280a3399b9490d9b48aaba4f2371fe0c0dfc64ade0004a3",
+      "status": "COMPLETE_DIAGNOSTIC_ACTION_SOURCE",
+      "transition_count": 11914
+    }
+  ],
+  "gripper_feedback_rate_hz": 500,
+  "physics_dt_s": 0.002,
+  "planned_rates_hz": [
+    50,
+    100,
+    500
+  ],
+  "schema": "p1.8-geophys-diagnostic-sources-v1"
+}

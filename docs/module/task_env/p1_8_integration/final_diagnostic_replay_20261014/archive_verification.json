@@ -1,0 +1,93 @@
+{
+  "schema": "p1.8-archive-verification-v1",
+  "checked_at_utc": "2026-10-14T12:42:51.997220+00:00",
+  "local_archive_tag_count": 9,
+  "remote_archive_tag_count": 9,
+  "tags_match_object_and_peeled_commit": true,
+  "tags": [
+    {
+      "name": "archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83",
+      "local_tag_object": "bbe339975cf7542b4936d574c2178ce0cb5d84d9",
+      "local_commit": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "remote_tag_object": "bbe339975cf7542b4936d574c2178ce0cb5d84d9",
+      "remote_commit": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34",
+      "local_tag_object": "a52ad014d46ee92bd71067b682f85d1ac0f8eae1",
+      "local_commit": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "remote_tag_object": "a52ad014d46ee92bd71067b682f85d1ac0f8eae1",
+      "remote_commit": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a",
+      "local_tag_object": "d7a7a1afdf3eca3d82056980eb199aa8e7004859",
+      "local_commit": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "remote_tag_object": "d7a7a1afdf3eca3d82056980eb199aa8e7004859",
+      "remote_commit": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe",
+      "local_tag_object": "d6c0d7185a35de7e433a4fec81b42d65dd1a7424",
+      "local_commit": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+      "remote_tag_object": "d6c0d7185a35de7e433a4fec81b42d65dd1a7424",
+      "remote_commit": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c",
+      "local_tag_object": "91638c29d16927f9066ffb93cf9c9969bc5b20a4",
+      "local_commit": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "remote_tag_object": "91638c29d16927f9066ffb93cf9c9969bc5b20a4",
+      "remote_commit": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c",
+      "local_tag_object": "062d23ee2c7c731acffaaf5a3aadc3ee2e93313c",
+      "local_commit": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "remote_tag_object": "062d23ee2c7c731acffaaf5a3aadc3ee2e93313c",
+      "remote_commit": "c36e759e8b3cef16147664a107422aa4650f159b",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49",
+      "local_tag_object": "f060f368ed5a91dbb394fce21e4c8f8da24eb456",
+      "local_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "remote_tag_object": "f060f368ed5a91dbb394fce21e4c8f8da24eb456",
+      "remote_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e",
+      "local_tag_object": "52c8d0b0796c6d2056e5d7b5648aaab528cf1942",
+      "local_commit": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "remote_tag_object": "52c8d0b0796c6d2056e5d7b5648aaab528cf1942",
+      "remote_commit": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+      "matches": true
+    },
+    {
+      "name": "archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c",
+      "local_tag_object": "f06f1fe561ac20dd1a9abe5a90bf1261f8cb7392",
+      "local_commit": "8e914da87e1c1afb989b86d5e2807cfecc6d6616",
+      "remote_tag_object": "f06f1fe561ac20dd1a9abe5a90bf1261f8cb7392",
+      "remote_commit": "8e914da87e1c1afb989b86d5e2807cfecc6d6616",
+      "matches": true
+    }
+  ],
+  "redundant_branch_unique_commits_vs_main": 0,
+  "redundant_branch_unique_commits_vs_surviving_branch": 0,
+  "old_worktree_untracked_log_preserved_copy": {
+    "sha256": "a321432be380ad69609f766a7f4f6eb3f6c14bb3242374cd710fd792657d6dc1",
+    "copy_matches_source": true
+  },
+  "surviving_worktree_untracked_log_preserved_copy": {
+    "sha256": "2bbd12caaec637aca600dc5a3ead6f65419ccda7a34eb59f768ea94a837dcbe0",
+    "copy_matches_source": true
+  },
+  "historical_tags_deleted": false,
+  "note": "The redundant integration branch points to current main and contributes no unique commit. Existing nine annotated archive tags are retained unchanged."
+}

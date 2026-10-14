@@ -1,0 +1,402 @@
+{
+  "interpretation": "The original Expert gate fails at descend_to_handle/stable_height_mismatch and remains failed. The diagnostic completes all 11 authored stages; the raw final canonical task metric is task_success=true (Nut inserted and released), and release_retreat endpoint passes. Lifecycle V2 does not validate that as canonical solution success (final_task_success_valid=false; no first_task_success lifecycle event), so these are physical task-predicate successes under diagnostic continuation, not FULL Expert passes or accepted goldens. Terminal reached/grasped/lifted/hovered booleans are false after placement/release; source contact diagnostics show canonical_grasped_nut=true from close_gripper through open_gripper, with the last true sample during open_gripper, so terminal false must not be read as \u201cnever grasped.\u201d",
+  "outcomes": [
+    {
+      "diagnostic_execution": {
+        "complete": true,
+        "release_retreat_endpoint_pass": true,
+        "stages_entered": [
+          "approach_nut",
+          "descend_to_handle",
+          "close_gripper",
+          "verify_lift",
+          "raise_for_transport",
+          "move_above_square_peg",
+          "align_nut_yaw",
+          "descend_to_peg_top",
+          "lower_nut_to_table",
+          "open_gripper",
+          "release_retreat"
+        ],
+        "stop_reason": "DIAGNOSTIC_SEQUENCE_COMPLETED"
+      },
+      "environment": {
+        "terminated": false,
+        "truncated": false
+      },
+      "gate_acceptance": {
+        "expert_complete": false,
+        "expert_failed": true,
+        "failed_stage": "descend_to_handle",
+        "failure_reason": "stable_height_mismatch",
+        "failure_time_s": 3.6399999999998207
+      },
+      "grasp_and_contact_trace": {
+        "canonical_grasped_nut_first_true": {
+          "control_step": 198,
+          "simulation_time_s": 3.9599999999997855,
+          "stage": "close_gripper"
+        },
+        "canonical_grasped_nut_last_true": {
+          "control_step": 1006,
+          "simulation_time_s": 20.119999999999727,
+          "stage": "open_gripper"
+        },
+        "canonical_grasped_nut_true_sample_count": 809,
+        "canonical_grasped_nut_true_samples_by_stage": {
+          "align_nut_yaw": 23,
+          "close_gripper": 32,
+          "descend_to_peg_top": 105,
+          "lower_nut_to_table": 168,
+          "move_above_square_peg": 192,
+          "open_gripper": 11,
+          "raise_for_transport": 130,
+          "verify_lift": 148
+        },
+        "cross_provider_contact_units_compared_directly": false,
+        "interpretation": "Source sidecar confirms task-level grasped state persisted through transport and ended during open_gripper; terminal grasped=false is post-release. GeoPhys pair identity is unavailable, so its body aggregate cannot be directly equated with MuJoCo contact pairs or forces.",
+        "mujoco_d1_first_contact_sample_time_s": 0.02,
+        "mujoco_d1_first_sample_nut_table_contact_count": 20,
+        "mujoco_d1_first_sample_nut_table_geom_names": [
+          "SquareNut_collision_0",
+          "SquareNut_collision_1",
+          "SquareNut_collision_2",
+          "SquareNut_collision_3",
+          "SquareNut_collision_4",
+          "grasp_table_geom"
+        ],
+        "mujoco_d1_first_sample_per_contact_normal_force_native_range": [
+          0.03436622447986409,
+          0.06069282796066083
+        ],
+        "mujoco_d1_target_contact_sample_cadence": "every 10 control boundaries plus final boundary",
+        "rate_hz": 50,
+        "source_contact_granularity": "one sample per outer control boundary; GeoPhys read_body_contact_state body aggregate, not pair-resolved; 500Hz coincides with physics dt 0.002s, 50/100Hz are sparse relative to native substeps",
+        "source_contact_sample_count": 1193,
+        "source_first_active_nut_contact": {
+          "body_contact_active": 1,
+          "control_step": 1,
+          "native_contact_count": 14,
+          "normal_impulse_native": 0.0019609893206506968,
+          "pair_level_contact_available": false,
+          "simulation_time_s": 0.020000000000000004,
+          "stage": "approach_nut",
+          "tangent_impulse_native": 0.0008467695442959666
+        },
+        "source_first_outer_boundary_nut_contact": {
+          "active": 1,
+          "control_step": 1,
+          "native_count": 14,
+          "normal_impulse_native": 0.0019609893206506968,
+          "simulation_time_s": 0.020000000000000004,
+          "tangent_impulse_native": 0.0008467695442959666
+        },
+        "source_pair_level_contact_available": false,
+        "source_sample_cadence_hz": 50
+      },
+      "qualification": {
+        "accepted_golden": "NOT_ELIGIBLE",
+        "full_expert_pass": false,
+        "qualification_status": "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE"
+      },
+      "rate_hz": 50,
+      "task_metric_outcome": {
+        "canonical_task_success_metric": true,
+        "lifecycle_task_success_valid": false,
+        "metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.14829082697809293,
+          "eef_to_nut_dist": 0.16618265242333433,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999992743134499,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5802261829376221,
+          "nut_y": 0.046317338943481445,
+          "nut_yaw": -3.0825264471396174,
+          "nut_z": 0.4716867208480835,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.0013366164191961538,
+          "peg_z_error": -0.0013132791519165354,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.059066206450175684
+        },
+        "physical_task_outcome_label": "PHYSICAL_TASK_SUCCESS",
+        "task_success_first_observed_event_time_s": null,
+        "terminal_snapshot_note": "Terminal intermediate predicates are false after successful insertion/release; source canonical_grasped_nut samples show grasp retention from close_gripper into open_gripper."
+      }
+    },
+    {
+      "diagnostic_execution": {
+        "complete": true,
+        "release_retreat_endpoint_pass": true,
+        "stages_entered": [
+          "approach_nut",
+          "descend_to_handle",
+          "close_gripper",
+          "verify_lift",
+          "raise_for_transport",
+          "move_above_square_peg",
+          "align_nut_yaw",
+          "descend_to_peg_top",
+          "lower_nut_to_table",
+          "open_gripper",
+          "release_retreat"
+        ],
+        "stop_reason": "DIAGNOSTIC_SEQUENCE_COMPLETED"
+      },
+      "environment": {
+        "terminated": false,
+        "truncated": false
+      },
+      "gate_acceptance": {
+        "expert_complete": false,
+        "expert_failed": true,
+        "failed_stage": "descend_to_handle",
+        "failure_reason": "stable_height_mismatch",
+        "failure_time_s": 3.619999999999823
+      },
+      "grasp_and_contact_trace": {
+        "canonical_grasped_nut_first_true": {
+          "control_step": 383,
+          "simulation_time_s": 3.8299999999998,
+          "stage": "close_gripper"
+        },
+        "canonical_grasped_nut_last_true": {
+          "control_step": 2006,
+          "simulation_time_s": 20.05999999999976,
+          "stage": "open_gripper"
+        },
+        "canonical_grasped_nut_true_sample_count": 1624,
+        "canonical_grasped_nut_true_samples_by_stage": {
+          "align_nut_yaw": 45,
+          "close_gripper": 74,
+          "descend_to_peg_top": 209,
+          "lower_nut_to_table": 335,
+          "move_above_square_peg": 383,
+          "open_gripper": 22,
+          "raise_for_transport": 260,
+          "verify_lift": 296
+        },
+        "cross_provider_contact_units_compared_directly": false,
+        "interpretation": "Source sidecar confirms task-level grasped state persisted through transport and ended during open_gripper; terminal grasped=false is post-release. GeoPhys pair identity is unavailable, so its body aggregate cannot be directly equated with MuJoCo contact pairs or forces.",
+        "mujoco_d1_first_contact_sample_time_s": 0.01,
+        "mujoco_d1_first_sample_nut_table_contact_count": 20,
+        "mujoco_d1_first_sample_nut_table_geom_names": [
+          "SquareNut_collision_0",
+          "SquareNut_collision_1",
+          "SquareNut_collision_2",
+          "SquareNut_collision_3",
+          "SquareNut_collision_4",
+          "grasp_table_geom"
+        ],
+        "mujoco_d1_first_sample_per_contact_normal_force_native_range": [
+          0.03607348457616057,
+          0.059131689828563705
+        ],
+        "mujoco_d1_target_contact_sample_cadence": "every 10 control boundaries plus final boundary",
+        "rate_hz": 100,
+        "source_contact_granularity": "one sample per outer control boundary; GeoPhys read_body_contact_state body aggregate, not pair-resolved; 500Hz coincides with physics dt 0.002s, 50/100Hz are sparse relative to native substeps",
+        "source_contact_sample_count": 2380,
+        "source_first_active_nut_contact": {
+          "body_contact_active": 1,
+          "control_step": 2,
+          "native_contact_count": 14,
+          "normal_impulse_native": 0.0019609893206506968,
+          "pair_level_contact_available": false,
+          "simulation_time_s": 0.020000000000000004,
+          "stage": "approach_nut",
+          "tangent_impulse_native": 0.0008467695442959666
+        },
+        "source_first_outer_boundary_nut_contact": {
+          "active": 0,
+          "control_step": 1,
+          "native_count": 0,
+          "normal_impulse_native": 0.0,
+          "simulation_time_s": 0.01,
+          "tangent_impulse_native": 0.0
+        },
+        "source_pair_level_contact_available": false,
+        "source_sample_cadence_hz": 100
+      },
+      "qualification": {
+        "accepted_golden": "NOT_ELIGIBLE",
+        "full_expert_pass": false,
+        "qualification_status": "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE"
+      },
+      "rate_hz": 100,
+      "task_metric_outcome": {
+        "canonical_task_success_metric": true,
+        "lifecycle_task_success_valid": false,
+        "metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.14815760333040046,
+          "eef_to_nut_dist": 0.16612352242962614,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999992743134499,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5802515745162964,
+          "nut_y": 0.04645608738064766,
+          "nut_yaw": -3.0740082719363806,
+          "nut_z": 0.47185584902763367,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.0014776614590101508,
+          "peg_z_error": -0.0011441509723663645,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.06758438165341252
+        },
+        "physical_task_outcome_label": "PHYSICAL_TASK_SUCCESS",
+        "task_success_first_observed_event_time_s": null,
+        "terminal_snapshot_note": "Terminal intermediate predicates are false after successful insertion/release; source canonical_grasped_nut samples show grasp retention from close_gripper into open_gripper."
+      }
+    },
+    {
+      "diagnostic_execution": {
+        "complete": true,
+        "release_retreat_endpoint_pass": true,
+        "stages_entered": [
+          "approach_nut",
+          "descend_to_handle",
+          "close_gripper",
+          "verify_lift",
+          "raise_for_transport",
+          "move_above_square_peg",
+          "align_nut_yaw",
+          "descend_to_peg_top",
+          "lower_nut_to_table",
+          "open_gripper",
+          "release_retreat"
+        ],
+        "stop_reason": "DIAGNOSTIC_SEQUENCE_COMPLETED"
+      },
+      "environment": {
+        "terminated": false,
+        "truncated": false
+      },
+      "gate_acceptance": {
+        "expert_complete": false,
+        "expert_failed": true,
+        "failed_stage": "descend_to_handle",
+        "failure_reason": "stable_height_mismatch",
+        "failure_time_s": 3.619999999999823
+      },
+      "grasp_and_contact_trace": {
+        "canonical_grasped_nut_first_true": {
+          "control_step": 1911,
+          "simulation_time_s": 3.8219999999998007,
+          "stage": "close_gripper"
+        },
+        "canonical_grasped_nut_last_true": {
+          "control_step": 10043,
+          "simulation_time_s": 20.085999999999746,
+          "stage": "open_gripper"
+        },
+        "canonical_grasped_nut_true_sample_count": 8133,
+        "canonical_grasped_nut_true_samples_by_stage": {
+          "align_nut_yaw": 227,
+          "close_gripper": 367,
+          "descend_to_peg_top": 1047,
+          "lower_nut_to_table": 1675,
+          "move_above_square_peg": 1919,
+          "open_gripper": 112,
+          "raise_for_transport": 1303,
+          "verify_lift": 1483
+        },
+        "cross_provider_contact_units_compared_directly": false,
+        "interpretation": "Source sidecar confirms task-level grasped state persisted through transport and ended during open_gripper; terminal grasped=false is post-release. GeoPhys pair identity is unavailable, so its body aggregate cannot be directly equated with MuJoCo contact pairs or forces.",
+        "mujoco_d1_first_contact_sample_time_s": 0.002,
+        "mujoco_d1_first_sample_nut_table_contact_count": 20,
+        "mujoco_d1_first_sample_nut_table_geom_names": [
+          "SquareNut_collision_0",
+          "SquareNut_collision_1",
+          "SquareNut_collision_2",
+          "SquareNut_collision_3",
+          "SquareNut_collision_4",
+          "grasp_table_geom"
+        ],
+        "mujoco_d1_first_sample_per_contact_normal_force_native_range": [
+          0.03755787614236038,
+          0.05760054665168047
+        ],
+        "mujoco_d1_target_contact_sample_cadence": "every 10 control boundaries plus final boundary",
+        "rate_hz": 500,
+        "source_contact_granularity": "one sample per outer control boundary; GeoPhys read_body_contact_state body aggregate, not pair-resolved; 500Hz coincides with physics dt 0.002s, 50/100Hz are sparse relative to native substeps",
+        "source_contact_sample_count": 11914,
+        "source_first_active_nut_contact": {
+          "body_contact_active": 1,
+          "control_step": 8,
+          "native_contact_count": 16,
+          "normal_impulse_native": 0.015697525814175606,
+          "pair_level_contact_available": false,
+          "simulation_time_s": 0.016,
+          "stage": "approach_nut",
+          "tangent_impulse_native": 0.006778774783015251
+        },
+        "source_first_outer_boundary_nut_contact": {
+          "active": 0,
+          "control_step": 1,
+          "native_count": 0,
+          "normal_impulse_native": 0.0,
+          "simulation_time_s": 0.002,
+          "tangent_impulse_native": 0.0
+        },
+        "source_pair_level_contact_available": false,
+        "source_sample_cadence_hz": 500
+      },
+      "qualification": {
+        "accepted_golden": "NOT_ELIGIBLE",
+        "full_expert_pass": false,
+        "qualification_status": "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE"
+      },
+      "rate_hz": 500,
+      "task_metric_outcome": {
+        "canonical_task_success_metric": true,
+        "lifecycle_task_success_valid": false,
+        "metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.1480587261957967,
+          "eef_to_nut_dist": 0.166050463572398,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999991253018379,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5802620053291321,
+          "nut_y": 0.046377211809158325,
+          "nut_yaw": -3.077229604625874,
+          "nut_z": 0.47198083996772766,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.0014019140416368643,
+          "peg_z_error": -0.0010191600322723704,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.06436304896391931
+        },
+        "physical_task_outcome_label": "PHYSICAL_TASK_SUCCESS",
+        "task_success_first_observed_event_time_s": null,
+        "terminal_snapshot_note": "Terminal intermediate predicates are false after successful insertion/release; source canonical_grasped_nut samples show grasp retention from close_gripper into open_gripper."
+      }
+    }
+  ],
+  "schema": "p1.8-geophys-diagnostic-outcomes-v1"
+}

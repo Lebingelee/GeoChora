@@ -113,7 +113,11 @@ class LiveRecording:
 
     def finish(self, report):
         probe = report.get('probe')
-        if probe == 'FULL':
+        if report.get('diagnostic_execution_mode'):
+            stop_reason = (report.get('diagnostic_sequence_stop_reason')
+                           or report.get('failure_boundary')
+                           or 'DIAGNOSTIC_SEQUENCE_INCOMPLETE')
+        elif probe == 'FULL':
             stop_reason = (report.get('completion_reason')
                            if report.get('pass') and report.get('completion_reason')
                            else report.get('failure_boundary') or 'full_expert_incomplete')

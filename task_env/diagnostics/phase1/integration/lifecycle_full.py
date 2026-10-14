@@ -31,6 +31,8 @@ from ....tasks.nut_assembly.guarded_authorization_candidate_v2 import (
     NutAssemblyGuardedAuthorizationCandidateV2,
 )
 from ....controllers.canonical.contracts import digest
+from .diagnostic_shadow import POLICY_ID as DIAGNOSTIC_SHADOW_POLICY_ID
+from .diagnostic_shadow import SOURCE_SHA256 as DIAGNOSTIC_SHADOW_SOURCE_SHA256
 
 
 _CROSS_PROVIDER_CONTRACT_ID = "p1.8-nutassembly-cross-provider-acceptance-v2"
@@ -225,7 +227,8 @@ def run(*, provider: str, rate: int, output: Path,
         collision_ablation: str = "none",
         trajectory_candidate: str = "lifecycle-v2",
         recording_storage_variant: str = "owner-fields-v1",
-        acceptance_contract_id: str | None = None) -> dict:
+        acceptance_contract_id: str | None = None,
+        diagnostic_shadow_mode: bool = False) -> dict:
     if provider not in {"mujoco", "geophys"}:
         raise ValueError("lifecycle FULL supports only GeoPhys and MuJoCo")
     if provider == "geophys" and collision_ablation != "none":
@@ -251,6 +254,20 @@ def run(*, provider: str, rate: int, output: Path,
     value["recording_storage_variant"] = recording_storage_variant
     value["cross_provider_acceptance_contract_id"] = acceptance_contract_id
     value["cross_provider_acceptance_contract_sha256"] = contract_sha256
+    if diagnostic_shadow_mode:
+        if trajectory_candidate != "guarded-primary-readiness-alternative-8n-v2-v5-clearance":
+            raise ValueError("diagnostic shadow mode requires the frozen V5/guarded candidate")
+        if acceptance_contract_id != _CROSS_PROVIDER_CONTRACT_ID:
+            raise ValueError("diagnostic shadow mode requires the pinned P1.8 V2 contract")
+        value["diagnostic_shadow_mode"] = True
+        value["diagnostic_shadow_policy_id"] = DIAGNOSTIC_SHADOW_POLICY_ID
+        value["_recording_role"] = "DIAGNOSTIC_ACTION_SOURCE"
+        value["recipe_identity"] = digest({
+            "frozen_expert_recipe": value["recipe_identity"],
+            "diagnostic_execution_mode": DIAGNOSTIC_SHADOW_POLICY_ID,
+            "diagnostic_shadow_source_sha256": DIAGNOSTIC_SHADOW_SOURCE_SHA256,
+            "expert_failure_semantics": "preserved; never promoted to pass",
+        })
     if collision_ablation != "none" and trajectory_candidate != "lifecycle-v2":
         raise ValueError("collision ablations are restricted to the frozen Lifecycle V2 baseline")
     collision_intervention = None
@@ -259,7 +276,7 @@ def run(*, provider: str, rate: int, output: Path,
     elif collision_ablation != "none":
         raise ValueError(f"unsupported collision ablation: {collision_ablation}")
     value["_loaded_diagnostics"] = True
-    value["_recording_role"] = "full_nutassembly_expert_lifecycle_v2"
+    value.setdefault("_recording_role", "full_nutassembly_expert_lifecycle_v2")
     worker.CLOSE_TIME_LIMIT_S = 1.5
 
     observer = NativeObserver(output) if provider == "mujoco" else None
@@ -352,9 +369,14 @@ def run(*, provider: str, rate: int, output: Path,
         session = result[0]
         if session_provider == "mujoco":
             session._mj = AppliedStepObserver(
-                session._mj, session, observer, lambda: owner_value["solution"].stage
+                session._mj, session, observer,
+                lambda: owner_value.get("_active_execution_solution",
+                                        owner_value["solution"]).stage
             )
-        session._diagnostic_arm_ramp_active = lambda: owner_value["solution"]._lift_released
+        session._diagnostic_arm_ramp_active = lambda: bool(getattr(
+            owner_value.get("_active_execution_solution", owner_value["solution"]),
+            "_lift_released", False
+        ))
         session._diagnostic_arm_ramp_memory = owner_value["_arm_schedule_memory"]
         session.step_control_interval = __import__("types").MethodType(
             ramped_control_interval, session
@@ -381,6 +403,10 @@ def run(*, provider: str, rate: int, output: Path,
                 collision_intervention=collision_intervention,
                 diagnostic_only=bool(collision_intervention),
                 trajectory_candidate=owner_value["solution"].version,
+                diagnostic_execution_mode=(DIAGNOSTIC_SHADOW_POLICY_ID
+                                           if diagnostic_shadow_mode else None),
+                diagnostic_shadow_source_sha256=(DIAGNOSTIC_SHADOW_SOURCE_SHA256
+                                                 if diagnostic_shadow_mode else None),
             )
             if acceptance_contract_id is not None:
                 recipe.update(
@@ -433,6 +459,10 @@ def run(*, provider: str, rate: int, output: Path,
         "cross_provider_acceptance_contract_id": acceptance_contract_id,
         "cross_provider_acceptance_contract_sha256": contract_sha256,
         "qualification": False,
+        "diagnostic_execution_mode": (DIAGNOSTIC_SHADOW_POLICY_ID
+                                      if diagnostic_shadow_mode else None),
+        "diagnostic_shadow_source_sha256": (DIAGNOSTIC_SHADOW_SOURCE_SHA256
+                                            if diagnostic_shadow_mode else None),
     })
     try:
         result = worker.run_loaded(value, provider, output, "FULL")
@@ -510,6 +540,14 @@ def run(*, provider: str, rate: int, output: Path,
         environment_terminated=False,
         environment_truncated=False,
         formal_d0_d2_status="NOT RUN; lifecycle replay readiness check only",
+        diagnostic_execution_mode=(DIAGNOSTIC_SHADOW_POLICY_ID
+                                   if diagnostic_shadow_mode else None),
+        diagnostic_shadow_policy_identity=(
+            digest({"policy_id": DIAGNOSTIC_SHADOW_POLICY_ID,
+                    "source_sha256": DIAGNOSTIC_SHADOW_SOURCE_SHA256,
+                    "recipe_identity": value["recipe_identity"]})
+            if diagnostic_shadow_mode else None
+        ),
         source_head=head,
         dirty_status=status.strip().splitlines(),
         collision_intervention=collision_intervention,
@@ -537,6 +575,8 @@ def run(*, provider: str, rate: int, output: Path,
         if collision_intervention else
         "FROZEN_GOLDEN_CANDIDATE_REVIEW_PENDING" if result.get("pass") else "NOT_ELIGIBLE"
     )
+    if diagnostic_shadow_mode:
+        result["qualification_status"] = "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE"
     worker._write(output / "full_expert_result.json", result)
     source_paths = {
         "lifecycle_core": Path("task_env/tasks/canonical_solution_lifecycle.py"),
@@ -562,6 +602,8 @@ def run(*, provider: str, rate: int, output: Path,
             "task_env/tasks/nut_assembly/guarded_authorization_candidate.py"),
         "guarded_authorization_candidate_v2": Path(
             "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py"),
+        "diagnostic_shadow_coordinator": Path(
+            "task_env/diagnostics/phase1/integration/diagnostic_shadow.py"),
     }
     manifest = {
         "schema": "p1.8-canonical-solution-lifecycle-evidence-v1",
@@ -582,6 +624,10 @@ def run(*, provider: str, rate: int, output: Path,
         "reset_sample_hash": result.get("reset_sample_hash"),
         "source_sha256": {name: _sha(path) for name, path in source_paths.items()},
         "result_sha256": _sha(output / "full_expert_result.json"),
+        "diagnostic_shadow_events_sha256": (
+            _sha(output / "diagnostic_shadow_events.json")
+            if diagnostic_shadow_mode else None
+        ),
         "execution_h5": result.get("live_recording", {}).get("path"),
         "execution_h5_sha256": (
             _sha(Path(result["live_recording"]["path"]))
@@ -589,8 +635,13 @@ def run(*, provider: str, rate: int, output: Path,
         ),
         "development_only": True,
         "qualification_status": (
+            "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE" if diagnostic_shadow_mode else
             "NOT_ELIGIBLE_DIAGNOSTIC_ONLY" if collision_intervention else "REVIEW_PENDING"
         ),
+        "diagnostic_execution_mode": (DIAGNOSTIC_SHADOW_POLICY_ID
+                                      if diagnostic_shadow_mode else None),
+        "diagnostic_shadow_source_sha256": (DIAGNOSTIC_SHADOW_SOURCE_SHA256
+                                            if diagnostic_shadow_mode else None),
     }
     worker._write(output / "full_expert_evidence_manifest.json", manifest)
     return result
@@ -616,19 +667,25 @@ def main() -> int:
     parser.add_argument("--recording-storage-variant", choices=recording_module.STORAGE_VARIANTS,
                         default=recording_module.STORAGE_VARIANTS[0])
     parser.add_argument("--acceptance-contract-id", choices=(_CROSS_PROVIDER_CONTRACT_ID,))
+    parser.add_argument("--diagnostic-shadow-mode", action="store_true",
+                        help="Continue authored stage plans in a separate diagnostic shadow after nonterminal Expert gate failures.")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run(provider=args.provider, rate=args.rate, output=args.output,
                  collision_ablation=args.collision_ablation,
                  trajectory_candidate=args.trajectory_candidate,
                  recording_storage_variant=args.recording_storage_variant,
-                 acceptance_contract_id=args.acceptance_contract_id)
+                 acceptance_contract_id=args.acceptance_contract_id,
+                 diagnostic_shadow_mode=args.diagnostic_shadow_mode)
     print(json.dumps({key: report.get(key) for key in (
         "pass", "failure_boundary", "expert_complete", "expert_failed",
         "completion_reason", "canonical_task_success", "coordinator_stage_sequence",
-        "release_retreat_endpoint_pass", "live_recording",
+        "release_retreat_endpoint_pass", "diagnostic_execution_mode",
+        "diagnostic_sequence_stop_reason", "diagnostic_sequence_complete",
+        "physical_task_outcome", "live_recording",
     )}, indent=2, allow_nan=False), flush=True)
-    return 0 if report.get("pass") and report.get("live_recording", {}).get("roundtrip_exact") else 1
+    return 0 if (report.get("pass") or args.diagnostic_shadow_mode) and report.get(
+        "live_recording", {}).get("roundtrip_exact") else 1
 
 
 if __name__ == "__main__":

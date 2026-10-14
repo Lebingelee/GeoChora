@@ -1,0 +1,15 @@
+{
+  "schema": "p1.8-surviving-branch-manifest-v1",
+  "branch": "codex/p1.8-frequency-robust-grasp",
+  "head_before_final_commit": "bc34b0e58b12d63ae808273e28c79b79f2272ad6",
+  "public_main": "9988cf700ac1b5f7ae9ba0a284deda4fa2141917",
+  "main_is_ancestor": true,
+  "ahead_behind_main": {
+    "main_only": 0,
+    "branch_only": 17
+  },
+  "publication_status": "PENDING",
+  "public_branch_url": "https://github.com/Lebingelee/GeoChora/tree/codex/p1.8-frequency-robust-grasp",
+  "main_modified": false,
+  "historical_qualification_changed": false
+}

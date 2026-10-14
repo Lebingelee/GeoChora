@@ -1,0 +1,33 @@
+{
+  "candidate": "guarded-primary-readiness-alternative-8n-v2-v5-clearance",
+  "controller_planner_solver_changes": [],
+  "d0_semantics": "same-provider diagnostic source reconstruction; not normal Expert reconstruction",
+  "d1_semantics": "replay frozen native CanonicalControlTarget and AppliedControl stream; do not recompute controller",
+  "d2_semantics": "replay frozen RequestedAction sequence and recompute controller from target live state; diagnostic schedule remains source-authored; label DIAGNOSTIC_D2_FROZEN_ACTION_EXECUTION",
+  "default_enabled": false,
+  "environment_termination_semantics": "source runner records false/false; replay runtime has no Gym terminated/truncated return, so replay reports null and action-sequence exhaustion independently",
+  "original_expert_state": "failure and original failed gate preserved; never converted to pass",
+  "permitted_target_providers": [
+    "GeoPhys",
+    "MuJoCo"
+  ],
+  "physics_changes": [],
+  "policy_id": "nutassembly-full-trajectory-observation-v1",
+  "progression_owner": "separate DiagnosticShadowCoordinator; canonical Expert is not mutated or reset",
+  "progression_rule": "continue only authored next-stage plans after nonterminal Expert gate failure",
+  "qualification_contract_id": "p1.8-nutassembly-cross-provider-acceptance-v2",
+  "qualification_status": "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE",
+  "schema": "p1.8-diagnostic-execution-contract-v1",
+  "source_provider": "GeoPhys",
+  "stop_conditions": [
+    "authored sequence complete",
+    "runtime termination",
+    "runtime truncation",
+    "action budget exhausted",
+    "runtime/capability failure",
+    "plan unavailable"
+  ],
+  "task_artifact_identity": "rate-specific canonical TaskArtifact; fixed 0.002s physics step",
+  "task_semantics_changes": [],
+  "threshold_changes": []
+}

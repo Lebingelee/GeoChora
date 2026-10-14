@@ -173,8 +173,10 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
     previous_state = state
     request = RequestedAction("absolute_pose", "world", "quaternion_wxyz", tuple(map(float, action)))
     recording = value.get('_live_recording')
+    diagnostics = dict(diagnostics)
+    recorded_expert_stage = diagnostics.pop("_recorded_expert_stage", stage)
     if recording is not None:
-        recording.begin(state, request, stage, diagnostics)
+        recording.begin(state, request, recorded_expert_stage, diagnostics)
     canonical, target = controller.compute(state, feedback, request)
     if recording is not None:
         recording.canonical = canonical
@@ -189,7 +191,7 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
                     index, sample_state,
                     sample_feedback, target, applied, substep_diagnostics,
                 )
-            solution = value["solution"]
+            solution = value.get("_active_execution_solution", value["solution"])
             if stage == "close_gripper" and callable(
                     getattr(solution, "make_native_guard_sample", None)):
                 _sample_obs, sample_info, _sample_evaluation = observation(
@@ -759,6 +761,17 @@ def run_loaded(value, provider, folder, probe):
         artifact, solution = value["artifact"], value["solution"]
         obs, info, evaluation = observation(state, artifact)
         solution.reset(obs, info, METADATA)
+        diagnostic_mode = bool(value.get("diagnostic_shadow_mode", False))
+        shadow_coordinator = None
+        if diagnostic_mode:
+            from ..integration.diagnostic_shadow import DiagnosticShadowCoordinator
+            shadow_coordinator = DiagnosticShadowCoordinator(solution)
+            shadow_coordinator.record(
+                "stage_entered", time_s=state.simulation_time,
+                control_step=state.control_step, stage=solution.stage,
+                entered_by="canonical_expert",
+            )
+            value["_active_execution_solution"] = solution
         recording_factory = value.get('live_recording_factory')
         recording = recording_factory(value, provider, session, audit, sample, realized, state, feedback, info) if recording_factory else None
         if recording is not None:
@@ -779,14 +792,43 @@ def run_loaded(value, provider, folder, probe):
                      "align_nut_yaw", "descend_to_peg_top")
         capture_stages = set(t1_stages) | {"lower_nut_to_table"}
         auth_ticks = value["solution"]._ticks(value["profile"]["solution"]["fallback_window_s"])
-        while not solution.done and not solution.failed:
-            public = solution.act()
-            before_stage = solution.stage
+        while True:
+            if diagnostic_mode:
+                actor = shadow_coordinator.active
+                if actor.done:
+                    shadow_coordinator.stop_reason = "DIAGNOSTIC_SEQUENCE_COMPLETED"
+                    break
+                if actor.failed:
+                    continued = shadow_coordinator.advance_after_failure(
+                        reason=actor.failure_reason, obs=obs, info=info,
+                        control_step=state.control_step,
+                        time_s=state.simulation_time,
+                    )
+                    if not continued:
+                        break
+                    actor = shadow_coordinator.active
+            else:
+                if solution.done or solution.failed:
+                    break
+                actor = solution
+            public = actor.act()
+            before_stage = actor.stage
+            recorded_expert_stage = solution.stage
             if before_stage == "close_gripper" and close_start_time is None:
                 close_start_time = state.simulation_time
-            goal_before = solution._goal.copy()
+            goal_before = actor._goal.copy()
             plan_duration = stage_plan_duration.get(before_stage)
             diagnostics = dict(public.diagnostics)
+            if diagnostic_mode:
+                diagnostics.update(
+                    diagnostic_execution_mode="nutassembly-full-trajectory-observation-v1",
+                    diagnostic_shadow_stage=before_stage,
+                    diagnostic_shadow_action_index=int(public.diagnostics.get("stage_step", 0)),
+                    diagnostic_shadow_state=shadow_coordinator.state_mapping(actor),
+                    diagnostic_arm_ramp_active=bool(getattr(actor, "_lift_released", False)),
+                    _recorded_expert_stage=recorded_expert_stage,
+                )
+                value["_active_execution_solution"] = actor
             if before_stage == "verify_lift" and capture_baseline is None:
                 capture_baseline = _relative_pose(state)
             state, feedback, obs, info, evaluation, row = _execute(
@@ -833,13 +875,26 @@ def run_loaded(value, provider, folder, probe):
             stage_rows.setdefault(before_stage, []).append(row)
             trace.append(row)
             readiness = controller.readiness(state, feedback)
-            if callable(getattr(solution, "observe_guarded_transition", None)):
-                solution.observe(
-                    obs, evaluation.reward, False, False, info, readiness=readiness,
+            if actor is solution:
+                if not solution.failed and not solution.done:
+                    if callable(getattr(solution, "observe_guarded_transition", None)):
+                        solution.observe(
+                            obs, evaluation.reward, False, False, info, readiness=readiness,
+                            transition_samples=row.get("transition_guard_samples", []),
+                        )
+                    else:
+                        solution.observe(obs, evaluation.reward, False, False, info,
+                                         readiness=readiness)
+            elif diagnostic_mode:
+                shadow_coordinator.observe_shadow(
+                    obs, evaluation.reward, info, readiness,
+                    control_step=state.control_step, time_s=state.simulation_time,
                     transition_samples=row.get("transition_guard_samples", []),
                 )
-            else:
-                solution.observe(obs, evaluation.reward, False, False, info, readiness=readiness)
+            actor_stage_after_observe = actor.stage
+            actor_failed_after_observe = bool(actor.failed)
+            actor_failure_reason = actor.failure_reason if actor_failed_after_observe else None
+            actor_done_after_observe = bool(actor.done)
             if value.get('_live_recording') is not None:
                 value['_live_recording'].complete(state, feedback, info, evaluation, row)
             contact_row = row.pop("_native_contact_diagnostic", None)
@@ -855,20 +910,81 @@ def run_loaded(value, provider, folder, probe):
                 }
                 native_contact_stream.write(json.dumps(contact_item, sort_keys=True, allow_nan=False) + "\n")
                 native_contact_count += 1
-            after_stage = solution.stage
+            next_actor = actor
+            if diagnostic_mode:
+                if actor_failed_after_observe:
+                    continued = shadow_coordinator.advance_after_failure(
+                        reason=actor_failure_reason, obs=obs, info=info,
+                        control_step=state.control_step,
+                        time_s=state.simulation_time,
+                    )
+                    next_actor = shadow_coordinator.active
+                    if not continued:
+                        next_actor = None
+                elif actor_done_after_observe:
+                    shadow_coordinator.stop_reason = "DIAGNOSTIC_SEQUENCE_COMPLETED"
+                    shadow_coordinator.record(
+                        "diagnostic_sequence_completed", time_s=state.simulation_time,
+                        control_step=state.control_step, final_stage=before_stage,
+                        final_stage_gate_pass=True,
+                    )
+                elif actor_stage_after_observe != before_stage:
+                    next_actor = actor
+                    shadow_coordinator.stage_sequence.append(actor_stage_after_observe)
+                    shadow_coordinator.record(
+                        "stage_readiness_passed", time_s=state.simulation_time,
+                        control_step=state.control_step, stage=before_stage,
+                        expert_gate_pass=(actor is solution),
+                    )
+                    shadow_coordinator.record(
+                        "stage_entered", time_s=state.simulation_time,
+                        control_step=state.control_step,
+                        stage=actor_stage_after_observe,
+                        entered_by=("canonical_expert" if actor is solution
+                                    else "diagnostic_shadow_readiness"),
+                    )
+                after_stage = (next_actor.stage if next_actor is not None
+                               else actor_stage_after_observe)
+            else:
+                after_stage = solution.stage
             if value.get('recording_transition_limit') and len(trace) >= value['recording_transition_limit']:
                 break
             stage_entered_next = after_stage != before_stage
             terminal_stage_completed = bool(
-                solution.done and before_stage == solution.STAGES[-1]
+                actor_done_after_observe and before_stage == actor.STAGES[-1]
             )
-            if stage_entered_next or terminal_stage_completed:
+            diagnostic_terminal = bool(
+                diagnostic_mode and next_actor is None
+                and shadow_coordinator.stop_reason == "DIAGNOSTIC_SEQUENCE_COMPLETED"
+            )
+            if stage_entered_next or terminal_stage_completed or diagnostic_terminal:
                 endpoint = _stage_endpoint(before_stage, stage_rows[before_stage], value)
                 endpoints.append(endpoint)
+                if diagnostic_mode:
+                    executed_rows = stage_rows[before_stage]
+                    shadow_coordinator.record(
+                        "stage_actions_executed",
+                        time_s=state.simulation_time,
+                        control_step=state.control_step,
+                        stage=before_stage,
+                        control_intervals_executed=len(executed_rows),
+                        planned_trajectory_duration_s=stage_plan_duration.get(before_stage),
+                        readiness_hold_intervals=sum(
+                            bool(item.get("readiness_hold", False))
+                            for item in executed_rows
+                        ),
+                        pose_gate_pass=bool(endpoint.get("pose_gate_pass", False)),
+                        capture_gate_pass=bool(endpoint.get("capture_gate_pass", False)),
+                        expert_gate_pass=(
+                            bool(endpoint.get("pose_gate_pass", False)
+                                 and endpoint.get("capture_gate_pass", False))
+                            if actor is solution else False
+                        ),
+                    )
                 if before_stage == "close_gripper":
                     guarded_policy = value.get("close_authorization_policy")
                     if guarded_policy:
-                        authorization_event = next((event for event in solution.events
+                        authorization_event = next((event for event in getattr(actor, "events", [])
                             if event.get("event") == "close_transition_authorized"), None)
                         selected = authorization_event.get("authorization_guard_id") if authorization_event else None
                         authorization_evidence = authorization_event or {}
@@ -951,7 +1067,10 @@ def run_loaded(value, provider, folder, probe):
                     break
                 if stage_entered_next:
                     stage_entry[after_stage] = state.simulation_time
-                    stage_plan_duration[after_stage] = len(solution._actions) * artifact.timebase.control_dt
+                    plan_owner = next_actor if next_actor is not None else actor
+                    stage_plan_duration[after_stage] = len(plan_owner._actions) * artifact.timebase.control_dt
+            if diagnostic_mode and (next_actor is None or actor_done_after_observe):
+                break
         if solution.failed:
             report["failure_boundary"] = "nutassembly_solution/" + str(solution.failure_reason)
         goal_stages = ("verify_lift",) if probe == "G0" else t1_stages
@@ -1140,6 +1259,55 @@ def run_loaded(value, provider, folder, probe):
             first_failed_stage_endpoint=first_failed_endpoint,
             native_contact_boundary_count=native_contact_count,
         )
+        if diagnostic_mode:
+            diagnostic_stop_reason = shadow_coordinator.stop_reason
+            if diagnostic_stop_reason is None:
+                diagnostic_stop_reason = (
+                    "DIAGNOSTIC_SEQUENCE_INCOMPLETE"
+                    if value.get("recording_transition_limit") else
+                    "ACTION_BUDGET_EXHAUSTED" if solution.failure_reason ==
+                    "canonical_solution_action_budget" else
+                    "DIAGNOSTIC_SEQUENCE_INCOMPLETE"
+                )
+            task_success_now = bool(info.get("task_metrics", {}).get("task_success",
+                                                                    info.get("is_success", False)))
+            outcome_categories = [
+                "PHYSICAL_TASK_SUCCESS" if task_success_now else "PHYSICAL_TASK_FAILED",
+                diagnostic_stop_reason,
+            ]
+            report.update(
+                diagnostic_execution_mode="nutassembly-full-trajectory-observation-v1",
+                diagnostic_action_source="DIAGNOSTIC_ACTION_SOURCE" if trace else None,
+                diagnostic_sequence_stop_reason=diagnostic_stop_reason,
+                diagnostic_sequence_complete=(diagnostic_stop_reason ==
+                                              "DIAGNOSTIC_SEQUENCE_COMPLETED"),
+                diagnostic_stage_sequence=list(shadow_coordinator.stage_sequence),
+                diagnostic_stage_events=shadow_coordinator.ordered_events(),
+                original_expert_gate_outcome={
+                    "expert_complete": bool(solution.done),
+                    "expert_failed": bool(solution.failed),
+                    "failure_reason": solution.failure_reason,
+                    "gate_failure_is_preserved": bool(solution.failed),
+                },
+                physical_task_outcome=("PHYSICAL_TASK_SUCCESS" if task_success_now
+                                       else "PHYSICAL_TASK_FAILED"),
+                environment_terminated=False,
+                environment_truncated=False,
+                diagnostic_outcome_categories=outcome_categories,
+                task_success_first_observed=(
+                    lifecycle_state.get("first_task_success_time_s")
+                    if lifecycle_state else None
+                ),
+                task_metrics_final=dict(info.get("task_metrics", {})),
+                actual_stop_reason=diagnostic_stop_reason,
+                diagnostic_execution_valid=bool(trace and audit is not None),
+            )
+            _write(folder / "diagnostic_shadow_events.json",
+                   {"policy_id": "nutassembly-full-trajectory-observation-v1",
+                    "source_expert_identity": value["solution_identity"],
+                    "stage_sequence": shadow_coordinator.stage_sequence,
+                    "events": shadow_coordinator.ordered_events(),
+                    "stop_reason": diagnostic_stop_reason})
         report["pass"] = report.pop("pass_")
         if report["pass"]:
             report["failure_boundary"] = None
@@ -1157,6 +1325,15 @@ def run_loaded(value, provider, folder, probe):
     except Exception as exc:
         report.update(failure_boundary=report.get("failure_boundary") or probe + "_execution",
                       error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
+        if value.get("diagnostic_shadow_mode"):
+            report.update(
+                diagnostic_execution_mode="nutassembly-full-trajectory-observation-v1",
+                diagnostic_sequence_stop_reason="RUNTIME_ERROR",
+                diagnostic_sequence_complete=False,
+                physical_task_outcome="PHYSICAL_TASK_FAILED",
+                diagnostic_outcome_categories=["RUNTIME_ERROR", "PHYSICAL_TASK_FAILED"],
+                diagnostic_execution_valid=False,
+            )
     finally:
         report['native_contact_boundary_count'] = native_contact_count
         report['contact_sidecar_storage'] = 'streamed-boundary-jsonl-v1'

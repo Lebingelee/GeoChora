@@ -1,0 +1,194 @@
+{
+  "rates": [
+    {
+      "canonical_grasped_nut_first_true": {
+        "control_step": 198,
+        "simulation_time_s": 3.9599999999997855,
+        "stage": "close_gripper"
+      },
+      "canonical_grasped_nut_last_true": {
+        "control_step": 1006,
+        "simulation_time_s": 20.119999999999727,
+        "stage": "open_gripper"
+      },
+      "canonical_grasped_nut_true_sample_count": 809,
+      "canonical_grasped_nut_true_samples_by_stage": {
+        "align_nut_yaw": 23,
+        "close_gripper": 32,
+        "descend_to_peg_top": 105,
+        "lower_nut_to_table": 168,
+        "move_above_square_peg": 192,
+        "open_gripper": 11,
+        "raise_for_transport": 130,
+        "verify_lift": 148
+      },
+      "cross_provider_contact_units_compared_directly": false,
+      "interpretation": "Source sidecar confirms task-level grasped state persisted through transport and ended during open_gripper; terminal grasped=false is post-release. GeoPhys pair identity is unavailable, so its body aggregate cannot be directly equated with MuJoCo contact pairs or forces.",
+      "mujoco_d1_first_contact_sample_time_s": 0.02,
+      "mujoco_d1_first_sample_nut_table_contact_count": 20,
+      "mujoco_d1_first_sample_nut_table_geom_names": [
+        "SquareNut_collision_0",
+        "SquareNut_collision_1",
+        "SquareNut_collision_2",
+        "SquareNut_collision_3",
+        "SquareNut_collision_4",
+        "grasp_table_geom"
+      ],
+      "mujoco_d1_first_sample_per_contact_normal_force_native_range": [
+        0.03436622447986409,
+        0.06069282796066083
+      ],
+      "mujoco_d1_target_contact_sample_cadence": "every 10 control boundaries plus final boundary",
+      "rate_hz": 50,
+      "source_contact_granularity": "one sample per outer control boundary; GeoPhys read_body_contact_state body aggregate, not pair-resolved; 500Hz coincides with physics dt 0.002s, 50/100Hz are sparse relative to native substeps",
+      "source_contact_sample_count": 1193,
+      "source_first_active_nut_contact": {
+        "body_contact_active": 1,
+        "control_step": 1,
+        "native_contact_count": 14,
+        "normal_impulse_native": 0.0019609893206506968,
+        "pair_level_contact_available": false,
+        "simulation_time_s": 0.020000000000000004,
+        "stage": "approach_nut",
+        "tangent_impulse_native": 0.0008467695442959666
+      },
+      "source_first_outer_boundary_nut_contact": {
+        "active": 1,
+        "control_step": 1,
+        "native_count": 14,
+        "normal_impulse_native": 0.0019609893206506968,
+        "simulation_time_s": 0.020000000000000004,
+        "tangent_impulse_native": 0.0008467695442959666
+      },
+      "source_pair_level_contact_available": false,
+      "source_sample_cadence_hz": 50
+    },
+    {
+      "canonical_grasped_nut_first_true": {
+        "control_step": 383,
+        "simulation_time_s": 3.8299999999998,
+        "stage": "close_gripper"
+      },
+      "canonical_grasped_nut_last_true": {
+        "control_step": 2006,
+        "simulation_time_s": 20.05999999999976,
+        "stage": "open_gripper"
+      },
+      "canonical_grasped_nut_true_sample_count": 1624,
+      "canonical_grasped_nut_true_samples_by_stage": {
+        "align_nut_yaw": 45,
+        "close_gripper": 74,
+        "descend_to_peg_top": 209,
+        "lower_nut_to_table": 335,
+        "move_above_square_peg": 383,
+        "open_gripper": 22,
+        "raise_for_transport": 260,
+        "verify_lift": 296
+      },
+      "cross_provider_contact_units_compared_directly": false,
+      "interpretation": "Source sidecar confirms task-level grasped state persisted through transport and ended during open_gripper; terminal grasped=false is post-release. GeoPhys pair identity is unavailable, so its body aggregate cannot be directly equated with MuJoCo contact pairs or forces.",
+      "mujoco_d1_first_contact_sample_time_s": 0.01,
+      "mujoco_d1_first_sample_nut_table_contact_count": 20,
+      "mujoco_d1_first_sample_nut_table_geom_names": [
+        "SquareNut_collision_0",
+        "SquareNut_collision_1",
+        "SquareNut_collision_2",
+        "SquareNut_collision_3",
+        "SquareNut_collision_4",
+        "grasp_table_geom"
+      ],
+      "mujoco_d1_first_sample_per_contact_normal_force_native_range": [
+        0.03607348457616057,
+        0.059131689828563705
+      ],
+      "mujoco_d1_target_contact_sample_cadence": "every 10 control boundaries plus final boundary",
+      "rate_hz": 100,
+      "source_contact_granularity": "one sample per outer control boundary; GeoPhys read_body_contact_state body aggregate, not pair-resolved; 500Hz coincides with physics dt 0.002s, 50/100Hz are sparse relative to native substeps",
+      "source_contact_sample_count": 2380,
+      "source_first_active_nut_contact": {
+        "body_contact_active": 1,
+        "control_step": 2,
+        "native_contact_count": 14,
+        "normal_impulse_native": 0.0019609893206506968,
+        "pair_level_contact_available": false,
+        "simulation_time_s": 0.020000000000000004,
+        "stage": "approach_nut",
+        "tangent_impulse_native": 0.0008467695442959666
+      },
+      "source_first_outer_boundary_nut_contact": {
+        "active": 0,
+        "control_step": 1,
+        "native_count": 0,
+        "normal_impulse_native": 0.0,
+        "simulation_time_s": 0.01,
+        "tangent_impulse_native": 0.0
+      },
+      "source_pair_level_contact_available": false,
+      "source_sample_cadence_hz": 100
+    },
+    {
+      "canonical_grasped_nut_first_true": {
+        "control_step": 1911,
+        "simulation_time_s": 3.8219999999998007,
+        "stage": "close_gripper"
+      },
+      "canonical_grasped_nut_last_true": {
+        "control_step": 10043,
+        "simulation_time_s": 20.085999999999746,
+        "stage": "open_gripper"
+      },
+      "canonical_grasped_nut_true_sample_count": 8133,
+      "canonical_grasped_nut_true_samples_by_stage": {
+        "align_nut_yaw": 227,
+        "close_gripper": 367,
+        "descend_to_peg_top": 1047,
+        "lower_nut_to_table": 1675,
+        "move_above_square_peg": 1919,
+        "open_gripper": 112,
+        "raise_for_transport": 1303,
+        "verify_lift": 1483
+      },
+      "cross_provider_contact_units_compared_directly": false,
+      "interpretation": "Source sidecar confirms task-level grasped state persisted through transport and ended during open_gripper; terminal grasped=false is post-release. GeoPhys pair identity is unavailable, so its body aggregate cannot be directly equated with MuJoCo contact pairs or forces.",
+      "mujoco_d1_first_contact_sample_time_s": 0.002,
+      "mujoco_d1_first_sample_nut_table_contact_count": 20,
+      "mujoco_d1_first_sample_nut_table_geom_names": [
+        "SquareNut_collision_0",
+        "SquareNut_collision_1",
+        "SquareNut_collision_2",
+        "SquareNut_collision_3",
+        "SquareNut_collision_4",
+        "grasp_table_geom"
+      ],
+      "mujoco_d1_first_sample_per_contact_normal_force_native_range": [
+        0.03755787614236038,
+        0.05760054665168047
+      ],
+      "mujoco_d1_target_contact_sample_cadence": "every 10 control boundaries plus final boundary",
+      "rate_hz": 500,
+      "source_contact_granularity": "one sample per outer control boundary; GeoPhys read_body_contact_state body aggregate, not pair-resolved; 500Hz coincides with physics dt 0.002s, 50/100Hz are sparse relative to native substeps",
+      "source_contact_sample_count": 11914,
+      "source_first_active_nut_contact": {
+        "body_contact_active": 1,
+        "control_step": 8,
+        "native_contact_count": 16,
+        "normal_impulse_native": 0.015697525814175606,
+        "pair_level_contact_available": false,
+        "simulation_time_s": 0.016,
+        "stage": "approach_nut",
+        "tangent_impulse_native": 0.006778774783015251
+      },
+      "source_first_outer_boundary_nut_contact": {
+        "active": 0,
+        "control_step": 1,
+        "native_count": 0,
+        "normal_impulse_native": 0.0,
+        "simulation_time_s": 0.002,
+        "tangent_impulse_native": 0.0
+      },
+      "source_pair_level_contact_available": false,
+      "source_sample_cadence_hz": 500
+    }
+  ],
+  "schema": "p1.8-diagnostic-contact-state-summary-v1"
+}
