@@ -1,24 +1,24 @@
 {
   "compact_deliverables": {
     "P1.8_Final_Diagnostic_Replay_and_Branch_Integration_Report.md": {
-      "bytes": 9495,
-      "sha256": "297b1cb2fd72526e4d258197d48e84d3059ba2e241e483bbd85b403204b79db4"
+      "bytes": 9611,
+      "sha256": "93ba6fe75b48258185afe5ce0795ebb8d676147a69bf490f750ca543154ff5b1"
     },
     "archive_verification.json": {
-      "bytes": 4305,
-      "sha256": "ee95cb83a184af4dbd010aceee4814ad75b01255d1831760e7f99deaba50b4af"
+      "bytes": 4674,
+      "sha256": "c1520c8e879184b6b4856a62315bbb1d05ae7630fdcdb7acaba89d50f682b270"
     },
     "branch_ancestry_report.md": {
-      "bytes": 731,
-      "sha256": "a8f5e790ac5135197024bd9f76089d25ae697556124805c32b105eaf21a5084e"
+      "bytes": 931,
+      "sha256": "da0f20a1c7f2aca9e51e1eda27c38f86f0de63d89f2adba90411ba0b56549b86"
     },
     "branch_cleanup_report.md": {
-      "bytes": 560,
-      "sha256": "6d84305a63ce4f60176f01b4115f165dac7670713e5ffbcdb15c0e324c2f97d1"
+      "bytes": 1195,
+      "sha256": "84e293a8b8b148d9d20fb27a147385c958bbaef8dbd6acb63985df9102e9e73e"
     },
     "branch_inventory.json": {
-      "bytes": 7380,
-      "sha256": "4601824f24676ac090857f47c98d17e14440d8d16532ca4ea12e17079590c506"
+      "bytes": 7258,
+      "sha256": "fd550f7407d890c1de41c0d43b11758f4689f1dd19fef634181a9bd868f985ab"
     },
     "consolidated_regression_results.json": {
       "bytes": 1372,
@@ -61,24 +61,24 @@
       "sha256": "deee3bdf0096ec3e25c53227c9f274aac4e8d99918e0a0e5f51ef0bbf8fc5bed"
     },
     "integration_readiness_report.md": {
-      "bytes": 992,
-      "sha256": "ab896e78d401b1bd6c4dbb569c4f32a5f10ed13f3951a2cf406096b1b57f379d"
+      "bytes": 956,
+      "sha256": "25c159b6ec438010ff5ff2ef6381d916bdcf9077a79770a9b21c5028384db9d8"
     },
     "replay_resource_profile.json": {
       "bytes": 10308,
       "sha256": "9305ebf710b6991aadf10465524fd63f6d74d68631b41b88d211eb9a159847fe"
     },
     "source_consolidation_report.md": {
-      "bytes": 891,
-      "sha256": "8136e6dd09fb15df3be468021edff14539c327c8b04411e5536a274aca853eaf"
+      "bytes": 851,
+      "sha256": "695301454446bd6c189f6f2e22db724092fee533cb28464a0c16c4cee475b33f"
     },
     "source_identity_reconciliation.json": {
       "bytes": 12611,
       "sha256": "2610dd7595b92daba9ec8b5bc3a806581c1f3d6777496437e9a1c6409ece38a6"
     },
     "surviving_branch_manifest.json": {
-      "bytes": 546,
-      "sha256": "79127555f1986373b41d68885c7711d33e6fb19b2719f5d80cad7cb60ba7f7fe"
+      "bytes": 916,
+      "sha256": "062f60107e95d0934684193e5039990a3ab3e7603e3608e86afc80b3a0e01ace"
     }
   },
   "implementation_and_test_sources": {
@@ -279,6 +279,10 @@
   "verification": {
     "targeted_test_suite": "66 passed, 0 failed, 2.36 s, geochora Conda env",
     "git_diff_check": "PASS",
-    "generated_at": "2026-10-14"
+    "branch_publication": "verified ordinary fast-forward push",
+    "active_p1_8_branch_count_local": 1,
+    "active_p1_8_branch_count_remote": 1,
+    "main_modified": false,
+    "generated_at_utc": "2026-10-14T12:45:26.504880+00:00"
   }
 }

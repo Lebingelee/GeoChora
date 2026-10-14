@@ -1,7 +1,5 @@
 # P1.8 Integration Readiness
 
-The active branch is structurally ready for development review: it is based on current `main`, contains the diagnostic implementation/tests, and has a completed 50/100/500 Hz GeoPhys diagnostic source matrix plus D1/D2 cross-provider replay results. The compact results are versioned here; large H5 trajectories and native traces remain in ignored local Evidence.
+The diagnostic implementation and compact evidence are committed and published on `codex/p1.8-frequency-robust-grasp` (diagnostic commit `4c91720ffe35e11210199295fdf98325eb079d9e`; cleanup receipt is recorded in this documentation commit). The branch contains current `main` `9988cf700ac1b5f7ae9ba0a284deda4fa2141917`, is ahead by 18 commits at verification, and is the sole active P1.8 branch on local and public refs. All nine P1.8 archive tags remain.
 
-Readiness is not qualification. All diagnostic sources preserve an original Expert failure at `descend_to_handle/stable_height_mismatch`; the diagnostic shadow reaches the authored terminal stage, but Lifecycle V2 does not recognize terminal task success as lifecycle-valid success. D0 reconstruction is partial and first diverges at transition 157. Cross-provider replay is diagnostic, not formal symmetric P1.8 qualification. Human review and remaining formal P1.8 prerequisites are still required.
-
-Remote publication, redundant branch cleanup and final one-branch verification remain pending.
+This is development-review readiness, not qualification. All diagnostic sources preserve the original Expert failure at `descend_to_handle/stable_height_mismatch`. The diagnostic shadow reaches the authored terminal stage and raw physical task predicates become true, but Lifecycle V2 does not validate success after the Expert failure. D0 is partial/invalid; D1 and D2 are diagnostic replay results. Formal cross-provider qualification and Human Review remain pending.
