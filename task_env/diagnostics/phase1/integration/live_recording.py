@@ -3,12 +3,16 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from time import perf_counter
 from .grasp_height_probe import context
 from .stable_grasp import worker
 from .replay_preparation import snapshot
 from ..p1_2_runtime import execution
 from ....trajectory.canonical.contracts import EpisodeMetadata, BoundaryRecord, TransitionRecord
-from ....trajectory.canonical.execution import ExecutionRecorder, save, load
+from ....trajectory.canonical.execution import ExecutionRecorder
+from ....trajectory.canonical.streaming import (
+    VERIFICATION_VERSION, save_streaming, verify_roundtrip,
+)
 from ....controllers.canonical.contracts import digest
 
 
@@ -29,8 +33,12 @@ class LiveRecording:
             digest({'control':'absolute_pose/world/wxyz','interval':cadence_identity}),sample.task_seed,'regression')
         initial_snapshot=snapshot(value,state,provider)
         owner_schema={name:{'version':p['version'],'source_sha256':p['source_sha256'],'fields':list(p['fields'])} for name,p in initial_snapshot['owners'].items()}
+        owner_blob_fields = ('_actions', '_transition_guard_state', '_close_authorization',
+                             '_last_guard_decision', 'events', 'lifecycle_state')
         self.recorder=ExecutionRecorder(metadata,{'schema':'r5-execution-recipe-v1',
             'recorder_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            'recording_io_contract':VERIFICATION_VERSION,
+            'owner_blob_fields':list(owner_blob_fields),
             'factory':'task_env.diagnostics.phase1.integration.grasp_height_probe.context',
             'artifact':value['artifact'].to_mapping(),'recipe_identity':value['recipe_identity'],
             'cadence':cadence_identity,'owner_schema':owner_schema,'stages':list(value['solution'].STAGES),'grasp_offset_z_m':.045895,'absolute_height_gate':False,
@@ -40,7 +48,7 @@ class LiveRecording:
             'solution_version':getattr(value['solution'],'version',None),
             'close_authorization_policy':value.get('close_authorization_policy'),
             'allowed_close_authorization_guards':value.get('allowed_close_authorization_guards',
-                ['controller_close_ready'])})
+                ['controller_close_ready'])}, content_fields=owner_blob_fields)
         self.recorder.value['recipe']['episode_role'] = value.get('_recording_role', 'regression')
         self.recorder.boundary(self.boundary(state,feedback,info),snapshot(value,state,provider),value['solution'].stage,info['task_metrics'],self.native_time())
 
@@ -100,11 +108,19 @@ class LiveRecording:
         else:
             stop_reason = ('g0_verified' if report.get('pass')
                            else report.get('failure_boundary') or 'bounded_recording')
+        started = perf_counter()
         value=self.recorder.freeze(stop_reason)
-        path=self.output/'execution.h5';save(path,value);loaded=load(path)
-        if loaded!=value:raise AssertionError('H5 first logical divergence')
+        freeze_s = perf_counter() - started
+        path=self.output/'execution.h5'
+        saved = save_streaming(path, value)
+        verified = verify_roundtrip(path, value)
+        if saved['logical_hash'] != verified['logical_hash']:
+            raise AssertionError('saved/verified logical hash mismatch')
         return {'schema':value['schema'],'pass':True,'path':str(path),
-            'logical_hash':digest(value),'T':len(value['transitions']),'boundaries':len(value['boundaries']),
+            'logical_hash':verified['logical_hash'],'T':len(value['transitions']),'boundaries':len(value['boundaries']),
+            'verification':verified,
+            'io_profile':{'freeze_validate_s':freeze_s,**saved,
+                          'read_compare_hash_s':verified['read_compare_hash_s']},
             'trace_exact':True,'roundtrip_exact':True,'first_divergence':None}
 
 

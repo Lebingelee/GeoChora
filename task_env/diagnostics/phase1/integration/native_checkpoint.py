@@ -10,7 +10,8 @@ from .stable_grasp import worker
 from .checkpoint_validation import checkpoints, restore_boundary
 from .replay_preparation import snapshot
 from ..nutassembly.common import observation, METADATA
-from ....trajectory.canonical.execution import load, expand_snapshot
+from ....trajectory.canonical.execution import expand_snapshot
+from ....trajectory.canonical.streaming import load_streaming as load
 from ....artifacts.contracts import CanonicalStateView
 
 

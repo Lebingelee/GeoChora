@@ -10,7 +10,8 @@ from pathlib import Path
 from .checkpoint_validation import initialized, one
 from .replay_preparation import snapshot
 from ....artifacts.contracts import CanonicalStateView
-from ....trajectory.canonical.execution import expand_snapshot, load
+from ....trajectory.canonical.execution import expand_snapshot
+from ....trajectory.canonical.streaming import load_streaming as load
 
 
 def validate_full(path: Path, output: Path) -> dict:

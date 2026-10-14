@@ -8,7 +8,8 @@ import json
 from pathlib import Path
 
 from ....controllers.canonical.contracts import CanonicalControlTarget
-from ....trajectory.canonical.execution import load
+from ....trajectory.canonical.streaming import load_streaming as load
+from ....trajectory.canonical.execution import expand_snapshot
 from ..nutassembly.common import observation
 from ..nutassembly_r5_architecture import tracking_worker as worker
 from .lifecycle_full import context
@@ -119,7 +120,8 @@ def replay_full(path: Path, output: Path) -> dict:
             state = after
         last_boundary = recorded["boundaries"][checked_transitions]
         final_task_success = bool(last_boundary["record"]["is_success"])
-        final_owner = recorded["boundaries"][-1]["owners"]["owners"]["coordinator"]["fields"]["lifecycle_state"]["value"]
+        final_snapshot = expand_snapshot(recorded["boundaries"][-1]["owners"], recorded["blobs"])
+        final_owner = final_snapshot["owners"]["coordinator"]["fields"]["lifecycle_state"]["value"]
         full_stream = checked_transitions == len(recorded["transitions"])
         lifecycle_completed = final_owner.get("status") == "completed"
         expected_native_steps = sum(

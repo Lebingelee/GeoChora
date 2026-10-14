@@ -18,6 +18,8 @@ LEGACY_FILE_SCHEMA = 'task-env-canonical-execution-v1'
 
 
 def validate(value):
+    import hashlib
+    from .streaming import _json_bytes, snapshot_digest
     if set(value) != {'schema','metadata','recipe','boundaries','transitions','blobs','stop_reason'} or value['schema'] not in (SCHEMA, LEGACY_SCHEMA):
         raise ValueError('execution trajectory schema')
     metadata = EpisodeMetadata.from_mapping(value['metadata'])
@@ -26,18 +28,21 @@ def validate(value):
         raise ValueError('T+1/T invariant')
     if not value['recipe'] or not value['stop_reason']:
         raise ValueError('recipe/stop provenance required')
+    encoded_blobs = {}
     for h, blob in value['blobs'].items():
-        if digest(blob) != h:
+        encoded = _json_bytes(blob)
+        if hashlib.sha256(encoded).hexdigest() != h:
             raise ValueError('corrupted owner blob')
+        encoded_blobs[h] = encoded
     for i, boundary in enumerate(boundaries):
         if set(boundary) != {'record','owners','stage','native_step_index','task_metrics_raw','native_time'}:
             raise ValueError('boundary fields')
         record = BoundaryRecord.from_mapping(boundary['record'])
         if record.control_step != i or boundary['native_step_index'] != i*metadata.timebase.control_substeps:
             raise ValueError('boundary ordering/native index')
-        snap = expand_snapshot(boundary['owners'], value['blobs'])
-        integrity = snap.pop('integrity_hash')
-        if digest(snap) != integrity or snap['control_step'] != i or snap['simulation_time'] != record.simulation_time:
+        snap = _resolve_snapshot_readonly(boundary['owners'], value['blobs'])
+        integrity = snap['integrity_hash']
+        if snapshot_digest(boundary['owners'], encoded_blobs) != integrity or snap['control_step'] != i or snap['simulation_time'] != record.simulation_time:
             raise ValueError('owner integrity/alignment')
         for name, payload in snap['owners'].items():
             expected=value['recipe']['owner_schema'].get(name)
@@ -87,6 +92,26 @@ def validate(value):
     return value
 
 
+def _resolve_snapshot_readonly(snapshot, blobs):
+    """Resolve owner-field references without copying large immutable field values.
+
+    Used only by read-only validation. Replay retains expand_snapshot's owned
+    deep copies, so restored mutable owners cannot alias the stored blobs.
+    """
+    result = dict(snapshot)
+    result['owners'] = {}
+    for name, owner in snapshot['owners'].items():
+        fields = {}
+        for field, entry in owner['fields'].items():
+            v = entry['value']
+            if isinstance(v, dict) and v.get('kind') == 'content-ref':
+                fields[field] = {**entry, 'value': blobs[v['sha256']]}
+            else:
+                fields[field] = entry
+        result['owners'][name] = {**owner, 'fields': fields}
+    return result
+
+
 def expand_snapshot(snapshot, blobs):
     result=copy.deepcopy(snapshot)
     for owner in result['owners'].values():
@@ -99,7 +124,10 @@ def expand_snapshot(snapshot, blobs):
 
 class ExecutionRecorder:
     """Own the opt-in episode data; receive actual completed application events."""
-    def __init__(self, metadata, recipe):
+    def __init__(self, metadata, recipe, *, content_fields=None):
+        self.content_fields = frozenset(('_actions',) if content_fields is None else content_fields)
+        if not self.content_fields or any(type(field) is not str for field in self.content_fields):
+            raise ValueError('named content-addressed owner fields required')
         self.value={'schema':SCHEMA,'metadata':metadata.to_mapping(),'recipe':copy.deepcopy(recipe),
                     'boundaries':[],'transitions':[],'blobs':{},'stop_reason':''}
         from .clock import SCHEMA as CLOCK_SCHEMA
@@ -112,8 +140,10 @@ class ExecutionRecorder:
         # Lossless content-addressed stage plans; no duplicated mutable owner.
         for owner in snap['owners'].values():
             for field,entry in owner['fields'].items():
-                if field=='_actions' and entry['present']:
-                    h=digest(entry['value']);self.value['blobs'][h]=entry['value']
+                if field in self.content_fields and entry['present']:
+                    h=digest(entry['value'])
+                    if h not in self.value['blobs']:
+                        self.value['blobs'][h]=entry['value']
                     entry['value']={'kind':'content-ref','sha256':h}
         self.value['boundaries'].append({'record':record.to_mapping(),'owners':snap,'stage':stage,
             'native_step_index':record.control_step*self.value['metadata']['timebase']['control_substeps'],

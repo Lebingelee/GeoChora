@@ -11,13 +11,18 @@ from ....artifacts.contracts import CanonicalStateView
 from ....controllers.canonical import RequestedAction
 from ....controllers.canonical.feedback import CanonicalControlFeedback
 from ....controllers.canonical.contracts import digest
-from ....trajectory.canonical.execution import load, expand_snapshot
+from ....trajectory.canonical.execution import expand_snapshot
+from ....trajectory.canonical.streaming import load_streaming as load
 from ....tasks.nut_assembly.canonical_reset import sample_reset
 
 
 def checkpoints(x):
-    bs=x['boundaries'];ss=[expand_snapshot(b['owners'],x['blobs']) for b in bs]
-    def field(i,owner,name):return _decode(ss[i]['owners'][owner]['fields'][name]['value'])
+    bs=x['boundaries']
+    def field(i,owner,name):
+        value=bs[i]['owners']['owners'][owner]['fields'][name]['value']
+        if isinstance(value,dict) and value.get('kind')=='content-ref':
+            value=x['blobs'][value['sha256']]
+        return _decode(value)
     p5=next(i for i,b in enumerate(bs) if b['stage']=='verify_lift')
     p7=next(i for i in range(p5,len(bs)) if field(i,'coordinator','_lift_released'))
     p3=next(i for i in range(len(bs)) if field(i,'arm_hold','locked'))

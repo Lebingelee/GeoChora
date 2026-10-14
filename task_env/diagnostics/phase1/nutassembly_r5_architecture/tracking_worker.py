@@ -742,7 +742,8 @@ def _stage_endpoint(stage, rows, value):
 def run_loaded(value, provider, folder, probe):
     session = audit = None
     trace = []
-    native_contact_trace = []
+    native_contact_stream = None
+    native_contact_count = 0
     stage_rows = {}
     endpoints = []
     close_rows = []
@@ -843,13 +844,17 @@ def run_loaded(value, provider, folder, probe):
                 value['_live_recording'].complete(state, feedback, info, evaluation, row)
             contact_row = row.pop("_native_contact_diagnostic", None)
             if contact_row is not None:
-                native_contact_trace.append({
+                if native_contact_stream is None:
+                    native_contact_stream = (folder / "contact_diagnostics.jsonl").open("x")
+                contact_item = {
                     "control_step": state.control_step,
                     "simulation_time_s": state.simulation_time,
                     "stage": before_stage,
                     "canonical_grasped_nut": bool(info["task_metrics"].get("grasped_nut", False)),
                     "contact": contact_row,
-                })
+                }
+                native_contact_stream.write(json.dumps(contact_item, sort_keys=True, allow_nan=False) + "\n")
+                native_contact_count += 1
             after_stage = solution.stage
             if value.get('recording_transition_limit') and len(trace) >= value['recording_transition_limit']:
                 break
@@ -1133,7 +1138,7 @@ def run_loaded(value, provider, folder, probe):
             close_sequence_pass=close_sequence_pass,
             solution_events=solution_events,
             first_failed_stage_endpoint=first_failed_endpoint,
-            native_contact_boundary_count=len(native_contact_trace),
+            native_contact_boundary_count=native_contact_count,
         )
         report["pass"] = report.pop("pass_")
         if report["pass"]:
@@ -1153,6 +1158,15 @@ def run_loaded(value, provider, folder, probe):
         report.update(failure_boundary=report.get("failure_boundary") or probe + "_execution",
                       error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
     finally:
+        report['native_contact_boundary_count'] = native_contact_count
+        report['contact_sidecar_storage'] = 'streamed-boundary-jsonl-v1'
+        if native_contact_stream is not None:
+            try:
+                native_contact_stream.close()
+            except Exception as exc:
+                report['pass'] = False
+                report['native_contact_recording_error'] = f'{type(exc).__name__}: {exc}'
+                report['failure_boundary'] = 'native_contact_recording'
         if value.get('_live_recording') is not None:
             try:
                 report['live_recording'] = value['_live_recording'].finish(report)
@@ -1168,10 +1182,6 @@ def run_loaded(value, provider, folder, probe):
             session.close()
         _write(folder / "trace.json", trace)
         _write(folder / "stage_endpoints.json", endpoints)
-        if native_contact_trace:
-            with (folder / "contact_diagnostics.jsonl").open("x") as stream:
-                for item in native_contact_trace:
-                    stream.write(json.dumps(item, sort_keys=True, allow_nan=False) + "\n")
         _write(folder / "report.json", report)
     return report
 
