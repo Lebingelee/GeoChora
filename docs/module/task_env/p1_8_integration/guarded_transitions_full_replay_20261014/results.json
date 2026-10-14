@@ -1,0 +1,194 @@
+{
+  "D0_D1_D2": {
+    "by_rate": {
+      "D0": {
+        "rates_hz": [
+          20,
+          50,
+          100,
+          500
+        ],
+        "status": "PASS_ALL_RATES"
+      },
+      "D1": {
+        "rates_hz": [
+          20,
+          50,
+          100,
+          500
+        ],
+        "status": "PASS_ALL_RATES"
+      },
+      "D2": {
+        "rates_hz": [
+          20,
+          50,
+          100,
+          500
+        ],
+        "status": "PASS_ALL_RATES"
+      }
+    },
+    "development_only": true,
+    "formal_status": "BLOCKED",
+    "overall_status": "MUJOCO_FULL_D0_D1_D2_PASS",
+    "provider": "mujoco"
+  },
+  "base_head": "9988cf700ac1b5f7ae9ba0a284deda4fa2141917",
+  "branch": "codex/p1.8-frequency-robust-grasp",
+  "candidate": "nutassembly-r5-v5-clearance-primary-readiness-alternative-8n-guarded-v2",
+  "configuration": {
+    "arm": "R3 with native-step arm ramp",
+    "gripper_feedback_hz": 500,
+    "gripper_force_cap_N": 10.0,
+    "gripper_force_target_N": 10.0,
+    "outer_rates_hz": [
+      20,
+      50,
+      100,
+      500
+    ],
+    "physics_dt_s": 0.002,
+    "provider": "mujoco",
+    "solver": "NoSlip2"
+  },
+  "formal_qualification": {
+    "blockers": [
+      "Human Review",
+      "eligible full-task source-golden status",
+      "symmetric GeoPhys FULL source/replay",
+      "primary-only 9 N evidence across intended matrix"
+    ],
+    "status": "BLOCKED"
+  },
+  "heldout": {
+    "exception": "Six of eight cells selected alternative_force_8n and two selected primary_controller_close_ready. In four alternative-selected cells the instantaneous controller_close_ready value recorded on the authorization sample is true; this single sample does not prove that primary readiness persisted for its full 0.1 s dwell. The selected guard and recorded continuous-dwell decision are authoritative. A primary-only run is needed to determine the exact boundary.",
+    "hand_peg_exception_count": 1,
+    "max_rotation_drift_rad": 0.014026036531404676,
+    "max_translation_drift_mm": 2.0739599191511915,
+    "rates_hz": [
+      20,
+      50,
+      100,
+      500
+    ],
+    "samples": [
+      "offset_a",
+      "offset_b"
+    ],
+    "status": "PASS_ALL_EIGHT_CELLS"
+  },
+  "local_evidence_root": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/",
+  "nominal_full_rates": [
+    {
+      "authorization_force_N": 9.05007334397822,
+      "close_authorization_branch": "alternative_force_8n",
+      "execution_h5_logical_sha256": "3f5aee2af47735d2a49db31ddd90322e3e07d0e8127cf90cbb6055807d0d366b",
+      "execution_h5_sha256": "c8d7e295dae9b2807642b012d59ecb7da83093417bb866f67ff12f445753074c",
+      "expert_complete": true,
+      "expert_completion_time_s": 23.8,
+      "max_rotation_drift_rad": 0.009154401535979122,
+      "max_translation_drift_mm": 1.6628523217193694,
+      "native_physics_samples": 11900,
+      "rate_hz": 20,
+      "retreat_endpoint_error_mm": 0.8127581589172459,
+      "retreat_endpoint_error_rad": 0.0002012253713305197,
+      "status": "FULL_EXPERT_ALTERNATIVE_AUTHORIZATION_DEVELOPMENT_PASS",
+      "task_success": true,
+      "task_success_time_s": 20.200000000000003
+    },
+    {
+      "authorization_force_N": 9.018213198994808,
+      "close_authorization_branch": "alternative_force_8n",
+      "execution_h5_logical_sha256": "7a8478aaef2e191ff93445812eb1217d5ecf676078c523a908cbcb1b8095fa46",
+      "execution_h5_sha256": "ad988fe7272eb132b917f97fd332150315c7a9e5ac28f7ff43955ee12990944a",
+      "expert_complete": true,
+      "expert_completion_time_s": 23.76,
+      "max_rotation_drift_rad": 0.008642894804603772,
+      "max_translation_drift_mm": 1.7328721197712373,
+      "native_physics_samples": 11880,
+      "rate_hz": 50,
+      "retreat_endpoint_error_mm": 0.8918985011220713,
+      "retreat_endpoint_error_rad": 0.00014404460722374505,
+      "status": "FULL_EXPERT_ALTERNATIVE_AUTHORIZATION_DEVELOPMENT_PASS",
+      "task_success": true,
+      "task_success_time_s": 20.12
+    },
+    {
+      "authorization_force_N": 9.00062907083732,
+      "close_authorization_branch": "alternative_force_8n",
+      "execution_h5_logical_sha256": "f26ebcc256c2972cbfa82ac671d9906f17bb479d7f38b3dbc85151736e08d4f4",
+      "execution_h5_sha256": "121632bdfc1c730edbaa6f9ae1a71e7cfdb51cc6c532738e96be26a7789993b7",
+      "expert_complete": true,
+      "expert_completion_time_s": 23.73,
+      "max_rotation_drift_rad": 0.008891190795431532,
+      "max_translation_drift_mm": 1.7599125256022627,
+      "native_physics_samples": 11865,
+      "rate_hz": 100,
+      "retreat_endpoint_error_mm": 0.9145055992513599,
+      "retreat_endpoint_error_rad": 0.00012567036154177526,
+      "status": "FULL_EXPERT_ALTERNATIVE_AUTHORIZATION_DEVELOPMENT_PASS",
+      "task_success": true,
+      "task_success_time_s": 20.09
+    },
+    {
+      "authorization_force_N": 9.016835585646376,
+      "close_authorization_branch": "alternative_force_8n",
+      "execution_h5_logical_sha256": "a26d619a9da7d58fca3a79dcfd4e5d40229da631a3bee169c1ee93ce8143df51",
+      "execution_h5_sha256": "ce6dad58dc968c2c1a9a47ea4b03d4dca5ee9991cf80f17c156e7fc4ebd1ed8e",
+      "expert_complete": true,
+      "expert_completion_time_s": 23.735999999997723,
+      "max_rotation_drift_rad": 0.008754914834349967,
+      "max_translation_drift_mm": 1.7574037646731,
+      "native_physics_samples": 11868,
+      "rate_hz": 500,
+      "retreat_endpoint_error_mm": 0.8946577120182667,
+      "retreat_endpoint_error_rad": 0.00011215732536236311,
+      "status": "FULL_EXPERT_ALTERNATIVE_AUTHORIZATION_DEVELOPMENT_PASS",
+      "task_success": true,
+      "task_success_time_s": 20.087999999999745
+    }
+  ],
+  "pickcube_regression": {
+    "qualification": false,
+    "seeds": [
+      31,
+      73
+    ],
+    "status": "PASS_ALL_SELECTED_SEEDS"
+  },
+  "primary_9n_diagnostic": {
+    "authorization_created": false,
+    "execution_h5_sha256": "a88015c14aa63355f3f00a6330b744b34af0e5586434395bfc105b50ec690d97",
+    "expert_complete": true,
+    "formal_full_pass": false,
+    "logical_sha256": "7a468cd75337693add73416889165ec109bffbc925d7f01baa1add90198ea91c",
+    "max_rotation_drift_rad": 0.015985209833272396,
+    "max_translation_drift_mm": 1.9944400361743275,
+    "result_sha256": "84e2a6ddba9b2daf4b4bdf80f823ad1e92fff61f8ae91d704cd7b4522a4858f8",
+    "run_directory": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/full_trajectory_frequency_audit/authorization_expiry_continue_primary9n_tb500_v2",
+    "status": "PHYSICAL_FULL_COMPLETED_AFTER_EXPLICIT_AUTHORIZATION_BYPASS",
+    "task_success": true
+  },
+  "rate_artifacts": [],
+  "reset_state_fingerprint_sha256": "012362523f92f1ce338b639cc12d495e4af6eeea11ef8e420ceb1fac995caed6",
+  "schema": "p1.8-guarded-full-replay-development-summary-v1",
+  "scope": "candidate-scoped MuJoCo development; not formal qualification",
+  "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+  "source_head": "ac38e1e16340fcf8416f3a540a0280e30e6f78bc",
+  "targeted_tests": {
+    "log_path": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/targeted_pytest_60.log",
+    "log_sha256": "0ab3234adfbcfe54beea4e76de9c3cd5f853014a29bfa60c29157a6236fc7898",
+    "scope": [
+      "guarded transition",
+      "solution lifecycle",
+      "streaming recording",
+      "frequency-grasp native math",
+      "offline event windows"
+    ],
+    "source_head": "ac38e1e16340fcf8416f3a540a0280e30e6f78bc",
+    "status": "PASS",
+    "tests_failed": 0,
+    "tests_passed": 60
+  }
+}

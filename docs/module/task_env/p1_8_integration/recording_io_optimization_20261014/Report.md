@@ -126,6 +126,20 @@ written, native gzip completeness was not checked, and full replay was not run;
 this optimization does not independently adjudicate FULL acceptance or promote
 a source golden.
 
+## Follow-up on the bounded semantic audit
+
+After commit `ac38e1e`, the same archived H5 was rechecked through the
+summary-only `validate_streaming` path. Its semantic and logical-hash checks
+passed with 118,688 KiB peak RSS (about 116 MiB), compared with 6,165,508 KiB
+in the earlier full-mapping audit. The reduction is about 52×. The current
+validator profile took 103.49 s versus the earlier 89.36 s profile, about
+15.8% slower; the current process wall time was 103.94 s. The comparison uses
+the same source H5 and complete semantic
+predicates, but one run per implementation; treat it as an observed resource
+tradeoff, not a repeated benchmark. It confirms bounded audit memory, not faster
+full replay loading. Details and hashes are in the
+[follow-up report](../recording_io_followup_20261014/Report.md).
+
 ## Resume guidance and remaining work
 
 For read-only audit of an existing source, use a fresh output file:

@@ -129,6 +129,9 @@ The guard evaluator is reusable internal infrastructure. The 8 N alternative,
 the 500 Hz canonical sample projection, the current NutAssembly candidate,
 and any resulting multi-frequency FULL or D0/D1/D2 evidence remain
 version-specific development claims. Check the matching Evidence manifest and
-report before describing a candidate as physically validated. No probabilistic
-transition learning is implemented; future action-selection models must not
-change the meaning of deterministic authorization guards.
+report before describing a candidate as physically validated. The current
+candidate-scoped MuJoCo FULL and D0/D1/D2 development results are summarized in
+the [dated P1.8 guarded-transition and replay report](p1_8_integration/guarded_transitions_full_replay_20261014/Report.md);
+they do not change the historical primary-only 9 N qualification result. No
+probabilistic transition learning is implemented; future action-selection
+models must not change the meaning of deterministic authorization guards.

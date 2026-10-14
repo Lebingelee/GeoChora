@@ -1,0 +1,75 @@
+{
+  "schema": "p18-recorder-io-followup-v1",
+  "status": "READ_ONLY_SEMANTIC_AUDIT_PASS",
+  "branch": "codex/p1.8-frequency-robust-grasp",
+  "head": "ac38e1e16340fcf8416f3a540a0280e30e6f78bc",
+  "audit_implementation": {
+    "path": "task_env/trajectory/canonical/streaming.py",
+    "sha256": "cdce8bfe968e574376a2a530d3725b7d4119da11c97235ede6088bd51709de0a"
+  },
+  "audit_entrypoint": {
+    "path": "task_env/diagnostics/phase1/integration/recording_io_audit.py",
+    "sha256": "b9a2e5a0e045477a7428b4039c12c968afd331828d38ca83cf5ab108c6838fb0"
+  },
+  "input": {
+    "evidence_id": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/guarded_v5_primary_alt8_v2_tb500/execution.h5",
+    "bytes": 253645379,
+    "sha256": "301a494f90cbf86d03b4ddcf939eb4ebcf578f8e6b048513e85ea85eff02f997",
+    "logical_bytes": 2044311447,
+    "logical_sha256": "f2fd057b02acae739cd930c828c4ae98cc0a36980e5e9e84f1d7301e595050f2",
+    "transitions": 11868,
+    "boundaries": 11869
+  },
+  "current_audit": {
+    "command": "python -m task_env.diagnostics.phase1.integration.recording_io_audit --input <source.h5> --output <fresh.json> --semantic",
+    "implementation": "validate_streaming summary-only two-pass semantic audit",
+    "semantic_validation": "PASS",
+    "payload_integrity": "PASS",
+    "full_expert_status": "NOT_ADJUDICATED",
+    "elapsed_wall_s": 103.94,
+    "profile_total_s": 103.49402210200788,
+    "first_pass_s": 45.247618230001535,
+    "semantic_stream_s": 58.24640387200634,
+    "peak_rss_KiB": 118688,
+    "time_reported_swaps": 0,
+    "virtual_memory_limit_KiB": 4500000,
+    "max_episode_records_retained": 1,
+    "audit_output_evidence_id": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/recording_io_followup_20261014/archived_semantic_audit_after_ac38.json",
+    "audit_output_sha256": "bdc8d4012de8b15d5189d9510dfcc4718bef86df9932b94db602bf1129873a15"
+  },
+  "historical_full_mapping_audit": {
+    "profile_total_s": 89.36455909599317,
+    "peak_rss_KiB": 6165508,
+    "source_h5_sha256": "301a494f90cbf86d03b4ddcf939eb4ebcf578f8e6b048513e85ea85eff02f997"
+  },
+  "chunk_size_counterfactual": {
+    "chunk_bytes": 8388608,
+    "semantic_validation": "PASS",
+    "logical_sha256": "f2fd057b02acae739cd930c828c4ae98cc0a36980e5e9e84f1d7301e595050f2",
+    "profile_total_s": 104.3686856199929,
+    "wall_s": 104.82,
+    "peak_rss_KiB": 158848,
+    "profile_time_change_percent_vs_1m": 0.8451343374431097,
+    "rss_change_percent_vs_1m": 33.836613642491244,
+    "output_evidence_id": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/recording_io_followup_20261014/semantic_audit_8m_chunk.json",
+    "output_sha256": "660b11a8b3b51cb3a3487f4e33be2f4ccb18dee483941303a3244691ddc8f122",
+    "time_log_evidence_id": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/recording_io_followup_20261014/chunk8m_run.log",
+    "time_log_sha256": "4a339be69324ccbf435ec0521e90943b9804c27efc389d630ee305e5025eb4de",
+    "interpretation": "single-run negative result; retain 1 MiB default"
+  },
+  "comparison": {
+    "peak_rss_reduction_factor": 51.94718926934484,
+    "peak_rss_reduction_percent": 98.07496803183128,
+    "profile_time_increase_percent": 15.81103644324724,
+    "runs_per_implementation": 1,
+    "interpretation": "large observed memory reduction with modest observed latency increase; single-run comparison, not a repeated benchmark"
+  },
+  "scope": {
+    "new_physics_rollout": "NOT_RUN",
+    "replay": "NOT_RUN",
+    "qualification": "NOT_RUN",
+    "full_expert_adjudication": "NOT_RUN",
+    "task_semantics_or_acceptance_gates_changed": false
+  },
+  "local_evidence_manifest": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/full_trajectory_frequency_audit/evidence_sha256_manifest.json"
+}
