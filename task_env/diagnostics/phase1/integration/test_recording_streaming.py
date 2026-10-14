@@ -237,3 +237,22 @@ def test_owner_blob_encoding_preserves_expanded_snapshots_and_owned_copies(tmp_p
     path = tmp_path / "dedup.h5"
     save_streaming(path, saved)
     assert load(path) == load_streaming(path) == saved
+
+
+def test_detailed_profile_preserves_streaming_validation(tmp_path, episode):
+    path = tmp_path / "profile.h5"
+    save_streaming(path, episode)
+    plain = validate_streaming(path, chunk_bytes=257)
+    profile = {}
+    measured = validate_streaming(path, chunk_bytes=257, profile=profile)
+    assert {k: v for k, v in measured.items() if k != "profile"} == {
+        k: v for k, v in plain.items() if k != "profile"}
+    detail = profile["detailed"]
+    for pass_name in ("first_pass", "second_pass"):
+        assert set(detail[pass_name]) == {
+            "h5_read_decompress_s", "utf8_buffer_s", "json_decode_s"}
+        assert all(0 <= elapsed <= profile["total_s"] for elapsed in detail[pass_name].values())
+    for name in ("first_pass_record_encode_hash_s", "boundary_validation_s",
+                 "transition_validation_s", "clock_validation_s"):
+        assert 0 < detail[name] <= profile["total_s"]
+    assert profile["max_episode_records_retained"] == 1

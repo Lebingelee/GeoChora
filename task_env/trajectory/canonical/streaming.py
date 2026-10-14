@@ -254,7 +254,8 @@ def _check_projections(handle, value):
 
 class _JsonCursor:
     """Incrementally decode top-level episode records, including split UTF-8."""
-    def __init__(self, dataset, chunk_bytes, *, raw_digest=None):
+    def __init__(self, dataset, chunk_bytes, *, raw_digest=None, timings=None):
+        self.timings = timings
         self.dataset = dataset
         self.chunk_bytes = chunk_bytes
         self.raw_digest = raw_digest
@@ -269,12 +270,18 @@ class _JsonCursor:
         self.buffer = self.buffer[self.position:]
         self.position = 0
         end = min(self.offset + self.chunk_bytes, self.dataset.size)
+        started = perf_counter() if self.timings is not None else 0.
         raw = self.dataset[self.offset:end].tobytes()
+        if self.timings is not None:
+            self.timings["h5_read_decompress_s"] += perf_counter() - started
         if self.raw_digest is not None:
             self.raw_digest.update(raw)
         self.offset = end
         self.eof = end == self.dataset.size
+        started = perf_counter() if self.timings is not None else 0.
         self.buffer += self.utf8.decode(raw, final=self.eof)
+        if self.timings is not None:
+            self.timings["utf8_buffer_s"] += perf_counter() - started
 
     def peek(self):
         while True:
@@ -295,7 +302,14 @@ class _JsonCursor:
         self.peek()
         while True:
             try:
-                value, end = self.decoder.raw_decode(self.buffer, self.position)
+                if self.timings is None:
+                    value, end = self.decoder.raw_decode(self.buffer, self.position)
+                else:
+                    decode_started = perf_counter()
+                    try:
+                        value, end = self.decoder.raw_decode(self.buffer, self.position)
+                    finally:
+                        self.timings["json_decode_s"] += perf_counter() - decode_started
                 # A numeric token may end on a read boundary or before a split
                 # exponent. Wait for its delimiter rather than accepting 1e as 1.
                 if end == len(self.buffer) and not self.eof:
@@ -435,13 +449,29 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
     if type(chunk_bytes) is not int or chunk_bytes <= 0:
         raise ValueError("positive integer I/O chunk size required")
     started = perf_counter()
+    detailed = {} if profile is not None else None
+    def pass_timings():
+        return {key: 0. for key in (
+            "h5_read_decompress_s", "utf8_buffer_s", "json_decode_s")}
+    first_timings = pass_timings() if detailed is not None else None
+    second_timings = pass_timings() if detailed is not None else None
+    encode_hash_s = 0.
+    boundary_validation_s = 0.
+    transition_validation_s = 0.
+    clock_validation_s = 0.
+    def canonical_update(value):
+        nonlocal encode_hash_s
+        tick = perf_counter() if detailed is not None else 0.
+        canonical_hash.update(_json_bytes(value))
+        if detailed is not None:
+            encode_hash_s += perf_counter() - tick
     with h5py.File(path, "r") as handle:
         _check_container(handle)
         dataset = handle["logical_json_utf8"]
         expected_hash = handle.attrs["logical_hash"]
         raw_hash = hashlib.sha256()
         canonical_hash = hashlib.sha256()
-        cursor = _JsonCursor(dataset, chunk_bytes, raw_digest=raw_hash)
+        cursor = _JsonCursor(dataset, chunk_bytes, raw_digest=raw_hash, timings=first_timings)
         cursor.take("{")
         canonical_hash.update(b"{")
         globals_ = {}
@@ -470,7 +500,7 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
                         if not record_first:
                             canonical_hash.update(b",")
                         record_first = False
-                        canonical_hash.update(_json_bytes(record))
+                        canonical_update(record)
                         counts[key] += 1
                     canonical_hash.update(b"]")
                 elif key == "blobs":
@@ -489,7 +519,7 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
                 else:
                     value = cursor.value()
                     globals_[key] = value
-                    canonical_hash.update(_json_bytes(value))
+                    canonical_update(value)
                 if cursor.peek() == "}":
                     break
                 cursor.take(",")
@@ -531,7 +561,7 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
         parsed = perf_counter()
 
         # Parse once more and validate each record before dropping it.
-        cursor = _JsonCursor(dataset, chunk_bytes)
+        cursor = _JsonCursor(dataset, chunk_bytes, timings=second_timings)
         cursor.take("{")
         boundary_index = 0
         transition_index = 0
@@ -552,8 +582,11 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
                 cursor.take(":")
                 if key == "boundaries":
                     for boundary in cursor.iter_array():
+                        tick = perf_counter() if detailed is not None else 0.
                         record, snap = validate_boundary_record(
                             boundary, boundary_index, metadata, recipe, blobs, encoded_blobs)
+                        if detailed is not None:
+                            boundary_validation_s += perf_counter() - tick
                         if boundary_index == 0 and (
                                 record.state != metadata.realized_initial_state.measured_state or
                                 record.control_step != 0 or record.simulation_time != 0.):
@@ -561,7 +594,10 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
                         if boundary["native_step_index"] != native_projection[boundary_index]:
                             raise ValueError("numeric projection")
                         if clock is not None:
+                            tick = perf_counter() if detailed is not None else 0.
                             clock.boundary(boundary_index, boundary)
+                            if detailed is not None:
+                                clock_validation_s += perf_counter() - tick
                         if boundary_index == counts["boundaries"] - 1:
                             last_task_success = record.is_success
                             last_simulation_time_s = record.simulation_time
@@ -569,10 +605,16 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
                         boundary_index += 1
                 elif key == "transitions":
                     for transition in cursor.iter_array():
+                        tick = perf_counter() if detailed is not None else 0.
                         validate_transition_record(
                             transition, transition_index, counts["transitions"], metadata, recipe)
+                        if detailed is not None:
+                            transition_validation_s += perf_counter() - tick
                         if clock is not None:
+                            tick = perf_counter() if detailed is not None else 0.
                             clock.transition(transition_index, transition)
+                            if detailed is not None:
+                                clock_validation_s += perf_counter() - tick
                         transition_index += 1
                 elif key == "blobs":
                     cursor.skip_object()
@@ -588,6 +630,14 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
             raise ValueError("execution keys changed between validation passes")
     validated = perf_counter()
     if profile is not None:
+        detailed.update(
+            first_pass=first_timings, second_pass=second_timings,
+            first_pass_record_encode_hash_s=encode_hash_s,
+            boundary_validation_s=boundary_validation_s,
+            transition_validation_s=transition_validation_s,
+            clock_validation_s=clock_validation_s,
+            accounting="disjoint leaf timers; remaining time includes traversal, setup, blob hashes and raw hash")
+        profile["detailed"] = detailed
         profile.update(first_pass_s=parsed-started, semantic_stream_s=validated-parsed,
                        total_s=validated-started, chunk_bytes=chunk_bytes,
                        max_episode_records_retained=1, logical_bytes=logical_bytes,
