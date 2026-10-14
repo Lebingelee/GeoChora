@@ -19,7 +19,7 @@ LEGACY_FILE_SCHEMA = 'task-env-canonical-execution-v1'
 
 def validate(value):
     import hashlib
-    from .streaming import _json_bytes, snapshot_digest
+    from .streaming import _json_bytes
     if set(value) != {'schema','metadata','recipe','boundaries','transitions','blobs','stop_reason'} or value['schema'] not in (SCHEMA, LEGACY_SCHEMA):
         raise ValueError('execution trajectory schema')
     metadata = EpisodeMetadata.from_mapping(value['metadata'])
@@ -35,61 +35,75 @@ def validate(value):
             raise ValueError('corrupted owner blob')
         encoded_blobs[h] = encoded
     for i, boundary in enumerate(boundaries):
-        if set(boundary) != {'record','owners','stage','native_step_index','task_metrics_raw','native_time'}:
-            raise ValueError('boundary fields')
-        record = BoundaryRecord.from_mapping(boundary['record'])
-        if record.control_step != i or boundary['native_step_index'] != i*metadata.timebase.control_substeps:
-            raise ValueError('boundary ordering/native index')
-        snap = _resolve_snapshot_readonly(boundary['owners'], value['blobs'])
-        integrity = snap['integrity_hash']
-        if snapshot_digest(boundary['owners'], encoded_blobs) != integrity or snap['control_step'] != i or snap['simulation_time'] != record.simulation_time:
-            raise ValueError('owner integrity/alignment')
-        for name, payload in snap['owners'].items():
-            expected=value['recipe']['owner_schema'].get(name)
-            if expected is None or payload['version']!=expected['version'] or payload['source_sha256']!=expected['source_sha256'] or set(payload['fields'])!=set(expected['fields']):
-                raise ValueError('owner schema/source/fields')
-        if set(snap['owners'])!=set(value['recipe']['owner_schema']):
-            raise ValueError('missing owner')
-        stage_index=snap['owners']['coordinator']['fields']['_stage_index']['value']
-        if value['recipe']['stages'][stage_index]!=boundary['stage']:
-            raise ValueError('coordinator stage mismatch')
-        if snap['artifact_hash'] != metadata.task_artifact_hash or snap['controller_identity'] != metadata.controller_identity or snap['solution_identity'] != metadata.expert_identity or snap['provider'] != metadata.execution.physics_provider:
-            raise ValueError('owner identity mismatch')
+        validate_boundary_record(boundary, i, metadata, value['recipe'], value['blobs'], encoded_blobs)
     initial = BoundaryRecord.from_mapping(boundaries[0]['record'])
     if initial.state != metadata.realized_initial_state.measured_state or initial.control_step != 0 or initial.simulation_time != 0.:
         raise ValueError('realized reset mismatch')
     for i, transition in enumerate(transitions):
-        if set(transition) != {'record','interval','native_audit'}:
-            raise ValueError('transition fields')
-        record = TransitionRecord.from_mapping(transition['record'])
-        interval = transition['interval']; count=metadata.timebase.control_substeps
-        if interval['control_step'] != i or len(interval['substeps']) != count or interval['native_step_count'] != count:
-            raise ValueError('missing/skipped native substep')
-        if interval['physics_dt'] != metadata.timebase.physics_dt or interval['control_substeps'] != count:
-            raise ValueError('interval timebase')
-        if value['recipe']['cadence']=='outer-equal-rate' and [s['updated'] for s in interval['substeps']]!=[True]+[False]*(count-1):
-            raise ValueError('equal-rate cadence')
-        for j, substep in enumerate(interval['substeps']):
-            if substep['index'] != j or substep['native_step_index'] != i*count+j+1 or type(substep['updated']) is not bool:
-                raise ValueError('substep order/update')
-            target = CanonicalControlTarget.from_mapping(substep['target'])
-            ack = AppliedCanonicalControl.from_mapping(substep['applied'])
-            if ack.target_hash != target.identity_hash or ack.provider_name != metadata.execution.physics_provider or target.controller_identity != metadata.controller_identity or target.task_artifact_hash != metadata.task_artifact_hash:
-                raise ValueError('applied/target identity')
-            if ack.gripper_force_limit_N != target.gripper.force_limit_N:
-                raise ValueError('applied cap')
-        # Last effective target is the boundary-level projection, not a fabricated ZOH.
-        if interval['substeps'][-1]['target'] != record.controller_target.to_mapping() or interval['substeps'][-1]['applied'] != record.applied_control.to_mapping():
-            raise ValueError('final interval projection')
-        audit=transition['native_audit']
-        if audit['observed_native_substeps'] != count or audit['control_step'] != i+1:
-            raise ValueError('independent native count mismatch')
-        if i<len(transitions)-1 and (record.terminated or record.truncated):
-            raise ValueError('after terminal')
+        validate_transition_record(transition, i, len(transitions), metadata, value['recipe'])
     if value['schema'] == SCHEMA:
         from .clock import validate_clock
         validate_clock(value)
     return value
+
+
+def validate_boundary_record(boundary, index, metadata, recipe, blobs, encoded_blobs):
+    """Validate one boundary; shared by resident and streaming validators."""
+    from .streaming import snapshot_digest
+    if set(boundary) != {'record','owners','stage','native_step_index','task_metrics_raw','native_time'}:
+        raise ValueError('boundary fields')
+    record = BoundaryRecord.from_mapping(boundary['record'])
+    if record.control_step != index or boundary['native_step_index'] != index*metadata.timebase.control_substeps:
+        raise ValueError('boundary ordering/native index')
+    snap = _resolve_snapshot_readonly(boundary['owners'], blobs)
+    integrity = snap['integrity_hash']
+    if snapshot_digest(boundary['owners'], encoded_blobs) != integrity or snap['control_step'] != index or snap['simulation_time'] != record.simulation_time:
+        raise ValueError('owner integrity/alignment')
+    for name, payload in snap['owners'].items():
+        expected = recipe['owner_schema'].get(name)
+        if expected is None or payload['version'] != expected['version'] or payload['source_sha256'] != expected['source_sha256'] or set(payload['fields']) != set(expected['fields']):
+            raise ValueError('owner schema/source/fields')
+    if set(snap['owners']) != set(recipe['owner_schema']):
+        raise ValueError('missing owner')
+    stage_index = snap['owners']['coordinator']['fields']['_stage_index']['value']
+    if recipe['stages'][stage_index] != boundary['stage']:
+        raise ValueError('coordinator stage mismatch')
+    if snap['artifact_hash'] != metadata.task_artifact_hash or snap['controller_identity'] != metadata.controller_identity or snap['solution_identity'] != metadata.expert_identity or snap['provider'] != metadata.execution.physics_provider:
+        raise ValueError('owner identity mismatch')
+    return record, snap
+
+
+def validate_transition_record(transition, index, transition_count, metadata, recipe):
+    """Validate one executed interval; shared by resident and streaming validators."""
+    if set(transition) != {'record','interval','native_audit'}:
+        raise ValueError('transition fields')
+    record = TransitionRecord.from_mapping(transition['record'])
+    interval = transition['interval']
+    count = metadata.timebase.control_substeps
+    if interval['control_step'] != index or len(interval['substeps']) != count or interval['native_step_count'] != count:
+        raise ValueError('missing/skipped native substep')
+    if interval['physics_dt'] != metadata.timebase.physics_dt or interval['control_substeps'] != count:
+        raise ValueError('interval timebase')
+    if recipe['cadence'] == 'outer-equal-rate' and [s['updated'] for s in interval['substeps']] != [True] + [False]*(count-1):
+        raise ValueError('equal-rate cadence')
+    for j, substep in enumerate(interval['substeps']):
+        if substep['index'] != j or substep['native_step_index'] != index*count+j+1 or type(substep['updated']) is not bool:
+            raise ValueError('substep order/update')
+        target = CanonicalControlTarget.from_mapping(substep['target'])
+        ack = AppliedCanonicalControl.from_mapping(substep['applied'])
+        if ack.target_hash != target.identity_hash or ack.provider_name != metadata.execution.physics_provider or target.controller_identity != metadata.controller_identity or target.task_artifact_hash != metadata.task_artifact_hash:
+            raise ValueError('applied/target identity')
+        if ack.gripper_force_limit_N != target.gripper.force_limit_N:
+            raise ValueError('applied cap')
+    # Last effective target is the boundary-level projection, not a fabricated ZOH.
+    if interval['substeps'][-1]['target'] != record.controller_target.to_mapping() or interval['substeps'][-1]['applied'] != record.applied_control.to_mapping():
+        raise ValueError('final interval projection')
+    audit = transition['native_audit']
+    if audit['observed_native_substeps'] != count or audit['control_step'] != index+1:
+        raise ValueError('independent native count mismatch')
+    if index < transition_count-1 and (record.terminated or record.truncated):
+        raise ValueError('after terminal')
+    return record
 
 
 def _resolve_snapshot_readonly(snapshot, blobs):

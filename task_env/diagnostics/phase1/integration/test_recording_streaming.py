@@ -15,8 +15,9 @@ from task_env.trajectory.canonical.execution import (
 from task_env.trajectory.canonical.contracts import BoundaryRecord, EpisodeMetadata
 from task_env.trajectory.canonical.streaming import (
     _JsonCursor, _json_bytes, load_streaming, logical_chunks, save_streaming, snapshot_digest,
-    verify_payload_integrity, verify_roundtrip,
+    validate_streaming, verify_payload_integrity, verify_roundtrip,
 )
+from task_env.diagnostics.phase1.integration.recording_io_audit import audit
 
 
 @pytest.fixture
@@ -48,6 +49,8 @@ def test_old_and_streaming_h5_have_identical_logical_payload_and_reader_output(t
     assert checked["byte_exact"] and not checked["legacy_full_object_load_executed"]
     assert load(old) == load(new) == episode
     assert load_streaming(old, chunk_bytes=257) == load_streaming(new) == episode
+    assert validate_streaming(old, chunk_bytes=257)["semantic_validation"] == "PASS"
+    assert validate_streaming(new, chunk_bytes=257)["semantic_validation"] == "PASS"
     with h5py.File(old, "r") as a, h5py.File(new, "r") as b:
         assert a["logical_json_utf8"][:].tobytes() == b["logical_json_utf8"][:].tobytes()
         assert a.attrs["schema"] == b.attrs["schema"]
@@ -151,6 +154,37 @@ def test_no_overwrite_and_archived_integrity_scope(tmp_path, episode):
         verify_payload_integrity(path)
 
 
+@pytest.mark.parametrize("chunk_bytes", [17, 4096])
+def test_streaming_semantic_audit_matches_resident_validator(tmp_path, episode, chunk_bytes):
+    path = tmp_path / "semantic.h5"
+    save_streaming(path, episode, chunk_bytes=4096)
+    profile = {}
+    summary = validate_streaming(path, chunk_bytes=chunk_bytes, profile=profile)
+    final = episode["boundaries"][-1]
+    owners = expand_snapshot(final["owners"], episode["blobs"])
+    assert summary["semantic_validation"] == "PASS"
+    assert summary["payload_integrity"] == "PASS"
+    assert summary["boundaries"] == len(episode["boundaries"])
+    assert summary["transitions"] == len(episode["transitions"])
+    assert summary["last_task_success"] == final["record"]["is_success"]
+    assert summary["last_lifecycle_state"] == owners["owners"]["coordinator"]["fields"].get("lifecycle_state")
+    assert summary["last_simulation_time_s"] == final["record"]["simulation_time"]
+    assert profile["max_episode_records_retained"] == 1
+    assert profile["logical_bytes"] > 0
+    assert type(summary["boundaries"]) is int and type(summary["transitions"]) is int
+
+
+def test_recording_audit_uses_bounded_semantic_summary(tmp_path, episode):
+    path = tmp_path / "audit.h5"
+    save_streaming(path, episode)
+    report = audit(path, semantic=True)
+    assert report["integrity"]["semantic_validation"] == "PASS"
+    assert report["semantic"]["validation_mode"] == "streaming-semantic-summary-v1"
+    assert report["semantic"]["full_expert_status"] == "NOT_ADJUDICATED"
+    assert report["qualification"] == "NOT_RUN"
+    assert report["replay"] == "NOT_RUN"
+
+
 def test_incremental_parser_handles_split_utf8_numbers_and_trailing_data(tmp_path):
     expected = {"blobs": {"number": 1.2345e-99}, "boundaries": [{"text": "夹爪"}],
                 "transitions": [], "metadata": {"number": -1.234e200}}
@@ -178,7 +212,7 @@ def test_incremental_loader_retains_semantic_validation_for_tampered_valid_json(
         d.resize((len(raw),))
         d[:] = np.frombuffer(raw, dtype=np.uint8)
         handle.attrs["logical_hash"] = digest(episode)
-    for reader in (load, load_streaming):
+    for reader in (load, load_streaming, validate_streaming):
         with pytest.raises(ValueError, match="missing/skipped native substep"):
             reader(path)
 

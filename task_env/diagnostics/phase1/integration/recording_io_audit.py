@@ -14,7 +14,7 @@ from time import perf_counter
 from ....controllers.canonical.contracts import digest
 from ....trajectory.canonical.execution import expand_snapshot
 from ....trajectory.canonical.streaming import (
-    _json_bytes, load_streaming, snapshot_digest, verify_payload_integrity,
+    _json_bytes, snapshot_digest, validate_streaming, verify_payload_integrity,
 )
 
 
@@ -56,19 +56,26 @@ def snapshot_benchmark(*, repeats=100, plan_rows=4000):
 def audit(path, *, semantic=False, benchmark=False):
     result = {"schema": "p18-recording-io-audit-v1", "source_h5": str(path),
               "qualification": "NOT_RUN", "replay": "NOT_RUN"}
-    result["integrity"] = verify_payload_integrity(path)
     if semantic:
         profile = {}
-        episode = load_streaming(path, profile=profile)
-        boundary = episode["boundaries"][-1]
-        owners = expand_snapshot(boundary["owners"], episode["blobs"])
+        validation = validate_streaming(path, profile=profile)
+        result["integrity"] = {
+            key: validation[key] for key in (
+                "logical_hash", "logical_bytes", "boundaries", "payload_integrity",
+                "semantic_validation", "full_expert_status")
+        }
         result["semantic"] = {
-            "status": "PASS", "profile": profile,
-            "transitions": len(episode["transitions"]),
-            "boundaries": len(episode["boundaries"]),
-            "last_task_success": boundary["record"]["is_success"],
-            "last_lifecycle_state": owners["owners"]["coordinator"]["fields"].get("lifecycle_state"),
-            "full_expert_status": "NOT_ADJUDICATED"}
+            "status": validation["semantic_validation"], "profile": profile,
+            "transitions": validation["transitions"],
+            "boundaries": validation["boundaries"],
+            "last_task_success": validation["last_task_success"],
+            "last_simulation_time_s": validation["last_simulation_time_s"],
+            "last_lifecycle_state": validation["last_lifecycle_state"],
+            "stage_sequence": validation["stage_sequence"],
+            "validation_mode": "streaming-semantic-summary-v1",
+            "full_expert_status": validation["full_expert_status"]}
+    else:
+        result["integrity"] = verify_payload_integrity(path)
     if benchmark:
         result["snapshot_benchmark"] = snapshot_benchmark()
     result["peak_rss_KiB"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

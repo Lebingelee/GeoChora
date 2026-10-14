@@ -254,9 +254,10 @@ def _check_projections(handle, value):
 
 class _JsonCursor:
     """Incrementally decode top-level episode records, including split UTF-8."""
-    def __init__(self, dataset, chunk_bytes):
+    def __init__(self, dataset, chunk_bytes, *, raw_digest=None):
         self.dataset = dataset
         self.chunk_bytes = chunk_bytes
+        self.raw_digest = raw_digest
         self.offset = 0
         self.buffer = ""
         self.position = 0
@@ -269,6 +270,8 @@ class _JsonCursor:
         self.position = 0
         end = min(self.offset + self.chunk_bytes, self.dataset.size)
         raw = self.dataset[self.offset:end].tobytes()
+        if self.raw_digest is not None:
+            self.raw_digest.update(raw)
         self.offset = end
         self.eof = end == self.dataset.size
         self.buffer += self.utf8.decode(raw, final=self.eof)
@@ -311,31 +314,46 @@ class _JsonCursor:
                 self.fill()
 
     def array(self):
+        return list(self.iter_array())
+
+    def iter_array(self):
         self.take("[")
-        items = []
-        if self.peek() != "]":
-            while True:
-                items.append(self.value())
-                if self.peek() == "]":
-                    break
-                self.take(",")
-        self.take("]")
-        return items
+        if self.peek() == "]":
+            self.take("]")
+            return
+        while True:
+            yield self.value()
+            if self.peek() == "]":
+                self.take("]")
+                return
+            self.take(",")
+
+    def iter_object(self):
+        self.take("{")
+        if self.peek() == "}":
+            self.take("}")
+            return
+        while True:
+            key = self.value()
+            if not isinstance(key, str):
+                raise ValueError("JSON object key must be a string")
+            self.take(":")
+            yield key, self.value()
+            if self.peek() == "}":
+                self.take("}")
+                return
+            self.take(",")
+
+    def skip_object(self):
+        for _key, _value in self.iter_object():
+            pass
 
     def blobs(self):
-        self.take("{")
         result = {}
-        if self.peek() != "}":
-            while True:
-                key = self.value()
-                if not isinstance(key, str):
-                    raise ValueError("JSON object key must be a string")
-                self.take(":")
-                result[key] = self.value()
-                if self.peek() == "}":
-                    break
-                self.take(",")
-        self.take("}")
+        for key, value in self.iter_object():
+            if key in result:
+                raise ValueError("duplicate JSON object key")
+            result[key] = value
         return result
 
     def episode(self):
@@ -395,3 +413,198 @@ def load_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
                        logical_hash_s=perf_counter() - validated,
                        total_s=perf_counter() - started, chunk_bytes=chunk_bytes)
     return value
+
+
+def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
+    """Validate a complete execution H5 without retaining its boundary/transition arrays.
+
+    This is an audit path, not a replay loader. Pass one checks raw and canonical
+    hashes while retaining only episode metadata, recipe and owner blobs. Pass
+    two applies the same per-record semantic validators as ``execution.validate``.
+    The result is a bounded summary; callers needing actions or states must use
+    ``load_streaming`` instead.
+    """
+    import h5py
+    from .clock import ClockStreamValidator
+    from .contracts import EpisodeMetadata
+    from .execution import (
+        FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, LEGACY_SCHEMA,
+        validate_boundary_record, validate_transition_record,
+    )
+
+    if type(chunk_bytes) is not int or chunk_bytes <= 0:
+        raise ValueError("positive integer I/O chunk size required")
+    started = perf_counter()
+    with h5py.File(path, "r") as handle:
+        _check_container(handle)
+        dataset = handle["logical_json_utf8"]
+        expected_hash = handle.attrs["logical_hash"]
+        raw_hash = hashlib.sha256()
+        canonical_hash = hashlib.sha256()
+        cursor = _JsonCursor(dataset, chunk_bytes, raw_digest=raw_hash)
+        cursor.take("{")
+        canonical_hash.update(b"{")
+        globals_ = {}
+        blobs = None
+        keys = set()
+        previous_key = None
+        counts = {"boundaries": 0, "transitions": 0}
+        first = True
+        if cursor.peek() != "}":
+            while True:
+                key = cursor.value()
+                if not isinstance(key, str) or key in keys or (
+                        previous_key is not None and key <= previous_key):
+                    raise ValueError("logical JSON key order")
+                keys.add(key)
+                previous_key = key
+                cursor.take(":")
+                if not first:
+                    canonical_hash.update(b",")
+                first = False
+                canonical_hash.update(_json_bytes(key) + b":")
+                if key in counts:
+                    canonical_hash.update(b"[")
+                    record_first = True
+                    for record in cursor.iter_array():
+                        if not record_first:
+                            canonical_hash.update(b",")
+                        record_first = False
+                        canonical_hash.update(_json_bytes(record))
+                        counts[key] += 1
+                    canonical_hash.update(b"]")
+                elif key == "blobs":
+                    blobs = cursor.blobs()
+                    globals_[key] = blobs
+                    canonical_hash.update(b"{")
+                    for blob_index, blob_key in enumerate(sorted(blobs)):
+                        if blob_index:
+                            canonical_hash.update(b",")
+                        canonical_hash.update(_json_bytes(blob_key) + b":")
+                        encoded = _json_bytes(blobs[blob_key])
+                        if hashlib.sha256(encoded).hexdigest() != blob_key:
+                            raise ValueError("corrupted owner blob")
+                        canonical_hash.update(encoded)
+                    canonical_hash.update(b"}")
+                else:
+                    value = cursor.value()
+                    globals_[key] = value
+                    canonical_hash.update(_json_bytes(value))
+                if cursor.peek() == "}":
+                    break
+                cursor.take(",")
+        cursor.take("}")
+        if cursor.peek():
+            raise ValueError("extra logical JSON data")
+        if raw_hash.hexdigest() != expected_hash:
+            raise ValueError("logical payload hash")
+        canonical_hash.update(b"}")
+        if canonical_hash.hexdigest() != expected_hash:
+            raise ValueError("noncanonical logical encoding/hash")
+        if keys != {"schema", "metadata", "recipe", "boundaries", "transitions", "blobs", "stop_reason"}:
+            raise ValueError("execution trajectory schema")
+        schema = globals_["schema"]
+        if schema not in (SCHEMA, LEGACY_SCHEMA):
+            raise ValueError("execution trajectory schema")
+        expected_schema = FILE_SCHEMA if schema == SCHEMA else LEGACY_FILE_SCHEMA
+        if handle.attrs["schema"] != expected_schema:
+            raise ValueError("H5/logical version mismatch")
+        metadata = EpisodeMetadata.from_mapping(globals_["metadata"])
+        recipe = globals_["recipe"]
+        if not recipe or not globals_["stop_reason"]:
+            raise ValueError("recipe/stop provenance required")
+        blobs = globals_["blobs"]
+        if not isinstance(blobs, dict):
+            raise ValueError("owner blobs mapping required")
+        if not counts["boundaries"] or counts["boundaries"] != counts["transitions"] + 1:
+            raise ValueError("T+1/T invariant")
+        encoded_blobs = {key: _json_bytes(value) for key, value in blobs.items()}
+        control_projection = handle["control_step"][:]
+        native_projection = handle["native_step_index"][:]
+        expected_steps = np.arange(counts["boundaries"], dtype=np.int64)
+        if len(control_projection) != len(expected_steps) or not np.array_equal(control_projection, expected_steps):
+            raise ValueError("numeric projection")
+        expected_native = expected_steps * metadata.timebase.control_substeps
+        if len(native_projection) != len(expected_native) or not np.array_equal(native_projection, expected_native):
+            raise ValueError("numeric projection")
+        logical_bytes = int(dataset.size)
+        parsed = perf_counter()
+
+        # Parse once more and validate each record before dropping it.
+        cursor = _JsonCursor(dataset, chunk_bytes)
+        cursor.take("{")
+        boundary_index = 0
+        transition_index = 0
+        last_task_success = None
+        last_lifecycle_state = None
+        last_simulation_time_s = None
+        clock = ClockStreamValidator(globals_["metadata"], recipe) if schema == SCHEMA else None
+        semantic_keys = set()
+        previous_key = None
+        if cursor.peek() != "}":
+            while True:
+                key = cursor.value()
+                if not isinstance(key, str) or key in semantic_keys or (
+                        previous_key is not None and key <= previous_key):
+                    raise ValueError("logical JSON key order")
+                semantic_keys.add(key)
+                previous_key = key
+                cursor.take(":")
+                if key == "boundaries":
+                    for boundary in cursor.iter_array():
+                        record, snap = validate_boundary_record(
+                            boundary, boundary_index, metadata, recipe, blobs, encoded_blobs)
+                        if boundary_index == 0 and (
+                                record.state != metadata.realized_initial_state.measured_state or
+                                record.control_step != 0 or record.simulation_time != 0.):
+                            raise ValueError("realized reset mismatch")
+                        if boundary["native_step_index"] != native_projection[boundary_index]:
+                            raise ValueError("numeric projection")
+                        if clock is not None:
+                            clock.boundary(boundary_index, boundary)
+                        if boundary_index == counts["boundaries"] - 1:
+                            last_task_success = record.is_success
+                            last_simulation_time_s = record.simulation_time
+                            last_lifecycle_state = snap["owners"]["coordinator"]["fields"].get("lifecycle_state")
+                        boundary_index += 1
+                elif key == "transitions":
+                    for transition in cursor.iter_array():
+                        validate_transition_record(
+                            transition, transition_index, counts["transitions"], metadata, recipe)
+                        if clock is not None:
+                            clock.transition(transition_index, transition)
+                        transition_index += 1
+                elif key == "blobs":
+                    cursor.skip_object()
+                else:
+                    cursor.value()
+                if cursor.peek() == "}":
+                    break
+                cursor.take(",")
+        cursor.take("}")
+        if cursor.peek() or boundary_index != counts["boundaries"] or transition_index != counts["transitions"]:
+            raise ValueError("streaming semantic record count")
+        if semantic_keys != keys:
+            raise ValueError("execution keys changed between validation passes")
+    validated = perf_counter()
+    if profile is not None:
+        profile.update(first_pass_s=parsed-started, semantic_stream_s=validated-parsed,
+                       total_s=validated-started, chunk_bytes=chunk_bytes,
+                       max_episode_records_retained=1, logical_bytes=logical_bytes,
+                       raw_logical_hash=raw_hash.hexdigest(),
+                       canonical_logical_hash=canonical_hash.hexdigest())
+    return {
+        "schema": "p18-streaming-semantic-audit-v1",
+        "logical_hash": canonical_hash.hexdigest(),
+        "logical_bytes": logical_bytes,
+        "payload_integrity": "PASS",
+        "semantic_validation": "PASS",
+        "full_expert_status": "NOT_ADJUDICATED",
+        "transitions": counts["transitions"],
+        "boundaries": counts["boundaries"],
+        "last_task_success": last_task_success,
+        "last_lifecycle_state": last_lifecycle_state,
+        "last_simulation_time_s": last_simulation_time_s,
+        "stage_sequence": recipe.get("stages"),
+        "profile": profile or {},
+    }
