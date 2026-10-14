@@ -16,6 +16,19 @@ from ....trajectory.canonical.streaming import (
 from ....controllers.canonical.contracts import digest
 
 
+STORAGE_VARIANTS = ('owner-fields-v1', 'stability-history-refs-v2')
+OWNER_BLOB_FIELDS = ('_actions', '_transition_guard_state', '_close_authorization',
+                     '_last_guard_decision', 'events', 'lifecycle_state')
+
+
+def storage_policy(variant):
+    """Diagnostic storage only; no controller or task-state mutation."""
+    if variant not in STORAGE_VARIANTS:
+        raise ValueError(f'unsupported recorder storage variant: {variant}')
+    return OWNER_BLOB_FIELDS, ((('stability', 'history'),)
+                              if variant == 'stability-history-refs-v2' else ())
+
+
 class LiveRecording:
     def __init__(self, value, provider, session, audit, sample, realized, state, feedback, info, *, output):
         self.value,self.provider,self.audit,self.output=value,provider,audit,output
@@ -33,12 +46,14 @@ class LiveRecording:
             digest({'control':'absolute_pose/world/wxyz','interval':cadence_identity}),sample.task_seed,'regression')
         initial_snapshot=snapshot(value,state,provider)
         owner_schema={name:{'version':p['version'],'source_sha256':p['source_sha256'],'fields':list(p['fields'])} for name,p in initial_snapshot['owners'].items()}
-        owner_blob_fields = ('_actions', '_transition_guard_state', '_close_authorization',
-                             '_last_guard_decision', 'events', 'lifecycle_state')
+        storage_variant = value.get('recording_storage_variant', STORAGE_VARIANTS[0])
+        owner_blob_fields, scoped_fields = storage_policy(storage_variant)
         self.recorder=ExecutionRecorder(metadata,{'schema':'r5-execution-recipe-v1',
             'recorder_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'recording_io_contract':VERIFICATION_VERSION,
             'owner_blob_fields':list(owner_blob_fields),
+            'recording_storage_variant':storage_variant,
+            'owner_scoped_blob_fields':[list(pair) for pair in scoped_fields],
             'factory':'task_env.diagnostics.phase1.integration.grasp_height_probe.context',
             'artifact':value['artifact'].to_mapping(),'recipe_identity':value['recipe_identity'],
             'cadence':cadence_identity,'owner_schema':owner_schema,'stages':list(value['solution'].STAGES),'grasp_offset_z_m':.045895,'absolute_height_gate':False,
@@ -48,7 +63,7 @@ class LiveRecording:
             'solution_version':getattr(value['solution'],'version',None),
             'close_authorization_policy':value.get('close_authorization_policy'),
             'allowed_close_authorization_guards':value.get('allowed_close_authorization_guards',
-                ['controller_close_ready'])}, content_fields=owner_blob_fields)
+                ['controller_close_ready'])}, content_fields=owner_blob_fields, owner_content_fields=scoped_fields)
         self.recorder.value['recipe']['episode_role'] = value.get('_recording_role', 'regression')
         self.recorder.boundary(self.boundary(state,feedback,info),snapshot(value,state,provider),value['solution'].stage,info['task_metrics'],self.native_time())
 
@@ -121,6 +136,8 @@ class LiveRecording:
             'verification':verified,
             'io_profile':{'freeze_validate_s':freeze_s,**saved,
                           'read_compare_hash_s':verified['read_compare_hash_s']},
+            'storage_variant':value['recipe']['recording_storage_variant'],
+            'owner_scoped_blob_fields':value['recipe']['owner_scoped_blob_fields'],
             'trace_exact':True,'roundtrip_exact':True,'first_divergence':None}
 
 
@@ -128,7 +145,9 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--provider',choices=('geophys','mujoco'),required=True)
     p.add_argument('--rate',type=int,choices=(500,100,50),required=True)
     p.add_argument('--output',type=Path,required=True);p.add_argument('--limit',type=int)
+    p.add_argument('--storage-variant',choices=STORAGE_VARIANTS,default=STORAGE_VARIANTS[0])
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False);v=context(a.rate)
+    v['recording_storage_variant']=a.storage_variant
     v['live_recording_factory']=lambda *args:LiveRecording(*args,output=a.output)
     if a.limit:v['recording_transition_limit']=a.limit
     worker.CLOSE_TIME_LIMIT_S=1.5

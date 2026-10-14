@@ -1,0 +1,321 @@
+{
+  "base_head": "7754d01caa6ef46f5ca946f01463522abef62dac",
+  "branch": "codex/p1.8-frequency-robust-grasp",
+  "default_storage_variant": "owner-fields-v1",
+  "evidence_root": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/recording_history_refs_live_v2",
+  "evidence_sha256": {
+    "baseline_500hz_prefix/compiled_model.json": "d73a1009eac9bb19ff1cf2f2b318c47ba6f395fd29698760185c42a22c5ececd",
+    "baseline_500hz_prefix/execution.h5": "f852e6e01e307fb708ea29b596aa0d5c6adf5726807af457b2d444d1faa98630",
+    "baseline_500hz_prefix/full_expert_evidence_manifest.json": "3f73c0376af3403e19776cf55da67daab9ad1a5f258ac0cc721d3d8a17f10050",
+    "baseline_500hz_prefix/full_expert_result.json": "05b8ea7b0d5719250188a141895042cc295f277cb66bdf798d5d46122c0ae738",
+    "baseline_500hz_prefix/launch.json": "3c15a5b36aaed1802c399808885c6198ebc57f3f1787b9fd4f6e36b515ef4967",
+    "baseline_500hz_prefix/native.jsonl.gz": "c4d4033faeb99ca2c73a946a30910725fa786c29cd530bccfb576290d93458ae",
+    "baseline_500hz_prefix/native_audit.json": "b04dea5f3a7b05fcea459da5ce736f49be450c8de0ab0f6cd18a63db19e0dcb8",
+    "baseline_500hz_prefix/recorder_acceptance.json": "1dc4ff47752cde5cc96d3f0a1cd25ddf9b5a262b1e5ac9346b1dedf78f5aacb9",
+    "baseline_500hz_prefix/report.json": "f65a2728c80e00bf8a81040ea898aea35d77a534b48e818e4877ce6e25a1de65",
+    "baseline_500hz_prefix/stage_endpoints.json": "5cac4ddea6477c19e2c918110a692407506ec24c087b0facec702dbad0959696",
+    "baseline_500hz_prefix/trace.json": "4b11f7caf8a6068492ce38736cf6ecba7dfae8702855bd378aae4a17040bcfae",
+    "candidate_500hz_prefix_retry/compiled_model.json": "d73a1009eac9bb19ff1cf2f2b318c47ba6f395fd29698760185c42a22c5ececd",
+    "candidate_500hz_prefix_retry/execution.h5": "ea28fc37df5f08c50249fe7f0c7ff832564eb9ba671143ff37ebdd77add62eac",
+    "candidate_500hz_prefix_retry/full_expert_evidence_manifest.json": "ec232de3c7fc7790b8b187612edbf32a0c2f3f87bb18d04865dfc4b2bbde7712",
+    "candidate_500hz_prefix_retry/full_expert_result.json": "5f5b9f1f2095b5f6c6e58110e0a80847a16b8f9dcc75879c076ad0867f3cf4f8",
+    "candidate_500hz_prefix_retry/launch.json": "994e1f13ac5c61a6e3cc84c71a8bd73b4cec842a85bf3cacd105b0f30fcffcd3",
+    "candidate_500hz_prefix_retry/native.jsonl.gz": "190ca63c6760e002b1e936cadd43eddc26afa657df0d8aa8a603c5b37f0a8f63",
+    "candidate_500hz_prefix_retry/native_audit.json": "b04dea5f3a7b05fcea459da5ce736f49be450c8de0ab0f6cd18a63db19e0dcb8",
+    "candidate_500hz_prefix_retry/recorder_acceptance.json": "f5600b1b60c8f4db16531d68759814da190a6b15ed288a86c8f557031324c78f",
+    "candidate_500hz_prefix_retry/report.json": "7f19678eb88836fda75f46eb0998f51cd13f41b1261c833383bcce99406cb1b9",
+    "candidate_500hz_prefix_retry/stage_endpoints.json": "5cac4ddea6477c19e2c918110a692407506ec24c087b0facec702dbad0959696",
+    "candidate_500hz_prefix_retry/trace.json": "4b11f7caf8a6068492ce38736cf6ecba7dfae8702855bd378aae4a17040bcfae",
+    "compare_live.py": "d11c943656ce3132255c6c815ea2d1aee6116a3d43dd884fc9dc1c7dcdc76e84",
+    "initial_smoke_failure.json": "bc24f23619b480eb4e6493ec9ce930ec4291587b5da5de52e423e7fe77010709",
+    "initial_test_failure.json": "a9233ac074ceb466a3be55c5caaa22cd932fb672730c7c0e0a4749f7ee43ddc7",
+    "live_equivalence.json": "55bb10d91453fa2022f64fe583fe293a0bd0a6d75a8897737e7c6ecc9dbff842",
+    "pickcube_seed31/launch.json": "a4767c1ffdf974d5000798940961b8ac048c5c45a1ebab457c9291cee6614d98",
+    "pickcube_seed31/report.json": "0dc6b03be69bbf5bfe459da395e674f5d5e826554df674eed814913096e29e7b",
+    "pickcube_seed31/trace.json": "e98a00c66db1870d0fa003bcbb7f030d50add5ae93d42526d88b909334d79b47",
+    "pickcube_seed73/launch.json": "3e7129f0c9ff6a20f17e1de63f9c99fc2b01c102e280b67f19b60cf01c2d08a1",
+    "pickcube_seed73/report.json": "2f73fb0efe3e367ac11c3693469aa266e6885a4f413724cee71cd8eb3ae8f166",
+    "pickcube_seed73/trace.json": "a0b426558bc194abe8955fa3b513d86a8fec1fa562b583475f4cfdd5cc45173e",
+    "smoke.py": "f15d7541d93e6a9c78c4d29b49e2ce39b75e24965d4618336440bad73060b4b1"
+  },
+  "failures_preserved": {
+    "isolation_setup": {
+      "correction": "local read-path symlinks for task_env and workspace; fresh output on retry",
+      "failed_output": "candidate_500hz_prefix",
+      "failure": "relative task profile paths unavailable in isolated log working directory; no physics executed",
+      "status": "CORRECTED_HARNESS"
+    },
+    "test_setup": {
+      "checks_before_fix": "58 passed, 1 failed",
+      "correction": "absolute package import; no assertion or tolerance changed",
+      "failure": "one new test used a relative import when pytest loads this directory without package context",
+      "status": "CORRECTED"
+    }
+  },
+  "live_equivalence": {
+    "boundaries": 2501,
+    "full_expert_status": "NOT_RUN",
+    "metrics": {
+      "baseline": {
+        "acceptance": {
+          "boundaries": 2501,
+          "full_expert_status": "NOT_RUN",
+          "legacy_reader_exact": true,
+          "logical_hash": "0230b2be38b2a649a73cce5e62e8fbc9e4daf4a3c61e4ac9eb95b45eeb14aaac",
+          "peak_rss_KiB": 1340864,
+          "physical_duration_s": 4.999999999999671,
+          "prefix_canonical_reconstruction_exact": true,
+          "roundtrip_exact": true,
+          "sampled_owner_restores_exact": true,
+          "scope": "2500-transition 500 Hz real native-ramp prefix recording; NOT FULL or formal D0/D1/D2",
+          "semantic_validation": "PASS",
+          "stage_sequence": [
+            "approach_nut",
+            "descend_to_handle",
+            "close_gripper",
+            "verify_lift"
+          ],
+          "status": "PASS",
+          "storage_recipe": {
+            "owner_blob_fields": [
+              "_actions",
+              "_transition_guard_state",
+              "_close_authorization",
+              "_last_guard_decision",
+              "events",
+              "lifecycle_state"
+            ],
+            "owner_scoped_blob_fields": [],
+            "recorder_source_sha256": "03d137cf17b322acbc0edf7c53793d62425d547cffd84f6aca7e5fe5ee6a76e1",
+            "recording_storage_variant": "owner-fields-v1"
+          },
+          "total_s": 118.20851689699339,
+          "transitions": 2500,
+          "variant": "owner-fields-v1"
+        },
+        "encode_compress_write_s": 2.508888427983038,
+        "freeze_validate_s": 4.167019977001473,
+        "logical_bytes": 105190999,
+        "physical_bytes": 18206544,
+        "read_compare_hash_s": 1.7642119619995356,
+        "source_validation_s": 4.188577728025848
+      },
+      "candidate": {
+        "acceptance": {
+          "boundaries": 2501,
+          "full_expert_status": "NOT_RUN",
+          "legacy_reader_exact": true,
+          "logical_hash": "c33dfb78b48c8e3ed46e7c41ff77172662cad0ebf488db3ccba4e033f687fe03",
+          "peak_rss_KiB": 876744,
+          "physical_duration_s": 4.999999999999671,
+          "prefix_canonical_reconstruction_exact": true,
+          "roundtrip_exact": true,
+          "sampled_owner_restores_exact": true,
+          "scope": "2500-transition 500 Hz real native-ramp prefix recording; NOT FULL or formal D0/D1/D2",
+          "semantic_validation": "PASS",
+          "stage_sequence": [
+            "approach_nut",
+            "descend_to_handle",
+            "close_gripper",
+            "verify_lift"
+          ],
+          "status": "PASS",
+          "storage_recipe": {
+            "owner_blob_fields": [
+              "_actions",
+              "_transition_guard_state",
+              "_close_authorization",
+              "_last_guard_decision",
+              "events",
+              "lifecycle_state"
+            ],
+            "owner_scoped_blob_fields": [
+              [
+                "stability",
+                "history"
+              ]
+            ],
+            "recorder_source_sha256": "03d137cf17b322acbc0edf7c53793d62425d547cffd84f6aca7e5fe5ee6a76e1",
+            "recording_storage_variant": "stability-history-refs-v2"
+          },
+          "total_s": 108.89847638801439,
+          "transitions": 2500,
+          "variant": "stability-history-refs-v2"
+        },
+        "encode_compress_write_s": 1.2740036720060743,
+        "freeze_validate_s": 3.4929058400157373,
+        "logical_bytes": 64237946,
+        "physical_bytes": 7174433,
+        "read_compare_hash_s": 0.9304236939933617,
+        "source_validation_s": 3.505553658003919
+      }
+    },
+    "physics_equivalence": "EXACT_RECORDED_STREAM",
+    "qualification": "NOT_RUN",
+    "scope": "same-reset 500 Hz live storage variants; all states/feedback/actions/targets/applied native control/owners exact; only representation and named recipe provenance differ",
+    "status": "PASS",
+    "transitions": 2500
+  },
+  "offline_full_counterfactual": {
+    "corruption_checks": {
+      "case": "bad history blob with recomputed valid outer payload hash",
+      "readers": {
+        "load": "REJECTED",
+        "load_streaming": "REJECTED",
+        "validate_streaming": "REJECTED"
+      },
+      "status": "PASS"
+    },
+    "legacy_reader": {
+      "boundaries": 12160,
+      "elapsed_s": 27.636441248003393,
+      "peak_rss_KiB": 1501840,
+      "qualification": "NOT_RUN",
+      "reader": "execution.load original full-mapping interface with current validators",
+      "replay": "NOT_RUN",
+      "sample_owner_restore_expansion": "PASS",
+      "status": "PASS",
+      "transitions": 12159
+    },
+    "status": "OFFLINE_LOSSLESS_STORAGE_COUNTERFACTUAL_PASS",
+    "storage": {
+      "baseline_logical_bytes": 899456779,
+      "baseline_physical_bytes": 189516102,
+      "candidate_logical_bytes": 294012415,
+      "candidate_physical_bytes": 31169727
+    },
+    "timings": {
+      "baseline_rss_KiB": [
+        162520,
+        168192
+      ],
+      "baseline_wall_s": [
+        71.53999999999999,
+        71.48
+      ],
+      "candidate_rss_KiB": [
+        203748,
+        202236
+      ],
+      "candidate_wall_s": [
+        29.19,
+        29.1
+      ],
+      "mean_speedup": 2.453594098473151,
+      "order": "baseline, candidate, legacy compatibility, candidate repeat, baseline repeat; serial CPU tests",
+      "repetitions_per_file": 2,
+      "scope": "small repeated same-trajectory audit comparison; not general performance guarantee"
+    },
+    "tool_checks": {
+      "candidate_semantics": "PASS",
+      "exact_fixture_comparison": "PASS",
+      "overwrite_rejected": "PASS",
+      "unrelated_recipe_change_rejected": "PASS"
+    }
+  },
+  "pickcube": {
+    "31": {
+      "boundaries": 1091,
+      "completion_events": [
+        {
+          "control_step": 198,
+          "kind": "pose_ready",
+          "stage": "move_above_cube",
+          "wait_ticks": 184
+        },
+        {
+          "control_step": 327,
+          "kind": "pose_ready",
+          "stage": "descend_vertical",
+          "wait_ticks": 117
+        },
+        {
+          "control_step": 940,
+          "kind": "gripper_ready",
+          "stage": "close_gripper",
+          "wait_ticks": 593
+        },
+        {
+          "control_step": 1091,
+          "kind": "task_outcome",
+          "stage": "lift",
+          "wait_ticks": 77
+        }
+      ],
+      "endpoint": true,
+      "failure_reason": null,
+      "pass": true,
+      "provider": "mujoco",
+      "qualification": false,
+      "seed": 31,
+      "task_success": true,
+      "wall_time_s": 2.2779701690014917
+    },
+    "73": {
+      "boundaries": 830,
+      "completion_events": [
+        {
+          "control_step": 69,
+          "kind": "pose_ready",
+          "stage": "move_above_cube",
+          "wait_ticks": 57
+        },
+        {
+          "control_step": 131,
+          "kind": "pose_ready",
+          "stage": "descend_vertical",
+          "wait_ticks": 50
+        },
+        {
+          "control_step": 745,
+          "kind": "gripper_ready",
+          "stage": "close_gripper",
+          "wait_ticks": 594
+        },
+        {
+          "control_step": 830,
+          "kind": "task_outcome",
+          "stage": "lift",
+          "wait_ticks": 9
+        }
+      ],
+      "endpoint": true,
+      "failure_reason": null,
+      "pass": true,
+      "provider": "mujoco",
+      "qualification": false,
+      "seed": 73,
+      "task_success": true,
+      "wall_time_s": 1.7248444419819862
+    }
+  },
+  "preserved_log_sha256": "2bbd12caaec637aca600dc5a3ead6f65419ccda7a34eb59f768ea94a837dcbe0",
+  "schema": "p18-history-refs-live-acceptance-v2",
+  "scope": {
+    "controller_planner_task_physics_changed": false,
+    "formal_qualification": "NOT_RUN",
+    "geophys_candidate": "NOT_RUN",
+    "new_full_D0_D1_D2": "NOT_RUN",
+    "new_full_rollout": "NOT_RUN"
+  },
+  "selector": [
+    [
+      "stability",
+      "history"
+    ]
+  ],
+  "source_sha256": {
+    "task_env/diagnostics/phase1/integration/lifecycle_full.py": "f974dc1ebb9e8bb9a3b4bf15a122e6c916d52965a37d44fbf6602df9b0c434fd",
+    "task_env/diagnostics/phase1/integration/live_recording.py": "03d137cf17b322acbc0edf7c53793d62425d547cffd84f6aca7e5fe5ee6a76e1",
+    "task_env/diagnostics/phase1/integration/recording_storage_smoke.py": "007f6abb4741d9e4c362f19a5b2d5044fe45b958b1e406cc24efd41355ee612a",
+    "task_env/diagnostics/phase1/integration/test_recording_streaming.py": "239435262573cc5771a343e89c589613ce726770b637735759e1ab4622979ccb",
+    "task_env/trajectory/canonical/execution.py": "21f0178779bae14467579d421db01179ddc47181856e8ca9c0c983c5503f3f63"
+  },
+  "source_status": "tested changes on base HEAD before optimization commit; source hashes bind exact tested implementation",
+  "status": "ISOLATED_RECORDER_ACCEPTANCE_PASS",
+  "storage_variant": "stability-history-refs-v2",
+  "tests": {
+    "command": "python -m pytest -q task_env/diagnostics/phase1/integration/test_recording_streaming.py task_env/diagnostics/phase1/integration/test_guarded_transition.py task_env/diagnostics/phase1/integration/test_solution_lifecycle.py task_env/diagnostics/phase1/frequency_grasp/test_native_math.py",
+    "passed": 68
+  }
+}

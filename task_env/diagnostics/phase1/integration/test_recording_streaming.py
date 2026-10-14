@@ -256,3 +256,96 @@ def test_detailed_profile_preserves_streaming_validation(tmp_path, episode):
                  "transition_validation_s", "clock_validation_s"):
         assert 0 < detail[name] <= profile["total_s"]
     assert profile["max_episode_records_retained"] == 1
+
+
+def _record_fixture_with_scoped_history(episode, *, scoped=False):
+    metadata = EpisodeMetadata.from_mapping(episode['metadata'])
+    recorder = ExecutionRecorder(metadata, episode['recipe'],
+        owner_content_fields=(('stability', 'history'),) if scoped else ())
+    expected = []
+    for boundary in episode['boundaries']:
+        owners = expand_snapshot(boundary['owners'], episode['blobs'])
+        expected.append(copy.deepcopy(owners))
+        recorder.boundary(BoundaryRecord.from_mapping(boundary['record']), owners,
+            boundary['stage'], boundary['task_metrics_raw'], boundary['native_time'])
+        # Caller mutations cannot change the recorder-owned blob/snapshot.
+        owners['owners']['stability']['fields']['history']['value'] = {'mutated': True}
+    recorder.value['transitions'] = copy.deepcopy(episode['transitions'])
+    return recorder.freeze(episode['stop_reason']), expected
+
+
+def test_scoped_history_is_lossless_owned_and_old_reader_compatible(tmp_path, episode):
+    baseline, expected = _record_fixture_with_scoped_history(episode)
+    candidate, candidate_expected = _record_fixture_with_scoped_history(episode, scoped=True)
+    assert candidate_expected == expected
+    assert candidate['transitions'] == baseline['transitions']
+    history_keys = set()
+    for index, boundary in enumerate(candidate['boundaries']):
+        entry = boundary['owners']['owners']['stability']['fields']['history']['value']
+        assert entry['kind'] == 'content-ref'
+        history_keys.add(entry['sha256'])
+        assert expand_snapshot(boundary['owners'], candidate['blobs']) == expected[index]
+        assert baseline['boundaries'][index]['owners']['owners']['stability']['fields']['history']['value'] == (
+            expected[index]['owners']['stability']['fields']['history']['value'])
+    assert len(history_keys) == 1
+    path = tmp_path / 'scoped.h5'
+    save_streaming(path, candidate)
+    assert verify_roundtrip(path, candidate)['byte_exact']
+    assert load(path) == load_streaming(path) == candidate
+    assert validate_streaming(path)['semantic_validation'] == 'PASS'
+    corrupted = copy.deepcopy(candidate)
+    corrupted['blobs'][next(iter(history_keys))] = {'corrupted': True}
+    with pytest.raises(ValueError, match='corrupted owner blob'):
+        validate(corrupted)
+
+
+def test_scoped_selector_does_not_capture_another_owner_history(episode):
+    metadata = EpisodeMetadata.from_mapping(episode['metadata'])
+    recorder = ExecutionRecorder(metadata, episode['recipe'],
+        owner_content_fields=(('stability', 'history'),))
+    boundary = episode['boundaries'][0]
+    owners = expand_snapshot(boundary['owners'], episode['blobs'])
+    other = {'present': True, 'value': ['must stay inline']}
+    owners['owners']['arm_hold']['fields']['history'] = copy.deepcopy(other)
+    recorder.boundary(BoundaryRecord.from_mapping(boundary['record']), owners,
+                     boundary['stage'], boundary['task_metrics_raw'], boundary['native_time'])
+    stored = recorder.value['boundaries'][0]['owners']['owners']
+    assert stored['arm_hold']['fields']['history'] == other
+    assert stored['stability']['fields']['history']['value']['kind'] == 'content-ref'
+
+
+@pytest.mark.parametrize('selectors', [('history',), (('stability',),),
+    (('stability', ''),), ((None, 'history'),)])
+def test_invalid_scoped_selectors_fail_closed(episode, selectors):
+    with pytest.raises(ValueError, match='owner/field'):
+        ExecutionRecorder(EpisodeMetadata.from_mapping(episode['metadata']),
+                          episode['recipe'], owner_content_fields=selectors)
+
+
+def test_unknown_scoped_owner_fails_before_appending(episode):
+    recorder = ExecutionRecorder(EpisodeMetadata.from_mapping(episode['metadata']),
+        episode['recipe'], owner_content_fields=(('missing-owner', 'history'),))
+    boundary = episode['boundaries'][0]
+    with pytest.raises(ValueError, match='unknown content-addressed owner field'):
+        recorder.boundary(BoundaryRecord.from_mapping(boundary['record']),
+            expand_snapshot(boundary['owners'], episode['blobs']), boundary['stage'])
+    assert recorder.value['boundaries'] == [] and recorder.value['blobs'] == {}
+
+
+def test_live_storage_variant_is_explicit_scoped_and_versioned():
+    from task_env.diagnostics.phase1.integration.live_recording import storage_policy
+    baseline, baseline_scoped = storage_policy('owner-fields-v1')
+    candidate, candidate_scoped = storage_policy('stability-history-refs-v2')
+    assert baseline == candidate and 'history' not in baseline
+    assert baseline_scoped == () and candidate_scoped == (('stability', 'history'),)
+    with pytest.raises(ValueError, match='unsupported recorder storage variant'):
+        storage_policy('unknown')
+
+
+def test_lifecycle_runner_rejects_unknown_storage_before_creating_evidence(tmp_path):
+    from task_env.diagnostics.phase1.integration.lifecycle_full import run
+    output = tmp_path / 'must-not-exist'
+    with pytest.raises(ValueError, match='unsupported recorder storage variant'):
+        run(provider='mujoco', rate=500, output=output,
+            recording_storage_variant='unknown')
+    assert not output.exists()

@@ -138,10 +138,15 @@ def expand_snapshot(snapshot, blobs):
 
 class ExecutionRecorder:
     """Own the opt-in episode data; receive actual completed application events."""
-    def __init__(self, metadata, recipe, *, content_fields=None):
+    def __init__(self, metadata, recipe, *, content_fields=None, owner_content_fields=None):
         self.content_fields = frozenset(('_actions',) if content_fields is None else content_fields)
         if not self.content_fields or any(type(field) is not str for field in self.content_fields):
             raise ValueError('named content-addressed owner fields required')
+        scoped = tuple(() if owner_content_fields is None else owner_content_fields)
+        if any(not isinstance(pair, (tuple, list)) or len(pair) != 2 or
+               any(type(part) is not str or not part for part in pair) for pair in scoped):
+            raise ValueError('named owner/field content-addressed selectors required')
+        self.owner_content_fields = frozenset(tuple(pair) for pair in scoped)
         self.value={'schema':SCHEMA,'metadata':metadata.to_mapping(),'recipe':copy.deepcopy(recipe),
                     'boundaries':[],'transitions':[],'blobs':{},'stop_reason':''}
         from .clock import SCHEMA as CLOCK_SCHEMA
@@ -150,11 +155,15 @@ class ExecutionRecorder:
         self.frozen=False
 
     def boundary(self, record, owners, stage, task_metrics=None, native_time=None):
+        for owner_name, field in self.owner_content_fields:
+            if owner_name not in owners['owners'] or field not in owners['owners'][owner_name]['fields']:
+                raise ValueError('unknown content-addressed owner field')
         snap=copy.deepcopy(owners)
         # Lossless content-addressed stage plans; no duplicated mutable owner.
-        for owner in snap['owners'].values():
+        for owner_name, owner in snap['owners'].items():
             for field,entry in owner['fields'].items():
-                if field in self.content_fields and entry['present']:
+                if (field in self.content_fields or
+                        (owner_name, field) in self.owner_content_fields) and entry['present']:
                     h=digest(entry['value'])
                     if h not in self.value['blobs']:
                         self.value['blobs'][h]=entry['value']

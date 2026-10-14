@@ -186,14 +186,17 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2"):
 
 def run(*, provider: str, rate: int, output: Path,
         collision_ablation: str = "none",
-        trajectory_candidate: str = "lifecycle-v2") -> dict:
+        trajectory_candidate: str = "lifecycle-v2",
+        recording_storage_variant: str = "owner-fields-v1") -> dict:
     if provider != "mujoco":
         raise ValueError("this bounded lifecycle run is MuJoCo-only")
     if rate not in {20, 50, 100, 500}:
         raise ValueError("FULL lifecycle diagnostic requires a supported 20/50/100/500 Hz rate")
+    recording_module.storage_policy(recording_storage_variant)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     value = context(rate, trajectory_candidate)
+    value["recording_storage_variant"] = recording_storage_variant
     if collision_ablation != "none" and trajectory_candidate != "lifecycle-v2":
         raise ValueError("collision ablations are restricted to the frozen Lifecycle V2 baseline")
     collision_intervention = None
@@ -308,6 +311,7 @@ def run(*, provider: str, rate: int, output: Path,
         "task_artifact_hash": value["artifact"].identity_hash,
         "solution_identity": value["solution_identity"],
         "recipe_identity": value["recipe_identity"],
+        "recording_storage_variant": recording_storage_variant,
         "collision_intervention": collision_intervention,
         "trajectory_candidate": value["solution"].version,
         "completion_policy": value["solution"].completion_policy.value,
@@ -480,11 +484,14 @@ def main() -> int:
         choices=("none", "hand-peg-body-pair-exclude"),
         default="none",
     )
+    parser.add_argument("--recording-storage-variant", choices=recording_module.STORAGE_VARIANTS,
+                        default=recording_module.STORAGE_VARIANTS[0])
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run(provider=args.provider, rate=args.rate, output=args.output,
                  collision_ablation=args.collision_ablation,
-                 trajectory_candidate=args.trajectory_candidate)
+                 trajectory_candidate=args.trajectory_candidate,
+                 recording_storage_variant=args.recording_storage_variant)
     print(json.dumps({key: report.get(key) for key in (
         "pass", "failure_boundary", "expert_complete", "expert_failed",
         "completion_reason", "canonical_task_success", "coordinator_stage_sequence",
