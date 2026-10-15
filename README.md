@@ -2,7 +2,7 @@
 
 面向具身智能的统一多仿真器、多渲染器 API 与工具中枢。
 
-当前 [Phase-I mainline 状态](docs/module/task_env/phase1_mainline_integration/README.md)与 [v1.0 发布范围](docs/releases/v1.0/README.md)：v1.0.0 接受限定的 Phase I Core baseline；P1.0–P1.6 保留各自历史 bounded approvals；P1.7 deferred；P1.8 基础设施回归通过，但 NutAssembly GeoPhys FULL 与 formal D0–D2 尚未完成。原 Phase I blueprint 仍未完成，发布不扩大任何资格范围。
+当前公开基线是 [GeoChora v1.0.0](docs/releases/v1.0/README.md)：它接受限定的 Phase I Core baseline，不代表原 Phase I 蓝图已经完成，也不授予新的 task、provider 或 policy 资格。P1.0–P1.6 保留各自原有的 bounded approvals；P1.7 仍为 deferred；P1.8 的生命周期、时间基准、guard 和流式 recorder 基础设施在声明范围内完成测试，但 NutAssembly 结果仍属开发或诊断证据。完整状态见 [Phase I mainline 记录](docs/module/task_env/phase1_mainline_integration/README.md)、[v1.0 证据索引](docs/releases/v1.0/evidence_index.json) 和 [Phase I follow-up](docs/roadmap/phase1_followups.md)。
 
 Geochora 提供稳定、可复现、可验证的任务构造、仿真执行、渲染展示、数据记录、学习评估与证据接口。它不替代物理引擎、渲染器、控制器、规划器、学习算法或 Agent，而是让这些能力能够通过一致的公共契约组合和验收。
 
@@ -83,7 +83,7 @@ Frozen Task Artifact
 
 ## 当前 Core 能力
 
-`task_env` 当前提供或集成以下能力：
+`task_env` 当前提供或集成以下 Core 接口和实现：
 
 - 环境、任务、机器人、物体和场景注册与配置；
 - Gymnasium 风格的单环境生命周期，以及同构并行环境；
@@ -109,6 +109,10 @@ env = make_env(
 
 具体 API、配置和脚本入口见 [`task_env/README.md`](task_env/README.md) 及 [`task_env/doc/`](task_env/doc/)。
 
+接口存在、任务已注册或类可导入，都不等于某条 task/provider 路线已获资格。v1.0 的资格只覆盖发布证据索引所列的具体交集：P1.0–P1.6 各自保留原 bounded approvals；其中 P1.5 是限定的 PickCube expert 路线，P1.6 是限定的 PickCube V2a policy/D3 结果，不扩展为通用任务、learner 或 provider 批准。
+
+P1.7 的完整 visuomotor 路线尚未资格化。P1.8 的基础设施回归在声明范围内通过；NutAssembly MuJoCo 的 FULL/D0/D1/D2 结果仍是绑定其来源的 development evidence。GeoPhys 50/100/500 Hz FULL 均保留原 `stable_height_mismatch` Expert gate failure；shadow sequence 后出现的插入、释放和原始 task-success predicates 不构成 lifecycle-valid Expert completion。GeoPhys D0 50 Hz 在 transition 157 首次分歧、属 partial/invalid reconstruction；GeoPhys-source D1 和 frozen-action D2 是 diagnostic execution，不是 formal cross-provider qualification。Human review 与正式 P1.8 qualification 均未完成。细节和已知限制见 [发布进度表](docs/releases/v1.0/phase1_progress_summary.md) 与 [限制清单](docs/releases/v1.0/known_limitations.md)。
+
 ## 当前开发重点与能力边界
 
 当前首要目标是构建可靠的多仿真器调用与多渲染器展示中枢。下列参考任务是 Core 和 provider 的资格验证路线，而不是 Geochora 的产品定义：
@@ -131,7 +135,7 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 
 Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 qualified；具体计划以 [Phase I 蓝图](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) 为准。
 
-能力声明必须以实际执行证据为准。Go2 CUDA/static/RSL 是当前最强的 current-HEAD tested regression route；P1.0 bounded evidence 未将其提升为 formal qualification；PickCube 和 NutAssembly 已有任务语义与相关入口，但完整 physics execution、随机化可行性、采集/保存/加载/回放 oracle 仍在完善，不能仅因任务注册或类可导入就宣称端到端支持。
+能力声明必须以实际执行证据和对应的 bounded decision 为准。Go2 CUDA/static/RSL 是当前 HEAD 的回归路线，不扩大 task/provider qualification。PickCube 有 P1.5 expert 与 P1.6 policy 的限定结果，但不代表所有 provider、随机化分布或数据工作流均获批准；NutAssembly 的当前证据按上文区分为 MuJoCo development 与 GeoPhys diagnostics，不构成端到端或跨 provider 正式支持。
 
 首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 
@@ -211,7 +215,7 @@ Task Artifact version 1 -> 多个 Experiment
 Experiment             -> 一个 canonical Evidence package
 ```
 
-推荐的本地工作区结构如下。`workspace/` 不提交到 Git：
+推荐的本地工作区结构如下。生成的 `workspace/` 数据默认按本地工作区管理并由 `.gitignore` 忽略；仓库仍保留受治理的历史 P1.6 closure 文档例外（见 [P1.6 evidence index](workspace/qualification/phase1/p1_6_closure/evidence_index.md)）。不要仅因目录名为 `workspace/` 就自动删除、移动或取消跟踪已有证据。
 
 ```text
 workspace/
@@ -253,7 +257,7 @@ Geochora/
 │   └── external/mujoco_menagerie/  # 外部资产 Git 子模块，仅记录链接
 ├── GeoPhys/    # GeoPhys Git 子模块与 physics provider
 ├── docs/       # 当前架构、契约与治理规范
-└── workspace/  # 本地任务/实验工作区，不提交到 Git
+└── workspace/  # 默认本地/忽略；存在受治理的历史跟踪证据例外
 ```
 
 核心边界包括：
@@ -280,6 +284,9 @@ Geochora 后续可以位于 PhysPi 项目的路径下供其调用，但目录位
 | Phase I smoke 与验收规范（active plan，非 capability claim） | [`docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md`](docs/module/task_env/07-phase-1-smoke-testing-and-acceptance.md) |
 | Phase I 调试与恢复手册（active plan，非 capability claim） | [`docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md`](docs/module/task_env/08-phase-1-debug-and-recovery-playbook.md) |
 | TaskEnv API、脚本和 quickstart | [`task_env/README.md`](task_env/README.md) |
+| v1.0 release evidence and limits | [`docs/releases/v1.0/README.md`](docs/releases/v1.0/README.md) |
+| Phase I follow-up tracks | [`docs/roadmap/phase1_followups.md`](docs/roadmap/phase1_followups.md) |
+| Phase II roadmap | [`docs/roadmap/phase2_plan.md`](docs/roadmap/phase2_plan.md) |
 | GeoPhys provider | [`GeoPhys/README.md`](GeoPhys/README.md) |
 
 ## 开发与验证原则

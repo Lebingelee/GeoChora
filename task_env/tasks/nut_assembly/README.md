@@ -78,3 +78,35 @@ reconstruction checks.
 
 Detailed evidence and wrist-camera manifests are stored under
 `workspace/qualification/phase1/p1_8_nutassembly_r5_architecture/historical_current_crossover/stable_grasp_10n_candidate/`.
+
+## v1.0 release status and current diagnostics
+
+The v1.0.0 release accepts the scoped Phase I Core baseline and the P1.8
+infrastructure regression in its declared test scope. NutAssembly itself has
+no formal P1.8 qualification. The R5 stable-grasp result above is a MuJoCo G0
+development result; it does not cover loaded transport, the full task, D0–D2,
+or other providers.
+
+The later V5 guarded diagnostic candidate preserves the original Expert gate
+failure at `descend_to_handle / stable_height_mismatch` for GeoPhys 50/100/500
+Hz. An opt-in shadow progression executes the authored 11-stage sequence and
+reaches raw insertion/release/task-success predicates, but the lifecycle has
+no first-observed task-success event and `final_task_success_valid=false`.
+This is not canonical Expert completion or a FULL golden. The environment
+does not terminate or truncate during that diagnostic continuation.
+
+For cross-provider replay, D1 freezes the native target/applied-control stream;
+D2 freezes RequestedAction and recomputes control from live canonical state.
+All 12 GeoPhys-source D1/D2 runs at 50/100/500 Hz were execution-valid and had
+raw task metrics true, but they remain diagnostic. Cross-provider trajectory
+differences appear at the first control boundary and later reach roughly
+4.6–6.5 mm in Nut-to-EE relative-vector distance and 0.063–0.081 rad in Nut
+rotation. These are cross-provider differences, not the separate within-run
+same-provider D2 controller-recomputation drift. GeoPhys D0 was run only at
+50 Hz; it first diverges at transition 157 and is partial/invalid for exact
+reconstruction. Formal P1.8 Human review and cross-provider qualification are
+pending.
+
+See the [v1.0 release progress summary](../../../docs/releases/v1.0/phase1_progress_summary.md),
+[known limitations](../../../docs/releases/v1.0/known_limitations.md), and
+[P1.8 final diagnostic report](../../../docs/module/task_env/p1_8_integration/final_diagnostic_replay_20261014/P1.8_Final_Diagnostic_Replay_and_Branch_Integration_Report.md).

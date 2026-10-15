@@ -45,14 +45,18 @@ task_env.script.*
 ## 安装
 
 ~~~bash
-python -m pip install -e .
+git submodule update --init --recursive
+
 python -m pip install -r task_env/requirements.txt
 
 # 并行环境、SB3 或 PPO 需要
 python -m pip install -r task_env/requirements-rl.txt
 
+# 从仓库根目录运行示例时，让 Python 找到 GeoPhys 与当前源码树：
 export PYTHONPATH=GeoPhys/src:.
 ~~~
+
+仓库根目录没有 `pyproject.toml`、`setup.py` 或 `setup.cfg`，当前安装方式是按本地 Python 环境安装上述依赖，并从仓库根目录设置 `PYTHONPATH`。
 
 CPU 可以运行基础环境和 smoke；CUDA 训练与大规模并行需要可用的 NVIDIA 驱动。推荐使用仓库已有的 geophys Python 环境。
 

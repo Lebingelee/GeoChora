@@ -77,5 +77,7 @@ GeoPhys             -X-> Geochora/task_env
 
 Use the specialized skills when their trigger applies:
 `geochora-architecture-refactor`, `geochora-doc-governance`,
-`geochora-public-api-governance`, `geochora-test-governance`, and
-`task-env-experiment-evidence`.
+`geochora-public-api-governance`, and `geochora-test-governance`. When work
+concerns Task Artifact, Experiment, or Evidence, also read the canonical
+contract at
+`docs/module/task_env/03-task-artifact-experiment-evidence-contract.md`.

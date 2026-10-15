@@ -1,0 +1,53 @@
+{
+  "schema": "geochora-v1-post-release-cleanup-validation-v1",
+  "date": "2026-10-15",
+  "disposition": {
+    "DOCS_CONSISTENCY": "PASS",
+    "AGENT_INSTRUCTIONS": "PASS",
+    "ARCHIVE_VERIFICATION": "PARTIAL",
+    "P1_3_BRANCH_CLEANUP": "REMOVED",
+    "P1_6_BRANCH_CLEANUP": "RETAINED_BLOCKED",
+    "TWO_BRANCH_TARGET": "PARTIAL",
+    "DEVELOP_PUBLICATION": "PENDING",
+    "MAIN_AND_TAG_IMMUTABLE": "PENDING"
+  },
+  "checks": {
+    "documentation_links": "PASS; 9 Markdown files and 49 relative links; GeoPhys submodule README checked at pinned gitlink",
+    "quickstart_commands": "PASS; root public API and TaskEnv single_inline CPU Pendulum smoke passed; PPO and trajectory collect help expose documented options",
+    "no_invalid_editable_install": "PASS; no editable-install command remains in repository docs",
+    "skill_metadata_yaml": "PASS; all five skill agents/openai.yaml files parsed",
+    "release_json_yaml": "PASS; 21 JSON and 6 YAML files parsed",
+    "claims_match_release_and_diagnostic_records": "PASS; checked v1.0 progress, evidence index, known limitations, and P1.8 diagnostic report",
+    "git_diff_check": "PASS; tracked diff clean and touched files have no trailing whitespace",
+    "no_runtime_or_task_behavior_changes": "PASS; changed paths are documentation, instructions, and validation records only",
+    "p1_3_branch_cleanup": "PASS",
+    "p1_6_branch_cleanup": "RETAINED_BLOCKED",
+    "p1_3_local_evidence_preserved": "PASS_IN_PLACE_NOT_ARCHIVED",
+    "off_host_archive_backup": "NOT_VERIFIED",
+    "develop_publication": "PENDING",
+    "main_and_v1_0_0_tag_immutable": "PENDING"
+  },
+  "repository_refs_before_cleanup": {
+    "main": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "develop": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "v1_0_0_peeled": "42787f5e4f658a3f81fdd2140cf7544d6342c783"
+  },
+  "branch_dispositions": {
+    "p1_3": "REMOVED; worktree and ignored data retained in place",
+    "p1_6": "RETAINED_BLOCKED; primary worktree contains user changes",
+    "two_branch_target": "PARTIAL"
+  },
+  "publication": {
+    "commit": "PENDING",
+    "develop_after": "PENDING",
+    "main_after": "PENDING",
+    "tag_object_after": "PENDING",
+    "tag_peeled_after": "PENDING"
+  },
+  "notes": [
+    "No project-context page or open Library document session was available.",
+    "No off-host archive backup is claimed.",
+    "No runtime, task, provider, or qualification behavior was changed."
+  ]
+}
