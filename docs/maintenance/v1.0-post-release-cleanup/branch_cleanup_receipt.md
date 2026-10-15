@@ -30,6 +30,15 @@ safe later review.
 
 ## Release protection
 
-No command in this cleanup moved `main` or the annotated v1.0.0 tag. A fresh
-remote readback after publication is recorded in
-`validation_results.json`. Only `develop` receives the cleanup commit.
+The documentation commit `652899b2829eac226164d8eb5c2770b1c29c9233` was
+published to `develop` by normal fast-forward. The remote readback resolved
+`develop` to that commit, `main` to
+`42787f5e4f658a3f81fdd2140cf7544d6342c783`, and the annotated `v1.0.0` tag to
+object `17c3100d4fabcb061c23569dea49973ebd177d51` peeled to
+`42787f5e4f658a3f81fdd2140cf7544d6342c783`. The P1.3 remote ref was absent
+and P1.6 remained at `761f1fde7fb0d2831ab5ee780821637c0f7e6215`.
+
+This readback and the publication disposition are recorded in
+`validation_results.json`. A follow-up commit updates that validation record
+on `develop`; the final remote tip is read back after that push as well. No
+command in this cleanup moved `main` or the annotated v1.0.0 tag.

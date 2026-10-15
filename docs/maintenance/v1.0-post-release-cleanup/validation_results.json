@@ -8,8 +8,8 @@
     "P1_3_BRANCH_CLEANUP": "REMOVED",
     "P1_6_BRANCH_CLEANUP": "RETAINED_BLOCKED",
     "TWO_BRANCH_TARGET": "PARTIAL",
-    "DEVELOP_PUBLICATION": "PENDING",
-    "MAIN_AND_TAG_IMMUTABLE": "PENDING"
+    "DEVELOP_PUBLICATION": "PASS",
+    "MAIN_AND_TAG_IMMUTABLE": "VERIFIED"
   },
   "checks": {
     "documentation_links": "PASS; 9 Markdown files and 49 relative links; GeoPhys submodule README checked at pinned gitlink",
@@ -24,8 +24,10 @@
     "p1_6_branch_cleanup": "RETAINED_BLOCKED",
     "p1_3_local_evidence_preserved": "PASS_IN_PLACE_NOT_ARCHIVED",
     "off_host_archive_backup": "NOT_VERIFIED",
-    "develop_publication": "PENDING",
-    "main_and_v1_0_0_tag_immutable": "PENDING"
+    "develop_publication": "PASS; normal fast-forward push and remote readback passed",
+    "main_and_v1_0_0_tag_immutable": "VERIFIED; checked after documentation push",
+    "p1_3_remote_branch_absent": "PASS",
+    "p1_6_remote_branch_retained": "PASS"
   },
   "repository_refs_before_cleanup": {
     "main": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
@@ -39,11 +41,14 @@
     "two_branch_target": "PARTIAL"
   },
   "publication": {
-    "commit": "PENDING",
-    "develop_after": "PENDING",
-    "main_after": "PENDING",
-    "tag_object_after": "PENDING",
-    "tag_peeled_after": "PENDING"
+    "documentation_commit": "652899b2829eac226164d8eb5c2770b1c29c9233",
+    "develop_after_documentation_push": "652899b2829eac226164d8eb5c2770b1c29c9233",
+    "main_after_documentation_push": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "tag_object_after_documentation_push": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "tag_peeled_after_documentation_push": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "p1_3_remote_branch_after_push": null,
+    "p1_6_remote_branch_after_push": "761f1fde7fb0d2831ab5ee780821637c0f7e6215",
+    "validation_record_commit": "this file's commit; fast-forwarded to develop after the documentation readback"
   },
   "notes": [
     "No project-context page or open Library document session was available.",
