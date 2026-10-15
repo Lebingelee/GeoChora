@@ -64,9 +64,10 @@
 
 ## Repository hygiene and publishing
 
-- `workspace/` is ignored for generated local data by default, but tracked
-  historical P1.6 closure documents are governed exceptions. Inspect Git state
-  before moving or removing anything there.
+- Keep generated `workspace/` data untracked. Historical P1.6 closure metadata
+  belongs to the immutable v1.0.0 release tree; see
+  `docs/maintenance/p2_0_part_a.md`. Preserve local bytes, decisions, hashes,
+  and relocation mappings before cleanup.
 - The repository currently has no root `pyproject.toml`, `setup.py`, or
   `setup.cfg`; document dependency installation and `PYTHONPATH`, not editable
   installation, unless packaging metadata is added deliberately.

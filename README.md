@@ -215,7 +215,7 @@ Task Artifact version 1 -> 多个 Experiment
 Experiment             -> 一个 canonical Evidence package
 ```
 
-推荐的本地工作区结构如下。生成的 `workspace/` 数据默认按本地工作区管理并由 `.gitignore` 忽略；仓库仍保留受治理的历史 P1.6 closure 文档例外（见 [P1.6 evidence index](workspace/qualification/phase1/p1_6_closure/evidence_index.md)）。不要仅因目录名为 `workspace/` 就自动删除、移动或取消跟踪已有证据。
+推荐的本地工作区结构如下。`develop` 中的 `workspace/` 数据按本地工作区管理并由 `.gitignore` 忽略。历史 P1.6 closure metadata 的权威副本保留在不可变的 [v1.0.0 evidence index](https://github.com/Lebingelee/GeoChora/blob/v1.0.0/workspace/qualification/phase1/p1_6_closure/evidence_index.md) 及其 release tree；本地副本和归档仍需按 [Evidence 归档所有权规则](docs/maintenance/p2_0_part_a.md) 保全，不能仅因目录名为 `workspace/` 就删除证据。
 
 ```text
 workspace/
@@ -257,7 +257,7 @@ Geochora/
 │   └── external/mujoco_menagerie/  # 外部资产 Git 子模块，仅记录链接
 ├── GeoPhys/    # GeoPhys Git 子模块与 physics provider
 ├── docs/       # 当前架构、契约与治理规范
-└── workspace/  # 默认本地/忽略；存在受治理的历史跟踪证据例外
+└── workspace/  # 本地任务、实验、维护与归档证据；develop 不跟踪生成数据
 ```
 
 核心边界包括：
