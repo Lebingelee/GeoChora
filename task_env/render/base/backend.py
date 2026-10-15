@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Mapping
 from .contracts import (
     RenderBackendCapabilities,
     RenderBackendBuildError,
+    RenderBackendName,
 )
 
 if TYPE_CHECKING:
@@ -115,15 +116,80 @@ class SceneSourceBackend(RenderBackend):
             ) from exc
 
 
+@dataclass(frozen=True)
+class _BackendRegistration:
+    descriptor: RenderBackendDescriptor
+    aliases: tuple[str, ...] = ()
+    listed: bool = True
+
+
+# One metadata authority, shared by discovery and the concrete adapter classes.
+# Implementation paths are strings so neither discovery nor validation imports
+# a renderer. Order is the historical available_render_backends() order.
+_BACKEND_REGISTRATIONS = (
+    _BackendRegistration(RenderBackendDescriptor(
+        name=RenderBackendName.RAYTRACER.value,
+        capabilities=RenderBackendCapabilities(
+            supports_parallel=True,
+            supports_asset_instancing=True,
+            supports_shared_asset_table=True,
+            supports_gpu_geometry_instancing=True,
+            supports_batch_transform_update=True,
+            transform_transport="device_world_major",
+            output_transport="geophys_framebuffer",
+        ),
+        implementation="task_env.render.raytracer.backend.RaytracerRenderBackend",
+    )),
+    _BackendRegistration(RenderBackendDescriptor(
+        name=RenderBackendName.RASTERIZER.value,
+        capabilities=RenderBackendCapabilities(
+            supports_parallel=True,
+            supports_asset_instancing=False,
+            supports_shared_asset_table=False,
+            supports_gpu_geometry_instancing=False,
+            supports_batch_transform_update=False,
+            transform_transport="device_world_major",
+            output_transport="geophys_framebuffer",
+        ),
+        implementation="task_env.render.rasterizer.backend.RasterizerRenderBackend",
+    )),
+    _BackendRegistration(RenderBackendDescriptor(
+        name=RenderBackendName.FLORA.value,
+        capabilities=RenderBackendCapabilities(
+            supports_parallel=True,
+            supports_asset_instancing=True,
+            output_transport="external_host_rgba8",
+        ),
+        implementation="task_env.render.flora.backend.FloraRenderBackend",
+    )),
+    _BackendRegistration(
+        RenderBackendDescriptor(
+            name="mujoco_reference",
+            capabilities=RenderBackendCapabilities(
+                supports_parallel=False,
+                supports_asset_instancing=False,
+                output_transport="external_reference",
+            ),
+            implementation="task_env.render.base.backend.LegacyReferenceRenderBackend",
+        ),
+        aliases=("mujoco", "external_mujoco"),
+        listed=False,
+    ),
+)
+
+
+def _backend_registration(name: str) -> _BackendRegistration:
+    for registration in _BACKEND_REGISTRATIONS:
+        if name == registration.descriptor.name or name in registration.aliases:
+            return registration
+    raise KeyError(name)
+
+
 class LegacyReferenceRenderBackend(SceneSourceBackend):
     """Compatibility adapter for the existing MuJoCo reference renderer."""
 
-    name = "mujoco_reference"
-    capabilities = RenderBackendCapabilities(
-        supports_parallel=False,
-        supports_asset_instancing=False,
-        output_transport="external_reference",
-    )
+    name = _backend_registration("mujoco_reference").descriptor.name
+    capabilities = _backend_registration("mujoco_reference").descriptor.capabilities
 
     @property
     def source_backend_name(self) -> str:

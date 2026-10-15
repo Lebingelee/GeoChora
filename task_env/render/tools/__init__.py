@@ -6,7 +6,17 @@ from .backend_registry import (
     normalize_render_backend,
 )
 from .processing import RenderBuildRequest, RenderProcessor, build_task_visualizer
-from .camera import CameraPoseSink, InteractiveCameraController
+
+
+def __getattr__(name: str):
+    # Camera interaction uses Taichi; request/registry imports must stay inert.
+    if name in {"CameraPoseSink", "InteractiveCameraController"}:
+        from importlib import import_module
+
+        value = getattr(import_module(".camera", __name__), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(name)
 
 __all__ = [
     "available_render_backends",

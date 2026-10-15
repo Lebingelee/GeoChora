@@ -1,9 +1,9 @@
 """Backend contract smoke for the TaskEnv render boundary.
 
-This diagnostic does not create a Vulkan window or allocate a renderer.  It
-checks that all three TaskEnv backend implementations receive the same common
-construction request and that the Flora registration remains lazy until the
-backend is actually built.
+This provider-free diagnostic checks request forwarding through the real
+backend adapters. Only native construction endpoints are substituted: the
+raytracer has its own scene builder, while rasterizer/Flora delegate to the
+source factory. No window, renderer, or physics runtime is allocated.
 
 Run from the repository root::
 
@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from types import ModuleType
+from unittest.mock import patch
 
 from task_env.render import (
     RenderProcessor,
@@ -51,14 +53,40 @@ def run_backend_contract_smoke() -> dict[str, object]:
     calls: dict[str, dict[str, object]] = {}
     for backend_name in expected:
         source = _FakeSceneSource()
-        visualizer = RenderProcessor(
-            _RenderConfig(backend=backend_name)
-        ).build_visualizer(source)
-        if len(source.calls) != 1:
-            raise AssertionError(
-                f"backend {backend_name!r} did not make exactly one source call"
-            )
-        call = source.calls[0]
+        raytracer_calls = []
+        registrations = []
+        scene = ModuleType("task_env.render.raytracer.scene")
+
+        def build_raytracer(prepared_source, *, visualizer_kwargs):
+            if prepared_source is not source:
+                raise AssertionError("raytracer lost the prepared source")
+            raytracer_calls.append(dict(visualizer_kwargs))
+            return {"backend": "raytracer", "kwargs": dict(visualizer_kwargs)}
+
+        scene.build_raytracer_visualizer = build_raytracer
+        visualization = ModuleType("visualization")
+        visualization.__path__ = []
+        flora = ModuleType("visualization.flora")
+        flora.register_flora_backend = lambda: registrations.append("flora")
+        with patch.dict("sys.modules", {
+            scene.__name__: scene,
+            visualization.__name__: visualization,
+            flora.__name__: flora,
+        }):
+            processor = RenderProcessor(_RenderConfig(backend=backend_name))
+            if registrations:
+                raise AssertionError("Flora registered before visualizer construction")
+            visualizer = processor.build_visualizer(source)
+        if backend_name == "raytracer":
+            if source.calls or len(raytracer_calls) != 1:
+                raise AssertionError("raytracer must use its scene builder exactly once")
+            call = {"backend": "raytracer", **raytracer_calls[0]}
+        else:
+            if len(source.calls) != 1 or raytracer_calls:
+                raise AssertionError(f"backend {backend_name!r} must use its source factory once")
+            call = source.calls[0]
+        if registrations != (["flora"] if backend_name == "flora" else []):
+            raise AssertionError("unexpected Flora registration count")
         if visualizer["backend"] != backend_name:
             raise AssertionError(
                 f"backend {backend_name!r} was not passed to the scene source"
@@ -67,6 +95,8 @@ def run_backend_contract_smoke() -> dict[str, object]:
             ("width", 320),
             ("height", 240),
             ("render_preset", "interactive"),
+            ("render_preset_overrides", None),
+            ("use_render_snapshot", None),
             ("render_snapshot_consumer", "slot"),
         ):
             if call[field] != expected_value:
@@ -99,4 +129,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

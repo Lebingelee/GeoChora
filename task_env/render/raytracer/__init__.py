@@ -1,8 +1,20 @@
 """TaskEnv RayTracer backend and asset-instance lowering."""
 
 from .backend import RaytracerRenderBackend
-from .scene import build_raytracer_visualizer
-from .visualizer import RaytracerSceneVisualizer
+
+
+def __getattr__(name: str):
+    from importlib import import_module
+
+    if name == "build_raytracer_visualizer":
+        module = ".scene"
+    elif name == "RaytracerSceneVisualizer":
+        module = ".visualizer"
+    else:
+        raise AttributeError(name)
+    value = getattr(import_module(module, __name__), name)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "RaytracerRenderBackend",

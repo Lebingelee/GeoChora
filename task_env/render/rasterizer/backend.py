@@ -1,20 +1,11 @@
 """TaskEnv adapter for GeoPhys' internal rasterizer."""
 
-from ..base.backend import SceneSourceBackend
-from ..base.contracts import RenderBackendCapabilities
+from ..base.backend import SceneSourceBackend, _backend_registration
 
 
 class RasterizerRenderBackend(SceneSourceBackend):
-    name = "rasterizer"
-    capabilities = RenderBackendCapabilities(
-        supports_parallel=True,
-        supports_asset_instancing=False,
-        supports_shared_asset_table=False,
-        supports_gpu_geometry_instancing=False,
-        supports_batch_transform_update=False,
-        transform_transport="device_world_major",
-        output_transport="geophys_framebuffer",
-    )
+    name = _backend_registration("rasterizer").descriptor.name
+    capabilities = _backend_registration("rasterizer").descriptor.capabilities
 
     @property
     def source_backend_name(self) -> str:

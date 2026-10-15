@@ -2,22 +2,13 @@
 
 from typing import Mapping
 
-from ..base.backend import SceneSourceBackend
-from ..base.contracts import RenderBackendBuildError, RenderBackendCapabilities
-from .scene import build_raytracer_visualizer
+from ..base.backend import SceneSourceBackend, _backend_registration
+from ..base.contracts import RenderBackendBuildError
 
 
 class RaytracerRenderBackend(SceneSourceBackend):
-    name = "raytracer"
-    capabilities = RenderBackendCapabilities(
-        supports_parallel=True,
-        supports_asset_instancing=True,
-        supports_shared_asset_table=True,
-        supports_gpu_geometry_instancing=True,
-        supports_batch_transform_update=True,
-        transform_transport="device_world_major",
-        output_transport="geophys_framebuffer",
-    )
+    name = _backend_registration("raytracer").descriptor.name
+    capabilities = _backend_registration("raytracer").descriptor.capabilities
 
     @property
     def source_backend_name(self) -> str:
@@ -30,6 +21,8 @@ class RaytracerRenderBackend(SceneSourceBackend):
         request,
         visualizer_kwargs: Mapping[str, object] | None = None,
     ) -> object:
+        from .scene import build_raytracer_visualizer
+
         kwargs = dict(request.visualizer_kwargs())
         if visualizer_kwargs:
             kwargs.update(dict(visualizer_kwargs))

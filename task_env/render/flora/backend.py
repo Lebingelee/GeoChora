@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Mapping
 
-from ..base.backend import SceneSourceBackend
-from ..base.contracts import RenderBackendBuildError, RenderBackendCapabilities
+from ..base.backend import SceneSourceBackend, _backend_registration
+from ..base.contracts import RenderBackendBuildError
 
 
 class FloraRenderBackend(SceneSourceBackend):
@@ -17,12 +17,8 @@ class FloraRenderBackend(SceneSourceBackend):
     transform transport remains an explicit render-boundary readback.
     """
 
-    name = "flora"
-    capabilities = RenderBackendCapabilities(
-        supports_parallel=True,
-        supports_asset_instancing=True,
-        output_transport="external_host_rgba8",
-    )
+    name = _backend_registration("flora").descriptor.name
+    capabilities = _backend_registration("flora").descriptor.capabilities
 
     @property
     def source_backend_name(self) -> str:
