@@ -1,0 +1,3002 @@
+{
+  "date": "2026-10-16",
+  "identity_migration": {
+    "artifact": "unchanged; same serialized mapping and SHA-256 on both providers",
+    "configuration": "one tracked task recipe; solution table-top/contact-margin defaults now explicit; removed unused candidate/profile selectors and profile explanatory metadata; runtime/action/gripper/resolved controller and scene configuration match S2-C1",
+    "construction_id": {
+      "s2_c1": "nutassembly-r5-v5-outcome-reference-construction-v2",
+      "s2_c2": "nut-assembly-outcome-reference-v1"
+    },
+    "controller_recipe": "new identities per provider because the task and solution source ownership changed; exact source/config values are under provider_identities",
+    "outcome_policy": "identity unchanged; original strict lifecycle remains independently reported",
+    "solution_identity": {
+      "s2_c1": "4bf902b9b0bcc84955e9d51177c5811e65e02b2b540678fa14235d13d7cad923",
+      "s2_c2": "cba7a4932f4b36b01a855417833509d301746325ba93e85cd4cfed23a802a9b4"
+    },
+    "source_xml": "unchanged byte-for-byte at both provider intersections; GeoPhys 909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d; MuJoCo 29d06cc1296411c9bfa8b8d251e915291f47629f058afd3c125a2f02f1f2217a"
+  },
+  "implementation_commits": [
+    {
+      "commit": "ce1cd782ff26b52c4fd8738fbb1b595cfd6f44f2",
+      "subject": "consolidate selected task authoring"
+    },
+    {
+      "commit": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+      "subject": "explicitly retire package-level legacy builder and include package init in source identity"
+    }
+  ],
+  "native_resource_limits": {
+    "cpu_affinity": "up to four available CPUs; each route remained single-core CPU-bound",
+    "new_kernel_storage_errors": "none in either final run",
+    "per_run_wall_time_limit_s": 480,
+    "pre_run_disk_free_floor_bytes": 5368709120,
+    "pre_run_mem_available_floor_bytes": 3221225472,
+    "preflight_minimum_available_memory_bytes": 3221225472,
+    "preflight_minimum_disk_free_bytes": 5368709120,
+    "process_tree_rss_limit_bytes": 2147483648,
+    "qualification": "bounded functional regression only; no D0/D1/D2, P1.8 FULL, training, GPU, checkpoint inference or release qualification",
+    "serial": true
+  },
+  "provider_free_validation": {
+    "command": "PYTHONPATH=. python -m pytest -q task_env/diagnostics/tasks/test_reference_construction.py task_env/diagnostics/tasks/test_nutassembly_outcome.py task_env/diagnostics/tasks/test_selected_consumers.py task_env/diagnostics/tasks/test_record_cli_completion.py task_env/diagnostics/tasks/test_s2_b2_legacy_retirement.py",
+    "git_diff_check": "PASS",
+    "py_compile": "PASS",
+    "result": "93 passed in 154.30s",
+    "source_head": "4d6d65c55eca994b4317bcfb80797c69e48452c6"
+  },
+  "provider_identities": {
+    "geophys": {
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "base_controller_identity": "89eaab0630a9ada53a1db065d79aa4d3d996941791d49dd913fa0452565fb54e",
+      "c1_comparison": {
+        "baseline_T": 2380,
+        "baseline_h5": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_geophys_c1_verified/execution.h5",
+        "baseline_sha256": "0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982",
+        "baseline_target_link_errors": [],
+        "current_T": 2380,
+        "current_target_link_errors": [],
+        "equivalent": true,
+        "first_behavioral_divergence": null,
+        "normalizations": [
+          "record.expert_diagnostics.version (source-version label)",
+          "boundary owners.controller_identity",
+          "boundary owners.solution_identity",
+          "boundary owners.integrity_hash (derived from source identity)",
+          "boundary owners.owners[*].source_sha256",
+          "controller_identity in canonical targets",
+          "applied target_hash after verifying linkage to each canonical target"
+        ]
+      },
+      "checks": {
+        "T_equals_expert_transitions": true,
+        "T_plus_1_boundaries": true,
+        "all_acceptance_checks": true,
+        "all_stage_actions_and_endpoints": true,
+        "artifact_identity": true,
+        "c1_behavior_equivalent_after_identity_normalization": true,
+        "clock_100hz": true,
+        "control_hz_100": true,
+        "diagnostic_shadow_disabled": true,
+        "eleven_stages_in_order": true,
+        "expert_completed": true,
+        "five_native_substeps_per_control": true,
+        "guard_authorization_present": true,
+        "h5_exists_and_finalized": true,
+        "inserted_and_released": true,
+        "limits_unchanged": true,
+        "native_interval_count": true,
+        "native_substeps_observed": true,
+        "no_runtime_termination_or_truncation": true,
+        "no_unapproved_readiness_bypass": true,
+        "original_strict_gate_observation": true,
+        "outcome_complete": true,
+        "outcome_policy_identity": true,
+        "outcome_policy_version": true,
+        "outer_applied_controls": true,
+        "physics_dt_2ms": true,
+        "planned_trajectory_completed": true,
+        "recorded_clock_validation": true,
+        "recorded_native_interval_count": true,
+        "release_retreat_endpoint": true,
+        "reset_clock_zero": true,
+        "reset_seed": true,
+        "resolved_source_hashes_match": true,
+        "resolved_source_revision": true,
+        "selected_uid": true,
+        "storage_roundtrip": true,
+        "target_identity_links_valid_in_both_episodes": true,
+        "task_success": true,
+        "transition_boundary_structure": true
+      },
+      "construction_id": "nut-assembly-outcome-reference-v1",
+      "controller_identity": "094bbf739793610750e45c1dfd8442d1c680f7b1da4a5b8c537abcb08a92b759",
+      "episode": {
+        "T": 2380,
+        "boundaries": 2381,
+        "expert_transitions": 2380,
+        "grouped_control_interval_calls": 0,
+        "grouped_native_substeps_requested": 0,
+        "native_control_steps_expected": 11900,
+        "native_control_steps_observed": 11900,
+        "native_count_evidence_scope": "task_env.runtime.sessions.geophys._step_physics_once public session adapter dispatch",
+        "native_observation_source": "task_env.runtime.sessions.geophys._step_physics_once public session adapter dispatch",
+        "native_physics_step_calls_observed": 11900,
+        "solution_done": true,
+        "solution_failed": false,
+        "solution_failure_reason": null,
+        "task_metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.14815760333040046,
+          "eef_to_nut_dist": 0.16612352242962614,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999992743134499,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5802515745162964,
+          "nut_y": 0.04645608738064766,
+          "nut_yaw": -3.0740082719363806,
+          "nut_z": 0.47185584902763367,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.0014776614590101508,
+          "peg_z_error": -0.0011441509723663645,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.06758438165341252
+        },
+        "terminal_control_step": 2380,
+        "terminal_simulation_time_s": 23.799999999997688,
+        "terminated": false,
+        "truncated": false
+      },
+      "final_h5_path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+      "guard_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+      "outcome_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+      "physical_profile": {
+        "controller": {
+          "ik_damping": 0.02,
+          "ik_position_gain": 0.9,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "joint_position_correction_max_gain": 5.0,
+          "joint_position_correction_rate_s": 2500.0,
+          "max_cartesian_rotation_rate_rad_s": 4.5,
+          "max_cartesian_translation_rate_m_s": 0.75,
+          "max_joint_increment_rate_rad_s": 16.0,
+          "position_deadband_m": 0.002,
+          "rotation_deadband_rad": 0.01
+        },
+        "gripper": {
+          "force_adjust_error_exponent": 1.0,
+          "force_adjust_rate_m_s": 0.12,
+          "opening_rate_m_s": 0.24
+        },
+        "schema_version": "canonical-panda-production-r3-persistent-reference-v1"
+      },
+      "provider_contact_profile": null,
+      "recipe_identity": "7d1b20f30008383d9936355848b39abcb0af3d8780ee588a05c885529ced3286",
+      "recording": {
+        "T": 2380,
+        "boundaries": 2381,
+        "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+        "recorded_native_applications": 11900,
+        "schema": "canonical-execution-trajectory-v2",
+        "sha256": "e539d5b2662d191c0a70b1ac9dd593842279397b8627f0e3871d8852c78c2271",
+        "size_bytes": 9295444,
+        "verification": {
+          "byte_exact": true,
+          "chunk_bytes": 1048576,
+          "legacy_full_object_load_executed": false,
+          "logical_bytes": 69385301,
+          "logical_hash": "086725d336cbff8221126a3792c3b63bf6e5ffd52dc920b07ce0338db7201afc",
+          "read_compare_hash_s": 0.9721931160020176,
+          "version": "canonical-json-streaming-byte-roundtrip-v1"
+        }
+      },
+      "resolved_configuration": {
+        "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
+        "artifact": {
+          "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+          "artifact_version": "ver_p1_8_e_nutassembly_nominal_v1",
+          "initialization": {
+            "inherited_state_policy": "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
+            "joint_position": {
+              "panda-v1/finger_joint1": 0.03999999910593033,
+              "panda-v1/finger_joint2": 0.03999999910593033,
+              "panda-v1/joint1": -0.7186926603317261,
+              "panda-v1/joint2": -0.3159964382648468,
+              "panda-v1/joint3": 0.4473997950553894,
+              "panda-v1/joint4": -1.8042062520980835,
+              "panda-v1/joint5": 0.13533875346183777,
+              "panda-v1/joint6": 1.5183225870132446,
+              "panda-v1/joint7": 0.4517156779766083
+            },
+            "poses_world": {
+              "square-nut-v1": {
+                "position": [
+                  0.5084999799728394,
+                  -0.07500000298023224,
+                  0.4729999899864197
+                ],
+                "quaternion_wxyz": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            },
+            "randomization": [],
+            "reset_validity": "NA-S0_frozen_deterministic_semantic_joint_and_pose_request",
+            "schema_version": "initialization-v0",
+            "settle_steps": 0
+          },
+          "required_capabilities": {
+            "names": [
+              "articulated_robot",
+              "body_pose_query",
+              "frame_pose_query",
+              "free_body",
+              "joint_position_actuation",
+              "joint_state_query",
+              "rigid_body"
+            ]
+          },
+          "schema_version": "task-artifact-v0",
+          "semantics": {
+            "evaluator": "nut_assembly_state_v0",
+            "parameters_si": {
+              "grasp_distance": 0.09,
+              "gripper_closed_opening": 0.045,
+              "gripper_release_opening": 0.065,
+              "hover_xy_tolerance": 0.05,
+              "insert_xy_tolerance": 0.03,
+              "insert_yaw_tolerance": 0.35,
+              "lift_height": 0.05,
+              "nut_contact_margin": 0.001,
+              "nut_half_height": 0.01,
+              "nut_handle_local_x": 0.054,
+              "peg_half_height": 0.06,
+              "release_distance": 0.055,
+              "table_top_z": 0.462
+            },
+            "required_joints": [
+              "panda-v1/finger_joint1",
+              "panda-v1/finger_joint2"
+            ],
+            "required_poses": [
+              "square-nut-v1",
+              "square-peg-v1",
+              "panda-v1/ee"
+            ],
+            "schema_version": "semantics-v0",
+            "success_definition": "nut_on_square_peg_canonical_state_v0"
+          },
+          "task_id": "nut-assembly-square-v1",
+          "timebase": {
+            "action_hold": "zero_order_hold",
+            "control_dt": 0.01,
+            "control_substeps": 5,
+            "observation_sampling": "post_control_step",
+            "physics_dt": 0.002,
+            "semantic_sampling": "post_control_step"
+          },
+          "world": {
+            "action": {
+              "controller_target": "arm_joint_position_and_gripper",
+              "mode": "absolute_pose",
+              "reference": "world",
+              "rotation_representation": "quaternion_wxyz"
+            },
+            "convention": "SI_right_handed_z_up_wxyz",
+            "entities": [
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/table",
+                "collision_intent": "support_contact",
+                "frames": [],
+                "geometry": "box",
+                "joints": [],
+                "kind": "static",
+                "parameters_si": {
+                  "top_z": 0.462
+                },
+                "semantic_id": "tabletop-v1"
+              },
+              {
+                "asset_reference": "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
+                "collision_intent": "arm_hand_finger_collision",
+                "frames": [
+                  "panda-v1/base",
+                  "panda-v1/ee"
+                ],
+                "geometry": "referenced_articulation",
+                "joints": [
+                  "panda-v1/joint1",
+                  "panda-v1/joint2",
+                  "panda-v1/joint3",
+                  "panda-v1/joint4",
+                  "panda-v1/joint5",
+                  "panda-v1/joint6",
+                  "panda-v1/joint7",
+                  "panda-v1/finger_joint1",
+                  "panda-v1/finger_joint2"
+                ],
+                "kind": "embodiment",
+                "parameters_si": {},
+                "semantic_id": "panda-v1"
+              },
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/square-nut/nutassembly-nominal-v1",
+                "collision_intent": "table_hand_peg_contact",
+                "frames": [],
+                "geometry": "authored_compound",
+                "joints": [],
+                "kind": "movable",
+                "parameters_si": {
+                  "inertia_x": 7.5e-05,
+                  "inertia_y": 7.5e-05,
+                  "inertia_z": 0.000125,
+                  "mass": 0.1
+                },
+                "semantic_id": "square-nut-v1"
+              },
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/square-peg",
+                "collision_intent": "nut_contact",
+                "frames": [],
+                "geometry": "box",
+                "joints": [],
+                "kind": "static",
+                "parameters_si": {
+                  "half_height": 0.06
+                },
+                "semantic_id": "square-peg-v1"
+              },
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/round-peg",
+                "collision_intent": "nut_contact",
+                "frames": [],
+                "geometry": "cylinder",
+                "joints": [],
+                "kind": "static",
+                "parameters_si": {
+                  "half_height": 0.06
+                },
+                "semantic_id": "round-peg-v1"
+              }
+            ],
+            "observation_requirements": [
+              "task-env-state-v2",
+              "privileged_state"
+            ],
+            "randomization_dimensions": [],
+            "schema_version": "world-v0"
+          }
+        },
+        "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+        "base_controller_identity": "89eaab0630a9ada53a1db065d79aa4d3d996941791d49dd913fa0452565fb54e",
+        "completion_policy": "on_expert_terminal_stage",
+        "construction_id": "nut-assembly-outcome-reference-v1",
+        "contact_profile": "GeoPhys native Row-PGS",
+        "controller_identity": "094bbf739793610750e45c1dfd8442d1c680f7b1da4a5b8c537abcb08a92b759",
+        "dynamic_profile": {
+          "controller": {
+            "ik_damping": 0.02,
+            "ik_position_gain": 0.9,
+            "ik_rotation_gain": 0.65,
+            "ik_rotation_row_weight": 0.22,
+            "joint_position_correction_max_gain": 5.0,
+            "joint_position_correction_rate_s": 2500.0,
+            "max_cartesian_rotation_rate_rad_s": 4.5,
+            "max_cartesian_translation_rate_m_s": 0.75,
+            "max_joint_increment_rate_rad_s": 16.0,
+            "position_deadband_m": 0.002,
+            "rotation_deadband_rad": 0.01
+          },
+          "gripper": {
+            "force_adjust_error_exponent": 1.0,
+            "force_adjust_rate_m_s": 0.12,
+            "opening_rate_m_s": 0.24
+          },
+          "planner": {
+            "rotation_acceleration_rad_s2": 27.0,
+            "rotation_speed_rad_s": 3.0,
+            "settle_duration_s": 0.26666666666666666,
+            "translation_acceleration_m_s2": 0.45,
+            "translation_speed_m_s": 0.06
+          }
+        },
+        "gripper_feedback_hz": 500,
+        "guard_policy": {
+          "alternative_guard": {
+            "conditions": [
+              "measured_force_at_least_threshold",
+              "force_mode_active",
+              "force_mode_initialized",
+              "grasped_nut",
+              "pose_ready"
+            ],
+            "guard_id": "alternative_force_8n",
+            "meaning": "task-facing alternative authorization; never relabeled as Controller Readiness",
+            "threshold_N": 8.0
+          },
+          "deadline_from_close_stage_entry_s": 1.5,
+          "physical_force_regulation": {
+            "cap_N": 10.0,
+            "controller_law": "unchanged R3",
+            "target_N": 10.0
+          },
+          "post_authorization_hold_s": 0.1,
+          "primary_guard": {
+            "conditions": [
+              "controller_close_ready",
+              "grasped_nut",
+              "pose_ready"
+            ],
+            "guard_id": "primary_controller_close_ready",
+            "meaning": "historical canonical Controller Readiness"
+          },
+          "required_continuous_dwell_s": 0.1,
+          "sampling": {
+            "clock": "native-physics-state-and-canonical-controller-feedback",
+            "decision_boundary": "next-outer-control-boundary",
+            "missing_samples": "break-continuity; no interpolation",
+            "sample_interval": "measured-left-closed-right-open",
+            "sample_period_s": 0.002
+          },
+          "schema": "nutassembly-close-authorization-primary-alternative-v1",
+          "selection": {
+            "allow_early_alternative": true,
+            "same_sample_tie_break": "primary_controller_readiness_first"
+          }
+        },
+        "guard_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+        "outcome_policy": {
+          "action_budget_s": 60.0,
+          "allowlist": [
+            {
+              "axis_span_m": 0.0001,
+              "maximum_height_residual_m": 0.0003,
+              "maximum_occurrences": 1,
+              "minimum_pose_wait_s": 0.5,
+              "minimum_samples": 20,
+              "pose_position_ready_m": 0.007,
+              "pose_rotation_ready_rad": 0.06,
+              "reason": "stable_height_mismatch",
+              "speed_m_s": 0.002,
+              "stage": "descend_to_handle",
+              "window_s": 0.2
+            }
+          ],
+          "capture_rotation_slip_rad": 0.15,
+          "capture_translation_slip_m": 0.008,
+          "close_authorization_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+          "completion": "all authored actions and endpoint gates including retreat; final inserted_on_peg AND released_nut",
+          "diagnostic_shadow_override": false,
+          "fail_closed": [
+            "unlisted_or_repeated_failure",
+            "invalid_state_or_clock",
+            "capture_violation",
+            "task_failure",
+            "runtime_error",
+            "terminated",
+            "truncated",
+            "action_budget_exhausted",
+            "incomplete_plan_or_retreat"
+          ],
+          "force_target_and_cap_N": 10.0,
+          "ordered_stages": [
+            "approach_nut",
+            "descend_to_handle",
+            "close_gripper",
+            "verify_lift",
+            "raise_for_transport",
+            "move_above_square_peg",
+            "align_nut_yaw",
+            "descend_to_peg_top",
+            "lower_nut_to_table",
+            "open_gripper",
+            "release_retreat"
+          ],
+          "policy_id": "nutassembly-outcome-oriented-completion-v1",
+          "rate_hz": 100,
+          "strict_height_tolerance_m": 0.0001
+        },
+        "outcome_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+        "physical_profile": {
+          "controller": {
+            "ik_damping": 0.02,
+            "ik_position_gain": 0.9,
+            "ik_rotation_gain": 0.65,
+            "ik_rotation_row_weight": 0.22,
+            "joint_position_correction_max_gain": 5.0,
+            "joint_position_correction_rate_s": 2500.0,
+            "max_cartesian_rotation_rate_rad_s": 4.5,
+            "max_cartesian_translation_rate_m_s": 0.75,
+            "max_joint_increment_rate_rad_s": 16.0,
+            "position_deadband_m": 0.002,
+            "rotation_deadband_rad": 0.01
+          },
+          "gripper": {
+            "force_adjust_error_exponent": 1.0,
+            "force_adjust_rate_m_s": 0.12,
+            "opening_rate_m_s": 0.24
+          },
+          "schema_version": "canonical-panda-production-r3-persistent-reference-v1"
+        },
+        "provider_contact_profile": null,
+        "qualification": "NOT_REQUALIFIED",
+        "resolved_controller_action": {
+          "cartesian_error_growth_margin": 0.004,
+          "cartesian_max_brake_step": 0.06,
+          "cartesian_max_position_step": 0.0075,
+          "cartesian_max_rotation_step": 0.045,
+          "cartesian_velocity_brake_gain": 0.025,
+          "cartesian_velocity_deadband": 0.03,
+          "gripper_close_ctrl": 0.0,
+          "gripper_default_force_N": 5.0,
+          "gripper_open_ctrl": 255.0,
+          "gripper_opening_range_m": 0.08,
+          "gripper_position_stiffness_N_per_m": 2500.0,
+          "ik_damping": 0.02,
+          "ik_max_delta_q": 0.16,
+          "ik_position_deadband": 0.002,
+          "ik_position_gain": 0.9,
+          "ik_rotation_deadband": 0.01,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "joint_position_correction_gain": 5.0,
+          "rsl_action_profile": null
+        },
+        "resolved_controller_gripper": {
+          "force_adjust_step_m": 0.0012,
+          "force_deadband_N": 1.0,
+          "force_limit_N": 10.0,
+          "kind": "experimental_rate_limited",
+          "opening_step_m": 0.0024
+        },
+        "runtime_config": {
+          "action": {
+            "cartesian_error_growth_margin": 0.004,
+            "cartesian_max_brake_step": 0.06,
+            "cartesian_max_position_step": 0.025,
+            "cartesian_max_rotation_step": 0.2,
+            "cartesian_velocity_brake_gain": 0.025,
+            "cartesian_velocity_deadband": 0.03,
+            "gripper_close_ctrl": 0.0,
+            "gripper_default_force_N": 5.0,
+            "gripper_open_ctrl": 255.0,
+            "gripper_opening_range_m": 0.08,
+            "gripper_position_stiffness_N_per_m": 2500.0,
+            "ik_damping": 0.02,
+            "ik_max_delta_q": 0.1,
+            "ik_position_deadband": 0.006,
+            "ik_position_gain": 0.9,
+            "ik_rotation_deadband": 0.035,
+            "ik_rotation_gain": 0.65,
+            "ik_rotation_row_weight": 0.22,
+            "joint_position_correction_gain": 2.5,
+            "rsl_action_profile": null
+          },
+          "agents": {
+            "agent_uids": [
+              "panda-v1"
+            ]
+          },
+          "asset": {
+            "asset_version": "stage0"
+          },
+          "episode": {
+            "horizon": 1000,
+            "ignore_done": false,
+            "seed": null
+          },
+          "objects": {
+            "object_uids": [
+              "square-nut-v1",
+              "square-peg-v1",
+              "round-peg-v1"
+            ]
+          },
+          "observation": {
+            "include_privileged_state": true,
+            "schema_version": "task-env-state-v2"
+          },
+          "render": {
+            "backend": "raytracer",
+            "camera_obs": false,
+            "cameras": [],
+            "height": 720,
+            "parallel": {
+              "cell_depth": 1.0,
+              "cell_width": 1.0,
+              "columns": 16,
+              "num": 256,
+              "padding": 0.0
+            },
+            "render_preset": "interactive",
+            "training": {
+              "every": 1
+            },
+            "width": 960
+          },
+          "robot": {
+            "controller": {
+              "delta_translation_unit": "meters",
+              "kind": "absolute_pose",
+              "max_absolute_rotvec_angle_rad": 3.141592653589793,
+              "max_rotation_delta_rad": 0.2,
+              "max_translation_delta_m": 0.03,
+              "reference": "world",
+              "rotation_representation": "quaternion_wxyz"
+            },
+            "gripper": {
+              "force_adjust_step_m": 0.0001,
+              "force_deadband_N": 1.0,
+              "force_limit_N": 10.0,
+              "kind": "experimental_rate_limited",
+              "opening_step_m": 0.002
+            }
+          },
+          "runtime": {
+            "backend": "cpu",
+            "batch_physics_layout": "merged_scene",
+            "body_contact_solver_iterations": null,
+            "broadphase": "n2",
+            "control_substeps": 5,
+            "enable_domain_boundary_contact": false,
+            "enable_ground_contact": null,
+            "gravity": [
+              0.0,
+              0.0,
+              -9.81
+            ],
+            "integrator": "implicitfast",
+            "physics_dt": 0.002,
+            "prewarm": false,
+            "rigid_solver_backend": "row_pgs",
+            "static_template": {
+              "contact": {
+                "fixed_topology_child_schur": false,
+                "response_backend": "auto",
+                "root_factor_6x6": false
+              },
+              "contact_precision": "f64",
+              "cuda_graph": false,
+              "kinematics_backend": "torch",
+              "profile": "auto"
+            },
+            "world_randomization": {}
+          },
+          "scene": {
+            "scene_uid": "tabletop-v1"
+          },
+          "task": {
+            "success_definition": "nut_on_square_peg_v1",
+            "task_uid": "nut-assembly-square-v1"
+          }
+        },
+        "runtime_open_actuators": [
+          "actuator8"
+        ],
+        "runtime_source_bindings": {
+          "bodies": {
+            "panda-v1/base": "link0",
+            "round-peg-v1": "peg2",
+            "square-nut-v1": "SquareNut",
+            "square-peg-v1": "peg1"
+          },
+          "frames": {
+            "panda-v1/ee": "nutassembly_ee_site"
+          },
+          "free_joints": {
+            "square-nut-v1": "SquareNut_joint"
+          },
+          "joint_targets": {
+            "panda-v1/joint1": "actuator1",
+            "panda-v1/joint2": "actuator2",
+            "panda-v1/joint3": "actuator3",
+            "panda-v1/joint4": "actuator4",
+            "panda-v1/joint5": "actuator5",
+            "panda-v1/joint6": "actuator6",
+            "panda-v1/joint7": "actuator7"
+          },
+          "joints": {
+            "panda-v1/finger_joint1": "finger_joint1",
+            "panda-v1/finger_joint2": "finger_joint2",
+            "panda-v1/joint1": "joint1",
+            "panda-v1/joint2": "joint2",
+            "panda-v1/joint3": "joint3",
+            "panda-v1/joint4": "joint4",
+            "panda-v1/joint5": "joint5",
+            "panda-v1/joint6": "joint6",
+            "panda-v1/joint7": "joint7"
+          }
+        },
+        "solution_config": {
+          "action_budget_s": 60.0,
+          "approach_height_m": 0.12,
+          "capture_rotation_slip_rad": 0.15,
+          "capture_translation_slip_m": 0.008,
+          "close_settle_s": 0.5,
+          "close_transition_s": 0.3333333333333333,
+          "grasp_min_closing_force_N": 25.0,
+          "grasp_offset": [
+            0.0,
+            0.0,
+            0.045895
+          ],
+          "grasp_opening_m": 0.0,
+          "grasp_quaternion_wxyz": [
+            0.0038,
+            0.99993765,
+            0.0,
+            0.0105
+          ],
+          "gripper_stable_speed_m_s": 0.003,
+          "max_close_hold_s": 8.0,
+          "max_pose_hold_s": 3.0,
+          "max_release_hold_s": 3.0,
+          "max_stage_plan_s": 6.0,
+          "nut_contact_margin_m": 0.001,
+          "opening_range_m": 0.08,
+          "opening_stable_range_m": 0.0005,
+          "pose_position_ready_m": 0.007,
+          "pose_rotation_ready_rad": 0.06,
+          "readiness_stable_s": 0.1,
+          "release_settle_s": 0.6666666666666666,
+          "release_transition_s": 0.3333333333333333,
+          "rotation_acceleration_rad_s2": 27.0,
+          "rotation_speed_rad_s": 3.0,
+          "settle_duration_s": 0.26666666666666666,
+          "table_top_z_m": 0.462,
+          "translation_acceleration_m_s2": 0.45,
+          "translation_speed_m_s": 0.06,
+          "verify_lift_m": 0.1
+        },
+        "solution_identity": "cba7a4932f4b36b01a855417833509d301746325ba93e85cd4cfed23a802a9b4",
+        "solution_parameters": {
+          "descend_endpoint_command_bias_m": 0.0001605,
+          "minimum_pose_wait_s": 0.5,
+          "outward_handle_offset_m": 0.024,
+          "pose_span_m": 0.0001,
+          "pose_speed_m_s": 0.002,
+          "pose_window_s": 0.2,
+          "postclose_hold_s": 0.1,
+          "servo_height_compensation_m": 0.0006514767471602623,
+          "stable_height_tolerance_m": 0.0001,
+          "version": "nutassembly-r5-v5-guarded-outcome-solution-v2"
+        },
+        "source_revision": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+        "source_sha256": {
+          "task_env/assembly/nut_assembly.py": "a3e0cb73abdb0eba59e2fb379ea7f58647bbe3c490ff13dd25e2712529a86ea2",
+          "task_env/assembly/source.py": "27d4cbdfe4a20405615580c1012afbe379fe284bef917b47a0fe535268dbd82e",
+          "task_env/controllers/canonical/__init__.py": "430174d12b7460013f14b183d71aaa440d578d4a1d257d33857221bcd75a69ec",
+          "task_env/controllers/canonical/contracts.py": "8f96d7393ca090ab7a269912053ed9ae17faa9a54279ec19eb097d4fa45847c5",
+          "task_env/controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+          "task_env/controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+          "task_env/controllers/canonical/feedback.py": "f027996d43f2dce8055279d66577f6c5ef7223e9c4daa152ee70a933949756ea",
+          "task_env/controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+          "task_env/controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+          "task_env/controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+          "task_env/controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+          "task_env/controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+          "task_env/controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+          "task_env/objects/nut_assembly.py": "33b1c49fe3fd41d142cce8bbfd0fc6f82b076f9111a9f87e4128891518735da9",
+          "task_env/runtime/sessions/common.py": "3339fe1b0c95469a9ef848198b1ce659fdcbc4dd6d61fbc9c6f45fd06b1edccb",
+          "task_env/runtime/sessions/source.py": "e82d3bb439c0c603bef6a619fa180149467c31f4f26d428aa6b0c59667d49e5d",
+          "task_env/tasks/canonical_solution_lifecycle.py": "68b753d6b3e120c347d0c09663fdeb6ad255be0d683496446a8f0886483058dc",
+          "task_env/tasks/nut_assembly/__init__.py": "3fd0fc98cc2242735afc6ab16b2f3fc4a32fe4eb8ec5c5fc83b1e682be6fdd63",
+          "task_env/tasks/nut_assembly/config.yaml": "749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531",
+          "task_env/tasks/nut_assembly/solution.py": "f522b01b5519b245c91c61720f8ce08465246bb159c8c05f7c80e1729cd4afb8",
+          "task_env/tasks/nut_assembly/task.py": "08299f7c8a725140bc617cc899eaea91da2da5c09f4eb51467ff95ffa5bbabae",
+          "task_env/tasks/reference_env.py": "c13f67d23ca97fb34cb1bd9151778f65eaf424f1f868e040004e332a2c0e37d4",
+          "task_env/trajectory/canonical/execution.py": "21f0178779bae14467579d421db01179ddc47181856e8ca9c0c983c5503f3f63",
+          "task_env/trajectory/canonical/streaming.py": "1e0c4c449e2c8179c9a26925317e9d1599e2170b5c8977d8cd66ace26b63379f"
+        },
+        "source_xml_sha256": "909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d",
+        "task_recipe": {
+          "environment": {
+            "episode": {
+              "horizon": 1000
+            },
+            "observation": {
+              "include_privileged_state": true,
+              "schema_version": "task-env-state-v2"
+            },
+            "render": {
+              "backend": "raytracer",
+              "height": 720,
+              "parallel": {
+                "cell_depth": 1.0,
+                "cell_width": 1.0,
+                "columns": 16,
+                "num": 256,
+                "padding": 0.0
+              },
+              "training": {
+                "every": 1
+              },
+              "width": 960
+            },
+            "robot": {
+              "controller": {
+                "kind": "delta_pose",
+                "reference": "world",
+                "rotation_representation": "quaternion_wxyz"
+              }
+            },
+            "runtime": {
+              "rigid_solver_backend": "row_pgs"
+            }
+          },
+          "recipe": {
+            "action": {
+              "controller_kind": "absolute_pose",
+              "output": "arm_joint_position_and_gripper",
+              "reference": "world",
+              "rotation_representation": "quaternion_wxyz"
+            },
+            "agent_uids": [
+              "panda-v1"
+            ],
+            "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+            "artifact_version": "ver_p1_8_e_nutassembly_nominal_v1",
+            "asset": {
+              "freejoint_armature": 0.03,
+              "freejoint_damping": 2.0,
+              "nut_contact_margin_m": 0.001,
+              "nut_diagonal_inertia_kg_m2": [
+                7.5e-05,
+                7.5e-05,
+                0.000125
+              ],
+              "nut_mass_kg": 0.1
+            },
+            "asset_profile_id": "nutassembly-nominal-v1",
+            "construction_id": "nut-assembly-outcome-reference-v1",
+            "control_dt": 0.01,
+            "control_hz": 100,
+            "control_substeps": 5,
+            "controller": {
+              "action_overrides": {},
+              "dynamic_profile": {
+                "controller": {
+                  "ik_damping": 0.02,
+                  "ik_position_gain": 0.9,
+                  "ik_rotation_gain": 0.65,
+                  "ik_rotation_row_weight": 0.22,
+                  "joint_position_correction_max_gain": 5.0,
+                  "joint_position_correction_rate_s": 2500.0,
+                  "max_cartesian_rotation_rate_rad_s": 4.5,
+                  "max_cartesian_translation_rate_m_s": 0.75,
+                  "max_joint_increment_rate_rad_s": 16.0,
+                  "position_deadband_m": 0.002,
+                  "rotation_deadband_rad": 0.01
+                },
+                "gripper": {
+                  "force_adjust_error_exponent": 1.0,
+                  "force_adjust_rate_m_s": 0.12,
+                  "opening_rate_m_s": 0.24
+                },
+                "planner": {
+                  "rotation_acceleration_rad_s2": 27.0,
+                  "rotation_speed_rad_s": 3.0,
+                  "settle_duration_s": 0.26666666666666666,
+                  "translation_acceleration_m_s2": 0.45,
+                  "translation_speed_m_s": 0.06
+                }
+              },
+              "force_cap_N": 10.0,
+              "force_deadband_N": 1.0,
+              "force_target_N": 10.0,
+              "gripper_overrides": {
+                "force_limit_N": 10.0
+              },
+              "implementation": "ProductionCanonicalPandaControllerR3"
+            },
+            "object_uids": [
+              "square-nut-v1",
+              "square-peg-v1",
+              "round-peg-v1"
+            ],
+            "observation_requirements": [
+              "task-env-state-v2",
+              "privileged_state"
+            ],
+            "outcome_policy": {
+              "diagnostic_shadow_override": false,
+              "fail_closed": [
+                "unlisted_or_repeated_failure",
+                "invalid_state_or_clock",
+                "capture_violation",
+                "task_failure",
+                "runtime_error",
+                "terminated",
+                "truncated",
+                "action_budget_exhausted",
+                "incomplete_plan_or_retreat"
+              ],
+              "policy_id": "nutassembly-outcome-oriented-completion-v1",
+              "readiness_allowlist": {
+                "axis_span_m": 0.0001,
+                "maximum_height_residual_m": 0.0003,
+                "maximum_occurrences": 1,
+                "minimum_pose_wait_s": 0.5,
+                "pose_window_s": 0.2,
+                "reason": "stable_height_mismatch",
+                "speed_m_s": 0.002,
+                "stage": "descend_to_handle"
+              }
+            },
+            "physics_dt": 0.002,
+            "providers": {
+              "mujoco": {
+                "native_version_tested": "3.8.1",
+                "option_overrides": {
+                  "noslip_iterations": 2
+                }
+              }
+            },
+            "required_capabilities": [
+              "rigid_body",
+              "free_body",
+              "articulated_robot",
+              "joint_position_actuation",
+              "joint_state_query",
+              "body_pose_query",
+              "frame_pose_query"
+            ],
+            "reset": {
+              "control_policy": "arm_targets_at_initial_joints_gripper_open",
+              "inherited_state_policy": "zero_named_joint_and_entity_velocities",
+              "joint_position": {
+                "panda-v1/finger_joint1": 0.03999999910593033,
+                "panda-v1/finger_joint2": 0.03999999910593033,
+                "panda-v1/joint1": -0.7186926603317261,
+                "panda-v1/joint2": -0.3159964382648468,
+                "panda-v1/joint3": 0.4473997950553894,
+                "panda-v1/joint4": -1.8042062520980835,
+                "panda-v1/joint5": 0.13533875346183777,
+                "panda-v1/joint6": 1.5183225870132446,
+                "panda-v1/joint7": 0.4517156779766083
+              },
+              "nut_pose": {
+                "position": [
+                  0.5084999799728394,
+                  -0.07500000298023224,
+                  0.4729999899864197
+                ],
+                "quaternion_wxyz": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              "profile": "NA-S0",
+              "sample_name": "NA-S0",
+              "sampler_id": "nut-assembly-square-v1/NA-S0",
+              "sampler_version": "frozen-authored-v0",
+              "settle_steps": 0,
+              "task_seed": 19
+            },
+            "scene": {
+              "ee_site_name": "nutassembly_ee_site",
+              "gravity": [
+                0,
+                0,
+                -9.81
+              ],
+              "gripper_friction": "4.0 0.20 0.01",
+              "nut_friction": "1.6 0.08 0.001",
+              "nut_pose": {
+                "position": [
+                  0.5085000000000001,
+                  -0.075,
+                  0.47300000000000003
+                ],
+                "quaternion_wxyz": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              "peg_friction": "1 0.005 0.0001",
+              "peg_half_height": 0.06,
+              "round_peg_position": [
+                0.58,
+                -0.045,
+                0.522
+              ],
+              "round_peg_radius": 0.02,
+              "square_peg_half_width": 0.016,
+              "square_peg_position": [
+                0.58,
+                0.045,
+                0.522
+              ],
+              "table_body_position": [
+                0.5545,
+                0,
+                0.452
+              ],
+              "table_friction": "1.2 0.25 0.02",
+              "table_half_size": [
+                0.28,
+                0.2,
+                0.01
+              ],
+              "table_top_z": 0.462
+            },
+            "scene_uid": "tabletop-v1",
+            "semantic_parameters": {
+              "grasp_distance": 0.09,
+              "gripper_closed_opening": 0.045,
+              "gripper_release_opening": 0.065,
+              "hover_xy_tolerance": 0.05,
+              "insert_xy_tolerance": 0.03,
+              "insert_yaw_tolerance": 0.35,
+              "lift_height": 0.05,
+              "release_distance": 0.055
+            },
+            "solution": {
+              "config": {
+                "action_budget_s": 60.0,
+                "approach_height_m": 0.12,
+                "capture_rotation_slip_rad": 0.15,
+                "capture_translation_slip_m": 0.008,
+                "close_settle_s": 0.5,
+                "close_transition_s": 0.3333333333333333,
+                "grasp_min_closing_force_N": 25.0,
+                "grasp_offset": [
+                  0.0,
+                  0.0,
+                  0.045895
+                ],
+                "grasp_opening_m": 0.0,
+                "grasp_quaternion_wxyz": [
+                  0.0038,
+                  0.99993765,
+                  0.0,
+                  0.0105
+                ],
+                "gripper_stable_speed_m_s": 0.003,
+                "max_close_hold_s": 8.0,
+                "max_pose_hold_s": 3.0,
+                "max_release_hold_s": 3.0,
+                "max_stage_plan_s": 6.0,
+                "opening_range_m": 0.08,
+                "opening_stable_range_m": 0.0005,
+                "pose_position_ready_m": 0.007,
+                "pose_rotation_ready_rad": 0.06,
+                "readiness_stable_s": 0.1,
+                "release_settle_s": 0.6666666666666666,
+                "release_transition_s": 0.3333333333333333,
+                "verify_lift_m": 0.1
+              },
+              "version": "nutassembly-r5-v5-guarded-outcome-solution-v2"
+            },
+            "success_definition": "nut_on_square_peg_v1",
+            "task_uid": "nut-assembly-square-v1"
+          }
+        }
+      },
+      "resolved_configuration_receipt": {
+        "configuration_identity": "7d1b20f30008383d9936355848b39abcb0af3d8780ee588a05c885529ced3286",
+        "file_sha256": "c3fcc80aa6c1653d47a2804b6b5c4abf9bd901d14c81faa901c32c479958ddaf",
+        "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/resolved_construction.json"
+      },
+      "resolved_controller_action": {
+        "cartesian_error_growth_margin": 0.004,
+        "cartesian_max_brake_step": 0.06,
+        "cartesian_max_position_step": 0.0075,
+        "cartesian_max_rotation_step": 0.045,
+        "cartesian_velocity_brake_gain": 0.025,
+        "cartesian_velocity_deadband": 0.03,
+        "gripper_close_ctrl": 0.0,
+        "gripper_default_force_N": 5.0,
+        "gripper_open_ctrl": 255.0,
+        "gripper_opening_range_m": 0.08,
+        "gripper_position_stiffness_N_per_m": 2500.0,
+        "ik_damping": 0.02,
+        "ik_max_delta_q": 0.16,
+        "ik_position_deadband": 0.002,
+        "ik_position_gain": 0.9,
+        "ik_rotation_deadband": 0.01,
+        "ik_rotation_gain": 0.65,
+        "ik_rotation_row_weight": 0.22,
+        "joint_position_correction_gain": 5.0,
+        "rsl_action_profile": null
+      },
+      "resolved_controller_gripper": {
+        "force_adjust_step_m": 0.0012,
+        "force_deadband_N": 1.0,
+        "force_limit_N": 10.0,
+        "kind": "experimental_rate_limited",
+        "opening_step_m": 0.0024
+      },
+      "s2_c1_h5_path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_geophys_c1_verified/execution.h5",
+      "s2_c1_identity": {
+        "construction_id": "nutassembly-r5-v5-outcome-reference-construction-v2",
+        "controller_identity": "cad9c5d2c1a619bc2ae94e240e7d4fb632b60599a7073e5c5adc616af0311a8f",
+        "recipe_identity": "84912989baf66361da3db2f5dbd3f514c0a509ccf1aac479f0639ed567bfa3a5",
+        "solution_identity": "4bf902b9b0bcc84955e9d51177c5811e65e02b2b540678fa14235d13d7cad923",
+        "source_head": "5b0058010f5416eefb08ce59cec43770602fc336",
+        "task_artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe"
+      },
+      "s2_c1_resolved_configuration_identity": "84912989baf66361da3db2f5dbd3f514c0a509ccf1aac479f0639ed567bfa3a5",
+      "s2_c1_source_sha256": {
+        "asset_profile": "8345011c00f22eb100a1964965ca3bb3647d612410ad1ac7b33de0b41badc8e4",
+        "assets.py": "cfd605246ba3ea55b02cb601fea6457dbe5f6c29d9b8f46616dd47eee9101379",
+        "canonical_artifact.py": "11dc9338e73f6fb830cbcfe1e48dd21e0d2fbace97b41490ed6e276728f0aac2",
+        "canonical_initialization.json": "afb93f07f40d808aa21a1495449145e5e768b09cd0d5344e642bfce8000f1954",
+        "canonical_reset.py": "22515797ad42cc93e58fe2bdd6a2c2774f13791e675b781f4604a91827b6128e",
+        "canonical_semantics.py": "0ae45a7b5712f0c175cfc9b2e0c6fe38995a70ed96f43630005352830e002bd6",
+        "canonical_solution.py": "e71577367a6b7f3dbe3b5547097faed106506fa4734a6862e39756be994d8040",
+        "canonical_solution_v2.py": "f55b7e7109da27fd4b7a1a063abb9f469155b1552cc08d4da43d75b74f5558a8",
+        "canonical_source.py": "ed0151ebb9920a996e50ca1635337b5eefba58bbe508c59b0546980e8871c838",
+        "clearance_candidate_v3.py": "9572067bb977ae2a15c1cdea504120e9a8d6df6f7c670386ee276ffd6e3076ef",
+        "clearance_candidate_v5.py": "5544fc915e47e67677447c322bed1fece4d73b0b068f1fab394c014bddd2b44f",
+        "construction": "e54a409d151ab27b6b03e374c2d285fe83cf249a7667de06943abc2dd79ced98",
+        "controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+        "controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+        "controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+        "controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+        "controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+        "controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+        "controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+        "controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+        "default.yaml": "5295f300f34b5361428fcda2cdab1a946bad27ad87e6e32b8a04aa37e852b167",
+        "definition.py": "39d1fc80a4b9de11577d6042876c3fc42c0616c606ad4b2b913115f54cc1e536",
+        "dynamic_profile": "5bbac0ad315c07a1ced354ccee845acf92ae50ab1a125255d6af486c83d4c266",
+        "execution_support": "89d0b32df124d7478818e2786812b35115ba30c65ab1134e9971ac6b4bca3bfa",
+        "geometry.py": "68d6423b8a4284afcba5a486e826e7e4944344aae0ecfb4e1c55c2daa53ae0fe",
+        "guarded_authorization_candidate.py": "49c87b0cd15e940f0c9e5cff6ffc6a3450dae63eff6809f30f8147cecf68d40d",
+        "guarded_authorization_candidate_v2.py": "42c49826376cbfc5a41496e6765c8544e9e9e3ecd9de00bb8348b6f531a3a796",
+        "mujoco_contact_profile": "cd65d982f3640526636386c42ffa2de793ba32f245ddf0317322c4f40ca48973",
+        "outcome_solution.py": "57b8deeed5a43e7af3cf3edd3a904c70a8276d2c011726f5e569ab60f66a1138",
+        "reference_config.py": "a741ffa35029e6b4a029498c195df419f493639cbe6f8433193adb735f29519a",
+        "stable_grasp_candidate.py": "bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423"
+      },
+      "s2_c1_source_xml_sha256": "909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d",
+      "solution_identity": "cba7a4932f4b36b01a855417833509d301746325ba93e85cd4cfed23a802a9b4",
+      "source_revision": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+      "source_sha256": {
+        "task_env/assembly/nut_assembly.py": "a3e0cb73abdb0eba59e2fb379ea7f58647bbe3c490ff13dd25e2712529a86ea2",
+        "task_env/assembly/source.py": "27d4cbdfe4a20405615580c1012afbe379fe284bef917b47a0fe535268dbd82e",
+        "task_env/controllers/canonical/__init__.py": "430174d12b7460013f14b183d71aaa440d578d4a1d257d33857221bcd75a69ec",
+        "task_env/controllers/canonical/contracts.py": "8f96d7393ca090ab7a269912053ed9ae17faa9a54279ec19eb097d4fa45847c5",
+        "task_env/controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+        "task_env/controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+        "task_env/controllers/canonical/feedback.py": "f027996d43f2dce8055279d66577f6c5ef7223e9c4daa152ee70a933949756ea",
+        "task_env/controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+        "task_env/controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+        "task_env/controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+        "task_env/controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+        "task_env/controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+        "task_env/controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+        "task_env/objects/nut_assembly.py": "33b1c49fe3fd41d142cce8bbfd0fc6f82b076f9111a9f87e4128891518735da9",
+        "task_env/runtime/sessions/common.py": "3339fe1b0c95469a9ef848198b1ce659fdcbc4dd6d61fbc9c6f45fd06b1edccb",
+        "task_env/runtime/sessions/source.py": "e82d3bb439c0c603bef6a619fa180149467c31f4f26d428aa6b0c59667d49e5d",
+        "task_env/tasks/canonical_solution_lifecycle.py": "68b753d6b3e120c347d0c09663fdeb6ad255be0d683496446a8f0886483058dc",
+        "task_env/tasks/nut_assembly/__init__.py": "3fd0fc98cc2242735afc6ab16b2f3fc4a32fe4eb8ec5c5fc83b1e682be6fdd63",
+        "task_env/tasks/nut_assembly/config.yaml": "749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531",
+        "task_env/tasks/nut_assembly/solution.py": "f522b01b5519b245c91c61720f8ce08465246bb159c8c05f7c80e1729cd4afb8",
+        "task_env/tasks/nut_assembly/task.py": "08299f7c8a725140bc617cc899eaea91da2da5c09f4eb51467ff95ffa5bbabae",
+        "task_env/tasks/reference_env.py": "c13f67d23ca97fb34cb1bd9151778f65eaf424f1f868e040004e332a2c0e37d4",
+        "task_env/trajectory/canonical/execution.py": "21f0178779bae14467579d421db01179ddc47181856e8ca9c0c983c5503f3f63",
+        "task_env/trajectory/canonical/streaming.py": "1e0c4c449e2c8179c9a26925317e9d1599e2170b5c8977d8cd66ace26b63379f"
+      },
+      "source_xml_sha256": "909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d",
+      "status": "PASS",
+      "supervisor": {
+        "budget_s": 480.0,
+        "maximum_io_full_avg10": 0.18,
+        "maximum_memory_full_avg10": 0.18,
+        "minimum_MemAvailable_bytes": 3387142144,
+        "new_kernel_storage_error_entries": "",
+        "peak_sampled_process_tree_rss_bytes": 1019514880,
+        "status": "PASS",
+        "wall_time_s": 397.55984054699366
+      },
+      "task_outcome": {
+        "completion_policy_id": "nutassembly-outcome-oriented-completion-v1",
+        "completion_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+        "execution_lifecycle_status": "completed",
+        "original_expert_lifecycle_status": {
+          "assessment": "strict gate evaluated on current execution; not historical qualification",
+          "expert_complete": false,
+          "expert_failed": true,
+          "failure_reason": "stable_height_mismatch",
+          "failure_step": 362,
+          "policy": "original-guarded-v2-v5-strict-gates"
+        },
+        "outcome_complete": true,
+        "planned_trajectory_completed": true,
+        "readiness_warnings": [
+          {
+            "achieved_z_m": 0.5169236660003662,
+            "admission_limit_m": 0.0003,
+            "axis_span_m": [
+              2.086162567138672e-07,
+              6.183981895446777e-07,
+              1.9729137420654297e-05
+            ],
+            "control_step": 362,
+            "height_residual_m": -0.0002212406621264762,
+            "maximum_speed_m_s": 0.00022701785814031078,
+            "policy_id": "nutassembly-outcome-oriented-completion-v1",
+            "policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+            "position_error_m": 0.0008737011705097761,
+            "reason": "stable_height_mismatch",
+            "rotation_error_rad": 6.220453643262314e-05,
+            "sample_count": 21,
+            "simulation_time_s": 3.62,
+            "stage": "descend_to_handle",
+            "strict_expected_z_m": 0.5171449066624927,
+            "strict_tolerance_m": 0.0001,
+            "wait_s": 0.5
+          }
+        ],
+        "recorded_native_applications": 11900,
+        "runtime_error": null,
+        "stage_execution_receipts": [
+          {
+            "actions_executed": 96,
+            "completed_step": 96,
+            "endpoint_pass": true,
+            "entry_step": 0,
+            "planned_actions": 87,
+            "planned_actions_executed": 87,
+            "stage": "approach_nut"
+          },
+          {
+            "actions_executed": 266,
+            "completed_step": 362,
+            "endpoint_pass": true,
+            "entry_step": 96,
+            "planned_actions": 216,
+            "planned_actions_executed": 216,
+            "stage": "descend_to_handle"
+          },
+          {
+            "actions_executed": 94,
+            "completed_step": 456,
+            "endpoint_pass": true,
+            "entry_step": 362,
+            "planned_actions": 84,
+            "planned_actions_executed": 84,
+            "stage": "close_gripper"
+          },
+          {
+            "actions_executed": 296,
+            "completed_step": 752,
+            "endpoint_pass": true,
+            "entry_step": 456,
+            "planned_actions": 287,
+            "planned_actions_executed": 287,
+            "stage": "verify_lift"
+          },
+          {
+            "actions_executed": 260,
+            "completed_step": 1012,
+            "endpoint_pass": true,
+            "entry_step": 752,
+            "planned_actions": 251,
+            "planned_actions_executed": 251,
+            "stage": "raise_for_transport"
+          },
+          {
+            "actions_executed": 383,
+            "completed_step": 1395,
+            "endpoint_pass": true,
+            "entry_step": 1012,
+            "planned_actions": 374,
+            "planned_actions_executed": 374,
+            "stage": "move_above_square_peg"
+          },
+          {
+            "actions_executed": 45,
+            "completed_step": 1440,
+            "endpoint_pass": true,
+            "entry_step": 1395,
+            "planned_actions": 36,
+            "planned_actions_executed": 36,
+            "stage": "align_nut_yaw"
+          },
+          {
+            "actions_executed": 209,
+            "completed_step": 1649,
+            "endpoint_pass": true,
+            "entry_step": 1440,
+            "planned_actions": 200,
+            "planned_actions_executed": 200,
+            "stage": "descend_to_peg_top"
+          },
+          {
+            "actions_executed": 335,
+            "completed_step": 1984,
+            "endpoint_pass": true,
+            "entry_step": 1649,
+            "planned_actions": 326,
+            "planned_actions_executed": 326,
+            "stage": "lower_nut_to_table"
+          },
+          {
+            "actions_executed": 110,
+            "completed_step": 2094,
+            "endpoint_pass": true,
+            "entry_step": 1984,
+            "planned_actions": 101,
+            "planned_actions_executed": 101,
+            "stage": "open_gripper"
+          },
+          {
+            "actions_executed": 286,
+            "completed_step": 2380,
+            "endpoint_pass": true,
+            "entry_step": 2094,
+            "planned_actions": 277,
+            "planned_actions_executed": 277,
+            "stage": "release_retreat"
+          }
+        ],
+        "task_metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.14815760333040046,
+          "eef_to_nut_dist": 0.16612352242962614,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999992743134499,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5802515745162964,
+          "nut_y": 0.04645608738064766,
+          "nut_yaw": -3.0740082719363806,
+          "nut_z": 0.47185584902763367,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.0014776614590101508,
+          "peg_z_error": -0.0011441509723663645,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.06758438165341252
+        },
+        "task_success": true,
+        "terminal_physical_measurements": {
+          "gripper_opening": 0.07999992743134499,
+          "inserted_on_peg": true,
+          "nut_x": 0.5802515745162964,
+          "nut_y": 0.04645608738064766,
+          "nut_yaw": -3.0740082719363806,
+          "nut_z": 0.47185584902763367,
+          "peg_xy_error": 0.0014776614590101508,
+          "peg_z_error": -0.0011441509723663645,
+          "released_nut": true,
+          "task_success": true,
+          "yaw_error": 0.06758438165341252
+        },
+        "unapproved_override_used": false
+      }
+    },
+    "mujoco": {
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "base_controller_identity": "a9f1c0046e2676f411bb6de002a2894341b83b9aeb7df6bb4970fa7b7e5d8ce4",
+      "c1_comparison": {
+        "baseline_T": 2373,
+        "baseline_h5": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_mujoco_c1/execution.h5",
+        "baseline_sha256": "0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4",
+        "baseline_target_link_errors": [],
+        "current_T": 2373,
+        "current_target_link_errors": [],
+        "equivalent": true,
+        "first_behavioral_divergence": null,
+        "normalizations": [
+          "record.expert_diagnostics.version (source-version label)",
+          "boundary owners.controller_identity",
+          "boundary owners.solution_identity",
+          "boundary owners.integrity_hash (derived from source identity)",
+          "boundary owners.owners[*].source_sha256",
+          "controller_identity in canonical targets",
+          "applied target_hash after verifying linkage to each canonical target"
+        ]
+      },
+      "checks": {
+        "T_equals_expert_transitions": true,
+        "T_plus_1_boundaries": true,
+        "all_acceptance_checks": true,
+        "all_stage_actions_and_endpoints": true,
+        "artifact_identity": true,
+        "c1_behavior_equivalent_after_identity_normalization": true,
+        "clock_100hz": true,
+        "control_hz_100": true,
+        "diagnostic_shadow_disabled": true,
+        "eleven_stages_in_order": true,
+        "expert_completed": true,
+        "five_native_substeps_per_control": true,
+        "guard_authorization_present": true,
+        "h5_exists_and_finalized": true,
+        "inserted_and_released": true,
+        "limits_unchanged": true,
+        "native_interval_count": true,
+        "native_substeps_observed": true,
+        "no_runtime_termination_or_truncation": true,
+        "no_unapproved_readiness_bypass": true,
+        "original_strict_gate_observation": true,
+        "outcome_complete": true,
+        "outcome_policy_identity": true,
+        "outcome_policy_version": true,
+        "outer_applied_controls": true,
+        "physics_dt_2ms": true,
+        "planned_trajectory_completed": true,
+        "recorded_clock_validation": true,
+        "recorded_native_interval_count": true,
+        "release_retreat_endpoint": true,
+        "reset_clock_zero": true,
+        "reset_seed": true,
+        "resolved_source_hashes_match": true,
+        "resolved_source_revision": true,
+        "selected_uid": true,
+        "storage_roundtrip": true,
+        "target_identity_links_valid_in_both_episodes": true,
+        "task_success": true,
+        "transition_boundary_structure": true
+      },
+      "construction_id": "nut-assembly-outcome-reference-v1",
+      "controller_identity": "3c455279a7d54214fdb6a8d808df8a575d8938b17e92fd7df7d517bca2b492ec",
+      "episode": {
+        "T": 2373,
+        "boundaries": 2374,
+        "expert_transitions": 2373,
+        "grouped_control_interval_calls": 0,
+        "grouped_native_substeps_requested": 0,
+        "native_control_steps_expected": 11865,
+        "native_control_steps_observed": 11865,
+        "native_count_evidence_scope": "task_env.runtime.sessions.mujoco public session adapter mj_step call",
+        "native_observation_source": "task_env.runtime.sessions.mujoco public session adapter mj_step call",
+        "native_physics_step_calls_observed": 11865,
+        "solution_done": true,
+        "solution_failed": false,
+        "solution_failure_reason": null,
+        "task_metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.14753844938265465,
+          "eef_to_nut_dist": 0.16550458016192987,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999999998634447,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5803840536439357,
+          "nut_y": 0.045106637627848965,
+          "nut_yaw": 3.1407798595679117,
+          "nut_z": 0.4729734395987674,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.000398583473181732,
+          "peg_z_error": -2.6560401232611497e-05,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.0008127940218813912
+        },
+        "terminal_control_step": 2373,
+        "terminal_simulation_time_s": 23.73,
+        "terminated": false,
+        "truncated": false
+      },
+      "final_h5_path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+      "guard_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+      "outcome_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+      "physical_profile": {
+        "controller": {
+          "ik_damping": 0.02,
+          "ik_position_gain": 0.9,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "joint_position_correction_max_gain": 5.0,
+          "joint_position_correction_rate_s": 2500.0,
+          "max_cartesian_rotation_rate_rad_s": 4.5,
+          "max_cartesian_translation_rate_m_s": 0.75,
+          "max_joint_increment_rate_rad_s": 16.0,
+          "position_deadband_m": 0.002,
+          "rotation_deadband_rad": 0.01
+        },
+        "gripper": {
+          "force_adjust_error_exponent": 1.0,
+          "force_adjust_rate_m_s": 0.12,
+          "opening_rate_m_s": 0.24
+        },
+        "schema_version": "canonical-panda-production-r3-persistent-reference-v1"
+      },
+      "provider_contact_profile": {
+        "model_option_overrides": {
+          "noslip_iterations": 2
+        },
+        "native_version_tested": "3.8.1",
+        "provider": "mujoco",
+        "version": "mujoco-coulomb-noslip2-v1"
+      },
+      "recipe_identity": "9f5ce3206807557d1780e7de8d8abf6009dc237e11a799ac37878d8c2de3f767",
+      "recording": {
+        "T": 2373,
+        "boundaries": 2374,
+        "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+        "recorded_native_applications": 11865,
+        "schema": "canonical-execution-trajectory-v2",
+        "sha256": "f7000d28e1a47363542bef8909341d5a13582175941b394987ad31f0ea4f5931",
+        "size_bytes": 8827904,
+        "verification": {
+          "byte_exact": true,
+          "chunk_bytes": 1048576,
+          "legacy_full_object_load_executed": false,
+          "logical_bytes": 66426603,
+          "logical_hash": "844eeec473ac745dd1c9b04b85865d99be11087ff243abea24f1343126b6a072",
+          "read_compare_hash_s": 0.9225909060041886,
+          "version": "canonical-json-streaming-byte-roundtrip-v1"
+        }
+      },
+      "resolved_configuration": {
+        "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
+        "artifact": {
+          "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+          "artifact_version": "ver_p1_8_e_nutassembly_nominal_v1",
+          "initialization": {
+            "inherited_state_policy": "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
+            "joint_position": {
+              "panda-v1/finger_joint1": 0.03999999910593033,
+              "panda-v1/finger_joint2": 0.03999999910593033,
+              "panda-v1/joint1": -0.7186926603317261,
+              "panda-v1/joint2": -0.3159964382648468,
+              "panda-v1/joint3": 0.4473997950553894,
+              "panda-v1/joint4": -1.8042062520980835,
+              "panda-v1/joint5": 0.13533875346183777,
+              "panda-v1/joint6": 1.5183225870132446,
+              "panda-v1/joint7": 0.4517156779766083
+            },
+            "poses_world": {
+              "square-nut-v1": {
+                "position": [
+                  0.5084999799728394,
+                  -0.07500000298023224,
+                  0.4729999899864197
+                ],
+                "quaternion_wxyz": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            },
+            "randomization": [],
+            "reset_validity": "NA-S0_frozen_deterministic_semantic_joint_and_pose_request",
+            "schema_version": "initialization-v0",
+            "settle_steps": 0
+          },
+          "required_capabilities": {
+            "names": [
+              "articulated_robot",
+              "body_pose_query",
+              "frame_pose_query",
+              "free_body",
+              "joint_position_actuation",
+              "joint_state_query",
+              "rigid_body"
+            ]
+          },
+          "schema_version": "task-artifact-v0",
+          "semantics": {
+            "evaluator": "nut_assembly_state_v0",
+            "parameters_si": {
+              "grasp_distance": 0.09,
+              "gripper_closed_opening": 0.045,
+              "gripper_release_opening": 0.065,
+              "hover_xy_tolerance": 0.05,
+              "insert_xy_tolerance": 0.03,
+              "insert_yaw_tolerance": 0.35,
+              "lift_height": 0.05,
+              "nut_contact_margin": 0.001,
+              "nut_half_height": 0.01,
+              "nut_handle_local_x": 0.054,
+              "peg_half_height": 0.06,
+              "release_distance": 0.055,
+              "table_top_z": 0.462
+            },
+            "required_joints": [
+              "panda-v1/finger_joint1",
+              "panda-v1/finger_joint2"
+            ],
+            "required_poses": [
+              "square-nut-v1",
+              "square-peg-v1",
+              "panda-v1/ee"
+            ],
+            "schema_version": "semantics-v0",
+            "success_definition": "nut_on_square_peg_canonical_state_v0"
+          },
+          "task_id": "nut-assembly-square-v1",
+          "timebase": {
+            "action_hold": "zero_order_hold",
+            "control_dt": 0.01,
+            "control_substeps": 5,
+            "observation_sampling": "post_control_step",
+            "physics_dt": 0.002,
+            "semantic_sampling": "post_control_step"
+          },
+          "world": {
+            "action": {
+              "controller_target": "arm_joint_position_and_gripper",
+              "mode": "absolute_pose",
+              "reference": "world",
+              "rotation_representation": "quaternion_wxyz"
+            },
+            "convention": "SI_right_handed_z_up_wxyz",
+            "entities": [
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/table",
+                "collision_intent": "support_contact",
+                "frames": [],
+                "geometry": "box",
+                "joints": [],
+                "kind": "static",
+                "parameters_si": {
+                  "top_z": 0.462
+                },
+                "semantic_id": "tabletop-v1"
+              },
+              {
+                "asset_reference": "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
+                "collision_intent": "arm_hand_finger_collision",
+                "frames": [
+                  "panda-v1/base",
+                  "panda-v1/ee"
+                ],
+                "geometry": "referenced_articulation",
+                "joints": [
+                  "panda-v1/joint1",
+                  "panda-v1/joint2",
+                  "panda-v1/joint3",
+                  "panda-v1/joint4",
+                  "panda-v1/joint5",
+                  "panda-v1/joint6",
+                  "panda-v1/joint7",
+                  "panda-v1/finger_joint1",
+                  "panda-v1/finger_joint2"
+                ],
+                "kind": "embodiment",
+                "parameters_si": {},
+                "semantic_id": "panda-v1"
+              },
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/square-nut/nutassembly-nominal-v1",
+                "collision_intent": "table_hand_peg_contact",
+                "frames": [],
+                "geometry": "authored_compound",
+                "joints": [],
+                "kind": "movable",
+                "parameters_si": {
+                  "inertia_x": 7.5e-05,
+                  "inertia_y": 7.5e-05,
+                  "inertia_z": 0.000125,
+                  "mass": 0.1
+                },
+                "semantic_id": "square-nut-v1"
+              },
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/square-peg",
+                "collision_intent": "nut_contact",
+                "frames": [],
+                "geometry": "box",
+                "joints": [],
+                "kind": "static",
+                "parameters_si": {
+                  "half_height": 0.06
+                },
+                "semantic_id": "square-peg-v1"
+              },
+              {
+                "asset_reference": "nut-assembly-square-v1/task-local/round-peg",
+                "collision_intent": "nut_contact",
+                "frames": [],
+                "geometry": "cylinder",
+                "joints": [],
+                "kind": "static",
+                "parameters_si": {
+                  "half_height": 0.06
+                },
+                "semantic_id": "round-peg-v1"
+              }
+            ],
+            "observation_requirements": [
+              "task-env-state-v2",
+              "privileged_state"
+            ],
+            "randomization_dimensions": [],
+            "schema_version": "world-v0"
+          }
+        },
+        "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+        "base_controller_identity": "a9f1c0046e2676f411bb6de002a2894341b83b9aeb7df6bb4970fa7b7e5d8ce4",
+        "completion_policy": "on_expert_terminal_stage",
+        "construction_id": "nut-assembly-outcome-reference-v1",
+        "contact_profile": "MuJoCo NoSlip2",
+        "controller_identity": "3c455279a7d54214fdb6a8d808df8a575d8938b17e92fd7df7d517bca2b492ec",
+        "dynamic_profile": {
+          "controller": {
+            "ik_damping": 0.02,
+            "ik_position_gain": 0.9,
+            "ik_rotation_gain": 0.65,
+            "ik_rotation_row_weight": 0.22,
+            "joint_position_correction_max_gain": 5.0,
+            "joint_position_correction_rate_s": 2500.0,
+            "max_cartesian_rotation_rate_rad_s": 4.5,
+            "max_cartesian_translation_rate_m_s": 0.75,
+            "max_joint_increment_rate_rad_s": 16.0,
+            "position_deadband_m": 0.002,
+            "rotation_deadband_rad": 0.01
+          },
+          "gripper": {
+            "force_adjust_error_exponent": 1.0,
+            "force_adjust_rate_m_s": 0.12,
+            "opening_rate_m_s": 0.24
+          },
+          "planner": {
+            "rotation_acceleration_rad_s2": 27.0,
+            "rotation_speed_rad_s": 3.0,
+            "settle_duration_s": 0.26666666666666666,
+            "translation_acceleration_m_s2": 0.45,
+            "translation_speed_m_s": 0.06
+          }
+        },
+        "gripper_feedback_hz": 500,
+        "guard_policy": {
+          "alternative_guard": {
+            "conditions": [
+              "measured_force_at_least_threshold",
+              "force_mode_active",
+              "force_mode_initialized",
+              "grasped_nut",
+              "pose_ready"
+            ],
+            "guard_id": "alternative_force_8n",
+            "meaning": "task-facing alternative authorization; never relabeled as Controller Readiness",
+            "threshold_N": 8.0
+          },
+          "deadline_from_close_stage_entry_s": 1.5,
+          "physical_force_regulation": {
+            "cap_N": 10.0,
+            "controller_law": "unchanged R3",
+            "target_N": 10.0
+          },
+          "post_authorization_hold_s": 0.1,
+          "primary_guard": {
+            "conditions": [
+              "controller_close_ready",
+              "grasped_nut",
+              "pose_ready"
+            ],
+            "guard_id": "primary_controller_close_ready",
+            "meaning": "historical canonical Controller Readiness"
+          },
+          "required_continuous_dwell_s": 0.1,
+          "sampling": {
+            "clock": "native-physics-state-and-canonical-controller-feedback",
+            "decision_boundary": "next-outer-control-boundary",
+            "missing_samples": "break-continuity; no interpolation",
+            "sample_interval": "measured-left-closed-right-open",
+            "sample_period_s": 0.002
+          },
+          "schema": "nutassembly-close-authorization-primary-alternative-v1",
+          "selection": {
+            "allow_early_alternative": true,
+            "same_sample_tie_break": "primary_controller_readiness_first"
+          }
+        },
+        "guard_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+        "outcome_policy": {
+          "action_budget_s": 60.0,
+          "allowlist": [
+            {
+              "axis_span_m": 0.0001,
+              "maximum_height_residual_m": 0.0003,
+              "maximum_occurrences": 1,
+              "minimum_pose_wait_s": 0.5,
+              "minimum_samples": 20,
+              "pose_position_ready_m": 0.007,
+              "pose_rotation_ready_rad": 0.06,
+              "reason": "stable_height_mismatch",
+              "speed_m_s": 0.002,
+              "stage": "descend_to_handle",
+              "window_s": 0.2
+            }
+          ],
+          "capture_rotation_slip_rad": 0.15,
+          "capture_translation_slip_m": 0.008,
+          "close_authorization_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+          "completion": "all authored actions and endpoint gates including retreat; final inserted_on_peg AND released_nut",
+          "diagnostic_shadow_override": false,
+          "fail_closed": [
+            "unlisted_or_repeated_failure",
+            "invalid_state_or_clock",
+            "capture_violation",
+            "task_failure",
+            "runtime_error",
+            "terminated",
+            "truncated",
+            "action_budget_exhausted",
+            "incomplete_plan_or_retreat"
+          ],
+          "force_target_and_cap_N": 10.0,
+          "ordered_stages": [
+            "approach_nut",
+            "descend_to_handle",
+            "close_gripper",
+            "verify_lift",
+            "raise_for_transport",
+            "move_above_square_peg",
+            "align_nut_yaw",
+            "descend_to_peg_top",
+            "lower_nut_to_table",
+            "open_gripper",
+            "release_retreat"
+          ],
+          "policy_id": "nutassembly-outcome-oriented-completion-v1",
+          "rate_hz": 100,
+          "strict_height_tolerance_m": 0.0001
+        },
+        "outcome_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+        "physical_profile": {
+          "controller": {
+            "ik_damping": 0.02,
+            "ik_position_gain": 0.9,
+            "ik_rotation_gain": 0.65,
+            "ik_rotation_row_weight": 0.22,
+            "joint_position_correction_max_gain": 5.0,
+            "joint_position_correction_rate_s": 2500.0,
+            "max_cartesian_rotation_rate_rad_s": 4.5,
+            "max_cartesian_translation_rate_m_s": 0.75,
+            "max_joint_increment_rate_rad_s": 16.0,
+            "position_deadband_m": 0.002,
+            "rotation_deadband_rad": 0.01
+          },
+          "gripper": {
+            "force_adjust_error_exponent": 1.0,
+            "force_adjust_rate_m_s": 0.12,
+            "opening_rate_m_s": 0.24
+          },
+          "schema_version": "canonical-panda-production-r3-persistent-reference-v1"
+        },
+        "provider_contact_profile": {
+          "model_option_overrides": {
+            "noslip_iterations": 2
+          },
+          "native_version_tested": "3.8.1",
+          "provider": "mujoco",
+          "version": "mujoco-coulomb-noslip2-v1"
+        },
+        "qualification": "NOT_REQUALIFIED",
+        "resolved_controller_action": {
+          "cartesian_error_growth_margin": 0.004,
+          "cartesian_max_brake_step": 0.06,
+          "cartesian_max_position_step": 0.0075,
+          "cartesian_max_rotation_step": 0.045,
+          "cartesian_velocity_brake_gain": 0.025,
+          "cartesian_velocity_deadband": 0.03,
+          "gripper_close_ctrl": 0.0,
+          "gripper_default_force_N": 5.0,
+          "gripper_open_ctrl": 255.0,
+          "gripper_opening_range_m": 0.08,
+          "gripper_position_stiffness_N_per_m": 2500.0,
+          "ik_damping": 0.02,
+          "ik_max_delta_q": 0.16,
+          "ik_position_deadband": 0.002,
+          "ik_position_gain": 0.9,
+          "ik_rotation_deadband": 0.01,
+          "ik_rotation_gain": 0.65,
+          "ik_rotation_row_weight": 0.22,
+          "joint_position_correction_gain": 5.0,
+          "rsl_action_profile": null
+        },
+        "resolved_controller_gripper": {
+          "force_adjust_step_m": 0.0012,
+          "force_deadband_N": 1.0,
+          "force_limit_N": 10.0,
+          "kind": "experimental_rate_limited",
+          "opening_step_m": 0.0024
+        },
+        "runtime_config": {
+          "action": {
+            "cartesian_error_growth_margin": 0.004,
+            "cartesian_max_brake_step": 0.06,
+            "cartesian_max_position_step": 0.025,
+            "cartesian_max_rotation_step": 0.2,
+            "cartesian_velocity_brake_gain": 0.025,
+            "cartesian_velocity_deadband": 0.03,
+            "gripper_close_ctrl": 0.0,
+            "gripper_default_force_N": 5.0,
+            "gripper_open_ctrl": 255.0,
+            "gripper_opening_range_m": 0.08,
+            "gripper_position_stiffness_N_per_m": 2500.0,
+            "ik_damping": 0.02,
+            "ik_max_delta_q": 0.1,
+            "ik_position_deadband": 0.006,
+            "ik_position_gain": 0.9,
+            "ik_rotation_deadband": 0.035,
+            "ik_rotation_gain": 0.65,
+            "ik_rotation_row_weight": 0.22,
+            "joint_position_correction_gain": 2.5,
+            "rsl_action_profile": null
+          },
+          "agents": {
+            "agent_uids": [
+              "panda-v1"
+            ]
+          },
+          "asset": {
+            "asset_version": "stage0"
+          },
+          "episode": {
+            "horizon": 1000,
+            "ignore_done": false,
+            "seed": null
+          },
+          "objects": {
+            "object_uids": [
+              "square-nut-v1",
+              "square-peg-v1",
+              "round-peg-v1"
+            ]
+          },
+          "observation": {
+            "include_privileged_state": true,
+            "schema_version": "task-env-state-v2"
+          },
+          "render": {
+            "backend": "raytracer",
+            "camera_obs": false,
+            "cameras": [],
+            "height": 720,
+            "parallel": {
+              "cell_depth": 1.0,
+              "cell_width": 1.0,
+              "columns": 16,
+              "num": 256,
+              "padding": 0.0
+            },
+            "render_preset": "interactive",
+            "training": {
+              "every": 1
+            },
+            "width": 960
+          },
+          "robot": {
+            "controller": {
+              "delta_translation_unit": "meters",
+              "kind": "absolute_pose",
+              "max_absolute_rotvec_angle_rad": 3.141592653589793,
+              "max_rotation_delta_rad": 0.2,
+              "max_translation_delta_m": 0.03,
+              "reference": "world",
+              "rotation_representation": "quaternion_wxyz"
+            },
+            "gripper": {
+              "force_adjust_step_m": 0.0001,
+              "force_deadband_N": 1.0,
+              "force_limit_N": 10.0,
+              "kind": "experimental_rate_limited",
+              "opening_step_m": 0.002
+            }
+          },
+          "runtime": {
+            "backend": "cpu",
+            "batch_physics_layout": "merged_scene",
+            "body_contact_solver_iterations": null,
+            "broadphase": "n2",
+            "control_substeps": 5,
+            "enable_domain_boundary_contact": false,
+            "enable_ground_contact": null,
+            "gravity": [
+              0.0,
+              0.0,
+              -9.81
+            ],
+            "integrator": "implicitfast",
+            "physics_dt": 0.002,
+            "prewarm": false,
+            "rigid_solver_backend": "row_pgs",
+            "static_template": {
+              "contact": {
+                "fixed_topology_child_schur": false,
+                "response_backend": "auto",
+                "root_factor_6x6": false
+              },
+              "contact_precision": "f64",
+              "cuda_graph": false,
+              "kinematics_backend": "torch",
+              "profile": "auto"
+            },
+            "world_randomization": {}
+          },
+          "scene": {
+            "scene_uid": "tabletop-v1"
+          },
+          "task": {
+            "success_definition": "nut_on_square_peg_v1",
+            "task_uid": "nut-assembly-square-v1"
+          }
+        },
+        "runtime_open_actuators": [
+          "actuator8"
+        ],
+        "runtime_source_bindings": {
+          "bodies": {
+            "panda-v1/base": "link0",
+            "round-peg-v1": "peg2",
+            "square-nut-v1": "SquareNut",
+            "square-peg-v1": "peg1"
+          },
+          "frames": {
+            "panda-v1/ee": "nutassembly_ee_site"
+          },
+          "free_joints": {
+            "square-nut-v1": "SquareNut_joint"
+          },
+          "joint_targets": {
+            "panda-v1/joint1": "actuator1",
+            "panda-v1/joint2": "actuator2",
+            "panda-v1/joint3": "actuator3",
+            "panda-v1/joint4": "actuator4",
+            "panda-v1/joint5": "actuator5",
+            "panda-v1/joint6": "actuator6",
+            "panda-v1/joint7": "actuator7"
+          },
+          "joints": {
+            "panda-v1/finger_joint1": "finger_joint1",
+            "panda-v1/finger_joint2": "finger_joint2",
+            "panda-v1/joint1": "joint1",
+            "panda-v1/joint2": "joint2",
+            "panda-v1/joint3": "joint3",
+            "panda-v1/joint4": "joint4",
+            "panda-v1/joint5": "joint5",
+            "panda-v1/joint6": "joint6",
+            "panda-v1/joint7": "joint7"
+          }
+        },
+        "solution_config": {
+          "action_budget_s": 60.0,
+          "approach_height_m": 0.12,
+          "capture_rotation_slip_rad": 0.15,
+          "capture_translation_slip_m": 0.008,
+          "close_settle_s": 0.5,
+          "close_transition_s": 0.3333333333333333,
+          "grasp_min_closing_force_N": 25.0,
+          "grasp_offset": [
+            0.0,
+            0.0,
+            0.045895
+          ],
+          "grasp_opening_m": 0.0,
+          "grasp_quaternion_wxyz": [
+            0.0038,
+            0.99993765,
+            0.0,
+            0.0105
+          ],
+          "gripper_stable_speed_m_s": 0.003,
+          "max_close_hold_s": 8.0,
+          "max_pose_hold_s": 3.0,
+          "max_release_hold_s": 3.0,
+          "max_stage_plan_s": 6.0,
+          "nut_contact_margin_m": 0.001,
+          "opening_range_m": 0.08,
+          "opening_stable_range_m": 0.0005,
+          "pose_position_ready_m": 0.007,
+          "pose_rotation_ready_rad": 0.06,
+          "readiness_stable_s": 0.1,
+          "release_settle_s": 0.6666666666666666,
+          "release_transition_s": 0.3333333333333333,
+          "rotation_acceleration_rad_s2": 27.0,
+          "rotation_speed_rad_s": 3.0,
+          "settle_duration_s": 0.26666666666666666,
+          "table_top_z_m": 0.462,
+          "translation_acceleration_m_s2": 0.45,
+          "translation_speed_m_s": 0.06,
+          "verify_lift_m": 0.1
+        },
+        "solution_identity": "cba7a4932f4b36b01a855417833509d301746325ba93e85cd4cfed23a802a9b4",
+        "solution_parameters": {
+          "descend_endpoint_command_bias_m": 0.0001605,
+          "minimum_pose_wait_s": 0.5,
+          "outward_handle_offset_m": 0.024,
+          "pose_span_m": 0.0001,
+          "pose_speed_m_s": 0.002,
+          "pose_window_s": 0.2,
+          "postclose_hold_s": 0.1,
+          "servo_height_compensation_m": 0.0006514767471602623,
+          "stable_height_tolerance_m": 0.0001,
+          "version": "nutassembly-r5-v5-guarded-outcome-solution-v2"
+        },
+        "source_revision": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+        "source_sha256": {
+          "task_env/assembly/nut_assembly.py": "a3e0cb73abdb0eba59e2fb379ea7f58647bbe3c490ff13dd25e2712529a86ea2",
+          "task_env/assembly/source.py": "27d4cbdfe4a20405615580c1012afbe379fe284bef917b47a0fe535268dbd82e",
+          "task_env/controllers/canonical/__init__.py": "430174d12b7460013f14b183d71aaa440d578d4a1d257d33857221bcd75a69ec",
+          "task_env/controllers/canonical/contracts.py": "8f96d7393ca090ab7a269912053ed9ae17faa9a54279ec19eb097d4fa45847c5",
+          "task_env/controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+          "task_env/controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+          "task_env/controllers/canonical/feedback.py": "f027996d43f2dce8055279d66577f6c5ef7223e9c4daa152ee70a933949756ea",
+          "task_env/controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+          "task_env/controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+          "task_env/controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+          "task_env/controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+          "task_env/controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+          "task_env/controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+          "task_env/objects/nut_assembly.py": "33b1c49fe3fd41d142cce8bbfd0fc6f82b076f9111a9f87e4128891518735da9",
+          "task_env/runtime/sessions/common.py": "3339fe1b0c95469a9ef848198b1ce659fdcbc4dd6d61fbc9c6f45fd06b1edccb",
+          "task_env/runtime/sessions/source.py": "e82d3bb439c0c603bef6a619fa180149467c31f4f26d428aa6b0c59667d49e5d",
+          "task_env/tasks/canonical_solution_lifecycle.py": "68b753d6b3e120c347d0c09663fdeb6ad255be0d683496446a8f0886483058dc",
+          "task_env/tasks/nut_assembly/__init__.py": "3fd0fc98cc2242735afc6ab16b2f3fc4a32fe4eb8ec5c5fc83b1e682be6fdd63",
+          "task_env/tasks/nut_assembly/config.yaml": "749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531",
+          "task_env/tasks/nut_assembly/solution.py": "f522b01b5519b245c91c61720f8ce08465246bb159c8c05f7c80e1729cd4afb8",
+          "task_env/tasks/nut_assembly/task.py": "08299f7c8a725140bc617cc899eaea91da2da5c09f4eb51467ff95ffa5bbabae",
+          "task_env/tasks/reference_env.py": "c13f67d23ca97fb34cb1bd9151778f65eaf424f1f868e040004e332a2c0e37d4",
+          "task_env/trajectory/canonical/execution.py": "21f0178779bae14467579d421db01179ddc47181856e8ca9c0c983c5503f3f63",
+          "task_env/trajectory/canonical/streaming.py": "1e0c4c449e2c8179c9a26925317e9d1599e2170b5c8977d8cd66ace26b63379f"
+        },
+        "source_xml_sha256": "29d06cc1296411c9bfa8b8d251e915291f47629f058afd3c125a2f02f1f2217a",
+        "task_recipe": {
+          "environment": {
+            "episode": {
+              "horizon": 1000
+            },
+            "observation": {
+              "include_privileged_state": true,
+              "schema_version": "task-env-state-v2"
+            },
+            "render": {
+              "backend": "raytracer",
+              "height": 720,
+              "parallel": {
+                "cell_depth": 1.0,
+                "cell_width": 1.0,
+                "columns": 16,
+                "num": 256,
+                "padding": 0.0
+              },
+              "training": {
+                "every": 1
+              },
+              "width": 960
+            },
+            "robot": {
+              "controller": {
+                "kind": "delta_pose",
+                "reference": "world",
+                "rotation_representation": "quaternion_wxyz"
+              }
+            },
+            "runtime": {
+              "rigid_solver_backend": "row_pgs"
+            }
+          },
+          "recipe": {
+            "action": {
+              "controller_kind": "absolute_pose",
+              "output": "arm_joint_position_and_gripper",
+              "reference": "world",
+              "rotation_representation": "quaternion_wxyz"
+            },
+            "agent_uids": [
+              "panda-v1"
+            ],
+            "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+            "artifact_version": "ver_p1_8_e_nutassembly_nominal_v1",
+            "asset": {
+              "freejoint_armature": 0.03,
+              "freejoint_damping": 2.0,
+              "nut_contact_margin_m": 0.001,
+              "nut_diagonal_inertia_kg_m2": [
+                7.5e-05,
+                7.5e-05,
+                0.000125
+              ],
+              "nut_mass_kg": 0.1
+            },
+            "asset_profile_id": "nutassembly-nominal-v1",
+            "construction_id": "nut-assembly-outcome-reference-v1",
+            "control_dt": 0.01,
+            "control_hz": 100,
+            "control_substeps": 5,
+            "controller": {
+              "action_overrides": {},
+              "dynamic_profile": {
+                "controller": {
+                  "ik_damping": 0.02,
+                  "ik_position_gain": 0.9,
+                  "ik_rotation_gain": 0.65,
+                  "ik_rotation_row_weight": 0.22,
+                  "joint_position_correction_max_gain": 5.0,
+                  "joint_position_correction_rate_s": 2500.0,
+                  "max_cartesian_rotation_rate_rad_s": 4.5,
+                  "max_cartesian_translation_rate_m_s": 0.75,
+                  "max_joint_increment_rate_rad_s": 16.0,
+                  "position_deadband_m": 0.002,
+                  "rotation_deadband_rad": 0.01
+                },
+                "gripper": {
+                  "force_adjust_error_exponent": 1.0,
+                  "force_adjust_rate_m_s": 0.12,
+                  "opening_rate_m_s": 0.24
+                },
+                "planner": {
+                  "rotation_acceleration_rad_s2": 27.0,
+                  "rotation_speed_rad_s": 3.0,
+                  "settle_duration_s": 0.26666666666666666,
+                  "translation_acceleration_m_s2": 0.45,
+                  "translation_speed_m_s": 0.06
+                }
+              },
+              "force_cap_N": 10.0,
+              "force_deadband_N": 1.0,
+              "force_target_N": 10.0,
+              "gripper_overrides": {
+                "force_limit_N": 10.0
+              },
+              "implementation": "ProductionCanonicalPandaControllerR3"
+            },
+            "object_uids": [
+              "square-nut-v1",
+              "square-peg-v1",
+              "round-peg-v1"
+            ],
+            "observation_requirements": [
+              "task-env-state-v2",
+              "privileged_state"
+            ],
+            "outcome_policy": {
+              "diagnostic_shadow_override": false,
+              "fail_closed": [
+                "unlisted_or_repeated_failure",
+                "invalid_state_or_clock",
+                "capture_violation",
+                "task_failure",
+                "runtime_error",
+                "terminated",
+                "truncated",
+                "action_budget_exhausted",
+                "incomplete_plan_or_retreat"
+              ],
+              "policy_id": "nutassembly-outcome-oriented-completion-v1",
+              "readiness_allowlist": {
+                "axis_span_m": 0.0001,
+                "maximum_height_residual_m": 0.0003,
+                "maximum_occurrences": 1,
+                "minimum_pose_wait_s": 0.5,
+                "pose_window_s": 0.2,
+                "reason": "stable_height_mismatch",
+                "speed_m_s": 0.002,
+                "stage": "descend_to_handle"
+              }
+            },
+            "physics_dt": 0.002,
+            "providers": {
+              "mujoco": {
+                "native_version_tested": "3.8.1",
+                "option_overrides": {
+                  "noslip_iterations": 2
+                }
+              }
+            },
+            "required_capabilities": [
+              "rigid_body",
+              "free_body",
+              "articulated_robot",
+              "joint_position_actuation",
+              "joint_state_query",
+              "body_pose_query",
+              "frame_pose_query"
+            ],
+            "reset": {
+              "control_policy": "arm_targets_at_initial_joints_gripper_open",
+              "inherited_state_policy": "zero_named_joint_and_entity_velocities",
+              "joint_position": {
+                "panda-v1/finger_joint1": 0.03999999910593033,
+                "panda-v1/finger_joint2": 0.03999999910593033,
+                "panda-v1/joint1": -0.7186926603317261,
+                "panda-v1/joint2": -0.3159964382648468,
+                "panda-v1/joint3": 0.4473997950553894,
+                "panda-v1/joint4": -1.8042062520980835,
+                "panda-v1/joint5": 0.13533875346183777,
+                "panda-v1/joint6": 1.5183225870132446,
+                "panda-v1/joint7": 0.4517156779766083
+              },
+              "nut_pose": {
+                "position": [
+                  0.5084999799728394,
+                  -0.07500000298023224,
+                  0.4729999899864197
+                ],
+                "quaternion_wxyz": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              "profile": "NA-S0",
+              "sample_name": "NA-S0",
+              "sampler_id": "nut-assembly-square-v1/NA-S0",
+              "sampler_version": "frozen-authored-v0",
+              "settle_steps": 0,
+              "task_seed": 19
+            },
+            "scene": {
+              "ee_site_name": "nutassembly_ee_site",
+              "gravity": [
+                0,
+                0,
+                -9.81
+              ],
+              "gripper_friction": "4.0 0.20 0.01",
+              "nut_friction": "1.6 0.08 0.001",
+              "nut_pose": {
+                "position": [
+                  0.5085000000000001,
+                  -0.075,
+                  0.47300000000000003
+                ],
+                "quaternion_wxyz": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              "peg_friction": "1 0.005 0.0001",
+              "peg_half_height": 0.06,
+              "round_peg_position": [
+                0.58,
+                -0.045,
+                0.522
+              ],
+              "round_peg_radius": 0.02,
+              "square_peg_half_width": 0.016,
+              "square_peg_position": [
+                0.58,
+                0.045,
+                0.522
+              ],
+              "table_body_position": [
+                0.5545,
+                0,
+                0.452
+              ],
+              "table_friction": "1.2 0.25 0.02",
+              "table_half_size": [
+                0.28,
+                0.2,
+                0.01
+              ],
+              "table_top_z": 0.462
+            },
+            "scene_uid": "tabletop-v1",
+            "semantic_parameters": {
+              "grasp_distance": 0.09,
+              "gripper_closed_opening": 0.045,
+              "gripper_release_opening": 0.065,
+              "hover_xy_tolerance": 0.05,
+              "insert_xy_tolerance": 0.03,
+              "insert_yaw_tolerance": 0.35,
+              "lift_height": 0.05,
+              "release_distance": 0.055
+            },
+            "solution": {
+              "config": {
+                "action_budget_s": 60.0,
+                "approach_height_m": 0.12,
+                "capture_rotation_slip_rad": 0.15,
+                "capture_translation_slip_m": 0.008,
+                "close_settle_s": 0.5,
+                "close_transition_s": 0.3333333333333333,
+                "grasp_min_closing_force_N": 25.0,
+                "grasp_offset": [
+                  0.0,
+                  0.0,
+                  0.045895
+                ],
+                "grasp_opening_m": 0.0,
+                "grasp_quaternion_wxyz": [
+                  0.0038,
+                  0.99993765,
+                  0.0,
+                  0.0105
+                ],
+                "gripper_stable_speed_m_s": 0.003,
+                "max_close_hold_s": 8.0,
+                "max_pose_hold_s": 3.0,
+                "max_release_hold_s": 3.0,
+                "max_stage_plan_s": 6.0,
+                "opening_range_m": 0.08,
+                "opening_stable_range_m": 0.0005,
+                "pose_position_ready_m": 0.007,
+                "pose_rotation_ready_rad": 0.06,
+                "readiness_stable_s": 0.1,
+                "release_settle_s": 0.6666666666666666,
+                "release_transition_s": 0.3333333333333333,
+                "verify_lift_m": 0.1
+              },
+              "version": "nutassembly-r5-v5-guarded-outcome-solution-v2"
+            },
+            "success_definition": "nut_on_square_peg_v1",
+            "task_uid": "nut-assembly-square-v1"
+          }
+        }
+      },
+      "resolved_configuration_receipt": {
+        "configuration_identity": "9f5ce3206807557d1780e7de8d8abf6009dc237e11a799ac37878d8c2de3f767",
+        "file_sha256": "27276d133c7463ecd367e5f7c39178eb5d115bfb159cad01509ff6f436ab14b6",
+        "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/resolved_construction.json"
+      },
+      "resolved_controller_action": {
+        "cartesian_error_growth_margin": 0.004,
+        "cartesian_max_brake_step": 0.06,
+        "cartesian_max_position_step": 0.0075,
+        "cartesian_max_rotation_step": 0.045,
+        "cartesian_velocity_brake_gain": 0.025,
+        "cartesian_velocity_deadband": 0.03,
+        "gripper_close_ctrl": 0.0,
+        "gripper_default_force_N": 5.0,
+        "gripper_open_ctrl": 255.0,
+        "gripper_opening_range_m": 0.08,
+        "gripper_position_stiffness_N_per_m": 2500.0,
+        "ik_damping": 0.02,
+        "ik_max_delta_q": 0.16,
+        "ik_position_deadband": 0.002,
+        "ik_position_gain": 0.9,
+        "ik_rotation_deadband": 0.01,
+        "ik_rotation_gain": 0.65,
+        "ik_rotation_row_weight": 0.22,
+        "joint_position_correction_gain": 5.0,
+        "rsl_action_profile": null
+      },
+      "resolved_controller_gripper": {
+        "force_adjust_step_m": 0.0012,
+        "force_deadband_N": 1.0,
+        "force_limit_N": 10.0,
+        "kind": "experimental_rate_limited",
+        "opening_step_m": 0.0024
+      },
+      "s2_c1_h5_path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_mujoco_c1/execution.h5",
+      "s2_c1_identity": {
+        "construction_id": "nutassembly-r5-v5-outcome-reference-construction-v2",
+        "controller_identity": "ce29b631ef50e842bbc0d51a5350ac668e9dca431caefc6a57afeedeb2ee05f3",
+        "recipe_identity": "c6747b2634c50f00703df2f09db179eb0e806cd6bfb411e79155d95b7e35ec46",
+        "solution_identity": "4bf902b9b0bcc84955e9d51177c5811e65e02b2b540678fa14235d13d7cad923",
+        "source_head": "5b0058010f5416eefb08ce59cec43770602fc336",
+        "task_artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe"
+      },
+      "s2_c1_resolved_configuration_identity": "c6747b2634c50f00703df2f09db179eb0e806cd6bfb411e79155d95b7e35ec46",
+      "s2_c1_source_sha256": {
+        "asset_profile": "8345011c00f22eb100a1964965ca3bb3647d612410ad1ac7b33de0b41badc8e4",
+        "assets.py": "cfd605246ba3ea55b02cb601fea6457dbe5f6c29d9b8f46616dd47eee9101379",
+        "canonical_artifact.py": "11dc9338e73f6fb830cbcfe1e48dd21e0d2fbace97b41490ed6e276728f0aac2",
+        "canonical_initialization.json": "afb93f07f40d808aa21a1495449145e5e768b09cd0d5344e642bfce8000f1954",
+        "canonical_reset.py": "22515797ad42cc93e58fe2bdd6a2c2774f13791e675b781f4604a91827b6128e",
+        "canonical_semantics.py": "0ae45a7b5712f0c175cfc9b2e0c6fe38995a70ed96f43630005352830e002bd6",
+        "canonical_solution.py": "e71577367a6b7f3dbe3b5547097faed106506fa4734a6862e39756be994d8040",
+        "canonical_solution_v2.py": "f55b7e7109da27fd4b7a1a063abb9f469155b1552cc08d4da43d75b74f5558a8",
+        "canonical_source.py": "ed0151ebb9920a996e50ca1635337b5eefba58bbe508c59b0546980e8871c838",
+        "clearance_candidate_v3.py": "9572067bb977ae2a15c1cdea504120e9a8d6df6f7c670386ee276ffd6e3076ef",
+        "clearance_candidate_v5.py": "5544fc915e47e67677447c322bed1fece4d73b0b068f1fab394c014bddd2b44f",
+        "construction": "e54a409d151ab27b6b03e374c2d285fe83cf249a7667de06943abc2dd79ced98",
+        "controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+        "controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+        "controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+        "controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+        "controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+        "controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+        "controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+        "controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+        "default.yaml": "5295f300f34b5361428fcda2cdab1a946bad27ad87e6e32b8a04aa37e852b167",
+        "definition.py": "39d1fc80a4b9de11577d6042876c3fc42c0616c606ad4b2b913115f54cc1e536",
+        "dynamic_profile": "5bbac0ad315c07a1ced354ccee845acf92ae50ab1a125255d6af486c83d4c266",
+        "execution_support": "89d0b32df124d7478818e2786812b35115ba30c65ab1134e9971ac6b4bca3bfa",
+        "geometry.py": "68d6423b8a4284afcba5a486e826e7e4944344aae0ecfb4e1c55c2daa53ae0fe",
+        "guarded_authorization_candidate.py": "49c87b0cd15e940f0c9e5cff6ffc6a3450dae63eff6809f30f8147cecf68d40d",
+        "guarded_authorization_candidate_v2.py": "42c49826376cbfc5a41496e6765c8544e9e9e3ecd9de00bb8348b6f531a3a796",
+        "mujoco_contact_profile": "cd65d982f3640526636386c42ffa2de793ba32f245ddf0317322c4f40ca48973",
+        "outcome_solution.py": "57b8deeed5a43e7af3cf3edd3a904c70a8276d2c011726f5e569ab60f66a1138",
+        "reference_config.py": "a741ffa35029e6b4a029498c195df419f493639cbe6f8433193adb735f29519a",
+        "stable_grasp_candidate.py": "bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423"
+      },
+      "s2_c1_source_xml_sha256": "29d06cc1296411c9bfa8b8d251e915291f47629f058afd3c125a2f02f1f2217a",
+      "solution_identity": "cba7a4932f4b36b01a855417833509d301746325ba93e85cd4cfed23a802a9b4",
+      "source_revision": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+      "source_sha256": {
+        "task_env/assembly/nut_assembly.py": "a3e0cb73abdb0eba59e2fb379ea7f58647bbe3c490ff13dd25e2712529a86ea2",
+        "task_env/assembly/source.py": "27d4cbdfe4a20405615580c1012afbe379fe284bef917b47a0fe535268dbd82e",
+        "task_env/controllers/canonical/__init__.py": "430174d12b7460013f14b183d71aaa440d578d4a1d257d33857221bcd75a69ec",
+        "task_env/controllers/canonical/contracts.py": "8f96d7393ca090ab7a269912053ed9ae17faa9a54279ec19eb097d4fa45847c5",
+        "task_env/controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+        "task_env/controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+        "task_env/controllers/canonical/feedback.py": "f027996d43f2dce8055279d66577f6c5ef7223e9c4daa152ee70a933949756ea",
+        "task_env/controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+        "task_env/controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+        "task_env/controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+        "task_env/controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+        "task_env/controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+        "task_env/controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+        "task_env/objects/nut_assembly.py": "33b1c49fe3fd41d142cce8bbfd0fc6f82b076f9111a9f87e4128891518735da9",
+        "task_env/runtime/sessions/common.py": "3339fe1b0c95469a9ef848198b1ce659fdcbc4dd6d61fbc9c6f45fd06b1edccb",
+        "task_env/runtime/sessions/source.py": "e82d3bb439c0c603bef6a619fa180149467c31f4f26d428aa6b0c59667d49e5d",
+        "task_env/tasks/canonical_solution_lifecycle.py": "68b753d6b3e120c347d0c09663fdeb6ad255be0d683496446a8f0886483058dc",
+        "task_env/tasks/nut_assembly/__init__.py": "3fd0fc98cc2242735afc6ab16b2f3fc4a32fe4eb8ec5c5fc83b1e682be6fdd63",
+        "task_env/tasks/nut_assembly/config.yaml": "749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531",
+        "task_env/tasks/nut_assembly/solution.py": "f522b01b5519b245c91c61720f8ce08465246bb159c8c05f7c80e1729cd4afb8",
+        "task_env/tasks/nut_assembly/task.py": "08299f7c8a725140bc617cc899eaea91da2da5c09f4eb51467ff95ffa5bbabae",
+        "task_env/tasks/reference_env.py": "c13f67d23ca97fb34cb1bd9151778f65eaf424f1f868e040004e332a2c0e37d4",
+        "task_env/trajectory/canonical/execution.py": "21f0178779bae14467579d421db01179ddc47181856e8ca9c0c983c5503f3f63",
+        "task_env/trajectory/canonical/streaming.py": "1e0c4c449e2c8179c9a26925317e9d1599e2170b5c8977d8cd66ace26b63379f"
+      },
+      "source_xml_sha256": "29d06cc1296411c9bfa8b8d251e915291f47629f058afd3c125a2f02f1f2217a",
+      "status": "PASS",
+      "supervisor": {
+        "budget_s": 480.0,
+        "maximum_io_full_avg10": 0.09,
+        "maximum_memory_full_avg10": 0.09,
+        "minimum_MemAvailable_bytes": 3636510720,
+        "new_kernel_storage_error_entries": "",
+        "peak_sampled_process_tree_rss_bytes": 648441856,
+        "status": "PASS",
+        "wall_time_s": 196.72067411900207
+      },
+      "task_outcome": {
+        "completion_policy_id": "nutassembly-outcome-oriented-completion-v1",
+        "completion_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+        "execution_lifecycle_status": "completed",
+        "original_expert_lifecycle_status": {
+          "assessment": "strict gate evaluated on current execution; not historical qualification",
+          "expert_complete": true,
+          "expert_failed": false,
+          "failure_reason": null,
+          "failure_step": null,
+          "policy": "original-guarded-v2-v5-strict-gates"
+        },
+        "outcome_complete": true,
+        "planned_trajectory_completed": true,
+        "readiness_warnings": [],
+        "recorded_native_applications": 11865,
+        "runtime_error": null,
+        "stage_execution_receipts": [
+          {
+            "actions_executed": 96,
+            "completed_step": 96,
+            "endpoint_pass": true,
+            "entry_step": 0,
+            "planned_actions": 87,
+            "planned_actions_executed": 87,
+            "stage": "approach_nut"
+          },
+          {
+            "actions_executed": 263,
+            "completed_step": 359,
+            "endpoint_pass": true,
+            "entry_step": 96,
+            "planned_actions": 213,
+            "planned_actions_executed": 213,
+            "stage": "descend_to_handle"
+          },
+          {
+            "actions_executed": 94,
+            "completed_step": 453,
+            "endpoint_pass": true,
+            "entry_step": 359,
+            "planned_actions": 84,
+            "planned_actions_executed": 84,
+            "stage": "close_gripper"
+          },
+          {
+            "actions_executed": 296,
+            "completed_step": 749,
+            "endpoint_pass": true,
+            "entry_step": 453,
+            "planned_actions": 287,
+            "planned_actions_executed": 287,
+            "stage": "verify_lift"
+          },
+          {
+            "actions_executed": 258,
+            "completed_step": 1007,
+            "endpoint_pass": true,
+            "entry_step": 749,
+            "planned_actions": 249,
+            "planned_actions_executed": 249,
+            "stage": "raise_for_transport"
+          },
+          {
+            "actions_executed": 386,
+            "completed_step": 1393,
+            "endpoint_pass": true,
+            "entry_step": 1007,
+            "planned_actions": 377,
+            "planned_actions_executed": 377,
+            "stage": "move_above_square_peg"
+          },
+          {
+            "actions_executed": 40,
+            "completed_step": 1433,
+            "endpoint_pass": true,
+            "entry_step": 1393,
+            "planned_actions": 31,
+            "planned_actions_executed": 31,
+            "stage": "align_nut_yaw"
+          },
+          {
+            "actions_executed": 209,
+            "completed_step": 1642,
+            "endpoint_pass": true,
+            "entry_step": 1433,
+            "planned_actions": 200,
+            "planned_actions_executed": 200,
+            "stage": "descend_to_peg_top"
+          },
+          {
+            "actions_executed": 335,
+            "completed_step": 1977,
+            "endpoint_pass": true,
+            "entry_step": 1642,
+            "planned_actions": 326,
+            "planned_actions_executed": 326,
+            "stage": "lower_nut_to_table"
+          },
+          {
+            "actions_executed": 110,
+            "completed_step": 2087,
+            "endpoint_pass": true,
+            "entry_step": 1977,
+            "planned_actions": 101,
+            "planned_actions_executed": 101,
+            "stage": "open_gripper"
+          },
+          {
+            "actions_executed": 286,
+            "completed_step": 2373,
+            "endpoint_pass": true,
+            "entry_step": 2087,
+            "planned_actions": 277,
+            "planned_actions_executed": 277,
+            "stage": "release_retreat"
+          }
+        ],
+        "task_metrics": {
+          "aligned_with_peg": true,
+          "eef_to_handle_dist": 0.14753844938265465,
+          "eef_to_nut_dist": 0.16550458016192987,
+          "grasped_nut": false,
+          "gripper_opening": 0.07999999998634447,
+          "gripper_released": true,
+          "hovered_over_peg": false,
+          "inserted_on_peg": true,
+          "lifted_nut": false,
+          "nut_returned_to_table": true,
+          "nut_x": 0.5803840536439357,
+          "nut_y": 0.045106637627848965,
+          "nut_yaw": 3.1407798595679117,
+          "nut_z": 0.4729734395987674,
+          "peg_passed_through_nut_center": true,
+          "peg_xy_error": 0.000398583473181732,
+          "peg_z_error": -2.6560401232611497e-05,
+          "reached_nut": false,
+          "released_nut": true,
+          "success_definition": true,
+          "table_seated_nut_max_z": 0.492,
+          "task_success": true,
+          "yaw_error": 0.0008127940218813912
+        },
+        "task_success": true,
+        "terminal_physical_measurements": {
+          "gripper_opening": 0.07999999998634447,
+          "inserted_on_peg": true,
+          "nut_x": 0.5803840536439357,
+          "nut_y": 0.045106637627848965,
+          "nut_yaw": 3.1407798595679117,
+          "nut_z": 0.4729734395987674,
+          "peg_xy_error": 0.000398583473181732,
+          "peg_z_error": -2.6560401232611497e-05,
+          "released_nut": true,
+          "task_success": true,
+          "yaw_error": 0.0008127940218813912
+        },
+        "unapproved_override_used": false
+      }
+    }
+  },
+  "public_api_migration": {
+    "legacy_task_env_route": "trajectory plan for nut-assembly-square-v1 rejects explicitly; selected UID uses current task-owned route",
+    "old_invocation": "task_env.tasks.nut_assembly.reference.build_reference(rate_hz=..., execution_policy=...) is removed; former multi-rate and guarded/diagnostic selector choices are not redirected",
+    "preserved_uid": "nut-assembly-outcome-reference-v1",
+    "retired_module_imports": "the 27 paths in removed_task_local_sources.inventory are absent; no semantic aliases are provided",
+    "retired_package_import": "from task_env.tasks.nut_assembly import build_reference raises ImportError with migration guidance",
+    "selected_builder": "task_env.tasks.nut_assembly.task.build_reference(provider=...)",
+    "version_compatibility": "breaking task-specific import/API removals need inclusion in the planned v1.0.1 migration guide and final maintainer release review"
+  },
+  "public_develop_baseline_before_s2_c1": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+  "public_develop_head_after_s2_c1": "a6372099ac2055045cca16c03a0514825d635e8f",
+  "public_refs_at_handoff": {
+    "c2_pushed_or_merged": false,
+    "develop": "a6372099ac2055045cca16c03a0514825d635e8f",
+    "main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51"
+  },
+  "removed_task_local_sources": {
+    "inventory": [
+      {
+        "path": "task_env/tasks/nut_assembly/README.md",
+        "pre_consolidation_blob": "024a6cc5e5535999db69cccc7c14323b01d23610",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "ad7148a15f207670d262b048c4e08b5e807a7856",
+        "working_tree_sha256": "64723e35f256c0c2a96215f528de203a621e75aade6aada94103c8d044a83946"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/assets.py",
+        "pre_consolidation_blob": "d79280d15646a72036f965d14ca738e45f239bfe",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "d79280d15646a72036f965d14ca738e45f239bfe",
+        "working_tree_sha256": "cfd605246ba3ea55b02cb601fea6457dbe5f6c29d9b8f46616dd47eee9101379"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_artifact.py",
+        "pre_consolidation_blob": "e47cbac20e1654529c485247b8f08f86c76ca1b4",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "e47cbac20e1654529c485247b8f08f86c76ca1b4",
+        "working_tree_sha256": "11dc9338e73f6fb830cbcfe1e48dd21e0d2fbace97b41490ed6e276728f0aac2"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_initialization.json",
+        "pre_consolidation_blob": "6f9fa6debb5a391ee50b32da9b39487ddf99f66a",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "6f9fa6debb5a391ee50b32da9b39487ddf99f66a",
+        "working_tree_sha256": "afb93f07f40d808aa21a1495449145e5e768b09cd0d5344e642bfce8000f1954"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_reset.py",
+        "pre_consolidation_blob": "f1f7fae69a50ebe7d61f625e62243b6b07de933f",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "f1f7fae69a50ebe7d61f625e62243b6b07de933f",
+        "working_tree_sha256": "22515797ad42cc93e58fe2bdd6a2c2774f13791e675b781f4604a91827b6128e"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_semantics.py",
+        "pre_consolidation_blob": "e13ef1523876514663bbf6182e3550c490f32fc6",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "e13ef1523876514663bbf6182e3550c490f32fc6",
+        "working_tree_sha256": "0ae45a7b5712f0c175cfc9b2e0c6fe38995a70ed96f43630005352830e002bd6"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_solution.py",
+        "pre_consolidation_blob": "3a043381cd249d6d68621aeec3f6f307480bb847",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "c441fa6cf995d2a8e89cd8153ff08d2b577d73cc",
+        "working_tree_sha256": "e71577367a6b7f3dbe3b5547097faed106506fa4734a6862e39756be994d8040"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+        "pre_consolidation_blob": "c0d29af2b2dc74b661065106a1cafa7c198ac7ce",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "c0d29af2b2dc74b661065106a1cafa7c198ac7ce",
+        "working_tree_sha256": "f55b7e7109da27fd4b7a1a063abb9f469155b1552cc08d4da43d75b74f5558a8"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/canonical_source.py",
+        "pre_consolidation_blob": "599c22b24727f25687a2a9ca3e0c016ce042be6f",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "18ccf29ce8728210df6d3732da273dffe7aaa72a",
+        "working_tree_sha256": "ed0151ebb9920a996e50ca1635337b5eefba58bbe508c59b0546980e8871c838"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/clearance_candidate_v3.py",
+        "pre_consolidation_blob": "e573836736fa158583be2e2cb9ca5d45d9b628f0",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "e573836736fa158583be2e2cb9ca5d45d9b628f0",
+        "working_tree_sha256": "9572067bb977ae2a15c1cdea504120e9a8d6df6f7c670386ee276ffd6e3076ef"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
+        "pre_consolidation_blob": "40fe2c3b2f7140c42a90df8d45820bc10b6ca218",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "40fe2c3b2f7140c42a90df8d45820bc10b6ca218",
+        "working_tree_sha256": "5544fc915e47e67677447c322bed1fece4d73b0b068f1fab394c014bddd2b44f"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/default.yaml",
+        "pre_consolidation_blob": "f8a9522e819c1ad02015107dddf27ef1ae46a106",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "f8a9522e819c1ad02015107dddf27ef1ae46a106",
+        "working_tree_sha256": "5295f300f34b5361428fcda2cdab1a946bad27ad87e6e32b8a04aa37e852b167"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/definition.py",
+        "pre_consolidation_blob": "feb1c09691e8e49780a2ae84341f506f22396d4f",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "39d1fc80a4b9de11577d6042876c3fc42c0616c606ad4b2b913115f54cc1e536"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/geometry.py",
+        "pre_consolidation_blob": "b6c281477c4fb8297f0a3399e5e850a5c007e3a3",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "68d6423b8a4284afcba5a486e826e7e4944344aae0ecfb4e1c55c2daa53ae0fe"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate.py",
+        "pre_consolidation_blob": "1b9083b096606bcf9ae3300b436d7495be00389c",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "1b9083b096606bcf9ae3300b436d7495be00389c",
+        "working_tree_sha256": "49c87b0cd15e940f0c9e5cff6ffc6a3450dae63eff6809f30f8147cecf68d40d"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+        "pre_consolidation_blob": "b5469c31dc616dc35c68df10ed7c3967f1d6a967",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "b5469c31dc616dc35c68df10ed7c3967f1d6a967",
+        "working_tree_sha256": "42c49826376cbfc5a41496e6765c8544e9e9e3ecd9de00bb8348b6f531a3a796"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/outcome_solution.py",
+        "pre_consolidation_blob": "43471fe87d3d4f63cff6d93dbd9a6b30607d4cab",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "57b8deeed5a43e7af3cf3edd3a904c70a8276d2c011726f5e569ab60f66a1138"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/profiles/mujoco-noslip2-v1.json",
+        "pre_consolidation_blob": "d30561416843987bca8aac0fa22ec3ef3898c574",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "cd65d982f3640526636386c42ffa2de793ba32f245ddf0317322c4f40ca48973"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json",
+        "pre_consolidation_blob": "9da89c6f6894a8cf7de44c75c3880e0260cdb811",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "9da89c6f6894a8cf7de44c75c3880e0260cdb811",
+        "working_tree_sha256": "90555a0f6e2ae7cbf1c83909be18324e4b29238adcd2b894a80ac1e237badf8f"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json",
+        "pre_consolidation_blob": "84842511ee36570d8a9def60b3809f39b0a1e2e4",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "84842511ee36570d8a9def60b3809f39b0a1e2e4",
+        "working_tree_sha256": "8345011c00f22eb100a1964965ca3bb3647d612410ad1ac7b33de0b41badc8e4"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json",
+        "pre_consolidation_blob": "eb5cfc0665890de49212bb5c1b3f6accd3a7f898",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "eb5cfc0665890de49212bb5c1b3f6accd3a7f898",
+        "working_tree_sha256": "19037bd65e405ee5ffe2b26b13555f3724750c6c9edcb5a603c0a2249fb7a5ff"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml",
+        "pre_consolidation_blob": "e4b35f2fbf827cb0e59f87dec7ef8c5de9eff86d",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "e4b35f2fbf827cb0e59f87dec7ef8c5de9eff86d",
+        "working_tree_sha256": "5bbac0ad315c07a1ced354ccee845acf92ae50ab1a125255d6af486c83d4c266"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/reference.py",
+        "pre_consolidation_blob": "4d0279d11cdbcfc20484979b89f8eb1e29622fd4",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "e54a409d151ab27b6b03e374c2d285fe83cf249a7667de06943abc2dd79ced98"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/reference_config.py",
+        "pre_consolidation_blob": "691557c15265cc02aae58a21c17892280b84d0ab",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "a741ffa35029e6b4a029498c195df419f493639cbe6f8433193adb735f29519a"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/reference_env.py",
+        "pre_consolidation_blob": "828ee002b831018053281007b0acee96f7337838",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "ef823832ffb118a12dc4b53ff168dea8639b1b5da868f6059508508970c5a72f"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/reference_execution.py",
+        "pre_consolidation_blob": "b8beac94938cecbc40c327c51122ab8685f8ebaf",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": null,
+        "working_tree_sha256": "89d0b32df124d7478818e2786812b35115ba30c65ab1134e9971ac6b4bca3bfa"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/stable_grasp_candidate.py",
+        "pre_consolidation_blob": "779ed062632464b3e5ad47dc5522ef4b7395eda4",
+        "pre_consolidation_commit": "a6372099ac2055045cca16c03a0514825d635e8f",
+        "v1_0_0_blob": "779ed062632464b3e5ad47dc5522ef4b7395eda4",
+        "working_tree_sha256": "bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423"
+      }
+    ],
+    "notes": "Every removed path has a pre-consolidation blob at a6372099. Eight paths have no v1.0.0 blob because they were added after that release; the remaining applicable v1.0.0 blobs are recorded individually. assets.py content is moved into task_env/assembly/nut_assembly.py.",
+    "recovery_commit": "a6372099ac2055045cca16c03a0514825d635e8f"
+  },
+  "s2_c1_integration": {
+    "acceptance": "PASS_BOUNDED_FUNCTIONAL; C1 NutAssembly full routes are the comparison baseline; C1 PickCube routes were not repeated because C2 did not change PickCube execution source",
+    "local_execution_commits": [
+      "13063f8a20479030efdeb565f637019d30445f5b",
+      "38f18f397454b13b3a269502577711f6868a0af9",
+      "5b0058010f5416eefb08ce59cec43770602fc336"
+    ],
+    "nutassembly_routes": {
+      "geophys": {
+        "T": 2380,
+        "boundaries": 2381,
+        "h5_sha256": "0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982",
+        "native_steps": 11900
+      },
+      "mujoco": {
+        "T": 2373,
+        "boundaries": 2374,
+        "h5_sha256": "0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4",
+        "native_steps": 11865
+      }
+    },
+    "public_develop_head": "a6372099ac2055045cca16c03a0514825d635e8f",
+    "public_develop_verified": true,
+    "public_remote": "Lebingelee/GeoChora"
+  },
+  "s2_c2_commits": [
+    "ce1cd782ff26b52c4fd8738fbb1b595cfd6f44f2",
+    "4d6d65c55eca994b4317bcfb80797c69e48452c6"
+  ],
+  "s2_c2_final_head": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+  "schema": "geochora-p2-0-b-s2-c2-nutassembly-source-identity-v1",
+  "scope": {
+    "generic_runtime_provider_controller_recorder_public_contracts_changed": false,
+    "go2_static_physics_rl_vectorization_renderer_phase_ii_changed": false,
+    "main_or_v1_0_0_changed": false,
+    "s3_s4_s4_5_s5_started": false,
+    "shared_reference_binding_changed": false,
+    "task_specific_route_and_assets_only": true
+  },
+  "selected_route": {
+    "execution_policy": {
+      "diagnostic_continuation": false,
+      "grants_full_expert_pass": false,
+      "outcome_completion": true,
+      "strict_expert_gate": "preserved-with-bounded-readiness-warning"
+    },
+    "outcome_policy_id": "nutassembly-outcome-oriented-completion-v1",
+    "outcome_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+    "task_artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+    "task_artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+    "task_artifact_version": "ver_p1_8_e_nutassembly_nominal_v1",
+    "uid": "nut-assembly-outcome-reference-v1"
+  },
+  "status": "LOCAL_UNMERGED_MAINTAINER_REVIEW",
+  "task_directory": [
+    "__init__.py",
+    "task.py",
+    "solution.py",
+    "config.yaml"
+  ]
+}

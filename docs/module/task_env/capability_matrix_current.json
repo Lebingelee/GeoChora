@@ -2,7 +2,7 @@
   "schema": "geochora-current-reference-capability-overlay-v1",
   "status": "S2_C1_INTEGRATED_BOUNDED_FUNCTIONAL_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
-  "integrated_baseline": "0cf32439579b3f683e8ff7744894a4c001ddc5e9",
+  "integrated_baseline": "a6372099ac2055045cca16c03a0514825d635e8f",
   "qualification_inherited": false,
   "selected_references": [
     {
@@ -37,7 +37,8 @@
       "new_adapter_full_trajectory_acceptance": "PASS_BOUNDED_FUNCTIONAL_BOTH_PROVIDERS; GeoPhys original strict expert failure is preserved separately",
       "historical_P1_8_strict_FULL_and_D0": "UNCHANGED_NO_RELABEL",
       "s2_b1_claim_limit": "PASS: current task-owned Outcome V1 route on both CPU providers; full planned trajectory and task outcome complete; GeoPhys strict stable_height_mismatch remains recorded as a readiness warning and strict Expert failure; no historical P1.8 FULL/D0-D2 relabel",
-      "s2_c1_local_claim_limit": "PASS_BOUNDED_FUNCTIONAL on exact S2-C1 execution source 5b0058010f5416eefb08ce59cec43770602fc336: GeoPhys/MuJoCo CPU, NA-S0 seed19, 100Hz; full 11-stage route and H5 roundtrip; H5 transition/boundary mappings match S2-B1 after removing only ReferenceTaskBinding source SHA and derived owner integrity digest; no P1.8 FULL or D0-D2 qualification inheritance"
+      "s2_c1_local_claim_limit": "PASS_BOUNDED_FUNCTIONAL on exact S2-C1 execution source 5b0058010f5416eefb08ce59cec43770602fc336: GeoPhys/MuJoCo CPU, NA-S0 seed19, 100Hz; full 11-stage route and H5 roundtrip; H5 transition/boundary mappings match S2-B1 after removing only ReferenceTaskBinding source SHA and derived owner integrity digest; no P1.8 FULL or D0-D2 qualification inheritance",
+      "s2_c2_local_claim_limit": "PASS_BOUNDED_FUNCTIONAL_LOCAL_UNMERGED on exact final source 4d6d65c55eca994b4317bcfb80797c69e48452c6: GeoPhys/MuJoCo CPU, NA-S0 seed19, 100Hz; all 11 stages, task/outcome completion, canonical H5 roundtrip; exact S2-C1 transition/boundary behavior after verifying and normalizing only source/controller identity-derived fields; no P1.8 FULL or D0-D2 qualification inheritance"
     }
   ],
   "new_reference_renderer_interoperability": "NOT_IMPLEMENTED",
@@ -45,18 +46,29 @@
   "provider_free_current_source_reexecution": "100 passed on S2-C1 source; bounded provider-free API/import, Artifact identity, task semantics/reset, lifecycle/controller, recorder/H5 CLI gating, provenance, retired import, and NutAssembly identity regression; NOT qualification",
   "S2_B": "S2-B1 and exact two-file S2-B2 retirement are integrated through bd9096cc; no release qualification",
   "S2_C1": {
-    "implementation_commits": ["13063f8a20479030efdeb565f637019d30445f5b", "38f18f397454b13b3a269502577711f6868a0af9", "5b0058010f5416eefb08ce59cec43770602fc336"],
+    "implementation_commits": [
+      "13063f8a20479030efdeb565f637019d30445f5b",
+      "38f18f397454b13b3a269502577711f6868a0af9",
+      "5b0058010f5416eefb08ce59cec43770602fc336"
+    ],
     "local_head": "5b0058010f5416eefb08ce59cec43770602fc336",
     "base_public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
     "integration": {
       "from": "bd9096ccad5cae54df0a2361d9797b2455862d49",
-      "to": "0cf32439579b3f683e8ff7744894a4c001ddc5e9",
+      "to": "a6372099ac2055045cca16c03a0514825d635e8f",
       "method": "normal fast-forward",
       "public_readback": "PASS",
-      "main_and_v1_0_0_unchanged": true
+      "main_and_v1_0_0_unchanged": true,
+      "public_remote_readback": "a6372099ac2055045cca16c03a0514825d635e8f"
     },
-    "pickcube_cpu_cases": ["GeoPhys seed31 100Hz PASS on 5b00580; 151 transitions/152 boundaries; H5 cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108", "MuJoCo seed31 100Hz PASS on 5b00580; 470 transitions/471 boundaries; H5 579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018"],
-    "nutassembly_cpu_cases": ["GeoPhys NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2380 transitions/2381 boundaries; H5 0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982", "MuJoCo NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2373 transitions/2374 boundaries; H5 0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4"],
+    "pickcube_cpu_cases": [
+      "GeoPhys seed31 100Hz PASS on 5b00580; 151 transitions/152 boundaries; H5 cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108",
+      "MuJoCo seed31 100Hz PASS on 5b00580; 470 transitions/471 boundaries; H5 579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018"
+    ],
+    "nutassembly_cpu_cases": [
+      "GeoPhys NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2380 transitions/2381 boundaries; H5 0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982",
+      "MuJoCo NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2373 transitions/2374 boundaries; H5 0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4"
+    ],
     "qualification_inherited": false,
     "other_scope": "NutAssembly selected task/outcome behavior, Go2, static physics, vectorization, and Renderer implementations unchanged; shared reference adapter uses explicit task binding"
   },
@@ -89,5 +101,29 @@
       "public_readback": "PASS",
       "main_and_v1_0_0_unchanged": true
     }
+  },
+  "S2_C2": {
+    "status": "PASS_BOUNDED_FUNCTIONAL_LOCAL_NOT_INTEGRATED",
+    "implementation_commits": [
+      "ce1cd782ff26b52c4fd8738fbb1b595cfd6f44f2",
+      "4d6d65c55eca994b4317bcfb80797c69e48452c6"
+    ],
+    "final_local_head": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+    "public_develop_head": "a6372099ac2055045cca16c03a0514825d635e8f",
+    "task_directory": [
+      "__init__.py",
+      "task.py",
+      "solution.py",
+      "config.yaml"
+    ],
+    "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+    "provider_cases": [
+      "GeoPhys NA-S0 seed19 100Hz PASS; T2380/T+1 2381; 11900 native steps",
+      "MuJoCo NA-S0 seed19 100Hz PASS; T2373/T+1 2374; 11865 native steps"
+    ],
+    "source_identity": "p2_0_s2_c2_source_identity.json",
+    "review_report": "p2_0_s2_c2_nutassembly_authoring.md",
+    "qualification_inherited": false,
+    "integration_approved": false
   }
 }
