@@ -107,7 +107,8 @@ def test_unapproved_failure_remains_fatal(reason):
     assert s.failed and s.failure_reason==reason and not s.outcome_complete
 
 
-@pytest.mark.parametrize('field',['ee_nan','nut_inf','zero_quaternion','opening_nan','success_inconsistent','clock'])
+@pytest.mark.parametrize('field',['ee_nan','nut_inf','zero_quaternion','opening_nan',
+                                'success_inconsistent','clock','string_nan_pose','string_predicate'])
 def test_invalid_or_nonfinite_state_fails_closed(field):
     f=Ideal()
     def bad(obs,info):
@@ -117,6 +118,8 @@ def test_invalid_or_nonfinite_state_fails_closed(field):
         if field=='opening_nan':info['task_metrics']['gripper_opening']=np.nan
         if field=='success_inconsistent':info['is_success']=True
         if field=='clock':info['simulation_time_s']+=.1
+        if field=='string_nan_pose':obs['state']['ee_pose']=['nan',0.,0.,1.,0.,0.,0.]
+        if field=='string_predicate':info['task_metrics']['released_nut']='False'
     f.step(bad)
     assert f.solution.failed and f.solution.failure_reason=='invalid_state_or_clock'
 

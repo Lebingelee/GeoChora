@@ -141,9 +141,13 @@ class NutAssemblyOutcomeSolutionV1(NutAssemblyGuardedAuthorizationCandidateV2):
         if not self._finite((obs, info, reward, samples)):
             raise ValueError('nonfinite state or evidence')
         for pose in (self._ee(obs), self._body(obs, 'square_nut_v1'), self._body(obs, 'square_peg_v1')):
-            if not .99 <= np.linalg.norm(pose[3:]) <= 1.01:
+            if not np.isfinite(pose).all() or not .99 <= np.linalg.norm(pose[3:]) <= 1.01:
                 raise ValueError('invalid pose quaternion')
         metrics = info['task_metrics']
+        if not all(isinstance(v, (bool, np.bool_)) for v in (
+                metrics['inserted_on_peg'], metrics['released_nut'],
+                metrics['task_success'], info['is_success'], info.get('task_failure', False))):
+            raise ValueError('canonical outcome predicates must be boolean')
         success = bool(metrics['inserted_on_peg'] and metrics['released_nut'])
         if success != bool(info['is_success']) or success != bool(metrics['task_success']):
             raise ValueError('inconsistent canonical task success')
