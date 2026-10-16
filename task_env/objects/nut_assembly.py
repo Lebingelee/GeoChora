@@ -12,6 +12,22 @@ from .base import BaseTaskObject
 
 NUT_ASSET_ROOT = REPO_ROOT / "task_env" / "objects" / "default_asset"
 
+# Reusable Nut/Peg asset geometry and inertial properties. Task placement and
+# reset semantics live in the owning Task Artifact instead.
+NUT_HALF_HEIGHT = 0.01
+NUT_CONTACT_MARGIN = 1.0e-3
+NUT_HANDLE_LOCAL_X = 0.054
+NUT_MASS = 1.0
+NUT_DIAG_INERTIA = (7.5e-4, 7.5e-4, 1.25e-3)
+NUTASSEMBLY_NOMINAL_V1_ID = "nutassembly-nominal-v1"
+NUTASSEMBLY_NOMINAL_V1_MASS = 0.1
+NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA = (7.5e-5, 7.5e-5, 1.25e-4)
+NUT_FREEJOINT_DAMPING = 2.0
+NUT_FREEJOINT_ARMATURE = 0.03
+PEG_HALF_HEIGHT = 0.06
+SQUARE_PEG_HALF_WIDTH = 0.016
+ROUND_PEG_RADIUS = 0.02
+
 
 @register_object("square-nut-v1")
 class SquareNutObject(BaseTaskObject):
@@ -97,8 +113,21 @@ class CubeObject(BaseTaskObject):
 
 __all__ = [
     "CubeObject",
+    "NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA",
+    "NUTASSEMBLY_NOMINAL_V1_ID",
+    "NUTASSEMBLY_NOMINAL_V1_MASS",
     "NUT_ASSET_ROOT",
+    "NUT_CONTACT_MARGIN",
+    "NUT_DIAG_INERTIA",
+    "NUT_FREEJOINT_ARMATURE",
+    "NUT_FREEJOINT_DAMPING",
+    "NUT_HALF_HEIGHT",
+    "NUT_HANDLE_LOCAL_X",
+    "NUT_MASS",
+    "PEG_HALF_HEIGHT",
+    "ROUND_PEG_RADIUS",
     "RoundPegObject",
+    "SQUARE_PEG_HALF_WIDTH",
     "SquareNutObject",
     "SquarePegObject",
 ]

@@ -1,0 +1,190 @@
+recipe:
+  construction_id: nut-assembly-outcome-reference-v1
+  task_uid: nut-assembly-square-v1
+  scene_uid: tabletop-v1
+  agent_uids: [panda-v1]
+  object_uids: [square-nut-v1, square-peg-v1, round-peg-v1]
+  success_definition: nut_on_square_peg_v1
+  artifact_id: nut-assembly-square-v1/p1_8_e/nominal-v1
+  artifact_version: ver_p1_8_e_nutassembly_nominal_v1
+  asset_profile_id: nutassembly-nominal-v1
+  control_hz: 100
+  physics_dt: 0.002
+  control_substeps: 5
+  control_dt: 0.01
+  required_capabilities:
+    - rigid_body
+    - free_body
+    - articulated_robot
+    - joint_position_actuation
+    - joint_state_query
+    - body_pose_query
+    - frame_pose_query
+  observation_requirements: [task-env-state-v2, privileged_state]
+  action:
+    controller_kind: absolute_pose
+    reference: world
+    rotation_representation: quaternion_wxyz
+    output: arm_joint_position_and_gripper
+  reset:
+    profile: NA-S0
+    task_seed: 19
+    sample_name: NA-S0
+    settle_steps: 0
+    sampler_id: nut-assembly-square-v1/NA-S0
+    sampler_version: frozen-authored-v0
+    inherited_state_policy: zero_named_joint_and_entity_velocities
+    control_policy: arm_targets_at_initial_joints_gripper_open
+    nut_pose:
+      position: [0.5084999799728394, -0.07500000298023224, 0.4729999899864197]
+      quaternion_wxyz: [0.0, 0.0, 0.0, 1.0]
+    joint_position:
+      panda-v1/joint1: -0.7186926603317261
+      panda-v1/joint2: -0.3159964382648468
+      panda-v1/joint3: 0.4473997950553894
+      panda-v1/joint4: -1.8042062520980835
+      panda-v1/joint5: 0.13533875346183777
+      panda-v1/joint6: 1.5183225870132446
+      panda-v1/joint7: 0.4517156779766083
+      panda-v1/finger_joint1: 0.03999999910593033
+      panda-v1/finger_joint2: 0.03999999910593033
+  scene:
+    table_half_size: [0.28, 0.2, 0.01]
+    table_top_z: 0.462
+    table_body_position: [0.5545, 0, 0.452]
+    table_friction: "1.2 0.25 0.02"
+    peg_half_height: 0.06
+    square_peg_half_width: 0.016
+    round_peg_radius: 0.02
+    square_peg_position: [0.58, 0.045, 0.522]
+    round_peg_position: [0.58, -0.045, 0.522]
+    peg_friction: "1 0.005 0.0001"
+    nut_pose:
+      position: [0.5085000000000001, -0.075, 0.47300000000000003]
+      quaternion_wxyz: [0.0, 0.0, 0.0, 1.0]
+    nut_friction: "1.6 0.08 0.001"
+    gripper_friction: "4.0 0.20 0.01"
+    ee_site_name: nutassembly_ee_site
+    gravity: [0, 0, -9.81]
+  asset:
+    nut_mass_kg: 0.1
+    nut_diagonal_inertia_kg_m2: [0.000075, 0.000075, 0.000125]
+    freejoint_damping: 2.0
+    freejoint_armature: 0.03
+    nut_contact_margin_m: 0.001
+  semantic_parameters:
+    insert_xy_tolerance: 0.03
+    insert_yaw_tolerance: 0.35
+    lift_height: 0.05
+    hover_xy_tolerance: 0.05
+    grasp_distance: 0.09
+    gripper_closed_opening: 0.045
+    gripper_release_opening: 0.065
+    release_distance: 0.055
+  controller:
+    implementation: ProductionCanonicalPandaControllerR3
+    force_target_N: 10.0
+    force_cap_N: 10.0
+    force_deadband_N: 1.0
+    action_overrides: {}
+    gripper_overrides: {force_limit_N: 10.0}
+    dynamic_profile:
+      controller:
+        max_cartesian_translation_rate_m_s: 0.75
+        max_cartesian_rotation_rate_rad_s: 4.5
+        max_joint_increment_rate_rad_s: 16.0
+        ik_damping: 0.02
+        ik_position_gain: 0.9
+        ik_rotation_gain: 0.65
+        ik_rotation_row_weight: 0.22
+        position_deadband_m: 0.002
+        rotation_deadband_rad: 0.01
+        joint_position_correction_rate_s: 2500.0
+        joint_position_correction_max_gain: 5.0
+      gripper:
+        opening_rate_m_s: 0.24
+        force_adjust_rate_m_s: 0.12
+        force_adjust_error_exponent: 1.0
+      planner:
+        translation_speed_m_s: 0.06
+        translation_acceleration_m_s2: 0.45
+        rotation_speed_rad_s: 3.0
+        rotation_acceleration_rad_s2: 27.0
+        settle_duration_s: 0.26666666666666666
+  solution:
+    version: nutassembly-r5-v5-guarded-outcome-solution-v2
+    config:
+      grasp_offset: [0.0, 0.0, 0.045895]
+      grasp_quaternion_wxyz: [0.0038, 0.99993765, 0.0, 0.0105]
+      grasp_opening_m: 0.0
+      opening_range_m: 0.08
+      approach_height_m: 0.12
+      close_transition_s: 0.3333333333333333
+      close_settle_s: 0.5
+      release_transition_s: 0.3333333333333333
+      release_settle_s: 0.6666666666666666
+      pose_position_ready_m: 0.007
+      pose_rotation_ready_rad: 0.06
+      readiness_stable_s: 0.1
+      gripper_stable_speed_m_s: 0.003
+      opening_stable_range_m: 0.0005
+      grasp_min_closing_force_N: 25.0
+      max_pose_hold_s: 3.0
+      max_close_hold_s: 8.0
+      max_release_hold_s: 3.0
+      capture_translation_slip_m: 0.008
+      capture_rotation_slip_rad: 0.15
+      verify_lift_m: 0.1
+      max_stage_plan_s: 6.0
+      action_budget_s: 60.0
+  outcome_policy:
+    policy_id: nutassembly-outcome-oriented-completion-v1
+    readiness_allowlist:
+      stage: descend_to_handle
+      reason: stable_height_mismatch
+      maximum_occurrences: 1
+      maximum_height_residual_m: 0.0003
+      minimum_pose_wait_s: 0.5
+      pose_window_s: 0.2
+      axis_span_m: 0.0001
+      speed_m_s: 0.002
+    fail_closed:
+      - unlisted_or_repeated_failure
+      - invalid_state_or_clock
+      - capture_violation
+      - task_failure
+      - runtime_error
+      - terminated
+      - truncated
+      - action_budget_exhausted
+      - incomplete_plan_or_retreat
+    diagnostic_shadow_override: false
+  providers:
+    mujoco:
+      option_overrides: {noslip_iterations: 2}
+      native_version_tested: 3.8.1
+environment:
+  observation:
+    schema_version: task-env-state-v2
+    include_privileged_state: true
+  episode:
+    horizon: 1000
+  runtime:
+    rigid_solver_backend: row_pgs
+  robot:
+    controller:
+      kind: delta_pose
+      reference: world
+      rotation_representation: quaternion_wxyz
+  render:
+    backend: raytracer
+    width: 960
+    height: 720
+    parallel:
+      num: 256
+      columns: 16
+      cell_width: 1.0
+      cell_depth: 1.0
+      padding: 0.0
+    training:
+      every: 1

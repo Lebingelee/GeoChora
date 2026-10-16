@@ -1,324 +1,407 @@
-"""NutAssembly registration, reset, reward and success semantics."""
-
+"""Selected NutAssembly Task Artifact, semantics, scene and public binding."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, replace
+import hashlib
+import json
 import math
 from pathlib import Path
+import subprocess
+import xml.etree.ElementTree as ET
 
 import numpy as np
+import yaml
 
-from ...environment import EpisodePhysicsState, RuntimeSnapshot, TaskEvaluation
-from ...environment.task_definition import TaskDefinitionBase
-from ...assembly import TaskReferences
-from ...registry import register_env
-from ..base import BaseTaskEnv
+from ...artifacts import (
+    ActionIntent, CanonicalStateView, EntityDefinition, InitializationContract,
+    PoseWorld, RequiredCapabilitySet, SemanticDefinition, TaskArtifact, Timebase,
+    WorldDefinition,
+)
+from ...artifacts.execution import ResetSample
+from ...assembly.nut_assembly import build_nut_assembly_model_xml
+from ...assembly.source import TaskSceneSource
+from ...controllers.canonical.contracts import digest
+from ...controllers.canonical.execution import StableArmTargetHold
+from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
+from ...environment import TaskCompositionSpec
+from ...environment.configuration import overlay_public_env_config, resolve_env_config
+from ...objects.nut_assembly import (
+    NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA,
+    NUTASSEMBLY_NOMINAL_V1_ID, NUTASSEMBLY_NOMINAL_V1_MASS,
+    NUT_CONTACT_MARGIN, NUT_FREEJOINT_ARMATURE, NUT_FREEJOINT_DAMPING,
+    NUT_HALF_HEIGHT, NUT_HANDLE_LOCAL_X, PEG_HALF_HEIGHT, ROUND_PEG_RADIUS,
+    SQUARE_PEG_HALF_WIDTH,
+)
+from ...registry import make_agent, make_object, make_scene, register_env
+from ...robots.panda import PandaAgent
+from ...runtime.sessions.source import RuntimeSource
 from ...utils.rotation import quat_wxyz_to_matrix
-from .assets import (
-    NUT_CONTACT_MARGIN,
-    NUT_HALF_HEIGHT,
-    NUT_HANDLE_LOCAL_X,
-    PEG_HALF_HEIGHT,
-    PEG_X,
-    PEG_Y_OFFSET,
-    PEG_Z,
-    TABLE_TOP_Z,
-)
-from .definition import (
-    NUT_ASSEMBLY_AGENT_UIDS,
-    NUT_ASSEMBLY_ENV_ID,
-    NUT_ASSEMBLY_EXPERT_PROFILE,
-    NUT_ASSEMBLY_OBJECT_UIDS,
-    NUT_ASSEMBLY_RESET_PROFILE,
-    NUT_ASSEMBLY_SCENE_UID,
-    NUT_ASSEMBLY_SENSOR_PROFILE,
-    NUT_ASSEMBLY_SQUARE_SPEC,
-    NUT_ASSEMBLY_SUCCESS_DEFINITION,
-    NUT_ASSEMBLY_TASK_UID,
-    NUT_ASSEMBLY_VARIANT,
-    NutAssemblyVariantSpec,
+from ..reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+from .solution import (
+    ArmRampMemory, NutAssemblyOutcomeSolutionV1, NutAssemblySolutionConfig,
+    OUTCOME_POLICY_ID, ReferenceArmSchedule, ReferenceExecutionController,
 )
 
-
-_PANDA_UID = "panda-v1"
-_SQUARE_NUT_UID = "square-nut-v1"
-_PEG_TOP_Z = PEG_Z + PEG_HALF_HEIGHT
-_TABLE_SEATED_NUT_Z = TABLE_TOP_Z + NUT_HALF_HEIGHT + NUT_CONTACT_MARGIN
-_INSERT_XY_TOLERANCE = 0.030
-_TABLE_SEATED_NUT_MAX_Z = TABLE_TOP_Z + 3.0 * NUT_HALF_HEIGHT
-_INSERT_YAW_TOLERANCE = 0.35
-_LIFT_HEIGHT = 0.050
-_HOVER_XY_TOLERANCE = 0.050
-_GRASP_DISTANCE = 0.090
-_GRIPPER_CLOSED_OPENING = 0.045
-_GRIPPER_RELEASE_OPENING = 0.065
-_GRIPPER_RELEASE_CTRL = 200.0
-_RELEASE_DISTANCE = 0.055
+CONFIG_PATH = Path(__file__).with_name("config.yaml")
+REFERENCE_ENV_ID = "nut-assembly-outcome-reference-v1"
+EEF = "panda-v1/ee"
+NUT = "square-nut-v1"
+PEG = "square-peg-v1"
+FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
+SUCCESS = "nut_on_square_peg_canonical_state_v0"
 
 
-def _quat_yaw_wxyz(quat: np.ndarray) -> float:
-    rotation = quat_wxyz_to_matrix(quat)
-    return float(math.atan2(rotation[1, 0], rotation[0, 0]))
+def _configuration():
+    value = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or set(value) != {"recipe", "environment"}:
+        raise ValueError("NutAssembly config.yaml must contain recipe and environment only")
+    recipe = value["recipe"]
+    if (recipe.get("control_hz") != 100 or recipe.get("control_substeps") != 5
+            or recipe.get("physics_dt") != 0.002 or recipe.get("control_dt") != 0.01
+            or recipe.get("artifact_id") != "nut-assembly-square-v1/p1_8_e/nominal-v1"
+            or recipe.get("outcome_policy", {}).get("policy_id") != OUTCOME_POLICY_ID
+            or recipe.get("solution", {}).get("version") != NutAssemblyOutcomeSolutionV1.version):
+        raise ValueError("NutAssembly admits only the selected 100 Hz Outcome V1 recipe")
+    readiness = recipe["outcome_policy"]["readiness_allowlist"]
+    if readiness != {"stage": "descend_to_handle", "reason": "stable_height_mismatch",
+            "maximum_occurrences": 1, "maximum_height_residual_m": 0.0003,
+            "minimum_pose_wait_s": 0.5, "pose_window_s": 0.2,
+            "axis_span_m": 0.0001, "speed_m_s": 0.002}:
+        raise ValueError("selected Outcome V1 readiness warning allowlist changed")
+    controller = recipe["controller"]
+    if (controller["force_target_N"] != 10.0 or controller["force_cap_N"] != 10.0
+            or controller["gripper_overrides"].get("force_limit_N") != 10.0):
+        raise ValueError("selected R3 force target/cap must remain 10 N")
+    provider = recipe["providers"].get("mujoco", {})
+    if provider.get("option_overrides") != {"noslip_iterations": 2}:
+        raise ValueError("selected MuJoCo solver profile changed")
+    asset, scene = recipe["asset"], recipe["scene"]
+    if (asset["nut_mass_kg"] != NUTASSEMBLY_NOMINAL_V1_MASS
+            or tuple(asset["nut_diagonal_inertia_kg_m2"]) != NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA
+            or asset["nut_contact_margin_m"] != NUT_CONTACT_MARGIN
+            or asset["freejoint_damping"] != NUT_FREEJOINT_DAMPING
+            or asset["freejoint_armature"] != NUT_FREEJOINT_ARMATURE
+            or scene["peg_half_height"] != PEG_HALF_HEIGHT
+            or scene["square_peg_half_width"] != SQUARE_PEG_HALF_WIDTH
+            or scene["round_peg_radius"] != ROUND_PEG_RADIUS):
+        raise ValueError("selected nominal object and contact asset parameters changed")
+    return value
 
 
-def _square_yaw_error(yaw: float) -> float:
-    period = 0.5 * math.pi
-    return abs(float((yaw + 0.5 * period) % period - 0.5 * period))
+def _recipe():
+    return _configuration()["recipe"]
 
 
-def _distance(a: np.ndarray, b: np.ndarray) -> float:
-    return float(np.linalg.norm(np.asarray(a, dtype=np.float64) - np.asarray(b, dtype=np.float64)))
+def semantic_definition() -> SemanticDefinition:
+    recipe = _recipe()
+    p = recipe["semantic_parameters"]
+    scene = recipe["scene"]
+    return SemanticDefinition("semantics-v0", "nut_assembly_state_v0",
+        (NUT, PEG, EEF), FINGERS,
+        {**{key: float(value) for key, value in p.items()},
+         "table_top_z": float(scene["table_top_z"]),
+         "nut_half_height": float(NUT_HALF_HEIGHT),
+         "nut_contact_margin": float(recipe["asset"]["nut_contact_margin_m"]),
+         "nut_handle_local_x": float(NUT_HANDLE_LOCAL_X),
+         "peg_half_height": float(scene["peg_half_height"])}, SUCCESS)
 
 
-@dataclass(frozen=True)
-class NutAssemblyTaskDefinition(TaskDefinitionBase):
-    """Versioned NutAssembly reward/success/release evaluation."""
-
-    references: TaskReferences
-    success_definition: str = NUT_ASSEMBLY_SUCCESS_DEFINITION
-
-    def __post_init__(self) -> None:
-        if self.success_definition != NUT_ASSEMBLY_SUCCESS_DEFINITION:
-            raise ValueError(
-                "NutAssemblyTaskDefinition only implements "
-                f"{NUT_ASSEMBLY_SUCCESS_DEFINITION!r}, got "
-                f"{self.success_definition!r}"
-            )
-        if _PANDA_UID not in self.references.agents:
-            raise KeyError("NutAssemblyTaskDefinition requires panda-v1 references")
-        if _SQUARE_NUT_UID not in self.references.objects:
-            raise KeyError("NutAssemblyTaskDefinition requires square-nut-v1 references")
-
-    def reset(self, snapshot: RuntimeSnapshot) -> TaskEvaluation:
-        return self._evaluate(snapshot)
-
-    def evaluate(
-        self,
-        previous_snapshot: RuntimeSnapshot,
-        action: np.ndarray,
-        current_snapshot: RuntimeSnapshot,
-    ) -> TaskEvaluation:
-        del previous_snapshot, action
-        return self._evaluate(current_snapshot)
-
-    def _evaluate(self, snapshot: RuntimeSnapshot) -> TaskEvaluation:
-        panda = self.references.agents[_PANDA_UID]
-        nut_ref = self.references.objects[_SQUARE_NUT_UID]
-        if snapshot.site_xpos is None:
-            raise ValueError("NutAssembly evaluation requires site_xpos")
-        if snapshot.ctrl is None:
-            raise ValueError("NutAssembly evaluation requires ctrl")
-
-        nut_qpos_adr = int(nut_ref.qpos_ids[0])
-        nut_qpos = np.asarray(
-            snapshot.qpos[nut_qpos_adr : nut_qpos_adr + 7],
-            dtype=np.float64,
-        )
-        if nut_qpos.shape != (7,):
-            raise ValueError("SquareNut qpos must contain freejoint pose")
-        nut_pos = nut_qpos[:3]
-        nut_quat = nut_qpos[3:7]
-        handle_pos = nut_pos + quat_wxyz_to_matrix(nut_quat) @ np.array(
-            [NUT_HANDLE_LOCAL_X, 0.0, 0.0],
-            dtype=np.float64,
-        )
-        eef_pos = np.asarray(
-            snapshot.site_xpos[int(panda.eef_site_id)],
-            dtype=np.float64,
-        )
-        peg_target = np.array([PEG_X, PEG_Y_OFFSET, _TABLE_SEATED_NUT_Z], dtype=np.float64)
-        peg_xy_error = float(np.linalg.norm(nut_pos[:2] - peg_target[:2]))
-        peg_z_error = float(nut_pos[2] - peg_target[2])
-        yaw_error = _square_yaw_error(_quat_yaw_wxyz(nut_quat))
-        eef_to_nut_dist = _distance(eef_pos, nut_pos)
-        eef_to_handle_dist = _distance(eef_pos, handle_pos)
-        gripper_qpos = np.asarray(snapshot.qpos[panda.gripper_qpos_ids], dtype=np.float64)
-        gripper_opening = float(np.sum(gripper_qpos))
-        gripper_ctrl = float(snapshot.ctrl[int(panda.gripper_actuator_ids[0])])
-
-        reached_nut = eef_to_handle_dist <= _GRASP_DISTANCE
-        gripper_closed = gripper_opening <= _GRIPPER_CLOSED_OPENING
-        grasped_nut = bool(reached_nut and gripper_closed)
-        lifted_nut = bool(nut_pos[2] >= TABLE_TOP_Z + NUT_HALF_HEIGHT + _LIFT_HEIGHT)
-        hovered_over_peg = bool(lifted_nut and peg_xy_error <= _HOVER_XY_TOLERANCE)
-        aligned_with_peg = bool(peg_xy_error <= _INSERT_XY_TOLERANCE and yaw_error <= _INSERT_YAW_TOLERANCE)
-        peg_passed_through_nut_center = bool(nut_pos[2] <= _PEG_TOP_Z - NUT_CONTACT_MARGIN)
-        nut_returned_to_table = bool(nut_pos[2] <= _TABLE_SEATED_NUT_MAX_Z)
-        inserted_on_peg = bool(
-            aligned_with_peg
-            and peg_passed_through_nut_center
-            and nut_returned_to_table
-        )
-        gripper_released = bool(
-            gripper_opening >= _GRIPPER_RELEASE_OPENING
-            or gripper_ctrl >= _GRIPPER_RELEASE_CTRL
-        )
-        released_nut = bool(
-            inserted_on_peg
-            and gripper_released
-            and eef_to_nut_dist >= _RELEASE_DISTANCE
-        )
-        task_success = bool(inserted_on_peg and released_nut)
-
-        reward_terms = {
-            "reach": 0.10 * float(1.0 - math.tanh(10.0 * eef_to_handle_dist)),
-            "grasp": 0.25 if grasped_nut else 0.0,
-            "lift": 0.25 if lifted_nut else 0.0,
-            "hover": 0.15 if hovered_over_peg else 0.0,
-            "insert": 0.15 if inserted_on_peg else 0.0,
-            "release": 0.10 if inserted_on_peg and released_nut else 0.0,
-            "success": 1.0 if task_success else 0.0,
-        }
-        metrics = {
-            "reached_nut": bool(reached_nut),
-            "grasped_nut": bool(grasped_nut),
-            "lifted_nut": bool(lifted_nut),
-            "hovered_over_peg": bool(hovered_over_peg),
-            "aligned_with_peg": bool(aligned_with_peg),
-            "peg_passed_through_nut_center": bool(peg_passed_through_nut_center),
-            "nut_returned_to_table": bool(nut_returned_to_table),
-            "inserted_on_peg": bool(inserted_on_peg),
-            "gripper_released": bool(gripper_released),
-            "released_nut": bool(released_nut),
-            "task_success": bool(task_success),
-            "nut_x": float(nut_pos[0]),
-            "nut_y": float(nut_pos[1]),
-            "nut_z": float(nut_pos[2]),
-            "table_seated_nut_max_z": float(_TABLE_SEATED_NUT_MAX_Z),
-            "peg_xy_error": float(peg_xy_error),
-            "peg_z_error": float(peg_z_error),
-            "yaw_error": float(yaw_error),
-            "eef_to_nut_dist": float(eef_to_nut_dist),
-            "eef_to_handle_dist": float(eef_to_handle_dist),
-            "gripper_opening": float(gripper_opening),
-            "gripper_ctrl": float(gripper_ctrl),
-            "success_definition": self.success_definition == NUT_ASSEMBLY_SUCCESS_DEFINITION,
-        }
-        return TaskEvaluation(
-            reward=sum(reward_terms.values()),
-            success=task_success,
-            failure=False,
-            metrics=metrics,
-            reward_terms=reward_terms,
-        )
+def evaluate(state: CanonicalStateView, semantics: SemanticDefinition | None = None):
+    from ...environment import TaskEvaluation
+    expected = semantic_definition()
+    semantics = expected if semantics is None else semantics
+    if not isinstance(state, CanonicalStateView) or semantics != expected:
+        raise ValueError("unsupported canonical NutAssembly state/semantics")
+    semantics.require_state(state)
+    p = semantics.parameters_si
+    nut, peg = state.pose_world[NUT], state.pose_world[PEG]
+    position = np.asarray(nut.position)
+    ee = np.asarray(state.pose_world[EEF].position)
+    rotation = quat_wxyz_to_matrix(nut.quaternion_wxyz)
+    handle = position + rotation @ np.array([p["nut_handle_local_x"], 0.0, 0.0])
+    yaw = float(np.arctan2(rotation[1, 0], rotation[0, 0]))
+    period = 0.5 * np.pi
+    yaw_error = abs((yaw + 0.5 * period) % period - 0.5 * period)
+    xy_error = float(np.linalg.norm(position[:2] - np.asarray(peg.position[:2])))
+    z_error = float(position[2] - (p["table_top_z"] + p["nut_half_height"] + p["nut_contact_margin"]))
+    ee_distance = float(np.linalg.norm(ee - position))
+    handle_distance = float(np.linalg.norm(ee - handle))
+    opening = float(sum(state.joint_position[name] for name in FINGERS))
+    reached = handle_distance <= p["grasp_distance"]
+    grasped = bool(reached and opening <= p["gripper_closed_opening"])
+    lifted = bool(position[2] >= p["table_top_z"] + p["nut_half_height"] + p["lift_height"])
+    hover = bool(lifted and xy_error <= p["hover_xy_tolerance"])
+    aligned = bool(xy_error <= p["insert_xy_tolerance"] and yaw_error <= p["insert_yaw_tolerance"])
+    passed = bool(position[2] <= peg.position[2] + p["peg_half_height"] - p["nut_contact_margin"])
+    returned = bool(position[2] <= p["table_top_z"] + 3 * p["nut_half_height"])
+    inserted = bool(aligned and passed and returned)
+    gripper_released = bool(opening >= p["gripper_release_opening"])
+    released = bool(inserted and gripper_released and ee_distance >= p["release_distance"])
+    success = bool(inserted and released)
+    metrics = {
+        "reached_nut": bool(reached), "grasped_nut": bool(grasped),
+        "lifted_nut": bool(lifted), "hovered_over_peg": bool(hover),
+        "aligned_with_peg": bool(aligned), "peg_passed_through_nut_center": bool(passed),
+        "nut_returned_to_table": bool(returned), "inserted_on_peg": bool(inserted),
+        "gripper_released": bool(gripper_released), "released_nut": bool(released),
+        "task_success": bool(success), "nut_x": float(position[0]),
+        "nut_y": float(position[1]), "nut_z": float(position[2]), "nut_yaw": yaw,
+        "table_seated_nut_max_z": p["table_top_z"] + 3 * p["nut_half_height"],
+        "peg_xy_error": xy_error, "peg_z_error": z_error, "yaw_error": yaw_error,
+        "eef_to_nut_dist": ee_distance, "eef_to_handle_dist": handle_distance,
+        "gripper_opening": opening, "success_definition": True,
+    }
+    terms = {"reach": 0.10 * (1.0 - math.tanh(10.0 * handle_distance)),
+             "grasp": 0.25 if grasped else 0.0, "lift": 0.25 if lifted else 0.0,
+             "hover": 0.15 if hover else 0.0, "insert": 0.15 if inserted else 0.0,
+             "release": 0.10 if released else 0.0, "success": 1.0 if success else 0.0}
+    return TaskEvaluation(reward=float(sum(terms.values())), success=success,
+        failure=False, metrics=metrics, reward_terms=terms)
 
 
-_ARM_DOF = 7
-_INITIAL_ARM_ALIGN_STEPS = 80
-_INITIAL_ARM_ALIGN_TOLERANCE = 0.015
-_INITIAL_HAND_SITE_TARGET_FROM_HANDLE = np.array([0.0, 0.0, 0.12], dtype=np.float64)
-_GRIPPER_TARGET_ROTATION = np.diag([1.0, -1.0, -1.0]).astype(np.float64)
-_IK_DAMPING = 2.0e-2
-_IK_POSITION_GAIN = 0.9
-_IK_MAX_DELTA_Q = 0.10
-_IK_ROTATION_GAIN = 0.65
-_IK_ROTATION_ROW_WEIGHT = 0.22
+def build_artifact() -> TaskArtifact:
+    recipe, scene, reset, asset = _recipe(), _recipe()["scene"], _recipe()["reset"], _recipe()["asset"]
+    initialization = {"nut_pose": reset["nut_pose"], "joint_position": reset["joint_position"]}
+    mass = float(asset["nut_mass_kg"])
+    inertia = tuple(float(v) for v in asset["nut_diagonal_inertia_kg_m2"])
+    if (mass != NUTASSEMBLY_NOMINAL_V1_MASS
+            or inertia != tuple(NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA)):
+        raise ValueError("selected nominal Nut asset profile changed")
+    return TaskArtifact("task-artifact-v0", recipe["artifact_id"], recipe["task_uid"],
+        recipe["artifact_version"],
+        WorldDefinition("world-v0", "SI_right_handed_z_up_wxyz", (
+            EntityDefinition("tabletop-v1", "static", "nut-assembly-square-v1/task-local/table",
+                (), (), "box", "support_contact", {"top_z": float(scene["table_top_z"])}),
+            EntityDefinition("panda-v1", "embodiment",
+                "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
+                ("panda-v1/base", EEF),
+                ("panda-v1/joint1", "panda-v1/joint2", "panda-v1/joint3", "panda-v1/joint4",
+                 "panda-v1/joint5", "panda-v1/joint6", "panda-v1/joint7", *FINGERS),
+                "referenced_articulation", "arm_hand_finger_collision", {}),
+            EntityDefinition("square-nut-v1", "movable",
+                "nut-assembly-square-v1/task-local/square-nut/" + NUTASSEMBLY_NOMINAL_V1_ID,
+                (), (), "authored_compound", "table_hand_peg_contact",
+                {"mass": mass, **{f"inertia_{axis}": value for axis, value in zip("xyz", inertia)}}),
+            EntityDefinition("square-peg-v1", "static", "nut-assembly-square-v1/task-local/square-peg",
+                (), (), "box", "nut_contact", {"half_height": float(scene["peg_half_height"])}),
+            EntityDefinition("round-peg-v1", "static", "nut-assembly-square-v1/task-local/round-peg",
+                (), (), "cylinder", "nut_contact", {"half_height": float(scene["peg_half_height"])}),
+        ), ActionIntent("absolute_pose", "world", "quaternion_wxyz", "arm_joint_position_and_gripper"),
+        tuple(recipe["observation_requirements"]), ()),
+        InitializationContract("initialization-v0",
+            {"square-nut-v1": PoseWorld.from_mapping(initialization["nut_pose"])},
+            dict(initialization["joint_position"]), (),
+            "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
+            "NA-S0_frozen_deterministic_semantic_joint_and_pose_request", 0),
+        semantic_definition(),
+        Timebase(float(recipe["physics_dt"]), int(recipe["control_substeps"]), float(recipe["control_dt"])),
+        RequiredCapabilitySet(tuple(recipe["required_capabilities"])))
 
 
-def _apply_episode_state_to_solver(solver: object, state: EpisodePhysicsState) -> None:
-    if state.qpos.size:
-        solver.write_qpos(state.qpos)
-    if state.qvel.size:
-        solver.write_qvel(state.qvel)
-        solver.write_qacc(state.qacc)
-    if state.ctrl.size:
-        solver.write_ctrl(state.ctrl)
-        solver.write_act(state.act)
-    solver.synchronize_kinematic_state(update_site_jacobians=False)
+def sample_reset(artifact: TaskArtifact, task_seed: int = 19) -> ResetSample:
+    expected = build_artifact()
+    if not isinstance(artifact, TaskArtifact) or artifact.to_mapping() != expected.to_mapping():
+        raise ValueError("selected NA-S0 TaskArtifact required")
+    if type(task_seed) is not int or task_seed != 19:
+        raise ValueError("selected NA-S0 uses fixed provenance seed19")
+    initialization = artifact.initialization
+    return ResetSample.create(schema_version="reset-sample-v0",
+        task_artifact_hash=artifact.identity_hash, sampler_id=_recipe()["reset"]["sampler_id"],
+        sampler_version=_recipe()["reset"]["sampler_version"], task_seed=task_seed,
+        joint_position=dict(initialization.joint_position), poses_world=dict(initialization.poses_world),
+        velocity_policy=_recipe()["reset"]["inherited_state_policy"],
+        control_policy=_recipe()["reset"]["control_policy"],
+        settle_steps=int(_recipe()["reset"]["settle_steps"]))
 
 
-def _episode_state_from_solver(solver: object) -> EpisodePhysicsState:
-    n_actuators = int(getattr(solver, "n_actuators", 0))
-    act = np.asarray(solver.read_act(), dtype=np.float32).copy() if n_actuators else np.zeros(0, dtype=np.float32)
-    return EpisodePhysicsState(
-        qpos=np.asarray(solver.read_qpos(), dtype=np.float32).copy(),
-        qvel=np.asarray(solver.read_qvel(), dtype=np.float32).copy(),
-        qacc=np.asarray(solver.read_qacc(), dtype=np.float32).copy(),
-        ctrl=np.asarray(solver.read_ctrl(), dtype=np.float32).copy(), act=act,
+def _environment_config():
+    recipe = _recipe()
+    base = resolve_env_config(task_uid=recipe["task_uid"], scene_uid=recipe["scene_uid"],
+        agent_uids=tuple(recipe["agent_uids"]), object_uids=tuple(recipe["object_uids"]),
+        success_definition=recipe["success_definition"])
+    config = overlay_public_env_config(base, _configuration()["environment"])
+    return replace(config, runtime=replace(config.runtime, backend="cpu", prewarm=False,
+        physics_dt=float(recipe["physics_dt"]), control_substeps=int(recipe["control_substeps"])),
+        render=replace(config.render, camera_obs=False),
+        robot=replace(config.robot, controller=replace(config.robot.controller,
+            kind="absolute_pose", reference="world", rotation_representation="quaternion_wxyz")))
+
+
+def build_runtime_source(artifact: TaskArtifact, provider="geophys"):
+    if artifact.to_mapping() != build_artifact().to_mapping():
+        raise ValueError("selected nominal NutAssembly Artifact required")
+    if provider not in {"geophys", "mujoco"}:
+        raise ValueError("selected provider must be geophys or mujoco")
+    recipe = _recipe()
+    source_config = recipe["controller"]
+    config = _environment_config()
+    config = replace(config,
+        action=replace(config.action, **source_config["action_overrides"]),
+        robot=replace(config.robot,
+            gripper=replace(config.robot.gripper, **source_config["gripper_overrides"])))
+    scene = recipe["scene"]
+    scene_parameters = {**scene, "physics_dt": recipe["physics_dt"],
+        "nut_contact_margin_m": recipe["asset"]["nut_contact_margin_m"],
+        "freejoint_damping": recipe["asset"]["freejoint_damping"],
+        "freejoint_armature": recipe["asset"]["freejoint_armature"]}
+    scene_xml, base = build_nut_assembly_model_xml(scene_parameters,
+        nut_mass_kg=float(recipe["asset"]["nut_mass_kg"]),
+        nut_diagonal_inertia_kg_m2=tuple(recipe["asset"]["nut_diagonal_inertia_kg_m2"]))
+    contact_profile = None
+    if provider == "mujoco":
+        overrides = recipe["providers"]["mujoco"]["option_overrides"]
+        if overrides != {"noslip_iterations": 2}:
+            raise ValueError("selected MuJoCo provider profile changed")
+        root = ET.fromstring(scene_xml)
+        option = root.find("option")
+        if option is None:
+            raise ValueError("MJCF source has no option element")
+        for key, value in overrides.items():
+            option.set(key, str(value))
+        scene_xml = ET.tostring(root, encoding="unicode")
+        contact_profile = {"provider": "mujoco", "version": "mujoco-coulomb-noslip2-v1",
+            "native_version_tested": recipe["providers"]["mujoco"]["native_version_tested"],
+            "model_option_overrides": overrides}
+    composition = TaskCompositionSpec(recipe["task_uid"], recipe["scene_uid"],
+        tuple(recipe["agent_uids"]), tuple(recipe["object_uids"]),
+        success_definition=recipe["success_definition"])
+    return RuntimeSource(artifact.identity_hash,
+        TaskSceneSource(scene_xml, base, "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1"),
+        {name: name.split("/", 1)[1] for name in artifact.initialization.joint_position},
+        {"square-nut-v1": "SquareNut", "square-peg-v1": "peg1",
+         "round-peg-v1": "peg2", "panda-v1/base": "link0"},
+        {EEF: scene["ee_site_name"]}, {"square-nut-v1": "SquareNut_joint"},
+        {f"panda-v1/joint{i}": f"actuator{i}" for i in range(1, 8)}, ("actuator8",),
+        composition, config, make_scene(recipe["scene_uid"]),
+        tuple(make_agent(uid) for uid in recipe["agent_uids"]),
+        tuple(make_object(uid) for uid in recipe["object_uids"])), contact_profile
+
+
+def _sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _source_identity_files():
+    root = Path(__file__).resolve().parents[3]
+    relative = (
+        "task_env/tasks/nut_assembly/task.py", "task_env/tasks/nut_assembly/solution.py",
+        "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
+        "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",
+        "task_env/tasks/reference_env.py", "task_env/tasks/canonical_solution_lifecycle.py",
+        "task_env/runtime/sessions/common.py", "task_env/runtime/sessions/source.py",
+        "task_env/trajectory/canonical/execution.py", "task_env/trajectory/canonical/streaming.py",
     )
+    controller = root / "task_env/controllers/canonical"
+    relative = (*relative, *(p.relative_to(root).as_posix() for p in controller.glob("*.py") if p.is_file()))
+    return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
-def _arm_ctrl_limits(scene_model: object) -> np.ndarray:
-    joint_data = scene_model.joint_data
-    ctrlrange = np.asarray(joint_data.get("actuator_ctrlrange", np.zeros((0, 2))), dtype=np.float64)
-    if ctrlrange.shape[0] < _ARM_DOF:
-        return np.tile(np.array([-np.inf, np.inf], dtype=np.float64), (_ARM_DOF, 1))
-    limits = ctrlrange[:_ARM_DOF].copy()
-    limited = np.asarray(joint_data.get("actuator_ctrllimited", np.ones(ctrlrange.shape[0])), dtype=np.int32)
-    for actuator_id in range(min(_ARM_DOF, limited.shape[0])):
-        if int(limited[actuator_id]) == 0:
-            limits[actuator_id] = (-np.inf, np.inf)
-    return limits
+def build_reference(*, provider="mujoco"):
+    """Build the single selected 100 Hz route without importing native providers."""
+    from ...controllers.canonical.contracts import digest
+    recipe = _recipe()
+    artifact = build_artifact()
+    source, contact_profile = build_runtime_source(artifact, provider)
+    dynamic = recipe["controller"]["dynamic_profile"]
+    controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
+    # The accepted R3 route fixes a 10 N force target/cap while preserving its
+    # controller law and task-facing close authorization.
+    controller.gripper_config = replace(controller.gripper_config, force_limit_N=10.0)
+    holder = StableArmTargetHold(controller)
+    settings = dict(recipe["solution"]["config"])
+    settings["grasp_offset"] = tuple(settings["grasp_offset"])
+    settings["table_top_z_m"] = float(recipe["scene"]["table_top_z"])
+    settings["nut_contact_margin_m"] = float(recipe["asset"]["nut_contact_margin_m"])
+    solution_config = NutAssemblySolutionConfig(**settings)
+    solution = NutAssemblyOutcomeSolutionV1(config=solution_config,
+        control_dt=artifact.timebase.control_dt, arm_hold=holder,
+        physics_dt_s=artifact.timebase.physics_dt)
+    base_controller_identity = controller.identity
+    source_files = _source_identity_files()
+    construction_id = recipe["construction_id"]
+    controller.identity = digest({"construction_id": construction_id,
+        "base_controller_identity": base_controller_identity,
+        "solution_identity": solution.identity,
+        "construction_source_sha256": source_files["task_env/tasks/nut_assembly/task.py"],
+        "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
+        "cadence": "native-gripper-500hz-v1",
+        "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory"})
+    root = Path(__file__).resolve().parents[3]
+    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
+        "artifact_sha256": artifact.identity_hash,
+        "runtime_config": asdict(source.config), "solution_config": asdict(solution_config),
+        "solution_parameters": {name: getattr(solution, name) for name in (
+            "version", "outward_handle_offset_m", "descend_endpoint_command_bias_m",
+            "minimum_pose_wait_s", "pose_window_s", "pose_span_m", "pose_speed_m_s",
+            "postclose_hold_s", "servo_height_compensation_m", "stable_height_tolerance_m")},
+        "task_recipe": _configuration(), "dynamic_profile": dynamic,
+        "physical_profile": controller.physical_profile,
+        "resolved_controller_action": asdict(controller.config),
+        "resolved_controller_gripper": asdict(controller.gripper_config),
+        "controller_identity": controller.identity, "base_controller_identity": base_controller_identity,
+        "solution_identity": solution.identity, "guard_policy": solution.policy_mapping,
+        "guard_policy_identity": solution.policy_identity,
+        "outcome_policy": solution.outcome_policy_mapping,
+        "outcome_policy_identity": solution.outcome_policy_identity,
+        "completion_policy": "on_expert_terminal_stage",
+        "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
+        "gripper_feedback_hz": 500,
+        "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
+        "provider_contact_profile": contact_profile,
+        "source_xml_sha256": hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+        "source_revision": revision, "source_sha256": source_files,
+        "qualification": "NOT_REQUALIFIED",
+        "runtime_source_bindings": {name: dict(getattr(source, name)) for name in (
+            "joints", "bodies", "frames", "free_joints", "joint_targets")},
+        "runtime_open_actuators": list(source.open_actuators)}
+    return {"construction_id": construction_id, "artifact": artifact, "source": source,
+        "controller": ReferenceExecutionController(holder, artifact.timebase.control_dt),
+        "controller_identity": controller.identity, "solution": solution,
+        "solution_identity": solution.identity, "solution_config": solution_config,
+        "recipe": resolved, "resolved_configuration": resolved,
+        "recipe_identity": digest(resolved), "close_authorization_policy": {
+            **solution.policy_mapping, "identity": solution.policy_identity},
+        "allowed_close_authorization_guards": [solution.primary_guard_id, solution.alternative_guard_id],
+        "execution_policy": {"policy_id": OUTCOME_POLICY_ID,
+            "diagnostic_continuation": False, "strict_expert_gate": "preserved-with-bounded-readiness-warning",
+            "grants_full_expert_pass": False, "outcome_completion": True},
+        "source_revision": revision, "source_sha256": source_files,
+        "_arm_schedule_memory": ArmRampMemory(), "_execution_provider": provider,
+        "_contact_profile": contact_profile}
 
 
-class NutAssemblyResetSampler:
-    """Resolve the deterministic NutAssembly initial alignment at assembly time."""
-
-    def resolve_initial_state(self, *, solver: object, compiled_scene) -> EpisodePhysicsState:
-        references = compiled_scene.references
-        if "panda-v1" not in references.agents or "square-nut-v1" not in references.objects:
-            return compiled_scene.initial_state
-        _apply_episode_state_to_solver(solver, compiled_scene.initial_state)
-        agent_ref = references.agents["panda-v1"]
-        nut_ref = references.objects["square-nut-v1"]
-        site_id, nut_qpos_adr = int(agent_ref.eef_site_id), int(nut_ref.qpos_ids[0])
-        arm_ctrl_limits = _arm_ctrl_limits(compiled_scene.scene_model)
-        qpos, ctrl = np.asarray(solver.read_qpos(), dtype=np.float32).copy(), np.asarray(solver.read_ctrl(), dtype=np.float32).copy()
-        for _iteration in range(_INITIAL_ARM_ALIGN_STEPS):
-            nut_qpos = np.asarray(solver.read_qpos(), dtype=np.float64)[nut_qpos_adr:nut_qpos_adr + 7]
-            handle_position = nut_qpos[:3] + quat_wxyz_to_matrix(nut_qpos[3:7]) @ np.array([NUT_HANDLE_LOCAL_X, 0.0, 0.0])
-            solver.refresh_site_jacobians()
-            current_position = np.asarray(solver.read_site_world_pos()[site_id], dtype=np.float64)
-            current_rotation = quat_wxyz_to_matrix(np.asarray(solver.read_site_world_quat()[site_id], dtype=np.float64))
-            jacp = np.asarray(solver.read_site_jacp()[site_id, agent_ref.arm_dof_ids], dtype=np.float64).T
-            jacr = np.asarray(solver.read_site_jacr()[site_id, agent_ref.arm_dof_ids], dtype=np.float64).T
-            position_error = handle_position + _INITIAL_HAND_SITE_TARGET_FROM_HANDLE - current_position
-            from ...utils.rotation import rotation_vector_error
-            rotation_error = rotation_vector_error(current_rotation, _GRIPPER_TARGET_ROTATION)
-            jacobian = np.vstack([jacp, _IK_ROTATION_ROW_WEIGHT * jacr])
-            error = np.concatenate([position_error, _IK_ROTATION_ROW_WEIGHT * _IK_ROTATION_GAIN * rotation_error])
-            delta_q = jacobian.T @ np.linalg.solve(jacobian @ jacobian.T + (_IK_DAMPING * _IK_DAMPING) * np.eye(6), error)
-            arm_target = np.clip(qpos[agent_ref.arm_qpos_ids].astype(np.float64) + _IK_POSITION_GAIN * np.clip(delta_q, -_IK_MAX_DELTA_Q, _IK_MAX_DELTA_Q), arm_ctrl_limits[:_ARM_DOF, 0], arm_ctrl_limits[:_ARM_DOF, 1])
-            qpos[agent_ref.arm_qpos_ids] = arm_target.astype(np.float32)
-            ctrl[agent_ref.arm_actuator_ids] = arm_target.astype(np.float32)
-            if agent_ref.gripper_qpos_ids.size:
-                qpos[agent_ref.gripper_qpos_ids] = np.float32(0.04)
-            if agent_ref.gripper_actuator_ids.size:
-                ctrl[agent_ref.gripper_actuator_ids] = np.float32(agent_ref.ctrl_range[agent_ref.gripper_actuator_ids[0], 1])
-            solver.write_qpos(qpos); solver.write_ctrl(ctrl); solver.synchronize_kinematic_state(update_site_jacobians=False)
-            if float(np.linalg.norm(position_error)) <= _INITIAL_ARM_ALIGN_TOLERANCE and float(np.linalg.norm(rotation_error)) <= 0.20:
-                break
-        if int(getattr(solver, "n_actuators", 0)) > 0:
-            solver.write_act(np.zeros(int(solver.n_actuators), dtype=np.float32))
-        solver.synchronize_kinematic_state(update_site_jacobians=False)
-        return _episode_state_from_solver(solver)
+def _reset_seed(seed):
+    if seed not in (19, None):
+        raise ValueError("selected NutAssembly NA-S0 has fixed provenance seed19")
+    return 19 if seed is None else seed
 
 
-class NutAssemblyEnv(BaseTaskEnv):
-    variant_spec = NUT_ASSEMBLY_SQUARE_SPEC
-    uid, task_uid, scene_uid = NUT_ASSEMBLY_ENV_ID, NUT_ASSEMBLY_TASK_UID, NUT_ASSEMBLY_SCENE_UID
-    agent_uids, object_uids = NUT_ASSEMBLY_AGENT_UIDS, NUT_ASSEMBLY_OBJECT_UIDS
-    success_definition, sensor_profile, reset_profile = NUT_ASSEMBLY_SUCCESS_DEFINITION, NUT_ASSEMBLY_SENSOR_PROFILE, NUT_ASSEMBLY_RESET_PROFILE
-
-    @classmethod
-    def default_config_path(cls) -> Path:
-        del cls
-        return Path(__file__).resolve().with_name("default.yaml")
-
-    def create_scene_composer(self):
-        from .assets import NutAssemblySceneComposer
-        return NutAssemblySceneComposer()
-
-    def create_reset_sampler(self):
-        return NutAssemblyResetSampler()
-
-    def create_task_definition(self, compiled_scene):
-        return NutAssemblyTaskDefinition(references=compiled_scene.references, success_definition=self.config.task.success_definition)
+def _schedule(env):
+    return ReferenceArmSchedule(env.solution, env.value["_arm_schedule_memory"])
 
 
-__all__ = [
-    "NUT_ASSEMBLY_AGENT_UIDS", "NUT_ASSEMBLY_ENV_ID", "NUT_ASSEMBLY_EXPERT_PROFILE",
-    "NUT_ASSEMBLY_OBJECT_UIDS", "NUT_ASSEMBLY_RESET_PROFILE", "NUT_ASSEMBLY_SCENE_UID",
-    "NUT_ASSEMBLY_SENSOR_PROFILE", "NUT_ASSEMBLY_SQUARE_SPEC", "NUT_ASSEMBLY_SUCCESS_DEFINITION",
-    "NUT_ASSEMBLY_TASK_UID", "NutAssemblyEnv", "NutAssemblyResetSampler", "NutAssemblyTaskDefinition",
-]
+def _observe_kwargs(env, guard_samples):
+    return {"readiness": env.controller.readiness(env.state, env.feedback),
+        "transition_samples": guard_samples}
+
+
+def _binding():
+    return ReferenceTaskBinding(build=lambda provider: build_reference(provider=provider),
+        reset_sample=sample_reset, evaluate=evaluate,
+        object_poses=((NUT, "square_nut_v1"), (PEG, "square_peg_v1")),
+        external_actions=False, interval_mode="native", recorder_mode="execution",
+        external_action_error="selected NutAssembly requires step_expert; unguarded external actions are not admitted",
+        reset_seed=_reset_seed, observe_expert_kwargs=_observe_kwargs,
+        schedule_factory=_schedule, capture_guard_samples=True,
+        record_native_substeps=True, abort_solution_on_runtime_error=True)
+
+
+@register_env()
+class NutAssemblyReferenceEnv(SelectedReferenceEnv):
+    uid = REFERENCE_ENV_ID
+    binding = _binding()
+
+
+__all__ = ["NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
+    "build_reference", "build_runtime_source", "evaluate", "sample_reset", "semantic_definition"]

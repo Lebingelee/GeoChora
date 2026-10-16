@@ -139,19 +139,9 @@ def _historical_build_plan(
     force_limit_N: float,
     camera_size: int = 64,
 ) -> tuple[dict[str, Any], Any]:
-    from task_env.tasks.nut_assembly.solution import NutAssemblySolution
     from task_env.tasks.pick_cube.solution import PickCubeSolution
     if env_id == 'nut-assembly-square-v1':
-        return (
-            _nut_assembly_config(
-                backend,
-                horizon,
-                camera_obs=camera_obs,
-                force_limit_N=force_limit_N,
-                camera_size=camera_size,
-            ),
-            NutAssemblySolution(),
-        )
+        raise ValueError('legacy NutAssembly TaskEnv route retired; use nut-assembly-outcome-reference-v1')
     if env_id == 'pick-cube-v1':
         return (
             _pick_cube_config(
@@ -186,6 +176,6 @@ def _build_plan(env_id, backend, horizon, *, camera_obs=False, force_limit_N=Non
         from task_env.tasks.pick_cube.task import build_reference
         value = build_reference()
     else:
-        from task_env.tasks.nut_assembly.reference import build_reference
+        from task_env.tasks.nut_assembly.task import build_reference
         value = build_reference(provider='geophys')
     return {'provider': 'geophys', 'backend': 'cpu', 'horizon': horizon}, value['solution']

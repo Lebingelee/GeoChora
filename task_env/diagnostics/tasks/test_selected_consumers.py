@@ -12,7 +12,7 @@ from task_env.controllers.canonical.contracts import AppliedCanonicalControl
 from task_env.controllers.canonical.feedback import CanonicalControlFeedback, CanonicalGripperFeedback
 from task_env.controllers.canonical.kinematics import ARM, FINGERS, PandaKinematics
 from task_env.runtime.sessions.common import _SessionValues
-from task_env.tasks.nut_assembly.reference_execution import ReferenceArmSchedule, ArmRampMemory
+from task_env.tasks.nut_assembly.solution import ReferenceArmSchedule, ArmRampMemory
 from task_env.tasks.reference_env import SelectedReferenceEnv
 
 IDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1')
@@ -127,7 +127,7 @@ def test_external_expert_modes_and_invalid_actions(uid, fake):
 
 
 def test_arm_schedule_matches_historical_interpolation_and_ack_memory():
-    from task_env.tasks.nut_assembly.reference import build_reference
+    from task_env.tasks.nut_assembly.task import build_reference
     from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
     value = build_reference()
     solution = SimpleNamespace(_lift_released=True)
@@ -160,7 +160,7 @@ def test_task_bindings_declare_selected_control_and_recording_requirements():
     assert (nutassembly.binding.interval_mode, nutassembly.binding.recorder_mode,
             nutassembly.binding.external_actions, nutassembly.binding.record_native_substeps,
             nutassembly.binding.capture_guard_samples) == ('native', 'execution', False, True, True)
-    assert nutassembly.value['construction_id'] == 'nutassembly-r5-v5-outcome-reference-construction-v2'
+    assert nutassembly.value['construction_id'] == 'nut-assembly-outcome-reference-v1'
     pickcube.close()
     nutassembly.close()
 

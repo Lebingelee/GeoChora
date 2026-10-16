@@ -9,18 +9,17 @@ from dataclasses import replace
 import json
 from pathlib import Path
 
-from task_env.tasks.nut_assembly.reference import build_reference, GUARDED_EXPERT, OUTCOME_COMPLETION
-from task_env.tasks.nut_assembly.outcome_solution import NutAssemblyOutcomeSolutionV1
-from task_env.tasks.nut_assembly.canonical_semantics import evaluate
+from task_env.tasks.nut_assembly.task import build_reference, evaluate
+from task_env.tasks.nut_assembly.solution import (
+    NutAssemblyOutcomeSolutionV1, NutAssemblySolutionConfig, OUTCOME_POLICY_ID,
+)
 from task_env.artifacts import CanonicalStateView, PoseWorld
 from task_env.controllers.canonical.readiness import CanonicalControlReadiness, GripperReadiness
 from task_env.utils.rotation import quat_multiply_wxyz, quat_wxyz_to_matrix
 
 META = {'action_schema': {'controller_kind':'absolute_pose','reference':'world',
                           'rotation_representation':'quaternion_wxyz'}}
-S2B1_IDENTITIES = json.loads(
-    (Path(__file__).resolve().parents[3] / 'docs/module/task_env/p2_0_s2_b1_source_identity.json').read_text()
-)['selected_routes']['nutassembly']
+OUTCOME_COMPLETION = OUTCOME_POLICY_ID
 
 
 class Hold:
@@ -30,7 +29,7 @@ class Hold:
 
 class Ideal:
     def __init__(self, *, residual=-.00022, release=True, authorize=True):
-        value = build_reference(execution_policy=GUARDED_EXPERT)
+        value = build_reference()
         self.solution = NutAssemblyOutcomeSolutionV1(config=value['solution_config'],
             control_dt=.01, physics_dt_s=.002, arm_hold=Hold())
         self.ee = np.array([.5,-.075,.7,*value['solution_config'].grasp_quaternion_wxyz])
@@ -94,7 +93,7 @@ def test_warning_advances_without_diagnostic_override_and_retains_original_gate_
     assert warning['strict_tolerance_m']==.0001 and warning['sample_count']>=20
     assert s.original_expert_lifecycle_status['expert_failed']
     assert not s.original_expert_lifecycle_status['expert_complete']
-    strict=build_reference(execution_policy=GUARDED_EXPERT)['solution']
+    strict=build_reference()['solution']
     assert not strict._stable_height_ready(.5,.50022)
 
 
@@ -187,15 +186,15 @@ def test_without_measured_release_task_cannot_complete():
 def test_default_and_source_policy_identity_and_complete_checkpoint_fields():
     v=build_reference();s=v['solution']
     assert isinstance(s,NutAssemblyOutcomeSolutionV1)
-    assert v['execution_policy']['policy_id']==OUTCOME_COMPLETION and not v['diagnostic_shadow_mode']
-    assert s.original_solution_identity==S2B1_IDENTITIES['guarded_solution_identity']
-    assert s.identity!=s.original_solution_identity
+    assert v['execution_policy']['policy_id']==OUTCOME_COMPLETION
+    assert v['execution_policy']['diagnostic_continuation'] is False
+    assert s.identity and len(s.identity)==64
+    assert s.outcome_policy_identity and len(s.outcome_policy_identity)==64
     assert v['source'].config.robot.gripper.force_limit_N==10.
-    from task_env.diagnostics.phase1.integration.replay_preparation import _fields,_owner_version
-    assert set(s.outcome_state_fields)<=set(_fields('coordinator',s))
-    assert _owner_version('coordinator',s)=='coordinator-task-owned-outcome-v1'
-    with pytest.raises(ValueError,match='only 100Hz'):build_reference(rate_hz=50)
-    with pytest.raises(ValueError,match='unchanged physical limits'):
+    assert s.lifecycle.completion_policy.value == 'on_expert_terminal_stage'
+    with pytest.raises(TypeError):build_reference(rate_hz=50)
+    with pytest.raises(TypeError):build_reference(execution_policy='diagnostic')
+    with pytest.raises(ValueError,match='unchanged limits and budget'):
         NutAssemblyOutcomeSolutionV1(config=replace(s.config,capture_translation_slip_m=.009),
             control_dt=.01,physics_dt_s=.002,arm_hold=Hold())
 

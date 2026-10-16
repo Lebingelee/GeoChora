@@ -10,17 +10,17 @@ import sys
 import pytest
 
 from task_env.artifacts import CanonicalStateView, PoseWorld, TaskArtifact
-from task_env.tasks.nut_assembly import reference as na
 from task_env.tasks.pick_cube.task import (
     build_artifact as pc_build_artifact, build_reference as pc_build_reference,
     evaluate as pc_evaluate, sample_reset as pc_sample_reset,
 )
-from task_env.tasks.nut_assembly.canonical_semantics import evaluate as na_evaluate
-from task_env.tasks.nut_assembly.canonical_reset import sample_reset as na_reset
+from task_env.tasks.nut_assembly.task import (
+    build_artifact as na_build_artifact, build_reference as na_build_reference,
+    evaluate as na_evaluate, sample_reset as na_reset,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 BASELINE = json.loads(Path(__file__).with_name('reference_construction_baseline.json').read_text())
-S2B1_IDENTITIES = json.loads((ROOT / 'docs/module/task_env/p2_0_s2_b1_source_identity.json').read_text())['selected_routes']
 
 
 def digest(value):
@@ -67,75 +67,72 @@ def test_pickcube_minimal_task_preserves_p16_identity_config_readiness_and_reset
     assert pc_build_artifact() == value['artifact']
 
 
-@pytest.mark.parametrize('rate', [50, 100, 500])
-@pytest.mark.parametrize('provider', ['geophys', 'mujoco'])
-def test_nutassembly_exact_historical_physics_solution_and_new_source_identity(rate, provider):
-    value = na.build_reference(rate_hz=rate, provider=provider, execution_policy=na.GUARDED_EXPERT)
-    old = BASELINE['nutassembly'][f'{provider}_{rate}']
-    assert_source(value, old, check_solution_identity=False)
-    assert value['solution_identity'] == S2B1_IDENTITIES['nutassembly']['guarded_solution_identity']
-    assert digest(value['controller'].physical_profile) == old['physical_profile_sha256']
-    assert digest(asdict(value['solution_config'])) == old['solution_config_sha256']
-    assert value['controller_identity'] != old['controller_identity']
-    assert value['source'].config.robot.gripper.force_limit_N == 10.
-    assert value['dynamic_profile_sha256'] == '5bbac0ad315c07a1ced354ccee845acf92ae50ab1a125255d6af486c83d4c266'
-    reset = na_reset(value['artifact'], 19)
-    assert reset.task_artifact_hash == value['artifact'].identity_hash
-    assert reset.settle_steps == 0
-    assert value['recipe_identity'] == digest(value['resolved_configuration'])
-    assert value['controller'].inner.version == 'native-gripper-500hz-v1'
-    assert not value['diagnostic_shadow_mode']
-
-
-def test_execution_policies_keep_the_same_strict_expert_and_no_outcome_policy_default():
-    strict = na.build_reference(execution_policy=na.GUARDED_EXPERT)
-    diagnostic = na.build_reference(execution_policy=na.DIAGNOSTIC_OBSERVATION)
-    assert strict['solution_identity'] == diagnostic['solution_identity']
-    assert strict['controller_identity'] == diagnostic['controller_identity']
-    assert strict['solution'].completion_policy.value == 'on_expert_terminal_stage'
-    assert diagnostic['solution'].completion_policy.value == 'on_expert_terminal_stage'
-    assert strict['solution']._stable_height_ready(.5, .6) is False
-    assert diagnostic['solution']._stable_height_ready(.5, .6) is False
-    assert diagnostic['diagnostic_shadow_mode'] and not strict['diagnostic_shadow_mode']
-    assert diagnostic['execution_policy']['grants_full_expert_pass'] is False
-    assert diagnostic['recipe_identity'] != strict['recipe_identity']
-    assert not diagnostic['execution_policy']['outcome_oriented_proposal_enabled']
-    lifecycle = strict['solution'].lifecycle
-    lifecycle.observe_task_outcome(task_success=True, control_step=1, simulation_time_s=.01)
-    assert lifecycle.task_success_seen and not lifecycle.expert_complete
-    lifecycle.fail('stable_height_mismatch', control_step=2, simulation_time_s=.02)
-    assert lifecycle.expert_failed and not lifecycle.expert_complete
-
-
-def test_nutassembly_selected_outcome_route_identity_and_active_dependency_boundary():
-    expected = S2B1_IDENTITIES['nutassembly']
+def test_nutassembly_selected_route_preserves_artifact_assets_and_resolved_parameters():
     for provider in ('geophys', 'mujoco'):
-        value = na.build_reference(provider=provider)
-        assert value['construction_id'] == na.OUTCOME_CONSTRUCTION_ID
+        value = na_build_reference(provider=provider)
+        old = BASELINE['nutassembly'][f'{provider}_100']
+        assert isinstance(value['artifact'], TaskArtifact)
         assert value['artifact'].artifact_id == 'nut-assembly-square-v1/p1_8_e/nominal-v1'
-        assert value['artifact'].identity_hash == BASELINE['nutassembly'][f'{provider}_100']['artifact_hash']
-        assert value['solution_identity'] == expected['outcome_solution_identity']
-        assert value['controller_identity'] == expected['outcome_controller_identity'][provider]
-        assert value['recipe_identity'] == expected['outcome_recipe_identity'][provider]
-        hashes = value['resolved_configuration']['source_sha256']
-        assert {'definition.py', 'reference_config.py', 'geometry.py'} <= set(hashes)
-        assert not {'task.py', 'solution.py'} & set(hashes)
-        assert digest(asdict(value['source'].config)) == BASELINE['nutassembly'][f'{provider}_100']['source_config_sha256']
-        assert hashlib.sha256(value['source'].scene_source.xml.encode()).hexdigest() == value['recipe']['source_xml_sha256']
-        assert value['execution_policy']['outcome_oriented_proposal_enabled']
-        assert value['execution_policy']['grants_full_expert_pass'] is False
+        assert value['artifact'].identity_hash == old['artifact_hash']
+        assert digest(asdict(value['source'].config)) == old['source_config_sha256']
+        xml = value['source'].scene_source.xml.replace(str(ROOT), '${REPO_ROOT}')
+        assert hashlib.sha256(xml.encode()).hexdigest() == old['normalized_xml_sha256']
+        assert value['source'].scene_source.xml == na_build_reference(provider=provider)['source'].scene_source.xml
+        assert value['source'].config.robot.gripper.force_limit_N == 10.0
+        assert value['solution'].STAGES == (
+            'approach_nut', 'descend_to_handle', 'close_gripper', 'verify_lift',
+            'raise_for_transport', 'move_above_square_peg', 'align_nut_yaw',
+            'descend_to_peg_top', 'lower_nut_to_table', 'open_gripper', 'release_retreat')
+        assert value['solution'].config.capture_translation_slip_m == .008
+        assert value['solution'].config.capture_rotation_slip_rad == .15
+        assert value['solution'].config.action_budget_s == 60.0
+        assert value['execution_policy']['policy_id'] == 'nutassembly-outcome-oriented-completion-v1'
+        assert value['execution_policy']['diagnostic_continuation'] is False
+        assert value['solution_identity'] != old['solution_identity']
+        assert value['recipe_identity'] == digest(value['resolved_configuration'])
+        assert value['source_revision']
+        reset = na_reset(value['artifact'], 19)
+        assert reset.task_artifact_hash == value['artifact'].identity_hash
+        assert reset.task_seed == 19 and reset.settle_steps == 0
+        assert value['controller'].inner.version == 'native-gripper-500hz-v1'
+    assert na_build_artifact().identity_hash == BASELINE['nutassembly']['geophys_100']['artifact_hash']
+
+
+def test_nutassembly_has_one_flattened_active_solution_and_four_task_files():
+    from importlib.util import find_spec
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
+    task_dir = ROOT / 'task_env/tasks/nut_assembly'
+    assert sorted(path.name for path in task_dir.iterdir() if path.is_file()) == [
+        '__init__.py', 'config.yaml', 'solution.py', 'task.py']
+    assert NutAssemblyOutcomeSolutionV1.__mro__ == (NutAssemblyOutcomeSolutionV1, object)
+    for module in (
+        'task_env.tasks.nut_assembly.canonical_artifact',
+        'task_env.tasks.nut_assembly.canonical_reset',
+        'task_env.tasks.nut_assembly.canonical_semantics',
+        'task_env.tasks.nut_assembly.canonical_solution',
+        'task_env.tasks.nut_assembly.canonical_solution_v2',
+        'task_env.tasks.nut_assembly.canonical_source',
+        'task_env.tasks.nut_assembly.clearance_candidate_v3',
+        'task_env.tasks.nut_assembly.clearance_candidate_v5',
+        'task_env.tasks.nut_assembly.guarded_authorization_candidate',
+        'task_env.tasks.nut_assembly.guarded_authorization_candidate_v2',
+        'task_env.tasks.nut_assembly.outcome_solution',
+        'task_env.tasks.nut_assembly.reference',
+        'task_env.tasks.nut_assembly.reference_config',
+        'task_env.tasks.nut_assembly.reference_env',
+        'task_env.tasks.nut_assembly.reference_execution',
+        'task_env.tasks.nut_assembly.stable_grasp_candidate',
+    ):
+        assert find_spec(module) is None
 
 
 @pytest.mark.parametrize('yaw', [-1.2, -0.2, 0.0, 0.2, 1.4])
-def test_nutassembly_shared_square_yaw_helper_preserves_existing_formula(yaw):
-    from task_env.tasks.nut_assembly.geometry import square_yaw_correction
-    from task_env.tasks.nut_assembly.solution import _square_yaw_correction
+def test_nutassembly_yaw_helper_preserves_the_selected_square_symmetry_formula(yaw):
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
     quaternion = [__import__('math').cos(yaw / 2), 0.0, 0.0, __import__('math').sin(yaw / 2)]
     period = 0.5 * __import__('math').pi
     expected = -((yaw + 0.5 * period) % period - 0.5 * period)
-    assert square_yaw_correction(quaternion) == pytest.approx(expected, abs=1e-12)
-    assert _square_yaw_correction is square_yaw_correction
-
+    assert NutAssemblyOutcomeSolutionV1._square_yaw_correction(quaternion) == pytest.approx(expected, abs=1e-12)
 
 def state(poses, opening):
     joints = {'panda-v1/finger_joint1': opening / 2,
@@ -181,11 +178,11 @@ def test_nutassembly_success_requires_measured_release_and_retreat():
     assert not na_evaluate(state(poses, .08)).success
 
 
-@pytest.mark.parametrize('options', [{'rate_hz':20}, {'rate_hz':True}, {'provider':'sapien'},
-                                     {'execution_policy':'on_task_success'}])
-def test_unadmitted_nutassembly_route_fails_closed(options):
-    with pytest.raises(ValueError):
-        na.build_reference(**options)
+@pytest.mark.parametrize('options', [{'provider':'sapien'}, {'rate_hz':50},
+                                     {'execution_policy':'diagnostic'}])
+def test_unadmitted_nutassembly_selectors_fail_closed(options):
+    with pytest.raises((ValueError, TypeError)):
+        na_build_reference(**options)
 
 
 def test_fresh_construction_has_no_diagnostic_native_or_workspace_dependency(tmp_path):
@@ -206,15 +203,20 @@ def checked(self,*args,**kwargs):
  return original(self,*args,**kwargs)
 Path.open=checked
 from task_env.tasks.pick_cube.task import build_reference as pc
-from task_env.tasks.nut_assembly.reference import build_reference as na
+from task_env.tasks.nut_assembly.task import build_reference as na
 assert pc()['artifact'].identity_hash.startswith('fd5bc968')
 assert na(provider='geophys')['source'].config.robot.gripper.force_limit_N==10.
 assert na(provider='mujoco')['source'].config.robot.gripper.force_limit_N==10.
 assert not any(n.startswith('task_env.diagnostics') for n in sys.modules)
 assert 'task_env.tasks.pick_cube.task' in sys.modules
 assert 'task_env.tasks.pick_cube.candidate' not in sys.modules
-assert 'task_env.tasks.nut_assembly.task' not in sys.modules
-assert 'task_env.tasks.nut_assembly.solution' not in sys.modules
+assert 'task_env.tasks.nut_assembly.task' in sys.modules
+assert 'task_env.tasks.nut_assembly.solution' in sys.modules
+assert not any(name.startswith('task_env.tasks.nut_assembly.') and name.rsplit('.',1)[-1] in {
+ 'canonical_artifact','canonical_reset','canonical_semantics','canonical_solution','canonical_solution_v2',
+ 'canonical_source','clearance_candidate_v3','clearance_candidate_v5','guarded_authorization_candidate',
+ 'guarded_authorization_candidate_v2','outcome_solution','reference','reference_config','reference_env',
+ 'reference_execution','stable_grasp_candidate'} for name in sys.modules)
 '''
     result = subprocess.run([sys.executable, '-c', code], cwd=tmp_path,
         env=dict(os.environ, PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE='1',

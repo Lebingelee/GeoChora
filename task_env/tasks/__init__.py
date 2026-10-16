@@ -2,7 +2,7 @@
 
 from .base import BaseTaskEnv
 from .empty import EmptyTaskEnv
-from .nut_assembly.reference_env import NutAssemblyReferenceEnv
+from .nut_assembly.task import NutAssemblyReferenceEnv
 from .pendulum import PendulumEnv
 from .pick_cube.task import PickCubeReferenceEnv
 from .two_wheel_balance import TwoWheelBalanceEnv

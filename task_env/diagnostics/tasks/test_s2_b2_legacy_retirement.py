@@ -23,38 +23,34 @@ RETIRED_MODULES = {
 RETIRED_PATHS = {module.replace('.', '/') + '.py' for module in RETIRED_MODULES}
 
 
-def test_selected_active_source_fingerprints_and_outcome_mro_are_unchanged():
-    identity = json.loads(IDENTITY_PATH.read_text())
-    for relative_path, record in identity['source_files'].items():
-        # S2-B1's PickCube files are frozen migration inputs; S2-C1 replaces
-        # that active closure. Keep the NutAssembly identity comparison exact.
-        if relative_path.startswith('task_env/tasks/pick_cube/'):
-            continue
-        path = ROOT / relative_path
-        assert path.is_file(), relative_path
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == record['new_source_sha256']
-    assert not RETIRED_PATHS.intersection(identity['source_files'])
-
-    from task_env.tasks.nut_assembly.outcome_solution import NutAssemblyOutcomeSolutionV1
-    from task_env.tasks.nut_assembly.reference import build_reference
+def test_selected_active_source_is_one_flattened_task_owned_solution():
+    from importlib.util import find_spec
+    from task_env.tasks.nut_assembly.solution import NutAssemblyOutcomeSolutionV1
+    from task_env.tasks.nut_assembly.task import build_reference
     active = build_reference(provider='mujoco')
-    assert active['construction_id'] == 'nutassembly-r5-v5-outcome-reference-construction-v2'
+    assert active['construction_id'] == 'nut-assembly-outcome-reference-v1'
     assert active['solution'].__class__ is NutAssemblyOutcomeSolutionV1
-    mro = [f'{item.__module__}.{item.__name__}' for item in NutAssemblyOutcomeSolutionV1.__mro__]
-    assert mro[:5] == [
-        'task_env.tasks.nut_assembly.outcome_solution.NutAssemblyOutcomeSolutionV1',
-        'task_env.tasks.nut_assembly.guarded_authorization_candidate_v2.NutAssemblyGuardedAuthorizationCandidateV2',
-        'task_env.tasks.nut_assembly.guarded_authorization_candidate.NutAssemblyGuardedAuthorizationCandidateV1',
-        'task_env.tasks.nut_assembly.clearance_candidate_v5.NutAssemblyHandClearanceCandidateV5',
-        'task_env.tasks.nut_assembly.clearance_candidate_v3.NutAssemblyHandClearanceCandidateV3',
-    ]
-    assert not any('clearance_candidate_v4' in item or 'stable_grasp_reference' in item for item in mro)
+    assert NutAssemblyOutcomeSolutionV1.__mro__ == (NutAssemblyOutcomeSolutionV1, object)
+    assert active['artifact'].identity_hash == '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
+    assert active['execution_policy']['diagnostic_continuation'] is False
+    assert not RETIRED_PATHS.intersection(json.loads(IDENTITY_PATH.read_text())['source_files'])
+    for module in (
+        'task_env.tasks.nut_assembly.canonical_solution_v2',
+        'task_env.tasks.nut_assembly.stable_grasp_candidate',
+        'task_env.tasks.nut_assembly.clearance_candidate_v3',
+        'task_env.tasks.nut_assembly.clearance_candidate_v5',
+        'task_env.tasks.nut_assembly.guarded_authorization_candidate',
+        'task_env.tasks.nut_assembly.guarded_authorization_candidate_v2',
+        'task_env.tasks.nut_assembly.outcome_solution',
+    ):
+        assert find_spec(module) is None
     assert not (RETIRED_MODULES & set(sys.modules))
 
 
 def test_no_current_python_entrypoint_imports_the_retired_modules():
     direct_imports = []
-    for path in (ROOT / 'task_env').rglob('*.py'):
+    roots = [ROOT / name for name in ('task_env/tasks', 'task_env/script', 'task_env/trajectory', 'task_env/reporter')]
+    for path in (path for root in roots for path in root.rglob('*.py')):
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module in RETIRED_MODULES:
@@ -131,7 +127,14 @@ def test_t_plus_one_boundary_and_100hz_clock_receipt_contract():
         validate_transition_boundaries(transitions, boundaries, control_dt=0.01, substeps=5)
 
 
-def test_b2_retired_candidates_remain_unimportable_after_pickcube_consolidation():
+def test_retired_and_consolidated_candidates_remain_unimportable():
     from importlib.util import find_spec
-    for module in RETIRED_MODULES:
+    for module in (*RETIRED_MODULES,
+        'task_env.tasks.nut_assembly.canonical_solution_v2',
+        'task_env.tasks.nut_assembly.stable_grasp_candidate',
+        'task_env.tasks.nut_assembly.clearance_candidate_v3',
+        'task_env.tasks.nut_assembly.clearance_candidate_v5',
+        'task_env.tasks.nut_assembly.guarded_authorization_candidate',
+        'task_env.tasks.nut_assembly.guarded_authorization_candidate_v2',
+        'task_env.tasks.nut_assembly.outcome_solution'):
         assert find_spec(module) is None
