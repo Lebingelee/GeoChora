@@ -108,15 +108,17 @@ PYTHONPATH=.:GeoPhys/src python -m task_env.script.trajectory.replay \
 精确逐文件清单、所有可解析 import caller 和 literal-reference caller 见
 [S2-B dependency manifest](p2_0_s2_b_deletion_manifest.json)。这是静态 inventory，动态/外部调用者不能据此被认定不存在。
 active inheritance、yaw helper、task spec/constants、source fingerprint、profile 和 assets 的依赖文件均为删除阻塞项，不能整文件删除。
+trajectory record CLI 的结果门控已修复并通过 provider-free 回归：失败或不完整轨迹仍会 finalize，但退出码为非零；另有一项单周期合成检查真实写入并重新读取 canonical H5。
 历史-only 候选也必须先有逐文件 recovery blob/hash、历史调用者归档/显式保留决定，以及维护者 S2-B 审阅。
 不将旧实现复制到另一个 active Core 目录。
 
-Provider-free 150 tests / 6 subtests 与四个具名 8 步 CPU smoke 只覆盖新入口的有界行为，不等于完整轨迹验收。
+Provider-free regression 为 162 passed、6 subtests passed（包括 CLI 成功/失败退出码，以及失败任务后真实 canonical H5 finalize/reload 用例）。从 S2-A task/runtime source `a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d`，通过本页两个新的 public `make_env` UID 串行完成四条完整 100 Hz CPU 功能回归：PickCube GeoPhys/MuJoCo seed31，NutAssembly GeoPhys/MuJoCo NA-S0 seed19。随后 trajectory record CLI 修复提交 `0f27225a6cdc884c6ff8f921351917ac3db47a4d` 未改变 task builder、session、controller、Solution 或四条轨迹逻辑；独立 CLI finalize/reload 测试提交为 `57c98f9063e35d6c15f6f2664e2a1238a1eed885`。额外合成单周期 CLI 检查只验证退出状态与 H5 finalize/reload，不作为 provider physics 证据。每条原生轨迹均验证 T/T+1、provider controls、时钟、终态、录制 finalization 与 H5 roundtrip；NutAssembly 另验证 11 个阶段、retreat endpoint、native application 数及 readiness/outcome 分离。
 
-S2-A 的完整新入口轨迹验收仍是 S2-B 前置条件：最小建议为两个任务 × 两个 provider，各一条具名 100Hz CPU 轨迹，
-PickCube 使用 S1.5 seed31/reference 合同并对照其实测 Expert/task outcome，NutAssembly 使用 NA-S0 seed19 并要求 full plan/retreat、task_success/outcome_complete。
-逐项比较 controller/requested action、物理终态、warnings、strict lifecycle 和 H5 finalization；不重复整个历史矩阵、不把旧失败改 PASS。
-NutAssembly 每次可从 420 秒/2 GiB 监测预算开始，先检查可用资源；实际预算不足必须 TIMEOUT，不能推定通过。
+PickCube GeoPhys 原始 runner 在 H5 finalization 后因 post-run verifier 错误退出 FAIL：它用绝对 `i*0.01` 与单 ULP 比较累计浮点时钟、把 grouped `session.step(substeps=5)` 的 substep 请求与直接 native-step 计数混为一项，并读取不存在的 `stage` 字段。保留该原始 FAIL receipt；独立 canonical H5 `validate()`、逐相邻边界时钟、task/expert 结果与 S1.5 seed31 GeoPhys H5 的全部 transition/boundary 对照均通过，故本报告将这一个功能结果标为 `PASS_RECONCILED`，不把包装器结果改写为 PASS。该比对没有首次 transition 或 boundary divergence。
+
+NutAssembly 两个当前入口的 H5 和 11-stage receipt 均通过。新 GeoPhys 路线重现严格 `stable_height_mismatch`（step362，残差 -0.0002212406621264762m），并单独记录 warning、原 expert failed 状态与 outcome success；MuJoCo 严格 expert 完成且无 warning。两个 provider 的 stage receipts 和选定终端物理指标与对应 S1.6 证据逐项相同。完整数据、源映射、资源监测与比较 receipt 位于 ignored `workspace/maintenance/p2_0_part_b_s2_a_final_20261016/`，详见 [S2-A 最终审阅](p2_0_s2_a_final_review.md)。这是有界功能回归，不是历史 qualification 或新 D0-D2 决策。
+
+`trajectory.record` 的结果门控已在提交 `0f27225a6cdc884c6ff8f921351917ac3db47a4d` 修正：录制仍会保留失败或不完整轨迹，但只有 task success 和所选完成策略均通过才返回退出码0；失败、termination、truncation/horizon stop 返回非零。12 个 provider-free CLI cases 覆盖 PickCube failure/task predicate、NutAssembly planned/outcome/override 条件、termination/truncation、两种退出码，以及失败后真实 H5 finalize/reload；同时确保严格 Expert failure 不会覆盖一个已完成且获准的 NutAssembly outcome。合并前仍需维护者决定显式公共 API 移除的版本与外部迁移策略。
 
 SATA 单盘风险和独立备份不足仍未解决；监测新 ATA/SATA/I/O 错误即停止。
 Go2/static physics、通用 Batch/Device/Learner、provider、controller、recorder 和 renderer 合同不在本次 retirement 范围。

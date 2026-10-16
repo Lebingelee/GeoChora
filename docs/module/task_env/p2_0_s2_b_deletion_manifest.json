@@ -301,11 +301,12 @@
   "generic_contracts_and_go2": "KEEP_OUT_OF_SCOPE: no Batch/Device/Learner, Go2/static physics retirement",
   "global_deletion_prerequisites": [
     "Maintainer S2-B approval of exact paths and symbols",
-    "Full current selected-adapter 100Hz named CPU trajectory regressions on both providers before deletion",
+    "Full current-source 100Hz named CPU full-route regression: SATISFIED for S2-A task/runtime source a59840fc; rerun if task execution source changes during extraction",
     "Extract required selected base plans/config/yaw/spec/helpers coherently with old/new source identity mapping; no obsolete copy",
     "Decide historical caller/test archival, verify recovery blobs (v1.0.0 or immutable S1/S1.6 commits), keep frozen evidence byte-identical",
     "Version compatibility and external consumer migration decision before v1.0.1 freeze",
-    "No new SATA/ATA/I/O errors; independent backup limitation remains"
+    "No new SATA/ATA/I/O errors; independent backup limitation remains",
+    "Trajectory record CLI completion/exit gating: SATISFIED in local fix commit 0f27225a6cdc884c6ff8f921351917ac3db47a4d; 12 CLI cases, including failed-task canonical H5 finalize/reload, included in the 162-test final run"
   ],
   "files": [
     {
@@ -3151,5 +3152,103 @@
         "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
       ]
     }
-  ]
+  ],
+  "s2_a_final_review": {
+    "reviewed_public_develop": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+    "reviewed_s2_a_source": "a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d",
+    "full_route_status": "BOUNDED_FUNCTIONAL_PASS_WITH_ONE_PICKCUBE_GEOPHYS_POSTRUN_RECONCILIATION",
+    "provider_free": "162 passed; 6 subtests passed (includes 12 CLI cases and failed-task canonical H5 finalize/reload)",
+    "cases": [
+      {
+        "case": "PickCube GeoPhys seed31 100Hz",
+        "status": "PASS_RECONCILED",
+        "T": 151,
+        "boundaries": 152,
+        "artifact": "pick-cube-v1/p1_6_experimental_100hz",
+        "h5_sha256": "1d172bfc76ad89e082259b4949f698e027e0d138c921b7c489527b22d70124f9",
+        "comparison": "All transition and boundary records exactly equal S1.5 GeoPhys evidence; original runner status FAIL due verifier defects; no task divergence"
+      },
+      {
+        "case": "PickCube MuJoCo seed31 100Hz",
+        "status": "PASS",
+        "T": 470,
+        "boundaries": 471,
+        "artifact": "pick-cube-v1/p1_6_experimental_100hz",
+        "h5_sha256": "c652dc7be2e4fdfae7a24a5e100702739026b39fa5a439f30e775e99a8bedbc3",
+        "comparison": "All transition and boundary records exactly equal S1.5 MuJoCo evidence"
+      },
+      {
+        "case": "NutAssembly GeoPhys NA-S0 seed19 100Hz",
+        "status": "PASS",
+        "T": 2380,
+        "boundaries": 2381,
+        "artifact": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+        "h5_sha256": "6eba60e3cc3a298da809bd7b6fef16ce0ff2a023f49df7a5db4acc274aeb3a18",
+        "native_applications": 11900,
+        "comparison": "All stage receipts and selected terminal metrics exactly equal S1.6 evidence; strict stable_height_mismatch preserved"
+      },
+      {
+        "case": "NutAssembly MuJoCo NA-S0 seed19 100Hz",
+        "status": "PASS",
+        "T": 2373,
+        "boundaries": 2374,
+        "artifact": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+        "h5_sha256": "2acec0802a48eca99319d2238c324bf8e373c3de5a69563eff3ef3b61115f627",
+        "native_applications": 11865,
+        "comparison": "All stage receipts and selected terminal metrics exactly equal S1.6 evidence"
+      }
+    ],
+    "review_finding_blocking_integration": "RESOLVED: CLI gates exit success on selected task completion and task outcome; a failed horizon-limited route finalized and reloaded a canonical H5 and returned exit code 1. Twelve provider-free CLI cases cover success/failure exits and completion gates.",
+    "public_api_decision_required": "Legacy UIDs and task package convenience exports are rejected/removed without alias; maintainer must decide v1.0.1 compatibility/versioning and external consumer migration.",
+    "integration_recommendation": "Canonical public baseline matches the current maintainer SHA. No merge or push performed. Present local chain for explicit fast-forward approval; public API compatibility/version decision remains for maintainer review.",
+    "qualification": "These are current-source bounded functional regressions, not formal qualification and do not alter historical evidence.",
+    "receipt": "workspace/maintenance/p2_0_part_b_s2_a_final_20261016/final_route_reconciliation.json",
+    "deletion_authorized": false,
+    "reviewed_final_head": "57c98f9063e35d6c15f6f2664e2a1238a1eed885",
+    "post_review_fix_commit": {
+      "commit": "0f27225a6cdc884c6ff8f921351917ac3db47a4d",
+      "parent": "a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d",
+      "scope": "trajectory recording CLI completion/exit status and provider-free tests only",
+      "files": [
+        {
+          "path": "task_env/script/trajectory/record.py",
+          "pre_fix_sha256": "0eb221abeeab3a4bf19fb12d0764b580307758a2de09d071be3b773096250143",
+          "post_fix_sha256": "55d9e3e2d62052a6a6ebb60101386a8f9c21e3cbf0ba3e8f79f0e8d6ced1f735"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_record_cli_completion.py",
+          "post_fix_sha256": "4481f7944310afdb8e10670fb661a6a4085992afdd312c19a975f25bf758f781"
+        }
+      ],
+      "provider_free_result": "161 passed; 6 subtests passed; 11 new CLI completion cases"
+    },
+    "requested_public_develop_sha": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+    "requested_public_develop_sha_resolves": true,
+    "actual_fetched_canonical_public_develop": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+    "actual_public_develop_remote": "git@github.com:Lebingelee/GeoChora.git",
+    "s2_a_parent_matches_actual_public_develop": true,
+    "baseline_note": "The current maintainer SHA matches the freshly fetched canonical public/develop head and the direct parent of S2-A. The previous prompt SHA typo is retained here only as audit context; active baseline fields use the corrected SHA.",
+    "previous_prompt_public_develop_sha": "77e194e2cac1ec82cde927d57d4bf3d67a8783c3",
+    "previous_prompt_public_develop_sha_resolves": false,
+    "cli_finalize_regression_commit": {
+      "commit": "57c98f9063e35d6c15f6f2664e2a1238a1eed885",
+      "parent": "0f27225a6cdc884c6ff8f921351917ac3db47a4d",
+      "scope": "provider-free CLI success/failure exits and one-interval canonical H5 finalization after horizon failure",
+      "test_file_sha256": "a13c0a4da8201476c03b969cc4644e754749c08cea5ff2c0473379db7619eb89",
+      "test_result": "12 CLI cases passed; complete selected provider-free suite: 162 passed; 6 subtests passed",
+      "synthetic_h5_receipt": "workspace/maintenance/p2_0_part_b_s2_a_final_20261016/cli_failure_smoke/receipt.json"
+    },
+    "fast_forward_gate": {
+      "status": "AWAITING_EXPLICIT_MAINTAINER_APPROVAL",
+      "expected_current_public_develop": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+      "tested_code_and_test_head": "57c98f9063e35d6c15f6f2664e2a1238a1eed885",
+      "commands": [
+        "git fetch public refs/heads/develop",
+        "test \"$(git rev-parse FETCH_HEAD)\" = 77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "git merge-base --is-ancestor FETCH_HEAD HEAD",
+        "git push public HEAD:refs/heads/develop"
+      ],
+      "stop_condition": "If remote develop has advanced or ancestry check fails, stop and re-review; do not force-push."
+    }
+  }
 }

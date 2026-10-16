@@ -135,7 +135,7 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 
 Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 qualified；具体计划以 [Phase I 蓝图](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) 为准。
 
-能力声明必须以实际执行证据和对应的 bounded decision 为准。Go2 CUDA/static/RSL 是当前 HEAD 的回归路线，不扩大 task/provider qualification。PickCube 有 P1.5 expert 与 P1.6 policy 的限定结果，但不代表所有 provider、随机化分布或数据工作流均获批准；历史 P1.8 NutAssembly 证据按上文保留。S1.6 的独立 Outcome V1 路由在 100 Hz GeoPhys/MuJoCo 完成具名完整轨迹的 bounded functional acceptance；待审阅 S2-A 新公开适配入口只做有界短冒烟，未继承完整轨迹验收或历史 FULL/D0 资格。详见 [当前 reference 入口](docs/module/task_env/p2_0_active_task_consumers.md)。
+能力声明必须以实际执行证据和对应的 bounded decision 为准。Go2 CUDA/static/RSL 是当前 HEAD 的回归路线，不扩大 task/provider qualification。PickCube 有 P1.5 expert 与 P1.6 policy 的限定结果，但不代表所有 provider、随机化分布或数据工作流均获批准；历史 P1.8 NutAssembly 证据按上文保留。S1.6 的独立 Outcome V1 路由在 100 Hz GeoPhys/MuJoCo 完成具名完整轨迹的 bounded functional acceptance；S2-A 新公开 `make_env` 路由也已在相同 provider/seed 交集完成四条完整 CPU 功能回归。PickCube GeoPhys 原测试包装器在 H5 finalization 后因阶段字段、时钟容差和 grouped-step 计数检查错误返回 FAIL；独立 H5 合同验证及与 S1.5 的逐 transition/boundary 对照通过。后续提交 `0f27225a` 修正了 trajectory record CLI 的失败结果门控。新入口没有继承 P1.6 checkpoint 或 P1.8 FULL/D0 资格。详见 [S2-A 最终审阅](docs/module/task_env/p2_0_s2_a_final_review.md) 和 [当前 reference 入口](docs/module/task_env/p2_0_active_task_consumers.md)。
 
 首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 

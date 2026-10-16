@@ -14,8 +14,8 @@
         "mujoco/cpu"
       ],
       "control_hz": 100,
-      "s2_a_claim_limit": "PASS: 8-interval reset/expert/recording/truncation smoke on GeoPhys/MuJoCo CPU; not full trajectory acceptance",
-      "new_adapter_full_trajectory_acceptance": "NOT_RUN",
+      "s2_a_claim_limit": "PASS: full 100Hz CPU functional routes on GeoPhys/MuJoCo in this bounded review; no P1.6 checkpoint inference or qualification inheritance",
+      "new_adapter_full_trajectory_acceptance": "PASS_BOUNDED_FUNCTIONAL; PickCube GeoPhys accepted by independent canonical H5 reconciliation after its post-run wrapper failed",
       "policy_checkpoint_inference": "NOT_RUN",
       "historical_P1_6_policy_qualification": "UNCHANGED_NO_INHERITANCE"
     },
@@ -31,16 +31,16 @@
       "gripper_inner_hz": 500,
       "task_success": "measured inserted_on_peg AND released_nut",
       "integrated_S1_6": "BOUNDED_FUNCTIONAL_ACCEPTANCE_BOTH_PROVIDERS; source 77e194e2",
-      "s2_a_claim_limit": "PASS: 8-interval reset/expert/recording/truncation smoke on GeoPhys/MuJoCo CPU; not full trajectory acceptance",
-      "new_adapter_full_trajectory_acceptance": "NOT_RUN",
+      "s2_a_claim_limit": "PASS: full 100Hz CPU functional routes on GeoPhys/MuJoCo in this bounded review; no qualification inheritance",
+      "new_adapter_full_trajectory_acceptance": "PASS_BOUNDED_FUNCTIONAL_BOTH_PROVIDERS; GeoPhys original strict expert failure is preserved separately",
       "historical_P1_8_strict_FULL_and_D0": "UNCHANGED_NO_RELABEL"
     }
   ],
   "new_reference_renderer_interoperability": "NOT_IMPLEMENTED",
-  "native_current_source_reexecution": "NOT_RUN",
+  "native_current_source_reexecution": "PASS_BOUNDED_FUNCTIONAL_REGRESSION: four named routes exercised S2-A task/runtime source a59840fc; a later CLI-only fix commit 0f27225 does not change task execution; PickCube GeoPhys is independently reconciled from finalized H5",
   "provider_free_current_source_reexecution": "SYNTHETIC_ONLY_NO_QUALIFICATION",
-  "S2_B": "BLOCKED_PENDING_MAINTAINER_REVIEW_FULL_ROUTE_REGRESSION_AND_DEPENDENCY_EXTRACTION",
+  "S2_B": "BLOCKED_PENDING_MAINTAINER_REVIEW_API_COMPATIBILITY_AND_DEPENDENCY_EXTRACTION",
   "storage": "SINGLE_SATA_RISK_AND_INDEPENDENT_BACKUP_LIMITATION_UNRESOLVED",
   "source_identity_manifest": "p2_0_s2_a_source_identity.json",
-  "provider_free": "150 passed, 6 subtests passed"
+  "provider_free": "162 passed, 6 subtests passed (final S2-A provider-free suite including CLI exit gating and failed-task H5 finalization)"
 }
