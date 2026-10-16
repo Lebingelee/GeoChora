@@ -20,8 +20,11 @@ from .canonical_source import build_runtime_source
 from .canonical_solution import CanonicalNutAssemblyConfig
 from .guarded_authorization_candidate_v2 import NutAssemblyGuardedAuthorizationCandidateV2
 from .reference_execution import ArmRampMemory, ReferenceExecutionController
+from .outcome_solution import NutAssemblyOutcomeSolutionV1, OUTCOME_POLICY_ID
 
 CONSTRUCTION_ID = 'nutassembly-r5-v5-guarded-reference-construction-v1'
+OUTCOME_CONSTRUCTION_ID = 'nutassembly-r5-v5-outcome-reference-construction-v2'
+OUTCOME_COMPLETION = OUTCOME_POLICY_ID
 GUARDED_EXPERT = 'nutassembly-guarded-expert-execution-v1'
 DIAGNOSTIC_OBSERVATION = 'nutassembly-diagnostic-outcome-observation-v1'
 ARM_SCHEDULE = 'linear-native-ramp-after-lift-v2-public-ack-memory'
@@ -37,7 +40,7 @@ def _sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=GUARDED_EXPERT):
+def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=OUTCOME_COMPLETION):
     """Resolve the selected recipe from tracked package resources only.
 
     20Hz remains historical MuJoCo-only evidence, outside this common route.
@@ -47,8 +50,11 @@ def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=GUARDED_
         raise ValueError('selected NutAssembly rate must be 50, 100 or 500 Hz')
     if provider not in {'geophys', 'mujoco'}:
         raise ValueError('selected NutAssembly provider must be geophys or mujoco')
-    if execution_policy not in {GUARDED_EXPERT, DIAGNOSTIC_OBSERVATION}:
+    if execution_policy not in {GUARDED_EXPERT, DIAGNOSTIC_OBSERVATION, OUTCOME_COMPLETION}:
         raise ValueError('unknown selected NutAssembly execution policy')
+    if execution_policy == OUTCOME_COMPLETION and rate_hz != 100:
+        raise ValueError('outcome completion v1 admits only 100Hz; select historical policy explicitly')
+    construction_id = (OUTCOME_CONSTRUCTION_ID if execution_policy == OUTCOME_COMPLETION else CONSTRUCTION_ID)
     profile_path = PROFILE_DIR / 'nutassembly-nominal-v2.json'
     dynamic_path = PROFILE_DIR / 'r5-controller-planner-reference.yaml'
     profile = json.loads(profile_path.read_text())
@@ -78,26 +84,35 @@ def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=GUARDED_
     config = CanonicalNutAssemblyConfig(**values)
     controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
     holder = StableArmTargetHold(controller)
-    solution = NutAssemblyGuardedAuthorizationCandidateV2(config=config,
+    solution_class = (NutAssemblyOutcomeSolutionV1 if execution_policy == OUTCOME_COMPLETION
+                      else NutAssemblyGuardedAuthorizationCandidateV2)
+    solution = solution_class(config=config,
         control_dt=artifact.timebase.control_dt, arm_hold=holder,
         physics_dt_s=artifact.timebase.physics_dt)
     base_controller_identity = controller.identity
     source_hash = _sha(Path(__file__))
     support_hash = _sha(Path(__file__).with_name('reference_execution.py'))
-    controller.identity = digest({'construction_id': CONSTRUCTION_ID,
+    controller.identity = digest({'construction_id': construction_id,
         'base_controller_identity': base_controller_identity,
         'solution_identity': solution.identity,
         'construction_source_sha256': source_hash, 'execution_support_sha256': support_hash,
         'cadence': 'native-gripper-500hz-v1', 'arm_schedule': ARM_SCHEDULE})
     policy = {'policy_id': execution_policy,
         'diagnostic_continuation': execution_policy == DIAGNOSTIC_OBSERVATION,
-        'strict_expert_gate': 'unchanged', 'historical_failure_labels': 'preserved',
+        'strict_expert_gate': ('bounded-height-warning' if execution_policy == OUTCOME_COMPLETION
+                              else 'unchanged'), 'historical_failure_labels': 'preserved',
         'grants_full_expert_pass': False,
-        'expert_completion_requires_original_gates': True,
-        'outcome_oriented_proposal_enabled': False}
+        'expert_completion_requires_original_gates': execution_policy != OUTCOME_COMPLETION,
+        'outcome_oriented_proposal_enabled': execution_policy == OUTCOME_COMPLETION}
+    if execution_policy == OUTCOME_COMPLETION:
+        policy.update(outcome_policy=solution.outcome_policy_mapping,
+                      outcome_policy_identity=solution.outcome_policy_identity,
+                      original_solution_identity=solution.original_solution_identity)
     source_ids = {'construction': source_hash, 'execution_support': support_hash,
         'asset_profile': _sha(profile_path), 'dynamic_profile': _sha(dynamic_path),
         'mujoco_contact_profile': _sha(PROFILE_DIR / 'mujoco-noslip2-v1.json')}
+    if execution_policy == OUTCOME_COMPLETION:
+        source_ids['outcome_solution.py'] = _sha(Path(__file__).with_name('outcome_solution.py'))
     for name in ('assets.py', 'canonical_artifact.py', 'canonical_source.py',
                  'canonical_reset.py', 'canonical_semantics.py', 'canonical_initialization.json',
                  'default.yaml', 'task.py', 'solution.py',
@@ -109,7 +124,7 @@ def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=GUARDED_
     for name in ('production_r3.py', 'production_r2.py', 'production.py', 'controller.py',
                  'gripper_execution.py', 'execution.py', 'readiness.py', 'kinematics.py'):
         source_ids['controllers/canonical/' + name] = _sha(canonical_dir / name)
-    resolved = {'construction_id': CONSTRUCTION_ID, 'artifact': artifact.to_mapping(),
+    resolved = {'construction_id': construction_id, 'artifact': artifact.to_mapping(),
         'artifact_sha256': artifact.identity_hash, 'runtime_config': asdict(source.config),
         'solution_config': asdict(config),
         'solution_parameters': {name: getattr(solution, name) for name in
@@ -135,7 +150,7 @@ def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=GUARDED_
             ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets')},
         'runtime_open_actuators': list(source.open_actuators)}
     recipe_identity = digest(resolved)
-    return {'construction_id': CONSTRUCTION_ID, 'artifact': artifact, 'source': source,
+    return {'construction_id': construction_id, 'artifact': artifact, 'source': source,
         'profile': profile, 'profile_path': str(profile_path), 'profile_sha256': source_ids['asset_profile'],
         'dynamic_profile': dynamic, 'dynamic_profile_path': str(dynamic_path),
         'dynamic_profile_sha256': source_ids['dynamic_profile'],
@@ -150,4 +165,4 @@ def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=GUARDED_
         '_execution_provider': provider, '_contact_profile': contact_profile}
 
 
-__all__ = ['build_reference', 'GUARDED_EXPERT', 'DIAGNOSTIC_OBSERVATION']
+__all__ = ['build_reference', 'OUTCOME_COMPLETION', 'GUARDED_EXPERT', 'DIAGNOSTIC_OBSERVATION']

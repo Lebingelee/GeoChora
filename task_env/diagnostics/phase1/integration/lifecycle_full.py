@@ -145,10 +145,10 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: 
         if trajectory_candidate != "guarded-primary-readiness-alternative-8n-v2-v5-clearance":
             raise ValueError("task-owned construction requires the selected guarded V2/V5 candidate")
         from ....tasks.nut_assembly.reference import (
-            build_reference, GUARDED_EXPERT, DIAGNOSTIC_OBSERVATION,
+            build_reference, OUTCOME_COMPLETION, DIAGNOSTIC_OBSERVATION,
         )
         return build_reference(rate_hz=rate, provider=provider, execution_policy=(
-            DIAGNOSTIC_OBSERVATION if diagnostic_observation else GUARDED_EXPERT))
+            DIAGNOSTIC_OBSERVATION if diagnostic_observation else OUTCOME_COMPLETION))
     if construction_route != "historical":
         raise ValueError("unknown NutAssembly construction route")
     value = frequency_run.context(rate, "arm_ramp_native_grip", provider=provider)
@@ -267,6 +267,8 @@ def run(*, provider: str, rate: int, output: Path,
     if contract is not None:
         _validate_cross_provider_contract(value, contract)
     value["recording_storage_variant"] = recording_storage_variant
+    if callable(getattr(value['solution'], 'outcome_report', None)):
+        value['_recording_role'] = 'TASK_OWNED_NUTASSEMBLY_OUTCOME_SOURCE_V1'
     value["cross_provider_acceptance_contract_id"] = acceptance_contract_id
     value["cross_provider_acceptance_contract_sha256"] = contract_sha256
     if diagnostic_shadow_mode:
@@ -434,6 +436,13 @@ def run(*, provider: str, rate: int, output: Path,
                               resolved_configuration=owner_value["resolved_configuration"],
                               arm_schedule_stepper_source_sha256=_sha(
                                   Path(frequency_run.__file__).parent / "arm_schedule.py"))
+                if callable(getattr(owner_value['solution'], 'outcome_report', None)):
+                    recipe.update(
+                        completion_policy_id=owner_value['execution_policy']['policy_id'],
+                        completion_policy_identity=owner_value['solution'].outcome_policy_identity,
+                        original_solution_identity=owner_value['solution'].original_solution_identity,
+                        task_owned_outcome=True,
+                    )
             if acceptance_contract_id is not None:
                 recipe.update(
                     cross_provider_acceptance_contract_id=acceptance_contract_id,
@@ -599,8 +608,22 @@ def run(*, provider: str, rate: int, output: Path,
     )
     if diagnostic_shadow_mode:
         result["qualification_status"] = "NOT_ELIGIBLE_DIAGNOSTIC_ACTION_SOURCE"
+    if callable(getattr(value['solution'], 'outcome_report', None)):
+        result.update(
+            mode='TASK_OWNED_OUTCOME_ACCEPTANCE',
+            completion_policy=value['solution'].outcome_policy_mapping['policy_id'],
+            full_expert_status='NOT_ASSESSED_UNDER_HISTORICAL_STRICT_POLICY',
+            golden_acceptance_status='NOT_HISTORICAL_QUALIFICATION',
+            qualification_status='BOUNDED_OUTCOME_REVIEW_PENDING',
+            outcome_acceptance_status=('PASS' if result.get('pass') else 'FAIL'),
+            environment_terminated=value['solution'].lifecycle.environment_terminated,
+            environment_truncated=value['solution'].lifecycle.environment_truncated,
+            absolute_height_gate_enabled=True,
+            height_gate_classification='bounded-readiness-warning-only-at-descend_to_handle',
+        )
     worker._write(output / "full_expert_result.json", result)
     source_paths = {
+        "execution_provenance": Path(__file__).with_name('provenance.py'),
         "lifecycle_core": Path("task_env/tasks/canonical_solution_lifecycle.py"),
         "nutassembly_lifecycle_solution": Path("task_env/tasks/nut_assembly/canonical_solution_v2.py"),
         "nutassembly_v1": Path("task_env/tasks/nut_assembly/canonical_solution.py"),

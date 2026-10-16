@@ -18,7 +18,8 @@ from ....controllers.canonical.contracts import digest
 
 STORAGE_VARIANTS = ('owner-fields-v1', 'stability-history-refs-v2')
 OWNER_BLOB_FIELDS = ('_actions', '_transition_guard_state', '_close_authorization',
-                     '_last_guard_decision', 'events', 'lifecycle_state')
+                     '_last_guard_decision', 'events', 'lifecycle_state',
+                     '_stage_receipts', '_readiness_warnings')
 
 
 def storage_policy(variant):

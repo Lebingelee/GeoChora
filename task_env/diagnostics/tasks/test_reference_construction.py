@@ -57,7 +57,7 @@ def test_pickcube_exact_p16_identity_config_readiness_reset_and_legacy_caller():
 @pytest.mark.parametrize('rate', [50, 100, 500])
 @pytest.mark.parametrize('provider', ['geophys', 'mujoco'])
 def test_nutassembly_exact_historical_physics_solution_and_new_source_identity(rate, provider):
-    value = na.build_reference(rate_hz=rate, provider=provider)
+    value = na.build_reference(rate_hz=rate, provider=provider, execution_policy=na.GUARDED_EXPERT)
     old = BASELINE['nutassembly'][f'{provider}_{rate}']
     assert_source(value, old)
     assert digest(value['controller'].physical_profile) == old['physical_profile_sha256']
@@ -74,7 +74,7 @@ def test_nutassembly_exact_historical_physics_solution_and_new_source_identity(r
 
 
 def test_execution_policies_keep_the_same_strict_expert_and_no_outcome_policy_default():
-    strict = na.build_reference()
+    strict = na.build_reference(execution_policy=na.GUARDED_EXPERT)
     diagnostic = na.build_reference(execution_policy=na.DIAGNOSTIC_OBSERVATION)
     assert strict['solution_identity'] == diagnostic['solution_identity']
     assert strict['controller_identity'] == diagnostic['controller_identity']
@@ -174,12 +174,19 @@ def test_task_owned_runner_selection_preserves_legacy_context_and_guard_admissio
         legacy = context(50, candidate, provider=provider)
         assert_source(legacy, BASELINE['nutassembly'][f'{provider}_50'])
         for diagnostic in (False, True):
-            selected = context(50, candidate, provider=provider,
+            selected = context(100, candidate, provider=provider,
                                construction_route='task-owned',
                                diagnostic_observation=diagnostic)
-            _validate_cross_provider_contract(selected, contract)
-            assert selected['construction_id'] == na.CONSTRUCTION_ID
+            if diagnostic:
+                _validate_cross_provider_contract(selected, contract)
+            else:
+                with pytest.raises(ValueError, match='solution_version'):
+                    _validate_cross_provider_contract(selected, contract)
+            assert selected['construction_id'] == (na.CONSTRUCTION_ID if diagnostic else na.OUTCOME_CONSTRUCTION_ID)
             assert selected['diagnostic_shadow_mode'] is diagnostic
-            assert selected['solution_identity'] == legacy['solution_identity']
+            if diagnostic:
+                assert selected['solution_identity'] == legacy['solution_identity']
+            else:
+                assert selected['solution'].original_solution_identity == legacy['solution_identity']
     with pytest.raises(ValueError, match='selected guarded'):
         context(50, construction_route='task-owned')

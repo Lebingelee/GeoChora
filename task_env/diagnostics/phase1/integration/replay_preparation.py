@@ -102,6 +102,7 @@ def _fields(name, owner=None):
         if hasattr(owner, '_transition_guard_state'):
             fields += ('_transition_guard_state', '_close_action_completed_at_s',
                        '_close_authorization', '_last_guard_decision')
+        fields += getattr(owner, 'outcome_state_fields', ())
         return fields + ('lifecycle_state',)
     return FIELDS[name]
 
@@ -110,6 +111,8 @@ def _owner_version(name, owner=None):
     if name == 'arm_schedule':
         return 'arm-schedule-public-ack-memory-v2'
     if name == 'coordinator' and owner is not None and hasattr(owner, '_lifecycle'):
+        if hasattr(owner, 'outcome_state_fields'):
+            return 'coordinator-task-owned-outcome-v1'
         if hasattr(owner, '_transition_guard_state'):
             return 'coordinator-canonical-guarded-lifecycle-v2'
         return 'coordinator-canonical-solution-lifecycle-v1'
@@ -117,7 +120,8 @@ def _owner_version(name, owner=None):
 
 
 def _checkpoint_version(value):
-    return ('p18-owner-checkpoint-prototype-v4'
+    return ('p20-nutassembly-outcome-owner-checkpoint-v1'
+            if hasattr(value['solution'], 'outcome_state_fields') else 'p18-owner-checkpoint-prototype-v4'
             if hasattr(value['solution'], '_transition_guard_state')
             else 'p18-owner-checkpoint-prototype-v3'
             if hasattr(value['solution'], '_lifecycle')

@@ -1,7 +1,7 @@
 # Proposal — NutAssembly outcome-oriented completion v1
 
 Proposal ID：`nutassembly-outcome-oriented-completion-v1-draft`。
-状态：**PROPOSED / REVIEW REQUIRED / NOT IMPLEMENTED / NOT DEFAULT**。
+原S1状态：**PROPOSED / REVIEW REQUIRED / NOT IMPLEMENTED / NOT DEFAULT**。2026-10-16 maintainer批准S1.6方向后，100Hz任务入口的精确实施合同以 [S1.6 outcome completion](../p2_0_nutassembly_outcome_completion.md) 为准；下文保留原提案背景，不代表当前默认状态，也不改写历史资格。
 
 本提案面向 maintainer 以已完成计划和最终物理任务结果选择活动开发实现的要求。它不是历史 Expert FULL gate 的修订，也不修改既有 TaskArtifact/Experiment、D0失败或资格决定。S1只交付本提案；现有ON_TASK_SUCCESS与ON_EXPERT_TERMINAL_STAGE均不改。
 

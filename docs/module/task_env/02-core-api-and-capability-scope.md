@@ -303,4 +303,4 @@ Go2 walk / RSL
 
 ## P2.0-B S1 construction supplement
 
-已新增 task-owned、显式版本化的 [active reference construction](p2_0_active_reference_construction.md)：PickCube精确P1.6 experimental_100hz与NutAssembly guarded V2/V5。该增量不替换既有默认factory、不移除历史实现，也不授予新source历史qualification；Nut outcome-oriented completion仍是未实施提案。
+已新增 task-owned、显式版本化的 [active reference construction](p2_0_active_reference_construction.md)：PickCube精确P1.6 experimental_100hz与NutAssembly guarded V2/V5。S1.6在该Nut task-owned API中实现100Hz默认的 [outcome completion v1](p2_0_nutassembly_outcome_completion.md)，只对具名高度readiness warning有界准入；严格历史选择仍显式保留。该增量不替换通用make_env factory、不移除历史实现，也不授予新source历史qualification。

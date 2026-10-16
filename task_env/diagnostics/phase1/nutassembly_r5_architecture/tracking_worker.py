@@ -1323,6 +1323,8 @@ def run_loaded(value, provider, folder, probe):
                                   else "T1_loaded_tracking_or_capture_gate" if probe == "T1"
                                   else "full_expert_acceptance_gate")
     except Exception as exc:
+        if callable(getattr(value.get('solution'), 'abort', None)):
+            value['solution'].abort('runtime_error')
         report.update(failure_boundary=report.get("failure_boundary") or probe + "_execution",
                       error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc())
         if value.get("diagnostic_shadow_mode"):
@@ -1337,10 +1339,21 @@ def run_loaded(value, provider, folder, probe):
     finally:
         report['native_contact_boundary_count'] = native_contact_count
         report['contact_sidecar_storage'] = 'streamed-boundary-jsonl-v1'
+        outcome_owner = value.get('solution')
+        if callable(getattr(outcome_owner, 'outcome_report', None)):
+            report.update(outcome_owner.outcome_report())
+            report['selected_policy_execution_complete'] = bool(outcome_owner.done)
+            original = outcome_owner.original_expert_lifecycle_status
+            report['expert_complete'] = original['expert_complete']
+            report['expert_failed'] = original['expert_failed']
+            report['pass'] = bool(report.get('pass') and outcome_owner.outcome_complete)
         if native_contact_stream is not None:
             try:
                 native_contact_stream.close()
             except Exception as exc:
+                if callable(getattr(outcome_owner, 'abort', None)):
+                    outcome_owner.abort('recording_error')
+                    report.update(outcome_owner.outcome_report())
                 report['pass'] = False
                 report['native_contact_recording_error'] = f'{type(exc).__name__}: {exc}'
                 report['failure_boundary'] = 'native_contact_recording'
@@ -1348,10 +1361,19 @@ def run_loaded(value, provider, folder, probe):
             try:
                 report['live_recording'] = value['_live_recording'].finish(report)
             except Exception as exc:
+                if callable(getattr(outcome_owner, 'abort', None)):
+                    outcome_owner.abort('recording_error')
+                    report.update(outcome_owner.outcome_report())
                 report['pass'] = False
                 report['recording_error'] = f'{type(exc).__name__}: {exc}'
                 report['failure_boundary'] = 'live_recording'
             value.pop('_live_recording', None)
+        if callable(getattr(outcome_owner, 'outcome_report', None)):
+            report.update(outcome_owner.outcome_report())
+            original = outcome_owner.original_expert_lifecycle_status
+            report['expert_complete'] = original['expert_complete']
+            report['expert_failed'] = original['expert_failed']
+            report['pass'] = bool(report.get('pass') and outcome_owner.outcome_complete)
         if audit:
             _write(folder / "native_audit.json", audit.boundaries)
             audit.close()
