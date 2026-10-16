@@ -1,6 +1,6 @@
 # P2.0-B S1 — Active reference construction
 
-状态：S1/S1.6 与 S2-C1 已集成到 public `develop`（当前 C1 integration head `a6372099ac2055045cca16c03a0514825d635e8f`）；PickCube authoring 与 NutAssembly authoring 的 current receipts 分别见 S2-C1/S2-C2。本地 S2-C2 尚未集成，所有新 source 均未继承 historical qualification。
+状态：S1/S1.6、S2-C1 与 S2-C2 均已集成到 public `develop`；S2-C2 integration readback 为 `5408d053be920ab6e3d9e88337b45ccf87ad757e`。PickCube/NutAssembly authoring receipts 分别见 S2-C1/S2-C2。新 source 均未继承 historical qualification。
 
 > 本页保留 S1/S1.6 构造迁移记录。当前 PickCube task authoring 以 [S2-C1 current section](#s2-c1-current-pickcube-authoring) 与 [S2-C1 receipt](p2_0_s2_c1_pickcube_authoring.md) 为准；当前 NutAssembly task authoring 以 [S2-C2 current section](#s2-c2-current-nutassembly-authoring) 与 [S2-C2 receipt](p2_0_s2_c2_nutassembly_authoring.md) 为准。旧 `task_env.tasks.pick_cube.reference` 与 NutAssembly candidate/reference modules 已从当前 active tree 移除。
 
@@ -92,8 +92,8 @@ S2前仍需：新source完整selected路径与record/replay验证；迁移公开
 
 ## S2-C2 current NutAssembly authoring
 
-本地 S2-C2 将 `task_env/tasks/nut_assembly/` 收敛为 `__init__.py`, `task.py`, `solution.py`, `config.yaml` 四个文件。Task/Artifact、scene composition、reset、evaluation 与现有 task binding 归 `task.py`；所选 Guarded V2/V5/R3 的11阶段专家、close guard、Outcome Completion V1、warning admission、strict lifecycle status 与 task-specific controller schedule 归单一 `solution.py`；资产几何/惯性和 MJCF assembly owner 在 `task_env/objects/nut_assembly.py` 与 `task_env/assembly/nut_assembly.py`。UID、TaskArtifact mapping、Outcome policy identity、provider scene XML 与 S2-C1 的完整 transition/boundary 行为保持相同；controller、solution、source 和 recipe identities 独立更新。
+已集成的 S2-C2 将 `task_env/tasks/nut_assembly/` 收敛为 `__init__.py`, `task.py`, `solution.py`, `config.yaml` 四个文件。Task/Artifact、scene composition、reset、evaluation 与现有 task binding 归 `task.py`；所选 Guarded V2/V5/R3 的11阶段专家、close guard、Outcome Completion V1、warning admission、strict lifecycle status 与 task-specific controller schedule 归单一 `solution.py`；资产几何/惯性和 MJCF assembly owner 在 `task_env/objects/nut_assembly.py` 与 `task_env/assembly/nut_assembly.py`。UID、TaskArtifact mapping、Outcome policy identity、provider scene XML 与 S2-C1 的完整 transition/boundary 行为保持相同；controller、solution、source 和 recipe identities 独立更新。
 
 最终本地源码 `4d6d65c55eca994b4317bcfb80797c69e48452c6` 在 GeoPhys/MuJoCo 各完成一次 100Hz、NA-S0 seed19 CPU 全轨迹和 canonical H5 roundtrip。GeoPhys保留 step362 的原始 `stable_height_mismatch` strict lifecycle failure 与单条允许 warning；MuJoCo 原始 Expert 完成且无 readiness warning。两个 provider 的所有 transition 与 boundary payload 在验证 per-run applied target hash 正确链接至对应 canonical target 后，只归一化源码/controller identity 派生字段，均与 S2-C1 完全相等。这是 bounded functional regression，不是 P1.8 FULL、D0/D1/D2 或新资格认定。
 
-旧 27 个 task-local implementation/config/profile 路径、API breaking changes、S2-C1 对照结果与各 provider source/config/controller/solution/H5 identities 见 [S2-C2 authoring receipt](p2_0_s2_c2_nutassembly_authoring.md) 与 [S2-C2 source identity/recovery manifest](p2_0_s2_c2_source_identity.json)。S2-C2 尚未集成，v1.0.1 兼容策略仍需维护者审阅。
+旧 27 个 task-local implementation/config/profile 路径、API breaking changes、S2-C1 对照结果与各 provider source/config/controller/solution/H5 identities 见 [S2-C2 authoring receipt](p2_0_s2_c2_nutassembly_authoring.md)、[S2-C2 integration receipt](p2_0_s2_c2_integration_receipt.md) 与 [S2-C2 source identity/recovery manifest](p2_0_s2_c2_source_identity.json)。v1.0.1 兼容策略仍需最终维护者审阅。

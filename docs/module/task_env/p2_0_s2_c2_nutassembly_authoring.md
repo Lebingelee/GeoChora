@@ -1,6 +1,6 @@
 # P2.0-B S2-C2 — Minimal NutAssembly task authoring
 
-状态：S2-C2 已在本地分支完成实现、provider-free 回归和最终源码双 provider bounded full-route 回归；提交 `4d6d65c55eca994b4317bcfb80797c69e48452c6` 尚未集成，等待维护者审阅。public `develop` 仍停在已集成的 S2-C1 head `a6372099ac2055045cca16c03a0514825d635e8f`。
+状态：S2-C2 已通过维护者指令要求的最终审查与 93 项 provider-free 回归，并于 2026-10-16 以 normal fast-forward 集成。最终 execution source 为 `4d6d65c55eca994b4317bcfb80797c69e48452c6`；集成后 public `develop` readback 为 `5408d053be920ab6e3d9e88337b45ccf87ad757e`。独立 integration receipt 见 [S2-C2 integration receipt](p2_0_s2_c2_integration_receipt.md)。
 
 ## S2-C1 integration receipt
 
@@ -104,4 +104,4 @@ The resolved source SHA map (24 files), provider build/contact profiles, full co
 
 ## Scope and handoff
 
-S2-C2 changes task-owned NutAssembly authoring, its asset/assembly ownership, task-local historical files, relevant task imports and focused tests. It does not change Go2, static physics, generic RL, Batch/Device/Vectorization, Renderer, Phase II interoperability, shared runtime/provider contracts, or PickCube execution. No examples/scripts were reconstructed. S3, S4, S4.5 and S5 have not started. The local S2-C2 commits are not pushed or merged; stop here for maintainer review of the implementation, API migration, and bounded acceptance evidence.
+S2-C2 changes task-owned NutAssembly authoring, its asset/assembly ownership, task-local historical files, relevant task imports and focused tests. It does not change Go2, static physics, generic RL, Batch/Device/Vectorization, Renderer, Phase II interoperability, shared runtime/provider contracts, or PickCube execution. No examples/scripts were reconstructed. S2-C2 is integrated at `5408d05`; Go2 retirement is a separate S3 change set. S4, S4.5 and S5 have not started. The bounded functional results do not confer historical qualification.
