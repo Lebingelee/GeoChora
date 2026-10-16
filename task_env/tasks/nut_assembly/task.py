@@ -284,6 +284,7 @@ def _sha(path):
 def _source_identity_files():
     root = Path(__file__).resolve().parents[3]
     relative = (
+        "task_env/tasks/nut_assembly/__init__.py",
         "task_env/tasks/nut_assembly/task.py", "task_env/tasks/nut_assembly/solution.py",
         "task_env/tasks/nut_assembly/config.yaml", "task_env/assembly/nut_assembly.py",
         "task_env/objects/nut_assembly.py", "task_env/assembly/source.py",

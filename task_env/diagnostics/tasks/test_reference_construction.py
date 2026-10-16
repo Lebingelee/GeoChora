@@ -124,6 +124,8 @@ def test_nutassembly_has_one_flattened_active_solution_and_four_task_files():
         'task_env.tasks.nut_assembly.stable_grasp_candidate',
     ):
         assert find_spec(module) is None
+    with pytest.raises(ImportError, match="package-level historical build_reference API is retired"):
+        from task_env.tasks.nut_assembly import build_reference  # noqa: F401
 
 
 @pytest.mark.parametrize('yaw', [-1.2, -0.2, 0.0, 0.2, 1.4])
