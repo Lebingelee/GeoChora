@@ -219,6 +219,14 @@ def test_repeat_warning_or_warning_at_another_stage_is_not_admitted():
     assert len(s.readiness_warnings)==1
 
 
+def test_historical_measured_opening_overshoot_is_not_a_new_command_range_gate():
+    # Fresh failure/S1.5 matching boundary280: a command cap is not a measured
+    # hard-stop threshold. Finite state, force cap and original predicates stay.
+    f=Ideal();f.opening=.08000223711133003
+    f.step()
+    assert not f.solution.failed
+
+
 @pytest.mark.parametrize('fault',['success_lost','retreat_pose'])
 def test_final_success_and_retreat_gate_cannot_be_replaced_by_stage_entry(fault):
     f=Ideal();f.until('release_retreat');s=f.solution

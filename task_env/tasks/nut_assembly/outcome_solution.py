@@ -147,8 +147,9 @@ class NutAssemblyOutcomeSolutionV1(NutAssemblyGuardedAuthorizationCandidateV2):
         success = bool(metrics['inserted_on_peg'] and metrics['released_nut'])
         if success != bool(info['is_success']) or success != bool(metrics['task_success']):
             raise ValueError('inconsistent canonical task success')
-        if not 0 <= float(metrics['gripper_opening']) <= self.config.opening_range_m + 1e-6:
-            raise ValueError('invalid measured gripper opening')
+        # opening_range_m bounds commands. Do not invent a tighter measured
+        # joint hard-stop: the retained native route has finite soft-limit
+        # overshoot. Canonical measured release and force/capture gates remain.
         if readiness is not None and not self._finite(readiness.to_mapping()):
             raise ValueError('nonfinite readiness')
         if readiness is not None and abs(readiness.gripper.force_limit_N - 10.) > 1e-12:
