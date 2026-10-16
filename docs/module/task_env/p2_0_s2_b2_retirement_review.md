@@ -1,7 +1,11 @@
 # GeoChora P2.0-B — S2-B1 Integration & S2-B2 Retirement Receipt
 
 日期：2026-10-16
-状态：S2-B1 已集成到 canonical public `develop`；S2-B2 exact two-file slice 已在本地实现，等待 maintainer review，未推送或合并。
+状态：S2-B1 已集成到 canonical public `develop`；获准的 S2-B2 exact two-file slice 已于 2026-10-16 通过普通 fast-forward 集成到 public `develop`。B2 实现提交为 `84438d470cce4f5a215a5934fdfc344b91adca30`，经更正的存储风险记录提交为 `a5e8cd0a50b8a79a75037e0c274b0e22d3ebdde2`。
+
+## S2-B2 public integration receipt
+
+集成前重新抓取的 canonical public `develop` 为 `71aadb8aada6c242166a1deadc610c230ba1c616`，它是本地提交链的祖先；工作区无 tracked/untracked 改动。基线到 `a5e8cd0` 的差异仅包含两项获准模块删除、两个历史诊断入口更新、provider-free 收据契约测试及当前维护文档/清单。`git push public HEAD:refs/heads/develop` 以普通 fast-forward 成功，服务端返回 `71aadb8..a5e8cd0`。随后仅为本收据追加文档记录；该文档提交也通过普通 fast-forward 发布。`main` 和 annotated `v1.0.0` 标签对象及其 peeled commit 保持不变。
 
 ## S2-B1 public integration receipt
 
