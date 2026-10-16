@@ -111,19 +111,19 @@ S0–S3 smoke 不等价于 qualification；S4 才是正式 subphase qualificatio
 - 验收公共 Core API 和文档是否足以让 Agent 构造任务；
 - 应根据文本需求生成，范围与 PickCube/NutAssembly 可比，但不能复制已有任务。
 
-### 3.4 Go2 Walk — locomotion/RL regression
+### 3.4 Go2 Walk — historical v1.0.0 locomotion/RL regression
 
 目的：
 
-- 保留历史 Evidence 最强的 Go2 CUDA/static/RSL training/runtime regression route；
+- v1.0.0 曾包含历史 Evidence 较强的 Go2 CUDA/static/RSL training/runtime regression route；
 - 确保 Core refactor 不破坏 device/RSL capability；
 - 作为以后把 locomotion 适配到其他机器人时的参考。
 
-Go2 路线是一项 regression/reference capability，而不是 manipulation 的架构驱动因素。
+该路线不是 manipulation 的架构驱动因素。P2.0-B S3 已将 Go2 专用 implementation 从当前 develop 退休；历史源代码、配置与结果继续通过不可变 v1.0.0 恢复。本节的 Go2 内容描述历史记录，不表示当前 active capability。
 
 ## 4. 当前状态注意事项
 
-历史 2026-09-07 capability audit 记录：
+历史 2026-09-07 capability audit 记录（不代表 S3 后的 active source set）：
 
 - Go2 CUDA/static/RSL 是当时最强的 production/qualification 路线；
 - Pendulum/TwoWheel 有 host batch Evidence；

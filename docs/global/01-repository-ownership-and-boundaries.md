@@ -78,7 +78,7 @@ OpenUSD 以后可能用于 scene interchange、composition 或 visualization。�
 
 GeoPhys 是当前/default implementation physics/runtime provider，并提供默认 rendering 路径。Qualification 必须绑定到有 Evidence 的 provider × backend/profile × task × lifecycle intersection，不能对整个 provider 作无范围的资格声明。
 
-Go2 CUDA/static/RSL 是历史 Evidence 最强的具名 regression route；其 current-HEAD qualification 仍需在 P1.0 baseline smoke 中重新确认，不能外推到 PickCube、NutAssembly 或其他 GeoPhys 路线。
+Go2 CUDA/static/RSL 曾是历史 Evidence 最强的具名 regression route，记录于 v1.0.0；P2.0-B S3 已从当前 develop 退休其 task/robot/RSL 专用路线。该历史资格不得外推到 PickCube、NutAssembly 或其他 GeoPhys 路线。通用 RL、vectorization 与 Static Physics contracts 保留。
 
 Phase-I primary target 为 GeoPhys/MuJoCo，boundary-validation target 为 SAPIEN/Genesis。这些目标不构成 provider-wide qualification；Phase-I additive provider sessions 已实现，当前 tested/approved bounded intersections 见 Mainline Integration Status。其他 simulator/render provider（包括 Flora）须经明确 adapter、capability declaration 和具名 acceptance route 接入。Physics 与 render provider 始终是不同边界。
 

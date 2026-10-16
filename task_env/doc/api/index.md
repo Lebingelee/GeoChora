@@ -48,17 +48,13 @@ optional SB3/RSL-RL learner or H5 recorder
 
 ~~~text
 empty-v1
-go2-walk-v1
-go2-walk-deploy-v1
-go2-walk-deploy-height-v1
-go2-walk-codex
-nut-assembly-square-v1
+nut-assembly-outcome-reference-v1
 pendulum-v1
-pick-cube-v1
+pick-cube-p16-reference-v1
 two-wheel-balance-v1
 ~~~
 
-其中 Pendulum、TwoWheel 和 Go2 任务已声明并行能力；PickCube、NutAssembly 等没有 parallel capability 的任务继续通过单环境入口使用。
+其中 Pendulum 和 TwoWheel 已声明并行能力；PickCube、NutAssembly 等没有 parallel capability 的任务继续通过单环境入口使用。旧 Go2 UID 已显式退休，不映射到其他 task。
 
 ## Appendix
 

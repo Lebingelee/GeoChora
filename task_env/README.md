@@ -176,7 +176,7 @@ render_parallel 还支持 width、height、columns、cell-width、cell-depth、p
 | --- | --- | --- |
 | task_env.script.camera_lighting_probe | 对比当前/legacy lighting 配置 | --mode current/legacy、--backend、--output |
 | task_env.script.render_input_probe | 检查 render input 和窗口输入 | --arch、--width、--height、--fps-limit |
-| task_env.script.flora_go2_single_smoke | Flora Go2 单资产 smoke | --module-dir、--width、--height、--force |
+| task_env.script.render_single | 单环境 renderer 显示入口 | --env-id、--render-backend、--mode |
 
 camera observation 与 UI render 的结果不要混用：前者进入 observation tree，后者只产生展示帧。
 
@@ -210,69 +210,11 @@ PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
 
 #### 统一 RSL-RL PPO
 
-rsl_ppo.py 是 Go2 和其他已声明 RSL profile 任务的统一训练入口：
+`rsl_ppo.py` 是 task-independent 的 RSL-RL 训练入口。调用者必须传入 `--env-id`；该 UID 必须同时有 active task 注册、homogeneous parallel capability 和适配的 learner action/observation contract。RSL/RL contracts 与 SB3、Batch/Device/Learner 和 vectorization 保持通用，当前没有 Go2 专用训练目标，也不会把 Go2 UID 映射到 PickCube 或 NutAssembly。
 
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.rsl_ppo \
-  --env-id go2-walk-v1 \
-  --num-env 256 \
-  --iterations 10 \
-  --rollout-steps 24 \
-  --sim-device cuda \
-  --rl-device cuda:0 \
-  --output-dir temp_outputs/task_env/go2_ppo_quickstart \
-  --save-interval 5
-~~~
+常用参数包括 env-id、num-env、iterations、rollout-steps、seed、sim-device、rl-device、env-config、output-dir、log-dir、save-interval、checkpoint-out 和 resume。调用前需为具体 UID 独立确认 RSL action/observation contracts；S3 不指定或验收新的 PPO 训练目标。render 与 hard-render 互斥；它们使用保留的通用 parallel renderer 设置。训练输出包括 checkpoint、TensorBoard event 和 train summary；resume 可接收 checkpoint 或运行目录。
 
-常用参数包括 env-id、num-env、iterations、rollout-steps、seed、sim-device、rl-device、env-config、output-dir、log-dir、save-interval、checkpoint-out 和 resume。render 与 hard-render 互斥：
-
-~~~bash
-# 使用任务 YAML overlay
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.rsl_ppo \
-  --env-id go2-walk-deploy-height-v1 \
-  --env-config task_env/tasks/go2_walk_deploy/domain_randomization_curriculum.yaml \
-  --num-env 256 --iterations 10 --rollout-steps 24 \
-  --sim-device cuda --rl-device cuda:0 \
-  --output-dir temp_outputs/task_env/go2_height_quickstart
-
-# 普通并行展示或 Go2 asset 展示
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.rsl_ppo \
-  --env-id go2-walk-v1 --num-env 256 --iterations 2 \
-  --rollout-steps 24 --sim-device cuda --rl-device cuda:0 \
-  --render --output-dir temp_outputs/task_env/go2_render_quickstart
-~~~
-
-训练输出包括 checkpoint、TensorBoard event 和 train summary；resume 可接收 checkpoint 或运行目录。
-
-#### Go2 held-out evaluator
-
-需要先准备 current-RSL checkpoint：
-
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.go2.go2_ppo_eval \
-  --checkpoint temp_outputs/task_env/go2_ppo_quickstart/model_5.pt \
-  --env-id go2-walk-v1 --num-env 32 --steps 200 \
-  --sim-device cuda --rl-device cuda:0 \
-  --output-dir temp_outputs/task_env/go2_eval
-~~~
-
-该脚本记录 rollout return、episode length、termination/timeout、device 和 transfer metadata，不负责训练。
-
-#### MuJoCo Go2 evaluator/helper
-
-go2_mujoco_eval.py 使用 checkpoint 做独立 MuJoCo actor rollout，go2_mujoco.py 用于单次 MuJoCo action/viewer smoke：
-
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.go2.go2_mujoco_eval \
-  --checkpoint temp_outputs/task_env/go2_ppo_quickstart/model_5.pt \
-  --env-id go2-walk-v1 --steps 1000 --device cpu \
-  --output-dir temp_outputs/task_env/go2_mujoco_eval
-
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.go2.go2_mujoco \
-  --steps 1 --output temp_outputs/task_env/go2_mujoco_one_step.json
-~~~
-
-MuJoCo evaluator 的 checkpoint observation contract 必须与 env-id 对应；height-deploy 可以额外传入四维 command。
+Go2 task UID、robot UID、RSL profiles、Go2 checkpoint/Isaac/MuJoCo evaluators 和 Go2 Flora wrappers 已由 P2.0-B S3 退休。历史实验应从不可变 `v1.0.0` 恢复；当前不提供语义替代，也不把 selected manipulation task 当作未经验证的 PPO 训练目标。
 
 ### trajectory：收集、回放、合并和转换
 

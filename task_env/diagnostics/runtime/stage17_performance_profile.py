@@ -815,7 +815,7 @@ def _profile_case(args: argparse.Namespace, batch: int) -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task-uid", default="go2-walk-v1")
+    parser.add_argument("--task-uid", required=True)
     parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--layout", choices=("merged_scene", "static_template"), default="static_template")
     parser.add_argument(

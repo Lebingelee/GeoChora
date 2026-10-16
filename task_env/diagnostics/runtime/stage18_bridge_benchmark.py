@@ -205,7 +205,7 @@ def _run_tree(script: Path, root: Path, args: argparse.Namespace) -> dict[str, A
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--single-run", action="store_true")
-    parser.add_argument("--task-uid", default="go2-walk-v1")
+    parser.add_argument("--task-uid", required=True)
     parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument("--warmup", type=int, default=3)

@@ -7,10 +7,19 @@ from typing import Any
 
 _PPO_ENV_ALIASES = {
     "pendulum": "pendulum-v1",
-    "go2_walk": "go2-walk-v1",
-    "go2_walk_deploy": "go2-walk-deploy-v1",
-    "go2_walk_deploy_height": "go2-walk-deploy-height-v1",
 }
+
+_RETIRED_GO2_ENV_IDS = frozenset(
+    {
+        "go2_walk",
+        "go2_walk_deploy",
+        "go2_walk_deploy_height",
+        "go2-walk-v1",
+        "go2-walk-deploy-v1",
+        "go2-walk-deploy-height-v1",
+        "go2-walk-codex",
+    }
+)
 
 
 def canonical_ppo_env_id(env_id: str) -> str:
@@ -19,6 +28,11 @@ def canonical_ppo_env_id(env_id: str) -> str:
     value = str(env_id).strip()
     if not value:
         raise ValueError("env_id cannot be empty")
+    if value in _RETIRED_GO2_ENV_IDS:
+        raise ValueError(
+            f"Go2 RSL environment {value!r} is retired; no training task is substituted. "
+            "Restore the immutable v1.0.0 source for historical execution."
+        )
     return _PPO_ENV_ALIASES.get(value, value)
 
 

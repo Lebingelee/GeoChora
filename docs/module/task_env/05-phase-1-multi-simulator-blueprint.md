@@ -6,6 +6,8 @@
 > 日期：2026-10-04
 > 范围：定义 Phase I 多仿真器资格验证的实施顺序、阶段 gate、Evidence 位置和完成标准。
 > 权威关系：作为 Phase-I 实施计划采纳，从属于 [系统架构基准](../../global/00-system-architecture-anchor.md)、[仓库所有权](../../global/01-repository-ownership-and-boundaries.md) 与 canonical TaskEnv contract。active 表示文档用于指导实施，不表示 capability 已实现、测试通过、qualified 或任何子阶段已获准。
+>
+> 后续状态（2026-10-16）：本蓝图中的 Go2 regression-route protection 是 Phase-I 时点计划；P2.0-B S3 已退休当前 develop 中的 Go2 专用路线。历史源代码与 Evidence 保持在不可变 v1.0.0，通用 RL、vectorization、provider 与 Static Physics contracts 保留。
 
 ## 1. 目的
 

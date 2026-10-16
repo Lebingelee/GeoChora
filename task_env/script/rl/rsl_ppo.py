@@ -14,7 +14,11 @@ LOGGER = logging.getLogger(__name__)
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env-id", default="go2-walk-v1")
+    parser.add_argument(
+        "--env-id",
+        required=True,
+        help="registered homogeneous TaskEnv UID; no default training task is selected",
+    )
     parser.add_argument("--num-env", type=int, default=2)
     parser.add_argument("--iterations", type=int, default=1500)
     parser.add_argument("--rollout-steps", type=int, default=24)
@@ -30,7 +34,7 @@ def _parser() -> argparse.ArgumentParser:
     render_group.add_argument(
         "--hard-render",
         action="store_true",
-        help="render Go2 visual assets in a bounded 16/32/64/96/128/256-world parallel view",
+        help="use the configured asset-backed parallel renderer",
     )
     parser.add_argument(
         "--hard-render-num",

@@ -46,7 +46,6 @@ from .stage17_performance_profile import (
 from .stage17_performance_profile import _ProfileCollector
 
 
-from ...utils._paths import MUJOCO_MENAGERIE_ROOT, REPO_ROOT
 PROFILE_SCHEMA = "task-env-stage-a-runtime-profile-v1"
 _ADDITIVE_STAGES = (
     "fk_geom_transform",
@@ -158,13 +157,6 @@ def _scene_fingerprint(args: argparse.Namespace) -> dict[str, str]:
         "task_uid": str(args.task_uid),
         "profile": str(args.profile),
     }
-    if str(args.task_uid) == "go2-walk-v1":
-        assets_path = REPO_ROOT / "task_env" / "tasks" / "go2_walk" / "assets.py"
-        xml_path = MUJOCO_MENAGERIE_ROOT / "unitree_go2" / "go2.xml"
-        payload["canonical_xml_sha256"] = sha256(xml_path.read_bytes()).hexdigest()
-        payload["composition_source_sha256"] = sha256(
-            assets_path.read_bytes()
-        ).hexdigest()
     digest = sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -327,7 +319,7 @@ def _build_spec(args: argparse.Namespace, batch: int):
                     "contact_precision": str(args.contact_precision),
                     "cuda_graph": False,
                     # Stage A is the general boundary profile; keep it on the
-                    # f64/CPU-safe P0 route instead of inheriting Go2's P12
+                    # f64/CPU-safe P0 route instead of inheriting task-specific
                     # production defaults from task YAML.
                     "contact": {
                         "fixed_topology_child_schur": False,
@@ -621,7 +613,7 @@ def _profile_case(args: argparse.Namespace, batch: int) -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task-uid", default="go2-walk-v1")
+    parser.add_argument("--task-uid", required=True)
     parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--kinematics-backend", choices=("torch", "taichi"), default="torch")
     parser.add_argument(

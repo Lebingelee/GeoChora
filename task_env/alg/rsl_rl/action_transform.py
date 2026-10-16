@@ -3,8 +3,8 @@
 Action semantics belong at the learner boundary, not in a task-specific
 runner.  A profile declares the policy-side clip, the task/native clip and an
 optional affine transform.  The default profile is an identity transform
-which falls back to the wrapped environment's public action space, so adding
-the Go2 reference profile does not alter other tasks.
+which falls back to the wrapped environment's public action space, so a
+task-specific profile does not alter other tasks.
 """
 
 from __future__ import annotations
@@ -133,10 +133,9 @@ class RslActionTransformSpec:
             value = value * self.scale + self.bias
         native_low = self.native_low if self.native_low is not None else fallback_low
         native_high = self.native_high if self.native_high is not None else fallback_high
-        # The Go2 reference declares the same policy/native bounds and an
-        # identity affine transform.  In that common device hot path the first
-        # clamp already establishes the native contract; launching an identical
-        # second clamp only adds scheduler work to every rollout tick.
+        # When policy/native bounds are identical under an identity transform,
+        # the first clamp already establishes the native contract; launching
+        # an identical second clamp only adds scheduler work to every tick.
         if (
             self.scale == 1.0
             and self.bias == 0.0

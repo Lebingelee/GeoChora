@@ -4,6 +4,8 @@
 
 > 状态：canonical Core 范围，v0.3
 > 日期：2026-10-04
+>
+> 当前实现状态更新（2026-10-16）：P2.0-B S3 已从 develop 退休 Go2 专用 task、robot、profile 与执行入口；Go2 历史代码和 Evidence 可从不可变 v1.0.0 恢复。通用 RL、Batch/Device/Learner、Vectorization、Provider、Static Physics 与 Renderer contracts 保留。以下较早阶段状态只描述其记录时点。
 
 ## 1. Core 使命
 
@@ -28,7 +30,7 @@ Core 的首要使命是成为可靠、provider-neutral 的多仿真器执行与�
 - MuJoCo 只有独立 oracle/probe 等路径，尚非统一 Task Artifact 的 production provider；multi-provider materialization 是 planned。
 - Task Artifact/Experiment/Evidence 的规范存在。P1.1 新增 `task_env.artifacts` 的 strict TaskArtifact v0 mapping contract skeleton（见 [06](06-phase-1-contracts-and-provider-boundaries.md#14-p11-additive-contract-route)）；production provider materialization、完整 Validator、Runner 与 Experiment/Evidence loader 仍未形成完整统一实现。
 - RSL/SB3 learner adapter 和部分 IL script 入口存在；统一 learner integration 及 manipulation IL acceptance 不能据此称为 qualified。
-- PickCube/NutAssembly 尚无完整 current-HEAD manipulation qualification；bounded current-HEAD Go2 CUDA/static/RSL regression 已在 P1.0 重新测试，没有因此产生新的 qualified intersection（qualified_intersections = []）。
+- 在本节对应的 P1.0 baseline 时，PickCube/NutAssembly 尚无完整 current-HEAD manipulation qualification；当时 bounded Go2 CUDA/static/RSL regression 没有产生新的 qualified intersection（qualified_intersections = []）。该 Go2 执行路线已由后续 S3 从当前 develop 退休；历史结果仍在 v1.0.0。
 
 ## 2. 最小独立能力
 
@@ -179,7 +181,7 @@ Core 不需要复制 agent_factory 的算法实现。
 
 Diffusion Policy 是 planned 初始主要 IL 路线；Flow Matching 可以通过 agent_factory 作为另一条参考路线。两者仍需 dataset、learner 和 closed-loop evaluation Evidence。
 
-Locomotion 仍是 RL 路线，可以使用现有 Go2/RSL 参考路径。
+Locomotion 仍是 RL 路线；当前保留通用 RSL/SB3 integration contracts，但 Go2 专用 task 不再是 develop 中的训练目标。RSL CLI 要求显式选择已注册的 homogeneous task，不会替换已退休的 Go2 UID。
 
 ### 3.8 Runner API
 
@@ -281,10 +283,10 @@ PickCube -> NutAssembly -> Agent 生成的相似但未见过的 manipulation tas
 Locomotion / RL：
 
 ~~~text
-Go2 walk / RSL
+历史 Go2 walk / RSL（v1.0.0；当前 develop 已退休）
 ~~~
 
-这些参考路径用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。Core 在扩展 manipulation capability 时，必须保留 Go2 CUDA/static/RSL 的历史 regression route，并以 current-HEAD Evidence 确认其状态。
+上述 Go2 参考路径曾用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。P2.0-B S3 已移除其 active implementation；Core 保留通用 RL/vectorization contracts 和 Static Physics runtime，但不再要求当前 develop 保留 Go2 专用回归任务。历史资格与限制不变。
 
 ## 7. Phase I 的明确非目标
 

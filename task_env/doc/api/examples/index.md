@@ -91,7 +91,6 @@ raw vector runtime 使用 multiprocessing `spawn` 和独立 Pipe；它不导入�
 - vector H5 聚合容器、异构 batch 和 multi-agent batch；
 - non-arm trajectory conversion；
 - RGB policy、`MultiInputPolicy` 训练和 reporter 联调；
-- 通用任务的 GPU device-resident observation/action 以及超出当前 contract smoke 的吞吐优化；只有显式声明
-  device hooks 的 private Go2 static bridge 已有固定 tick/autoreset smoke。
+- 通用任务的 GPU device-resident observation/action 以及超出当前 contract smoke 的吞吐优化；历史 Go2 device-hook smoke 随 Go2 路线一同退休，不构成当前通用任务的 device capability Evidence。
 
 这些能力不能从现有脚本命令的“可运行”推断为已实现。
