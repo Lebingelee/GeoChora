@@ -14,7 +14,7 @@ from task_env.trajectory.canonical.streaming import load_streaming
 def reexecute_selected(path, *, output):
     from task_env import make_env
     from task_env.tasks.reference_env import __file__ as adapter_file
-    from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID as PC
+    from task_env.tasks.pick_cube.task import REFERENCE_ENV_ID as PC
     from task_env.tasks.nut_assembly.reference_env import REFERENCE_ENV_ID as NA
     SELECTED_ENV_IDS = (PC, NA)
     with h5py.File(path, 'r') as handle:

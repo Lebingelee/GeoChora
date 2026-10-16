@@ -1,19 +1,15 @@
-"""Task-owned PickCube MJCF composition."""
+"""PickCube object geometry and provider-neutral asset preparation."""
 
 from __future__ import annotations
 
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from ...robots.panda import PANDA_ASSET_ROOT
+from ..robots.panda import PANDA_ASSET_ROOT
 
 
-TABLE_HALF_SIZE = (0.28, 0.20, 0.01)
-TABLE_TOP_Z = 0.462
 CUBE_HALF_SIZE = 0.025
 CUBE_CONTACT_MARGIN = 1.0e-3
-CUBE_WORLD_POS = (0.50, 0.0, TABLE_TOP_Z + CUBE_HALF_SIZE + CUBE_CONTACT_MARGIN)
-CUBE_WORLD_QUAT = (1.0, 0.0, 0.0, 0.0)
 CUBE_MASS = 0.08
 CUBE_DIAG_INERTIA = (3.5e-5, 3.5e-5, 3.5e-5)
 CUBE_FREEJOINT_DAMPING = 0.8
@@ -126,7 +122,7 @@ def _strengthen_panda_gripper_actuator(root: ET.Element) -> None:
     gripper.set("biasprm", f"0 {-GRIPPER_SERVO_STIFFNESS:g} {-GRIPPER_CLOSE_DAMPING:g}")
 
 
-def _add_tabletop(root: ET.Element) -> None:
+def _add_tabletop(root: ET.Element, *, half_size, top_z, center_xy) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
         raise KeyError("Panda MJCF does not contain worldbody")
@@ -138,7 +134,7 @@ def _add_tabletop(root: ET.Element) -> None:
         "body",
         {
             "name": "grasp_table",
-            "pos": f"0.5545 0 {TABLE_TOP_Z - TABLE_HALF_SIZE[2]}",
+            "pos": f"{center_xy[0]:g} {center_xy[1]:g} {top_z - half_size[2]:g}",
         },
     )
     ET.SubElement(
@@ -147,7 +143,7 @@ def _add_tabletop(root: ET.Element) -> None:
         {
             "name": "grasp_table_geom",
             "type": "box",
-            "size": "{} {} {}".format(*TABLE_HALF_SIZE),
+            "size": "{} {} {}".format(*half_size),
             "condim": "4",
             "friction": "1.2 0.25 0.02",
             "rgba": "0.34 0.39 0.42 1",
@@ -159,7 +155,7 @@ def _add_tabletop(root: ET.Element) -> None:
         {
             "name": "grasp_table_visual",
             "type": "box",
-            "size": "{} {} {}".format(*TABLE_HALF_SIZE),
+            "size": "{} {} {}".format(*half_size),
             "contype": "0",
             "conaffinity": "0",
             "group": "2",
@@ -169,7 +165,7 @@ def _add_tabletop(root: ET.Element) -> None:
     )
 
 
-def _add_cube(root: ET.Element) -> None:
+def _add_cube(root: ET.Element, *, world_pos, world_quat) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
         raise KeyError("Panda MJCF does not contain worldbody")
@@ -181,8 +177,8 @@ def _add_cube(root: ET.Element) -> None:
         "body",
         {
             "name": "PickCube",
-            "pos": "{} {} {}".format(*CUBE_WORLD_POS),
-            "quat": "{} {} {} {}".format(*CUBE_WORLD_QUAT),
+            "pos": "{} {} {}".format(*world_pos),
+            "quat": "{} {} {} {}".format(*world_quat),
         },
     )
     ET.SubElement(
@@ -309,20 +305,34 @@ def _increase_panda_gripper_collision_friction(root: ET.Element) -> None:
 
 
 class PickCubeSceneComposer:
-    """Build the task-owned PickCube source and solver scene model."""
+    """Prepare reusable PickCube/Panda assets for task-owned composition."""
 
     adapter_name = "task_env_pickcube_owned_builder_v1"
     source_label = "task-env-pick-cube"
 
-    def build_source_description(self):
-        from ...assembly.source import TaskSceneSource
+    def __init__(self, *, table_half_size, table_top_z, table_center_xy,
+                 cube_world_pos, cube_world_quat):
+        self.table_half_size = tuple(table_half_size)
+        self.table_top_z = float(table_top_z)
+        self.table_center_xy = tuple(table_center_xy)
+        self.cube_world_pos = tuple(cube_world_pos)
+        self.cube_world_quat = tuple(cube_world_quat)
 
-        xml, base_dir = build_pick_cube_model_xml()
+    def build_source_description(self):
+        from ..assembly.source import TaskSceneSource
+
+        xml, base_dir = build_pick_cube_model_xml(
+            table_half_size=self.table_half_size,
+            table_top_z=self.table_top_z,
+            table_center_xy=self.table_center_xy,
+            cube_world_pos=self.cube_world_pos,
+            cube_world_quat=self.cube_world_quat,
+        )
         return TaskSceneSource(xml, base_dir, self.source_label)
 
     def build_scene_source(self, composition, agents):
         # Compatibility for existing scalar compiler; conversion belongs to provider.
-        from ...runtime.sessions.geophys_source import native_scene_source
+        from ..runtime.sessions.geophys_source import native_scene_source
 
         return native_scene_source(self.build_source_description()), self.adapter_name
 
@@ -331,8 +341,9 @@ class PickCubeSceneComposer:
         return imported_scene.build_rigid_scene_model(use_imported_meshes=False)
 
 
-def build_pick_cube_model_xml() -> tuple[str, Path]:
-    """Build the task-owned PickCube MJCF string."""
+def build_pick_cube_model_xml(*, table_half_size, table_top_z, table_center_xy,
+                              cube_world_pos, cube_world_quat) -> tuple[str, Path]:
+    """Prepare an MJCF source from object assets and task composition values."""
 
     panda_xml = PANDA_ASSET_ROOT / "panda.xml"
     root = _load_xml(panda_xml)
@@ -342,8 +353,9 @@ def build_pick_cube_model_xml() -> tuple[str, Path]:
     _ensure_panda_hand_collision_proxies(root)
     _strengthen_panda_arm_actuators(root)
     _strengthen_panda_gripper_actuator(root)
-    _add_tabletop(root)
-    _add_cube(root)
+    _add_tabletop(root, half_size=table_half_size, top_z=table_top_z,
+                  center_xy=table_center_xy)
+    _add_cube(root, world_pos=cube_world_pos, world_quat=cube_world_quat)
     _ensure_positive_auxiliary_body_inertials(root)
     _enable_scene_collision_geoms(root)
     _increase_panda_gripper_collision_friction(root)
@@ -352,9 +364,9 @@ def build_pick_cube_model_xml() -> tuple[str, Path]:
 
 __all__ = [
     "CUBE_CONTACT_MARGIN",
+    "CUBE_DIAG_INERTIA",
     "CUBE_HALF_SIZE",
-    "CUBE_WORLD_POS",
-    "CUBE_WORLD_QUAT",
+    "CUBE_MASS",
     "EE_SITE_NAME",
     "PickCubeSceneComposer",
     "TABLE_TOP_Z",

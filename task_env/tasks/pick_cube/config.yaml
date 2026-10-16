@@ -1,0 +1,53 @@
+recipe:
+  construction_id: pickcube-p16-reference-construction-v2
+  task_uid: pick-cube-v1
+  reference_env_id: pick-cube-p16-reference-v1
+  artifact_id: pick-cube-v1/p1_6_experimental_100hz
+  artifact_version: ver_p1_6_experimental_100hz
+  control_hz: 100
+  physics_dt: 0.002
+  control_substeps: 5
+  control_dt: 0.01
+  scene_uid: tabletop-v1
+  agent_uids: [panda-v1]
+  object_uids: [cube-v1]
+  success_definition: cube_lifted_v1
+  scene:
+    table_half_size: [0.28, 0.20, 0.01]
+    table_top_z: 0.462
+    table_center_xy: [0.5545, 0.0]
+    initial_cube_position: [0.50, 0.0, 0.48800000000000004]
+    initial_cube_quaternion_wxyz: [1.0, 0.0, 0.0, 0.0]
+  reset:
+    center_xy: [0.5545, 0.0]
+    half_extent_m: 0.10
+    sampler_id: pick-cube-v1/uniform_xy
+    sampler_version: pcg64-v0
+  success:
+    lift_height_m: 0.10
+    reach_distance_m: 0.09
+    gripper_closed_opening_m: 0.045
+
+environment:
+  observation:
+    schema_version: task-env-state-v2
+    include_privileged_state: true
+  episode:
+    horizon: 1000
+  robot:
+    controller:
+      kind: absolute_pose
+      reference: world
+      rotation_representation: quaternion_wxyz
+  render:
+    backend: raytracer
+    width: 960
+    height: 720
+    parallel:
+      num: 256
+      columns: 16
+      cell_width: 1.0
+      cell_depth: 1.0
+      padding: 0.0
+    training:
+      every: 1

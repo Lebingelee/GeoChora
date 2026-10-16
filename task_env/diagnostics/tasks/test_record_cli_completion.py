@@ -22,6 +22,7 @@ def _env(*, task_kind='pick_cube', done=True, failed=False, task_success=True,
     )
     return SimpleNamespace(
         task_kind=task_kind,
+        binding=SimpleNamespace(recorder_mode='execution' if task_kind == 'nut_assembly' else 'canonical'),
         solution=solution,
         info={'is_success': task_success, 'task_metrics': {'task_success': task_success}},
     )

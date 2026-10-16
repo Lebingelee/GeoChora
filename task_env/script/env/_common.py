@@ -109,7 +109,7 @@ def run_single(
             if not env.action_space.contains(action):
                 raise ValueError("sampled action is outside the advertised action_space")
             observation, reward, terminated, truncated, info = (
-                env.step_expert() if getattr(env, 'task_kind', None) == 'nut_assembly' else env.step(action))
+                env.step(action) if env.binding.external_actions else env.step_expert())
             check_observation(observation, env.observation_space)
             if not np.isfinite(float(reward)):
                 raise ValueError("TaskEnv reward is not finite")

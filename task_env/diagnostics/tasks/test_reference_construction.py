@@ -9,10 +9,12 @@ import sys
 
 import pytest
 
-from task_env.artifacts import CanonicalStateView, PoseWorld
-from task_env.tasks.pick_cube import reference as pc
+from task_env.artifacts import CanonicalStateView, PoseWorld, TaskArtifact
 from task_env.tasks.nut_assembly import reference as na
-from task_env.tasks.pick_cube.canonical_semantics import evaluate as pc_evaluate
+from task_env.tasks.pick_cube.task import (
+    build_artifact as pc_build_artifact, build_reference as pc_build_reference,
+    evaluate as pc_evaluate, sample_reset as pc_sample_reset,
+)
 from task_env.tasks.nut_assembly.canonical_semantics import evaluate as na_evaluate
 from task_env.tasks.nut_assembly.canonical_reset import sample_reset as na_reset
 
@@ -35,31 +37,34 @@ def assert_source(value, expected, *, check_solution_identity=True):
         assert solution_identity == expected['solution_identity']
 
 
-def test_pickcube_exact_p16_identity_config_readiness_reset_and_legacy_caller():
-    value = pc.build_reference()
+def test_pickcube_minimal_task_preserves_p16_identity_config_readiness_and_reset():
+    value = pc_build_reference()
     old = BASELINE['pickcube']
-    assert_source(value, old)
-    assert {'artifact.py', 'definition.py', 'reference_config.py', 'reset_policy.py'} <= set(
-        value['resolved_configuration']['source_sha256']
-    )
-    assert not {'candidate.py', 'task.py'} & set(value['resolved_configuration']['source_sha256'])
+    assert isinstance(value['artifact'], TaskArtifact)
+    assert_source(value, old, check_solution_identity=False)
     assert value['artifact'].artifact_id == 'pick-cube-v1/p1_6_experimental_100hz'
     assert value['artifact'].artifact_version == 'ver_p1_6_experimental_100hz'
     assert value['controller'].identity == old['controller_identity']
     assert digest(asdict(value['readiness'])) == old['readiness_sha256']
+    assert value['solution'].version == 'pick-cube-p16-readiness-expert-v2'
+    solution_hash = hashlib.sha256((ROOT / 'task_env/tasks/pick_cube/solution.py').read_bytes()).hexdigest()
+    assert value['solution'].identity == digest({
+        'version': value['solution'].version, 'config': value['readiness'].identity,
+        'implementation_sha256': solution_hash,
+    })
+    source_hashes = value['resolved_configuration']['source_sha256']
+    assert source_hashes['task_env/tasks/pick_cube/task.py'] == hashlib.sha256(
+        (ROOT / 'task_env/tasks/pick_cube/task.py').read_bytes()).hexdigest()
+    assert source_hashes['task_env/tasks/pick_cube/solution.py'] == solution_hash
+    assert source_hashes['task_env/tasks/pick_cube/config.yaml'] == hashlib.sha256(
+        (ROOT / 'task_env/tasks/pick_cube/config.yaml').read_bytes()).hexdigest()
+    assert source_hashes['task_env/objects/pick_cube.py'] == hashlib.sha256(
+        (ROOT / 'task_env/objects/pick_cube.py').read_bytes()).hexdigest()
+    assert value['source_revision']
+    assert value['resolved_configuration']['task_recipe']['recipe']['control_hz'] == 100
     for seed, expected in old['resets'].items():
-        assert json.loads(json.dumps(pc.sample_reset(value['artifact'], int(seed)).to_mapping())) == expected
-    from task_env.tasks.pick_cube.timebase import build_timebase_candidate
-    from task_env.tasks.pick_cube.candidate import build_candidate
-    assert build_candidate().identity_hash == '461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e'
-    assert build_timebase_candidate('TB-100').identity_hash != value['artifact'].identity_hash
-    with pytest.raises(ValueError):
-        pc.sample_reset(build_timebase_candidate('TB-100'), 31)
-    from task_env.diagnostics.phase1.policy_search.timebase100 import context
-    _, artifact, source, config, controller, expert = context('cpu')
-    assert artifact == value['artifact'] and source.config == value['source'].config
-    assert config == value['readiness'] and controller.identity == value['controller'].identity
-    assert expert.identity == value['solution'].identity
+        assert json.loads(json.dumps(pc_sample_reset(value['artifact'], int(seed)).to_mapping())) == expected
+    assert pc_build_artifact() == value['artifact']
 
 
 @pytest.mark.parametrize('rate', [50, 100, 500])
@@ -144,7 +149,7 @@ def test_pickcube_lift_only_success_and_reward_independent_oracle():
     for lift, success in [(.09999, False), (.10001, True)]:
         current = state({'cube-v1': PoseWorld((.5, 0., rest + lift), (1., 0., 0., 0.)),
                          'panda-v1/ee': PoseWorld((.5, 0., 1.5), (1., 0., 0., 0.))}, .08)
-        result = pc_evaluate(current, pc.build_artifact().semantics)
+        result = pc_evaluate(current, pc_build_artifact().semantics)
         assert result.success is success
         assert result.metrics['grasped_cube'] is False
         assert result.reward_terms['grasp'] == 0.
@@ -187,13 +192,13 @@ def checked(self,*args,**kwargs):
  reads.append(str(self))
  return original(self,*args,**kwargs)
 Path.open=checked
-from task_env.tasks.pick_cube.reference import build_reference as pc
+from task_env.tasks.pick_cube.task import build_reference as pc
 from task_env.tasks.nut_assembly.reference import build_reference as na
 assert pc()['artifact'].identity_hash.startswith('fd5bc968')
 assert na(provider='geophys')['source'].config.robot.gripper.force_limit_N==10.
 assert na(provider='mujoco')['source'].config.robot.gripper.force_limit_N==10.
 assert not any(n.startswith('task_env.diagnostics') for n in sys.modules)
-assert 'task_env.tasks.pick_cube.task' not in sys.modules
+assert 'task_env.tasks.pick_cube.task' in sys.modules
 assert 'task_env.tasks.pick_cube.candidate' not in sys.modules
 assert 'task_env.tasks.nut_assembly.task' not in sys.modules
 assert 'task_env.tasks.nut_assembly.solution' not in sys.modules
@@ -205,32 +210,28 @@ assert 'task_env.tasks.nut_assembly.solution' not in sys.modules
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_task_owned_runner_selection_preserves_legacy_context_and_guard_admission():
-    # Import the retained runner only in this explicit compatibility test.
-    # It imports MuJoCo's observer module but does not create a native runtime.
-    from task_env.diagnostics.phase1.integration.lifecycle_full import (
-        context, _validate_cross_provider_contract, _CROSS_PROVIDER_CONTRACT_PATH,
-    )
-    contract = json.loads(_CROSS_PROVIDER_CONTRACT_PATH.read_text())
-    candidate = 'guarded-primary-readiness-alternative-8n-v2-v5-clearance'
-    for provider in ('geophys', 'mujoco'):
-        legacy = context(50, candidate, provider=provider)
-        assert_source(legacy, BASELINE['nutassembly'][f'{provider}_50'], check_solution_identity=False)
-        assert legacy['solution_identity'] == S2B1_IDENTITIES['nutassembly']['guarded_solution_identity']
-        for diagnostic in (False, True):
-            selected = context(100, candidate, provider=provider,
-                               construction_route='task-owned',
-                               diagnostic_observation=diagnostic)
-            if diagnostic:
-                _validate_cross_provider_contract(selected, contract)
-            else:
-                with pytest.raises(ValueError, match='solution_version'):
-                    _validate_cross_provider_contract(selected, contract)
-            assert selected['construction_id'] == (na.CONSTRUCTION_ID if diagnostic else na.OUTCOME_CONSTRUCTION_ID)
-            assert selected['diagnostic_shadow_mode'] is diagnostic
-            if diagnostic:
-                assert selected['solution_identity'] == legacy['solution_identity']
-            else:
-                assert selected['solution'].original_solution_identity == legacy['solution_identity']
-    with pytest.raises(ValueError, match='selected guarded'):
-        context(50, construction_route='task-owned')
+def test_pickcube_historical_modules_and_gym_entrypoint_are_explicitly_retired():
+    from importlib.util import find_spec
+    from task_env.diagnostics.historical_tasks import make_historical_env
+    task_dir = ROOT / 'task_env/tasks/pick_cube'
+    assert sorted(path.name for path in task_dir.iterdir() if path.is_file()) == [
+        '__init__.py', 'config.yaml', 'solution.py', 'task.py',
+    ]
+    for module in (
+        'task_env.tasks.pick_cube.artifact',
+        'task_env.tasks.pick_cube.assets',
+        'task_env.tasks.pick_cube.candidate',
+        'task_env.tasks.pick_cube.canonical_semantics',
+        'task_env.tasks.pick_cube.definition',
+        'task_env.tasks.pick_cube.reference',
+        'task_env.tasks.pick_cube.reference_config',
+        'task_env.tasks.pick_cube.reference_env',
+        'task_env.tasks.pick_cube.readiness_solution',
+        'task_env.tasks.pick_cube.reset',
+        'task_env.tasks.pick_cube.reset_policy',
+        'task_env.tasks.pick_cube.runtime_source',
+        'task_env.tasks.pick_cube.timebase',
+    ):
+        assert find_spec(module) is None
+    with pytest.raises(RuntimeError, match='restore the immutable v1.0.0 source'):
+        make_historical_env('pick-cube-v1')

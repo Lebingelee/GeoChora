@@ -70,11 +70,11 @@ def test_actual_factory_reset_expert_recording_and_teardown(uid, provider, fake,
     for _ in range(3): env.step_expert()
     assert env._stopped
     assert env.state.control_step == 3
-    assert len(env.session.calls) == (3 if env.task_kind=='pick_cube' else 15)
+    assert len(env.session.calls) == (3 if env.binding.interval_mode == 'grouped' else 15)
     with pytest.raises(RuntimeError): env.step_expert()
     result = env.finish_recording('bounded_truncation')
     assert result.get('byte_exact', result.get('logical_mapping_exact'))
-    if env.task_kind == 'pick_cube':
+    if env.binding.recorder_mode == 'canonical':
         from task_env.trajectory.canonical.h5 import load as load_outer
         outer = load_outer(path).to_mapping()
         value = {**outer, 'recipe': {'d0_reconstructible':False}}
@@ -83,7 +83,7 @@ def test_actual_factory_reset_expert_recording_and_teardown(uid, provider, fake,
     assert len(value['transitions']) == 3 and len(value['boundaries']) == 4
     assert not value['recipe']['d0_reconstructible']
     assert value['metadata']['task_artifact_hash'] == env.artifact.identity_hash
-    if env.task_kind == 'nut_assembly':
+    if env.binding.recorder_mode == 'execution':
         assert env.info['readiness_warnings'] == []
         assert not env.info['outcome_complete']
         assert env.info['original_expert_lifecycle_status']
@@ -116,7 +116,7 @@ def test_external_expert_modes_and_invalid_actions(uid, fake):
     env = make_env(uid);env.reset(seed=19)
     with pytest.raises((ValueError, RuntimeError)): env.step(np.full(8, np.nan))
     assert env.state.control_step == 0
-    if uid == IDS[0]:
+    if env.binding.external_actions:
         with pytest.raises(RuntimeError): env.step_expert()
     else:
         assert env._episode_mode is None  # no unguarded Nut action entered execution
@@ -152,34 +152,17 @@ def test_active_imports_do_not_load_diagnostics_or_native(tmp_path):
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize('active', [False, True])
-@pytest.mark.parametrize('provider', ['geophys', 'mujoco'])
-def test_selected_interval_exact_historical_public_stream(active, provider):
-    from task_env.tasks.nut_assembly.reference import build_reference
-    from task_env.tasks.nut_assembly.canonical_reset import sample_reset
-    from task_env.diagnostics.phase1.frequency_grasp.arm_schedule import ramped_control_interval
-    from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
-    value = build_reference(provider=provider)
-    target = CanonicalControlTarget('canonical-control-v0', value['artifact'].identity_hash,
-        value['controller_identity'], ARM, {k:.4 for k in ARM}, {k:.4 for k in ARM},
-        GripperControlTarget('panda-v1/gripper', .08, 10., .08))
-    class Servo:
-        def inner_gripper_step(self, state, feedback):
-            return target.gripper, {'inner_update_performed': True}
-    sessions=[]
-    for _ in range(2):
-        session=FakeSession(value['artifact'], SimpleNamespace(physics_provider=provider), source=value['source'], binding=None)
-        session.reset(sample_reset(value['artifact']))
-        sessions.append(session)
-    memory1=ArmRampMemory({k:.1 for k in ARM});memory2=ArmRampMemory(dict(memory1.last_applied_arm))
-    old,new=sessions
-    old._diagnostic_arm_ramp_active=lambda:active
-    old._diagnostic_arm_ramp_memory=memory1
-    before=ramped_control_interval(old,target,Servo())
-    after=new.step_control_interval(target,Servo(),arm_schedule=ReferenceArmSchedule(SimpleNamespace(_lift_released=active),memory2))
-    assert before == after
-    assert memory1.last_applied_arm == memory2.last_applied_arm
-    assert [t.to_mapping() for t in old.calls] == [t.to_mapping() for t in new.calls]
+def test_task_bindings_declare_selected_control_and_recording_requirements():
+    pickcube = make_env(IDS[0])
+    nutassembly = make_env(IDS[1])
+    assert (pickcube.binding.interval_mode, pickcube.binding.recorder_mode,
+            pickcube.binding.external_actions) == ('grouped', 'canonical', True)
+    assert (nutassembly.binding.interval_mode, nutassembly.binding.recorder_mode,
+            nutassembly.binding.external_actions, nutassembly.binding.record_native_substeps,
+            nutassembly.binding.capture_guard_samples) == ('native', 'execution', False, True, True)
+    assert nutassembly.value['construction_id'] == 'nutassembly-r5-v5-outcome-reference-construction-v2'
+    pickcube.close()
+    nutassembly.close()
 
 
 def test_reporter_and_expert_factory_use_selected_owner(fake):

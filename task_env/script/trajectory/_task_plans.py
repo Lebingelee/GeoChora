@@ -183,7 +183,7 @@ def _build_plan(env_id, backend, horizon, *, camera_obs=False, force_limit_N=Non
     if camera_obs or force_limit_N is not None or backend != 'cpu':
         raise ValueError('selected reference uses fixed CPU state-only control configuration')
     if env_id == SELECTED_ENV_IDS[0]:
-        from task_env.tasks.pick_cube.reference import build_reference
+        from task_env.tasks.pick_cube.task import build_reference
         value = build_reference()
     else:
         from task_env.tasks.nut_assembly.reference import build_reference

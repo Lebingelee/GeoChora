@@ -7,8 +7,10 @@ Rendering/camera probes and legacy H5 replay use this boundary deliberately.
 def make_historical_env(uid, *, config=None, render_mode=None, **kwargs):
     from task_env.environment.configuration import resolve_task_env_config
     if uid == 'pick-cube-v1':
-        from task_env.tasks.pick_cube.task import PickCubeEnv
-        cls = PickCubeEnv
+        raise RuntimeError(
+            'historical PickCube TaskEnv was retired from current develop; '
+            'restore the immutable v1.0.0 source for historical execution'
+        )
     elif uid == 'nut-assembly-square-v1':
         from task_env.tasks.nut_assembly.task import NutAssemblyEnv
         cls = NutAssemblyEnv

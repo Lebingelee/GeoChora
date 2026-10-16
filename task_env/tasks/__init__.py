@@ -4,7 +4,7 @@ from .base import BaseTaskEnv
 from .empty import EmptyTaskEnv
 from .nut_assembly.reference_env import NutAssemblyReferenceEnv
 from .pendulum import PendulumEnv
-from .pick_cube.reference_env import PickCubeReferenceEnv
+from .pick_cube.task import PickCubeReferenceEnv
 from .two_wheel_balance import TwoWheelBalanceEnv
 from .go2_walk import Go2WalkEnv
 from .go2_walk_deploy import Go2WalkDeployEnv, Go2WalkDeployHeightEnv

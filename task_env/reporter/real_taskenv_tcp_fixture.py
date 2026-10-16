@@ -6,7 +6,7 @@ import argparse
 
 from task_env import make_env
 from task_env.reporter import ReporterDisconnected, ReporterSession, TcpReporterTransport
-from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID
+from task_env.tasks.pick_cube.task import REFERENCE_ENV_ID
 from task_env.utils.runtime_support import get_task_env_logger
 
 

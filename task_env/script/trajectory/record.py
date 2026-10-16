@@ -28,7 +28,7 @@ def _completion_result(env, *, terminated=False, truncated=False):
         reason = 'selected_policy_incomplete'
     elif not result['task_success']:
         reason = 'task_success_false'
-    elif env.task_kind == 'nut_assembly':
+    elif env.binding.recorder_mode == 'execution':
         outcome = solution.outcome_report()
         result['planned_trajectory_completed'] = bool(outcome.get('planned_trajectory_completed'))
         result['outcome_complete'] = bool(outcome.get('outcome_complete'))
