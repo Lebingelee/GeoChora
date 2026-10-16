@@ -110,8 +110,8 @@ def collect(args: argparse.Namespace) -> None:
 def reset_smoke(args: argparse.Namespace) -> None:
     """Prove that repeated TaskEnv resets do not alter PickCube outcomes."""
 
-    from task_env import make_env
-    from task_env.script.recorder import _build_plan
+    from task_env.diagnostics.historical_tasks import make_historical_env as make_env
+    from task_env.script.trajectory._task_plans import _historical_build_plan as _build_plan
 
     config, _ = _build_plan(
         args.env_id,

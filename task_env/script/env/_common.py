@@ -46,8 +46,8 @@ def _observation_leaf_shapes(value: Any, path: str = "") -> dict[str, dict[str, 
 
 
 def inline_config(env_id: str, backend: str, horizon: int) -> dict[str, Any]:
-    if env_id == "pick-cube-v1":
-        return pick_cube_config(backend=backend, horizon=horizon)
+    if env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
+        return {'provider': 'geophys', 'backend': backend, 'horizon': horizon}
     return {
         "runtime": {"backend": backend, "broadphase": "n2", "prewarm": False},
         "episode": {"horizon": horizon},
@@ -63,6 +63,9 @@ def public_config(
     """Resolve inline example defaults followed by the user YAML mapping."""
 
     values = deep_merge(inline_config(env_id, backend, horizon), load_yaml_mapping(config_path))
+    if env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}:
+        values['backend'] = backend
+        return values
     runtime = dict(values.get("runtime", {}))
     runtime["backend"] = backend
     values["runtime"] = runtime
@@ -83,7 +86,8 @@ def run_single(
     logger = get_logger(f"task-env-stage14-{summary_name}")
 
     def create(backend: str):
-        values = deep_merge(config, {"runtime": {"backend": backend}})
+        selected = env_id in {'pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1'}
+        values = dict(config, backend=backend) if selected else deep_merge(config, {'runtime': {'backend': backend}})
         return make_env(env_id, config=values)
 
     backend, env = with_backend_fallback(
@@ -100,10 +104,12 @@ def run_single(
             # Stage 13 exposes structured action spaces (for example,
             # ``{"torque": Box(...)}``) on the public boundary.  Keep the
             # sampled tree intact instead of assuming every space is a Box.
-            action = env.action_space.sample()
+            action = (np.array([*observation['state']['ee_pose'], 1.], dtype=np.float64)
+                      if hasattr(env, 'step_expert') else env.action_space.sample())
             if not env.action_space.contains(action):
                 raise ValueError("sampled action is outside the advertised action_space")
-            observation, reward, terminated, truncated, info = env.step(action)
+            observation, reward, terminated, truncated, info = (
+                env.step_expert() if getattr(env, 'task_kind', None) == 'nut_assembly' else env.step(action))
             check_observation(observation, env.observation_space)
             if not np.isfinite(float(reward)):
                 raise ValueError("TaskEnv reward is not finite")
@@ -115,7 +121,7 @@ def run_single(
                     "truncated": bool(truncated),
                 }
             )
-            if terminated or truncated:
+            if terminated or truncated or getattr(env, '_stopped', False):
                 break
         summary = {
             "env_id": env_id,
@@ -124,7 +130,7 @@ def run_single(
             "steps_requested": steps,
             "steps_completed": len(rows),
             "rows": rows,
-            "resolved": resolved_config_summary(env),
+            "resolved": (env.value['resolved_configuration'] if hasattr(env, 'step_expert') else resolved_config_summary(env)),
             "final_info": json_compatible(info),
         }
         output = stage14_output("env", summary_name, "summary.json")

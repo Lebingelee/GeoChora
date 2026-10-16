@@ -1,0 +1,3155 @@
+{
+  "schema": "geochora-s2-b-task-deletion-manifest-v1",
+  "baseline": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+  "status": "REVIEW_REQUIRED_NO_DELETION_AUTHORIZED",
+  "selected_roots": [
+    "task_env/tasks/pick_cube/reference_env.py",
+    "task_env/tasks/nut_assembly/reference_env.py",
+    "task_env/trajectory/reference_replay.py"
+  ],
+  "method": "All tracked + new first-party Python AST imports; explicit builder source-fingerprint files and tracked task data. Literal module/path references include frozen docs. File-level edges include imports inside historical functions and are conservative, not proof of execution. No indexing/rebuilding or external/dynamic completeness claim.",
+  "active_graph": {
+    "task_env/tasks/nut_assembly/__init__.py": [
+      "task_env/tasks/nut_assembly/reference.py"
+    ],
+    "task_env/tasks/nut_assembly/assets.py": [
+      "task_env/objects/nut_assembly.py",
+      "task_env/robots/panda.py"
+    ],
+    "task_env/tasks/nut_assembly/canonical_artifact.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/controllers/canonical/kinematics.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/tasks/nut_assembly/canonical_semantics.py"
+    ],
+    "task_env/tasks/nut_assembly/canonical_initialization.json": [],
+    "task_env/tasks/nut_assembly/canonical_reset.py": [
+      "task_env/artifacts/execution.py",
+      "task_env/tasks/nut_assembly/canonical_artifact.py"
+    ],
+    "task_env/tasks/nut_assembly/canonical_semantics.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/environment/__init__.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/canonical_solution.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/planners/__init__.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/tasks/nut_assembly/solution.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/canonical_solution_v2.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/tasks/canonical_solution_lifecycle.py",
+      "task_env/tasks/nut_assembly/canonical_solution.py",
+      "task_env/tasks/nut_assembly/stable_grasp_candidate.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/canonical_source.py": [
+      "task_env/assembly/source.py",
+      "task_env/environment/__init__.py",
+      "task_env/environment/configuration.py",
+      "task_env/registry.py",
+      "task_env/runtime/sessions/source.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/tasks/nut_assembly/canonical_artifact.py",
+      "task_env/tasks/nut_assembly/task.py"
+    ],
+    "task_env/tasks/nut_assembly/clearance_candidate_v3.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/clearance_candidate_v5.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/tasks/nut_assembly/clearance_candidate_v3.py"
+    ],
+    "task_env/tasks/nut_assembly/default.yaml": [],
+    "task_env/tasks/nut_assembly/guarded_authorization_candidate.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/tasks/guarded_transition.py",
+      "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py": [
+      "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
+      "task_env/tasks/nut_assembly/guarded_authorization_candidate.py"
+    ],
+    "task_env/tasks/nut_assembly/outcome_solution.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/profiles/mujoco-noslip2-v1.json": [],
+    "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json": [],
+    "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json": [],
+    "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json": [],
+    "task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml": [],
+    "task_env/tasks/nut_assembly/reference.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/controllers/canonical/execution.py",
+      "task_env/controllers/canonical/production_r3.py",
+      "task_env/tasks/nut_assembly/canonical_artifact.py",
+      "task_env/tasks/nut_assembly/canonical_solution.py",
+      "task_env/tasks/nut_assembly/canonical_source.py",
+      "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+      "task_env/tasks/nut_assembly/outcome_solution.py",
+      "task_env/tasks/nut_assembly/reference_execution.py"
+    ],
+    "task_env/tasks/nut_assembly/reference_env.py": [
+      "task_env/registry.py",
+      "task_env/tasks/nut_assembly/canonical_reset.py",
+      "task_env/tasks/nut_assembly/reference.py",
+      "task_env/tasks/reference_env.py"
+    ],
+    "task_env/tasks/nut_assembly/reference_execution.py": [
+      "task_env/controllers/canonical/gripper_execution.py"
+    ],
+    "task_env/tasks/nut_assembly/solution.py": [
+      "task_env/planners/__init__.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/stable_grasp_candidate.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/controllers/canonical/execution.py",
+      "task_env/tasks/nut_assembly/canonical_solution.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/nut_assembly/task.py": [
+      "task_env/assembly/__init__.py",
+      "task_env/environment/__init__.py",
+      "task_env/environment/task_definition.py",
+      "task_env/registry.py",
+      "task_env/tasks/base.py",
+      "task_env/tasks/nut_assembly/assets.py",
+      "task_env/utils/rotation/__init__.py"
+    ],
+    "task_env/tasks/pick_cube/__init__.py": [
+      "task_env/tasks/pick_cube/readiness_solution.py",
+      "task_env/tasks/pick_cube/reference.py"
+    ],
+    "task_env/tasks/pick_cube/assets.py": [
+      "task_env/assembly/source.py",
+      "task_env/robots/panda.py",
+      "task_env/runtime/sessions/geophys_source.py"
+    ],
+    "task_env/tasks/pick_cube/candidate.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/environment/configuration.py",
+      "task_env/robots/panda.py",
+      "task_env/tasks/pick_cube/assets.py",
+      "task_env/tasks/pick_cube/canonical_semantics.py",
+      "task_env/tasks/pick_cube/task.py"
+    ],
+    "task_env/tasks/pick_cube/canonical_semantics.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/environment/__init__.py",
+      "task_env/tasks/pick_cube/assets.py",
+      "task_env/tasks/pick_cube/task.py"
+    ],
+    "task_env/tasks/pick_cube/default.yaml": [],
+    "task_env/tasks/pick_cube/readiness_solution.py": [
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/planners/__init__.py",
+      "task_env/planners/completion.py",
+      "task_env/tasks/pick_cube/solution.py"
+    ],
+    "task_env/tasks/pick_cube/reference.py": [
+      "task_env/artifacts/execution.py",
+      "task_env/controllers/canonical/__init__.py",
+      "task_env/tasks/pick_cube/candidate.py",
+      "task_env/tasks/pick_cube/readiness_solution.py",
+      "task_env/tasks/pick_cube/reset.py",
+      "task_env/tasks/pick_cube/runtime_source.py"
+    ],
+    "task_env/tasks/pick_cube/reference_env.py": [
+      "task_env/registry.py",
+      "task_env/tasks/pick_cube/reference.py",
+      "task_env/tasks/reference_env.py"
+    ],
+    "task_env/tasks/pick_cube/reset.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/artifacts/execution.py",
+      "task_env/tasks/pick_cube/timebase.py"
+    ],
+    "task_env/tasks/pick_cube/runtime_source.py": [
+      "task_env/environment/__init__.py",
+      "task_env/environment/configuration.py",
+      "task_env/registry.py",
+      "task_env/runtime/sessions/source.py",
+      "task_env/tasks/pick_cube/assets.py",
+      "task_env/tasks/pick_cube/task.py",
+      "task_env/tasks/pick_cube/timebase.py"
+    ],
+    "task_env/tasks/pick_cube/solution.py": [
+      "task_env/planners/__init__.py",
+      "task_env/tasks/pick_cube/assets.py"
+    ],
+    "task_env/tasks/pick_cube/task.py": [
+      "task_env/assembly/__init__.py",
+      "task_env/environment/__init__.py",
+      "task_env/environment/task_definition.py",
+      "task_env/registry.py",
+      "task_env/tasks/base.py",
+      "task_env/tasks/pick_cube/assets.py"
+    ],
+    "task_env/tasks/pick_cube/timebase.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/tasks/pick_cube/candidate.py"
+    ],
+    "task_env/tasks/reference_env.py": [
+      "task_env/artifacts/__init__.py",
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/environment/protocols.py",
+      "task_env/planners/completion.py",
+      "task_env/runtime/sessions/__init__.py",
+      "task_env/runtime/sessions/api.py",
+      "task_env/runtime/sessions/common.py",
+      "task_env/runtime/sessions/control.py",
+      "task_env/runtime/sessions/provenance.py",
+      "task_env/tasks/nut_assembly/canonical_semantics.py",
+      "task_env/tasks/nut_assembly/reference_execution.py",
+      "task_env/tasks/pick_cube/canonical_semantics.py",
+      "task_env/trajectory/canonical/contracts.py",
+      "task_env/trajectory/canonical/execution.py",
+      "task_env/trajectory/canonical/h5.py",
+      "task_env/trajectory/canonical/streaming.py"
+    ],
+    "task_env/trajectory/reference_replay.py": [
+      "task_env/__init__.py",
+      "task_env/controllers/canonical/contracts.py",
+      "task_env/runtime/sessions/__init__.py",
+      "task_env/runtime/sessions/common.py",
+      "task_env/tasks/nut_assembly/reference_env.py",
+      "task_env/tasks/pick_cube/reference_env.py",
+      "task_env/tasks/reference_env.py",
+      "task_env/trajectory/canonical/h5.py",
+      "task_env/trajectory/canonical/streaming.py"
+    ]
+  },
+  "s2_b_exact_candidate_files": [
+    "task_env/tasks/nut_assembly/clearance_candidate_v4.py",
+    "task_env/tasks/nut_assembly/stable_grasp_reference.py"
+  ],
+  "whole_file_deletion_blocked": [
+    "task_env/tasks/nut_assembly/__init__.py",
+    "task_env/tasks/nut_assembly/assets.py",
+    "task_env/tasks/nut_assembly/canonical_artifact.py",
+    "task_env/tasks/nut_assembly/canonical_initialization.json",
+    "task_env/tasks/nut_assembly/canonical_reset.py",
+    "task_env/tasks/nut_assembly/canonical_semantics.py",
+    "task_env/tasks/nut_assembly/canonical_solution.py",
+    "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+    "task_env/tasks/nut_assembly/canonical_source.py",
+    "task_env/tasks/nut_assembly/clearance_candidate_v3.py",
+    "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
+    "task_env/tasks/nut_assembly/default.yaml",
+    "task_env/tasks/nut_assembly/guarded_authorization_candidate.py",
+    "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+    "task_env/tasks/nut_assembly/outcome_solution.py",
+    "task_env/tasks/nut_assembly/profiles/mujoco-noslip2-v1.json",
+    "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json",
+    "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json",
+    "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json",
+    "task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml",
+    "task_env/tasks/nut_assembly/reference.py",
+    "task_env/tasks/nut_assembly/reference_env.py",
+    "task_env/tasks/nut_assembly/reference_execution.py",
+    "task_env/tasks/nut_assembly/solution.py",
+    "task_env/tasks/nut_assembly/stable_grasp_candidate.py",
+    "task_env/tasks/nut_assembly/task.py",
+    "task_env/tasks/pick_cube/__init__.py",
+    "task_env/tasks/pick_cube/assets.py",
+    "task_env/tasks/pick_cube/candidate.py",
+    "task_env/tasks/pick_cube/canonical_semantics.py",
+    "task_env/tasks/pick_cube/default.yaml",
+    "task_env/tasks/pick_cube/readiness_solution.py",
+    "task_env/tasks/pick_cube/reference.py",
+    "task_env/tasks/pick_cube/reference_env.py",
+    "task_env/tasks/pick_cube/reset.py",
+    "task_env/tasks/pick_cube/runtime_source.py",
+    "task_env/tasks/pick_cube/solution.py",
+    "task_env/tasks/pick_cube/task.py",
+    "task_env/tasks/pick_cube/timebase.py"
+  ],
+  "legacy_symbols_blocked_inside_active_files": {
+    "task_env/tasks/pick_cube/task.py": [
+      "PickCubeEnv",
+      "PickCubeTaskDefinition (spec/constants still imported)"
+    ],
+    "task_env/tasks/nut_assembly/task.py": [
+      "NutAssemblyEnv",
+      "NutAssemblyTaskDefinition",
+      "reset/geometry helpers used by selected assets/source"
+    ],
+    "task_env/tasks/pick_cube/solution.py": [
+      "legacy PickCubeSolution API (selected readiness inherits plans/config)"
+    ],
+    "task_env/tasks/nut_assembly/solution.py": [
+      "legacy NutAssemblySolution API (_yaw helper remains selected dependency)"
+    ],
+    "task_env/script/trajectory/_task_plans.py": [
+      "_historical_build_plan",
+      "_nut_assembly_config",
+      "_pick_cube_config (explicit historical grouped and stage11 recovery only)"
+    ]
+  },
+  "generic_contracts_and_go2": "KEEP_OUT_OF_SCOPE: no Batch/Device/Learner, Go2/static physics retirement",
+  "global_deletion_prerequisites": [
+    "Maintainer S2-B approval of exact paths and symbols",
+    "Full current selected-adapter 100Hz named CPU trajectory regressions on both providers before deletion",
+    "Extract required selected base plans/config/yaw/spec/helpers coherently with old/new source identity mapping; no obsolete copy",
+    "Decide historical caller/test archival, verify recovery blobs (v1.0.0 or immutable S1/S1.6 commits), keep frozen evidence byte-identical",
+    "Version compatibility and external consumer migration decision before v1.0.1 freeze",
+    "No new SATA/ATA/I/O errors; independent backup limitation remains"
+  ],
+  "files": [
+    {
+      "path": "task_env/tasks/nut_assembly/README.md",
+      "sha256": "64723e35f256c0c2a96215f528de203a621e75aade6aada94103c8d044a83946",
+      "baseline_blob": "16e897af2ea34cc624699f1ecad333d0ac3c993b",
+      "v1_0_0_blob": "ad7148a15f207670d262b048c4e08b5e807a7856",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "ad7148a15f207670d262b048c4e08b5e807a7856"
+      },
+      "disposition": "KEEP_CURRENT_DOCUMENTATION",
+      "delete_now": false,
+      "active_closure": false,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/maintenance/v1.0-post-release-cleanup/documentation_audit.md",
+          "line": 22,
+          "text": "- `task_env/tasks/nut_assembly/README.md` appends a v1.0 status section and"
+        },
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 126,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/README.md\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 733,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/README.md\","
+        }
+      ],
+      "deletion_blockers": []
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/__init__.py",
+      "sha256": "d37cacd8fc587ea3750b5a857c4a12cee405d0d0be4614a650bd11f0562b82b9",
+      "baseline_blob": "7c6c29b1bbaec485a56d78b0e882c0087efded84",
+      "v1_0_0_blob": "7c6c29b1bbaec485a56d78b0e882c0087efded84",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "7c6c29b1bbaec485a56d78b0e882c0087efded84"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/frequency_grasp/run.py",
+          "line": 16,
+          "import": "from ....tasks.nut_assembly import canonical_artifact"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/loaded_episode.py",
+          "line": 26,
+          "import": "from ....tasks.nut_assembly import canonical_solution, stable_grasp_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/stable_grasp.py",
+          "line": 10,
+          "import": "from ....tasks.nut_assembly import stable_grasp_candidate, stable_grasp_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 14,
+          "import": "from task_env.tasks.nut_assembly import reference as na"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_active_reference_construction.md",
+          "line": 22,
+          "text": "from task_env.tasks.nut_assembly.reference import ("
+        },
+        {
+          "path": "docs/module/task_env/p2_0_nutassembly_outcome_completion.md",
+          "line": 7,
+          "text": "`task_env.tasks.nut_assembly.reference.build_reference(rate_hz=100, provider=...)` 默认选择 `nutassembly-outcome-oriented-completion-v1`，construction ID=`nutassembly-r5-v5-outcome-reference-construction-v2`；Solution owner为 `NutAssemblyOutcomeSo"
+        },
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 131,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/__init__.py\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 740,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/__init__.py\","
+        },
+        {
+          "path": "task_env/diagnostics/historical_tasks.py",
+          "line": 13,
+          "text": "from task_env.tasks.nut_assembly.task import NutAssemblyEnv"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 446,
+          "text": "recipe.update(factory=\"task_env.tasks.nut_assembly.reference.build_reference\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 128,
+          "text": "from task_env.tasks.nut_assembly.clearance_candidate_v5 import ("
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 131,
+          "text": "from task_env.tasks.nut_assembly.guarded_authorization_candidate import ("
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 134,
+          "text": "from task_env.tasks.nut_assembly.guarded_authorization_candidate_v2 import ("
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 31,
+          "text": "from task_env.tasks.nut_assembly.canonical_solution import ("
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 35,
+          "text": "from task_env.tasks.nut_assembly.canonical_solution_v2 import NutAssemblyCanonicalSolutionV2"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 10,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference, GUARDED_EXPERT, OUTCOME_COMPLETION"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 11,
+          "text": "from task_env.tasks.nut_assembly.outcome_solution import NutAssemblyOutcomeSolutionV1"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 12,
+          "text": "from task_env.tasks.nut_assembly.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 14,
+          "text": "from task_env.tasks.nut_assembly import reference as na"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 16,
+          "text": "from task_env.tasks.nut_assembly.canonical_semantics import evaluate as na_evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 17,
+          "text": "from task_env.tasks.nut_assembly.canonical_reset import sample_reset as na_reset"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 152,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference as na"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 15,
+          "text": "from task_env.tasks.nut_assembly.reference_execution import ReferenceArmSchedule, ArmRampMemory"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 130,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 158,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 159,
+          "text": "from task_env.tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/doc/api/planning/task_owned_solutions.md",
+          "line": 3,
+          "text": "**Import path**：`task_env.solutions`、`task_env.tasks.pick_cube`、`task_env.tasks.nut_assembly`"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 142,
+          "text": "from task_env.tasks.nut_assembly.solution import NutAssemblySolution"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 189,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json",
+          "line": 18,
+          "text": "\"module\": \"task_env.tasks.nut_assembly.stable_grasp_candidate\","
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 18,
+          "text": "from task_env.tasks.nut_assembly.reference_env import REFERENCE_ENV_ID as NA"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/assets.py",
+      "sha256": "cfd605246ba3ea55b02cb601fea6457dbe5f6c29d9b8f46616dd47eee9101379",
+      "baseline_blob": "d79280d15646a72036f965d14ca738e45f239bfe",
+      "v1_0_0_blob": "d79280d15646a72036f965d14ca738e45f239bfe",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "d79280d15646a72036f965d14ca738e45f239bfe"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_dynamic_recovery/tracking_worker.py",
+          "line": 16,
+          "import": "from ....tasks.nut_assembly.assets import TABLE_TOP_Z"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/common.py",
+          "line": 10,
+          "import": "from ....tasks.nut_assembly.assets import (\n    NUTASSEMBLY_NOMINAL_V1_ID,\n    NUTASSEMBLY_NOMINAL_V1_MASS,\n    NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA,\n)"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_r5_architecture/tracking_worker.py",
+          "line": 18,
+          "import": "from ....tasks.nut_assembly.assets import ARM_FORCE_RANGE, TABLE_TOP_Z"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_artifact.py",
+          "line": 9,
+          "import": "from .assets import (NUT_MASS, NUT_DIAG_INERTIA, NUTASSEMBLY_NOMINAL_V1_ID,\n    NUTASSEMBLY_NOMINAL_V1_MASS, NUTASSEMBLY_NOMINAL_V1_DIAG_INERTIA,\n    PEG_HALF_HEIGHT, TABLE_TOP_Z)"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_semantics.py",
+          "line": 8,
+          "import": "from .assets import NUT_HALF_HEIGHT, NUT_CONTACT_MARGIN, NUT_HANDLE_LOCAL_X, PEG_HALF_HEIGHT, TABLE_TOP_Z"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_solution.py",
+          "line": 14,
+          "import": "from .assets import PEG_HALF_HEIGHT, NUT_HALF_HEIGHT, NUT_CONTACT_MARGIN, TABLE_TOP_Z"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_source.py",
+          "line": 9,
+          "import": "from .assets import build_nut_assembly_model_xml, EE_SITE_NAME, NUTASSEMBLY_NOMINAL_V1_ID"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/clearance_candidate_v3.py",
+          "line": 20,
+          "import": "from .assets import NUT_HANDLE_LOCAL_X"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/solution.py",
+          "line": 22,
+          "import": "from .assets import NUT_CONTACT_MARGIN, NUT_HALF_HEIGHT, PEG_HALF_HEIGHT, TABLE_TOP_Z"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/task.py",
+          "line": 17,
+          "import": "from .assets import (\n    NUT_CONTACT_MARGIN,\n    NUT_HALF_HEIGHT,\n    NUT_HANDLE_LOCAL_X,\n    PEG_HALF_HEIGHT,\n    PEG_X,\n    PEG_Y_OFFSET,\n    PEG_Z,\n    TABLE_TOP_Z,\n)"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/task.py",
+          "line": 336,
+          "import": "from .assets import NutAssemblySceneComposer"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/regression_results.json",
+          "line": 15,
+          "text": "\"unchanged:task_env/tasks/nut_assembly/assets.py\": true,"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 747,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/assets.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/regression.py",
+          "line": 71,
+          "text": "'task_env/tasks/nut_assembly/canonical_solution.py','task_env/tasks/nut_assembly/assets.py',"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 31,
+          "text": "\"task_env/tasks/nut_assembly/assets.py\","
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json",
+          "line": 11,
+          "text": "\"geometry_source\": \"task_env/tasks/nut_assembly/assets.py + pinned Panda/Nut assets\","
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json",
+          "line": 11,
+          "text": "\"geometry_source\": \"task_env/tasks/nut_assembly/assets.py + pinned Panda/Nut assets\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_artifact.py",
+      "sha256": "11dc9338e73f6fb830cbcfe1e48dd21e0d2fbace97b41490ed6e276728f0aac2",
+      "baseline_blob": "e47cbac20e1654529c485247b8f08f86c76ca1b4",
+      "v1_0_0_blob": "e47cbac20e1654529c485247b8f08f86c76ca1b4",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "e47cbac20e1654529c485247b8f08f86c76ca1b4"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/frequency_grasp/run.py",
+          "line": 16,
+          "import": "from ....tasks.nut_assembly import canonical_artifact"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/common.py",
+          "line": 7,
+          "import": "from ....tasks.nut_assembly.canonical_artifact import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/common.py",
+          "line": 15,
+          "import": "from ....tasks.nut_assembly.canonical_artifact import build_nominal_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+          "line": 10,
+          "import": "from ....tasks.nut_assembly.canonical_artifact import build_candidate"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_reset.py",
+          "line": 3,
+          "import": "from .canonical_artifact import require_family"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_source.py",
+          "line": 10,
+          "import": "from .canonical_artifact import require_family"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference.py",
+          "line": 18,
+          "import": "from .canonical_artifact import build_nominal_candidate"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 754,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/canonical_artifact.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 32,
+          "text": "\"task_env/tasks/nut_assembly/canonical_artifact.py\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_initialization.json",
+      "sha256": "afb93f07f40d808aa21a1495449145e5e768b09cd0d5344e642bfce8000f1954",
+      "baseline_blob": "6f9fa6debb5a391ee50b32da9b39487ddf99f66a",
+      "v1_0_0_blob": "6f9fa6debb5a391ee50b32da9b39487ddf99f66a",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "6f9fa6debb5a391ee50b32da9b39487ddf99f66a"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 761,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/canonical_initialization.json\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 33,
+          "text": "\"task_env/tasks/nut_assembly/canonical_initialization.json\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_reset.py",
+      "sha256": "22515797ad42cc93e58fe2bdd6a2c2774f13791e675b781f4604a91827b6128e",
+      "baseline_blob": "f1f7fae69a50ebe7d61f625e62243b6b07de933f",
+      "v1_0_0_blob": "f1f7fae69a50ebe7d61f625e62243b6b07de933f",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "f1f7fae69a50ebe7d61f625e62243b6b07de933f"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/checkpoint_validation.py",
+          "line": 16,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/readiness_synthetic.py",
+          "line": 18,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/worker.py",
+          "line": 12,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_dynamic_recovery/tracking_worker.py",
+          "line": 17,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 21,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/worker.py",
+          "line": 17,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_r5_architecture/tracking_worker.py",
+          "line": 19,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+          "line": 12,
+          "import": "from ....tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 17,
+          "import": "from task_env.tasks.nut_assembly.canonical_reset import sample_reset as na_reset"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 159,
+          "import": "from task_env.tasks.nut_assembly.canonical_reset import sample_reset"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference_env.py",
+          "line": 5,
+          "import": "from .canonical_reset import sample_reset"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 768,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/canonical_reset.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 35,
+          "text": "\"task_env/tasks/nut_assembly/canonical_reset.py\","
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 17,
+          "text": "from task_env.tasks.nut_assembly.canonical_reset import sample_reset as na_reset"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 159,
+          "text": "from task_env.tasks.nut_assembly.canonical_reset import sample_reset"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_semantics.py",
+      "sha256": "0ae45a7b5712f0c175cfc9b2e0c6fe38995a70ed96f43630005352830e002bd6",
+      "baseline_blob": "e13ef1523876514663bbf6182e3550c490f32fc6",
+      "v1_0_0_blob": "e13ef1523876514663bbf6182e3550c490f32fc6",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "e13ef1523876514663bbf6182e3550c490f32fc6"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/common.py",
+          "line": 9,
+          "import": "from ....tasks.nut_assembly.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 12,
+          "import": "from task_env.tasks.nut_assembly.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 16,
+          "import": "from task_env.tasks.nut_assembly.canonical_semantics import evaluate as na_evaluate"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_artifact.py",
+          "line": 8,
+          "import": "from .canonical_semantics import semantic_definition, EEF"
+        },
+        {
+          "path": "task_env/tasks/reference_env.py",
+          "line": 121,
+          "import": "from .nut_assembly.canonical_semantics import evaluate"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 775,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/canonical_semantics.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 36,
+          "text": "\"task_env/tasks/nut_assembly/canonical_semantics.py\","
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 12,
+          "text": "from task_env.tasks.nut_assembly.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 16,
+          "text": "from task_env.tasks.nut_assembly.canonical_semantics import evaluate as na_evaluate"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_solution.py",
+      "sha256": "3cf29500282a682eef539db30412202370b119de22905843156925889c97799f",
+      "baseline_blob": "c441fa6cf995d2a8e89cd8153ff08d2b577d73cc",
+      "v1_0_0_blob": "c441fa6cf995d2a8e89cd8153ff08d2b577d73cc",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "c441fa6cf995d2a8e89cd8153ff08d2b577d73cc"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/loaded_episode.py",
+          "line": 26,
+          "import": "from ....tasks.nut_assembly import canonical_solution, stable_grasp_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 31,
+          "import": "from task_env.tasks.nut_assembly.canonical_solution import (\n    CanonicalNutAssemblyConfig,\n    NutAssemblyCanonicalSolutionV1,\n)"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/common.py",
+          "line": 17,
+          "import": "from ....tasks.nut_assembly.canonical_solution import (\n    CanonicalNutAssemblyConfig,\n    NutAssemblyCanonicalSolutionV1,\n)"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/campaign.py",
+          "line": 6,
+          "import": "from ....tasks.nut_assembly.canonical_solution import CanonicalNutAssemblyConfig,NutAssemblyCanonicalSolutionV1"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+          "line": 47,
+          "import": "from ....tasks.nut_assembly.canonical_solution import NutAssemblyCanonicalSolutionV1,CanonicalNutAssemblyConfig"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+          "line": 25,
+          "import": "from .canonical_solution import NutAssemblyCanonicalSolutionV1"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference.py",
+          "line": 20,
+          "import": "from .canonical_solution import CanonicalNutAssemblyConfig"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/stable_grasp_candidate.py",
+          "line": 13,
+          "import": "from .canonical_solution import NutAssemblyCanonicalSolutionV1"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/stable_grasp_reference.py",
+          "line": 13,
+          "import": "from .canonical_solution import NutAssemblyCanonicalSolutionV1"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/height_gate_ablation_comparison.json",
+          "line": 243,
+          "text": "\"task_env/tasks/nut_assembly/canonical_solution.py\": true,"
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/regression_results.json",
+          "line": 14,
+          "text": "\"unchanged:task_env/tasks/nut_assembly/canonical_solution.py\": true,"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 782,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/canonical_solution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 651,
+          "text": "\"nutassembly_v1\": Path(\"task_env/tasks/nut_assembly/canonical_solution.py\"),"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/regression.py",
+          "line": 71,
+          "text": "'task_env/tasks/nut_assembly/canonical_solution.py','task_env/tasks/nut_assembly/assets.py',"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 31,
+          "text": "from task_env.tasks.nut_assembly.canonical_solution import ("
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 35,
+          "text": "from task_env.tasks.nut_assembly.canonical_solution_v2 import NutAssemblyCanonicalSolutionV2"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 37,
+          "text": "\"task_env/tasks/nut_assembly/canonical_solution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/campaign.py",
+          "line": 21,
+          "text": "cfg=CanonicalNutAssemblyConfig();source=Path('task_env/tasks/nut_assembly/canonical_solution.py');sha=hashlib.sha256(source.read_bytes()).hexdigest()"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+      "sha256": "f55b7e7109da27fd4b7a1a063abb9f469155b1552cc08d4da43d75b74f5558a8",
+      "baseline_blob": "c0d29af2b2dc74b661065106a1cafa7c198ac7ce",
+      "v1_0_0_blob": "c0d29af2b2dc74b661065106a1cafa7c198ac7ce",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "c0d29af2b2dc74b661065106a1cafa7c198ac7ce"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 24,
+          "import": "from ....tasks.nut_assembly.canonical_solution_v2 import NutAssemblyStableGraspCandidateV2"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 35,
+          "import": "from task_env.tasks.nut_assembly.canonical_solution_v2 import NutAssemblyCanonicalSolutionV2"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/clearance_candidate_v3.py",
+          "line": 21,
+          "import": "from .canonical_solution_v2 import NutAssemblyStableGraspCandidateV2"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate.py",
+          "line": 18,
+          "import": "from .canonical_solution_v2 import NutAssemblyStableGraspCandidateV2, _LifecycleV2Mixin"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 650,
+          "text": "\"nutassembly_lifecycle_solution\": Path(\"task_env/tasks/nut_assembly/canonical_solution_v2.py\"),"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_solution_lifecycle.py",
+          "line": 35,
+          "text": "from task_env.tasks.nut_assembly.canonical_solution_v2 import NutAssemblyCanonicalSolutionV2"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/canonical_source.py",
+      "sha256": "90153119be74f0bf70d24109716b80eaaad5d3ce0dbf5ab16bd9880f59550dad",
+      "baseline_blob": "18ccf29ce8728210df6d3732da273dffe7aaa72a",
+      "v1_0_0_blob": "18ccf29ce8728210df6d3732da273dffe7aaa72a",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "18ccf29ce8728210df6d3732da273dffe7aaa72a"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/common.py",
+          "line": 8,
+          "import": "from ....tasks.nut_assembly.canonical_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/common.py",
+          "line": 16,
+          "import": "from ....tasks.nut_assembly.canonical_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+          "line": 11,
+          "import": "from ....tasks.nut_assembly.canonical_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference.py",
+          "line": 19,
+          "import": "from .canonical_source import build_runtime_source"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 789,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/canonical_source.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 34,
+          "text": "\"task_env/tasks/nut_assembly/canonical_source.py\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/clearance_candidate_v3.py",
+      "sha256": "9572067bb977ae2a15c1cdea504120e9a8d6df6f7c670386ee276ffd6e3076ef",
+      "baseline_blob": "e573836736fa158583be2e2cb9ca5d45d9b628f0",
+      "v1_0_0_blob": "e573836736fa158583be2e2cb9ca5d45d9b628f0",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "e573836736fa158583be2e2cb9ca5d45d9b628f0"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 25,
+          "import": "from ....tasks.nut_assembly.clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/clearance_candidate_v4.py",
+          "line": 17,
+          "import": "from .clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
+          "line": 19,
+          "import": "from .clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 664,
+          "text": "\"clearance_candidate_v3\": Path(\"task_env/tasks/nut_assembly/clearance_candidate_v3.py\"),"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/clearance_candidate_v4.py",
+      "sha256": "10067cbdea578c17c9a1659667e8dbb5edd081ab362b2ad16b1fcdd8a53b3f83",
+      "baseline_blob": "6251ac1d861ab41c14379b3fd9af7cd9e82034e3",
+      "v1_0_0_blob": "6251ac1d861ab41c14379b3fd9af7cd9e82034e3",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "6251ac1d861ab41c14379b3fd9af7cd9e82034e3"
+      },
+      "disposition": "S2_B_CANDIDATE_REVIEW_REQUIRED",
+      "delete_now": false,
+      "active_closure": false,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 26,
+          "import": "from ....tasks.nut_assembly.clearance_candidate_v4 import NutAssemblyHandClearanceCandidateV4"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 665,
+          "text": "\"clearance_candidate_v4\": Path(\"task_env/tasks/nut_assembly/clearance_candidate_v4.py\"),"
+        }
+      ],
+      "deletion_blockers": [
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports",
+        "No production reachability found by this bounded static scan; external/dynamic callers still require maintainer audit"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
+      "sha256": "5544fc915e47e67677447c322bed1fece4d73b0b068f1fab394c014bddd2b44f",
+      "baseline_blob": "40fe2c3b2f7140c42a90df8d45820bc10b6ca218",
+      "v1_0_0_blob": "40fe2c3b2f7140c42a90df8d45820bc10b6ca218",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "40fe2c3b2f7140c42a90df8d45820bc10b6ca218"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 27,
+          "import": "from ....tasks.nut_assembly.clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 128,
+          "import": "from task_env.tasks.nut_assembly.clearance_candidate_v5 import (\n        NutAssemblyHandClearanceCandidateV5,\n    )"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+          "line": 11,
+          "import": "from .clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 666,
+          "text": "\"clearance_candidate_v5\": Path(\"task_env/tasks/nut_assembly/clearance_candidate_v5.py\"),"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 128,
+          "text": "from task_env.tasks.nut_assembly.clearance_candidate_v5 import ("
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/default.yaml",
+      "sha256": "5295f300f34b5361428fcda2cdab1a946bad27ad87e6e32b8a04aa37e852b167",
+      "baseline_blob": "f8a9522e819c1ad02015107dddf27ef1ae46a106",
+      "v1_0_0_blob": "f8a9522e819c1ad02015107dddf27ef1ae46a106",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "f8a9522e819c1ad02015107dddf27ef1ae46a106"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/branch_inventory.json",
+          "line": 166,
+          "text": "\"status\": \"m GeoPhys\\n M task_env/tasks/nut_assembly/default.yaml\\n M task_env/tasks/pick_cube/solution.py\\n?? .codegraph/\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 796,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/default.yaml\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 38,
+          "text": "\"task_env/tasks/nut_assembly/default.yaml\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate.py",
+      "sha256": "49c87b0cd15e940f0c9e5cff6ffc6a3450dae63eff6809f30f8147cecf68d40d",
+      "baseline_blob": "1b9083b096606bcf9ae3300b436d7495be00389c",
+      "v1_0_0_blob": "1b9083b096606bcf9ae3300b436d7495be00389c",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "1b9083b096606bcf9ae3300b436d7495be00389c"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 28,
+          "import": "from ....tasks.nut_assembly.guarded_authorization_candidate import (\n    NutAssemblyGuardedAuthorizationCandidateV1,\n)"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 131,
+          "import": "from task_env.tasks.nut_assembly.guarded_authorization_candidate import (\n        NutAssemblyGuardedAuthorizationCandidateV1,\n    )"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+          "line": 12,
+          "import": "from .guarded_authorization_candidate import (\n    NutAssemblyGuardedAuthorizationCandidateV1,\n)"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 669,
+          "text": "\"task_env/tasks/nut_assembly/guarded_authorization_candidate.py\"),"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 131,
+          "text": "from task_env.tasks.nut_assembly.guarded_authorization_candidate import ("
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 134,
+          "text": "from task_env.tasks.nut_assembly.guarded_authorization_candidate_v2 import ("
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+      "sha256": "42c49826376cbfc5a41496e6765c8544e9e9e3ecd9de00bb8348b6f531a3a796",
+      "baseline_blob": "b5469c31dc616dc35c68df10ed7c3967f1d6a967",
+      "v1_0_0_blob": "b5469c31dc616dc35c68df10ed7c3967f1d6a967",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "b5469c31dc616dc35c68df10ed7c3967f1d6a967"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 31,
+          "import": "from ....tasks.nut_assembly.guarded_authorization_candidate_v2 import (\n    NutAssemblyGuardedAuthorizationCandidateV2,\n)"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 134,
+          "import": "from task_env.tasks.nut_assembly.guarded_authorization_candidate_v2 import (\n        NutAssemblyGuardedAuthorizationCandidateV2,\n    )"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/outcome_solution.py",
+          "line": 16,
+          "import": "from .guarded_authorization_candidate_v2 import NutAssemblyGuardedAuthorizationCandidateV2"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference.py",
+          "line": 21,
+          "import": "from .guarded_authorization_candidate_v2 import NutAssemblyGuardedAuthorizationCandidateV2"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 671,
+          "text": "\"task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py\"),"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/test_guarded_transition.py",
+          "line": 134,
+          "text": "from task_env.tasks.nut_assembly.guarded_authorization_candidate_v2 import ("
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/outcome_solution.py",
+      "sha256": "57b8deeed5a43e7af3cf3edd3a904c70a8276d2c011726f5e569ab60f66a1138",
+      "baseline_blob": "43471fe87d3d4f63cff6d93dbd9a6b30607d4cab",
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": "43471fe87d3d4f63cff6d93dbd9a6b30607d4cab"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 11,
+          "import": "from task_env.tasks.nut_assembly.outcome_solution import NutAssemblyOutcomeSolutionV1"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference.py",
+          "line": 23,
+          "import": "from .outcome_solution import NutAssemblyOutcomeSolutionV1, OUTCOME_POLICY_ID"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 11,
+          "text": "from task_env.tasks.nut_assembly.outcome_solution import NutAssemblyOutcomeSolutionV1"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/profiles/mujoco-noslip2-v1.json",
+      "sha256": "cd65d982f3640526636386c42ffa2de793ba32f245ddf0317322c4f40ca48973",
+      "baseline_blob": "d30561416843987bca8aac0fa22ec3ef3898c574",
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": "d30561416843987bca8aac0fa22ec3ef3898c574"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [],
+      "literal_reference_callers": [],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json",
+      "sha256": "90555a0f6e2ae7cbf1c83909be18324e4b29238adcd2b894a80ac1e237badf8f",
+      "baseline_blob": "9da89c6f6894a8cf7de44c75c3880e0260cdb811",
+      "v1_0_0_blob": "9da89c6f6894a8cf7de44c75c3880e0260cdb811",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "9da89c6f6894a8cf7de44c75c3880e0260cdb811"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 803,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 39,
+          "text": "\"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/common.py",
+          "line": 23,
+          "text": "PROFILE_PATH = Path(\"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json\")"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json",
+      "sha256": "8345011c00f22eb100a1964965ca3bb3647d612410ad1ac7b33de0b41badc8e4",
+      "baseline_blob": "84842511ee36570d8a9def60b3809f39b0a1e2e4",
+      "v1_0_0_blob": "84842511ee36570d8a9def60b3809f39b0a1e2e4",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "84842511ee36570d8a9def60b3809f39b0a1e2e4"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 810,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/stable_grasp.py",
+          "line": 12,
+          "text": "PROFILE = Path('task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json')"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_dynamic_recovery/campaign.py",
+          "line": 17,
+          "text": "PROFILE_PATH = Path(\"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json\")"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_dynamic_recovery/tracking_worker.py",
+          "line": 26,
+          "text": "PROFILE_PATH = Path(\"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json\")"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_r5_architecture/tracking_worker.py",
+          "line": 28,
+          "text": "PROFILE_PATH = Path(\"task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json\")"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json",
+      "sha256": "19037bd65e405ee5ffe2b26b13555f3724750c6c9edcb5a603c0a2249fb7a5ff",
+      "baseline_blob": "eb5cfc0665890de49212bb5c1b3f6accd3a7f898",
+      "v1_0_0_blob": "eb5cfc0665890de49212bb5c1b3f6accd3a7f898",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "eb5cfc0665890de49212bb5c1b3f6accd3a7f898"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/height_gate_ablation_comparison.json",
+          "line": 244,
+          "text": "\"task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json\": true,"
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/integration_integrity.json",
+          "line": 66,
+          "text": "\"task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json\": true"
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/prequalification_candidate_lock.json",
+          "line": 23,
+          "text": "\"task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json\": \"19037bd65e405ee5ffe2b26b13555f3724750c6c9edcb5a603c0a2249fb7a5ff\","
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/review_refresh_1mm/prequalification_candidate_lock.json",
+          "line": 14,
+          "text": "\"task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json\": \"19037bd65e405ee5ffe2b26b13555f3724750c6c9edcb5a603c0a2249fb7a5ff\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 817,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml",
+      "sha256": "5bbac0ad315c07a1ced354ccee845acf92ae50ab1a125255d6af486c83d4c266",
+      "baseline_blob": "e4b35f2fbf827cb0e59f87dec7ef8c5de9eff86d",
+      "v1_0_0_blob": "e4b35f2fbf827cb0e59f87dec7ef8c5de9eff86d",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "e4b35f2fbf827cb0e59f87dec7ef8c5de9eff86d"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/regression_results.json",
+          "line": 72,
+          "text": "\"changed_tree\": \"M task_env/tasks/nut_assembly/stable_grasp_candidate.py\\n?? task_env/controllers/canonical/execution.py\\n?? task_env/controllers/canonical/gripper_execution.py\\n?? task_env/diagnostics/phase1/integration/\\n?? task_env/tasks"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 824,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/stable_grasp.py",
+          "line": 13,
+          "text": "DYNAMIC = Path('task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml')"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/reference.py",
+      "sha256": "f54e9d0373b7a59bba568f103985e402a870200885ca867a4c9f3cb39eac916e",
+      "baseline_blob": "870d3d5a980327c8f9cbe323720b64e18aa22b08",
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": "870d3d5a980327c8f9cbe323720b64e18aa22b08"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 147,
+          "import": "from ....tasks.nut_assembly.reference import (\n            build_reference, OUTCOME_COMPLETION, DIAGNOSTIC_OBSERVATION,\n        )"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 10,
+          "import": "from task_env.tasks.nut_assembly.reference import build_reference, GUARDED_EXPERT, OUTCOME_COMPLETION"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 14,
+          "import": "from task_env.tasks.nut_assembly import reference as na"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 130,
+          "import": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 158,
+          "import": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 189,
+          "import": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/__init__.py",
+          "line": 2,
+          "import": "from .reference import build_reference"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference_env.py",
+          "line": 4,
+          "import": "from .reference import build_reference"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_active_reference_construction.md",
+          "line": 22,
+          "text": "from task_env.tasks.nut_assembly.reference import ("
+        },
+        {
+          "path": "docs/module/task_env/p2_0_nutassembly_outcome_completion.md",
+          "line": 7,
+          "text": "`task_env.tasks.nut_assembly.reference.build_reference(rate_hz=100, provider=...)` 默认选择 `nutassembly-outcome-oriented-completion-v1`，construction ID=`nutassembly-r5-v5-outcome-reference-construction-v2`；Solution owner为 `NutAssemblyOutcomeSo"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 446,
+          "text": "recipe.update(factory=\"task_env.tasks.nut_assembly.reference.build_reference\","
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_nutassembly_outcome.py",
+          "line": 10,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference, GUARDED_EXPERT, OUTCOME_COMPLETION"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 152,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference as na"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 15,
+          "text": "from task_env.tasks.nut_assembly.reference_execution import ReferenceArmSchedule, ArmRampMemory"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 130,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 158,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 189,
+          "text": "from task_env.tasks.nut_assembly.reference import build_reference"
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 18,
+          "text": "from task_env.tasks.nut_assembly.reference_env import REFERENCE_ENV_ID as NA"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/reference_env.py",
+      "sha256": "4e609b3c229a386e4f8e9585357c26c904791e9bc80c0928855cc8da366439b9",
+      "baseline_blob": null,
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": null
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/tasks/__init__.py",
+          "line": 5,
+          "import": "from .nut_assembly.reference_env import NutAssemblyReferenceEnv"
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 18,
+          "import": "from task_env.tasks.nut_assembly.reference_env import REFERENCE_ENV_ID as NA"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 136,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/reference_env.py\","
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 18,
+          "text": "from task_env.tasks.nut_assembly.reference_env import REFERENCE_ENV_ID as NA"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/reference_execution.py",
+      "sha256": "89d0b32df124d7478818e2786812b35115ba30c65ab1134e9971ac6b4bca3bfa",
+      "baseline_blob": "b587f3df2c1ac3109d8b97e041e8ca72702bf827",
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": "b587f3df2c1ac3109d8b97e041e8ca72702bf827"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 397,
+          "import": "from ....tasks.nut_assembly.reference_execution import ReferenceArmSchedule"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 15,
+          "import": "from task_env.tasks.nut_assembly.reference_execution import ReferenceArmSchedule, ArmRampMemory"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/reference.py",
+          "line": 22,
+          "import": "from .reference_execution import ArmRampMemory, ReferenceExecutionController"
+        },
+        {
+          "path": "task_env/tasks/reference_env.py",
+          "line": 102,
+          "import": "from .nut_assembly.reference_execution import ReferenceArmSchedule"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 141,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/reference_execution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 647,
+          "text": "\"selected_reference_execution\": Path('task_env/tasks/nut_assembly/reference_execution.py'),"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+          "line": 15,
+          "text": "from task_env.tasks.nut_assembly.reference_execution import ReferenceArmSchedule, ArmRampMemory"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/solution.py",
+      "sha256": "c722c037951e259e08aaaf1e362e1c2ff698c27fd8bce8fc89c4cac387c00319",
+      "baseline_blob": "71a4a83b38725ecaab26424ad7693845a3f9cd20",
+      "v1_0_0_blob": "71a4a83b38725ecaab26424ad7693845a3f9cd20",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "71a4a83b38725ecaab26424ad7693845a3f9cd20"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/common.py",
+          "line": 10,
+          "import": "from ....tasks.nut_assembly.solution import NutAssemblySolution, NutAssemblySolutionConfig"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/grasp_diagnosis.py",
+          "line": 18,
+          "import": "from ....tasks.nut_assembly.solution import NutAssemblySolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/worker.py",
+          "line": 13,
+          "import": "from ....tasks.nut_assembly.solution import NutAssemblySolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+          "line": 13,
+          "import": "from ....tasks.nut_assembly.solution import NutAssemblySolution,NutAssemblySolutionConfig"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 142,
+          "import": "from task_env.tasks.nut_assembly.solution import NutAssemblySolution"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_solution.py",
+          "line": 15,
+          "import": "from .solution import _square_yaw_correction"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 831,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/solution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 40,
+          "text": "\"task_env/tasks/nut_assembly/solution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/historical.py",
+          "line": 65,
+          "text": "metrics=result['task_metrics'];report={'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'backend':args.backend,'seed':19,'success':result['success'],'transitions':result['transitions'],'stage_counts':dict(Count"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_recovery/worker.py",
+          "line": 45,
+          "text": "solution=NutAssemblySolution();sid=digest({'legacy_source_sha256':hashlib.sha256(Path('task_env/tasks/nut_assembly/solution.py').read_bytes()).hexdigest(),'config':asdict(solution.config)})"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 142,
+          "text": "from task_env.tasks.nut_assembly.solution import NutAssemblySolution"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/stable_grasp_candidate.py",
+      "sha256": "bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423",
+      "baseline_blob": "779ed062632464b3e5ad47dc5522ef4b7395eda4",
+      "v1_0_0_blob": "779ed062632464b3e5ad47dc5522ef4b7395eda4",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "779ed062632464b3e5ad47dc5522ef4b7395eda4"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/height_gate_ablation.py",
+          "line": 6,
+          "import": "from ....tasks.nut_assembly.stable_grasp_candidate import NutAssemblyStableGraspCandidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/loaded_episode.py",
+          "line": 26,
+          "import": "from ....tasks.nut_assembly import canonical_solution, stable_grasp_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/stable_grasp.py",
+          "line": 10,
+          "import": "from ....tasks.nut_assembly import stable_grasp_candidate, stable_grasp_reference"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+          "line": 26,
+          "import": "from .stable_grasp_candidate import NutAssemblyStableGraspCandidate"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/integration_integrity.json",
+          "line": 62,
+          "text": "\"task_env/tasks/nut_assembly/stable_grasp_candidate.py\": true,"
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/prequalification_candidate_lock.json",
+          "line": 19,
+          "text": "\"task_env/tasks/nut_assembly/stable_grasp_candidate.py\": \"b3c508722dcf674aee4f6004d52040f930adddb3478e807e4b0702947d65ee2d\","
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/review_refresh_1mm/integration_integrity.json",
+          "line": 6,
+          "text": "\"task_env/tasks/nut_assembly/stable_grasp_candidate.py\": {"
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/pre_d0_d2_readiness/review_refresh_1mm/prequalification_candidate_lock.json",
+          "line": 10,
+          "text": "\"task_env/tasks/nut_assembly/stable_grasp_candidate.py\": \"bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423\","
+        },
+        {
+          "path": "docs/module/task_env/p1_8_integration/regression_results.json",
+          "line": 72,
+          "text": "\"changed_tree\": \"M task_env/tasks/nut_assembly/stable_grasp_candidate.py\\n?? task_env/controllers/canonical/execution.py\\n?? task_env/controllers/canonical/gripper_execution.py\\n?? task_env/diagnostics/phase1/integration/\\n?? task_env/tasks"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 838,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/stable_grasp_candidate.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+          "line": 652,
+          "text": "\"stable_grasp_candidate_v1\": Path(\"task_env/tasks/nut_assembly/stable_grasp_candidate.py\"),"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json",
+          "line": 18,
+          "text": "\"module\": \"task_env.tasks.nut_assembly.stable_grasp_candidate\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/stable_grasp_reference.py",
+      "sha256": "b51c054bb997e294d9e3605a28d86eec1dfc253589f3da1578078a64a6908324",
+      "baseline_blob": "e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9",
+      "v1_0_0_blob": "e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9"
+      },
+      "disposition": "S2_B_CANDIDATE_REVIEW_REQUIRED",
+      "delete_now": false,
+      "active_closure": false,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/integration/stable_grasp.py",
+          "line": 10,
+          "import": "from ....tasks.nut_assembly import stable_grasp_candidate, stable_grasp_reference"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/regression_results.json",
+          "line": 72,
+          "text": "\"changed_tree\": \"M task_env/tasks/nut_assembly/stable_grasp_candidate.py\\n?? task_env/controllers/canonical/execution.py\\n?? task_env/controllers/canonical/gripper_execution.py\\n?? task_env/diagnostics/phase1/integration/\\n?? task_env/tasks"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 845,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/stable_grasp_reference.py\","
+        }
+      ],
+      "deletion_blockers": [
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports",
+        "No production reachability found by this bounded static scan; external/dynamic callers still require maintainer audit"
+      ]
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/task.py",
+      "sha256": "32cd37f9215166b76200a082dd573e5b04478f6bc6538c318a3ebbc2f2f17b5f",
+      "baseline_blob": "6cc37a1490eb488cb4c4fd5280d17ec38e8cd6d7",
+      "v1_0_0_blob": "6cc37a1490eb488cb4c4fd5280d17ec38e8cd6d7",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "6cc37a1490eb488cb4c4fd5280d17ec38e8cd6d7"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/historical_tasks.py",
+          "line": 13,
+          "import": "from task_env.tasks.nut_assembly.task import NutAssemblyEnv"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly/native.py",
+          "line": 5,
+          "import": "from ....tasks.nut_assembly.task import NutAssemblyTaskDefinition"
+        },
+        {
+          "path": "task_env/tasks/nut_assembly/canonical_source.py",
+          "line": 8,
+          "import": "from .task import NutAssemblyEnv, NUT_ASSEMBLY_SQUARE_SPEC"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 146,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/task.py\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 852,
+          "text": "\"path\": \"task_env/tasks/nut_assembly/task.py\","
+        },
+        {
+          "path": "task_env/diagnostics/historical_tasks.py",
+          "line": 13,
+          "text": "from task_env.tasks.nut_assembly.task import NutAssemblyEnv"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/nutassembly_nominal/campaign.py",
+          "line": 41,
+          "text": "\"task_env/tasks/nut_assembly/task.py\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/__init__.py",
+      "sha256": "887f8f63f887a5415af335614e158911cd4f52622ed97088722ee92136e2a8ac",
+      "baseline_blob": "07b9f29b8c80ec4a821c77d3b9ab2d3cb8d5cb9a",
+      "v1_0_0_blob": "07b9f29b8c80ec4a821c77d3b9ab2d3cb8d5cb9a",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "07b9f29b8c80ec4a821c77d3b9ab2d3cb8d5cb9a"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 13,
+          "import": "from task_env.tasks.pick_cube import reference as pc"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md",
+          "line": 566,
+          "text": "`task_env.tasks.pick_cube.reset.sample_reset` 使用 versioned NumPy PCG64 sampler，"
+        },
+        {
+          "path": "docs/module/task_env/p2_0_active_reference_construction.md",
+          "line": 10,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference, sample_reset"
+        },
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 151,
+          "text": "\"path\": \"task_env/tasks/pick_cube/__init__.py\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 873,
+          "text": "\"path\": \"task_env/tasks/pick_cube/__init__.py\","
+        },
+        {
+          "path": "task_env/diagnostics/historical_tasks.py",
+          "line": 10,
+          "text": "from task_env.tasks.pick_cube.task import PickCubeEnv"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/control/pure.py",
+          "line": 65,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_preparation/collection.py",
+          "line": 13,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_preparation/supplement.py",
+          "line": 16,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 74,
+          "text": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 260,
+          "text": "check('provider_free_candidate_import_load', 'import_boundary', lambda: _provider_free('task_env.tasks.pick_cube.candidate'))"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 228,
+          "text": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 229,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 230,
+          "text": "from task_env.tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_4_camera.py",
+          "line": 27,
+          "text": "command=[sys.executable,'-c',\"import sys; import task_env; import task_env.observations.canonical_camera; import task_env.render.camera; from task_env.tasks.pick_cube.candidate import build_candidate; assert build_candidate().identity_hash="
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/d3_cross_provider.py",
+          "line": 52,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/flow100_rollout.py",
+          "line": 19,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 29,
+          "text": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 30,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 31,
+          "text": "from task_env.tasks.pick_cube.readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 32,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 33,
+          "text": "from task_env.tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 66,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 13,
+          "text": "from task_env.tasks.pick_cube import reference as pc"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 15,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate as pc_evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 46,
+          "text": "from task_env.tasks.pick_cube.timebase import build_timebase_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 151,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference as pc"
+        },
+        {
+          "path": "task_env/doc/api/planning/task_owned_solutions.md",
+          "line": 3,
+          "text": "**Import path**：`task_env.solutions`、`task_env.tasks.pick_cube`、`task_env.tasks.nut_assembly`"
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_tcp_fixture.py",
+          "line": 9,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_v2_tcp_fixture.py",
+          "line": 9,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 143,
+          "text": "from task_env.tasks.pick_cube.solution import PickCubeSolution"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 186,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference"
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 17,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID as PC"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/assets.py",
+      "sha256": "2356ef00e64d4cb2f792114c8dde22a9e22d342c6ba4f0f36813eba4d1f817ac",
+      "baseline_blob": "2905b18f0579ecd8543676492e3561b02ffdeea5",
+      "v1_0_0_blob": "2905b18f0579ecd8543676492e3561b02ffdeea5",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "2905b18f0579ecd8543676492e3561b02ffdeea5"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 52,
+          "import": "from ...tasks.pick_cube.assets import TABLE_TOP_Z, CUBE_HALF_SIZE"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/candidate.py",
+          "line": 8,
+          "import": "from .assets import (\n    CUBE_HALF_SIZE, CUBE_MASS, CUBE_DIAG_INERTIA, CUBE_CONTACT_MARGIN,\n    TABLE_TOP_Z, TABLE_HALF_SIZE,\n)"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/canonical_semantics.py",
+          "line": 10,
+          "import": "from .assets import TABLE_TOP_Z, CUBE_HALF_SIZE"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/runtime_source.py",
+          "line": 8,
+          "import": "from .assets import EE_SITE_NAME, PickCubeSceneComposer"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/solution.py",
+          "line": 19,
+          "import": "from .assets import CUBE_HALF_SIZE"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/task.py",
+          "line": 16,
+          "import": "from .assets import CUBE_CONTACT_MARGIN, CUBE_HALF_SIZE, TABLE_TOP_Z"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/task.py",
+          "line": 181,
+          "import": "from .assets import PickCubeSceneComposer"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 880,
+          "text": "\"path\": \"task_env/tasks/pick_cube/assets.py\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/candidate.py",
+      "sha256": "55a5dfb4077d0c8c7bcab0a384d720eb110cd4c008b169d5596cc47cb90be56c",
+      "baseline_blob": "53a7105c24ae3fac4497a06f505ed4bec5c31494",
+      "v1_0_0_blob": "53a7105c24ae3fac4497a06f505ed4bec5c31494",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "53a7105c24ae3fac4497a06f505ed4bec5c31494"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/control/spec.py",
+          "line": 13,
+          "import": "from ....tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multi_backend_replay/golden.py",
+          "line": 11,
+          "import": "from ....tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 25,
+          "import": "from ...tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 26,
+          "import": "from ...tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 29,
+          "import": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/state_policy/spec.py",
+          "line": 7,
+          "import": "from ....tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/reference.py",
+          "line": 8,
+          "import": "from .candidate import build_candidate"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/timebase.py",
+          "line": 4,
+          "import": "from .candidate import build_candidate"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 887,
+          "text": "\"path\": \"task_env/tasks/pick_cube/candidate.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 74,
+          "text": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 260,
+          "text": "check('provider_free_candidate_import_load', 'import_boundary', lambda: _provider_free('task_env.tasks.pick_cube.candidate'))"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 228,
+          "text": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_4_camera.py",
+          "line": 27,
+          "text": "command=[sys.executable,'-c',\"import sys; import task_env; import task_env.observations.canonical_camera; import task_env.render.camera; from task_env.tasks.pick_cube.candidate import build_candidate; assert build_candidate().identity_hash="
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 29,
+          "text": "from task_env.tasks.pick_cube.candidate import build_candidate"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/canonical_semantics.py",
+      "sha256": "91f9051de15992c2f89d51f6fc4fdf5d613bfec11ebf168e9067287e993a5ec7",
+      "baseline_blob": "6ae0e068d457dabf23e2acf5fb364b4f88202767",
+      "v1_0_0_blob": "6ae0e068d457dabf23e2acf5fb364b4f88202767",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "6ae0e068d457dabf23e2acf5fb364b4f88202767"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/control/worker.py",
+          "line": 9,
+          "import": "from ....tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multi_backend_replay/replay.py",
+          "line": 11,
+          "import": "from ....tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multirate/replay.py",
+          "line": 14,
+          "import": "from ....tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 26,
+          "import": "from ...tasks.pick_cube.canonical_semantics import CUBE, EEF, FINGERS, evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 27,
+          "import": "from ...tasks.pick_cube.canonical_semantics import evaluate as evaluate_canonical"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/d3_cross_provider.py",
+          "line": 52,
+          "import": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/flow100_rollout.py",
+          "line": 19,
+          "import": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 30,
+          "import": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 15,
+          "import": "from task_env.tasks.pick_cube.canonical_semantics import evaluate as pc_evaluate"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/candidate.py",
+          "line": 12,
+          "import": "from .canonical_semantics import EEF, FINGERS, semantic_definition"
+        },
+        {
+          "path": "task_env/tasks/reference_env.py",
+          "line": 118,
+          "import": "from .pick_cube.canonical_semantics import evaluate"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 894,
+          "text": "\"path\": \"task_env/tasks/pick_cube/canonical_semantics.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_training.py",
+          "line": 53,
+          "text": "'task_env/tasks/pick_cube/canonical_semantics.py', 'task_env/tasks/pick_cube/task.py',"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/d3_cross_provider.py",
+          "line": 52,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/flow100_rollout.py",
+          "line": 19,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 30,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 15,
+          "text": "from task_env.tasks.pick_cube.canonical_semantics import evaluate as pc_evaluate"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/default.yaml",
+      "sha256": "bff13415d6bbdc33d17a1f91137c8bc57b7cf740c3de34ce64d466446b809770",
+      "baseline_blob": "a788e43c30be2eb45e8eff2ffceac34ffed22f3c",
+      "v1_0_0_blob": "a788e43c30be2eb45e8eff2ffceac34ffed22f3c",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "a788e43c30be2eb45e8eff2ffceac34ffed22f3c"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 901,
+          "text": "\"path\": \"task_env/tasks/pick_cube/default.yaml\","
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/readiness_solution.py",
+      "sha256": "685c9dc61aa40e4d99324ae01e8a3092b9bcee457319c24e0cc182ed96806046",
+      "baseline_blob": "f6951081e26ed933fd609ee255cd1c735664cb5f",
+      "v1_0_0_blob": "f6951081e26ed933fd609ee255cd1c735664cb5f",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "f6951081e26ed933fd609ee255cd1c735664cb5f"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/frequency_grasp/pickcube_regression.py",
+          "line": 10,
+          "import": "from ....tasks.pick_cube.readiness_solution import PickCubeReadinessConfig,PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multi_backend_replay/golden.py",
+          "line": 14,
+          "import": "from ....tasks.pick_cube.readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multirate/common.py",
+          "line": 11,
+          "import": "from ....tasks.pick_cube.readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multirate/expert.py",
+          "line": 15,
+          "import": "from ....tasks.pick_cube.readiness_solution import PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_5_readiness.py",
+          "line": 14,
+          "import": "from ...tasks.pick_cube.readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 31,
+          "import": "from task_env.tasks.pick_cube.readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/state_policy/spec.py",
+          "line": 10,
+          "import": "from ....tasks.pick_cube.readiness_solution import PickCubeReadinessConfig,PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/state_policy/worker.py",
+          "line": 9,
+          "import": "from ....tasks.pick_cube.readiness_solution import PickCubeReadinessSolution"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/__init__.py",
+          "line": 6,
+          "import": "from .readiness_solution import PickCubeReadinessSolution, PickCubeReadinessConfig"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/reference.py",
+          "line": 10,
+          "import": "from .readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/regression_results.json",
+          "line": 16,
+          "text": "\"unchanged:task_env/tasks/pick_cube/readiness_solution.py\": true,"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 908,
+          "text": "\"path\": \"task_env/tasks/pick_cube/readiness_solution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_training.py",
+          "line": 52,
+          "text": "'task_env/tasks/pick_cube/readiness_solution.py', 'task_env/tasks/pick_cube/solution.py',"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/integration/regression.py",
+          "line": 72,
+          "text": "'task_env/tasks/pick_cube/readiness_solution.py','task_env/runtime/sessions/mujoco.py']"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_5_readiness.py",
+          "line": 27,
+          "text": "paths = ['task_env/tasks/pick_cube/solution.py', 'task_env/tasks/pick_cube/readiness_solution.py',"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 31,
+          "text": "from task_env.tasks.pick_cube.readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/reference.py",
+      "sha256": "74e9aa7cc9ed9f041c1c75565040a5c1e9ef3b2f923fe970a5a6e95213ce1fee",
+      "baseline_blob": "3c03f967616b1560af928492c603c54f4e834eaa",
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": "3c03f967616b1560af928492c603c54f4e834eaa"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 66,
+          "import": "from task_env.tasks.pick_cube.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 13,
+          "import": "from task_env.tasks.pick_cube import reference as pc"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 186,
+          "import": "from task_env.tasks.pick_cube.reference import build_reference"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/__init__.py",
+          "line": 2,
+          "import": "from .reference import build_reference"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/reference_env.py",
+          "line": 4,
+          "import": "from .reference import build_reference, sample_reset"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_active_reference_construction.md",
+          "line": 10,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference, sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 66,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 151,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference as pc"
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_tcp_fixture.py",
+          "line": 9,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_v2_tcp_fixture.py",
+          "line": 9,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 186,
+          "text": "from task_env.tasks.pick_cube.reference import build_reference"
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 17,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID as PC"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/reference_env.py",
+      "sha256": "43dbdf9dd4e469923344e86e69789a084338c87a7b29c3a0f72102b736f19fc5",
+      "baseline_blob": null,
+      "v1_0_0_blob": null,
+      "recovery": {
+        "canonical": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+        "blob": null
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/reporter/real_taskenv_tcp_fixture.py",
+          "line": 9,
+          "import": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_v2_tcp_fixture.py",
+          "line": 9,
+          "import": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/tasks/__init__.py",
+          "line": 7,
+          "import": "from .pick_cube.reference_env import PickCubeReferenceEnv"
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 17,
+          "import": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID as PC"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 156,
+          "text": "\"path\": \"task_env/tasks/pick_cube/reference_env.py\","
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_tcp_fixture.py",
+          "line": 9,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/reporter/real_taskenv_v2_tcp_fixture.py",
+          "line": 9,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID"
+        },
+        {
+          "path": "task_env/trajectory/reference_replay.py",
+          "line": 17,
+          "text": "from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID as PC"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/reset.py",
+      "sha256": "eb3fc7c53a210a62487d49cfca34cae33880811f6c1de2f599b14c77db29f465",
+      "baseline_blob": "b315d8f2978de235bf7e2df0f336da7062e5cec4",
+      "v1_0_0_blob": "b315d8f2978de235bf7e2df0f336da7062e5cec4",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "b315d8f2978de235bf7e2df0f336da7062e5cec4"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/control/pure.py",
+          "line": 10,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/control/spec.py",
+          "line": 15,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_preparation/collection.py",
+          "line": 13,
+          "import": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_preparation/supplement.py",
+          "line": 16,
+          "import": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/frequency_grasp/pickcube_regression.py",
+          "line": 9,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multi_backend_replay/golden.py",
+          "line": 13,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multi_backend_replay/lifecycle.py",
+          "line": 6,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multirate/expert.py",
+          "line": 14,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 28,
+          "import": "from ...tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 32,
+          "import": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/state_policy/pure.py",
+          "line": 15,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/state_policy/spec.py",
+          "line": 9,
+          "import": "from ....tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/reference.py",
+          "line": 11,
+          "import": "from .reset import sample_reset as historical_sample_reset"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md",
+          "line": 566,
+          "text": "`task_env.tasks.pick_cube.reset.sample_reset` 使用 versioned NumPy PCG64 sampler，"
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 915,
+          "text": "\"path\": \"task_env/tasks/pick_cube/reset.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/control/pure.py",
+          "line": 65,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_preparation/collection.py",
+          "line": 13,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_preparation/supplement.py",
+          "line": 16,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 229,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 32,
+          "text": "from task_env.tasks.pick_cube.reset import sample_reset"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/runtime_source.py",
+      "sha256": "f21069002dcd5496b835a766e17547b6e46e200a245083640fc89a56bc32fce0",
+      "baseline_blob": "77136c0cd0a53eb2961460f8c717fa468b968814",
+      "v1_0_0_blob": "77136c0cd0a53eb2961460f8c717fa468b968814",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "77136c0cd0a53eb2961460f8c717fa468b968814"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/control/spec.py",
+          "line": 14,
+          "import": "from ....tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multi_backend_replay/golden.py",
+          "line": 12,
+          "import": "from ....tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/multirate/common.py",
+          "line": 10,
+          "import": "from ....tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 29,
+          "import": "from ...tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 33,
+          "import": "from task_env.tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/state_policy/spec.py",
+          "line": 8,
+          "import": "from ....tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/reference.py",
+          "line": 9,
+          "import": "from .runtime_source import build_runtime_source"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 922,
+          "text": "\"path\": \"task_env/tasks/pick_cube/runtime_source.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_2_runtime.py",
+          "line": 230,
+          "text": "from task_env.tasks.pick_cube.runtime_source import build_runtime_source"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/policy_search/timebase100.py",
+          "line": 33,
+          "text": "from task_env.tasks.pick_cube.runtime_source import build_runtime_source"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/solution.py",
+      "sha256": "c37d158cd5103f5f1b4b885d7675989550a3506269e4becdde463f7fe333799c",
+      "baseline_blob": "2254fcadf558c1c35a74bf42ef776725d2992918",
+      "v1_0_0_blob": "2254fcadf558c1c35a74bf42ef776725d2992918",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "2254fcadf558c1c35a74bf42ef776725d2992918"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/control/spec.py",
+          "line": 16,
+          "import": "from ....tasks.pick_cube.solution import PickCubeSolutionConfig"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/control/worker.py",
+          "line": 10,
+          "import": "from ....tasks.pick_cube.solution import PickCubeSolution,PickCubeSolutionConfig"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 143,
+          "import": "from task_env.tasks.pick_cube.solution import PickCubeSolution"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/readiness_solution.py",
+          "line": 8,
+          "import": "from .solution import PickCubeSolution, PickCubeSolutionConfig, _COLLECTION_LIFT_MARGIN"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p1_8_integration/branch_inventory.json",
+          "line": 166,
+          "text": "\"status\": \"m GeoPhys\\n M task_env/tasks/nut_assembly/default.yaml\\n M task_env/tasks/pick_cube/solution.py\\n?? .codegraph/\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 929,
+          "text": "\"path\": \"task_env/tasks/pick_cube/solution.py\","
+        },
+        {
+          "path": "task_env/diagnostics/phase1/control/spec.py",
+          "line": 76,
+          "text": "'expert_identity':'unchanged_PickCubeSolution','expert_source_sha256':hashlib.sha256(Path('task_env/tasks/pick_cube/solution.py').read_bytes()).hexdigest(),"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_training.py",
+          "line": 52,
+          "text": "'task_env/tasks/pick_cube/readiness_solution.py', 'task_env/tasks/pick_cube/solution.py',"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_5_readiness.py",
+          "line": 27,
+          "text": "paths = ['task_env/tasks/pick_cube/solution.py', 'task_env/tasks/pick_cube/readiness_solution.py',"
+        },
+        {
+          "path": "task_env/script/trajectory/_task_plans.py",
+          "line": 143,
+          "text": "from task_env.tasks.pick_cube.solution import PickCubeSolution"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/task.py",
+      "sha256": "1ce0153a33ace25a3cd735917a001127e133a6d5d30922de77cab12a2b01cf1d",
+      "baseline_blob": "88d49f2d8fedd446da490f63831f0e3d27e5e30d",
+      "v1_0_0_blob": "88d49f2d8fedd446da490f63831f0e3d27e5e30d",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "88d49f2d8fedd446da490f63831f0e3d27e5e30d"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": true,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/historical_tasks.py",
+          "line": 10,
+          "import": "from task_env.tasks.pick_cube.task import PickCubeEnv"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 91,
+          "import": "from ...tasks.pick_cube.task import PickCubeTaskDefinition, _LIFT_HEIGHT"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/p1_1_contracts.py",
+          "line": 266,
+          "import": "from ...tasks.pick_cube.task import PickCubeEnv, PickCubeResetSampler"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/candidate.py",
+          "line": 13,
+          "import": "from .task import PICK_CUBE_SPEC, PickCubeEnv, PickCubeResetSampler"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/canonical_semantics.py",
+          "line": 11,
+          "import": "from .task import (\n    PICK_CUBE_SUCCESS_DEFINITION, _LIFT_HEIGHT, _REACH_DISTANCE,\n    _GRIPPER_CLOSED_OPENING,\n)"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/runtime_source.py",
+          "line": 10,
+          "import": "from .task import PickCubeEnv, PICK_CUBE_SPEC"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/p2_0_s2_a_source_identity.json",
+          "line": 161,
+          "text": "\"path\": \"task_env/tasks/pick_cube/task.py\","
+        },
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 936,
+          "text": "\"path\": \"task_env/tasks/pick_cube/task.py\","
+        },
+        {
+          "path": "task_env/diagnostics/historical_tasks.py",
+          "line": 10,
+          "text": "from task_env.tasks.pick_cube.task import PickCubeEnv"
+        },
+        {
+          "path": "task_env/diagnostics/phase1/flow_training.py",
+          "line": 53,
+          "text": "'task_env/tasks/pick_cube/canonical_semantics.py', 'task_env/tasks/pick_cube/task.py',"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    },
+    {
+      "path": "task_env/tasks/pick_cube/timebase.py",
+      "sha256": "b17f1cb01690f4552d164685f9d9fe7e858d55eafe2c5637aff807f3806921e6",
+      "baseline_blob": "e7f79014e5584794bf5102ffb8a0a0fbfa3621ee",
+      "v1_0_0_blob": "e7f79014e5584794bf5102ffb8a0a0fbfa3621ee",
+      "recovery": {
+        "canonical": "v1.0.0",
+        "blob": "e7f79014e5584794bf5102ffb8a0a0fbfa3621ee"
+      },
+      "disposition": "KEEP_ACTIVE_DEPENDENCY",
+      "delete_now": false,
+      "active_closure": true,
+      "source_fingerprint_dependency": false,
+      "direct_import_callers": [
+        {
+          "path": "task_env/diagnostics/phase1/multirate/common.py",
+          "line": 9,
+          "import": "from ....tasks.pick_cube.timebase import build_timebase_candidate"
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 46,
+          "import": "from task_env.tasks.pick_cube.timebase import build_timebase_candidate"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/reset.py",
+          "line": 6,
+          "import": "from .timebase import require_timebase_family"
+        },
+        {
+          "path": "task_env/tasks/pick_cube/runtime_source.py",
+          "line": 9,
+          "import": "from .timebase import require_timebase_family"
+        }
+      ],
+      "literal_reference_callers": [
+        {
+          "path": "docs/module/task_env/phase1_mainline_integration/source_identity_proof.json",
+          "line": 943,
+          "text": "\"path\": \"task_env/tasks/pick_cube/timebase.py\","
+        },
+        {
+          "path": "task_env/diagnostics/tasks/test_reference_construction.py",
+          "line": 46,
+          "text": "from task_env.tasks.pick_cube.timebase import build_timebase_candidate"
+        }
+      ],
+      "deletion_blockers": [
+        "Active selected construction/import or source-fingerprint/data dependency; whole-file deletion forbidden",
+        "Resolve every listed caller: migrate reusable selected dependency or archive explicit historical tool/test; do not rewrite frozen reports"
+      ]
+    }
+  ]
+}

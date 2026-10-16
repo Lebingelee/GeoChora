@@ -40,3 +40,29 @@ class ReferenceExecutionController:
 
     def inner_gripper_step(self, *args):
         return self.inner.inner_gripper_step(*args)
+
+
+class ReferenceArmSchedule:
+    """Selected V2 public-ack interpolation; runtime owns native stepping."""
+    version = 'linear-native-ramp-after-lift-v2-public-ack-memory'
+
+    def __init__(self, solution, memory):
+        self.solution, self.memory = solution, memory
+
+    def begin(self, target):
+        self.active = bool(self.solution._lift_released)
+        if self.active and self.memory.last_applied_arm is None:
+            raise ValueError('arm ramp requires a preceding public applied acknowledgement')
+        self.initial = dict(self.memory.last_applied_arm or target.arm_servo_position)
+
+    def target(self, target, index, count):
+        from dataclasses import replace
+        if not self.active:
+            return target
+        fraction = (index + 1) / count
+        arm = {k: self.initial[k] + fraction * (v - self.initial[k])
+               for k, v in target.arm_servo_position.items()}
+        return replace(target, arm_position=arm, arm_servo_position=arm)
+
+    def applied(self, acknowledgement):
+        self.memory.last_applied_arm = dict(acknowledgement.arm_servo_position)

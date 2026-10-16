@@ -16,7 +16,8 @@ from ._bootstrap import configure_imports
 
 configure_imports()
 
-from task_env import CameraSpec, make_env
+from task_env import CameraSpec
+from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 from task_env.utils.rotation import look_at_quat_wxyz as _look_at_quat
 
 

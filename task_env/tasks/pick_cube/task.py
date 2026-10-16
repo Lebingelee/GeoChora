@@ -157,7 +157,6 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         )
 
 
-@register_env()
 class PickCubeEnv(BaseTaskEnv):
     """Registered PickCube environment and task-owned runtime factories."""
 

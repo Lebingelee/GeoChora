@@ -1,3 +1,5 @@
+> 当前 active route 见 [P2.0-B selected consumers](../../../docs/module/task_env/p2_0_active_task_consumers.md)。下文旧 env UID/config 属历史接口；当前 make_env 明确拒绝，恢复请使用冻结 v1.0.0。
+
 # NutAssemblySquare solution ownership
 
 `solution.py` remains the historical compatibility solution. Its implementation,

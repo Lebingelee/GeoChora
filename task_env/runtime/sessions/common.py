@@ -53,7 +53,7 @@ class _SessionValues:
                                     self._provider, self.snapshot(), 0)
 
     def step_control_interval(self, held_target, gripper_inner_servo, *, audit=None,
-                              diagnostic_readback=None, interval_observer=None):
+                              diagnostic_readback=None, interval_observer=None, arm_schedule=None):
         """Opt-in arm-ZOH interval with a shared physics-rate gripper update.
 
         Existing ``step()`` remains unchanged. Providers implement only
@@ -63,6 +63,8 @@ class _SessionValues:
         from dataclasses import replace
         self._require_reset()
         start = self.snapshot()
+        if arm_schedule is not None:
+            arm_schedule.begin(held_target)
         if audit is not None:
             audit.begin_inner_interval(start)
         substep_rows = []
@@ -75,7 +77,11 @@ class _SessionValues:
                 feedback = self.control_feedback(state)
                 gripper_target, diagnostics = gripper_inner_servo.inner_gripper_step(state, feedback)
                 target = replace(held_target, gripper=gripper_target)
+                if arm_schedule is not None:
+                    target = arm_schedule.target(target, substep_index, self._artifact.timebase.control_substeps)
                 last_applied = self.apply_control(target)
+                if arm_schedule is not None:
+                    arm_schedule.applied(last_applied)
                 if audit is None:
                     self._step_physics_once()
                 else:

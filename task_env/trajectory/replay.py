@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 import yaml
 
-from task_env.registry import make_env
+from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 from .metadata import load_metadata
 
 
@@ -236,7 +236,7 @@ def _replay_single_trajectory(
 ) -> dict[str, object]:
     """Replay one trajectory in one short-lived simulator process."""
 
-    from task_env.registry import make_env
+    from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 
     source = Path(path)
     with h5py.File(source, "r") as root:

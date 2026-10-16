@@ -5,10 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from task_env import CameraSpec
-from task_env.tasks.nut_assembly.solution import NutAssemblySolution
-from task_env.tasks.nut_assembly.task import NUT_ASSEMBLY_TASK_UID
-from task_env.tasks.pick_cube import PickCubeSolution
-from task_env.tasks.pick_cube.task import PICK_CUBE_TASK_UID
 from task_env.utils.rotation import look_at_quat_wxyz
 
 
@@ -134,7 +130,7 @@ def _pick_cube_config(
     }
 
 
-def _build_plan(
+def _historical_build_plan(
     env_id: str,
     backend: str,
     horizon: int,
@@ -143,7 +139,9 @@ def _build_plan(
     force_limit_N: float,
     camera_size: int = 64,
 ) -> tuple[dict[str, Any], Any]:
-    if env_id == NUT_ASSEMBLY_TASK_UID:
+    from task_env.tasks.nut_assembly.solution import NutAssemblySolution
+    from task_env.tasks.pick_cube.solution import PickCubeSolution
+    if env_id == 'nut-assembly-square-v1':
         return (
             _nut_assembly_config(
                 backend,
@@ -154,7 +152,7 @@ def _build_plan(
             ),
             NutAssemblySolution(),
         )
-    if env_id == PICK_CUBE_TASK_UID:
+    if env_id == 'pick-cube-v1':
         return (
             _pick_cube_config(
                 backend,
@@ -169,3 +167,25 @@ def _build_plan(
 
 
 __all__ = ["_build_plan", "_nut_assembly_config", "_pick_cube_config"]
+
+
+SELECTED_ENV_IDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1')
+
+
+def _build_plan(env_id, backend, horizon, *, camera_obs=False, force_limit_N=None, camera_size=64):
+    """Explicit selected route; historical control/camera overlays are incompatible.
+
+    The returned expert is a construction preview. Execution must use the expert
+    belonging to the materialized environment after reset (shared arm hold).
+    """
+    if env_id not in SELECTED_ENV_IDS:
+        raise ValueError('legacy task plan incompatible; choose an explicit selected reference UID')
+    if camera_obs or force_limit_N is not None or backend != 'cpu':
+        raise ValueError('selected reference uses fixed CPU state-only control configuration')
+    if env_id == SELECTED_ENV_IDS[0]:
+        from task_env.tasks.pick_cube.reference import build_reference
+        value = build_reference()
+    else:
+        from task_env.tasks.nut_assembly.reference import build_reference
+        value = build_reference(provider='geophys')
+    return {'provider': 'geophys', 'backend': 'cpu', 'horizon': horizon}, value['solution']

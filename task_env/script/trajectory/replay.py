@@ -15,15 +15,27 @@ else:
     from .._bootstrap import BACKEND_CHOICES, get_logger, stage14_output, write_json
 
 
-def main() -> None:
+def main(argv=None) -> None:
     from task_env.trajectory import replay_and_verify_collection, replay_and_verify_universal_action
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trajectory", type=Path, required=True)
     parser.add_argument("--backend", choices=BACKEND_CHOICES, default="cpu")
     parser.add_argument("--require-exact", action="store_true")
+    parser.add_argument('--selected-reexecute', action='store_true', help='Same-source selected expert comparison; --output must be a fresh H5 path')
+    parser.add_argument('--historical', action='store_true',
+                        help='Explicit recovery-only legacy H5 replay; never selected-route acceptance')
     parser.add_argument("--output", type=Path)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.selected_reexecute:
+        if args.historical or args.output is None or args.require_exact:
+            parser.error('selected comparison requires fresh --output and excludes historical flags')
+        from task_env.trajectory.reference_replay import reexecute_selected
+        import json
+        print(json.dumps(reexecute_selected(args.trajectory, output=args.output)))
+        return
+    if not args.historical:
+        parser.error('legacy H5 replay requires --historical; selected H5 validation uses canonical.streaming.validate_streaming, not D0 reconstruction')
     logger = get_logger("task-env-stage14-trajectory-replay")
     backend = None if args.backend == "auto" else args.backend
     import h5py

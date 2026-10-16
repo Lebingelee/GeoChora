@@ -59,7 +59,7 @@ def main() -> None:
     if args.width < 1 or args.height < 1 or args.steps < 1 or args.sleep < 0.0:
         parser.error("width, height, and steps must be positive; sleep must be non-negative")
 
-    from task_env import make_env
+    from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 
     logger = get_logger("task-env-p2-s17a-render-cli")
     env = make_env(

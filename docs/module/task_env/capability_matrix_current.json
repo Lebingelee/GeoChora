@@ -1,0 +1,46 @@
+{
+  "schema": "geochora-current-reference-capability-overlay-v1",
+  "status": "S2_A_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
+  "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
+  "integrated_baseline": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+  "qualification_inherited": false,
+  "selected_references": [
+    {
+      "env_id": "pick-cube-p16-reference-v1",
+      "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "provider_backend": [
+        "geophys/cpu",
+        "mujoco/cpu"
+      ],
+      "control_hz": 100,
+      "s2_a_claim_limit": "PASS: 8-interval reset/expert/recording/truncation smoke on GeoPhys/MuJoCo CPU; not full trajectory acceptance",
+      "new_adapter_full_trajectory_acceptance": "NOT_RUN",
+      "policy_checkpoint_inference": "NOT_RUN",
+      "historical_P1_6_policy_qualification": "UNCHANGED_NO_INHERITANCE"
+    },
+    {
+      "env_id": "nut-assembly-outcome-reference-v1",
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "policy_id": "nutassembly-outcome-oriented-completion-v1",
+      "provider_backend": [
+        "geophys/cpu",
+        "mujoco/cpu"
+      ],
+      "control_hz": 100,
+      "gripper_inner_hz": 500,
+      "task_success": "measured inserted_on_peg AND released_nut",
+      "integrated_S1_6": "BOUNDED_FUNCTIONAL_ACCEPTANCE_BOTH_PROVIDERS; source 77e194e2",
+      "s2_a_claim_limit": "PASS: 8-interval reset/expert/recording/truncation smoke on GeoPhys/MuJoCo CPU; not full trajectory acceptance",
+      "new_adapter_full_trajectory_acceptance": "NOT_RUN",
+      "historical_P1_8_strict_FULL_and_D0": "UNCHANGED_NO_RELABEL"
+    }
+  ],
+  "new_reference_renderer_interoperability": "NOT_IMPLEMENTED",
+  "native_current_source_reexecution": "NOT_RUN",
+  "provider_free_current_source_reexecution": "SYNTHETIC_ONLY_NO_QUALIFICATION",
+  "S2_B": "BLOCKED_PENDING_MAINTAINER_REVIEW_FULL_ROUTE_REGRESSION_AND_DEPENDENCY_EXTRACTION",
+  "storage": "SINGLE_SATA_RISK_AND_INDEPENDENT_BACKUP_LIMITATION_UNRESOLVED",
+  "source_identity_manifest": "p2_0_s2_a_source_identity.json",
+  "provider_free": "150 passed, 6 subtests passed"
+}

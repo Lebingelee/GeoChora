@@ -66,3 +66,7 @@ provider-free固定快照检查保护Artifact、reset、source config/XML、cont
 [原Outcome-Oriented Completion Policy proposal](proposals/nutassembly-outcome-completion-v1.md) 保留提案背景；S1.6已实施并版本化100Hz task-owned默认。复用现有Core lifecycle enum，独立policy identity和outcome字段见当前合同，不将新结果标为历史FULL。
 
 S2前仍需：新source完整selected路径与record/replay验证；迁移公开plans/reporter及余下callers；抽出旧expert继承与yaw helper；移交Nut candidate MRO依赖；review API removal与删除清单。S1不提前删除这些实现。
+
+## S2-A 调用者迁移（待审阅）
+
+当前公开构造、录制/重执行和兼容移除边界见 [active task consumers](p2_0_active_task_consumers.md)。S1.6 evidence 的 source identity 保持冻结；新适配器须独立验收，不能继承历史资格。

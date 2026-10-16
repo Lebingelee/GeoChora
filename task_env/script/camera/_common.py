@@ -84,7 +84,7 @@ def _image(observation: Mapping[str, Any], name: str) -> np.ndarray:
 
 
 def run_camera(*, requested_backend: str, bound: bool) -> Path:
-    from task_env import make_env
+    from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 
     name = "bound" if bound else "static"
     logger = get_logger(f"task-env-stage14-camera-{name}")

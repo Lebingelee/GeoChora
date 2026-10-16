@@ -18,8 +18,8 @@ else:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env-id", default="pick-cube-v1")
-    parser.add_argument("--backend", choices=BACKEND_CHOICES, default="auto")
+    parser.add_argument("--env-id", default="pick-cube-p16-reference-v1")
+    parser.add_argument("--backend", choices=BACKEND_CHOICES, default="cpu")
     parser.add_argument("--steps", type=int, default=3)
     parser.add_argument("--horizon", type=int, default=10)
     parser.add_argument("--seed", type=int, default=31)

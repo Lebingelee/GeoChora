@@ -393,6 +393,20 @@ def run(*, provider: str, rate: int, output: Path,
                 lambda: owner_value.get("_active_execution_solution",
                                         owner_value["solution"]).stage
             )
+        if construction_route == 'task-owned' and not diagnostic_shadow_mode:
+            from ....tasks.nut_assembly.reference_execution import ReferenceArmSchedule
+            from ....runtime.sessions.common import _SessionValues
+            schedule = ReferenceArmSchedule(owner_value['solution'], owner_value['_arm_schedule_memory'])
+            # Retain independent RampedArmAudit's exact expected-stream check.
+            def selected_interval(held_target, servo, *, audit=None, **kwargs):
+                active = bool(owner_value['solution']._lift_released)
+                initial = dict(owner_value['_arm_schedule_memory'].last_applied_arm or held_target.arm_servo_position)
+                if audit is not None:
+                    audit._diagnostic_plan = (initial, dict(held_target.arm_servo_position), active)
+                return _SessionValues.step_control_interval(session, held_target, servo,
+                    audit=audit, arm_schedule=schedule, **kwargs)
+            session.step_control_interval = selected_interval
+            return result
         session._diagnostic_arm_ramp_active = lambda: bool(getattr(
             owner_value.get("_active_execution_solution", owner_value["solution"]),
             "_lift_released", False
@@ -434,7 +448,13 @@ def run(*, provider: str, rate: int, output: Path,
                               construction_source_sha256=owner_value["resolved_configuration"]["source_sha256"],
                               execution_policy=owner_value["execution_policy"],
                               resolved_configuration=owner_value["resolved_configuration"],
+                              arm_schedule_stepper=(
+                                  'task_env.runtime.sessions.common._SessionValues.step_control_interval'
+                                  if not diagnostic_shadow_mode else
+                                  'task_env.diagnostics.phase1.frequency_grasp.arm_schedule.ramped_control_interval'),
                               arm_schedule_stepper_source_sha256=_sha(
+                                  Path(__file__).resolve().parents[3] / 'runtime/sessions/common.py'
+                                  if not diagnostic_shadow_mode else
                                   Path(frequency_run.__file__).parent / "arm_schedule.py"))
                 if callable(getattr(owner_value['solution'], 'outcome_report', None)):
                     recipe.update(
@@ -623,6 +643,8 @@ def run(*, provider: str, rate: int, output: Path,
         )
     worker._write(output / "full_expert_result.json", result)
     source_paths = {
+        "selected_session_interval": Path(__file__).resolve().parents[3] / 'runtime/sessions/common.py',
+        "selected_reference_execution": Path('task_env/tasks/nut_assembly/reference_execution.py'),
         "execution_provenance": Path(__file__).with_name('provenance.py'),
         "lifecycle_core": Path("task_env/tasks/canonical_solution_lifecycle.py"),
         "nutassembly_lifecycle_solution": Path("task_env/tasks/nut_assembly/canonical_solution_v2.py"),

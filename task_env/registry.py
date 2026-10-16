@@ -132,7 +132,13 @@ def make_env(
     import importlib
 
     importlib.import_module("task_env.tasks")
+    if uid in {'pick-cube-v1', 'nut-assembly-square-v1'}:
+        raise ValueError('legacy reference task UID retired from active make_env; use '
+                         'pick-cube-p16-reference-v1 or nut-assembly-outcome-reference-v1 '
+                         'with explicit provider/backend/horizon; see v1.0.1 migration guide')
     environment_type = ENV_REGISTRY.get(uid)
+    if hasattr(environment_type, 'from_reference_config'):
+        return environment_type.from_reference_config(config, render_mode=render_mode, **kwargs)
     from .environment.configuration import resolve_task_env_config
 
     resolved_config = resolve_task_env_config(environment_type, config)

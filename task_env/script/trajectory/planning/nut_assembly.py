@@ -19,14 +19,16 @@ else:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=BACKEND_CHOICES, default="auto")
-    parser.add_argument("--horizon", type=int, default=600)
+    parser.add_argument('--provider', choices=('geophys','mujoco'), default='geophys')
+    parser.add_argument("--horizon", type=int, default=6000)
     parser.add_argument("--seed", type=int, default=19)
     args = parser.parse_args()
     if args.horizon < 1:
         parser.error("--horizon must be positive")
     run_solution(
-        env_id="nut-assembly-square-v1",
+        env_id='nut-assembly-outcome-reference-v1',
         requested_backend=args.backend,
+        provider=args.provider,
         horizon=args.horizon,
         seed=args.seed,
         summary_name="nut_assembly",

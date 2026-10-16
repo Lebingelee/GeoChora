@@ -31,14 +31,14 @@ else:
 configure_imports()
 
 from task_env.utils.runtime_support import get_task_env_logger
-from task_env import make_env
+from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 from task_env.recorders import (
     RecorderConfig,
     TransitionRecordWrapper,
     append_trajectory_collection_h5,
     save_trajectory_collection_h5,
 )
-from ._task_plans import _build_plan
+from ._task_plans import _historical_build_plan as _build_plan
 from task_env.trajectory.metadata import load_metadata
 from task_env.trajectory.processing import (
     merge_trajectory_collections,
@@ -465,7 +465,7 @@ def _merge(args: argparse.Namespace) -> Path:
     return output
 
 
-def main() -> None:
+def _historical_main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -507,6 +507,27 @@ def main() -> None:
         if args.output is None:
             args.output = args.input_dir.with_name(f"{args.input_dir.name}-merged.h5")
     args.handler(args)
+
+
+def main() -> None:
+    """Default commands use selected routes; old grouped tooling is explicit recovery."""
+    import sys
+    arguments = sys.argv[1:]
+    if arguments and arguments[0] == '--historical-grouped':
+        sys.argv = [sys.argv[0], *arguments[1:]]
+        _historical_main()
+        return
+    if arguments and arguments[0] == 'collect':
+        from .record import main as selected_record
+        selected_record(arguments[1:])
+        return
+    if arguments and arguments[0] == 'replay':
+        from .replay import main as selected_replay
+        selected_replay(arguments[1:])
+        return
+    parser = argparse.ArgumentParser(description='Selected-reference collect/replay; legacy grouped operations require --historical-grouped')
+    parser.add_argument('command', choices=('collect', 'replay'))
+    parser.parse_args(arguments)
 
 
 if __name__ == "__main__":

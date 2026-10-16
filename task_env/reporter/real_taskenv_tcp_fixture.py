@@ -4,52 +4,21 @@ from __future__ import annotations
 
 import argparse
 
-from task_env import CameraSpec, make_env
+from task_env import make_env
 from task_env.reporter import ReporterDisconnected, ReporterSession, TcpReporterTransport
-from task_env.tasks.pick_cube.task import PICK_CUBE_TASK_UID
+from task_env.tasks.pick_cube.reference_env import REFERENCE_ENV_ID
 from task_env.utils.runtime_support import get_task_env_logger
 
 
-logger = get_task_env_logger("simulation", module="task-env-real-reporter-tcp-fixture")
 
 
 def _config() -> dict:
-    return {
-        "runtime": {
-            "backend": "cpu",
-            "broadphase": "n2",
-            "prewarm": False,
-            "control_substeps": 1,
-        },
-        "robot": {"controller": {"kind": "absolute_joint"}},
-        "observation": {"schema_version": "task-env-state-v2"},
-        "render": {
-            "camera_obs": True,
-            "backend": "raytracer",
-            "cameras": (
-                CameraSpec(
-                    "front_hwc",
-                    width=16,
-                    height=12,
-                    rgb_layout="HWC",
-                    rgb_dtype="float32",
-                    position=(0.7, 0.0, 0.8),
-                ),
-                CameraSpec(
-                    "wrist_chw",
-                    width=16,
-                    height=12,
-                    rgb_layout="CHW",
-                    rgb_dtype="uint8",
-                    position=(0.6, 0.2, 0.7),
-                ),
-            ),
-        },
-        "episode": {"horizon": 8},
-    }
+    """Selected state-only reference; historical camera fixture is not requalified."""
+    return {'provider': 'geophys', 'backend': 'cpu', 'horizon': 8}
 
 
 def main() -> None:
+    logger = get_task_env_logger("simulation", module="task-env-real-reporter-tcp-fixture")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, required=True)
@@ -60,7 +29,7 @@ def main() -> None:
     if args.max_steps < 1:
         raise ValueError("--max-steps must be positive")
 
-    env = make_env(PICK_CUBE_TASK_UID, config=_config())
+    env = make_env(REFERENCE_ENV_ID, config=_config())
     transport = TcpReporterTransport(args.host, args.port)
     session = ReporterSession(env, transport)
     completed_steps = 0

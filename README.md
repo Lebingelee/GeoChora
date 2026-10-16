@@ -135,7 +135,7 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 
 Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 qualified；具体计划以 [Phase I 蓝图](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) 为准。
 
-能力声明必须以实际执行证据和对应的 bounded decision 为准。Go2 CUDA/static/RSL 是当前 HEAD 的回归路线，不扩大 task/provider qualification。PickCube 有 P1.5 expert 与 P1.6 policy 的限定结果，但不代表所有 provider、随机化分布或数据工作流均获批准；NutAssembly 的当前证据按上文区分为 MuJoCo development 与 GeoPhys diagnostics，不构成端到端或跨 provider 正式支持。
+能力声明必须以实际执行证据和对应的 bounded decision 为准。Go2 CUDA/static/RSL 是当前 HEAD 的回归路线，不扩大 task/provider qualification。PickCube 有 P1.5 expert 与 P1.6 policy 的限定结果，但不代表所有 provider、随机化分布或数据工作流均获批准；历史 P1.8 NutAssembly 证据按上文保留。S1.6 的独立 Outcome V1 路由在 100 Hz GeoPhys/MuJoCo 完成具名完整轨迹的 bounded functional acceptance；待审阅 S2-A 新公开适配入口只做有界短冒烟，未继承完整轨迹验收或历史 FULL/D0 资格。详见 [当前 reference 入口](docs/module/task_env/p2_0_active_task_consumers.md)。
 
 首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 
@@ -198,13 +198,13 @@ PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
   --num-env 8 --backend cpu --updates 3 --rollout-steps 5 \
   --output-dir temp_outputs/task_env/pendulum_ppo_quickstart
 
-# PickCube trajectory collection
+# Selected P1.6 reference recording (S2-A API migration under review)
 PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory collect \
-  --env_id pick-cube-v1 --backend cpu --num-traj 1 --horizon 600 --no-render \
-  --output temp_outputs/task_env/trajectories/source.h5
+  --env-id pick-cube-p16-reference-v1 --provider geophys --seed 31 \
+  --horizon 6000 --output workspace/new-run/pickcube.h5
 ```
 
-运行产物默认写入 `temp_outputs/`，该目录不属于提交到 Git 的源代码。
+所选 reference 的 [S2-A 入口和不兼容迁移说明](docs/module/task_env/p2_0_active_task_consumers.md) 区分 active construction 与 historical recovery。新 reference 录制写入 ignored `workspace/`；旧示例输出 `temp_outputs/` 也不属于 Git 源码。
 
 ## Task Artifact、Experiment 与 Evidence
 

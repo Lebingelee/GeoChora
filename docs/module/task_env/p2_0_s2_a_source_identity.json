@@ -1,0 +1,275 @@
+{
+  "schema": "p2-0-b-s2-a-source-migration-v1",
+  "baseline": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+  "files": [
+    {
+      "path": "task_env/__init__.py",
+      "old_source_sha256": "266740b9013a0092e6d5b536e13697adc37149e7005afbe55f80756698d279c5",
+      "new_source_sha256": "1171a5e68156c3297a1ddd13611c22261e30983fac00876992a0b170bbca82b2"
+    },
+    {
+      "path": "task_env/diagnostics/historical_tasks.py",
+      "old_source_sha256": null,
+      "new_source_sha256": "a5be7fc21fe4d53f8b38a5c5631a3133921ea746a880a862954d657148c5773b"
+    },
+    {
+      "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
+      "old_source_sha256": "cb8727a26ea87aa078608ce3a0f3daaa602868aaba8bb9a2785d8121761b8aaa",
+      "new_source_sha256": "6bcb89c2013e5adebe297a568ef790bb980f346d2d47b118d37bd2343181760f"
+    },
+    {
+      "path": "task_env/diagnostics/tasks/test_selected_consumers.py",
+      "old_source_sha256": null,
+      "new_source_sha256": "174f71ad97dfcee7581c34b9d6ce824fef8afb41ca94a2671467b79026229e4e"
+    },
+    {
+      "path": "task_env/registry.py",
+      "old_source_sha256": "75f7de732c520abe1f37d684ac734d2b28a31f159eb40870cfc7ccd8d642f9a1",
+      "new_source_sha256": "c1f1afe5d3a0e46f62ccf9730ea21538da7d61afbbb1283d3801f7798bee6343"
+    },
+    {
+      "path": "task_env/reporter/real_taskenv_tcp_fixture.py",
+      "old_source_sha256": "d85a699fca9ea352df2e2f51fe35bea83ad157740b28ea420e123d9299c94220",
+      "new_source_sha256": "cbd5042d9aaa6c7a3695f8d7bbcb2d616e48dd19e9b394615a6efd1744754646"
+    },
+    {
+      "path": "task_env/reporter/real_taskenv_v2_tcp_fixture.py",
+      "old_source_sha256": "a21c761f485f4474e5ff9f72e42bf82d2988721c92ee576fff00a820af2ce267",
+      "new_source_sha256": "b4b1e806d58bdf89ffb3e45972a5d2ccdd438a7595c2aee99c93e034dd2961c7"
+    },
+    {
+      "path": "task_env/runtime/sessions/common.py",
+      "old_source_sha256": "82cba6b570ec1a67aa4dce788e35993222dd8b5c5cfa66ab2b0847ba285ee72e",
+      "new_source_sha256": "3339fe1b0c95469a9ef848198b1ce659fdcbc4dd6d61fbc9c6f45fd06b1edccb"
+    },
+    {
+      "path": "task_env/script/camera/_common.py",
+      "old_source_sha256": "8c4c09ec0b0a9490bfdd86c00c4da42c5d38618dc16b9e9ae4a72f7df9ffc237",
+      "new_source_sha256": "bd3c42e692b42e0f9729a9ee434925d277f746fc5ef2f00a8ec627cb8e85f6a3"
+    },
+    {
+      "path": "task_env/script/camera_lighting_probe.py",
+      "old_source_sha256": "6520967bab9ec9a65ae1083a38d72869270ec93f17b9929bcdee01927aa22735",
+      "new_source_sha256": "c56570540506fdd8d52adffee9255be2b67d676a3f2e6b29dc435f5b4557150f"
+    },
+    {
+      "path": "task_env/script/env/_common.py",
+      "old_source_sha256": "39cda308de2d8235827e76c024372e8731f9cd731c5f480fe087efc371040dc7",
+      "new_source_sha256": "8b84ee1be50bc733fe0e6c7e115d1ab93abfd0882262b6d551892cf4fdf96892"
+    },
+    {
+      "path": "task_env/script/env/single_from_file.py",
+      "old_source_sha256": "36c5487ff036f943513db6e30ee7b0d41b45697365352fb94a0d2063c307159e",
+      "new_source_sha256": "c984545ab2b2aafbca081012a1e5b24ec16814ed81af5315e61f4e3bd1bf4375"
+    },
+    {
+      "path": "task_env/script/env/single_inline.py",
+      "old_source_sha256": "58632aeb4289b5ba8fbf689a32b75834bbd8b88960386bb4e80d7c123c3c25cb",
+      "new_source_sha256": "a6dbcbb4d56a04e078f25361aae0ec98dbad5214b594cde5f1b151ab2f3b875b"
+    },
+    {
+      "path": "task_env/script/render_single.py",
+      "old_source_sha256": "3d4556f80f75e948abd4e8fa96e50cae336776918523d74f8f75522442abeccf",
+      "new_source_sha256": "c2ed5ec2704fd00c1739344994807d9202cf9aca61706d61737cd9069bae1f5c"
+    },
+    {
+      "path": "task_env/script/stage11.py",
+      "old_source_sha256": "b304ed448fdbaf214cdf105c3e2c956b08640ba47caa898267101e07d98d90b2",
+      "new_source_sha256": "4685bc414bdf64cf7a243cbfe19fc50faec5d9363d52a31fc87dc2173e761343"
+    },
+    {
+      "path": "task_env/script/stage11_socket.py",
+      "old_source_sha256": "4454aa6d44dc05e6841124dbd8455bac571faa5a59f5d64e9dadccc2ea486af4",
+      "new_source_sha256": "cf5bf79841c9782937813a99470190bcb4564d35474d222fb37aa3d8d8672d3e"
+    },
+    {
+      "path": "task_env/script/trajectory/_task_plans.py",
+      "old_source_sha256": "b90299066d309264b58944670dbf9f746e5ac103e8cbdcf10bc07348202e2b2f",
+      "new_source_sha256": "c679ab235045fe30dfe9d5244d7b32d206dfad54dcc27129e4f97c1a78c71d40"
+    },
+    {
+      "path": "task_env/script/trajectory/commands.py",
+      "old_source_sha256": "9bf3d92def3b8674e72f5f09b1adb7cc67bbde68f840b1a4e900b106f0bd5391",
+      "new_source_sha256": "468eba5f23b7878e20e7dcff3f7d4b0836a9206f47bb2b64300444fc4217a2b3"
+    },
+    {
+      "path": "task_env/script/trajectory/planning/_common.py",
+      "old_source_sha256": "4888e2ec861611a289704c239f2cb678ddba00cc347f2d5f08e1e93b6f7aa745",
+      "new_source_sha256": "af04779e1cf655b13cf44dd305e9dd525d388424b47de404085b592faf05b0f4"
+    },
+    {
+      "path": "task_env/script/trajectory/planning/nut_assembly.py",
+      "old_source_sha256": "39e1c7e70bf9ff983dfb7ed38dec2907bd37eef5dab1df6ace54e9608272a000",
+      "new_source_sha256": "e9e81dd83cc6fff58af4e9da3000776daa0710d0e65f43cce9e04b6abae30dab"
+    },
+    {
+      "path": "task_env/script/trajectory/planning/pick_cube.py",
+      "old_source_sha256": "ad9ee74710dbb70191fc3fab91a4c01dfa2e2493abd0c1e5fb1957e36cee9076",
+      "new_source_sha256": "3d2bae23d0a2c8bd8cb9acab2456647605488cc5edd246f7f5879630b90efeec"
+    },
+    {
+      "path": "task_env/script/trajectory/record.py",
+      "old_source_sha256": "82189f08b8b388fe6c0e0bd9365993a0324dd6a7204cb32d0e81c59d617305b6",
+      "new_source_sha256": "0eb221abeeab3a4bf19fb12d0764b580307758a2de09d071be3b773096250143"
+    },
+    {
+      "path": "task_env/script/trajectory/replay.py",
+      "old_source_sha256": "f9b9c8e580990404dcd1527824a824ecb04e8efe47004b0bc8c3849b1254ce79",
+      "new_source_sha256": "37674e362a88ab1ebffc47670db8077cd08cc4c085e59ea77397c29e52ffc461"
+    },
+    {
+      "path": "task_env/tasks/__init__.py",
+      "old_source_sha256": "0e7d92e0a6c68e2ff8596cbc045a5f8f52083fe3682606cbc9b010987f536731",
+      "new_source_sha256": "61dc651d3eaa5c6518e87b575401cd660c64e96d5377c2607edb6e3ff35f8036"
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/README.md",
+      "old_source_sha256": "2ba152386c613ae74b2f1aec471e3ca4a8921b69214f86755a7f4ddcfbff9c99",
+      "new_source_sha256": "64723e35f256c0c2a96215f528de203a621e75aade6aada94103c8d044a83946"
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/__init__.py",
+      "old_source_sha256": "244fbe51dc1cf91c09af9af8d7ab887543bbd0fe03065e9ee326715b6221dd0a",
+      "new_source_sha256": "d37cacd8fc587ea3750b5a857c4a12cee405d0d0be4614a650bd11f0562b82b9"
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/reference_env.py",
+      "old_source_sha256": null,
+      "new_source_sha256": "4e609b3c229a386e4f8e9585357c26c904791e9bc80c0928855cc8da366439b9"
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/reference_execution.py",
+      "old_source_sha256": "63b50d8f4e449798ff5d95f638586ad72477a97fa47b846acb8201f719e4e69e",
+      "new_source_sha256": "89d0b32df124d7478818e2786812b35115ba30c65ab1134e9971ac6b4bca3bfa"
+    },
+    {
+      "path": "task_env/tasks/nut_assembly/task.py",
+      "old_source_sha256": "d9f2ba36c38a2a7c08c96cc834fe7195e511f8525b1929a13402b03962a72d27",
+      "new_source_sha256": "32cd37f9215166b76200a082dd573e5b04478f6bc6538c318a3ebbc2f2f17b5f"
+    },
+    {
+      "path": "task_env/tasks/pick_cube/__init__.py",
+      "old_source_sha256": "4270d1b02357f9e543f0d2135aa37b1a10f7c216ba31ce1010052437d5e4db27",
+      "new_source_sha256": "887f8f63f887a5415af335614e158911cd4f52622ed97088722ee92136e2a8ac"
+    },
+    {
+      "path": "task_env/tasks/pick_cube/reference_env.py",
+      "old_source_sha256": null,
+      "new_source_sha256": "43dbdf9dd4e469923344e86e69789a084338c87a7b29c3a0f72102b736f19fc5"
+    },
+    {
+      "path": "task_env/tasks/pick_cube/task.py",
+      "old_source_sha256": "fbf6ad4f54356ce7a2deb6a6c5dd9f7b66d2dbd5ae7049056535f7c051be76d8",
+      "new_source_sha256": "1ce0153a33ace25a3cd735917a001127e133a6d5d30922de77cab12a2b01cf1d"
+    },
+    {
+      "path": "task_env/tasks/reference_env.py",
+      "old_source_sha256": null,
+      "new_source_sha256": "b18d3a789b63f1a2e51253b7416ac91c2387ef2152841ecb266f1b428ccdc78e"
+    },
+    {
+      "path": "task_env/trajectory/reference_replay.py",
+      "old_source_sha256": null,
+      "new_source_sha256": "43e0a34121ec054279845914575ef19bc6b0950a6e8796bed1086d0dd48dac9c"
+    },
+    {
+      "path": "task_env/trajectory/replay.py",
+      "old_source_sha256": "22fb072c36b760c34e01331d0911255318222af5bd81a71b5727324076680f30",
+      "new_source_sha256": "6f281c129896fbefb47bd76c07e3e859c47b5ed673999094484c38f76f25047d"
+    }
+  ],
+  "selected_identities": {
+    "pickcube": {
+      "artifact": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "controller": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+      "solution": "fcef1d3a9c093a1d0adfce394a44099f5bff61edae48b3dce2ff50406118cd61",
+      "configuration_receipt_sha256": "bbef7d0ad171476fd1a75acda65f164abcbc7cc74d49d323ab0ebea1489846d6"
+    },
+    "nutassembly_geophys": {
+      "artifact": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "policy_id": "nutassembly-outcome-oriented-completion-v1",
+      "policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+      "solution": "7a4816bd248444abfa8ea90c2e6200950d90ab08e1db59c867b979fe0e3626e6",
+      "old_controller": "9940cc4bea3fb658e82aa5fc2e9525c2a12204d5e42ea91b4884b45290ffb7ef",
+      "new_controller": "0d5d3e05efe734a7aba8fd451afd1e5699e515c072d20c1048d945237b3d9421",
+      "old_recipe": "48c7f4da32b89579c5aec8520b57c965a58de0b24a4f6c648b44612465f935ff",
+      "new_recipe": "97a7103394e50cc11db8463fd501de60e327c8515850e50426677e404596d0ee",
+      "explanation": "execution_support source includes task-owned public-ack schedule; source task.py registration removed. Physical/controller parameter equivalence is checked separately; no historical qualification inheritance."
+    },
+    "nutassembly_mujoco": {
+      "artifact": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "policy_id": "nutassembly-outcome-oriented-completion-v1",
+      "policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+      "solution": "7a4816bd248444abfa8ea90c2e6200950d90ab08e1db59c867b979fe0e3626e6",
+      "old_controller": "5535d3a59495915eebb084c0188ae9b7fc21161e080d955eabb14c4c069b6c5b",
+      "new_controller": "2867280b91cf709516d3580ffcb595a74cb40513b8c773ccb141a04ebae7d069",
+      "old_recipe": "9f338b1e5463838a75bc2535fe064bf20eb1c18dd20e4f2f6622ce1b948e560d",
+      "new_recipe": "d829233d6d053345ac94f965b140a0dbc60635b4880b83b4ff3f5a1191c79ba3",
+      "explanation": "execution_support source includes task-owned public-ack schedule; source task.py registration removed. Physical/controller parameter equivalence is checked separately; no historical qualification inheritance."
+    }
+  },
+  "unchanged_resolved_contract_checks": {
+    "pickcube": {
+      "artifact": true,
+      "artifact_sha256": true,
+      "runtime_config": true,
+      "readiness": true,
+      "resolved_controller_action": true,
+      "resolved_controller_gripper": true,
+      "controller_identity": true,
+      "solution_identity": true,
+      "source_xml_sha256": true,
+      "runtime_source_bindings": true,
+      "runtime_open_actuators": true
+    },
+    "nutassembly_geophys": {
+      "artifact": true,
+      "artifact_sha256": true,
+      "runtime_config": true,
+      "solution_config": true,
+      "solution_parameters": true,
+      "dynamic_profile": true,
+      "physical_profile": true,
+      "resolved_controller_action": true,
+      "resolved_controller_gripper": true,
+      "r3_parameters": true,
+      "base_controller_identity": true,
+      "solution_identity": true,
+      "guard_policy": true,
+      "execution_policy": true,
+      "arm_schedule": true,
+      "gripper_feedback_hz": true,
+      "contact_profile": true,
+      "source_xml_sha256": true,
+      "runtime_source_bindings": true,
+      "runtime_open_actuators": true
+    },
+    "nutassembly_mujoco": {
+      "artifact": true,
+      "artifact_sha256": true,
+      "runtime_config": true,
+      "solution_config": true,
+      "solution_parameters": true,
+      "dynamic_profile": true,
+      "physical_profile": true,
+      "resolved_controller_action": true,
+      "resolved_controller_gripper": true,
+      "r3_parameters": true,
+      "base_controller_identity": true,
+      "solution_identity": true,
+      "guard_policy": true,
+      "execution_policy": true,
+      "arm_schedule": true,
+      "gripper_feedback_hz": true,
+      "contact_profile": true,
+      "source_xml_sha256": true,
+      "runtime_source_bindings": true,
+      "runtime_open_actuators": true
+    }
+  },
+  "historical_hashes_rewritten": false,
+  "qualification_inherited": false
+}

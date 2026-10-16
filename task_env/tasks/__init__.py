@@ -2,9 +2,9 @@
 
 from .base import BaseTaskEnv
 from .empty import EmptyTaskEnv
-from .nut_assembly import NutAssemblyEnv
+from .nut_assembly.reference_env import NutAssemblyReferenceEnv
 from .pendulum import PendulumEnv
-from .pick_cube import PickCubeEnv
+from .pick_cube.reference_env import PickCubeReferenceEnv
 from .two_wheel_balance import TwoWheelBalanceEnv
 from .go2_walk import Go2WalkEnv
 from .go2_walk_deploy import Go2WalkDeployEnv, Go2WalkDeployHeightEnv
@@ -15,9 +15,9 @@ __all__ = [
     "BaseSceneBuilder",
     "BaseTaskEnv",
     "EmptyTaskEnv",
-    "NutAssemblyEnv",
+    "NutAssemblyReferenceEnv",
     "PendulumEnv",
-    "PickCubeEnv",
+    "PickCubeReferenceEnv",
     "TabletopSceneBuilder",
     "TwoWheelBalanceEnv",
     "Go2WalkEnv",

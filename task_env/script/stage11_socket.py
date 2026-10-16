@@ -27,7 +27,7 @@ else:
 
 configure_imports()
 
-from task_env import make_env
+from task_env.diagnostics.historical_tasks import make_historical_env as make_env
 from task_env.script.recorder import _pick_cube_config
 
 

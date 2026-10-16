@@ -321,7 +321,6 @@ class NutAssemblyResetSampler:
         return _episode_state_from_solver(solver)
 
 
-@register_env()
 class NutAssemblyEnv(BaseTaskEnv):
     variant_spec = NUT_ASSEMBLY_SQUARE_SPEC
     uid, task_uid, scene_uid = NUT_ASSEMBLY_ENV_ID, NUT_ASSEMBLY_TASK_UID, NUT_ASSEMBLY_SCENE_UID
