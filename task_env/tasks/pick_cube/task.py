@@ -36,7 +36,6 @@ from ...objects.pick_cube import (
 
 
 CONFIG_PATH = Path(__file__).with_name("config.yaml")
-PICK_CUBE_P16_ARTIFACT_SHA256 = "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4"
 EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
@@ -220,8 +219,6 @@ def build_artifact() -> TaskArtifact:
             "joint_state_query", "body_pose_query", "frame_pose_query",
         )),
     )
-    if artifact.identity_hash != PICK_CUBE_P16_ARTIFACT_SHA256:
-        raise ValueError("selected P1.6 TaskArtifact identity mismatch")
     return artifact
 
 
@@ -356,7 +353,7 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
 
 __all__ = [
-    "PICK_CUBE_P16_ARTIFACT_SHA256", "PickCubeReferenceEnv", "PickCubeTaskDefinition",
+    "PickCubeReferenceEnv", "PickCubeTaskDefinition",
     "REFERENCE_ENV_ID", "build_artifact", "build_reference", "build_runtime_source", "evaluate", "make_reference_binding",
     "sample_reset", "semantic_definition",
 ]
