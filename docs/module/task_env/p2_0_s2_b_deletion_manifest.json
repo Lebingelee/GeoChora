@@ -326,7 +326,7 @@
     "Resolve remaining active and historical callers for future removal proposals; frozen recovery may rely on v1.0.0 or immutable commits/tags. Do not copy obsolete implementations into maintained Core paths.",
     "Record any future public API compatibility removals and migration notices for v1.0.1; the two current module/diagnostic selector removals are documented in the active task migration guide.",
     "Do not remove generic Core lifecycle/provider/controller/recording contracts, Go2, or static physics in this slice.",
-    "No new SATA/ATA/I/O error; retain the known single-disk and independent-backup limitations."
+    "A kernel-journal review found an Oct 15 ata5 BadCRC and subsequent /dev/sda READ I/O errors; direct dmesg access was denied, so the earlier empty query was inconclusive. The maintainer later confirmed the storage issue was handled and authorized bounded CPU full-route/H5 testing. Preserve this historical receipt and continue monitoring; retain single-disk and independent-backup limitations."
   ],
   "files": [
     {

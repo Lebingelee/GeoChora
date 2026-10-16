@@ -52,7 +52,7 @@ The provider-free suite passed **168 tests in 17.60 s** on the S2-B2 source. It 
 
 The four native routes were not rerun: this slice changes only historical diagnostic selection, removes modules outside the selected source closure, and adds provider-free receipt validation; no selected execution dependency or configuration fingerprint changed. Prior S2-B1 full-route PASS results remain the latest native evidence. No D0-D2 qualification is inferred. Existing ignored failure receipts and H5 outputs were not overwritten.
 
-Before and after work, the available kernel log query showed no ATA/SATA/read-write I/O error. No native or other resource-intensive execution was needed. The known single-disk SATA and independent-backup limitations remain open.
+The later kernel-journal review found an Oct 15 ata5 `BadCRC` event followed by failed queued reads and `/dev/sda` READ I/O errors at sectors `1922308096` and `1922310144`. Direct `dmesg` access was denied, so the earlier empty result was not evidence that the kernel log was clean. The maintainer subsequently confirmed that the storage issue was handled and explicitly authorized bounded GeoPhys/MuJoCo CPU full-route and H5 tests. This authorization supports the upcoming S2-C1 validation; it does not erase the historical error receipt. Preserve the known single-disk SATA and independent-backup limitations in active risk records.
 
 ## Remaining active legacy dependencies and recommendation
 
