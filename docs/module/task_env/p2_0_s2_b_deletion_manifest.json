@@ -1,7 +1,7 @@
 {
   "schema": "geochora-s2-b-task-deletion-manifest-v1",
   "baseline": "32bdde9573cc20f8d8b2aafa975422834df2585b",
-  "status": "REVIEW_REQUIRED_NO_DELETION_AUTHORIZED",
+  "status": "S2_B2_LOCAL_IMPLEMENTED_REVIEW_REQUIRED",
   "selected_roots": [
     "task_env/tasks/pick_cube/reference_env.py",
     "task_env/tasks/nut_assembly/reference_env.py",
@@ -63,10 +63,6 @@
       "task_env/tasks/nut_assembly/assets.py",
       "task_env/tasks/nut_assembly/canonical_solution_v2.py",
       "task_env/utils/rotation/__init__.py"
-    ],
-    "task_env/tasks/nut_assembly/clearance_candidate_v4.py": [
-      "task_env/controllers/canonical/contracts.py",
-      "task_env/tasks/nut_assembly/clearance_candidate_v3.py"
     ],
     "task_env/tasks/nut_assembly/clearance_candidate_v5.py": [
       "task_env/controllers/canonical/contracts.py",
@@ -130,11 +126,6 @@
     "task_env/tasks/nut_assembly/stable_grasp_candidate.py": [
       "task_env/controllers/canonical/contracts.py",
       "task_env/controllers/canonical/execution.py",
-      "task_env/tasks/nut_assembly/canonical_solution.py",
-      "task_env/utils/rotation/__init__.py"
-    ],
-    "task_env/tasks/nut_assembly/stable_grasp_reference.py": [
-      "task_env/controllers/canonical/contracts.py",
       "task_env/tasks/nut_assembly/canonical_solution.py",
       "task_env/utils/rotation/__init__.py"
     ],
@@ -329,12 +320,12 @@
   },
   "generic_contracts_and_go2": "KEEP_OUT_OF_SCOPE: no Batch/Device/Learner, Go2/static physics retirement",
   "global_deletion_prerequisites": [
-    "Maintainer approval of an exact S2-B2 deletion diff; this S2-B1 approval does not authorize deletion.",
-    "S2-B1 provider-free API/import/artifact/semantics/lifecycle/recording/provenance suite: 157 passed on the current source; four named full-route regressions must pass before S2-B2 because selected source bytes changed.",
-    "Keep the selected PickCube P1.6 Artifact and selected NutAssembly Outcome V1 route with recorded S2-B1 source/controller/recipe identities; preserve old S2-A and pre-S2-B1 identities without relabeling historical Evidence.",
-    "Resolve every remaining direct importer and literal historical reference; archive/recovery callers only through approved migration, using v1.0.0 or immutable commits/tags. Do not copy old implementations into a maintained Core path.",
-    "Maintainer decision on public UID and export compatibility and the v1.0.1 migration notice before any public API removal.",
-    "Do not remove generic Core lifecycle/provider/controller/recording contracts, Go2, or static physics in S2-B2.",
+    "Maintainer approval authorizes exactly clearance_candidate_v4.py and stable_grasp_reference.py for this S2-B2 slice; any additional removal requires separate approval.",
+    "S2-B1 provider-free regression and four named full-route regressions are preserved in the integration receipt; this S2-B2 selector/deletion slice did not change selected execution source bytes.",
+    "Keep the selected PickCube P1.6 Artifact and selected NutAssembly Outcome V1 route with recorded S2-B1 source/controller/recipe identities; preserve historical Evidence without relabeling.",
+    "Resolve remaining active and historical callers for future removal proposals; frozen recovery may rely on v1.0.0 or immutable commits/tags. Do not copy obsolete implementations into maintained Core paths.",
+    "Record any future public API compatibility removals and migration notices for v1.0.1; the two current module/diagnostic selector removals are documented in the active task migration guide.",
+    "Do not remove generic Core lifecycle/provider/controller/recording contracts, Go2, or static physics in this slice.",
     "No new SATA/ATA/I/O error; retain the known single-disk and independent-backup limitations."
   ],
   "files": [
@@ -1185,27 +1176,38 @@
         "canonical": "v1.0.0",
         "blob": "6251ac1d861ab41c14379b3fd9af7cd9e82034e3"
       },
-      "disposition": "S2_B_CANDIDATE_REVIEW_REQUIRED",
-      "delete_now": false,
+      "disposition": "RETIRED_FROM_CURRENT_DEVELOP_LOCAL_REVIEW_REQUIRED",
+      "delete_now": true,
       "active_closure": false,
       "source_fingerprint_dependency": false,
-      "direct_import_callers": [
+      "direct_import_callers": [],
+      "literal_reference_callers": [],
+      "deletion_blockers": [],
+      "retired_direct_import_callers": [
         {
           "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
           "line": 26,
           "import": "from ....tasks.nut_assembly.clearance_candidate_v4 import NutAssemblyHandClearanceCandidateV4"
         }
       ],
-      "literal_reference_callers": [
+      "current_production_callers": [],
+      "current_tree_state": "ABSENT_AFTER_S2_B2_LOCAL_IMPLEMENTATION",
+      "implementation_commit": "84438d470cce4f5a215a5934fdfc344b91adca30",
+      "retired_invocation": "lifecycle_full --trajectory-candidate handle-clearance-v4-live-settle",
+      "retired_implementation_identity": "NutAssemblyHandClearanceCandidateV4 / nutassembly-r5-stable-grasp-10n-lifecycle-v2-handle-clearance-v4-live-settle",
+      "retirement_notes": [
+        "No current active task caller remains.",
+        "Historical replay requires the recorded immutable v1.0.0 recovery blob.",
+        "Frozen reports and literal historical references are preserved unchanged."
+      ],
+      "retired_literal_invocation_references": [
         {
           "path": "task_env/diagnostics/phase1/integration/lifecycle_full.py",
           "line": 665,
           "text": "\"clearance_candidate_v4\": Path(\"task_env/tasks/nut_assembly/clearance_candidate_v4.py\"),"
         }
       ],
-      "deletion_blockers": [
-        "Resolve current and historical callers before S2-B2; preserve frozen reports and exact immutable recovery sources."
-      ]
+      "literal_reference_classification": "historical/report references are preserved and are not current execution callers"
     },
     {
       "path": "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
@@ -2075,18 +2077,31 @@
         "canonical": "v1.0.0",
         "blob": "e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9"
       },
-      "disposition": "S2_B_CANDIDATE_REVIEW_REQUIRED",
-      "delete_now": false,
+      "disposition": "RETIRED_FROM_CURRENT_DEVELOP_LOCAL_REVIEW_REQUIRED",
+      "delete_now": true,
       "active_closure": false,
       "source_fingerprint_dependency": false,
-      "direct_import_callers": [
+      "direct_import_callers": [],
+      "literal_reference_callers": [],
+      "deletion_blockers": [],
+      "retired_direct_import_callers": [
         {
           "path": "task_env/diagnostics/phase1/integration/stable_grasp.py",
           "line": 10,
           "import": "from ....tasks.nut_assembly import stable_grasp_candidate, stable_grasp_reference"
         }
       ],
-      "literal_reference_callers": [
+      "current_production_callers": [],
+      "current_tree_state": "ABSENT_AFTER_S2_B2_LOCAL_IMPLEMENTATION",
+      "implementation_commit": "84438d470cce4f5a215a5934fdfc344b91adca30",
+      "retired_invocation": "stable_grasp.py --reference / import task_env.tasks.nut_assembly.stable_grasp_reference",
+      "retired_implementation_identity": "NutAssemblyStableGraspCandidate / nutassembly-r5-stable-grasp-10n-v1",
+      "retirement_notes": [
+        "No current active task caller remains.",
+        "Historical replay requires the recorded immutable v1.0.0 recovery blob.",
+        "Frozen reports and literal historical references are preserved unchanged."
+      ],
+      "preserved_historical_literal_references": [
         {
           "path": "docs/module/task_env/p1_8_integration/regression_results.json",
           "line": 72,
@@ -2098,9 +2113,7 @@
           "text": "\"path\": \"task_env/tasks/nut_assembly/stable_grasp_reference.py\","
         }
       ],
-      "deletion_blockers": [
-        "Resolve current and historical callers before S2-B2; preserve frozen reports and exact immutable recovery sources."
-      ]
+      "literal_reference_classification": "historical/report references are preserved and are not current execution callers"
     },
     {
       "path": "task_env/tasks/nut_assembly/task.py",
@@ -3472,7 +3485,7 @@
       "s2_b1_pushed": false
     }
   },
-  "manifest_snapshot": "S2-B1 selected-source graph integrated at 961ff67489cf6ed1fd3665fc77db2e3f389796e9; 49 source/documentation records; S2-B2 scoped retirement is not yet applied.",
+  "manifest_snapshot": "S2-B1 integrated on public develop at 71aadb8aada6c242166a1deadc610c230ba1c616; S2-B2 exact two-module retirement implemented locally in 84438d470cce4f5a215a5934fdfc344b91adca30; two historical callers retired explicitly; no additional deletions authorized.",
   "consolidated_support_files": [
     "task_env/tasks/nut_assembly/canonical_solution.py",
     "task_env/tasks/nut_assembly/canonical_source.py",
@@ -3595,5 +3608,66 @@
       "v1_0_0_tag_object_unchanged": "17c3100d4fabcb061c23569dea49973ebd177d51",
       "v1_0_0_commit_unchanged": "42787f5e4f658a3f81fdd2140cf7544d6342c783"
     }
+  },
+  "s2_b2_retirement_state": {
+    "status": "IMPLEMENTED_LOCAL_PENDING_MAINTAINER_REVIEW",
+    "baseline_public_develop": "71aadb8aada6c242166a1deadc610c230ba1c616",
+    "implementation_commit": "84438d470cce4f5a215a5934fdfc344b91adca30",
+    "review_report": "docs/module/task_env/p2_0_s2_b2_retirement_review.md",
+    "exact_scope": [
+      "task_env/tasks/nut_assembly/clearance_candidate_v4.py",
+      "task_env/tasks/nut_assembly/stable_grasp_reference.py"
+    ],
+    "public_push_or_merge": false,
+    "active_routes_unchanged": [
+      "pick-cube-p16-reference-v1",
+      "nut-assembly-outcome-reference-v1"
+    ],
+    "active_source_fingerprints": {
+      "recorded": 18,
+      "matched": 18,
+      "selected_task_source_changed": false
+    },
+    "provider_free_regression": {
+      "status": "PASS",
+      "passed": 168,
+      "elapsed_s": 17.6,
+      "scope": "API/import, Artifact identity, task semantics, reset, Outcome V1, controller/guard/lifecycle, provenance, recorder/CLI, retired selectors, MRO/source fingerprints, T/T+1 clock and provider-specific native-step receipts"
+    },
+    "full_route_regression": {
+      "status": "NOT_RERUN",
+      "reason": "Only historical diagnostic selectors and files outside the selected execution-source closure changed; all 18 S2-B1 selected source fingerprints still match.",
+      "latest_evidence": "Four S2-B1 current-source 100Hz CPU routes PASS; no D0-D2 qualification implied."
+    },
+    "recovery": {
+      "ref": "v1.0.0",
+      "tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+      "peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+      "modules": {
+        "task_env/tasks/nut_assembly/clearance_candidate_v4.py": {
+          "source_sha256": "10067cbdea578c17c9a1659667e8dbb5edd081ab362b2ad16b1fcdd8a53b3f83",
+          "v1_0_0_blob": "6251ac1d861ab41c14379b3fd9af7cd9e82034e3",
+          "invocation": "lifecycle_full --trajectory-candidate handle-clearance-v4-live-settle",
+          "implementation": "NutAssemblyHandClearanceCandidateV4 / nutassembly-r5-stable-grasp-10n-lifecycle-v2-handle-clearance-v4-live-settle",
+          "retired_caller": "task_env/diagnostics/phase1/integration/lifecycle_full.py"
+        },
+        "task_env/tasks/nut_assembly/stable_grasp_reference.py": {
+          "source_sha256": "b51c054bb997e294d9e3605a28d86eec1dfc253589f3da1578078a64a6908324",
+          "v1_0_0_blob": "e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9",
+          "invocation": "stable_grasp.py --reference / import task_env.tasks.nut_assembly.stable_grasp_reference",
+          "implementation": "NutAssemblyStableGraspCandidate / nutassembly-r5-stable-grasp-10n-v1",
+          "retired_caller": "task_env/diagnostics/phase1/integration/stable_grasp.py"
+        }
+      }
+    },
+    "unchanged_refs": {
+      "main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+      "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+      "v1_0_0_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783"
+    },
+    "known_resource_limitations": [
+      "single-disk SATA risk",
+      "independent-backup limitation"
+    ]
   }
 }
