@@ -2,26 +2,26 @@
 
 ## Review boundary and decision
 
-The current maintainer baseline `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8` matches the freshly fetched canonical GeoChora `public` remote `develop` head and is the direct parent of local S2-A `a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d`. An earlier prompt contained a mistyped SHA (`77e194e2cac1ec82cde927d57d4bf3d67a8783c3`); that value does not resolve and has been corrected in the active maintenance records below. All 35 recorded implementation/source identities matched the bytes exercised by the four native runs. The separate CLI-only fix `0f27225a6cdc884c6ff8f921351917ac3db47a4d` is directly on top of S2-A and changes no task builder, session, controller, solution, or runtime execution source. The four named native cases ran on exact S2-A source `a59840fc…`; provider-free checks now run on the final review commit chain. No merge, push, or change to `main`, `v1.0.0`, or historical Evidence occurred.
+The original maintainer baseline `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8` was the freshly fetched canonical GeoChora `public` remote `develop` head and direct parent of S2-A `a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d`. An earlier prompt contained a mistyped SHA (`77e194e2cac1ec82cde927d57d4bf3d67a8783c3`); that value does not resolve and remains only as audit context. All 35 recorded implementation/source identities matched the bytes exercised by the four native runs. The separate CLI-only fix `0f27225a6cdc884c6ff8f921351917ac3db47a4d` is directly on top of S2-A and changes no task builder, session, controller, solution, or runtime execution source. The four named native cases ran on exact S2-A source `a59840fc…`; provider-free checks ran on the final reviewed chain.
 
-The selected public routes passed bounded full-trajectory functional checks. PickCube GeoPhys is classified `PASS_RECONCILED`: its simulator run and finalized H5 passed independent contract and historical comparison checks, while the original post-run wrapper exited `FAIL` due to verifier defects recorded below. That failure receipt is preserved. The trajectory-record CLI result gate has since been corrected and tested. The baseline is confirmed. The reviewed commit chain is ready for maintainer fast-forward approval, subject to the documented public API compatibility/version decision; this review does not merge or push it.
+The selected public routes passed bounded full-trajectory functional checks. PickCube GeoPhys is classified `PASS_RECONCILED`: its simulator run and finalized H5 passed independent contract and historical comparison checks, while the original post-run wrapper exited `FAIL` due to verifier defects recorded below. That failure receipt is preserved. The trajectory-record CLI result gate has since been corrected and tested.
 
 The reviewed 42-file diff contains 35 implementation/test files and 7 documentation, capability, or identity/dependency-manifest files. No historical implementation was deleted.
 
 ## S2-A integration gate
 
-The checked code chain is `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8` → `a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d` → `0f27225a6cdc884c6ff8f921351917ac3db47a4d` → `57c98f9063e35d6c15f6f2664e2a1238a1eed885`. The added `57c98f9` commit changes tests only. The final provider-free run passed 162 tests and 6 subtests. A fresh canonical remote lookup still returned the stated baseline SHA; the earlier malformed prompt SHA remains only as audit context in the manifest. No fast-forward or push has been executed.
+The checked code chain is `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8` → `a59840fc31f1da8aa9cbb0f7ce99f31773b91b5d` → `0f27225a6cdc884c6ff8f921351917ac3db47a4d` → `57c98f9063e35d6c15f6f2664e2a1238a1eed885` → `32bdde9573cc20f8d8b2aafa975422834df2585b`. The added `57c98f9` commit changes tests only. The final provider-free run passed 162 tests and 6 subtests.
 
-After explicit maintainer approval, the bounded fast-forward command sequence is:
+The maintainer approved the bounded S2-A fast-forward. Before pushing, the canonical `public/develop` SHA was fetched as `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8`, verified as an ancestor of `32bdde9573cc20f8d8b2aafa975422834df2585b`, and the local tree was clean. The exact push was:
 
 ```bash
 git fetch public refs/heads/develop
 test "$(git rev-parse FETCH_HEAD)" = 77e194e2cac1ec82f7a39255a1eef0da9cd95ba8
-git merge-base --is-ancestor FETCH_HEAD HEAD
-git push public HEAD:refs/heads/develop
+git merge-base --is-ancestor FETCH_HEAD 32bdde9573cc20f8d8b2aafa975422834df2585b
+git push public 32bdde9573cc20f8d8b2aafa975422834df2585b:refs/heads/develop
 ```
 
-Expected result: public `develop` advances from `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8` to the reviewed local chain head; `main` and `v1.0.0` remain unchanged. If the remote head differs or the ancestry gate fails, stop and re-review. The command sequence is recorded for approval and has not been run.
+The push advanced `public/develop` from `77e194e2cac1ec82f7a39255a1eef0da9cd95ba8` to `32bdde9573cc20f8d8b2aafa975422834df2585b` by fast-forward. Independent `git ls-remote` readback confirmed that exact `develop` SHA. The same readback confirmed `public/main=e4e39883fbe01d4be4b172a53a535ef0095b3d64`, annotated `v1.0.0` tag object `17c3100d4fabcb061c23569dea49973ebd177d51`, and peeled release commit `42787f5e4f658a3f81fdd2140cf7544d6342c783`; none were changed. Historical Evidence remains untouched. No S2-B1 changes have been pushed.
 
 ## Code review
 

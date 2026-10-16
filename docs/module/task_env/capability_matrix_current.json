@@ -2,7 +2,7 @@
   "schema": "geochora-current-reference-capability-overlay-v1",
   "status": "S2_A_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
-  "integrated_baseline": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8",
+  "integrated_baseline": "32bdde9573cc20f8d8b2aafa975422834df2585b",
   "qualification_inherited": false,
   "selected_references": [
     {
