@@ -6,6 +6,8 @@ it is a lifecycle/semantics test, never physical provider qualification.
 import numpy as np
 import pytest
 from dataclasses import replace
+import json
+from pathlib import Path
 
 from task_env.tasks.nut_assembly.reference import build_reference, GUARDED_EXPERT, OUTCOME_COMPLETION
 from task_env.tasks.nut_assembly.outcome_solution import NutAssemblyOutcomeSolutionV1
@@ -16,6 +18,9 @@ from task_env.utils.rotation import quat_multiply_wxyz, quat_wxyz_to_matrix
 
 META = {'action_schema': {'controller_kind':'absolute_pose','reference':'world',
                           'rotation_representation':'quaternion_wxyz'}}
+S2B1_IDENTITIES = json.loads(
+    (Path(__file__).resolve().parents[3] / 'docs/module/task_env/p2_0_s2_b1_source_identity.json').read_text()
+)['selected_routes']['nutassembly']
 
 
 class Hold:
@@ -183,7 +188,7 @@ def test_default_and_source_policy_identity_and_complete_checkpoint_fields():
     v=build_reference();s=v['solution']
     assert isinstance(s,NutAssemblyOutcomeSolutionV1)
     assert v['execution_policy']['policy_id']==OUTCOME_COMPLETION and not v['diagnostic_shadow_mode']
-    assert s.original_solution_identity=='15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e'
+    assert s.original_solution_identity==S2B1_IDENTITIES['guarded_solution_identity']
     assert s.identity!=s.original_solution_identity
     assert v['source'].config.robot.gripper.force_limit_N==10.
     from task_env.diagnostics.phase1.integration.replay_preparation import _fields,_owner_version

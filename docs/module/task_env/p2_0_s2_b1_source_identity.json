@@ -1,0 +1,175 @@
+{
+  "baseline": "32bdde9573cc20f8d8b2aafa975422834df2585b",
+  "migration": {
+    "nutassembly": "Artifact, resolved runtime configuration, physical source XML and completion-policy identity remain unchanged. The canonical solution source now uses the shared square-yaw helper; therefore solution, controller and recipe identities are new and recorded above. Old S2-A identities remain preserved in S2-A evidence.",
+    "pickcube": "TaskArtifact schema and serialized identity are unchanged; the active P1.6 artifact now comes from artifact.py. Historical P1.1 build_candidate is a compatibility wrapper over the same factory and retains its existing Artifact hash."
+  },
+  "qualification": "NOT_REQUALIFIED",
+  "schema": "p2-0-b-s2-b1-source-identity-migration-v1",
+  "selected_routes": {
+    "nutassembly": {
+      "active_source_sha256": {
+        "asset_profile": "8345011c00f22eb100a1964965ca3bb3647d612410ad1ac7b33de0b41badc8e4",
+        "assets.py": "cfd605246ba3ea55b02cb601fea6457dbe5f6c29d9b8f46616dd47eee9101379",
+        "canonical_artifact.py": "11dc9338e73f6fb830cbcfe1e48dd21e0d2fbace97b41490ed6e276728f0aac2",
+        "canonical_initialization.json": "afb93f07f40d808aa21a1495449145e5e768b09cd0d5344e642bfce8000f1954",
+        "canonical_reset.py": "22515797ad42cc93e58fe2bdd6a2c2774f13791e675b781f4604a91827b6128e",
+        "canonical_semantics.py": "0ae45a7b5712f0c175cfc9b2e0c6fe38995a70ed96f43630005352830e002bd6",
+        "canonical_solution.py": "e71577367a6b7f3dbe3b5547097faed106506fa4734a6862e39756be994d8040",
+        "canonical_solution_v2.py": "f55b7e7109da27fd4b7a1a063abb9f469155b1552cc08d4da43d75b74f5558a8",
+        "canonical_source.py": "ed0151ebb9920a996e50ca1635337b5eefba58bbe508c59b0546980e8871c838",
+        "clearance_candidate_v3.py": "9572067bb977ae2a15c1cdea504120e9a8d6df6f7c670386ee276ffd6e3076ef",
+        "clearance_candidate_v5.py": "5544fc915e47e67677447c322bed1fece4d73b0b068f1fab394c014bddd2b44f",
+        "construction": "e54a409d151ab27b6b03e374c2d285fe83cf249a7667de06943abc2dd79ced98",
+        "controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+        "controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+        "controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+        "controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+        "controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+        "controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+        "controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+        "controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+        "default.yaml": "5295f300f34b5361428fcda2cdab1a946bad27ad87e6e32b8a04aa37e852b167",
+        "definition.py": "39d1fc80a4b9de11577d6042876c3fc42c0616c606ad4b2b913115f54cc1e536",
+        "dynamic_profile": "5bbac0ad315c07a1ced354ccee845acf92ae50ab1a125255d6af486c83d4c266",
+        "execution_support": "89d0b32df124d7478818e2786812b35115ba30c65ab1134e9971ac6b4bca3bfa",
+        "geometry.py": "68d6423b8a4284afcba5a486e826e7e4944344aae0ecfb4e1c55c2daa53ae0fe",
+        "guarded_authorization_candidate.py": "49c87b0cd15e940f0c9e5cff6ffc6a3450dae63eff6809f30f8147cecf68d40d",
+        "guarded_authorization_candidate_v2.py": "42c49826376cbfc5a41496e6765c8544e9e9e3ecd9de00bb8348b6f531a3a796",
+        "mujoco_contact_profile": "cd65d982f3640526636386c42ffa2de793ba32f245ddf0317322c4f40ca48973",
+        "outcome_solution.py": "57b8deeed5a43e7af3cf3edd3a904c70a8276d2c011726f5e569ab60f66a1138",
+        "reference_config.py": "a741ffa35029e6b4a029498c195df419f493639cbe6f8433193adb735f29519a",
+        "stable_grasp_candidate.py": "bcae3c71f8a135f435bba43c38f01c04750db379f7382e7761cfe927f5f8f423"
+      },
+      "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "artifact_version": "ver_p1_8_e_nutassembly_nominal_v1",
+      "guarded_solution_identity": "88f36bd630be50715db7ac182e141e9fc2124501c963d0481867eff438228c8b",
+      "historical_controller_identity_before_s2_b1": {
+        "geophys": "0d5d3e05efe734a7aba8fd451afd1e5699e515c072d20c1048d945237b3d9421",
+        "mujoco": "2867280b91cf709516d3580ffcb595a74cb40513b8c773ccb141a04ebae7d069"
+      },
+      "historical_solution_identity_before_s2_b1": "7a4816bd248444abfa8ea90c2e6200950d90ab08e1db59c867b979fe0e3626e6",
+      "outcome_controller_identity": {
+        "geophys": "cad9c5d2c1a619bc2ae94e240e7d4fb632b60599a7073e5c5adc616af0311a8f",
+        "mujoco": "ce29b631ef50e842bbc0d51a5350ac668e9dca431caefc6a57afeedeb2ee05f3"
+      },
+      "outcome_policy_identity": "a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee",
+      "outcome_recipe_identity": {
+        "geophys": "84912989baf66361da3db2f5dbd3f514c0a509ccf1aac479f0639ed567bfa3a5",
+        "mujoco": "c6747b2634c50f00703df2f09db179eb0e806cd6bfb411e79155d95b7e35ec46"
+      },
+      "outcome_solution_identity": "4bf902b9b0bcc84955e9d51177c5811e65e02b2b540678fa14235d13d7cad923",
+      "outcome_source_xml_sha256": {
+        "geophys": "909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d",
+        "mujoco": "29d06cc1296411c9bfa8b8d251e915291f47629f058afd3c125a2f02f1f2217a"
+      },
+      "selected_close_authorization_policy_identity": "065af38f034f896d3003d8f63cfb2ea9acac3adcefe078b678bd7596d57a0674",
+      "source_config_sha256": "937aec616f2547181c3b522959a9430a801a3916ee5657b9ad7379365b51b688"
+    },
+    "pickcube": {
+      "active_source_sha256": {
+        "artifact.py": "c6b140c32cc59fb130e3e332ee975963de65318474574b1130035dd751536eea",
+        "assets.py": "2356ef00e64d4cb2f792114c8dde22a9e22d342c6ba4f0f36813eba4d1f817ac",
+        "canonical_semantics.py": "e6e5973c3bb898a123f809c31e39bc9be0f3c39401994a4b702e45332624e83b",
+        "controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+        "controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+        "controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+        "controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+        "default.yaml": "bff13415d6bbdc33d17a1f91137c8bc57b7cf740c3de34ce64d466446b809770",
+        "definition.py": "ac80171fba1c1b1fc327a74373b17d59d244d3b4743197b183ad062cacbc1c52",
+        "readiness_solution.py": "685c9dc61aa40e4d99324ae01e8a3092b9bcee457319c24e0cc182ed96806046",
+        "reference.py": "ff33e44bf5de22e38a923ec12533345e12d5793a32d7d90a6b05f40cf7027b42",
+        "reference_config.py": "7b6100a9cc70c298ea6c10eaac5955ab870f68d57662578ec03d2243455aad45",
+        "reset.py": "eb3fc7c53a210a62487d49cfca34cae33880811f6c1de2f599b14c77db29f465",
+        "reset_policy.py": "304003fbf39a484aaed9e08b8620d0d9f4c64c561187e41b1e6a0dc38a24a7f3",
+        "runtime_source.py": "4459279c01740f55eebf033e12b43818df9be08fa83cd7c41e4cc767f9aa6cbe",
+        "solution.py": "c37d158cd5103f5f1b4b885d7675989550a3506269e4becdde463f7fe333799c",
+        "timebase.py": "b95d034d6c0908b6c60a7d6446dca2fccb3b26c8ccaea19e46b9a8c833efddf5"
+      },
+      "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "artifact_version": "ver_p1_6_experimental_100hz",
+      "controller_identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+      "legacy_p1_1_artifact_sha256": "461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e",
+      "readiness_sha256": "20682c171916420dbdf49ee65a5af4319896f245183f9e415b664adb167f94cc",
+      "reset_seed_31_sample_id": "reset-ee9644c1af42c7897f79a0cece21e5fc4bd5323ae40eba7b7259d34d681a5fb6",
+      "solution_identity": "fcef1d3a9c093a1d0adfce394a44099f5bff61edae48b3dce2ff50406118cd61",
+      "source_config_sha256": "d187ad45cec5fe7ac8a12a115dcf7a185336e8c1b78524ae5d2a6ed17bac22a1"
+    }
+  },
+  "source_files": {
+    "task_env/tasks/nut_assembly/canonical_solution.py": {
+      "new_source_sha256": "e71577367a6b7f3dbe3b5547097faed106506fa4734a6862e39756be994d8040",
+      "old_source_sha256": "3cf29500282a682eef539db30412202370b119de22905843156925889c97799f"
+    },
+    "task_env/tasks/nut_assembly/canonical_source.py": {
+      "new_source_sha256": "ed0151ebb9920a996e50ca1635337b5eefba58bbe508c59b0546980e8871c838",
+      "old_source_sha256": "90153119be74f0bf70d24109716b80eaaad5d3ce0dbf5ab16bd9880f59550dad"
+    },
+    "task_env/tasks/nut_assembly/definition.py": {
+      "new_source_sha256": "39d1fc80a4b9de11577d6042876c3fc42c0616c606ad4b2b913115f54cc1e536",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/nut_assembly/geometry.py": {
+      "new_source_sha256": "68d6423b8a4284afcba5a486e826e7e4944344aae0ecfb4e1c55c2daa53ae0fe",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/nut_assembly/reference.py": {
+      "new_source_sha256": "e54a409d151ab27b6b03e374c2d285fe83cf249a7667de06943abc2dd79ced98",
+      "old_source_sha256": "f54e9d0373b7a59bba568f103985e402a870200885ca867a4c9f3cb39eac916e"
+    },
+    "task_env/tasks/nut_assembly/reference_config.py": {
+      "new_source_sha256": "a741ffa35029e6b4a029498c195df419f493639cbe6f8433193adb735f29519a",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/nut_assembly/solution.py": {
+      "new_source_sha256": "88d7b8a650eba12578d90bbcbd923ebec604304222aff31d411da188f4da2d49",
+      "old_source_sha256": "c722c037951e259e08aaaf1e362e1c2ff698c27fd8bce8fc89c4cac387c00319"
+    },
+    "task_env/tasks/nut_assembly/task.py": {
+      "new_source_sha256": "bfa9e561d879494ff3bc7f504880950a4c3894ecc439d8444b8cdb66ed4c1685",
+      "old_source_sha256": "32cd37f9215166b76200a082dd573e5b04478f6bc6538c318a3ebbc2f2f17b5f"
+    },
+    "task_env/tasks/pick_cube/artifact.py": {
+      "new_source_sha256": "c6b140c32cc59fb130e3e332ee975963de65318474574b1130035dd751536eea",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/pick_cube/candidate.py": {
+      "new_source_sha256": "7289adde9c692534ae36fe47edb33caad3a56cfc61b1bb3a1cbe904c8c7a4af2",
+      "old_source_sha256": "55a5dfb4077d0c8c7bcab0a384d720eb110cd4c008b169d5596cc47cb90be56c"
+    },
+    "task_env/tasks/pick_cube/canonical_semantics.py": {
+      "new_source_sha256": "e6e5973c3bb898a123f809c31e39bc9be0f3c39401994a4b702e45332624e83b",
+      "old_source_sha256": "91f9051de15992c2f89d51f6fc4fdf5d613bfec11ebf168e9067287e993a5ec7"
+    },
+    "task_env/tasks/pick_cube/definition.py": {
+      "new_source_sha256": "ac80171fba1c1b1fc327a74373b17d59d244d3b4743197b183ad062cacbc1c52",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/pick_cube/reference.py": {
+      "new_source_sha256": "ff33e44bf5de22e38a923ec12533345e12d5793a32d7d90a6b05f40cf7027b42",
+      "old_source_sha256": "74e9aa7cc9ed9f041c1c75565040a5c1e9ef3b2f923fe970a5a6e95213ce1fee"
+    },
+    "task_env/tasks/pick_cube/reference_config.py": {
+      "new_source_sha256": "7b6100a9cc70c298ea6c10eaac5955ab870f68d57662578ec03d2243455aad45",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/pick_cube/reset_policy.py": {
+      "new_source_sha256": "304003fbf39a484aaed9e08b8620d0d9f4c64c561187e41b1e6a0dc38a24a7f3",
+      "old_source_sha256": null
+    },
+    "task_env/tasks/pick_cube/runtime_source.py": {
+      "new_source_sha256": "4459279c01740f55eebf033e12b43818df9be08fa83cd7c41e4cc767f9aa6cbe",
+      "old_source_sha256": "f21069002dcd5496b835a766e17547b6e46e200a245083640fc89a56bc32fce0"
+    },
+    "task_env/tasks/pick_cube/task.py": {
+      "new_source_sha256": "1a9987f6263c91a8e3712192992ba69fd863c74b2a63861a4bb66de6df000c3d",
+      "old_source_sha256": "1ce0153a33ace25a3cd735917a001127e133a6d5d30922de77cab12a2b01cf1d"
+    },
+    "task_env/tasks/pick_cube/timebase.py": {
+      "new_source_sha256": "b95d034d6c0908b6c60a7d6446dca2fccb3b26c8ccaea19e46b9a8c833efddf5",
+      "old_source_sha256": "b17f1cb01690f4552d164685f9d9fe7e858d55eafe2c5637aff807f3806921e6"
+    }
+  }
+}

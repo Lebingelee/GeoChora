@@ -18,25 +18,31 @@ from task_env.tasks.nut_assembly.canonical_reset import sample_reset as na_reset
 
 ROOT = Path(__file__).resolve().parents[3]
 BASELINE = json.loads(Path(__file__).with_name('reference_construction_baseline.json').read_text())
+S2B1_IDENTITIES = json.loads((ROOT / 'docs/module/task_env/p2_0_s2_b1_source_identity.json').read_text())['selected_routes']
 
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def assert_source(value, expected):
+def assert_source(value, expected, *, check_solution_identity=True):
     assert value['artifact'].identity_hash == expected['artifact_hash']
     assert digest(asdict(value['source'].config)) == expected['source_config_sha256']
     xml = value['source'].scene_source.xml.replace(str(ROOT), '${REPO_ROOT}')
     assert hashlib.sha256(xml.encode()).hexdigest() == expected['normalized_xml_sha256']
-    solution_identity = value.get('solution_identity', value['solution'].identity)
-    assert solution_identity == expected['solution_identity']
+    if check_solution_identity:
+        solution_identity = value.get('solution_identity', value['solution'].identity)
+        assert solution_identity == expected['solution_identity']
 
 
 def test_pickcube_exact_p16_identity_config_readiness_reset_and_legacy_caller():
     value = pc.build_reference()
     old = BASELINE['pickcube']
     assert_source(value, old)
+    assert {'artifact.py', 'definition.py', 'reference_config.py', 'reset_policy.py'} <= set(
+        value['resolved_configuration']['source_sha256']
+    )
+    assert not {'candidate.py', 'task.py'} & set(value['resolved_configuration']['source_sha256'])
     assert value['artifact'].artifact_id == 'pick-cube-v1/p1_6_experimental_100hz'
     assert value['artifact'].artifact_version == 'ver_p1_6_experimental_100hz'
     assert value['controller'].identity == old['controller_identity']
@@ -44,6 +50,8 @@ def test_pickcube_exact_p16_identity_config_readiness_reset_and_legacy_caller():
     for seed, expected in old['resets'].items():
         assert json.loads(json.dumps(pc.sample_reset(value['artifact'], int(seed)).to_mapping())) == expected
     from task_env.tasks.pick_cube.timebase import build_timebase_candidate
+    from task_env.tasks.pick_cube.candidate import build_candidate
+    assert build_candidate().identity_hash == '461d2f08fc08685583d4e7a9ff0cf8401a223e6b719c9ecc32e4f32476f3c25e'
     assert build_timebase_candidate('TB-100').identity_hash != value['artifact'].identity_hash
     with pytest.raises(ValueError):
         pc.sample_reset(build_timebase_candidate('TB-100'), 31)
@@ -59,7 +67,8 @@ def test_pickcube_exact_p16_identity_config_readiness_reset_and_legacy_caller():
 def test_nutassembly_exact_historical_physics_solution_and_new_source_identity(rate, provider):
     value = na.build_reference(rate_hz=rate, provider=provider, execution_policy=na.GUARDED_EXPERT)
     old = BASELINE['nutassembly'][f'{provider}_{rate}']
-    assert_source(value, old)
+    assert_source(value, old, check_solution_identity=False)
+    assert value['solution_identity'] == S2B1_IDENTITIES['nutassembly']['guarded_solution_identity']
     assert digest(value['controller'].physical_profile) == old['physical_profile_sha256']
     assert digest(asdict(value['solution_config'])) == old['solution_config_sha256']
     assert value['controller_identity'] != old['controller_identity']
@@ -91,6 +100,36 @@ def test_execution_policies_keep_the_same_strict_expert_and_no_outcome_policy_de
     assert lifecycle.task_success_seen and not lifecycle.expert_complete
     lifecycle.fail('stable_height_mismatch', control_step=2, simulation_time_s=.02)
     assert lifecycle.expert_failed and not lifecycle.expert_complete
+
+
+def test_nutassembly_selected_outcome_route_identity_and_active_dependency_boundary():
+    expected = S2B1_IDENTITIES['nutassembly']
+    for provider in ('geophys', 'mujoco'):
+        value = na.build_reference(provider=provider)
+        assert value['construction_id'] == na.OUTCOME_CONSTRUCTION_ID
+        assert value['artifact'].artifact_id == 'nut-assembly-square-v1/p1_8_e/nominal-v1'
+        assert value['artifact'].identity_hash == BASELINE['nutassembly'][f'{provider}_100']['artifact_hash']
+        assert value['solution_identity'] == expected['outcome_solution_identity']
+        assert value['controller_identity'] == expected['outcome_controller_identity'][provider]
+        assert value['recipe_identity'] == expected['outcome_recipe_identity'][provider]
+        hashes = value['resolved_configuration']['source_sha256']
+        assert {'definition.py', 'reference_config.py', 'geometry.py'} <= set(hashes)
+        assert not {'task.py', 'solution.py'} & set(hashes)
+        assert digest(asdict(value['source'].config)) == BASELINE['nutassembly'][f'{provider}_100']['source_config_sha256']
+        assert hashlib.sha256(value['source'].scene_source.xml.encode()).hexdigest() == value['recipe']['source_xml_sha256']
+        assert value['execution_policy']['outcome_oriented_proposal_enabled']
+        assert value['execution_policy']['grants_full_expert_pass'] is False
+
+
+@pytest.mark.parametrize('yaw', [-1.2, -0.2, 0.0, 0.2, 1.4])
+def test_nutassembly_shared_square_yaw_helper_preserves_existing_formula(yaw):
+    from task_env.tasks.nut_assembly.geometry import square_yaw_correction
+    from task_env.tasks.nut_assembly.solution import _square_yaw_correction
+    quaternion = [__import__('math').cos(yaw / 2), 0.0, 0.0, __import__('math').sin(yaw / 2)]
+    period = 0.5 * __import__('math').pi
+    expected = -((yaw + 0.5 * period) % period - 0.5 * period)
+    assert square_yaw_correction(quaternion) == pytest.approx(expected, abs=1e-12)
+    assert _square_yaw_correction is square_yaw_correction
 
 
 def state(poses, opening):
@@ -154,6 +193,10 @@ assert pc()['artifact'].identity_hash.startswith('fd5bc968')
 assert na(provider='geophys')['source'].config.robot.gripper.force_limit_N==10.
 assert na(provider='mujoco')['source'].config.robot.gripper.force_limit_N==10.
 assert not any(n.startswith('task_env.diagnostics') for n in sys.modules)
+assert 'task_env.tasks.pick_cube.task' not in sys.modules
+assert 'task_env.tasks.pick_cube.candidate' not in sys.modules
+assert 'task_env.tasks.nut_assembly.task' not in sys.modules
+assert 'task_env.tasks.nut_assembly.solution' not in sys.modules
 '''
     result = subprocess.run([sys.executable, '-c', code], cwd=tmp_path,
         env=dict(os.environ, PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE='1',
@@ -172,7 +215,8 @@ def test_task_owned_runner_selection_preserves_legacy_context_and_guard_admissio
     candidate = 'guarded-primary-readiness-alternative-8n-v2-v5-clearance'
     for provider in ('geophys', 'mujoco'):
         legacy = context(50, candidate, provider=provider)
-        assert_source(legacy, BASELINE['nutassembly'][f'{provider}_50'])
+        assert_source(legacy, BASELINE['nutassembly'][f'{provider}_50'], check_solution_identity=False)
+        assert legacy['solution_identity'] == S2B1_IDENTITIES['nutassembly']['guarded_solution_identity']
         for diagnostic in (False, True):
             selected = context(100, candidate, provider=provider,
                                construction_route='task-owned',

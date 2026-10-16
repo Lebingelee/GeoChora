@@ -2,17 +2,17 @@
 from dataclasses import replace
 from ...assembly.source import TaskSceneSource
 from ...environment import TaskCompositionSpec
-from ...environment.configuration import overlay_public_env_config, load_yaml_mapping
 from ...registry import make_agent, make_object, make_scene
 from ...runtime.sessions.source import RuntimeSource
-from .task import NutAssemblyEnv, NUT_ASSEMBLY_SQUARE_SPEC
+from .definition import NUT_ASSEMBLY_SQUARE_SPEC
+from .reference_config import build_reference_config
 from .assets import build_nut_assembly_model_xml, EE_SITE_NAME, NUTASSEMBLY_NOMINAL_V1_ID
 from .canonical_artifact import require_family
 
 
 def build_runtime_source(artifact):
     require_family(artifact); spec = NUT_ASSEMBLY_SQUARE_SPEC
-    config = overlay_public_env_config(NutAssemblyEnv.default_config(), load_yaml_mapping(NutAssemblyEnv.default_config_path()))
+    config = build_reference_config()
     config = replace(config, runtime=replace(config.runtime, backend='cpu', prewarm=False,
         physics_dt=artifact.timebase.physics_dt, control_substeps=artifact.timebase.control_substeps),
         render=replace(config.render, camera_obs=False), robot=replace(config.robot,

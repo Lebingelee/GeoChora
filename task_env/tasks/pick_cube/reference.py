@@ -3,48 +3,52 @@ from dataclasses import asdict, replace
 import hashlib
 from pathlib import Path
 
-from ...artifacts.execution import ResetSample
 from ...controllers.canonical import ProductionCanonicalPandaController
-from .candidate import build_candidate
+from .artifact import (
+    HISTORICAL_ARTIFACT_ID,
+    HISTORICAL_ARTIFACT_VERSION,
+    build_p16_artifact,
+    build_task_artifact,
+)
 from .runtime_source import build_runtime_source
 from .readiness_solution import PickCubeReadinessConfig, PickCubeReadinessSolution
-from .reset import sample_reset as historical_sample_reset
+from .reset import sample_reset as task_sample_reset
+from .definition import (
+    PICK_CUBE_P16_ARTIFACT_ID,
+    PICK_CUBE_P16_ARTIFACT_SHA256,
+    PICK_CUBE_P16_ARTIFACT_VERSION,
+)
 
 CONSTRUCTION_ID = 'pickcube-p16-reference-construction-v1'
-ARTIFACT_ID = 'pick-cube-v1/p1_6_experimental_100hz'
-ARTIFACT_VERSION = 'ver_p1_6_experimental_100hz'
-ARTIFACT_SHA256 = 'fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4'
+ARTIFACT_ID = PICK_CUBE_P16_ARTIFACT_ID
+ARTIFACT_VERSION = PICK_CUBE_P16_ARTIFACT_VERSION
+ARTIFACT_SHA256 = PICK_CUBE_P16_ARTIFACT_SHA256
 
 
 def build_artifact():
-    historical = build_candidate()
-    artifact = replace(historical, artifact_id=ARTIFACT_ID,
-        artifact_version=ARTIFACT_VERSION,
-        timebase=replace(historical.timebase, physics_dt=.002,
-                         control_substeps=5, control_dt=.010))
+    artifact = build_p16_artifact()
     if artifact.identity_hash != ARTIFACT_SHA256:
         raise ValueError('P1.6 selected Artifact identity mismatch')
     return artifact
 
 
 def sample_reset(artifact, task_seed):
-    """Preserve PCG64-v0 draws, rebinding only the selected Artifact identity."""
+    """Sample the selected P1.6 identity with the canonical PCG64-v0 policy."""
     if artifact != build_artifact():
         raise ValueError('selected P1.6 experimental_100hz Artifact required')
-    sample = historical_sample_reset(build_candidate(), task_seed)
-    payload = sample.to_mapping()
-    payload.pop('sample_id')
-    payload['task_artifact_hash'] = artifact.identity_hash
-    return ResetSample.create(**payload)
+    return task_sample_reset(artifact, task_seed)
 
 
 def build_reference(*, backend='cpu'):
     """Construct without importing/starting a simulator; no qualification grant."""
     if backend not in {'cpu', 'cuda'}:
         raise ValueError('PickCube reference backend must be cpu or cuda')
-    historical = build_candidate()
+    historical = build_task_artifact(
+        artifact_id=HISTORICAL_ARTIFACT_ID,
+        artifact_version=HISTORICAL_ARTIFACT_VERSION,
+    )
     artifact = build_artifact()
-    source0 = build_runtime_source(historical)
+    source0 = build_runtime_source(artifact)
     source = replace(source0, task_artifact_hash=artifact.identity_hash,
         config=replace(source0.config, runtime=replace(source0.config.runtime,
             physics_dt=.002, control_substeps=5, backend=backend, prewarm=False)))
@@ -52,9 +56,10 @@ def build_reference(*, backend='cpu'):
     controller = ProductionCanonicalPandaController.from_source(artifact, source)
     solution = PickCubeReadinessSolution(config=readiness)
     source_ids = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
-                  for name in ('reference.py', 'candidate.py', 'runtime_source.py', 'reset.py',
+                  for name in ('reference.py', 'artifact.py', 'reference_config.py', 'definition.py',
+                               'runtime_source.py', 'reset.py', 'reset_policy.py', 'timebase.py',
                                'canonical_semantics.py', 'readiness_solution.py', 'solution.py',
-                               'task.py', 'assets.py', 'default.yaml')}
+                               'assets.py', 'default.yaml')}
     canonical_dir = Path(__file__).resolve().parents[2] / 'controllers' / 'canonical'
     for name in ('production.py', 'controller.py', 'readiness.py', 'kinematics.py'):
         source_ids['controllers/canonical/' + name] = hashlib.sha256((canonical_dir / name).read_bytes()).hexdigest()

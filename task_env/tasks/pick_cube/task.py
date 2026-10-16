@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 from typing import Any
 
@@ -14,62 +13,26 @@ from ...assembly import TaskReferences
 from ...registry import register_env
 from ..base import BaseTaskEnv
 from .assets import CUBE_CONTACT_MARGIN, CUBE_HALF_SIZE, TABLE_TOP_Z
-
-
-@dataclass(frozen=True)
-class PickCubeVariantSpec:
-    """Stable identifiers and profiles for the registered PickCube variant."""
-
-    env_id: str
-    task_uid: str
-    variant: str
-    scene_uid: str
-    agent_uids: tuple[str, ...]
-    object_uids: tuple[str, ...]
-    success_definition: str
-    scene_profile: str
-    sensor_profile: str
-    reset_profile: str
-    expert_profile: str
-    reward_profile: str
-    language_templates: tuple[str, ...] = ()
-
-
-PICK_CUBE_SPEC = PickCubeVariantSpec(
-    env_id="pick-cube-v1",
-    task_uid="pick-cube-v1",
-    variant="default",
-    scene_uid="tabletop-v1",
-    agent_uids=("panda-v1",),
-    object_uids=("cube-v1",),
-    success_definition="cube_lifted_v1",
-    scene_profile="tabletop_panda_cube_v1",
-    sensor_profile="state_privileged_optional_base_hand_camera_v1",
-    reset_profile="uniform_table_center_xy_v1",
-    expert_profile="cartesian_pose_primitive_sequence_v1",
-    reward_profile="cube_lift_height_10cm_v2",
-    language_templates=("pick up the cube",),
+from .definition import (
+    CUBE_UID as _CUBE_UID,
+    GRIPPER_CLOSED_OPENING_M as _GRIPPER_CLOSED_OPENING,
+    LIFT_HEIGHT_M as _LIFT_HEIGHT,
+    PANDA_UID as _PANDA_UID,
+    PICK_CUBE_AGENT_UIDS,
+    PICK_CUBE_ENV_ID,
+    PICK_CUBE_EXPERT_PROFILE,
+    PICK_CUBE_OBJECT_UIDS,
+    PICK_CUBE_RESET_PROFILE,
+    PICK_CUBE_SCENE_UID,
+    PICK_CUBE_SENSOR_PROFILE,
+    PICK_CUBE_SPEC,
+    PICK_CUBE_SUCCESS_DEFINITION,
+    PICK_CUBE_TASK_UID,
+    PICK_CUBE_VARIANT,
+    REACH_DISTANCE_M as _REACH_DISTANCE,
+    PickCubeVariantSpec,
 )
-
-PICK_CUBE_ENV_ID = PICK_CUBE_SPEC.env_id
-PICK_CUBE_TASK_UID = PICK_CUBE_SPEC.task_uid
-PICK_CUBE_VARIANT = PICK_CUBE_SPEC.variant
-PICK_CUBE_SUCCESS_DEFINITION = PICK_CUBE_SPEC.success_definition
-PICK_CUBE_SCENE_UID = PICK_CUBE_SPEC.scene_uid
-PICK_CUBE_AGENT_UIDS = PICK_CUBE_SPEC.agent_uids
-PICK_CUBE_OBJECT_UIDS = PICK_CUBE_SPEC.object_uids
-PICK_CUBE_EXPERT_PROFILE = PICK_CUBE_SPEC.expert_profile
-PICK_CUBE_RESET_PROFILE = PICK_CUBE_SPEC.reset_profile
-PICK_CUBE_SENSOR_PROFILE = PICK_CUBE_SPEC.sensor_profile
-
-
-_PANDA_UID = "panda-v1"
-_CUBE_UID = "cube-v1"
-_LIFT_HEIGHT = 0.100
-_REACH_DISTANCE = 0.090
-# ``grasped_cube`` is a diagnostic/reward heuristic.  The task's authoritative
-# success contract is only the 10 cm measured cube lift below.
-_GRIPPER_CLOSED_OPENING = 0.045
+from .reset_policy import RESET_HALF_EXTENT_M, TABLE_CENTER_XY
 
 
 def _distance(left: np.ndarray, right: np.ndarray) -> float:
@@ -195,8 +158,8 @@ class PickCubeEnv(BaseTaskEnv):
 class PickCubeResetSampler:
     """Sample replayable PickCube positions at the public reset boundary."""
 
-    table_center_xy = np.asarray((0.5545, 0.0), dtype=np.float32)
-    half_extent_m = 0.10
+    table_center_xy = TABLE_CENTER_XY
+    half_extent_m = RESET_HALF_EXTENT_M
 
     def sample_episode_state(
         self,

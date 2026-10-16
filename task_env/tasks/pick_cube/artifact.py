@@ -1,0 +1,139 @@
+"""Single TaskArtifact factory shared by selected and historical PickCube routes."""
+from ...artifacts import (
+    ActionIntent,
+    EntityDefinition,
+    InitializationContract,
+    PoseWorld,
+    RequiredCapabilitySet,
+    TaskArtifact,
+    Timebase,
+    UniformDimension,
+    WorldDefinition,
+)
+from ...robots.panda import PandaAgent
+from .assets import (
+    CUBE_CONTACT_MARGIN,
+    CUBE_DIAG_INERTIA,
+    CUBE_HALF_SIZE,
+    CUBE_MASS,
+    TABLE_HALF_SIZE,
+    TABLE_TOP_Z,
+)
+from .canonical_semantics import EEF, FINGERS, semantic_definition
+from .definition import PICK_CUBE_SPEC, PICK_CUBE_P16_ARTIFACT_ID, PICK_CUBE_P16_ARTIFACT_VERSION
+from .reference_config import build_reference_config
+from .reset_policy import RESET_HALF_EXTENT_M, TABLE_CENTER_XY
+
+
+HISTORICAL_ARTIFACT_ID = "pick-cube-v1/p1_1_candidate"
+HISTORICAL_ARTIFACT_VERSION = "ver_p1_1_candidate"
+
+
+def build_task_artifact(*, artifact_id, artifact_version, timebase=None) -> TaskArtifact:
+    """Build the one canonical PickCube TaskArtifact schema.
+
+    The historical P1.1 wrapper and selected P1.6 construction pass distinct
+    serialized identities/timebases through this shared factory.
+    """
+    if type(artifact_id) is not str or not artifact_id.strip():
+        raise ValueError("artifact_id must be nonempty")
+    if type(artifact_version) is not str or not artifact_version.strip():
+        raise ValueError("artifact_version must be nonempty")
+    config = build_reference_config()
+    runtime = config.runtime
+    resolved_timebase = timebase or Timebase(
+        runtime.physics_dt,
+        runtime.control_substeps,
+        runtime.physics_dt * runtime.control_substeps,
+    )
+    if not isinstance(resolved_timebase, Timebase):
+        raise TypeError("PickCube artifact requires a canonical Timebase")
+
+    initial_joints = {
+        f"panda-v1/{name}": value
+        for name, value in PandaAgent().initial_state_spec().joint_positions
+    }
+    center = tuple(float(value) for value in TABLE_CENTER_XY)
+    dimensions = tuple(
+        UniformDimension(
+            f"cube-v1.position_world.{axis}", bounds, bounds, bounds, bounds
+        )
+        for axis, value in zip(("x", "y"), center, strict=True)
+        for bounds in ((value - RESET_HALF_EXTENT_M, value + RESET_HALF_EXTENT_M),)
+    )
+    return TaskArtifact(
+        schema_version="task-artifact-v0",
+        artifact_id=artifact_id,
+        task_id=PICK_CUBE_SPEC.task_uid,
+        artifact_version=artifact_version,
+        world=WorldDefinition(
+            schema_version="world-v0",
+            convention="SI_right_handed_z_up_wxyz",
+            entities=(
+                EntityDefinition(
+                    "tabletop-v1", "static", "tabletop-v1/task-local",
+                    ("tabletop-v1/top",), (), "box", "support_contact",
+                    {"top_z": TABLE_TOP_Z,
+                     **{f"half_size_{axis}": value
+                        for axis, value in zip("xyz", TABLE_HALF_SIZE, strict=True)}},
+                ),
+                EntityDefinition(
+                    "panda-v1", "embodiment",
+                    "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
+                    ("panda-v1/base", EEF),
+                    (*tuple(f"panda-v1/joint{i}" for i in range(1, 8)), *FINGERS),
+                    "referenced_articulation", "arm_hand_finger_collision", {},
+                ),
+                EntityDefinition(
+                    "cube-v1", "movable", "cube-v1/task-local", (), (),
+                    "free_box", "table_hand_contact",
+                    {"half_size": CUBE_HALF_SIZE, "mass": CUBE_MASS,
+                     **{f"inertia_{axis}": value
+                        for axis, value in zip("xyz", CUBE_DIAG_INERTIA, strict=True)}},
+                ),
+            ),
+            action=ActionIntent(
+                "absolute_pose", "world", "quaternion_wxyz",
+                "arm_joint_position_and_gripper",
+            ),
+            observation_requirements=("task-env-state-v2", "privileged_state"),
+            randomization_dimensions=tuple(dimension.name for dimension in dimensions),
+        ),
+        initialization=InitializationContract(
+            schema_version="initialization-v0",
+            poses_world={
+                "cube-v1": PoseWorld(
+                    (center[0], center[1], TABLE_TOP_Z + CUBE_HALF_SIZE + CUBE_CONTACT_MARGIN),
+                    (1.0, 0.0, 0.0, 0.0),
+                )
+            },
+            joint_position=initial_joints,
+            randomization=dimensions,
+            inherited_state_policy=(
+                "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open"
+            ),
+            reset_validity="cube_free_pose_in_declared_xy_envelope_fixed_z_identity_wxyz",
+            settle_steps=0,
+        ),
+        semantics=semantic_definition(),
+        timebase=resolved_timebase,
+        required_capabilities=RequiredCapabilitySet((
+            "rigid_body", "free_body", "articulated_robot", "joint_position_actuation",
+            "joint_state_query", "body_pose_query", "frame_pose_query",
+        )),
+    )
+
+
+def build_p16_artifact() -> TaskArtifact:
+    """Construct the selected P1.6 experimental_100hz Artifact identity."""
+    return build_task_artifact(
+        artifact_id=PICK_CUBE_P16_ARTIFACT_ID,
+        artifact_version=PICK_CUBE_P16_ARTIFACT_VERSION,
+        timebase=Timebase(physics_dt=0.002, control_substeps=5, control_dt=0.010),
+    )
+
+
+__all__ = [
+    "HISTORICAL_ARTIFACT_ID", "HISTORICAL_ARTIFACT_VERSION", "build_p16_artifact",
+    "build_task_artifact",
+]

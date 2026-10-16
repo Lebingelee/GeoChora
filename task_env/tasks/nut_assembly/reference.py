@@ -113,9 +113,9 @@ def build_reference(*, rate_hz=100, provider='mujoco', execution_policy=OUTCOME_
         'mujoco_contact_profile': _sha(PROFILE_DIR / 'mujoco-noslip2-v1.json')}
     if execution_policy == OUTCOME_COMPLETION:
         source_ids['outcome_solution.py'] = _sha(Path(__file__).with_name('outcome_solution.py'))
-    for name in ('assets.py', 'canonical_artifact.py', 'canonical_source.py',
+    for name in ('assets.py', 'canonical_artifact.py', 'canonical_source.py', 'definition.py',
                  'canonical_reset.py', 'canonical_semantics.py', 'canonical_initialization.json',
-                 'default.yaml', 'task.py', 'solution.py',
+                 'default.yaml', 'reference_config.py', 'geometry.py',
                  'canonical_solution.py', 'canonical_solution_v2.py', 'stable_grasp_candidate.py',
                  'clearance_candidate_v3.py', 'clearance_candidate_v5.py',
                  'guarded_authorization_candidate.py', 'guarded_authorization_candidate_v2.py'):

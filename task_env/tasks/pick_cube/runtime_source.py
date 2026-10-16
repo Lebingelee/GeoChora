@@ -2,18 +2,18 @@
 from dataclasses import replace
 
 from ...environment import TaskCompositionSpec
-from ...environment.configuration import load_yaml_mapping, overlay_public_env_config
 from ...registry import make_agent, make_object, make_scene
 from ...runtime.sessions.source import RuntimeSource
 from .assets import EE_SITE_NAME, PickCubeSceneComposer
+from .definition import PICK_CUBE_SPEC
+from .reference_config import build_reference_config
 from .timebase import require_timebase_family
-from .task import PickCubeEnv, PICK_CUBE_SPEC
 
 
 def build_runtime_source(artifact):
     require_timebase_family(artifact)
     spec = PICK_CUBE_SPEC
-    config = overlay_public_env_config(PickCubeEnv.default_config(), load_yaml_mapping(PickCubeEnv.default_config_path()))
+    config = build_reference_config()
     config = replace(config, runtime=replace(config.runtime, backend='cpu', prewarm=False,
                      physics_dt=artifact.timebase.physics_dt, control_substeps=artifact.timebase.control_substeps),
                      render=replace(config.render, camera_obs=False))

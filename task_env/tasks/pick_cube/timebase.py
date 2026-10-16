@@ -1,7 +1,12 @@
 """Explicit bounded PickCube timebase variants; historical default stays exact."""
 from dataclasses import replace
 from ...artifacts import TaskArtifact, Timebase
-from .candidate import build_candidate
+from .artifact import (
+    HISTORICAL_ARTIFACT_ID,
+    HISTORICAL_ARTIFACT_VERSION,
+    build_p16_artifact,
+    build_task_artifact,
+)
 
 PROFILES = {'TB-500': (1, .002), 'TB-100': (5, .010), 'TB-50': (10, .020)}
 
@@ -9,7 +14,10 @@ PROFILES = {'TB-500': (1, .002), 'TB-100': (5, .010), 'TB-50': (10, .020)}
 def build_timebase_candidate(profile: str) -> TaskArtifact:
     if profile not in PROFILES:
         raise ValueError('unsupported explicit PickCube timebase profile')
-    default = build_candidate()
+    default = build_task_artifact(
+        artifact_id=HISTORICAL_ARTIFACT_ID,
+        artifact_version=HISTORICAL_ARTIFACT_VERSION,
+    )
     if profile == 'TB-500':
         return default
     substeps, dt = PROFILES[profile]
@@ -21,6 +29,9 @@ def require_timebase_family(artifact: TaskArtifact) -> str:
     """Admit only exact declared variants, including all unchanged semantic fields."""
     if not isinstance(artifact, TaskArtifact):
         raise TypeError('TaskArtifact required')
+    selected = build_p16_artifact()
+    if artifact.to_mapping() == selected.to_mapping() and artifact.identity_hash == selected.identity_hash:
+        return 'P1.6-experimental_100hz'
     mapping = artifact.to_mapping()
     for profile in PROFILES:
         expected = build_timebase_candidate(profile)

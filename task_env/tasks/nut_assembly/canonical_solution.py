@@ -12,7 +12,7 @@ from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAc
 from ...controllers.canonical.contracts import digest
 from ...utils.rotation import normalize_quat_wxyz, rotate_vector_wxyz, quat_multiply_wxyz, quat_angle_wxyz, quat_wxyz_to_matrix
 from .assets import PEG_HALF_HEIGHT, NUT_HALF_HEIGHT, NUT_CONTACT_MARGIN, TABLE_TOP_Z
-from .solution import _square_yaw_correction
+from .geometry import square_yaw_correction as _square_yaw_correction
 
 
 @dataclass(frozen=True)

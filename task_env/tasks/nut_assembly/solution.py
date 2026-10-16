@@ -15,11 +15,11 @@ import numpy as np
 
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...utils.rotation import (
-    normalize_quat_wxyz,
     quat_multiply_wxyz,
     rotate_vector_wxyz,
 )
 from .assets import NUT_CONTACT_MARGIN, NUT_HALF_HEIGHT, PEG_HALF_HEIGHT, TABLE_TOP_Z
+from .geometry import square_yaw_correction as _square_yaw_correction
 
 
 @dataclass(frozen=True)
@@ -41,13 +41,6 @@ class NutAssemblySolutionConfig:
             max_steps=160,
         )
     )
-
-
-def _square_yaw_correction(quaternion_wxyz: np.ndarray) -> float:
-    w, x, y, z = normalize_quat_wxyz(quaternion_wxyz)
-    yaw = float(np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z)))
-    period = 0.5 * np.pi
-    return -float((yaw + 0.5 * period) % period - 0.5 * period)
 
 
 class NutAssemblySolution:

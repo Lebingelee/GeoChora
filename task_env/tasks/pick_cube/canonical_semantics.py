@@ -8,9 +8,11 @@ import math
 from ...artifacts import CanonicalStateView, SemanticDefinition
 from ...environment import TaskEvaluation
 from .assets import TABLE_TOP_Z, CUBE_HALF_SIZE
-from .task import (
-    PICK_CUBE_SUCCESS_DEFINITION, _LIFT_HEIGHT, _REACH_DISTANCE,
-    _GRIPPER_CLOSED_OPENING,
+from .definition import (
+    GRIPPER_CLOSED_OPENING_M as _GRIPPER_CLOSED_OPENING,
+    LIFT_HEIGHT_M as _LIFT_HEIGHT,
+    PICK_CUBE_SUCCESS_DEFINITION,
+    REACH_DISTANCE_M as _REACH_DISTANCE,
 )
 
 CUBE = 'cube-v1'
