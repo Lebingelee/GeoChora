@@ -300,3 +300,7 @@ Go2 walk / RSL
 - 在已声明 Phase-I acceptance envelope 外宣称 MuJoCo/SAPIEN/Genesis 的完整支持；
 - 在 SAPIEN/Genesis 上进行完整 policy training，或强制 Flora 集成；
 - 对完整 real -> sim -> policy -> real 支持作出仓库级声明。
+
+## P2.0-B S1 construction supplement
+
+已新增 task-owned、显式版本化的 [active reference construction](p2_0_active_reference_construction.md)：PickCube精确P1.6 experimental_100hz与NutAssembly guarded V2/V5。该增量不替换既有默认factory、不移除历史实现，也不授予新source历史qualification；Nut outcome-oriented completion仍是未实施提案。

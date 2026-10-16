@@ -60,33 +60,14 @@ def write_json(path: Path | str, value) -> None:
 
 
 def context(backend: str):
-    """Build a new timebase identity without changing the default candidate."""
+    """Compatibility tuple; task owner constructs the exact P1.6 reference."""
     if backend not in {"cpu", "cuda"}:
         raise ValueError("diagnostic backend must be cpu or cuda")
-    historical = build_candidate()
-    experimental = replace(
-        historical,
-        artifact_id=EXPERIMENTAL_ARTIFACT_ID,
-        artifact_version=EXPERIMENTAL_ARTIFACT_VERSION,
-        timebase=replace(historical.timebase, physics_dt=0.002, control_substeps=5, control_dt=0.010),
-    )
-    source0 = build_runtime_source(historical)
-    runtime = replace(
-        source0.config.runtime,
-        physics_dt=0.002,
-        control_substeps=5,
-        backend=backend,
-        prewarm=False,
-    )
-    source = replace(
-        source0,
-        task_artifact_hash=experimental.identity_hash,
-        config=replace(source0.config, runtime=runtime),
-    )
-    readiness = PickCubeReadinessConfig.from_source(experimental, source)
-    controller = ProductionCanonicalPandaController.from_source(experimental, source)
-    expert = PickCubeReadinessSolution(config=readiness)
-    return historical, experimental, source, readiness, controller, expert
+    from task_env.tasks.pick_cube.reference import build_reference
+
+    value = build_reference(backend=backend)
+    return (value['historical_artifact'], value['artifact'], value['source'],
+            value['readiness'], value['controller'], value['solution'])
 
 
 def sample_for_variant(experimental_artifact, seed: int) -> ResetSample:

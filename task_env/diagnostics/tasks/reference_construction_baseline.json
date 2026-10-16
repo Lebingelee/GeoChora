@@ -1,0 +1,218 @@
+{
+  "source_commit": "08e9a912ccf9aec2cde927d57d4bf3d67a8783c3",
+  "scope": "Captured before S1; construction only; legacy MuJoCo module stubbed solely for unused native observer imports; no provider execution.",
+  "pickcube": {
+    "artifact_hash": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+    "solution_identity": "fcef1d3a9c093a1d0adfce394a44099f5bff61edae48b3dce2ff50406118cd61",
+    "controller_identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+    "source_config_sha256": "d187ad45cec5fe7ac8a12a115dcf7a185336e8c1b78524ae5d2a6ed17bac22a1",
+    "normalized_xml_sha256": "017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba",
+    "readiness_sha256": "20682c171916420dbdf49ee65a5af4319896f245183f9e415b664adb167f94cc",
+    "resets": {
+      "11": {
+        "schema_version": "reset-sample-v0",
+        "sample_id": "reset-1e767fe27c9531b9d8153d574c693b3f421f0b86c34db60d4e98c445c8cf9523",
+        "task_artifact_hash": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+        "sampler_id": "pick-cube-v1/uniform_xy",
+        "sampler_version": "pcg64-v0",
+        "task_seed": 11,
+        "joint_position": {
+          "panda-v1/finger_joint1": 0.04,
+          "panda-v1/finger_joint2": 0.04,
+          "panda-v1/joint1": -0.17,
+          "panda-v1/joint2": 0.0,
+          "panda-v1/joint3": 0.0,
+          "panda-v1/joint4": -1.57079,
+          "panda-v1/joint5": 0.0,
+          "panda-v1/joint6": 1.57079,
+          "panda-v1/joint7": -0.7853
+        },
+        "poses_world": {
+          "cube-v1": {
+            "position": [
+              0.48021402434137656,
+              -0.00014442751197700499,
+              0.48800000000000004
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "velocity_policy": "zero_named_joint_and_entity_velocities",
+        "control_policy": "arm_targets_at_initial_joints_gripper_open",
+        "settle_steps": 0
+      },
+      "31": {
+        "schema_version": "reset-sample-v0",
+        "sample_id": "reset-ee9644c1af42c7897f79a0cece21e5fc4bd5323ae40eba7b7259d34d681a5fb6",
+        "task_artifact_hash": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+        "sampler_id": "pick-cube-v1/uniform_xy",
+        "sampler_version": "pcg64-v0",
+        "task_seed": 31,
+        "joint_position": {
+          "panda-v1/finger_joint1": 0.04,
+          "panda-v1/finger_joint2": 0.04,
+          "panda-v1/joint1": -0.17,
+          "panda-v1/joint2": 0.0,
+          "panda-v1/joint3": 0.0,
+          "panda-v1/joint4": -1.57079,
+          "panda-v1/joint5": 0.0,
+          "panda-v1/joint6": 1.57079,
+          "panda-v1/joint7": -0.7853
+        },
+        "poses_world": {
+          "cube-v1": {
+            "position": [
+              0.6351343459705087,
+              -0.08646434752767339,
+              0.48800000000000004
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "velocity_policy": "zero_named_joint_and_entity_velocities",
+        "control_policy": "arm_targets_at_initial_joints_gripper_open",
+        "settle_steps": 0
+      },
+      "73": {
+        "schema_version": "reset-sample-v0",
+        "sample_id": "reset-234653b64d8860c43c7d275be09f8482692ec4c8265856ac5525aeb6b86e46e2",
+        "task_artifact_hash": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+        "sampler_id": "pick-cube-v1/uniform_xy",
+        "sampler_version": "pcg64-v0",
+        "task_seed": 73,
+        "joint_position": {
+          "panda-v1/finger_joint1": 0.04,
+          "panda-v1/finger_joint2": 0.04,
+          "panda-v1/joint1": -0.17,
+          "panda-v1/joint2": 0.0,
+          "panda-v1/joint3": 0.0,
+          "panda-v1/joint4": -1.57079,
+          "panda-v1/joint5": 0.0,
+          "panda-v1/joint6": 1.57079,
+          "panda-v1/joint7": -0.7853
+        },
+        "poses_world": {
+          "cube-v1": {
+            "position": [
+              0.5530272216451751,
+              -0.03932649242771396,
+              0.48800000000000004
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "velocity_policy": "zero_named_joint_and_entity_velocities",
+        "control_policy": "arm_targets_at_initial_joints_gripper_open",
+        "settle_steps": 0
+      },
+      "1000": {
+        "schema_version": "reset-sample-v0",
+        "sample_id": "reset-8703ddb51c1a98af6bf82671caf22266e5167d92bc3693d8c25753ffc2d6c240",
+        "task_artifact_hash": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+        "sampler_id": "pick-cube-v1/uniform_xy",
+        "sampler_version": "pcg64-v0",
+        "task_seed": 1000,
+        "joint_position": {
+          "panda-v1/finger_joint1": 0.04,
+          "panda-v1/finger_joint2": 0.04,
+          "panda-v1/joint1": -0.17,
+          "panda-v1/joint2": 0.0,
+          "panda-v1/joint3": 0.0,
+          "panda-v1/joint4": -1.57079,
+          "panda-v1/joint5": 0.0,
+          "panda-v1/joint6": 1.57079,
+          "panda-v1/joint7": -0.7853
+        },
+        "poses_world": {
+          "cube-v1": {
+            "position": [
+              0.5587771313825491,
+              0.020768369401265918,
+              0.48800000000000004
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "velocity_policy": "zero_named_joint_and_entity_velocities",
+        "control_policy": "arm_targets_at_initial_joints_gripper_open",
+        "settle_steps": 0
+      }
+    }
+  },
+  "nutassembly": {
+    "geophys_50": {
+      "artifact_hash": "699fc9147a07cb76f40c48decfddc350ed0ad3688beebe8b0da5268374e881e9",
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "controller_identity": "13dd4aa2ee532aeb69c7b0cecea1535d1c30c03bec137c98d5e4bc5b18617f7e",
+      "source_config_sha256": "1cd5d985937e6997d60f4415cc65f614a67149de6a6d7e5cfd54d05b33117cf0",
+      "normalized_xml_sha256": "5acbe1cc14c14dc4bdf8ac5da586b2080780bad91ffada2754e055602a8b6592",
+      "physical_profile_sha256": "0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c",
+      "solution_config_sha256": "c82d08ad871b9c8e4350f17ac2189827671b7f6a3df41452efe92599b53b5802"
+    },
+    "mujoco_50": {
+      "artifact_hash": "699fc9147a07cb76f40c48decfddc350ed0ad3688beebe8b0da5268374e881e9",
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "controller_identity": "13dd4aa2ee532aeb69c7b0cecea1535d1c30c03bec137c98d5e4bc5b18617f7e",
+      "source_config_sha256": "1cd5d985937e6997d60f4415cc65f614a67149de6a6d7e5cfd54d05b33117cf0",
+      "normalized_xml_sha256": "3fa90450d014fe1f70858af1bdad3d0b9d119234876e6362f15ee4d3b0b8e8c4",
+      "physical_profile_sha256": "0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c",
+      "solution_config_sha256": "c82d08ad871b9c8e4350f17ac2189827671b7f6a3df41452efe92599b53b5802"
+    },
+    "geophys_100": {
+      "artifact_hash": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "controller_identity": "15c1b6cdfa000f685a165d7e8504db186ff206df953275ef80bd78d57748a50e",
+      "source_config_sha256": "937aec616f2547181c3b522959a9430a801a3916ee5657b9ad7379365b51b688",
+      "normalized_xml_sha256": "5acbe1cc14c14dc4bdf8ac5da586b2080780bad91ffada2754e055602a8b6592",
+      "physical_profile_sha256": "0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c",
+      "solution_config_sha256": "c82d08ad871b9c8e4350f17ac2189827671b7f6a3df41452efe92599b53b5802"
+    },
+    "mujoco_100": {
+      "artifact_hash": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "controller_identity": "15c1b6cdfa000f685a165d7e8504db186ff206df953275ef80bd78d57748a50e",
+      "source_config_sha256": "937aec616f2547181c3b522959a9430a801a3916ee5657b9ad7379365b51b688",
+      "normalized_xml_sha256": "3fa90450d014fe1f70858af1bdad3d0b9d119234876e6362f15ee4d3b0b8e8c4",
+      "physical_profile_sha256": "0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c",
+      "solution_config_sha256": "c82d08ad871b9c8e4350f17ac2189827671b7f6a3df41452efe92599b53b5802"
+    },
+    "geophys_500": {
+      "artifact_hash": "908cd3c41b6c3391e81dda2415d691dea378c7dd10138dcf8e5ebc4293dfd9f4",
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "controller_identity": "cd6d5a2f2fda965df73a0885f1b61dd25cf8687b64e9124bd6cf040d107dfa09",
+      "source_config_sha256": "d5771f8b8bfdcc26b6ea348f76f5e66857cceabd69c9335ed02c0d43690716b9",
+      "normalized_xml_sha256": "5acbe1cc14c14dc4bdf8ac5da586b2080780bad91ffada2754e055602a8b6592",
+      "physical_profile_sha256": "0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c",
+      "solution_config_sha256": "c82d08ad871b9c8e4350f17ac2189827671b7f6a3df41452efe92599b53b5802"
+    },
+    "mujoco_500": {
+      "artifact_hash": "908cd3c41b6c3391e81dda2415d691dea378c7dd10138dcf8e5ebc4293dfd9f4",
+      "solution_identity": "15bfc3745c622ecb9eeb0b22248d2b12417ca3c40dbfd6b849ee06729b1dba2e",
+      "controller_identity": "cd6d5a2f2fda965df73a0885f1b61dd25cf8687b64e9124bd6cf040d107dfa09",
+      "source_config_sha256": "d5771f8b8bfdcc26b6ea348f76f5e66857cceabd69c9335ed02c0d43690716b9",
+      "normalized_xml_sha256": "3fa90450d014fe1f70858af1bdad3d0b9d119234876e6362f15ee4d3b0b8e8c4",
+      "physical_profile_sha256": "0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c",
+      "solution_config_sha256": "c82d08ad871b9c8e4350f17ac2189827671b7f6a3df41452efe92599b53b5802"
+    }
+  }
+}

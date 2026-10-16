@@ -137,8 +137,19 @@ def _exclude_hand_peg_pair(value: dict) -> dict:
     return intervention
 
 
-def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: str = "mujoco"):
+def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: str = "mujoco",
+            construction_route: str = "historical", diagnostic_observation: bool = False):
     """Build the provider profile plus fixed native-ramp/native-500Hz recipe."""
+    if construction_route == "task-owned":
+        if trajectory_candidate != "guarded-primary-readiness-alternative-8n-v2-v5-clearance":
+            raise ValueError("task-owned construction requires the selected guarded V2/V5 candidate")
+        from ....tasks.nut_assembly.reference import (
+            build_reference, GUARDED_EXPERT, DIAGNOSTIC_OBSERVATION,
+        )
+        return build_reference(rate_hz=rate, provider=provider, execution_policy=(
+            DIAGNOSTIC_OBSERVATION if diagnostic_observation else GUARDED_EXPERT))
+    if construction_route != "historical":
+        raise ValueError("unknown NutAssembly construction route")
     value = frequency_run.context(rate, "arm_ramp_native_grip", provider=provider)
     old_solution_identity = value["solution_identity"]
     old_controller_identity = value["controller_identity"]
@@ -228,7 +239,8 @@ def run(*, provider: str, rate: int, output: Path,
         trajectory_candidate: str = "lifecycle-v2",
         recording_storage_variant: str = "owner-fields-v1",
         acceptance_contract_id: str | None = None,
-        diagnostic_shadow_mode: bool = False) -> dict:
+        diagnostic_shadow_mode: bool = False,
+        construction_route: str = "historical") -> dict:
     if provider not in {"mujoco", "geophys"}:
         raise ValueError("lifecycle FULL supports only GeoPhys and MuJoCo")
     if provider == "geophys" and collision_ablation != "none":
@@ -248,7 +260,9 @@ def run(*, provider: str, rate: int, output: Path,
     recording_module.storage_policy(recording_storage_variant)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
-    value = context(rate, trajectory_candidate, provider=provider)
+    value = context(rate, trajectory_candidate, provider=provider,
+                    construction_route=construction_route,
+                    diagnostic_observation=diagnostic_shadow_mode)
     if contract is not None:
         _validate_cross_provider_contract(value, contract)
     value["recording_storage_variant"] = recording_storage_variant
@@ -295,7 +309,10 @@ def run(*, provider: str, rate: int, output: Path,
             saved.pop("integrity_hash")
             saved["owners"]["arm_schedule"] = {
                 "version": "arm-schedule-public-ack-memory-v2",
-                "source_sha256": _sha(Path(frequency_run.__file__).parent / "arm_schedule.py"),
+                "source_sha256": (
+                    owner_value["resolved_configuration"]["source_sha256"]["execution_support"]
+                    if owner_value.get("construction_id") else
+                    _sha(Path(frequency_run.__file__).parent / "arm_schedule.py")),
                 "fields": {"last_applied_arm": {
                     "present": True,
                     "value": owner_value["_arm_schedule_memory"].last_applied_arm,
@@ -408,6 +425,14 @@ def run(*, provider: str, rate: int, output: Path,
                 diagnostic_shadow_source_sha256=(DIAGNOSTIC_SHADOW_SOURCE_SHA256
                                                  if diagnostic_shadow_mode else None),
             )
+            if construction_route == "task-owned":
+                recipe.update(factory="task_env.tasks.nut_assembly.reference.build_reference",
+                              construction_id=owner_value["construction_id"],
+                              construction_source_sha256=owner_value["resolved_configuration"]["source_sha256"],
+                              execution_policy=owner_value["execution_policy"],
+                              resolved_configuration=owner_value["resolved_configuration"],
+                              arm_schedule_stepper_source_sha256=_sha(
+                                  Path(frequency_run.__file__).parent / "arm_schedule.py"))
             if acceptance_contract_id is not None:
                 recipe.update(
                     cross_provider_acceptance_contract_id=acceptance_contract_id,
@@ -643,6 +668,11 @@ def run(*, provider: str, rate: int, output: Path,
         "diagnostic_shadow_source_sha256": (DIAGNOSTIC_SHADOW_SOURCE_SHA256
                                             if diagnostic_shadow_mode else None),
     }
+    if construction_route == "task-owned":
+        manifest["construction_id"] = value["construction_id"]
+        manifest["construction_source_sha256"] = value["resolved_configuration"]["source_sha256"]
+        manifest["execution_policy"] = value["execution_policy"]
+        worker._write(output / "resolved_construction.json", value["resolved_configuration"])
     worker._write(output / "full_expert_evidence_manifest.json", manifest)
     return result
 
@@ -669,6 +699,8 @@ def main() -> int:
     parser.add_argument("--acceptance-contract-id", choices=(_CROSS_PROVIDER_CONTRACT_ID,))
     parser.add_argument("--diagnostic-shadow-mode", action="store_true",
                         help="Continue authored stage plans in a separate diagnostic shadow after nonterminal Expert gate failures.")
+    parser.add_argument("--construction-route", choices=("historical", "task-owned"),
+                        default="historical", help="Explicit S1 constructor; historical route remains available.")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     report = run(provider=args.provider, rate=args.rate, output=args.output,
@@ -676,7 +708,8 @@ def main() -> int:
                  trajectory_candidate=args.trajectory_candidate,
                  recording_storage_variant=args.recording_storage_variant,
                  acceptance_contract_id=args.acceptance_contract_id,
-                 diagnostic_shadow_mode=args.diagnostic_shadow_mode)
+                 diagnostic_shadow_mode=args.diagnostic_shadow_mode,
+                 construction_route=args.construction_route)
     print(json.dumps({key: report.get(key) for key in (
         "pass", "failure_boundary", "expert_complete", "expert_failed",
         "completion_reason", "canonical_task_success", "coordinator_stage_sequence",
