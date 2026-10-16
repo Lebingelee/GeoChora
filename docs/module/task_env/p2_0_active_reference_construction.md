@@ -70,3 +70,14 @@ S2前仍需：新source完整selected路径与record/replay验证；迁移公开
 ## S2-A 调用者迁移（待审阅）
 
 当前公开构造、录制/重执行和兼容移除边界见 [active task consumers](p2_0_active_task_consumers.md)。S1.6 evidence 的 source identity 保持冻结；新适配器须独立验收，不能继承历史资格。
+
+## S2-B2 — 两个历史 NutAssembly selector 退役
+
+当前 develop 的 S2-B2 bounded slice 移除了 `clearance_candidate_v4.py` 和 `stable_grasp_reference.py`，不改变选定的 Outcome V1 活动构造、task semantics、Candidate MRO、控制器或生命周期。冻结的 P1.8 报告和 Evidence 保持原样；需要重放以下历史调用时，从不可变 `v1.0.0` 恢复对应源，而不是在当前路径中选择其他候选：
+
+| 退役调用 | 当前行为 | 历史恢复身份 |
+|---|---|---|
+| `lifecycle_full --trajectory-candidate handle-clearance-v4-live-settle` | argparse 显式拒绝该旧 choice；保留 V3、V5、Guarded V1/V2 和 task-owned 路由 | `clearance_candidate_v4.py`，v1.0.0 blob `6251ac1d861ab41c14379b3fd9af7cd9e82034e3` |
+| `stable_grasp.py --reference` / `stable_grasp_reference` module import | CLI 在创建输出目录前显式拒绝，提示恢复 v1.0.0；不映射到 development candidate | `stable_grasp_reference.py`，v1.0.0 blob `e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9` |
+
+这是两个可直接导入的历史模块和诊断 selector/CLI invocation 的兼容性移除记录；`task_env.tasks.nut_assembly.__all__` 未导出它们。活动 UID、Artifact、Outcome Completion V1、Guarded V2/V5/R3 lineage、guard/物理限制、录制合同及严格生命周期观测未改变。本地删除 SHA、恢复 ref 和审查收据见 [S2-B2 retirement review](p2_0_s2_b2_retirement_review.md)；这是当前 v1.0.1 迁移说明，不改写 v1.0.0 记录。

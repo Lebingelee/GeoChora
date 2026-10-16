@@ -23,7 +23,6 @@ from ..frequency_grasp.native import AppliedStepObserver, NativeObserver
 from ..nutassembly_r5_architecture import tracking_worker as worker
 from ....tasks.nut_assembly.canonical_solution_v2 import NutAssemblyStableGraspCandidateV2
 from ....tasks.nut_assembly.clearance_candidate_v3 import NutAssemblyHandClearanceCandidateV3
-from ....tasks.nut_assembly.clearance_candidate_v4 import NutAssemblyHandClearanceCandidateV4
 from ....tasks.nut_assembly.clearance_candidate_v5 import NutAssemblyHandClearanceCandidateV5
 from ....tasks.nut_assembly.guarded_authorization_candidate import (
     NutAssemblyGuardedAuthorizationCandidateV1,
@@ -157,7 +156,6 @@ def context(rate: int, trajectory_candidate: str = "lifecycle-v2", *, provider: 
     solution_classes = {
         "lifecycle-v2": NutAssemblyStableGraspCandidateV2,
         "handle-clearance-v3": NutAssemblyHandClearanceCandidateV3,
-        "handle-clearance-v4-live-settle": NutAssemblyHandClearanceCandidateV4,
         "handle-clearance-v5-shared-height-correction": NutAssemblyHandClearanceCandidateV5,
         "guarded-primary-readiness-alternative-8n-v1": NutAssemblyGuardedAuthorizationCandidateV1,
         "guarded-primary-readiness-alternative-8n-v2-v5-clearance":
@@ -662,7 +660,6 @@ def run(*, provider: str, rate: int, output: Path,
         "frequency_native_observer": Path(frequency_run.__file__).parent / "native.py",
         "lifecycle_runner": Path(__file__),
         "clearance_candidate_v3": Path("task_env/tasks/nut_assembly/clearance_candidate_v3.py"),
-        "clearance_candidate_v4": Path("task_env/tasks/nut_assembly/clearance_candidate_v4.py"),
         "clearance_candidate_v5": Path("task_env/tasks/nut_assembly/clearance_candidate_v5.py"),
         "guarded_transition_evaluator": Path("task_env/tasks/guarded_transition.py"),
         "guarded_authorization_candidate": Path(
@@ -725,8 +722,7 @@ def main() -> int:
     parser.add_argument("--rate", type=int, choices=(20, 50, 100, 500), default=100)
     parser.add_argument(
         "--trajectory-candidate",
-        choices=("lifecycle-v2", "handle-clearance-v3", "handle-clearance-v4-live-settle",
-                 "handle-clearance-v5-shared-height-correction",
+        choices=("lifecycle-v2", "handle-clearance-v3", "handle-clearance-v5-shared-height-correction",
                  "guarded-primary-readiness-alternative-8n-v1",
                  "guarded-primary-readiness-alternative-8n-v2-v5-clearance"),
         default="lifecycle-v2",

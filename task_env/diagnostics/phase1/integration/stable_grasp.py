@@ -7,7 +7,7 @@ from pathlib import Path
 from ..nutassembly_r5_architecture import tracking_worker as worker
 from ....controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
 from ....controllers.canonical.gripper_execution import EqualRateGripperServo
-from ....tasks.nut_assembly import stable_grasp_candidate, stable_grasp_reference
+from ....tasks.nut_assembly import stable_grasp_candidate
 
 PROFILE = Path('task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json')
 DYNAMIC = Path('task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml')
@@ -25,8 +25,8 @@ class ExecutionController:
 
 
 def context(hz, *, reference=False, skip_absolute_height_gate=False):
-    if reference and skip_absolute_height_gate:
-        raise ValueError('frozen reference cannot use the height-gate ablation')
+    if reference:
+        raise ValueError('stable_grasp_reference was retired; restore v1.0.0 to replay that historical route')
     value = worker._context('NA-TB'+str(hz), PROFILE, DYNAMIC)
     source = value['source']
     source = replace(source, config=replace(source.config, robot=replace(source.config.robot,
@@ -34,7 +34,7 @@ def context(hz, *, reference=False, skip_absolute_height_gate=False):
     value['source'] = source
     controller = ProductionCanonicalPandaControllerR3.from_source(value['artifact'], source, profile=value['dynamic_profile'])
     config = replace(value['solution_config'], grasp_offset=(0.,0.,.044895))
-    module = stable_grasp_reference if reference else stable_grasp_candidate
+    module = stable_grasp_candidate
     holder = module.StableArmTargetHold(controller)
     solution_type = module.NutAssemblyStableGraspCandidate
     if skip_absolute_height_gate:
@@ -62,7 +62,10 @@ def main():
     p.add_argument('--reference',action='store_true')
     p.add_argument('--skip-absolute-height-gate',action='store_true',
         help='Diagnostic only: keep measured stability, remove absolute expected-Z gate')
-    args=p.parse_args(); args.output.mkdir(parents=True,exist_ok=False)
+    args=p.parse_args()
+    if args.reference:
+        p.error('stable_grasp_reference was retired; restore v1.0.0 to replay that historical route')
+    args.output.mkdir(parents=True,exist_ok=False)
     value=context(args.rate,reference=args.reference,
         skip_absolute_height_gate=args.skip_absolute_height_gate)
     worker.CLOSE_TIME_LIMIT_S=1.5
