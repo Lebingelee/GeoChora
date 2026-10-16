@@ -75,7 +75,11 @@ def test_record_cli_exit_code_reflects_completion_and_finalizes(failed, success,
         env._stopped = True
         return None, 0.0, terminated, truncated, env.info
     env.step_expert = stop_with_flag
-    env.finish_recording = lambda stop_reason: calls.setdefault('stop_reason', stop_reason) or {'roundtrip': True}
+    def finish_recording(stop_reason):
+        calls['stop_reason'] = stop_reason
+        calls['finalized'] = True
+        return {'roundtrip': True}
+    env.finish_recording = finish_recording
     env.close = lambda: calls.setdefault('closed', True)
     monkeypatch.setattr(task_env, 'make_env', lambda uid, config: env)
     code = main(['--env-id', 'pick-cube-p16-reference-v1', '--provider', 'mujoco',
@@ -83,5 +87,37 @@ def test_record_cli_exit_code_reflects_completion_and_finalizes(failed, success,
     output = capsys.readouterr().out
     assert code == expected
     assert calls['stop_reason'] == reason
+    assert calls['finalized']
     assert calls['closed']
     assert ('"status": "PASS"' in output) is (expected == 0)
+
+
+def test_failed_cli_run_finalizes_readable_h5_before_nonzero_exit(monkeypatch, tmp_path, capsys):
+    """Exercise the CLI and real canonical recorder with one synthetic interval."""
+    import task_env
+    import task_env.runtime.sessions.provenance as provenance
+    import task_env.tasks.reference_env as reference_env
+    from task_env.diagnostics.tasks.test_selected_consumers import FakeSession
+    from task_env.trajectory.canonical.h5 import load
+
+    monkeypatch.setattr(reference_env, 'materialize_control', FakeSession)
+    monkeypatch.setattr(provenance, 'provider_build_identity',
+                        lambda provider: {'synthetic_provider': provider})
+    real_make_env = task_env.make_env
+    monkeypatch.setattr(task_env, 'make_env',
+                        lambda uid, config: real_make_env(uid, config={**config, 'horizon': 1}))
+
+    path = tmp_path / 'failed-episode.h5'
+    code = main(['--env-id', 'pick-cube-p16-reference-v1', '--provider', 'mujoco',
+                 '--horizon', '1', '--seed', '31', '--output', str(path)])
+    output = capsys.readouterr().out
+
+    assert code == 1
+    assert '"status": "FAIL"' in output
+    assert '"logical_mapping_exact": true' in output
+    assert path.is_file()
+    trajectory = load(path)
+    assert trajectory.stop_reason == 'environment_truncated_or_horizon_reached'
+    assert len(trajectory.transitions) == 1
+    assert len(trajectory.boundaries) == 2
+    assert trajectory.transitions[0].truncated is True
