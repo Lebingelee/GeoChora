@@ -15,6 +15,7 @@ import numpy as np
 
 from . import live_recording as recording_module
 from .live_recording import LiveRecording
+from .provenance import execution_identity
 from ..frequency_grasp import run as frequency_run
 from ..frequency_grasp.arm_schedule import RampedArmAudit, ramped_control_interval
 from ..frequency_grasp.cadence import validate_native_cadence
@@ -447,16 +448,12 @@ def run(*, provider: str, rate: int, output: Path,
         *args, output=output
     )
 
-    status = subprocess.run(
-        ["git", "status", "--short", "--branch"], check=True,
-        text=True, capture_output=True,
-    ).stdout
-    head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], check=True, text=True, capture_output=True,
-    ).stdout.strip()
+    identity = execution_identity()
+    status = '\n'.join(identity['dirty_status'])
+    head = identity['head']
     worker._write(output / "launch.json", {
         "schema": "p1.8-nutassembly-lifecycle-full-launch-v1",
-        "branch": "codex/p1.8-frequency-robust-grasp",
+        "branch": identity['branch'],
         "head": head,
         "dirty_status": status.strip().splitlines(),
         "provider": provider,
@@ -632,7 +629,7 @@ def run(*, provider: str, rate: int, output: Path,
     }
     manifest = {
         "schema": "p1.8-canonical-solution-lifecycle-evidence-v1",
-        "branch": "codex/p1.8-frequency-robust-grasp",
+        "branch": identity['branch'],
         "head": head,
         "provider": provider,
         "provider_build_identity": worker.provider_build_identity(provider),
