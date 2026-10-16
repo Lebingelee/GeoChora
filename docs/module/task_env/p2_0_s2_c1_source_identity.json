@@ -1,0 +1,367 @@
+{
+  "attempt_history": {
+    "correction": "Restored the pre-C1 tuple-scalar evaluation order in commit 38f18f3 and added an exact metric/reward regression; both providers were rerun from the corrected commit.",
+    "final_commit_after_identity_cleanup": {
+      "change": "Removed the hardcoded Artifact SHA guard; canonical TaskArtifact.identity_hash remains recorded and its exact selected value remains asserted by provider-free regression. Both CPU routes were rerun.",
+      "source_revision": "5b0058010f5416eefb08ce59cec43770602fc336"
+    },
+    "mujoco_first_attempt": {
+      "first_divergence": {
+        "left": 0.09966140700877034,
+        "path": "$.boundaries[12].task_metrics.eef_to_cube_dist",
+        "right": 0.09966140700877033
+      },
+      "h5_sha256": "1dd50f8af940fa849bc7a24d9c6b75c701021e7e5571266e72a2d8738426af98",
+      "result_path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco/result.json",
+      "source_revision": "13063f8a20479030efdeb565f637019d30445f5b",
+      "status": "FAIL"
+    },
+    "runner_doc_dirty_preflight": {
+      "reason": "The first final-commit supervisor launch rejected pending docs-only changes as dirty. No task code was dirty, no simulation was started, and no H5 was created; the worker check was narrowed to task_env execution source and the route was rerun in a fresh directory.",
+      "source_revision": "5b0058010f5416eefb08ce59cec43770602fc336",
+      "status": "FAIL_BEFORE_SIMULATION"
+    }
+  },
+  "configuration": {
+    "generated_source_xml_sha256": "bdd119833a5ae3c8176daf1f5ef586c3601870f10f4b4b5f6d7aa730fe5f0fed",
+    "recipe_identity_by_provider": {
+      "geophys": "1cbf8b866358142e861c21cb84f1681db954835619d0d9f1287d860676f1ce40",
+      "mujoco": "1cbf8b866358142e861c21cb84f1681db954835619d0d9f1287d860676f1ce40"
+    },
+    "runtime_configuration_sha256": "d187ad45cec5fe7ac8a12a115dcf7a185336e8c1b78524ae5d2a6ed17bac22a1",
+    "task_config_sha256": "0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0"
+  },
+  "controller": {
+    "identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+    "unchanged_from_s2_b1": true
+  },
+  "current_source_sha256": {
+    "task_env/controllers/canonical/__init__.py": "430174d12b7460013f14b183d71aaa440d578d4a1d257d33857221bcd75a69ec",
+    "task_env/controllers/canonical/contracts.py": "8f96d7393ca090ab7a269912053ed9ae17faa9a54279ec19eb097d4fa45847c5",
+    "task_env/controllers/canonical/controller.py": "e7bb83423e9985aa9a3b0a27e817271f0815e3a4f12d86a3a4c80d1b82645c4a",
+    "task_env/controllers/canonical/execution.py": "583c06a37f7b077269c6096f3609d9fa6c71cf91718a83d0bc70b833b6f54935",
+    "task_env/controllers/canonical/feedback.py": "f027996d43f2dce8055279d66577f6c5ef7223e9c4daa152ee70a933949756ea",
+    "task_env/controllers/canonical/gripper_execution.py": "ed1e613a97f155575b35053263a2cff43ce21f7c42c4fe8b287a01ef988b03aa",
+    "task_env/controllers/canonical/kinematics.py": "6f98710123c503e43710d105c06dac3fc8011dbe7bffcf5aaf273e40edd9f385",
+    "task_env/controllers/canonical/production.py": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+    "task_env/controllers/canonical/production_r2.py": "22c3e0d2a2d0ec3f0fc89fd0fabe215d195a59d7ade0091b68bfd6244b7e8a93",
+    "task_env/controllers/canonical/production_r3.py": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5",
+    "task_env/controllers/canonical/readiness.py": "0a3af691f38172f2e8114da850da80e127e09167765eb48729e7a7e588b3a69d",
+    "task_env/objects/pick_cube.py": "8596bf4c5301c08a59dd4cc2b453c9f37315cc1bbec3c1e3b3899171d8939156",
+    "task_env/runtime/sessions/source.py": "e82d3bb439c0c603bef6a619fa180149467c31f4f26d428aa6b0c59667d49e5d",
+    "task_env/tasks/pick_cube/config.yaml": "0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0",
+    "task_env/tasks/pick_cube/solution.py": "12da709337079185f1c98b15fa438fcef62696e6dce90e999817099fcdbe2d13",
+    "task_env/tasks/pick_cube/task.py": "34cfee8362ffa6f55b0823fbf8e44035447ed65b08fb12ed82fe0f942f55b9ff",
+    "task_env/tasks/reference_env.py": "c13f67d23ca97fb34cb1bd9151778f65eaf424f1f868e040004e332a2c0e37d4"
+  },
+  "evidence_root": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/",
+  "execution_evidence": {
+    "geophys": {
+      "status": "PASS",
+      "provider": "geophys",
+      "backend": "cpu",
+      "seed": 31,
+      "route_uid": "pick-cube-p16-reference-v1",
+      "source_revision": "5b0058010f5416eefb08ce59cec43770602fc336",
+      "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_version": "ver_p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "construction_id": "pickcube-p16-reference-construction-v2",
+      "resolved_configuration_identity": "1cbf8b866358142e861c21cb84f1681db954835619d0d9f1287d860676f1ce40",
+      "runtime_config_sha256": "d187ad45cec5fe7ac8a12a115dcf7a185336e8c1b78524ae5d2a6ed17bac22a1",
+      "controller_identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+      "solution_identity": "514a5ed3bc0d289761ef88a00b1e7c11df2795133506ab148db9ab8e98e55241",
+      "solution_version": "pick-cube-p16-readiness-expert-v2",
+      "provider_provenance": {
+        "build": "{'provider': 'geophys', 'package_version': None, 'repository_revision': 'c665ce5028a12bb4d2afe49f05e015fa9b684a39', 'dirty_build_sha256': None, 'import_origin': '/home/lly/Program_Files/Geochora/GeoPhys/src/geophys/__init__.py', 'origin_sha256': '57e772e69d39e79fb21fd23547727d7cc9738970ad307b70cd3ebbf2e0264c9e', 'manifest_version': 'git:c665ce5028a12bb4d2afe49f05e015fa9b684a39'}"
+      },
+      "transitions": 151,
+      "boundaries": 152,
+      "native_steps_expected": 755,
+      "native_steps_observed": 755,
+      "expert_done": true,
+      "expert_failed": false,
+      "stages": [
+        "move_above_cube",
+        "descend_vertical",
+        "close_gripper",
+        "lift"
+      ],
+      "task_success": true,
+      "cube_lift_m": 0.10818110752105708,
+      "terminated": false,
+      "truncated": false,
+      "h5_sha256": "cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108",
+      "baseline_h5_sha256": "c4e66723e81d5391751b6b2007d9a82c69a4550738b62933f3a4d48079290415",
+      "recording_identity": "261b58e22c07be2f1aaa76ec0604fd6f035eeaed79a9feae450a5a8fffc26b39",
+      "h5_roundtrip": true,
+      "first_full_record_difference": {
+        "left": "\"pick-cube-p16-readiness-expert-v2\"",
+        "path": "$.transitions[0].expert_diagnostics.expert_version",
+        "right": "\"pick-cube-readiness-v1\""
+      },
+      "transition_and_boundary_mappings_equal_after_expert_version_label_normalization": true,
+      "physical_control_trajectory_equal_to_s2_b1": true,
+      "resource_monitor": {
+        "wall_time_s": 46.19268843199825,
+        "peak_sampled_process_tree_rss_bytes": 657874944,
+        "minimum_MemAvailable_bytes": 3629817856,
+        "maximum_memory_full_avg10": 3.46,
+        "maximum_io_full_avg10": 5.51,
+        "budget_s": 180.0,
+        "rss_limit_bytes": 2147483648,
+        "new_kernel_storage_error_entries": ""
+      }
+    },
+    "mujoco": {
+      "status": "PASS",
+      "provider": "mujoco",
+      "backend": "cpu",
+      "seed": 31,
+      "route_uid": "pick-cube-p16-reference-v1",
+      "source_revision": "5b0058010f5416eefb08ce59cec43770602fc336",
+      "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_version": "ver_p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "construction_id": "pickcube-p16-reference-construction-v2",
+      "resolved_configuration_identity": "1cbf8b866358142e861c21cb84f1681db954835619d0d9f1287d860676f1ce40",
+      "runtime_config_sha256": "d187ad45cec5fe7ac8a12a115dcf7a185336e8c1b78524ae5d2a6ed17bac22a1",
+      "controller_identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+      "solution_identity": "514a5ed3bc0d289761ef88a00b1e7c11df2795133506ab148db9ab8e98e55241",
+      "solution_version": "pick-cube-p16-readiness-expert-v2",
+      "provider_provenance": {
+        "build": "{'provider': 'mujoco', 'package_version': '3.8.1', 'repository_revision': None, 'dirty_build_sha256': None, 'import_origin': '/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py', 'origin_sha256': 'f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497', 'manifest_version': 'package:3.8.1'}"
+      },
+      "transitions": 470,
+      "boundaries": 471,
+      "native_steps_expected": 2350,
+      "native_steps_observed": 2350,
+      "expert_done": true,
+      "expert_failed": false,
+      "stages": [
+        "move_above_cube",
+        "descend_vertical",
+        "close_gripper",
+        "lift"
+      ],
+      "task_success": true,
+      "cube_lift_m": 0.10606502570351223,
+      "terminated": false,
+      "truncated": false,
+      "h5_sha256": "579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018",
+      "baseline_h5_sha256": "3d4e8bcabd3cfba2e66df2bb3ae2e0e4f409d39b8026c6d6f60b7f372ebe4e45",
+      "recording_identity": "f7b1d0ba1612417815519da23cb7ebf2565abe217026c89301f4415f3ea2f440",
+      "h5_roundtrip": true,
+      "first_full_record_difference": {
+        "left": "\"pick-cube-p16-readiness-expert-v2\"",
+        "path": "$.transitions[0].expert_diagnostics.expert_version",
+        "right": "\"pick-cube-readiness-v1\""
+      },
+      "transition_and_boundary_mappings_equal_after_expert_version_label_normalization": true,
+      "physical_control_trajectory_equal_to_s2_b1": true,
+      "resource_monitor": {
+        "wall_time_s": 10.046727168009966,
+        "peak_sampled_process_tree_rss_bytes": 303153152,
+        "minimum_MemAvailable_bytes": 3737739264,
+        "maximum_memory_full_avg10": 0.31,
+        "maximum_io_full_avg10": 0.58,
+        "budget_s": 120.0,
+        "rss_limit_bytes": 2147483648,
+        "new_kernel_storage_error_entries": ""
+      }
+    }
+  },
+  "former_modules": [
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/artifact.py",
+      "pre_c1_git_blob": "0fcae783c5aca9849d252a7078d330141ab7d86f",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/artifact.py",
+      "pre_c1_source_sha256": "c6b140c32cc59fb130e3e332ee975963de65318474574b1130035dd751536eea",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": null
+    },
+    {
+      "current_disposition": "removed_obsolete_variant",
+      "former_path": "task_env/tasks/pick_cube/candidate.py",
+      "pre_c1_git_blob": "cdbbbfe0345fa5d8448a1695fc1084b45b3a2fa6",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/candidate.py",
+      "pre_c1_source_sha256": "7289adde9c692534ae36fe47edb33caad3a56cfc61b1bb3a1cbe904c8c7a4af2",
+      "replacement_owner": null,
+      "v1_0_0_blob": "53a7105c24ae3fac4497a06f505ed4bec5c31494"
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/canonical_semantics.py",
+      "pre_c1_git_blob": "3b25cd35b9b25975d7d4faa12ff48c2d000953ce",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/canonical_semantics.py",
+      "pre_c1_source_sha256": "e6e5973c3bb898a123f809c31e39bc9be0f3c39401994a4b702e45332624e83b",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": "6ae0e068d457dabf23e2acf5fb364b4f88202767"
+    },
+    {
+      "current_disposition": "replaced_configuration",
+      "former_path": "task_env/tasks/pick_cube/default.yaml",
+      "pre_c1_git_blob": "a788e43c30be2eb45e8eff2ffceac34ffed22f3c",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/default.yaml",
+      "pre_c1_source_sha256": "bff13415d6bbdc33d17a1f91137c8bc57b7cf740c3de34ce64d466446b809770",
+      "replacement_owner": "task_env/tasks/pick_cube/config.yaml",
+      "v1_0_0_blob": "a788e43c30be2eb45e8eff2ffceac34ffed22f3c"
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/definition.py",
+      "pre_c1_git_blob": "6e1deeeb0f0f85e9f6bf17726ffb2211d3b30f28",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/definition.py",
+      "pre_c1_source_sha256": "ac80171fba1c1b1fc327a74373b17d59d244d3b4743197b183ad062cacbc1c52",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": null
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/readiness_solution.py",
+      "pre_c1_git_blob": "f6951081e26ed933fd609ee255cd1c735664cb5f",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/readiness_solution.py",
+      "pre_c1_source_sha256": "685c9dc61aa40e4d99324ae01e8a3092b9bcee457319c24e0cc182ed96806046",
+      "replacement_owner": "task_env/tasks/pick_cube/solution.py",
+      "v1_0_0_blob": "f6951081e26ed933fd609ee255cd1c735664cb5f"
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/reference.py",
+      "pre_c1_git_blob": "977705aad53a14d0e4edf55eedf8232f25c77a47",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/reference.py",
+      "pre_c1_source_sha256": "ff33e44bf5de22e38a923ec12533345e12d5793a32d7d90a6b05f40cf7027b42",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": null
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/reference_config.py",
+      "pre_c1_git_blob": "c1b7a3740fed065122a89138b39a299a3d377025",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/reference_config.py",
+      "pre_c1_source_sha256": "7b6100a9cc70c298ea6c10eaac5955ab870f68d57662578ec03d2243455aad45",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": null
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/reference_env.py",
+      "pre_c1_git_blob": "6e88d53225cf1010ece048307f7d9a48b532318a",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/reference_env.py",
+      "pre_c1_source_sha256": "43dbdf9dd4e469923344e86e69789a084338c87a7b29c3a0f72102b736f19fc5",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": null
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/reset.py",
+      "pre_c1_git_blob": "b315d8f2978de235bf7e2df0f336da7062e5cec4",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/reset.py",
+      "pre_c1_source_sha256": "eb3fc7c53a210a62487d49cfca34cae33880811f6c1de2f599b14c77db29f465",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": "b315d8f2978de235bf7e2df0f336da7062e5cec4"
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/reset_policy.py",
+      "pre_c1_git_blob": "bf1134275868f00cb9e4b67f3841c09b160559e6",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/reset_policy.py",
+      "pre_c1_source_sha256": "304003fbf39a484aaed9e08b8620d0d9f4c64c561187e41b1e6a0dc38a24a7f3",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": null
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/runtime_source.py",
+      "pre_c1_git_blob": "8c77574dc0687f75e3feae4c29544d91852fdadb",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/runtime_source.py",
+      "pre_c1_source_sha256": "4459279c01740f55eebf033e12b43818df9be08fa83cd7c41e4cc767f9aa6cbe",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": "77136c0cd0a53eb2961460f8c717fa468b968814"
+    },
+    {
+      "current_disposition": "consolidated_into_task_owner",
+      "former_path": "task_env/tasks/pick_cube/timebase.py",
+      "pre_c1_git_blob": "b960497db769a2a96d215664ab5a92da98840e78",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/timebase.py",
+      "pre_c1_source_sha256": "b95d034d6c0908b6c60a7d6446dca2fccb3b26c8ccaea19e46b9a8c833efddf5",
+      "replacement_owner": "task_env/tasks/pick_cube/task.py",
+      "v1_0_0_blob": "e7f79014e5584794bf5102ffb8a0a0fbfa3621ee"
+    },
+    {
+      "current_disposition": "relocated",
+      "former_path": "task_env/tasks/pick_cube/assets.py",
+      "pre_c1_git_blob": "2905b18f0579ecd8543676492e3561b02ffdeea5",
+      "pre_c1_recovery_ref": "bd9096ccad5cae54df0a2361d9797b2455862d49:task_env/tasks/pick_cube/assets.py",
+      "pre_c1_source_sha256": "2356ef00e64d4cb2f792114c8dde22a9e22d342c6ba4f0f36813eba4d1f817ac",
+      "replacement_owner": "task_env/objects/pick_cube.py",
+      "v1_0_0_blob": "2905b18f0579ecd8543676492e3561b02ffdeea5"
+    }
+  ],
+  "immutable_main_and_release_protection": {
+    "main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "modified": false,
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51"
+  },
+  "public_api_removals": {
+    "compatibility_status": "BREAKING_DIRECT_IMPORT_AND_SYMBOL_REMOVALS_FOR_PLANNED_V1_0_1_REVIEW; NO_SILENT_ALIAS",
+    "relocated_module_path": {
+      "new": "task_env.objects.pick_cube",
+      "old": "task_env.tasks.pick_cube.assets"
+    },
+    "retired_direct_module_paths": [
+      "task_env.tasks.pick_cube.artifact",
+      "task_env.tasks.pick_cube.candidate",
+      "task_env.tasks.pick_cube.canonical_semantics",
+      "task_env.tasks.pick_cube.definition",
+      "task_env.tasks.pick_cube.readiness_solution",
+      "task_env.tasks.pick_cube.reference",
+      "task_env.tasks.pick_cube.reference_config",
+      "task_env.tasks.pick_cube.reference_env",
+      "task_env.tasks.pick_cube.reset",
+      "task_env.tasks.pick_cube.reset_policy",
+      "task_env.tasks.pick_cube.runtime_source",
+      "task_env.tasks.pick_cube.timebase"
+    ],
+    "retired_symbols": [
+      "PICK_CUBE_AGENT_UIDS",
+      "PICK_CUBE_ENV_ID",
+      "PICK_CUBE_EXPERT_PROFILE",
+      "PICK_CUBE_OBJECT_UIDS",
+      "PICK_CUBE_RESET_PROFILE",
+      "PICK_CUBE_SCENE_UID",
+      "PICK_CUBE_SENSOR_PROFILE",
+      "PICK_CUBE_SPEC",
+      "PICK_CUBE_SUCCESS_DEFINITION",
+      "PICK_CUBE_TASK_UID",
+      "PICK_CUBE_VARIANT",
+      "PickCubeEnv",
+      "PickCubeResetSampler",
+      "PickCubeVariantSpec",
+      "candidate.build_candidate"
+    ]
+  },
+  "qualification": "NOT_REQUALIFIED",
+  "reviewed_base": {
+    "public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+    "source_code_head": "5b0058010f5416eefb08ce59cec43770602fc336"
+  },
+  "schema": "geochora-p2-0-b-s2-c1-source-identity-v1",
+  "selected_task": {
+    "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+    "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+    "artifact_version": "ver_p1_6_experimental_100hz",
+    "construction_id": "pickcube-p16-reference-construction-v2",
+    "current_implementation_revision": "5b0058010f5416eefb08ce59cec43770602fc336",
+    "route_uid": "pick-cube-p16-reference-v1",
+    "seed31_reset_sample_identity": "ee9644c1af42c7897f79a0cece21e5fc4bd5323ae40eba7b7259d34d681a5fb6"
+  },
+  "solution": {
+    "identity": "514a5ed3bc0d289761ef88a00b1e7c11df2795133506ab148db9ab8e98e55241",
+    "implementation_sha256": "12da709337079185f1c98b15fa438fcef62696e6dce90e999817099fcdbe2d13",
+    "prior_identity": "fcef1d3a9c093a1d0adfce394a44099f5bff61edae48b3dce2ff50406118cd61",
+    "version": "pick-cube-p16-readiness-expert-v2"
+  },
+  "source_revision_is_committed": true
+}

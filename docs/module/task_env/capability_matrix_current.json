@@ -1,8 +1,8 @@
 {
   "schema": "geochora-current-reference-capability-overlay-v1",
-  "status": "S2_B1_INTEGRATED_S2_B2_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
+  "status": "S2_B2_INTEGRATED_S2_C1_LOCAL_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
-  "integrated_baseline": "961ff67489cf6ed1fd3665fc77db2e3f389796e9",
+  "integrated_baseline": "bd9096ccad5cae54df0a2361d9797b2455862d49",
   "qualification_inherited": false,
   "selected_references": [
     {
@@ -18,7 +18,8 @@
       "new_adapter_full_trajectory_acceptance": "PASS_BOUNDED_FUNCTIONAL; PickCube GeoPhys accepted by independent canonical H5 reconciliation after its post-run wrapper failed",
       "policy_checkpoint_inference": "NOT_RUN",
       "historical_P1_6_policy_qualification": "UNCHANGED_NO_INHERITANCE",
-      "s2_b1_claim_limit": "PASS: current task-owned route on both CPU providers; exact selected P1.6 Artifact and per-provider S2-A transition/boundary behavior preserved; no checkpoint inference or qualification inheritance"
+      "s2_b1_claim_limit": "PASS: current task-owned route on both CPU providers; exact selected P1.6 Artifact and per-provider S2-A transition/boundary behavior preserved; no checkpoint inference or qualification inheritance",
+      "s2_c1_local_claim_limit": "PASS_BOUNDED_FUNCTIONAL on final current local execution source 5b0058010f5416eefb08ce59cec43770602fc336: GeoPhys/MuJoCo seed31 full routes; complete transition and boundary mappings match S2-B1 after normalizing only the explicitly versioned expert_diagnostics.expert_version label; no checkpoint inference or qualification inheritance"
     },
     {
       "env_id": "nut-assembly-outcome-reference-v1",
@@ -40,8 +41,22 @@
   ],
   "new_reference_renderer_interoperability": "NOT_IMPLEMENTED",
   "native_current_source_reexecution": "PASS_BOUNDED_FUNCTIONAL_REGRESSION: four named public make_env routes exercised exact S2-B1 source 60fafb689efe89312d4d79b0431c61ebc98642d8; provider-by-provider H5 transition/boundary comparison to S2-A is exact after source/config identity metadata is excluded; no P1.8 FULL or D0-D2 qualification inheritance",
-  "provider_free_current_source_reexecution": "157 passed; bounded provider-free API, import isolation, Artifact identity, task semantics, reset, lifecycle, controller, recorder/streaming, provenance, and guarded-outcome regression; NOT qualification",
-  "S2_B": "S2_B1_INTEGRATED_AT_961ff674; S2_B2_SCOPED_RETIREMENT_IN_PROGRESS_NOT_YET_APPLIED; no release qualification",
+  "provider_free_current_source_reexecution": "100 passed on S2-C1 source; bounded provider-free API/import, Artifact identity, task semantics/reset, lifecycle/controller, recorder/H5 CLI gating, provenance, retired import, and NutAssembly identity regression; NOT qualification",
+  "S2_B": "S2-B1 and exact two-file S2-B2 retirement are integrated through bd9096cc; no release qualification",
+  "S2_C1": {
+    "implementation_commits": ["13063f8a20479030efdeb565f637019d30445f5b", "38f18f397454b13b3a269502577711f6868a0af9", "5b0058010f5416eefb08ce59cec43770602fc336"],
+    "local_head": "5b0058010f5416eefb08ce59cec43770602fc336",
+    "base_public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+    "integration": "NOT_PUSHED_OR_MERGED_PENDING_MAINTAINER_REVIEW",
+    "pickcube_cpu_cases": ["GeoPhys seed31 100Hz PASS on 5b00580; 151 transitions/152 boundaries; H5 cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108", "MuJoCo seed31 100Hz PASS on 5b00580; 470 transitions/471 boundaries; H5 579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018"],
+    "qualification_inherited": false,
+    "other_scope": "NutAssembly execution policy, Go2, static physics, vectorization, and Renderer implementations unchanged; shared reference adapter uses explicit task binding"
+  },
+  "S2_B2_integration": {
+    "implementation_commit": "84438d470cce4f5a215a5934fdfc344b91adca30",
+    "public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+    "main_and_v1_0_0_unchanged": true
+  },
   "storage": "SINGLE_SATA_RISK_AND_INDEPENDENT_BACKUP_LIMITATION_UNRESOLVED",
   "source_identity_manifest": "p2_0_s2_a_source_identity.json",
   "provider_free": "162 passed, 6 subtests passed (final S2-A provider-free suite including CLI exit gating and failed-task H5 finalization)",

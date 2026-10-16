@@ -5,11 +5,13 @@ S1/S1.6 已正常快进集成到公开 develop `77e194e2cac1ec82f7a39255a1eef0da
 
 当前 capability 声明见 [current reference matrix overlay](capability_matrix_current.json)，不修改冻结 v1.0.0 matrix。
 
+> 当前实现已叠加本地 S2-C1：PickCube task directory 收敛为四个文件，builder 从本页 S2-A 时点的 `tasks.pick_cube.reference` 移到 `tasks.pick_cube.task`。本页关于 S2-A caller migration 的原始 execution/evidence 记录保留不变；当前 task-authoring、删除路径、source identities 与新增 full-route receipt 见 [S2-C1 authoring receipt](p2_0_s2_c1_pickcube_authoring.md)。S2-C1 尚未推送或合并。
+
 ## 唯一 active route
 
 | 入口 | task-owned construction | 唯一所选 Artifact / policy |
 |---|---|---|
-| `make_env('pick-cube-p16-reference-v1', config=...)` / `PickCubeReferenceEnv` | `tasks.pick_cube.reference.build_reference` | 精确 `pick-cube-v1/p1_6_experimental_100hz`，不是 TB-100；原 readiness expert |
+| `make_env('pick-cube-p16-reference-v1', config=...)` / `PickCubeReferenceEnv` | 当前 S2-C1：`tasks.pick_cube.task.build_reference` | 精确 `pick-cube-v1/p1_6_experimental_100hz`，不是 TB-100；版本化 readiness expert |
 | `make_env('nut-assembly-outcome-reference-v1', config=...)` / `NutAssemblyReferenceEnv` | `tasks.nut_assembly.reference.build_reference` | V2/V5/R3，100 Hz，`nutassembly-outcome-oriented-completion-v1` |
 
 高级 API 的模块路径为 `task_env.tasks.{pick_cube,nut_assembly}.reference_env`。
@@ -99,11 +101,7 @@ PYTHONPATH=.:GeoPhys/src python -m task_env.script.trajectory.replay \
 
 ## 历史与 S2-B 边界
 
-旧 task.py、solution.py、candidate/helper、默认 YAML 等仍完整保留（仅移除旧 env registration）。
-`diagnostics.historical_tasks.make_historical_env` 是明确 recovery-only 构造；不是第二个 active route。
-旧相机/lighting/render/stage11_socket 与旧 H5 replay 使用此隔离入口；它们不建立当前 reference capability。
-其他 Phase I campaigns、qualification/recovery tests 保留原显式源码路径和原 frozen source hash 检查。
-当前旧模块发生 registration 源码身份变化，不能冒充 v1.0.0 的逐字节历史源码；严格恢复应 checkout 冻结 tag/commit。
+以上内容描述 S2-A/S1 时点的历史调用状态。S2-C1 后，PickCube 历史 task/candidate/helper/default recipe 模块已从当前 task directory 删除；`diagnostics.historical_tasks.make_historical_env('pick-cube-v1')` 明确拒绝并指向 immutable v1.0.0 source。其他 Phase I campaign/recovery scripts 中仍有旧直接 import；它们属于历史 recovery-only，必须运行于冻结 release 或不可变历史 commit，当前 develop 不提供 silent alias。S2-C1 删除模块、pre-C1 SHA/blob 与 v1.0.0 可用 blob 见 [source identity migration record](p2_0_s2_c1_source_identity.json)。
 
 精确逐文件清单、所有可解析 import caller 和 literal-reference caller 见
 [S2-B dependency manifest](p2_0_s2_b_deletion_manifest.json)。这是静态 inventory，动态/外部调用者不能据此被认定不存在。

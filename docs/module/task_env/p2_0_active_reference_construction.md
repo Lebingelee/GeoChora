@@ -1,18 +1,20 @@
 # P2.0-B S1 — Active reference construction
 
-状态：implemented construction；S1.6当前默认变化见下文链接；需要 maintainer integration review，未重新授予 historical qualification。
+状态：S1/S1.6 已集成；当前 PickCube task-authoring 已由本地 S2-C1 更新并等待 maintainer review，所有新source均未继承 historical qualification。
+
+> 本页保留 S1/S1.6 构造迁移记录。当前 PickCube task authoring 以 [S2-C1 current section](#s2-c1-current-pickcube-authoring) 与 [S2-C1 receipt](p2_0_s2_c1_pickcube_authoring.md) 为准；旧 `task_env.tasks.pick_cube.reference` 模块已从当前 develop 移除。
 
 S1 在 task owner 中提供 versioned construction API，仍使用现有 TaskArtifact v0。它不替换 `make_env` 默认路线，不删除历史实现，不执行 Go2/static retirement 或 v1.0.1 发布。
 
 ## PickCube
 
 ```python
-from task_env.tasks.pick_cube.reference import build_reference, sample_reset
+from task_env.tasks.pick_cube.task import build_reference, sample_reset
 value = build_reference(backend="cpu")
 sample = sample_reset(value["artifact"], 31)
 ```
 
-`pickcube-p16-reference-construction-v1` 构造精确 `pick-cube-v1/p1_6_experimental_100hz` / `ver_p1_6_experimental_100hz`，Artifact SHA256 为 `fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4`。physics_dt=0.002s、5 substeps、100Hz control；不是 TB-100。
+S1 的 `pickcube-p16-reference-construction-v1` 已由 S2-C1 `pickcube-p16-reference-construction-v2` 取代。current builder 构造精确 `pick-cube-v1/p1_6_experimental_100hz` / `ver_p1_6_experimental_100hz`，Artifact SHA256 为 `fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4`。physics_dt=0.002s、5 substeps、100Hz control；不是 TB-100。
 
 返回 artifact/source/controller/solution/readiness 与完整 `resolved_configuration`。P1.6 canonical semantics、PCG64 reset、readiness expert、ProductionCanonicalPandaController 保留。既有 `policy_search.timebase100.context(backend)` 转发构造并保留原六项 tuple 和错误文本；V2a policy 26D/no_qvel、h50/a36、absolute_joint 的原合同未修改。没有复制、加载或修改 frozen checkpoint。
 
@@ -56,7 +58,7 @@ PickCube Artifact/controller/expert身份保持；Nut三率Artifact与显式历�
 
 | 旧owner | S1 owner / compatibility |
 |---|---|
-| policy_search/timebase100.context | tasks/pick_cube/reference.build_reference；原tuple入口转发 |
+| policy_search/timebase100.context | S1: tasks/pick_cube/reference.build_reference；current S2-C1: tasks/pick_cube/task.build_reference；历史campaign须恢复历史source |
 | nominal/common → tracking_worker._context → stable_grasp → grasp_height_probe → frequency_grasp → lifecycle_full.context | tasks/nut_assembly/reference.build_reference；旧context链继续可调用，new route显式选择 |
 | frequency_grasp/cadence.NativeRateGripperServo、stable_grasp.ExecutionController | tasks/nut_assembly/reference_execution；旧类继续保留；新source独立标识 |
 | existing lifecycle_full / diagnostic_shadow runtime | owner未迁动；S1只增加构造选择与provenance |
@@ -81,3 +83,7 @@ S2前仍需：新source完整selected路径与record/replay验证；迁移公开
 | `stable_grasp.py --reference` / `stable_grasp_reference` module import | CLI 在创建输出目录前显式拒绝，提示恢复 v1.0.0；不映射到 development candidate | `stable_grasp_reference.py`，v1.0.0 blob `e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9` |
 
 这是两个可直接导入的历史模块和诊断 selector/CLI invocation 的兼容性移除记录；`task_env.tasks.nut_assembly.__all__` 未导出它们。活动 UID、Artifact、Outcome Completion V1、Guarded V2/V5/R3 lineage、guard/物理限制、录制合同及严格生命周期观测未改变。本地删除 SHA、恢复 ref 和审查收据见 [S2-B2 retirement review](p2_0_s2_b2_retirement_review.md)；这是当前 v1.0.1 迁移说明，不改写 v1.0.0 记录。
+
+## S2-C1 current PickCube authoring
+
+当前 PickCube directory 只有 `__init__.py`, `task.py`, `solution.py`, `config.yaml` 四个文件。TaskArtifact、task semantics、reset、scene composition、RuntimeSource 和 registration 归 `task.py`；P1.6 readiness expert 归 `solution.py`；对象几何和 scene asset preparation 归 `task_env.objects.pick_cube`。当前路线、S2-B2 public receipt、完整旧导入删除列表、恢复 blob、源/config/controller/solution 身份和两个 provider 的 H5 full-route 结果见 [S2-C1 receipt](p2_0_s2_c1_pickcube_authoring.md) 和 [S2-C1 source identity record](p2_0_s2_c1_source_identity.json)。S2-C1 保持本地等待审阅，没有自动集成。
