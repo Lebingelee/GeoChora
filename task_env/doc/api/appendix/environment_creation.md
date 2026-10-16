@@ -63,4 +63,17 @@ learner/adapter 边界。
 `import task_env`、`from task_env import make_parallel_env` 不会提前加载 SB3、Torch、Taichi 或 Pendulum batch
 runtime；具体依赖在真正选择 local/remote parallel execution 后才导入。
 
-可直接运行的单环境、并行、相机、轨迹和 PPO 命令见 [API examples](../examples/index.md)。
+### Selected task-owned reference routes
+
+The current selected manipulation UIDs are `pick-cube-p16-reference-v1` and
+`nut-assembly-outcome-reference-v1`. Construct both through
+`from task_env import make_env` with an explicit `provider`, `backend="cpu"`,
+and bounded `horizon`. They admit the current scalar CPU GeoPhys/MuJoCo
+intersection. NutAssembly requires `step_expert()`; it rejects unguarded
+external actions. The root [developer examples](../../../../examples/README.md)
+show task execution and canonical H5 recording without introducing another
+environment or recording API.
+
+The examples do not establish a new qualification, checkpoint result, or
+Physics × Renderer capability. Generic parallel APIs remain independent of
+these selected scalar task routes.

@@ -40,6 +40,33 @@ Go2 专用 task/robot/RSL 与诊断入口已从当前 develop 移除。v1.0.0 �
 
 Selected active task UIDs remain `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`. They are single-environment task routes and are not substituted as PPO targets by this retirement.
 
+## P2.0-B S4.5-A: developer workflow migration (local candidate)
+
+The S4.5-A candidate adds runnable root examples under `examples/` using
+`from task_env import make_env`. Selected current commands use only
+`pick-cube-p16-reference-v1` or `nut-assembly-outcome-reference-v1`, explicit
+GeoPhys/MuJoCo providers, and CPU. NutAssembly must advance through guarded
+`step_expert()`; no external gripper action route is added. Recording continues
+to use the task-owned canonical recorder and existing H5 schema. The storage
+reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
+
+| Retired path or command | Current behavior and migration |
+| --- | --- |
+| `task_env.script.stage11` and `task_env.script.stage11_socket` | Entry points return an explicit retirement error. Restore their recorded source commit or immutable `v1.0.0` in a separate historical checkout. |
+| `task_env.diagnostics.phase1.nutassembly_recovery.historical` | Legacy TaskEnv/provider-private recovery route is explicitly retired. Restore its exact source recovery ref for historical diagnostics; current execution uses the selected NutAssembly UID through `make_env`. |
+| `task_env.script.trajectory._task_plans` and its `_build_plan`, `_historical_build_plan`, `_pick_cube_config`, `_nut_assembly_config` helpers | Retired. Use the selected public UID with `make_env`; no old task ID is redirected. |
+| `task_env.script.trajectory.commands collect` and `--historical-grouped` | Grouped Stage 14/Phase I collection is retired. Use `task_env.script.trajectory.record` or `examples/recording/record_expert.py` for one current selected route. |
+| `task_env.script.recorder._pick_cube_config`, `_nut_assembly_config`, `_build_plan`, `_look_at_quat` | Removed from the compatibility command module. `task_env.script.recorder` now delegates only to selected expert recording. |
+| `task_env.script.trajectory._nut_assembly_config` and `_pick_cube_config` package exports | Removed; task-owned configuration is selected by its Task Artifact and not reconstructed by a script helper. |
+| `task_env.script.trajectory.planning.*` selected routes | Kept and now construct through `make_env`; NutAssembly calls only `step_expert()`. |
+| `task_env.script.env.single_*` and `parallel_*` | Kept. The single examples use public `make_env`; parallel examples remain generic registered batch workflows. |
+| `task_env.script.trajectory.convert` and `replay` | Kept as offline utilities. Historical H5 replay still requires explicit `--historical`; selected same-source reexecution remains a separate path. |
+
+Exact pre-change source blobs, SHA-256 values, and recovery refs are recorded in
+[`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/p2_0_s4_5_a_source_recovery.json).
+The S4.5-A code and examples are local review candidates; they do not alter
+frozen release documents or qualification labels.
+
 ## P2.0-B S4: static-template retirement (local candidate)
 
 The S4 candidate is on a local review branch based on public `develop` commit

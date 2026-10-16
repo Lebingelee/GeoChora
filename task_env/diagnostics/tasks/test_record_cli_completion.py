@@ -12,27 +12,31 @@ def _env(*, task_kind='pick_cube', done=True, failed=False, task_success=True,
         done=done,
         failed=failed,
         failure_reason=reason,
-        outcome_report=lambda: {
+    )
+    if task_kind == 'nut_assembly':
+        solution.outcome_report = lambda: {
             'planned_trajectory_completed': planned,
             'outcome_complete': outcome,
             'unapproved_override_used': override,
             # The outcome CLI must keep strict lifecycle status independent.
             'original_expert_lifecycle_status': {'expert_complete': False, 'expert_failed': True},
-        },
-    )
+        }
     return SimpleNamespace(
         task_kind=task_kind,
-        binding=SimpleNamespace(recorder_mode='execution' if task_kind == 'nut_assembly' else 'canonical'),
         solution=solution,
         info={'is_success': task_success, 'task_metrics': {'task_success': task_success}},
     )
 
 
+def _result(env, **kwargs):
+    return _completion_result(env, env.info, **kwargs)
+
+
 def test_pickcube_requires_successful_expert_and_task_outcome():
-    assert _completion_result(_env())['status'] == 'PASS'
-    assert _completion_result(_env(done=False))['failure_reason'] == 'selected_policy_incomplete'
-    assert _completion_result(_env(failed=True, reason='controller_failure'))['failure_reason'] == 'controller_failure'
-    assert _completion_result(_env(task_success=False))['failure_reason'] == 'task_success_false'
+    assert _result(_env())['status'] == 'PASS'
+    assert _result(_env(done=False))['failure_reason'] == 'selected_policy_incomplete'
+    assert _result(_env(failed=True, reason='controller_failure'))['failure_reason'] == 'controller_failure'
+    assert _result(_env(task_success=False))['failure_reason'] == 'task_success_false'
 
 
 @pytest.mark.parametrize(('flag', 'reason'), [
@@ -40,11 +44,11 @@ def test_pickcube_requires_successful_expert_and_task_outcome():
     ('truncated', 'environment_truncated_or_horizon_reached'),
 ])
 def test_terminal_or_horizon_stop_is_not_recorded_as_success(flag, reason):
-    assert _completion_result(_env(), **{flag: True})['failure_reason'] == reason
+    assert _result(_env(), **{flag: True})['failure_reason'] == reason
 
 
 def test_nutassembly_outcome_can_succeed_while_original_strict_expert_failed():
-    result = _completion_result(_env(task_kind='nut_assembly'))
+    result = _result(_env(task_kind='nut_assembly'))
     assert result['status'] == 'PASS'
     assert result['planned_trajectory_completed'] and result['outcome_complete']
 
@@ -55,7 +59,7 @@ def test_nutassembly_outcome_can_succeed_while_original_strict_expert_failed():
     ({'override': True}, 'unapproved_override_used_or_unreported'),
 ])
 def test_nutassembly_requires_full_approved_outcome(kwargs, reason):
-    assert _completion_result(_env(task_kind='nut_assembly', **kwargs))['failure_reason'] == reason
+    assert _result(_env(task_kind='nut_assembly', **kwargs))['failure_reason'] == reason
 
 
 @pytest.mark.parametrize(('failed', 'success', 'terminated', 'truncated', 'expected', 'reason'), [
@@ -68,12 +72,11 @@ def test_record_cli_exit_code_reflects_completion_and_finalizes(failed, success,
     import task_env
 
     calls = {}
-    env = _env(done=not failed, failed=failed, task_success=success, reason='controller_failure' if failed else None)
-    env.reset = lambda seed: None
+    env = _env(done=False, failed=failed, task_success=success, reason='controller_failure' if failed else None)
+    env.reset = lambda seed: (None, env.info)
     env.start_recording = lambda path: None
-    env._stopped = not (terminated or truncated)
     def stop_with_flag():
-        env._stopped = True
+        env.solution.done = True
         return None, 0.0, terminated, truncated, env.info
     env.step_expert = stop_with_flag
     def finish_recording(stop_reason):

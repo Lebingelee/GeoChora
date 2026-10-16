@@ -2,6 +2,7 @@
 from dataclasses import replace
 from types import SimpleNamespace
 import sys
+import json
 import numpy as np
 import pytest
 
@@ -168,14 +169,13 @@ def test_task_bindings_declare_selected_control_and_recording_requirements():
 def test_reporter_and_expert_factory_use_selected_owner(fake):
     from task_env.reporter.real_taskenv_tcp_fixture import _config
     from task_env.reporter.real_taskenv_v2_tcp_fixture import _config as config2
-    from task_env.script.trajectory._task_plans import _build_plan
     for uid in IDS:
-        cfg, solution = _build_plan(uid, 'cpu', 5)
-        env = make_env(uid, config=cfg)
-        assert type(env.solution) is type(solution)
+        env = make_env(uid, config={'provider': 'geophys', 'backend': 'cpu', 'horizon': 5})
+        assert env.uid == uid
+        assert env.artifact.identity_hash == env.metadata['task_artifact_hash']
+        assert env.solution.identity
         env.close()
     assert _config() == config2() == {'provider':'geophys', 'backend':'cpu', 'horizon':8}
-    with pytest.raises(ValueError): _build_plan(IDS[1], 'cpu', 5, force_limit_N=30.)
 
 
 @pytest.mark.parametrize('uid', IDS)
@@ -209,3 +209,111 @@ def test_failed_reset_closes_old_runtime_and_requires_new_reset(fake):
     assert old.closed and env.session is None and env._stopped
     with pytest.raises(RuntimeError):env.step_expert()
     env.reset(seed=19);env.step_expert();env.close()
+
+
+def test_nutassembly_public_example_does_not_admit_external_gripper_actions():
+    env=make_env(IDS[1])
+    try:
+        assert env.binding.external_actions is False
+        with pytest.raises(RuntimeError, match='requires step_expert'):
+            env.step(np.zeros(8))
+    finally:
+        env.close()
+
+
+def test_example_completion_reports_task_outcome_and_expert_status_separately():
+    from examples._common import episode_result
+
+    class Solution:
+        done = True
+        failed = False
+        failure_reason = None
+        def outcome_report(self):
+            return {'planned_trajectory_completed': True, 'outcome_complete': True,
+                    'unapproved_override_used': False, 'expert_complete': False,
+                    'readiness_warnings': ['stable_height_mismatch']}
+
+    env=SimpleNamespace(solution=Solution(),info={'is_success':True,
+        'task_metrics':{'task_success':True},'original_expert_lifecycle_status':{
+            'policy':'original-guarded-v2-v5-strict-gates', 'expert_complete':False,
+            'expert_failed':True, 'failure_reason':'stable_height_mismatch'}})
+    report=episode_result(env,info=env.info,transitions=11)
+    assert report['status']=='PASS' and report['task_success'] is True
+    assert report['expert_complete'] is False and report['outcome_complete'] is True
+    assert report['original_expert_lifecycle_status']['expert_complete'] is False
+
+
+def test_planning_cli_keeps_outcome_success_separate_from_strict_expert_lifecycle():
+    from task_env.script.trajectory.planning._common import _completion_fields
+
+    class OutcomeSolution:
+        done = True
+        failed = False
+
+        def __init__(self, complete=True):
+            self.complete = complete
+
+        def outcome_report(self):
+            return {'planned_trajectory_completed': self.complete, 'outcome_complete': self.complete,
+                    'unapproved_override_used': False, 'expert_complete': False,
+                    'readiness_warnings': ['stable_height_mismatch']}
+
+    fields = _completion_fields(OutcomeSolution(), {
+        'is_success': True,
+        'task_metrics': {'task_success': True},
+        'original_expert_lifecycle_status': {
+            'policy': 'original-guarded-v2-v5-strict-gates', 'expert_complete': False,
+            'expert_failed': True, 'failure_reason': 'stable_height_mismatch',
+        },
+    }, terminated=False, truncated=False)
+    assert fields['success'] is True
+    assert fields['task_success'] is True
+    assert fields['expert_complete'] is False
+    assert fields['outcome_complete'] is True
+    assert fields['original_expert_lifecycle_status']['expert_complete'] is False
+    assert fields['readiness_warnings'] == ['stable_height_mismatch']
+
+    incomplete = _completion_fields(OutcomeSolution(complete=False), {
+        'is_success': True, 'task_metrics': {'task_success': True},
+    }, terminated=False, truncated=False)
+    assert incomplete['success'] is False
+    assert _completion_fields(OutcomeSolution(), {
+        'is_success': True, 'task_metrics': {'task_success': True},
+    }, terminated=True, truncated=False)['success'] is False
+
+
+def test_recording_example_finalizes_failed_task_h5_and_returns_nonzero(fake, tmp_path, monkeypatch, capsys):
+    from contextlib import nullcontext
+    import task_env
+    from examples.recording import record_expert
+    monkeypatch.setattr(record_expert, 'bounded_process', lambda *args: nullcontext({'bounded_test': True}))
+    monkeypatch.setattr(task_env, 'make_env', lambda uid, config=None: make_env(uid, config=config))
+    output=tmp_path/'failed-current-route.h5'
+    code=record_expert.main(['--env-id', IDS[0], '--provider', 'mujoco', '--horizon', '3',
+        '--output', str(output), '--time-limit-s', '10', '--memory-limit-mb', '1024'])
+    result=json.loads(capsys.readouterr().out)
+    assert code==1 and result['status']=='FAIL'
+    assert output.exists() and result['roundtrip']=='PASS'
+    assert result['recording']['transitions']==3 and result['recording']['boundaries']==4
+    assert result['recording']['t_plus_one_valid'] is True
+
+
+def test_retired_phase_i_and_grouped_trajectory_commands_fail_explicitly(capsys):
+    from task_env.script import stage11, stage11_socket
+    from task_env.script.trajectory.commands import main as trajectory_main
+    assert stage11.main([])==2
+    assert stage11_socket.main([])==2
+    assert trajectory_main(['--historical-grouped'])==2
+    message=capsys.readouterr().err
+    assert 'p2_0_s4_5_a_source_recovery.json' in message and 'No task UID' in message
+
+
+def test_removed_task_plan_and_private_recorder_exports_are_not_active():
+    import importlib
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module('task_env.script.trajectory._task_plans')
+    import task_env.script.recorder as recorder
+    import task_env.script.trajectory as trajectory
+    assert recorder.__all__==['main']
+    assert not hasattr(trajectory, '_build_plan')
+    assert not hasattr(recorder, '_pick_cube_config')

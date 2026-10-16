@@ -1,0 +1,104 @@
+{
+  "schema": "geochora-p2-0-s4-5-a-source-recovery-v1",
+  "status": "LOCAL_S4_5_A_CANDIDATE_NOT_INTEGRATED",
+  "base_s4_commit": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+  "recovery_files": [
+    {
+      "path": "task_env/script/stage11.py",
+      "disposition": "retired_phase_i_entrypoint",
+      "pre_change_sha256": "4685bc414bdf64cf7a243cbfe19fc50faec5d9363d52a31fc87dc2173e761343",
+      "pre_change_git_blob": "ad316c16eb1ac1bee139bdda8d36b18fe92dd145",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "ad316c16eb1ac1bee139bdda8d36b18fe92dd145"
+    },
+    {
+      "path": "task_env/script/stage11_socket.py",
+      "disposition": "retired_phase_i_entrypoint",
+      "pre_change_sha256": "cf5bf79841c9782937813a99470190bcb4564d35474d222fb37aa3d8d8672d3e",
+      "pre_change_git_blob": "42dfb4caafe0bbd152996a51339556b9f35f8ecb",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "42dfb4caafe0bbd152996a51339556b9f35f8ecb"
+    },
+    {
+      "path": "task_env/diagnostics/phase1/nutassembly_recovery/historical.py",
+      "disposition": "retired_provider_private_recovery_entrypoint",
+      "pre_change_sha256": "bec207f03d348bba5d2817250a031ba859dd8bfda149cadf960b38f2d930d9e7",
+      "pre_change_git_blob": "f60056dd9f3df0c200e16319f3bbaa39e057b58a",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "f60056dd9f3df0c200e16319f3bbaa39e057b58a"
+    },
+    {
+      "path": "task_env/script/trajectory/commands.py",
+      "disposition": "historical_grouped_cli_removed_generic_offline_apis_retained",
+      "pre_change_sha256": "468eba5f23b7878e20e7dcff3f7d4b0836a9206f47bb2b64300444fc4217a2b3",
+      "pre_change_git_blob": "c5a96ca053350d21189a975bd89932767a8bd1a5",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "c5a96ca053350d21189a975bd89932767a8bd1a5"
+    },
+    {
+      "path": "task_env/script/trajectory/_task_plans.py",
+      "disposition": "retired_private_task_configuration_and_factory_helpers",
+      "pre_change_sha256": "31dbc2fcca0d90031ab337ba3cc5b1f12a419cd19bcce60405cd3250e41a4255",
+      "pre_change_git_blob": "4db8d71b5daef4a6e6460cf447e7091898adc330",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "4db8d71b5daef4a6e6460cf447e7091898adc330"
+    },
+    {
+      "path": "task_env/script/trajectory/__init__.py",
+      "disposition": "removed_private_legacy_exports",
+      "pre_change_sha256": "0b4e25fe464586b3af632bbf663b2e9ebe6fdca69f5a305a3ce97a4de8d729be",
+      "pre_change_git_blob": "cd4a4ba378f6da0bd7c17282284178ab8644e4f7",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "cd4a4ba378f6da0bd7c17282284178ab8644e4f7"
+    },
+    {
+      "path": "task_env/script/trajectory/planning/_common.py",
+      "disposition": "selected_route_migrated_legacy_fallback_removed",
+      "pre_change_sha256": "af04779e1cf655b13cf44dd305e9dd525d388424b47de404085b592faf05b0f4",
+      "pre_change_git_blob": "ee182fb3e1cdefd04ca51231089875fcecff5bd3",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "ee182fb3e1cdefd04ca51231089875fcecff5bd3"
+    },
+    {
+      "path": "task_env/script/trajectory/planning/nut_assembly.py",
+      "disposition": "current_cli_uses_guarded_expert",
+      "pre_change_sha256": "e9e81dd83cc6fff58af4e9da3000776daa0710d0e65f43cce9e04b6abae30dab",
+      "pre_change_git_blob": "f7c80f9b5d1b1c5dd8d223b2806b63638f4a4883",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "f7c80f9b5d1b1c5dd8d223b2806b63638f4a4883"
+    },
+    {
+      "path": "task_env/script/trajectory/record.py",
+      "disposition": "selected_uid_registry_and_public_lifecycle_loop",
+      "pre_change_sha256": "c32ebf0ede5e7a83406fc714fe6cb27b24ff942089ce7b6ee635e7490912775b",
+      "pre_change_git_blob": "88b2d0d8b350f01884e9fb2f2dd0862e83f815df",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "88b2d0d8b350f01884e9fb2f2dd0862e83f815df"
+    },
+    {
+      "path": "task_env/script/recorder.py",
+      "disposition": "private_historical_helper_exports_removed",
+      "pre_change_sha256": "a189a72908372c37f1394ae50108cd26ce24dda473315be01924a3fd757a594e",
+      "pre_change_git_blob": "c75a64992bb7c4b978ccd704e7c1dd0706d22605",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "c75a64992bb7c4b978ccd704e7c1dd0706d22605"
+    }
+  ],
+  "retired_invocations": [
+    "task_env.script.stage11",
+    "task_env.script.stage11_socket",
+    "task_env.diagnostics.phase1.nutassembly_recovery.historical",
+    "task_env.script.trajectory collect",
+    "task_env.script.trajectory --historical-grouped",
+    "task_env.script.trajectory._task_plans._historical_build_plan",
+    "task_env.script.recorder._build_plan",
+    "task_env.script.recorder._pick_cube_config",
+    "task_env.script.recorder._nut_assembly_config"
+  ],
+  "retained_generic_offline_utilities": [
+    "task_env.script.trajectory.convert",
+    "task_env.script.trajectory.replay",
+    "task_env.trajectory.processing.merge_trajectory_collections"
+  ],
+  "notes": "All captured bytes are recoverable by the recorded immutable Git commit/ref. The v1.0.0 tag remains unchanged; local S4 base commit recovery is used where the later S4 script bytes differ from the release."
+}

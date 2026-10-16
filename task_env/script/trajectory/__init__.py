@@ -1,18 +1,9 @@
-"""TaskEnv trajectory examples and compatibility command exports.
-
-The package is intentionally lazy: offline conversion/replay imports do not
-load the task solution builders, while the historical Stage 11 imports keep
-working when their symbols are requested.
-"""
+"""Selected-route recording and provider-independent trajectory utilities."""
 
 from importlib import import_module
 
 
 _LAZY_EXPORTS = {
-    "_build_plan": ("._task_plans", "_build_plan"),
-    "_collect": (".commands", "_collect"),
-    "_nut_assembly_config": ("._task_plans", "_nut_assembly_config"),
-    "_pick_cube_config": ("._task_plans", "_pick_cube_config"),
     "main": (".commands", "main"),
 }
 
