@@ -53,9 +53,13 @@ def _train_once(
     log_every_updates: int,
     save_every_updates: int,
     batch_physics_layout: str = "merged_scene",
-    static_template_profile: str = "auto",
     integrator: str = "implicitfast",
 ) -> tuple[str, dict[str, Any]]:
+    if batch_physics_layout != "merged_scene":
+        raise ValueError(
+            "static_template batch physics is retired; use the supported "
+            "'merged_scene' layout. No runtime substitution is performed."
+        )
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import BaseCallback
     import h5py
@@ -236,9 +240,6 @@ def _train_once(
                 "runtime": {
                     "batch_physics_layout": batch_physics_layout,
                     "integrator": integrator,
-                    "static_template": {
-                        "profile": static_template_profile,
-                    },
                 },
             },
             num_env=num_env,
@@ -297,7 +298,6 @@ def _train_once(
                 "checkpoint": str(checkpoint.with_suffix(".zip")),
                 "execution": "remote",
                 "batch_physics_layout": batch_physics_layout,
-                "static_template_profile": static_template_profile,
                 "integrator": integrator,
                 "learner_imported_taichi": False,
             }
@@ -320,21 +320,36 @@ def _train_once(
         env.close()
 
 
-def main() -> None:
+def _parse_batch_layout(value: str) -> str:
+    layout = str(value).strip().lower()
+    if layout == "static_template":
+        raise argparse.ArgumentTypeError(
+            "static_template is retired; select merged_scene. "
+            "No runtime substitution is performed."
+        )
+    if layout != "merged_scene":
+        raise argparse.ArgumentTypeError(
+            "the only active TaskEnv batch layout is merged_scene"
+        )
+    return layout
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--num-env", dest="num_env", type=int, default=4)
     parser.add_argument("--backend", choices=BACKEND_CHOICES, default="auto")
     parser.add_argument(
         "--batch-physics-layout",
-        choices=("merged_scene", "static_template"),
+        type=_parse_batch_layout,
+        choices=("merged_scene",),
         default="merged_scene",
-        help="select the batch physics layout; static_template is the Stage 15 route",
+        help="select the supported batch physics layout",
     )
     parser.add_argument(
         "--static-template-profile",
-        choices=("auto", "rigid_batch_v1"),
-        default="auto",
-        help="explicit static profile; rigid_batch_v1 uses src/solvers/rigid/batch",
+        dest="retired_static_template_profile",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--integrator",
@@ -389,7 +404,27 @@ def main() -> None:
         action="store_true",
         help="run the same short native PPO loop for B=1, 2, and 4",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def parse_args(
+    argv: list[str] | None = None,
+    *,
+    parser: argparse.ArgumentParser | None = None,
+) -> argparse.Namespace:
+    parser = parser or build_parser()
+    args = parser.parse_args(argv)
+    if args.retired_static_template_profile is not None:
+        parser.error(
+            "--static-template-profile is retired with static-template physics; "
+            "select --batch-physics-layout merged_scene."
+        )
+    return args
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parse_args(parser=parser)
     if (
         args.num_env < 1
         or args.updates < 1
@@ -436,7 +471,6 @@ def main() -> None:
             log_every_updates=args.log_every_updates,
             save_every_updates=args.save_every_updates,
             batch_physics_layout=args.batch_physics_layout,
-            static_template_profile=args.static_template_profile,
             integrator=args.integrator,
         )
         logger.check_or_raise(

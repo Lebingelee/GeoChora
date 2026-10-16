@@ -33,7 +33,7 @@ import numpy as np
 from task_env.utils._device_stack import get_device_stack_provenance, preload_device_stack
 
 from ...utils._paths import REPO_ROOT
-PROFILE_SCHEMA = "task-env-stage17-performance-profile-v1"
+PROFILE_SCHEMA = "task-env-stage17-runtime-profile-v2"
 
 
 def _subprocess_text_encoding() -> str:
@@ -601,27 +601,14 @@ def _resolve_device(plan: Mapping[str, Any], backend: str) -> Any:
 
 
 def _env_config(args: argparse.Namespace) -> dict[str, Any]:
-    candidate = str(args.contact_candidate)
-    runtime: dict[str, Any] = {
+    return {
+        "base_seed": int(args.seed),
+        "runtime": {
         "backend": str(args.backend),
         "prewarm": False,
         "batch_physics_layout": str(args.layout),
+        },
     }
-    if args.layout == "static_template":
-        runtime["static_template"] = {
-            "profile": str(args.profile),
-            "kinematics_backend": str(args.kinematics_backend),
-            "contact_precision": str(args.contact_precision),
-            "cuda_graph": str(args.backend) == "cuda",
-            "contact": {
-                "response_backend": "active_slot_cholesky_f32_v1",
-                "fixed_topology_child_schur": candidate in {"p1", "p12"},
-                "root_factor_6x6": candidate == "p12",
-            },
-        }
-        runtime["enable_ground_contact"] = args.profile == "articulated_fused_ground_contact_v1"
-        runtime["enable_domain_boundary_contact"] = False
-    return {"base_seed": int(args.seed), "runtime": runtime}
 
 
 def _build_spec(args: argparse.Namespace, batch: int):
@@ -785,18 +772,6 @@ def _profile_case(args: argparse.Namespace, batch: int) -> dict[str, Any]:
             "num_envs": int(batch),
             "backend": str(args.backend),
             "layout": str(args.layout),
-            "profile": str(args.profile),
-            "kinematics_backend": (
-                str(args.kinematics_backend)
-                if args.layout == "static_template"
-                else "not_applicable"
-            ),
-            "contact_precision": (
-                str(args.contact_precision)
-                if args.layout == "static_template"
-                else "not_applicable"
-            ),
-            "contact_candidate": str(args.contact_candidate),
             "device_field_plan": plan,
             "resource_summary": summary,
             "benchmark_facts": {
@@ -817,32 +792,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task-uid", required=True)
     parser.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
-    parser.add_argument("--layout", choices=("merged_scene", "static_template"), default="static_template")
     parser.add_argument(
-        "--profile",
-        choices=(
-            "articulated_fused_no_contact_v1",
-            "articulated_fused_ground_contact_v1",
-            "articulated_ground_contact_v1",
-        ),
-        default="articulated_fused_ground_contact_v1",
-    )
-    parser.add_argument(
-        "--contact-precision",
-        choices=("f64", "f32"),
-        default="f64",
-    )
-    parser.add_argument(
-        "--kinematics-backend",
-        choices=("torch", "taichi"),
-        default="torch",
-        help="FK/geom backend for the static fused runtime; Taichi is an explicit A/B path",
-    )
-    parser.add_argument(
-        "--contact-candidate",
-        choices=("p0", "p1", "p12"),
-        default="p12",
-        help="diagnostic candidate selected before environment construction",
+        "--layout",
+        choices=("merged_scene", "static_template"),
+        default="merged_scene",
+        help="merged_scene is active; static_template is accepted only to report retirement",
     )
     parser.add_argument("--num-envs", type=int, nargs="+", default=(1,))
     parser.add_argument("--warmup", type=int, default=5)
@@ -864,15 +818,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.layout == "static_template":
+        parser.error(
+            "static_template is retired; use --layout merged_scene. "
+            "No runtime substitution is performed."
+        )
     if any(int(batch) < 1 for batch in args.num_envs):
         raise ValueError("--num-envs values must be positive")
     if int(args.warmup) < 0 or int(args.steps) < 1:
         raise ValueError("--warmup must be non-negative and --steps must be positive")
-    if args.layout != "static_template" and args.profile != "articulated_fused_ground_contact_v1":
-        # merged_scene 不消费该 profile；保留稳定的 manifest 值，但不暗示它选择了
-        # 某个具体 runtime。
-        args.profile = "articulated_fused_ground_contact_v1"
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     # Importing the public TaskEnv contract currently loads the runtime
@@ -881,13 +837,7 @@ def main(argv: list[str] | None = None) -> None:
     # request from the diagnostic itself.
     preload = get_device_stack_provenance()
     if preload is None:
-        # Static TaskEnv construction calls the public preload contract with
-        # Triton requested even on CPU.  Match that process-level fingerprint
-        # so the diagnostic does not reject its own construction request.
-        request_triton = (
-            str(args.backend) == "cuda"
-            or str(args.layout) == "static_template"
-        )
+        request_triton = str(args.backend) == "cuda"
         preload = preload_device_stack(request_triton=request_triton)
     process_before = _gpu_compute_processes()
     report = {
@@ -897,18 +847,6 @@ def main(argv: list[str] | None = None) -> None:
             "task_uid": str(args.task_uid),
             "backend": str(args.backend),
             "layout": str(args.layout),
-            "profile": str(args.profile),
-            "kinematics_backend": (
-                str(args.kinematics_backend)
-                if args.layout == "static_template"
-                else "not_applicable"
-            ),
-            "contact_precision": (
-                str(args.contact_precision)
-                if args.layout == "static_template"
-                else "not_applicable"
-            ),
-            "contact_candidate": str(args.contact_candidate),
             "num_envs": [int(value) for value in args.num_envs],
             "seed": int(args.seed),
             "warmup_steps": int(args.warmup),

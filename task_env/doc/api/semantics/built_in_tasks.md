@@ -50,9 +50,8 @@ environment.TaskLifecycleAdapter`。
 两条路径共享 `PendulumTaskSemantics` 的 observation leaf 顺序、reward terms、success window、horizon、reset
 采样和 action bounds。当前 Pendulum batch 由 `SceneBatchRuntime` 提供 `BatchState`、`BatchDiagnostics`、
 `BatchResetResult` 和 `BatchStepResult`；`PendulumBatchRuntime` 仅保留旧导入兼容名，上层不解释 kernel 或
-positional readback。当前在同一个 `BatchRuntimeProtocol` 下提供可配置的
-`StaticTemplateBatchRuntime` 首个 `hinge_or_slide_no_contact_v1` profile；它只对满足该能力的拓扑启用，
-不引入 Pendulum-specific factory 分支，unsupported topology 会由公共 factory 明确拒绝。
+positional readback。S4 local candidate 退休 GeoChora-owned `StaticTemplateBatchRuntime` route；
+`merged_scene` 是当前唯一的 TaskEnv batch physics factory route，候选尚未集成到 public `develop`。
 
 batch task 的公共任务语义由 `environment.TaskLifecycleAdapter` 与其 batch runtime 子适配器共同处理；task
 definition 只提供统一 `TaskStateView` 上的 reset/evaluate、observation projection 与 action semantics。

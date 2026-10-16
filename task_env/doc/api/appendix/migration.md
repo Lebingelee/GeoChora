@@ -34,7 +34,28 @@ Go2 专用 task/robot/RSL 与诊断入口已从当前 develop 移除。v1.0.0 �
 | `task_env.flora_go2_assets`、`task_env.tasks.go2_walk.flora_assets`、Go2 Flora diagnostic/smoke imports | Go2 资产适配与诊断已移除；通用 `task_env.render.flora` renderer 和 public render-description lowering 保留。 |
 | `unitree_go2_reference`、`unitree_go2_debug` learner profile | 当前 profile 已移除；RSL 默认 action transform 仍使用任务公开 action space，不提供 Go2 的 ±100 native action 语义。 |
 | `task_env.script.rl.rsl_ppo` 无 `--env-id` | 现在 CLI 要求显式 `--env-id`。Go2 UID 及旧 `go2_walk*` aliases 显式报 retired；其他 task 仍须有 parallel registration 与兼容的 learner contracts。 |
-| `stage_a_runtime_profile`、`stage17_performance_profile`、`stage18_bridge_benchmark` 不传 `--task-uid` | 三个通用 runtime diagnostics 现在要求明确 task UID；旧 Go2 默认调用已退休。 |
-| `stage_b_torch_reference`、`stage_g_contact_precision`、`stage19d_cuda_graph_*`、`stage_p_topology_candidate_benchmark`、`stage_f_cuda_graph_lifecycle` | 这些历史诊断依赖 Go2/static profile fixture，已在核对实际调用后移除；其历史 Evidence 保持不变，S4 不得依赖这些入口充当当前通用 Static Physics 回归 fixture。 |
+| `stage17_performance_profile` 不传 `--task-uid` | Stage 17 要求显式 task UID；S4 local candidate 仅保留 `merged_scene`，`--layout static_template` 会明确报错。 |
+| `stage_a_runtime_profile`、`stage18_bridge_benchmark`、`stage_g_contact_precision_gate` | S4 local candidate 中这些静态模板专用诊断模块已移除；历史 Evidence 与资格结论不变。 |
+| `stage_b_torch_reference`、`stage_g_contact_precision`、`stage19d_cuda_graph_*`、`stage_p_topology_candidate_benchmark`、`stage_f_cuda_graph_lifecycle` | 这些历史诊断依赖 Go2/static profile fixture，已在核对实际调用后移除；其历史 Evidence 保持不变。 |
 
 Selected active task UIDs remain `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`. They are single-environment task routes and are not substituted as PPO targets by this retirement.
+
+## P2.0-B S4: static-template retirement (local candidate)
+
+The S4 candidate is on a local review branch based on public `develop` commit
+`5b8c901135e624a248cf73d29be9a6fea70feb2b`; it is not integrated. It removes
+`task_env.runtime.providers.static`, the `task_env.runtime.static_*`
+compatibility modules, and the public `StaticTemplate*` configuration/runtime
+exports. `runtime.batch_physics_layout=static_template` and explicit public
+`runtime.static_template.*` configuration now fail with migration guidance.
+`RuntimeConfig` retains the default-only static config value to preserve
+unrelated scalar Task config identities; non-default direct values are rejected.
+No request is redirected to `merged_scene`.
+
+The `pendulum_ppo` `--batch-physics-layout static_template` and
+`--static-template-profile` options, and Stage 17's `--layout static_template`,
+fail explicitly. The Stage A profile, Stage G precision gate, and Stage 18
+static bridge module paths are retired. Use `merged_scene` for the supported
+TaskEnv batch factory. `GeoPhysRigidBatchRuntime` remains an adapter with its
+prior capability limits and is not a `make_parallel_env` route. Release-level
+compatibility policy remains subject to v1.0.1 review.

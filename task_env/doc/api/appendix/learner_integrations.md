@@ -18,4 +18,4 @@
 
 P2.0-B S3 从当前 develop 移除了 Go2 task/robot registration、RSL profiles、Go2 checkpoint conversion/evaluation、Isaac/MuJoCo Go2 diagnostics 与 Go2-specific Flora wrappers。旧 Go2 task/agent UIDs 显式报 retired，不映射到其他任务；Go2 CLI/module imports 已移除。v1.0.0 是历史源代码和原始 Evidence 的恢复点。该 retirement 没有修改、重标或扩展历史 qualification。
 
-Generic RSL-RL/SB3/vectorization contracts 仍可供未来明确注册且通过 action/observation contract review 的 task 使用。Go2 CUDA/static/RSL 的旧回归结果仅代表其历史 source/config/provider intersection，不证明当前 develop 仍有 Go2 runtime capability。Static Physics 实现与 GeoPhys/Flora renderer 均未在 S3 修改；S4 的通用 Static Physics 回归需使用与具体任务无关、当前可构造的 fixture。
+Generic RSL-RL/SB3/vectorization contracts 仍可供未来明确注册且通过 action/observation contract review 的 task 使用。Go2 CUDA/static/RSL 的旧回归结果仅代表其历史 source/config/provider intersection，不证明当前 develop 仍有 Go2 runtime capability。S3 没有修改 Static Physics；S4 local candidate 退休 GeoChora-owned static-template route，同时保留通用 learner/vectorization contracts、GeoPhys-owned Rigid Batch adapter 和 renderer 实现。该候选未被集成，也没有为这些保留项增加新的 capability qualification。

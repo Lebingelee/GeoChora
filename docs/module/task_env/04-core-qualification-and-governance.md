@@ -5,6 +5,8 @@
 > 状态：canonical Core validation policy，v0.3
 > 日期：2026-10-04
 
+> P2.0-B 当前状态（2026-10-16）：S3 Go2 retirement 已集成至 public `develop`。S4 static-template retirement 目前是本地 review candidate，不授予新的 provider/capability qualification；候选的测试只验证删除边界与保留 contracts，GeoPhys-owned Batch adapter、`merged_scene` 与 generic learner routes 的声明范围仍以各自已有 Evidence 为准。
+
 ## 1. 目的
 
 每次 Geochora Core 更新都必须保留已有的资格化能力，并以明确方式增加新能力。

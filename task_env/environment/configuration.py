@@ -171,6 +171,20 @@ def overlay_public_env_config(
             "TaskEnv public config cannot override task topology/semantics: "
             + ", ".join(unknown)
         )
+    runtime_values = values.get("runtime")
+    if isinstance(runtime_values, Mapping):
+        layout = str(runtime_values.get("batch_physics_layout", "")).strip().lower()
+        if layout == "static_template":
+            raise ValueError(
+                "runtime.batch_physics_layout='static_template' is retired; "
+                "use 'merged_scene'. No runtime substitution is performed."
+            )
+        if "static_template" in runtime_values:
+            raise ValueError(
+                "runtime.static_template is retired with the static-template physics "
+                "implementation; remove it and use 'merged_scene'. No runtime "
+                "substitution is performed."
+            )
     return replace(
         base,
         asset=update_config(base.asset, values.get("asset")),

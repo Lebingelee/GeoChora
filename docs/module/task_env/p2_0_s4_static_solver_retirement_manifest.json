@@ -1,0 +1,302 @@
+{
+  "schema": "geochora-p2-0-s4-static-solver-retirement-manifest-v1",
+  "status": "LOCAL_S4_CANDIDATE_NOT_INTEGRATED",
+  "canonical_public_develop_before_s4": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+  "immutable_release_ref": "v1.0.0",
+  "immutable_release_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+  "source_files": [
+    {
+      "path": "task_env/diagnostics/runtime/stage18_bridge_benchmark.py",
+      "sha256": "98196db291103ee08e37d9010ceee5ec65c398b35f9d69466efccb0b4d18e027",
+      "baseline_git_blob": "554a5d8ab9dd8acb268d67c76f964646062180a3",
+      "recovery_ref": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+      "recovery_git_blob": "554a5d8ab9dd8acb268d67c76f964646062180a3"
+    },
+    {
+      "path": "task_env/diagnostics/runtime/stage_a_runtime_profile.py",
+      "sha256": "53ac04690830246ba03a25b8bed51286f221fa7899ad0ed649c910893742a1c6",
+      "baseline_git_blob": "c6e0c7ee27cff052ef70616445251af5565af4a0",
+      "recovery_ref": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+      "recovery_git_blob": "c6e0c7ee27cff052ef70616445251af5565af4a0"
+    },
+    {
+      "path": "task_env/diagnostics/runtime/stage_g_contact_precision_gate.py",
+      "sha256": "4a0c420cbe3a830164eea7a8efcd314b122f1029053b8529585160621f8ef3e4",
+      "baseline_git_blob": "b6c024c9f5f47b9388054c8e0d4a58a4fffdc07f",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "b6c024c9f5f47b9388054c8e0d4a58a4fffdc07f"
+    },
+    {
+      "path": "task_env/runtime/providers/static/__init__.py",
+      "sha256": "c1634ca0ddb2940cc9d4a20b46a14001e660a109022ff477ef3a368fbf78a49e",
+      "baseline_git_blob": "bd68e8e8ef7b031430bf3f2a40ef52b0e9fa4df5",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "bd68e8e8ef7b031430bf3f2a40ef52b0e9fa4df5"
+    },
+    {
+      "path": "task_env/runtime/providers/static/execution.py",
+      "sha256": "56eb613676652eb37d73e3fdbae1c9d9e3aab194ebc9b24c20e80ac25402764a",
+      "baseline_git_blob": "ff62e5386851811ee0a3fe2c51505e58027e76fd",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "ff62e5386851811ee0a3fe2c51505e58027e76fd"
+    },
+    {
+      "path": "task_env/runtime/providers/static/fused.py",
+      "sha256": "8933a1a125f8acf753c6ecbca4094c500e51f5fccddba7d9c6c0baab9f8e5c36",
+      "baseline_git_blob": "80f6bde24a7296eb6e02a162b5aa788f4e63f206",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "80f6bde24a7296eb6e02a162b5aa788f4e63f206"
+    },
+    {
+      "path": "task_env/runtime/providers/static/model.py",
+      "sha256": "6bb6c4dc4edc9bebb4ae815adab31b4d123877a5579f7cdd5dbc7dc040b8e976",
+      "baseline_git_blob": "67423160b43f69350987d7da1c57a6438a415a52",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "67423160b43f69350987d7da1c57a6438a415a52"
+    },
+    {
+      "path": "task_env/runtime/providers/static/physics.py",
+      "sha256": "081a40457eba6e299211f82644a669d26c69d89eab38f50b62ffef76834665a1",
+      "baseline_git_blob": "61e807377437fa0deed249097bbca10bae03ac45",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "61e807377437fa0deed249097bbca10bae03ac45"
+    },
+    {
+      "path": "task_env/runtime/providers/static/profile.py",
+      "sha256": "e0b0ce50c71e8f18fb454424d1576f74f30ab9197108606ce5c02315efb0292f",
+      "baseline_git_blob": "2935c860502697e782b222bbbf05c127920e126e",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "2935c860502697e782b222bbbf05c127920e126e"
+    },
+    {
+      "path": "task_env/runtime/providers/static/provider.py",
+      "sha256": "337d85f20967f84c26be92035909a3e70653c6e92086d079488dcbb91f4f7e8a",
+      "baseline_git_blob": "726872d3cbf5c1b39f33267d5c373abc583cedd0",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "726872d3cbf5c1b39f33267d5c373abc583cedd0"
+    },
+    {
+      "path": "task_env/runtime/providers/static/reference.py",
+      "sha256": "9a3b5840d55722fa00eabb8f4fb8f3a7f044c3d497c5bfc21bb153a2141af386",
+      "baseline_git_blob": "b5709bc03ad17c4cdf58df06c130756045e66cbc",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "b5709bc03ad17c4cdf58df06c130756045e66cbc"
+    },
+    {
+      "path": "task_env/runtime/providers/static/runtime.py",
+      "sha256": "41f51eaa60f70a1f0113d3c5dee1a212bc1691fdee9eb5a78e7bb92569187a22",
+      "baseline_git_blob": "e482a6e4a0c7ef4b4dfaec83270f470963f43498",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "e482a6e4a0c7ef4b4dfaec83270f470963f43498"
+    },
+    {
+      "path": "task_env/runtime/providers/static/taichi.py",
+      "sha256": "1b8cba7cfae0e87a472157b01f7bdd29974fc8963eae252aec690b0a4eeb10d4",
+      "baseline_git_blob": "f6b15fb727e5ba64676bc77ea80ccb77e30a15e5",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "f6b15fb727e5ba64676bc77ea80ccb77e30a15e5"
+    },
+    {
+      "path": "task_env/runtime/providers/static/workspace.py",
+      "sha256": "acf174e5ef3bd9398219532e63cf1d83a2d7825e29f50c663ccf7e8de531d58d",
+      "baseline_git_blob": "3ec2d7976acc9a314cf1f0fb9aa9837fbedc12e8",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "3ec2d7976acc9a314cf1f0fb9aa9837fbedc12e8"
+    },
+    {
+      "path": "task_env/runtime/static_capabilities.py",
+      "sha256": "09a4a7ba50e715e919bfc0c93dd78692cd42f2fdfe785753d67647d37a440119",
+      "baseline_git_blob": "27cd47f49081875ea70b7f2e285a731a3a32b7b0",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "27cd47f49081875ea70b7f2e285a731a3a32b7b0"
+    },
+    {
+      "path": "task_env/runtime/static_execution.py",
+      "sha256": "25bd9fd4b64f588d9c0a3ef17726183771a31e43111a71bb03469d77e47e85cc",
+      "baseline_git_blob": "b54f96a4c6009845401f861124f162cd024451d7",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "b54f96a4c6009845401f861124f162cd024451d7"
+    },
+    {
+      "path": "task_env/runtime/static_provider.py",
+      "sha256": "99e89d53896b8e04ced26f60b983c786ab5c9efc96c68684b017ac6c95d7962a",
+      "baseline_git_blob": "12bd93e3ecf5871bf847c51bd24301822dcd5c3f",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "12bd93e3ecf5871bf847c51bd24301822dcd5c3f"
+    },
+    {
+      "path": "task_env/runtime/static_template.py",
+      "sha256": "45d7d54db1d824397c6cba103a07fa26eccc8ba53a01e557959638eac4601f23",
+      "baseline_git_blob": "a1ef69a6803349af23f1a4e2c28b61e3b1384c4a",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "a1ef69a6803349af23f1a4e2c28b61e3b1384c4a"
+    },
+    {
+      "path": "task_env/runtime/static_template_fused.py",
+      "sha256": "bc14787bdd983ca38c6aa12c7e68ceb655979d9927c4b5393fdaf6b3c33c4df5",
+      "baseline_git_blob": "7ff61c1ccd0af756e2e90c6e063c2c0c2d2ac00a",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "7ff61c1ccd0af756e2e90c6e063c2c0c2d2ac00a"
+    },
+    {
+      "path": "task_env/runtime/static_template_model.py",
+      "sha256": "be39c80dac3cd2747eba8dc7c366f9796142901d3e41ce975d3681809b4b8f04",
+      "baseline_git_blob": "a785d1720f4d7356ff92a5b703828ee19d9d5302",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "a785d1720f4d7356ff92a5b703828ee19d9d5302"
+    },
+    {
+      "path": "task_env/runtime/static_template_physics.py",
+      "sha256": "4bb985aaa1629697dc85b8a382cb52a03584b45d1e41d09c72fbb4e3fdde3eae",
+      "baseline_git_blob": "fe6faed16729b177aa74c3887eadf5e692eb4a1d",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "fe6faed16729b177aa74c3887eadf5e692eb4a1d"
+    },
+    {
+      "path": "task_env/runtime/static_template_reference.py",
+      "sha256": "57430fd7a25e6515af2793e71c8c7dbf2d42cf047be01621c525a0a41e25be12",
+      "baseline_git_blob": "fd42002d20a671ad7b8e68b2183a1758c6429fb1",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "fd42002d20a671ad7b8e68b2183a1758c6429fb1"
+    },
+    {
+      "path": "task_env/runtime/static_template_rigid_batch.py",
+      "sha256": "f37cd8e0f64fb2c25139613e15a1975358bed078adf088a25d534f115d9b96bf",
+      "baseline_git_blob": "b965f3cdcdb8d754066e3ebb134bd1211a7d771b",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "b965f3cdcdb8d754066e3ebb134bd1211a7d771b"
+    },
+    {
+      "path": "task_env/runtime/static_template_taichi.py",
+      "sha256": "9f02406362b964d21412baf97e66da35d74cd1458fe35748944dc2e558748b33",
+      "baseline_git_blob": "bd920023ef66df267557f8f3d6fde1ed669adf0d",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "bd920023ef66df267557f8f3d6fde1ed669adf0d"
+    },
+    {
+      "path": "task_env/runtime/static_workspace.py",
+      "sha256": "fecd30a9070e9cb9ab2f6bb512e8101b3c7b20b665174ec5a43f980706a7fab9",
+      "baseline_git_blob": "7826a3cd0be07c28a9ca2e62cb2bd56564cb7437",
+      "recovery_ref": "v1.0.0",
+      "recovery_git_blob": "7826a3cd0be07c28a9ca2e62cb2bd56564cb7437"
+    }
+  ],
+  "retired_public_imports": [
+    "task_env.runtime.providers.static",
+    "task_env.runtime.static_capabilities",
+    "task_env.runtime.static_execution",
+    "task_env.runtime.static_provider",
+    "task_env.runtime.static_template",
+    "task_env.runtime.static_template_fused",
+    "task_env.runtime.static_template_model",
+    "task_env.runtime.static_template_physics",
+    "task_env.runtime.static_template_reference",
+    "task_env.runtime.static_template_rigid_batch",
+    "task_env.runtime.static_template_taichi",
+    "task_env.runtime.static_workspace",
+    "task_env.environment.StaticTemplateContactConfig",
+    "task_env.environment.StaticTemplateRuntimeConfig"
+  ],
+  "retired_layout_and_config": [
+    "runtime.batch_physics_layout=static_template",
+    "public explicit runtime.static_template.* mapping/YAML configuration",
+    "non-default direct RuntimeConfig.static_template values"
+  ],
+  "retired_cli_identities": [
+    "task_env.script.rl.pendulum_ppo --batch-physics-layout static_template",
+    "task_env.script.rl.pendulum_ppo --static-template-profile <profile>",
+    "task_env.diagnostics.runtime.stage17_performance_profile --layout static_template",
+    "task_env.diagnostics.runtime.stage_a_runtime_profile",
+    "task_env.diagnostics.runtime.stage18_bridge_benchmark",
+    "task_env.diagnostics.runtime.stage_g_contact_precision_gate",
+    "task_env.diagnostics.runtime.stage17_performance_profile --profile <static-profile>",
+    "task_env.diagnostics.runtime.stage17_performance_profile --contact-precision <precision>",
+    "task_env.diagnostics.runtime.stage17_performance_profile --kinematics-backend <backend>",
+    "task_env.diagnostics.runtime.stage17_performance_profile --contact-candidate <candidate>"
+  ],
+  "retained_mixed_ownership_paths": [
+    "task_env.runtime.contracts",
+    "task_env.runtime.admission",
+    "task_env.runtime.device_plan",
+    "task_env.runtime.providers.merged_scene",
+    "task_env.runtime.providers.geophys.rigid_batch",
+    "task_env.runtime.geophys_rigid_batch",
+    "task_env.vectorization",
+    "task_env.render.providers.parallel_source",
+    "task_env.utils._device_stack"
+  ],
+  "retained_contracts": [
+    "BatchRuntimeProtocol and TaskEnv batch lifecycle",
+    "batch reset/step and masked reset",
+    "observation/action batching",
+    "host/device admission",
+    "SB3/RSL learner adapters",
+    "GeoPhysRigidBatchRuntime with its existing limitations",
+    "merged_scene runtime route"
+  ],
+  "notes": "Recovery points are verified immutable refs: exact v1.0.0 where bytes match; otherwise the exact public S3 baseline commit. Frozen Evidence and ignored outputs are not deleted. The default static config value remains in RuntimeConfig solely to preserve existing scalar-task resolved-config identity; it cannot select a runtime.",
+  "retired_public_symbols": [
+    "task_env.runtime.StaticTemplateBatchRuntime",
+    "task_env.runtime.StaticTemplateDescriptor",
+    "task_env.runtime.STATIC_TEMPLATE_CAPABILITIES",
+    "task_env.runtime.StaticTemplateCapability",
+    "task_env.runtime.get_static_template_capability",
+    "task_env.runtime.resolve_static_template_profile",
+    "task_env.runtime.static_template_compatibility_issues",
+    "task_env.runtime.LocalPairKey",
+    "task_env.runtime.StaticTemplateContactWorkspace",
+    "task_env.runtime.StaticTemplateModel",
+    "task_env.runtime.StaticTemplateExecutionPlan",
+    "task_env.runtime.StaticTemplateRigidSolverReference",
+    "task_env.runtime.StaticTemplateFusedArticulated",
+    "task_env.runtime.StaticTemplateRigidBatch",
+    "task_env.environment.StaticTemplateContactConfig",
+    "task_env.environment.StaticTemplateRuntimeConfig"
+  ],
+  "retired_diagnostic_modules": [
+    "task_env.diagnostics.runtime.stage_a_runtime_profile",
+    "task_env.diagnostics.runtime.stage18_bridge_benchmark",
+    "task_env.diagnostics.runtime.stage_g_contact_precision_gate"
+  ],
+  "preserved_internal_renderer_compatibility": "task_env.render.providers.parallel_source retains its legacy static_template state-layout reader unchanged; no active TaskEnv physics factory emits that layout.",
+  "deprecated_config_data_fields": [
+    "RuntimeConfig.static_template retains its original default object only to preserve existing scalar resolved-config identities",
+    "public runtime mapping/YAML use of runtime.static_template.* is rejected",
+    "non-default direct RuntimeConfig static_template values are rejected"
+  ],
+  "report": "p2_0_s4_static_solver_retirement.md",
+  "source_identity_record": "p2_0_s4_source_identity.json",
+  "retirement_groups": {
+    "static_solver_and_provider_modules": [
+      "task_env/runtime/providers/static/__init__.py",
+      "task_env/runtime/providers/static/execution.py",
+      "task_env/runtime/providers/static/fused.py",
+      "task_env/runtime/providers/static/model.py",
+      "task_env/runtime/providers/static/physics.py",
+      "task_env/runtime/providers/static/profile.py",
+      "task_env/runtime/providers/static/provider.py",
+      "task_env/runtime/providers/static/reference.py",
+      "task_env/runtime/providers/static/runtime.py",
+      "task_env/runtime/providers/static/taichi.py",
+      "task_env/runtime/providers/static/workspace.py"
+    ],
+    "static_compatibility_facades": [
+      "task_env/runtime/static_capabilities.py",
+      "task_env/runtime/static_execution.py",
+      "task_env/runtime/static_provider.py",
+      "task_env/runtime/static_template.py",
+      "task_env/runtime/static_template_fused.py",
+      "task_env/runtime/static_template_model.py",
+      "task_env/runtime/static_template_physics.py",
+      "task_env/runtime/static_template_reference.py",
+      "task_env/runtime/static_template_rigid_batch.py",
+      "task_env/runtime/static_template_taichi.py",
+      "task_env/runtime/static_workspace.py"
+    ],
+    "static_only_diagnostics": [
+      "task_env/diagnostics/runtime/stage18_bridge_benchmark.py",
+      "task_env/diagnostics/runtime/stage_a_runtime_profile.py",
+      "task_env/diagnostics/runtime/stage_g_contact_precision_gate.py"
+    ]
+  }
+}

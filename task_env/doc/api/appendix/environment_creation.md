@@ -56,13 +56,9 @@ batch wrapper 只补充 batch runtime、seed/masked reset 与 slot info；任务
 不再实现 Pendulum-specific batch definition。SB3 flatten 和 autoreset 只发生在
 learner/adapter 边界。
 
-`env_config["runtime"]["batch_physics_layout"]` 是并行物理布局选择，默认 `"merged_scene"`，因此省略该字段时
-行为与既有 `SceneBatchRuntime` 相同。`"static_template"` 当前开放
-`hinge_or_slide_no_contact_v1`、`articulated_fused_no_contact_v1` 与
-`articulated_fused_ground_contact_v1` profiles：它们采用共享 immutable model 与 exact-B per-world state，
-CPU/CUDA smoke 已通过；fused ground profile 只提供 analytic local ground rows。能力检查失败会明确抛出，不会悄悄切回
-`merged_scene`。该字段不改变
-`execution="local"|"remote"` 的进程语义，也不属于 single `make_env()` 的创建入口。
+`env_config["runtime"]["batch_physics_layout"]` 与 `execution="local"|"remote"` 相互独立；当前只支持
+`"merged_scene"`。在 S4 local candidate 中，显式请求已退休的 `"static_template"` 会 fail closed 并提示使用
+`merged_scene`，不会静默切换布局。`execution` 仍控制当前进程或独立 worker，不属于 single `make_env()` 的创建入口。
 
 `import task_env`、`from task_env import make_parallel_env` 不会提前加载 SB3、Torch、Taichi 或 Pendulum batch
 runtime；具体依赖在真正选择 local/remote parallel execution 后才导入。

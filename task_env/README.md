@@ -184,7 +184,7 @@ camera observation 与 UI render 的结果不要混用：前者进入 observatio
 
 #### Pendulum native SB3 PPO
 
-pendulum_ppo.py 使用 remote homogeneous batch 和 SB3 PPO，适合验证并行环境、rollout 和 return curve。关键参数为 num-env、backend、batch-physics-layout、static-template-profile、integrator、updates、rollout-steps、seed、output-dir、save-log 和 verify-batches。
+pendulum_ppo.py 使用 remote homogeneous batch 和 SB3 PPO，适合验证并行环境、rollout 和 return curve。当前受支持的布局为 `merged_scene`；关键参数还包括 num-env、backend、integrator、updates、rollout-steps、seed、output-dir、save-log 和 verify-batches。
 
 ~~~bash
 PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
@@ -196,17 +196,7 @@ PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
   --save-log
 ~~~
 
-如果需要测试当前 src/solvers/rigid/batch 的 Pendulum 路径，使用与该 profile 匹配的显式配置：
-
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
-  --num-env 256 --backend cuda \
-  --batch-physics-layout static_template \
-  --static-template-profile rigid_batch_v1 \
-  --integrator euler \
-  --updates 3 --rollout-steps 5 \
-  --output-dir temp_outputs/task_env/pendulum_rigid_batch
-~~~
+`--batch-physics-layout static_template` 与 `--static-template-profile` 已在当前 S4 candidate 中退役；CLI 会明确报错，不会改走其他布局。GeoPhys 的 `GeoPhysRigidBatchRuntime` adapter 仍保留，但不再由 TaskEnv 的并行 runtime factory 选择。
 
 #### 统一 RSL-RL PPO
 

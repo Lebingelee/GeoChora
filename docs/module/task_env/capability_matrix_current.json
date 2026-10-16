@@ -1,6 +1,20 @@
 {
   "schema": "geochora-current-reference-capability-overlay-v1",
   "status": "S2_C1_INTEGRATED_BOUNDED_FUNCTIONAL_NOT_A_RELEASE_MATRIX",
+  "local_s4_candidate": {
+    "status": "STATIC_TEMPLATE_RETIREMENT_PENDING_REVIEW_NOT_INTEGRATED",
+    "base_public_develop": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+    "active_taskenv_batch_layout": "merged_scene",
+    "retired_taskenv_route": "static_template",
+    "preserved_routes": [
+      "GeoPhys-owned GeoPhysRigidBatchRuntime adapter with unchanged limitations",
+      "generic Batch/Device/Learner and Vectorization contracts",
+      "existing Renderer implementation and registry"
+    ],
+    "qualification_inherited": false,
+    "report": "p2_0_s4_static_solver_retirement.md",
+    "recovery_manifest": "p2_0_s4_static_solver_retirement_manifest.json"
+  },
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
   "integrated_baseline": "a6372099ac2055045cca16c03a0514825d635e8f",
   "qualification_inherited": false,

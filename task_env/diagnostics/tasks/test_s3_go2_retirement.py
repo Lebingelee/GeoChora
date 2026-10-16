@@ -81,14 +81,20 @@ def test_generic_rsl_runner_rejects_retired_go2_ids_without_substitution(env_id)
 
 
 def test_generic_runtime_diagnostics_require_explicit_task_uid():
+    parser = importlib.import_module(
+        "task_env.diagnostics.runtime.stage17_performance_profile"
+    ).build_parser()
+    action = next(item for item in parser._actions if item.dest == "task_uid")
+    assert action.required is True
+
+
+def test_static_only_runtime_diagnostics_are_retired():
     for module_name in (
         "task_env.diagnostics.runtime.stage_a_runtime_profile",
-        "task_env.diagnostics.runtime.stage17_performance_profile",
         "task_env.diagnostics.runtime.stage18_bridge_benchmark",
+        "task_env.diagnostics.runtime.stage_g_contact_precision_gate",
     ):
-        parser = importlib.import_module(module_name).build_parser()
-        action = next(item for item in parser._actions if item.dest == "task_uid")
-        assert action.required is True
+        assert importlib.util.find_spec(module_name) is None
 
 
 def test_generic_rl_vectorization_and_renderer_contracts_remain_importable():

@@ -16,8 +16,6 @@ from .config import (
     RobotControllerConfig,
     RuntimeConfig,
     SceneBuildConfig,
-    StaticTemplateContactConfig,
-    StaticTemplateRuntimeConfig,
     TaskConfig,
     TrainingRenderConfig,
 )
@@ -112,8 +110,6 @@ __all__ = [
     "SceneBuilderComponent",
     "SnapshotRequest",
     "StageUnavailableError",
-    "StaticTemplateContactConfig",
-    "StaticTemplateRuntimeConfig",
     "TaskCompositionSpec",
     "TaskConfig",
     "TaskDefinition",

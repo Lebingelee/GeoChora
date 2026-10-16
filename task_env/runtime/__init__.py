@@ -55,62 +55,6 @@ _COMPAT_EXPORTS = {
         "task_env.runtime.providers.merged_scene",
         "SceneBatchRuntime",
     ),
-    "StaticTemplateBatchRuntime": (
-        "task_env.runtime.providers.static.runtime",
-        "StaticTemplateBatchRuntime",
-    ),
-    "StaticTemplateDescriptor": (
-        "task_env.runtime.providers.static.runtime",
-        "StaticTemplateDescriptor",
-    ),
-    "STATIC_TEMPLATE_CAPABILITIES": (
-        "task_env.runtime.providers.static.profile",
-        "STATIC_TEMPLATE_CAPABILITIES",
-    ),
-    "StaticTemplateCapability": (
-        "task_env.runtime.providers.static.profile",
-        "StaticTemplateCapability",
-    ),
-    "get_static_template_capability": (
-        "task_env.runtime.providers.static.profile",
-        "get_static_template_capability",
-    ),
-    "resolve_static_template_profile": (
-        "task_env.runtime.providers.static.profile",
-        "resolve_static_template_profile",
-    ),
-    "static_template_compatibility_issues": (
-        "task_env.runtime.providers.static.profile",
-        "static_template_compatibility_issues",
-    ),
-    "LocalPairKey": (
-        "task_env.runtime.providers.static.workspace",
-        "LocalPairKey",
-    ),
-    "StaticTemplateContactWorkspace": (
-        "task_env.runtime.providers.static.workspace",
-        "StaticTemplateContactWorkspace",
-    ),
-    "StaticTemplateModel": (
-        "task_env.runtime.providers.static.model",
-        "StaticTemplateModel",
-    ),
-    "StaticTemplateExecutionPlan": (
-        "task_env.runtime.providers.static.execution",
-        "StaticTemplateExecutionPlan",
-    ),
-    "StaticTemplateRigidSolverReference": (
-        "task_env.runtime.providers.static.reference",
-        "StaticTemplateRigidSolverReference",
-    ),
-    "StaticTemplateFusedArticulated": (
-        "task_env.runtime.providers.static.fused",
-        "StaticTemplateFusedArticulated",
-    ),
-    "StaticTemplateRigidBatch": (
-        "task_env.runtime.static_template_rigid_batch",
-        "StaticTemplateRigidBatch",
-    ),
 }
 
 

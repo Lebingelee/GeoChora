@@ -36,14 +36,13 @@ UI rendering 绝不会把 `CameraObservationProvider` 的 sensor image 冒充为
 
 ## Parallel UI rendering
 
-`task_env.render.ParallelRenderProvider` 统一 static-template 与 merged-scene 的并行渲染边界。默认
+`task_env.render.ParallelRenderProvider` 提供 batch renderer-facing 的布局转换与 snapshot 边界。默认
 `world_ids` 为连续的 `0..parallel_render_num-1`，`parallel_render_num` 必须处于 `1..num_envs`；
 `set_parallel_render_layout()` 只生成 renderer-facing 的 cell translation。provider 不创建 solver、不
 复制完整 batch state，也不隐式做 physics reset/step。
 
-并行渲染 contract 已接到真实批量 runtime：`merged_scene` 使用全局扁平 body/geom 字段的 selected
-device slice，`static_template` 使用 `(world, local)` 字段的 selected slice；两者都只写入一个 renderer
-proxy 和有界 `RenderSnapshotRing`，不进行完整 B 的 host state readback。选中的每个 world 在同一帧内写入
+当前 `merged_scene` runtime 使用全局扁平 body/geom 字段的 selected device slice，只写入一个 renderer
+proxy 和有界 `RenderSnapshotRing`，不进行完整 B 的 host state readback。内部仍保留对 `(world, local)` 字段形状的历史读取分支，但 S4 candidate 不再有 TaskEnv physics route 产生该布局。选中的每个 world 在同一帧内写入
 自己的 renderer record range，然后一次性发布快照，因此网格中不会只显示最后一个 world。
 
 真实 source 当前支持内部 `rasterizer`/`raytracer`。`rgb_array` 保持 renderer 创建时的固定网格视角，

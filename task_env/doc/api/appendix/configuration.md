@@ -31,43 +31,20 @@ episode
 | physics_dt | 0.002 | 物理时间步 |
 | control_substeps | 1 | 一个 control tick 的物理子步数 |
 | backend | cpu | cpu、vulkan 或 cuda |
-| integrator | implicitfast | 默认积分器；rigid_batch_v1 要求 euler |
+| integrator | implicitfast | GeoPhys runtime 积分器 |
 | broadphase | n2 | 场景 broadphase |
 | prewarm | true | 是否预热运行 kernel |
-| batch_physics_layout | merged_scene | merged_scene 或 static_template |
+| batch_physics_layout | merged_scene | 当前只支持 merged_scene |
 | enable_ground_contact | null | 是否启用地面接触 |
 | enable_domain_boundary_contact | false | 是否启用边界接触 |
 
-batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：前者选择并行物理布局，后者选择当前进程 local 或独立 worker remote。single make_env 不接受 batch layout。
+batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：当前并行物理布局只支持 `merged_scene`，execution 选择当前进程 local 或独立 worker remote。single make_env 不接受 batch layout。请求已退休的 `static_template` 会明确失败，不会改走其他布局。
 
-## StaticTemplateRuntimeConfig
+## 已退休的 static-template runtime 配置
 
-静态模板配置位于 runtime.static_template：
+S4 本地 candidate 移除了 GeoChora-owned static-template physics factory、profile selector 和兼容模块；该 candidate 尚未集成到 public `develop`。`runtime.batch_physics_layout: static_template` 会 fail closed。现有 `RuntimeConfig` 保留 static-template 默认配置对象，以免无关 scalar Task 的 resolved-config identity 改变；public YAML/mapping 中显式出现 `runtime.static_template.*`，或直接传入非默认静态 profile 时都会 fail closed。错误信息指引使用 `merged_scene`，但不会自动转换用户配置。`StaticTemplate*Config` 不再从 `task_env.environment` package root 导出。
 
-| 字段 | 可用值/默认值 | 说明 |
-| --- | --- | --- |
-| profile | auto | 静态模板 capability |
-| kinematics_backend | torch | torch 或 taichi |
-| contact_precision | f64 | f64 或 f32 |
-| cuda_graph | false | 显式启用 CUDA Graph |
-| contact.response_backend | auto | auto 或 active_slot_cholesky_f32_v1 |
-| contact.fixed_topology_child_schur | false | 固定 topology child Schur |
-| contact.root_factor_6x6 | false | 有界 root 6×6 factor；依赖 child Schur |
-
-profile 当前包括：
-
-~~~text
-auto
-hinge_or_slide_no_contact_v1
-articulated_fused_no_contact_v1
-articulated_fused_ground_contact_v1
-articulated_ground_contact_v1
-rigid_batch_v1
-~~~
-
-profile 由 compiled topology 和接触 capability 共同决定。不能使用 ground/domain contact 的 profile 会明确拒绝不兼容配置，不会静默退回 merged_scene。
-
-rigid_batch_v1 在同一 static-template factory/lifecycle 中调用 src/solvers/rigid/batch 的 BatchedRigidSolver；当前要求 integrator=euler，不提供 TaskEnv ground/domain contact，也不声明 zero-copy device transition，state exchange 保持显式 host/NumPy boundary。其它静态 profile 的 implementation、execution、state/workspace 和 transfer capability 通过 resource_summary 与 record metadata 暴露。
+GeoPhys-owned `GeoPhysRigidBatchRuntime` adapter 与通用 Batch/Device contracts 保留；该 adapter 的 import 不代表它已注册为 `make_parallel_env` 的 runtime route，也不扩展其既有 capability envelope。旧静态 solver 实现从 `v1.0.0` 或 S4 retirement manifest 记录的 S3 baseline commit 恢复。
 
 ## Action、observation 和 render
 
@@ -78,4 +55,4 @@ rigid_batch_v1 在同一 static-template factory/lifecycle 中调用 src/solvers
 
 ## 解析与复现
 
-推荐在运行前固定任务 UID、YAML、backend、seed、num_env、execution 和输出目录，并保存 env.get_record_metadata()。resolved config 中会记录 runtime layout、profile、device transition 和 reset policy，便于判断实际是否走到了目标 runtime。
+推荐在运行前固定任务 UID、YAML、backend、seed、num_env、execution 和输出目录，并保存 env.get_record_metadata()。resolved config 中会记录 runtime layout、device transition 和 reset policy，便于判断实际是否走到了目标 runtime。

@@ -129,16 +129,15 @@ class RuntimeConfig:
     # ``None`` keeps the scene-derived row-PGS contact sweep budget.  A positive
     # override is useful for highly coupled multi-contact grasps.
     body_contact_solver_iterations: int | None = None
-    # Contact participation is an explicit runtime capability.  ``None`` keeps
-    # the layout's historical default (merged scenes stay contact-disabled;
-    # articulated static templates use the authored ground when present).
+    # Contact participation is an explicit GeoPhys runtime capability.
     enable_ground_contact: bool | None = None
     enable_domain_boundary_contact: bool = False
-    # Parallel physics layout is deliberately separate from local/remote
-    # execution.  ``merged_scene`` remains the compatibility default.
-    batch_physics_layout: Literal["merged_scene", "static_template"] = "merged_scene"
-    # Static runtime policy is nested so one task YAML declares every value
-    # participating in construction and CUDA Graph identity.
+    # Batch layout is separate from local/remote execution. The only active
+    # TaskEnv route is merged_scene; static_template remains rejected below.
+    batch_physics_layout: Literal["merged_scene"] = "merged_scene"
+    # Deprecated identity-preserving fields. They remain at their original
+    # defaults so resolved scalar task configuration fingerprints do not drift;
+    # they cannot select or configure an active runtime.
     static_template: StaticTemplateRuntimeConfig = field(
         default_factory=StaticTemplateRuntimeConfig
     )
@@ -153,15 +152,26 @@ class RuntimeConfig:
             raise ValueError("control_substeps must be at least 1")
         if self.backend not in {"cpu", "vulkan", "cuda"}:
             raise ValueError("backend must be one of: cpu, vulkan, cuda")
-        if self.batch_physics_layout not in {"merged_scene", "static_template"}:
+        if str(self.batch_physics_layout).strip().lower() == "static_template":
             raise ValueError(
-                "batch_physics_layout must be one of: merged_scene, static_template"
+                "batch_physics_layout='static_template' is retired; use the supported "
+                "'merged_scene' batch layout. No runtime substitution is performed."
+            )
+        if self.batch_physics_layout != "merged_scene":
+            raise ValueError(
+                "unsupported batch_physics_layout; the only active TaskEnv layout "
+                "is 'merged_scene'"
             )
         static_template = self.static_template
         if isinstance(static_template, Mapping):
             static_template = StaticTemplateRuntimeConfig(**dict(static_template))
         if not isinstance(static_template, StaticTemplateRuntimeConfig):
             raise TypeError("runtime.static_template must be a mapping or StaticTemplateRuntimeConfig")
+        if static_template != StaticTemplateRuntimeConfig():
+            raise ValueError(
+                "non-default runtime.static_template values are retired; remove the "
+                "static-template options. No runtime substitution is performed."
+            )
         object.__setattr__(self, "static_template", static_template)
         if len(self.gravity) != 3:
             raise ValueError("gravity must have three components")

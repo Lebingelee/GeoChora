@@ -5,7 +5,7 @@
 > 状态：canonical Core 范围，v0.3
 > 日期：2026-10-04
 >
-> 当前实现状态更新（2026-10-16）：P2.0-B S3 已从 develop 退休 Go2 专用 task、robot、profile 与执行入口；Go2 历史代码和 Evidence 可从不可变 v1.0.0 恢复。通用 RL、Batch/Device/Learner、Vectorization、Provider、Static Physics 与 Renderer contracts 保留。以下较早阶段状态只描述其记录时点。
+> 当前实现状态更新（2026-10-16）：public `develop` 已集成 P2.0-B S3 Go2 retirement。S4 static-template retirement 位于以 `5b8c901135e624a248cf73d29be9a6fea70feb2b` 为基线的本地 candidate，尚未集成；该 candidate 仅保留 `merged_scene` TaskEnv batch physics route，并保留通用 RL、Batch/Device/Learner、Vectorization、GeoPhys provider adapter 与 Renderer contracts。Go2/静态 solver 历史源与 Evidence 仍可通过不可变恢复 refs 获取。以下较早阶段状态只描述其记录时点。
 
 ## 1. Core 使命
 
@@ -286,7 +286,7 @@ Locomotion / RL：
 历史 Go2 walk / RSL（v1.0.0；当前 develop 已退休）
 ~~~
 
-上述 Go2 参考路径曾用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。P2.0-B S3 已移除其 active implementation；Core 保留通用 RL/vectorization contracts 和 Static Physics runtime，但不再要求当前 develop 保留 Go2 专用回归任务。历史资格与限制不变。
+上述 Go2 参考路径曾用于验证 Core contract 和 provider，不定义 Geochora 的完整产品边界。P2.0-B S3 已移除其 active implementation；S4 local candidate 进一步退休 GeoChora-owned static-template physics implementation。通用 RL/vectorization contracts 与 GeoPhys-owned `GeoPhysRigidBatchRuntime` adapter 保留，但 adapter 不作为 `make_parallel_env` 的已注册 runtime route，也不扩展其原有能力范围。历史资格与限制不变。
 
 ## 7. Phase I 的明确非目标
 

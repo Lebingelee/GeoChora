@@ -64,17 +64,9 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         build_runtime: bool = True,
     ) -> None:
         self.config = config if config is not None else self.default_config()
-        # Static providers may share Taichi-backed scene compilation with the
-        # TaskEnv assembly path.  Establish the audited Torch/Triton order
-        # before scene/model imports can load Taichi; this keeps direct public
-        # environment construction independent of caller import order.
-        if self.config.runtime.batch_physics_layout == "static_template":
-            from ..utils._device_stack import preload_device_stack
-
-            preload_device_stack()
         # Import only the lightweight render contract during environment
-        # construction.  Concrete renderer backends stay out of the physics
-        # bootstrap so static CUDA providers can own Triton/Taichi ordering.
+        # construction. Concrete renderer backends stay out of the physics
+        # bootstrap.
         from ..render.base.contracts import normalize_render_mode
 
         self.render_mode = (
