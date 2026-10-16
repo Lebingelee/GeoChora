@@ -1,7 +1,7 @@
 # GeoChora P2.0-B S2-C2 Integration & S3 Go2 Retirement
 
 Date: 2026-10-16
-Status: S2-C2 integrated; S3 prepared as one local review commit for maintainer review. No S3 push, merge, v1.0.1 publication, S4, or S4.5 work was performed.
+Status: S2-C2 and S3 are integrated into public `develop`; S3 was integrated by normal fast-forward after final review. No v1.0.1 publication, S4, or S4.5 work was performed at the time of this report. See the [S3 integration receipt](p2_0_s3_integration_receipt.md).
 
 ## Part A — S2-C2 integration receipt
 
@@ -73,4 +73,4 @@ Before/after resource observations were approximately 3.8–3.9 GiB `MemAvailabl
 
 ## Maintainer handoff
 
-S2-C2 is integrated at the public `develop` baseline above. S3 is a separate local review change on `codex/p2-0-b-s3-go2-retirement`; the public remote remains at the S2-C2 baseline. Review the exact S3 commit before deciding whether to integrate it. No S3 push/merge, main or `v1.0.0` modification, S4 Static Physics retirement, S4.5 scripts/examples reconstruction, Renderer interoperability, or v1.0.1 publication has occurred.
+S2-C2 and S3 are integrated at public `develop` commit `9c6548d69cbddb63c63727b7210814c1881c5180`; the remote readback, protected refs, exact S3 diff, recovery hashes, production-import scan, and focused provider-free suite are recorded in the [S3 integration receipt](p2_0_s3_integration_receipt.md). No main or `v1.0.0` modification, S4 Static Physics retirement, S4.5 scripts/examples reconstruction, Renderer interoperability, or v1.0.1 publication was part of S3.
