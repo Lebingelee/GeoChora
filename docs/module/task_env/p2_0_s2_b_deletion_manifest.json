@@ -3472,7 +3472,7 @@
       "s2_b1_pushed": false
     }
   },
-  "manifest_snapshot": "S2-B1 local selected-source graph; source byte hashes reflect this review tree; baseline_blob resolves against public/develop parent.",
+  "manifest_snapshot": "S2-B1 local selected-source graph refreshed from current tracked source bytes; 49 file records; no deletion authorized. Baseline blobs resolve against the integrated public/develop parent.",
   "consolidated_support_files": [
     "task_env/tasks/nut_assembly/canonical_solution.py",
     "task_env/tasks/nut_assembly/canonical_source.py",
@@ -3494,10 +3494,95 @@
     "task_env/tasks/pick_cube/timebase.py"
   ],
   "s2_b1_review_state": {
-    "status": "LOCAL_REVIEW_REQUIRED",
+    "status": "BOUNDED_ACCEPTANCE_COMPLETE_AWAITING_MAINTAINER_REVIEW",
     "baseline_public_develop": "32bdde9573cc20f8d8b2aafa975422834df2585b",
     "implementation": "selected task construction dependency consolidation only",
-    "native_full_route_regression": "pending",
-    "deletion_authorized": false
+    "implementation_commit": "8ff33b310bd15c8f5fa5e5f8bfae5f0873b64006",
+    "manifest_refresh_commit": "60fafb689efe89312d4d79b0431c61ebc98642d8",
+    "review_report": "docs/module/task_env/p2_0_s2_b1_review.md",
+    "source_identity_migration": "docs/module/task_env/p2_0_s2_b1_source_identity.json",
+    "provider_free_regression": {
+      "status": "PASS",
+      "passed": 157,
+      "elapsed_s": 15.95,
+      "scope": "task API, import isolation, Artifact identity, semantics, reset, lifecycle, controller, recorder/streaming, provenance and guarded outcomes"
+    },
+    "native_full_route_regression": {
+      "status": "PASS_BOUNDED_FUNCTIONAL_ALL_FOUR_CASES",
+      "source_head": "60fafb689efe89312d4d79b0431c61ebc98642d8",
+      "output_root": "workspace/maintenance/p2_0_part_b_s2_b1_20261016/",
+      "limits": {
+        "cpu_affinity": 4,
+        "rss_limit_bytes": 2147483648,
+        "case_budget_seconds": {
+          "pickcube": 180,
+          "nutassembly": 420
+        }
+      },
+      "cases": [
+        {
+          "case": "pickcube_geophys_seed31_100hz",
+          "status": "PASS",
+          "T": 151,
+          "boundaries": 152,
+          "native_applications": 755,
+          "h5_sha256": "c4e66723e81d5391751b6b2007d9a82c69a4550738b62933f3a4d48079290415"
+        },
+        {
+          "case": "pickcube_mujoco_seed31_100hz",
+          "status": "PASS",
+          "T": 470,
+          "boundaries": 471,
+          "native_applications": 2350,
+          "h5_sha256": "3d4e8bcabd3cfba2e66df2bb3ae2e0e4f409d39b8026c6d6f60b7f372ebe4e45"
+        },
+        {
+          "case": "nutassembly_geophys_NA-S0_seed19_100hz",
+          "status": "PASS",
+          "T": 2380,
+          "boundaries": 2381,
+          "native_applications": 11900,
+          "h5_sha256": "495ce4b678494b9c373f30839932dadecc55eafd64f60358edb778c0d9c95cfd",
+          "task_success": true,
+          "planned_trajectory_completed": true,
+          "outcome_complete": true,
+          "strict_expert_complete": false,
+          "strict_failure": "stable_height_mismatch at descend_to_handle step 362",
+          "readiness_warning_count": 1
+        },
+        {
+          "case": "nutassembly_mujoco_NA-S0_seed19_100hz",
+          "status": "PASS",
+          "T": 2373,
+          "boundaries": 2374,
+          "native_applications": 11865,
+          "h5_sha256": "39739dbd6bf7dc1ea819cdeef54c124288e9c1beced792b018e6cdca30e2db74",
+          "task_success": true,
+          "planned_trajectory_completed": true,
+          "outcome_complete": true,
+          "strict_expert_complete": true,
+          "readiness_warning_count": 0
+        }
+      ],
+      "s2_a_comparison": "Exact transition and boundary equality per task/provider after excluding only source/config identity metadata; no first behavior divergence found.",
+      "initial_verifier_failures": "Preserved in separate ignored case directories; PickCube clock/native-counter verifier defects and NutAssembly post-run KeyError were corrected in the ignored runner, then fresh cases passed.",
+      "historical_qualification": "NOT_REQUALIFIED; no P1.8 FULL or D0-D2 claim"
+    },
+    "s2_b2_candidates": [
+      {
+        "path": "task_env/tasks/nut_assembly/clearance_candidate_v4.py",
+        "current_sha256": "10067cbdea578c17c9a1659667e8dbb5edd081ab362b2ad16b1fcdd8a53b3f83",
+        "v1_0_0_blob": "6251ac1d861ab41c14379b3fd9af7cd9e82034e3",
+        "current_historical_caller": "task_env/diagnostics/phase1/integration/lifecycle_full.py"
+      },
+      {
+        "path": "task_env/tasks/nut_assembly/stable_grasp_reference.py",
+        "current_sha256": "b51c054bb997e294d9e3605a28d86eec1dfc253589f3da1578078a64a6908324",
+        "v1_0_0_blob": "e8cc8880ddf2e5342c74d8ef63a8acd6696f5bb9",
+        "current_historical_caller": "task_env/diagnostics/phase1/integration/stable_grasp.py"
+      }
+    ],
+    "deletion_authorized": false,
+    "s2_b1_pushed_or_merged": false
   }
 }
