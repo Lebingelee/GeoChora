@@ -70,6 +70,10 @@ The selected builder now lives at `task_env.tasks.nut_assembly.task.build_refere
 
 Current selected consumers in package registration, trajectory recording/replay and reference execution were migrated to `task.py`. Phase I historical diagnostics may still name removed candidate modules; do not run those scripts against this active tree and do not map their old selectors to Outcome V1. Restore commit `a6372099…` or the applicable immutable v1.0.0 blobs to recover historical source. Frozen reports and Evidence remain untouched.
 
+### Authoring API convention review
+
+The package roots are currently inconsistent: `task_env.tasks.pick_cube` re-exports `build_reference`, while `task_env.tasks.nut_assembly` explicitly rejects that package-level import and keeps its builder at `task_env.tasks.nut_assembly.task`. Recommend one convention for v1.0.1: `task_env.make_env(uid, ...)` is the canonical public environment construction API; task-package roots expose registration identity/types only; exact `task.py` builders remain task-owned construction helpers for internal authoring and bounded verification. Do not restore the NutAssembly package alias or silently remove the PickCube export during this integration. Retire the PickCube root export only through a separately documented, versioned compatibility change after its callers migrate.
+
 ## Validation
 
 The provider-free suite passed **93 tests in 154.30 s** after the explicit package-level API retirement was added. It covers Artifact/config/reset identity, semantics, readiness and Outcome V1, guard failures, invalid state, termination/truncation/budget behavior, route registration/import isolation, recorder/replay boundaries, CLI result gating, retired imports and source provenance. `py_compile` and `git diff --check` passed.
