@@ -1,7 +1,7 @@
 # GeoChora P2.0-B — S2-B2 Integration and S2-C1 PickCube Authoring Receipt
 
 日期：2026-10-16
-状态：S2-B2 已集成到 public `develop`；S2-C1 PickCube task-authoring 实现与有界回归已完成，保留在本地分支等待维护者审阅。没有推送 S2-C1，没有发布 v1.0.1。
+状态：S2-B2 已集成到 public `develop`；S2-C1 PickCube task-authoring 与 NutAssembly 共享 binding 的有界双 provider 功能验收已完成。S2-C1 仍处于本地审阅/集成流程；没有发布 v1.0.1。
 
 ## S2-B2 public integration
 
@@ -36,7 +36,7 @@ env = make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco"})
 
 `task.py` 拥有 TaskArtifact、task composition、reset、canonical semantics、RuntimeSource 与显式 registration；`solution.py` 拥有四阶段 P1.6 readiness expert；`config.yaml` 只声明一个 100 Hz 选定 recipe。现有 Core TaskArtifact v0、TaskDefinition、RuntimeSource/Session、Controller、Recorder 和 public `make_env` contract 继续复用。不存在第二套 artifact schema、环境工厂或任务 predicate。
 
-`SelectedReferenceEnv` 通过内部 `ReferenceTaskBinding` 接收各 task 的构造、reset、evaluation、observation poses、expert lifecycle 参数、控制周期模式与 recorder 要求，移除了按 PickCube/NutAssembly 名称分支的协调逻辑。NutAssembly 的绑定显式保留 native interval、execution recorder、guard samples、arm schedule、NA-S0 seed19 admission 和 runtime-abort 行为。它的 selected Artifact、Outcome V1 Solution、controller、recipe/configuration、task predicates、guard/physical limits 和原始严格 lifecycle status 未改；共享 adapter 的执行字节有变化，但 provider-free identity/lifecycle/recording 检查通过。本切片没有重新运行 NutAssembly native full route。
+`SelectedReferenceEnv` 通过内部 `ReferenceTaskBinding` 接收各 task 的构造、reset、evaluation、observation poses、expert lifecycle 参数、控制周期模式与 recorder 要求，移除了按 PickCube/NutAssembly 名称分支的协调逻辑。NutAssembly 的绑定显式保留 native interval、execution recorder、guard samples、arm schedule、NA-S0 seed19 admission 和 runtime-abort 行为。它的 selected Artifact、Outcome V1 Solution、controller、recipe/configuration、task predicates、guard/physical limits 和原始严格 lifecycle status 未改；共享 adapter 的执行字节有变化，并已用最终 S2-C1 source 在 GeoPhys/MuJoCo 各执行一次完整 native route。
 
 PickCube 可复用物体几何、惯性与 provider-neutral scene asset preparation 从 task 目录移到 `task_env/objects/pick_cube.py`；任务特定 table/cube placement 由 `task.py` recipe 驱动。Task module 不导入 GeoPhys 或 MuJoCo 的 native physics API；provider scene compilation 仍由既有 adapter 负责。
 
@@ -127,10 +127,23 @@ Current H5 bytes and overall logical identities differ from S2-B1 because source
 
 Raw final-source receipts: [GeoPhys result](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json), [GeoPhys resource monitor](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/supervisor.json), [MuJoCo result](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json), [MuJoCo resource monitor](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/supervisor.json), and [preserved first MuJoCo divergence](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco/result.json). The final implementation review baseline and source mapping are in the adjacent tracked [identity record](p2_0_s2_c1_source_identity.json).
 
+### NutAssembly shared-binding full-route regression
+
+The two selected full routes used the final S2-C1 execution code commit `5b0058010f5416eefb08ce59cec43770602fc336`, public UID `nut-assembly-outcome-reference-v1`, seed 19 / NA-S0, CPU, 100 Hz control and 2 ms physics (`5` native steps per control interval). Both completed all eleven authored stages, including `release_retreat`, produced T transitions and T+1 boundaries, finalized and round-tripped canonical H5, and returned `task_success=true`, `planned_trajectory_completed=true`, `outcome_complete=true`. No runtime termination/truncation or unapproved override occurred. Original strict lifecycle reporting is retained independently from the Outcome V1 result.
+
+| Provider | T / boundaries | Native steps | Strict lifecycle / warning | Terminal measured state | H5 SHA-256 | Time / peak sampled process-tree RSS |
+|---|---:|---:|---|---|---|---:|
+| GeoPhys CPU | 2380 / 2381 | 11900 | Original Expert `failed`, `stable_height_mismatch` at `descend_to_handle`, step 362; admitted and recorded as the selected readiness warning | inserted/released/task success true; peg XY error `0.00147766146 m`, peg Z error `-0.00114415097 m`, yaw error `0.06758438 rad`, opening `0.0799999274 m` | `0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982` | 305.17 s / 812,478,464 B |
+| MuJoCo CPU | 2373 / 2374 | 11865 | Original strict Expert `completed`; no readiness warnings | inserted/released/task success true; peg XY error `0.00039858347 m`, peg Z error `-0.00002656040 m`, yaw error `0.00081279402 rad`, opening `0.07999999999 m` | `0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4` | 102.38 s / 428,929,024 B |
+
+For GeoPhys, an initial worker receipt was marked FAIL because its harness looked for a nonexistent `resolved.source_revision` field and mapped semantic identity aliases to literal paths. That run did complete the route and preserve H5. The corrected independent verifier used the recorded `source_head`, checked each resolved source SHA using the correct owner path, and produced a fresh direct PASS receipt at `nutassembly_geophys_c1_verified/`. The earlier failed harness receipt is preserved and not relabeled. Both providers were then compared with S2-B1 H5. The first raw difference in each file is `boundaries[0].owners.integrity_hash`, derived from the changed `ReferenceTaskBinding` source SHA (`b18d3a...` to `c13f67...`); after removing only that source identity and its dependent integrity digest, all transition and boundary mappings match exactly. Artifact SHA `99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe`, solution identity `4bf902b9b0bcc84955e9d51177c5811e65e02b2b540678fa14235d13d7cad923`, reset identity `767d56397dec41243aec445232d8d726b0891e7eeb49f655b789a86b23b5f4a2`, Outcome V1 policy identity `a940c6cfc4b9dbe64ae55b615e7bdbd9a210dc7495c6337b08cff688c52694ee`, and the per-provider recipes/controllers match their accepted S2-B1 identities. This is bounded functional regression, not historical P1.8 FULL or D0-D2 qualification.
+
+Raw receipts: [GeoPhys result](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_geophys_c1_verified/result.json), [GeoPhys resource monitor](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_geophys_c1_verified/supervisor.json), [GeoPhys S2-B1 reconciliation](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_geophys_c1_verified/reconciliation.json), [MuJoCo result](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_mujoco_c1/result.json), [MuJoCo resource monitor](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_mujoco_c1/supervisor.json), and [MuJoCo S2-B1 reconciliation](../../../workspace/maintenance/p2_0_part_b_s2_c1_20261016/nutassembly_mujoco_c1/reconciliation.json). The corrected GeoPhys run's source revision, full resolved configuration, source SHA list, H5 and outcome report are retained in the ignored maintenance directory.
+
 运行期间 memory/I/O PSI 未达到 stop threshold，监督器未观察到新 kernel ATA/SATA/read-write I/O errors。既有 Oct 15 BadCRC/READ I/O 事件仍保留在 S2-B2 receipt；single-disk SATA 与 independent-backup 风险仍然存在。
 
 ## 影响范围与建议
 
-NutAssembly 的选定 task/outcome 逻辑、artifact、source closure、solution/controller/recipe identity、guard/物理限制和 recorded lifecycle 语义未改变；共享 reference adapter 仅将 task-specific 分支变为 binding 配置，provider-free 测试确认选定契约不变。本次没有跑 NutAssembly native route，因此不声称对其重新完成 full-route acceptance。Go2、静态 physics solver、通用 vectorization/Batch/Device/Learner、Renderer、Phase II interoperability、P1.6 checkpoint 与 v1.0.0 发布内容均未修改。
+NutAssembly 的选定 task/outcome 逻辑、artifact、solution/controller/recipe identity、guard/物理限制和 recorded lifecycle 语义未改变；共享 reference adapter 的源码身份更新已被记录，H5 行为仅在 source identity 与派生 digest 字段上不同。Go2、静态 physics solver、通用 vectorization/Batch/Device/Learner、Renderer、Phase II interoperability、P1.6 checkpoint 与 v1.0.0 发布内容均未修改。
 
-此次已移除上述列出的当前 PickCube 模块/导入和便利 API；S2-B2 删除的两项 NutAssembly candidate 不在当前树。`task_env` 的通用 lifecycle/controller/recorder/provider/API contract 保留。v1.0.1 的公开兼容策略仍需维护者审阅。本地实现现可供审阅；不自动集成。S2-C2、S3、S4、S4.5 和 S5 均未开始。
+此次已移除上述列出的当前 PickCube 模块/导入和便利 API；S2-B2 删除的两项 NutAssembly candidate 不在当前树。`task_env` 的通用 lifecycle/controller/recorder/provider/API contract 保留。v1.0.1 的公开兼容策略仍需维护者审阅。S2-C1 review 和 native regression 门槛已通过，现按用户指示核验并执行正常 fast-forward 集成；S2-C2 随后在独立分支实现，不与 C1 集成提交混合。S3、S4、S4.5 和 S5 均未开始。

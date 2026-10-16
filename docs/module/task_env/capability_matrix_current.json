@@ -1,6 +1,6 @@
 {
   "schema": "geochora-current-reference-capability-overlay-v1",
-  "status": "S2_B2_INTEGRATED_S2_C1_LOCAL_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
+  "status": "S2_B2_INTEGRATED_S2_C1_ACCEPTED_FOR_BOUNDED_INTEGRATION_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
   "integrated_baseline": "bd9096ccad5cae54df0a2361d9797b2455862d49",
   "qualification_inherited": false,
@@ -36,7 +36,8 @@
       "s2_a_claim_limit": "PASS: full 100Hz CPU functional routes on GeoPhys/MuJoCo in this bounded review; no qualification inheritance",
       "new_adapter_full_trajectory_acceptance": "PASS_BOUNDED_FUNCTIONAL_BOTH_PROVIDERS; GeoPhys original strict expert failure is preserved separately",
       "historical_P1_8_strict_FULL_and_D0": "UNCHANGED_NO_RELABEL",
-      "s2_b1_claim_limit": "PASS: current task-owned Outcome V1 route on both CPU providers; full planned trajectory and task outcome complete; GeoPhys strict stable_height_mismatch remains recorded as a readiness warning and strict Expert failure; no historical P1.8 FULL/D0-D2 relabel"
+      "s2_b1_claim_limit": "PASS: current task-owned Outcome V1 route on both CPU providers; full planned trajectory and task outcome complete; GeoPhys strict stable_height_mismatch remains recorded as a readiness warning and strict Expert failure; no historical P1.8 FULL/D0-D2 relabel",
+      "s2_c1_local_claim_limit": "PASS_BOUNDED_FUNCTIONAL on exact S2-C1 execution source 5b0058010f5416eefb08ce59cec43770602fc336: GeoPhys/MuJoCo CPU, NA-S0 seed19, 100Hz; full 11-stage route and H5 roundtrip; H5 transition/boundary mappings match S2-B1 after removing only ReferenceTaskBinding source SHA and derived owner integrity digest; no P1.8 FULL or D0-D2 qualification inheritance"
     }
   ],
   "new_reference_renderer_interoperability": "NOT_IMPLEMENTED",
@@ -47,10 +48,11 @@
     "implementation_commits": ["13063f8a20479030efdeb565f637019d30445f5b", "38f18f397454b13b3a269502577711f6868a0af9", "5b0058010f5416eefb08ce59cec43770602fc336"],
     "local_head": "5b0058010f5416eefb08ce59cec43770602fc336",
     "base_public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
-    "integration": "NOT_PUSHED_OR_MERGED_PENDING_MAINTAINER_REVIEW",
+    "integration": "ACCEPTANCE_COMPLETE_NORMAL_FAST_FORWARD_IN_PROGRESS",
     "pickcube_cpu_cases": ["GeoPhys seed31 100Hz PASS on 5b00580; 151 transitions/152 boundaries; H5 cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108", "MuJoCo seed31 100Hz PASS on 5b00580; 470 transitions/471 boundaries; H5 579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018"],
+    "nutassembly_cpu_cases": ["GeoPhys NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2380 transitions/2381 boundaries; H5 0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982", "MuJoCo NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2373 transitions/2374 boundaries; H5 0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4"],
     "qualification_inherited": false,
-    "other_scope": "NutAssembly execution policy, Go2, static physics, vectorization, and Renderer implementations unchanged; shared reference adapter uses explicit task binding"
+    "other_scope": "NutAssembly selected task/outcome behavior, Go2, static physics, vectorization, and Renderer implementations unchanged; shared reference adapter uses explicit task binding"
   },
   "S2_B2_integration": {
     "implementation_commit": "84438d470cce4f5a215a5934fdfc344b91adca30",
