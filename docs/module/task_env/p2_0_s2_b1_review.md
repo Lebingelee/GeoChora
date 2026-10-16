@@ -2,9 +2,24 @@
 
 ## Decision and review boundary
 
-S2-A is integrated into the canonical public `develop` branch at `32bdde9573cc20f8d8b2aafa975422834df2585b`. S2-B1 is a separate local change set: implementation `8ff33b310bd15c8f5fa5e5f8bfae5f0873b64006`, followed by dependency-manifest refresh `60fafb689efe89312d4d79b0431c61ebc98642d8`. The latter is the exact source HEAD used for the final S2-B1 native runs. S2-B1 has not been pushed or merged.
+S2-A is integrated into the canonical public `develop` branch at `32bdde9573cc20f8d8b2aafa975422834df2585b`. S2-B1 consists of implementation `8ff33b310bd15c8f5fa5e5f8bfae5f0873b64006`, dependency-manifest refresh `60fafb689efe89312d4d79b0431c61ebc98642d8`, and final review receipt `961ff67489cf6ed1fd3665fc77db2e3f389796e9`. The latter is the tested and integrated final S2-B1 HEAD; the exact task source HEAD used for the four native runs is `60fafb…`, and the intervening `961ff…` commit is documentation-only. S2-B1 has been fast-forwarded into public `develop`.
 
 The review covers selected task-construction ownership, source identities, callers, current-source provider-free tests, and four serial CPU full-route runs. It does not delete historical implementations, retire Go2 or custom static physics, start Renderer interoperability, alter frozen Evidence, or publish v1.0.1. The existing deletion manifest remains `REVIEW_REQUIRED_NO_DELETION_AUTHORIZED`.
+
+## S2-B1 integration receipt
+
+Before integration, canonical `public/develop` was fetched and verified at `32bdde9573cc20f8d8b2aafa975422834df2585b`, the exact S2-B1 baseline. The implementation commit is descended from that baseline through S2-A integration metadata; `60fafb…` is parented by `8ff33b3…`, and `961ff…` is parented by `60fafb…`. The working tree was clean. All 18 recorded S2-B1 task-source file hashes and all four current-source full-route receipts matched the tested `60fafb…` source; the provider-free suite passed 157 tests. `git diff 60fafb… 961ff…` contains only the current capability matrix, this review receipt, and the S2-B deletion manifest.
+
+The normal fast-forward push was:
+
+```bash
+git fetch public refs/heads/develop
+test "$(git rev-parse FETCH_HEAD)" = 32bdde9573cc20f8d8b2aafa975422834df2585b
+git merge-base --is-ancestor FETCH_HEAD 961ff67489cf6ed1fd3665fc77db2e3f389796e9
+git push public 961ff67489cf6ed1fd3665fc77db2e3f389796e9:refs/heads/develop
+```
+
+The push advanced public `develop` from `32bdde9573cc20f8d8b2aafa975422834df2585b` to `961ff67489cf6ed1fd3665fc77db2e3f389796e9`; `git ls-remote` confirmed that exact ref. The same readback confirmed public `main=e4e39883fbe01d4be4b172a53a535ef0095b3d64`, annotated `v1.0.0` tag object `17c3100d4fabcb061c23569dea49973ebd177d51`, and peeled release commit `42787f5e4f658a3f81fdd2140cf7544d6342c783` were unchanged.
 
 ## S2-A integration receipt
 

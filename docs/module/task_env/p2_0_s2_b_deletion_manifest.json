@@ -3472,7 +3472,7 @@
       "s2_b1_pushed": false
     }
   },
-  "manifest_snapshot": "S2-B1 local selected-source graph refreshed from current tracked source bytes; 49 file records; no deletion authorized. Baseline blobs resolve against the integrated public/develop parent.",
+  "manifest_snapshot": "S2-B1 selected-source graph integrated at 961ff67489cf6ed1fd3665fc77db2e3f389796e9; 49 source/documentation records; S2-B2 scoped retirement is not yet applied.",
   "consolidated_support_files": [
     "task_env/tasks/nut_assembly/canonical_solution.py",
     "task_env/tasks/nut_assembly/canonical_source.py",
@@ -3494,7 +3494,7 @@
     "task_env/tasks/pick_cube/timebase.py"
   ],
   "s2_b1_review_state": {
-    "status": "BOUNDED_ACCEPTANCE_COMPLETE_AWAITING_MAINTAINER_REVIEW",
+    "status": "INTEGRATED_FAST_FORWARD_S2_B2_SCOPE_REVIEW_REQUIRED",
     "baseline_public_develop": "32bdde9573cc20f8d8b2aafa975422834df2585b",
     "implementation": "selected task construction dependency consolidation only",
     "implementation_commit": "8ff33b310bd15c8f5fa5e5f8bfae5f0873b64006",
@@ -3583,6 +3583,17 @@
       }
     ],
     "deletion_authorized": false,
-    "s2_b1_pushed_or_merged": false
+    "s2_b1_pushed_or_merged": true,
+    "resulting_public_develop_sha": "961ff67489cf6ed1fd3665fc77db2e3f389796e9",
+    "integration": {
+      "remote": "public",
+      "from_public_develop": "32bdde9573cc20f8d8b2aafa975422834df2585b",
+      "to_public_develop": "961ff67489cf6ed1fd3665fc77db2e3f389796e9",
+      "method": "normal fast-forward",
+      "verified_readback": true,
+      "main_unchanged": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+      "v1_0_0_tag_object_unchanged": "17c3100d4fabcb061c23569dea49973ebd177d51",
+      "v1_0_0_commit_unchanged": "42787f5e4f658a3f81fdd2140cf7544d6342c783"
+    }
   }
 }

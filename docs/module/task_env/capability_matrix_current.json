@@ -1,8 +1,8 @@
 {
   "schema": "geochora-current-reference-capability-overlay-v1",
-  "status": "S2_B1_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
+  "status": "S2_B1_INTEGRATED_S2_B2_REVIEW_REQUIRED_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
-  "integrated_baseline": "32bdde9573cc20f8d8b2aafa975422834df2585b",
+  "integrated_baseline": "961ff67489cf6ed1fd3665fc77db2e3f389796e9",
   "qualification_inherited": false,
   "selected_references": [
     {
@@ -41,7 +41,7 @@
   "new_reference_renderer_interoperability": "NOT_IMPLEMENTED",
   "native_current_source_reexecution": "PASS_BOUNDED_FUNCTIONAL_REGRESSION: four named public make_env routes exercised exact S2-B1 source 60fafb689efe89312d4d79b0431c61ebc98642d8; provider-by-provider H5 transition/boundary comparison to S2-A is exact after source/config identity metadata is excluded; no P1.8 FULL or D0-D2 qualification inheritance",
   "provider_free_current_source_reexecution": "157 passed; bounded provider-free API, import isolation, Artifact identity, task semantics, reset, lifecycle, controller, recorder/streaming, provenance, and guarded-outcome regression; NOT qualification",
-  "S2_B": "S2_B1_BOUNDED_ACCEPTANCE_COMPLETE_AWAITING_MAINTAINER_REVIEW; S2_B2 deletion unauthorized",
+  "S2_B": "S2_B1_INTEGRATED_AT_961ff674; S2_B2_SCOPED_RETIREMENT_IN_PROGRESS_NOT_YET_APPLIED; no release qualification",
   "storage": "SINGLE_SATA_RISK_AND_INDEPENDENT_BACKUP_LIMITATION_UNRESOLVED",
   "source_identity_manifest": "p2_0_s2_a_source_identity.json",
   "provider_free": "162 passed, 6 subtests passed (final S2-A provider-free suite including CLI exit gating and failed-task H5 finalization)",
@@ -58,6 +58,13 @@
       "nutassembly_mujoco_NA-S0_seed19_100hz_PASS"
     ],
     "deletion_authorized": false,
-    "qualification_inherited": false
+    "qualification_inherited": false,
+    "integration": {
+      "from": "32bdde9573cc20f8d8b2aafa975422834df2585b",
+      "to": "961ff67489cf6ed1fd3665fc77db2e3f389796e9",
+      "method": "normal fast-forward",
+      "public_readback": "PASS",
+      "main_and_v1_0_0_unchanged": true
+    }
   }
 }
