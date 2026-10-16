@@ -1,8 +1,8 @@
 {
   "schema": "geochora-current-reference-capability-overlay-v1",
-  "status": "S2_B2_INTEGRATED_S2_C1_ACCEPTED_FOR_BOUNDED_INTEGRATION_NOT_A_RELEASE_MATRIX",
+  "status": "S2_C1_INTEGRATED_BOUNDED_FUNCTIONAL_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
-  "integrated_baseline": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+  "integrated_baseline": "0cf32439579b3f683e8ff7744894a4c001ddc5e9",
   "qualification_inherited": false,
   "selected_references": [
     {
@@ -48,7 +48,13 @@
     "implementation_commits": ["13063f8a20479030efdeb565f637019d30445f5b", "38f18f397454b13b3a269502577711f6868a0af9", "5b0058010f5416eefb08ce59cec43770602fc336"],
     "local_head": "5b0058010f5416eefb08ce59cec43770602fc336",
     "base_public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
-    "integration": "ACCEPTANCE_COMPLETE_NORMAL_FAST_FORWARD_IN_PROGRESS",
+    "integration": {
+      "from": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+      "to": "0cf32439579b3f683e8ff7744894a4c001ddc5e9",
+      "method": "normal fast-forward",
+      "public_readback": "PASS",
+      "main_and_v1_0_0_unchanged": true
+    },
     "pickcube_cpu_cases": ["GeoPhys seed31 100Hz PASS on 5b00580; 151 transitions/152 boundaries; H5 cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108", "MuJoCo seed31 100Hz PASS on 5b00580; 470 transitions/471 boundaries; H5 579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018"],
     "nutassembly_cpu_cases": ["GeoPhys NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2380 transitions/2381 boundaries; H5 0afcc143cbfc3091dc005200a0891c1ece4e6e786d035fe748abee4349b54982", "MuJoCo NA-S0 seed19 100Hz PASS_RECONCILED on 5b00580; 2373 transitions/2374 boundaries; H5 0d927e416260e20fe00d7e011debf6b2da35ee31dfe9d8d1a2e32b81411189c4"],
     "qualification_inherited": false,

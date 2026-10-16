@@ -408,6 +408,18 @@
     ]
   },
   "qualification": "NOT_REQUALIFIED",
+  "public_integration": {
+    "method": "normal fast-forward",
+    "previous_public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
+    "integrated_acceptance_commit": "0cf32439579b3f683e8ff7744894a4c001ddc5e9",
+    "public_develop_readback": "0cf32439579b3f683e8ff7744894a4c001ddc5e9",
+    "push_status": "PASS",
+    "force_push_or_history_rewrite": false,
+    "main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "main_and_v1_0_0_modified": false
+  },
   "reviewed_base": {
     "public_develop": "bd9096ccad5cae54df0a2361d9797b2455862d49",
     "source_code_head": "5b0058010f5416eefb08ce59cec43770602fc336"

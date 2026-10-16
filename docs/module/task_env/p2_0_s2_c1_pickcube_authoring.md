@@ -1,13 +1,17 @@
 # GeoChora P2.0-B — S2-B2 Integration and S2-C1 PickCube Authoring Receipt
 
 日期：2026-10-16
-状态：S2-B2 已集成到 public `develop`；S2-C1 PickCube task-authoring 与 NutAssembly 共享 binding 的有界双 provider 功能验收已完成。S2-C1 仍处于本地审阅/集成流程；没有发布 v1.0.1。
+状态：S2-B2 与 S2-C1 已集成到 public `develop`；S2-C1 PickCube task-authoring 与 NutAssembly 共享 binding 的有界双 provider 功能验收已完成。没有发布 v1.0.1。
 
 ## S2-B2 public integration
 
 S2-B2 的执行提交 `84438d470cce4f5a215a5934fdfc344b91adca30` 基于 public `develop` `71aadb8aada6c242166a1deadc610c230ba1c616`。更正后的存储风险收据和最终 integration receipt 分别为 `a5e8cd0a50b8a79a75037e0c274b0e22d3ebdde2` 与 `bd9096ccad5cae54df0a2361d9797b2455862d49`。本次重新抓取 public refs 后，`develop` 仍为 `bd9096ccad5cae54df0a2361d9797b2455862d49`；`main` 仍为 `e4e39883fbe01d4be4b172a53a535ef0095b3d64`，annotated `v1.0.0` 标签对象仍为 `17c3100d4fabcb061c23569dea49973ebd177d51`。
 
 S2-B2 的 exact two-file NutAssembly candidate retirement 与 integration receipt 见 [S2-B2 审查记录](p2_0_s2_b2_retirement_review.md)。本次未重做架构审计或改写冻结 Evidence。
+
+## S2-C1 fast-forward integration
+
+执行源码提交链 `13063f8a20479030efdeb565f637019d30445f5b` → `38f18f397454b13b3a269502577711f6868a0af9` → `5b0058010f5416eefb08ce59cec43770602fc336` 以 public `develop` `bd9096ccad5cae54df0a2361d9797b2455862d49` 为基线。最终 acceptance receipt 为 `0cf32439579b3f683e8ff7744894a4c001ddc5e9`。复核 ancestry、限定 diff、task-env clean 状态、100 项 provider-free regression 与四条 current-source full routes 后，按普通 fast-forward 集成；没有 force push 或历史改写。远端读回 `develop=0cf32439579b3f683e8ff7744894a4c001ddc5e9`。`main=e4e39883fbe01d4be4b172a53a535ef0095b3d64` 未变；annotated `v1.0.0` tag object `17c3100d4fabcb061c23569dea49973ebd177d51` 及 peeled release commit `42787f5e4f658a3f81fdd2140cf7544d6342c783` 未变。后续仅添加此回执文档，不变更已测试的 S2-C1 execution source。
 
 ## S2-C1 实现
 
