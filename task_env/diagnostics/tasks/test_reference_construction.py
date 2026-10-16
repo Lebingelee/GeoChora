@@ -158,6 +158,19 @@ def test_pickcube_lift_only_success_and_reward_independent_oracle():
         assert result.reward_terms['lift'] == pytest.approx(min(.4, lift / .1 * .4), abs=1e-12, rel=0)
 
 
+def test_pickcube_scalar_metrics_preserve_accepted_mujoco_boundary_values():
+    current = state({
+        'cube-v1': PoseWorld((0.6351343459705087, -0.08646434752767339, 0.48762747518153127),
+                             (1., 0., 0., 0.)),
+        'panda-v1/ee': PoseWorld((0.5914863404002174, -0.08949059580312209, 0.5771712604381248),
+                                 (-0.01493029538157625, 0.7644666296611904,
+                                  0.6443596055257806, -0.012982957326429108)),
+    }, 0.07999873306277117)
+    result = pc_evaluate(current, pc_build_artifact().semantics)
+    assert result.metrics['eef_to_cube_dist'] == 0.09966140700877033
+    assert result.reward == 0.026493052593642232
+
+
 def test_nutassembly_success_requires_measured_release_and_retreat():
     poses = {'square-nut-v1': PoseWorld((.58, .045, .473), (1., 0., 0., 0.)),
              'square-peg-v1': PoseWorld((.58, .045, .5), (1., 0., 0., 0.)),

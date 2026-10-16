@@ -89,8 +89,9 @@ def semantic_definition() -> SemanticDefinition:
 def _evaluate_values(cube_pos, eef_pos, gripper_opening, semantics=None) -> TaskEvaluation:
     semantics = semantic_definition() if semantics is None else semantics
     p = semantics.parameters_si
-    cube_pos = np.asarray(cube_pos, dtype=np.float64)
-    eef_pos = np.asarray(eef_pos, dtype=np.float64)
+    # Keep the historical tuple-scalar evaluation order. Coercing these
+    # coordinates to NumPy scalars changes a few distance/reward values by one
+    # ULP even when every recorded physical state and action is identical.
     cube_lift = float(cube_pos[2] - p["rest_height"])
     distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(eef_pos, cube_pos, strict=True)))
     reached = distance <= p["reach_distance"]
