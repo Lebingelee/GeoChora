@@ -25,8 +25,13 @@
 - PickCube's production controller identity includes the hash of generated
   MJCF bytes that contain the absolute checkout root. The identity therefore
   changes when the same source tree is checked out at a different path; both
-  values and the normalized source hash are recorded in the source manifest.
-  The selected Artifact/config and normalized MJCF identity remained stable.
+  values and normalized XML hash are recorded in the source manifest. A
+  provider-free one-action controller probe produced the same physical control
+  target fields across the two checkouts, but did not apply that target through
+  a provider. Cross-checkout controller hash equality is not guaranteed. The
+  provisional recommendation is to retain this limitation; maintainer decision
+  remains open. The relocated-checkout full regression is NOT_RUN; preserve the
+  exploratory 139 PASS / 8 FAIL result and its explanation in the S5-C1 receipt.
 - **OPEN storage risk:** `/dev/sda` / `ata5` has recorded BadCRC and READ I/O
   errors. The workspace resides on one physical disk and an independent backup
   has not been verified. A clean recent kernel scan does not close this risk.

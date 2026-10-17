@@ -24,6 +24,8 @@ release-candidate preparation only. No release tag or GitHub Release exists;
 - [Test and acceptance summary](test_acceptance_summary.md)
 - [Backup manifest](backup_manifest.json)
 - [Release readiness gates](release_readiness.md)
+- [S5-C1 final gate receipt](../../module/task_env/p2_0_s5_c1_final_release_gate.md)
+- [S5-C2 publication procedure draft](publication_procedure_draft.md)
 
 The only current candidate capability matrix is
 [`capability_matrix_v1_1_0_candidate.json`](../../module/task_env/capability_matrix_v1_1_0_candidate.json).

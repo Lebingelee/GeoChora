@@ -35,6 +35,10 @@
     {
       "commit": "e0e4dbcbc3dc9d17d0dec58142be5cfb20937e73",
       "purpose": "S5-A release-preflight documentation baseline"
+    },
+    {
+      "commit": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+      "purpose": "S5-B release-candidate documents and final provider-free regression baseline"
     }
   ],
   "submodule_gitlinks": [
@@ -158,7 +162,14 @@
     "disposable_normalized_mjcf_sha256": "017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba",
     "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
     "task_config_sha256": "0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0",
-    "cause": "Production controller identity includes PandaKinematics.source_sha256 over raw generated MJCF bytes; the MJCF embeds the checkout root. Task file bytes, Artifact hash, task config hash, and normalized MJCF matched. Preserve each run-specific identity in provenance."
+    "cause": "Production controller identity includes PandaKinematics.source_sha256 over raw generated MJCF bytes; the MJCF embeds the checkout root. Task file bytes, Artifact hash, task config hash, and normalized MJCF matched. Preserve each run-specific identity in provenance.",
+    "canonical_raw_mjcf_sha256": "bdd119833a5ae3c8176daf1f5ef586c3601870f10f4b4b5f6d7aa730fe5f0fed",
+    "canonical_normalized_mjcf_sha256": "017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba",
+    "canonical_meshdir": "/home/lly/Program_Files/Geochora/asset/external/mujoco_menagerie/franka_emika_panda/assets",
+    "disposable_meshdir": "/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/asset/external/mujoco_menagerie/franka_emika_panda/assets",
+    "normalized_xml_comparison": "PASS; replacing each absolute checkout root with ${REPO_ROOT} yields byte-identical XML.",
+    "provider_applied_control_target_readback": "NOT_RUN",
+    "controller_hash_portability": "Not guaranteed across checkout roots; no identity/code migration performed."
   },
   "s5_b_scope_note": "S5-B adds release-candidate documentation and a provider-free negative-import test helper correction only. No task/provider/runtime/learner/renderer implementation was changed.",
   "submodule_remote_checks": {
@@ -172,6 +183,19 @@
     "clean_checkout_smoke": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.json",
     "clean_checkout_source_identity": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_source_identity.json",
     "cli_help_check": "workspace/maintenance/p2_0_s5_b_20261017/cli_help_check.json",
-    "cli_and_failure_gates": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log"
+    "cli_and_failure_gates": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+    "s5_c1_provider_free_final": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
+    "s5_c1_release_gate_receipt": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md"
+  },
+  "s5_c1_final_gate": {
+    "review_receipt": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
+    "reviewed_candidate_head": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_develop": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+    "local_documentation_changes": "S5-C1 release-gate updates are a local, reviewable documentation set; not integrated or published.",
+    "provider_free_command": "python -m pytest -q task_env/diagnostics/tasks task_env/diagnostics/render/test_backend_registry.py",
+    "provider_free_result": "147 passed; 6 subtests passed; 1 upstream Taichi deprecation warning; 160.51 s",
+    "provider_free_receipt": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
+    "controller_portability_decision": "Recommendation B (retain documented path-sensitive identity); maintainer decision pending.",
+    "backup_gate": "BACKUP_NOT_VERIFIED; RELEASE_BLOCKED"
   }
 }

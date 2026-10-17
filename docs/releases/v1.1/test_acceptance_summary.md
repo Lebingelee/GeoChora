@@ -39,6 +39,10 @@ was established.
   The S5-B change only makes the retired-Go2 module test treat a missing
   dotted parent package as an unavailable import; it changes no runtime code.
   Log: `workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log`.
+- **PASS:** S5-C1 final provider-free release suite, 147 passed, 6 subtests,
+  one upstream Taichi locale deprecation warning, 160.51 s. Same command as
+  above; receipt:
+  `workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log`.
 - **PASS:** the trajectory converter forwarding fix's focused tests and
   post-fix workflow checks; conversion algorithm, H5 schema, and action
   semantics are unchanged.
@@ -57,6 +61,11 @@ was established.
   submodule Gitlinks, and make/reset/close for PickCube and NutAssembly on both
   GeoPhys/CPU and MuJoCo/CPU. No expert routes were run. The checkout used the
   existing validated Python 3.12.14 environment.
+- **PASS — PROVIDER-FREE IDENTITY PROBE:** replacing the absolute checkout root
+  with `${REPO_ROOT}` produced identical PickCube MJCF. A synthetic controller
+  compute generated identical physical target fields and FK/Jacobian values.
+  No detached provider-applied target or full task route was run; this does not
+  establish relocated full-route equivalence.
 - **NOT_RUN:** a fresh dependency installation.
 - **EXPLORATORY FAIL — ENVIRONMENT/IDENTITY SENSITIVITY:** the first full
   provider-free suite launched from a path under ignored `workspace/` reported

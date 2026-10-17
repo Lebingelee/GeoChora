@@ -2,12 +2,19 @@
   "schema": "geochora-v1-1-release-candidate-backup-manifest-v1",
   "status": "BACKUP_NOT_VERIFIED",
   "target_release": "v1.1.0",
-  "reason": "The repository, ignored Evidence, and available workspaces reside on the single physical /dev/sda device. No independent destination was available, so no copied-artifact restore verification was performed.",
+  "reason": "BACKUP_NOT_VERIFIED: only one physical disk (/dev/sda) is available and no independent physical device or authorized controlled external destination was identified. No copy or restore test was attempted.",
   "source_storage_observation": {
     "physical_device": "/dev/sda",
     "known_risk": "/dev/sda / ata5 BadCRC and READ I/O errors recorded in prior maintenance evidence",
     "independent_backup_available": false,
-    "recent_kernel_query": "No matching ATA/SATA/read/write error lines were returned in the checked recent interval; this is not proof of device integrity."
+    "recent_kernel_query": "No matching ATA/SATA/read/write error lines were returned in the checked recent interval; this is not proof of device integrity.",
+    "observed_physical_devices": [
+      "/dev/sda"
+    ],
+    "authorized_independent_destination": "NONE_IDENTIFIED",
+    "copy_attempted": false,
+    "restore_test_attempted": false,
+    "status": "BACKUP_NOT_VERIFIED"
   },
   "required_backup_scope": [
     {
@@ -73,5 +80,464 @@
     "Verify copied hashes and Git object/ref identities.",
     "Perform representative restore reads for source, v1.0.0 Evidence, H5, and checkpoint artifacts.",
     "Do not delete or rewrite local Evidence before restore verification is accepted."
+  ],
+  "observation_date": "2026-10-17",
+  "backup_plan": {
+    "status": "PREPARED_NOT_EXECUTED",
+    "destination_requirement": "Maintainer-authorized independent physical device or controlled external storage. No destination is approved or configured.",
+    "repository_source": ".",
+    "repository_bundle": "geochora-v1.1.0-rc.bundle",
+    "repository_bundle_command": "git bundle create /AUTHORIZED/INDEPENDENT/DESTINATION/geochora-v1.1.0-rc.bundle --all",
+    "repository_bundle_verification": "git bundle verify /AUTHORIZED/INDEPENDENT/DESTINATION/geochora-v1.1.0-rc.bundle; restore to a separate checkout and verify required commits/tags/trees.",
+    "submodule_bundles": [
+      {
+        "path": "GeoPhys",
+        "commit": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+        "bundle": "geophys-v1.1.0-rc.bundle",
+        "command": "git -C GeoPhys bundle create /AUTHORIZED/INDEPENDENT/DESTINATION/geophys-v1.1.0-rc.bundle --all"
+      },
+      {
+        "path": "asset/external/mujoco_menagerie",
+        "commit": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+        "bundle": "mujoco-menagerie-v1.1.0-rc.bundle",
+        "command": "git -C asset/external/mujoco_menagerie bundle create /AUTHORIZED/INDEPENDENT/DESTINATION/mujoco-menagerie-v1.1.0-rc.bundle --all"
+      }
+    ],
+    "all_current_refs_captured_below": "Use --all bundles at backup time; the attached snapshot lists the 64 refs present during the S5-C1 baseline check. The `--all` bundle captures refs created afterward as well. Include current S5-C1 tracked documentation changes and ignored evidence files in the file-copy inventory.",
+    "required_restore_reads": [
+      "root Git bundle and protected v1.0.0 tag/tree",
+      "GeoPhys and Menagerie pinned Gitlink objects",
+      "one representative selected-task H5",
+      "one representative frozen v1.0.0 Evidence file",
+      "one checkpoint artifact"
+    ],
+    "do_not_execute_until": "An independent destination is explicitly authorized.",
+    "reviewed_integration_commits": [
+      "5d57272d1ce7469bb214cf185137853a7eb6deb0",
+      "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "fc12780dcaebcb12f9740ae7f3f28224a47c3bbf",
+      "bee498d1d784015f034c5b4af34320fdffa61411",
+      "e0e4dbcbc3dc9d17d0dec58142be5cfb20937e73",
+      "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
+    ],
+    "working_tree_state": "The 2fb60de S5-B base commit had a clean tracked tree before the separate S5-C1 documentation package was created. Preserve the S5-C1 package independently from the functional and S5-B integration targets."
+  },
+  "local_ref_snapshot_at_check": {
+    "count": 64,
+    "refs": [
+      {
+        "ref": "refs/archive/p1.8/integration-report-staging-abed234",
+        "object": "abed2345d496124206d47fb6ca5260e7aa5e81fe"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/captures/1792232784674/9ac815f3-e7ee-44b1-90c6-db6b46afaea7/base",
+        "object": "36544b39cf2ba5e6568d6081ff7851c1dd041a23"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/418d4a97f19fd13bab9ce1b394b0951e/0d924c5d2005ab01b8fcbc092a55414e/1792227592250/603d6c1c-0c0d-47dc-a645-701a8bf62d29",
+        "object": "36544b39cf2ba5e6568d6081ff7851c1dd041a23"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/4ad8a86d9e3a158ee3f7cca9393af871/644146ef6a8293fd03003f90016f3599/1791869291155/1ebbc683-7617-4c41-97b0-e488a73c33ec",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/5fccf31bb985b1ecfba1ab3746daf8d8/785aa71c66bde0a9e9046c59af4f0634/1792061696321/ce887d0a-c7d7-4fd0-aa35-e7f3bddd7306",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/963cf0f1e19ddc825cd41ac76f0c602b/f9c7cad93133305c3de5beecda9ea903/1792036416530/a11c17ed-4777-4dc8-a28e-1e48910c76ea",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/c3fe95e31030c757d5e1be70c05fe0f1/1464b4e037d3de72dc18db7efadf498e/1791882725493/06649c92-e98a-4c90-8504-c502c58d11d3",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/e3c7bf433f344568e11a82228c8ba808/a2408a4b7d47d4ba39fd822eb3268572/1791899145671/339f66cf-772c-4452-b7c6-717ae65069a4",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/e5cc95593c2414953633ae19eea06913/d014e424a2dcb0e6b284b68adad17daa/1791968106450/ccc48717-e738-46da-b22f-b8b32f10d037",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/e90eb7a5d035f0680f4beb1a6e82dd52/638b9d7ab12460f3f0dde854e414f8ec/1791800979706/64b89837-6180-4d1e-bae6-7a93e286ad9b",
+        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
+      },
+      {
+        "ref": "refs/codex/turn-diffs/checkpoints/edcc0f7ed0255ca5510faef50f1b2b39/808f17c2262cb4ff56b6edfa535e93d6/1792078872632/14ae853b-7165-4f9c-8c6f-36582edcd824",
+        "object": "0804e88b2219e980e6a7d2c563d023ce6294279c"
+      },
+      {
+        "ref": "refs/heads/Geochora",
+        "object": "abdb968ad517a87e733e87d48f8ba1d96290f978"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-m1-renderer-registry",
+        "object": "08e9a912ccf9aec2cde927d57d4bf3d67a8783c3"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s1-active-builders",
+        "object": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s2-a-consumers",
+        "object": "32bdde9573cc20f8d8b2aafa975422834df2585b"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s2-b1-consolidation",
+        "object": "bd9096ccad5cae54df0a2361d9797b2455862d49"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s2-c1-pickcube-authoring",
+        "object": "a6372099ac2055045cca16c03a0514825d635e8f"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s2-c2-nutassembly",
+        "object": "8b950e9a2f01667c6e0f4ec8d2cf06a44b9aadae"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s3-go2-retirement",
+        "object": "5b8c901135e624a248cf73d29be9a6fea70feb2b"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s4-5-a-developer-workflows",
+        "object": "59105726c6ec28f467b637b7124f667a6fdd6b52"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s4-5-b-workflow-consolidation",
+        "object": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
+      },
+      {
+        "ref": "refs/heads/codex/p2-0-b-s4-static-physics-retirement",
+        "object": "0ff2d846a36c7014d2b40a530f52d99e64266ff9"
+      },
+      {
+        "ref": "refs/heads/develop",
+        "object": "77e194e2cac1ec82f7a39255a1eef0da9cd95ba8"
+      },
+      {
+        "ref": "refs/heads/main",
+        "object": "e4e39883fbe01d4be4b172a53a535ef0095b3d64"
+      },
+      {
+        "ref": "refs/remotes/origin/Geochora",
+        "object": "abdb968ad517a87e733e87d48f8ba1d96290f978"
+      },
+      {
+        "ref": "refs/remotes/origin/agent/decouple-physbench-mcp",
+        "object": "01727a24cfd660edb4740107833b4df5cc051e03"
+      },
+      {
+        "ref": "refs/remotes/origin/archive",
+        "object": "28e890ea7bf4348e7a164df8a1affcb58490cf31"
+      },
+      {
+        "ref": "refs/remotes/origin/archive-pr11-stacked-d7c84ae",
+        "object": "d7c84ae0b7b0e446f003b6d0c7a0036c29ef8a46"
+      },
+      {
+        "ref": "refs/remotes/origin/claude/frosty-elion-adb9ae",
+        "object": "4df93319c0ad41b0da79e5e2d4da49b4574e1771"
+      },
+      {
+        "ref": "refs/remotes/origin/claude/gifted-wilson-b40331",
+        "object": "1a3de46a17e4a2fd6de2c6a543fcfb3b35ef003d"
+      },
+      {
+        "ref": "refs/remotes/origin/claude/m4-interactive-sim-session",
+        "object": "65de043063cc43acdc4c05a21cae0707cb71602d"
+      },
+      {
+        "ref": "refs/remotes/origin/claude/physbench-mcp-bridge",
+        "object": "a3da757e6db10b587e24d7c11498f94e6e82d35e"
+      },
+      {
+        "ref": "refs/remotes/origin/claude/strange-ptolemy-4d865b",
+        "object": "ad671c0e26a7922f2811ec32a48d2bf4bfd9f4ad"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/data-flywheel-integration",
+        "object": "d76fe3818bb8ddb735343a813d5a13e8d76dc01b"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/docs-chinese-readme",
+        "object": "09283e4f0ff1538fbb894ba5d9196f8f24b15034"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/feat-unified-engine-workflow",
+        "object": "79507173a4de38d115be27e3976f1b255b61dc23"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/fix-readme-docs-audit",
+        "object": "84a784418b9ee3d7392fe7c089529b7ead2b3e01"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/genesis-interactive-experiment",
+        "object": "a73453a38305508718185b9ec0898b1ca9d25d0b"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/m3-lesson-hot-channel",
+        "object": "6b0629dc3ff730055b2ab900a2542acf31a39b8e"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/mujoco-adapter",
+        "object": "9df5e4056c39e9d464bc68f7ce976a206ffb4f57"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/physpi-r1",
+        "object": "eede0069cd6bc9d96cc1d69e9a4fbddbe6d5c053"
+      },
+      {
+        "ref": "refs/remotes/origin/codex/workflow-router-skill-evolution",
+        "object": "6d27d320df174914ff10ac918e0739c931b19dba"
+      },
+      {
+        "ref": "refs/remotes/origin/docs/m2-plan-and-plain-language",
+        "object": "e140d6786f4166bc487534bf2711a99ab46b60e9"
+      },
+      {
+        "ref": "refs/remotes/origin/feat/geophys-rag",
+        "object": "588d0e25cca59197f6b98f0f91e5f5e67094536b"
+      },
+      {
+        "ref": "refs/remotes/origin/feature/builtin-knowledge-snapshots",
+        "object": "7d690c7ee297ab671148b4e10146a74ece1ca243"
+      },
+      {
+        "ref": "refs/remotes/origin/feature/geophys-integration",
+        "object": "6954aa6c0b7c5b4c631b9092588ba92018a09c24"
+      },
+      {
+        "ref": "refs/remotes/origin/feature/rag-migration",
+        "object": "dff29caa50a0d154b82151a6b372084d5dbd0794"
+      },
+      {
+        "ref": "refs/remotes/origin/fix/geophys-codex-followup",
+        "object": "f7a2e4126d1f0b30c37b513b7f00902e194a910f"
+      },
+      {
+        "ref": "refs/remotes/origin/fix/knowledge-provider-hardening",
+        "object": "34e2accf7e6868aec3f1977537659729a41d69f8"
+      },
+      {
+        "ref": "refs/remotes/origin/main",
+        "object": "759d048f3ae2a1ab21560a7846257132777a2fd1"
+      },
+      {
+        "ref": "refs/remotes/origin/refactor/astra",
+        "object": "7f1f428dd5c07993548b0d2fb1593c3495edddb5"
+      },
+      {
+        "ref": "refs/remotes/origin/refactor/drop-physbench-mcp",
+        "object": "05ad620d0c278880df60def9bde366bc2a17ea63"
+      },
+      {
+        "ref": "refs/remotes/public/develop",
+        "object": "0ff2d846a36c7014d2b40a530f52d99e64266ff9"
+      },
+      {
+        "ref": "refs/remotes/public/main",
+        "object": "e4e39883fbe01d4be4b172a53a535ef0095b3d64"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-4h-multi-backend-replay-5e7012c70a83",
+        "object": "bbe339975cf7542b4936d574c2178ce0cb5d84d9"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-d-multirate-timebase-60b51e38ff34",
+        "object": "a52ad014d46ee92bd71067b682f85d1ac0f8eae1"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-nutassembly-multirate-9331d1ec0d5a",
+        "object": "d7a7a1afdf3eca3d82056980eb199aa8e7004859"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-r1-grasp-diagnosis-dde727ff0cbe",
+        "object": "d6c0d7185a35de7e433a4fec81b42d65dd1a7424"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-r2-nutassembly-solution-c36e759e8b3c",
+        "object": "91638c29d16927f9066ffb93cf9c9969bc5b20a4"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-r2-rate-controls-c36e759e8b3c",
+        "object": "062d23ee2c7c731acffaaf5a3aadc3ee2e93313c"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-r3-nutassembly-nominal-6160ba0a8b49",
+        "object": "f060f368ed5a91dbb394fce21e4c8f8da24eb456"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-r4-dynamic-retuning-0f2290c9b25e",
+        "object": "52c8d0b0796c6d2056e5d7b5648aaab528cf1942"
+      },
+      {
+        "ref": "refs/tags/archive/p1.8/p1.8-e-r5-controller-architecture-8e914da87e1c",
+        "object": "f06f1fe561ac20dd1a9abe5a90bf1261f8cb7392"
+      },
+      {
+        "ref": "refs/tags/v1.0.0",
+        "object": "17c3100d4fabcb061c23569dea49973ebd177d51"
+      }
+    ]
+  },
+  "additional_current_receipts": [
+    {
+      "item": "S5-C1 final provider-free test log",
+      "path": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
+      "verification_required": "Copy and compare SHA-256; preserve exact log."
+    },
+    {
+      "item": "S5-C1 release gate report and publication procedure",
+      "paths": [
+        "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
+        "docs/releases/v1.1/publication_procedure_draft.md"
+      ],
+      "verification_required": "Include the exact committed and working-tree documentation state in the backup file inventory."
+    },
+    {
+      "item": "provider_free_final.log",
+      "path": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
+      "sha256": "64db2c4256dc6c4a23458fdf09f714e1c45b2fc860c3d37b809917f2df14630a",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "provider_free_final.log",
+      "path": "workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+      "sha256": "327a950d905b5a9a2f9fe99a25ad963e43fce0837bee6a6859aac9f29134a763",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "cli_and_failure_gates.log",
+      "path": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+      "sha256": "fbd78fec782001f93d58ec55c49ed2f14ea9bf835f6197896c81813538559ce5",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "cli_help_check.json",
+      "path": "workspace/maintenance/p2_0_s5_b_20261017/cli_help_check.json",
+      "sha256": "86a2b6cf52edb629ad4ff41f1015c907ee1617578adc6737dea25add663002fc",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "clean_checkout_smoke.json",
+      "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.json",
+      "sha256": "db52bda164ede8eb4024e51e672a43e378fe0476885dc7be792eb4f84942e1f1",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "clean_checkout_source_identity.json",
+      "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_source_identity.json",
+      "sha256": "178dc421bb1c826f0e42b718099a9b3ba3a6cc10b8a8cd9f4e49cca43b6edf56",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "provider_free_final.log",
+      "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+      "sha256": "8ee3e3128ae413e694aeab6e7475ffd4df207548cc543c72bdcd9971761a0fe9",
+      "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    }
+  ],
+  "verification_result": {
+    "destination_category": "NONE",
+    "destination_identity": null,
+    "copy_completion": "NOT_RUN",
+    "file_size_sha256_comparison": "NOT_RUN",
+    "git_bundle_object_verification": "NOT_RUN",
+    "submodule_recovery": "NOT_RUN",
+    "representative_h5_restore_read": "NOT_RUN",
+    "representative_evidence_restore_read": "NOT_RUN",
+    "manifest_completeness": "PREPARED; no independent copy exists to verify",
+    "final_status": "BACKUP_NOT_VERIFIED"
+  },
+  "release_candidate_document_files": [
+    {
+      "path": "docs/releases/v1.1/README.md",
+      "sha256": "170f8bfa2a931909c84c17bb7469d55dceaf835b2e8832f93dee48a1836f3f85",
+      "size_bytes": 1699
+    },
+    {
+      "path": "docs/releases/v1.1/capability_matrix.md",
+      "sha256": "b7e8899347d13d4986d931ed1ae279274361d6aecc0d8ac779efa4ca1b6d6cc5",
+      "size_bytes": 1340
+    },
+    {
+      "path": "docs/releases/v1.1/installation.md",
+      "sha256": "9e7df8d0e3a9cc8f65834b0248ef5f2c68a85b58faf1db5f7b613ee271eb2885",
+      "size_bytes": 5958
+    },
+    {
+      "path": "docs/releases/v1.1/known_limitations.md",
+      "sha256": "857990e5de257d4d3d32e39a74b28e427f0bddbace6f40a860aa3488e73376b8",
+      "size_bytes": 2594
+    },
+    {
+      "path": "docs/releases/v1.1/learning_and_rendering_limits.md",
+      "sha256": "666b9bcb4ec659be772ef72eb3656da27811648f1560f5147702404b5453a220",
+      "size_bytes": 1503
+    },
+    {
+      "path": "docs/releases/v1.1/migration.md",
+      "sha256": "fb17cabbeb492bdb7fbf6ca7a4532545a7a455cdec2c3b5f63bf98e684b14b92",
+      "size_bytes": 2861
+    },
+    {
+      "path": "docs/releases/v1.1/public_api_and_tasks.md",
+      "sha256": "e7a2f2bfa2849af0b500ee8b68333f357fce2dda9d5dc34021479437b75c2e31",
+      "size_bytes": 3174
+    },
+    {
+      "path": "docs/releases/v1.1/publication_procedure_draft.md",
+      "sha256": "82601ce4a12c8a2333a37bbc3c34a68ddb6c2c216999ef17de5b3a4a4d6d65a3",
+      "size_bytes": 4466
+    },
+    {
+      "path": "docs/releases/v1.1/release_readiness.md",
+      "sha256": "b305468d770d74d9f012e14bb2b25daac375e46ebe6a81d2169b7d3ef3724a77",
+      "size_bytes": 2989
+    },
+    {
+      "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
+      "sha256": "1d586794ce8806cefd699507fb710f4ce98480e83543bcbc6c43f490acd26d69",
+      "size_bytes": 2239
+    },
+    {
+      "path": "docs/releases/v1.1/source_recovery_manifest.json",
+      "sha256": "b341e54940d01a27af86105c0c8d2b0b47041a3c9201b289c4f82ee9c3ac8da0",
+      "size_bytes": 11933
+    },
+    {
+      "path": "docs/releases/v1.1/test_acceptance_summary.md",
+      "sha256": "d4a3a4de6cad49fd8f6b53c7cbe7ecb190869931a70cdec13b6276a423b6a909",
+      "size_bytes": 5922
+    },
+    {
+      "path": "docs/module/task_env/capability_matrix_v1_1_0_candidate.json",
+      "sha256": "39e0b930a17165bb9d0989244b1400f64f869e7ee51d9eaefc4efd8e1f1d3e76",
+      "size_bytes": 20384
+    },
+    {
+      "path": "task_env/doc/api/appendix/migration.md",
+      "sha256": "2297ebdb0640529b056cc25daa475766ed11f73ef370f36b65277ce6575bde82",
+      "size_bytes": 12011
+    },
+    {
+      "path": "README.md",
+      "sha256": "529de2ef2ce2387b02e1dc86ded106b39266bf34ad775cdbd2681908fa0c3233",
+      "size_bytes": 18561
+    },
+    {
+      "path": "task_env/README.md",
+      "sha256": "7656e63de6dc84b2074fe49749a1ee117f32e3622e5274a7a0b21a901f941855",
+      "size_bytes": 5124
+    },
+    {
+      "path": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
+      "sha256": "7b96fcca77f0187a31751b35d936b9346cf6445b0bdf985aabc1bf0de3d49e41",
+      "size_bytes": 10326
+    }
   ]
 }

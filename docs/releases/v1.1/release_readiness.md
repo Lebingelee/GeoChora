@@ -4,22 +4,21 @@
 
 | Gate | Status | Evidence / remaining condition |
 | --- | --- | --- |
-| Source integrity | **PASS WITH RECORDED LIMITATION** | Exact local ancestry reviewed through `bee498d`; selected task source files are unchanged. A relocated checkout produces a different PickCube controller identity because raw MJCF includes the checkout path; Artifact/config and normalized MJCF match. |
-| Git ancestry and protected refs | **PASS** | Freshly fetched public `develop` is `0ff2d846`; local source chain is an ancestor. `main` and annotated `v1.0.0` refs match recorded identities. Re-fetch before any integration or publication. |
-| Task/runtime regression | **PASS — TESTED_BOUNDED** | 147 tests plus 6 subtests and accepted task/provider receipts; no new full routes were needed because selected execution closures are unchanged. This is not qualification. |
-| Public API compatibility disclosure | **PASS — REVIEW REQUIRED** | Breaking identities and migration/recovery routes are listed. Maintainer must approve the final external-user migration notice before publication. |
-| Capability matrix correctness | **PASS — CANDIDATE** | v1.1.0 matrix is the sole current matrix. NutAssembly H5 hashes were reconciled against final-source reports and retained files. Maintainer review remains required. |
-| Documentation consistency | **PASS — BOUNDED** | Current target/version policy, active command paths, local links, and nine CLI help invocations were checked. Historical reports remain labeled by their original review time. |
-| Clean-checkout reproduction | **PASS — BOUNDED** | Detached `bee498d` worktree, exact two root Gitlinks, and four selected UID/provider construct/reset/close cases passed. No full routes or fresh dependency installation were run. Relocated-root controller identity variation is documented. |
-| Fresh dependency installation | **NOT_RUN** | Requirements and source-based installation steps are documented, but pip installation into a clean environment was not tested. |
-| Submodule and asset availability | **PASS — EXACT OBJECT FETCH** | Required root Gitlink identities match; exact pinned commits were fetch-dry-run resolved from both declared remotes and initialized in the disposable worktree. |
-| Evidence/H5 provenance | **PASS — RECORDED** | Accepted H5 hashes and source/config/Artifact identities are recorded. No new qualification is claimed. |
-| Independent backup verification | **BLOCKED — BACKUP_NOT_VERIFIED** | Only `/dev/sda` is available; no independent copy or restore test exists. See [backup manifest](backup_manifest.json). |
-| Version policy documentation | **PASS — RC ONLY** | `v1.1.0` is selected; policy explicitly documents breaking changes and does not claim strict SemVer. |
-| Maintainer release authorization | **MAINTAINER_DECISION_REQUIRED** | This candidate prep authorizes no merge, push, tag, `main` change, or publication. |
+| Functional integration authorization | **MAINTAINER_DECISION_REQUIRED** | Recommend the S4.5-A/B + CLI unit through `bee498d1`; no push or merge occurred. |
+| Release-document integration authorization | **MAINTAINER_DECISION_REQUIRED** | Review the S5-A/S5-B candidate docs through `2fb60de` separately. |
+| Source integrity and ancestry | **PASS** | Exact parent chain checked through `2fb60de`; the tested S5-B base had a clean tracked worktree before S5-C1 review docs were added. S5-C1 documents are maintained as a separate local review package and are not part of either integration candidate. Public `develop`, `main`, and v1.0.0 tag identities were read back. |
+| Task/runtime regression | **PASS — TESTED_BOUNDED** | 147 tests + 6 subtests; four accepted task/provider full-route receipts remain bound to their recorded source. No new routes were needed. |
+| Public API compatibility disclosure | **PASS — DISCLOSURE COMPLETE** | Breaking identities and recovery routes are in the inventory; final external migration notice still needs maintainer review. |
+| Controller portability decision | **MAINTAINER_DECISION_REQUIRED** | Recommend retaining path-sensitive identity; controller hash equality across checkout roots is not guaranteed. No controller code changed. |
+| Detached-checkout reproduction | **PASS — BOUNDED** | Existing validated environment; exact Gitlinks; four construct/reset/close cases. No full relocated regression. |
+| Fresh dependency installation | **NOT_RUN** | No clean Python environment install. Source-based commands are documented; repository packaging metadata is absent. |
+| Git submodule and asset availability | **PASS** | Exact root Gitlinks are initialized and exact commits were remotely resolvable. Panda asset bundle hashes match across tested checkouts. |
+| Evidence and source recovery | **PASS — LOCAL CHECK ONLY** | 94/94 retired source blobs, 10/10 migrated blobs, and 8/8 listed ignored H5/checkpoint files match hashes. No independent copy is implied. |
+| v1.1.0 capability matrix approval | **MAINTAINER_DECISION_REQUIRED** | One current candidate matrix; bounded results and non-claims are explicit. |
+| Independent backup verification | **BLOCKED — BACKUP_NOT_VERIFIED** | Only `/dev/sda` is available; no authorized external destination or restore verification. |
+| Maintainer publication authorization | **MAINTAINER_DECISION_REQUIRED** | No tag, `main` update, or GitHub Release is authorized here. |
 
-Release publication remains blocked by independent backup/restore verification,
-fresh dependency-install decision, final review of compatibility/capability
-documents, explicit maintainer authorization, and review of the
-checkout-root-sensitive PickCube controller identity policy. `BACKUP_NOT_VERIFIED`
-is an open release blocker.
+**Publication status: BLOCKED.** Independent backup and restore verification
+is the primary blocker. The [S5-C1 receipt](../../module/task_env/p2_0_s5_c1_final_release_gate.md)
+contains the exact refs, portability analysis, test results, and open decisions.
+See the [backup manifest](backup_manifest.json) and [S5-C2 procedure draft](publication_procedure_draft.md).
