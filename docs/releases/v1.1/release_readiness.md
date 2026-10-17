@@ -4,10 +4,11 @@
 
 Public `develop` includes the S4.5 functional unit, converter fix, and S5-B
 candidate documents through `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`.
-Local S5-C3/C4/C5/C6 records preserve the acceptance package, retention audit,
-and exact L3 retirement candidates; these updates are not remotely integrated.
-Publication remains **BLOCKED**. The previous full-workspace backup gate stays
-active until the maintainer approves a scoped retention proposal.
+The local C8 preflight and its final manifest receipts are recorded on the
+current maintenance branch; its release-governance updates and exact deletion
+manifests have not been integrated remotely. Publication remains **BLOCKED**. The previous
+full-workspace backup gate remains active because no scoped-retention waiver or
+deletion batch has been approved.
 
 | Gate | Status | Evidence / remaining condition |
 | --- | --- | --- |
@@ -24,20 +25,21 @@ active until the maintainer approves a scoped retention proposal.
 | Submodule/source recovery | **PASS — LOCAL CHECK ONLY** | Required Gitlinks are present; 94/94 retired blobs, 10/10 migrated blobs, and 8/8 enumerated H5/checkpoint hashes matched. No independent restore was performed. |
 | v1.1.0 capability matrix approval | **MAINTAINER_DECISION_REQUIRED** | One candidate matrix; four manipulation/provider intersections remain TESTED_BOUNDED, not newly qualified. |
 | Previous full-workspace backup gate | **BLOCKED — BACKUP_NOT_VERIFIED** | The earlier requirement to back up the full workspace remains active until scoped retention is explicitly approved. The prior single-disk/no-destination observation is preserved. |
-| Release metadata preservation | **PASS — LOCAL_GIT_ONLY; S5-C4/C5/C6 DOCS UNCOMMITTED** | S5-C3 L1 package is in local Git. C4/C5/C6 updates are prepared as a separate documentation commit; no public integration was authorized or performed. |
+| Release metadata preservation | **PASS — LOCAL_GIT_ONLY; C8 DOCS NOT PUBLIC** | C8 rechecked 84 tracked L1 files (1,042,038 bytes) against path, size, inode/link-count, and SHA-256 identities. The C8 documents are committed locally; no public integration was authorized or performed. |
 | Current TaskEnv raw evidence | **PASS — L2_RAW_EVIDENCE_LOCALLY_VERIFIED** | 22 selected files, 24,563,669 bytes, including six H5 files and bounded SB3/batch raw receipts; local sizes/hashes are verified. This is not an independent backup. |
 | Raw evidence backup | **BLOCKED — L2_INDEPENDENT_BACKUP_NOT_VERIFIED** | No independent copy or restore read exists; hashes cannot restore missing files. The exact L2 list is in [the evidence index](evidence/README.md). |
-| Historical workspace backup | **BLOCKED — L3_HISTORICAL_BACKUP_NOT_VERIFIED** | Qualification and historical records remain local and untouched. The inventory identifies 75,974,623,232 allocated bytes under `workspace/`; the v1.0.0 P1.6 recovery tar location is unresolved in the scanned workspace. The reduced policy would exclude L3 only after approval. |
-| Scoped retention policy and residual-risk acceptance | **MAINTAINER_DECISION_REQUIRED** | S5-C6 proposes L1_METADATA_PRESERVED / L2_CURRENT_RAW_EVIDENCE_REQUIRED / L3_HISTORICAL_RAW_RETIREMENT_ALLOWED. It does not replace the active full-workspace gate. Approval and explicit acceptance of unbacked L2/L3 risk are required first. |
-| Cleanup proposal | **CLEANUP_PENDING_APPROVAL — NO_EXECUTION_ALLOWLIST** | S5-C6 binds separate A/B/C proposals to the exact S5-C5 manifests. Every approval envelope has `execution_authorized: false`; the worktree receipts, 516 unresolved C rows, two symlinks, and external-consumer review remain holds. No bytes were reclaimed. |
+| Historical workspace backup | **BLOCKED — L3_HISTORICAL_BACKUP_NOT_VERIFIED** | Historical raw data remains local and untouched. C8 estimates 75,417,538,560 bytes (70.24 GiB) of conditional, inode-deduplicated allocation across candidate batches; this is not a verified backup or guaranteed recoverable space. The v1.0.0 P1.6 recovery archive remains unresolved. |
+| Scoped retention policy and residual-risk acceptance | **MAINTAINER_DECISION_REQUIRED** | C8 proposes `L1_METADATA_REQUIRED` / `L2_CURRENT_RAW_EVIDENCE_REQUIRED` / `L3_REVIEWED_RETIREMENT_ALLOWED`. This proposal has not replaced the full-workspace backup gate. The maintainer must explicitly approve the policy change and accept unbacked raw-data/storage risk before any waiver is recorded. |
+| Cleanup proposal | **CLEANUP_PENDING_APPROVAL — EXACT LOCAL MANIFESTS; NO DELETION** | C8 final allowlists are in ignored `workspace/maintenance/p2_0_s5_c8_20261017/`. A: 17 files / 311,296 allocated bytes; B: 6,792 approved paths / 3,317,481,472 bytes plus 3 holds; C1: 3,382 P1.8 files / 10,978,766,848 bytes plus the source-bundle holdout; C2: 62,254 paths / 61,120,978,944 bytes plus 518 holds. No batch has exact-hash authorization; actual reclaimed bytes are zero. |
+| P1.8 archive retirement | **MAINTAINER_DECISION_REQUIRED — IRREVERSIBLE LOSS REVIEWED** | The live archive reconciles to 3,298 exact common entries, 278 manifest-listed files already absent, and 85 live-only entries. The P1.8 source bundle remains held; retiring the approved portion permanently removes unbacked raw experiment data and some historical records. See the C8 loss assessment and exact C1 manifest before authorizing. |
 | Remote evidence preservation | **MAINTAINER_DECISION_REQUIRED** | No separate authorization to integrate the S5-C3 evidence commit was given; remote file/hash verification is not run. |
 | Publication authorization | **MAINTAINER_DECISION_REQUIRED** | No v1.1.0 tag, `main` change, or GitHub Release is authorized or created. |
-| L3 retention and cleanup review | **MAINTAINER_DECISION_REQUIRED** | S5-C6 validated the A/B/C manifest hashes and current path metadata. External consumers are not exhaustively checked; L3-C includes irrecoverable raw data and remains blocked. Actual reclaimed bytes: zero. |
+| L3 retention and cleanup review | **MAINTAINER_DECISION_REQUIRED** | C8 revalidated exact A/B/C1/C2 path manifests. No known active repository TaskEnv consumer was found, but external PhysPi/Skill usage has not been exhaustively checked; historical raw recovery loss remains a maintainer risk decision. Actual reclaimed bytes: zero. |
 
 The S5-C1/S5-C2 reports, proposed S5-C3 evidence package, and its review report are linked from the
-[release package](README.md). The [S5-C5 plan](../../module/task_env/p2_0_s5_c5_l3_retirement_planning.md)
-and [S5-C6 retirement preparation](../../module/task_env/p2_0_s5_c6_l3_retirement_preparation.md)
-bind exact L3 inventories to separate, non-executable approval proposals. The
-[backup manifest](backup_manifest.json) retains the previous blocked result.
-Neither the scope proposal nor cleanup is effective before explicit maintainer
-approval.
+[release package](README.md). C8 supersedes the earlier cleanup-candidate snapshot with exact local
+manifests while preserving the S5-C5/C6 inventories as historical records. The
+[C8 preflight report](evidence/retirement/c8_retention_and_cleanup_preflight.md)
+records the manifest hashes and approval boundary. The [backup manifest](backup_manifest.json)
+retains the previous blocked result. Neither the scoped-retention proposal nor cleanup is effective
+before explicit maintainer approval.
