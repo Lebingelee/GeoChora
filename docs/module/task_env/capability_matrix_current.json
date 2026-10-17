@@ -1,23 +1,8 @@
 {
   "schema": "geochora-current-reference-capability-overlay-v1",
-  "status": "S3_INTEGRATED_S4_AND_S4_5_A_LOCAL_CANDIDATES_NOT_A_RELEASE_MATRIX",
-  "local_s4_candidate": {
-    "status": "STATIC_TEMPLATE_RETIREMENT_REVIEWED_PENDING_EXPLICIT_INTEGRATION_AUTHORIZATION",
-    "base_public_develop": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
-    "active_taskenv_batch_layout": "merged_scene",
-    "retired_taskenv_route": "static_template",
-    "preserved_routes": [
-      "GeoPhys-owned GeoPhysRigidBatchRuntime adapter with unchanged limitations",
-      "generic Batch/Device/Learner and Vectorization contracts",
-      "existing Renderer implementation and registry"
-    ],
-    "qualification_inherited": false,
-    "report": "p2_0_s4_static_solver_retirement.md",
-    "recovery_manifest": "p2_0_s4_static_solver_retirement_manifest.json",
-    "local_head": "0ff2d846a36c7014d2b40a530f52d99e64266ff9"
-  },
+  "status": "S3_S4_INTEGRATED_S4_5_A_B_LOCAL_CANDIDATES_NOT_A_RELEASE_MATRIX",
   "published_release_matrix": "../../releases/v1.0/capability_matrix.json",
-  "integrated_baseline": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+  "integrated_baseline": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
   "qualification_inherited": false,
   "selected_references": [
     {
@@ -209,6 +194,88 @@
     "source_recovery": "p2_0_s4_5_a_source_recovery.json",
     "implementation_commits": [
       "5d57272d1ce7469bb214cf185137853a7eb6deb0"
-    ]
+    ],
+    "final_review_head": "59105726c6ec28f467b637b7124f667a6fdd6b52"
+  },
+  "integrated_s4": {
+    "status": "INTEGRATED_PUBLIC_DEVELOP_NOT_QUALIFIED",
+    "base_public_develop": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+    "active_taskenv_batch_layout": "merged_scene",
+    "retired_taskenv_route": "static_template",
+    "preserved_routes": [
+      "GeoPhys-owned GeoPhysRigidBatchRuntime adapter with unchanged limitations",
+      "generic Batch/Device/Learner and Vectorization contracts",
+      "existing Renderer implementation and registry"
+    ],
+    "qualification_inherited": false,
+    "report": "p2_0_s4_static_solver_retirement.md",
+    "recovery_manifest": "p2_0_s4_static_solver_retirement_manifest.json",
+    "local_head": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+    "integration": {
+      "from": "5b8c901135e624a248cf73d29be9a6fea70feb2b",
+      "to": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "method": "normal fast-forward",
+      "public_readback": "PASS",
+      "main_and_v1_0_0_unchanged": true
+    }
+  },
+  "local_s4_5_b_candidate": {
+    "status": "LOCAL_REVIEW_CANDIDATE_NOT_INTEGRATED",
+    "branch": "codex/p2-0-b-s4-5-b-workflow-consolidation",
+    "base_s4_5_a_review_head": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+    "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+    "public_develop_at_final_review": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+    "current_public_develop": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+    "workflows": [
+      "selected PickCube and guarded NutAssembly example routes retained",
+      "canonical H5 recording and provider-free offline inspection",
+      "Pendulum SB3 one-update smoke over existing runner",
+      "Pendulum scalar and merged_scene batch rasterizer examples",
+      "explicit retirement of historical single-task/camera CLI routes"
+    ],
+    "final_examples_tree": [
+      "examples/README.md",
+      "examples/_common.py",
+      "examples/learning/pendulum_sb3.py",
+      "examples/recording/inspect_h5.py",
+      "examples/recording/record_expert.py",
+      "examples/rendering/pendulum_parallel_rgb.py",
+      "examples/rendering/pendulum_single_rgb.py",
+      "examples/tasks/nut_assembly.py",
+      "examples/tasks/pick_cube.py"
+    ],
+    "provider_free_regression": "PASS: 146 tests, 6 subtests, 1 upstream Taichi locale deprecation warning, 158.32s; renderer contract fake endpoints only, not native rendering qualification.",
+    "bounded_native_results": {
+      "pendulum_single_rgb": "PASS_BOUNDED_RENDER_SMOKE_NOT_QUALIFICATION; GeoPhys CPU scalar TaskEnv/rasterizer; 32x24 finite float32 frame; one step.",
+      "pendulum_parallel_rgb": "PASS_BOUNDED_RENDER_SMOKE_NOT_QUALIFICATION; GeoPhys CPU merged_scene/rasterizer; one world, one step, 32x24.",
+      "pendulum_sb3": "PASS_BOUNDED_SMOKE_NOT_QUALIFICATION; existing SB3 runner; CPU merged_scene; 2 envs; 1 update/4 timesteps; output preserved under workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/.",
+      "nutassembly_mujoco_seed19_horizon2": "EXPECTED_INCOMPLETE; exact HEAD 929dd8f; exit 1; truncated; task_success/planned_trajectory_completed/outcome_complete/expert_complete false.",
+      "pickcube_h5_inspection": "PASS canonical H5 schema/storage/T+1 check; 470 transitions/471 boundaries; D0 NOT_ASSESSED."
+    },
+    "source_closure_unchanged": [
+      "task_env/tasks",
+      "task_env/runtime",
+      "task_env/alg",
+      "task_env/vectorization",
+      "task_env/render",
+      "task_env/objects",
+      "GeoPhys/src",
+      "GeoPhys/test"
+    ],
+    "retired_api_paths": [
+      "task_env.script.render_single",
+      "task_env.script.camera.static",
+      "task_env.script.camera.bound",
+      "task_env.script.camera_lighting_probe",
+      "task_env.script.camera._common"
+    ],
+    "source_recovery_manifest": "p2_0_s4_5_b_source_recovery.json",
+    "review_report": "p2_0_s4_5_b_workflow_consolidation.md",
+    "qualification_inherited": false,
+    "renderer_interoperability": "NOT_IMPLEMENTED",
+    "native_rsl_training": "NOT_RUN",
+    "historical_full_task_routes_rerun": false,
+    "integration_approved": false,
+    "storage": "SINGLE_SATA_BADCRC_RISK_AND_INDEPENDENT_BACKUP_LIMITATION_OPEN"
   }
 }

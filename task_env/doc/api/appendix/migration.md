@@ -57,6 +57,8 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 | `task_env.script.trajectory._task_plans` and its `_build_plan`, `_historical_build_plan`, `_pick_cube_config`, `_nut_assembly_config` helpers | Retired. Use the selected public UID with `make_env`; no old task ID is redirected. |
 | `task_env.script.trajectory.commands collect` and `--historical-grouped` | Grouped Stage 14/Phase I collection is retired. Use `task_env.script.trajectory.record` or `examples/recording/record_expert.py` for one current selected route. |
 | `task_env.script.recorder._pick_cube_config`, `_nut_assembly_config`, `_build_plan`, `_look_at_quat` | Removed from the compatibility command module. `task_env.script.recorder` now delegates only to selected expert recording. |
+| `task_env.script.planner` | Retained as a compatibility command that delegates to selected PickCube planning; it does not preserve the historical task factory. |
+| `task_env.script.recorder` | Retained as a compatibility command that delegates to `task_env.script.trajectory.record`; it does not define another recorder or H5 schema. |
 | `task_env.script.trajectory._nut_assembly_config` and `_pick_cube_config` package exports | Removed; task-owned configuration is selected by its Task Artifact and not reconstructed by a script helper. |
 | `task_env.script.trajectory.planning.*` selected routes | Kept and now construct through `make_env`; NutAssembly calls only `step_expert()`. |
 | `task_env.script.env.single_*` and `parallel_*` | Kept. The single examples use public `make_env`; parallel examples remain generic registered batch workflows. |

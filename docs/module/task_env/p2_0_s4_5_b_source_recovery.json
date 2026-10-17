@@ -1,0 +1,314 @@
+{
+  "schema": "geochora-p2-0-s4-5-b-source-recovery-v1",
+  "status": "LOCAL_REVIEW_CANDIDATE_NOT_INTEGRATED",
+  "base_s4_5_a_commit": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+  "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+  "public_develop_at_review": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+  "public_main_at_review": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+  "immutable_release_tag_object_at_review": "17c3100d4fabcb061c23569dea49973ebd177d51",
+  "retired_routes": [
+    {
+      "path": "task_env/script/render_single.py",
+      "disposition": "retired_stage_specific_cli",
+      "previous_sha256": "c2ed5ec2704fd00c1739344994807d9202cf9aca61706d61737cd9069bae1f5c",
+      "previous_git_blob": "d26ecd28e042ad03288c2aa181460548d7e1ed59",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "d26ecd28e042ad03288c2aa181460548d7e1ed59",
+      "previous_cli_or_import_identity": "python -m task_env.script.render_single [--env-id pendulum-v1|pick-cube-v1] [--mode ...] [--render-backend ...]",
+      "caller_disposition": "No current production imports/callers; docs and the old script itself were the only repository references after migration. Historical PickCube route was not retained.",
+      "current_behavior": "Explicit exit 2 with migration guidance.",
+      "replacement": "examples/rendering/pendulum_single_rgb.py for current scalar Pendulum; examples/rendering/pendulum_parallel_rgb.py for current batch Pendulum. No manipulation renderer intersection is claimed."
+    },
+    {
+      "path": "task_env/script/camera/static.py",
+      "disposition": "retired_historical_task_camera_cli",
+      "previous_sha256": "99a3abee426811b2e085110a9800ca8da420f65984c19451675ec08256ce168f",
+      "previous_git_blob": "72a020d69888dd3075523e85f324bef406162791",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "72a020d69888dd3075523e85f324bef406162791",
+      "previous_cli_or_import_identity": "python -m task_env.script.camera.static [--backend auto|cpu|vulkan|cuda]",
+      "caller_disposition": "Only imported shared helper task_env.script.camera._common; no other current callers or imports.",
+      "current_behavior": "Explicit exit 2; no replacement camera-observation route for selected manipulation tasks. CameraSpec/Camera contracts remain.",
+      "replacement": "None; use CameraSpec only on a TaskArtifact that declares camera observations."
+    },
+    {
+      "path": "task_env/script/camera/bound.py",
+      "disposition": "retired_historical_task_camera_cli",
+      "previous_sha256": "c63636c35d074a7fa68708bf1a060630de039fcf4d7faae49804134993f9f3d3",
+      "previous_git_blob": "dd33b191b24c23f21ffcb8f2fc9a4af9857c2018",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "dd33b191b24c23f21ffcb8f2fc9a4af9857c2018",
+      "previous_cli_or_import_identity": "python -m task_env.script.camera.bound [--backend auto|cpu|vulkan|cuda]",
+      "caller_disposition": "Only imported shared helper task_env.script.camera._common; no other current callers or imports.",
+      "current_behavior": "Explicit exit 2; no replacement camera-observation route for selected manipulation tasks. CameraSpec/Camera contracts remain.",
+      "replacement": "None; use CameraSpec only on a TaskArtifact that declares camera observations."
+    },
+    {
+      "path": "task_env/script/camera_lighting_probe.py",
+      "disposition": "retired_provider_private_lighting_probe",
+      "previous_sha256": "c56570540506fdd8d52adffee9255be2b67d676a3f2e6b29dc435f5b4557150f",
+      "previous_git_blob": "6e1033152cd2dd3ca7cd47737d639fb01e2f6d0b",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "6e1033152cd2dd3ca7cd47737d639fb01e2f6d0b",
+      "previous_cli_or_import_identity": "python -m task_env.script.camera_lighting_probe --mode current|legacy [--backend ...] --seed N --output PATH",
+      "caller_disposition": "No current production callers; this script was a historical PickCube probe and accessed env._sensor_provider._visualizer.",
+      "current_behavior": "Explicit exit 2; renderer internals are not exposed as a replacement public API.",
+      "replacement": "None."
+    }
+  ],
+  "removed_files": [
+    {
+      "path": "task_env/script/camera/_common.py",
+      "disposition": "deleted_historical_camera_helper",
+      "previous_sha256": "bd3c42e692b42e0f9729a9ee434925d277f746fc5ef2f00a8ec627cb8e85f6a3",
+      "previous_git_blob": "b4b1a0d6dabc3cd1e5ae47501ac8500b5c32b772",
+      "recovery_ref": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+      "recovery_git_blob": "b4b1a0d6dabc3cd1e5ae47501ac8500b5c32b772",
+      "previous_cli_or_import_identity": "task_env.script.camera._common.camera_config/_image/run_camera",
+      "caller_disposition": "The only executable importers were the retired camera.static and camera.bound entry points. Repository search found no remaining production importer.",
+      "current_behavior": "Deleted.",
+      "replacement": "None; generic CameraSpec and camera observation APIs remain separate."
+    }
+  ],
+  "implementation_source_migrations": [
+    {
+      "path": "examples/_common.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "2b60ee9ead3cbc1628b18bb626e3f18e5a5cf1f771de0611bddbca5b8d168f4a",
+      "base_git_blob": "e895584b8302b8b954d79124efc55582c2d233f6",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "b2eaffc08ecf7735a209ddc680594ee3cc21a553f07a4f5550ebb3a5bb5d7308",
+      "current_git_blob": "8b7a85859096dca0aabcf9f2cede211c54751ccd",
+      "change": "Clarifies Linux per-process RLIMIT_AS, per-process CPU-time limits, coordinator wall alarm and explicit scope; no process-tree RSS claim."
+    },
+    {
+      "path": "examples/tasks/pick_cube.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "f6e8908ac687f67bde49e896f00db771b0383202ac244f728d6d4828907ecef1",
+      "base_git_blob": "071dff163364f62e8af3a9689e295c43fd40235e",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "8953a9d911140060f1c5039fb6e6bdd66c248d65806d7185bd47039984385d62",
+      "current_git_blob": "4dd0a5325850a6243ab2eefe099138e5e931eb23",
+      "change": "Adds --address-space-limit-mb spelling while preserving --memory-limit-mb alias; both mean per-process RLIMIT_AS."
+    },
+    {
+      "path": "examples/tasks/nut_assembly.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "11377020c4f3fb9da0b4a4865a3fb79b32fc968c280d2df9f52a1ae3c2e2ce5f",
+      "base_git_blob": "80ea294f6cf0fcdbf9d45e24891d421effd54b8d",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "b9c88d7245583199592c1bbc6f5c4f5fb408647aa247e829761b56c333996f57",
+      "current_git_blob": "ee80ba2ec660ee7c3cdd0dfaa090c1e813461865",
+      "change": "Adds --address-space-limit-mb spelling while preserving --memory-limit-mb alias; both mean per-process RLIMIT_AS."
+    },
+    {
+      "path": "examples/recording/record_expert.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "c6b2810882657efbeadab4fcb143c270688010940bb1182875a6f44fbe9bf786",
+      "base_git_blob": "a2399cb173654e9ccffb10d2a69be8af322725fb",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "ec94b507324c34c05f0c6fda9830fe774ec6c7800d5220ff38fcfe49238c61a0",
+      "current_git_blob": "2dcc79190e7da0fe8893d626c20748810bf03581",
+      "change": "Adds --address-space-limit-mb spelling while preserving --memory-limit-mb alias; both mean per-process RLIMIT_AS."
+    },
+    {
+      "path": "task_env/script/render_parallel.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "a1def4b449a22e3fe0e03d058b4f6d3846fab50df5934db25fee52e98008dcef",
+      "base_git_blob": "67658bb80b0114fb016c3e2b78666f67678b3aba",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "c8c84d6c04aea61a903d5c97761ffa339a3c61db15288ddcbfb6b078e887bb64",
+      "current_git_blob": "3e1f8e55df1682271b5ffd399987313381700f14",
+      "change": "Adds optional argv argument to existing main for wrapper delegation. The CLI defaults/flags and return behavior remain unchanged."
+    },
+    {
+      "path": "task_env/script/rl/pendulum_ppo.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "8aa79037778dcf0528b6bed9766856843a1dff751453cfa106cac625c535324d",
+      "base_git_blob": "35d78921a3c70e933f3aee544f55a2e28d2cf467",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "0c5050b941bcc3a1131b135f397b546422e5dabf12789ee235ce64e215cafaed",
+      "current_git_blob": "932dfb9a118ce044874c2498c0d53a050bfc289a",
+      "change": "Adds optional argv argument to existing main for the bounded wrapper. Existing runner, defaults, algorithm and return behavior remain unchanged."
+    },
+    {
+      "path": "task_env/script/render_single.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "c2ed5ec2704fd00c1739344994807d9202cf9aca61706d61737cd9069bae1f5c",
+      "base_git_blob": "d26ecd28e042ad03288c2aa181460548d7e1ed59",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "61c8bc32cc23ce7dd376a92c51cc3c6a5c3772de587b29f51ee247f161aa8b36",
+      "current_git_blob": "9fac811eb90031627c777c416278fcb73ddb4bb8",
+      "change": "Historical CLI replaced by explicit retirement stub; no silent task-ID redirection."
+    },
+    {
+      "path": "task_env/script/camera/static.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "99a3abee426811b2e085110a9800ca8da420f65984c19451675ec08256ce168f",
+      "base_git_blob": "72a020d69888dd3075523e85f324bef406162791",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "3beec4c55490b6a4b9d9881d7b2ad1af7ef88ec85ad28a72f789a43758906c08",
+      "current_git_blob": "9c242990e2b782809a866752f056fb2336d7584c",
+      "change": "Historical CLI replaced by explicit retirement stub; no alias to a current task."
+    },
+    {
+      "path": "task_env/script/camera/bound.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "c63636c35d074a7fa68708bf1a060630de039fcf4d7faae49804134993f9f3d3",
+      "base_git_blob": "dd33b191b24c23f21ffcb8f2fc9a4af9857c2018",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "9e0f7de48a599814d1404b168d3919b9adcde87c205a836a265d6f7f2818113c",
+      "current_git_blob": "747f97b13e85f898c3923f303f88bc82291739c6",
+      "change": "Historical CLI replaced by explicit retirement stub; no alias to a current task."
+    },
+    {
+      "path": "task_env/script/camera_lighting_probe.py",
+      "base_ref": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "base_sha256": "c56570540506fdd8d52adffee9255be2b67d676a3f2e6b29dc435f5b4557150f",
+      "base_git_blob": "6e1033152cd2dd3ca7cd47737d639fb01e2f6d0b",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "current_sha256": "c54700350e3ebd384f0610da02b50c02c258299aef34beda48a7c6d9e9eb5502",
+      "current_git_blob": "73d0c65d284cf95c4ed3a07f67c4f2ea9416185e",
+      "change": "Provider-private historical probe replaced by explicit retirement stub."
+    }
+  ],
+  "new_workflows": [
+    {
+      "path": "examples/learning/pendulum_sb3.py",
+      "workflow": "learning_smoke",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "git_blob": "d0d9e2a56788acf3803ac629ed4830a968494501",
+      "sha256": "d41978d8ef89f2e15d985821f42d61814b7ec38fa45bc9767762e7eff282e85c",
+      "capability_intersection": "Pendulum-v1 / GeoPhys CPU / merged_scene batch / existing SB3 PPO runner",
+      "validation_result": "PASS_BOUNDED_SMOKE_NOT_QUALIFICATION: one update, 4 timesteps, 2 environments; no convergence/qualification claim."
+    },
+    {
+      "path": "examples/recording/inspect_h5.py",
+      "workflow": "offline_recording_inspection",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "git_blob": "f8aa323d6cd182bcffcdc126edf00768c46108b7",
+      "sha256": "e3428196db14cd01e68f33f83ef005724e33af325929036e9171d1fdb64d38d3",
+      "capability_intersection": "Canonical TaskEnv H5 reader; provider-free",
+      "validation_result": "PASS for the accepted PickCube recording; validates schema/storage and T+1 boundaries, not D0."
+    },
+    {
+      "path": "examples/rendering/pendulum_parallel_rgb.py",
+      "workflow": "render_smoke",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "git_blob": "ed4b899e66c8da020c021b8accc74bd847354369",
+      "sha256": "36e0b10213e1c3d72b9333703794ad87a5a64fbdf44753e860af31cb1501c978",
+      "capability_intersection": "Pendulum / GeoPhys CPU / merged_scene batch / rasterizer RGB",
+      "validation_result": "PASS_BOUNDED_RENDER_SMOKE_NOT_QUALIFICATION: one world, one step, 32x24."
+    },
+    {
+      "path": "examples/rendering/pendulum_single_rgb.py",
+      "workflow": "render_smoke",
+      "implementation_commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "git_blob": "c1a3c1c3ac3279493cbc0dc2b44c235986a07499",
+      "sha256": "8c52f501e4ef67d81cb695e6d4fc99623685a600d8d143903a64174ea1093a51",
+      "capability_intersection": "Pendulum / GeoPhys CPU / scalar TaskEnv / rasterizer RGB",
+      "validation_result": "PASS_BOUNDED_RENDER_SMOKE_NOT_QUALIFICATION: one render and one step, 32x24."
+    }
+  ],
+  "retained_entry_points": [
+    {
+      "identity": "task_env.script.render_parallel",
+      "disposition": "retained_current_pendulum_batch_route",
+      "caller": "examples/rendering/pendulum_parallel_rgb.py plus documented direct CLI",
+      "limits": "GeoPhys CPU, merged_scene, rasterizer RGB bounded smoke only; other renderer/provider/headed display intersections unverified."
+    },
+    {
+      "identity": "task_env.script.render_input_probe",
+      "disposition": "retained_standalone_taichi_forge_input_probe",
+      "caller": "manual developer probe only",
+      "limits": "does not construct TaskEnv or test Physics x Renderer."
+    },
+    {
+      "identity": "task_env.script.rl.rsl_ppo",
+      "disposition": "retained_generic_rsl_cli",
+      "caller": "explicit --env-id required; provider/batch/learner admission remains fail-closed",
+      "limits": "no RSL training run performed; no Go2 replacement or manipulation PPO target."
+    },
+    {
+      "identity": "task_env.script.trajectory.convert/replay/merge",
+      "disposition": "retained_generic_offline_utilities",
+      "caller": "existing public/offline routes unchanged",
+      "limits": "historical replay, selected-source reexecution and H5 inspection remain distinct; no D0 claim."
+    },
+    {
+      "identity": "task_env.script.env.single_* / parallel_*",
+      "disposition": "retained_current_task_and_batch_construction_utilities",
+      "caller": "documented current Pendulum routes; selected task examples use public make_env directly",
+      "limits": "No unrelated generic environment utility was retired."
+    },
+    {
+      "identity": "task_env.script.planner",
+      "disposition": "retained_pickcube_planning_compatibility_entry_point",
+      "caller": "imports task_env.script.trajectory.planning.pick_cube.main",
+      "limits": "Compatibility wrapper only; not a second builder or historical task factory."
+    },
+    {
+      "identity": "task_env.script.trajectory.planning.pick_cube / nut_assembly",
+      "disposition": "retained_selected_expert_planning_routes",
+      "caller": "selected public task routes; NutAssembly uses guarded step_expert",
+      "limits": "No task execution-source change."
+    },
+    {
+      "identity": "task_env.script.recorder",
+      "disposition": "retained_selected_recording_compatibility_entry_point",
+      "caller": "delegates directly to task_env.script.trajectory.record.main",
+      "limits": "No duplicate recorder or H5 schema."
+    },
+    {
+      "identity": "task_env.script.stage11 / stage11_socket",
+      "disposition": "already_explicitly_retired_in_S4_5_A",
+      "caller": "no active caller; old source recovery is in p2_0_s4_5_a_source_recovery.json",
+      "limits": "Not modified in S4.5-B."
+    }
+  ],
+  "current_code_callers": {
+    "retired_camera_helper": "Only the two retired camera entry points imported it; no remaining imports found.",
+    "retired_cli_paths": "No active current-production imports or consumers found; remaining mentions are explicit retired stubs, migration docs and negative regression tests.",
+    "search_basis": "CodeGraph exploration of renderer/task entry points plus repository-wide rg on retired module identities.",
+    "retained_routes": "planner.py delegates to selected PickCube planning; recorder.py delegates to selected trajectory.record; env utilities and trajectory planning/convert/replay/merge were retained. Stage11 entry points were already explicit retired stubs from S4.5-A."
+  },
+  "api_migrations": [
+    {
+      "identity": "task_env.script.render_single",
+      "change": "Historical CLI options/behavior retired; direct invocation exits 2. Use current Pendulum scalar or batch examples. Old pick-cube-v1 route is not redirected."
+    },
+    {
+      "identity": "task_env.script.camera.static / task_env.script.camera.bound / task_env.script.camera_lighting_probe",
+      "change": "Historical command behaviors retired with exit 2; no task ID, camera route, or private renderer behavior is aliased."
+    },
+    {
+      "identity": "task_env.script.camera._common",
+      "change": "Removed private historical helper module; recovery blob recorded above."
+    },
+    {
+      "identity": "task_env.script.render_parallel.main / task_env.script.rl.pendulum_ppo.main",
+      "change": "Optional argv accepted for wrapper calls. Default CLI arguments and return semantics preserved; no algorithm/runtime behavior change."
+    },
+    {
+      "identity": "examples/tasks/* and examples/recording/record_expert.py resource options",
+      "change": "--address-space-limit-mb added; previous --memory-limit-mb remains an alias with clarified virtual-address-space semantics."
+    }
+  ],
+  "protected_source_closures_unchanged_from_s4_5_a": [
+    "task_env/tasks",
+    "task_env/runtime",
+    "task_env/alg",
+    "task_env/vectorization",
+    "task_env/render",
+    "task_env/objects",
+    "GeoPhys/src",
+    "GeoPhys/test",
+    "docs/releases",
+    "docs/evidence",
+    "task_env/recorders",
+    "task_env/artifacts",
+    "task_env/trajectory"
+  ],
+  "qualification_inherited": false,
+  "storage_risk": "OPEN: known single-disk SATA/BadCRC risk and lack of verified independent backup remain unresolved; no new matching kernel I/O error was observed in the 45-minute scan."
+}
