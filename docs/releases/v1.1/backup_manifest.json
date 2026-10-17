@@ -2,7 +2,7 @@
   "schema": "geochora-v1-1-release-candidate-backup-manifest-v1",
   "status": "BACKUP_NOT_VERIFIED",
   "target_release": "v1.1.0",
-  "reason": "BACKUP_NOT_VERIFIED: only one physical disk (/dev/sda) is available and no independent physical device or authorized controlled external destination was identified. No copy or restore test was attempted.",
+  "reason": "BACKUP_NOT_VERIFIED: no authorized independent destination was identified. Source and required ignored workspace are on the single physical /dev/sda. No copy or restore test was attempted.",
   "source_storage_observation": {
     "physical_device": "/dev/sda",
     "known_risk": "/dev/sda / ata5 BadCRC and READ I/O errors recorded in prior maintenance evidence",
@@ -19,7 +19,7 @@
   "required_backup_scope": [
     {
       "item": "v1.1.0 release-candidate source and all local/unpushed commits/refs",
-      "identity": "candidate code bee498d1d784015f034c5b4af34320fdffa61411 plus review/docs chain and S5-B documentation commit",
+      "identity": "Code candidate bee498d1d784015f034c5b4af34320fdffa61411; integrated public docs 2fb60de7851bf2e5651c2dc99fff7451c16e1a94; local S5-C1 documentation commit 2f8555a4c86470fb63cd2386a6e88729d4795a23; all refs captured by root and submodule --all bundles.",
       "verification_required": "Bundle refs and Git objects; verify commit and tree identities after copy."
     },
     {
@@ -49,8 +49,13 @@
       "verification_required": "Copy and hash each listed file; restore/read representative H5 and checkpoint from backup."
     },
     {
+      "item": "Ignored historical qualification Evidence and maintenance receipts",
+      "identity": "Preserve workspace/qualification/ (about 62 GB), workspace/maintenance/ (about 3.5 GB), and the remaining workspace/ data (workspace total about 71 GB). This covers Phase-I qualification outputs and S3/S4/S4.5/S5 maintenance receipts; the full workspace is retained as the conservative scope.",
+      "verification_required": "Inventory files and sizes before transfer; compare SHA-256 for the complete copied set; restore/read representative historical qualification Evidence and maintenance receipts. Do not rely only on the eight-item H5 list."
+    },
+    {
       "item": "Candidate documentation and test receipts",
-      "identity": "docs/releases/v1.1, candidate matrix, S5-A reports, and workspace/maintenance/p2_0_s5_a_20261017 receipts",
+      "identity": "docs/releases/v1.1, docs/module/task_env/capability_matrix_v1_1_0_candidate.json, source/migration manifests, S5-A/B/C1/C2 reports and all named workspace/maintenance receipts.",
       "verification_required": "Hash after copy and validate JSON, Markdown links, and test logs from the copied source."
     },
     {
@@ -103,7 +108,7 @@
         "command": "git -C asset/external/mujoco_menagerie bundle create /AUTHORIZED/INDEPENDENT/DESTINATION/mujoco-menagerie-v1.1.0-rc.bundle --all"
       }
     ],
-    "all_current_refs_captured_below": "Use --all bundles at backup time; the attached snapshot lists the 64 refs present during the S5-C1 baseline check. The `--all` bundle captures refs created afterward as well. Include current S5-C1 tracked documentation changes and ignored evidence files in the file-copy inventory.",
+    "all_current_refs_captured_below": "The static snapshot lists named repository refs and excludes automatically generated ephemeral refs/codex/turn-diffs checkpoints. At actual backup time, the --all bundles capture every ref present, including transient refs.",
     "required_restore_reads": [
       "root Git bundle and protected v1.0.0 tag/tree",
       "GeoPhys and Menagerie pinned Gitlink objects",
@@ -121,54 +126,20 @@
       "e0e4dbcbc3dc9d17d0dec58142be5cfb20937e73",
       "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
     ],
-    "working_tree_state": "The 2fb60de S5-B base commit had a clean tracked tree before the separate S5-C1 documentation package was created. Preserve the S5-C1 package independently from the functional and S5-B integration targets."
+    "working_tree_state": "S5-C1 is preserved as separate local documentation-only commit 2f8555a4c86470fb63cd2386a6e88729d4795a23 (parent 2fb60de). The S5-C2 report/readiness changes are local and must be included as files or a patch in addition to Git bundles.",
+    "destination_type": "NONE_IDENTIFIED_OR_AUTHORIZED",
+    "authorized_path_or_endpoint": null,
+    "destination_capacity": "UNKNOWN; no independent target is available for inspection.",
+    "access_security": "No destination credentials or private access tokens were provided or used. Do not select an external service without maintainer approval.",
+    "pre_copy_scope": "Full conservative scope is about 74 GB before overhead; source files are on /dev/sda and no independent target capacity can be checked."
   },
   "local_ref_snapshot_at_check": {
-    "count": 64,
+    "count": 54,
+    "excluded_from_static_snapshot": "refs/codex/turn-diffs/* are automatically generated ephemeral Codex turn checkpoints; git bundle --all at backup time captures all refs then present.",
     "refs": [
       {
         "ref": "refs/archive/p1.8/integration-report-staging-abed234",
         "object": "abed2345d496124206d47fb6ca5260e7aa5e81fe"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/captures/1792232784674/9ac815f3-e7ee-44b1-90c6-db6b46afaea7/base",
-        "object": "36544b39cf2ba5e6568d6081ff7851c1dd041a23"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/418d4a97f19fd13bab9ce1b394b0951e/0d924c5d2005ab01b8fcbc092a55414e/1792227592250/603d6c1c-0c0d-47dc-a645-701a8bf62d29",
-        "object": "36544b39cf2ba5e6568d6081ff7851c1dd041a23"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/4ad8a86d9e3a158ee3f7cca9393af871/644146ef6a8293fd03003f90016f3599/1791869291155/1ebbc683-7617-4c41-97b0-e488a73c33ec",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/5fccf31bb985b1ecfba1ab3746daf8d8/785aa71c66bde0a9e9046c59af4f0634/1792061696321/ce887d0a-c7d7-4fd0-aa35-e7f3bddd7306",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/963cf0f1e19ddc825cd41ac76f0c602b/f9c7cad93133305c3de5beecda9ea903/1792036416530/a11c17ed-4777-4dc8-a28e-1e48910c76ea",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/c3fe95e31030c757d5e1be70c05fe0f1/1464b4e037d3de72dc18db7efadf498e/1791882725493/06649c92-e98a-4c90-8504-c502c58d11d3",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/e3c7bf433f344568e11a82228c8ba808/a2408a4b7d47d4ba39fd822eb3268572/1791899145671/339f66cf-772c-4452-b7c6-717ae65069a4",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/e5cc95593c2414953633ae19eea06913/d014e424a2dcb0e6b284b68adad17daa/1791968106450/ccc48717-e738-46da-b22f-b8b32f10d037",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/e90eb7a5d035f0680f4beb1a6e82dd52/638b9d7ab12460f3f0dde854e414f8ec/1791800979706/64b89837-6180-4d1e-bae6-7a93e286ad9b",
-        "object": "5de9e37f897796f9baabc9a334f39353971ba2cd"
-      },
-      {
-        "ref": "refs/codex/turn-diffs/checkpoints/edcc0f7ed0255ca5510faef50f1b2b39/808f17c2262cb4ff56b6edfa535e93d6/1792078872632/14ae853b-7165-4f9c-8c6f-36582edcd824",
-        "object": "0804e88b2219e980e6a7d2c563d023ce6294279c"
       },
       {
         "ref": "refs/heads/Geochora",
@@ -208,7 +179,7 @@
       },
       {
         "ref": "refs/heads/codex/p2-0-b-s4-5-b-workflow-consolidation",
-        "object": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
+        "object": "2f8555a4c86470fb63cd2386a6e88729d4795a23"
       },
       {
         "ref": "refs/heads/codex/p2-0-b-s4-static-physics-retirement",
@@ -336,7 +307,7 @@
       },
       {
         "ref": "refs/remotes/public/develop",
-        "object": "0ff2d846a36c7014d2b40a530f52d99e64266ff9"
+        "object": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
       },
       {
         "ref": "refs/remotes/public/main",
@@ -439,6 +410,30 @@
       "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
       "sha256": "8ee3e3128ae413e694aeab6e7475ffd4df207548cc543c72bdcd9971761a0fe9",
       "verification_required": "Copy and compare this exact SHA-256; then perform required restore read where applicable."
+    },
+    {
+      "item": "S5-C2 successful provider-free suite",
+      "path": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log",
+      "sha256": "077f593c60258c00ffc3eb9c693b1a3c97c695d10c8d0b7acec1335bf9c0f8b2",
+      "verification_required": "Copy and compare exact SHA-256; preserve the output and verify restore where applicable."
+    },
+    {
+      "item": "S5-C2 initial Python environment error (not a test)",
+      "path": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_default_python_attempt.log",
+      "sha256": "8f91a1b257819261d8fbd1b08a6a9865e2a2523dc022f61c6b04e1178c56f72e",
+      "verification_required": "Copy and compare exact SHA-256; preserve the output and verify restore where applicable."
+    },
+    {
+      "item": "S5-C2 functional integration receipt",
+      "path": "workspace/maintenance/p2_0_s5_c2_20261017/functional_integration_receipt.json",
+      "sha256": "0e0c3e27cc641ae7d721fa5844d8242940a97abc4941b08d1ea54ba4649f16ba",
+      "verification_required": "Copy and compare exact SHA-256; preserve the output and verify restore where applicable."
+    },
+    {
+      "item": "S5-C2 documentation integration receipt",
+      "path": "workspace/maintenance/p2_0_s5_c2_20261017/documentation_integration_receipt.json",
+      "sha256": "35d668adcd3687cda46fa089352745cf1b63a6c218655f24fc4e66ed30d8e8e8",
+      "verification_required": "Copy and compare exact SHA-256; preserve the output and verify restore where applicable."
     }
   ],
   "verification_result": {
@@ -450,14 +445,14 @@
     "submodule_recovery": "NOT_RUN",
     "representative_h5_restore_read": "NOT_RUN",
     "representative_evidence_restore_read": "NOT_RUN",
-    "manifest_completeness": "PREPARED; no independent copy exists to verify",
+    "manifest_completeness": "PREPARED; all enumerated local artifact/document hashes and named refs checked. No independent copy exists to verify.",
     "final_status": "BACKUP_NOT_VERIFIED"
   },
   "release_candidate_document_files": [
     {
       "path": "docs/releases/v1.1/README.md",
-      "sha256": "170f8bfa2a931909c84c17bb7469d55dceaf835b2e8832f93dee48a1836f3f85",
-      "size_bytes": 1699
+      "sha256": "95474c0d7f4d7410685fcf125e69dcc043f1bbfc9314ceb309026fa12db635a4",
+      "size_bytes": 2053
     },
     {
       "path": "docs/releases/v1.1/capability_matrix.md",
@@ -491,13 +486,13 @@
     },
     {
       "path": "docs/releases/v1.1/publication_procedure_draft.md",
-      "sha256": "82601ce4a12c8a2333a37bbc3c34a68ddb6c2c216999ef17de5b3a4a4d6d65a3",
-      "size_bytes": 4466
+      "sha256": "79159ee5597b54d59e5237ff06e429832733b6e4e13118d5ad6cf170d228ba28",
+      "size_bytes": 2823
     },
     {
       "path": "docs/releases/v1.1/release_readiness.md",
-      "sha256": "b305468d770d74d9f012e14bb2b25daac375e46ebe6a81d2169b7d3ef3724a77",
-      "size_bytes": 2989
+      "sha256": "4ccd33ba7a227b890aac9ba261f1bf68022e6e2900f6d969358610b651020e33",
+      "size_bytes": 3287
     },
     {
       "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
@@ -505,19 +500,24 @@
       "size_bytes": 2239
     },
     {
+      "path": "docs/releases/v1.1/s5_c3_publication_checklist_draft.md",
+      "sha256": "b1555c0cc074b87c7fe1d3d4fcdaf0068b2c3aec515f15225a61c5cd883fd11d",
+      "size_bytes": 3214
+    },
+    {
       "path": "docs/releases/v1.1/source_recovery_manifest.json",
-      "sha256": "b341e54940d01a27af86105c0c8d2b0b47041a3c9201b289c4f82ee9c3ac8da0",
-      "size_bytes": 11933
+      "sha256": "4744f8f9d10fe13ffbbdc2a25a5a907619f22fe727678e2fdd40b653049d88f4",
+      "size_bytes": 14742
     },
     {
       "path": "docs/releases/v1.1/test_acceptance_summary.md",
-      "sha256": "d4a3a4de6cad49fd8f6b53c7cbe7ecb190869931a70cdec13b6276a423b6a909",
-      "size_bytes": 5922
+      "sha256": "7db32d1a5f8dd047cc0800fbedd1a2b8eec3cbed70d4c4a08e4b6ca8c89f57be",
+      "size_bytes": 6722
     },
     {
       "path": "docs/module/task_env/capability_matrix_v1_1_0_candidate.json",
-      "sha256": "39e0b930a17165bb9d0989244b1400f64f869e7ee51d9eaefc4efd8e1f1d3e76",
-      "size_bytes": 20384
+      "sha256": "229ca3ca9d01c17731c54297c83a79bf21138d6762c19c4ce78df78c52b9eb57",
+      "size_bytes": 20955
     },
     {
       "path": "task_env/doc/api/appendix/migration.md",
@@ -526,8 +526,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "529de2ef2ce2387b02e1dc86ded106b39266bf34ad775cdbd2681908fa0c3233",
-      "size_bytes": 18561
+      "sha256": "9eea691c9f4fb5711b4c2aff01a8671acca121d9a02c752fa7d1c044cce99d5b",
+      "size_bytes": 18626
     },
     {
       "path": "task_env/README.md",
@@ -538,6 +538,30 @@
       "path": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
       "sha256": "7b96fcca77f0187a31751b35d936b9346cf6445b0bdf985aabc1bf0de3d49e41",
       "size_bytes": 10326
+    },
+    {
+      "path": "docs/module/task_env/p2_0_s5_c2_public_integration_readiness.md",
+      "sha256": "2b2d7c4e98d8e1522d2449de8fab89d4c2370de694497e988b715d769fae876a",
+      "size_bytes": 6867
     }
-  ]
+  ],
+  "public_integration_snapshot": {
+    "public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "local_s5_c1_document_commit": "2f8555a4c86470fb63cd2386a6e88729d4795a23",
+    "local_s5_c1_commit_parent": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
+  },
+  "volume_assessment": {
+    "workspace_total": "about 71 GB",
+    "workspace_qualification": "about 62 GB",
+    "workspace_maintenance": "about 3.5 GB",
+    "root_git_object_database": "about 690 MB",
+    "GeoPhys_checkout": "about 188 MB",
+    "mujoco_menagerie_checkout": "about 1.8 GB",
+    "conservative_full_set_estimate": "about 74 GB before bundle overhead and safety margin, if all workspace, root objects, and required submodule trees are included.",
+    "local_free_space": "about 492 GB on /home, same physical /dev/sda; not an independent destination.",
+    "independent_destination_capacity": "UNKNOWN; no destination exists/authorized."
+  }
 }

@@ -29,6 +29,11 @@ was established.
 
 ## Provider-free preflight
 
+### S5-C2 rerun on the integrated candidate source
+
+- **PASS:** `PYTHONPATH=GeoPhys/src:. /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q task_env/diagnostics/tasks task_env/diagnostics/render/test_backend_registry.py` on code/document target `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`, Python 3.12.14: **147 passed, 6 subtests passed, 1 upstream Taichi locale deprecation warning, 160.07 s**. Receipt: `workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log`.
+- **NOT_RUN / environment error:** the first shell invocation selected the default Python 3.14.7 environment, where pytest is not installed. The observed output and exit code are preserved separately at `workspace/maintenance/p2_0_s5_c2_20261017/provider_free_default_python_attempt.log`. This is not a test result.
+
 - **PASS:** 147 tests and 6 subtests, 155.10 s, at the exact patch committed as
   `bee498d`; one upstream Taichi locale deprecation warning. Log:
   `workspace/maintenance/p2_0_s5_a_20261017/provider_free_final.log`.

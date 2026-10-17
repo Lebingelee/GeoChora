@@ -2,23 +2,27 @@
 
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 
+Public `develop` now includes the S4.5 functional unit, converter fix, and S5-B
+candidate documents through `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`.
+Publication remains **BLOCKED**.
+
 | Gate | Status | Evidence / remaining condition |
 | --- | --- | --- |
-| Functional integration authorization | **MAINTAINER_DECISION_REQUIRED** | Recommend the S4.5-A/B + CLI unit through `bee498d1`; no push or merge occurred. |
-| Release-document integration authorization | **MAINTAINER_DECISION_REQUIRED** | Review the S5-A/S5-B candidate docs through `2fb60de` separately. |
-| Source integrity and ancestry | **PASS** | Exact parent chain checked through `2fb60de`; the tested S5-B base had a clean tracked worktree before S5-C1 review docs were added. S5-C1 documents are maintained as a separate local review package and are not part of either integration candidate. Public `develop`, `main`, and v1.0.0 tag identities were read back. |
-| Task/runtime regression | **PASS — TESTED_BOUNDED** | 147 tests + 6 subtests; four accepted task/provider full-route receipts remain bound to their recorded source. No new routes were needed. |
-| Public API compatibility disclosure | **PASS — DISCLOSURE COMPLETE** | Breaking identities and recovery routes are in the inventory; final external migration notice still needs maintainer review. |
-| Controller portability decision | **MAINTAINER_DECISION_REQUIRED** | Recommend retaining path-sensitive identity; controller hash equality across checkout roots is not guaranteed. No controller code changed. |
-| Detached-checkout reproduction | **PASS — BOUNDED** | Existing validated environment; exact Gitlinks; four construct/reset/close cases. No full relocated regression. |
-| Fresh dependency installation | **NOT_RUN** | No clean Python environment install. Source-based commands are documented; repository packaging metadata is absent. |
-| Git submodule and asset availability | **PASS** | Exact root Gitlinks are initialized and exact commits were remotely resolvable. Panda asset bundle hashes match across tested checkouts. |
-| Evidence and source recovery | **PASS — LOCAL CHECK ONLY** | 94/94 retired source blobs, 10/10 migrated blobs, and 8/8 listed ignored H5/checkpoint files match hashes. No independent copy is implied. |
-| v1.1.0 capability matrix approval | **MAINTAINER_DECISION_REQUIRED** | One current candidate matrix; bounded results and non-claims are explicit. |
-| Independent backup verification | **BLOCKED — BACKUP_NOT_VERIFIED** | Only `/dev/sda` is available; no authorized external destination or restore verification. |
-| Maintainer publication authorization | **MAINTAINER_DECISION_REQUIRED** | No tag, `main` update, or GitHub Release is authorized here. |
+| Functional integration | **PASS** | Normal fast-forward from `0ff2d846` to `bee498d1d784015f034c5b4af34320fdffa61411`; public readback matched. |
+| Release-document integration | **PASS** | Normal fast-forward from `bee498d1` to `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`; public readback matched. S5-C1 documentation commit `2f8555a4c86470fb63cd2386a6e88729d4795a23` and S5-C2 report updates remain local. |
+| Protected refs and ancestry | **PASS** | Public `main` is `e4e39883fbe01d4be4b172a53a535ef0095b3d64`; annotated v1.0.0 tag object `17c3100d4fabcb061c23569dea49973ebd177d51`, peeled commit `42787f5e4f658a3f81fdd2140cf7544d6342c783`; all unchanged after both integrations. |
+| Source identity / selected task closure | **PASS — LOCAL CHECK** | Selected task, controller, runtime, provider, and object-owner sources did not change in `bee..2fb`; exact task identities remain listed in the candidate matrix. |
+| Bounded functional regression | **PASS — TESTED_BOUNDED** | S5-C2 rerun at `2fb60de`, Python 3.12.14: 147 passed, 6 subtests passed, one upstream warning, 160.07 s. No new native route was run. |
+| API migration disclosure | **PASS — DISCLOSURE COMPLETE** | Breaking task UID, imports, runtime options, and CLI changes are documented; release-notice approval remains separate. |
+| Controller identity decision | **MAINTAINER_DECISION_REQUIRED** | Recommend Option B: retain current path-sensitive controller identity. Cross-checkout equality is not guaranteed; no relocated native rollout. |
+| Existing-environment detached checkout | **PASS — BOUNDED** | Exact Gitlinks and construct/reset/close smokes for both tasks/providers; no full route. |
+| Fresh Python dependency installation | **NOT_RUN** | Existing Python 3.12.14 environment used. Decide whether this limitation is acceptable for a source-based release. |
+| Full relocated-checkout regression | **NOT_RUN** | Prior exploration was 139 PASS / 8 FAIL; test-helper and path issues were analyzed, but the full suite was not rerun. |
+| Submodule/source recovery | **PASS — LOCAL CHECK ONLY** | Required Gitlinks are present; 94/94 retired blobs, 10/10 migrated blobs, and 8/8 enumerated H5/checkpoint hashes matched. No independent restore was performed. |
+| v1.1.0 capability matrix approval | **MAINTAINER_DECISION_REQUIRED** | One candidate matrix; four manipulation/provider intersections remain TESTED_BOUNDED, not newly qualified. |
+| Independent backup verification | **BLOCKED — BACKUP_NOT_VERIFIED** | No authorized independent destination found. No copy or restore test was attempted. |
+| Publication authorization | **MAINTAINER_DECISION_REQUIRED** | No v1.1.0 tag, `main` change, or GitHub Release is authorized or created. |
 
-**Publication status: BLOCKED.** Independent backup and restore verification
-is the primary blocker. The [S5-C1 receipt](../../module/task_env/p2_0_s5_c1_final_release_gate.md)
-contains the exact refs, portability analysis, test results, and open decisions.
-See the [backup manifest](backup_manifest.json) and [S5-C2 procedure draft](publication_procedure_draft.md).
+The S5-C1 report and current S5-C2 integration/backup receipt are linked from
+the [release package](README.md). The [backup manifest](backup_manifest.json)
+records the required set and the reason publication remains blocked.

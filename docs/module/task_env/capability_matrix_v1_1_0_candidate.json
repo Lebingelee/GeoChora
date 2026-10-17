@@ -367,5 +367,15 @@
       "verified_path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
       "basis": "Matches the S2-C2 final-source acceptance report and direct SHA-256 of retained H5; the superseded value was the baseline H5 identity."
     }
+  },
+  "public_integration": {
+    "status": "INTEGRATED_TO_DEVELOP_NOT_PUBLISHED",
+    "pre_integration_base": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+    "functional_commit": "bee498d1d784015f034c5b4af34320fdffa61411",
+    "release_candidate_document_commit": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_develop_readback": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "main_readback": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "v1_0_0_tag_object_readback": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "release_publication": "NOT_PERFORMED"
   }
 }

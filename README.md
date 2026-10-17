@@ -142,8 +142,9 @@ Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 q
 能力声明必须绑定具体 source、provider/backend、task、配置和 Evidence。当前
 PickCube P1.6 task-owned 路由与 NutAssembly Outcome V1 路由，在 GeoPhys/MuJoCo
 CPU、100 Hz、指定 seed 上有 bounded full-route functional receipts；这些结果不
-授予 checkpoint inference、P1.8 FULL 或 D0-D2 资格。S4.5-A/B 的开发示例和
-Pendulum 学习/渲染 smoke 仍是本地候选，不能描述为已集成的发布能力。Go2 与
+授予 checkpoint inference、P1.8 FULL 或 D0-D2 资格。S4.5-A/B 开发工作流现已
+集成到 public `develop`；Pendulum 学习/渲染只是 bounded smoke，不构成通用学习或
+渲染资格。v1.1.0 仍是未发布的候选版本。Go2 与
 GeoChora-owned static-template 求解器只通过历史版本恢复，不属于当前 active
 implementation。细节见 [S4.5 review](docs/module/task_env/p2_0_s4_5_b_workflow_consolidation.md)
 和 [v1.1.0 release-candidate capability matrix](docs/module/task_env/capability_matrix_v1_1_0_candidate.json)。

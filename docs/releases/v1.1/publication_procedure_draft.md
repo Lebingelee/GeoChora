@@ -2,42 +2,48 @@
 
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 
-This is a future procedure only. It does not authorize integration, a release
-tag, a GitHub Release, or a `main` update. Do not execute the publication steps
-until every blocking gate is resolved and the maintainer gives explicit
-authorization.
+The functional unit and S5-B release-candidate documents have been integrated
+to public `develop` at
+`2fb60de7851bf2e5651c2dc99fff7451c16e1a94`. The S5-C1 documentation commit
+`2f8555a4c86470fb63cd2386a6e88729d4795a23` and S5-C2 report updates remain
+local and are not part of public `develop`. These integrations do not publish
+v1.1.0.
 
-1. Obtain separate maintainer authorization for the functional integration unit and the release-candidate documents. After authorization, the exact fast-forward sequence is:
+Future release procedure:
 
-   ```bash
-   git fetch public
-   test "$(git rev-parse public/develop)" = "0ff2d846a36c7014d2b40a530f52d99e64266ff9"
-   test "$(git rev-parse public/main)" = "e4e39883fbe01d4be4b172a53a535ef0095b3d64"
-   test "$(git rev-parse v1.0.0)" = "17c3100d4fabcb061c23569dea49973ebd177d51"
-   test "$(git rev-parse 'v1.0.0^{}')" = "42787f5e4f658a3f81fdd2140cf7544d6342c783"
-   git merge-base --is-ancestor public/develop bee498d1d784015f034c5b4af34320fdffa61411
-   git push public bee498d1d784015f034c5b4af34320fdffa61411:refs/heads/develop
-   test "$(git ls-remote public refs/heads/develop | cut -f1)" = "bee498d1d784015f034c5b4af34320fdffa61411"
+1. Complete review of the local S5-C1/S5-C2 release-gate documents. After
+   maintainer approval and a separate documentation commit, fetch `public`,
+   verify `public/develop` is the expected ancestor, and use a normal
+   fast-forward only. Read back the exact public SHA. Do not push the local
+   S5-C1 commit by itself or silently include unreviewed changes.
+2. Obtain explicit maintainer acceptance of controller identity Option B, or
+   stop for a separately scoped identity-stabilization proposal. Preserve all
+   historic H5/controller hashes.
+3. Record the maintainer's decision on fresh-install and full relocated-suite
+   scope. Do not convert either `NOT_RUN` into `PASS` without execution.
+4. Complete the independent backup using the source set in
+   [`backup_manifest.json`](backup_manifest.json). Require a verified
+   independent destination, capacity, hashes, bundle/object validation, exact
+   submodule recovery, and representative restore reads. `BACKUP_NOT_VERIFIED`
+   is a stop condition.
+5. Re-fetch public refs and verify the exact approved source tree, protected
+   `main`, immutable v1.0.0 tag/Evidence, submodule Gitlinks, API migration
+   inventory, capability matrix, and final provider-free regression. Repeat
+   native runs only for a changed selected execution source or a specific
+   unresolved risk.
+6. Obtain maintainer approval for the release notes, migration notice,
+   capability claims, limitations, final commit, and publication. The target
+   remains v1.1.0 under GeoChora's project-specific versioning policy; no new
+   qualification is implied.
+7. Only after all gates pass and explicit authorization is given, create an
+   annotated `v1.1.0` tag on the specifically approved commit. Read back both
+   tag object and peeled commit. Publish the GitHub Release only after tag
+   verification; treat tag creation and publication as separate authorized
+   actions.
+8. Record the release commit, tag object, peeled commit, backup manifest hash,
+   submodule Gitlinks, final test receipts, and publication timestamp. Do not
+   modify `main` or v1.0.0 without separate authorization.
 
-   git fetch public
-   test "$(git rev-parse public/develop)" = "bee498d1d784015f034c5b4af34320fdffa61411"
-   test "$(git rev-parse public/main)" = "e4e39883fbe01d4be4b172a53a535ef0095b3d64"
-   test "$(git rev-parse v1.0.0)" = "17c3100d4fabcb061c23569dea49973ebd177d51"
-   test "$(git rev-parse 'v1.0.0^{}')" = "42787f5e4f658a3f81fdd2140cf7544d6342c783"
-   git merge-base --is-ancestor public/develop 2fb60de7851bf2e5651c2dc99fff7451c16e1a94
-   git push public 2fb60de7851bf2e5651c2dc99fff7451c16e1a94:refs/heads/develop
-   test "$(git ls-remote public refs/heads/develop | cut -f1)" = "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
-   ```
-
-   Stop without pushing if either expected `develop` SHA differs, ancestry fails, or the target moves during the sequence. Readback verifies integration only; it does not publish v1.1.0. Neither command has been run.
-2. Resolve the controller-identity portability decision. The current recommendation is to retain per-checkout identity and document that controller hash equality across checkout paths is not guaranteed. Do not rewrite prior provenance or H5 records.
-3. Complete clean-environment installation validation if the maintainer requires it. Otherwise record the approved limitation: existing-environment detached construction smoke only; fresh installation remains NOT_RUN.
-4. Copy the exact candidate source, all refs and Git objects, required submodules, recovery manifests, v1.0.0 Evidence, enumerated H5/checkpoints, release documents and test receipts to authorized independent physical or controlled external storage. From the repository root, create a Git bundle with `git bundle create geochora-v1.1.0-rc.bundle --all`; create separate `--all` bundles inside `GeoPhys/` and `asset/external/mujoco_menagerie/`. Verify each bundle with `git bundle verify`, compare all Gitlink SHAs, and hash copied files. Restore representative H5 and v1.0.0 Evidence from the destination and read them. Update the backup manifest only from observed results. Do not treat another path on `/dev/sda` as independent storage.
-5. Re-fetch public refs. Verify the approved candidate tree, clean tracked worktree, exact Gitlinks, current capability matrix, migration inventory, protected `main` and immutable v1.0.0 tag/Evidence. Run the final bounded provider-free suite; repeat native runs only if task execution source changed or an uncovered specific risk requires them.
-6. Obtain explicit maintainer approval for the release notes, compatibility notice, capability matrix, remaining limitations, and publication. At this point require the independent backup gate to be PASS; `BACKUP_NOT_VERIFIED` means stop.
-7. Only after those approvals, tag the specifically approved develop commit as `v1.1.0` by annotated tag and verify the remote tag object plus peeled commit. Publish the release notes and candidate artifacts; do not create a tag from a moving or unreviewed branch.
-8. Record the exact release commit, tag object, peeled commit, backup manifest hash, submodule Gitlinks, final test receipts, and publication timestamp in the release receipt. Keep v1.0.0 and its Evidence unchanged.
-
-The target version remains **v1.1.0** under the GeoChora project-specific
-versioning policy. This policy does not claim strict SemVer compatibility and
-does not imply new capability qualification.
+The release is currently **PUBLICATION_BLOCKED** by the independent backup
+gate. See the [S5-C3 publication checklist](s5_c3_publication_checklist_draft.md)
+and [S5-C2 integration receipt](../../module/task_env/p2_0_s5_c2_public_integration_readiness.md).

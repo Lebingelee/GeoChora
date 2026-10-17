@@ -39,6 +39,10 @@
     {
       "commit": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
       "purpose": "S5-B release-candidate documents and final provider-free regression baseline"
+    },
+    {
+      "commit": "2f8555a4c86470fb63cd2386a6e88729d4795a23",
+      "purpose": "S5-C1 release-gate documentation; separate local commit, not public integration target"
     }
   ],
   "submodule_gitlinks": [
@@ -196,6 +200,46 @@
     "provider_free_result": "147 passed; 6 subtests passed; 1 upstream Taichi deprecation warning; 160.51 s",
     "provider_free_receipt": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
     "controller_portability_decision": "Recommendation B (retain documented path-sensitive identity); maintainer decision pending.",
-    "backup_gate": "BACKUP_NOT_VERIFIED; RELEASE_BLOCKED"
+    "backup_gate": "BACKUP_NOT_VERIFIED; RELEASE_BLOCKED",
+    "documentation_commit": "2f8555a4c86470fb63cd2386a6e88729d4795a23"
+  },
+  "public_integration": {
+    "status": "S5_4_5_AND_S5B_INTEGRATED; RELEASE_NOT_PUBLISHED",
+    "pre_integration_public_develop": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+    "functional_target": "bee498d1d784015f034c5b4af34320fdffa61411",
+    "functional_readback": "bee498d1d784015f034c5b4af34320fdffa61411",
+    "documentation_target": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "documentation_readback": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "current_public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "s5_c1_document_commit": "2f8555a4c86470fb63cd2386a6e88729d4795a23",
+    "s5_c1_document_commit_parent": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "s5_c1_document_commit_in_public_develop": false,
+    "push_receipts": [
+      {
+        "path": "workspace/maintenance/p2_0_s5_c2_20261017/functional_integration_receipt.json",
+        "sha256": "0e0c3e27cc641ae7d721fa5844d8242940a97abc4941b08d1ea54ba4649f16ba"
+      },
+      {
+        "path": "workspace/maintenance/p2_0_s5_c2_20261017/documentation_integration_receipt.json",
+        "sha256": "35d668adcd3687cda46fa089352745cf1b63a6c218655f24fc4e66ed30d8e8e8"
+      }
+    ]
+  },
+  "s5_c2_final_gate": {
+    "receipt": "docs/module/task_env/p2_0_s5_c2_public_integration_readiness.md",
+    "current_public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "provider_free_result": "147 passed; 6 subtests passed; 1 upstream Taichi deprecation warning; 160.07 s",
+    "provider_free_receipt": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log",
+    "provider_free_sha256": "077f593c60258c00ffc3eb9c693b1a3c97c695d10c8d0b7acec1335bf9c0f8b2",
+    "default_python_environment_error_receipt": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_default_python_attempt.log",
+    "backup_status": "BACKUP_NOT_VERIFIED; RELEASE_BLOCKED",
+    "controller_option_b": "RECOMMENDED; MAINTAINER_ACCEPTANCE_REQUIRED",
+    "integration_status": "Both approved normal fast-forwards completed and remote refs read back exactly.",
+    "functional_integration_receipt_sha256": "0e0c3e27cc641ae7d721fa5844d8242940a97abc4941b08d1ea54ba4649f16ba",
+    "documentation_integration_receipt_sha256": "35d668adcd3687cda46fa089352745cf1b63a6c218655f24fc4e66ed30d8e8e8",
+    "s5_c1_local_documentation_commit": "2f8555a4c86470fb63cd2386a6e88729d4795a23"
   }
 }
