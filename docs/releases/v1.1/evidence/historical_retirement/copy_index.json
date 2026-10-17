@@ -341,6 +341,6 @@
       "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_rate_control/acceptance_report.md"
     ],
     "omitted_or_private_support_references": "Remain named in original source records; not copied where they contain private paths.",
-    "recursive_link_scan": "See preflight verification; package remains an uncommitted candidate."
+    "recursive_link_scan": "All retained report links are satisfied by the preserved support-file set. The metadata package is locally committed at 10dd76712204225592cef9b37d8889dbbcfde2e6; it has not been pushed and the release remains unpublished."
   }
 }
