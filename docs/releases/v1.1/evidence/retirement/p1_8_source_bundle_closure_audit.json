@@ -1,0 +1,20 @@
+{
+  "bundle_path": "workspace/qualification/phase1/archives/p2_0_part_a/legacy_evidence_archive/p1_8_integration_20261012/p1_8_source.bundle",
+  "bundle_ref_count": 72,
+  "bundle_sha256": "e6c6067ada628c2207017051a510f921ac6bac57f903abe0ac2e13507efa0737",
+  "bundle_size_bytes": 18571359,
+  "bundle_verify": true,
+  "commit_ref_count": 66,
+  "mismatched_objects": [],
+  "missing_head_refs": [],
+  "missing_objects": [],
+  "notes": "Temporary pack/index lived under /tmp; no repository refs or object stores were changed.",
+  "other_ref_count": 0,
+  "pack_object_entries": 7610,
+  "refs_present_as_objects_in_root": 72,
+  "root_git_object_closure_missing_count": 0,
+  "root_git_object_type_mismatch_count": 0,
+  "schema": "geochora-s5-c8-p1-8-bundle-object-closure-audit-v1",
+  "tree_ref_count": 6,
+  "unique_pack_objects": 7610
+}
