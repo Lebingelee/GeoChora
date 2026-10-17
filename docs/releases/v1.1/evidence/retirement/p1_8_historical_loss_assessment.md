@@ -16,6 +16,8 @@ A Git-tracked package at `docs/releases/v1.1/evidence/historical_retirement/` pr
 
 The original 1,752,569-byte `file_manifest.json` has SHA-256 `0eb01f44b3b3409b11c4874e5bccc06c56d35af4104e21448a5f46819532f943`. Its exact bytes were copied outside the target to the ignored C8 preservation directory and verified; the copy is on the same `/dev/sda` device and is not an independent backup. Other small live-only private-path records are likewise held locally where listed in the copy receipts. They were not published into Git.
 
+The copy index considered 46 records: 37 are preserved in Git and 9 were excluded. Of those 9, only `file_manifest.json` has an exact copy outside the archive; the other 8 are not duplicated elsewhere and are included in the C1 approval list. If C1 is approved, those eight records become permanently unavailable, including a 109,399,343-byte acceptance record. Its older copy-index row had no SHA-256, but the C8 live snapshot did hash every current archive file. The C1 manifest records the current hash for this record and the exact eight paths.
+
 ## Source carriers and recovery limits
 
 | Carrier | Size | SHA-256 | Current recovery assessment |

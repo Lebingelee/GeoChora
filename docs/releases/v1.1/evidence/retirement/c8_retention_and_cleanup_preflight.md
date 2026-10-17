@@ -12,6 +12,8 @@ The original archive manifest and its live filesystem snapshot remain separate. 
 
 The P1.8 source bundle verifies, and all 7,610 packed objects exist in the root object database. A ref-reachability check found 7,592 reachable objects and 18 unreachable tree objects, including six direct tree-ref targets. Only 29 of 72 exact bundle ref name+OID pairs match local refs; none match a current public ref. C1 therefore excludes the bundle until those six tree refs and their object closure are pinned or separately preserved.
 
+The preserved copy index lists 37 of 46 selected decision/provenance records as Git copies. Of the nine excluded records, only the private-path `file_manifest.json` has a verified byte-identical copy outside the P1.8 target, on the same disk. The other eight excluded records remain in the C1 candidate and would be irrecoverably lost if C1 is approved; one is a 109,399,343-byte acceptance record. C8's live snapshot captured current hashes for all 3,383 files, including that record. These exclusions and exact paths are explicit in the copy index and C1 manifest.
+
 ## Exact batch candidates
 
 The machine-readable file allowlists, protected-inode inventory, lstat records, source-manifest identities, hardlink accounting, and post-operation checks are in the ignored local directory `workspace/maintenance/p2_0_s5_c8_20261017/`:
