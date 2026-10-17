@@ -21,7 +21,7 @@ The machine-readable file allowlists, protected-inode inventory, lstat records, 
 | Batch | Scope | Conditional unique reclaimable allocation | Exceptions |
 |---|---|---:|---|
 | A | 17 L3-A regenerable cache files | 311,296 bytes | None after current path/hash verification |
-| B | 173 ordinary files plus 6,619 registered-worktree file entries (6,792 approved paths total; 3 additional P1.1 holds) | 3,317,481,472 bytes | The checkout includes 573 ignored files, no non-ignored untracked files, and 3 Git administrative pointers; copied S5-B receipts are outside the worktree. Only non-forced Git worktree removal is proposed; if it refuses, stop without a force or manual fallback. |
+| B | 173 ordinary files plus 6,619 registered-worktree file entries (6,792 approved paths total; 3 additional P1.1 holds) | 3,317,481,472 bytes | The checkout includes 573 ignored files, no non-ignored untracked files, and 3 Git administrative pointers. The ignored set is 493 Python bytecode files, 68 Taichi `.tic` caches, one `.tcb` cache, one cache lock, five pytest-cache files, and five S5-B run/verification receipts; it contains no H5 or checkpoint. The five receipts were copied outside the worktree and reverified byte-identically. Only non-forced Git worktree removal is proposed; if it refuses, stop without a force or manual fallback. |
 | C1 | P1.8 live archive, exact files only | 10,978,766,848 bytes | `p1_8_source.bundle` remains held (18,571,359 logical bytes); no directory-recursive removal. |
 | C2 | Remaining L3-C historical raw files | 61,120,978,944 bytes | 516 C6 unresolved paths and 2 symlinks remain held/not followed. Hardlinked storage is deduplicated by inode. |
 
