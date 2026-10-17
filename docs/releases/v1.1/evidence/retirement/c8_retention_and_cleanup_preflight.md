@@ -17,7 +17,7 @@ The machine-readable file allowlists, protected-inode inventory, lstat records, 
 | Batch | Scope | Conditional unique reclaimable allocation | Exceptions |
 |---|---|---:|---|
 | A | 17 L3-A regenerable cache files | 311,296 bytes | None after current path/hash verification |
-| B | 6,792 exact approved L3-B file paths (6,795 total reviewed entries including 3 holds), including a registered detached checkout handled only by non-forced Git worktree operations | 3,317,481,472 bytes | Three P1.1 candidate files remain held. The checkout includes 573 ignored/untracked files and 3 Git administrative pointers; copied S5-B receipts are outside the worktree. |
+| B | 173 ordinary files plus 6,619 registered-worktree file entries (6,792 approved paths total; 3 additional P1.1 holds) | 3,317,481,472 bytes | The checkout includes 573 ignored/untracked files and 3 Git administrative pointers; copied S5-B receipts are outside the worktree. Only non-forced Git worktree removal is proposed; if it refuses, stop without a force or manual fallback. |
 | C1 | P1.8 live archive, exact files only | 10,978,766,848 bytes | `p1_8_source.bundle` remains held (18,571,359 logical bytes); no directory-recursive removal. |
 | C2 | Remaining L3-C historical raw files | 61,120,978,944 bytes | 516 C6 unresolved paths and 2 symlinks remain held/not followed. Hardlinked storage is deduplicated by inode. |
 
