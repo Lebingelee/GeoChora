@@ -1,0 +1,356 @@
+{
+  "E4_required_all_five_pad_fixture": {
+    "GeoPhys": {
+      "close_authorization": null,
+      "close_end_s": 11.150000000000393,
+      "close_start_s": 2.319999999999966,
+      "failure_boundary": "nutassembly_solution/close_gripper_readiness_timeout",
+      "final_force_N": 0.002376278629526496,
+      "final_opening_m": 9.505115201591252e-07,
+      "max_capture_position_drift_m": 0.0,
+      "max_capture_rotation_drift_rad": 0.0,
+      "pass": false,
+      "provider": "geophys",
+      "verify_lift_pass": false
+    },
+    "MuJoCo": {
+      "close_authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1400000000000001,
+        "controller_close_ready": false,
+        "end_closing_force_N": 25.717219230788718,
+        "end_opening_m": 0.010299561960715096,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 25.717219230788718,
+        "fallback_opening_span_m": 0.000110666218054176,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "close_end_s": 3.71,
+      "close_start_s": 2.58,
+      "failure_boundary": "nutassembly_solution/verify_lift_readiness_timeout",
+      "final_force_N": 25.717219230788718,
+      "final_opening_m": 0.010299561960715096,
+      "max_capture_position_drift_m": 0.10190259147895084,
+      "max_capture_rotation_drift_rad": 0.06413611612001756,
+      "pass": false,
+      "provider": "mujoco",
+      "verify_lift_pass": false
+    },
+    "specification": {
+      "active_collision_geometries": {
+        "fingertip_pad_boxes": [
+          {
+            "body": "left_finger",
+            "class": "fingertip_pad_collision_1",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "left_finger",
+            "class": "fingertip_pad_collision_2",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "left_finger",
+            "class": "fingertip_pad_collision_3",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "left_finger",
+            "class": "fingertip_pad_collision_4",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "left_finger",
+            "class": "fingertip_pad_collision_5",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "right_finger",
+            "class": "fingertip_pad_collision_1",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "right_finger",
+            "class": "fingertip_pad_collision_2",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "right_finger",
+            "class": "fingertip_pad_collision_3",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "right_finger",
+            "class": "fingertip_pad_collision_4",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "right_finger",
+            "class": "fingertip_pad_collision_5",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "square_nut_handle": [
+          {
+            "body": "SquareNut",
+            "pos": [
+              0.054,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.02525,
+              0.015875,
+              0.01
+            ]
+          }
+        ],
+        "table": [
+          "grasp_table_geom"
+        ]
+      },
+      "actuator/controller/gripper/planner": "current shared R5 unchanged",
+      "disabled": [
+        "finger collision meshes",
+        "auxiliary fingertip boxes",
+        "hand proxies",
+        "Nut outer-frame boxes",
+        "pegs",
+        "all other authored collision geoms"
+      ],
+      "mass_kg": 0.1,
+      "pad_classes": [
+        "fingertip_pad_collision_1",
+        "fingertip_pad_collision_2",
+        "fingertip_pad_collision_3",
+        "fingertip_pad_collision_4",
+        "fingertip_pad_collision_5"
+      ]
+    }
+  },
+  "E4_supplemental_main_pad_only": {
+    "GeoPhys": {
+      "close_authorization": null,
+      "close_end_s": 11.150000000000393,
+      "close_start_s": 2.319999999999966,
+      "failure_boundary": "nutassembly_solution/close_gripper_readiness_timeout",
+      "final_force_N": 0.0009320098906755447,
+      "final_opening_m": 9.660354383100866e-08,
+      "max_capture_position_drift_m": 0.0,
+      "max_capture_rotation_drift_rad": 0.0,
+      "pass": false,
+      "provider": "geophys",
+      "verify_lift_pass": false
+    },
+    "MuJoCo": {
+      "close_authorization": null,
+      "close_end_s": 11.41,
+      "close_start_s": 2.58,
+      "failure_boundary": "nutassembly_solution/close_gripper_readiness_timeout",
+      "final_force_N": 12.708210521697659,
+      "final_opening_m": 0.005080637333182307,
+      "max_capture_position_drift_m": 0.0,
+      "max_capture_rotation_drift_rad": 0.0,
+      "pass": false,
+      "provider": "mujoco",
+      "verify_lift_pass": false
+    },
+    "specification": {
+      "active_collision_geometries": {
+        "fingertip_main_pads": [
+          {
+            "body": "left_finger",
+            "class": "fingertip_pad_collision_1",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "body": "right_finger",
+            "class": "fingertip_pad_collision_1",
+            "pos": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "square_nut_handle": [
+          {
+            "body": "SquareNut",
+            "pos": [
+              0.054,
+              0.0,
+              0.0
+            ],
+            "size": [
+              0.02525,
+              0.015875,
+              0.01
+            ]
+          }
+        ],
+        "table": [
+          "grasp_table_geom"
+        ]
+      },
+      "actuator/controller/gripper/planner": "current shared R5 unchanged",
+      "disabled": [
+        "finger collision meshes",
+        "auxiliary fingertip boxes",
+        "hand proxies",
+        "Nut outer-frame boxes",
+        "pegs",
+        "all other authored collision geoms"
+      ],
+      "mass_kg": 0.1
+    }
+  },
+  "M0_classification": "kinematic_mapping_match",
+  "M0_pair_level_cross_provider_contact_geometry": "unresolved_for_GeoPhys_due_to_public_body_aggregate_only",
+  "M1_80mm_anomaly": "main and auxiliary finger pad boxes contact SquareNut_collision_3 outer frame; no handle contact; canonical force reaches 29.37 N while physical main pad gap is 82.67 mm",
+  "confidence": "medium",
+  "current_10p63mm_state_classification": "DEEP_PENETRATION",
+  "current_active_contact_geometry": [
+    "main pad boxes to SquareNut_collision_4",
+    "auxiliary pad boxes to SquareNut_collision_4",
+    "finger collision mesh to SquareNut_collision_4"
+  ],
+  "current_main_pad_handle_contact": "yes_in_static_MuJoCo_reconstruction",
+  "historical_reproduction_environment_mujoco": "3.8.1",
+  "historical_success_located_and_reproduced": true,
+  "historical_success_max_nut_lift_m": 0.09733812329923952,
+  "primary_classification": "mixed_engineering_boundary",
+  "production_behavior_modified": false,
+  "recommended_next_change": "In a separately authorized development step, align the R5 approach/grasp pose and physical closing/force-adjust trajectory with the reproduced historical state before changing collision assets. Keep thresholds and physics fixed. Use the exact hand-camera and contact-state evidence to assess the main/aux pad path; do not modify simulator dynamics.",
+  "schema": "p1-8-r5-engineering-grasp-decision-v1",
+  "secondary_factors": [
+    {
+      "classification": "deep_interpenetration",
+      "confidence": "high",
+      "evidence": "10.63 mm R5 authorization: main pad/handle 9.328 mm, aux pad/handle 10.774 mm, mesh/handle 3.198 mm static overlap."
+    },
+    {
+      "classification": "unintended_collision_pair",
+      "confidence": "high",
+      "evidence": "M1 at approximately 80 mm has finger pads against outer-frame collision geom SquareNut_collision_3, not handle collision geom SquareNut_collision_4."
+    },
+    {
+      "classification": "gripper_dynamics_regression",
+      "confidence": "medium",
+      "evidence": "Current free-close/force-adjust rates are 3x/12x historical; historical succeeds at nearly identical authorization opening/force, while R5 slips after authorization. Rates were not isolated in this audit."
+    },
+    {
+      "classification": "historical_environment_drift",
+      "confidence": "low",
+      "evidence": "Exact historical 0.1 kg lift reproduced in MuJoCo 3.8.1; this rules out a fundamental inability in the current environment."
+    }
+  ],
+  "simulator_dynamics_modification_justified": false,
+  "status": "engineering_boundary_localized"
+}

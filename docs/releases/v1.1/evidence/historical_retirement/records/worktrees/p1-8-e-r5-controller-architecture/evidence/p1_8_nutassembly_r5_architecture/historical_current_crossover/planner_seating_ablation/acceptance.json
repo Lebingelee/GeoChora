@@ -1,0 +1,2474 @@
+{
+  "status": "mechanical_retention_improved_G0_close_speed_unresolved",
+  "production_modified": false,
+  "quintic_alone_restores_MuJoCo": false,
+  "continuous_qref_explicit_seating_restores_MuJoCo_3_rates": true,
+  "MuJoCo_full_G0": false,
+  "GeoPhys_TB100_after_auth_G0": true,
+  "T1_full_D0_D2_boundary": "NOT_RUN",
+  "results": {
+    "mujoco/cubic_current": {
+      "G0_pass": false,
+      "verify_lift_pass": false,
+      "authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1700000000000004,
+        "controller_close_ready": false,
+        "end_closing_force_N": 26.610935837907622,
+        "end_opening_m": 0.010658450626103072,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 26.610935837907622,
+        "fallback_opening_span_m": 0.00012161304201002698,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "nutassembly_solution/verify_lift_readiness_timeout",
+      "max_Nut_lift_from_reset_m": 0.007376948914791681,
+      "max_capture_translation_drift_m": 0.10192337712949082,
+      "max_capture_rotation_drift_rad": 0.009294647293893581,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48,
+            "force_N": 4.087495995008794e-07,
+            "opening_m": 0.08000000011718045,
+            "Nut_z_m": 0.47297344036785727,
+            "EE_z_m": 0.5920899817473709
+          },
+          "pos_rms": 0.0021929581315838147,
+          "pos_peak": 0.0030016148588996043,
+          "rot_rms": 0.015602547184772705,
+          "rot_peak": 0.03378499000855643
+        },
+        "descend_to_handle": {
+          "n": 209,
+          "last": {
+            "t_s": 2.57,
+            "force_N": 0.0,
+            "opening_m": 0.07999998333996476,
+            "Nut_z_m": 0.47298161441170994,
+            "EE_z_m": 0.5222095105038985
+          },
+          "pos_rms": 0.0015033669705269996,
+          "pos_peak": 0.002755406366757165,
+          "rot_rms": 0.001743247064405685,
+          "rot_peak": 0.004507473894123304
+        },
+        "close_gripper": {
+          "n": 117,
+          "last": {
+            "t_s": 3.74,
+            "force_N": 26.610935837907622,
+            "opening_m": 0.010658450626103072,
+            "Nut_z_m": 0.472887223882292,
+            "EE_z_m": 0.5208600356113025
+          },
+          "pos_rms": 0.0003881106149842658,
+          "pos_peak": 0.0007222267508146099,
+          "rot_rms": 0.0007830740429844576,
+          "rot_peak": 0.0014197525920307675
+        },
+        "verify_lift": {
+          "n": 577,
+          "last": {
+            "t_s": 9.51,
+            "force_N": 2.2245820087919653e-05,
+            "opening_m": 8.898340219359667e-09,
+            "Nut_z_m": 0.4729734395987675,
+            "EE_z_m": 0.6208600402830976
+          },
+          "pos_rms": 0.0009068007830389423,
+          "pos_peak": 0.002203894374833466,
+          "rot_rms": 0.0005432764766065576,
+          "rot_peak": 0.0017306954713442882
+        }
+      },
+      "reference_sequence_SHA256": "26cb2a5ad9a077a552a30ea8ca25e52c5192bf01901980b4e24332a5be2497c6",
+      "plan_spec": [
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.4545018882004396,
+            -0.07500000298023224,
+            0.5229831792418634,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.0,
+          "planned_steps": 200,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.45451536774635315,
+            -0.07502567023038864,
+            0.5920900106430054,
+            0.003914576955139637,
+            0.9999226331710815,
+            -0.003969888668507338,
+            0.0111188730224967
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.520983193397522,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449015498161316,
+            -0.07499781996011734,
+            0.5222095251083374,
+            0.003788231872022152,
+            0.999937891960144,
+            4.384685234981589e-05,
+            0.010483462363481522
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.4544963538646698,
+            -0.07501374930143356,
+            0.6208600163459778,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.77,
+          "planned_steps": 277,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544963538646698,
+            -0.07501374930143356,
+            0.5208600163459778,
+            0.003787865862250328,
+            0.9999380707740784,
+            -1.141288703365717e-05,
+            0.010466750711202621
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5208432020504528
+    },
+    "mujoco/cubic_matched": {
+      "G0_pass": false,
+      "verify_lift_pass": false,
+      "authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1600000000000001,
+        "controller_close_ready": false,
+        "end_closing_force_N": 26.316210801844345,
+        "end_opening_m": 0.0105412774489428,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 26.316210801844345,
+        "fallback_opening_span_m": 0.00012635028908741276,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "nutassembly_solution/verify_lift_readiness_timeout",
+      "max_Nut_lift_from_reset_m": 0.0032612659031114877,
+      "max_capture_translation_drift_m": 0.10126324091085306,
+      "max_capture_rotation_drift_rad": 0.007352623286787779,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48,
+            "force_N": 4.087495995008794e-07,
+            "opening_m": 0.08000000011718045,
+            "Nut_z_m": 0.47297344036785727,
+            "EE_z_m": 0.5920899817473709
+          },
+          "pos_rms": 0.0021929581315838147,
+          "pos_peak": 0.0030016148588996043,
+          "rot_rms": 0.015602547184772705,
+          "rot_peak": 0.03378499000855643
+        },
+        "descend_to_handle": {
+          "n": 252,
+          "last": {
+            "t_s": 3.0,
+            "force_N": 0.0,
+            "opening_m": 0.07999992481250134,
+            "Nut_z_m": 0.47297718303429115,
+            "EE_z_m": 0.5224785389779529
+          },
+          "pos_rms": 0.0010271527399665485,
+          "pos_peak": 0.0019283737570477395,
+          "rot_rms": 0.001551063426925345,
+          "rot_peak": 0.004464687271258386
+        },
+        "close_gripper": {
+          "n": 116,
+          "last": {
+            "t_s": 4.16,
+            "force_N": 26.316210801844345,
+            "opening_m": 0.0105412774489428,
+            "Nut_z_m": 0.47288863251796276,
+            "EE_z_m": 0.5208533570871203
+          },
+          "pos_rms": 0.0003670326287831751,
+          "pos_peak": 0.0006700853180280258,
+          "rot_rms": 0.0007756544634548358,
+          "rot_peak": 0.0014013933001939944
+        },
+        "verify_lift": {
+          "n": 640,
+          "last": {
+            "t_s": 10.56,
+            "force_N": 2.2245760870661806e-05,
+            "opening_m": 8.89829846089093e-09,
+            "Nut_z_m": 0.47297343959876853,
+            "EE_z_m": 0.6208533645333993
+          },
+          "pos_rms": 0.0006541110388788594,
+          "pos_peak": 0.0016999953967132147,
+          "rot_rms": 0.0004652113687470254,
+          "rot_peak": 0.0016168136488705345
+        }
+      },
+      "reference_sequence_SHA256": "f1b01c8819d67020109c168704d6093feb9417d6857b5ead33122e564ecf98c2",
+      "plan_spec": [
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.4545018882004396,
+            -0.07500000298023224,
+            0.5229831792418634,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.43,
+          "planned_steps": 243,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.45451536774635315,
+            -0.07502567023038864,
+            0.5920900106430054,
+            0.003914576955139637,
+            0.9999226331710815,
+            -0.003969888668507338,
+            0.0111188730224967
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.520983193397522,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449602603912354,
+            -0.07499773055315018,
+            0.5224785208702087,
+            0.0037924950011074543,
+            0.9999377727508545,
+            2.9880471629439853e-05,
+            0.010491752065718174
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.4544972777366638,
+            -0.07500748336315155,
+            0.6208533406257629,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.4,
+          "planned_steps": 340,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544972777366638,
+            -0.07500748336315155,
+            0.5208533406257629,
+            0.0037862248718738556,
+            0.9999380707740784,
+            -5.695807431038702e-06,
+            0.010464672930538654
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.520831251888327
+    },
+    "mujoco/quintic": {
+      "G0_pass": false,
+      "verify_lift_pass": false,
+      "authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.17,
+        "controller_close_ready": false,
+        "end_closing_force_N": 26.61310491251324,
+        "end_opening_m": 0.010659554146300885,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 26.61310491251324,
+        "fallback_opening_span_m": 0.0001234700106787865,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "nutassembly_solution/verify_lift_readiness_timeout",
+      "max_Nut_lift_from_reset_m": 0.004080248410197718,
+      "max_capture_translation_drift_m": 0.10107766187243405,
+      "max_capture_rotation_drift_rad": 0.008403292079200613,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48,
+            "force_N": 4.64582853965112e-07,
+            "opening_m": 0.08000000010530176,
+            "Nut_z_m": 0.47297344036785727,
+            "EE_z_m": 0.5920895407529627
+          },
+          "pos_rms": 0.0021924243172341444,
+          "pos_peak": 0.002998733712290577,
+          "rot_rms": 0.015777430206826655,
+          "rot_peak": 0.035414323481694765
+        },
+        "descend_to_handle": {
+          "n": 252,
+          "last": {
+            "t_s": 3.0,
+            "force_N": 0.0,
+            "opening_m": 0.0799999197935302,
+            "Nut_z_m": 0.4729769398711651,
+            "EE_z_m": 0.5227902889071642
+          },
+          "pos_rms": 0.0012989938018209072,
+          "pos_peak": 0.002258359514947844,
+          "rot_rms": 0.0015669468221819081,
+          "rot_peak": 0.004452993405377031
+        },
+        "close_gripper": {
+          "n": 117,
+          "last": {
+            "t_s": 4.17,
+            "force_N": 26.61310491251324,
+            "opening_m": 0.010659554146300885,
+            "Nut_z_m": 0.4728903662149411,
+            "EE_z_m": 0.5208478775029305
+          },
+          "pos_rms": 0.0003836269709726511,
+          "pos_peak": 0.0007492079688116191,
+          "rot_rms": 0.0007921785773630387,
+          "rot_peak": 0.0014633272689342626
+        },
+        "verify_lift": {
+          "n": 640,
+          "last": {
+            "t_s": 10.57,
+            "force_N": 2.224566881275606e-05,
+            "opening_m": 8.898268488154262e-09,
+            "Nut_z_m": 0.47297343959876853,
+            "EE_z_m": 0.6208478808820153
+          },
+          "pos_rms": 0.0007735414669120371,
+          "pos_peak": 0.0016307908744762848,
+          "rot_rms": 0.0004858733502703232,
+          "rot_peak": 0.0015170751969095244
+        }
+      },
+      "reference_sequence_SHA256": "b013f161f87dc01070059b3d1e87a454a0a57b28888071a540518cfe4fd09293",
+      "plan_spec": [
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.4545018882004396,
+            -0.07500000298023224,
+            0.5229831792418634,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.43,
+          "planned_steps": 243,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.4545152187347412,
+            -0.07502613216638565,
+            0.5920895338058472,
+            0.003925418946892023,
+            0.9999217987060547,
+            -0.004059129394590855,
+            0.011156531982123852
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.520983193397522,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45450037717819214,
+            -0.07499825954437256,
+            0.5227903127670288,
+            0.003805554239079356,
+            0.9999373555183411,
+            1.3279451195558067e-05,
+            0.010526123456656933
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.4544921815395355,
+            -0.0750173032283783,
+            0.6208478569984436,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.4,
+          "planned_steps": 340,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544921815395355,
+            -0.0750173032283783,
+            0.5208478569984436,
+            0.003778449259698391,
+            0.9999383687973022,
+            -1.4233808542485349e-05,
+            0.010441606864333153
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5208069921012614
+    },
+    "mujoco/seating": {
+      "G0_pass": false,
+      "verify_lift_pass": false,
+      "authorization": null,
+      "failure": "nutassembly_solution/close_gripper_readiness_timeout",
+      "max_Nut_lift_from_reset_m": 7.459872661008671e-05,
+      "max_capture_translation_drift_m": 0.0,
+      "max_capture_rotation_drift_rad": 0.0,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48,
+            "force_N": 4.087495995008794e-07,
+            "opening_m": 0.08000000011718045,
+            "Nut_z_m": 0.47297344036785727,
+            "EE_z_m": 0.5920899817473709
+          },
+          "pos_rms": 0.0021929581315838147,
+          "pos_peak": 0.0030016148588996043,
+          "rot_rms": 0.015602547184772705,
+          "rot_peak": 0.03378499000855643
+        },
+        "descend_to_handle": {
+          "n": 209,
+          "last": {
+            "t_s": 2.57,
+            "force_N": 0.0,
+            "opening_m": 0.07999998333996476,
+            "Nut_z_m": 0.47298161441170994,
+            "EE_z_m": 0.5222095105038985
+          },
+          "pos_rms": 0.0015033669705269996,
+          "pos_peak": 0.002755406366757165,
+          "rot_rms": 0.001743247064405685,
+          "rot_peak": 0.004507473894123304
+        },
+        "close_gripper": {
+          "n": 935,
+          "last": {
+            "t_s": 11.92,
+            "force_N": 12.35439808455653,
+            "opening_m": 0.004941761653184196,
+            "Nut_z_m": 0.47300234931831636,
+            "EE_z_m": 0.5182832464666494
+          },
+          "pos_rms": 0.000251649952305851,
+          "pos_peak": 0.0010407005235909227,
+          "rot_rms": 0.00042438328348844866,
+          "rot_peak": 0.0015936512377558037
+        }
+      },
+      "reference_sequence_SHA256": "79cfba25abcdc02a609cf1fe9710c3d4e880e2919640999cf169b1c5be4bf2a4",
+      "plan_spec": [
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.4545018882004396,
+            -0.07500000298023224,
+            0.5229831792418634,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.0,
+          "planned_steps": 200,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.45451536774635315,
+            -0.07502567023038864,
+            0.5920900106430054,
+            0.003914576955139637,
+            0.9999226331710815,
+            -0.003969888668507338,
+            0.0111188730224967
+          ]
+        },
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.5182832191467285,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 1.35,
+          "planned_steps": 135,
+          "seating_extra_down_m": 0.0027,
+          "seating_fixed_hold_s": 0.1,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449015498161316,
+            -0.07499781996011734,
+            0.5222095251083374,
+            0.003788231872022152,
+            0.999937891960144,
+            4.384685234981589e-05,
+            0.010483462363481522
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": null
+    },
+    "mujoco/seating_after_authorization": {
+      "G0_pass": false,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1700000000000004,
+        "controller_close_ready": false,
+        "end_closing_force_N": 26.610935837907622,
+        "end_opening_m": 0.010658450626103072,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 26.610935837907622,
+        "fallback_opening_span_m": 0.00012161304201002698,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "G0_close_or_verify_lift_gate",
+      "max_Nut_lift_from_reset_m": 0.10199140091853476,
+      "max_capture_translation_drift_m": 0.003783897113042114,
+      "max_capture_rotation_drift_rad": 0.0552225489249123,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48,
+            "force_N": 4.087495995008794e-07,
+            "opening_m": 0.08000000011718045,
+            "Nut_z_m": 0.47297344036785727,
+            "EE_z_m": 0.5920899817473709
+          },
+          "pos_rms": 0.0021929581315838147,
+          "pos_peak": 0.0030016148588996043,
+          "rot_rms": 0.015602547184772705,
+          "rot_peak": 0.03378499000855643
+        },
+        "descend_to_handle": {
+          "n": 209,
+          "last": {
+            "t_s": 2.57,
+            "force_N": 0.0,
+            "opening_m": 0.07999998333996476,
+            "Nut_z_m": 0.47298161441170994,
+            "EE_z_m": 0.5222095105038985
+          },
+          "pos_rms": 0.0015033669705269996,
+          "pos_peak": 0.002755406366757165,
+          "rot_rms": 0.001743247064405685,
+          "rot_peak": 0.004507473894123304
+        },
+        "close_gripper": {
+          "n": 117,
+          "last": {
+            "t_s": 3.74,
+            "force_N": 26.610935837907622,
+            "opening_m": 0.010658450626103072,
+            "Nut_z_m": 0.472887223882292,
+            "EE_z_m": 0.5208600356113025
+          },
+          "pos_rms": 0.0003881106149842658,
+          "pos_peak": 0.0007222267508146099,
+          "rot_rms": 0.0007830740429844576,
+          "rot_peak": 0.0014197525920307675
+        },
+        "verify_lift": {
+          "n": 344,
+          "last": {
+            "t_s": 7.18,
+            "force_N": 11.796039742578506,
+            "opening_m": 0.0047183002321415455,
+            "Nut_z_m": 0.5733230022504011,
+            "EE_z_m": 0.6213559082508595
+          },
+          "pos_rms": 0.0011659324072035694,
+          "pos_peak": 0.0019528636868524688,
+          "rot_rms": 0.0007326886631198019,
+          "rot_peak": 0.001476529536163849
+        }
+      },
+      "reference_sequence_SHA256": "8a2c8037daff230569903898083c83d1b98977869e19cb737b4c5b78d58fdf82",
+      "plan_spec": [
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4545018882004396,
+            -0.07500000298023224,
+            0.5229831792418634,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.0,
+          "planned_steps": 200,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.45451536774635315,
+            -0.07502567023038864,
+            0.5920900106430054,
+            0.003914576955139637,
+            0.9999226331710815,
+            -0.003969888668507338,
+            0.0111188730224967
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.520983193397522,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449015498161316,
+            -0.07499781996011734,
+            0.5222095251083374,
+            0.003788231872022152,
+            0.999937891960144,
+            4.384685234981589e-05,
+            0.010483462363481522
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4544963538646698,
+            -0.07501374930143356,
+            0.6208600163459778,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.35,
+          "planned_steps": 335,
+          "seating_extra_down_m": 0.0027,
+          "seating_fixed_hold_s": 0.1,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544963538646698,
+            -0.07501374930143356,
+            0.5208600163459778,
+            0.003787865862250328,
+            0.9999380707740784,
+            -1.141288703365717e-05,
+            0.010466750711202621
+          ],
+          "seating_location": "after_authorization"
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45450156927108765,
+            -0.07501496374607086,
+            0.7100328946113587,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.49,
+          "planned_steps": 249,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.45450156927108765,
+            -0.07501496374607086,
+            0.6213558912277222,
+            0.003786524059250951,
+            0.9999382495880127,
+            -8.025988051940658e-08,
+            0.010449145920574665
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5172290902492958
+    },
+    "mujoco/seating_after_authorization_tb50": {
+      "G0_pass": false,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1600000000000001,
+        "controller_close_ready": false,
+        "end_closing_force_N": 26.62383193458058,
+        "end_opening_m": 0.010666503683136413,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 26.62383193458058,
+        "fallback_opening_span_m": 0.00011821555854549595,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 5,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "G0_close_or_verify_lift_gate",
+      "max_Nut_lift_from_reset_m": 0.10206214547339043,
+      "max_capture_translation_drift_m": 0.0037947396908890427,
+      "max_capture_rotation_drift_rad": 0.05549596050642657,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 24,
+          "last": {
+            "t_s": 0.48,
+            "force_N": 0.0,
+            "opening_m": 0.07999996934869467,
+            "Nut_z_m": 0.47297344036785727,
+            "EE_z_m": 0.5920886570361563
+          },
+          "pos_rms": 0.0021962361182022746,
+          "pos_peak": 0.0030016398920290357,
+          "rot_rms": 0.015402099940940729,
+          "rot_peak": 0.03320701686047342
+        },
+        "descend_to_handle": {
+          "n": 105,
+          "last": {
+            "t_s": 2.58,
+            "force_N": 0.0,
+            "opening_m": 0.07999952733681256,
+            "Nut_z_m": 0.47298001999088185,
+            "EE_z_m": 0.5222357421147455
+          },
+          "pos_rms": 0.0015524152720304402,
+          "pos_peak": 0.002857821069783627,
+          "rot_rms": 0.001694265086253248,
+          "rot_peak": 0.004399406965635563
+        },
+        "close_gripper": {
+          "n": 58,
+          "last": {
+            "t_s": 3.74,
+            "force_N": 26.62383193458058,
+            "opening_m": 0.010666503683136413,
+            "Nut_z_m": 0.4728877095394281,
+            "EE_z_m": 0.5208536474553006
+          },
+          "pos_rms": 0.000370209949664269,
+          "pos_peak": 0.0006522525077259536,
+          "rot_rms": 0.0007861482064917851,
+          "rot_peak": 0.0014183390574782073
+        },
+        "verify_lift": {
+          "n": 173,
+          "last": {
+            "t_s": 7.2,
+            "force_N": 11.796178149036757,
+            "opening_m": 0.00471835597156652,
+            "Nut_z_m": 0.5732904260575787,
+            "EE_z_m": 0.6213364811968644
+          },
+          "pos_rms": 0.0012525303468267674,
+          "pos_peak": 0.002035774628115392,
+          "rot_rms": 0.000727763727374272,
+          "rot_peak": 0.001471444364031343
+        }
+      },
+      "reference_sequence_SHA256": "e237806ad47b854ab431a0331bde92c60b894c13789b07a2305ee2bddba247b4",
+      "plan_spec": [
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.4,
+          "planned_steps": 20,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4545018882004396,
+            -0.07500000298023224,
+            0.5229831792418634,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.02,
+          "planned_steps": 101,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.45451557636260986,
+            -0.07502683252096176,
+            0.5920886397361755,
+            0.003886326914653182,
+            0.9999244809150696,
+            -0.0037695851642638445,
+            0.011034136638045311
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.520983193397522,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 42,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449098944664,
+            -0.0749979093670845,
+            0.5222357511520386,
+            0.0037914125714451075,
+            0.9999377727508545,
+            4.038742190459743e-05,
+            0.010493189096450806
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45449602603912354,
+            -0.07501454651355743,
+            0.6208536386489868,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.38,
+          "planned_steps": 169,
+          "seating_extra_down_m": 0.0027,
+          "seating_fixed_hold_s": 0.1,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.45449602603912354,
+            -0.07501454651355743,
+            0.5208536386489868,
+            0.0037872926332056522,
+            0.9999380707740784,
+            -1.1980558156210463e-05,
+            0.010465073399245739
+          ],
+          "seating_location": "after_authorization"
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45450180768966675,
+            -0.07501546293497086,
+            0.710046067237854,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.5,
+          "planned_steps": 125,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.45450180768966675,
+            -0.07501546293497086,
+            0.6213364601135254,
+            0.0037864483892917633,
+            0.9999382495880127,
+            5.241408373990453e-08,
+            0.01044735312461853
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5172091602135379
+    },
+    "mujoco/seating_after_authorization_tb500": {
+      "G0_pass": false,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1859999999998694,
+        "controller_close_ready": false,
+        "end_closing_force_N": 26.59693847717228,
+        "end_opening_m": 0.010649672708743379,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 26.59693847717228,
+        "fallback_opening_span_m": 0.00011108933558563044,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 50,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "G0_close_or_verify_lift_gate",
+      "max_Nut_lift_from_reset_m": 0.10192189162420717,
+      "max_capture_translation_drift_m": 0.0037724664151642514,
+      "max_capture_rotation_drift_rad": 0.055222575884073956,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 239,
+          "last": {
+            "t_s": 0.47800000000000037,
+            "force_N": 3.879310952470405e-07,
+            "opening_m": 0.08000000011412756,
+            "Nut_z_m": 0.4729734403945228,
+            "EE_z_m": 0.5920780195179761
+          },
+          "pos_rms": 0.002194981249759515,
+          "pos_peak": 0.0029999346641128044,
+          "rot_rms": 0.01622884858439817,
+          "rot_peak": 0.035918112885131845
+        },
+        "descend_to_handle": {
+          "n": 1047,
+          "last": {
+            "t_s": 2.5719999999999383,
+            "force_N": 2.730127738459487e-05,
+            "opening_m": 0.08000000362494622,
+            "Nut_z_m": 0.47298196990043284,
+            "EE_z_m": 0.5222248731948989
+          },
+          "pos_rms": 0.0015249627988446058,
+          "pos_peak": 0.002660692419649837,
+          "rot_rms": 0.0010781193917861382,
+          "rot_peak": 0.002527312804449512
+        },
+        "close_gripper": {
+          "n": 593,
+          "last": {
+            "t_s": 3.7579999999998077,
+            "force_N": 26.59693847717228,
+            "opening_m": 0.010649672708743379,
+            "Nut_z_m": 0.4728885016329367,
+            "EE_z_m": 0.5208642462335658
+          },
+          "pos_rms": 0.00039859331701268963,
+          "pos_peak": 0.0007482499955723762,
+          "rot_rms": 0.0007772463794823265,
+          "rot_peak": 0.001419044620653587
+        },
+        "verify_lift": {
+          "n": 1720,
+          "last": {
+            "t_s": 7.197999999999429,
+            "force_N": 11.796014378002262,
+            "opening_m": 0.004718291645460868,
+            "Nut_z_m": 0.5733145494088084,
+            "EE_z_m": 0.6213474901505606
+          },
+          "pos_rms": 0.001174064826846653,
+          "pos_peak": 0.001994311577240983,
+          "rot_rms": 0.0007335381997367721,
+          "rot_peak": 0.0014810525740980736
+        }
+      },
+      "reference_sequence_SHA256": "743943b382f832add449044b677e04fd24857b1d95e1ecb38d2e871eed536bb3",
+      "plan_spec": [
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.38,
+          "planned_steps": 190,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.4544568657875061,
+            -0.07505328208208084,
+            0.5929791927337646,
+            -9.829361079027876e-05,
+            0.9996864795684814,
+            0.025037335231900215,
+            0.0001813854178180918
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45450188820041604,
+            -0.07500000298023224,
+            0.5229831791114201,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 1.996,
+          "planned_steps": 998,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.4545154571533203,
+            -0.07502637058496475,
+            0.5920780301094055,
+            0.003908894956111908,
+            0.9999228119850159,
+            -0.003971652593463659,
+            0.011106266640126705
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4545018970966339,
+            -0.07500000298023224,
+            0.520983193397522,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.834,
+          "planned_steps": 417,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449012517929077,
+            -0.07499656826257706,
+            0.5222248435020447,
+            0.003786625573411584,
+            0.9999379515647888,
+            4.415847433847375e-05,
+            0.010479007847607136
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45449569821357727,
+            -0.07501192390918732,
+            0.6208642482757568,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.342,
+          "planned_steps": 1671,
+          "seating_extra_down_m": 0.0027,
+          "seating_fixed_hold_s": 0.1,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.45449569821357727,
+            -0.07501192390918732,
+            0.5208642482757568,
+            0.0037853908725082874,
+            0.9999381303787231,
+            -9.394223525305279e-06,
+            0.010460593737661839
+          ],
+          "seating_location": "after_authorization"
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.454500675201416,
+            -0.07501319795846939,
+            0.7100329542160034,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.486,
+          "planned_steps": 1243,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.454500675201416,
+            -0.07501319795846939,
+            0.6213474869728088,
+            0.0037867105565965176,
+            0.9999382495880127,
+            -1.2897776002773753e-07,
+            0.010450492613017559
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.517247807486
+    },
+    "geophys/cubic_current": {
+      "G0_pass": true,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9299999999998976,
+        "controller_close_ready": true,
+        "end_closing_force_N": 30.0,
+        "end_opening_m": 0.03362607583403587,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 1.560896635055542e-06,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": null,
+      "max_Nut_lift_from_reset_m": 0.10097366571426392,
+      "max_capture_translation_drift_m": 6.768641500203667e-05,
+      "max_capture_rotation_drift_rad": 0.0007449008365813944,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48000000000000037,
+            "force_N": 0.0,
+            "opening_m": 0.0799999050796032,
+            "Nut_z_m": 0.4719012677669525,
+            "EE_z_m": 0.5920899510383606
+          },
+          "pos_rms": 0.002192911002513146,
+          "pos_peak": 0.0030015899075182236,
+          "rot_rms": 0.015602442992783303,
+          "rot_peak": 0.033784956393525
+        },
+        "descend_to_handle": {
+          "n": 212,
+          "last": {
+            "t_s": 2.5999999999999353,
+            "force_N": 0.0540008544921875,
+            "opening_m": 0.08002176508307457,
+            "Nut_z_m": 0.47190061211586,
+            "EE_z_m": 0.5211791396141052
+          },
+          "pos_rms": 0.0014814506093182248,
+          "pos_peak": 0.0026501912240223294,
+          "rot_rms": 0.0017344876418489616,
+          "rot_peak": 0.004503767666151414
+        },
+        "close_gripper": {
+          "n": 93,
+          "last": {
+            "t_s": 3.529999999999833,
+            "force_N": 30.0,
+            "opening_m": 0.03362607583403587,
+            "Nut_z_m": 0.4719015061855316,
+            "EE_z_m": 0.5196717381477356
+          },
+          "pos_rms": 0.00020319751389468016,
+          "pos_peak": 0.0006734096622028835,
+          "rot_rms": 0.00014356921144614897,
+          "rot_peak": 0.0002003031027122991
+        },
+        "verify_lift": {
+          "n": 286,
+          "last": {
+            "t_s": 6.389999999999518,
+            "force_N": 30.0,
+            "opening_m": 0.03355487063527107,
+            "Nut_z_m": 0.5724696516990662,
+            "EE_z_m": 0.6201789379119873
+          },
+          "pos_rms": 0.0011748990716720696,
+          "pos_peak": 0.001993525098957459,
+          "rot_rms": 0.0005762416515413171,
+          "rot_peak": 0.0008467114946257123
+        }
+      },
+      "reference_sequence_SHA256": "45a994bd2db2f2443b6757e4ba244b305af27b1e53d5bdfd48535fc446750322",
+      "plan_spec": [
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.45445698499679565,
+            -0.07505333423614502,
+            0.5929791927337646,
+            -9.828904876485467e-05,
+            0.9996864795684814,
+            0.02503734827041626,
+            0.0001814453862607479
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.4544999799728546,
+            -0.07500001360968617,
+            0.5219013069269494,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.0300000000000002,
+          "planned_steps": 203,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.454515278339386,
+            -0.07502555847167969,
+            0.5920899510383606,
+            0.003914646804332733,
+            0.9999226331710815,
+            -0.003969788551330566,
+            0.011118791997432709
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.4544999897480011,
+            -0.07500001043081284,
+            0.5199013094902039,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.454489141702652,
+            -0.0749930888414383,
+            0.5211791396141052,
+            0.003803432220593095,
+            0.9999374151229858,
+            4.553794860839844e-05,
+            0.010522687807679176
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.4544947147369385,
+            -0.07499930262565613,
+            0.6196717381477356,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.77,
+          "planned_steps": 277,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544947147369385,
+            -0.07499930262565613,
+            0.5196717381477356,
+            0.00378476083278656,
+            0.9999382495880127,
+            2.980231954552437e-07,
+            0.010450508445501328
+          ]
+        },
+        {
+          "curve": "cubic_current",
+          "goal_pose": [
+            0.45449966192245483,
+            -0.07500074058771133,
+            0.7097093009948731,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.5100000000000002,
+          "planned_steps": 251,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.45449966192245483,
+            -0.07500074058771133,
+            0.6201789379119873,
+            0.0037852139212191105,
+            0.9999383091926575,
+            -3.8743016261832963e-07,
+            0.01044530887156725
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5196148157119751
+    },
+    "geophys/cubic_matched": {
+      "G0_pass": true,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9299999999998976,
+        "controller_close_ready": true,
+        "end_closing_force_N": 30.0,
+        "end_opening_m": 0.033152177929878235,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 1.6987323760986328e-06,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": null,
+      "max_Nut_lift_from_reset_m": 0.1003265380859375,
+      "max_capture_translation_drift_m": 8.458142521541645e-05,
+      "max_capture_rotation_drift_rad": 0.001227958541407123,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48000000000000037,
+            "force_N": 0.0,
+            "opening_m": 0.0799999050796032,
+            "Nut_z_m": 0.4719012677669525,
+            "EE_z_m": 0.5920899510383606
+          },
+          "pos_rms": 0.002192911002513146,
+          "pos_peak": 0.0030015899075182236,
+          "rot_rms": 0.015602442992783303,
+          "rot_peak": 0.033784956393525
+        },
+        "descend_to_handle": {
+          "n": 256,
+          "last": {
+            "t_s": 3.039999999999887,
+            "force_N": 0.00445556640625,
+            "opening_m": 0.08000179007649422,
+            "Nut_z_m": 0.4719012677669525,
+            "EE_z_m": 0.5214416980743408
+          },
+          "pos_rms": 0.0010077219463438365,
+          "pos_peak": 0.0018146773846671946,
+          "rot_rms": 0.0015387312106308934,
+          "rot_peak": 0.004461690158815667
+        },
+        "close_gripper": {
+          "n": 93,
+          "last": {
+            "t_s": 3.9699999999997844,
+            "force_N": 30.0,
+            "opening_m": 0.033152177929878235,
+            "Nut_z_m": 0.47190606594085693,
+            "EE_z_m": 0.5196709632873535
+          },
+          "pos_rms": 0.00015658201137991914,
+          "pos_peak": 0.00042854122720955,
+          "rot_rms": 0.00014596456091985692,
+          "rot_peak": 0.00021308825575657938
+        },
+        "verify_lift": {
+          "n": 349,
+          "last": {
+            "t_s": 7.4599999999994,
+            "force_N": 30.0,
+            "opening_m": 0.03307567164301872,
+            "Nut_z_m": 0.5723092555999756,
+            "EE_z_m": 0.6199990510940552
+          },
+          "pos_rms": 0.0007957385872508088,
+          "pos_peak": 0.0013334341217695548,
+          "rot_rms": 0.00045441894513183857,
+          "rot_peak": 0.0006578661084147855
+        }
+      },
+      "reference_sequence_SHA256": "cd9b4a89d6735caf3838c713d542909d3d95d0c6002d9552b45a4a65253fa488",
+      "plan_spec": [
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.45445698499679565,
+            -0.07505333423614502,
+            0.5929791927337646,
+            -9.828904876485467e-05,
+            0.9996864795684814,
+            0.02503734827041626,
+            0.0001814453862607479
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.4544999799728546,
+            -0.07500001360968617,
+            0.5219013069269494,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.47,
+          "planned_steps": 247,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.454515278339386,
+            -0.07502555847167969,
+            0.5920899510383606,
+            0.003914646804332733,
+            0.9999226331710815,
+            -0.003969788551330566,
+            0.011118791997432709
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.4544999897480011,
+            -0.07500001043081284,
+            0.5199013094902039,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.4544967710971832,
+            -0.0749962106347084,
+            0.5214416980743408,
+            0.0038079270161688328,
+            0.9999372959136963,
+            2.9653310775756836e-05,
+            0.010530856437981129
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.45449474453926086,
+            -0.0749998465180397,
+            0.6196709632873535,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.4,
+          "planned_steps": 340,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.45449474453926086,
+            -0.0749998465180397,
+            0.5196709632873535,
+            0.0037855147384107113,
+            0.9999381899833679,
+            8.940696716308594e-08,
+            0.010451915673911572
+          ]
+        },
+        {
+          "curve": "cubic_matched",
+          "goal_pose": [
+            0.454498827457428,
+            -0.07500037550926208,
+            0.7096898102760315,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.08,
+          "planned_steps": 308,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.454498827457428,
+            -0.07500037550926208,
+            0.6199990510940552,
+            0.003790336661040783,
+            0.9999380707740784,
+            1.1920927533992653e-07,
+            0.010463399812579155
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5196032524108887
+    },
+    "geophys/quintic": {
+      "G0_pass": true,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9299999999998976,
+        "controller_close_ready": true,
+        "end_closing_force_N": 30.0,
+        "end_opening_m": 0.03355824202299118,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 2.5387853384017944e-06,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": null,
+      "max_Nut_lift_from_reset_m": 0.10019713640213013,
+      "max_capture_translation_drift_m": 0.0001259039196749067,
+      "max_capture_rotation_drift_rad": 0.001152990231227641,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48000000000000037,
+            "force_N": 0.0,
+            "opening_m": 0.0799999050796032,
+            "Nut_z_m": 0.4719012677669525,
+            "EE_z_m": 0.5920895338058472
+          },
+          "pos_rms": 0.0021923923555391502,
+          "pos_peak": 0.002998757222780993,
+          "rot_rms": 0.015777534678481777,
+          "rot_peak": 0.035414460113248294
+        },
+        "descend_to_handle": {
+          "n": 256,
+          "last": {
+            "t_s": 3.039999999999887,
+            "force_N": 0.036346435546875,
+            "opening_m": 0.08001469075679779,
+            "Nut_z_m": 0.4719010293483734,
+            "EE_z_m": 0.5217228531837463
+          },
+          "pos_rms": 0.0012799255847785293,
+          "pos_peak": 0.002167228874475254,
+          "rot_rms": 0.001558760110059339,
+          "rot_peak": 0.004451719272218847
+        },
+        "close_gripper": {
+          "n": 93,
+          "last": {
+            "t_s": 3.9699999999997844,
+            "force_N": 30.0,
+            "opening_m": 0.03355824202299118,
+            "Nut_z_m": 0.47191932797431946,
+            "EE_z_m": 0.5196459293365479
+          },
+          "pos_rms": 0.00016938784434676485,
+          "pos_peak": 0.00027229825347677784,
+          "rot_rms": 0.00014005627430065232,
+          "rot_peak": 0.00019426586877918897
+        },
+        "verify_lift": {
+          "n": 349,
+          "last": {
+            "t_s": 7.4599999999994,
+            "force_N": 30.0,
+            "opening_m": 0.03347331844270229,
+            "Nut_z_m": 0.5721303820610046,
+            "EE_z_m": 0.6197344064712524
+          },
+          "pos_rms": 0.0009718511534846003,
+          "pos_peak": 0.0015851274952924813,
+          "rot_rms": 0.000505831936899353,
+          "rot_peak": 0.0008520961004832408
+        }
+      },
+      "reference_sequence_SHA256": "2a5a4948309a64ad2ecd37caddc8193cd6a5462a5453a28e3f8e91c6be31820c",
+      "plan_spec": [
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.45445698499679565,
+            -0.07505333423614502,
+            0.5929791927337646,
+            -9.828904876485467e-05,
+            0.9996864795684814,
+            0.02503734827041626,
+            0.0001814453862607479
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.4544999799728546,
+            -0.07500001360968617,
+            0.5219013069269494,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.47,
+          "planned_steps": 247,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.454515278339386,
+            -0.07502605766057968,
+            0.5920895338058472,
+            0.003925389610230923,
+            0.9999217987060547,
+            -0.0040590460412204266,
+            0.011156614869832993
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.4544999897480011,
+            -0.07500001043081284,
+            0.5199013094902039,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.45449957251548767,
+            -0.07499752193689346,
+            0.5217228531837463,
+            0.003807577071711421,
+            0.9999372959136963,
+            1.3500451132131275e-05,
+            0.010533943772315979
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.4544934332370758,
+            -0.07499933987855911,
+            0.6196459293365478,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.4,
+          "planned_steps": 340,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544934332370758,
+            -0.07499933987855911,
+            0.5196459293365479,
+            0.003783698193728924,
+            0.9999382495880127,
+            6.556510925292969e-07,
+            0.010447102598845959
+          ]
+        },
+        {
+          "curve": "quintic",
+          "goal_pose": [
+            0.45449796319007874,
+            -0.07499833405017853,
+            0.7096040391921997,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.08,
+          "planned_steps": 308,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.45449796319007874,
+            -0.07499833405017853,
+            0.6197344064712524,
+            0.003794813761487603,
+            0.9999379515647888,
+            8.940696147874405e-07,
+            0.010474346578121185
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5195319056510925
+    },
+    "geophys/seating": {
+      "G0_pass": false,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 1.4399999999998419,
+        "controller_close_ready": true,
+        "end_closing_force_N": 30.0,
+        "end_opening_m": 0.033613359555602074,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 2.7138739824295044e-06,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": "G0_close_or_verify_lift_gate",
+      "max_Nut_lift_from_reset_m": 0.1010778546333313,
+      "max_capture_translation_drift_m": 0.00016333809514551125,
+      "max_capture_rotation_drift_rad": 0.0009495669382221664,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48000000000000037,
+            "force_N": 0.0,
+            "opening_m": 0.0799999050796032,
+            "Nut_z_m": 0.4719012677669525,
+            "EE_z_m": 0.5920899510383606
+          },
+          "pos_rms": 0.002192911002513146,
+          "pos_peak": 0.0030015899075182236,
+          "rot_rms": 0.015602442992783303,
+          "rot_peak": 0.033784956393525
+        },
+        "descend_to_handle": {
+          "n": 212,
+          "last": {
+            "t_s": 2.5999999999999353,
+            "force_N": 0.0540008544921875,
+            "opening_m": 0.08002176508307457,
+            "Nut_z_m": 0.47190061211586,
+            "EE_z_m": 0.5211791396141052
+          },
+          "pos_rms": 0.0014814506093182248,
+          "pos_peak": 0.0026501912240223294,
+          "rot_rms": 0.0017344876418489616,
+          "rot_peak": 0.004503767666151414
+        },
+        "close_gripper": {
+          "n": 144,
+          "last": {
+            "t_s": 4.039999999999777,
+            "force_N": 30.0,
+            "opening_m": 0.033613359555602074,
+            "Nut_z_m": 0.471905380487442,
+            "EE_z_m": 0.5167192816734314
+          },
+          "pos_rms": 0.00026498822600125576,
+          "pos_peak": 0.0006734096622028835,
+          "rot_rms": 0.00012386366960276214,
+          "rot_peak": 0.0002003031027122991
+        },
+        "verify_lift": {
+          "n": 286,
+          "last": {
+            "t_s": 6.899999999999462,
+            "force_N": 30.0,
+            "opening_m": 0.03356174752116203,
+            "Nut_z_m": 0.5725732445716858,
+            "EE_z_m": 0.6172261238098145
+          },
+          "pos_rms": 0.0011943532129485314,
+          "pos_peak": 0.0019945599815720024,
+          "rot_rms": 0.0005703765766259879,
+          "rot_peak": 0.0008372574730822824
+        }
+      },
+      "reference_sequence_SHA256": "d3b1413e81ea6cf57c5f2a5afb361937d0282cc65c6887cae43b46ec45b8ea97",
+      "plan_spec": [
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.45445698499679565,
+            -0.07505333423614502,
+            0.5929791927337646,
+            -9.828904876485467e-05,
+            0.9996864795684814,
+            0.02503734827041626,
+            0.0001814453862607479
+          ]
+        },
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.4544999799728546,
+            -0.07500001360968617,
+            0.5219013069269494,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.0300000000000002,
+          "planned_steps": 203,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.454515278339386,
+            -0.07502555847167969,
+            0.5920899510383606,
+            0.003914646804332733,
+            0.9999226331710815,
+            -0.003969788551330566,
+            0.011118791997432709
+          ]
+        },
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.4544999897480011,
+            -0.07500001043081284,
+            0.5172013352394104,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 1.35,
+          "planned_steps": 135,
+          "seating_extra_down_m": 0.0027,
+          "seating_fixed_hold_s": 0.1,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.454489141702652,
+            -0.0749930888414383,
+            0.5211791396141052,
+            0.003803432220593095,
+            0.9999374151229858,
+            4.553794860839844e-05,
+            0.010522687807679176
+          ]
+        },
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.45449212193489075,
+            -0.07499918341636658,
+            0.6167192816734314,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.77,
+          "planned_steps": 277,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.45449212193489075,
+            -0.07499918341636658,
+            0.5167192816734314,
+            0.0037770140916109085,
+            0.9999385476112366,
+            5.662440685227921e-07,
+            0.010424855165183544
+          ]
+        },
+        {
+          "curve": "seating",
+          "goal_pose": [
+            0.45449692010879517,
+            -0.0750005692243576,
+            0.7066528940200806,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.5100000000000002,
+          "planned_steps": 251,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.45449692010879517,
+            -0.0750005692243576,
+            0.6172261238098145,
+            0.0037852346431463957,
+            0.9999382495880127,
+            -2.086162567138672e-07,
+            0.010445564985275269
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5165693163871765
+    },
+    "geophys/seating_after_authorization": {
+      "G0_pass": true,
+      "verify_lift_pass": true,
+      "authorization": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9299999999998976,
+        "controller_close_ready": true,
+        "end_closing_force_N": 30.0,
+        "end_opening_m": 0.03362607583403587,
+        "fallback_grasped_nut_throughout": true,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 1.560896635055542e-06,
+        "fallback_window_duration_s": 0.1,
+        "fallback_window_ticks": 10,
+        "pose_gate_at_authorization": true,
+        "stable_fallback_satisfied": true
+      },
+      "failure": null,
+      "max_Nut_lift_from_reset_m": 0.10406768321990967,
+      "max_capture_translation_drift_m": 0.0032000058009048382,
+      "max_capture_rotation_drift_rad": 0.0006907881941335423,
+      "qref_initial_reset_events": 1,
+      "additional_qref_reset_events": 0,
+      "lead_clamp_events": 0,
+      "actuator_saturation_fraction": 0.0,
+      "stage_stats": {
+        "approach_nut": {
+          "n": 48,
+          "last": {
+            "t_s": 0.48000000000000037,
+            "force_N": 0.0,
+            "opening_m": 0.0799999050796032,
+            "Nut_z_m": 0.4719012677669525,
+            "EE_z_m": 0.5920899510383606
+          },
+          "pos_rms": 0.002192911002513146,
+          "pos_peak": 0.0030015899075182236,
+          "rot_rms": 0.015602442992783303,
+          "rot_peak": 0.033784956393525
+        },
+        "descend_to_handle": {
+          "n": 212,
+          "last": {
+            "t_s": 2.5999999999999353,
+            "force_N": 0.0540008544921875,
+            "opening_m": 0.08002176508307457,
+            "Nut_z_m": 0.47190061211586,
+            "EE_z_m": 0.5211791396141052
+          },
+          "pos_rms": 0.0014814506093182248,
+          "pos_peak": 0.0026501912240223294,
+          "rot_rms": 0.0017344876418489616,
+          "rot_peak": 0.004503767666151414
+        },
+        "close_gripper": {
+          "n": 93,
+          "last": {
+            "t_s": 3.529999999999833,
+            "force_N": 30.0,
+            "opening_m": 0.03362607583403587,
+            "Nut_z_m": 0.4719015061855316,
+            "EE_z_m": 0.5196717381477356
+          },
+          "pos_rms": 0.00020319751389468016,
+          "pos_peak": 0.0006734096622028835,
+          "rot_rms": 0.00014356921144614897,
+          "rot_peak": 0.0002003031027122991
+        },
+        "verify_lift": {
+          "n": 344,
+          "last": {
+            "t_s": 6.969999999999454,
+            "force_N": 30.0,
+            "opening_m": 0.0335587989538908,
+            "Nut_z_m": 0.575594425201416,
+            "EE_z_m": 0.6201654672622681
+          },
+          "pos_rms": 0.001090156306828981,
+          "pos_peak": 0.0019496993012725124,
+          "rot_rms": 0.0005311339350039791,
+          "rot_peak": 0.0008399321639062064
+        }
+      },
+      "reference_sequence_SHA256": "f0babe3c2c3af49ea128f7ad1b9e02ac38aa56125937965f20421e5a68e1608b",
+      "plan_spec": [
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.45449997997283936,
+            -0.07500000298023224,
+            0.5929999899864197,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 0.39,
+          "planned_steps": 39,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "approach_nut",
+          "start_pose": [
+            0.45445698499679565,
+            -0.07505333423614502,
+            0.5929791927337646,
+            -9.828904876485467e-05,
+            0.9996864795684814,
+            0.02503734827041626,
+            0.0001814453862607479
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4544999799728546,
+            -0.07500001360968617,
+            0.5219013069269494,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.0300000000000002,
+          "planned_steps": 203,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "descend_to_handle",
+          "start_pose": [
+            0.454515278339386,
+            -0.07502555847167969,
+            0.5920899510383606,
+            0.003914646804332733,
+            0.9999226331710815,
+            -0.003969788551330566,
+            0.011118791997432709
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4544999897480011,
+            -0.07500001043081284,
+            0.5199013094902039,
+            0.003800000064074993,
+            0.9999376535415649,
+            0.0,
+            0.010499999858438969
+          ],
+          "planned_duration_s": 0.84,
+          "planned_steps": 84,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "close_gripper",
+          "start_pose": [
+            0.454489141702652,
+            -0.0749930888414383,
+            0.5211791396141052,
+            0.003803432220593095,
+            0.9999374151229858,
+            4.553794860839844e-05,
+            0.010522687807679176
+          ]
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.4544947147369385,
+            -0.07499930262565613,
+            0.6196717381477356,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 3.35,
+          "planned_steps": 335,
+          "seating_extra_down_m": 0.0027,
+          "seating_fixed_hold_s": 0.1,
+          "stage": "verify_lift",
+          "start_pose": [
+            0.4544947147369385,
+            -0.07499930262565613,
+            0.5196717381477356,
+            0.00378476083278656,
+            0.9999382495880127,
+            2.980231954552437e-07,
+            0.010450508445501328
+          ],
+          "seating_location": "after_authorization"
+        },
+        {
+          "curve": "seating_after_authorization",
+          "goal_pose": [
+            0.454499751329422,
+            -0.07500071078538895,
+            0.706571056842804,
+            0.0038000000116137074,
+            0.9999376530560483,
+            0.0,
+            0.010500000032090508
+          ],
+          "planned_duration_s": 2.44,
+          "planned_steps": 244,
+          "seating_extra_down_m": 0.0,
+          "seating_fixed_hold_s": 0.0,
+          "stage": "raise_for_transport",
+          "start_pose": [
+            0.454499751329422,
+            -0.07500071078538895,
+            0.6201654672622681,
+            0.0037855615373700857,
+            0.9999382495880127,
+            -1.7881392011531716e-07,
+            0.010446460917592049
+          ]
+        }
+      ],
+      "min_verify_EE_Z_m": 0.5164893865585327
+    }
+  }
+}

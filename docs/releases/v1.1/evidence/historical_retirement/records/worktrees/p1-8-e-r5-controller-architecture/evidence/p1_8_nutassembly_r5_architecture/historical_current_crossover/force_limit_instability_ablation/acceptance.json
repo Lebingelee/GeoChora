@@ -1,0 +1,14 @@
+{
+  "status": "force_profile_causal_effect_supported_TB100_only",
+  "diagnostic_lift_pass_limits_N": [
+    20,
+    10
+  ],
+  "runtime_failure_limits_N": [
+    30
+  ],
+  "nominal_G0_accepted": false,
+  "low_force_fixed_time_lift_non_authorized": true,
+  "production_modified": false,
+  "no_qualification_claim": true
+}

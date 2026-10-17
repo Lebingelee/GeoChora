@@ -1,0 +1,346 @@
+{
+  "schema": "geochora-p1-8-historical-retirement-copy-index-v1",
+  "status": "RELEASE_CANDIDATE — NOT_PUBLISHED",
+  "source_root_repo_relative": "workspace/qualification/phase1/archives/p2_0_part_a/legacy_evidence_archive/p1_8_integration_20261012",
+  "preservation_note": "Copied files below are byte-for-byte historical metadata records, not new qualification decisions. Items not copied remain in the P1.8 archive pending retirement review.",
+  "records": [
+    {
+      "source_path": "archive_complete.json",
+      "preserved_path": "p1_8_archive_complete.json",
+      "size_bytes": 192,
+      "sha256": "b7e8a975b14f8781f52e8b6fe94df2ee18c0fd6b7bb0c262f962b9eb216ef339",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "integration_regression/final_regression/equivalence.json",
+      "preserved_path": "records/integration_regression/final_regression/equivalence.json",
+      "size_bytes": 2421,
+      "sha256": "5002a26e37bdc4de508e5ed4683e11321d98f260ebd4a0f05123cc750397aaf6",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "integration_regression/regression/equivalence.json",
+      "preserved_path": "records/integration_regression/regression/equivalence.json",
+      "size_bytes": 2368,
+      "sha256": "391bd87f2a0149f790bfd3a025aedee67d33e22ab1417ff3b7e2e091cfa5609d",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r4-dynamic-retuning/evidence/p1_8_nutassembly_dynamic_recovery/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r4-dynamic-retuning/evidence/p1_8_nutassembly_dynamic_recovery/acceptance.json",
+      "size_bytes": 1032,
+      "sha256": "c7bd419911a549cbcdc3d6c5c58b4486ed6bf8aa4882812e1c1d63ac31bf6fe0",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r4-dynamic-retuning/evidence/p1_8_nutassembly_dynamic_recovery/acceptance_report.md",
+      "preserved_path": "records/worktrees/p1-8-e-r4-dynamic-retuning/evidence/p1_8_nutassembly_dynamic_recovery/acceptance_report.md",
+      "size_bytes": 2347,
+      "sha256": "bcd104c276fad7776c7899e7b30e73806bc6f5e5eab250e3361c8a30859be559",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/acceptance.json",
+      "size_bytes": 31589,
+      "sha256": "74571417d5cf31e9322286f0b58e33f38d607713ea84138dec315c7964b4a63b",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/acceptance_report.md",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/acceptance_report.md",
+      "size_bytes": 21090,
+      "sha256": "398ec7c2eb6828e7bb3c39c56ff38c20234717ab5a6deaa119bce9cbb9cbb893",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/engineering_grasp_audit/engineering_decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/engineering_grasp_audit/engineering_decision.json",
+      "size_bytes": 10514,
+      "sha256": "895a3fdd728be96bfa04bd91c3e15be1137beac980548888d9f84a6d5b0fa528",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/grasp_retention/retention_decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/grasp_retention/retention_decision.json",
+      "size_bytes": 5887,
+      "sha256": "e0d2347649cfdc0587bf476652b2fdab076ad1779ca7d6d5cebc4beb5119dc6e",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/arm_response_ablation/decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/arm_response_ablation/decision.json",
+      "size_bytes": 366,
+      "sha256": "a574cb3e341cffe65740d571eac5bab20f97448da3c4c2c37563ec4377613b78",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/causal_decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/causal_decision.json",
+      "size_bytes": 7834,
+      "sha256": "d11243f0f7581425fc7d03224e133c0491a15c83db88d0b623dd9e5dac280fef",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/force_limit_instability_ablation/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/force_limit_instability_ablation/acceptance.json",
+      "size_bytes": 318,
+      "sha256": "cbb02017d169855059ebfb452d319d6cc9e53613aa6b7b11075856c0a24e87e7",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/gripper_history_ablation/decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/gripper_history_ablation/decision.json",
+      "size_bytes": 318,
+      "sha256": "da02534fafed2717c0ad684e7744111ce50b834680b31a43411d680788b3d3f4",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/historical_state_ablation/decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/historical_state_ablation/decision.json",
+      "size_bytes": 39339,
+      "sha256": "42e60ef1d8e5fd0907f694375f9b74f342627649e96643b8208d3951d75539ad",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/planner_seating_ablation/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/planner_seating_ablation/acceptance.json",
+      "size_bytes": 79584,
+      "sha256": "4c9c842780f810b7f91c8de9925f1066efd40b230af1b060226103d311ae9ef6",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/preclose_stability_ablation/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/preclose_stability_ablation/acceptance.json",
+      "size_bytes": 299,
+      "sha256": "6963ba68d184514d58bcca2e9aca0d507f2d5b4927937f0c9df2cad471bbbaf0",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/qref_mechanism_ablation/decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/qref_mechanism_ablation/decision.json",
+      "size_bytes": 50933,
+      "sha256": "18f9fa3a7a3f72fcc3f1e56b347fab6ddd9d70d298f488a2c370ade8f31a8b71",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/reset_component_ablation/decision.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/reset_component_ablation/decision.json",
+      "size_bytes": 25058,
+      "sha256": "40567da3aabca4e271e51683c1e8877ae9c866d9e48f8022187d9fe523de2416",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/stable_grasp_10n_candidate/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/stable_grasp_10n_candidate/acceptance.json",
+      "size_bytes": 357,
+      "sha256": "07721c4cb0fc2a8aa8f8f9cf973c00c675636773f2de2679a864ab2fbb65caed",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/static_grasp_height_ablation/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/static_grasp_height_ablation/acceptance.json",
+      "size_bytes": 208,
+      "sha256": "72e787acaae8f112eceaf8efe2c06d29808bbaa816d838440c71881b2e2bf973",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/verify_lift_trajectory_ablation/instrumentation_repeat/media_equivalence.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/verify_lift_trajectory_ablation/instrumentation_repeat/media_equivalence.json",
+      "size_bytes": 849,
+      "sha256": "ef8aba2549719578ce5d89f15fbd64afb462859f044d4693ad4f1c8b72698a28",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/materialization_audit/materialization_report.md",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/materialization_audit/materialization_report.md",
+      "size_bytes": 12008,
+      "sha256": "4b41f525648bf904ff7c388f8d9f08569860590e2786c7141255493acc9380c1",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/rejected_achieved_state/acceptance.json",
+      "preserved_path": "records/worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/rejected_achieved_state/acceptance.json",
+      "size_bytes": 2030,
+      "sha256": "a83a51b0f0506182cb103d9997032f994156d077a1094f444135084468ad581d",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/acceptance.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/acceptance.json",
+      "size_bytes": 13518,
+      "sha256": "993d39591cfb03fa2992cab76bd6abf5cad74fe4a18416a7190ae03fb5b9d671",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/acceptance_report.md",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/acceptance_report.md",
+      "size_bytes": 7474,
+      "sha256": "2fbb66b0f13bc8e24238a52e436f0198945163c1750e1dbdff87eb071aef7161",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/committed_source_identity.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/committed_source_identity.json",
+      "size_bytes": 2466,
+      "sha256": "18b5cd4291d75a9c239b1bd673fe730048d261af4c5d1ff5b117158ed4711237",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/prerequisites/genesis/lifecycle/initial_source_identity.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/prerequisites/genesis/lifecycle/initial_source_identity.json",
+      "size_bytes": 220,
+      "sha256": "c913af45257e6627444fbe28aa768f2f1cd6e9c9887fab87ffca104df58ca4ff",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/sapien_recovery/acceptance_report.md",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/sapien_recovery/acceptance_report.md",
+      "size_bytes": 5243,
+      "sha256": "de9efe40fdd17b7daa1cd9455b0d6fa4454ccc1bc458914d506d00ee2bf008b5",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/sapien_recovery/committed_source_identity.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/sapien_recovery/committed_source_identity.json",
+      "size_bytes": 3099,
+      "sha256": "a5a547a4eebfca8466dbd8da2ec2a33cea2278fe399b76c91d305f88c5c739bb",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multirate_timebase/acceptance.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_multirate_timebase/acceptance.json",
+      "size_bytes": 4229,
+      "sha256": "6a4dbaa2eb9ff9411745b7ad60f59974caa903a28eb6a88bb7e1cd4e43071baa",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_grasp_recovery/acceptance.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_grasp_recovery/acceptance.json",
+      "size_bytes": 814,
+      "sha256": "f5240fc4849afd41fa5407d64b30d80e88260c9dfe203ee04394e2d1773a38fb",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_multirate/acceptance.json",
+      "preserved_path": "records/worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_multirate/acceptance.json",
+      "size_bytes": 5076,
+      "sha256": "43d9457fbb1aa79b929b8aa8ea7b20aaeb52a109db74d14b703cc19f95d5a0ae",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_rate_control/acceptance.json",
+      "preserved_path": "records/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_rate_control/acceptance.json",
+      "size_bytes": 3733,
+      "sha256": "5a5972613a8d4f247a2cbaddcd5af98fb7169a774f4448076d2aab0d2b2f8db2",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_solution_recovery/acceptance_report.md",
+      "preserved_path": "records/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_solution_recovery/acceptance_report.md",
+      "size_bytes": 5519,
+      "sha256": "f8ecdc8741ea05149de34e24ad450f2aaccf0f6a13976a7026a1e1f75cf80a20",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_solution_recovery/planner_gripper_analysis.md",
+      "preserved_path": "records/worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_solution_recovery/planner_gripper_analysis.md",
+      "size_bytes": 8077,
+      "sha256": "744cd2ba9dc37cdf7b03bca121c7f0c83b05ed59e3a77b387f0d2431d3d99aec",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18e-r3-nominal/evidence/p1_8_nutassembly_nominal/acceptance.json",
+      "preserved_path": "records/worktrees/p18e-r3-nominal/evidence/p1_8_nutassembly_nominal/acceptance.json",
+      "size_bytes": 3818,
+      "sha256": "84c9313f9981a06608ee18801ccfbe63e7c4c82d62942652ce8061738f0202e6",
+      "copy_verification": "BYTE_IDENTICAL"
+    },
+    {
+      "source_path": "worktrees/p18e-r3-nominal/evidence/p1_8_nutassembly_nominal/acceptance_report.md",
+      "preserved_path": "records/worktrees/p18e-r3-nominal/evidence/p1_8_nutassembly_nominal/acceptance_report.md",
+      "size_bytes": 6517,
+      "sha256": "5a98122a53a86e0e1b65f9a52f1fb226edb3d0386b07ebfbca3649c190d22d62",
+      "copy_verification": "BYTE_IDENTICAL"
+    }
+  ],
+  "not_copied": [
+    {
+      "source_path": "file_manifest.json",
+      "size_bytes": 1752569,
+      "sha256": "0eb01f44b3b3409b11c4874e5bccc06c56d35af4104e21448a5f46819532f943",
+      "reason": "EXCLUDED_PRIVATE_MACHINE_PATHS; raw bytes remain local in archive"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/historical_current_crossover/equal_rate_close_1p5/acceptance.json",
+      "size_bytes": 109399343,
+      "reason": "EXCLUDED_LARGE_HISTORICAL_RECORD; raw bytes remain local in archive",
+      "current_sha256": "NOT_COMPUTED"
+    },
+    {
+      "source_path": "worktrees/p1-8-e-r5-controller-architecture/evidence/p1_8_nutassembly_r5_architecture/rejected_achieved_state/acceptance_report.md",
+      "size_bytes": 6777,
+      "sha256": "62558934551f5d4fe5fc5ceef08dc9cb496f3fb6e33e03999280ed6eb5e9b883",
+      "reason": "EXCLUDED_PRIVATE_MACHINE_PATHS; raw bytes remain local in archive"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multi_backend_replay/sapien_recovery/acceptance.json",
+      "size_bytes": 16928,
+      "sha256": "03cf736278835702b1d35b04534510a2666d2d934a734b54cff45b45de805d14",
+      "reason": "EXCLUDED_PRIVATE_MACHINE_PATHS; raw bytes remain local in archive"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_multirate_timebase/acceptance_report.md",
+      "size_bytes": 5082,
+      "sha256": "8493abb8828ec7226461d3d2ad1e1929b81ee79c6a64385d4d30f22a600ed9f5",
+      "reason": "EXCLUDED_FROM_GIT_PACKAGE: its verbatim relative references include machine-path-bearing evidence_index/multirate_matrix; original bytes remain unchanged in the local archive.",
+      "original_source_unchanged": true
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_grasp_recovery/acceptance_report.md",
+      "size_bytes": 6084,
+      "sha256": "0b1ccbbc0b7d5e8d64ac5c01eee02e9b9dd8982f9eb7634b6b47b6be98b6655c",
+      "reason": "EXCLUDED_PRIVATE_MACHINE_PATHS; raw bytes remain local in archive"
+    },
+    {
+      "source_path": "worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_multirate/acceptance_report.md",
+      "size_bytes": 6742,
+      "sha256": "61d2e61349ebdd6e5256a8a52d68cb129626dd7b0165906c8214b1c7002085fa",
+      "reason": "EXCLUDED_FROM_GIT_PACKAGE: its verbatim relative references include machine-path-bearing supporting records; original bytes remain unchanged in the local archive.",
+      "original_source_unchanged": true
+    },
+    {
+      "source_path": "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_rate_control/acceptance_report.md",
+      "size_bytes": 6613,
+      "sha256": "10b10c7e44b79400c271977fbebcbb62189cb2c657e2b1ff2f19fe10dec4d485",
+      "reason": "EXCLUDED_FROM_GIT_PACKAGE: source report contains existing trailing whitespace; keep exact source in archive rather than normalize it.",
+      "original_source_unchanged": true
+    },
+    {
+      "source_path": "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_solution_recovery/acceptance.json",
+      "size_bytes": 15896,
+      "sha256": "f0e97230f80d6ce195449689731d711b41ac62d259f9ba1dc9a43e1bbdff95e5",
+      "reason": "EXCLUDED_PRIVATE_MACHINE_PATHS; raw bytes remain local in archive"
+    }
+  ],
+  "summary": {
+    "source_records_considered": 46,
+    "copied_record_count": 37,
+    "copied_bytes": 366744,
+    "excluded_record_count": 9,
+    "preserves_formal_human_judge_decision": false,
+    "qualification_status": "No new or changed qualification decision; P1.8 formal Human/Judge qualification remains not approved.",
+    "copies_verified_byte_identical": true,
+    "records_preserving_formal_human_judge_decision": false
+  },
+  "relative_link_review": {
+    "retained_report_links": "All local relative links from copied acceptance reports are satisfied by the preserved support-file set.",
+    "omitted_reports": [
+      "worktrees/p18-multi-backend-replay/evidence/p1_8_multirate_timebase/acceptance_report.md",
+      "worktrees/p18-multi-backend-replay/evidence/p1_8_nutassembly_multirate/acceptance_report.md",
+      "worktrees/p18e-r2-recovery/evidence/p1_8_nutassembly_rate_control/acceptance_report.md"
+    ],
+    "omitted_or_private_support_references": "Remain named in original source records; not copied where they contain private paths.",
+    "recursive_link_scan": "See preflight verification; package remains an uncommitted candidate."
+  }
+}

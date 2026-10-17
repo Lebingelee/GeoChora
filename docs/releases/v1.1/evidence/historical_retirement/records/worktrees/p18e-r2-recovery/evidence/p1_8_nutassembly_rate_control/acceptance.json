@@ -1,0 +1,80 @@
+{
+  "comparison": {
+    "nut_mujoco_tb100_force29_seed19": {
+      "closing_feedback_at_first_grasp_N": 1.0633418807417314,
+      "final_grasped_nut": false,
+      "lift_relative_rotation_deviation_max_rad": 0.35042685880845,
+      "lift_relative_translation_deviation_max_m": 0.09881768924612258,
+      "max_nut_lift_m": 0.015830670786741552,
+      "opening_at_first_grasp_m": 0.044570678799698275
+    },
+    "pickcube_mujoco_seed31": {
+      "closing_feedback_at_readiness_N": 29.01725004100178,
+      "lift_relative_rotation_deviation_max_rad": 0.03823510083984066,
+      "lift_relative_translation_deviation_max_m": 0.014164121391652303,
+      "max_cube_lift_m": 0.10531660301603113,
+      "opening_at_readiness_m": 0.017156143281268948,
+      "task_success": true
+    }
+  },
+  "date": "2026-10-07",
+  "diagnostic_limit": "Canonical closing-force readiness is not object-retention readiness. Native MuJoCo contact values are diagnostic only.",
+  "established": [
+    {
+      "claim": "Free-space EE tracking passes the predeclared bounds for all three rates on GeoPhys and MuJoCo.",
+      "intersections": 6,
+      "profiles": {
+        "NA-TB100": "candidate01",
+        "NA-TB50": "candidate01",
+        "NA-TB500": "candidate02"
+      }
+    },
+    {
+      "claim": "Unloaded gripper open-close-hold-reopen sweep passes at all three rates on both providers.",
+      "intersections": 6
+    },
+    {
+      "claim": "PickCube can be carried by the stored MuJoCo P1.5 readiness route: P1.6 reran seed31 as a passing regression, cube lift 0.1053166 m.",
+      "evidence": "P1.6 regression/p1_5_readiness/mujoco/seed31"
+    },
+    {
+      "claim": "The Nut reaches the requested close region, has contacts with both MuJoCo fingers, and briefly satisfies the canonical grasp semantic before slipping."
+    }
+  ],
+  "evidence_refs": [
+    "report.md",
+    "pickcube_nut_force_pose_comparison.md",
+    "pickcube_nut_force_pose_comparison.json",
+    "results.json"
+  ],
+  "failed": [
+    {
+      "claim": "Stable Nut loaded retention on MuJoCo across the three control rates.",
+      "first_boundary": "mujoco_loaded_grasp_retention",
+      "intersections_passed": 0,
+      "intersections_total": 3
+    },
+    {
+      "claim": "Increasing the force limit to 45 N / 60 N or reducing TB100 lift speed alone fixes Nut retention.",
+      "evidence": "capture_force45, capture_force60, capture_force60_readiness49, capture_slow_lift"
+    }
+  ],
+  "first_failing_boundary": "mujoco_loaded_grasp_retention",
+  "p1_8_e_disposition": "PARTIAL / NOT APPROVED; D0/D1/D2 remain N/A without a successful golden Nut trajectory.",
+  "profile_policy": "Experimental profile overlays are each bound to one immutable TaskArtifact hash/timebase; TaskArtifact identity and runtime defaults are unchanged.",
+  "qualification_claim": false,
+  "schema": "nutassembly-rate-control-acceptance-v0",
+  "scope": "Artifact-bound multi-rate planner/controller and gripper diagnostics; not NutAssembly qualification",
+  "status": "partial_with_localized_failure",
+  "task_artifact_hashes": {
+    "NA-TB100": "c288c8bc43f4a4c7d112e1937ec3348a363acced6d1a6aa798117e8eb33f9a03",
+    "NA-TB50": "d60d7ec1a69483ccae5f793e3a3ddabed3244479ec42324f3a1b6b7078da00fc",
+    "NA-TB500": "078c1b01bc4223b79bd93da2cf7e2508380deaf1d36c8354fc31fcb60edc46de"
+  },
+  "unqualified": [
+    "Full NutAssembly task success, peg transport, insertion and release.",
+    "General provider equivalence or MuJoCo provider-wide grasp failure.",
+    "Native contact-force equivalence between PickCube and Nut; the successful cube trace has no native contact-force rows.",
+    "A single causal attribution among Nut contact geometry, force readback/mapping and provider contact realization."
+  ]
+}

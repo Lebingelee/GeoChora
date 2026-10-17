@@ -1,0 +1,5 @@
+{
+  "path": "task_env/runtime/sessions/genesis.py",
+  "sha256": "dfcadefe53e5df5236c26c0a81b3a047ae74f1c82d0063f90e7744f7cebb39bf",
+  "binding": "exact adapter bytes unchanged from first P0 invocation through capture"
+}

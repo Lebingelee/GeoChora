@@ -1,0 +1,9 @@
+{
+  "next_executed": false,
+  "next_recommended": "C arm response ablation",
+  "production_modified": false,
+  "r1_gripper_verify_pass": false,
+  "r5_gripper_verify_pass": false,
+  "status": "B_completed_no_retention_recovery",
+  "sufficiency": "complete R1 gripper block not sufficient from matched R5 close-entry"
+}

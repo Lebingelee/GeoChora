@@ -1,0 +1,129 @@
+{
+  "schema": "geochora.p1_8_nutassembly_acceptance.v0",
+  "status": "partial_with_localized_failure",
+  "human_approval_created": false,
+  "starting_implementation": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+  "first_boundary": "closed_loop_expert / close_gripper",
+  "classification": "closed_loop_expert_grasp_behavior",
+  "terminal_failure": "release_completed_without_task_success at open_gripper",
+  "established": [
+    "additive provider-neutral task/source/reset/semantic family",
+    "six state-only semantic fixtures",
+    "historical geometry/metric migration comparison",
+    "same physical NA-S0 applied on both primary providers at all three rates",
+    "six reset/state/time/ZOH checks",
+    "six unsuccessful canonical trajectory strict roundtrips",
+    "PickCube bounded regressions"
+  ],
+  "failed": [
+    "all six governed expert episodes lack grasp/lift/insertion/task success"
+  ],
+  "not_authorized": [
+    "six dependent D0 sequences",
+    "24 D1/D2 replay cells without successful source goldens"
+  ],
+  "runtime_fixes": 0,
+  "behavioral_tuning": 0,
+  "historical_parser_bookkeeping_fixes": 1,
+  "rate_specific_controller_tuning": false,
+  "rate_specific_planner_tuning": false,
+  "physics_contact_tuning": false,
+  "spec_lock": {
+    "sha256": "75867c825156a96b16f498d1e00630b4735f81e05a1b6ed1fb620f0a8bb6ee11",
+    "locked_at": "2026-10-07T08:47:07.498082+00:00"
+  },
+  "expert_identity": "ba0fe70f9f31900545852b7047c83f8d37351783765189a6274b2c3007220b7e",
+  "expert_config_hash": "e1cde97603af8c98fb4aeef0714d4c35fee7893ced0bd19539aca2aece75097d",
+  "controller_identity_by_profile": {
+    "NA-TB100": "37a41a9c55ec72ca28b7ee07f55ccff37a236b679fe353d65f9713fe89654b89",
+    "NA-TB50": "37a41a9c55ec72ca28b7ee07f55ccff37a236b679fe353d65f9713fe89654b89",
+    "NA-TB500": "37a41a9c55ec72ca28b7ee07f55ccff37a236b679fe353d65f9713fe89654b89"
+  },
+  "profiles": {
+    "NA-TB100": {
+      "artifact_hash": "c288c8bc43f4a4c7d112e1937ec3348a363acced6d1a6aa798117e8eb33f9a03",
+      "reset_sample_hash": "4677e4efc0800eacbc3c078aec5d76821421977ebb3d57fc05869bc28c9a31e3",
+      "timebase": {
+        "action_hold": "zero_order_hold",
+        "control_dt": 0.01,
+        "control_substeps": 5,
+        "observation_sampling": "post_control_step",
+        "physics_dt": 0.002,
+        "semantic_sampling": "post_control_step"
+      }
+    },
+    "NA-TB50": {
+      "artifact_hash": "d60d7ec1a69483ccae5f793e3a3ddabed3244479ec42324f3a1b6b7078da00fc",
+      "reset_sample_hash": "8d853167141a744344dff39af5bf88c179576fc7d1ba48f992a786de765f0922",
+      "timebase": {
+        "action_hold": "zero_order_hold",
+        "control_dt": 0.02,
+        "control_substeps": 10,
+        "observation_sampling": "post_control_step",
+        "physics_dt": 0.002,
+        "semantic_sampling": "post_control_step"
+      }
+    },
+    "NA-TB500": {
+      "artifact_hash": "078c1b01bc4223b79bd93da2cf7e2508380deaf1d36c8354fc31fcb60edc46de",
+      "reset_sample_hash": "fae7474e6c0dbb6177e81da85135dafee3eedf3528e3d124ec524ee3b6815fa9",
+      "timebase": {
+        "action_hold": "zero_order_hold",
+        "control_dt": 0.002,
+        "control_substeps": 1,
+        "observation_sampling": "post_control_step",
+        "physics_dt": 0.002,
+        "semantic_sampling": "post_control_step"
+      }
+    }
+  },
+  "regressions": {
+    "frozen_sources_unchanged": true,
+    "accepted_P18D_evidence_unchanged": true,
+    "spec_lock_unchanged": true,
+    "implementation_source_lock_unchanged": true,
+    "provider_source_unchanged": true,
+    "approved_baseline_ancestor": true,
+    "GeoPhys_gitlink_checkout_clean": true,
+    "public_main_unchanged": true,
+    "P1_1_PASS": true,
+    "PickCube_D0_PASS": true,
+    "PickCube_D1_D2_spots_PASS": true,
+    "provider_free_guard_PASS": true,
+    "six_expert_attempts_complete": true,
+    "six_strict_roundtrips_PASS": true,
+    "six_reset_time_ZOH_PASS": true,
+    "legacy_geometry_metric_migration_PASS": true,
+    "no_Human_decision_created": true,
+    "diff_check_PASS": true,
+    "new_source_AST_PASS": true,
+    "JSON_YAML_parse_PASS": true
+  },
+  "limitations": [
+    "deterministic sample only",
+    "common failure across rates does not isolate rate as sole cause",
+    "gripper/source/controller compatibility is a recovery hypothesis, not established defect",
+    "boundary contact capture may miss substep transients",
+    "replay implementations untested for this task",
+    "historical metric comparison is not current physics qualification"
+  ],
+  "phase_I_closed": false,
+  "p1_6_p1_7_waived": false,
+  "evidence_refs": [
+    "migration/",
+    "nutassembly_spec.yaml",
+    "expert/",
+    "stage_summary.json",
+    "failure_localization.json",
+    "contact_diagnostics/",
+    "replay_matrix.json",
+    "precision_report.md",
+    "timing_report.md",
+    "integrity_checks.json"
+  ],
+  "gripper_tendon_stiffness_mapping_consistent": true,
+  "ending_branch": "codex/p1.8-e-nutassembly-multirate",
+  "ending_HEAD": "9331d1ec0d5aeafa067ea354f5d9525acf40e2ba",
+  "committed_source_exact": true,
+  "review_branch_published": true
+}

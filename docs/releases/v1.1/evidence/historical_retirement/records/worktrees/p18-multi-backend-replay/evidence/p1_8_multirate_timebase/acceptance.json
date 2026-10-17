@@ -1,0 +1,94 @@
+{
+  "schema": "geochora.p1_8_multirate_acceptance.v1",
+  "status": "ready_for_human_review",
+  "human_approval_created": false,
+  "starting_implementation": "5e7012c70a83f26d1f6a0e51b3160efc00006c35",
+  "profiles": [
+    "TB-500",
+    "TB-100",
+    "TB-50"
+  ],
+  "seeds": [
+    31,
+    73
+  ],
+  "gate_e": {
+    "passed": 4,
+    "required": 4
+  },
+  "d0": {
+    "passed": 4,
+    "required": 4,
+    "exact_matches": 462
+  },
+  "replay": {
+    "final_passed": 32,
+    "required": 32,
+    "initial_mujoco_failures_retained": 8
+  },
+  "behavioral_tuning": 0,
+  "infrastructure_fixes": 1,
+  "first_failure": "canonical_timebase_alignment (MuJoCo binary64 native accumulation; recovered)",
+  "remaining_failure": null,
+  "regressions": {
+    "prior_evidence_unchanged": true,
+    "frozen_behavioral_sources_unchanged": true,
+    "golden_action_lock_unchanged": true,
+    "workspace/qualification/phase1/p1_8_multirate_timebase_spec_sha256": true,
+    "workspace/qualification/phase1/p1_8_multirate_timebase_implementation_sources": true,
+    "workspace/qualification/phase1/p1_8_multirate_timebase_frozen_sources": true,
+    "workspace/qualification/phase1/p1_8_multirate_timebase/infrastructure_fix1_spec_sha256": true,
+    "workspace/qualification/phase1/p1_8_multirate_timebase/infrastructure_fix1_implementation_sources": true,
+    "workspace/qualification/phase1/p1_8_multirate_timebase/infrastructure_fix1_frozen_sources": true,
+    "original_dirty_source_bytes_unchanged": true,
+    "main_ref_unchanged": true,
+    "GeoPhys_gitlink_checkout_clean": true,
+    "provider_import_source_unchanged": true,
+    "ancestry_start_baseline": true,
+    "P1_1_PASS": true,
+    "P1_2_PASS": true,
+    "P1_3_PASS": true,
+    "TB500_anchor_PASS": true,
+    "TB500_8_spot_checks_PASS": true,
+    "TB500_D0_exact": true,
+    "diff_check": true,
+    "changed_python_AST_parse": true,
+    "evidence_JSON_YAML_parse": true
+  },
+  "claim": "For the frozen seeds31/73, TB-100 and TB-50 support successful expert trajectory generation, exact D0 public-action reconstruction and task-valid D1/D2 replay through GeoPhys, MuJoCo, SAPIEN and Genesis with physics_dt=0.002 s and unchanged per-tick controller/planner parameters. TB-500 accepted identity and bounded regression behavior are preserved.",
+  "unqualified": [
+    "general manipulation",
+    "rates below 50 Hz",
+    "exact trajectory/dynamics equality",
+    "policy portability",
+    "NutAssembly",
+    "full P1.8 completion",
+    "Phase I closure"
+  ],
+  "p1_6_p1_7_waived": false,
+  "evidence_refs": [
+    "multirate_spec.yaml",
+    "multirate_spec_lock.json",
+    "golden_sequence_lock.json",
+    "provider_free_contracts.json",
+    "multirate_matrix.json",
+    "timing_report.json",
+    "stage_summary.json",
+    "infrastructure_fix1.json",
+    "integrity_checks.json",
+    "regression/"
+  ],
+  "original_tree_note": {
+    "inventory_role": "retained historical P1.8 inventory, not proof of current external branch/status freeze",
+    "historical_branch_status_matches": false,
+    "current_branch": "codex/p1.6-policy-search-100hz-gpu",
+    "current_HEAD": "cda511f49eb544dabe685ec1dbcc6345884d66c8",
+    "current_status": "M task_env/alg/agent_factory/agents/impl/flow_vanilla.py\n M task_env/alg/agent_factory/agents/mixins/actor/flow_matching.py\n M task_env/alg/agent_factory/agents/mixins/normalization_mixins.py\n M task_env/alg/agent_factory/data/impl/geochora_canonical/__init__.py\n M task_env/alg/agent_factory/data/normalization/quantile.py\n M task_env/alg/agent_factory/training/flow_metrics.py\n M task_env/diagnostics/phase1/flow_training.py\n?? .codegraph/\n?? docs/module/task_env/goal/\n?? task_env/diagnostics/phase1/flow_horizon_training.py\n?? task_env/diagnostics/phase1/flow_training_normalized.py\n?? task_env/diagnostics/phase1/policy_search/\n?? task_env/diagnostics/phase1/test_flow_horizon_chunks.py\n?? task_env/diagnostics/phase1/test_flow_normalization_variant.py",
+    "existing_inventory_source_bytes_match": true,
+    "original_tree_mutation_performed_by_this_goal": false
+  },
+  "ending_HEAD": "60b51e38ff3460da62296f73bbb93138f9d41b7f",
+  "ending_branch": "codex/p1.8-d-multirate-timebase",
+  "committed_source_exact": true,
+  "tracked_clean": true
+}

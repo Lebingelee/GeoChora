@@ -1,0 +1,121 @@
+{
+  "accepted_bounded_prechecks": {
+    "a0_pass": true,
+    "canonical_trajectory_roundtrip": "PASS",
+    "close_readiness_pass": true,
+    "p1_1_checks": 30,
+    "p1_1_contracts": "pass",
+    "p1_2_checks": {
+      "closed_sessions": true,
+      "geophys": "PASS",
+      "mujoco": "PASS",
+      "negative_capability_admission": "PASS",
+      "provider_free_guard": "PASS",
+      "public_main_contains_approved": false,
+      "same_serialized_input": true,
+      "same_source_representation": true
+    },
+    "p1_2_initial_provenance_attempt": "stopped before execution; exact approval files found in the other worktree and copied unchanged",
+    "p1_2_runtime": "ready_for_human_review",
+    "pickcube_d0": {
+      "pass": 2,
+      "required": 2
+    },
+    "pickcube_d1_d2": {
+      "pass": 8,
+      "required": 8
+    },
+    "verify_lift_pass": true
+  },
+  "behavioral_tuning_after_nominal_lock": false,
+  "decision": "not_approved",
+  "evidence_refs": [
+    "nominal_spec.yaml",
+    "nominal_spec_lock.json",
+    "provenance/source_freeze.json",
+    "phase_a/report.json",
+    "campaign_report.json",
+    "phase_a/expert/tb500/geophys/report.json",
+    "phase_a/replay_matrix.md",
+    "precision_report.md",
+    "timing_report.md",
+    "regression/pickcube",
+    "regression/canonical_trajectory_roundtrip.json",
+    "regression/p1_1/report.json",
+    "regression/p1_2/report.json"
+  ],
+  "first_failure": {
+    "boundary": "closed_loop_expert/lower_nut_to_table",
+    "canonical_gripper_released": false,
+    "canonical_inserted_on_peg": false,
+    "canonical_released_nut": false,
+    "canonical_task_success": false,
+    "final_control_step": 14370,
+    "final_peg_z_error_m": 0.08091460657119748,
+    "final_simulation_time_s": 28.73999999999495,
+    "provider": "geophys",
+    "rate": "NA-TB500",
+    "reason": "lower_nut_to_table_readiness_timeout",
+    "stage": "lower_nut_to_table",
+    "success": false
+  },
+  "geophys_modified": false,
+  "heavy_load_1kg_separate_stress_profile_unchanged": true,
+  "nominal_profile": "nutassembly-nominal-v1",
+  "nominal_spec_sha256": "e765fcfb4dcba0325d9936b2775d2f8b3ee56cfb481740461beb7e5c2b80fa30",
+  "operational_status": "partial_with_localized_failure",
+  "p1_6_p1_7_waived": false,
+  "phase": "p1_8_nutassembly_nominal",
+  "phase_a": {
+    "a0_precheck": {
+      "pass": 6,
+      "required": 6
+    },
+    "a1_expert": {
+      "attempted": 1,
+      "failed": 1,
+      "failure_reason": "lower_nut_to_table_readiness_timeout",
+      "first_failing_boundary": "closed_loop_expert/lower_nut_to_table",
+      "first_failing_cell": "GeoPhys / NA-TB500",
+      "pass": 0,
+      "required": 6
+    },
+    "a2_goldens": {
+      "created": 0,
+      "required": 6,
+      "status": "not_created"
+    },
+    "a3_d0": {
+      "pass": 0,
+      "required": 6,
+      "status": "not_run"
+    },
+    "a4_d1": {
+      "pass": 0,
+      "required": 12,
+      "status": "not_run"
+    },
+    "a5_d2": {
+      "pass": 0,
+      "required": 12,
+      "status": "not_run"
+    },
+    "decision": "fail",
+    "first_failing_boundary": "closed_loop_expert/lower_nut_to_table"
+  },
+  "phase_b": {
+    "decision": "not_run",
+    "entered": false,
+    "reason": "Phase A mandatory expert gate failed; boundary provider expansion forbidden"
+  },
+  "phase_i_closed": false,
+  "physics_controller_task_semantics_modified_after_lock": false,
+  "provider_specific_task_solution_branch_added": false,
+  "public_main_head": "f977528b9b9866c50afcf8ea9b5f5deadce60892",
+  "public_main_modified": false,
+  "published_branch": "codex/p1.8-e-r3-nutassembly-nominal",
+  "published_head": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+  "qualification_base_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+  "qualification_branch": "codex/p1.8-e-r3-nutassembly-nominal",
+  "schema": "p1_8_e_r3_acceptance_v1"
+}

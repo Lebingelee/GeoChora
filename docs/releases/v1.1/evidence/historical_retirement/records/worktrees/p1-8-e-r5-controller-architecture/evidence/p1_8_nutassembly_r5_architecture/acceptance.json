@@ -1,0 +1,793 @@
+{
+  "behavioral_parameter_sweep": false,
+  "branch": "codex/p1.8-e-r5-controller-architecture",
+  "checkpoint_commit": "7e8c1e042d5156ef87bcdba20ad141426747ce14",
+  "continuation_start_utc": "2026-10-08T04:12:39Z",
+  "controller_fix_commit": "9332fbe",
+  "d0_d1_d2": "NOT_RUN",
+  "ending_head": "8d9968f0070852ae707f3f635c946242d432bd59",
+  "ending_head_current": "e8ee54fa16e6537a39b61038d892f2646c0e1ac7",
+  "evidence_root": "workspace/qualification/phase1/p1_8_nutassembly_r5_architecture",
+  "first_segment_comparison": {
+    "metrics": {
+      "C11": {
+        "actuator_saturation_fraction": null,
+        "endpoint_position_error_m": 0.006534175947609865,
+        "endpoint_rotation_error_rad": 0.0027679028484742982,
+        "max_q_ref_lead_rad": null,
+        "position_p95_m": 0.027641515663651153,
+        "position_peak_m": 0.02779951445403302,
+        "position_rms_m": 0.01712732206967713,
+        "rotation_p95_rad": 0.004206435743259824,
+        "rotation_peak_rad": 0.004857812162381591,
+        "rotation_rms_rad": 0.0030262293816610236
+      },
+      "persistent_R3": {
+        "actuator_max_abs_force_N": 22.7841796875,
+        "actuator_saturation_fraction": 0.0,
+        "endpoint_pass": true,
+        "endpoint_position_error_m": 0.0007660620994299193,
+        "endpoint_rotation_error_rad": 6.423688552769743e-05,
+        "lead_clamp_events": 0,
+        "max_q_ref_lead_rad": 0.032226667120734964,
+        "mean_abs_q_ref_lead_rad": 0.005757325307549095,
+        "position_p95_m": 0.0034921517034226086,
+        "position_peak_m": 0.003773435299499735,
+        "position_rms_m": 0.001545538697247054,
+        "rotation_p95_rad": 0.006300169170290374,
+        "rotation_peak_rad": 0.007291585030605123,
+        "rotation_rms_rad": 0.002271260985841376,
+        "stable_time_s": 3.3439999999998533
+      },
+      "rejected_R3": {
+        "actuator_saturation_fraction": null,
+        "endpoint_position_error_m": 0.19315087269324413,
+        "endpoint_rotation_error_rad": 0.2137367710663333,
+        "max_q_ref_lead_rad": 0.00328,
+        "position_p95_m": 0.1931127527154809,
+        "position_peak_m": 0.19315087269324413,
+        "position_rms_m": 0.13444283832329723,
+        "rotation_p95_rad": 0.21120641075527144,
+        "rotation_peak_rad": 0.2137367710663333,
+        "rotation_rms_rad": 0.1555429515061109
+      }
+    },
+    "planned_boundaries": 1622,
+    "provider": "GeoPhys",
+    "rate": "TB500",
+    "schema_version": "p1.8-e-r5-first-segment-comparison-v1",
+    "waypoint": "vertical_translation"
+  },
+  "full_nutassembly": "NOT_RUN",
+  "grasp_retention_continuation": {
+    "baseline_geophys_tb100": {
+      "authorization_branch": "controller_close_ready",
+      "authorization_time_s": 0.93,
+      "capture_rotation_drift_rad": 0.000927,
+      "capture_translation_drift_m": 3.188754875257742e-05,
+      "force_N": 30.0,
+      "opening_m": 0.03319036588072777,
+      "pass": true,
+      "report": "grasp_retention/baseline/geophys_tb100/report.json",
+      "verify_lift_pass": true
+    },
+    "baseline_mujoco_tb100": {
+      "authorization_branch": "stable_grasp_fallback",
+      "authorization_time_s": 1.17,
+      "bilateral_contact_at_first_relative_slip": true,
+      "bilateral_contact_loss_s": 4.372,
+      "capture_rotation_drift_rad": 0.005164,
+      "capture_translation_drift_m": 0.10192653643111194,
+      "first_bilateral_contact_s": 2.572,
+      "first_capture_violation_s": 4.204,
+      "first_relative_slip_over_1mm_s": 3.992,
+      "force_N": 26.549333227843707,
+      "force_at_first_relative_slip_N": 26.51644680005313,
+      "high_force_samples_without_nut_contact": 0,
+      "opening_m": 0.0106328086177788,
+      "pass": false,
+      "relative_drift_at_first_slip_m": 0.0010130403503603896,
+      "report": "grasp_retention/baseline/mujoco_tb100/report.json",
+      "verify_lift_pass": false
+    },
+    "behavioral_sweep": false,
+    "branch": "codex/p1.8-e-r5-controller-architecture",
+    "correction_01": {
+      "geophys_report": "grasp_retention/correction_01/geophys_tb100/report.json.gz",
+      "geophys_tb100_pass": true,
+      "mujoco_failure": "close_gripper_readiness_timeout",
+      "mujoco_report": "grasp_retention/correction_01/mujoco_tb100/report.json.gz",
+      "mujoco_tb100_pass": false,
+      "profile": "grasp_offset.z 0.050 -> 0.047 m",
+      "rate_expansion_run": false,
+      "second_correction_used": false,
+      "shared": true
+    },
+    "d0_d2": "NOT_RUN",
+    "ending_head": "e8ee54fa16e6537a39b61038d892f2646c0e1ac7",
+    "evidence": [
+      "grasp_retention/contact_timeline.md",
+      "grasp_retention/retention_comparison.md",
+      "grasp_retention/retention_decision.json",
+      "grasp_retention/baseline/contact_summary.json",
+      "grasp_retention/correction_01/summary.json"
+    ],
+    "full_nutassembly": "NOT_RUN",
+    "physics_stopped_utc": "2026-10-08T05:12:08Z",
+    "primary_classification": "verify_lift_slip",
+    "report_generated_at_utc": "2026-10-08T05:25:03Z",
+    "sapien_genesis": "NOT_RUN",
+    "start_utc": "2026-10-08T04:55:21Z",
+    "starting_head": "8d9968f0070852ae707f3f635c946242d432bd59",
+    "t1": "NOT_RUN",
+    "wall_clock_minutes_at_report": 29.69
+  },
+  "grasp_retention_correction_01": {
+    "geophys_tb100_pass": true,
+    "mujoco_authorization": null,
+    "mujoco_close_end_force_N": 11.79636490515152,
+    "mujoco_close_end_opening_m": 0.004718545789491631,
+    "mujoco_peak_transient_force_N": 27.547194768746998,
+    "mujoco_tb100_pass": false,
+    "profile_path": "grasp_retention/correction_01/nutassembly-nominal-v2-downshift-3mm.json",
+    "profile_sha256": "2a2bd8ade2ae30ab5d43ec75a8329fd0d7116cee8563b0c756806f4b714696b2",
+    "promoted": false,
+    "second_correction_used": false
+  },
+  "gripper_fixed_rate": {
+    "cells": {
+      "GeoPhys/TB100": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9299999999998976,
+        "closing_force_N": 30.0,
+        "failure_boundary": null,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 2.039596438407898e-06,
+        "fallback_stable": true,
+        "fallback_window_s": 0.1,
+        "grasp_loss": false,
+        "max_capture_position_drift_m": 3.188754875257742e-05,
+        "max_capture_rotation_drift_rad": 0.000927,
+        "opening_m": 0.03319036588072777,
+        "pass": true,
+        "previous_capture_drift_status": "superseded by corrected TB100 rerun",
+        "provider": "GeoPhys",
+        "rate": "TB100",
+        "report": "grasp_retention/baseline/geophys_tb100/report.json",
+        "verify_lift_pass": true
+      },
+      "GeoPhys/TB50": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9199999999998987,
+        "closing_force_N": 30.0,
+        "failure_boundary": null,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 1.6205012798309326e-06,
+        "fallback_stable": true,
+        "fallback_window_s": 0.1,
+        "grasp_loss": false,
+        "max_capture_position_drift_m": null,
+        "max_capture_rotation_drift_rad": null,
+        "opening_m": 0.033629829064011574,
+        "pass": true,
+        "previous_capture_drift_status": "invalid_inverse_quaternion_diagnostic; not revalidated in this continuation",
+        "provider": "GeoPhys",
+        "rate": "TB50",
+        "report": "gripper_fixed_rate/g0/geophys/tb50/report.json",
+        "verify_lift_pass": true
+      },
+      "GeoPhys/TB500": {
+        "authorization_branch": "controller_close_ready",
+        "authorization_time_s": 0.9319999999998974,
+        "closing_force_N": 30.0,
+        "failure_boundary": null,
+        "fallback_minimum_force_N": 30.0,
+        "fallback_opening_span_m": 2.5257468223571777e-06,
+        "fallback_stable": true,
+        "fallback_window_s": 0.1,
+        "grasp_loss": false,
+        "max_capture_position_drift_m": null,
+        "max_capture_rotation_drift_rad": null,
+        "opening_m": 0.033337002620100975,
+        "pass": true,
+        "previous_capture_drift_status": "invalid_inverse_quaternion_diagnostic; not revalidated in this continuation",
+        "provider": "GeoPhys",
+        "rate": "TB500",
+        "report": "gripper_fixed_rate/g0/geophys/tb500/report.json",
+        "verify_lift_pass": true
+      },
+      "MuJoCo/TB100": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1700000000000004,
+        "closing_force_N": 26.549333227843707,
+        "failure_boundary": "nutassembly_solution/verify_lift_readiness_timeout",
+        "fallback_minimum_force_N": 26.549333227843707,
+        "fallback_opening_span_m": 0.00011314213268073282,
+        "fallback_stable": true,
+        "fallback_window_s": 0.1,
+        "grasp_loss": true,
+        "max_capture_position_drift_m": 0.10192653643111194,
+        "max_capture_rotation_drift_rad": 0.005164,
+        "opening_m": 0.0106328086177788,
+        "pass": false,
+        "previous_capture_drift_status": "superseded by corrected TB100 rerun",
+        "provider": "MuJoCo",
+        "rate": "TB100",
+        "report": "grasp_retention/baseline/mujoco_tb100/report.json",
+        "verify_lift_pass": false
+      },
+      "MuJoCo/TB50": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1400000000000001,
+        "closing_force_N": 26.58276608090784,
+        "failure_boundary": "nutassembly_solution/verify_lift_readiness_timeout",
+        "fallback_minimum_force_N": 26.58276608090784,
+        "fallback_opening_span_m": 0.00014547090125297327,
+        "fallback_stable": true,
+        "fallback_window_s": 0.1,
+        "grasp_loss": true,
+        "max_capture_position_drift_m": null,
+        "max_capture_rotation_drift_rad": null,
+        "opening_m": 0.010653919647121066,
+        "pass": false,
+        "previous_capture_drift_status": "invalid_inverse_quaternion_diagnostic; not revalidated in this continuation",
+        "provider": "MuJoCo",
+        "rate": "TB50",
+        "report": "gripper_fixed_rate/g0/mujoco/tb50/report.json",
+        "verify_lift_pass": false
+      },
+      "MuJoCo/TB500": {
+        "authorization_branch": "stable_grasp_fallback",
+        "authorization_time_s": 1.1819999999998698,
+        "closing_force_N": 26.539418141074133,
+        "failure_boundary": "nutassembly_solution/verify_lift_readiness_timeout",
+        "fallback_minimum_force_N": 26.539418141074133,
+        "fallback_opening_span_m": 0.00011028297033059513,
+        "fallback_stable": true,
+        "fallback_window_s": 0.1,
+        "grasp_loss": true,
+        "max_capture_position_drift_m": null,
+        "max_capture_rotation_drift_rad": null,
+        "opening_m": 0.010626570626782446,
+        "pass": false,
+        "previous_capture_drift_status": "invalid_inverse_quaternion_diagnostic; not revalidated in this continuation",
+        "provider": "MuJoCo",
+        "rate": "TB500",
+        "report": "gripper_fixed_rate/g0/mujoco/tb500/report.json",
+        "verify_lift_pass": false
+      }
+    },
+    "inner_frequency_hz": 500,
+    "pass_count": 3,
+    "physics_dt_s": 0.002,
+    "status": "partial",
+    "tested": true,
+    "total": 6
+  },
+  "gripper_rates_modified": false,
+  "historical_arm_architecture_ending_head": "8d9968f0070852ae707f3f635c946242d432bd59",
+  "historical_arm_architecture_status": "persistent_reference_supported",
+  "implementation_correction_count": 1,
+  "mujoco_tb50_diagnosis": {
+    "classification": "verify_lift_slip",
+    "close_authorization": {
+      "authorization_branch": "stable_grasp_fallback",
+      "authorization_time_s": 1.1400000000000001,
+      "closing_force_N": 26.58276608090784,
+      "failure_boundary": "nutassembly_solution/verify_lift_readiness_timeout",
+      "fallback_minimum_force_N": 26.58276608090784,
+      "fallback_opening_span_m": 0.00014547090125297327,
+      "fallback_stable": true,
+      "fallback_window_s": 0.1,
+      "grasp_loss": true,
+      "max_capture_position_drift_m": null,
+      "max_capture_rotation_drift_rad": null,
+      "opening_m": 0.010653919647121066,
+      "pass": false,
+      "provider": "MuJoCo",
+      "rate": "TB50",
+      "report": "gripper_fixed_rate/g0/mujoco/tb50/report.json",
+      "superseded_capture_drift_m": 0.3060312092371103,
+      "verify_lift_pass": false
+    },
+    "diagnostic_only": true,
+    "first_verify_lift_force_below_1N": {
+      "force_N": 0.0,
+      "grasped_nut": true,
+      "nut_z_m": 0.47299046542726236,
+      "opening_m": 0.0007896958154741094,
+      "stage": "verify_lift",
+      "time_s": 4.34
+    },
+    "first_zero_opening_saturation": {
+      "force_N": 27.488930196228434,
+      "measured_opening_m": 0.011192562713617044,
+      "stage": "close_gripper",
+      "time_s": 3.5699999999998284
+    },
+    "force_mode_first_activation": {
+      "commanded_opening_m": 0.06721103252855906,
+      "force_N": 3.361126380274243,
+      "measured_opening_m": 0.07942414351751687,
+      "time_s": 2.6079999999999344
+    },
+    "grasp_state_transitions": [
+      {
+        "commanded_opening_m": 0.08,
+        "force_N": 5.482874996687315e-06,
+        "grasped_nut": false,
+        "nut_xyz_m": [
+          0.5085002519660929,
+          -0.07500000298023224,
+          0.47299264626571424
+        ],
+        "opening_m": 0.07999998250525661,
+        "stage": "approach_nut",
+        "time_s": 0.02
+      },
+      {
+        "commanded_opening_m": 0.035197068595886234,
+        "force_N": 1.5387506786725282,
+        "grasped_nut": true,
+        "nut_xyz_m": [
+          0.5093693343046268,
+          -0.07502409765482805,
+          0.47301184384699685
+        ],
+        "opening_m": 0.041084253393616335,
+        "stage": "close_gripper",
+        "time_s": 2.8000000000000003
+      },
+      {
+        "commanded_opening_m": 0.0,
+        "force_N": 3.0053126601433484e-05,
+        "grasped_nut": false,
+        "nut_xyz_m": [
+          0.5090817841386723,
+          -0.07601064860368595,
+          0.4729734481678158
+        ],
+        "opening_m": 8.632061726836996e-08,
+        "stage": "verify_lift",
+        "time_s": 4.8
+      }
+    ],
+    "interpretation": "TB50 confirms close authorization after the old ~2.42 N plateau is resolved, then verify_lift fails with the Nut near table height. Exact native contact loss during TB50 verify_lift is not observed. Current TB100 evidence supports verify_lift_slip: the Nut first exceeds the 8 mm relative-drift bound while bilateral contact remains, then loses bilateral contact. The old TB50 0.306 m position-drift figure is invalid.",
+    "max_capture_position_drift_m": null,
+    "native_contact_summary": {
+      "coverage_note": "TB50 native contact logging covers close authorization only. The current TB100 rerun records native contacts throughout verify-lift and localizes bilateral loss at 4.372 s.",
+      "finger_table_observed": false,
+      "first_finger_nut_contact_observed_after_step_s": 2.5819999999999372,
+      "hand_nut_observed": false,
+      "last_finger_nut_contact_observed_after_step_s": 3.719999999999812,
+      "left_finger_first_s": 2.5819999999999372,
+      "left_finger_last_s": 3.719999999999812,
+      "right_finger_first_s": 2.5819999999999372,
+      "right_finger_last_s": 3.719999999999812
+    },
+    "nut_z_at_final_m": 0.47297343959876853,
+    "provider": "MuJoCo",
+    "rate": "TB50",
+    "schema_version": "p1.8-e-r5-mujoco-tb50-contact-diagnostic-v1",
+    "superseded_capture_drift": {
+      "position_m": 0.3060312092371103,
+      "reason": "position drift used the incorrect inverse-quaternion diagnostic; value is invalid",
+      "rotation_rad": 0.0052805833897554945
+    }
+  },
+  "new_branch_created": false,
+  "persistent_arm_status": "persistent_reference_supported",
+  "persistent_reference": {
+    "causal_hypothesis": "supported",
+    "first_segment_pass": true,
+    "full_tb500_pass": true,
+    "identity_tb500_geophys": "e776a8fbd43e9ce03d7a0a94d3420f5ce01f886b820adb55898db1888584f3ec",
+    "law": "q_ref_next = q_ref_previous + qdot_cmd * control_dt",
+    "lead_bound_rad": 0.15,
+    "profile_version": "canonical-panda-production-r3-persistent-reference-v1",
+    "reset": "q_ref = canonical q_actual at controller reset",
+    "six_cell_t0_pass": true,
+    "source_sha256": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5"
+  },
+  "phase_i_qualification_claim": false,
+  "physics_stop_utc": "2026-10-08T04:33:03Z",
+  "planner_modified": false,
+  "provider_specific_tuning": false,
+  "r1_source_sha256": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+  "r1_unchanged": true,
+  "rejected_prototype_preserved": true,
+  "report_generated_at_utc": "2026-10-08T04:42:22Z",
+  "sapien_genesis": "NOT_RUN",
+  "schema_version": "p1.8-e-r5-persistent-reference-acceptance-v1",
+  "starting_authority_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+  "starting_head": "7e8c1e042d5156ef87bcdba20ad141426747ce14",
+  "status": "grasp_retention_unresolved",
+  "stopped_physics_by_minute_55": true,
+  "t0_cells": {
+    "GeoPhys/TB100": {
+      "arm_force_saturation_fraction": 0.0,
+      "arm_longest_saturation_s": 0.0,
+      "arm_max_abs_force_N": 64.189208984375,
+      "endpoint_count": 5,
+      "endpoint_rows": [
+        {
+          "pass": true,
+          "position_error_m": 0.0007169716071205328,
+          "rotation_error_rad": 0.0001247731913571837,
+          "time_to_stable_s": 3.3499999999998527,
+          "waypoint": "vertical_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.001154698381239732,
+          "rotation_error_rad": 0.00434176426068056,
+          "time_to_stable_s": 2.8699999999996844,
+          "waypoint": "lateral_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0005662099860105736,
+          "rotation_error_rad": 7.134202911572659e-05,
+          "time_to_stable_s": 4.050000000000562,
+          "waypoint": "diagonal_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0002283772385359167,
+          "rotation_error_rad": 0.038077799202797004,
+          "time_to_stable_s": 0.6600000000002204,
+          "waypoint": "orientation_yaw"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0009740992810170682,
+          "rotation_error_rad": 0.0031867701849869687,
+          "time_to_stable_s": 2.470000000000825,
+          "waypoint": "combined_translation_rotation"
+        }
+      ],
+      "endpoints_passed": 5,
+      "lead_clamp_events": 8,
+      "max_joint_reference_lead_rad": 0.15000000000000002,
+      "mean_abs_joint_lead_rad": 0.007767727124701332,
+      "mean_position_error_m": 0.0012189779449568003,
+      "pass": true,
+      "position_p95_m": 0.0025776500211224904,
+      "position_peak_m": 0.003715805877181489,
+      "position_rms_m": 0.001403316278644004,
+      "provider": "GeoPhys",
+      "q_ref_reset_events": 1,
+      "rate": "TB100",
+      "report": "persistent_reference/six_cell_t0/t0/geophys/tb100/attempt-02/report.json",
+      "rotation_p95_rad": 0.01120165022557608,
+      "rotation_peak_rad": 0.11740051199437007,
+      "rotation_rms_rad": 0.014158110856557219,
+      "trace": "persistent_reference/six_cell_t0/t0/geophys/tb100/attempt-02/trace.json"
+    },
+    "GeoPhys/TB50": {
+      "arm_force_saturation_fraction": 0.0,
+      "arm_longest_saturation_s": 0.0,
+      "arm_max_abs_force_N": 76.953857421875,
+      "endpoint_count": 5,
+      "endpoint_rows": [
+        {
+          "pass": true,
+          "position_error_m": 0.0006376181891269961,
+          "rotation_error_rad": 0.00013392600982113528,
+          "time_to_stable_s": 3.3599999999998515,
+          "waypoint": "vertical_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0010722289725843658,
+          "rotation_error_rad": 0.004190249709412905,
+          "time_to_stable_s": 2.8799999999996833,
+          "waypoint": "lateral_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0004925946757090347,
+          "rotation_error_rad": 7.202500579709498e-05,
+          "time_to_stable_s": 4.060000000000574,
+          "waypoint": "diagonal_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.00020047723636950094,
+          "rotation_error_rad": 0.03491664262397145,
+          "time_to_stable_s": 0.6800000000002271,
+          "waypoint": "orientation_yaw"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0008604607875423336,
+          "rotation_error_rad": 0.002789503144469058,
+          "time_to_stable_s": 2.480000000000828,
+          "waypoint": "combined_translation_rotation"
+        }
+      ],
+      "endpoints_passed": 5,
+      "lead_clamp_events": 5,
+      "max_joint_reference_lead_rad": 0.15000000000000002,
+      "mean_abs_joint_lead_rad": 0.008125312569693642,
+      "mean_position_error_m": 0.0013006104669618852,
+      "pass": true,
+      "position_p95_m": 0.0026374695741126315,
+      "position_peak_m": 0.003652098319668801,
+      "position_rms_m": 0.0014779444358720179,
+      "provider": "GeoPhys",
+      "q_ref_reset_events": 1,
+      "rate": "TB50",
+      "report": "persistent_reference/six_cell_t0/t0/geophys/tb50/report.json",
+      "rotation_p95_rad": 0.0157039427901739,
+      "rotation_peak_rad": 0.10683015813643489,
+      "rotation_rms_rad": 0.013266211254614274,
+      "trace": "persistent_reference/six_cell_t0/t0/geophys/tb50/trace.json"
+    },
+    "GeoPhys/TB500": {
+      "arm_force_saturation_fraction": 0.0,
+      "arm_longest_saturation_s": 0.0,
+      "arm_max_abs_force_N": 52.4183349609375,
+      "endpoint_count": 5,
+      "endpoint_rows": [
+        {
+          "pass": true,
+          "position_error_m": 0.0007583831943658223,
+          "rotation_error_rad": 0.00011859822868861289,
+          "time_to_stable_s": 3.3439999999998533,
+          "waypoint": "vertical_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0012074421362165421,
+          "rotation_error_rad": 0.004427923298659029,
+          "time_to_stable_s": 2.8679999999996846,
+          "waypoint": "lateral_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0006061687664367504,
+          "rotation_error_rad": 7.06559075715409e-05,
+          "time_to_stable_s": 4.0440000000005565,
+          "waypoint": "diagonal_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.00024315657262012838,
+          "rotation_error_rad": 0.04038878946970945,
+          "time_to_stable_s": 0.6520000000002177,
+          "waypoint": "orientation_yaw"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0010374379502413212,
+          "rotation_error_rad": 0.003414646797628749,
+          "time_to_stable_s": 2.462000000000822,
+          "waypoint": "combined_translation_rotation"
+        }
+      ],
+      "endpoints_passed": 5,
+      "lead_clamp_events": 28,
+      "max_joint_reference_lead_rad": 0.15000000000000002,
+      "mean_abs_joint_lead_rad": 0.007498409113867586,
+      "mean_position_error_m": 0.0012375999109977011,
+      "pass": true,
+      "position_p95_m": 0.002546897635708497,
+      "position_peak_m": 0.003773435299499735,
+      "position_rms_m": 0.0014346469390947335,
+      "provider": "GeoPhys",
+      "q_ref_reset_events": 1,
+      "rate": "TB500",
+      "report": "persistent_reference/full_tb500/t0/geophys/tb500/report.json",
+      "rotation_p95_rad": 0.008277230976740513,
+      "rotation_peak_rad": 0.12616661811194482,
+      "rotation_rms_rad": 0.014899455190987914,
+      "trace": "persistent_reference/full_tb500/t0/geophys/tb500/trace.json"
+    },
+    "MuJoCo/TB100": {
+      "arm_force_saturation_fraction": 0.0,
+      "arm_longest_saturation_s": 0.0,
+      "arm_max_abs_force_N": 41.48377777713313,
+      "endpoint_count": 5,
+      "endpoint_rows": [
+        {
+          "pass": true,
+          "position_error_m": 0.0007170114607917221,
+          "rotation_error_rad": 0.00012464060227042494,
+          "time_to_stable_s": 3.35,
+          "waypoint": "vertical_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0011547696374338806,
+          "rotation_error_rad": 0.004341577479554736,
+          "time_to_stable_s": 2.8699999999999997,
+          "waypoint": "lateral_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0005663188002215864,
+          "rotation_error_rad": 7.117229502470417e-05,
+          "time_to_stable_s": 4.05,
+          "waypoint": "diagonal_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.00022836852128878246,
+          "rotation_error_rad": 0.03807762047575351,
+          "time_to_stable_s": 0.6600000000000001,
+          "waypoint": "orientation_yaw"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0009742687112172026,
+          "rotation_error_rad": 0.0031871645646553114,
+          "time_to_stable_s": 2.4700000000000006,
+          "waypoint": "combined_translation_rotation"
+        }
+      ],
+      "endpoints_passed": 5,
+      "lead_clamp_events": 8,
+      "max_joint_reference_lead_rad": 0.15000000000000002,
+      "mean_abs_joint_lead_rad": 0.007767719780278553,
+      "mean_position_error_m": 0.0012189761034371363,
+      "pass": true,
+      "position_p95_m": 0.002577618768945646,
+      "position_peak_m": 0.0037159688159112882,
+      "position_rms_m": 0.001403312472585719,
+      "provider": "MuJoCo",
+      "q_ref_reset_events": 1,
+      "rate": "TB100",
+      "report": "persistent_reference/six_cell_t0/t0/mujoco/tb100/report.json",
+      "rotation_p95_rad": 0.01120183635981654,
+      "rotation_peak_rad": 0.1174005888504385,
+      "rotation_rms_rad": 0.01415810730208692,
+      "trace": "persistent_reference/six_cell_t0/t0/mujoco/tb100/trace.json"
+    },
+    "MuJoCo/TB50": {
+      "arm_force_saturation_fraction": 0.0,
+      "arm_longest_saturation_s": 0.0,
+      "arm_max_abs_force_N": 41.34369309042586,
+      "endpoint_count": 5,
+      "endpoint_rows": [
+        {
+          "pass": true,
+          "position_error_m": 0.000637429636833235,
+          "rotation_error_rad": 0.0001340155100126872,
+          "time_to_stable_s": 3.36,
+          "waypoint": "vertical_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0010721646088624295,
+          "rotation_error_rad": 0.004190286462306594,
+          "time_to_stable_s": 2.8800000000000003,
+          "waypoint": "lateral_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.000492436469128568,
+          "rotation_error_rad": 7.22089915100683e-05,
+          "time_to_stable_s": 4.0600000000000005,
+          "waypoint": "diagonal_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0002005819400171515,
+          "rotation_error_rad": 0.03491672117919019,
+          "time_to_stable_s": 0.6799999999999997,
+          "waypoint": "orientation_yaw"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0008604367491763376,
+          "rotation_error_rad": 0.002789523653036199,
+          "time_to_stable_s": 2.4800000000000004,
+          "waypoint": "combined_translation_rotation"
+        }
+      ],
+      "endpoints_passed": 5,
+      "lead_clamp_events": 5,
+      "max_joint_reference_lead_rad": 0.15000000000000002,
+      "mean_abs_joint_lead_rad": 0.008125307180560601,
+      "mean_position_error_m": 0.0013006039042406496,
+      "pass": true,
+      "position_p95_m": 0.002637415224114819,
+      "position_peak_m": 0.003652092271307974,
+      "position_rms_m": 0.0014779396344493196,
+      "provider": "MuJoCo",
+      "q_ref_reset_events": 1,
+      "rate": "TB50",
+      "report": "persistent_reference/six_cell_t0/t0/mujoco/tb50/report.json",
+      "rotation_p95_rad": 0.015703914610954706,
+      "rotation_peak_rad": 0.1068302855381017,
+      "rotation_rms_rad": 0.013266219326509758,
+      "trace": "persistent_reference/six_cell_t0/t0/mujoco/tb50/trace.json"
+    },
+    "MuJoCo/TB500": {
+      "arm_force_saturation_fraction": 0.0,
+      "arm_longest_saturation_s": 0.0,
+      "arm_max_abs_force_N": 43.32631076983421,
+      "endpoint_count": 5,
+      "endpoint_rows": [
+        {
+          "pass": true,
+          "position_error_m": 0.0007584302977648056,
+          "rotation_error_rad": 0.00011783135026542538,
+          "time_to_stable_s": 3.3439999999998533,
+          "waypoint": "vertical_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0012074601165542051,
+          "rotation_error_rad": 0.004427734485898812,
+          "time_to_stable_s": 2.8679999999996846,
+          "waypoint": "lateral_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0006062512101444369,
+          "rotation_error_rad": 7.027287772043542e-05,
+          "time_to_stable_s": 4.0440000000005565,
+          "waypoint": "diagonal_translation"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0002431872493454347,
+          "rotation_error_rad": 0.0403889250579631,
+          "time_to_stable_s": 0.6520000000002177,
+          "waypoint": "orientation_yaw"
+        },
+        {
+          "pass": true,
+          "position_error_m": 0.0010373534863320833,
+          "rotation_error_rad": 0.003414800974275582,
+          "time_to_stable_s": 2.462000000000822,
+          "waypoint": "combined_translation_rotation"
+        }
+      ],
+      "endpoints_passed": 5,
+      "lead_clamp_events": 28,
+      "max_joint_reference_lead_rad": 0.15000000000000002,
+      "mean_abs_joint_lead_rad": 0.007498408216824978,
+      "mean_position_error_m": 0.0012376009550605896,
+      "pass": true,
+      "position_p95_m": 0.0025468714077403216,
+      "position_peak_m": 0.0037733223746772154,
+      "position_rms_m": 0.0014346481898182013,
+      "provider": "MuJoCo",
+      "q_ref_reset_events": 1,
+      "rate": "TB500",
+      "report": "persistent_reference/six_cell_t0/t0/mujoco/tb500/report.json",
+      "rotation_p95_rad": 0.008277140692240186,
+      "rotation_peak_rad": 0.12616674607203884,
+      "rotation_rms_rad": 0.01489946511961604,
+      "trace": "persistent_reference/six_cell_t0/t0/mujoco/tb500/trace.json"
+    }
+  },
+  "t0_pass_count": 6,
+  "t0_total": 6,
+  "t1": "NOT_RUN",
+  "thresholds_modified": false,
+  "wall_clock_minutes_at_report": 29.72,
+  "materialization_audit_continuation": {
+    "status": "materialization_boundary_localized",
+    "branch": "codex/p1.8-e-r5-controller-architecture",
+    "start_head": "e8ee54fa16e6537a39b61038d892f2646c0e1ac7",
+    "ending_head": "e8ee54fa16e6537a39b61038d892f2646c0e1ac7",
+    "m0": "kinematic_mapping_match",
+    "m1": "dynamic provider response mismatch; both fixed-object closes timed out",
+    "m2": "GeoPhys PASS; MuJoCo verify-lift FAIL",
+    "root_cause": "mixed_materialization_boundary",
+    "confidence": "medium",
+    "correction_applied": false,
+    "rate_expansion": "NOT_RUN",
+    "physics_cutoff_rule": "No physics run started after the planned cutoff; this continuation stopped before the 55-minute wall-clock boundary.",
+    "approx_wall_clock_minutes": 36.55,
+    "last_physics_output_utc": "2026-10-08T05:58:01Z",
+    "report_time_utc": "2026-10-08T06:16:56Z",
+    "physics_stopped_before_55_minute_trigger": true,
+    "r1_source_sha256": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+    "r3_source_sha256": "8805f0f3b6e5497871269888d876216baef96bfa7e5fabc8f3e0eef93e1152b5"
+  }
+}

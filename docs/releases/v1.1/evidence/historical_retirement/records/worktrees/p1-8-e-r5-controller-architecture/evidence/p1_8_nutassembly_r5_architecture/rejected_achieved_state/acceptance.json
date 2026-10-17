@@ -1,0 +1,63 @@
+{
+  "schema_version": "p1.8-e-r5-acceptance-v1",
+  "status": "architecture_candidate_rejected",
+  "start_utc": "2026-10-08T03:44:47Z",
+  "stop_utc": "2026-10-08T04:01:40Z",
+  "total_minutes": 16.88,
+  "stopped_physics_by_minute_55": true,
+  "starting_authority_commit": "6160ba0a8b494f0cc3989d464b5ef61d83219b10",
+  "r4_snapshot_commit": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+  "r5_branch": "codex/p1.8-e-r5-controller-architecture",
+  "r5_head": "0f2290c9b25e590da04be82a74b0aea8b005735a",
+  "r5_changes_committed": false,
+  "r1_source_unchanged_sha256": "715d78a6339a4b18f6517b2a9a2eee71bc9e2c6cfcf05723d50adae4059754f3",
+  "r3_source_sha256": "8babb8ed0bcb829e46a17eedec827f3c9aab8dd4284b7908c7590c17ff857dec",
+  "t0_cells": {
+    "GeoPhys/TB500": {
+      "status": "FAIL",
+      "waypoints_passed": 0,
+      "first_waypoint": "vertical_translation",
+      "position_rms_m": 0.16547546919147268,
+      "position_p95_m": 0.19380254260346524,
+      "position_peak_m": 0.19388140581407293,
+      "rotation_rms_rad": 0.1989904259839934,
+      "rotation_p95_rad": 0.2547727831416866,
+      "rotation_peak_rad": 0.2593711450616375,
+      "planned_duration_s": 3.244,
+      "readiness_hold_s": 3
+    },
+    "GeoPhys/TB100": {
+      "status": "NOT_RUN"
+    },
+    "GeoPhys/TB50": {
+      "status": "NOT_RUN"
+    },
+    "MuJoCo/TB500": {
+      "status": "NOT_RUN"
+    },
+    "MuJoCo/TB100": {
+      "status": "NOT_RUN"
+    },
+    "MuJoCo/TB50": {
+      "status": "NOT_RUN"
+    }
+  },
+  "g0_cells": {
+    "GeoPhys/TB500": "NOT_RUN",
+    "GeoPhys/TB100": "NOT_RUN",
+    "GeoPhys/TB50": "NOT_RUN",
+    "MuJoCo/TB500": "NOT_RUN",
+    "MuJoCo/TB100": "NOT_RUN",
+    "MuJoCo/TB50": "NOT_RUN"
+  },
+  "implementation_fixes": 0,
+  "behavioral_candidates_after_first_run": 0,
+  "parameter_sweep": false,
+  "t1": "NOT_RUN",
+  "full_nutassembly": "NOT_RUN",
+  "d0_d1_d2": "NOT_RUN",
+  "sapien_genesis": "NOT_RUN",
+  "evidence_only": true,
+  "recommendation": "return_to_arm_architecture_design",
+  "mujoco_tb50_cause": "unresolved_not_run"
+}

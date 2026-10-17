@@ -1,0 +1,18 @@
+[
+  {
+    "geometry_sequence_sha256": "fbf066902ec010ad717e22c2c231beeab2ff2dd5852fdec2c6a97912327b4d8e",
+    "instrumentation_repeat_video": "videos/r5_reference/hand_camera.mp4",
+    "label": "r5_reference",
+    "native_geometry_samples": 4755,
+    "primary_and_instrumentation_repeat_geometry_exact": true,
+    "reason": "identical recorded physical trajectory; same state replay MP4 represents both diagnostic runs"
+  },
+  {
+    "geometry_sequence_sha256": "591b4a83f8f58ecdcecbafd0914f9b464d6e1ab4c4047738ab84598b1cb61ffc",
+    "instrumentation_repeat_video": "videos/r1_reference/hand_camera.mp4",
+    "label": "r1_reference",
+    "native_geometry_samples": 5380,
+    "primary_and_instrumentation_repeat_geometry_exact": true,
+    "reason": "identical recorded physical trajectory; same state replay MP4 represents both diagnostic runs"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "status": "preclose_stability_and_low_height_closure_improved_lift_runtime_unresolved",
+  "G0_pass": 0,
+  "low_height_close_z_band_pass": 3,
+  "low_height_execution_invalid": 3,
+  "production_modified": false,
+  "diagnostic_arm_hold_added": true,
+  "videos": 9,
+  "qualification_claim": false
+}

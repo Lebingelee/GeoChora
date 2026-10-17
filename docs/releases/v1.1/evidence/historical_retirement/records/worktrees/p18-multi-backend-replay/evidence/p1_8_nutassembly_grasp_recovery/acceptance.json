@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_human_review",
+  "scope": "diagnosis only",
+  "P18E_qualification": "partial / not approved",
+  "causal_classification": "grasp_pose_or_contact_geometry_boundary",
+  "ending_HEAD": "dde727ff0cbeaf7fbe9f07e53ec97346538191ce",
+  "production_changes": false,
+  "R0": "R0-B: gripper_did_not_close (TB100/TB50); R0-A additional TB500 pose lag",
+  "R1": {
+    "geophys": "no mechanical grasp after 1s",
+    "mujoco": "no mechanical grasp after 1s; semantic heuristic only"
+  },
+  "R2": "not executed",
+  "D0_D1_D2": "N/A",
+  "reporting_error_preserved": true,
+  "physics_reexecution": false,
+  "recommended_next_action": "Human review of authored EE/handle/finger/table geometric compatibility and canonical actuator force-mode feedback; do not propose readiness-only fix or tune in this run"
+}

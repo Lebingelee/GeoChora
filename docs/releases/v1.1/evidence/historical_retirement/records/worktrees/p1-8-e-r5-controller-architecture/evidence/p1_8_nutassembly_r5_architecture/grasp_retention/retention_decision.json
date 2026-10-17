@@ -1,0 +1,147 @@
+{
+  "baseline": {
+    "force_without_nut_contact": {
+      "answer": "no in the sampled MuJoCo baseline close trace",
+      "evidence": "232 of 232 samples at or above 25 N had bilateral finger/Nut contact",
+      "geophys_answer": "unknown; finger-pair attribution is not publicly available"
+    },
+    "geophys_tb100": {
+      "authorization_branch": "controller_close_ready",
+      "authorization_force_N": 30,
+      "authorization_opening_m": 0.03319036588072777,
+      "authorization_time_s": 0.93,
+      "corrected_max_capture_rotation_drift_rad": 0.000927,
+      "corrected_max_capture_translation_drift_m": 3.188754875257742e-05,
+      "pair_level_contact_attribution_available": false,
+      "verify_lift_pass": true
+    },
+    "mujoco_tb100": {
+      "authorization_branch": "stable_grasp_fallback",
+      "authorization_force_N": 26.549333227843707,
+      "authorization_opening_m": 0.0106328086177788,
+      "authorization_simulation_time_s": 3.74,
+      "bilateral_contact_at_first_drift": true,
+      "bilateral_contact_at_first_relative_slip": true,
+      "bilateral_contact_loss_time_s": 4.372,
+      "canonical_grasped_true_after_bilateral_loss_sample_count": 229,
+      "close_authorization_time_s": 1.17,
+      "corrected_max_capture_rotation_drift_rad": 0.005164,
+      "corrected_max_capture_translation_drift_m": 0.10192653643111194,
+      "finger_nut_contact_pairs_at_authorization": 44,
+      "finger_nut_contacts_per_side": 22,
+      "first_bilateral_contact_time_s": 2.572,
+      "first_force_below_1N_time_s": 4.358,
+      "first_relative_drift_over_8mm_time_s": 4.204,
+      "first_relative_slip_over_1mm_time_s": 3.992,
+      "force_at_first_drift_N": 14.00627138320574,
+      "force_at_first_relative_slip_N": 26.51644680005313,
+      "force_decomposition_at_authorization": {
+        "actuator_force_signed_N": -26.54757985979641,
+        "classified_contacts_total": 57,
+        "equality_force_native": 0.013940156027149526,
+        "finger_generalized_actuator_N": [
+          -13.273789929898205,
+          -13.273789929898205
+        ],
+        "finger_generalized_constraint_N": [
+          13.275416692256801,
+          13.273185427229311
+        ],
+        "finger_nut_contacts_per_side": 22,
+        "finger_table_contact": false,
+        "interpretation": "bilateral Nut-contact load; not internal-limit/equality resistance. Net resultant includes table support.",
+        "lower_joint_coordinate_distance_m": [
+          0.005316234670905508,
+          0.005316573946873291
+        ],
+        "net_contact_resultant_force_magnitude_N": 0.9810711536972052,
+        "net_contact_resultant_force_world_N": [
+          4.5567e-06,
+          -0.0001481336,
+          0.9810711425
+        ],
+        "net_contact_resultant_moment_world_Nm": [
+          -0.0003003626,
+          -0.0007890258,
+          -0.0004049352
+        ],
+        "normal_contact_force_sum_left_finger_nut_N": 16.059224694315354,
+        "normal_contact_force_sum_nut_table_N": 7.126286865952731,
+        "normal_contact_force_sum_right_finger_nut_N": 16.236697942408558,
+        "normal_contact_force_sum_total_N": 39.42221391551457,
+        "nut_table_contacts": 13
+      },
+      "force_mode_entry_time_s": 2.616,
+      "native_actuator_force_at_authorization_N_signed": -26.54757985979641,
+      "nut_rise_before_slip_m_approx": 0.00102,
+      "relative_drift_at_first_slip_m": 0.0010130403503603896,
+      "samples_force_ge_25N": 232,
+      "samples_force_ge_25N_bilateral": 232,
+      "samples_force_ge_25N_without_nut_contact": 0,
+      "verify_lift_pass": false,
+      "zero_opening_saturation_time_s": 3.564
+    },
+    "opening_difference": {
+      "explanation": "different measured finger-joint/contact/force state at readiness; exact provider realization source unresolved",
+      "geophys_combined_opening_m": 0.03319036588072777,
+      "geophys_finger_joint_positions_m": [
+        0.0165943,
+        0.0165961
+      ],
+      "mujoco_combined_opening_m": 0.0106328086177788,
+      "mujoco_finger_joint_positions_m": [
+        0.0053162,
+        0.0053166
+      ]
+    },
+    "primary_classification": "verify_lift_slip",
+    "secondary_observation": "GeoPhys and MuJoCo readiness states show different gripper/contact realization; exact source unresolved"
+  },
+  "behavioral_parameter_sweep": false,
+  "branch": "codex/p1.8-e-r5-controller-architecture",
+  "correction_01": {
+    "change": {
+      "grasp_offset_m_after": [
+        0,
+        0,
+        0.047
+      ],
+      "grasp_offset_m_before": [
+        0,
+        0,
+        0.05
+      ]
+    },
+    "geophys_tb100": {
+      "authorization_time_s": 0.93,
+      "capture_translation_drift_m": 4.44414083389e-05,
+      "pass": true,
+      "verify_lift_pass": true
+    },
+    "id": "R1_shared_grasp_z_down_3mm",
+    "mujoco_tb100": {
+      "authorization": null,
+      "bilateral_contact_at_close_end": true,
+      "failure_boundary": "close_gripper_readiness_timeout",
+      "final_force_N": 11.79636490515152,
+      "final_opening_m": 0.004718545789491631,
+      "pass": false,
+      "peak_transient_force_N": 27.547194768746998,
+      "verify_lift_run": false
+    },
+    "profile_sha256": "2a2bd8ade2ae30ab5d43ec75a8329fd0d7116cee8563b0c756806f4b714696b2",
+    "promoted_to_canonical_profile": false,
+    "rationale": "baseline force-weighted finger/Nut contact centroid migrated from 2.879 mm above Nut COM at authorization to 7.952 mm at the first capture-drift violation"
+  },
+  "correction_2_used": false,
+  "d0_d2_run": false,
+  "ending_head": "e8ee54fa16e6537a39b61038d892f2646c0e1ac7",
+  "full_nutassembly_run": false,
+  "persistent_arm_modified": false,
+  "rate_expansion_run": false,
+  "sapien_genesis_run": false,
+  "schema_version": "p1.8-e-r5-grasp-retention-decision-v1",
+  "starting_head": "8d9968f0070852ae707f3f635c946242d432bd59",
+  "status": "grasp_retention_unresolved",
+  "t1_run": false
+}
