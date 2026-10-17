@@ -5,7 +5,7 @@
 > 状态：canonical Core 范围，v0.3
 > 日期：2026-10-04
 >
-> 当前实现状态更新（2026-10-17）：public `develop` 已集成 P2.0-B S3 Go2 retirement 与 S4 GeoChora-owned static-template physics retirement。TaskEnv batch factory 仅保留 `merged_scene` route；通用 RL、Batch/Device/Learner、Vectorization、GeoPhys provider adapter 与 Renderer contracts 保留。S4 不增加新的 provider/capability qualification。Go2/静态 solver 历史源与 Evidence 仍可通过不可变恢复 refs 获取。以下较早阶段状态只描述其记录时点。
+> 当前实现状态更新（2026-10-17）：public `develop` 已集成 P2.0-B S3 Go2 retirement 与 S4 GeoChora-owned static-template physics retirement。S4.5-A/B workflow implementation 与 S5-A trajectory CLI 修复目前仍是本地 review chain，尚未集成；该修复只转发 argv 并补 CLI regression，不改变转换语义。TaskEnv batch factory 仅保留 `merged_scene` route；通用 RL、Batch/Device/Learner、Vectorization、GeoPhys provider adapter 与 Renderer contracts 保留。S4/S4.5 不增加新的 provider/capability qualification。Go2/静态 solver 历史源与 Evidence 仍可通过不可变恢复 refs 获取。以下较早阶段状态只描述其记录时点。
 
 ## 1. Core 使命
 

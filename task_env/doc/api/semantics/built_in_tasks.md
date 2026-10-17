@@ -3,21 +3,52 @@
 **Import path**：`task_env.tasks`  
 **任务域**：Task Semantics  
 **稳定性**：Public API（env）/ Extension API（definition）  
-**职责**：提供内置 PickCube、NutAssembly、Pendulum 与双轮平衡车环境。
+**职责**：注册当前选定的 PickCube/NutAssembly reference routes，以及
+Pendulum、双轮平衡车等通用任务环境。
 **调用者/消费者**：`make_env`、Gym 使用者。  
 **源码**：`tasks/pick_cube/`、`tasks/nut_assembly/`、`tasks/pendulum.py`、`tasks/two_wheel_balance.py`
 
-## `PickCubeEnv` and `PickCubeTaskDefinition`
+## Selected PickCube reference route
 
-**Kind**：class / dataclass；**Defined in**：`pick_cube/task.py`
+Public construction uses `make_env("pick-cube-p16-reference-v1", config=...)`.
+The task-owned route is `PickCubeReferenceEnv` in `pick_cube/task.py` and uses
+the canonical `TaskArtifact` identity
+`pick-cube-v1/p1_6_experimental_100hz` (`fd5bc968…`). The task authoring package
+also contains its artifact/reset/evaluation builder functions, but these are
+not a second public environment factory.
 
-`PickCubeEnv` 是 `BaseTaskEnv` 子类。`PickCubeTaskDefinition(references, success_definition=...)` 需要 `panda-v1` 与 `cube-v1` 引用；其 evaluate 使用 end-effector/cube snapshot、gripper opening 计算 reward、lift success。缺少所需 `site_xpos` 或 `body_xpos` 会抛 `ValueError`。
+This is the selected P1.6 `experimental_100hz` reference: 100 Hz control,
+five 2 ms physics steps per control interval, absolute-pose expert actions,
+and the measured 0.100 m lift predicate. It is a single-environment route;
+no policy-checkpoint inference or new P1.6 qualification is implied.
 
-## `NutAssemblyEnv` and `NutAssemblyTaskDefinition`
+## Selected NutAssembly outcome reference route
 
-**Kind**：class / dataclass；**Defined in**：`nut_assembly/task.py`
+Public construction uses `make_env("nut-assembly-outcome-reference-v1",
+config=...)`. The registered class is `NutAssemblyReferenceEnv` in
+`nut_assembly/task.py`; the task owns one selected guarded expert and
+Outcome Completion V1. It advances only through `step_expert()`.
 
-definition 需要 `panda-v1` 与 `square-nut-v1` 引用，并验证传入 `success_definition` 等于其版本常量；不匹配抛 `ValueError`，缺引用抛 `KeyError`。奖励、success/failure 只能通过 `TaskEvaluation` 进入 env lifecycle。
+Its canonical artifact remains
+`nut-assembly-square-v1/p1_8_e/nominal-v1` with identity
+`99e374bd…`; the public environment UID and serialized TaskArtifact identity
+are intentionally distinct. Task success is measured insertion AND release.
+Outcome completion, readiness warnings, and the original strict Expert
+lifecycle status remain separate. The bounded GeoPhys/MuJoCo route receipts do
+not rewrite historical P1.8 FULL or D0-D2 results.
+
+The selected task authoring API is task-owned. The public environment entry is
+`make_env`; package-level construction helper exports are not uniform across
+the two task packages and should be treated as an API compatibility decision,
+not as interchangeable environment constructors.
+
+## Generic Pendulum and TwoWheel tasks
+
+`PendulumEnv` and `TwoWheelBalanceEnv` remain generic Core environments with
+their existing task definitions, lifecycle semantics, and optional registered
+batch routes. Pendulum is the only route used by the current bounded
+`merged_scene`, SB3 and rasterizer examples. Those smokes do not qualify general
+learning, rendering, or GeoPhys Rigid Batch capability.
 
 ## `PendulumEnv` and `PendulumTaskDefinition`
 

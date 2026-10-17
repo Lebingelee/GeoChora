@@ -137,7 +137,12 @@ Evidence 经审查后可以沉淀为：
 
 - Primary target：GeoPhys、MuJoCo。
 - Boundary-validation target：SAPIEN、Genesis。
-- PickCube 为主要 manipulation route，NutAssemblySquare 为 precision/contact regression。Go2 CUDA/static/RSL 仅是 v1.0.0 的历史 regression route；P2.0-B S3 从当前 develop 退休 Go2 专用实现，历史恢复以不可变 v1.0.0 为准，通用 RL、vectorization 与 Static Physics contracts 继续保留。
+- 当前活动 manipulation routes 是 `pick-cube-p16-reference-v1` 与
+  `nut-assembly-outcome-reference-v1`。Go2 CUDA/static/RSL 是 v1.0.0 的历史
+  regression route；P2.0-B S3 已退休 Go2 专用实现，历史恢复以不可变
+  `v1.0.0` 为准。P2.0-B S4 已退休 GeoChora-owned static-template 求解器；
+  通用 RL、Batch/Device/Vectorization contracts 与受限的 GeoPhys-owned
+  `GeoPhysRigidBatchRuntime` adapter 仍保留。
 
 这些角色不构成 provider-wide acceptance。GeoPhys 是 default provider；Phase-I additive runtime 已实现 GeoPhys/MuJoCo/SAPIEN/Genesis adapters。各 tested/approved bounded intersection 与剩余限制见 Mainline Integration Status，不能外推所有 task 或 provider。
 

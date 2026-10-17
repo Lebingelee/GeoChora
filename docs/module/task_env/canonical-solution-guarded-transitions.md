@@ -5,6 +5,14 @@
 > provider capabilities, or historical qualification results. NutAssembly's
 > alternative 8 N authorization is an opt-in candidate and is not a universal
 > grasp requirement or a production default.
+>
+> Historical context: this note records the guarded-transition design and
+> candidate vocabulary available during the P1.8 development campaign. The
+> active selected NutAssembly implementation is the flattened task-owned
+> Outcome Completion V1 route in `task_env/tasks/nut_assembly/solution.py`;
+> candidate class names and profiles below are not current production imports.
+> See `p2_0_s2_c2_nutassembly_authoring.md` for the selected implementation and
+> its bounded acceptance boundary.
 
 ## Purpose and ownership
 

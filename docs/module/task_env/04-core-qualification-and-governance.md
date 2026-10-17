@@ -5,7 +5,11 @@
 > 状态：canonical Core validation policy，v0.3
 > 日期：2026-10-04
 
-> P2.0-B 当前状态（2026-10-17）：S3 Go2 retirement 与 S4 static-template retirement 已集成至 public `develop`。S4 不授予新的 provider/capability qualification；其回归只验证退休边界与保留 contracts。GeoPhys-owned Batch adapter、`merged_scene` 与 generic learner routes 的声明范围仍以各自已有 Evidence 为准。
+> P2.0-B 当前状态（2026-10-17）：S3 Go2 retirement 与 S4 static-template
+> retirement 已集成至 public `develop`（当前远端观察值 `0ff2d846`）。S4.5-A
+> 与 S4.5-B 仍是本地 review candidates；尚未集成。S4/S4.5 回归不增加 provider
+> 或 capability qualification。GeoPhys-owned Batch adapter、`merged_scene` 与
+> generic learner routes 的声明范围仍以具名 Evidence 为准。
 
 ## 1. 目的
 

@@ -1,9 +1,15 @@
-# P2.0-B S4 Static-Template Solver Retirement — Local Review Candidate
+# P2.0-B S4 Static-Template Solver Retirement — Review and Integration Receipt
 
 Date: 2026-10-16
-Status: local candidate; not pushed or integrated
+Status at review: local candidate; integration was pending maintainer authorization
 Branch: `codex/p2-0-b-s4-static-physics-retirement`
 Base: public `develop` `5b8c901135e624a248cf73d29be9a6fea70feb2b` (the S3 integration receipt)
+
+Current status (2026-10-17): the exact S4 implementation was subsequently
+integrated into public `develop` at `0ff2d846a36c7014d2b40a530f52d99e64266ff9`
+by normal fast-forward. The original review status and base below are retained
+as the review-time record; the integration receipt appears at the end of this
+document.
 
 ## S3 integration receipt
 

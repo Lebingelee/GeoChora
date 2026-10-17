@@ -115,5 +115,7 @@ The `pendulum_ppo` `--batch-physics-layout static_template` and
 fail explicitly. The Stage A profile, Stage G precision gate, and Stage 18
 static bridge module paths are retired. Use `merged_scene` for the supported
 TaskEnv batch factory. `GeoPhysRigidBatchRuntime` remains an adapter with its
-prior capability limits and is not a `make_parallel_env` route. Release-level
-compatibility policy remains subject to v1.0.1 review.
+prior capability limits and is not a `make_parallel_env` route. The release
+compatibility policy remains undecided: the maintainer must choose the
+documented `v1.0.1` exception or strict-SemVer `v2.0.0` proposal in the S5-A
+version decision record.

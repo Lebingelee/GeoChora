@@ -121,7 +121,11 @@ P1.7 的完整 visuomotor 路线尚未资格化。P1.8 的基础设施回归在�
 PickCube -> NutAssembly -> Agent 生成的相近但未见过的操作任务
 ```
 
-Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 provider 范围如下：
+当前活动参考任务通过公共 `make_env` 入口构造：`pick-cube-p16-reference-v1`
+与 `nut-assembly-outcome-reference-v1`。Go2 专用任务、机器人、profile 和训练
+路线已从当前 develop 退休；静态模板求解器也已退休。通用 RSL-RL、SB3、
+Batch/Device/Vectorization、GeoPhys `merged_scene` 和 Renderer 合约继续保留，
+但各自支持范围必须以具名测试交集为准。当前 provider 范围如下：
 
 | 能力 | 当前状态 |
 | --- | --- |
@@ -135,7 +139,14 @@ Go2 walk / RSL 是当前需要保持的 locomotion / RL 回归路线。当前 pr
 
 Phase-I provider 角色是 roadmap 目标，不代表 implemented、tested 或 qualified；具体计划以 [Phase I 蓝图](docs/module/task_env/05-phase-1-multi-simulator-blueprint.md) 为准。
 
-能力声明必须以实际执行证据和对应的 bounded decision 为准。Go2 CUDA/static/RSL 是当前 HEAD 的回归路线，不扩大 task/provider qualification。PickCube 有 P1.5 expert 与 P1.6 policy 的限定结果，但不代表所有 provider、随机化分布或数据工作流均获批准；历史 P1.8 NutAssembly 证据按上文保留。S1.6 的独立 Outcome V1 路由在 100 Hz GeoPhys/MuJoCo 完成具名完整轨迹的 bounded functional acceptance；S2-A 新公开 `make_env` 路由也已在相同 provider/seed 交集完成四条完整 CPU 功能回归。PickCube GeoPhys 原测试包装器在 H5 finalization 后因阶段字段、时钟容差和 grouped-step 计数检查错误返回 FAIL；独立 H5 合同验证及与 S1.5 的逐 transition/boundary 对照通过。后续提交 `0f27225a` 修正了 trajectory record CLI 的失败结果门控。新入口没有继承 P1.6 checkpoint 或 P1.8 FULL/D0 资格。详见 [S2-A 最终审阅](docs/module/task_env/p2_0_s2_a_final_review.md) 和 [当前 reference 入口](docs/module/task_env/p2_0_active_task_consumers.md)。
+能力声明必须绑定具体 source、provider/backend、task、配置和 Evidence。当前
+PickCube P1.6 task-owned 路由与 NutAssembly Outcome V1 路由，在 GeoPhys/MuJoCo
+CPU、100 Hz、指定 seed 上有 bounded full-route functional receipts；这些结果不
+授予 checkpoint inference、P1.8 FULL 或 D0-D2 资格。S4.5-A/B 的开发示例和
+Pendulum 学习/渲染 smoke 仍是本地候选，不能描述为已集成的发布能力。Go2 与
+GeoChora-owned static-template 求解器只通过历史版本恢复，不属于当前 active
+implementation。细节见 [S4.5 review](docs/module/task_env/p2_0_s4_5_b_workflow_consolidation.md)
+和 [release-candidate capability matrix](docs/module/task_env/capability_matrix_v1_0_1_candidate.json)。
 
 首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 
