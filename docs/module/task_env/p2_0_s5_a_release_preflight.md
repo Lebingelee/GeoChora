@@ -1,5 +1,14 @@
 # GeoChora P2.0-B S5-A — Release Preflight
 
+> **Historical review snapshot with current-status amendment.** The initial
+> S5-A review left the release version unresolved. The maintainer has since
+> selected **v1.1.0** for release-candidate preparation under a project-specific
+> versioning policy. The pending A/B choice recorded below is superseded; see
+> the current [v1.1.0 version policy](p2_0_s5_a_version_policy_decision.md),
+> [candidate matrix](capability_matrix_v1_1_0_candidate.json), and
+> [release package](../../releases/v1.1/README.md). No release has been
+> published and no tag has been created.
+
 Date: 2026-10-17
 
 Status: **preflight prepared; maintainer decisions and stage integrations remain pending**
@@ -88,13 +97,16 @@ remain a separate release-preflight record.
 The detailed inventories are:
 
 - [Source and capability inventory](p2_0_s5_a_release_inventory.md)
-- [Candidate capability matrix](capability_matrix_v1_0_1_candidate.json)
+- [Current candidate capability matrix](capability_matrix_v1_1_0_candidate.json)
 - [Breaking compatibility inventory](p2_0_s5_a_compatibility_inventory.json)
 - [Version-policy decision](p2_0_s5_a_version_policy_decision.md)
 
-The release name is unresolved. The maintainer must choose **A** (`v1.0.1`
-under an explicit project-specific breaking-change policy) or **B** (`v2.0.0`
-to follow strict SemVer after incompatible removals). No tag was created.
+At the time of the original S5-A preflight, the release name was unresolved and
+the `v1.0.1`/`v2.0.0` alternatives were under review. That decision is now
+superseded: the approved candidate target is `v1.1.0`, with explicit breaking
+API changes under GeoChora's project-specific versioning policy. Strict SemVer
+compliance is not claimed. The earlier alternatives remain historical review
+context; they are not a current decision gate. No tag was created.
 
 The present-tense documentation audit found and corrected these stale claims:
 
@@ -118,8 +130,9 @@ The present-tense documentation audit found and corrected these stale claims:
   its P1.8 candidate classes/profiles as historical development context and
   points to the active flattened NutAssembly solution. The S4 retirement
   receipt distinguishes its review-time local status from its later public
-  integration. The migration guide presents the unresolved version choice
-  instead of treating `v1.0.1` as already selected.
+  integration. The migration guide now identifies `v1.1.0` as the selected
+  candidate target; the initial review's unresolved version choice remains
+  only in this historical snapshot.
 
 Historical P1.8, Phase I, source-lock, qualification, and frozen release
 reports intentionally retain their original-time claims. They are not current
@@ -190,8 +203,8 @@ copy; and record the location, timestamp, verification result, and responsible
 maintainer. The repository and its same-disk clones do not satisfy this
 requirement.
 
-Release publication remains blocked pending: separate S4.5-A/B maintainer
-integration decisions; a version-policy choice; public API migration approval;
-final capability matrix review; final source/ref readback after integration;
-and verified independent backup. This document authorizes none of those
-external actions.
+Release publication remains blocked pending: explicit S4.5-A/B and CLI-fix
+integration approval, final public API migration review, final matrix review,
+source/ref readback after integration, clean-checkout installation decision,
+and verified independent backup. The v1.1.0 target is selected for RC
+preparation only. This document authorizes no push, tag, merge, or release.

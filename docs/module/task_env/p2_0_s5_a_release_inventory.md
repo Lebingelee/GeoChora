@@ -1,5 +1,11 @@
 # GeoChora P2.0-B S5-A — Release-Candidate Source Inventory
 
+> **Current designation:** this is the S5-A review snapshot. The selected
+> release-candidate target is now GeoChora **v1.1.0** under the
+> project-specific versioning policy. The current matrix is
+> [`capability_matrix_v1_1_0_candidate.json`](capability_matrix_v1_1_0_candidate.json);
+> the old v1.0.1 matrix is archived as historical draft evidence.
+
 Status: **preflight draft; not a release or capability qualification**. S4.5-B
 implementation head: `929dd8fafe8dca5b0f375341045501c0a8eed9c7`; its documentation
 receipt is `fc12780dcaebcb12f9740ae7f3f28224a47c3bbf`. S5-A compatibility fix:
@@ -19,7 +25,7 @@ Historical approvals do not transfer to the candidate source.
 | PickCube | UID `pick-cube-p16-reference-v1`; Artifact `pick-cube-v1/p1_6_experimental_100hz`; Artifact SHA-256 `fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4`; config SHA-256 `0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0`; task tree `bac089f4ace6ca0693a8261fefacbc25dc108f48` | **TESTED_BOUNDED** on GeoPhys CPU and MuJoCo CPU, 100 Hz, seed 31. Its serialized Artifact identity is distinct from its public environment UID. No checkpoint inference; current source has no inherited P1.6 qualification. |
 | NutAssembly | UID `nut-assembly-outcome-reference-v1`; Artifact `nut-assembly-square-v1/p1_8_e/nominal-v1`; Artifact SHA-256 `99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe`; config SHA-256 `749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531`; task tree `eed6b5c6f900e3c04f5150562f2758d17be4c9fb` | **TESTED_BOUNDED** on GeoPhys CPU and MuJoCo CPU, 100 Hz, NA-S0 seed 19. It uses guarded `step_expert()` and Outcome Completion V1. Task success, outcome completion, readiness warning and strict Expert lifecycle remain separate. No P1.8 FULL or D0-D2 inheritance. |
 | Generic built-in tasks | `pendulum-v1`, `two-wheel-balance-v1`; generic task definitions in `task_env.tasks` | **IMPLEMENTED**. Pendulum has the bounded current batch, SB3 and rasterizer examples listed below. |
-| Physics providers | Scalar selected reference routes: GeoPhys CPU and MuJoCo CPU. Pendulum smoke: GeoPhys CPU. | **TESTED_BOUNDED** only for the named cases in the [candidate matrix](capability_matrix_v1_0_1_candidate.json). No provider-wide claim. SAPIEN/Genesis remain roadmap targets, not evidenced by S4.5. |
+| Physics providers | Scalar selected reference routes: GeoPhys CPU and MuJoCo CPU. Pendulum smoke: GeoPhys CPU. | **TESTED_BOUNDED** only for the named cases in the [v1.1.0 candidate matrix](capability_matrix_v1_1_0_candidate.json). No provider-wide claim. SAPIEN/Genesis remain roadmap targets, not evidenced by S4.5. |
 | Batch/runtime | `BatchRuntimeProtocol`, `make_parallel_env`, `merged_scene`; retained GeoPhys-owned `GeoPhysRigidBatchRuntime` adapter | **IMPLEMENTED**. Pendulum/GeoPhys CPU/`merged_scene` bounded batch smoke is recorded. The adapter has no native validation in S4/S4.5 receipts; `static_template` is **RETIRED**, never redirected. |
 | Task Artifact | Existing canonical `TaskArtifact` and `task-artifact-v0`; selected PickCube/NutAssembly Artifact hashes above | **IMPLEMENTED** and identity-tested. S4.5 changes no Artifact schema or selected serialized task identity. |
 | Recording and trajectory | Existing task-owned recorder and canonical H5 readers; `trajectory.record`, `convert`, `replay`, `merge`; explicit historical replay option | **TESTED_BOUNDED** for the PickCube/MuJoCo/CPU/seed31 470-transition recording and offline validation. H5 storage/logical roundtrip is not D0 reconstruction. Incomplete task runs finalize H5 where possible and still return nonzero. |
@@ -32,7 +38,7 @@ Historical approvals do not transfer to the candidate source.
 | Further release/capability expansion | S5 release decisions; Phase II renderer interoperability; new provider or training qualifications | **PLANNED**, not part of this candidate. |
 
 The exact tested intersections, source revisions, result receipts, and explicit
-non-claims are in [`capability_matrix_v1_0_1_candidate.json`](capability_matrix_v1_0_1_candidate.json).
+non-claims are in [`capability_matrix_v1_1_0_candidate.json`](capability_matrix_v1_1_0_candidate.json).
 The immutable v1.0.0 matrix remains
 [`docs/releases/v1.0/capability_matrix.json`](../../releases/v1.0/capability_matrix.json).
 

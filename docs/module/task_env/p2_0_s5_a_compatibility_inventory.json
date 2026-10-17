@@ -1,9 +1,9 @@
 {
   "schema": "geochora-p2-0-s5-a-compatibility-inventory-v1",
-  "status": "DRAFT_DECISION_REQUIRED_BEFORE_RELEASE",
+  "status": "DRAFT_V1_1_0_RELEASE_CANDIDATE_COMPATIBILITY_INVENTORY",
   "candidate_source_head": "bee498d1d784015f034c5b4af34320fdffa61411",
   "s4_5_b_implementation_head": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
-  "release_version_decision": "PENDING_MAINTAINER_CHOICE_A_OR_B",
+  "release_version_decision": "TARGET_SELECTED_FOR_RELEASE_CANDIDATE_PREPARATION_ONLY; publication/tag/main modification not authorized",
   "entries": [
     {
       "area": "selected task UID",
@@ -27,7 +27,11 @@
     },
     {
       "area": "environment construction and selected-task execution contract",
-      "old_public_identity": ["direct historical PickCube/NutAssembly environment constructors", "task_env.tasks.nut_assembly.build_reference", "make_env with pick-cube-v1 or nut-assembly-square-v1"],
+      "old_public_identity": [
+        "direct historical PickCube/NutAssembly environment constructors",
+        "task_env.tasks.nut_assembly.build_reference",
+        "make_env with pick-cube-v1 or nut-assembly-square-v1"
+      ],
       "current_replacement": "Construct through task_env.make_env using pick-cube-p16-reference-v1 or nut-assembly-outcome-reference-v1; NutAssembly advances through guarded step_expert().",
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_ENV_CONSTRUCTION_AND_EXECUTION_CONTRACT",
@@ -37,7 +41,12 @@
     },
     {
       "area": "Go2 task UIDs",
-      "old_public_identity": ["go2-walk-v1", "go2-walk-deploy-v1", "go2-walk-deploy-height-v1", "go2-walk-codex"],
+      "old_public_identity": [
+        "go2-walk-v1",
+        "go2-walk-deploy-v1",
+        "go2-walk-deploy-height-v1",
+        "go2-walk-codex"
+      ],
       "current_replacement": null,
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_RETIRED_NO_ALIAS",
@@ -47,7 +56,14 @@
     },
     {
       "area": "Go2 agent UID and RSL aliases",
-      "old_public_identity": {"agent_uid": "go2-v1", "rsl_aliases": ["go2_walk", "go2_walk_deploy", "go2_walk_deploy_height"]},
+      "old_public_identity": {
+        "agent_uid": "go2-v1",
+        "rsl_aliases": [
+          "go2_walk",
+          "go2_walk_deploy",
+          "go2_walk_deploy_height"
+        ]
+      },
       "current_replacement": null,
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_RETIRED_NO_ALIAS",
@@ -57,7 +73,25 @@
     },
     {
       "area": "Go2 Python modules and implementation files",
-      "old_public_identity": ["task_env.diagnostics.flora.asset_bundle", "task_env.diagnostics.flora.shared_asset_256", "task_env.diagnostics.flora.single_scene", "task_env.diagnostics.go2", "task_env.diagnostics.runtime.stage19d_cuda_graph_contact", "task_env.diagnostics.runtime.stage19d_cuda_graph_taichi_core", "task_env.diagnostics.runtime.stage_b_torch_reference", "task_env.diagnostics.runtime.stage_f_cuda_graph_lifecycle", "task_env.diagnostics.runtime.stage_g_contact_precision", "task_env.diagnostics.runtime.stage_p_topology_candidate_benchmark", "task_env.flora_go2_assets", "task_env.robots.go2", "task_env.script.flora_go2_single_smoke", "task_env.script.rl.go2", "task_env.tasks.go2_walk", "task_env.tasks.go2_walk_codex", "task_env.tasks.go2_walk_deploy"],
+      "old_public_identity": [
+        "task_env.diagnostics.flora.asset_bundle",
+        "task_env.diagnostics.flora.shared_asset_256",
+        "task_env.diagnostics.flora.single_scene",
+        "task_env.diagnostics.go2",
+        "task_env.diagnostics.runtime.stage19d_cuda_graph_contact",
+        "task_env.diagnostics.runtime.stage19d_cuda_graph_taichi_core",
+        "task_env.diagnostics.runtime.stage_b_torch_reference",
+        "task_env.diagnostics.runtime.stage_f_cuda_graph_lifecycle",
+        "task_env.diagnostics.runtime.stage_g_contact_precision",
+        "task_env.diagnostics.runtime.stage_p_topology_candidate_benchmark",
+        "task_env.flora_go2_assets",
+        "task_env.robots.go2",
+        "task_env.script.flora_go2_single_smoke",
+        "task_env.script.rl.go2",
+        "task_env.tasks.go2_walk",
+        "task_env.tasks.go2_walk_codex",
+        "task_env.tasks.go2_walk_deploy"
+      ],
       "current_replacement": null,
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_REMOVED_IMPORTS",
@@ -68,7 +102,11 @@
     },
     {
       "area": "generic runtime profile CLI defaults",
-      "old_public_identity": ["RSL CLI without --env-id", "Go2-specific default/profile aliases", "Stage 17 profile invocation without --task-uid"],
+      "old_public_identity": [
+        "RSL CLI without --env-id",
+        "Go2-specific default/profile aliases",
+        "Stage 17 profile invocation without --task-uid"
+      ],
       "current_replacement": "Explicit --env-id / --task-uid with current registry and learner-capability admission",
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_DEFAULT_REMOVAL_FAIL_CLOSED",
@@ -78,7 +116,36 @@
     },
     {
       "area": "Static Template public imports and symbols",
-      "old_public_identity": ["task_env.runtime.providers.static", "task_env.runtime.static_capabilities", "task_env.runtime.static_execution", "task_env.runtime.static_provider", "task_env.runtime.static_template", "task_env.runtime.static_template_fused", "task_env.runtime.static_template_model", "task_env.runtime.static_template_physics", "task_env.runtime.static_template_reference", "task_env.runtime.static_template_rigid_batch", "task_env.runtime.static_template_taichi", "task_env.runtime.static_workspace", "task_env.environment.StaticTemplateContactConfig", "task_env.environment.StaticTemplateRuntimeConfig", "task_env.runtime.StaticTemplateBatchRuntime", "task_env.runtime.StaticTemplateDescriptor", "task_env.runtime.STATIC_TEMPLATE_CAPABILITIES", "task_env.runtime.StaticTemplateCapability", "task_env.runtime.get_static_template_capability", "task_env.runtime.resolve_static_template_profile", "task_env.runtime.static_template_compatibility_issues", "task_env.runtime.LocalPairKey", "task_env.runtime.StaticTemplateContactWorkspace", "task_env.runtime.StaticTemplateModel", "task_env.runtime.StaticTemplateExecutionPlan", "task_env.runtime.StaticTemplateRigidSolverReference", "task_env.runtime.StaticTemplateFusedArticulated", "task_env.runtime.StaticTemplateRigidBatch"],
+      "old_public_identity": [
+        "task_env.runtime.providers.static",
+        "task_env.runtime.static_capabilities",
+        "task_env.runtime.static_execution",
+        "task_env.runtime.static_provider",
+        "task_env.runtime.static_template",
+        "task_env.runtime.static_template_fused",
+        "task_env.runtime.static_template_model",
+        "task_env.runtime.static_template_physics",
+        "task_env.runtime.static_template_reference",
+        "task_env.runtime.static_template_rigid_batch",
+        "task_env.runtime.static_template_taichi",
+        "task_env.runtime.static_workspace",
+        "task_env.environment.StaticTemplateContactConfig",
+        "task_env.environment.StaticTemplateRuntimeConfig",
+        "task_env.runtime.StaticTemplateBatchRuntime",
+        "task_env.runtime.StaticTemplateDescriptor",
+        "task_env.runtime.STATIC_TEMPLATE_CAPABILITIES",
+        "task_env.runtime.StaticTemplateCapability",
+        "task_env.runtime.get_static_template_capability",
+        "task_env.runtime.resolve_static_template_profile",
+        "task_env.runtime.static_template_compatibility_issues",
+        "task_env.runtime.LocalPairKey",
+        "task_env.runtime.StaticTemplateContactWorkspace",
+        "task_env.runtime.StaticTemplateModel",
+        "task_env.runtime.StaticTemplateExecutionPlan",
+        "task_env.runtime.StaticTemplateRigidSolverReference",
+        "task_env.runtime.StaticTemplateFusedArticulated",
+        "task_env.runtime.StaticTemplateRigidBatch"
+      ],
       "current_replacement": "No StaticTemplate solver. Generic BatchRuntimeProtocol, merged_scene, and GeoPhysRigidBatchRuntime remain distinct supported contracts.",
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_REMOVED_RUNTIME_AND_SYMBOLS",
@@ -88,7 +155,15 @@
     },
     {
       "area": "Static Template layout, config and CLI",
-      "old_public_identity": ["runtime.batch_physics_layout=static_template", "runtime.static_template.* public mapping/YAML", "non-default RuntimeConfig.static_template values", "--batch-physics-layout static_template", "--static-template-profile", "static-profile/contact-precision/kinematics-backend/contact-candidate Stage 17 options", "static-template-only Stage A/18/G diagnostic commands"],
+      "old_public_identity": [
+        "runtime.batch_physics_layout=static_template",
+        "runtime.static_template.* public mapping/YAML",
+        "non-default RuntimeConfig.static_template values",
+        "--batch-physics-layout static_template",
+        "--static-template-profile",
+        "static-profile/contact-precision/kinematics-backend/contact-candidate Stage 17 options",
+        "static-template-only Stage A/18/G diagnostic commands"
+      ],
       "current_replacement": "merged_scene for supported TaskEnv batch routes; otherwise fail-closed unsupported-capability error",
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_RETIRED_CONFIG_AND_CLI",
@@ -98,7 +173,15 @@
     },
     {
       "area": "Stage 11 / Phase I and historical collection CLI",
-      "old_public_identity": ["task_env.script.stage11", "task_env.script.stage11_socket", "task_env.diagnostics.phase1.nutassembly_recovery.historical", "task_env.script.trajectory collect", "--historical-grouped", "task_env.script.trajectory._task_plans and private _build_plan/_historical_build_plan/config helpers", "private task-specific task_env.script.recorder helpers"],
+      "old_public_identity": [
+        "task_env.script.stage11",
+        "task_env.script.stage11_socket",
+        "task_env.diagnostics.phase1.nutassembly_recovery.historical",
+        "task_env.script.trajectory collect",
+        "--historical-grouped",
+        "task_env.script.trajectory._task_plans and private _build_plan/_historical_build_plan/config helpers",
+        "private task-specific task_env.script.recorder helpers"
+      ],
       "current_replacement": "Selected expert/example recording via public make_env and the canonical recorder; otherwise explicit retirement with separate historical checkout instructions",
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_RETIRED_HISTORICAL_ENTRYPOINTS",
@@ -108,7 +191,13 @@
     },
     {
       "area": "historical rendering/camera CLI and helper imports",
-      "old_public_identity": ["task_env.script.render_single", "task_env.script.camera.static", "task_env.script.camera.bound", "task_env.script.camera_lighting_probe", "task_env.script.camera._common"],
+      "old_public_identity": [
+        "task_env.script.render_single",
+        "task_env.script.camera.static",
+        "task_env.script.camera.bound",
+        "task_env.script.camera_lighting_probe",
+        "task_env.script.camera._common"
+      ],
       "current_replacement": "Pendulum examples for supported scalar/batch rasterizer RGB only; no selected manipulation camera route is declared",
       "behavior_equivalent": false,
       "compatibility_classification": "BREAKING_RETIRED_SCRIPT_IMPORTS_AND_OPTIONS",
@@ -118,7 +207,10 @@
     },
     {
       "area": "selected task authoring surface",
-      "old_public_identity": ["historical multi-file/candidate task modules", "task_env.tasks.nut_assembly.build_reference package export"],
+      "old_public_identity": [
+        "historical multi-file/candidate task modules",
+        "task_env.tasks.nut_assembly.build_reference package export"
+      ],
       "current_replacement": "Four-file PickCube and NutAssembly task directories; make_env is canonical environment construction; NutAssembly task builder is task_env.tasks.nut_assembly.task.build_reference",
       "behavior_equivalent": "Selected serialized TaskArtifact identity and task semantics are preserved, but removed candidate classes/builders are not equivalent APIs.",
       "compatibility_classification": "BREAKING_TASK_AUTHORING_AND_PACKAGE_EXPORT_CHANGE",
@@ -129,9 +221,42 @@
     },
     {
       "area": "PickCube task-local historical imports and development candidate",
-      "old_python_imports": ["task_env.tasks.pick_cube.artifact", "task_env.tasks.pick_cube.candidate", "task_env.tasks.pick_cube.canonical_semantics", "task_env.tasks.pick_cube.definition", "task_env.tasks.pick_cube.readiness_solution", "task_env.tasks.pick_cube.reference", "task_env.tasks.pick_cube.reference_config", "task_env.tasks.pick_cube.reference_env", "task_env.tasks.pick_cube.reset", "task_env.tasks.pick_cube.reset_policy", "task_env.tasks.pick_cube.runtime_source", "task_env.tasks.pick_cube.timebase"],
-      "removed_or_replaced_file_paths": ["task_env/tasks/pick_cube/artifact.py", "task_env/tasks/pick_cube/candidate.py", "task_env/tasks/pick_cube/canonical_semantics.py", "task_env/tasks/pick_cube/default.yaml", "task_env/tasks/pick_cube/definition.py", "task_env/tasks/pick_cube/readiness_solution.py", "task_env/tasks/pick_cube/reference.py", "task_env/tasks/pick_cube/reference_config.py", "task_env/tasks/pick_cube/reference_env.py", "task_env/tasks/pick_cube/reset.py", "task_env/tasks/pick_cube/reset_policy.py", "task_env/tasks/pick_cube/runtime_source.py", "task_env/tasks/pick_cube/timebase.py", "task_env/tasks/pick_cube/assets.py"],
-      "current_replacement": {"task_implementation": "task_env.tasks.pick_cube.task", "selected_solution": "task_env.tasks.pick_cube.solution", "recipe": "task_env.tasks.pick_cube.config.yaml", "reusable_asset_owner": "task_env.objects.pick_cube"},
+      "old_python_imports": [
+        "task_env.tasks.pick_cube.artifact",
+        "task_env.tasks.pick_cube.candidate",
+        "task_env.tasks.pick_cube.canonical_semantics",
+        "task_env.tasks.pick_cube.definition",
+        "task_env.tasks.pick_cube.readiness_solution",
+        "task_env.tasks.pick_cube.reference",
+        "task_env.tasks.pick_cube.reference_config",
+        "task_env.tasks.pick_cube.reference_env",
+        "task_env.tasks.pick_cube.reset",
+        "task_env.tasks.pick_cube.reset_policy",
+        "task_env.tasks.pick_cube.runtime_source",
+        "task_env.tasks.pick_cube.timebase"
+      ],
+      "removed_or_replaced_file_paths": [
+        "task_env/tasks/pick_cube/artifact.py",
+        "task_env/tasks/pick_cube/candidate.py",
+        "task_env/tasks/pick_cube/canonical_semantics.py",
+        "task_env/tasks/pick_cube/default.yaml",
+        "task_env/tasks/pick_cube/definition.py",
+        "task_env/tasks/pick_cube/readiness_solution.py",
+        "task_env/tasks/pick_cube/reference.py",
+        "task_env/tasks/pick_cube/reference_config.py",
+        "task_env/tasks/pick_cube/reference_env.py",
+        "task_env/tasks/pick_cube/reset.py",
+        "task_env/tasks/pick_cube/reset_policy.py",
+        "task_env/tasks/pick_cube/runtime_source.py",
+        "task_env/tasks/pick_cube/timebase.py",
+        "task_env/tasks/pick_cube/assets.py"
+      ],
+      "current_replacement": {
+        "task_implementation": "task_env.tasks.pick_cube.task",
+        "selected_solution": "task_env.tasks.pick_cube.solution",
+        "recipe": "task_env.tasks.pick_cube.config.yaml",
+        "reusable_asset_owner": "task_env.objects.pick_cube"
+      },
       "behavior_equivalent": "The selected P1.6 serialized Artifact and bounded task semantics are retained; historical implementation modules and development candidate identities are not compatibility aliases.",
       "compatibility_classification": "BREAKING_TASK_LOCAL_IMPORT_AND_CANDIDATE_REMOVAL",
       "caller_migration": "Use task_env.make_env for public construction. Task authors use the four-file directory; historical source is restored at the exact per-file ref/blob in the S2-C1 source identity manifest.",
@@ -140,9 +265,66 @@
     },
     {
       "area": "NutAssembly task-local candidate/profile imports",
-      "old_python_imports": ["task_env.tasks.nut_assembly.assets", "task_env.tasks.nut_assembly.canonical_artifact", "task_env.tasks.nut_assembly.canonical_reset", "task_env.tasks.nut_assembly.canonical_semantics", "task_env.tasks.nut_assembly.canonical_solution", "task_env.tasks.nut_assembly.canonical_solution_v2", "task_env.tasks.nut_assembly.canonical_source", "task_env.tasks.nut_assembly.clearance_candidate_v3", "task_env.tasks.nut_assembly.clearance_candidate_v4", "task_env.tasks.nut_assembly.clearance_candidate_v5", "task_env.tasks.nut_assembly.definition", "task_env.tasks.nut_assembly.geometry", "task_env.tasks.nut_assembly.guarded_authorization_candidate", "task_env.tasks.nut_assembly.guarded_authorization_candidate_v2", "task_env.tasks.nut_assembly.outcome_solution", "task_env.tasks.nut_assembly.reference", "task_env.tasks.nut_assembly.reference_config", "task_env.tasks.nut_assembly.reference_env", "task_env.tasks.nut_assembly.reference_execution", "task_env.tasks.nut_assembly.stable_grasp_candidate", "task_env.tasks.nut_assembly.stable_grasp_reference"],
-      "removed_or_replaced_file_paths": ["task_env/tasks/nut_assembly/README.md", "task_env/tasks/nut_assembly/assets.py", "task_env/tasks/nut_assembly/canonical_artifact.py", "task_env/tasks/nut_assembly/canonical_initialization.json", "task_env/tasks/nut_assembly/canonical_reset.py", "task_env/tasks/nut_assembly/canonical_semantics.py", "task_env/tasks/nut_assembly/canonical_solution.py", "task_env/tasks/nut_assembly/canonical_solution_v2.py", "task_env/tasks/nut_assembly/canonical_source.py", "task_env/tasks/nut_assembly/clearance_candidate_v3.py", "task_env/tasks/nut_assembly/clearance_candidate_v4.py", "task_env/tasks/nut_assembly/clearance_candidate_v5.py", "task_env/tasks/nut_assembly/default.yaml", "task_env/tasks/nut_assembly/definition.py", "task_env/tasks/nut_assembly/geometry.py", "task_env/tasks/nut_assembly/guarded_authorization_candidate.py", "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py", "task_env/tasks/nut_assembly/outcome_solution.py", "task_env/tasks/nut_assembly/profiles/mujoco-noslip2-v1.json", "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json", "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json", "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json", "task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml", "task_env/tasks/nut_assembly/reference.py", "task_env/tasks/nut_assembly/reference_config.py", "task_env/tasks/nut_assembly/reference_env.py", "task_env/tasks/nut_assembly/reference_execution.py", "task_env/tasks/nut_assembly/stable_grasp_candidate.py", "task_env/tasks/nut_assembly/stable_grasp_reference.py"],
-      "current_replacement": {"task_implementation_and_recipe": "task_env.tasks.nut_assembly.task / config.yaml", "selected_solution": "task_env.tasks.nut_assembly.solution", "reusable_assembly_owner": "task_env.assembly.nut_assembly", "reusable_object_owner": "task_env.objects.nut_assembly"},
+      "old_python_imports": [
+        "task_env.tasks.nut_assembly.assets",
+        "task_env.tasks.nut_assembly.canonical_artifact",
+        "task_env.tasks.nut_assembly.canonical_reset",
+        "task_env.tasks.nut_assembly.canonical_semantics",
+        "task_env.tasks.nut_assembly.canonical_solution",
+        "task_env.tasks.nut_assembly.canonical_solution_v2",
+        "task_env.tasks.nut_assembly.canonical_source",
+        "task_env.tasks.nut_assembly.clearance_candidate_v3",
+        "task_env.tasks.nut_assembly.clearance_candidate_v4",
+        "task_env.tasks.nut_assembly.clearance_candidate_v5",
+        "task_env.tasks.nut_assembly.definition",
+        "task_env.tasks.nut_assembly.geometry",
+        "task_env.tasks.nut_assembly.guarded_authorization_candidate",
+        "task_env.tasks.nut_assembly.guarded_authorization_candidate_v2",
+        "task_env.tasks.nut_assembly.outcome_solution",
+        "task_env.tasks.nut_assembly.reference",
+        "task_env.tasks.nut_assembly.reference_config",
+        "task_env.tasks.nut_assembly.reference_env",
+        "task_env.tasks.nut_assembly.reference_execution",
+        "task_env.tasks.nut_assembly.stable_grasp_candidate",
+        "task_env.tasks.nut_assembly.stable_grasp_reference"
+      ],
+      "removed_or_replaced_file_paths": [
+        "task_env/tasks/nut_assembly/README.md",
+        "task_env/tasks/nut_assembly/assets.py",
+        "task_env/tasks/nut_assembly/canonical_artifact.py",
+        "task_env/tasks/nut_assembly/canonical_initialization.json",
+        "task_env/tasks/nut_assembly/canonical_reset.py",
+        "task_env/tasks/nut_assembly/canonical_semantics.py",
+        "task_env/tasks/nut_assembly/canonical_solution.py",
+        "task_env/tasks/nut_assembly/canonical_solution_v2.py",
+        "task_env/tasks/nut_assembly/canonical_source.py",
+        "task_env/tasks/nut_assembly/clearance_candidate_v3.py",
+        "task_env/tasks/nut_assembly/clearance_candidate_v4.py",
+        "task_env/tasks/nut_assembly/clearance_candidate_v5.py",
+        "task_env/tasks/nut_assembly/default.yaml",
+        "task_env/tasks/nut_assembly/definition.py",
+        "task_env/tasks/nut_assembly/geometry.py",
+        "task_env/tasks/nut_assembly/guarded_authorization_candidate.py",
+        "task_env/tasks/nut_assembly/guarded_authorization_candidate_v2.py",
+        "task_env/tasks/nut_assembly/outcome_solution.py",
+        "task_env/tasks/nut_assembly/profiles/mujoco-noslip2-v1.json",
+        "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v1.json",
+        "task_env/tasks/nut_assembly/profiles/nutassembly-nominal-v2.json",
+        "task_env/tasks/nut_assembly/profiles/nutassembly-r5-stable-grasp-10n-v1.json",
+        "task_env/tasks/nut_assembly/profiles/r5-controller-planner-reference.yaml",
+        "task_env/tasks/nut_assembly/reference.py",
+        "task_env/tasks/nut_assembly/reference_config.py",
+        "task_env/tasks/nut_assembly/reference_env.py",
+        "task_env/tasks/nut_assembly/reference_execution.py",
+        "task_env/tasks/nut_assembly/stable_grasp_candidate.py",
+        "task_env/tasks/nut_assembly/stable_grasp_reference.py"
+      ],
+      "current_replacement": {
+        "task_implementation_and_recipe": "task_env.tasks.nut_assembly.task / config.yaml",
+        "selected_solution": "task_env.tasks.nut_assembly.solution",
+        "reusable_assembly_owner": "task_env.assembly.nut_assembly",
+        "reusable_object_owner": "task_env.objects.nut_assembly"
+      },
       "behavior_equivalent": "Selected V2/V5/R3/Outcome V1 physical task and Artifact identity are retained. Obsolete candidate classes, profile selectors, and their import semantics are removed; no old Candidate import is aliased.",
       "compatibility_classification": "BREAKING_TASK_LOCAL_IMPORT_PROFILE_AND_CANDIDATE_REMOVAL",
       "caller_migration": "Construct through task_env.make_env and advance through guarded step_expert(). For the package-level builder, task_env.tasks.nut_assembly.build_reference is explicitly retired; no replacement public constructor is promised. Historical source is recovered from the exact S2/S2-B2 manifest ref in a separate checkout.",
@@ -195,5 +377,11 @@
     "tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
     "peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
     "rule": "Do not edit historical reports, Evidence, or labels; restore historical implementation only from the exact immutable refs in each manifest."
-  }
+  },
+  "release_version": "1.1.0",
+  "versioning_policy": "GeoChora project-specific policy. v1.1.0 is a Core consolidation release with documented breaking API changes; strict Semantic Versioning compliance is not claimed.",
+  "superseded_version_alternatives": [
+    "v1.0.1 project-policy exception",
+    "v2.0.0 strict-SemVer alternative"
+  ]
 }

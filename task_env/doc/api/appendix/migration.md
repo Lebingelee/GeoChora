@@ -1,5 +1,11 @@
 # Migration
 
+> **Current release planning (2026-10-17):** GeoChora v1.1.0 is the selected
+> release-candidate target under the project-specific versioning policy. It is
+> a Core consolidation release with documented breaking API changes and is
+> not claimed to follow strict SemVer. The sections below describe current
+> migration behavior; the immutable v1.0.0 release documents remain unchanged.
+
 **Import path**：不适用  
 **任务域**：Appendix  
 **稳定性**：Public API migration note  
@@ -66,8 +72,8 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 
 Exact pre-change source blobs, SHA-256 values, and recovery refs are recorded in
 [`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/p2_0_s4_5_a_source_recovery.json).
-The S4.5-A code and examples remain local review candidates; they do not alter
-frozen release documents or qualification labels. The S4 implementation was
+The S4.5-A code and examples remain local review candidates at the recorded
+review state; they do not alter frozen release documents or qualification labels. The S4 implementation was
 subsequently integrated into public `develop` at
 `0ff2d846a36c7014d2b40a530f52d99e64266ff9` by normal fast-forward.
 
@@ -95,7 +101,24 @@ pre-change SHA-256, Git blob, invocation identity, caller disposition, and
 replacement boundary. Use the repository-root
 [`examples/README.md`](../../../../examples/README.md) for current commands.
 This local candidate does not alter frozen release documents or qualification
-labels.
+labels. Its former v1.0.1 compatibility discussion is superseded by the
+selected v1.1.0 project-specific policy; see the current release-candidate
+package for the consolidated migration list.
+
+## P2.0-B S5-B: v1.1.0 release-candidate status
+
+The selected target is **GeoChora v1.1.0**, for release-candidate preparation
+only. It is a Core consolidation release with documented breaking API changes;
+the project-specific versioning policy does not claim strict SemVer compliance
+or full backward compatibility. No tag or release has been created. The
+complete current migration inventory, recovery refs, capability boundaries,
+and release gates are in [`docs/releases/v1.1/`](../../../../docs/releases/v1.1/README.md).
+
+Current task construction uses `from task_env import make_env` with
+`pick-cube-p16-reference-v1` or `nut-assembly-outcome-reference-v1`. Historical
+UIDs, Go2, GeoChora Static Template runtime options, old candidate imports, and
+retired Stage/Phase-specific commands are not redirected. Restore the exact
+immutable recovery ref for historical execution.
 
 ## P2.0-B S4: static-template retirement (integrated)
 
@@ -115,7 +138,8 @@ The `pendulum_ppo` `--batch-physics-layout static_template` and
 fail explicitly. The Stage A profile, Stage G precision gate, and Stage 18
 static bridge module paths are retired. Use `merged_scene` for the supported
 TaskEnv batch factory. `GeoPhysRigidBatchRuntime` remains an adapter with its
-prior capability limits and is not a `make_parallel_env` route. The release
-compatibility policy remains undecided: the maintainer must choose the
-documented `v1.0.1` exception or strict-SemVer `v2.0.0` proposal in the S5-A
-version decision record.
+prior capability limits and is not a `make_parallel_env` route. At the time of
+the S4 retirement review, release compatibility policy remained undecided.
+That historical decision gate is superseded by the selected v1.1.0
+project-specific policy described at the top of this guide and in the current
+release-candidate package.

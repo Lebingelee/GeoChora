@@ -22,6 +22,14 @@ def _generic_parallel_factory(**_kwargs):
     return object()
 
 
+def _find_spec_or_none(module_name):
+    """Treat an absent parent package as an unavailable dotted module."""
+    try:
+        return importlib.util.find_spec(module_name)
+    except ModuleNotFoundError:
+        return None
+
+
 def test_selected_tasks_remain_registered_and_go2_uids_are_retired():
     import task_env
     from task_env.registry import AGENT_REGISTRY, ENV_REGISTRY, make_agent, make_env
@@ -56,7 +64,7 @@ def test_selected_tasks_remain_registered_and_go2_uids_are_retired():
     ),
 )
 def test_retired_go2_modules_are_not_importable(module_name):
-    assert importlib.util.find_spec(module_name) is None
+    assert _find_spec_or_none(module_name) is None
 
 
 def test_generic_rsl_cli_requires_an_explicit_registered_task():
@@ -94,7 +102,7 @@ def test_static_only_runtime_diagnostics_are_retired():
         "task_env.diagnostics.runtime.stage18_bridge_benchmark",
         "task_env.diagnostics.runtime.stage_g_contact_precision_gate",
     ):
-        assert importlib.util.find_spec(module_name) is None
+        assert _find_spec_or_none(module_name) is None
 
 
 def test_generic_rl_vectorization_and_renderer_contracts_remain_importable():

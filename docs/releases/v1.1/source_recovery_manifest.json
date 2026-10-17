@@ -1,0 +1,177 @@
+{
+  "schema": "geochora-v1-1-release-candidate-source-recovery-manifest-v1",
+  "status": "RELEASE_CANDIDATE_NOT_PUBLISHED",
+  "target_release": "v1.1.0",
+  "versioning_policy": "GeoChora project-specific versioning; documented breaking API changes; strict SemVer compliance not claimed.",
+  "candidate_code_revision": "bee498d1d784015f034c5b4af34320fdffa61411",
+  "candidate_documentation_base": "e0e4dbcbc3dc9d17d0dec58142be5cfb20937e73",
+  "public_develop_reviewed": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
+  "protected_refs_reviewed": {
+    "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "v1_0_0_annotated_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783"
+  },
+  "commit_chain": [
+    {
+      "commit": "5d57272d1ce7469bb214cf185137853a7eb6deb0",
+      "purpose": "S4.5-A selected task, expert, and recording workflows"
+    },
+    {
+      "commit": "59105726c6ec28f467b637b7124f667a6fdd6b52",
+      "purpose": "S4.5-A review receipt"
+    },
+    {
+      "commit": "929dd8fafe8dca5b0f375341045501c0a8eed9c7",
+      "purpose": "S4.5-B learning and rendering workflow consolidation"
+    },
+    {
+      "commit": "fc12780dcaebcb12f9740ae7f3f28224a47c3bbf",
+      "purpose": "S4.5-B source recovery and workflow review receipt; independently inspected"
+    },
+    {
+      "commit": "bee498d1d784015f034c5b4af34320fdffa61411",
+      "purpose": "trajectory converter argv forwarding fix; no conversion/schema/action changes"
+    },
+    {
+      "commit": "e0e4dbcbc3dc9d17d0dec58142be5cfb20937e73",
+      "purpose": "S5-A release-preflight documentation baseline"
+    }
+  ],
+  "submodule_gitlinks": [
+    {
+      "path": "GeoPhys",
+      "commit": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+      "object_available_local": true,
+      "exact_commit_fetch_dry_run": "PASS",
+      "remote_main_at_check": "82b08cc7f12b0106135a94c39673d2f9f5d6b63b"
+    },
+    {
+      "path": "asset/external/mujoco_menagerie",
+      "commit": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+      "object_available_local": true,
+      "exact_commit_fetch_dry_run": "PASS",
+      "remote_main_at_check": "62ab00f2bc44f6f20c1c9b7a13f3fb1dd41a4e35"
+    }
+  ],
+  "nested_optional_submodules": [
+    {
+      "path": "GeoPhys/external/dexjoco",
+      "initialized": false,
+      "needed_for_tested_intersections": false
+    },
+    {
+      "path": "GeoPhys/external/mujoco_menagerie",
+      "initialized": false,
+      "needed_for_tested_intersections": false
+    }
+  ],
+  "task_artifacts": [
+    {
+      "public_uid": "pick-cube-p16-reference-v1",
+      "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "task_config_sha256": "0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0",
+      "tested_task_source_revision": "5b0058010f5416eefb08ce59cec43770602fc336"
+    },
+    {
+      "public_uid": "nut-assembly-outcome-reference-v1",
+      "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "task_config_sha256": "749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531",
+      "tested_task_source_revision": "4d6d65c55eca994b4317bcfb80797c69e48452c6",
+      "policy": "nutassembly-outcome-oriented-completion-v1"
+    }
+  ],
+  "recovery_manifests": [
+    "docs/module/task_env/p2_0_s2_c1_source_identity.json",
+    "docs/module/task_env/p2_0_s2_c2_source_identity.json",
+    "docs/module/task_env/p2_0_s3_go2_retirement_manifest.json",
+    "docs/module/task_env/p2_0_s4_static_solver_retirement_manifest.json",
+    "docs/module/task_env/p2_0_s4_5_a_source_recovery.json",
+    "docs/module/task_env/p2_0_s4_5_b_source_recovery.json",
+    "docs/module/task_env/p2_0_s5_a_compatibility_inventory.json"
+  ],
+  "key_ignored_evidence": [
+    {
+      "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
+      "sha256": "cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108",
+      "scope": "PickCube GeoPhys CPU seed31 full route"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
+      "sha256": "579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018",
+      "scope": "PickCube MuJoCo CPU seed31 full route"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+      "sha256": "e539d5b2662d191c0a70b1ac9dd593842279397b8627f0e3871d8852c78c2271",
+      "scope": "NutAssembly GeoPhys CPU NA-S0 seed19 final-source full route; strict Expert failure and readiness warning retained"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+      "sha256": "f7000d28e1a47363542bef8909341d5a13582175941b394987ad31f0ea4f5931",
+      "scope": "NutAssembly MuJoCo CPU NA-S0 seed19 final-source full route"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+      "sha256": "e22bcadbb142c81f2bdd8f12a432b82b22cef0c25ddeba8cec29f764bca87ae8",
+      "scope": "Canonical PickCube recording and storage roundtrip"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
+      "sha256": "e87a3100cf8b7d775932ebf14749c4f4a6e8336ee7c1db314fddfee1b45c6c96",
+      "scope": "Bounded Pendulum SB3 return record"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
+      "sha256": "361069281b5ed745f89d031933e220edc3e7c52e760e36922b9f3b3b62d0e61d",
+      "scope": "Bounded one-update Pendulum SB3 checkpoint"
+    },
+    {
+      "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
+      "sha256": "3496cfc76a886dcbe5337fef27daea0d36a3d11e59f9bd4fdac9fe6481571654",
+      "scope": "Bounded Pendulum SB3 result summary"
+    }
+  ],
+  "recovery_rule": "Use the recorded immutable v1.0.0, S2, S3, S4, or S4.5 refs in a separate checkout. Do not port retired implementations into the current active tree.",
+  "frozen_release_rule": "docs/releases/v1.0 and frozen historical Evidence are immutable.",
+  "clean_checkout_reproduction": {
+    "source_head": "bee498d1d784015f034c5b4af34320fdffa61411",
+    "worktree": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017",
+    "root_submodule_status": {
+      "GeoPhys": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+      "asset/external/mujoco_menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+    },
+    "construct_reset_close": "PASS for PickCube and NutAssembly on GeoPhys/CPU and MuJoCo/CPU",
+    "full_route": "NOT_RUN",
+    "fresh_dependency_install": "NOT_RUN",
+    "smoke_receipt": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.json",
+    "source_identity_receipt": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_source_identity.json"
+  },
+  "checkout_path_identity_observation": {
+    "task": "PickCube P1.6",
+    "canonical_checkout_root": "/home/lly/Program_Files/Geochora",
+    "canonical_controller_identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
+    "disposable_checkout_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017",
+    "disposable_controller_identity": "a8ef891961d020721a35a032ea2093e8da61f36747babfe4bc4ff0e12195cbde",
+    "disposable_raw_mjcf_sha256": "c5a845a7824fd6810d10d3f461ca248d71448a84de3b29c5453cdcda7022915e",
+    "disposable_normalized_mjcf_sha256": "017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba",
+    "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+    "task_config_sha256": "0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0",
+    "cause": "Production controller identity includes PandaKinematics.source_sha256 over raw generated MJCF bytes; the MJCF embeds the checkout root. Task file bytes, Artifact hash, task config hash, and normalized MJCF matched. Preserve each run-specific identity in provenance."
+  },
+  "s5_b_scope_note": "S5-B adds release-candidate documentation and a provider-free negative-import test helper correction only. No task/provider/runtime/learner/renderer implementation was changed.",
+  "submodule_remote_checks": {
+    "method": "git fetch --dry-run origin <pinned-gitlink-commit> in each initialized submodule",
+    "result": "Both exact pinned commits were advertised/resolvable from their declared remotes during candidate preparation. The remote main heads differ from the pinned historical commits; the superproject Gitlinks remain authoritative.",
+    "nested_optional_submodules": "Not initialized or required for the bounded selected task construction smoke."
+  },
+  "provider_free_and_clean_checkout_receipts": {
+    "provider_free_final": "workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+    "initial_clean_checkout_provider_free_exploration": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+    "clean_checkout_smoke": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.json",
+    "clean_checkout_source_identity": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_source_identity.json",
+    "cli_help_check": "workspace/maintenance/p2_0_s5_b_20261017/cli_help_check.json",
+    "cli_and_failure_gates": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log"
+  }
+}

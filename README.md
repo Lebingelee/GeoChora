@@ -146,7 +146,7 @@ CPU、100 Hz、指定 seed 上有 bounded full-route functional receipts；这�
 Pendulum 学习/渲染 smoke 仍是本地候选，不能描述为已集成的发布能力。Go2 与
 GeoChora-owned static-template 求解器只通过历史版本恢复，不属于当前 active
 implementation。细节见 [S4.5 review](docs/module/task_env/p2_0_s4_5_b_workflow_consolidation.md)
-和 [release-candidate capability matrix](docs/module/task_env/capability_matrix_v1_0_1_candidate.json)。
+和 [v1.1.0 release-candidate capability matrix](docs/module/task_env/capability_matrix_v1_1_0_candidate.json)。
 
 首个 Core milestone 明确不包含：PhysPi 的记忆与 Skill 实现、自动 Core patch 或递归自我改进、OpenUSD 强制集成、软体任务、手机视频到数字孪生、3DGS sim-to-real、大规模 VLA/WAM 训练、强制真实机器人部署，以及所有 planned provider 的完整支持。
 
@@ -156,10 +156,10 @@ implementation。细节见 [S4.5 review](docs/module/task_env/p2_0_s4_5_b_workfl
 
 ### 环境准备
 
-开发通常从仓库根目录执行。需要 Python 3.10+、可用的 GeoPhys 子模块和对应后端依赖；CUDA 训练与大规模并行还需要兼容的 NVIDIA 驱动。
+开发通常从仓库根目录执行。v1.1.0 候选在 Ubuntu 24.04.4 LTS / x86_64 / Python 3.12.14 上做过验证；其他系统与 Python 版本需要单独验证。需要可用的 GeoPhys 子模块和对应后端依赖；CUDA 训练与大规模并行还需要兼容的 NVIDIA 驱动。
 
 ```bash
-git submodule update --init --recursive
+git submodule update --init GeoPhys asset/external/mujoco_menagerie
 
 python -m pip install -r task_env/requirements.txt
 # 并行环境、SB3 或 PPO 需要时再安装：
@@ -209,13 +209,13 @@ PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
   --num-env 8 --backend cpu --updates 3 --rollout-steps 5 \
   --output-dir temp_outputs/task_env/pendulum_ppo_quickstart
 
-# Selected P1.6 reference recording (S2-A API migration under review)
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory collect \
-  --env-id pick-cube-p16-reference-v1 --provider geophys --seed 31 \
-  --horizon 6000 --output workspace/new-run/pickcube.h5
+# Selected PickCube P1.6 recording through the current public API
+PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py \
+  --env-id pick-cube-p16-reference-v1 --provider mujoco --seed 31 \
+  --horizon 600 --output workspace/new-run/pickcube.h5
 ```
 
-所选 reference 的 [S2-A 入口和不兼容迁移说明](docs/module/task_env/p2_0_active_task_consumers.md) 区分 active construction 与 historical recovery。新 reference 录制写入 ignored `workspace/`；旧示例输出 `temp_outputs/` 也不属于 Git 源码。
+所选 reference 的当前使用方式见 [v1.1.0 候选文档](docs/releases/v1.1/README.md) 和 [API 迁移说明](task_env/doc/api/appendix/migration.md)。旧分组 `trajectory collect` 已退役，不会映射到新任务。录制输出写入 ignored `workspace/`；这些本地数据不属于 Git 源码。
 
 ## Task Artifact、Experiment 与 Evidence
 

@@ -1,0 +1,77 @@
+{
+  "schema": "geochora-v1-1-release-candidate-backup-manifest-v1",
+  "status": "BACKUP_NOT_VERIFIED",
+  "target_release": "v1.1.0",
+  "reason": "The repository, ignored Evidence, and available workspaces reside on the single physical /dev/sda device. No independent destination was available, so no copied-artifact restore verification was performed.",
+  "source_storage_observation": {
+    "physical_device": "/dev/sda",
+    "known_risk": "/dev/sda / ata5 BadCRC and READ I/O errors recorded in prior maintenance evidence",
+    "independent_backup_available": false,
+    "recent_kernel_query": "No matching ATA/SATA/read/write error lines were returned in the checked recent interval; this is not proof of device integrity."
+  },
+  "required_backup_scope": [
+    {
+      "item": "v1.1.0 release-candidate source and all local/unpushed commits/refs",
+      "identity": "candidate code bee498d1d784015f034c5b4af34320fdffa61411 plus review/docs chain and S5-B documentation commit",
+      "verification_required": "Bundle refs and Git objects; verify commit and tree identities after copy."
+    },
+    {
+      "item": "Git submodules",
+      "identity": {
+        "GeoPhys": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+        "asset/external/mujoco_menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+      },
+      "verification_required": "Archive or independently fetch exact commit objects and compare Gitlink identities."
+    },
+    {
+      "item": "Source-recovery and compatibility manifests",
+      "identity": "S2-C1/C2, S3, S4, S4.5-A/B, S5-A inventories and v1.1 source_recovery_manifest.json",
+      "verification_required": "Hash files after independent copy and read representative retired-source blobs."
+    },
+    {
+      "item": "Frozen v1.0.0 release and qualification records",
+      "identity": {
+        "tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+        "peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783"
+      },
+      "verification_required": "Verify tag object, release tree, Evidence index, and representative Evidence files from the independent copy."
+    },
+    {
+      "item": "Important ignored H5/checkpoint artifacts",
+      "identity": "Enumerated with paths and SHA-256 in source_recovery_manifest.json",
+      "verification_required": "Copy and hash each listed file; restore/read representative H5 and checkpoint from backup."
+    },
+    {
+      "item": "Candidate documentation and test receipts",
+      "identity": "docs/releases/v1.1, candidate matrix, S5-A reports, and workspace/maintenance/p2_0_s5_a_20261017 receipts",
+      "verification_required": "Hash after copy and validate JSON, Markdown links, and test logs from the copied source."
+    },
+    {
+      "item": "S5-B final test and clean-checkout receipts",
+      "identity": "workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log plus clean-checkout smoke and source-identity JSON receipts under workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/",
+      "verification_required": "Copy each receipt and verify its file SHA-256 on independent storage."
+    },
+    {
+      "item": "Preserved exploratory clean-checkout failure receipt",
+      "identity": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+      "verification_required": "Keep the 139-pass/8-fail exploratory log with the final 147-pass receipt; do not relabel or delete the failed attempt."
+    },
+    {
+      "item": "Final S5-B CLI help receipt",
+      "identity": "workspace/maintenance/p2_0_s5_b_20261017/cli_help_check.json",
+      "verification_required": "Copy and verify SHA-256 with the provider-free and clean-checkout receipts."
+    },
+    {
+      "item": "S5-B focused CLI and failure-gating test receipt",
+      "identity": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+      "verification_required": "Copy and verify with the complete provider-free test log."
+    }
+  ],
+  "completion_requirements": [
+    "Use independent physical or controlled external storage, not another directory or clone on /dev/sda.",
+    "Record destination identity, timestamp, responsible maintainer, and file inventory.",
+    "Verify copied hashes and Git object/ref identities.",
+    "Perform representative restore reads for source, v1.0.0 Evidence, H5, and checkpoint artifacts.",
+    "Do not delete or rewrite local Evidence before restore verification is accepted."
+  ]
+}

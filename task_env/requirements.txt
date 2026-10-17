@@ -1,6 +1,6 @@
 # TaskEnv 使用的 GeoPhys 核心依赖。
 # 从仓库根目录安装：
-#   python -m pip install -r test/task_env/requirements.txt
+#   python -m pip install -r task_env/requirements.txt
 
 numpy==2.2.6
 scipy>=1.14

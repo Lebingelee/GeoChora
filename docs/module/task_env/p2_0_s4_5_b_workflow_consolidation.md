@@ -1,5 +1,12 @@
 # GeoChora P2.0-B S4.5-A Review and S4.5-B Workflow Consolidation
 
+> **Current-status amendment (2026-10-17):** this report records the S4.5-B
+> implementation review at its original local-candidate state. The selected
+> release-candidate target is now v1.1.0 under a project-specific policy, and
+> the S5-A version alternatives below are historical context. See the current
+> [v1.1.0 release-candidate package](../../releases/v1.1/README.md). This
+> amendment does not integrate or publish the candidate.
+
 Date: 2026-10-17
 Status: S4.5-A integration recommended, awaiting maintainer decision; S4.5-B is local and unmerged.
 S4.5-A review head: `59105726c6ec28f467b637b7124f667a6fdd6b52`
