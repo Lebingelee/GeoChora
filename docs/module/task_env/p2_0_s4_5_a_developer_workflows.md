@@ -2,7 +2,7 @@
 
 Date: 2026-10-16
 
-Status: S4 review gates pass, integration pending explicit maintainer authorization; S4.5-A is a local review candidate
+Status at handoff: S4 review gates passed and integration was pending maintainer authorization; S4.5-A is a local review candidate
 
 Public `develop` baseline: `5b8c901135e624a248cf73d29be9a6fea70feb2b`
 
@@ -98,4 +98,4 @@ Current API removals are listed in the migration appendix: the private trajector
 
 Resource runs were serial. The latest snapshot showed about 5.2 GiB available and low memory/I/O PSI. No ATA/SATA/read-write error lines appeared in the retrieved recent kernel journal, which does not establish that the known single-disk `/dev/sda` / `ata5` BadCRC risk or independent-backup limitation is resolved. Both remain **OPEN**.
 
-S4.5-A is local and reviewable on `codex/p2-0-b-s4-5-a-developer-workflows`; implementation commit `5d57272d1ce7469bb214cf185137853a7eb6deb0`. The report and capability overlay are a separate follow-up documentation change. Nothing has been pushed, S4 is not integrated, and `main`/`v1.0.0` remain unchanged.
+S4.5-A remains local and reviewable on `codex/p2-0-b-s4-5-a-developer-workflows`; implementation commit `5d57272d1ce7469bb214cf185137853a7eb6deb0`, followed by documentation handoff commit `59105726c6ec28f467b637b7124f667a6fdd6b52`. On 2026-10-17, the maintainer authorized S4 integration; public `develop` now reads `0ff2d846a36c7014d2b40a530f52d99e64266ff9`. `main` and `v1.0.0` remain unchanged. S4.5-A itself has not been pushed or merged.

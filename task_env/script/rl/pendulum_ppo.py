@@ -422,9 +422,9 @@ def parse_args(
     return args
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
-    args = parse_args(parser=parser)
+    args = parse_args(argv, parser=parser)
     if (
         args.num_env < 1
         or args.updates < 1
@@ -497,7 +497,5 @@ def main() -> None:
         batch_physics_layout=args.batch_physics_layout,
         output=str(summary_path),
     )
-
-
 if __name__ == "__main__":
     main()

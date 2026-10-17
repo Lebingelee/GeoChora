@@ -34,13 +34,13 @@ Go2 专用 task/robot/RSL 与诊断入口已从当前 develop 移除。v1.0.0 �
 | `task_env.flora_go2_assets`、`task_env.tasks.go2_walk.flora_assets`、Go2 Flora diagnostic/smoke imports | Go2 资产适配与诊断已移除；通用 `task_env.render.flora` renderer 和 public render-description lowering 保留。 |
 | `unitree_go2_reference`、`unitree_go2_debug` learner profile | 当前 profile 已移除；RSL 默认 action transform 仍使用任务公开 action space，不提供 Go2 的 ±100 native action 语义。 |
 | `task_env.script.rl.rsl_ppo` 无 `--env-id` | 现在 CLI 要求显式 `--env-id`。Go2 UID 及旧 `go2_walk*` aliases 显式报 retired；其他 task 仍须有 parallel registration 与兼容的 learner contracts。 |
-| `stage17_performance_profile` 不传 `--task-uid` | Stage 17 要求显式 task UID；S4 local candidate 仅保留 `merged_scene`，`--layout static_template` 会明确报错。 |
-| `stage_a_runtime_profile`、`stage18_bridge_benchmark`、`stage_g_contact_precision_gate` | S4 local candidate 中这些静态模板专用诊断模块已移除；历史 Evidence 与资格结论不变。 |
+| `stage17_performance_profile` 不传 `--task-uid` | Stage 17 要求显式 task UID；S4 已集成并仅保留 `merged_scene`，`--layout static_template` 会明确报错。 |
+| `stage_a_runtime_profile`、`stage18_bridge_benchmark`、`stage_g_contact_precision_gate` | S4 中这些静态模板专用诊断模块已移除；历史 Evidence 与资格结论不变。 |
 | `stage_b_torch_reference`、`stage_g_contact_precision`、`stage19d_cuda_graph_*`、`stage_p_topology_candidate_benchmark`、`stage_f_cuda_graph_lifecycle` | 这些历史诊断依赖 Go2/static profile fixture，已在核对实际调用后移除；其历史 Evidence 保持不变。 |
 
 Selected active task UIDs remain `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`. They are single-environment task routes and are not substituted as PPO targets by this retirement.
 
-## P2.0-B S4.5-A: developer workflow migration (local candidate)
+## P2.0-B S4.5-A: selected task workflows (local review candidate)
 
 The S4.5-A candidate adds runnable root examples under `examples/` using
 `from task_env import make_env`. Selected current commands use only
@@ -64,13 +64,42 @@ reader checks H5 validity and `T+1` boundaries, but does not reconstruct D0.
 
 Exact pre-change source blobs, SHA-256 values, and recovery refs are recorded in
 [`p2_0_s4_5_a_source_recovery.json`](../../../../docs/module/task_env/p2_0_s4_5_a_source_recovery.json).
-The S4.5-A code and examples are local review candidates; they do not alter
-frozen release documents or qualification labels.
+The S4.5-A code and examples remain local review candidates; they do not alter
+frozen release documents or qualification labels. The S4 implementation was
+subsequently integrated into public `develop` at
+`0ff2d846a36c7014d2b40a530f52d99e64266ff9` by normal fast-forward.
 
-## P2.0-B S4: static-template retirement (local candidate)
+## P2.0-B S4.5-B: learning and rendering workflow consolidation (local candidate)
 
-The S4 candidate is on a local review branch based on public `develop` commit
-`5b8c901135e624a248cf73d29be9a6fea70feb2b`; it is not integrated. It removes
+The S4.5-B candidate adds a one-update Pendulum SB3 wrapper over the existing
+`task_env.script.rl.pendulum_ppo` runner, an offline canonical H5 inspector,
+and bounded scalar and batch Pendulum/GeoPhys CPU/rasterizer RGB examples. The
+learning smoke checks runner wiring only. The rendering smokes do not test
+Flora or Physics × Renderer interoperability. RSL-RL stays generic and
+requires an explicit `--env-id`; no Go2 replacement or manipulation PPO target
+is added.
+
+| Retired or retained entry point | Current behavior and migration |
+| --- | --- |
+| `task_env.script.render_single` | Explicit retired-route error; it depended on historical task construction. Use `examples/rendering/pendulum_single_rgb.py` for the bounded current scalar Pendulum route or `examples/rendering/pendulum_parallel_rgb.py` for the bounded batch route; selected manipulation renderer support is not claimed. |
+| `task_env.script.camera.static`, `task_env.script.camera.bound`, and `task_env.script.camera_lighting_probe` | Explicit retired-route errors; these used the historical PickCube task, and the lighting probe read provider-private renderer state. `CameraSpec` and Camera contracts remain. |
+| `task_env.script.camera._common` | Removed; only the retired camera scripts called it. Exact source is recoverable from the S4.5-B base commit in the recovery manifest. |
+| `task_env.script.render_parallel` | Retained as an advanced Pendulum-only batch rendering entry point. The bounded smoke covers GeoPhys CPU, `merged_scene`, rasterizer, RGB-array mode, one world and one step. Other renderers/providers and headed UI are unverified. |
+| `task_env.script.render_input_probe` | Retained as a standalone Taichi Forge window-input probe. It does not construct a TaskEnv or establish a rendering capability. |
+| `task_env.script.trajectory.convert`, `replay`, and `merge` | Retained as generic offline utilities; historical replay remains explicit and separate from canonical H5 inspection and selected-source reexecution. |
+
+The S4.5-B source-recovery manifest records each retired script path,
+pre-change SHA-256, Git blob, invocation identity, caller disposition, and
+replacement boundary. Use the repository-root
+[`examples/README.md`](../../../../examples/README.md) for current commands.
+This local candidate does not alter frozen release documents or qualification
+labels.
+
+## P2.0-B S4: static-template retirement (integrated)
+
+S4 was integrated into public `develop` at
+`0ff2d846a36c7014d2b40a530f52d99e64266ff9` by normal fast-forward from
+`5b8c901135e624a248cf73d29be9a6fea70feb2b`. It removes
 `task_env.runtime.providers.static`, the `task_env.runtime.static_*`
 compatibility modules, and the public `StaticTemplate*` configuration/runtime
 exports. `runtime.batch_physics_layout=static_template` and explicit public

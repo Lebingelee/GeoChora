@@ -42,7 +42,7 @@ UI rendering 绝不会把 `CameraObservationProvider` 的 sensor image 冒充为
 复制完整 batch state，也不隐式做 physics reset/step。
 
 当前 `merged_scene` runtime 使用全局扁平 body/geom 字段的 selected device slice，只写入一个 renderer
-proxy 和有界 `RenderSnapshotRing`，不进行完整 B 的 host state readback。内部仍保留对 `(world, local)` 字段形状的历史读取分支，但 S4 candidate 不再有 TaskEnv physics route 产生该布局。选中的每个 world 在同一帧内写入
+proxy 和有界 `RenderSnapshotRing`，不进行完整 B 的 host state readback。内部仍保留对 `(world, local)` 字段形状的历史读取分支，但 public `develop` 集成 S4 后没有 TaskEnv physics route 产生该布局。选中的每个 world 在同一帧内写入
 自己的 renderer record range，然后一次性发布快照，因此网格中不会只显示最后一个 world。
 
 真实 source 当前支持内部 `rasterizer`/`raytracer`。`rgb_array` 保持 renderer 创建时的固定网格视角，

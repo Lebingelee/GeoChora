@@ -1,27 +1,21 @@
-"""Capture and validate one fixed world-frame camera observation."""
+"""Retired historical PickCube camera-observation example."""
 
 from __future__ import annotations
 
-import argparse
-
-if __package__ in (None, ""):
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-    from task_env.script._bootstrap import BACKEND_CHOICES
-    from task_env.script.camera._common import run_camera
-else:
-    from .._bootstrap import BACKEND_CHOICES
-    from ._common import run_camera
+import sys
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--backend", choices=BACKEND_CHOICES, default="auto")
-    args = parser.parse_args()
-    run_camera(requested_backend=args.backend, bound=False)
+def main(argv=None) -> int:
+    print(
+        "task_env.script.camera.static is retired because it constructed the historical "
+        "pick-cube-v1 task. CameraSpec remains available to Task Artifacts whose "
+        "observation contract declares cameras; selected reference task camera "
+        "acceptance is not established. See "
+        "docs/module/task_env/p2_0_s4_5_b_source_recovery.json for source recovery.",
+        file=sys.stderr,
+    )
+    return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -24,7 +24,7 @@ else:
     from ._bootstrap import get_logger
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-id", choices=("pendulum-v1",), default="pendulum-v1")
     parser.add_argument("--num-env", type=int, default=4)
@@ -45,7 +45,7 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=300)
     parser.add_argument("--seed", type=int, default=73)
     parser.add_argument("--sleep", type=float, default=0.02)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if (
         args.num_env < 1
         or args.width < 1
@@ -134,7 +134,5 @@ def main() -> None:
         parallel_render_num=render_num,
         steps=args.steps,
     )
-
-
 if __name__ == "__main__":
     main()

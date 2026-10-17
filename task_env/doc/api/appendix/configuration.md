@@ -42,7 +42,7 @@ batch_physics_layout 与 make_parallel_env 的 execution 参数相互独立：�
 
 ## 已退休的 static-template runtime 配置
 
-S4 本地 candidate 移除了 GeoChora-owned static-template physics factory、profile selector 和兼容模块；该 candidate 尚未集成到 public `develop`。`runtime.batch_physics_layout: static_template` 会 fail closed。现有 `RuntimeConfig` 保留 static-template 默认配置对象，以免无关 scalar Task 的 resolved-config identity 改变；public YAML/mapping 中显式出现 `runtime.static_template.*`，或直接传入非默认静态 profile 时都会 fail closed。错误信息指引使用 `merged_scene`，但不会自动转换用户配置。`StaticTemplate*Config` 不再从 `task_env.environment` package root 导出。
+S4 已集成到 public `develop`（`0ff2d846a36c7014d2b40a530f52d99e64266ff9`），并移除了 GeoChora-owned static-template physics factory、profile selector 和兼容模块。`runtime.batch_physics_layout: static_template` 会 fail closed。现有 `RuntimeConfig` 保留 static-template 默认配置对象，以免无关 scalar Task 的 resolved-config identity 改变；public YAML/mapping 中显式出现 `runtime.static_template.*`，或直接传入非默认静态 profile 时都会 fail closed。错误信息指引使用 `merged_scene`，但不会自动转换用户配置。`StaticTemplate*Config` 不再从 `task_env.environment` package root 导出。
 
 GeoPhys-owned `GeoPhysRigidBatchRuntime` adapter 与通用 Batch/Device contracts 保留；该 adapter 的 import 不代表它已注册为 `make_parallel_env` 的 runtime route，也不扩展其既有 capability envelope。旧静态 solver 实现从 `v1.0.0` 或 S4 retirement manifest 记录的 S3 baseline commit 恢复。
 

@@ -69,4 +69,14 @@ The 123-test provider-free run and native smoke ran serially. During the native 
 
 S4.5 must separately inventory scripts/examples that expose the retired layout and remove or migrate only those callers with their own API review. It must not infer support for GeoPhys Rigid Batch profiles, change Renderer interoperability, or reconstruct every historical script. A maintainer must also decide the v1.0.1 compatibility treatment for direct imports, default-only serialized config data, and old metadata consumers before release freeze.
 
-S4 remains a local candidate based on public S3 `develop` `5b8c901135e624a248cf73d29be9a6fea70feb2b`. It has not been pushed or merged. S4.5, S5, v1.0.1 publication, and any main/v1.0.0 change are outside this change set.
+### Public integration receipt (2026-10-17)
+
+After the review gates above passed, the maintainer authorized the bounded S4
+integration. The exact S4 commit `0ff2d846a36c7014d2b40a530f52d99e64266ff9`
+was pushed to public `develop` by normal fast-forward from
+`5b8c901135e624a248cf73d29be9a6fea70feb2b`. Public readback returned the S4
+SHA. `main` remained `e4e39883fbe01d4be4b172a53a535ef0095b3d64`, and the
+annotated `v1.0.0` tag object remained
+`17c3100d4fabcb061c23569dea49973ebd177d51`. This integration did not create
+new provider/capability qualification. S4.5, S5, v1.0.1 publication, and any
+main/v1.0.0 change remain outside the S4 change set.

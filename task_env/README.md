@@ -1,268 +1,90 @@
-# Geochora TaskEnv
+# TaskEnv Core
 
-TaskEnv 为 Geochora 提供单环境、同构并行环境、相机/渲染、强化学习和轨迹采集入口。所有示例均从 Geochora 仓库根目录执行。
+`task_env/` owns GeoChora's public task/environment lifecycle, task-owned
+reference implementations, controller and observation contracts, generic
+parallel execution adapters, recording, learning boundaries, and renderer
+contracts. Provider-private solver state remains behind provider adapters.
 
-当前 v1.0 scope 与能力边界见 [GeoChora v1.0 release package](../docs/releases/v1.0/README.md)。该 scoped Core baseline 不授予新的 task、provider 或 replay qualification。
+The repository has no root packaging metadata. From the repository root, use
+the GeoChora dependency environment and set `PYTHONPATH`:
 
-## 项目结构
-
-~~~text
-task_env/
-├── __init__.py              # public exports、make_env、make_parallel_env
-├── registry.py              # environment / agent / object / scene registry
-├── environment/             # config、Gym lifecycle、state/observation contracts
-├── assembly/                # world/robot/object 编译和稳定 references
-├── robots/                  # robot/agent asset 与 controller contract
-├── objects/                 # object asset 与 reference contract
-├── controllers/             # public action 到 control command
-├── observations/            # observation 与 camera sensor projection
-├── tasks/                   # task composition、reset、reward、success、failure（含 tasks/worlds/）
-├── runtime/                 # physics runtime、batch layout、reset/step lifecycle
-├── vectorization/           # local/remote parallel、SB3 adapter、masked reset
-├── render/                  # rasterizer、raytracer、Flora 和 parallel render provider
-├── planners/                # public motion primitive 与 task-owned solution
-├── recorders/               # public transition 与 H5 recorder
-├── trajectory/              # trajectory schema、processing、replay
-├── alg/                    # SB3 / RSL-RL learner boundary
-├── script/                  # 可直接执行的 env/camera/rl/trajectory CLI
-├── diagnostics/             # 诊断、对照和专项 smoke，不是日常使用入口
-└── doc/                     # Quickstart 以外的使用、开发和 API 文档
-~~~
-
-常用的调用关系如下：
-
-~~~text
-task_env.make_env(...)
-    → scene assembly → task lifecycle → observation/reward/info
-
-task_env.make_parallel_env(...)
-    → parallel capability → batch runtime → local/remote vector lifecycle
-
-task_env.script.*
-    → 调用上述 public API，不直接替代 task、runtime 或 solver
-~~~
-
-## 安装
-
-~~~bash
-git submodule update --init --recursive
-
-python -m pip install -r task_env/requirements.txt
-
-# 并行环境、SB3 或 PPO 需要
-python -m pip install -r task_env/requirements-rl.txt
-
-# 从仓库根目录运行示例时，让 Python 找到 GeoPhys 与当前源码树：
-export PYTHONPATH=GeoPhys/src:.
-~~~
-
-仓库根目录没有 `pyproject.toml`、`setup.py` 或 `setup.cfg`，当前安装方式是按本地 Python 环境安装上述依赖，并从仓库根目录设置 `PYTHONPATH`。
-
-CPU 可以运行基础环境和 smoke；CUDA 训练与大规模并行需要可用的 NVIDIA 驱动。推荐使用仓库已有的 geophys Python 环境。
-
-查看当前注册环境：
-
-~~~bash
-PYTHONPATH=GeoPhys/src:. python - <<'PY'
-import task_env
-
-print("single:", task_env.ENV_REGISTRY.uids())
-print("parallel:", task_env.PARALLEL_ENV_REGISTRY.uids())
-PY
-~~~
-
-## Quickstart
-
-### env：创建、配置和运行环境
-
-#### Python public API
-
-~~~python
-from task_env import make_env
-
-env = make_env(
-    "pendulum-v1",
-    config={"runtime": {"backend": "cpu"}},
-)
-try:
-    observation, info = env.reset(seed=73)
-    for _ in range(100):
-        observation, reward, terminated, truncated, info = env.step(
-            env.action_space.sample()
-        )
-        if terminated or truncated:
-            observation, info = env.reset()
-finally:
-    env.close()
-~~~
-
-单环境遵循 Gymnasium 五元组接口：reset 返回 observation/info，step 返回 observation/reward/terminated/truncated/info。动作和观测的结构、shape、dtype 以 action_space 和 observation_space 为准。
-
-#### script/env 入口
-
-| 入口 | 作用 | 常用参数 |
-| --- | --- | --- |
-| task_env.script.env.single_inline | 内联配置创建单环境并短步进 | --env-id、--backend、--steps、--horizon、--seed |
-| task_env.script.env.single_from_file | 从公共 YAML 创建单环境 | --env-id、--env-config、--backend、--steps、--horizon |
-| task_env.script.env.parallel_inline | 创建 remote 同构并行环境并短步进 | --env-id、--backend、--num-env、--steps、--seed |
-| task_env.script.env.parallel_from_file | 从公共 YAML 创建 remote 并行环境 | --env-id、--env-config、--backend、--num-env、--steps |
-
-~~~bash
-# 单环境：默认示例为 PickCube，也可以替换为 pendulum-v1
+```bash
 PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.single_inline \
-  --env-id pendulum-v1 --backend cpu --steps 3 --horizon 10
+  --env-id pendulum-v1 --backend cpu --steps 1
 
-# 单环境 YAML
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.single_from_file \
-  --env-id pendulum-v1 \
-  --env-config task_env/doc/api/examples/pendulum_cpu.yaml \
-  --backend cpu --steps 3 --horizon 10
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py \
+  --provider mujoco --seed 31
 
-# 并行环境：默认使用 remote worker
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_inline \
-  --env-id pendulum-v1 --backend cpu --num-env 4 --steps 3
+PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py \
+  --provider geophys --seed 19
+```
 
-# 并行环境 YAML
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_from_file \
-  --env-id pendulum-v1 \
-  --env-config task_env/doc/api/examples/pendulum_cpu.yaml \
-  --backend cpu --num-env 4 --steps 3
-~~~
+The current selected manipulation UIDs are
+`pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
+Construct them through `from task_env import make_env`; NutAssembly advances
+only through its guarded `step_expert()` route. Task success and expert
+lifecycle completion remain separate.
 
-inline/file 示例会写出环境摘要，默认输出位于 temp_outputs/task_env 下。需要在当前进程调试时，直接使用 make_parallel_env(..., execution="local")；需要隔离 learner 和 simulator 时，使用 execution="remote"。task_env.script.environment 是 single_inline 的兼容入口。
+## Current developer workflows
 
-### camera：相机 observation 与 UI render
-
-TaskEnv 中有两种相机用途：
-
-- camera/static.py、camera/bound.py 采集 public camera observation，分别对应 world-fixed camera 和 site-bound camera；
-- render_single.py、render_parallel.py 展示 UI frame，分别对应单环境和选定并行 world，不改变 physics 或 task observation 语义。
-
-#### camera observation
-
-这两个脚本默认使用 PickCube、raytracer 和 32×24 相机，并把 RGB/summary 写入 temp_outputs/task_env：
-
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.camera.static --backend cpu
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.camera.bound --backend cpu
-~~~
-
-static 用固定 world frame 相机；bound 用 site-bound 相机，并在 reset 后推进一步验证 parent pose 与图像变化。无 CUDA 时可以显式使用 cpu。
-
-#### UI render
-
-~~~bash
-# 单环境 RGB/offscreen
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.render_single \
-  --env-id pendulum-v1 --mode rgb_array \
-  --backend cpu --render-backend rasterizer --steps 3
-
-# 单环境 headed window
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.render_single \
-  --env-id pendulum-v1 --mode human \
-  --backend cuda --render-backend rasterizer
-
-# 并行 selected-world 网格
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.render_parallel \
-  --env-id pendulum-v1 --num-env 4 --parallel-render-num 4 \
-  --mode human --backend cuda --render-backend rasterizer
-~~~
-
-render_parallel 还支持 width、height、columns、cell-width、cell-depth、padding、steps、seed 和 sleep。无显示服务器时将 mode 改为 rgb_array；human 模式需要图形会话。
-
-#### camera/render 专项脚本
-
-| 入口 | 用途 | 关键参数 |
+| Workflow | Entry point | Boundary |
 | --- | --- | --- |
-| task_env.script.camera_lighting_probe | 对比当前/legacy lighting 配置 | --mode current/legacy、--backend、--output |
-| task_env.script.render_input_probe | 检查 render input 和窗口输入 | --arch、--width、--height、--fps-limit |
-| task_env.script.render_single | 单环境 renderer 显示入口 | --env-id、--render-backend、--mode |
+| Scalar environment | `task_env.script.env.single_inline` | Public `make_env`, Gymnasium reset/step, Pendulum default. |
+| Generic batch environment | `task_env.script.env.parallel_inline` | Public `make_parallel_env`, explicit CPU supported smoke on Pendulum/`merged_scene`. |
+| Selected task expert | `examples/tasks/pick_cube.py`, `examples/tasks/nut_assembly.py` | Selected task-owned experts, explicit provider, bounded CPU run. |
+| Canonical recording | `examples/recording/record_expert.py` | Existing recorder/H5 schema, selected expert, nonzero on incomplete result. |
+| Offline H5 inspection | `examples/recording/inspect_h5.py` | Canonical reader integrity and T+1 check; not replay or D0. |
+| SB3 smoke | `examples/learning/pendulum_sb3.py` | One update through the existing Pendulum runner; not convergence evidence. |
+| Native renderer smoke | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Scalar and `merged_scene` batch Pendulum frames, GeoPhys CPU, rasterizer RGB. |
+| Advanced parallel renderer | `task_env.script.render_parallel` | Same narrow route; other providers, Flora, and headed UI are not established. |
+| Window input probe | `task_env.script.render_input_probe` | Taichi Forge keyboard/window probe without a TaskEnv. |
 
-camera observation 与 UI render 的结果不要混用：前者进入 observation tree，后者只产生展示帧。
+See [root examples](../examples/README.md) for exact commands, output paths,
+resource notes, and evidence limits. Linux examples use per-process
+`RLIMIT_AS` virtual-address-space limits; these are not RSS or aggregate
+process-tree memory caps.
 
-### rl：PPO、checkpoint 和评估
+## Parallel and learner boundaries
 
-#### Pendulum native SB3 PPO
+`make_parallel_env` is optional and only admits tasks with explicit
+homogeneous registrations. The current TaskEnv batch physics layout is
+`merged_scene`. The retired `static_template` layout fails closed; it is not
+redirected. `GeoPhysRigidBatchRuntime` remains a GeoPhys-owned adapter with its
+existing capability limits and is not a registered TaskEnv batch factory
+route.
 
-pendulum_ppo.py 使用 remote homogeneous batch 和 SB3 PPO，适合验证并行环境、rollout 和 return curve。当前受支持的布局为 `merged_scene`；关键参数还包括 num-env、backend、integrator、updates、rollout-steps、seed、output-dir、save-log 和 verify-batches。
+SB3 flattening remains at `SB3FlattenVecWrapper`; RSL-RL remains generic and
+requires an explicit `--env-id` plus active batch and learner-contract
+admission. PickCube and NutAssembly are not implicit PPO targets. Go2-specific
+task, robot, profile, and training routes are retired from current develop;
+historical recovery is through immutable `v1.0.0`.
 
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.rl.pendulum_ppo \
-  --num-env 8 --backend cpu \
-  --batch-physics-layout merged_scene \
-  --integrator implicitfast \
-  --updates 3 --rollout-steps 5 \
-  --output-dir temp_outputs/task_env/pendulum_ppo_quickstart \
-  --save-log
-~~~
+## Rendering and Camera boundaries
 
-`--batch-physics-layout static_template` 与 `--static-template-profile` 已在当前 S4 candidate 中退役；CLI 会明确报错，不会改走其他布局。GeoPhys 的 `GeoPhysRigidBatchRuntime` adapter 仍保留，但不再由 TaskEnv 的并行 runtime factory 选择。
+Camera observations and UI frame presentation are separate contracts.
+`CameraSpec`, the Camera APIs, Renderer Registry, Flora, and rasterizer
+implementations remain available within their declared support. Current
+bounded native rendering evidence covers Pendulum × GeoPhys CPU × scalar
+TaskEnv × rasterizer RGB and Pendulum × GeoPhys CPU × `merged_scene` batch ×
+rasterizer RGB. No selected manipulation task × Flora route or Physics ×
+Renderer interoperability is claimed.
 
-#### 统一 RSL-RL PPO
+`task_env.script.render_single` returns an explicit retired-route error because
+it used a historical task factory; current scalar Pendulum rendering is shown
+in `examples/rendering/pendulum_single_rgb.py`. `task_env.script.camera.static`,
+`task_env.script.camera.bound`, and `task_env.script.camera_lighting_probe`
+also fail explicitly because they depended on historical PickCube construction
+or renderer internals. Their original source identities and caller dispositions
+are recorded in the S4.5-B recovery manifest.
 
-`rsl_ppo.py` 是 task-independent 的 RSL-RL 训练入口。调用者必须传入 `--env-id`；该 UID 必须同时有 active task 注册、homogeneous parallel capability 和适配的 learner action/observation contract。RSL/RL contracts 与 SB3、Batch/Device/Learner 和 vectorization 保持通用，当前没有 Go2 专用训练目标，也不会把 Go2 UID 映射到 PickCube 或 NutAssembly。
+## Trajectory utilities
 
-常用参数包括 env-id、num-env、iterations、rollout-steps、seed、sim-device、rl-device、env-config、output-dir、log-dir、save-interval、checkpoint-out 和 resume。调用前需为具体 UID 独立确认 RSL action/observation contracts；S3 不指定或验收新的 PPO 训练目标。render 与 hard-render 互斥；它们使用保留的通用 parallel renderer 设置。训练输出包括 checkpoint、TensorBoard event 和 train summary；resume 可接收 checkpoint 或运行目录。
+Use `task_env.script.trajectory.record` or the root `record_expert.py` example
+for selected expert recording. `convert` remains an offline Panda/controller
+action conversion route. `replay` requires explicit `--historical` for legacy
+H5 replay; selected-source reexecution and offline H5 inspection are separate
+operations. H5 roundtrip does not establish D0 reconstruction.
 
-Go2 task UID、robot UID、RSL profiles、Go2 checkpoint/Isaac/MuJoCo evaluators 和 Go2 Flora wrappers 已由 P2.0-B S3 退休。历史实验应从不可变 `v1.0.0` 恢复；当前不提供语义替代，也不把 selected manipulation task 当作未经验证的 PPO 训练目标。
-
-### trajectory：收集、回放、合并和转换
-
-trajectory package 提供 collect、replay、merge 三个组合命令：
-
-~~~bash
-# 收集 PickCube/NutAssembly source trajectories
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory collect \
-  --env_id pick-cube-v1 \
-  --backend cpu --num-traj 1 --horizon 600 --no-render \
-  --output temp_outputs/task_env/trajectories/source.h5
-
-# 回放 trajectory collection
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory replay \
-  --trajectory temp_outputs/task_env/trajectories/source.h5 \
-  --backend cpu \
-  --output temp_outputs/task_env/trajectories/replayed.h5
-
-# 合并目录下的 H5 collection
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory merge \
-  --input_dir temp_outputs/task_env/trajectories \
-  --output temp_outputs/task_env/trajectories/merged.h5
-~~~
-
-collect 还支持 env_config、seed、gripper-force、vis、camera-size 和 max-attempts；replay 支持 replay_config、backend 和 vis。
-
-#### 单条 public solution 记录
-
-record.py 针对 PickCube/NutAssembly 的 public solution 生成 H5 v2：
-
-~~~bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory.record \
-  --env-id pick-cube-v1 \
-  --backend cpu --horizon 600 --no-render \
-  --output temp_outputs/task_env/trajectories/pick_cube.h5
-~~~
-
-record 只消费 public reset/step/info/metadata，不读取 solver private state。H5 基本长度关系为 len(observation)-1 == len(action) == T。
-
-#### Panda trajectory offline API
-
-~~~bash
-# 转换 Panda/controller action schema
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory.convert \
-  --input source.h5 --output converted.h5 \
-  --target-mode absolute_pose --target-reference world
-
-# 回放并检查 Panda trajectory
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.trajectory.replay \
-  --trajectory converted.h5 --backend cpu --require-exact
-~~~
-
-planning/pick_cube.py 和 planning/nut_assembly.py 是 task-owned solution 示例；planner.py、recorder.py 等根级 script 仍作为兼容入口保留。
-
-## 进一步阅读
-
-- [文档入口](doc/index.md)：按使用者、任务开发者和资产开发者分类。
-- [训练与采集](doc/新手使用训练与采集.md)：RL、SB3、RSL-RL 和 H5 细节。
-- [自定义任务](doc/自定义任务构建指南.md)：创建新的 TaskEnv task family。
-- [资产导入与二次开发](doc/资产导入与二次开发指南.md)：添加 robot、object 和 world。
-- [API Reference](doc/api/index.md)：公开 API、配置、并行和数据契约。
+The [API example index](doc/api/examples/index.md) and
+[migration notes](doc/api/appendix/migration.md) describe current routes and
+retired APIs. Historical release documentation and Evidence remain unchanged.

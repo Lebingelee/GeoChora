@@ -32,7 +32,11 @@ def main(argv=None) -> int:
     parser.add_argument("--horizon", type=int, default=6000)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--time-limit-s", type=int, default=420)
-    parser.add_argument("--memory-limit-mb", type=int, default=8192)
+    parser.add_argument(
+        "--address-space-limit-mb", "--memory-limit-mb", dest="memory_limit_mb",
+        type=int, default=8192,
+        help="Linux per-process RLIMIT_AS virtual address-space cap; not RSS or process-tree memory",
+    )
     args = parser.parse_args(argv)
     if not 1 <= args.horizon <= 6000:
         parser.error("--horizon must be in [1, 6000]")

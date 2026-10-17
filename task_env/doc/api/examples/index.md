@@ -1,41 +1,38 @@
 # TaskEnv API examples
 
-这些示例是 TaskEnv 的可运行入口索引。脚本只负责配置解析、调用顺序、contract 检查和结果摘要；任务语义、
-batch runtime、SB3 协议转换与 H5 schema 仍由 `task_env/` 的公共模块负责。
+The repository-root [developer workflow guide](../../../../examples/README.md)
+is the command index for current scalar tasks, expert recording, H5
+inspection, batch smoke, learning smoke, and the bounded rendering route.
+Examples call existing public APIs; they do not define another TaskEnv,
+TaskArtifact, recorder, or renderer contract.
 
-## 运行约定
-
-在仓库根目录、GeoPhys 环境中运行：
+Run from the repository root in the GeoChora dependency environment:
 
 ```bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.single_inline --backend cpu
+PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.single_inline --env-id pendulum-v1 --backend cpu --steps 1
+PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_inline --env-id pendulum-v1 --backend cpu --num-env 2 --steps 1
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --seed 31
+PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19
 ```
 
-脚本默认将摘要、相机帧、轨迹和 checkpoint 写入
-`temp_outputs/task_env/`。`--backend auto`/`cuda` 会先尝试 CUDA；失败后才切换 CPU，并在 logger 中
-记录 `runtime.backend_fallback`。脚本不会把 CPU fallback 伪装成 CUDA 成功。
+## Current commands
 
-## 命令矩阵
+| Goal | Command | Boundary |
+| --- | --- | --- |
+| Scalar task construction | `examples/tasks/pick_cube.py` or `examples/tasks/nut_assembly.py` | Public `task_env.make_env`; explicit provider; selected task-owned expert. |
+| Canonical recording | `examples/recording/record_expert.py --env-id <selected-uid> --provider <geophys\|mujoco> --output <fresh.h5>` | Existing task-owned recorder and canonical H5. |
+| Offline H5 inspection | `examples/recording/inspect_h5.py --input <recording.h5>` | Canonical schema/hash/projection and T+1 validation; not D0 replay. |
+| Batch environment | `task_env.script.env.parallel_inline` | Generic Pendulum `make_parallel_env` route; current bounded CPU smoke only. |
+| SB3 example | `examples/learning/pendulum_sb3.py --output-dir <fresh-dir>` | One update through the existing Pendulum PPO runner; no convergence claim. |
+| Rendering examples | `examples/rendering/pendulum_single_rgb.py`, `examples/rendering/pendulum_parallel_rgb.py` | Bounded Pendulum × GeoPhys CPU × rasterizer RGB smokes through scalar `make_env` and merged-scene batch routes. |
+| Offline trajectory conversion | `task_env.script.trajectory.convert` | Existing Panda/controller action conversion contract. |
+| Historical H5 replay | `task_env.script.trajectory.replay --historical ...` | Recovery-only route; not selected-source acceptance or D0 by default. |
 
-| 示例 | 命令 | 公开边界 | 默认产物 |
-| --- | --- | --- | --- |
-| 单环境 inline | `python -m task_env.script.env.single_inline` | `make_env`、Gym reset/step | `env/single_inline/summary.json` |
-| 单环境 YAML | `python -m task_env.script.env.single_from_file --env-id pendulum-v1 --env-config task_env/doc/api/examples/pendulum_cpu.yaml --backend cpu` | YAML + resolved config | `env/single_from_file/summary.json` |
-| 并行 inline | `python -m task_env.script.env.parallel_inline --num-env 4` | `make_parallel_env(..., execution="remote")` | `env/parallel_inline/summary.json` |
-| 并行 YAML | `python -m task_env.script.env.parallel_from_file --num-env 4 --env-config task_env/doc/api/examples/pendulum_cpu.yaml --backend cpu` | 公共 env config + batch tree | `env/parallel_from_file/summary.json` |
-| 静态相机 | `python -m task_env.script.camera.static` | `CameraSpec(frame="world")` + RGB observation | `camera/static.*` |
-| 绑定相机 | `python -m task_env.script.camera.bound` | `CameraSpec(frame="site", parent=...)` | `camera/bound.*` |
-| PickCube 规划 | `python -m task_env.script.trajectory.planning.pick_cube` | `PickCubeSolution` + `env.step` | logger summary |
-| NutAssembly 规划 | `python -m task_env.script.trajectory.planning.nut_assembly` | `NutAssemblySolution` + `env.step` | logger summary |
-| 轨迹录制 | `python -m task_env.script.trajectory.record --env-id pick-cube-v1` | `TransitionRecordWrapper` + H5 v2 | `trajectories/<env_id>/*.h5` |
-| Panda 转换 | `python -m task_env.script.trajectory.convert --input source.h5 --output converted.h5` | offline Panda action schema | 显式 `--output` |
-| Panda 重播 | `python -m task_env.script.trajectory.replay --trajectory converted.h5` | observation/reward/universal action | `trajectories/replay.json` |
-| Pendulum PPO | `python -m task_env.script.rl.pendulum_ppo --num-env 8 --rollout-steps 5 --updates 3000 --save-log` | raw vector tree → SB3 flatten + H5 return curve | `temp_outputs/task_env/rl/pendulum_ppo/*` |
+The selected public manipulation UIDs are `pick-cube-p16-reference-v1` and
+`nut-assembly-outcome-reference-v1`. Historical `pick-cube-v1` and
+`nut-assembly-square-v1` identifiers are not redirected.
 
-`convert`、`replay` 只面向 Panda/controller action schema；Pendulum、双轮车的 non-arm trajectory 不会被脚本
-默认转码。旧的 `environment.py`、`planner.py`、`recorder.py` 和 `trajectory` module 命令继续作为兼容入口。
-
-## 单环境 public API
+## Public construction API
 
 ```python
 from task_env import make_env
@@ -49,48 +46,39 @@ finally:
     env.close()
 ```
 
-Pendulum 的 raw tree 是 `observation["state"]["proprioception"]` 和
-`action["torque"]`；不应在单环境示例中强行转成 Panda 的 8 维 action。
+Selected PickCube and NutAssembly routes use task-owned `step_expert()` and
+their current public provider configuration. NutAssembly does not admit
+arbitrary external actions. A successful physical task outcome, a completed
+expert lifecycle, and a finalized recording are reported separately.
 
-## 并行与 SB3 public API
+## Batch and learning boundary
 
 ```python
 from task_env import make_parallel_env
-from task_env.utils import SB3FlattenVecWrapper
 
-raw_env = make_parallel_env(
-    "pendulum-v1",
-    {"base_seed": 73},
-    num_env=4,
-    backend="cpu",
-    execution="remote",
+env = make_parallel_env(
+    "pendulum-v1", {"base_seed": 73}, num_env=2, backend="cpu", execution="remote"
 )
 try:
-    raw_observation = raw_env.reset()
-    # raw_observation["state"]["proprioception"].shape == (4, 3)
+    observation = env.reset()
+    # Raw batch observations retain their structured tree and batch-first shape.
 finally:
-    raw_env.close()
-
-sb3_env = SB3FlattenVecWrapper(
-    make_parallel_env(
-        "pendulum-v1", {"base_seed": 73}, num_env=4, backend="cpu", execution="remote"
-    )
-)
-try:
-    observation = sb3_env.reset()  # shape == (4, 3), only at learner boundary
-finally:
-    sb3_env.close()
+    env.close()
 ```
 
-raw vector runtime 使用 multiprocessing `spawn` 和独立 Pipe；它不导入或复用 `task_env.reporter` 的 TCP/JSON
-协议。raw recorder 应放在 flatten wrapper 之下，保证 H5 仍保存 `obs/*`、`action/*` 和
-`universal_action/*` 的结构树。
+The SB3 adapter owns flattening at the learner boundary. RSL-RL remains a
+generic, fail-closed CLI and requires an explicit `--env-id`; neither selected
+manipulation UID is made a default PPO target. Importability and a one-update
+smoke do not qualify training.
 
-## 明确保留为 planned
+## Rendering and Camera limits
 
-- vector H5 聚合容器、异构 batch 和 multi-agent batch；
-- non-arm trajectory conversion；
-- RGB policy、`MultiInputPolicy` 训练和 reporter 联调；
-- 通用任务的 GPU device-resident observation/action 以及超出当前 contract smoke 的吞吐优化；历史 Go2 device-hook smoke 随 Go2 路线一同退休，不构成当前通用任务的 device capability Evidence。
-
-这些能力不能从现有脚本命令的“可运行”推断为已实现。
+`CameraSpec`, camera observation, UI rendering, the Renderer Registry, Flora,
+and rasterizer contracts remain distinct APIs. The bounded native rendering
+examples cover Pendulum × GeoPhys CPU × scalar TaskEnv × rasterizer RGB and
+Pendulum × GeoPhys CPU × merged-scene batch × rasterizer RGB. They do not test
+Flora or any Physics × Renderer interoperation. The old single-task CLI and
+PickCube camera scripts are retired; the current scalar example uses public
+`make_env`, while selected reference tasks have no camera acceptance claim.
+See [trajectory and camera notes](trajectory_and_camera.md)
+and the [migration table](../appendix/migration.md).

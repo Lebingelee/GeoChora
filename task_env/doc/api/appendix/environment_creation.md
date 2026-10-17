@@ -57,7 +57,7 @@ batch wrapper 只补充 batch runtime、seed/masked reset 与 slot info；任务
 learner/adapter 边界。
 
 `env_config["runtime"]["batch_physics_layout"]` 与 `execution="local"|"remote"` 相互独立；当前只支持
-`"merged_scene"`。在 S4 local candidate 中，显式请求已退休的 `"static_template"` 会 fail closed 并提示使用
+`"merged_scene"`。自 public `develop` 集成 S4 后，显式请求已退休的 `"static_template"` 会 fail closed 并提示使用
 `merged_scene`，不会静默切换布局。`execution` 仍控制当前进程或独立 worker，不属于 single `make_env()` 的创建入口。
 
 `import task_env`、`from task_env import make_parallel_env` 不会提前加载 SB3、Torch、Taichi 或 Pendulum batch

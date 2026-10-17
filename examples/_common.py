@@ -41,10 +41,15 @@ def _virtual_bytes() -> int:
 
 @contextmanager
 def bounded_process(memory_limit_mb: int, time_limit_s: int):
-    """Bound address space, native thread fan-out, CPU time, and wall time."""
+    """Apply Linux-oriented per-process limits for example runs.
 
-    if os.name != "posix" or not hasattr(signal, "setitimer"):
-        raise RuntimeError("these examples require POSIX resource and timer limits")
+    ``RLIMIT_AS`` caps this process's virtual address space. It is neither an
+    RSS limit nor an aggregate process-tree memory limit. CPU time is also a
+    per-process limit; the real-time alarm bounds the coordinating process.
+    """
+
+    if not sys.platform.startswith("linux") or os.name != "posix" or not hasattr(signal, "setitimer"):
+        raise RuntimeError("these example limits are supported on Linux with POSIX resource and timer APIs")
     if not 1024 <= memory_limit_mb <= 8192:
         raise ValueError("--memory-limit-mb must be between 1024 and 8192")
     if not 1 <= time_limit_s <= 420:
@@ -74,8 +79,10 @@ def bounded_process(memory_limit_mb: int, time_limit_s: int):
         signal.signal(signal.SIGXCPU, _raise_timeout)
     signal.setitimer(signal.ITIMER_REAL, float(time_limit_s))
     try:
-        yield {"address_space_limit_bytes": as_limit, "cpu_limit_s": cpu_limit,
-               "wall_limit_s": time_limit_s, "native_threads": 1}
+        yield {"address_space_limit_bytes": as_limit, "address_space_limit_scope": "single_process_rlimit_as",
+               "cpu_limit_s": cpu_limit, "cpu_limit_scope": "single_process_rlimit_cpu",
+               "wall_limit_s": time_limit_s, "wall_limit_scope": "coordinating_process_alarm",
+               "native_threads": 1}
     finally:
         signal.setitimer(signal.ITIMER_REAL, *old_timer)
         signal.signal(signal.SIGALRM, old_alarm)

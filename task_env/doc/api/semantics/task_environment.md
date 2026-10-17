@@ -24,11 +24,17 @@
 ### Example
 
 ```python
-env = make_env("pick-cube-v1", config=config)
-obs, info = env.reset(seed=31)
-obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+from task_env import make_env
+
+env = make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})
+try:
+    obs, info = env.reset(seed=73)
+    obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+finally:
+    env.close()
 ```
 
 可运行入口：`python -m task_env.script.env.single_inline`；完整参数矩阵见
-[`doc/api/examples/index.md`](../examples/index.md)。该示例会实际执行 reset、bounded random action、step
-和显式 close。
+[`doc/api/examples/index.md`](../examples/index.md)。当前 manipulation UIDs 与
+expert/recording 入口见仓库根目录 `examples/README.md`；历史 `pick-cube-v1`
+不会映射到新的 selected task。
