@@ -476,6 +476,21 @@
       "sha256": "e6191a07513393af4ba9a7a0014efc6444030bb6193387a6ae4f4049a5087158"
     },
     {
+      "path": "docs/module/task_env/p2_0_s5_c4_evidence_retention_audit.md",
+      "size_bytes": 18521,
+      "sha256": "7add83dfa66b60ba7d8a6aa1563e2b03d494201c8bf6fc2bad82beb447ef420d"
+    },
+    {
+      "path": "docs/module/task_env/p2_0_s5_c5_l3_retirement_planning.md",
+      "size_bytes": 15921,
+      "sha256": "2e59e0080a6c51734010f4a3433ba58e6447000a021f779999942d59d968cf26"
+    },
+    {
+      "path": "docs/module/task_env/p2_0_s5_c6_l3_retirement_preparation.md",
+      "size_bytes": 16966,
+      "sha256": "5b2637c1aafc57b18955b37b72d9397a6f636253e736bb499d4c261fdbe8ae66"
+    },
+    {
       "path": "docs/releases/v1.1/README.md",
       "size_bytes": 2221,
       "sha256": "50806de164eaa218fadede1ab843b31f8aaeebaabcf6bd9af56fd141e3859198"
@@ -487,13 +502,33 @@
     },
     {
       "path": "docs/releases/v1.1/evidence/README.md",
-      "size_bytes": 6578,
-      "sha256": "cd42e092fd471856beaecfbcc275b0cfb3d5f3fdf6944dc06e4100c11174460b"
+      "size_bytes": 11052,
+      "sha256": "d0396aa3686d836302131c979c48a8f6df91f61ee495df7389be22f9e8377bc3"
     },
     {
       "path": "docs/releases/v1.1/evidence/manipulation_acceptance.md",
       "size_bytes": 5246,
       "sha256": "a50aab4e3692ea230fd51cdea55eefa2d8b53dffea36c6b4a284e1d7fd7fcb00"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/retirement/deletion_receipt_template.json",
+      "size_bytes": 1591,
+      "sha256": "448ef218288b9b7f8018d61fa878bdc93aa5a434b8a4aba958ff15091ae5e940"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/retirement/l3_a_approval_candidate.json",
+      "size_bytes": 18303,
+      "sha256": "e6eab4f2018cf332cc2ae2aec1b9c83f21705bfae47833481168909281f93a55"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/retirement/l3_b_approval_candidate.json",
+      "size_bytes": 4559,
+      "sha256": "01fdf61f3055c6c652a5244e357dd745bc82daecf0f29443a76199f8b05a6839"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/retirement/l3_c_approval_candidate.json",
+      "size_bytes": 56174,
+      "sha256": "252de838a83c278c37eff38076968d0c7812211fe961194ce6b119e646510733"
     },
     {
       "path": "docs/releases/v1.1/evidence/system_smoke_acceptance.md",
@@ -507,8 +542,8 @@
     },
     {
       "path": "docs/releases/v1.1/known_limitations.md",
-      "size_bytes": 3157,
-      "sha256": "51a5ef47b40d89aa3f1db02d84ae1317cd345b74b0135d4d842de4514b747cbd"
+      "size_bytes": 5036,
+      "sha256": "c5f85c1a9f525e1055950f970509030fca4cf78a54f975ffabfa76b7d4c05dfc"
     },
     {
       "path": "docs/releases/v1.1/learning_and_rendering_limits.md",
@@ -532,8 +567,8 @@
     },
     {
       "path": "docs/releases/v1.1/release_readiness.md",
-      "size_bytes": 4789,
-      "sha256": "bbcb1a7725b4b4be0500fcaed147790e5c332d5d405259de2b84cecaebb570be"
+      "size_bytes": 6194,
+      "sha256": "47d94a059cdd9b00e3e9ff7ef442a7119182c4c9c862d1095dc5c640fe57e6ab"
     },
     {
       "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
@@ -575,8 +610,8 @@
     "local_s5_c1_commit_parent": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
   },
   "volume_assessment": {
-    "workspace_total": "about 71 GB",
-    "workspace_qualification": "about 62 GB",
+    "workspace_total": "76,057,251,840 bytes currently allocated (includes S5-C5 ignored planning manifests); C4 pre-C5 observation was 75,974,623,232 bytes.",
+    "workspace_qualification": "65,536,290,816 bytes allocated at the C4 scan; historical raw review only, not automatically disposable.",
     "workspace_maintenance": "about 3.5 GB",
     "root_git_object_database": "about 690 MB",
     "GeoPhys_checkout": "about 188 MB",
@@ -584,8 +619,8 @@
     "conservative_full_set_estimate": "about 74 GB before bundle overhead and safety margin, if all workspace, root objects, and required submodule trees are included.",
     "local_free_space": "about 492 GB on /home, same physical /dev/sda; not an independent destination.",
     "independent_destination_capacity": "UNKNOWN; no destination exists/authorized.",
-    "proposed_l2_inventory": "24,390,405 bytes (about 23.26 MiB), comprising five selected H5s and listed result/log receipts; local inventory only, no independent copy.",
-    "proposed_l3_scope": "Historical workspace, previously estimated at about 71 GB, remains local and is outside the proposed mandatory off-host scope only if explicitly approved."
+    "proposed_l2_inventory": "24,563,669 bytes (22 exact paths, six H5s), locally size/SHA-256 verified; independent backup not verified.",
+    "proposed_l3_scope": "L3-A/B/C file-level unique allocated blocks are reviewed in S5-C5; potential recovery is conditional and no deletion is authorized."
   },
   "proposed_minimal_release_evidence_policy": {
     "proposal_status": "PENDING_EXPLICIT_MAINTAINER_APPROVAL",
@@ -604,10 +639,10 @@
       ]
     },
     "l2_selected_raw_evidence": {
-      "status": "RAW_EVIDENCE_BACKUP_NOT_VERIFIED",
+      "status": "L2_CURRENT_RAW_EVIDENCE_REQUIRED; local hashes verified, independent backup NOT_VERIFIED",
       "inventory": "docs/releases/v1.1/evidence/README.md",
-      "items": "five selected H5 files, four native-run result JSONs and worker logs, provider-free final log, CLI failure-gating log",
-      "total_bytes": 24390405,
+      "items": "The current exact 22-file L2 set (six accepted H5s, checkpoint, current result/worker receipts, batch/learning result receipts, and final provider-free/CLI result logs); see docs/releases/v1.1/evidence/README.md.",
+      "total_bytes": 24563669,
       "sha256_scope": "Current source disk only; hash metadata does not restore missing raw files.",
       "copy_or_restore": "NOT_RUN",
       "retention": "Keep existing local files in place; no deletion or rewrite."
@@ -638,6 +673,459 @@
       "observation": "Only /dev/sda was identified; no independent destination was authorized or available; no copy or restore was attempted.",
       "estimated_scope": "about 74 GB before bundle overhead and safety margin",
       "preserved": "The previous full-workspace requirement and failure observation remain in required_backup_scope and verification_result."
-    }
+    },
+    "record_status": "HISTORICAL_S5_C3_PROPOSAL_SUPERSEDED_BY_S5_C4_C5_EXACT_L2_INVENTORY",
+    "superseded_by": "docs/releases/v1.1/evidence/README.md and scoped_retention_proposal.L2"
+  },
+  "scoped_retention_proposal": {
+    "status": "PROPOSAL_PENDING_EXPLICIT_MAINTAINER_APPROVAL",
+    "effective": false,
+    "replaces_previous_full_workspace_gate": false,
+    "previous_gate_status": "BACKUP_NOT_VERIFIED; RELEASE_BLOCKED until scope change is approved",
+    "proposal_date": "2026-10-17",
+    "policy": {
+      "L1_METADATA_REQUIRED": "Preserve all tracked release-candidate metadata and exact source/evidence identities. Current S5-C4/C5/C6 documentation is prepared in a local review commit and is not public.",
+      "L2_CURRENT_RAW_EVIDENCE_REQUIRED": "Preserve the exact 22-file / 24,563,669-byte accepted L2 set in place; 22/22 sizes and hashes checked on the source disk. Independent copy/restore is not verified.",
+      "L3_REVIEWED_RETIREMENT_ALLOWED": "Proposal only. File-level A/B/C manifests exist; no item is authorized for deletion and all historical loss/recovery decisions require separate maintainer review.",
+      "L2_INDEPENDENT_BACKUP_NOT_VERIFIED": "No independent copy or restore read.",
+      "L3_HISTORICAL_RECOVERY_LOSS_RISK": "L3 remains local; exact raw recovery is incomplete for some sources, including the unresolved P1.6 tar and local-only P1.8 source snapshots.",
+      "MAINTAINER_DELETION_APPROVAL_REQUIRED": "Separate explicit approval is required for A, B, and C; retention-direction approval alone is not deletion authorization.",
+      "L3_HISTORICAL_RAW_RETIREMENT_ALLOWED": "Retirement is allowed only after explicit batch-specific approval and irreversible-loss acceptance; unresolved external consumers, protected paths, and symlink boundaries remain excluded."
+    },
+    "L1": {
+      "scope": "Git-tracked release scope/version policy, API/task inventory, migration, capability and source/recovery identities, acceptance summaries, test results, known limitations, readiness and preservation records",
+      "path_inventory": [
+        "docs/module/task_env/capability_matrix_v1_1_0_candidate.json",
+        "docs/module/task_env/p2_0_s2_c1_pickcube_authoring.md",
+        "docs/module/task_env/p2_0_s2_c1_source_identity.json",
+        "docs/module/task_env/p2_0_s2_c2_nutassembly_authoring.md",
+        "docs/module/task_env/p2_0_s2_c2_source_identity.json",
+        "docs/module/task_env/p2_0_s3_go2_retirement_manifest.json",
+        "docs/module/task_env/p2_0_s4_5_a_developer_workflows.md",
+        "docs/module/task_env/p2_0_s4_5_a_source_recovery.json",
+        "docs/module/task_env/p2_0_s4_5_b_source_recovery.json",
+        "docs/module/task_env/p2_0_s4_5_b_workflow_consolidation.md",
+        "docs/module/task_env/p2_0_s4_static_solver_retirement_manifest.json",
+        "docs/module/task_env/p2_0_s5_a_compatibility_inventory.json",
+        "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
+        "docs/module/task_env/p2_0_s5_c2_public_integration_readiness.md",
+        "docs/module/task_env/p2_0_s5_c3_minimal_release_evidence.md",
+        "docs/module/task_env/p2_0_s5_c4_evidence_retention_audit.md",
+        "docs/module/task_env/p2_0_s5_c5_l3_retirement_planning.md",
+        "docs/module/task_env/p2_0_s5_c6_l3_retirement_preparation.md",
+        "docs/releases/v1.1/README.md",
+        "docs/releases/v1.1/backup_manifest.json",
+        "docs/releases/v1.1/capability_matrix.md",
+        "docs/releases/v1.1/evidence/README.md",
+        "docs/releases/v1.1/evidence/manipulation_acceptance.md",
+        "docs/releases/v1.1/evidence/retirement/deletion_receipt_template.json",
+        "docs/releases/v1.1/evidence/retirement/l3_a_approval_candidate.json",
+        "docs/releases/v1.1/evidence/retirement/l3_b_approval_candidate.json",
+        "docs/releases/v1.1/evidence/retirement/l3_c_approval_candidate.json",
+        "docs/releases/v1.1/evidence/system_smoke_acceptance.md",
+        "docs/releases/v1.1/installation.md",
+        "docs/releases/v1.1/known_limitations.md",
+        "docs/releases/v1.1/learning_and_rendering_limits.md",
+        "docs/releases/v1.1/migration.md",
+        "docs/releases/v1.1/public_api_and_tasks.md",
+        "docs/releases/v1.1/publication_procedure_draft.md",
+        "docs/releases/v1.1/release_readiness.md",
+        "docs/releases/v1.1/release_scope_and_version_policy.md",
+        "docs/releases/v1.1/s5_c3_publication_checklist_draft.md",
+        "docs/releases/v1.1/source_recovery_manifest.json",
+        "docs/releases/v1.1/test_acceptance_summary.md",
+        "task_env/doc/api/appendix/migration.md"
+      ],
+      "local_candidate_head": "28dc2f48a6c16defa9bb3c8037e717a4873ae523",
+      "public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+      "preservation_boundary": "C4/C5/C6 documentation is available in the local review branch and is not public; raw workspace files remain ignored."
+    },
+    "L2": {
+      "scope": "Minimum selected current TaskEnv acceptance raw files: four accepted manipulation full-route H5s, canonical recorder H5, current SB3 bounded return/checkpoint/result outputs, accepted merged_scene batch receipt, and essential result/test logs",
+      "file_count": 22,
+      "total_bytes": 24563669,
+      "h5_file_count": 6,
+      "total_h5_bytes": 24333284,
+      "items": [
+        {
+          "path": "workspace/maintenance/p2_0_b_part_b_s4_20261016/merged_scene_pendulum_cpu_batch_smoke_final.json",
+          "bytes": 736,
+          "sha256": "19bc6f82e4e7adf5ea6102df8c169108d6ab37ba8fa657b93593d17f4ea7d296",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Accepted Pendulum merged_scene batch reset/step receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+          "bytes": 2649912,
+          "sha256": "e22bcadbb142c81f2bdd8f12a432b82b22cef0c25ddeba8cec29f764bca87ae8",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Canonical PickCube recording and logical storage roundtrip H5"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log",
+          "bytes": 480,
+          "sha256": "f9bbbc5dba19f006d959d6140fdcc758b8a3ebc4bb8f664c0f8ce2fe55007a2c",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Preserved PyTorch CUDA initialization warning during CPU SB3 run"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log",
+          "bytes": 2097,
+          "sha256": "7ec6e2fe2ec44c71c2caf58f5a7447a5a1fe57266a587736e7ecc0c6a6ed35d5",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Bounded SB3 execution stdout"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json",
+          "bytes": 1715,
+          "sha256": "d016b19b7f36c8728e65edd66da52de43df4c061922580caa70e8c5756ae42fe",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Bounded SB3 example status, requested configuration and resource limits"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
+          "bytes": 136182,
+          "sha256": "361069281b5ed745f89d031933e220edc3e7c52e760e36922b9f3b3b62d0e61d",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Current bounded Pendulum SB3 one-update output checkpoint; not a performance or qualification artifact"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
+          "bytes": 31312,
+          "sha256": "e87a3100cf8b7d775932ebf14749c4f4a6e8336ee7c1db314fddfee1b45c6c96",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Bounded Pendulum SB3 one-update return H5"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
+          "bytes": 742,
+          "sha256": "3496cfc76a886dcbe5337fef27daea0d36a3d11e59f9bd4fdac9fe6481571654",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Bounded Pendulum SB3 runner result summary"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
+          "bytes": 878784,
+          "sha256": "cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "PickCube GeoPhys CPU seed31 full-route H5"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json",
+          "bytes": 24698,
+          "sha256": "f746f7a4f3785a762cd9fa174e263fd1415b6920fa1098c712334beb9725dda5",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log",
+          "bytes": 2239,
+          "sha256": "66e6783bbae541748729acb3aee9555057509ec036fedf56ef627e80eae437df",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
+          "bytes": 2649928,
+          "sha256": "579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "PickCube MuJoCo CPU seed31 full-route H5"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json",
+          "bytes": 24614,
+          "sha256": "96e85d923987ace7fe8980561b00e3df9023d3c6242d347fadacdc191aa7a6fd",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log",
+          "bytes": 1547,
+          "sha256": "a18ccfe34c3a88d5a6655dda1b2d5e085bc268c811e2d057dce30de6fe67e017",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+          "bytes": 9295444,
+          "sha256": "e539d5b2662d191c0a70b1ac9dd593842279397b8627f0e3871d8852c78c2271",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "NutAssembly GeoPhys CPU NA-S0 seed19 Outcome V1 H5; original strict lifecycle failure retained"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json",
+          "bytes": 15899,
+          "sha256": "cf97d8f3c61dce71ede1307669be2a9217fa27f9b18bb342afb74dad85b3c6f5",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log",
+          "bytes": 2115,
+          "sha256": "0934302ca7f0b1e7d71ba82923c80dc024dac75e06d1d6a0827c9ff123e1fd7e",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+          "bytes": 8827904,
+          "sha256": "f7000d28e1a47363542bef8909341d5a13582175941b394987ad31f0ea4f5931",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "NutAssembly MuJoCo CPU NA-S0 seed19 Outcome V1 H5"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json",
+          "bytes": 14927,
+          "sha256": "ea25746cbfc18c068cce3dc7c46246237d5570be0b6ecaf8c590be2f8e6b168c",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log",
+          "bytes": 1422,
+          "sha256": "deacad498bbf4ba7bab5ad00a657809018eccdfa555a3889e8ee7699d077a53e",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Task full-route result/worker supporting acceptance receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+          "bytes": 98,
+          "sha256": "fbd78fec782001f93d58ec55c49ed2f14ea9bf835f6197896c81813538559ce5",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Focused converter argv and H5 result-gating receipt"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log",
+          "bytes": 874,
+          "sha256": "077f593c60258c00ffc3eb9c693b1a3c97c695d10c8d0b7acec1335bf9c0f8b2",
+          "status": "LOCAL_BYTES_HASH_VERIFIED",
+          "independent_backup": "NOT_VERIFIED",
+          "role": "Final 147-test/6-subtest provider-free S5-C2 receipt"
+        }
+      ],
+      "local_status": "Exact bytes are present and SHA-256 checked on /dev/sda; no independent backup or restore test",
+      "limits": "No H5 hash substitutes for raw data. SB3 smoke includes a preserved CUDA initialization warning in stderr. Rendering outputs were in-memory and no raw frame file exists."
+    },
+    "L3": {
+      "scope": "Historical qualification, source recovery archives, previous task/solver candidates, retired Go2/static-template runs, experiments, diagnostics, demos, and unselected maintenance outputs",
+      "status": "HISTORICAL_WORKSPACE_BACKUP_NOT_VERIFIED",
+      "bytes_observation": "C4 pre-C5 workspace du: 75,974,623,232 bytes; current workspace after writing C5 local manifests: 76,057,251,840 bytes. C4 qualification subtree: 65,536,290,816 bytes. Current candidate file-block estimates exclude directory blocks and deduplicate hardlinks.",
+      "classifications": "S5-C5 exact file-level A/B/C candidates are bound by hashes in S5-C6. C6 adds L3-C unresolved-row and symlink holds, B worktree receipt exceptions, and cache/source identity checks.",
+      "policy_proposal": "L3_HISTORICAL_RAW_RETIREMENT_ALLOWED is proposed but ineffective until explicit maintainer approval and per-batch risk acceptance; the existing full-workspace backup gate remains active.",
+      "historical_dependency_audit": {
+        "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+        "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+        "v1_0_0_tracked_p1_6_metadata": "workspace/qualification/phase1/p1_6_closure/ (present in immutable release tree)",
+        "p1_8_local_archive_path": "workspace/qualification/phase1/archives/p2_0_part_a/legacy_evidence_archive/p1_8_integration_20261012/",
+        "p1_8_archive_apparent_bytes": 10989629850,
+        "p1_8_archive_allocated_bytes_observed": 11001884672,
+        "p1_8_archive_manifest_note": "Historical GeoPhys Git bundle is not reconstructable from Git history because an old parent object is missing; exact source-tree snapshots retained.",
+        "p1_6_recovery_tar_recorded_bytes": 205486080,
+        "p1_6_recovery_tar_recorded_members": 441,
+        "p1_6_recovery_tar_location": "NOT_RESOLVED_IN_CURRENT_WORKSPACE_METADATA_SCAN; no file matched recorded size or a name/path containing the archive identity",
+        "p1_6_recovery_tar_status": "UNKNOWN_REVIEW_REQUIRED; do not claim recovered or present",
+        "preservation_decision": "Keep all qualification workspace data and historical reports protected. Do not delete on the basis of age, failed status, or the proposed reduced off-host scope."
+      },
+      "preservation_decision": "No deletion. Preserve all L1/L2 and unresolved/protected evidence. Batch C requires explicit permanent-loss acceptance and external-consumer review.",
+      "classification_manifest": "workspace/maintenance/p2_0_s5_c5_20261017/historical_raw_retirement_review.json",
+      "c6_report": "docs/module/task_env/p2_0_s5_c6_l3_retirement_preparation.md"
+    },
+    "cleanup_dry_run": {
+      "status": "CLEANUP_PENDING_APPROVAL",
+      "allowlist_path": "workspace/maintenance/p2_0_s5_c4_20261017/proposed_cleanup_allowlist.json",
+      "allowlist_sha256": "f79eb22b47bd4e1a7db8645cf0755ad336607b4d026174f41cf094daf59f25d7",
+      "files": 17,
+      "logical_bytes": 273905,
+      "allocated_bytes": 311296,
+      "estimated_reclaimable": "311,296 bytes (about 304 KiB) of file blocks; directory metadata not counted",
+      "scope": "Only unlinked Python bytecode cache files with adjacent source files, outside registered worktrees and historical qualification. Exact file hashes and source hashes are in the allowlist.",
+      "deletion_performed": false
+    },
+    "inventory": {
+      "path": "workspace/maintenance/p2_0_s5_c4_20261017/workspace_file_inventory.jsonl",
+      "sha256": "ee8576edee885f1890fdd0bd86825c42349b5e83c21fe082028eeca5f3dddfef",
+      "summary_path": "workspace/maintenance/p2_0_s5_c4_20261017/inventory_summary.json",
+      "summary_sha256": "6631425549f3ca090ddcd7748c92f01550be6afa3a869260902d6b0dc4b974f7",
+      "method": "Metadata-only no-follow walk; no whole-workspace file hashing; selected L2 and exact candidate caches only were content-hashed.",
+      "entries": 85467,
+      "symlinks_not_followed": 2,
+      "hardlinked_file_path_entries": 750,
+      "registered_nested_worktree": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017 at bee498d1d784015f034c5b4af34320fdffa61411; KEEP_UNTIL_BACKUP"
+    },
+    "l2_inventory_reference": "docs/releases/v1.1/evidence/README.md"
+  },
+  "current_taskenv_retention_status": {
+    "L1_METADATA_REQUIRED": "Present in local tracked tree; C4/C5/C6 documentation is prepared in a local review commit and is not public.",
+    "L2_CURRENT_RAW_EVIDENCE_REQUIRED": "PASS locally for exactly 22 files / 24,563,669 bytes; all sizes and SHA-256 values match the evidence index.",
+    "L2_INDEPENDENT_BACKUP_NOT_VERIFIED": "No independent copy or restore read.",
+    "L3_REVIEWED_RETIREMENT_ALLOWED": "HISTORICAL_S5_C5_LABEL; superseded by the current S5-C6 proposal label, not effective.",
+    "L3_HISTORICAL_RECOVERY_LOSS_RISK": "OPEN; all raw archives remain on /dev/sda, P1.6 recovery tar location is unresolved, P1.8 archive has incomplete Git recovery.",
+    "MAINTAINER_DELETION_APPROVAL_REQUIRED": "Required separately for A, B, and C. External PhysPi/Skill consumers remain unverified; Batch C is execution-blocked.",
+    "L1_METADATA_PRESERVED": "C4/C5/C6 metadata is available locally and is not public.",
+    "L3_HISTORICAL_RAW_RETIREMENT_ALLOWED": "PROPOSAL_PENDING_APPROVAL; separate A/B/C envelopes have execution_authorized=false and empty execution_allowlist.",
+    "HISTORICAL_RAW_DATA_LOSS_RISK": "OPEN; P1.6 archive location unresolved, P1.8 GeoPhys source snapshots local-only, no independent raw-data copies verified.",
+    "STORAGE_HEALTH_RISK_OPEN": "OPEN; prior /dev/sda/ata5 BadCRC and READ errors remain unresolved by recent clean log queries."
+  },
+  "s5_c5_retention_review": {
+    "status": "PROPOSAL_PENDING_EXPLICIT_MAINTAINER_APPROVAL",
+    "effective": false,
+    "replaces_previous_full_workspace_gate": false,
+    "previous_gate_status": "BACKUP_NOT_VERIFIED; RELEASE_BLOCKED until scope change is approved",
+    "policy": {
+      "L1": "L1_METADATA_REQUIRED",
+      "L2": "L2_CURRENT_RAW_EVIDENCE_REQUIRED",
+      "L3": "L3_REVIEWED_RETIREMENT_ALLOWED"
+    },
+    "risk_statuses": [
+      "L2_INDEPENDENT_BACKUP_NOT_VERIFIED",
+      "L3_HISTORICAL_RECOVERY_LOSS_RISK",
+      "MAINTAINER_DELETION_APPROVAL_REQUIRED"
+    ],
+    "L2": {
+      "files": 22,
+      "bytes": 24563669,
+      "sha256_check": "22/22 matched on 2026-10-17; source disk only",
+      "backup": "NOT_VERIFIED"
+    },
+    "L3_file_block_estimates": {
+      "L3-A": {
+        "files": 17,
+        "allocated_bytes": 311296,
+        "gib": 0.00029
+      },
+      "L3-B": {
+        "paths": 6795,
+        "allocated_bytes": 3317497856,
+        "gib": 3.089638,
+        "includes_registered_worktree": true,
+        "git_storage_accounting": "Registered clean checkout uses parent worktree admin and GeoPhys/Menagerie submodule gitdirs under the main repository .git outside workspace; shared object blocks are excluded from workspace estimates. No .git directories or alternates were found under workspace; inspected shared stores had no objects/info/alternates."
+      },
+      "L3-C": {
+        "unique_allocated_bytes": 72514465792,
+        "gib": 67.534359,
+        "shared_hardlinks_counted_once": 206,
+        "paths": 66155
+      },
+      "L3-D": {
+        "files": 0,
+        "external_consumer_questions": "UNRESOLVED_GROUP_LEVEL"
+      }
+    },
+    "actual_bytes_reclaimed": 0,
+    "manifests": {
+      "safe_regenerable_cleanup.json": {
+        "path": "workspace/maintenance/p2_0_s5_c5_20261017/safe_regenerable_cleanup.json",
+        "sha256": "033b4e63b1965ea293a11d02cc9d39985ff0cd75b8435149928ce99b496a3e14"
+      },
+      "superseded_experiment_cleanup.json": {
+        "path": "workspace/maintenance/p2_0_s5_c5_20261017/superseded_experiment_cleanup.json",
+        "sha256": "cf02a17bd96cc6e793fa4f640541b2d401c5ceb545d42895cdab8899533d61f7"
+      },
+      "historical_raw_retirement_review.json": {
+        "path": "workspace/maintenance/p2_0_s5_c5_20261017/historical_raw_retirement_review.json",
+        "sha256": "8359315ea46b0442a8c8bc0ed5c8834aa5d6b236a13e5319ff87038897557eed"
+      },
+      "summary": "workspace/maintenance/p2_0_s5_c5_20261017/reclassification_summary.json"
+    },
+    "P1_6_recovery_tar": "205,486,080 bytes / 441 members / recorded SHA d31b64570e951b1cd694afe105f554dd44199d3f43aba689dac5c62c804d3d93; not found in C4 workspace scan; location unresolved",
+    "P1_8_archive": "local-only; 10,989,629,850 logical bytes; 3,383 files; historical GeoPhys Git bundle incomplete because parent object is missing; exact source snapshots present locally; no independent copy",
+    "cleanup_performed": false,
+    "maintainer_decisions_required": [
+      "Approve/reject reduced L3 retention policy while acknowledging unbacked L2/L3 risks",
+      "Resolve external PhysPi/Human/Judge references",
+      "Review exact L3-B paths and registered worktree receipts",
+      "Accept irrecoverable historical loss separately before any L3-C retirement"
+    ]
+  },
+  "s5_c6_retirement_preparation": {
+    "status": "APPROVAL_PROPOSAL_ONLY",
+    "effective": false,
+    "deletion_performed": false,
+    "public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "protected_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "immutable_v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "l2": {
+      "files": 22,
+      "bytes": 24563669,
+      "verification": "22/22 path/size/SHA-256 matched; no copies or modifications."
+    },
+    "protected_inode_check": {
+      "protected_paths": 911,
+      "distinct_inodes": 911,
+      "candidate_inode_aliases": 0,
+      "candidate_paths_checked": 72967
+    },
+    "batches": {
+      "A": {
+        "manifest": "docs/releases/v1.1/evidence/retirement/l3_a_approval_candidate.json",
+        "source_manifest": "workspace/maintenance/p2_0_s5_c5_20261017/safe_regenerable_cleanup.json",
+        "source_sha256": "033b4e63b1965ea293a11d02cc9d39985ff0cd75b8435149928ce99b496a3e14",
+        "files": 17,
+        "allocated_bytes": 311296,
+        "execution_authorized": false
+      },
+      "B": {
+        "manifest": "docs/releases/v1.1/evidence/retirement/l3_b_approval_candidate.json",
+        "source_manifest": "workspace/maintenance/p2_0_s5_c5_20261017/superseded_experiment_cleanup.json",
+        "source_sha256": "cf02a17bd96cc6e793fa4f640541b2d401c5ceb545d42895cdab8899533d61f7",
+        "rows": 6795,
+        "allocated_bytes_if_all": 3317497856,
+        "worktree_rows": 6619,
+        "receipt_holdouts": 4,
+        "execution_authorized": false
+      },
+      "C": {
+        "manifest": "docs/releases/v1.1/evidence/retirement/l3_c_approval_candidate.json",
+        "source_manifest": "workspace/maintenance/p2_0_s5_c5_20261017/historical_raw_retirement_review.json",
+        "source_sha256": "8359315ea46b0442a8c8bc0ed5c8834aa5d6b236a13e5319ff87038897557eed",
+        "rows": 66155,
+        "unique_allocated_bytes": 72514465792,
+        "unresolved_rows": 516,
+        "symlink_rows": 2,
+        "execution_authorized": false
+      }
+    },
+    "unresolved_release_risks": [
+      "L2_INDEPENDENT_BACKUP_NOT_VERIFIED",
+      "HISTORICAL_RAW_DATA_LOSS_RISK",
+      "STORAGE_HEALTH_RISK_OPEN",
+      "external PhysPi/Skill consumer inventory incomplete",
+      "P1.6 recovery archive location unresolved",
+      "P1.8 exact GeoPhys source recovery local-only"
+    ],
+    "reclaim_actual_bytes": 0,
+    "maintainer_approval_units": [
+      "Batch A only",
+      "Batch B separately, with receipt preservation and Git worktree procedure",
+      "Batch C separately with explicit irreversible historical-loss acceptance and external-consumer review"
+    ],
+    "receipt_template": "docs/releases/v1.1/evidence/retirement/deletion_receipt_template.json",
+    "approval_envelopes": [
+      "docs/releases/v1.1/evidence/retirement/l3_a_approval_candidate.json",
+      "docs/releases/v1.1/evidence/retirement/l3_b_approval_candidate.json",
+      "docs/releases/v1.1/evidence/retirement/l3_c_approval_candidate.json"
+    ],
+    "documentation_commit_status": "LOCAL_ONLY_NOT_PUBLIC"
   }
 }

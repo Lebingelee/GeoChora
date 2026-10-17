@@ -35,14 +35,40 @@
 - **OPEN storage risk:** `/dev/sda` / `ata5` has recorded BadCRC and READ I/O
   errors. The workspace resides on one physical disk and an independent backup
   has not been verified. A clean recent kernel scan does not close this risk.
-- **Proposed retention scope is not yet approved:** the L1 release acceptance
-  summaries are prepared in local Git; public remote integration is not yet
-  authorized. Five selected L2 H5 files and supporting logs remain on the
-  existing disk and have local SHA-256/size checks only. The prior full
-  workspace backup failure remains recorded. SHA-256 metadata cannot restore
-  missing raw data. L3 historical workspace data is outside the proposed
-  mandatory off-host scope only if the maintainer accepts that risk; no L2/L3
-  files were deleted or rewritten.
+- **Proposed retention scope is not yet approved:** L1 summaries are in local
+  Git; S5-C4/C5/C6 documentation is prepared in a local review commit and is
+  not public. The exact L2 set has 22 files (six H5 files), totaling
+  24,563,669 bytes. All paths,
+  sizes, and hashes match on the existing `/dev/sda`; no independent copy or
+  restore read exists. SHA-256 metadata cannot restore missing raw data. S5-C5
+  reclassified the ignored workspace using allocated file blocks: L3-A 17
+  cache files / 311,296 bytes; L3-B 6,795 paths / 3,317,497,856 unique bytes,
+  including a registered clean-checkout worktree; and L3-C 66,155 historical
+  paths / 72,514,465,792 unique bytes. C6 identified four worktree receipts to
+  preserve, three old P1.1 candidate files and one failed environment-selection
+  receipt to hold, 516 unresolved L3-C rows, and two symlinks outside any
+  proposed file allowlist. L3-D has no remaining C5 file rows, while external
+  PhysPi/Skill consumers remain unverified. These are conditional review
+  estimates; actual reclaimed space is zero. No approval envelope authorizes
+  deletion. The earlier
+  full-workspace `BACKUP_NOT_VERIFIED` gate remains active until a maintainer
+  explicitly approves a replacement policy and accepts the unbacked L2/L3
+  risks. No L2 or L3 files were deleted or rewritten.
+- **Historical recovery-location gap:** the v1.0.0 archive manifest records a
+  205,486,080-byte, 441-member P1.6 recovery tar, but the S5-C4 workspace
+  metadata scan did not locate a matching path or size. Its availability is
+  `UNKNOWN_REVIEW_REQUIRED`; the tracked P1.6 closure metadata is not a
+  replacement for the raw tar. The P1.8 integration archive is present locally
+  at the path recorded in the S5-C4 audit, with apparent size matching the
+  v1.0.0 archive manifest. Neither archive has a verified independent backup.
+- **Cleanup is not authorized:** exact L3-A/B/C source manifests remain in the
+  ignored S5-C5 maintenance directory. The [S5-C6 preparation](../../module/task_env/p2_0_s5_c6_l3_retirement_preparation.md)
+  and its three tracked envelopes bind each proposal to those exact hashes;
+  every `execution_allowlist` is empty. The registered worktree requires a
+  Git-aware, separately approved removal after its four receipts are
+  preserved. Historical raw retirement requires separate acceptance of
+  irreversible loss and external-consumer review. No cleanup has been
+  performed.
 - External users and deployments may rely on removed APIs that repository
   scans cannot discover. The compatibility inventory is the migration record;
   no silent aliases are supplied.

@@ -1,0 +1,89 @@
+{
+  "target_release": "v1.1.0",
+  "status": "APPROVAL_PROPOSAL_ONLY",
+  "execution_authorized": false,
+  "observation_date": "2026-10-17",
+  "l2_preserved": {
+    "file_count": 22,
+    "bytes": 24563669,
+    "sha256_verified": true
+  },
+  "protected_inode_check": {
+    "protected_path_count": 911,
+    "distinct_protected_inode_count": 911,
+    "candidate_inode_alias_count": 0,
+    "checked_candidate_paths": 72967,
+    "scope": "All Git-tracked paths, current L1 inventory, local C4/C5 governance docs, and exact L2 paths.",
+    "observation": "Post-envelope L1/L2 alias recheck; all candidate lstat metadata matched C5."
+  },
+  "pre_execution_revalidation_required": true,
+  "stop_on_any_path_inode_size_link_type_or_hash_mismatch": true,
+  "schema": "geochora-s5-c6-l3-b-approval-candidate-v1",
+  "batch": "B",
+  "exact_source_manifest": {
+    "path": "workspace/maintenance/p2_0_s5_c5_20261017/superseded_experiment_cleanup.json",
+    "sha256": "cf02a17bd96cc6e793fa4f640541b2d401c5ceb545d42895cdab8899533d61f7",
+    "rows": 6795,
+    "allocated_bytes_if_all_candidate_files_removed": 3317497856
+  },
+  "candidate_groups": {
+    "registered_clean_checkout": {
+      "root": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017",
+      "rows": 6619,
+      "allocated_bytes": 1990119424,
+      "head": "bee498d1d784015f034c5b4af34320fdffa61411",
+      "clean_tracked_and_untracked_state": true,
+      "superproject_commit_is_ancestor_of_public_develop": true,
+      "geo_phys_gitlink": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+      "menagerie_gitlink": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+      "both_gitlinks_match_current_root_submodules": true,
+      "unique_superproject_commits": 0,
+      "shared_git_admin_and_object_storage_outside_workspace": true,
+      "exact_receipts_to_preserve": [
+        {
+          "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_source_identity.json",
+          "bytes": 1548,
+          "sha256": "178dc421bb1c826f0e42b718099a9b3ba3a6cc10b8a8cd9f4e49cca43b6edf56",
+          "allocated_bytes": 4096,
+          "required_action": "PRESERVE_EXACT_BYTES_BEFORE_ANY_WORKTREE_RETIREMENT"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+          "bytes": 15084,
+          "sha256": "8ee3e3128ae413e694aeab6e7475ffd4df207548cc543c72bdcd9971761a0fe9",
+          "allocated_bytes": 16384,
+          "required_action": "PRESERVE_EXACT_BYTES_BEFORE_ANY_WORKTREE_RETIREMENT"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.log",
+          "bytes": 2502,
+          "sha256": "b4f0afd53194887c8bc1fb612c8c1a0b712981a21501831f24fc02670aaf7643",
+          "allocated_bytes": 4096,
+          "required_action": "PRESERVE_EXACT_BYTES_BEFORE_ANY_WORKTREE_RETIREMENT"
+        },
+        {
+          "path": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.json",
+          "bytes": 1406,
+          "sha256": "db52bda164ede8eb4024e51e672a43e378fe0476885dc7be792eb4f84942e1f1",
+          "allocated_bytes": 4096,
+          "required_action": "PRESERVE_EXACT_BYTES_BEFORE_ANY_WORKTREE_RETIREMENT"
+        }
+      ],
+      "retirement_method": "Separate approved non-forced git worktree remove operation only after exact receipt preservation and validation. Never recursively delete the worktree; do not delete shared main-repository/submodule object storage."
+    },
+    "non_worktree_rows": 176,
+    "non_worktree_allocated_bytes": 1327378432,
+    "superseded_s1_5_s1_6_rows": 168,
+    "uncertain_pickcube_p1_1_candidate_paths": [
+      "workspace/tasks/pick-cube-v1/artifacts/ver_p1_1_candidate/README.md",
+      "workspace/tasks/pick-cube-v1/artifacts/ver_p1_1_candidate/manifest.yaml",
+      "workspace/tasks/pick-cube-v1/artifacts/ver_p1_1_candidate/artifact.json"
+    ],
+    "failed_environment_selection_receipts": [
+      "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_default_python_attempt.log"
+    ]
+  },
+  "current_dependency": "No current selected-task runtime dependency identified; source and acceptance receipts retain historical audit value.",
+  "execution_allowlist": [],
+  "approval_required": "Separate Batch B approval; resolve candidate exceptions and preserve referenced clean-checkout receipts before worktree retirement."
+}

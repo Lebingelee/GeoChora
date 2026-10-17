@@ -5,11 +5,15 @@
 > 状态：canonical Core validation policy，v0.3
 > 日期：2026-10-04
 
-> P2.0-B 当前状态（2026-10-17）：S3 Go2 retirement 与 S4 static-template
-> retirement 已集成至 public `develop`（当前远端观察值 `0ff2d846`）。S4.5-A
-> 与 S4.5-B 仍是本地 review candidates；尚未集成。S4/S4.5 回归不增加 provider
-> 或 capability qualification。GeoPhys-owned Batch adapter、`merged_scene` 与
-> generic learner routes 的声明范围仍以具名 Evidence 为准。
+> P2.0-B 当前状态（2026-10-17）：S3 Go2 retirement、S4 static-template
+> retirement、S4.5-A/B 与 converter argv fix 已集成至 public `develop`
+>（远端观察值 `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`）。S5-A/B 文档随该
+> develop 更新集成；S5-C1/C2/C3 与本地 S5-C4/C5/C6 保留/清理审计仍是未集成的
+> release-candidate 审阅材料。上述回归不增加 provider 或 capability
+> qualification。GeoPhys-owned Batch adapter、`merged_scene` 与 generic learner
+> routes 的声明范围仍以具名 Evidence 为准。v1.1.0 的原始 L2/L3 Evidence
+> 仍没有独立备份；S5-C6 将 L3-A/B/C 列为分批退休候选，但没有任何
+> deletion authorization。缩小保留范围仍待 maintainer 批准，SATA 风险保持开放。
 
 ## 1. 目的
 
