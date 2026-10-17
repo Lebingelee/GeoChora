@@ -35,6 +35,14 @@
 - **OPEN storage risk:** `/dev/sda` / `ata5` has recorded BadCRC and READ I/O
   errors. The workspace resides on one physical disk and an independent backup
   has not been verified. A clean recent kernel scan does not close this risk.
+- **Proposed retention scope is not yet approved:** the L1 release acceptance
+  summaries are prepared in local Git; public remote integration is not yet
+  authorized. Five selected L2 H5 files and supporting logs remain on the
+  existing disk and have local SHA-256/size checks only. The prior full
+  workspace backup failure remains recorded. SHA-256 metadata cannot restore
+  missing raw data. L3 historical workspace data is outside the proposed
+  mandatory off-host scope only if the maintainer accepts that risk; no L2/L3
+  files were deleted or rewritten.
 - External users and deployments may rely on removed APIs that repository
   scans cannot discover. The compatibility inventory is the migration record;
   no silent aliases are supplied.

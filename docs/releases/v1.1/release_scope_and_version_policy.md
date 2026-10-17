@@ -37,3 +37,15 @@ The previously considered `v1.0.1` and `v2.0.0` alternatives are historical
 decision context only; the current target is not an open version-selection
 gate. Publication, tag creation, and protected-branch updates still require
 separate maintainer authorization.
+
+## Proposed release-evidence preservation policy
+
+S5-C3 proposes preserving a small L1 acceptance package in Git, inventorying
+the selected L2 H5/log files by local size and SHA-256, and treating the
+historical L3 workspace as outside the mandatory v1.1.0 off-host preservation
+set. This is a governance proposal, not an approved replacement for the
+previous full-workspace backup gate. Until the maintainer explicitly approves
+the reduced scope and accepts the remaining raw-data risks, the current backup
+gate remains **BLOCKED**. Hash metadata identifies expected bytes but cannot
+restore a missing H5 or other raw artifact. See the [evidence index](evidence/README.md),
+[backup manifest](backup_manifest.json), and [release readiness](release_readiness.md).

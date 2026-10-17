@@ -2,9 +2,12 @@
 
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 
-Public `develop` now includes the S4.5 functional unit, converter fix, and S5-B
+Public `develop` includes the S4.5 functional unit, converter fix, and S5-B
 candidate documents through `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`.
-Publication remains **BLOCKED**.
+Local commits now preserve the S5-C2 review and proposed S5-C3 evidence package;
+neither is remotely integrated. Publication remains **BLOCKED**. The previous
+full-workspace backup gate stays active until the maintainer approves the
+scoped retention proposal.
 
 | Gate | Status | Evidence / remaining condition |
 | --- | --- | --- |
@@ -20,9 +23,16 @@ Publication remains **BLOCKED**.
 | Full relocated-checkout regression | **NOT_RUN** | Prior exploration was 139 PASS / 8 FAIL; test-helper and path issues were analyzed, but the full suite was not rerun. |
 | Submodule/source recovery | **PASS — LOCAL CHECK ONLY** | Required Gitlinks are present; 94/94 retired blobs, 10/10 migrated blobs, and 8/8 enumerated H5/checkpoint hashes matched. No independent restore was performed. |
 | v1.1.0 capability matrix approval | **MAINTAINER_DECISION_REQUIRED** | One candidate matrix; four manipulation/provider intersections remain TESTED_BOUNDED, not newly qualified. |
-| Independent backup verification | **BLOCKED — BACKUP_NOT_VERIFIED** | No authorized independent destination found. No copy or restore test was attempted. |
+| Previous full-workspace backup gate | **BLOCKED — BACKUP_NOT_VERIFIED** | The earlier requirement to back up the full workspace remains active until scoped retention is explicitly approved. The prior single-disk/no-destination observation is preserved. |
+| Release metadata preservation | **PASS — LOCAL_GIT_ONLY** | S5-C3 L1 index and summaries are preserved in local Git; public integration has not been authorized or performed. |
+| Raw evidence backup | **BLOCKED — RAW_EVIDENCE_BACKUP_NOT_VERIFIED** | Five L2 H5s plus supporting result/log receipts are present and hash-checked on the source disk. No independent copy or restore read exists; hashes cannot restore missing files. |
+| Historical workspace backup | **BLOCKED — HISTORICAL_WORKSPACE_BACKUP_NOT_VERIFIED** | L3 is outside the proposed mandatory off-host scope only if approved; the historical workspace remains local and untouched. |
+| Scoped retention policy and residual-risk acceptance | **MAINTAINER_DECISION_REQUIRED** | Approve or reject the reduced scope and explicitly accept the unbacked L2/L3 risks before replacing the earlier backup gate. |
+| Remote evidence preservation | **MAINTAINER_DECISION_REQUIRED** | No separate authorization to integrate the S5-C3 evidence commit was given; remote file/hash verification is not run. |
 | Publication authorization | **MAINTAINER_DECISION_REQUIRED** | No v1.1.0 tag, `main` change, or GitHub Release is authorized or created. |
 
-The S5-C1 report and current S5-C2 integration/backup receipt are linked from
-the [release package](README.md). The [backup manifest](backup_manifest.json)
-records the required set and the reason publication remains blocked.
+The S5-C1/S5-C2 reports, proposed S5-C3 evidence package, and its review report are linked from the
+[release package](README.md). The [backup manifest](backup_manifest.json)
+preserves the previous blocked result and separately records the proposed
+reduced retention scope. That proposal does not change the active gate until
+maintainer approval.

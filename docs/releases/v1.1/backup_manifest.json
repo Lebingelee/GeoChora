@@ -19,7 +19,7 @@
   "required_backup_scope": [
     {
       "item": "v1.1.0 release-candidate source and all local/unpushed commits/refs",
-      "identity": "Code candidate bee498d1d784015f034c5b4af34320fdffa61411; integrated public docs 2fb60de7851bf2e5651c2dc99fff7451c16e1a94; local S5-C1 documentation commit 2f8555a4c86470fb63cd2386a6e88729d4795a23; all refs captured by root and submodule --all bundles.",
+      "identity": "Code candidate bee498d1d784015f034c5b4af34320fdffa61411; integrated public docs 2fb60de7851bf2e5651c2dc99fff7451c16e1a94; local S5-C1 documentation commit 2f8555a4c86470fb63cd2386a6e88729d4795a23; local S5-C2 docs commit 9de96ddd6b42d8d29f7e513a8f17a3adc64bc7bf; include the current S5-C3 evidence commit/ref when preparing any later authorized bundle.",
       "verification_required": "Bundle refs and Git objects; verify commit and tree identities after copy."
     },
     {
@@ -126,7 +126,7 @@
       "e0e4dbcbc3dc9d17d0dec58142be5cfb20937e73",
       "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
     ],
-    "working_tree_state": "S5-C1 is preserved as separate local documentation-only commit 2f8555a4c86470fb63cd2386a6e88729d4795a23 (parent 2fb60de). The S5-C2 report/readiness changes are local and must be included as files or a patch in addition to Git bundles.",
+    "working_tree_state": "S5-C1 docs are local commit 2f8555a4c86470fb63cd2386a6e88729d4795a23; S5-C2 docs are local commit 9de96ddd6b42d8d29f7e513a8f17a3adc64bc7bf (parent S5-C1); S5-C3 L1 evidence and policy proposal are local and not public. Include all current branch refs and the final L1 evidence commit in any later authorized bundle.",
     "destination_type": "NONE_IDENTIFIED_OR_AUTHORIZED",
     "authorized_path_or_endpoint": null,
     "destination_capacity": "UNKNOWN; no independent target is available for inspection.",
@@ -353,7 +353,8 @@
         "ref": "refs/tags/v1.0.0",
         "object": "17c3100d4fabcb061c23569dea49973ebd177d51"
       }
-    ]
+    ],
+    "snapshot_context": "This named-ref snapshot predates the S5-C2 local documentation commit 9de96ddd6b42d8d29f7e513a8f17a3adc64bc7bf and S5-C3 package. It is retained as the earlier observation; a future authorized backup must use fresh refs and git bundle --all."
   },
   "additional_current_receipts": [
     {
@@ -445,104 +446,124 @@
     "submodule_recovery": "NOT_RUN",
     "representative_h5_restore_read": "NOT_RUN",
     "representative_evidence_restore_read": "NOT_RUN",
-    "manifest_completeness": "PREPARED; all enumerated local artifact/document hashes and named refs checked. No independent copy exists to verify.",
+    "manifest_completeness": "The enumerated L1 document hashes and L2 source-disk hashes were checked locally. No independent copy exists; copy and restore verification remain NOT_RUN.",
     "final_status": "BACKUP_NOT_VERIFIED"
   },
   "release_candidate_document_files": [
     {
-      "path": "docs/releases/v1.1/README.md",
-      "sha256": "95474c0d7f4d7410685fcf125e69dcc043f1bbfc9314ceb309026fa12db635a4",
-      "size_bytes": 2053
-    },
-    {
-      "path": "docs/releases/v1.1/capability_matrix.md",
-      "sha256": "b7e8899347d13d4986d931ed1ae279274361d6aecc0d8ac779efa4ca1b6d6cc5",
-      "size_bytes": 1340
-    },
-    {
-      "path": "docs/releases/v1.1/installation.md",
-      "sha256": "9e7df8d0e3a9cc8f65834b0248ef5f2c68a85b58faf1db5f7b613ee271eb2885",
-      "size_bytes": 5958
-    },
-    {
-      "path": "docs/releases/v1.1/known_limitations.md",
-      "sha256": "857990e5de257d4d3d32e39a74b28e427f0bddbace6f40a860aa3488e73376b8",
-      "size_bytes": 2594
-    },
-    {
-      "path": "docs/releases/v1.1/learning_and_rendering_limits.md",
-      "sha256": "666b9bcb4ec659be772ef72eb3656da27811648f1560f5147702404b5453a220",
-      "size_bytes": 1503
-    },
-    {
-      "path": "docs/releases/v1.1/migration.md",
-      "sha256": "fb17cabbeb492bdb7fbf6ca7a4532545a7a455cdec2c3b5f63bf98e684b14b92",
-      "size_bytes": 2861
-    },
-    {
-      "path": "docs/releases/v1.1/public_api_and_tasks.md",
-      "sha256": "e7a2f2bfa2849af0b500ee8b68333f357fce2dda9d5dc34021479437b75c2e31",
-      "size_bytes": 3174
-    },
-    {
-      "path": "docs/releases/v1.1/publication_procedure_draft.md",
-      "sha256": "79159ee5597b54d59e5237ff06e429832733b6e4e13118d5ad6cf170d228ba28",
-      "size_bytes": 2823
-    },
-    {
-      "path": "docs/releases/v1.1/release_readiness.md",
-      "sha256": "4ccd33ba7a227b890aac9ba261f1bf68022e6e2900f6d969358610b651020e33",
-      "size_bytes": 3287
-    },
-    {
-      "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
-      "sha256": "1d586794ce8806cefd699507fb710f4ce98480e83543bcbc6c43f490acd26d69",
-      "size_bytes": 2239
-    },
-    {
-      "path": "docs/releases/v1.1/s5_c3_publication_checklist_draft.md",
-      "sha256": "b1555c0cc074b87c7fe1d3d4fcdaf0068b2c3aec515f15225a61c5cd883fd11d",
-      "size_bytes": 3214
-    },
-    {
-      "path": "docs/releases/v1.1/source_recovery_manifest.json",
-      "sha256": "4744f8f9d10fe13ffbbdc2a25a5a907619f22fe727678e2fdd40b653049d88f4",
-      "size_bytes": 14742
-    },
-    {
-      "path": "docs/releases/v1.1/test_acceptance_summary.md",
-      "sha256": "7db32d1a5f8dd047cc0800fbedd1a2b8eec3cbed70d4c4a08e4b6ca8c89f57be",
-      "size_bytes": 6722
+      "path": "README.md",
+      "size_bytes": 18626,
+      "sha256": "9eea691c9f4fb5711b4c2aff01a8671acca121d9a02c752fa7d1c044cce99d5b"
     },
     {
       "path": "docs/module/task_env/capability_matrix_v1_1_0_candidate.json",
-      "sha256": "229ca3ca9d01c17731c54297c83a79bf21138d6762c19c4ce78df78c52b9eb57",
-      "size_bytes": 20955
-    },
-    {
-      "path": "task_env/doc/api/appendix/migration.md",
-      "sha256": "2297ebdb0640529b056cc25daa475766ed11f73ef370f36b65277ce6575bde82",
-      "size_bytes": 12011
-    },
-    {
-      "path": "README.md",
-      "sha256": "9eea691c9f4fb5711b4c2aff01a8671acca121d9a02c752fa7d1c044cce99d5b",
-      "size_bytes": 18626
-    },
-    {
-      "path": "task_env/README.md",
-      "sha256": "7656e63de6dc84b2074fe49749a1ee117f32e3622e5274a7a0b21a901f941855",
-      "size_bytes": 5124
+      "size_bytes": 20955,
+      "sha256": "229ca3ca9d01c17731c54297c83a79bf21138d6762c19c4ce78df78c52b9eb57"
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
-      "sha256": "7b96fcca77f0187a31751b35d936b9346cf6445b0bdf985aabc1bf0de3d49e41",
-      "size_bytes": 10326
+      "size_bytes": 10326,
+      "sha256": "7b96fcca77f0187a31751b35d936b9346cf6445b0bdf985aabc1bf0de3d49e41"
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c2_public_integration_readiness.md",
-      "sha256": "2b2d7c4e98d8e1522d2449de8fab89d4c2370de694497e988b715d769fae876a",
-      "size_bytes": 6867
+      "size_bytes": 6865,
+      "sha256": "f3fa6c9b32f50b472572d59bb0cab94ce06895c3d6030a97da5aac7b067992f1"
+    },
+    {
+      "path": "docs/module/task_env/p2_0_s5_c3_minimal_release_evidence.md",
+      "size_bytes": 5346,
+      "sha256": "e6191a07513393af4ba9a7a0014efc6444030bb6193387a6ae4f4049a5087158"
+    },
+    {
+      "path": "docs/releases/v1.1/README.md",
+      "size_bytes": 2221,
+      "sha256": "50806de164eaa218fadede1ab843b31f8aaeebaabcf6bd9af56fd141e3859198"
+    },
+    {
+      "path": "docs/releases/v1.1/capability_matrix.md",
+      "size_bytes": 1340,
+      "sha256": "b7e8899347d13d4986d931ed1ae279274361d6aecc0d8ac779efa4ca1b6d6cc5"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/README.md",
+      "size_bytes": 6578,
+      "sha256": "cd42e092fd471856beaecfbcc275b0cfb3d5f3fdf6944dc06e4100c11174460b"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/manipulation_acceptance.md",
+      "size_bytes": 5246,
+      "sha256": "a50aab4e3692ea230fd51cdea55eefa2d8b53dffea36c6b4a284e1d7fd7fcb00"
+    },
+    {
+      "path": "docs/releases/v1.1/evidence/system_smoke_acceptance.md",
+      "size_bytes": 3212,
+      "sha256": "974e983acf1c9cb091d3ef55fcca7c1f2ed6ef4d12089a1cdada10e8ae2a7915"
+    },
+    {
+      "path": "docs/releases/v1.1/installation.md",
+      "size_bytes": 5958,
+      "sha256": "9e7df8d0e3a9cc8f65834b0248ef5f2c68a85b58faf1db5f7b613ee271eb2885"
+    },
+    {
+      "path": "docs/releases/v1.1/known_limitations.md",
+      "size_bytes": 3157,
+      "sha256": "51a5ef47b40d89aa3f1db02d84ae1317cd345b74b0135d4d842de4514b747cbd"
+    },
+    {
+      "path": "docs/releases/v1.1/learning_and_rendering_limits.md",
+      "size_bytes": 1503,
+      "sha256": "666b9bcb4ec659be772ef72eb3656da27811648f1560f5147702404b5453a220"
+    },
+    {
+      "path": "docs/releases/v1.1/migration.md",
+      "size_bytes": 2861,
+      "sha256": "fb17cabbeb492bdb7fbf6ca7a4532545a7a455cdec2c3b5f63bf98e684b14b92"
+    },
+    {
+      "path": "docs/releases/v1.1/public_api_and_tasks.md",
+      "size_bytes": 3174,
+      "sha256": "e7a2f2bfa2849af0b500ee8b68333f357fce2dda9d5dc34021479437b75c2e31"
+    },
+    {
+      "path": "docs/releases/v1.1/publication_procedure_draft.md",
+      "size_bytes": 3319,
+      "sha256": "fe4b9cae0d74668474b26e4a6e79f55dc3d37fb9e6db56653be0623de9ade1c1"
+    },
+    {
+      "path": "docs/releases/v1.1/release_readiness.md",
+      "size_bytes": 4789,
+      "sha256": "bbcb1a7725b4b4be0500fcaed147790e5c332d5d405259de2b84cecaebb570be"
+    },
+    {
+      "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
+      "size_bytes": 3002,
+      "sha256": "aa8a500c6d1b6331361b2bf86c5afbc5f4599b35fe13986f5042e5a5b70375e3"
+    },
+    {
+      "path": "docs/releases/v1.1/s5_c3_publication_checklist_draft.md",
+      "size_bytes": 4089,
+      "sha256": "711d7a22a3ab9f22bf01ccf1bcafe49a52a3cc44883deaeeba8a455ecbb6a314"
+    },
+    {
+      "path": "docs/releases/v1.1/source_recovery_manifest.json",
+      "size_bytes": 15645,
+      "sha256": "915278ca6b09e4f6e8c759f4cd515630451e7be702af7897928bf5624aebfddc"
+    },
+    {
+      "path": "docs/releases/v1.1/test_acceptance_summary.md",
+      "size_bytes": 6722,
+      "sha256": "7db32d1a5f8dd047cc0800fbedd1a2b8eec3cbed70d4c4a08e4b6ca8c89f57be"
+    },
+    {
+      "path": "task_env/README.md",
+      "size_bytes": 5124,
+      "sha256": "7656e63de6dc84b2074fe49749a1ee117f32e3622e5274a7a0b21a901f941855"
+    },
+    {
+      "path": "task_env/doc/api/appendix/migration.md",
+      "size_bytes": 12011,
+      "sha256": "2297ebdb0640529b056cc25daa475766ed11f73ef370f36b65277ce6575bde82"
     }
   ],
   "public_integration_snapshot": {
@@ -562,6 +583,61 @@
     "mujoco_menagerie_checkout": "about 1.8 GB",
     "conservative_full_set_estimate": "about 74 GB before bundle overhead and safety margin, if all workspace, root objects, and required submodule trees are included.",
     "local_free_space": "about 492 GB on /home, same physical /dev/sda; not an independent destination.",
-    "independent_destination_capacity": "UNKNOWN; no destination exists/authorized."
+    "independent_destination_capacity": "UNKNOWN; no destination exists/authorized.",
+    "proposed_l2_inventory": "24,390,405 bytes (about 23.26 MiB), comprising five selected H5s and listed result/log receipts; local inventory only, no independent copy.",
+    "proposed_l3_scope": "Historical workspace, previously estimated at about 71 GB, remains local and is outside the proposed mandatory off-host scope only if explicitly approved."
+  },
+  "proposed_minimal_release_evidence_policy": {
+    "proposal_status": "PENDING_EXPLICIT_MAINTAINER_APPROVAL",
+    "replaces_previous_gate": false,
+    "previous_gate_status": "BACKUP_NOT_VERIFIED",
+    "approval_required_before_scope_change": true,
+    "evidence_index": "docs/releases/v1.1/evidence/README.md",
+    "l1_release_metadata": {
+      "status": "RELEASE_METADATA_PRESERVED_LOCAL_GIT_ONLY",
+      "public_remote_integration": "NOT_AUTHORIZED_OR_PERFORMED",
+      "contents": [
+        "release evidence index",
+        "four bounded manipulation summaries",
+        "recording/regression/learning/rendering smoke summaries",
+        "existing candidate capability and source-recovery manifests"
+      ]
+    },
+    "l2_selected_raw_evidence": {
+      "status": "RAW_EVIDENCE_BACKUP_NOT_VERIFIED",
+      "inventory": "docs/releases/v1.1/evidence/README.md",
+      "items": "five selected H5 files, four native-run result JSONs and worker logs, provider-free final log, CLI failure-gating log",
+      "total_bytes": 24390405,
+      "sha256_scope": "Current source disk only; hash metadata does not restore missing raw files.",
+      "copy_or_restore": "NOT_RUN",
+      "retention": "Keep existing local files in place; no deletion or rewrite."
+    },
+    "l3_historical_workspace": {
+      "status": "HISTORICAL_WORKSPACE_BACKUP_NOT_VERIFIED",
+      "estimated_workspace_size": "about 71 GB, based on the previous inventory",
+      "proposed_scope": "Outside mandatory v1.1.0 off-host preservation only if the maintainer approves the reduced policy and accepts this risk.",
+      "retention": "Keep existing workspace and frozen historical records untouched."
+    },
+    "risk_acceptance": {
+      "status": "MAINTAINER_RISK_ACCEPTANCE_REQUIRED",
+      "required_acceptance": [
+        "unbacked L2 raw acceptance evidence",
+        "L3 historical workspace not independently backed up",
+        "known single-disk /dev/sda and ata5 BadCRC/READ I/O history"
+      ]
+    },
+    "separate_statuses": {
+      "RELEASE_METADATA_PRESERVED": "LOCAL_GIT_ONLY; remote integration pending separate authorization",
+      "RAW_EVIDENCE_BACKUP_NOT_VERIFIED": "L2 files remain only on the local source disk; no copy/restore read",
+      "HISTORICAL_WORKSPACE_BACKUP_NOT_VERIFIED": "L3 remains local; outside proposed mandatory off-host scope only after approval",
+      "MAINTAINER_RISK_ACCEPTANCE_REQUIRED": "PENDING"
+    },
+    "historical_full_workspace_observation": {
+      "observed_date": "2026-10-17",
+      "status": "BACKUP_NOT_VERIFIED",
+      "observation": "Only /dev/sda was identified; no independent destination was authorized or available; no copy or restore was attempted.",
+      "estimated_scope": "about 74 GB before bundle overhead and safety margin",
+      "preserved": "The previous full-workspace requirement and failure observation remain in required_backup_scope and verification_result."
+    }
   }
 }

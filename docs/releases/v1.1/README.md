@@ -23,6 +23,8 @@ release-candidate preparation only. No release tag or GitHub Release exists;
 - [Breaking-change migration guide](migration.md)
 - [Known limitations](known_limitations.md)
 - [Source, evidence, and recovery manifest](source_recovery_manifest.json)
+- [Release acceptance evidence index](evidence/README.md)
+- [S5-C3 minimal evidence and retention report](../../module/task_env/p2_0_s5_c3_minimal_release_evidence.md)
 - [Test and acceptance summary](test_acceptance_summary.md)
 - [Backup manifest](backup_manifest.json)
 - [Release readiness gates](release_readiness.md)
