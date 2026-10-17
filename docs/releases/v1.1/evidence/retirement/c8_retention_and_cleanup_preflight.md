@@ -17,11 +17,13 @@ The machine-readable file allowlists, protected-inode inventory, lstat records, 
 | Batch | Scope | Conditional unique reclaimable allocation | Exceptions |
 |---|---|---:|---|
 | A | 17 L3-A regenerable cache files | 311,296 bytes | None after current path/hash verification |
-| B | 173 ordinary files plus 6,619 registered-worktree file entries (6,792 approved paths total; 3 additional P1.1 holds) | 3,317,481,472 bytes | The checkout includes 573 ignored/untracked files and 3 Git administrative pointers; copied S5-B receipts are outside the worktree. Only non-forced Git worktree removal is proposed; if it refuses, stop without a force or manual fallback. |
+| B | 173 ordinary files plus 6,619 registered-worktree file entries (6,792 approved paths total; 3 additional P1.1 holds) | 3,317,481,472 bytes | The checkout includes 573 ignored files, no non-ignored untracked files, and 3 Git administrative pointers; copied S5-B receipts are outside the worktree. Only non-forced Git worktree removal is proposed; if it refuses, stop without a force or manual fallback. |
 | C1 | P1.8 live archive, exact files only | 10,978,766,848 bytes | `p1_8_source.bundle` remains held (18,571,359 logical bytes); no directory-recursive removal. |
 | C2 | Remaining L3-C historical raw files | 61,120,978,944 bytes | 516 C6 unresolved paths and 2 symlinks remain held/not followed. Hardlinked storage is deduplicated by inode. |
 
 The figures are conditional upper bounds based on current allocated blocks, not guaranteed disk-space recovery. The aggregate candidate set is 75,417,538,560 bytes (about 70.24 GiB) if every proposed batch is approved and storage behavior matches the current lstat snapshot. Batch B must use proper submodule/root `git worktree remove` operations; shared Git object stores are not part of its file allowlist.
+
+The B checkout is at `bee498d1d784015f034c5b4af34320fdffa61411`, an ancestor of public `develop`, with zero unique root commits. Its GeoPhys and Menagerie Gitlinks match `c665ce5028a12bb4d2afe49f05e015fa9b684a39` and `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`. Both nested submodule repositories were compared with the current repositories: their reachable and full object databases are subsets of the current corresponding stores, with no unique object or unreachable ref target. Some ref names differ; the target commits remain reachable in current refs. The current Menagerie repository uses an object alternate under the separate `/home/lly/Program_Files/GeoPhys` checkout; that path is outside all cleanup batches and must remain available. If a non-forced Git removal refuses, stop and leave the worktree intact.
 
 The exact approval hashes are in `workspace/maintenance/p2_0_s5_c8_20261017/final_preflight_summary.json` and the `.sha256` sidecars for each batch manifest. They are generated from the exact current protected metadata. Any path, inode, source, or manifest change invalidates the affected approval hash.
 
