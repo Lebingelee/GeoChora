@@ -15,7 +15,7 @@ else:
     from .._bootstrap import get_logger, write_json
 
 
-def main() -> None:
+def main(argv=None) -> None:
     from task_env.trajectory.processing import inspect_trajectory, transcode_actions, validate_trajectory
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -24,7 +24,7 @@ def main() -> None:
     parser.add_argument("--target-mode", choices=("absolute_joint", "absolute_pose", "delta_pose"), required=True)
     parser.add_argument("--target-reference", choices=("world", "base", "ee"))
     parser.add_argument("--mode", choices=("strict", "interpolation"), default="strict")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logger = get_logger("task-env-stage14-trajectory-convert")
     before = inspect_trajectory(args.input)
     validate_trajectory(args.input)

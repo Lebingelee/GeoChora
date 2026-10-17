@@ -186,3 +186,13 @@ def test_offline_h5_inspector_reports_validation_without_d0_claim(monkeypatch, c
     )
     assert inspector.main(["--input", str(tmp_path / "bad.h5")]) == 1
     assert json.loads(capsys.readouterr().out)["status"] == "FAIL"
+
+
+def test_trajectory_dispatcher_forwards_convert_help_arguments(capsys):
+    import pytest
+    from task_env.script.trajectory.commands import main as trajectory_main
+
+    with pytest.raises(SystemExit) as result:
+        trajectory_main(["convert", "--help"])
+    assert result.value.code == 0
+    assert "--input" in capsys.readouterr().out
