@@ -1,20 +1,100 @@
 {
   "bundle_path": "workspace/qualification/phase1/archives/p2_0_part_a/legacy_evidence_archive/p1_8_integration_20261012/p1_8_source.bundle",
   "bundle_ref_count": 72,
+  "bundle_ref_targets_reachable_from_current_local_refs": 66,
+  "bundle_ref_targets_unreachable_from_current_local_refs": 6,
   "bundle_sha256": "e6c6067ada628c2207017051a510f921ac6bac57f903abe0ac2e13507efa0737",
   "bundle_size_bytes": 18571359,
   "bundle_verify": true,
   "commit_ref_count": 66,
-  "mismatched_objects": [],
-  "missing_head_refs": [],
-  "missing_objects": [],
-  "notes": "Temporary pack/index lived under /tmp; no repository refs or object stores were changed.",
-  "other_ref_count": 0,
-  "pack_object_entries": 7610,
-  "refs_present_as_objects_in_root": 72,
-  "root_git_object_closure_missing_count": 0,
-  "root_git_object_type_mismatch_count": 0,
-  "schema": "geochora-s5-c8-p1-8-bundle-object-closure-audit-v1",
+  "exact_local_ref_name_and_oid_match_count": 29,
+  "exact_public_ref_name_and_oid_match_count": 0,
+  "method": "Temporary pack/index audit outside the repository; no Git refs or object databases were changed.",
+  "pack_object_count": 7610,
+  "pack_objects_not_reachable_from_current_local_refs": 18,
+  "pack_objects_present_in_current_root_object_database": 7610,
+  "pack_objects_reachable_from_current_local_refs": 7592,
+  "risk": "All bundle objects presently exist in the root object database, but 18 tree objects (including six direct tree-ref targets) are not reachable from current local refs and none of the bundle ref names matches a current public remote ref. Preserve the bundle until those exact tree refs/objects are safely pinned or separately retained.",
+  "schema": "geochora-s5-c8-p1-8-bundle-reachability-audit-v1",
   "tree_ref_count": 6,
-  "unique_pack_objects": 7610
+  "unreachable_pack_object_types": {
+    "tree": 18
+  },
+  "unreachable_packed_tree_objects": [
+    {
+      "object_id": "198bf22566e206086520acfe341311a51270e5d5",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "b1bcb4319b416b756017ac9f8dfff46d24032329",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "2b489dc1f2f1c8e4b1483e9da239587f87204214",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "13a2648fa0798a4c53398eb42129842a2072994c",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "6d426ce4e55048f8aa991bc8454bcc5fe3f56daf",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "54f7f6bc63aec379da8fbdac146daeefb7b27c64",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "027b84eb130cca3c854c34e6bd423c5e72118b14",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "1ecefbf95686dd429ab250fab3f1ab6b0acae370",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "b778a1c57761a2b1da8033feb83a41d553b45571",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "acc9b1699f9b6c8488cf046530e958c641dcac81",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "bb256c31d57ab0671bafe299f73647a0de086e80",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "5b0805b21ebf5c7476225d66e4091c6c08ce5a5b",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "d2cc485a24918e5764567f4f27d4f99f7c2b2cce",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "c5782a6b5aa1267adfc52bb288dbe267c6199d03",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "41f6926a2bc4fc0e76f16b63ea042bf5c5aec2b3",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "e2a49c7e0ae34b8c02464a1318eb852828ed79b5",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "e184f8525374156abd6226569c169a88d612c413",
+      "object_type": "tree"
+    },
+    {
+      "object_id": "f673035da2dd06573a35523adf73c5bfbec9dbac",
+      "object_type": "tree"
+    }
+  ],
+  "unreachable_ref_target_types": {
+    "tree": 6
+  }
 }

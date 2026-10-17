@@ -6,9 +6,11 @@
 
 ## Retention baseline
 
-The retained historical-decision package was committed locally at `10dd76712204225592cef9b37d8889dbbcfde2e6`; it contains 37 exact original records (366,744 bytes) plus its README and copy index. The C8 documentation and compact bundle-closure receipt are recorded as current L1 metadata. L1 contains 83 files: 40 prior release metadata files, the 39-file historical decision package, and 4 C8 records. L2 has 22/22 current files at their recorded sizes and SHA-256 values (24,563,669 bytes). The accepted GeoPhys NutAssembly physical outcome and its original strict Expert failure remain distinct. No L1/L2 path or inode overlaps a cleanup candidate.
+The retained historical-decision package was committed locally at `10dd76712204225592cef9b37d8889dbbcfde2e6`; it contains 37 exact original records (366,744 bytes) plus its README and copy index. The C8 documentation and compact bundle-closure receipt/checksum are recorded as current L1 metadata. L1 contains 84 files: 40 prior release metadata files, the 39-file historical decision package, and 5 C8 records. L2 has 22/22 current files at their recorded sizes and SHA-256 values (24,563,669 bytes). The accepted GeoPhys NutAssembly physical outcome and its original strict Expert failure remain distinct. No L1/L2 path or inode overlaps a cleanup candidate.
 
 The original archive manifest and its live filesystem snapshot remain separate. The 3,576-record archive manifest and 3,383-file live inventory reconcile to 3,298 exact common entries, 278 absent historical entries, and 85 live-only entries. The 37 selected P1.8 decision/provenance records have exact Git copies; the private-path file manifest and selected small metadata copies are held outside the P1.8 target on the same disk.
+
+The P1.8 source bundle verifies, and all 7,610 packed objects exist in the root object database. A ref-reachability check found 7,592 reachable objects and 18 unreachable tree objects, including six direct tree-ref targets. Only 29 of 72 exact bundle ref name+OID pairs match local refs; none match a current public ref. C1 therefore excludes the bundle until those six tree refs and their object closure are pinned or separately preserved.
 
 ## Exact batch candidates
 
