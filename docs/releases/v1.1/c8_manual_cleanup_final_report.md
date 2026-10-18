@@ -74,4 +74,4 @@ C1/C2 相应历史原始轨迹、实验数据和 GeoPhys 源码快照已不在�
 
 ## 原 Goal 完成情况复核
 
-按原 Goal A–K 判据：A/B/C/D/E/F/I/J 已有完成证据；G 为部分完成（普通候选路径消失，但缺少用户逐项 unlink 收据，B worktree 未退休）；H 的保护数据和空间观测已完成，精确逐项回收归因不可验证；K 的 readiness 报告已完成，但 release 仍 BLOCKED。不能将整项 Goal 标记为无条件 complete，也不因保留例外再开启一轮常规清理。当前 release_readiness.md 等此前版本仍记录执行停止时状态，应结合本追加交付阅读；统一这些当前状态页仍是文档同步待办。目标系统查询仍为旧 blocked 状态；工具仅支持 complete/blocked/paused，恢复 active 由用户端控制，不虚报已更改系统状态。
+按原 Goal A–K 判据：A/B/C/D/E/F/I/J 已有完成证据；G 为部分完成（普通候选路径消失，但缺少用户逐项 unlink 收据，B worktree 未退休）；H 的保护数据和空间观测已完成，精确逐项回收归因不可验证；K 的 readiness 报告已完成，但 release 仍 BLOCKED。不能将整项 Goal 标记为无条件 complete，也不因保留例外再开启一轮常规清理。当前 release_readiness.md、backup manifest 和相关状态页现已同步为手工处理后观察，早期收据保持历史身份。目标系统已恢复 active；详见[原 Goal 完成审计](c8_goal_completion_audit.md)。存储/worktree/逐项收据不足仍保留，不宣称完整 Goal complete。

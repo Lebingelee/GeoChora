@@ -979,12 +979,12 @@
     "L1_METADATA_REQUIRED": "Present in local tracked tree; C4/C5/C6 documentation is prepared in a local review commit and is not public.",
     "L2_CURRENT_RAW_EVIDENCE_REQUIRED": "PASS locally for exactly 22 files / 24,563,669 bytes; all sizes and SHA-256 values match the evidence index.",
     "L2_INDEPENDENT_BACKUP_NOT_VERIFIED": "No independent copy or restore read.",
-    "L3_REVIEWED_RETIREMENT_ALLOWED": "HISTORICAL_S5_C5_LABEL; superseded by the current S5-C6 proposal label, not effective.",
-    "L3_HISTORICAL_RECOVERY_LOSS_RISK": "OPEN; all raw archives remain on /dev/sda, P1.6 recovery tar location is unresolved, P1.8 archive has incomplete Git recovery.",
-    "MAINTAINER_DELETION_APPROVAL_REQUIRED": "Required separately for A, B, and C. External PhysPi/Skill consumers remain unverified; Batch C is execution-blocked.",
-    "L1_METADATA_PRESERVED": "C4/C5/C6 metadata is available locally and is not public.",
-    "L3_HISTORICAL_RAW_RETIREMENT_ALLOWED": "PROPOSAL_PENDING_APPROVAL; separate A/B/C envelopes have execution_authorized=false and empty execution_allowlist.",
-    "HISTORICAL_RAW_DATA_LOSS_RISK": "OPEN; P1.6 archive location unresolved, P1.8 GeoPhys source snapshots local-only, no independent raw-data copies verified.",
+    "L3_REVIEWED_RETIREMENT_ALLOWED": "Effective only for exact approved C8 A/B/C1/C2 scopes; not a general cleanup or backup waiver.",
+    "L3_HISTORICAL_RECOVERY_LOSS_RISK": "Historical raw/source carriers at approved ordinary paths absent; independent recovery not verified. P1.6 recovery archive was already unresolved.",
+    "MAINTAINER_DELETION_APPROVAL_REQUIRED": "Exact four C8 hashes already approved. No extra deletion, worktree fallback, backup waiver or publication approved.",
+    "L1_METADATA_PRESERVED": "Versioned locally; original L1 historical bytes in Git; current documentation migrations versioned. Remote C8 integration not authorized.",
+    "L3_HISTORICAL_RAW_RETIREMENT_ALLOWED": "Exact C8 ordinary scopes approved; 65,826 ordinary paths absent after maintainer manual handling. Worktree and holdouts retained.",
+    "HISTORICAL_RAW_DATA_LOSS_RISK": "C1/C2 permanent historical loss accepted; SHA metadata cannot restore absent raw bytes.",
     "STORAGE_HEALTH_RISK_OPEN": "OPEN; prior /dev/sda/ata5 BadCRC and READ errors remain unresolved by recent clean log queries."
   },
   "s5_c5_retention_review": {
@@ -1142,5 +1142,26 @@
     "full_workspace_backup_waiver": false,
     "independent_backup_status": "BACKUP_NOT_VERIFIED",
     "report": "c8_execution_and_phase2_closure.md"
+  },
+  "historical_sections_notice": "s5_c5_retention_review, s5_c6_retirement_preparation, scoped_retention_proposal and s5_c8_retirement_authorization_and_storage_stop retain dated pre-cleanup observations. They are not current filesystem-presence claims. Use s5_c8_manual_cleanup_current_status for present status.",
+  "s5_c8_manual_cleanup_current_status": {
+    "observation_date": "2026-10-18",
+    "status": "PARTIAL_MANUAL_PATH_ABSENCE_VERIFIED",
+    "report": "c8_manual_cleanup_final_report.md",
+    "receipt": "evidence/retirement/c8_manual_cleanup_observation_20261018.json",
+    "ordinary_paths_absent": 65826,
+    "registered_worktree_entries_retained": 6619,
+    "other_holdouts_retained": 522,
+    "L2_files_verified": 22,
+    "L2_bytes": 24563669,
+    "per_file_operator_unlink_receipts": "NOT_AVAILABLE",
+    "workspace_allocated_bytes_after_observation": 2815557632,
+    "workspace_allocated_decrease_bytes_observed": 73354846208,
+    "space_limit": "Aggregate historical before/after observation; not exact file deletion attribution.",
+    "independent_backup": "NOT_VERIFIED",
+    "full_workspace_backup_waiver": false,
+    "post_cleanup_provider_free_tests": "9 passed on fa4d898 execution source; 7 in 1.51s plus 2 in 0.81s",
+    "historical_raw_loss": "Absent approved C1/C2 raw/source bytes may be permanently unrecoverable; accepted by maintainer.",
+    "storage_risk": "OPEN; counter increased to 0x7fd at later integrity recheck; no further destructive actions."
   }
 }
