@@ -14,8 +14,8 @@ GeoChora v1.0.0 packages the currently substantiated Phase I Core baseline. The 
 - [Archive and restore manifest](archive_manifest.json)
 - [Validation report](validation_report.md)
 - [Known limitations](known_limitations.md)
-- [Phase I follow-up tracks](../../roadmap/phase1_followups.md)
-- [Phase II handoff plan](../../roadmap/phase2_plan.md)
+- [Phase I follow-up tracks](https://github.com/Lebingelee/GeoChora/blob/v1.1.0/docs/roadmap/phase1_followups.md)
+- [Phase II handoff plan](https://github.com/Lebingelee/GeoChora/blob/v1.1.0/docs/roadmap/phase2_plan.md)
 - [Human-readable handoff](phase1_v1_release_handoff.md)
 
 ## Scope boundaries

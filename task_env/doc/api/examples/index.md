@@ -9,11 +9,14 @@ TaskArtifact, recorder, or renderer contract.
 Run from the repository root in the GeoChora dependency environment:
 
 ```bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.single_inline --env-id pendulum-v1 --backend cpu --steps 1
 PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.parallel_inline --env-id pendulum-v1 --backend cpu --num-env 2 --steps 1
 PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --seed 31
 PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19
 ```
+
+The v1.1.0 `single_inline` Pendulum route currently fails during stepping because its helper reads
+`env.binding`, which generic Pendulum does not expose. Use the public construction example below;
+[canonical troubleshooting](../../../../docs/module/task_env/troubleshooting.md#已复现的-cli-缺陷) records the reproducer.
 
 ## Current commands
 

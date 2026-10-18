@@ -1,28 +1,28 @@
-# v1.1.0 Breaking-Change Migration Guide
+# v1.1.0 Public API Migration
 
-**RELEASE_CANDIDATE — NOT_PUBLISHED**
+v1.1.0 已发布，包含 breaking changes。完整旧 identities/symbols/flags/config、替代路线、
+等价性分类与 recovery refs 保留在
+[冻结 compatibility inventory](https://github.com/Lebingelee/GeoChora/blob/v1.1.0/docs/module/task_env/p2_0_s5_a_compatibility_inventory.json)。
 
-GeoChora v1.1.0 is a Core consolidation release with documented breaking API
-changes under the project-specific versioning policy. It does not promise
-strict SemVer compatibility. The source of truth for the exhaustive old
-identity, current replacement, equivalence, classification, migration, and
-immutable recovery ref is the
-[`v1.1.0 compatibility inventory`](../../module/task_env/p2_0_s5_a_compatibility_inventory.json).
-
-| Old identity or route | Current route | Compatibility and migration |
+| v1.0/历史入口 | v1.1.0 入口 | 迁移限制 |
 | --- | --- | --- |
-| `pick-cube-v1` environment UID | `pick-cube-p16-reference-v1` via `task_env.make_env` | Breaking identity; not semantically aliased. Review selected P1.6 Artifact and task contract. |
-| `nut-assembly-square-v1` environment UID | `nut-assembly-outcome-reference-v1` via `task_env.make_env` | Breaking identity; use guarded `step_expert()`. No arbitrary external gripper route. |
-| Direct legacy task constructors and old package helper imports | `from task_env import make_env` for public environment construction | Breaking API. PickCube and NutAssembly helper exports are not symmetrical; use public `make_env`, not package-root builder assumptions. |
-| Go2 UIDs, `go2-v1`, Go2 modules, aliases, profiles and defaults | No replacement | Retired without aliases. Restore immutable `v1.0.0` for historical source/execution. |
-| Static Template imports, runtime symbols, `static_template` layout/config and diagnostic options | `merged_scene` only where separately admitted | Breaking removal. Unsupported requests fail closed; no redirect to another runtime. Recover exact source from the S4 manifest refs. |
-| Historical Stage 11, Phase I grouped collection and old task-specific recorder helpers | Current selected recording examples and `task_env.script.trajectory.record` | Historical routes are retired; current examples use public task UIDs and the canonical recorder. Historical execution needs the recorded immutable source. |
-| Historical camera/render scripts and removed private helper | Pendulum rasterizer examples for the two tested intersections | No general replacement. Camera contracts remain; task/provider combinations must be separately admitted. |
-| RSL CLI without explicit environment/task UID | Supply `--env-id` and satisfy current learner capability admission | Removed default; unsupported combinations fail closed. |
+| `pick-cube-v1` | `make_env("pick-cube-p16-reference-v1", config={"provider":"mujoco","backend":"cpu"})` | breaking identity；非同义 alias，检查 selected P1.6 Artifact |
+| `nut-assembly-square-v1` | `make_env("nut-assembly-outcome-reference-v1", config={"provider":"geophys","backend":"cpu"})` | guarded `step_expert()`，不接受任意 external action |
+| direct legacy constructors/package helpers | `from task_env import make_env` | PickCube/NutAssembly helper exports 不对称，不假造 root builder |
+| Go2 UID/robot/modules/profiles/defaults | 无 replacement | 当前 retired，历史在 v1.0.0 |
+| StaticTemplate imports/runtime/layout/config | 仅已 admission 的 merged_scene | fail closed，不静默 redirect；generic contracts 不代表 native batch qualification |
+| Stage11/grouped collect/旧 task recorder | selected root examples、`task_env.script.trajectory.record` | 使用现有 recorder，历史 source 需原 ref |
+| historical camera/render scripts/private helper | 两条 Pendulum rasterizer examples | 只覆盖具名 scalar/batch CPU RGB，无通用替代 |
+| RSL CLI 隐式 task | 显式 `--env-id` | 仍须 homogeneous 与 learner admission，无 Go2 替换 |
 
-The exact removed Python paths, public symbols, CLI flags, serialized runtime
-fields, defaults, and per-file source recovery refs are in the compatibility
-inventory and the S3/S4/S4.5 recovery manifests. Historical release documents
-and Evidence are not rewritten. For historical runs, check out the exact
-immutable ref in a separate working tree rather than porting old task
-implementations into current Core.
+Selected 配置只接受 provider/backend/horizon；通用 Pendulum 使用 nested runtime config，两者不能混传。
+参考[当前 public API](../../module/task_env/public-api.md)和[examples](../../../examples/README.md)。
+
+原路径保留的[workflow A recovery](../../module/task_env/p2_0_s4_5_a_source_recovery.json)和
+[workflow B recovery](../../module/task_env/p2_0_s4_5_b_source_recovery.json)继续供退役 CLI 错误提示读取。
+[Go2 recovery](https://github.com/Lebingelee/GeoChora/blob/v1.1.0/docs/module/task_env/p2_0_s3_go2_retirement_manifest.json)
+与[static recovery](https://github.com/Lebingelee/GeoChora/blob/v1.1.0/docs/module/task_env/p2_0_s4_static_solver_retirement_manifest.json)
+给出逐文件 source hashes/refs。历史执行应在独立 checkout 恢复指定 immutable source，不把旧实现复制回 Core。
+
+Post-release 文档路径改用 semantic names；完整旧文档 → current canonical/tag mapping 见
+[inventory](../../maintenance/consolidation-inventory.json)。所有 v1.0.0/v1.1.0 frozen records 不变。

@@ -15,10 +15,10 @@ public behavior and evidence-backed capability claims.
 Start from the current branch, dirty state, real production callers, runtime
 and provider provenance, and the canonical Geochora documents:
 
-- `docs/global/00-system-architecture-anchor.md`
-- `docs/global/01-repository-ownership-and-boundaries.md`
-- `docs/module/task_env/02-core-api-and-capability-scope.md`
-- `docs/module/task_env/04-core-qualification-and-governance.md`
+- `docs/global/architecture.md`
+- `docs/global/ownership.md`
+- `docs/module/task_env/public-api.md`
+- `docs/module/task_env/qualification.md`
 
 Use CodeGraph when its index is current to trace symbols and call paths. A
 filename or line count is not evidence of an ownership seam.

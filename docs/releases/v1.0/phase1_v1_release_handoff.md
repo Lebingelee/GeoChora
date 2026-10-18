@@ -21,4 +21,4 @@ Private absolute recovery paths are held only in the local evidence resolver and
 
 ## Next work
 
-Start with [Phase I follow-ups](../../roadmap/phase1_followups.md). P1.7 and formal P1.8 work can continue alongside Phase II. The open limitations and each replay mode's status are stated in [known limitations](known_limitations.md) and the [capability matrix](capability_matrix.json).
+Start with [Phase I follow-ups](https://github.com/Lebingelee/GeoChora/blob/v1.1.0/docs/roadmap/phase1_followups.md). P1.7 and formal P1.8 work can continue alongside Phase II. The open limitations and each replay mode's status are stated in [known limitations](known_limitations.md) and the [capability matrix](capability_matrix.json).

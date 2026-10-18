@@ -50,8 +50,11 @@ end-to-end qualification.
 - **NutAssemblySquare**: precision/contact regression beyond PickCube.
 - **Agent-generated similar unseen task**: documentation and public-API
   sufficiency acceptance route.
-- **Go2 Walk / RSL**: locomotion/RL regression route that must survive Core
-  changes.
+- **Go2 Walk / RSL**: historical v1.0.0 route; Go2-specific current implementation
+  is RETIRED. Generic learner/batch contracts remain; do not require a current Go2 run.
+- Current claims use the single v1.1.0 matrix at
+  `docs/module/task_env/capability_matrix_v1_1_0_candidate.json`; selected routes
+  are TESTED_BOUNDED, not new Qualification.
 
 Do not copy GeoPhys's test directory taxonomy into Geochora without checking
 the current Core test structure and purpose.

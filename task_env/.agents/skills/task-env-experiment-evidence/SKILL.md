@@ -14,9 +14,9 @@ experience distillation or Skill-promotion implementation.
 
 Follow:
 
-- `docs/module/task_env/02-core-api-and-capability-scope.md`
-- `docs/module/task_env/03-task-artifact-experiment-evidence-contract.md`
-- `docs/module/task_env/04-core-qualification-and-governance.md`
+- `docs/module/task_env/public-api.md`
+- `docs/module/task_env/task-artifact.md`
+- `docs/module/task_env/qualification.md`
 - `task_env/README.md`
 
 If the current implementation does not yet provide a formal schema or command,

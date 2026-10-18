@@ -1,5 +1,7 @@
 # TaskEnv API Reference
 
+当前模块使用与能力治理入口：[TaskEnv canonical docs](../../../docs/module/task_env/README.md)。符号级细节继续在 API reference 维护。
+
 本文记录 TaskEnv 的稳定公开入口和数据契约。快速运行请看 [README Quickstart](../../README.md)；训练、采集、任务和资产开发入口见 [文档入口](../index.md)。
 
 ## 公开数据流

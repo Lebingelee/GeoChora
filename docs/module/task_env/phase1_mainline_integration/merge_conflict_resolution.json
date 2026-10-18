@@ -1,9 +1,0 @@
-{
-  "file": "docs/module/task_env/06-phase-1-contracts-and-provider-boundaries.md",
-  "base_ref": "cda511f49eb544dabe685ec1dbcc6345884d66c8",
-  "p1_6_ref": "761f1fde7fb0d2831ab5ee780821637c0f7e6215",
-  "p1_8_ref": "1f1cd67c56ea30e7b2c14f03a9a4dc6ca7bccbdd",
-  "chosen_resolution": "keep bounded P1.6 approval plus explicitly historical P1.8 roadmap and failure records",
-  "semantic_justification": "distinct phase scopes and times; no acceptance promotion or source behavioral selection",
-  "regression_required": "link/status/source-hash check only; no code conflict"
-}

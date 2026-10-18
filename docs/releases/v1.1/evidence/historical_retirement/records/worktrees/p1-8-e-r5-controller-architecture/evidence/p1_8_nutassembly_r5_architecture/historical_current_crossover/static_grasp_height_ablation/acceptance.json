@@ -1,9 +1,0 @@
-{
-  "status": "diagnostic_comparison_complete_both_simple_routes_failed",
-  "qualified": false,
-  "G0_pass": 0,
-  "cells": 6,
-  "verify_lift_run": 5,
-  "verify_lift_pass": 0,
-  "production_modified": false
-}

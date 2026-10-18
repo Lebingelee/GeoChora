@@ -26,11 +26,11 @@ search. Do not initialize or rebuild an index as part of an unrelated task.
 
 Read these pages when the task crosses their concerns:
 
-- `docs/global/00-system-architecture-anchor.md`
-- `docs/global/01-repository-ownership-and-boundaries.md`
-- `docs/module/task_env/02-core-api-and-capability-scope.md`
-- `docs/module/task_env/03-task-artifact-experiment-evidence-contract.md`
-- `docs/module/task_env/04-core-qualification-and-governance.md`
+- `docs/global/architecture.md`
+- `docs/global/ownership.md`
+- `docs/module/task_env/public-api.md`
+- `docs/module/task_env/task-artifact.md`
+- `docs/module/task_env/qualification.md`
 
 ## Classify the change first
 
@@ -80,4 +80,4 @@ Use the specialized skills when their trigger applies:
 `geochora-public-api-governance`, and `geochora-test-governance`. When work
 concerns Task Artifact, Experiment, or Evidence, also read the canonical
 contract at
-`docs/module/task_env/03-task-artifact-experiment-evidence-contract.md`.
+`docs/module/task_env/task-artifact.md`.

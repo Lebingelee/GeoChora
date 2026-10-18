@@ -1,5 +1,7 @@
 # TaskEnv Core
 
+当前模块使用与能力治理入口：[TaskEnv canonical docs](../docs/module/task_env/README.md)。符号级细节继续在 API reference 维护。
+
 `task_env/` owns GeoChora's public task/environment lifecycle, task-owned
 reference implementations, controller and observation contracts, generic
 parallel execution adapters, recording, learning boundaries, and renderer
@@ -9,9 +11,6 @@ The repository has no root packaging metadata. From the repository root, use
 the GeoChora dependency environment and set `PYTHONPATH`:
 
 ```bash
-PYTHONPATH=GeoPhys/src:. python -m task_env.script.env.single_inline \
-  --env-id pendulum-v1 --backend cpu --steps 1
-
 PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py \
   --provider mujoco --seed 31
 
@@ -29,7 +28,7 @@ lifecycle completion remain separate.
 
 | Workflow | Entry point | Boundary |
 | --- | --- | --- |
-| Scalar environment | `task_env.script.env.single_inline` | Public `make_env`, Gymnasium reset/step, Pendulum default. |
+| Scalar environment | Public `task_env.make_env` | Pendulum reset/step; `single_inline` currently fails with `env.binding` AttributeError. See canonical troubleshooting. |
 | Generic batch environment | `task_env.script.env.parallel_inline` | Public `make_parallel_env`, explicit CPU supported smoke on Pendulum/`merged_scene`. |
 | Selected task expert | `examples/tasks/pick_cube.py`, `examples/tasks/nut_assembly.py` | Selected task-owned experts, explicit provider, bounded CPU run. |
 | Canonical recording | `examples/recording/record_expert.py` | Existing recorder/H5 schema, selected expert, nonzero on incomplete result. |

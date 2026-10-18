@@ -57,3 +57,11 @@ not silently edit prose to hide the disagreement.
 
 For changes to public API or governed tests, also use
 `geochora-public-api-governance` or `geochora-test-governance` respectively.
+
+## Consolidation validation
+
+For this repository's tag-backed post-release inventory, run
+`python .agents/skills/geochora-doc-governance/scripts/validate_docs.py` after staging.
+The [validator](scripts/validate_docs.py) checks retained bytes, tag recovery, counts, links/anchors,
+JSON, source-document references and documentation-only scope against the consolidation inventory.
+It does not prove runtime behavior or qualification; retain actual failed smoke results separately.
