@@ -589,13 +589,13 @@
     },
     {
       "path": "docs/releases/v1.1/publication_procedure_draft.md",
-      "size_bytes": 3667,
-      "sha256": "8e1ee6e6fc5adfef7fc49520919817648f559bee0749047f70c5fd040c7f03c6"
+      "size_bytes": 5013,
+      "sha256": "b40405c2278883e97bccbcc3a8492bf06571ce055869adf0329edb3a2dfc6009"
     },
     {
       "path": "docs/releases/v1.1/release_readiness.md",
-      "size_bytes": 17488,
-      "sha256": "68bb8ede87cc505f4e4f1ec4a3ad0cfa661767214889578222e19f47e8073e66"
+      "size_bytes": 17919,
+      "sha256": "c05ba9374e24b78cf15aef290d473ff02006582df9a8689a0620ee032af2cec9"
     },
     {
       "path": "docs/releases/v1.1/release_scope_and_version_policy.md",

@@ -7,7 +7,8 @@ The reviewed S5-C1–C8 release-review chain is integrated into public
 authorized using the `v1.1.0` candidate branch as a public L2 evidence backup.
 The exact 22-file L2 copy is present and verified at
 `745efc6a6693a7d10407c6ddd02837a2ae574131`; this does not publish v1.1.0 or
-grant qualification.
+grant qualification. The latest public `v1.1.0` branch readback is
+`e0e861998711f7ec5e1f10784ca857dc39d7d575`, which retains that payload.
 
 Current review decisions and remaining procedure:
 
@@ -58,3 +59,23 @@ this backup operation.
 See the [release readiness](release_readiness.md), [release evidence
 index](evidence/README.md), and [S5-C3 publication
 checklist](s5_c3_publication_checklist_draft.md).
+
+## Proposed backup-scope exception — NOT ACCEPTED
+
+The exact L2 copy is 22 files / 24,563,669 bytes and is verified off-host on
+the public GitHub `v1.1.0` branch. It protects against loss of the local
+`/dev/sda` copy, but the source and backup share one public repository and
+account. A separately administered destination, a full-workspace bundle, and
+separate submodule bundles are not verified.
+
+Proposed exception for v1.1.0 only: retain L1 release metadata in the final
+Git history and retain all 22 L2 raw files; accept the verified GitHub branch
+copy as the L2 preservation copy; waive only the requirement for a second,
+separately administered L2 destination and a full historical workspace
+bundle. Explicitly accept the same-repository/account common-mode risk, the
+open historical SATA/BadCRC risk, and the already accepted C8 L3 retirement
+loss. This proposal does not claim a full backup PASS, restore the retired L3
+bytes, close the storage risk, grant qualification, or authorize publication.
+The exception takes effect only if the maintainer explicitly accepts it in the
+final Publication GO. Until then, the independent-backup gate remains
+`BACKUP_NOT_VERIFIED` and publication remains `PUBLICATION_BLOCKED`.
