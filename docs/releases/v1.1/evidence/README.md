@@ -141,13 +141,15 @@ qualification decisions remain unchanged and available through immutable
   `2fb60de`; this did not create a formal qualification decision.
 - **PASS — S5-C5 L2 recheck:** all 22 paths still match the indexed size and
   SHA-256; no L2 bytes were changed.
-- **PASS — L2 REMOTE COPY:** the public `v1.1.0` branch at
+- **PASS — L2 REMOTE COPY:** payload commit
   `745efc6a6693a7d10407c6ddd02837a2ae574131` contains 22/22 exact L2 blobs;
-  all sizes and SHA-256 values match, and representative H5/JSON reads passed.
+  latest public `v1.1.0` branch HEAD readback is
+  `e0e861998711f7ec5e1f10784ca857dc39d7d575`. All sizes and SHA-256 values
+  match, and representative H5/JSON reads passed.
 - **AUTHORIZED:** public GitHub branch copy of exact L2 originals, including
   the approved embedded local path strings; no tag or release publication is
   authorized.
 - **NOT VERIFIED:** the historical full-workspace backup plan remains
   unexecuted; the scoped L2 branch copy does not cover full source bundles,
   submodules, or L3.
-- **C8 PARTIAL / MANUAL_PATH_ABSENCE_VERIFIED:** exact approvals are in the historical [execution-stop receipt](retirement/c8_execution_receipt_20261018.json); current results are in the [manual post-observation receipt](retirement/c8_manual_cleanup_observation_20261018.json). All 65,826 ordinary paths are absent. Registered worktree and 522 holdouts remain. Post-cleanup 9 provider-free tests passed; storage and backup gates remain open.
+- **C8 CLOSED WITH ACCEPTED EXCEPTIONS / MANUAL_PATH_ABSENCE_VERIFIED:** exact approvals are in the historical [execution-stop receipt](retirement/c8_execution_receipt_20261018.json); current results are in the [manual post-observation receipt](retirement/c8_manual_cleanup_observation_20261018.json). All 65,826 ordinary paths are absent. Registered worktree and 522 holdouts remain. Post-cleanup 9 provider-free tests passed; historical storage and full-workspace backup risks remain open.

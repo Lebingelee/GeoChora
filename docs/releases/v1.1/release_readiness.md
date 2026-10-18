@@ -15,12 +15,14 @@ limits, the breaking API migration disclosure, the fresh-install and
 relocated-regression `NOT_RUN` limitations, and the recorded C8 residuals.
 The maintainer has authorized an exact L2 copy to the public GitHub
 `v1.1.0` candidate branch, including source files that contain embedded local
-absolute paths. The local copy and hashes are verified, and the remote branch
-now reads back at `745efc6a6693a7d10407c6ddd02837a2ae574131`; all 22 remote
-blob hashes match. A representative H5 and result JSON read passed. The user
-authorized this L2-only copy (under 100 MB) and approved the embedded local-path
-strings. It does not cover the historical full-workspace bundle or publish the
-release. On
+absolute paths. The payload commit is
+`745efc6a6693a7d10407c6ddd02837a2ae574131`; its 22 blob hashes match. A
+representative H5 and result JSON read passed. The branch subsequently advanced
+with backup-status receipts; latest public readback on 2026-10-18 is
+`v1.1.0=e0e861998711f7ec5e1f10784ca857dc39d7d575`, which retains the payload
+commit. The user authorized this L2-only copy (under 100 MB) and approved the
+embedded local-path strings. It does not cover the historical full-workspace
+bundle or publish the release. On
 2026-10-18 the maintainer authorized all four exact C8 batches and accepted
 C1/C2 loss.
 Assistant deletion stopped before unlinking when the SCSI counter rose; later
@@ -55,8 +57,8 @@ report](c8_execution_and_phase2_closure.md).
 | Scoped retention policy and residual-risk acceptance | **MAINTAINER_ACCEPTED — C8 SCOPE ONLY** | L1/L2 preservation and exact A/B/C1/C2 retirement authorized on 2026-10-18, including C1/C2 permanent historical loss. The current L2 GitHub copy is recorded separately; it does not restore retired L3 data. |
 | Approved C8 execution | **C8_CLOSURE_ACCEPTED_WITH_EXCEPTIONS** | All 65,826 approved ordinary paths are absent; no user per-file unlink receipts exist. B worktree remains held (6,619 entries); all 522 pre-existing holdouts remain. Assistant deletion stayed storage-latched. Maintainer explicitly accepted retained worktree/holds and missing per-file operator logs for final C8 closure. |
 | P1.8 archive retirement | **PARTIAL — 3,382 PATHS ABSENT** | The held source bundle remains. C1 permanent-loss acceptance is recorded; raw trajectories/source carriers at the retired paths are no longer locally available there. Hashes do not restore them. |
-| Remote evidence preservation | **PASS — L1 AND L2 COPY** | L1 is on public `develop` at `c679267`; the L2 copy is on public `v1.1.0` at `745efc6a`. Readback hashes and representative H5/JSON reads passed. |
-| Storage monitoring | **OPEN_RISK — BOUNDED BACKUP MAY PROCEED** | Counter-only growth is an investigation signal after the repeated SMART-refresh correlation. Stop on actual I/O failure, new ATA/block/filesystem errors, CRC/bad-sector growth or integrity anomalies. Historic SATA risk remains OPEN; the authorized L2 GitHub copy still requires remote verification. |
+| Remote evidence preservation | **PASS — L1 AND L2 COPY** | L1 is on public `develop` at `c679267`; the L2 payload commit `745efc6a` is retained on public `v1.1.0`, whose latest readback is `e0e8619`. Readback hashes and representative H5/JSON reads passed. |
+| Storage monitoring | **OPEN_RISK — HISTORICAL SATA ISSUE** | Counter-only growth is an investigation signal after the repeated SMART-refresh correlation. Stop on actual I/O failure, new ATA/block/filesystem errors, CRC/bad-sector growth or integrity anomalies. The exact L2 copy is remotely verified; the historical SATA risk remains OPEN. |
 | Publication authorization | **NOT AUTHORIZED IN THIS INSTRUCTION** | No v1.1.0 tag, `main` change, or GitHub Release is authorized or created; a separate final Publication GO is required. |
 | L3 retention and cleanup review | **PARTIAL; RESIDUAL HOLDS PRESERVED** | Ordinary paths handled manually; 522 holdouts and the registered worktree remain. No force/deinit/manual worktree fallback was attempted. |
 
@@ -90,7 +92,7 @@ release.
 | D. Fresh-install validation | **NOT_RUN — LIMITATION ACCEPTED** | The source-checkout/Python 3.12.14 validation scope is accepted; no fresh installation or packaging claim is made. |
 | E. Full relocated-checkout regression | **NOT_RUN — LIMITATION ACCEPTED** | Preserve the exploratory 139 PASS / 8 FAIL result and its explained path/test-helper causes; no full rerun or relocated native rollout is claimed. |
 | F. L1 remote preservation | **PASS — PUBLIC GIT** | Candidate `c679267` is present on public `develop`; remote SHA readback matched, and protected refs are unchanged. |
-| G. L2 integrity and backup | **PASS — SCOPED REMOTE COPY; FULL BACKUP NOT VERIFIED** | All 22 local originals, branch copies, and fetched remote Git blobs match (24,563,669 bytes). A representative NutAssembly H5 opened and a PickCube result JSON parsed from fetched objects. The same-repository copy is off-host but not separately administered; the full-workspace bundle remains unverified. |
+| G. L2 integrity and backup | **PASS — SCOPED REMOTE COPY; FULL BACKUP NOT VERIFIED** | All 22 local originals, branch copies, and fetched remote Git blobs match (24,563,669 bytes). A representative NutAssembly H5 opened and a PickCube result JSON parsed from fetched objects. Payload commit `745efc6a` is retained on the current public branch HEAD `e0e8619`. The same-repository copy is off-host but not separately administered; the full-workspace bundle remains unverified. |
 | H. Historical L3 retirement | **C8_CLOSURE_ACCEPTED_WITH_EXCEPTIONS** | The exact C8 loss is accepted while the registered worktree and all 522 holdouts remain. Unknown/external consumers remain a disclosed limit; no further deletion is authorized. |
 | I. `/dev/sda` storage risk | **OPEN — BACKUP WORK AUTHORIZED** | The maintainer directed that the L2 backup proceed despite the warning. Counter-only `ioerr_cnt` growth is an investigation signal; actual I/O failures, new storage errors, integrity failures, or CRC/bad-sector growth remain stop conditions. |
 | J. Publication and repository changes | **NOT AUTHORIZED IN THIS INSTRUCTION** | The maintainer separately authorized the `v1.1.0` branch for this exact L2 backup only. `main`, release tag, GitHub Release, and further cleanup remain subject to separate explicit approval. |
@@ -119,7 +121,8 @@ ref readback, not inferred from this dated report.
   `main=e4e39883fbe01d4be4b172a53a535ef0095b3d64`, annotated `v1.0.0` tag
   object `17c3100d4fabcb061c23569dea49973ebd177d51` peeling to
   `42787f5e4f658a3f81fdd2140cf7544d6342c783`. At the time of this update,
-  `v1.1.0` branch reads back at `745efc6a6693a7d10407c6ddd02837a2ae574131`;
+  `v1.1.0` payload commit is `745efc6a6693a7d10407c6ddd02837a2ae574131` and
+  the latest branch HEAD readback is `e0e861998711f7ec5e1f10784ca857dc39d7d575`;
   no release tag or GitHub Release has been created. The candidate is a descendant of `main`,
   `develop`, and the frozen release commit.
 - **PASS:** the release package's JSON files parse; all 91 current L1 paths

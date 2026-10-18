@@ -29,13 +29,18 @@
   provider-free one-action controller probe produced the same physical control
   target fields across the two checkouts, but did not apply that target through
   a provider. Cross-checkout controller hash equality is not guaranteed. The
-  provisional recommendation is to retain this limitation; maintainer decision
-  remains open. The relocated-checkout full regression is NOT_RUN; preserve the
-  exploratory 139 PASS / 8 FAIL result and its explanation in the S5-C1 receipt.
+  maintainer accepted Option B: retain this identity algorithm and limitation;
+  historical identities and H5 hashes remain unchanged. The relocated-checkout
+  full regression is NOT_RUN; preserve the exploratory 139 PASS / 8 FAIL result
+  and its explanation in the S5-C1 receipt.
 - **OPEN storage risk:** `/dev/sda` / `ata5` has recorded BadCRC and READ I/O
-  errors. The workspace resides on one physical disk and an independent backup
-  has not been verified. A clean recent kernel scan does not close this risk.
-- **S5-C8 retirement authorized and manually completed with accepted evidence limits:** On 2026-10-18 the maintainer approved the four exact A/B/C1/C2 manifests and accepted possible permanent C1/C2 historical raw-data/source-snapshot loss. Assistant deletion stopped before its first unlink after `/dev/sda` SCSI `ioerr_cnt` rose from 2000 to 2005. The maintainer later reported two successful SMART refreshes, each correlated with a fixed +5 counter increment, with cached reads steady; individual low-level commands were not captured, so this does not explain every historical increment. After manual handling, 65,826 approved ordinary paths were observed absent; no per-file user unlink receipts exist. Current reports found no matching new ATA/READ error, and the observed CRC and bad-sector attributes did not increase. Counter-only growth is now an investigation signal; stop on actual ATA/block/filesystem errors, read/write failures, CRC or bad-sector growth, or integrity anomalies. The historical SATA/BadCRC risk remains OPEN, and SMART status does not establish device reliability. Original L1 and all 22 L2 files (24,563,669 bytes) were verified intact. The full-workspace backup requirement was explicitly not waived. See [the final C8 report](c8_manual_cleanup_final_report.md) and [monitoring revision](c8_storage_monitoring_revision.md).
+  errors. The exact 22-file L2 set (24,563,669 bytes) is now copied to the public
+  GitHub `v1.1.0` branch and verified by remote size/SHA-256 readback plus
+  representative H5/JSON reads. The branch shares the same public repository
+  and account; a separately administered backup, full-workspace bundle, and
+  separate submodule bundles are not verified. A clean recent kernel scan does
+  not close the historical SATA risk.
+- **S5-C8 retirement authorized and manually completed with accepted evidence limits:** On 2026-10-18 the maintainer approved the four exact A/B/C1/C2 manifests and accepted possible permanent C1/C2 historical raw-data/source-snapshot loss. Assistant deletion stopped before its first unlink after `/dev/sda` SCSI `ioerr_cnt` rose from 2000 to 2005. The maintainer later reported two successful SMART refreshes, each correlated with a fixed +5 counter increment, with cached reads steady; individual low-level commands were not captured, so this does not explain every historical increment. After manual handling, 65,826 approved ordinary paths were observed absent; no per-file user unlink receipts exist. Current reports found no matching new ATA/READ error, and the observed CRC and bad-sector attributes did not increase. Counter-only growth is now an investigation signal; stop on actual ATA/block/filesystem errors, read/write failures, CRC or bad-sector growth, or integrity anomalies. The historical SATA/BadCRC risk remains OPEN, and SMART status does not establish device reliability. Original L1 and all 22 L2 files (24,563,669 bytes) were verified intact; the exact L2 bytes are now also remotely preserved as described above. The full historical workspace and L3 raw-data archive were not backed up. See [the final C8 report](c8_manual_cleanup_final_report.md) and [monitoring revision](c8_storage_monitoring_revision.md).
 - **Historical recovery-location gap:** the v1.0.0 archive manifest records a
   205,486,080-byte, 441-member P1.6 recovery tar, but the S5-C4 workspace
   metadata scan did not locate a matching path or size. Its availability is
@@ -50,4 +55,4 @@
   scans cannot discover. The compatibility inventory is the migration record;
   no silent aliases are supplied.
 
-- **C8 停止判据更正（2026-10-18）：** 维护者两次 SMART 刷新均令 SCSI 计数增加 5，而缓存读取不增加。当前将单独计数增量作为调查信号；实际 I/O、内核存储错误、CRC/坏扇区增长或哈希异常才触发相应停止。历史 SATA 风险与独立备份门槛仍保留，详见[监测修订](c8_storage_monitoring_revision.md)。
+- **C8 停止判据更正（2026-10-18）：** 维护者两次 SMART 刷新均令 SCSI 计数增加 5，而缓存读取不增加。当前将单独计数增量作为调查信号；实际 I/O、内核存储错误、CRC/坏扇区增长或哈希异常才触发相应停止。历史 SATA 风险仍开放；L2 已完成 GitHub 远端副本核验，但独立管理域和完整工作区备份未核验，详见[监测修订](c8_storage_monitoring_revision.md)与[备份清单](backup_manifest.json)。

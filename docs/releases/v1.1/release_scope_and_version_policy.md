@@ -40,16 +40,27 @@ decision context only; the current target is not an open version-selection
 gate. Publication, tag creation, and protected-branch updates still require
 separate maintainer authorization.
 
-## Proposed release-evidence preservation policy
+## Release-evidence retention and backup status
 
-S5-C3 proposes preserving a small L1 acceptance package in Git, inventorying
-the selected L2 H5/log files by local size and SHA-256, and treating the
-historical L3 workspace as outside the mandatory v1.1.0 off-host preservation
-set. This is a governance proposal, not an approved replacement for the
-previous full-workspace backup gate. Until the maintainer explicitly approves
-the reduced scope and accepts the remaining raw-data risks, the current backup
-gate remains **BLOCKED**. Hash metadata identifies expected bytes but cannot
-restore a missing H5 or other raw artifact. See the [evidence index](evidence/README.md),
-[backup manifest](backup_manifest.json), and [release readiness](release_readiness.md).
+The S5-C3/C4/C5 L1/L2/L3 reduction began as a proposal; its historical
+approval boundary is retained in those dated reports. For the current v1.1.0
+candidate, the maintainer subsequently selected an L2-only off-host copy capped
+below 100 MB and authorized publishing the exact 22-file L2 set
+(24,563,669 bytes) to the public GitHub `v1.1.0` branch, including embedded
+local absolute-path strings. The remote copy was read back and verified:
+22/22 file sizes and SHA-256 values match; a representative NutAssembly H5
+opened and a PickCube result JSON parsed from fetched Git objects. The exact
+payload commit and verification receipt are in the [backup manifest](backup_manifest.json).
 
-On 2026-10-18 the maintainer authorized only the exact C8 A/B/C1/C2 retirement scopes, accepting C1/C2 historical loss while explicitly preserving the backup gate. Thus `L1_METADATA_REQUIRED`, `L2_CURRENT_RAW_EVIDENCE_REQUIRED`, and reviewed L3 retirement apply to these scopes; mandatory off-host backup has not been waived or satisfied. The assistant retained its storage stop; subsequent maintainer manual handling left all 65,826 approved ordinary paths absent. Worktree and holdouts remain. See [the C8 final report](c8_manual_cleanup_final_report.md). This scope-specific retirement acceptance does not waive or satisfy any independent backup gate.
+This satisfies the selected L2 off-host-copy scope. The branch is in the same
+public repository/account, so a separately administered backup is not
+established. No full-workspace bundle, all-ref Git bundle, or independent
+submodule bundle was made. The C8 maintainer accepted the specified L3
+historical retirement and residual loss; hashes cannot restore those removed
+raw files. The known single-disk SATA risk remains open. These limits are
+disclosed in [known limitations](known_limitations.md) and [release readiness](release_readiness.md).
+
+The earlier `BACKUP_NOT_VERIFIED` full-scope observation remains historical;
+the current L2 transfer has its own verification status. No broader backup
+waiver is claimed, and this copy does not authorize publication, a release tag,
+or protected-branch updates.

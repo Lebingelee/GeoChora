@@ -210,7 +210,7 @@
     "functional_readback": "bee498d1d784015f034c5b4af34320fdffa61411",
     "documentation_target": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
     "documentation_readback": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
-    "current_public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "current_public_develop": "c679267790726d3e34d080a133535c2c308a7a55",
     "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
     "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
     "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
@@ -226,7 +226,8 @@
         "path": "workspace/maintenance/p2_0_s5_c2_20261017/documentation_integration_receipt.json",
         "sha256": "35d668adcd3687cda46fa089352745cf1b63a6c218655f24fc4e66ed30d8e8e8"
       }
-    ]
+    ],
+    "public_develop_readback_at_s5b_integration": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
   },
   "s5_c2_final_gate": {
     "receipt": "docs/module/task_env/p2_0_s5_c2_public_integration_readiness.md",
@@ -283,5 +284,21 @@
       }
     ],
     "historical_paths_notice": "Earlier S5-B/C1/C2 snapshots retain original paths; current receipt lookup uses these verified preserved copies. No source results were regenerated."
+  },
+  "current_final_release_review": {
+    "review_date": "2026-10-18",
+    "status": "RELEASE_CANDIDATE_NOT_PUBLISHED",
+    "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "public_develop": "c679267790726d3e34d080a133535c2c308a7a55",
+    "public_v1_1_0_branch_head": "e0e861998711f7ec5e1f10784ca857dc39d7d575",
+    "public_v1_1_0_tag": "NOT_CREATED",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51",
+    "v1_0_0_peeled_commit": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "l2_payload_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131",
+    "l2_payload": "22/22 files and 24,563,669 bytes; remote size/SHA-256 readback passed; representative H5/JSON reads passed",
+    "backup_scope_limit": "Same public repository/account; not a separately administered backup. Full-workspace, independent submodule bundles, and fresh-install/full-relocated regression remain unverified.",
+    "controller_identity": "Option B accepted; path-sensitive identity retained; no relocated full native rollout claimed.",
+    "qualification": "No new formal qualification; selected manipulation/provider intersections remain TESTED_BOUNDED.",
+    "publication_authorization": "NOT_GRANTED"
   }
 }

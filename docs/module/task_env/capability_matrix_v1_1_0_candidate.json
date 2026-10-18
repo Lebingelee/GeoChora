@@ -351,7 +351,7 @@
     "Go2 and GeoChora static-template implementations are retired from active develop."
   ],
   "published_v1_0_0_matrix": "docs/releases/v1.0/capability_matrix.json",
-  "storage_risk": "OPEN: single-disk SATA/BadCRC risk and unverified independent backup remain unresolved.",
+  "storage_risk": "OPEN: historical single-disk SATA/BadCRC risk remains. The exact 22-file L2 set (24,563,669 bytes) is SHA-256 verified on the public v1.1.0 GitHub branch in the same repository/account; full-workspace, separate-admin-domain, and separate submodule backup remain unverified.",
   "versioning_policy": "GeoChora project-specific policy; v1.1.0 is a Core consolidation release with documented breaking API changes and is not claimed to comply with strict Semantic Versioning.",
   "supersedes": "docs/module/task_env/archive/capability_matrix_v1_0_1_candidate_historical.json",
   "evidence_reconciliation": {
@@ -373,9 +373,13 @@
     "pre_integration_base": "0ff2d846a36c7014d2b40a530f52d99e64266ff9",
     "functional_commit": "bee498d1d784015f034c5b4af34320fdffa61411",
     "release_candidate_document_commit": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
-    "public_develop_readback": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_develop_readback": "c679267790726d3e34d080a133535c2c308a7a55",
     "main_readback": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
     "v1_0_0_tag_object_readback": "17c3100d4fabcb061c23569dea49973ebd177d51",
-    "release_publication": "NOT_PERFORMED"
+    "release_publication": "NOT_PERFORMED",
+    "public_develop_readback_at_s5b_review": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_v1_1_0_branch_readback": "e0e861998711f7ec5e1f10784ca857dc39d7d575",
+    "l2_payload_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131",
+    "l2_payload_status": "22/22 size and SHA-256 verified; same-repository/account copy; full-workspace backup not verified"
   }
 }

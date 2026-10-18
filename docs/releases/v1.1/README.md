@@ -22,6 +22,22 @@ as the target version; publication remains a separate, ref-verified action.
 At the start of this review no v1.1.0 tag or GitHub Release existed, and
 `main`, `v1.0.0`, and frozen Evidence were unchanged.
 
+## Current release-candidate state
+
+At the latest final-review readback on 2026-10-18, public `main` remained
+`e4e39883fbe01d4be4b172a53a535ef0095b3d64`, public `develop` was
+`c679267790726d3e34d080a133535c2c308a7a55`, and the public `v1.1.0` branch
+held the reviewed L2 acceptance copy. The `v1.0.0` annotated tag object remains
+`17c3100d4fabcb061c23569dea49973ebd177d51` peeling to
+`42787f5e4f658a3f81fdd2140cf7544d6342c783`. The v1.1.0 candidate has not been
+published: no `v1.1.0` tag, `main` update, or GitHub Release exists. See the
+[current readiness receipt](release_readiness.md) for the candidate ref and
+release-gate state. The latest public `v1.1.0` branch readback is
+`e0e861998711f7ec5e1f10784ca857dc39d7d575`; it retains the verified L2 payload
+commit `745efc6a6693a7d10407c6ddd02837a2ae574131`. The GitHub L2 copy is
+remote and hash-verified, but it is in the same public repository/account;
+full-workspace and separate administrative-domain backup are not verified.
+
 ## Candidate package
 
 - [Scope and version policy](release_scope_and_version_policy.md)

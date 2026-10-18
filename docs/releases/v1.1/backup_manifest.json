@@ -469,10 +469,12 @@
     "recovery_domain_limit": "Hosted in the same public GitHub repository/account; this is an off-host copy but not a separately administered or physically independent backup.",
     "not_authorized": "No main update, tag, GitHub Release, publication, additional cleanup, or historical-file deletion.",
     "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131",
-    "remote_ref_readback": "PASS — public/v1.1.0 fetched and resolves to remote_commit",
+    "remote_ref_readback": "PASS — payload commit 745efc6a6693a7d10407c6ddd02837a2ae574131 is retained on public/v1.1.0; latest branch HEAD readback is e0e861998711f7ec5e1f10784ca857dc39d7d575",
     "representative_h5_read": "PASS — NutAssembly GeoPhys execution.h5 opened from fetched Git object with h5py 3.16.0",
     "representative_result_read": "PASS — PickCube GeoPhys result.json parsed from fetched Git object",
-    "restore_scope_note": "Reads were performed from fetched remote Git objects; no separate destination or full fresh-checkout restore test was performed."
+    "restore_scope_note": "Reads were performed from fetched remote Git objects; no separate destination or full fresh-checkout restore test was performed.",
+    "latest_branch_head_readback": "e0e861998711f7ec5e1f10784ca857dc39d7d575",
+    "latest_ref_check_date": "2026-10-18"
   },
   "release_candidate_document_files": [
     {
@@ -482,8 +484,8 @@
     },
     {
       "path": "docs/module/task_env/capability_matrix_v1_1_0_candidate.json",
-      "size_bytes": 20955,
-      "sha256": "229ca3ca9d01c17731c54297c83a79bf21138d6762c19c4ce78df78c52b9eb57"
+      "size_bytes": 21506,
+      "sha256": "70f8c648efa0ae906d24cfc47653fc379351cc171acf96beabbfd3ba4a8e3404"
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
@@ -517,8 +519,8 @@
     },
     {
       "path": "docs/releases/v1.1/README.md",
-      "size_bytes": 3044,
-      "sha256": "db104c23e974983dd764480f9b1dd7f6e562c585d54b9b43aaef10ed2948b451"
+      "size_bytes": 4028,
+      "sha256": "a760e308f98e491eb5a0c51f94bcfb345df819e59a28c752b19222d54e2c0522"
     },
     {
       "path": "docs/releases/v1.1/capability_matrix.md",
@@ -527,8 +529,8 @@
     },
     {
       "path": "docs/releases/v1.1/evidence/README.md",
-      "size_bytes": 13432,
-      "sha256": "9aab6c98aed27c62de769ffa231cd15d481a3036d0a5a4cbfc8754fa95f3416b"
+      "size_bytes": 13562,
+      "sha256": "2a3a217513a3775fb8f8c6f97ef632bedfe0fc70106c782b6d7717f5e716748c"
     },
     {
       "path": "docs/releases/v1.1/evidence/manipulation_acceptance.md",
@@ -567,8 +569,8 @@
     },
     {
       "path": "docs/releases/v1.1/known_limitations.md",
-      "size_bytes": 5573,
-      "sha256": "b7a990cb4ef7ca1d8433d078506a1c55d64f631fa7e1710122c3cda25eb444a9"
+      "size_bytes": 6078,
+      "sha256": "74684ef26bc3f800f31498b6666e218423081af841614d958da3832d66e068eb"
     },
     {
       "path": "docs/releases/v1.1/learning_and_rendering_limits.md",
@@ -592,13 +594,13 @@
     },
     {
       "path": "docs/releases/v1.1/release_readiness.md",
-      "size_bytes": 16475,
-      "sha256": "e848cb7d885cea7debd0c5020fca894044286ca743308ac2735808e2ead903e9"
+      "size_bytes": 16788,
+      "sha256": "456426c3d5e6dc0d818742d3260e1192ae716296089721b45c1683a434c86e19"
     },
     {
       "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
-      "size_bytes": 3777,
-      "sha256": "fa7e38c76d412cbf80757b960379a3f9938fe6f3c48b12f22ae29e7cfc15f0cf"
+      "size_bytes": 3902,
+      "sha256": "83776d43d111f05559c9e507f4e4b061ae39047afd31f07b664893faec72cbd2"
     },
     {
       "path": "docs/releases/v1.1/s5_c3_publication_checklist_draft.md",
@@ -607,8 +609,8 @@
     },
     {
       "path": "docs/releases/v1.1/source_recovery_manifest.json",
-      "size_bytes": 17395,
-      "sha256": "21ed1b97f3b4637e70babb1fc4617374f33512f1b3b75703406cc2ad79e3f25e"
+      "size_bytes": 18698,
+      "sha256": "606dbed215d1cc1eaa6f469dcfe89499e68cfe973e5fb717d7d669367e0f9634"
     },
     {
       "path": "docs/releases/v1.1/test_acceptance_summary.md",
@@ -1329,5 +1331,15 @@
     "report": "c8_storage_monitoring_revision.md",
     "historical_stop_latch": "Preserved; no deletion tools re-enabled",
     "no_new_deletion_or_publication": true
+  },
+  "latest_remote_ref_readback": {
+    "check_date": "2026-10-18",
+    "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "public_develop": "c679267790726d3e34d080a133535c2c308a7a55",
+    "public_v1_1_0_branch_head": "e0e861998711f7ec5e1f10784ca857dc39d7d575",
+    "l2_payload_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131",
+    "l2_payload_retained_on_branch": "YES",
+    "v1_1_0_tag": "NOT_CREATED",
+    "github_release": "NOT_PUBLISHED"
   }
 }
