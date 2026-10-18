@@ -35,6 +35,11 @@ report](c8_manual_cleanup_final_report.md), [the storage-monitoring
 revision](c8_storage_monitoring_revision.md), and the dated [execution-stop
 report](c8_execution_and_phase2_closure.md).
 
+A later documentation-only reconciliation of current refs and L2 backup
+status is present on the local release-candidate branch and has not been
+integrated remotely. The remote `develop` and `v1.1.0` refs remain the exact
+SHAs stated above; the local candidate should be reviewed as a separate delta.
+
 | Gate | Status | Evidence / remaining condition |
 | --- | --- | --- |
 | Functional integration | **PASS** | Normal fast-forward from `0ff2d846` to `bee498d1d784015f034c5b4af34320fdffa61411`; public readback matched. |
@@ -51,13 +56,14 @@ report](c8_execution_and_phase2_closure.md).
 | v1.1.0 capability matrix approval | **MAINTAINER_ACCEPTED — BOUNDED CLAIMS ONLY** | The current candidate matrix is approved in principle; four manipulation/provider intersections remain `TESTED_BOUNDED`, not newly qualified. |
 | Historical L3 retention | **MAINTAINER_ACCEPTED — RETIREMENT WITH RECORDED EXCEPTIONS** | C8 retirement and residual loss are accepted as recorded. Missing historical raw data has not been restored. |
 | Release metadata preservation | **PASS — PUBLIC_GIT** | All 91 L1 entries are tracked in the integrated source. Fourteen differ from the older C8 snapshot after documented updates; each older exact blob is recoverable from Git history. The 37 exact historical records and original bytes remain available. |
+| Current release-document reconciliation | **PASS — LOCAL CANDIDATE ONLY** | The current-ref, L2 status, retention, and retrospective edits are committed on the local release-candidate branch. They are not yet in public Git; publishing this delta requires explicit remote-integration authorization. |
 | Current TaskEnv raw evidence | **PASS — L2_LOCAL_AND_REMOTE_HASH_VERIFIED** | 22 selected files, 24,563,669 bytes, including six H5 files and bounded SB3/batch raw receipts; local and remote sizes/hashes match. |
 | Raw evidence backup | **PASS — SCOPED L2 REMOTE COPY** | Public `v1.1.0` branch `745efc6a6693a7d10407c6ddd02837a2ae574131` contains 22/22 files with matching sizes/SHA-256; a NutAssembly H5 opened and a PickCube result JSON parsed from fetched remote Git objects. Twelve originals contain approved local path strings. The copy is off-host but in the same GitHub repository/account; it is not the full-workspace or separately administered backup. |
 | Historical workspace backup | **NOT_VERIFIED — HISTORICAL LOSS ACCEPTED** | 65,826 approved ordinary paths are absent after maintainer manual handling; exact independent recovery is not verified and historical raw/source bytes may be permanently lost. Workspace allocation observed 2,815,557,632 bytes after cleanup, down 68.317 GiB from the recorded baseline. This is aggregate observation, not exact unlink-attributable recovery. The v1.0.0 P1.6 recovery archive remains unresolved. This is a disclosed accepted retention risk, not a backup PASS. |
 | Scoped retention policy and residual-risk acceptance | **MAINTAINER_ACCEPTED — C8 SCOPE ONLY** | L1/L2 preservation and exact A/B/C1/C2 retirement authorized on 2026-10-18, including C1/C2 permanent historical loss. The current L2 GitHub copy is recorded separately; it does not restore retired L3 data. |
 | Approved C8 execution | **C8_CLOSURE_ACCEPTED_WITH_EXCEPTIONS** | All 65,826 approved ordinary paths are absent; no user per-file unlink receipts exist. B worktree remains held (6,619 entries); all 522 pre-existing holdouts remain. Assistant deletion stayed storage-latched. Maintainer explicitly accepted retained worktree/holds and missing per-file operator logs for final C8 closure. |
 | P1.8 archive retirement | **PARTIAL — 3,382 PATHS ABSENT** | The held source bundle remains. C1 permanent-loss acceptance is recorded; raw trajectories/source carriers at the retired paths are no longer locally available there. Hashes do not restore them. |
-| Remote evidence preservation | **PASS — L1 AND L2 COPY** | L1 is on public `develop` at `c679267`; the L2 payload commit `745efc6a` is retained on public `v1.1.0`, whose latest readback is `e0e8619`. Readback hashes and representative H5/JSON reads passed. |
+| Remote evidence preservation | **PASS — PUBLIC L1 BASELINE AND L2 COPY** | The integrated L1 baseline is on public `develop` at `c679267`; latest release-document reconciliation remains local. The L2 payload commit `745efc6a` is retained on public `v1.1.0`, whose latest readback is `e0e8619`. Readback hashes and representative H5/JSON reads passed. |
 | Storage monitoring | **OPEN_RISK — HISTORICAL SATA ISSUE** | Counter-only growth is an investigation signal after the repeated SMART-refresh correlation. Stop on actual I/O failure, new ATA/block/filesystem errors, CRC/bad-sector growth or integrity anomalies. The exact L2 copy is remotely verified; the historical SATA risk remains OPEN. |
 | Publication authorization | **NOT AUTHORIZED IN THIS INSTRUCTION** | No v1.1.0 tag, `main` change, or GitHub Release is authorized or created; a separate final Publication GO is required. |
 | L3 retention and cleanup review | **PARTIAL; RESIDUAL HOLDS PRESERVED** | Ordinary paths handled manually; 522 holdouts and the registered worktree remain. No force/deinit/manual worktree fallback was attempted. |

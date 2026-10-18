@@ -37,6 +37,9 @@ release-gate state. The latest public `v1.1.0` branch readback is
 commit `745efc6a6693a7d10407c6ddd02837a2ae574131`. The GitHub L2 copy is
 remote and hash-verified, but it is in the same public repository/account;
 full-workspace and separate administrative-domain backup are not verified.
+The current documentation reconciliation is committed only on the local
+candidate branch, after that public readback; it has not been pushed. Use the
+remote refs rather than this paragraph to determine publication status.
 
 ## Candidate package
 

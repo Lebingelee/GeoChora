@@ -519,8 +519,8 @@
     },
     {
       "path": "docs/releases/v1.1/README.md",
-      "size_bytes": 4028,
-      "sha256": "a760e308f98e491eb5a0c51f94bcfb345df819e59a28c752b19222d54e2c0522"
+      "size_bytes": 4250,
+      "sha256": "c0bc6b318467c81945dc653416fdb680081c3611f6985a63e0b0b9b07c1474fa"
     },
     {
       "path": "docs/releases/v1.1/capability_matrix.md",
@@ -594,8 +594,8 @@
     },
     {
       "path": "docs/releases/v1.1/release_readiness.md",
-      "size_bytes": 16788,
-      "sha256": "456426c3d5e6dc0d818742d3260e1192ae716296089721b45c1683a434c86e19"
+      "size_bytes": 17488,
+      "sha256": "68bb8ede87cc505f4e4f1ec4a3ad0cfa661767214889578222e19f47e8073e66"
     },
     {
       "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
