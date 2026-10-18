@@ -527,8 +527,8 @@
     },
     {
       "path": "docs/releases/v1.1/evidence/README.md",
-      "size_bytes": 13405,
-      "sha256": "d8879ccee2ac7eee1678194d286a3183f8596e8ec311d75e5d05608c9180cd93"
+      "size_bytes": 13432,
+      "sha256": "9aab6c98aed27c62de769ffa231cd15d481a3036d0a5a4cbfc8754fa95f3416b"
     },
     {
       "path": "docs/releases/v1.1/evidence/manipulation_acceptance.md",

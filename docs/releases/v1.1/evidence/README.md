@@ -52,8 +52,8 @@ candidate matrix or source/recovery records where available. On 2026-10-18 the
 maintainer authorized an exact public GitHub copy of all 22 L2 files
 (24,563,669 bytes) on the `v1.1.0` candidate branch. The local copies are under
 `evidence/raw/l2/`; the backup manifest maps each source path to its copy and
-records both hashes. The branch now reads back at
-`745efc6a6693a7d10407c6ddd02837a2ae574131`; all 22 remote blob sizes and
+records both hashes. The L2 payload commit `745efc6a6693a7d10407c6ddd02837a2ae574131`
+is preserved on the public branch; all 22 remote blob sizes and
 SHA-256 values match. A representative NutAssembly H5 opened successfully from
 the fetched Git object, and a representative result JSON parsed successfully.
 The full-workspace bundle and separately administered backup remain
