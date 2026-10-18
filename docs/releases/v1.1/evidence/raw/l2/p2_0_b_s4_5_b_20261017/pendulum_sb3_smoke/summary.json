@@ -1,0 +1,23 @@
+{
+  "batches": [
+    {
+      "backend": "cpu",
+      "batch_physics_layout": "merged_scene",
+      "checkpoint": "/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
+      "episodes_recorded": 0,
+      "execution": "remote",
+      "integrator": "implicitfast",
+      "learner_imported_taichi": false,
+      "num_env": 2,
+      "return_log": "/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
+      "rollout_steps": 2,
+      "seed": 75,
+      "seed_mode": "fixed",
+      "task_uid": "pendulum-v1",
+      "timesteps": 4,
+      "updates": 1,
+      "updates_completed": 1
+    }
+  ],
+  "verify_batches": false
+}

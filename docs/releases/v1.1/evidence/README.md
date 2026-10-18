@@ -38,19 +38,26 @@ policy, installation and migration guides, public API/task inventory, known
 limitations, test summary, backup/readiness records, the single candidate
 capability matrix, the S2-C1/S2-C2 source identity records, S3/S4 recovery
 manifests, S4.5 workflow receipts, and the current TaskEnv migration guide.
-The exact paths are enumerated in the S5-C4 audit. At the C4 snapshot they were present through local commit `28dc2f48`; later C8 metadata remains on the local maintenance branch. These retention updates have not been integrated into public `develop`.
+The exact paths are enumerated in the S5-C4 audit. Current release metadata is
+present on public `develop` at `c679267790726d3e34d080a133535c2c308a7a55`.
 
 The summaries preserve bounded results and raw-evidence hashes. Hash metadata
 can identify a missing file but cannot restore its contents.
 
 ## L2 — Selected raw evidence inventory
 
-All paths below are existing ignored workspace files. Their sizes and hashes
-were checked on the current local disk on 2026-10-17 against the candidate
-matrix or source/recovery records where available. No files were copied,
-moved, or modified. The five original task/recording H5 files total
-**24,301,972 bytes**; adding the bounded SB3 return H5 brings the six-H5 total
-to **24,333,284 bytes** (about **23.21 MiB**).
+The source paths below are existing ignored workspace files. Their sizes and
+hashes were checked on the current local disk on 2026-10-17 against the
+candidate matrix or source/recovery records where available. On 2026-10-18 the
+maintainer authorized an exact public GitHub copy of all 22 L2 files
+(24,563,669 bytes) on the `v1.1.0` candidate branch. The local copies are under
+`evidence/raw/l2/`; the backup manifest maps each source path to its copy and
+records both hashes. Remote push and restore/readback remain pending. Twelve
+original files contain local absolute-path metadata; the maintainer explicitly
+approved publishing those exact bytes. This remains release-candidate evidence
+and grants no new Qualification. The five original task/recording H5 files
+total **24,301,972 bytes**; adding the bounded SB3 return H5 brings the six-H5
+total to **24,333,284 bytes** (about **23.21 MiB**).
 
 ### Accepted full-route and recording H5 files
 
@@ -96,11 +103,12 @@ rasterizer examples produced in-memory RGB frames only; no native Flora frame
 artifact exists to preserve. Their bounded run scope and source identities are
 recorded in L1 rather than represented as a missing raw image.
 
-The expanded minimum L2 inventory contains **22 files totaling 24,563,669
-bytes** (about **23.43 MiB**). This is a local integrity inventory, not an
-independent backup or restore verification. L2 remains on the existing disk.
-Preserve it in place until a separately authorized archive destination and
-transfer procedure are available.
+The expanded L2 inventory contains **22 files totaling 24,563,669 bytes**
+(about **23.43 MiB**), below the 100 MB limit selected by the maintainer. The
+local branch copy matches every source size and SHA-256. Remote verification is
+pending. If verified, it will establish an off-host copy in the same public
+GitHub repository, but not a separately administered backup or a full-workspace
+backup. Keep the original local files unchanged.
 
 ## L3 — Historical workspace
 
@@ -127,10 +135,12 @@ qualification decisions remain unchanged and available through immutable
   `2fb60de`; this did not create a formal qualification decision.
 - **PASS — S5-C5 L2 recheck:** all 22 paths still match the indexed size and
   SHA-256; no L2 bytes were changed.
-- **NOT_RUN:** independent L2 copy or restore read.
-- **NOT_RUN:** remote Git preservation of this new evidence package; no remote
-  integration authorization was given in this task.
-- **BLOCKED pending maintainer decision:** the new L1/L2/L3 retention proposal
-  does not replace the full-workspace backup requirement until explicitly
-  approved.
+- **PENDING:** remote GitHub branch readback and representative H5/result-file
+  reads for the authorized L2 copy.
+- **AUTHORIZED:** public GitHub branch copy of exact L2 originals, including
+  the approved embedded local path strings; no tag or release publication is
+  authorized.
+- **NOT SATISFIED:** the historical full-workspace backup plan remains
+  unexecuted; the scoped L2 branch copy does not cover full source bundles,
+  submodules, or L3.
 - **C8 PARTIAL / MANUAL_PATH_ABSENCE_VERIFIED:** exact approvals are in the historical [execution-stop receipt](retirement/c8_execution_receipt_20261018.json); current results are in the [manual post-observation receipt](retirement/c8_manual_cleanup_observation_20261018.json). All 65,826 ordinary paths are absent. Registered worktree and 522 holdouts remain. Post-cleanup 9 provider-free tests passed; storage and backup gates remain open.

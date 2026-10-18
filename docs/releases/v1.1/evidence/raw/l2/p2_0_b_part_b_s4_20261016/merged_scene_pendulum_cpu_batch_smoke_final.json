@@ -1,0 +1,36 @@
+{
+  "case": "pendulum-v1 merged_scene CPU batch smoke",
+  "num_env": 2,
+  "execution": "local",
+  "status": "PASS",
+  "step_completed": true,
+  "elapsed_seconds": 19.539,
+  "action_space": "Dict('torque': Box(-2.0, 2.0, (1,), float32))",
+  "reset_observation_tree_shape": {
+    "state": {
+      "proprioception": [
+        2,
+        3
+      ]
+    }
+  },
+  "step_observation_tree_shape": {
+    "state": {
+      "proprioception": [
+        2,
+        3
+      ]
+    }
+  },
+  "rewards": [
+    0.9779344797134399,
+    0.1348901242017746
+  ],
+  "dones": [
+    false,
+    false
+  ],
+  "finite_numeric_outputs": true,
+  "info_count": 2,
+  "evidence_scope": "native GeoPhys CPU merged_scene batch reset plus one step; not task qualification"
+}

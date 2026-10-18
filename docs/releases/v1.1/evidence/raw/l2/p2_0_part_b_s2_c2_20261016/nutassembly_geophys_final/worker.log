@@ -1,0 +1,11 @@
+[Taichi] version 0.6.2, llvm 20.1.7, commit 9b384286, linux, python 3.12.14
+18:39:34 [Runtime] Taichi cache
+         Cache    warm | 133 kernels | 61.6 MiB
+[Taichi] Starting on arch=x64
+18:39:34 [Runtime] Taichi runtime
+         Runtime  CPU | fastest compile | 4 threads | cache on
+18:39:34 [WARN] [Scene] MJCF import completed with retained or rejected semantics
+         status=completed_with_diagnostics | issue_count=1 | action="Inspect the Agent JSONL detail records before relying on omitted semantics"
+18:39:34 [SUCCESS] [Scene] Scene import completed
+         status=completed | source_format=mjcf | cached=False | scene_name=panda | body_count=15 | shape_count=100 | joint_count=10
+{"T": 2380, "case": "nutassembly_geophys_100hz", "checks": {"T_equals_expert_transitions": true, "T_plus_1_boundaries": true, "all_acceptance_checks": true, "all_stage_actions_and_endpoints": true, "artifact_identity": true, "c1_behavior_equivalent_after_identity_normalization": true, "clock_100hz": true, "control_hz_100": true, "diagnostic_shadow_disabled": true, "eleven_stages_in_order": true, "expert_completed": true, "five_native_substeps_per_control": true, "guard_authorization_present": true, "h5_exists_and_finalized": true, "inserted_and_released": true, "limits_unchanged": true, "native_interval_count": true, "native_substeps_observed": true, "no_runtime_termination_or_truncation": true, "no_unapproved_readiness_bypass": true, "original_strict_gate_observation": true, "outcome_complete": true, "outcome_policy_identity": true, "outcome_policy_version": true, "outer_applied_controls": true, "physics_dt_2ms": true, "planned_trajectory_completed": true, "recorded_clock_validation": true, "recorded_native_interval_count": true, "release_retreat_endpoint": true, "reset_clock_zero": true, "reset_seed": true, "resolved_source_hashes_match": true, "resolved_source_revision": true, "selected_uid": true, "storage_roundtrip": true, "target_identity_links_valid_in_both_episodes": true, "task_success": true, "transition_boundary_structure": true}, "error": null, "first_divergence": null, "status": "PASS"}

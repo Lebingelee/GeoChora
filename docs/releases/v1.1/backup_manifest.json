@@ -1,8 +1,8 @@
 {
   "schema": "geochora-v1-1-release-candidate-backup-manifest-v1",
-  "status": "BACKUP_NOT_VERIFIED",
+  "status": "L2_REMOTE_COPY_PENDING; FULL_WORKSPACE_BACKUP_NOT_VERIFIED",
   "target_release": "v1.1.0",
-  "reason": "BACKUP_NOT_VERIFIED: no authorized independent destination was identified. Source and required ignored workspace are on the single physical /dev/sda. No copy or restore test was attempted.",
+  "reason": "The maintainer authorized an exact public GitHub v1.1.0 branch copy of the 22-file L2 set (24,563,669 bytes), including approved local absolute-path strings. The local copy is hash-verified; remote push/readback remains pending. The earlier conservative full-source/workspace bundle plan (about 74 GB) is not performed and is not satisfied by this L2-only operation.",
   "source_storage_observation": {
     "physical_device": "/dev/sda",
     "known_risk": "/dev/sda / ata5 BadCRC and READ I/O errors recorded in prior maintenance evidence",
@@ -88,8 +88,8 @@
   ],
   "observation_date": "2026-10-17",
   "backup_plan": {
-    "status": "PREPARED_NOT_EXECUTED",
-    "destination_requirement": "Maintainer-authorized independent physical device or controlled external storage. No destination is approved or configured.",
+    "status": "HISTORICAL_FULL_SCOPE_PLAN_NOT_EXECUTED",
+    "destination_requirement": "Historical 2026-10-17 full-scope plan: independent physical device or controlled external storage. It was not executed. The separately authorized current operation is only the exact L2 set on the public GitHub v1.1.0 branch.",
     "repository_source": ".",
     "repository_bundle": "geochora-v1.1.0-rc.bundle",
     "repository_bundle_command": "git bundle create /AUTHORIZED/INDEPENDENT/DESTINATION/geochora-v1.1.0-rc.bundle --all",
@@ -116,7 +116,7 @@
       "one representative frozen v1.0.0 Evidence file",
       "one checkpoint artifact"
     ],
-    "do_not_execute_until": "An independent destination is explicitly authorized.",
+    "do_not_execute_until": "This historical full-scope bundle plan remains unexecuted; it is not authorized by the scoped L2 branch-copy approval.",
     "reviewed_integration_commits": [
       "5d57272d1ce7469bb214cf185137853a7eb6deb0",
       "59105726c6ec28f467b637b7124f667a6fdd6b52",
@@ -127,7 +127,7 @@
       "2fb60de7851bf2e5651c2dc99fff7451c16e1a94"
     ],
     "working_tree_state": "S5-C1 docs are local commit 2f8555a4c86470fb63cd2386a6e88729d4795a23; S5-C2 docs are local commit 9de96ddd6b42d8d29f7e513a8f17a3adc64bc7bf (parent S5-C1); S5-C3 L1 evidence and policy proposal are local and not public. Include all current branch refs and the final L1 evidence commit in any later authorized bundle.",
-    "destination_type": "NONE_IDENTIFIED_OR_AUTHORIZED",
+    "destination_type": "NONE_FOR_HISTORICAL_FULL_SCOPE_PLAN",
     "authorized_path_or_endpoint": null,
     "destination_capacity": "UNKNOWN; no independent target is available for inspection.",
     "access_security": "No destination credentials or private access tokens were provided or used. Do not select an external service without maintainer approval.",
@@ -438,16 +438,36 @@
     }
   ],
   "verification_result": {
-    "destination_category": "NONE",
-    "destination_identity": null,
-    "copy_completion": "NOT_RUN",
-    "file_size_sha256_comparison": "NOT_RUN",
-    "git_bundle_object_verification": "NOT_RUN",
-    "submodule_recovery": "NOT_RUN",
-    "representative_h5_restore_read": "NOT_RUN",
-    "representative_evidence_restore_read": "NOT_RUN",
-    "manifest_completeness": "The enumerated L1 document hashes and L2 source-disk hashes were checked locally. No independent copy exists; copy and restore verification remain NOT_RUN.",
-    "final_status": "BACKUP_NOT_VERIFIED"
+    "destination_category": "PUBLIC_GITHUB_BRANCH_L2_COPY",
+    "destination_identity": "public remote refs/heads/v1.1.0; L2-only copy",
+    "copy_completion": "LOCAL_COPY_SHA256_VERIFIED; REMOTE_PUSH_PENDING",
+    "file_size_sha256_comparison": "LOCAL_COPY_PASS; REMOTE_READBACK_PENDING",
+    "git_bundle_object_verification": "NOT_RUN — this is a scoped L2 evidence copy, not a full Git bundle backup",
+    "submodule_recovery": "NOT_RUN — submodule recovery remains governed by the existing public Gitlinks",
+    "representative_h5_restore_read": "REMOTE_READBACK_PENDING",
+    "representative_evidence_restore_read": "REMOTE_READBACK_PENDING",
+    "manifest_completeness": "22/22 L2 files mapped to exact branch paths; source and copied SHA-256 values match locally.",
+    "final_status": "L2_REMOTE_COPY_PENDING; FULL_WORKSPACE_BACKUP_NOT_VERIFIED"
+  },
+  "current_scoped_l2_backup": {
+    "status": "AUTHORIZED_LOCAL_COPY_READY_REMOTE_PENDING",
+    "target_release": "v1.1.0",
+    "approval_date": "2026-10-18",
+    "destination_category": "PUBLIC_GITHUB_BRANCH_COPY",
+    "remote_name": "public",
+    "repository": "Lebingelee/GeoChora",
+    "branch": "v1.1.0",
+    "expected_base_commit": "c679267790726d3e34d080a133535c2c308a7a55",
+    "payload_count": 22,
+    "payload_bytes": 24563669,
+    "payload_limit_bytes": 100000000,
+    "local_copies": "docs/releases/v1.1/evidence/raw/l2/",
+    "local_copy_sha256_status": "22/22 size and SHA-256 match the source manifest",
+    "remote_copy_sha256_status": "PENDING_PUSH_AND_REMOTE_READBACK",
+    "local_absolute_path_disclosure": "The maintainer explicitly approved publishing exact originals including embedded local absolute-path strings.",
+    "scope_limit": "L2 raw acceptance evidence only; not the complete workspace, all local refs, independent submodule bundles, or a full-source backup.",
+    "recovery_domain_limit": "Hosted in the same public GitHub repository/account; this is an off-host copy but not a separately administered or physically independent backup.",
+    "not_authorized": "No main update, tag, GitHub Release, publication, additional cleanup, or historical-file deletion."
   },
   "release_candidate_document_files": [
     {
@@ -753,7 +773,8 @@
           "sha256": "19bc6f82e4e7adf5ea6102df8c169108d6ab37ba8fa657b93593d17f4ea7d296",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Accepted Pendulum merged_scene batch reset/step receipt"
+          "role": "Accepted Pendulum merged_scene batch reset/step receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_part_b_s4_20261016/merged_scene_pendulum_cpu_batch_smoke_final.json"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
@@ -761,7 +782,8 @@
           "sha256": "e22bcadbb142c81f2bdd8f12a432b82b22cef0c25ddeba8cec29f764bca87ae8",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Canonical PickCube recording and logical storage roundtrip H5"
+          "role": "Canonical PickCube recording and logical storage roundtrip H5",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log",
@@ -769,7 +791,8 @@
           "sha256": "f9bbbc5dba19f006d959d6140fdcc758b8a3ebc4bb8f664c0f8ce2fe55007a2c",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Preserved PyTorch CUDA initialization warning during CPU SB3 run"
+          "role": "Preserved PyTorch CUDA initialization warning during CPU SB3 run",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log",
@@ -777,7 +800,8 @@
           "sha256": "7ec6e2fe2ec44c71c2caf58f5a7447a5a1fe57266a587736e7ecc0c6a6ed35d5",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Bounded SB3 execution stdout"
+          "role": "Bounded SB3 execution stdout",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json",
@@ -785,7 +809,8 @@
           "sha256": "d016b19b7f36c8728e65edd66da52de43df4c061922580caa70e8c5756ae42fe",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Bounded SB3 example status, requested configuration and resource limits"
+          "role": "Bounded SB3 example status, requested configuration and resource limits",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
@@ -793,7 +818,8 @@
           "sha256": "361069281b5ed745f89d031933e220edc3e7c52e760e36922b9f3b3b62d0e61d",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Current bounded Pendulum SB3 one-update output checkpoint; not a performance or qualification artifact"
+          "role": "Current bounded Pendulum SB3 one-update output checkpoint; not a performance or qualification artifact",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
@@ -801,7 +827,8 @@
           "sha256": "e87a3100cf8b7d775932ebf14749c4f4a6e8336ee7c1db314fddfee1b45c6c96",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Bounded Pendulum SB3 one-update return H5"
+          "role": "Bounded Pendulum SB3 one-update return H5",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
@@ -809,7 +836,8 @@
           "sha256": "3496cfc76a886dcbe5337fef27daea0d36a3d11e59f9bd4fdac9fe6481571654",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Bounded Pendulum SB3 runner result summary"
+          "role": "Bounded Pendulum SB3 runner result summary",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
@@ -817,7 +845,8 @@
           "sha256": "cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "PickCube GeoPhys CPU seed31 full-route H5"
+          "role": "PickCube GeoPhys CPU seed31 full-route H5",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json",
@@ -825,7 +854,8 @@
           "sha256": "f746f7a4f3785a762cd9fa174e263fd1415b6920fa1098c712334beb9725dda5",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log",
@@ -833,7 +863,8 @@
           "sha256": "66e6783bbae541748729acb3aee9555057509ec036fedf56ef627e80eae437df",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
@@ -841,7 +872,8 @@
           "sha256": "579c676d542f53b1dde8e7488ccff6e1fd01b7e2d6b56e2e975e759d3af69018",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "PickCube MuJoCo CPU seed31 full-route H5"
+          "role": "PickCube MuJoCo CPU seed31 full-route H5",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json",
@@ -849,7 +881,8 @@
           "sha256": "96e85d923987ace7fe8980561b00e3df9023d3c6242d347fadacdc191aa7a6fd",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log",
@@ -857,7 +890,8 @@
           "sha256": "a18ccfe34c3a88d5a6655dda1b2d5e085bc268c811e2d057dce30de6fe67e017",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
@@ -865,7 +899,8 @@
           "sha256": "e539d5b2662d191c0a70b1ac9dd593842279397b8627f0e3871d8852c78c2271",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "NutAssembly GeoPhys CPU NA-S0 seed19 Outcome V1 H5; original strict lifecycle failure retained"
+          "role": "NutAssembly GeoPhys CPU NA-S0 seed19 Outcome V1 H5; original strict lifecycle failure retained",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json",
@@ -873,7 +908,8 @@
           "sha256": "cf97d8f3c61dce71ede1307669be2a9217fa27f9b18bb342afb74dad85b3c6f5",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log",
@@ -881,7 +917,8 @@
           "sha256": "0934302ca7f0b1e7d71ba82923c80dc024dac75e06d1d6a0827c9ff123e1fd7e",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
@@ -889,7 +926,8 @@
           "sha256": "f7000d28e1a47363542bef8909341d5a13582175941b394987ad31f0ea4f5931",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "NutAssembly MuJoCo CPU NA-S0 seed19 Outcome V1 H5"
+          "role": "NutAssembly MuJoCo CPU NA-S0 seed19 Outcome V1 H5",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json",
@@ -897,7 +935,8 @@
           "sha256": "ea25746cbfc18c068cce3dc7c46246237d5570be0b6ecaf8c590be2f8e6b168c",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log",
@@ -905,7 +944,8 @@
           "sha256": "deacad498bbf4ba7bab5ad00a657809018eccdfa555a3889e8ee7699d077a53e",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Task full-route result/worker supporting acceptance receipt"
+          "role": "Task full-route result/worker supporting acceptance receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log"
         },
         {
           "path": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
@@ -913,7 +953,8 @@
           "sha256": "fbd78fec782001f93d58ec55c49ed2f14ea9bf835f6197896c81813538559ce5",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Focused converter argv and H5 result-gating receipt"
+          "role": "Focused converter argv and H5 result-gating receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_b_20261017/cli_and_failure_gates.log"
         },
         {
           "path": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log",
@@ -921,11 +962,20 @@
           "sha256": "077f593c60258c00ffc3eb9c693b1a3c97c695d10c8d0b7acec1335bf9c0f8b2",
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
-          "role": "Final 147-test/6-subtest provider-free S5-C2 receipt"
+          "role": "Final 147-test/6-subtest provider-free S5-C2 receipt",
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_c2_20261017/provider_free_final.log"
         }
       ],
       "local_status": "Exact bytes are present and SHA-256 checked on /dev/sda; no independent backup or restore test",
-      "limits": "No H5 hash substitutes for raw data. SB3 smoke includes a preserved CUDA initialization warning in stderr. Rendering outputs were in-memory and no raw frame file exists."
+      "limits": "No H5 hash substitutes for raw data. SB3 smoke includes a preserved CUDA initialization warning in stderr. Rendering outputs were in-memory and no raw frame file exists.",
+      "github_backup": {
+        "remote": "public",
+        "branch": "refs/heads/v1.1.0",
+        "scope": "L2 only: 22 exact files / 24,563,669 bytes; six H5 files",
+        "state": "PENDING_REMOTE_READBACK",
+        "privacy": "Maintainer approved publishing exact originals including embedded local absolute paths.",
+        "layout": "docs/releases/v1.1/evidence/raw/l2/<original workspace/maintenance subpath after workspace/>"
+      }
     },
     "L3": {
       "scope": "Historical qualification, source recovery archives, previous task/solver candidates, retired Go2/static-template runs, experiments, diagnostics, demos, and unselected maintenance outputs",

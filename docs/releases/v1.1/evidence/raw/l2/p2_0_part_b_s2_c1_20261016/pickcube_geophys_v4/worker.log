@@ -1,0 +1,11 @@
+[Taichi] version 0.6.2, llvm 20.1.7, commit 9b384286, linux, python 3.12.14
+17:11:27 [Runtime] Taichi cache
+         Cache    warm | 133 kernels | 61.6 MiB
+[Taichi] Starting on arch=x64
+17:11:27 [Runtime] Taichi runtime
+         Runtime  CPU | fastest compile | 4 threads | cache on
+17:11:27 [WARN] [Scene] MJCF import completed with retained or rejected semantics
+         status=completed_with_diagnostics | issue_count=1 | action="Inspect the Agent JSONL detail records before relying on omitted semantics"
+17:11:27 [SUCCESS] [Scene] Scene import completed
+         status=completed | source_format=mjcf | cached=False | scene_name=panda | body_count=13 | shape_count=88 | joint_count=10
+{"case": "pickcube_geophys_seed31_100hz", "checks": {"100hz_2ms_5substeps": true, "T_transitions_T_plus_1_boundaries": true, "action_observation_schema": true, "adjacent_100hz_control_clock": true, "all_acceptance_checks": true, "artifact_identity": true, "behavioral_trajectory_equivalence": true, "clean_tested_source_head": true, "expert_completed": true, "four_authored_stages": true, "h5_finalized_and_logical_roundtrip": true, "h5_schema_validated": true, "historical_selected_contracts": true, "native_step_count_matches": true, "no_termination_or_truncation": true, "provider_applied_controls": true, "provider_native_step_accounting": true, "recipe_identity_present": true, "reset_identity_matches_baseline": true, "seed31_reset": true, "selected_route": true, "single_selected_solution": true, "source_identity_files_present": true, "task_success_lift_only": true}, "comparison": {"baseline_h5_sha256": "c4e66723e81d5391751b6b2007d9a82c69a4550738b62933f3a4d48079290415", "current_h5_sha256": "cd39b1d2e6c14c6a3fc39b744e26657448aedaf1d29b34ac60fcaec0026d9108", "current_recording_identity": "261b58e22c07be2f1aaa76ec0604fd6f035eeaed79a9feae450a5a8fffc26b39", "exact_transition_and_boundary_records": false, "first_behavior_difference": null, "first_full_record_difference": {"left": "\"pick-cube-p16-readiness-expert-v2\"", "path": "$.transitions[0].expert_diagnostics.expert_version", "right": "\"pick-cube-readiness-v1\""}, "task_control_state_behavior_equivalent_excluding_solution_diagnostics": true}, "error": null, "status": "PASS"}
