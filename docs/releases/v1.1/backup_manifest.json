@@ -1162,7 +1162,7 @@
     "full_workspace_backup_waiver": false,
     "post_cleanup_provider_free_tests": "9 passed on fa4d898 execution source; 7 in 1.51s plus 2 in 0.81s",
     "historical_raw_loss": "Absent approved C1/C2 raw/source bytes may be permanently unrecoverable; accepted by maintainer.",
-    "storage_risk": "OPEN; counter increased to 0x7fd at later integrity recheck; no further destructive actions."
+    "storage_risk": "Historical SATA/BadCRC risk OPEN. Maintainer repeatable SMART refresh observations support fixed +5 counter increments; counter alone is an investigation signal. Low-I/O verification allowed under revised criteria; no independent backup waiver."
   },
   "current_receipt_path_migration": {
     "date": "2026-10-18",
@@ -1194,5 +1194,29 @@
     ],
     "historical_paths_notice": "Earlier S5-B/C1/C2 snapshots retain original paths; current receipt lookup uses these verified preserved copies. No source results were regenerated."
   },
-  "required_backup_scope_historical_notice": "Original broad required_backup_scope includes historical pre-retirement volumes and source paths. It is an unmet historical requirement, not a claim that deleted raw files remain. Use current C8 status, current receipt path migration and L2 inventory for available data; no waiver is granted."
+  "required_backup_scope_historical_notice": "Original broad required_backup_scope includes historical pre-retirement volumes and source paths. It is an unmet historical requirement, not a claim that deleted raw files remain. Use current C8 status, current receipt path migration and L2 inventory for available data; no waiver is granted.",
+  "storage_monitoring_revision": {
+    "date": "2026-10-18",
+    "policy": "c8-storage-stop-criteria-v2",
+    "counter_alone": "INVESTIGATE_NOT_PROOF_OF_NEW_READ_WRITE_FAILURE",
+    "maintainer_reported_smart_refresh_observations": [
+      "0x802->0x807 (+5), success",
+      "0x807->0x80c (+5), success",
+      "subsequent cached attribute read: unchanged"
+    ],
+    "independent_assistant_cached_read": {
+      "ioerr_cnt": "0x80c",
+      "udma_crc": 37,
+      "reallocated": 0,
+      "pending": 0,
+      "uncorrectable": 0,
+      "smart_failing": false
+    },
+    "low_io_work": "PERMITTED_WITH_MONITORING",
+    "historical_risk": "OPEN",
+    "independent_backup": "NOT_VERIFIED",
+    "report": "c8_storage_monitoring_revision.md",
+    "historical_stop_latch": "Preserved; no deletion tools re-enabled",
+    "no_new_deletion_or_publication": true
+  }
 }

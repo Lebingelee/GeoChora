@@ -27,7 +27,7 @@ C1/C2 相应历史原始轨迹、实验数据和 GeoPhys 源码快照已不在�
 - 本轮执行源码相对 public/develop 的 `task_env`、GeoPhys Gitlink、asset、`docs/releases/v1.0` 无 diff；未重复已接受的 native full routes。
 - 恢复原 Goal 后，已在清理后源码 `fa4d898` 上重新运行相同 9 项 provider-free 检查：7 passed in 1.51s，2 passed in 0.81s。覆盖选定 Artifact、reset、semantics、retired UID、import isolation、workspace independence 与 task binding。Python 3.12.14、2 GiB RLIMIT_AS、150 秒 CPU ceiling、180 秒 subprocess timeout；无 native 执行。日志和命令保留在原 C8 execution 目录的 post_manual_cleanup_tests.json 与两个 .log。没有新增 Qualification、D0–D2、训练或 native 渲染验证。
 - public/develop 读回 `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`；main `e4e39883fbe01d4be4b172a53a535ef0095b3d64`；v1.0.0 tag object `17c3100d4fabcb061c23569dea49973ebd177d51`、peeled `42787f5e4f658a3f81fdd2140cf7544d6342c783`。
-- `/sys/block/sda/device/ioerr_cnt` 从上轮 `0x7ee` 增至 `0x7f3`。这是尚未分类的 SCSI 错误计数异常；可读 kernel log 未提供同期新 ATA 读写错误解释，不能证明存储健康。停止所有进一步删除和高负载操作；不重置停止标记、不绕过安全门。
+- `/sys/block/sda/device/ioerr_cnt` 从上轮 `0x7ee` 增至 `0x7f3`。这是尚未分类的 SCSI 错误计数异常；可读 kernel log 未提供同期新 ATA 读写错误解释，不能证明存储健康。该句属于最初停止时的保守判读；维护者后续 SMART 复现实验后，当前采用[修订判据](c8_storage_monitoring_revision.md)。单独计数增长不再阻止有界低 I/O 工作；旧停止标记保留为历史记录，不在本次执行额外删除。
 
 [机器可读观察收据](evidence/retirement/c8_manual_cleanup_observation_20261018.json)保留计数、空间、监测/清单哈希和限制。完整扫描记录仍在 ignored 的 C8 手工监测目录。
 
@@ -55,7 +55,7 @@ C1/C2 相应历史原始轨迹、实验数据和 GeoPhys 源码快照已不在�
 | 选定任务功能 | PASS，限既有 TESTED_BOUNDED 的四个 task/provider CPU 交集 |
 | API migration、项目版本策略 | 文档已准备；v1.1.0 为含 breaking changes 的项目特定 consolidation 版本，不宣称严格 SemVer |
 | 注册 worktree 退休 | BLOCKED，继续保留 |
-| 存储异常 | BLOCKED，未分类计数继续增加 |
+| 存储状态 | 历史 SATA 风险 OPEN；近期计数固定增量有维护者 SMART 刷新复现实验支持，不能独自证明新读写故障。有界只读工作允许继续，见监测修订 |
 | 独立备份 | BLOCKED / NOT_VERIFIED，清理授权没有豁免备份门槛 |
 | Controller Option B 风险、能力矩阵批准 | MAINTAINER_DECISION_REQUIRED |
 | Fresh-install / 全量 relocated regression | NOT_RUN；既有 detached-checkout smoke 不等于这两项；139 PASS / 8 FAIL 记录保持 |
@@ -74,4 +74,4 @@ C1/C2 相应历史原始轨迹、实验数据和 GeoPhys 源码快照已不在�
 
 ## 原 Goal 完成情况复核
 
-按原 Goal A–K 判据：A/B/C/D/E/F/I/J 已有完成证据；G 为部分完成（普通候选路径消失，但缺少用户逐项 unlink 收据，B worktree 未退休）；H 的保护数据和空间观测已完成，精确逐项回收归因不可验证；K 的 readiness 报告已完成，但 release 仍 BLOCKED。不能将整项 Goal 标记为无条件 complete，也不因保留例外再开启一轮常规清理。当前 release_readiness.md、backup manifest 和相关状态页现已同步为手工处理后观察，早期收据保持历史身份。目标系统已恢复 active；详见[原 Goal 完成审计](c8_goal_completion_audit.md)。存储/worktree/逐项收据不足仍保留，不宣称完整 Goal complete。
+按原 Goal A–K 判据：A/B/C/D/E/F/I/J 已有完成证据；G 为部分完成（普通候选路径消失，但缺少用户逐项 unlink 收据，B worktree 未退休）；H 的保护数据和空间观测已完成，精确逐项回收归因不可验证；K 的 readiness 报告已完成，但 release 仍 BLOCKED。不能将整项 Goal 标记为无条件 complete，也不因保留例外再开启一轮常规清理。当前 release_readiness.md、backup manifest 和相关状态页现已同步为手工处理后观察，早期收据保持历史身份。目标系统已恢复 active；详见[原 Goal 完成审计](c8_goal_completion_audit.md)。worktree/逐项收据不足仍保留；存储风险继续披露，但不以单独计数增长停止低 I/O 工作，不宣称完整 Goal complete。

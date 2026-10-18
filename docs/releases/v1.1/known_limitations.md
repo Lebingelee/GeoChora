@@ -47,3 +47,5 @@
 - External users and deployments may rely on removed APIs that repository
   scans cannot discover. The compatibility inventory is the migration record;
   no silent aliases are supplied.
+
+- **C8 停止判据更正（2026-10-18）：** 维护者两次 SMART 刷新均令 SCSI 计数增加 5，而缓存读取不增加。当前将单独计数增量作为调查信号；实际 I/O、内核存储错误、CRC/坏扇区增长或哈希异常才触发相应停止。历史 SATA 风险与独立备份门槛仍保留，详见[监测修订](c8_storage_monitoring_revision.md)。

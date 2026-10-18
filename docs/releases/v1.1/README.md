@@ -30,6 +30,7 @@ release-candidate preparation only. No release tag or GitHub Release exists;
 - [Release readiness gates](release_readiness.md)
 - [S5-C8 final manual-cleanup observation, remaining gates and Phase 2.0 closure](c8_manual_cleanup_final_report.md)
 - [S5-C8 original-goal requirement-by-requirement completion audit](c8_goal_completion_audit.md)
+- [S5-C8 revised storage monitoring criteria and SMART interpretation](c8_storage_monitoring_revision.md)
 - [S5-C8 earlier authorized execution and safety-stop receipt](c8_execution_and_phase2_closure.md)
 - [S5-C1 final gate receipt](../../module/task_env/p2_0_s5_c1_final_release_gate.md)
 - [S5-C2 integration and backup gate receipt](../../module/task_env/p2_0_s5_c2_public_integration_readiness.md)
