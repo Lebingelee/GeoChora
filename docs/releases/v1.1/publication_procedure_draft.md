@@ -5,8 +5,9 @@
 The reviewed S5-C1–C8 release-review chain is integrated into public
 `develop` at `c679267790726d3e34d080a133535c2c308a7a55`. The maintainer
 authorized using the `v1.1.0` candidate branch as a public L2 evidence backup.
-This branch is being prepared with the exact 22-file L2 copy; it does not
-publish v1.1.0 or grant qualification.
+The exact 22-file L2 copy is present and verified at
+`745efc6a6693a7d10407c6ddd02837a2ae574131`; this does not publish v1.1.0 or
+grant qualification.
 
 Current review decisions and remaining procedure:
 
@@ -22,18 +23,20 @@ Current review decisions and remaining procedure:
 3. Preserve L1 metadata in Git and retain all 22 L2 files (24,563,669 bytes).
    The maintainer explicitly approved publishing the exact L2 originals,
    including embedded local absolute paths, to the public `v1.1.0` candidate
-   branch. The local copy and hashes match; remote push, fetch, and representative
-   restore reads are still required before marking the L2 copy verified. This is
-   an L2-only off-host copy in the same public GitHub repository, not a separately
-   administered backup or full-workspace backup. The former full-scope backup
-   remains unverified; no missing historical raw data is restored by this copy.
+   branch. Remote readback verified all 22 blob sizes and SHA-256 values; a
+   representative NutAssembly H5 opened and a PickCube result JSON parsed from
+   fetched Git objects. This is an L2-only off-host copy in the same public
+   GitHub repository, not a separately administered backup or full-workspace
+   backup. The former full-scope backup remains unverified; no missing historical
+   raw data is restored by this copy.
 4. Keep the fresh-install check and full relocated-checkout regression as
    `NOT_RUN`; their limitations are accepted for this review. The historical
    exploratory 139 PASS / 8 FAIL result remains disclosed; do not report a
    relocated full-suite or native-route pass.
-5. After L2 remote readback, perform one final source/ref/evidence readback.
-   Repeat native runs only if the selected
-   execution source changes or a specific unresolved risk warrants one.
+5. L2 remote readback is complete at `745efc6a6693a7d10407c6ddd02837a2ae574131`.
+   Before any publication, perform a fresh source/ref/evidence readback.
+   Repeat native runs only if the selected execution source changes or a
+   specific unresolved risk warrants one.
 6. Publication is a separate step and is not authorized here. Before it,
    present the exact RELEASE_COMMIT, `main`/`develop`/release-branch/tag
    operations, L2 backup receipt, bounded capability claims, breaking API
@@ -46,10 +49,9 @@ Current review decisions and remaining procedure:
    publication. Preserve the frozen v1.0.0 worktree, the retained C8 worktree
    and holdouts, all unique logs, and unrelated refs.
 
-The release remains **RELEASE_CANDIDATE — NOT_PUBLISHED** while the approved L2
-copy awaits remote readback and restore checks. The full-workspace backup remains
-unverified; this L2 copy does not cover all submodules or local-only historical
-refs. C8 closure is
+The release remains **RELEASE_CANDIDATE — NOT_PUBLISHED**. The scoped L2 copy is
+verified, while the full-workspace backup remains unverified; this L2 copy does
+not cover all submodules or local-only historical refs. C8 closure is
 accepted with its retained worktree, holdouts and missing per-file deletion
 receipts. No `main` update, release tag, or GitHub Release is authorized by
 this backup operation.

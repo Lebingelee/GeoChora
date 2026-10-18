@@ -1,8 +1,8 @@
 {
   "schema": "geochora-v1-1-release-candidate-backup-manifest-v1",
-  "status": "L2_REMOTE_COPY_PENDING; FULL_WORKSPACE_BACKUP_NOT_VERIFIED",
+  "status": "L2_REMOTE_COPY_VERIFIED; FULL_WORKSPACE_BACKUP_NOT_VERIFIED; SEPARATE_ADMIN_DOMAIN_NOT_VERIFIED",
   "target_release": "v1.1.0",
-  "reason": "The maintainer authorized an exact public GitHub v1.1.0 branch copy of the 22-file L2 set (24,563,669 bytes), including approved local absolute-path strings. The local copy is hash-verified; remote push/readback remains pending. The earlier conservative full-source/workspace bundle plan (about 74 GB) is not performed and is not satisfied by this L2-only operation.",
+  "reason": "The maintainer authorized an exact public GitHub v1.1.0 branch copy of the 22-file L2 set (24,563,669 bytes), including approved local absolute-path strings. The remote copy now reads back with matching size and SHA-256 for all files; representative H5 and result JSON reads passed. The earlier conservative full-source/workspace bundle plan (about 74 GB) remains unperformed and is not satisfied by this L2-only operation.",
   "source_storage_observation": {
     "physical_device": "/dev/sda",
     "known_risk": "/dev/sda / ata5 BadCRC and READ I/O errors recorded in prior maintenance evidence",
@@ -439,18 +439,18 @@
   ],
   "verification_result": {
     "destination_category": "PUBLIC_GITHUB_BRANCH_L2_COPY",
-    "destination_identity": "public remote refs/heads/v1.1.0; L2-only copy",
-    "copy_completion": "LOCAL_COPY_SHA256_VERIFIED; REMOTE_PUSH_PENDING",
-    "file_size_sha256_comparison": "LOCAL_COPY_PASS; REMOTE_READBACK_PENDING",
+    "destination_identity": "public remote refs/heads/v1.1.0 at 745efc6a6693a7d10407c6ddd02837a2ae574131; exact 22-file L2-only copy",
+    "copy_completion": "PASS — branch push and remote fetch/readback completed",
+    "file_size_sha256_comparison": "PASS — 22/22 remote blob sizes and SHA-256 match the source manifest",
     "git_bundle_object_verification": "NOT_RUN — this is a scoped L2 evidence copy, not a full Git bundle backup",
     "submodule_recovery": "NOT_RUN — submodule recovery remains governed by the existing public Gitlinks",
-    "representative_h5_restore_read": "REMOTE_READBACK_PENDING",
-    "representative_evidence_restore_read": "REMOTE_READBACK_PENDING",
-    "manifest_completeness": "22/22 L2 files mapped to exact branch paths; source and copied SHA-256 values match locally.",
-    "final_status": "L2_REMOTE_COPY_PENDING; FULL_WORKSPACE_BACKUP_NOT_VERIFIED"
+    "representative_h5_restore_read": "PASS — NutAssembly GeoPhys H5 opened from fetched branch Git object",
+    "representative_evidence_restore_read": "PASS — PickCube GeoPhys result JSON parsed from fetched branch Git object",
+    "manifest_completeness": "22/22 L2 files mapped to exact branch paths; local originals, local copies, and fetched remote Git blobs have matching sizes and SHA-256.",
+    "final_status": "L2_REMOTE_COPY_VERIFIED; FULL_WORKSPACE_BACKUP_NOT_VERIFIED; SEPARATE_ADMIN_DOMAIN_NOT_VERIFIED"
   },
   "current_scoped_l2_backup": {
-    "status": "AUTHORIZED_LOCAL_COPY_READY_REMOTE_PENDING",
+    "status": "REMOTE_COPY_VERIFIED",
     "target_release": "v1.1.0",
     "approval_date": "2026-10-18",
     "destination_category": "PUBLIC_GITHUB_BRANCH_COPY",
@@ -463,11 +463,16 @@
     "payload_limit_bytes": 100000000,
     "local_copies": "docs/releases/v1.1/evidence/raw/l2/",
     "local_copy_sha256_status": "22/22 size and SHA-256 match the source manifest",
-    "remote_copy_sha256_status": "PENDING_PUSH_AND_REMOTE_READBACK",
+    "remote_copy_sha256_status": "PASS — all 22 remote Git blobs match recorded size and SHA-256",
     "local_absolute_path_disclosure": "The maintainer explicitly approved publishing exact originals including embedded local absolute-path strings.",
     "scope_limit": "L2 raw acceptance evidence only; not the complete workspace, all local refs, independent submodule bundles, or a full-source backup.",
     "recovery_domain_limit": "Hosted in the same public GitHub repository/account; this is an off-host copy but not a separately administered or physically independent backup.",
-    "not_authorized": "No main update, tag, GitHub Release, publication, additional cleanup, or historical-file deletion."
+    "not_authorized": "No main update, tag, GitHub Release, publication, additional cleanup, or historical-file deletion.",
+    "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131",
+    "remote_ref_readback": "PASS — public/v1.1.0 fetched and resolves to remote_commit",
+    "representative_h5_read": "PASS — NutAssembly GeoPhys execution.h5 opened from fetched Git object with h5py 3.16.0",
+    "representative_result_read": "PASS — PickCube GeoPhys result.json parsed from fetched Git object",
+    "restore_scope_note": "Reads were performed from fetched remote Git objects; no separate destination or full fresh-checkout restore test was performed."
   },
   "release_candidate_document_files": [
     {
@@ -482,13 +487,13 @@
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md",
-      "size_bytes": 10326,
-      "sha256": "7b96fcca77f0187a31751b35d936b9346cf6445b0bdf985aabc1bf0de3d49e41"
+      "size_bytes": 10252,
+      "sha256": "e33cb41ef21de44908582e7e084e4a22e84d05d05a7ea13b764f35046f84a22a"
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c2_public_integration_readiness.md",
-      "size_bytes": 6865,
-      "sha256": "f3fa6c9b32f50b472572d59bb0cab94ce06895c3d6030a97da5aac7b067992f1"
+      "size_bytes": 6826,
+      "sha256": "8950dd1c49775858393948f8119ff98aefba88f811a10020f830a7a883f7b549"
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c3_minimal_release_evidence.md",
@@ -502,8 +507,8 @@
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c5_l3_retirement_planning.md",
-      "size_bytes": 15921,
-      "sha256": "2e59e0080a6c51734010f4a3433ba58e6447000a021f779999942d59d968cf26"
+      "size_bytes": 15927,
+      "sha256": "aad59510d1b5114a65fb5fff509c139d5fa8383b505121beb8cdb319c00b5ca0"
     },
     {
       "path": "docs/module/task_env/p2_0_s5_c6_l3_retirement_preparation.md",
@@ -512,8 +517,8 @@
     },
     {
       "path": "docs/releases/v1.1/README.md",
-      "size_bytes": 2221,
-      "sha256": "50806de164eaa218fadede1ab843b31f8aaeebaabcf6bd9af56fd141e3859198"
+      "size_bytes": 3044,
+      "sha256": "db104c23e974983dd764480f9b1dd7f6e562c585d54b9b43aaef10ed2948b451"
     },
     {
       "path": "docs/releases/v1.1/capability_matrix.md",
@@ -522,8 +527,8 @@
     },
     {
       "path": "docs/releases/v1.1/evidence/README.md",
-      "size_bytes": 11052,
-      "sha256": "d0396aa3686d836302131c979c48a8f6df91f61ee495df7389be22f9e8377bc3"
+      "size_bytes": 13405,
+      "sha256": "d8879ccee2ac7eee1678194d286a3183f8596e8ec311d75e5d05608c9180cd93"
     },
     {
       "path": "docs/releases/v1.1/evidence/manipulation_acceptance.md",
@@ -547,13 +552,13 @@
     },
     {
       "path": "docs/releases/v1.1/evidence/retirement/l3_c_approval_candidate.json",
-      "size_bytes": 56174,
-      "sha256": "252de838a83c278c37eff38076968d0c7812211fe961194ce6b119e646510733"
+      "size_bytes": 56215,
+      "sha256": "522cabdbe4a02d5bdf359fbdb8f3fbba5a29e3897c260330fa9f8774bc96d7a7"
     },
     {
       "path": "docs/releases/v1.1/evidence/system_smoke_acceptance.md",
-      "size_bytes": 3212,
-      "sha256": "974e983acf1c9cb091d3ef55fcca7c1f2ed6ef4d12089a1cdada10e8ae2a7915"
+      "size_bytes": 3190,
+      "sha256": "1fdb856087e70c24b7f2ef3ab4d8dbb436deb32e1fb2704f99e3604288e25802"
     },
     {
       "path": "docs/releases/v1.1/installation.md",
@@ -562,8 +567,8 @@
     },
     {
       "path": "docs/releases/v1.1/known_limitations.md",
-      "size_bytes": 5036,
-      "sha256": "c5f85c1a9f525e1055950f970509030fca4cf78a54f975ffabfa76b7d4c05dfc"
+      "size_bytes": 5573,
+      "sha256": "b7a990cb4ef7ca1d8433d078506a1c55d64f631fa7e1710122c3cda25eb444a9"
     },
     {
       "path": "docs/releases/v1.1/learning_and_rendering_limits.md",
@@ -582,18 +587,18 @@
     },
     {
       "path": "docs/releases/v1.1/publication_procedure_draft.md",
-      "size_bytes": 3319,
-      "sha256": "fe4b9cae0d74668474b26e4a6e79f55dc3d37fb9e6db56653be0623de9ade1c1"
+      "size_bytes": 3667,
+      "sha256": "8e1ee6e6fc5adfef7fc49520919817648f559bee0749047f70c5fd040c7f03c6"
     },
     {
       "path": "docs/releases/v1.1/release_readiness.md",
-      "size_bytes": 6194,
-      "sha256": "47d94a059cdd9b00e3e9ff7ef442a7119182c4c9c862d1095dc5c640fe57e6ab"
+      "size_bytes": 16475,
+      "sha256": "e848cb7d885cea7debd0c5020fca894044286ca743308ac2735808e2ead903e9"
     },
     {
       "path": "docs/releases/v1.1/release_scope_and_version_policy.md",
-      "size_bytes": 3002,
-      "sha256": "aa8a500c6d1b6331361b2bf86c5afbc5f4599b35fe13986f5042e5a5b70375e3"
+      "size_bytes": 3777,
+      "sha256": "fa7e38c76d412cbf80757b960379a3f9938fe6f3c48b12f22ae29e7cfc15f0cf"
     },
     {
       "path": "docs/releases/v1.1/s5_c3_publication_checklist_draft.md",
@@ -602,13 +607,13 @@
     },
     {
       "path": "docs/releases/v1.1/source_recovery_manifest.json",
-      "size_bytes": 15645,
-      "sha256": "915278ca6b09e4f6e8c759f4cd515630451e7be702af7897928bf5624aebfddc"
+      "size_bytes": 17395,
+      "sha256": "21ed1b97f3b4637e70babb1fc4617374f33512f1b3b75703406cc2ad79e3f25e"
     },
     {
       "path": "docs/releases/v1.1/test_acceptance_summary.md",
-      "size_bytes": 6722,
-      "sha256": "7db32d1a5f8dd047cc0800fbedd1a2b8eec3cbed70d4c4a08e4b6ca8c89f57be"
+      "size_bytes": 6683,
+      "sha256": "290a5372d57f67652435544e5adc57f42f2586c0b97b9f19cc0ec9f9e9b23c89"
     },
     {
       "path": "task_env/README.md",
@@ -774,7 +779,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Accepted Pendulum merged_scene batch reset/step receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_part_b_s4_20261016/merged_scene_pendulum_cpu_batch_smoke_final.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_part_b_s4_20261016/merged_scene_pendulum_cpu_batch_smoke_final.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
@@ -783,7 +790,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Canonical PickCube recording and logical storage roundtrip H5",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log",
@@ -792,7 +801,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Preserved PyTorch CUDA initialization warning during CPU SB3 run",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stderr.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log",
@@ -801,7 +812,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Bounded SB3 execution stdout",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke.stdout.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json",
@@ -810,7 +823,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Bounded SB3 example status, requested configuration and resource limits",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/example_result.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
@@ -819,7 +834,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Current bounded Pendulum SB3 one-update output checkpoint; not a performance or qualification artifact",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/pendulum_ppo_b2_cpu.zip",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
@@ -828,7 +845,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Bounded Pendulum SB3 one-update return H5",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/return_curve.h5",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
@@ -837,7 +856,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Bounded Pendulum SB3 runner result summary",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_b_20261017/pendulum_sb3_smoke/summary.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
@@ -846,7 +867,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "PickCube GeoPhys CPU seed31 full-route H5",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/execution.h5",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json",
@@ -855,7 +878,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/result.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log",
@@ -864,7 +889,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_geophys_v4/worker.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
@@ -873,7 +900,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "PickCube MuJoCo CPU seed31 full-route H5",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/execution.h5",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json",
@@ -882,7 +911,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/result.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log",
@@ -891,7 +922,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c1_20261016/pickcube_mujoco_v4/worker.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
@@ -900,7 +933,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "NutAssembly GeoPhys CPU NA-S0 seed19 Outcome V1 H5; original strict lifecycle failure retained",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/execution.h5",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json",
@@ -909,7 +944,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/result.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log",
@@ -918,7 +955,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_geophys_final/worker.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
@@ -927,7 +966,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "NutAssembly MuJoCo CPU NA-S0 seed19 Outcome V1 H5",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/execution.h5",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json",
@@ -936,7 +977,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/result.json",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log",
@@ -945,7 +988,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Task full-route result/worker supporting acceptance receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_part_b_s2_c2_20261016/nutassembly_mujoco_final/worker.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
@@ -954,7 +999,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Focused converter argv and H5 result-gating receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_b_20261017/cli_and_failure_gates.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_b_20261017/cli_and_failure_gates.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         },
         {
           "path": "workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log",
@@ -963,7 +1010,9 @@
           "status": "LOCAL_BYTES_HASH_VERIFIED",
           "independent_backup": "NOT_VERIFIED",
           "role": "Final 147-test/6-subtest provider-free S5-C2 receipt",
-          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_c2_20261017/provider_free_final.log"
+          "github_branch_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_s5_c2_20261017/provider_free_final.log",
+          "remote_copy_status": "VERIFIED_SIZE_AND_SHA256",
+          "remote_commit": "745efc6a6693a7d10407c6ddd02837a2ae574131"
         }
       ],
       "local_status": "Exact bytes are present and SHA-256 checked on /dev/sda; no independent backup or restore test",

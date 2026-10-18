@@ -15,10 +15,12 @@ limits, the breaking API migration disclosure, the fresh-install and
 relocated-regression `NOT_RUN` limitations, and the recorded C8 residuals.
 The maintainer has authorized an exact L2 copy to the public GitHub
 `v1.1.0` candidate branch, including source files that contain embedded local
-absolute paths. The local copy and hashes are verified; remote push and
-restore/readback remain pending. The user authorized this L2-only copy (under
-100 MB) and approved the embedded local-path strings. It does not cover the
-historical full-workspace bundle or publish the release. On
+absolute paths. The local copy and hashes are verified, and the remote branch
+now reads back at `745efc6a6693a7d10407c6ddd02837a2ae574131`; all 22 remote
+blob hashes match. A representative H5 and result JSON read passed. The user
+authorized this L2-only copy (under 100 MB) and approved the embedded local-path
+strings. It does not cover the historical full-workspace bundle or publish the
+release. On
 2026-10-18 the maintainer authorized all four exact C8 batches and accepted
 C1/C2 loss.
 Assistant deletion stopped before unlinking when the SCSI counter rose; later
@@ -47,13 +49,13 @@ report](c8_execution_and_phase2_closure.md).
 | v1.1.0 capability matrix approval | **MAINTAINER_ACCEPTED — BOUNDED CLAIMS ONLY** | The current candidate matrix is approved in principle; four manipulation/provider intersections remain `TESTED_BOUNDED`, not newly qualified. |
 | Historical L3 retention | **MAINTAINER_ACCEPTED — RETIREMENT WITH RECORDED EXCEPTIONS** | C8 retirement and residual loss are accepted as recorded. Missing historical raw data has not been restored. |
 | Release metadata preservation | **PASS — PUBLIC_GIT** | All 91 L1 entries are tracked in the integrated source. Fourteen differ from the older C8 snapshot after documented updates; each older exact blob is recoverable from Git history. The 37 exact historical records and original bytes remain available. |
-| Current TaskEnv raw evidence | **PASS — L2_RAW_EVIDENCE_LOCALLY_VERIFIED** | 22 selected files, 24,563,669 bytes, including six H5 files and bounded SB3/batch raw receipts; local sizes/hashes are verified. This is not an independent backup. |
-| Raw evidence backup | **AUTHORIZED — REMOTE_READBACK_PENDING** | 22 exact files / 24,563,669 bytes are locally copied under `evidence/raw/l2/`; every file matches its source size and SHA-256. The public `v1.1.0` branch copy is authorized and within the 100 MB limit, but not yet pushed/read back. Twelve originals contain local absolute path strings; the maintainer approved publishing those exact bytes. This is an off-host L2 copy in the same GitHub repository, not a full-workspace or separately administered backup. |
+| Current TaskEnv raw evidence | **PASS — L2_LOCAL_AND_REMOTE_HASH_VERIFIED** | 22 selected files, 24,563,669 bytes, including six H5 files and bounded SB3/batch raw receipts; local and remote sizes/hashes match. |
+| Raw evidence backup | **PASS — SCOPED L2 REMOTE COPY** | Public `v1.1.0` branch `745efc6a6693a7d10407c6ddd02837a2ae574131` contains 22/22 files with matching sizes/SHA-256; a NutAssembly H5 opened and a PickCube result JSON parsed from fetched remote Git objects. Twelve originals contain approved local path strings. The copy is off-host but in the same GitHub repository/account; it is not the full-workspace or separately administered backup. |
 | Historical workspace backup | **NOT_VERIFIED — HISTORICAL LOSS ACCEPTED** | 65,826 approved ordinary paths are absent after maintainer manual handling; exact independent recovery is not verified and historical raw/source bytes may be permanently lost. Workspace allocation observed 2,815,557,632 bytes after cleanup, down 68.317 GiB from the recorded baseline. This is aggregate observation, not exact unlink-attributable recovery. The v1.0.0 P1.6 recovery archive remains unresolved. This is a disclosed accepted retention risk, not a backup PASS. |
-| Scoped retention policy and residual-risk acceptance | **MAINTAINER_ACCEPTED — C8 SCOPE ONLY** | L1/L2 preservation and exact A/B/C1/C2 retirement authorized on 2026-10-18, including C1/C2 permanent historical loss. C8 acceptance does not waive the independent L2 backup gate. |
+| Scoped retention policy and residual-risk acceptance | **MAINTAINER_ACCEPTED — C8 SCOPE ONLY** | L1/L2 preservation and exact A/B/C1/C2 retirement authorized on 2026-10-18, including C1/C2 permanent historical loss. The current L2 GitHub copy is recorded separately; it does not restore retired L3 data. |
 | Approved C8 execution | **C8_CLOSURE_ACCEPTED_WITH_EXCEPTIONS** | All 65,826 approved ordinary paths are absent; no user per-file unlink receipts exist. B worktree remains held (6,619 entries); all 522 pre-existing holdouts remain. Assistant deletion stayed storage-latched. Maintainer explicitly accepted retained worktree/holds and missing per-file operator logs for final C8 closure. |
 | P1.8 archive retirement | **PARTIAL — 3,382 PATHS ABSENT** | The held source bundle remains. C1 permanent-loss acceptance is recorded; raw trajectories/source carriers at the retired paths are no longer locally available there. Hashes do not restore them. |
-| Remote evidence preservation | **PASS — L1; PENDING — L2** | L1 release metadata is present on public `develop` at `c679267`. Exact L2 raw evidence is staged on the local `v1.1.0` branch; remote push/readback and representative restore reads remain. |
+| Remote evidence preservation | **PASS — L1 AND L2 COPY** | L1 is on public `develop` at `c679267`; the L2 copy is on public `v1.1.0` at `745efc6a`. Readback hashes and representative H5/JSON reads passed. |
 | Storage monitoring | **OPEN_RISK — BOUNDED BACKUP MAY PROCEED** | Counter-only growth is an investigation signal after the repeated SMART-refresh correlation. Stop on actual I/O failure, new ATA/block/filesystem errors, CRC/bad-sector growth or integrity anomalies. Historic SATA risk remains OPEN; the authorized L2 GitHub copy still requires remote verification. |
 | Publication authorization | **NOT AUTHORIZED IN THIS INSTRUCTION** | No v1.1.0 tag, `main` change, or GitHub Release is authorized or created; a separate final Publication GO is required. |
 | L3 retention and cleanup review | **PARTIAL; RESIDUAL HOLDS PRESERVED** | Ordinary paths handled manually; 522 holdouts and the registered worktree remain. No force/deinit/manual worktree fallback was attempted. |
@@ -88,7 +90,7 @@ release.
 | D. Fresh-install validation | **NOT_RUN — LIMITATION ACCEPTED** | The source-checkout/Python 3.12.14 validation scope is accepted; no fresh installation or packaging claim is made. |
 | E. Full relocated-checkout regression | **NOT_RUN — LIMITATION ACCEPTED** | Preserve the exploratory 139 PASS / 8 FAIL result and its explained path/test-helper causes; no full rerun or relocated native rollout is claimed. |
 | F. L1 remote preservation | **PASS — PUBLIC GIT** | Candidate `c679267` is present on public `develop`; remote SHA readback matched, and protected refs are unchanged. |
-| G. L2 integrity and backup | **LOCAL PASS; REMOTE READBACK PENDING** | All 22 local originals and copied branch-path files match. The maintainer authorized an exact public GitHub branch copy (24,563,669 bytes, below 100 MB), including embedded path strings. Readback and representative restore reads remain. The full-workspace bundle remains unverified. |
+| G. L2 integrity and backup | **PASS — SCOPED REMOTE COPY; FULL BACKUP NOT VERIFIED** | All 22 local originals, branch copies, and fetched remote Git blobs match (24,563,669 bytes). A representative NutAssembly H5 opened and a PickCube result JSON parsed from fetched objects. The same-repository copy is off-host but not separately administered; the full-workspace bundle remains unverified. |
 | H. Historical L3 retirement | **C8_CLOSURE_ACCEPTED_WITH_EXCEPTIONS** | The exact C8 loss is accepted while the registered worktree and all 522 holdouts remain. Unknown/external consumers remain a disclosed limit; no further deletion is authorized. |
 | I. `/dev/sda` storage risk | **OPEN — BACKUP WORK AUTHORIZED** | The maintainer directed that the L2 backup proceed despite the warning. Counter-only `ioerr_cnt` growth is an investigation signal; actual I/O failures, new storage errors, integrity failures, or CRC/bad-sector growth remain stop conditions. |
 | J. Publication and repository changes | **NOT AUTHORIZED IN THIS INSTRUCTION** | The maintainer separately authorized the `v1.1.0` branch for this exact L2 backup only. `main`, release tag, GitHub Release, and further cleanup remain subject to separate explicit approval. |
@@ -97,13 +99,14 @@ release.
 
 The maintainer authorized an exact 22-file L2 copy (24,563,669 bytes) on the
 public GitHub `v1.1.0` branch, within the 100 MB limit. The original local
-files remain unchanged. This operation can verify off-host preservation of the
-selected L2 bytes; it does not create a separately administered backup, a full
-workspace/source bundle, or copies of all submodule objects. Remote SHA-256
-readback and representative restored reads are required before marking this
-scoped L2 copy verified. The historical full-scope backup observation remains
-`BACKUP_NOT_VERIFIED`; C8 acceptance does not reconstruct deleted historical
-raw data. No release publication is authorized by this backup approval.
+files remain unchanged. Remote readback verified 22/22 blob sizes and SHA-256;
+a representative NutAssembly H5 opened and a PickCube result JSON parsed from
+fetched Git objects. This verifies off-host preservation of the selected L2
+bytes; it does not create a separately administered backup, a full
+workspace/source bundle, or copies of all submodule objects. The historical
+full-scope backup observation remains `BACKUP_NOT_VERIFIED`; C8 acceptance does
+not reconstruct deleted historical raw data. No release publication is
+authorized by this backup approval.
 
 At this review snapshot the release remains **RELEASE_CANDIDATE —
 NOT_PUBLISHED**. Later publication status must be determined from fresh remote
@@ -116,8 +119,8 @@ ref readback, not inferred from this dated report.
   `main=e4e39883fbe01d4be4b172a53a535ef0095b3d64`, annotated `v1.0.0` tag
   object `17c3100d4fabcb061c23569dea49973ebd177d51` peeling to
   `42787f5e4f658a3f81fdd2140cf7544d6342c783`. At the time of this update,
-  `v1.1.0` exists as a local candidate backup branch; no remote branch
-  readback, tag, or GitHub Release has yet been completed. The candidate is a descendant of `main`,
+  `v1.1.0` branch reads back at `745efc6a6693a7d10407c6ddd02837a2ae574131`;
+  no release tag or GitHub Release has been created. The candidate is a descendant of `main`,
   `develop`, and the frozen release commit.
 - **PASS:** the release package's JSON files parse; all 91 current L1 paths
   are tracked and present; 126 local Markdown links resolved in the prior
@@ -125,9 +128,9 @@ ref readback, not inferred from this dated report.
   the exact older blobs remain in Git history. The L2 raw payload contains no
   detected credentials, private keys, or password-like strings; twelve files
   contain local absolute paths, whose public inclusion the maintainer approved.
-- **PASS — LOCAL INTEGRITY ONLY:** all 22 L2 paths and staged branch copies
-  match their recorded sizes and SHA-256 values (24,563,669 bytes; six H5
-  files). Remote readback and restore checks are still pending.
+- **PASS — SCOPED REMOTE COPY:** all 22 L2 source/copy/remote blobs match their
+  recorded sizes and SHA-256 values (24,563,669 bytes; six H5 files). A
+  representative H5 and result JSON were read from fetched remote Git objects.
 - **PASS — EXISTING CODE RECEIPTS:** the 147-test/6-subtest S5-C2 provider-free
   run at `2fb60de` and the nine post-C8 provider-free checks on the unchanged
   selected source are recorded in the linked reports. The exact converter
@@ -141,4 +144,4 @@ ref readback, not inferred from this dated report.
 - **PASS — SCOPE:** integrated `develop` through `c679267` changes only
   documentation/governance; selected task/provider/runtime sources and
   Gitlinks are unchanged. The separate local `v1.1.0` backup branch contains
-  the exact 22-file L2 payload and pending remote-verification metadata.
+  the exact 22-file L2 payload and verified remote-readback metadata.

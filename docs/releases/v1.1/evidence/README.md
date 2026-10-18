@@ -52,7 +52,12 @@ candidate matrix or source/recovery records where available. On 2026-10-18 the
 maintainer authorized an exact public GitHub copy of all 22 L2 files
 (24,563,669 bytes) on the `v1.1.0` candidate branch. The local copies are under
 `evidence/raw/l2/`; the backup manifest maps each source path to its copy and
-records both hashes. Remote push and restore/readback remain pending. Twelve
+records both hashes. The branch now reads back at
+`745efc6a6693a7d10407c6ddd02837a2ae574131`; all 22 remote blob sizes and
+SHA-256 values match. A representative NutAssembly H5 opened successfully from
+the fetched Git object, and a representative result JSON parsed successfully.
+The full-workspace bundle and separately administered backup remain
+unverified. Twelve
 original files contain local absolute-path metadata; the maintainer explicitly
 approved publishing those exact bytes. This remains release-candidate evidence
 and grants no new Qualification. The five original task/recording H5 files
@@ -105,10 +110,11 @@ recorded in L1 rather than represented as a missing raw image.
 
 The expanded L2 inventory contains **22 files totaling 24,563,669 bytes**
 (about **23.43 MiB**), below the 100 MB limit selected by the maintainer. The
-local branch copy matches every source size and SHA-256. Remote verification is
-pending. If verified, it will establish an off-host copy in the same public
-GitHub repository, but not a separately administered backup or a full-workspace
-backup. Keep the original local files unchanged.
+local branch copy and remote Git objects match every source size and SHA-256.
+A representative H5 and result JSON were read from fetched Git objects. This
+verifies an off-host copy in the same public GitHub repository, but not a
+separately administered backup or a full-workspace backup. Keep the original
+local files unchanged.
 
 ## L3 — Historical workspace
 
@@ -122,7 +128,7 @@ per-path inventory remains in ignored
 `workspace/maintenance/p2_0_s5_c4_20261017/`. The S5-C5 [retention plan](../../../module/task_env/p2_0_s5_c5_l3_retirement_planning.md)
 and its three exact, DRY_RUN_ONLY manifests reclassify L3 into regenerable
 L3-A, superseded/review L3-B, historical raw L3-C, and unresolved L3-D. S5-C6
-bound those historical inventories to separate proposals with empty execution allowlists. C8 subsequently produced exact A/B/C1/C2 manifests; the maintainer authorized those hashes on 2026-10-18 and accepted C1/C2 permanent loss. Assistant execution stopped before deletion; the later manual-cleanup observation found all 65,826 ordinary candidate paths absent. The earlier `BACKUP_NOT_VERIFIED` gate remains active because no backup waiver was authorized. The three P1.1 holds, P1.8 bundle, 516 unresolved C2 paths and two symlinks remain held. No L2 raw file was changed. Historical raw files at the approved ordinary paths are now absent; independent recoverability is not verified. Tracked v1.0.0 release records and
+bound those historical inventories to separate proposals with empty execution allowlists. C8 subsequently produced exact A/B/C1/C2 manifests; the maintainer authorized those hashes on 2026-10-18 and accepted C1/C2 permanent loss. Assistant execution stopped before deletion; the later manual-cleanup observation found all 65,826 ordinary candidate paths absent. The historical full-workspace `BACKUP_NOT_VERIFIED` observation remains; the newly authorized L2 branch copy is tracked separately. The three P1.1 holds, P1.8 bundle, 516 unresolved C2 paths and two symlinks remain held. No L2 raw file was changed. Historical raw files at the approved ordinary paths are now absent; independent recoverability is not verified. Tracked v1.0.0 release records and
 qualification decisions remain unchanged and available through immutable
 `v1.0.0`.
 
@@ -135,12 +141,13 @@ qualification decisions remain unchanged and available through immutable
   `2fb60de`; this did not create a formal qualification decision.
 - **PASS — S5-C5 L2 recheck:** all 22 paths still match the indexed size and
   SHA-256; no L2 bytes were changed.
-- **PENDING:** remote GitHub branch readback and representative H5/result-file
-  reads for the authorized L2 copy.
+- **PASS — L2 REMOTE COPY:** the public `v1.1.0` branch at
+  `745efc6a6693a7d10407c6ddd02837a2ae574131` contains 22/22 exact L2 blobs;
+  all sizes and SHA-256 values match, and representative H5/JSON reads passed.
 - **AUTHORIZED:** public GitHub branch copy of exact L2 originals, including
   the approved embedded local path strings; no tag or release publication is
   authorized.
-- **NOT SATISFIED:** the historical full-workspace backup plan remains
+- **NOT VERIFIED:** the historical full-workspace backup plan remains
   unexecuted; the scoped L2 branch copy does not cover full source bundles,
   submodules, or L3.
 - **C8 PARTIAL / MANUAL_PATH_ABSENCE_VERIFIED:** exact approvals are in the historical [execution-stop receipt](retirement/c8_execution_receipt_20261018.json); current results are in the [manual post-observation receipt](retirement/c8_manual_cleanup_observation_20261018.json). All 65,826 ordinary paths are absent. Registered worktree and 522 holdouts remain. Post-cleanup 9 provider-free tests passed; storage and backup gates remain open.
