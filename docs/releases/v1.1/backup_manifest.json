@@ -1146,7 +1146,7 @@
   "historical_sections_notice": "s5_c5_retention_review, s5_c6_retirement_preparation, scoped_retention_proposal and s5_c8_retirement_authorization_and_storage_stop retain dated pre-cleanup observations. They are not current filesystem-presence claims. Use s5_c8_manual_cleanup_current_status for present status.",
   "s5_c8_manual_cleanup_current_status": {
     "observation_date": "2026-10-18",
-    "status": "PARTIAL_MANUAL_PATH_ABSENCE_VERIFIED",
+    "status": "MAINTAINER_ACCEPTED_C8_CLOSURE_WITH_RETAINED_EXCEPTIONS",
     "report": "c8_manual_cleanup_final_report.md",
     "receipt": "evidence/retirement/c8_manual_cleanup_observation_20261018.json",
     "ordinary_paths_absent": 65826,
@@ -1162,7 +1162,19 @@
     "full_workspace_backup_waiver": false,
     "post_cleanup_provider_free_tests": "9 passed on fa4d898 execution source; 7 in 1.51s plus 2 in 0.81s",
     "historical_raw_loss": "Absent approved C1/C2 raw/source bytes may be permanently unrecoverable; accepted by maintainer.",
-    "storage_risk": "Historical SATA/BadCRC risk OPEN. Maintainer repeatable SMART refresh observations support fixed +5 counter increments; counter alone is an investigation signal. Low-I/O verification allowed under revised criteria; no independent backup waiver."
+    "storage_risk": "Historical SATA/BadCRC risk OPEN. Maintainer repeatable SMART refresh observations support fixed +5 counter increments; counter alone is an investigation signal. Low-I/O verification allowed under revised criteria; no independent backup waiver.",
+    "maintainer_closure_acceptance": {
+      "date": "2026-10-18",
+      "exact_reply": "接受上述残余项和证据限制，完成 C8 收尾",
+      "accepted_conditions": [
+        "Registered B worktree and all holdouts retained",
+        "65,826 ordinary path absences plus protected hashes and space observations serve as manual cleanup result",
+        "No per-file operator logs were saved; execution history not reconstructable"
+      ],
+      "backup_waiver": false,
+      "extra_deletion": false,
+      "push_main_tag_publication_authorization": false
+    }
   },
   "current_receipt_path_migration": {
     "date": "2026-10-18",

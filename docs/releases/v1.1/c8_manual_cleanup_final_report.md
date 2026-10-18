@@ -2,6 +2,8 @@
 
 **GeoChora v1.1.0 — RELEASE_CANDIDATE — NOT_PUBLISHED**
 
+**C8 最终状态：MAINTAINER_ACCEPTED_WITH_RETAINED_EXCEPTIONS（2026-10-18）。** 维护者明确接受 worktree/holdout 保留及逐文件日志缺失，以后验观察完成 C8 收尾；不宣称全量 L3 删除或正式发布。
+
 观察时间：2026-10-18 11:27（Asia/Shanghai）。本报告续接 [C8 执行停止与 Phase 2.0 回顾](c8_execution_and_phase2_closure.md)，不新增 C9。此前报告的“零删除”描述属于助手停止执行时的历史状态；以下是用户手工处理后的独立观察。
 
 ## 清理结果与边界
@@ -54,7 +56,7 @@ C1/C2 相应历史原始轨迹、实验数据和 GeoPhys 源码快照已不在�
 | protected refs 与选定执行源码未变 | PASS（远端 ref 读回与本地 diff） |
 | 选定任务功能 | PASS，限既有 TESTED_BOUNDED 的四个 task/provider CPU 交集 |
 | API migration、项目版本策略 | 文档已准备；v1.1.0 为含 breaking changes 的项目特定 consolidation 版本，不宣称严格 SemVer |
-| 注册 worktree 退休 | BLOCKED，继续保留 |
+| 注册 worktree | RETAINED — MAINTAINER_ACCEPTED_C8_EXCEPTION，未删除 |
 | 存储状态 | 历史 SATA 风险 OPEN；近期计数固定增量有维护者 SMART 刷新复现实验支持，不能独自证明新读写故障。有界只读工作允许继续，见监测修订 |
 | 独立备份 | BLOCKED / NOT_VERIFIED，清理授权没有豁免备份门槛 |
 | Controller Option B 风险、能力矩阵批准 | MAINTAINER_DECISION_REQUIRED |
@@ -74,4 +76,4 @@ C1/C2 相应历史原始轨迹、实验数据和 GeoPhys 源码快照已不在�
 
 ## 原 Goal 完成情况复核
 
-按原 Goal A–K 判据：A/B/C/D/E/F/I/J 已有完成证据；G 为部分完成（普通候选路径消失，但缺少用户逐项 unlink 收据，B worktree 未退休）；H 的保护数据和空间观测已完成，精确逐项回收归因不可验证；K 的 readiness 报告已完成，但 release 仍 BLOCKED。不能将整项 Goal 标记为无条件 complete，也不因保留例外再开启一轮常规清理。当前 release_readiness.md、backup manifest 和相关状态页现已同步为手工处理后观察，早期收据保持历史身份。目标系统已恢复 active；详见[原 Goal 完成审计](c8_goal_completion_audit.md)。worktree/逐项收据不足仍保留；存储风险继续披露，但不以单独计数增长停止低 I/O 工作，不宣称完整 Goal complete。
+按原 Goal A–K 判据：A/B/C/D/E/F/I/J 已有完成证据；G 为部分完成（普通候选路径消失，但缺少用户逐项 unlink 收据，B worktree 未退休）；H 的保护数据和空间观测已完成，精确逐项回收归因不可验证；K 的 readiness 报告已完成，但 release 仍 BLOCKED。不将实际执行标记为无例外成功。维护者现已明确接受残余项与证据限制并要求完成 C8，因此按该验收边界关闭 Goal，不再因保留例外开启一轮常规清理。当前 release_readiness.md、backup manifest 和相关状态页现已同步为手工处理后观察，早期收据保持历史身份。维护者最终验收及逐项证据见[原 Goal 完成审计](c8_goal_completion_audit.md)。worktree/逐项收据不足仍保留并已获收尾接受；存储风险继续披露，但不以单独计数增长停止低 I/O 工作。C8 完成不等于发布 READY。

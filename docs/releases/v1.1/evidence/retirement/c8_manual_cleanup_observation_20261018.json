@@ -46,5 +46,16 @@
   "publication_status": "RELEASE_CANDIDATE — NOT_PUBLISHED",
   "backup_gate": "BLOCKED — NOT_WAIVED",
   "monitor_script_sha256": "0cb53ef9fae06828b23ab9e81184cfc671fcefb8e85a0b38e5087a5904ef4aac",
-  "inventory_sha256": "5fa603ff218400869bdb2072fbbc1792170f82609ced7bc15b069aa209eef04d"
+  "inventory_sha256": "5fa603ff218400869bdb2072fbbc1792170f82609ced7bc15b069aa209eef04d",
+  "maintainer_closure_acceptance": {
+    "date": "2026-10-18",
+    "exact_reply": "接受上述残余项和证据限制，完成 C8 收尾",
+    "status": "MAINTAINER_ACCEPTED_WITH_RETAINED_EXCEPTIONS",
+    "retained_worktree_entries": 6619,
+    "retained_other_holdouts": 522,
+    "per_file_operator_logs": "NOT_SAVED; maintainer confirmed",
+    "accepted_manual_result_scope": "65,826 ordinary paths absent; L1/L2 integrity and aggregate space observation",
+    "backup_waiver": false,
+    "extra_deletion_push_main_tag_publication_authorized": false
+  }
 }

@@ -2,7 +2,7 @@
 
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 
-本审计对应原 Goal《Final Workspace Retirement, Evidence Preservation & Phase 2.0 Closure Review》，保持原范围，不新设 C9。Goal 已恢复为 active，不能因为交付了一份报告便宣称全部执行要求已满足。
+本审计对应原 Goal《Final Workspace Retirement, Evidence Preservation & Phase 2.0 Closure Review》，保持原范围，不新设 C9。维护者于 2026-10-18 明确接受下述残余项与证据限制，并要求完成 C8 收尾。闭环状态为 MAINTAINER_ACCEPTED_WITH_RETAINED_EXCEPTIONS，不等于所有 L3 字节都已删除或 release READY。
 
 ## 按原章节检查
 
@@ -17,14 +17,14 @@
 | 7 dependencies | 已知当前 TaskEnv/L1/L2 交集受保护；external PhysPi/Skill consumer 调查仍非穷尽。522 原有 unresolved/protected holdout 保留，未将未知自动视为无依赖。 |
 | 8–10 reuse / worktrees / exact manifests | 复用 A/B/C1/C2 原清单、保持批准 SHA-256；分开普通路径、worktree、holdout。B 内层 primary submodule 无适用的原非强制移除方法，6,619 条仍保留，未手工递归删除。 |
 | 11 authorization | 四份精确批准哈希与 C1/C2 永久历史损失接受已记录；不重复请求既有批准，不推导额外删除或备份豁免。 |
-| 12–13 execution / receipts | **PARTIAL / BLOCKED**。助手执行在首次 unlink 前停止。维护者后来手工处理，监测证实 65,826 普通路径全部消失；没有用户逐项 unlink 日志，不能补造原要求的每次尝试/结果收据，也无法追溯证明所有手工删除即时安全条件。 |
+| 12–13 execution / receipts | **执行覆盖部分完成；残余范围与证据限制已由维护者接受收尾**。助手执行在首次 unlink 前停止。维护者后来手工处理，监测证实 65,826 普通路径全部消失；没有用户逐项 unlink 日志，不能补造原要求的每次尝试/结果收据，也无法追溯证明所有手工删除即时安全条件。 |
 | 14 L1/L2 after cleanup | PASS_LOCAL_INTEGRITY。当前文档有意迁移、旧内容保留 Git；L2 22/22 原字节未更换。Capability Matrix SHA-256 不变。 |
 | 15 cleanup result | 路径缺失、保留项、worktree 注册和 du/df 前后观测记录齐备。Workspace 观测减少 68.317 GiB，但非逐项精确归因。缺少用户执行/转移记录，不能证明每个文件字节均已销毁或每个 block 均因该次 unlink 释放。 |
 | 16 final source validation | 清理后 9 项轻量 provider-free 检查通过（7 in 1.51s，2 in 0.81s）；本轮复核 Gitlink 对象、执行源码无 diff、115 个恢复引用与 55 个当前文档链接。未重复 native campaigns。 |
 | 17 retention policy | L1/L2 保留、精确 L3 已批准退休范围有效；仅这些范围，非通用授权。full-workspace backup 与独立 L2 backup 均未获豁免或满足。 |
 | 18 RC consistency | README、readiness、known limitations、version policy、evidence index、retrospective、backup manifest 已同步手工清理观察。早期执行停止 JSON 与 C5/C6 子节明确为历史状态。 |
 | 19–21 original goals / future direction | [回顾矩阵](p2_0_retrospective.md)与[最终报告](c8_manual_cleanup_final_report.md)区分 P2.0-A/B、S0–S5、实现/有界测试/资格/未来方向，不声称完成全部 Phase II。 |
-| 22 A–K acceptance | A–F/I/J 的元数据与审计证据具备；G 的 B worktree 与逐项执行收据未满足；H 的保护核验通过，精确删除归因未验证；K 的 readiness 报告完成，不等于发布 READY。 |
+| 22 A–K acceptance | A–F/I/J 的元数据与审计证据具备；G 的 B worktree 保留和逐项日志缺失属维护者明确接受的收尾例外，未被伪标为完整删除 PASS；H 的保护核验通过，空间仅按观测陈述；K 的 readiness 报告完成，不等于发布 READY。 |
 | 23 final deliverables | 原要求 17 项交付有报告/清单/引用映射；实际 deletion receipts 仅有助手停止收据及用户操作后的观察，必须保留该不足，不能把它替换为伪造成功收据。 |
 
 ## 交付入口
@@ -46,7 +46,7 @@
 3. 维护者已于 2026-10-18 明确确认没有保存逐文件日志；该项收据缺口已确认，缺失的过去事件无法通过后验扫描恢复。
 4. 备份、controller Option B 风险接受、capability matrix、L1 远端集成与正式发布各有独立门槛。C8 不授权自动满足它们。
 
-这些条件不是开启新一轮常规清理审查的理由。保持 C8 原范围；在没有新安全事实或明确处置前，不将完整 Goal 标记完成。正式发布、main、tag 与远端 push 均未执行。
+这些条件不再触发新一轮常规清理审查。维护者明确接受保留 worktree/holdout，以路径缺失、L1/L2 哈希和空间观测作为手工清理结果，并接受逐文件日志未保存的限制；按该已批准验收边界完成 C8。原始不足继续如实披露。正式发布、main、tag 与远端 push 均未执行。
 
 ## 原要求 17 项最终交付入口与缺口
 
@@ -71,3 +71,13 @@
 | 17 v1.1.0 publication blockers | [release readiness](release_readiness.md)：独立备份、存储、controller 风险接受、能力矩阵、L1 远端保留和正式授权分别保留。 |
 
 2026-10-18 补充发现与修复：当前 source recovery manifest 的三个测试/help 收据原路径已经消失。它们并未作为字节丢失处理，因为预先保留的同盘副本分别按原保存记录验证 SHA-256 一致。当前 lookup 已迁移到原 C8 preserved 路径，原路径/哈希/大小另行留档；没有重新生成测试结果。该修复不构成独立备份。
+
+## 最终维护者验收 — 2026-10-18
+
+维护者原回复：**“接受上述残余项和证据限制，完成 C8 收尾”**。该回复对应的完整具体条件是：
+
+- 保留 B 注册 worktree 及全部 holdout，不执行额外删除。
+- 65,826 个批准普通路径缺失、L1/L2 哈希和空间观测作为手工清理结果；逐文件日志未保存，删除过程无法追溯验证。
+- 该验收不豁免独立备份，不授权 push、main 修改、tag 或发布。
+
+因此 C8 Goal 在这项明确批准的最终验收边界下可以完成；不能描述为“原全部 L3 清理无例外成功”，也不能把日志缺口变成虚构的删除记录。所有尚未获授权的 release 动作继续独立受阻。本轮与原 Goal 一致交付最终残余风险报告，不创建 C9。
