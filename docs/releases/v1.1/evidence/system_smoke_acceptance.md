@@ -18,7 +18,7 @@ All results below are bounded tests/smokes, not formal qualification.
 ## Provider-free release regression
 
 - Source target: public `develop` candidate `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`.
-- Command: `PYTHONPATH=GeoPhys/src:. /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q task_env/diagnostics/tasks task_env/diagnostics/render/test_backend_registry.py`.
+- Command: `PYTHONPATH=GeoPhys/src:. python -m pytest -q task_env/diagnostics/tasks task_env/diagnostics/render/test_backend_registry.py` (Python 3.12.14).
 - Result: 147 passed, 6 subtests passed, one upstream Taichi locale
   deprecation warning, 160.07 seconds.
 - Log: `workspace/maintenance/p2_0_s5_c2_20261017/provider_free_final.log`,

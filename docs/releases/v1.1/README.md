@@ -1,17 +1,26 @@
-# GeoChora v1.1.0 Release Candidate
+# GeoChora v1.1.0 Release Content
 
-**RELEASE_CANDIDATE — NOT_PUBLISHED**
 Target version: **v1.1.0**
-Code candidate: `bee498d1d784015f034c5b4af34320fdffa61411`
-Pre-integration base: public `develop` `0ff2d846a36c7014d2b40a530f52d99e64266ff9`
-Integrated public `develop`: `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`
-Local S5-C1 documentation commit: `2f8555a4c86470fb63cd2386a6e88729d4795a23` (not integrated)
+
+This directory contains the proposed v1.1.0 release content and review
+receipts. Publication status is determined by the public Git refs and any
+GitHub Release, not by this document. Verify `refs/heads/v1.1.0` and
+`refs/tags/v1.1.0` before describing the release as published.
+
+## Provenance snapshot
+
+At the start of final release review, the functional implementation candidate
+was `bee498d1d784015f034c5b4af34320fdffa61411`, and the public integration
+base was `develop` at `2fb60de7851bf2e5651c2dc99fff7451c16e1a94`. S5-C1 through
+S5-C8 release-review documents were local and unintegrated. The final reviewed
+release commit, if approved, is recorded by the Git release refs.
 
 GeoChora v1.1.0 is a Core consolidation release with documented breaking API
 changes under the project-specific GeoChora versioning policy. It is not
-claimed to follow strict Semantic Versioning. The target is approved for
-release-candidate preparation only. No release tag or GitHub Release exists;
-`main`, `v1.0.0`, and frozen Evidence remain unchanged.
+claimed to follow strict Semantic Versioning. The maintainer selected v1.1.0
+as the target version; publication remains a separate, ref-verified action.
+At the start of this review no v1.1.0 tag or GitHub Release existed, and
+`main`, `v1.0.0`, and frozen Evidence were unchanged.
 
 ## Candidate package
 

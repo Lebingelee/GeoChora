@@ -3,7 +3,7 @@
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 **Evidence class:** bounded acceptance and smoke evidence; no new formal qualification.
 
-**C8 update (2026-10-18):** all 22 L2 hashes were rechecked intact. The four exact retirement manifests are authorized. Assistant execution stopped on a storage-counter rise; subsequent maintainer manual handling left all 65,826 ordinary candidate paths absent. See [the current C8 report](../c8_manual_cleanup_final_report.md). No backup waiver was granted.
+**C8 update (2026-10-18):** all 22 L2 hashes were rechecked intact. The four exact retirement manifests are authorized. Assistant execution stopped when the SCSI counter rose; later repeatable maintainer observations tied fixed increments to SMART refreshes, so counter-only growth is now an investigation signal rather than proof of a new read/write failure. Subsequent maintainer manual handling left all 65,826 ordinary candidate paths absent, with no per-file unlink logs. See [the current C8 report](../c8_manual_cleanup_final_report.md) and [monitoring revision](../c8_storage_monitoring_revision.md). No backup waiver was granted.
 
 This Git-trackable index summarizes the acceptance evidence selected for the
 v1.1.0 candidate. It reuses the existing [candidate capability matrix](../../../module/task_env/capability_matrix_v1_1_0_candidate.json),

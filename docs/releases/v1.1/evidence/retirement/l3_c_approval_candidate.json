@@ -556,7 +556,7 @@
     "symlink_exceptions": [
       {
         "path": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/recording_history_refs_live_v2/run_cwd/task_env",
-        "target": "/home/lly/.codex/worktrees/archive_v1_0_0/task_env",
+        "target": "<frozen-v1.0.0-worktree>/task_env (host-local absolute path omitted)",
         "device": 2052,
         "inode": 30308897,
         "link_count": 1,
@@ -564,7 +564,7 @@
       },
       {
         "path": "workspace/qualification/phase1/p1_8_guarded_transitions_20261014/recording_history_refs_live_v2/run_cwd/workspace",
-        "target": "/home/lly/Program_Files/Geochora/workspace",
+        "target": "<primary-repository>/workspace (host-local absolute path omitted)",
         "device": 2052,
         "inode": 30308896,
         "link_count": 1,

@@ -1143,7 +1143,7 @@
     "independent_backup_status": "BACKUP_NOT_VERIFIED",
     "report": "c8_execution_and_phase2_closure.md"
   },
-  "historical_sections_notice": "s5_c5_retention_review, s5_c6_retirement_preparation, scoped_retention_proposal and s5_c8_retirement_authorization_and_storage_stop retain dated pre-cleanup observations. They are not current filesystem-presence claims. Use s5_c8_manual_cleanup_current_status for present status.",
+  "historical_sections_notice": "s5_c5_retention_review, s5_c6_retirement_preparation, scoped_retention_proposal and s5_c8_retirement_authorization_and_storage_stop retain dated pre-cleanup observations. They are not current filesystem-presence claims. Use s5_c8_manual_cleanup_current_status for present status. release_candidate_document_files and public_integration_snapshot are dated 2026-10-17 snapshots; later S5-C1 through S5-C8 document changes are preserved in subsequent Git commits, so the earlier listed document hashes are not current hashes for the final review tree.",
   "s5_c8_manual_cleanup_current_status": {
     "observation_date": "2026-10-18",
     "status": "MAINTAINER_ACCEPTED_C8_CLOSURE_WITH_RETAINED_EXCEPTIONS",

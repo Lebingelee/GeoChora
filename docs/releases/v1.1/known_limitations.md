@@ -35,14 +35,16 @@
 - **OPEN storage risk:** `/dev/sda` / `ata5` has recorded BadCRC and READ I/O
   errors. The workspace resides on one physical disk and an independent backup
   has not been verified. A clean recent kernel scan does not close this risk.
-- **S5-C8 retirement authorized, execution stopped:** On 2026-10-18 the maintainer approved the four exact A/B/C1/C2 manifests and accepted permanent C1/C2 historical raw-data/source-snapshot loss. Assistant deletion stopped before its first unlink when `/dev/sda` SCSI `ioerr_cnt` rose from 2000 to 2005. After maintainer manual handling, 65,826 approved ordinary paths are absent; this is a path observation without per-file user execution receipts. No matching current kernel storage-error line was found; cached SMART update timing is only a correlation and does not clear the anomaly. Original L1 and all 22 L2 files (24,563,669 bytes) were verified intact. The full-workspace backup requirement was explicitly not waived. See [the final C8 report](c8_manual_cleanup_final_report.md) and its historical execution-stop reference.
+- **S5-C8 retirement authorized and manually completed with accepted evidence limits:** On 2026-10-18 the maintainer approved the four exact A/B/C1/C2 manifests and accepted possible permanent C1/C2 historical raw-data/source-snapshot loss. Assistant deletion stopped before its first unlink after `/dev/sda` SCSI `ioerr_cnt` rose from 2000 to 2005. The maintainer later reported two successful SMART refreshes, each correlated with a fixed +5 counter increment, with cached reads steady; individual low-level commands were not captured, so this does not explain every historical increment. After manual handling, 65,826 approved ordinary paths were observed absent; no per-file user unlink receipts exist. Current reports found no matching new ATA/READ error, and the observed CRC and bad-sector attributes did not increase. Counter-only growth is now an investigation signal; stop on actual ATA/block/filesystem errors, read/write failures, CRC or bad-sector growth, or integrity anomalies. The historical SATA/BadCRC risk remains OPEN, and SMART status does not establish device reliability. Original L1 and all 22 L2 files (24,563,669 bytes) were verified intact. The full-workspace backup requirement was explicitly not waived. See [the final C8 report](c8_manual_cleanup_final_report.md) and [monitoring revision](c8_storage_monitoring_revision.md).
 - **Historical recovery-location gap:** the v1.0.0 archive manifest records a
   205,486,080-byte, 441-member P1.6 recovery tar, but the S5-C4 workspace
   metadata scan did not locate a matching path or size. Its availability is
   `UNKNOWN_REVIEW_REQUIRED`; the tracked P1.6 closure metadata is not a
-  replacement for the raw tar. The P1.8 integration archive is present locally
-  at the path recorded in the S5-C4 audit, with apparent size matching the
-  v1.0.0 archive manifest. Neither archive has a verified independent backup.
+  replacement for the raw tar. The original P1.8 integration archive is no
+  longer present at its pre-retirement path: 3,382 approved ordinary paths are
+  absent and the held source bundle remains. The historical GeoPhys bundle is
+  incomplete for full source reconstruction. Neither historical archive has
+  a verified independent backup.
 - **Worktree and holdout limits:** Exact batch approvals persist. All 65,826 ordinary candidate paths are absent; 6,619 registered worktree entries and the 522 original holdouts remain. Storage safety remains unresolved. The three P1.1 holds, P1.8 source bundle, 516 unresolved C2 files and two symlinks remain excluded. B's inner GeoPhys is a primary repository rather than a removable linked worktree; the described non-forced removal cannot apply. No force, deinit or manual worktree deletion was performed. The existing S5-B receipt copies remain on the same disk and are not independent backup.
 - External users and deployments may rely on removed APIs that repository
   scans cannot discover. The compatibility inventory is the migration record;

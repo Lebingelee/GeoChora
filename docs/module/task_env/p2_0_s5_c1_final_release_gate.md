@@ -1,6 +1,6 @@
 # GeoChora P2.0-B S5-C1 — v1.1.0 Final Release Gate Resolution
 
-**Status: RELEASE_BLOCKED — RELEASE_CANDIDATE, NOT_PUBLISHED**  
+**Status: RELEASE_BLOCKED — RELEASE_CANDIDATE, NOT_PUBLISHED**
 **Target:** GeoChora v1.1.0. Version selection is closed and is not reopened.
 
 ## Current refs and integration review
@@ -76,7 +76,7 @@ composer sets `meshdir` to the resolved absolute Menagerie assets directory.
 | Source revision | `2fb60de7851bf2e5651c2dc99fff7451c16e1a94` | `bee498d1d784015f034c5b4af34320fdffa61411` |
 | Controller identity | `76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9` | `a8ef891961d020721a35a032ea2093e8da61f36747babfe4bc4ff0e12195cbde` |
 | Raw generated MJCF SHA-256 | `bdd119833a5ae3c8176daf1f5ef586c3601870f10f4b4b5f6d7aa730fe5f0fed` | `c5a845a7824fd6810d10d3f461ca248d71448a84de3b29c5453cdcda7022915e` |
-| Absolute `meshdir` | `/home/lly/Program_Files/Geochora/asset/external/mujoco_menagerie/franka_emika_panda/assets` | `/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/asset/external/mujoco_menagerie/franka_emika_panda/assets` |
+| Absolute `meshdir` | `<original-checkout-root>/asset/external/mujoco_menagerie/franka_emika_panda/assets` | `<detached-checkout-root>/asset/external/mujoco_menagerie/franka_emika_panda/assets` |
 | XML SHA after replacing checkout root with `${REPO_ROOT}` | `017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba` | same |
 
 The Artifact SHA `fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4`, task configuration SHA `0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0`, resolved runtime config SHA `d187ad45cec5fe7ac8a12a115dcf7a185336e8c1b78524ae5d2a6ed17bac22a1`, solution identity `514a5ed3bc0d289761ef88a00b1e7c11df2795133506ab148db9ab8e98e55241`, and readiness identity `ccc3e93e1d740beaad3b0c52098c87e5830baabfa1f146df6fdbcf647b60c453` match. PickCube task, solution, config, object-owner source hashes also match; the Panda asset-bundle digest is `5c5f93668a16c2861e51cd7be911b7fffb6727db71758ca1a289a666824885ea` in both.

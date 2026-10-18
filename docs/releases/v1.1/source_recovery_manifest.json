@@ -158,9 +158,9 @@
   },
   "checkout_path_identity_observation": {
     "task": "PickCube P1.6",
-    "canonical_checkout_root": "/home/lly/Program_Files/Geochora",
+    "canonical_checkout_root": "<original-checkout-root>",
     "canonical_controller_identity": "76108c78b8159391e448ad9f49050bed42fd7a86e0e00a0520083b4e5efb02e9",
-    "disposable_checkout_root": "/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017",
+    "disposable_checkout_root": "<detached-checkout-root>",
     "disposable_controller_identity": "a8ef891961d020721a35a032ea2093e8da61f36747babfe4bc4ff0e12195cbde",
     "disposable_raw_mjcf_sha256": "c5a845a7824fd6810d10d3f461ca248d71448a84de3b29c5453cdcda7022915e",
     "disposable_normalized_mjcf_sha256": "017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba",
@@ -169,8 +169,8 @@
     "cause": "Production controller identity includes PandaKinematics.source_sha256 over raw generated MJCF bytes; the MJCF embeds the checkout root. Task file bytes, Artifact hash, task config hash, and normalized MJCF matched. Preserve each run-specific identity in provenance.",
     "canonical_raw_mjcf_sha256": "bdd119833a5ae3c8176daf1f5ef586c3601870f10f4b4b5f6d7aa730fe5f0fed",
     "canonical_normalized_mjcf_sha256": "017b3fb8ae4ad46bd382b43d4462c067d9d6ceafbbfea0a43880bcf0fed6f1ba",
-    "canonical_meshdir": "/home/lly/Program_Files/Geochora/asset/external/mujoco_menagerie/franka_emika_panda/assets",
-    "disposable_meshdir": "/home/lly/Program_Files/Geochora/workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/asset/external/mujoco_menagerie/franka_emika_panda/assets",
+    "canonical_meshdir": "<original-checkout-root>/asset/external/mujoco_menagerie/franka_emika_panda/assets",
+    "disposable_meshdir": "<detached-checkout-root>/asset/external/mujoco_menagerie/franka_emika_panda/assets",
     "normalized_xml_comparison": "PASS; replacing each absolute checkout root with ${REPO_ROOT} yields byte-identical XML.",
     "provider_applied_control_target_readback": "NOT_RUN",
     "controller_hash_portability": "Not guaranteed across checkout roots; no identity/code migration performed."

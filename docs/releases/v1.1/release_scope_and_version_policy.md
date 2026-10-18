@@ -3,8 +3,10 @@
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 
 GeoChora v1.1.0 is a Core consolidation release with documented breaking API
-changes. The maintainer selected `v1.1.0` for release-candidate preparation.
-This version uses an explicit GeoChora project-specific versioning policy;
+changes. The maintainer selected `v1.1.0` as the target version for this
+release. Publication, tag creation, and protected-branch updates remain
+separate authorization and ref-verification steps. This version uses an
+explicit GeoChora project-specific versioning policy;
 strict Semantic Versioning compliance is not claimed. A minor version
 increment under this policy does not imply full backward compatibility.
 

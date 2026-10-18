@@ -62,7 +62,7 @@ v1.1.0 package remains `RELEASE_CANDIDATE — NOT_PUBLISHED`.
 Command on the exact integrated code/document source `2fb60de`:
 
 ```bash
-PYTHONPATH=GeoPhys/src:. /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q task_env/diagnostics/tasks task_env/diagnostics/render/test_backend_registry.py
+PYTHONPATH=GeoPhys/src:. python -m pytest -q task_env/diagnostics/tasks task_env/diagnostics/render/test_backend_registry.py
 ```
 
 Result: **147 passed, 6 subtests passed, 1 upstream Taichi locale deprecation

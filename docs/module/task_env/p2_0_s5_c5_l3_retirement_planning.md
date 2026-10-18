@@ -132,7 +132,7 @@ The only registered nested worktree under the scanned workspace is the clean
 checkout above. It has no unique main-repository commit relative to public
 `develop`, but contains local ignored receipts and pinned submodule checkouts.
 Its root, GeoPhys, and Menagerie `.git` files point to the parent repository's
-shared worktree administration under `/home/lly/Program_Files/Geochora/.git`;
+shared worktree administration under the primary repository's Git common directory;
 the object stores are outside `workspace/`. The workspace scan found no nested
 `.git` directories or object alternates under `workspace/`, and the inspected
 shared object stores had no `objects/info/alternates` file. Thus the L3-B
