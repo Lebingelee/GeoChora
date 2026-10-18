@@ -47,3 +47,27 @@
 4. 备份、controller Option B 风险接受、capability matrix、L1 远端集成与正式发布各有独立门槛。C8 不授权自动满足它们。
 
 这些条件不是开启新一轮常规清理审查的理由。保持 C8 原范围；在没有新安全事实或明确处置前，不将完整 Goal 标记完成。正式发布、main、tag 与远端 push 均未执行。
+
+## 原要求 17 项最终交付入口与缺口
+
+| 项 | 交付物与实际状态 |
+|---|---|
+| 1 执行与批准收据 | [原始授权/停止收据](evidence/retirement/c8_execution_receipt_20261018.json) + [后验观察](evidence/retirement/c8_manual_cleanup_observation_20261018.json)。不将后者称为用户逐次 unlink 收据。 |
+| 2 L1/L2 preservation manifest | `workspace/maintenance/p2_0_s5_c8_manual_cleanup/final_current_l1_l2_manifest.json`；历史 baseline、后续迁移与 Git 提交共同保留，L2 精确列表见 [Evidence index](evidence/README.md)。本地 ignored 清单，尚非远端保存。 |
+| 3 P1.8 live reconciliation | C8 原目录 `p1_8_manifest_reconciliation.json`、`p1_8_live_filesystem_manifest.json` 与其 SHA-256 sidecar；[历史元数据 index](evidence/historical_retirement/copy_index.json)保留原载体身份。 |
+| 4 历史决策 metadata index | [37 条 exact-copy index](evidence/historical_retirement/copy_index.json)，本轮逐条 SHA-256 核验。 |
+| 5 不可恢复损失报告 | [最终报告](c8_manual_cleanup_final_report.md) + 原 C8 C1/C2 清单 `loss_summary` / 风险字段；源码载体和历史结果不可恢复风险已确认。 |
+| 6 A/B/C1/C2 精确清单 | `workspace/maintenance/p2_0_s5_c8_20261017/batch_{a_l3a,b_l3b,c1_p1_8,c2_l3c}_final.json`（花括号仅说明四个原文件名，不是执行命令）；四个 SHA-256 绑定于 [原批准收据](evidence/retirement/c8_execution_receipt_20261018.json)。 |
+| 7 各批批准身份 | 同上收据引用维护者对四个哈希的明确批准及 C1/C2 损失接受；不包含额外删除/备份豁免/发布授权。 |
+| 8 实际删除收据 | **缺口确认**：维护者明确没有保存逐文件日志。仅保留助手停止记录、监测 `events.jsonl` 和最终 path-absence 观察；不得伪造历史执行过程。 |
+| 9 清理后 L1/L2 | 最终 snapshot + 本轮 `final_goal_integrity.json`；旧 snapshot 不因文档迁移而改写。L2 22/22 原哈希通过。 |
+| 10 GiB / 残余 Workspace | [观察收据](evidence/retirement/c8_manual_cleanup_observation_20261018.json)：前后 Workspace allocation 差 68.317 GiB，残余观测 2,815,557,632 字节；非逐项 unlink 精确归因。 |
+| 11 repository/worktree | [最终报告](c8_manual_cleanup_final_report.md)记录 protected refs；注册 worktree 未移除、522 holds 保留，未执行 force/deinit/共享对象删除。 |
+| 12 retention/readiness | [readiness](release_readiness.md)、[backup manifest](backup_manifest.json)、[policy](release_scope_and_version_policy.md)；当前状态已同步，历史 snapshot 明确标识。 |
+| 13 P2.0-A 完成度 | [goal-to-implementation 矩阵](p2_0_retrospective.md)：部分完成，worktree、恢复与存储/备份限制保留。 |
+| 14 P2.0-B 完成度 | 同矩阵：选定 Core consolidation 批准范围实现完成，release 尚未发布，不冒称全部 Phase II。 |
+| 15 原 Goal 实现映射 | [retrospective](p2_0_retrospective.md) + 本文逐章检查，含原目标、实现、提交、测试和限制。 |
+| 16 后续 Phase II/P2.x | [最终报告](c8_manual_cleanup_final_report.md)和 retrospective 的 benchmark/native-vs-TaskEnv/Harness、轨迹与 PhysPi 边界研究交接；未在 C8 实现。 |
+| 17 v1.1.0 publication blockers | [release readiness](release_readiness.md)：独立备份、存储、controller 风险接受、能力矩阵、L1 远端保留和正式授权分别保留。 |
+
+2026-10-18 补充发现与修复：当前 source recovery manifest 的三个测试/help 收据原路径已经消失。它们并未作为字节丢失处理，因为预先保留的同盘副本分别按原保存记录验证 SHA-256 一致。当前 lookup 已迁移到原 C8 preserved 路径，原路径/哈希/大小另行留档；没有重新生成测试结果。该修复不构成独立备份。

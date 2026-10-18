@@ -182,13 +182,13 @@
     "nested_optional_submodules": "Not initialized or required for the bounded selected task construction smoke."
   },
   "provider_free_and_clean_checkout_receipts": {
-    "provider_free_final": "workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+    "provider_free_final": "workspace/maintenance/p2_0_s5_c8_20261017/preserved_s5b_root_support/provider_free_final.log",
     "initial_clean_checkout_provider_free_exploration": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
     "clean_checkout_smoke": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_smoke.json",
     "clean_checkout_source_identity": "workspace/maintenance/p2_0_v1_1_clean_checkout_20261017/workspace/maintenance/p2_0_s5_b_20261017/clean_checkout_source_identity.json",
-    "cli_help_check": "workspace/maintenance/p2_0_s5_b_20261017/cli_help_check.json",
+    "cli_help_check": "workspace/maintenance/p2_0_s5_c8_20261017/preserved_s5b_root_support/cli_help_check.json",
     "cli_and_failure_gates": "workspace/maintenance/p2_0_s5_b_20261017/cli_and_failure_gates.log",
-    "s5_c1_provider_free_final": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
+    "s5_c1_provider_free_final": "workspace/maintenance/p2_0_s5_c8_20261017/preserved_s5c1_s5c2_receipts/provider_free_final.log",
     "s5_c1_release_gate_receipt": "docs/module/task_env/p2_0_s5_c1_final_release_gate.md"
   },
   "s5_c1_final_gate": {
@@ -250,8 +250,38 @@
     "review_report": "docs/module/task_env/p2_0_s5_c3_minimal_release_evidence.md",
     "raw_l2_inventory": "docs/releases/v1.1/evidence/README.md",
     "raw_l2_local_sha_check": "PASS; no independent copy or restore read",
-    "historical_l3": "Retained locally; outside proposed mandatory off-host scope only if approved",
+    "historical_l3": "Historical snapshot superseded by exact C8 retirement: 65,826 ordinary paths absent; registered worktree and 522 original holds retained. No backup waiver.",
     "full_workspace_gate": "BACKUP_NOT_VERIFIED remains recorded and active until scope approval",
     "qualification_effect": "No new qualification decision; all four manipulation intersections remain TESTED_BOUNDED"
+  },
+  "s5_c8_receipt_path_migration": {
+    "date": "2026-10-18",
+    "changes": [
+      {
+        "identity": "provider_free_final",
+        "original_path": "workspace/maintenance/p2_0_s5_b_20261017/provider_free_final.log",
+        "current_preserved_path": "workspace/maintenance/p2_0_s5_c8_20261017/preserved_s5b_root_support/provider_free_final.log",
+        "sha256": "327a950d905b5a9a2f9fe99a25ad963e43fce0837bee6a6859aac9f29134a763",
+        "size_bytes": 874,
+        "verification": "SHA256_MATCHES_PRE_RETIREMENT_COPY_RECEIPT; SAME_DISK_NOT_BACKUP"
+      },
+      {
+        "identity": "cli_help_check",
+        "original_path": "workspace/maintenance/p2_0_s5_b_20261017/cli_help_check.json",
+        "current_preserved_path": "workspace/maintenance/p2_0_s5_c8_20261017/preserved_s5b_root_support/cli_help_check.json",
+        "sha256": "86a2b6cf52edb629ad4ff41f1015c907ee1617578adc6737dea25add663002fc",
+        "size_bytes": 2048,
+        "verification": "SHA256_MATCHES_PRE_RETIREMENT_COPY_RECEIPT; SAME_DISK_NOT_BACKUP"
+      },
+      {
+        "identity": "s5_c1_provider_free_final",
+        "original_path": "workspace/maintenance/p2_0_s5_c1_20261017/provider_free_final.log",
+        "current_preserved_path": "workspace/maintenance/p2_0_s5_c8_20261017/preserved_s5c1_s5c2_receipts/provider_free_final.log",
+        "sha256": "64db2c4256dc6c4a23458fdf09f714e1c45b2fc860c3d37b809917f2df14630a",
+        "size_bytes": 874,
+        "verification": "SHA256_MATCHES_PRE_RETIREMENT_COPY_RECEIPT; SAME_DISK_NOT_BACKUP"
+      }
+    ],
+    "historical_paths_notice": "Earlier S5-B/C1/C2 snapshots retain original paths; current receipt lookup uses these verified preserved copies. No source results were regenerated."
   }
 }

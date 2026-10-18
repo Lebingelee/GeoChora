@@ -2,7 +2,7 @@
   "schema": "geochora-p1-8-historical-retirement-copy-index-v1",
   "status": "RELEASE_CANDIDATE — NOT_PUBLISHED",
   "source_root_repo_relative": "workspace/qualification/phase1/archives/p2_0_part_a/legacy_evidence_archive/p1_8_integration_20261012",
-  "preservation_note": "Copied files below are byte-for-byte historical metadata records, not new qualification decisions. Items not copied remain in the P1.8 archive pending retirement review.",
+  "preservation_note": "Copied files below are byte-for-byte historical metadata records, not new qualification decisions. C8 later retired approved ordinary archive paths; non-copied raw records may no longer be available. Exact historical source paths and copied record hashes are unchanged. See ../../c8_manual_cleanup_final_report.md for current losses and holds.",
   "records": [
     {
       "source_path": "archive_complete.json",
