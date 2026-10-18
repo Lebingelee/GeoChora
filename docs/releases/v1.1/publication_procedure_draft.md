@@ -8,53 +8,52 @@ S5-C1 through S5-C8 release-review documents are on the current maintenance
 branch and have not been integrated remotely. These local commits do not
 publish v1.1.0.
 
-Future release procedure:
+Current review decisions and remaining procedure:
 
-1. Complete review of the local S5-C1 through S5-C8 release-gate, evidence,
-   and cleanup records. After separate maintainer authorization for the exact
-   release commit, fetch `public`, verify `public/develop` is its expected
-   ancestor, and use a normal fast-forward only. Read back the exact public
-   SHA; verify the remote L1 hashes and reject unexpected binaries, secrets,
-   or host-local paths. Do not push unreviewed local documentation.
-2. Obtain explicit maintainer acceptance of controller identity Option B, or
-   stop for a separately scoped identity-stabilization proposal. Preserve all
-   historic H5/controller hashes. The current recommendation and its bounded
-   evidence are listed in [release readiness](release_readiness.md).
-3. Record the maintainer's decision on fresh-install and full relocated-suite
-   scope. Do not convert either `NOT_RUN` into `PASS` without execution.
-4. Resolve the retention-policy proposal in
-   [`backup_manifest.json`](backup_manifest.json). The existing full-workspace
-   gate remains active unless the maintainer explicitly approves the scoped
-   L1/L2/L3 policy and accepts the remaining risks. L1 hashes do not restore
-   missing L2 files. If the reduced policy is approved, retain L1 in Git,
-   preserve L2 on disk, and record `RAW_EVIDENCE_BACKUP_NOT_VERIFIED` and
-   `HISTORICAL_WORKSPACE_BACKUP_NOT_VERIFIED` without promoting either to PASS.
-   The specific proposed release exception is recorded in
-   [release readiness](release_readiness.md); it is not approved by this draft.
-   Obtain explicit risk acceptance before publication review.
-5. Re-fetch public refs and verify the exact approved source tree, protected
-   `main`, immutable v1.0.0 tag/Evidence, submodule Gitlinks, API migration
-   inventory, capability matrix, and final provider-free regression. Repeat
-   native runs only for a changed selected execution source or a specific
-   unresolved risk.
-6. Obtain maintainer approval for the release notes, migration notice,
-   capability claims, limitations, final commit, and publication. The target
-   remains v1.1.0 under GeoChora's project-specific versioning policy; no new
-   qualification is implied.
-7. Only after all gates pass and explicit authorization is given, create an
-   annotated `v1.1.0` tag on the specifically approved commit. Read back both
-   tag object and peeled commit. Publish the GitHub Release only after tag
-   verification; treat tag creation and publication as separate authorized
-   actions.
-8. Record the release commit, tag object, peeled commit, backup manifest hash,
-   submodule Gitlinks, final test receipts, and publication timestamp. Do not
-   modify `main` or v1.0.0 without separate authorization.
+1. The maintainer accepted controller identity Option B, the current
+   capability matrix within its existing `TESTED_BOUNDED` scope, breaking API
+   migration disclosure, and the `NOT_RUN` fresh-install/relocated-regression
+   limitations. Preserve the current controller algorithm, historic H5
+   hashes, and all qualification labels. These decisions do not grant new
+   qualification.
+2. The exact authorized candidate `501c5e55e290870d8ac712ef82c7c33f6956c011`
+   still had stale pending-decision wording in this readiness file. Per the
+   maintainer's stop condition, it was not pushed. A local documentation
+   correction is being prepared; the resulting exact SHA must be reviewed and
+   authorized before normal fast-forward integration. Fetch `public` again
+   immediately before that push, verify ancestry and protected refs, then read
+   back the exact public SHA. Never force-push.
+3. Preserve L1 metadata in Git and retain all 22 L2 files (24,563,669 bytes).
+   The maintainer directed that the L2 copy proceed despite the historic disk
+   warning. The current host exposes only `/dev/sda`; no independent disk or
+   network destination is mounted. Do not copy L2 to another directory on the
+   same device and do not claim a backup. The backup gate remains
+   `L2_INDEPENDENT_BACKUP_NOT_VERIFIED` until a separately mounted/authorized
+   destination is copied, hash-verified, and tested with representative
+   restore reads. C8 acceptance of historical L3 loss does not waive L2.
+4. Keep the fresh-install check and full relocated-checkout regression as
+   `NOT_RUN`; their limitations are accepted for this review. The historical
+   exploratory 139 PASS / 8 FAIL result remains disclosed; do not report a
+   relocated full-suite or native-route pass.
+5. After documentation integration and a verified L2 backup, perform one
+   final source/ref/evidence readback. Repeat native runs only if the selected
+   execution source changes or a specific unresolved risk warrants one.
+6. Publication is a separate step and is not authorized here. Before it,
+   present the exact RELEASE_COMMIT, `main`/`develop`/release-branch/tag
+   operations, L2 backup receipt, bounded capability claims, breaking API
+   notice, and accepted limitations. Wait for an explicit Publication GO.
+7. Only after that GO may the approved procedure update `main`, create the
+   `v1.1.0` branch and annotated tag, and publish a GitHub Release if it is
+   explicitly included. Read back every remote ref; never move v1.0.0.
+8. Branch/worktree cleanup requires a separate exact-name approval after
+   publication. Preserve the frozen v1.0.0 worktree, the retained C8 worktree
+   and holdouts, all unique logs, and unrelated refs.
 
-The release remains **PUBLICATION_BLOCKED**. C8's exact retirement scopes
-were approved and the maintainer accepted closure after observing ordinary
-candidate path absence; the registered worktree and holdouts remain, and no
-per-file deletion logs were saved. No scoped-backup replacement or waiver was
-approved, so the independent backup gate remains active. See the [release
-evidence index](evidence/README.md), [S5-C3 publication
-checklist](s5_c3_publication_checklist_draft.md), and [S5-C2 integration
-receipt](../../module/task_env/p2_0_s5_c2_public_integration_readiness.md).
+The release remains **PUBLICATION_BLOCKED** solely on the release gate because
+no independent L2 destination is currently available; the reviewed develop
+integration is separately paused until the corrected documentation commit's
+exact SHA is authorized. No backup waiver is approved. C8 closure is accepted
+with its retained worktree, holdouts and missing per-file deletion receipts.
+See the [release readiness](release_readiness.md), [release evidence
+index](evidence/README.md), and [S5-C3 publication
+checklist](s5_c3_publication_checklist_draft.md).
