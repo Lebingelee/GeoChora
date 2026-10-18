@@ -1154,7 +1154,7 @@
     "other_holdouts_retained": 522,
     "L2_files_verified": 22,
     "L2_bytes": 24563669,
-    "per_file_operator_unlink_receipts": "NOT_AVAILABLE",
+    "per_file_operator_unlink_receipts": "NOT_SAVED — explicitly confirmed by maintainer 2026-10-18; cannot reconstruct past execution from path absence",
     "workspace_allocated_bytes_after_observation": 2815557632,
     "workspace_allocated_decrease_bytes_observed": 73354846208,
     "space_limit": "Aggregate historical before/after observation; not exact file deletion attribution.",
