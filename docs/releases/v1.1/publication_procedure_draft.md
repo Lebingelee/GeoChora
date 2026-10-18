@@ -48,8 +48,6 @@ Future release procedure:
    submodule Gitlinks, final test receipts, and publication timestamp. Do not
    modify `main` or v1.0.0 without separate authorization.
 
-The release is currently **PUBLICATION_BLOCKED**. The scoped evidence-retention
-proposal is not yet approved and does not silently waive the earlier backup
-gate. See the [release evidence index](evidence/README.md), [S5-C3 publication
+The release is currently **PUBLICATION_BLOCKED**. The exact C8 retirement scopes are approved, but no scoped-backup replacement or waiver was approved. The earlier backup gate remains active, and C8 execution is storage-blocked before deletion. See the [release evidence index](evidence/README.md), [S5-C3 publication
 checklist](s5_c3_publication_checklist_draft.md), and [S5-C2 integration
 receipt](../../module/task_env/p2_0_s5_c2_public_integration_readiness.md).

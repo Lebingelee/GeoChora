@@ -1,0 +1,148 @@
+{
+  "L1_pre_execution_bytes": 1042337,
+  "L1_pre_execution_files": 84,
+  "L1_pre_execution_sha256": "ALL_MATCH",
+  "L2_bytes": 24563669,
+  "L2_files": 22,
+  "L2_inventory_ref": "docs/releases/v1.1/evidence/README.md",
+  "L2_sha256": "22/22 MATCH",
+  "actual_deleted_files": 0,
+  "actual_irrecoverable_loss_this_execution": "NONE",
+  "actual_retired_worktrees": 0,
+  "approved_manifest_files_modified": false,
+  "approved_manifest_sha256": {
+    "A": "a39734b52f69b11492d1d3e7b9ee5bfc2c4da938fc47bcf44607a04999822f75",
+    "B": "500012d5e2a6e0e998cd58bcc245bac885f1b88f0e1a140fac48b9e6802186b9",
+    "C1": "ff1c3e8e2db976293fd9da1f6f22a0ac3ffabb9a823f3a8d49e00b7f3f333281",
+    "C2": "f3bf52ee69e91515755f7b238d854bacf232bc98d08041bd0c50e489acd578de"
+  },
+  "backup_policy": {
+    "full_workspace_backup_waiver": false,
+    "independent_backup": "NOT_VERIFIED",
+    "raw_L2_loss_risk": "OPEN",
+    "storage_health": "OPEN"
+  },
+  "batch_B_worktree_method": {
+    "reason": "The nested GeoPhys git-dir equals its git-common-dir and git worktree list reports its primary repository, not a linked-worktree registration for the checkout path. Installed git-worktree manual says the main worktree cannot be removed and worktrees containing submodules require force. Force, deinit and manual deletion were not authorized or attempted.",
+    "remove_command_attempted": false,
+    "status": "HOLD_NOT_EXECUTABLE_BY_DESCRIBED_NONFORCED_NESTED_METHOD",
+    "tracked_root_checkout_revision": "bee498d1d784015f034c5b4af34320fdffa61411"
+  },
+  "batches": {
+    "A": {
+      "approved": true,
+      "attempted_deletions": 0,
+      "deleted_files": 0,
+      "status": "NOT_RUN_STORAGE_SAFETY_STOP"
+    },
+    "B": {
+      "approved": true,
+      "attempted_deletions": 0,
+      "deleted_files": 0,
+      "status": "NOT_RUN_STORAGE_SAFETY_STOP"
+    },
+    "C1": {
+      "approved": true,
+      "attempted_deletions": 0,
+      "deleted_files": 0,
+      "status": "NOT_RUN_STORAGE_SAFETY_STOP"
+    },
+    "C2": {
+      "approved": true,
+      "attempted_deletions": 0,
+      "deleted_files": 0,
+      "status": "NOT_RUN_STORAGE_SAFETY_STOP"
+    }
+  },
+  "candidate_paths_lstat_verified": 72445,
+  "capability_matrix_sha256": "229ca3ca9d01c17731c54297c83a79bf21138d6762c19c4ce78df78c52b9eb57",
+  "cleanup_attributable_reclaimed_bytes": 0,
+  "conditional_approved_upper_bound_bytes": 75417538560,
+  "continuation": "Resume only within the same C8 after storage anomaly classification/resolution. Exact batch approvals persist while the approved paths/identities and manifest bytes remain unchanged. Resolve non-forced worktree method separately; no force fallback.",
+  "date_utc": "2026-10-18T02:33:16.017589+00:00",
+  "df_observation": {
+    "available_bytes": 527471026176,
+    "filesystem_total_bytes": 671240200192,
+    "note": "Live filesystem observations include unrelated activity and receipt creation; not a cleanup-space delta.",
+    "used_bytes": 109596819456
+  },
+  "execution_status": "STOPPED_BEFORE_FIRST_DELETE_STORAGE_ANOMALY_UNRESOLVED",
+  "exercised_source_revision": "153af68e51140b0cc1b79b3db493a7648b8da3eb",
+  "explicit_recovery_refs_verified": 115,
+  "local_receipt_hashes": {
+    "authorization.json": "e7c1617beb75ae59925e58e632d2bc7c06b25eea2aef675297487f9d680367ff",
+    "current_source_provider_free.log": "bc31853adddcfd7e3b826cc8e22c29e765f6642a421859dbd18f6658469180a2",
+    "execute_authorized.py": "7be26cbee449671c8c87d14e7585e2767b3fc992669b76e032475b61c2fa35cd",
+    "import_binding_checks.log": "79b903863726d60eca4ecd47120a678395b6f13f47884ac91d9813264850a318",
+    "post_stop_integrity.json": "ab20571d3b78dd38138f00f144e4ea272902ae2a828ec568c59312000bc2a592",
+    "post_stop_integrity_corrected.json": "788dcb582a357f8c6e725dd9503ed349e94ab8a5e93958270f5a1bd49ab8b089",
+    "storage_safety_stop.json": "91784b7f0067f03eb38ef691495396b4c6b8e9015698acefa4c9ec055482c5d9"
+  },
+  "maintainer_authorization": "User explicitly authorized exact four SHA-256 manifests and accepted permanent C1/C2 historical Evidence/raw/source snapshot loss. Preserve all Protected/Hold/Unknown. No independent-backup waiver, extra deletion, push/main/tag/publication authorization.",
+  "no_push_no_tag_no_main_change_no_release": true,
+  "preserved_historical_records": 37,
+  "public_refs": {
+    "local_head": "153af68e51140b0cc1b79b3db493a7648b8da3eb",
+    "preflight_source_head": "153af68e51140b0cc1b79b3db493a7648b8da3eb",
+    "public_develop": "2fb60de7851bf2e5651c2dc99fff7451c16e1a94",
+    "public_main": "e4e39883fbe01d4be4b172a53a535ef0095b3d64",
+    "target_release": "v1.1.0",
+    "v1_0_0_peeled": "42787f5e4f658a3f81fdd2140cf7544d6342c783",
+    "v1_0_0_tag_object": "17c3100d4fabcb061c23569dea49973ebd177d51"
+  },
+  "record_type": "S5-C8 maintenance execution and safety-stop receipt",
+  "release": "v1.1.0",
+  "release_status": "RELEASE_CANDIDATE — NOT_PUBLISHED",
+  "remaining_holdouts": {
+    "B_P1_1_files": 3,
+    "C1_source_bundle": 1,
+    "C2_symlinks": 2,
+    "C2_unresolved_paths": 516,
+    "approved_candidate_paths_held_due_to_storage": 72445
+  },
+  "source_trees": {
+    "GeoPhys": "c665ce5028a12bb4d2afe49f05e015fa9b684a39",
+    "asset/external/mujoco_menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+    "docs/releases/v1.0": "48a4132696938a83e98dd77b7e6cfe6d905ca903",
+    "selected_execution_diff_from_public_develop": "",
+    "task_env": "1f2a480499e09ac6bb25147823edbdb62b5ce5b1",
+    "task_env/tasks/nut_assembly": "eed6b5c6f900e3c04f5150562f2758d17be4c9fb",
+    "task_env/tasks/pick_cube": "bac089f4ace6ca0693a8261fefacbc25dc108f48"
+  },
+  "storage_stop": {
+    "SMART_causality": "Unproven correlation only; not clearance",
+    "cached_SMART_updated_utc": "2026-10-18T02:24:10Z",
+    "cause": "UNRESOLVED SCSI error-count increment; not established as an ATA/SATA or filesystem read/write failure",
+    "first_ioerr_cnt": 2000,
+    "first_observed_utc": "2026-10-18T02:23:06Z",
+    "kernel_ring_access": "Denied; sudo required password and was not used",
+    "new_storage_lines_in_readable_current_kernel_log": 0,
+    "second_ioerr_cnt": 2005,
+    "second_observed_utc": "2026-10-18T02:25:17Z",
+    "stop_latched": true
+  },
+  "task_artifact_identity_refs": [
+    {
+      "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+      "artifact_sha256": "fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4",
+      "public_uid": "pick-cube-p16-reference-v1",
+      "task_config_sha256": "0d6b26b08affd68c95a4f3209111f7c4ee2ce62088b664370f7c11b6045e9aa0",
+      "tested_task_source_revision": "5b0058010f5416eefb08ce59cec43770602fc336"
+    },
+    {
+      "artifact_id": "nut-assembly-square-v1/p1_8_e/nominal-v1",
+      "artifact_sha256": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+      "policy": "nutassembly-outcome-oriented-completion-v1",
+      "public_uid": "nut-assembly-outcome-reference-v1",
+      "task_config_sha256": "749c78638a1e5c5e59374ceccd846767bacce5af969c2c50370482d2a288c531",
+      "tested_task_source_revision": "4d6d65c55eca994b4317bcfb80797c69e48452c6"
+    }
+  ],
+  "validation": {
+    "corrected_recovery_verifier": "PASS: 115 syntactically explicit refs available; no missing recovery object found",
+    "initial_recovery_verifier": "FAIL_INSTRUMENTATION: 10 narrative recovery_ref values treated as Git revspecs; original failure retained",
+    "native_full_routes": "NOT_RUN; source unchanged and storage stop",
+    "provider_free_current_source": "7 passed in 1.25s plus 2 passed in 0.78s"
+  },
+  "workspace_du_allocated_bytes": 76170403840
+}

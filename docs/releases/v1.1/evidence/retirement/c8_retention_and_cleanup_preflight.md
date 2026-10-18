@@ -2,7 +2,7 @@
 
 **Release:** GeoChora v1.1.0
 **State:** `RELEASE_CANDIDATE — NOT_PUBLISHED`
-**Preflight:** complete for the exact manifests listed below; **no deletion executed**.
+**Preflight snapshot:** 2026-10-17; complete for the exact manifests listed below. Subsequent exact authorization and the 2026-10-18 storage safety stop are recorded in the [C8 execution report](../../c8_execution_and_phase2_closure.md). No deletion has executed.
 
 ## Retention baseline
 

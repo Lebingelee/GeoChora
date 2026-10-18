@@ -28,6 +28,7 @@ release-candidate preparation only. No release tag or GitHub Release exists;
 - [Test and acceptance summary](test_acceptance_summary.md)
 - [Backup manifest](backup_manifest.json)
 - [Release readiness gates](release_readiness.md)
+- [S5-C8 authorized execution, safety stop and Phase 2.0 closure status](c8_execution_and_phase2_closure.md)
 - [S5-C1 final gate receipt](../../module/task_env/p2_0_s5_c1_final_release_gate.md)
 - [S5-C2 integration and backup gate receipt](../../module/task_env/p2_0_s5_c2_public_integration_readiness.md)
 - [S5-C3 publication checklist draft](s5_c3_publication_checklist_draft.md)

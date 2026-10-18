@@ -1127,5 +1127,20 @@
       "docs/releases/v1.1/evidence/retirement/l3_c_approval_candidate.json"
     ],
     "documentation_commit_status": "LOCAL_ONLY_NOT_PUBLIC"
+  },
+  "s5_c8_retirement_authorization_and_storage_stop": {
+    "date": "2026-10-18",
+    "approved_batches": {
+      "A": "a39734b52f69b11492d1d3e7b9ee5bfc2c4da938fc47bcf44607a04999822f75",
+      "B": "500012d5e2a6e0e998cd58bcc245bac885f1b88f0e1a140fac48b9e6802186b9",
+      "C1": "ff1c3e8e2db976293fd9da1f6f22a0ac3ffabb9a823f3a8d49e00b7f3f333281",
+      "C2": "f3bf52ee69e91515755f7b238d854bacf232bc98d08041bd0c50e489acd578de"
+    },
+    "C1_C2_permanent_historical_loss_accepted": true,
+    "execution": "NOT_RUN_STORAGE_SAFETY_STOP",
+    "deleted_files": 0,
+    "full_workspace_backup_waiver": false,
+    "independent_backup_status": "BACKUP_NOT_VERIFIED",
+    "report": "c8_execution_and_phase2_closure.md"
   }
 }

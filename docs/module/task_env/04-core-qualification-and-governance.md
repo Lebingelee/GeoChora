@@ -12,8 +12,9 @@
 > release-candidate 审阅材料。上述回归不增加 provider 或 capability
 > qualification。GeoPhys-owned Batch adapter、`merged_scene` 与 generic learner
 > routes 的声明范围仍以具名 Evidence 为准。v1.1.0 的原始 L2/L3 Evidence
-> 仍没有独立备份；S5-C6 将 L3-A/B/C 列为分批退休候选，但没有任何
-> deletion authorization。缩小保留范围仍待 maintainer 批准，SATA 风险保持开放。
+> 仍没有独立备份。2026-10-18 maintainer 已按精确 SHA-256 授权 C8 的 A/B/C1/C2，
+> 并接受 C1/C2 历史数据永久损失；执行前 SCSI 错误计数上升，删除已停止且实际删除为零。
+> 备份门槛未获豁免；SATA 风险保持开放。见 [C8 当前执行报告](../../releases/v1.1/c8_execution_and_phase2_closure.md)。
 
 ## 1. 目的
 

@@ -3,6 +3,8 @@
 **RELEASE_CANDIDATE — NOT_PUBLISHED**
 **Evidence class:** bounded acceptance and smoke evidence; no new formal qualification.
 
+**C8 update (2026-10-18):** all 22 L2 hashes were rechecked intact. The four exact retirement manifests are authorized, but execution stopped before deletion on an unclassified storage-counter rise. See [the current C8 report](../c8_execution_and_phase2_closure.md). No backup waiver was granted.
+
 This Git-trackable index summarizes the acceptance evidence selected for the
 v1.1.0 candidate. It reuses the existing [candidate capability matrix](../../../module/task_env/capability_matrix_v1_1_0_candidate.json),
 [source/recovery manifest](../source_recovery_manifest.json), and named
@@ -36,9 +38,7 @@ policy, installation and migration guides, public API/task inventory, known
 limitations, test summary, backup/readiness records, the single candidate
 capability matrix, the S2-C1/S2-C2 source identity records, S3/S4 recovery
 manifests, S4.5 workflow receipts, and the current TaskEnv migration guide.
-The exact paths are enumerated in the S5-C4 audit. They are present in local
-Git through `28dc2f48`; the C4 changes remain local and none of these latest
-retention updates has been integrated into public `develop`.
+The exact paths are enumerated in the S5-C4 audit. At the C4 snapshot they were present through local commit `28dc2f48`; later C8 metadata remains on the local maintenance branch. These retention updates have not been integrated into public `develop`.
 
 The summaries preserve bounded results and raw-evidence hashes. Hash metadata
 can identify a missing file but cannot restore its contents.
@@ -115,12 +115,7 @@ per-path inventory remains in ignored
 `workspace/maintenance/p2_0_s5_c4_20261017/`. The S5-C5 [retention plan](../../../module/task_env/p2_0_s5_c5_l3_retirement_planning.md)
 and its three exact, DRY_RUN_ONLY manifests reclassify L3 into regenerable
 L3-A, superseded/review L3-B, historical raw L3-C, and unresolved L3-D. S5-C6
-binds those inventories to separate approval proposals; each has an empty
-execution allowlist. The proposed `L3_HISTORICAL_RAW_RETIREMENT_ALLOWED`
-policy is not effective; the previous `BACKUP_NOT_VERIFIED` gate remains
-active until explicit maintainer approval. The registered worktree receipts,
-516 unresolved C rows, two symlinks, and external-consumer review remain
-holds. Nothing was deleted or rewritten. Tracked v1.0.0 release records and
+bound those historical inventories to separate proposals with empty execution allowlists. C8 subsequently produced exact A/B/C1/C2 manifests; the maintainer authorized those hashes on 2026-10-18 and accepted C1/C2 permanent loss. Execution is storage-blocked before deletion. The earlier `BACKUP_NOT_VERIFIED` gate remains active because no backup waiver was authorized. The three P1.1 holds, P1.8 bundle, 516 unresolved C2 paths and two symlinks remain held. No raw file was deleted or rewritten. Tracked v1.0.0 release records and
 qualification decisions remain unchanged and available through immutable
 `v1.0.0`.
 
@@ -139,6 +134,4 @@ qualification decisions remain unchanged and available through immutable
 - **BLOCKED pending maintainer decision:** the new L1/L2/L3 retention proposal
   does not replace the full-workspace backup requirement until explicitly
   approved.
-- **DRY_RUN_ONLY:** exact L3-A/B/C file manifests were prepared. No cleanup was
-  performed. The earlier 17-file cache allowlist remains in the S5-C4 audit;
-  all A/B/C groups require separate review before deletion.
+- **C8 AUTHORIZED / NOT_RUN_STORAGE_STOP:** exact A/B/C1/C2 approvals are recorded in the [execution receipt](retirement/c8_execution_receipt_20261018.json). Storage and non-forced worktree constraints still apply; no cleanup ran.

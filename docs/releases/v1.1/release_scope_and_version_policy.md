@@ -49,3 +49,5 @@ the reduced scope and accepts the remaining raw-data risks, the current backup
 gate remains **BLOCKED**. Hash metadata identifies expected bytes but cannot
 restore a missing H5 or other raw artifact. See the [evidence index](evidence/README.md),
 [backup manifest](backup_manifest.json), and [release readiness](release_readiness.md).
+
+On 2026-10-18 the maintainer authorized only the exact C8 A/B/C1/C2 retirement scopes, accepting C1/C2 historical loss while explicitly preserving the backup gate. Thus `L1_METADATA_REQUIRED`, `L2_CURRENT_RAW_EVIDENCE_REQUIRED`, and reviewed L3 retirement apply to these scopes; mandatory off-host backup has not been waived or satisfied. Execution is currently storage-blocked before any deletion; see [C8](c8_execution_and_phase2_closure.md).
