@@ -246,6 +246,37 @@ Renderer Session；同配置共享 Scene/cache 时，Camera calibration/buffer/s
   transmission/constraints/inertial-frame/contact 语义，不能将保留但未执行误标 EXACT supported。
 - **Codex AUDIT**：确定现有 MJCF-centered `assembly/compiler.py` 能复用的构造边界，以及哪些 conversions 必须 deferred；不得以“架构完整”名义重写 solver。
 
+#### D01a bounded execution receipt (2026-10-20)
+
+按 [执行顺序](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，A05、B04a、C01a
+完成后进入 D01a。维护者批准将 `scene-definition-v3` 原样 mapping 作为该 microprobe 的输入契约；本切片仍是
+EXTEND_EXISTING/COMPOSE_EXISTING 的 GeoPhys 有界桥接，不是新的通用 Scene importer 或第二套 Runtime。
+
+实现沿用 `RuntimeSource`、现有 GeoPhys session/composer、GeoPhys public `SceneSource`/`ImportedScene`
+与 `build_rigid_scene_model()`。candidate `TaskArtifact` 和 `ResetSample` 使用既有 v0 类型；新 Scene identity、
+source-closure digest 和 Provider import identity 分别记录。v3 scalar joint axis 被投影到 MJCF 后由 public importer
+实际导入；Frame、Joint endpoint/transform/axis 与 actuator resource 映射须逐项吻合，否则 materialization 失败。
+Reset realization tolerance 在 reset 返回后、首个 rollout step 前执行。
+
+真实 microprobe 使用 A05 v3 Scene mapping、Panda Menagerie MJCF source closure 和既有 procedural square-peg
+source，在 GeoPhys `main` `4436787e9cb85ce519506a2a9af86d1eeec9de2d` CPU 上运行。通过同一个 candidate Artifact 和
+同一个 ResetSample，将 `panda-main/joint1` 的 canonical axis 改变后重建 Scene，reset readback 仍满足 tolerance，
+`panda-main/link1` 的实测姿态变化 `0.246226`；因此新 Scene 输入确实影响 Provider realization。Panda 的独立 source closure
+记录了 68 个依赖文件；procedural peg 的生成 source bytes 和 closure digest 单独记录，并将其生成的 body 投影进组合
+MJCF root。public importer 返回 12 bodies、83 shapes、9 joints、8 actuators、
+8 transmissions、3 constraints；public rigid model 建立 24 个 collision geometries、8 actuators、9 qpos/DOF。
+
+Canonical v3 当前没有几何、惯量、接触、约束或 transmission 字段，因此这些属性在 Canonical mapping 中仍标为
+`SOURCE_RETAINED`。其中 MJCF 几何/惯量/约束/transmission source bytes 被当前 public importer 读取并进入公开 IR 或
+solver description；这不等于它们已经成为可移植的 Canonical contract。接触响应没有被本 probe 验证。映射报告按
+`CANONICAL_REPRESENTED`、`SOURCE_RETAINED`、`APPROXIMATE`、`UNSUPPORTED` 分列，不把 Source Retained 冒充语义执行。
+
+有界验收与负例位于 `task_env/diagnostics/tasks/test_phase_ii_d01a_scene_materialization.py`：4 passed，覆盖
+真实 GeoPhys main reset/首步、同 ResetSample 的 axis variant、缺 Frame/Joint/Geometry、source-closure 不匹配、
+超容差和 malformed source。Evidence receipt 保存在被忽略的
+`workspace/maintenance/phase_ii_d01a_main_20261020/d01a_microprobe_receipt.json`。该结果不声明 MuJoCo/第二 Provider、
+Controller/action、contact behavior、Task success、D01b、Task Harness 或 Qualification 已通过。
+
 ### D02 — Typed Canonical State / Requirements / Owner Views（a/b）
 
 - **D02a**：依赖 A02，提前规定 requirements、state type/frame、clock/sample/boundary identity、

@@ -1,0 +1,20 @@
+{
+  "asset_declaration_identity": "15625e5ce56ee99f2cbc135b5519fc7c4009e84bd78139f03a70ccc3bbb017f2",
+  "canonical_scene_identity": "047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e",
+  "generator": {
+    "generated_content_serialization": "ElementTree.tostring(peg body, encoding=utf-8)",
+    "generated_content_sha256": "703b9fdde5653d62f49f81615d6170b2f7d63ec1058493bf5fa9790b4bacea55",
+    "id": "task_env.assembly.nut_assembly.build_nut_assembly_model_xml",
+    "parameters": {
+      "half_height_m": 0.06,
+      "half_width_m": 0.016,
+      "shape": "square"
+    },
+    "version": "nut-assembly-peg-v1"
+  },
+  "schema_version": "geochora.d01a-asset-source-fixture-v1",
+  "source_closure_digest": "6fadf3986265a56bbedc99e1546a566641928e612d8839ea94cafaa6f15b19ff",
+  "source_closure_file": "square_peg.xml",
+  "source_reference": "geochora-procedural://nut-assembly/peg/square",
+  "source_revision": "nut-assembly-peg-v1"
+}

@@ -13,7 +13,12 @@ class _GeoPhysSession(_SessionValues):
         runtime = bootstrap_task_runtime(
             config=source.config, composition=source.composition, scene=source.scene,
             agents=source.agents, objects=source.objects,
-            scene_composer=GeoPhysSourceComposer(source.scene_source), create_render_source=False,
+            scene_composer=GeoPhysSourceComposer(
+                source.scene_source,
+                scene_definition=source.scene_definition,
+                source_closure_digest=source.source_closure_digest,
+            ),
+            create_render_source=False,
         )
         self._boundary = runtime.boundary
         compiled = runtime.compiled_scene

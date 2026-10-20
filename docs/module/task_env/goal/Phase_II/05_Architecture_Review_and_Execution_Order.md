@@ -220,6 +220,19 @@ Camera pairing、学习收敛或正式 qualification。已有 MuJoCo 成功不�
 P00 需声明未来重跑预算/条件，不把 timeout 变 PASS。
 更完整的历史限制继续由 [known limitations](../../../../releases/v1.1/known-limitations.md) 保留。
 
+### 5.2 依赖 gate 复核与 D01a 实际执行顺序（2026-10-20）
+
+表 3 仍是实施依赖的权威顺序。实际开工时，GeoPhys Gitlink 从原 D01a 规划审阅所绑定的开发同步点切换到
+pure `main` `4436787e9cb85ce519506a2a9af86d1eeec9de2d`；因此在满足 A05/B04a/C01a 依赖后、D01a 之前增加了
+一次 provider-baseline revalidation gate。该 gate 复跑 A03–A05/B04a/D02a/C01a/D05a 关联的十个定向测试文件，
+结果为 **91 passed**。这一步是基线改变后的证据重建，不调整父 Goal，也不把旧 GeoPhys SHA 的结果转移到 main。
+
+随后按表 3 进入 D01a。维护者已批准将 A05 `scene-definition-v3` mapping 原样作为 D01a microprobe 输入；真实
+GeoPhys main CPU probe 与负例结果见 [D01a bounded execution receipt](04_Phase_D_Physics_Rendering.md#d01a-bounded-execution-receipt-2026-10-20)。
+D01a 的 4 项定向测试全部通过，receipt 明确限定为一个 provider/backend 的静态 Scene materialization/reset probe，
+不构成 MuJoCo、contact、controller/task success、D01b 或 Qualification 证据。接下来按依赖图可进入 D02b；B01/B02
+须等待 D02b，不能仅凭 D01a 提前越过其直接前置。
+
 ## 6. 原稿保存、文档验证与二审交接
 
 原稿只通过第一次提交保存，不在活动目录创建第二份 canonical 副本。第一次提交五个文件的 SHA-256：
@@ -246,10 +259,11 @@ Core 源码链接使用仓库相对路径，便于在 develop 二审；GeoPhys �
 
 - 六份文件覆盖 20 个唯一父 Goal；31 个实施切片加 P00/P99 的依赖均指向表中更早的已定义条目，无环。
 - 仓库链接/Markdown anchors 和 Gitlink-pinned GeoPhys source references 已检查，Python 引用行号均在文件范围内。
-- 原稿提交的五个 SHA-256 与首次审阅逐字节一致；最终改动范围仅本目录六份 Markdown，源码/Gitlinks 不变。
-- 修订后的 staged `git diff --check` 通过；全仓 validate_docs.py 的唯一错误为上述数量上限，
+- 原稿提交的五个 SHA-256 与首次审阅逐字节一致；当时该规划修订提交的最终范围仅含本目录六份 Markdown，源码/Gitlinks 不变。
+- 当时修订后的 staged `git diff --check` 通过；全仓 validate_docs.py 的唯一错误为上述数量上限，
   其链接、JSON、冻结 refs/保留 bytes/source-doc checks 未报告其他错误。
-- 本次没有重跑 runtime/qualification；`5.1` 保留的是先前 f292df1 审阅结果。
+- 原规划修订轮次没有重跑 runtime/qualification；`5.1` 保留先前 f292df1 审阅结果，后续 GeoPhys main 基线复核与 D01a
+  bounded microprobe 已追加记录在 `5.2` 和 [Phase D D01a receipt](04_Phase_D_Physics_Rendering.md#d01a-bounded-execution-receipt-2026-10-20)。
 
 二审建议依次确认：
 
@@ -260,5 +274,6 @@ Core 源码链接使用仓库相对路径，便于在 develop 二审；GeoPhys �
    不要求一次批准全部 100–175 人日。
 4. 指定下一次 audit/implementation 的切片和 Evidence 范围后再启动；Task Harness/Agent Workflow 保持后续阶段。
 
-本次未修改 canonical contracts、module Skills、capability matrix、历史 Decisions、源码、tests、examples 或 Gitlinks。
-实现改变 public API/ownership/capability 后，必须按仓库治理同步 canonical docs/module Skills，并重新取得相应 review。
+本轮 D01a 增加了内部 RuntimeSource→GeoPhys public importer 的有界桥接与定向测试，并更新了 Phase II 计划记录；
+没有修改 canonical contracts、module Skills、capability matrix、历史 Decisions 或 Provider 实现。若后续改变 public
+API/ownership/capability，须按仓库治理同步 canonical docs/module Skills 并重新取得相应 review。

@@ -52,6 +52,8 @@ def materialize(artifact: TaskArtifact, execution: ExecutionSpec, *, source: Run
         raise ValueError('source execution/timebase mismatch')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
+    if source.scene_definition is not None and execution.physics_provider != 'geophys':
+        raise ValueError('scene-definition-v3 materialization is currently GeoPhys-only')
     if set(source.joints) != set(artifact.initialization.joint_position):
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):

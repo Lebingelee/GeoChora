@@ -1,0 +1,736 @@
+{
+  "actuator_resources": [
+    {
+      "actuator_id": "actuator1",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator2",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator3",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator4",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator5",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator6",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator7",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    },
+    {
+      "actuator_id": "actuator8",
+      "entity_id": "panda-main",
+      "schema_version": "actuator-resource-v1"
+    }
+  ],
+  "articulations": [
+    {
+      "entity_id": "panda-main",
+      "joints": [
+        {
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "left_finger"
+          },
+          "joint_id": "finger_joint1",
+          "kind": "prismatic",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "hand"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0584
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "meter",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "meter_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "right_finger"
+          },
+          "joint_id": "finger_joint2",
+          "kind": "prismatic",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "hand"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0584
+            ],
+            "quaternion_wxyz": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "position_representation": "meter",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "meter_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": null,
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "hand"
+          },
+          "joint_id": "hand_fixed_mount",
+          "kind": "fixed",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link7"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.107
+            ],
+            "quaternion_wxyz": [
+              0.9238795391929064,
+              0.0,
+              0.0,
+              -0.3826834162342327
+            ]
+          },
+          "position_representation": "none",
+          "position_size": 0,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "none",
+          "velocity_size": 0
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link1"
+          },
+          "joint_id": "joint1",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link0"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.333
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link2"
+          },
+          "joint_id": "joint2",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link1"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              0.7071067811865475,
+              -0.7071067811865478,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link3"
+          },
+          "joint_id": "joint3",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link2"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              -0.316,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              0.7071067811865475,
+              0.7071067811865478,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link4"
+          },
+          "joint_id": "joint4",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link3"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0825,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              0.7071067811865475,
+              0.7071067811865478,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link5"
+          },
+          "joint_id": "joint5",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link4"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              -0.0825,
+              0.384,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              0.7071067811865475,
+              -0.7071067811865478,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link6"
+          },
+          "joint_id": "joint6",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link5"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              0.7071067811865475,
+              0.7071067811865478,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        },
+        {
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "child_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link7"
+          },
+          "joint_id": "joint7",
+          "kind": "revolute",
+          "parent_frame": {
+            "entity_id": "panda-main",
+            "frame_id": "link6"
+          },
+          "pose_child_from_joint": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "pose_parent_from_joint": {
+            "position": [
+              0.088,
+              0.0,
+              0.0
+            ],
+            "quaternion_wxyz": [
+              0.7071067811865475,
+              0.7071067811865478,
+              0.0,
+              0.0
+            ]
+          },
+          "position_representation": "radian",
+          "position_size": 1,
+          "schema_version": "joint-definition-v1",
+          "velocity_representation": "radian_per_second",
+          "velocity_size": 1
+        }
+      ],
+      "link_frame_ids": [
+        "hand",
+        "left_finger",
+        "link0",
+        "link1",
+        "link2",
+        "link3",
+        "link4",
+        "link5",
+        "link6",
+        "link7",
+        "right_finger"
+      ],
+      "root_frame_id": "link0",
+      "schema_version": "articulation-definition-v1"
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "panda-v1",
+      "asset_version": "mujoco-menagerie-panda",
+      "license_id": null,
+      "schema_version": "asset-definition-v1",
+      "source_content_sha256": null,
+      "source_reference": "mujoco-menagerie://franka_emika_panda/panda.xml",
+      "source_revision": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+    },
+    {
+      "asset_id": "square-peg-v1",
+      "asset_version": "nut-assembly-peg-v1",
+      "license_id": null,
+      "schema_version": "asset-definition-v1",
+      "source_content_sha256": null,
+      "source_reference": "geochora-procedural://nut-assembly/peg/square",
+      "source_revision": "nut-assembly-peg-v1"
+    }
+  ],
+  "control_groups": [
+    {
+      "actuator_refs": [
+        {
+          "actuator_id": "actuator1",
+          "entity_id": "panda-main"
+        },
+        {
+          "actuator_id": "actuator2",
+          "entity_id": "panda-main"
+        },
+        {
+          "actuator_id": "actuator3",
+          "entity_id": "panda-main"
+        },
+        {
+          "actuator_id": "actuator4",
+          "entity_id": "panda-main"
+        },
+        {
+          "actuator_id": "actuator5",
+          "entity_id": "panda-main"
+        },
+        {
+          "actuator_id": "actuator6",
+          "entity_id": "panda-main"
+        },
+        {
+          "actuator_id": "actuator7",
+          "entity_id": "panda-main"
+        }
+      ],
+      "entity_id": "panda-main",
+      "group_id": "arm",
+      "schema_version": "control-group-v1"
+    },
+    {
+      "actuator_refs": [
+        {
+          "actuator_id": "actuator8",
+          "entity_id": "panda-main"
+        }
+      ],
+      "entity_id": "panda-main",
+      "group_id": "gripper",
+      "schema_version": "control-group-v1"
+    }
+  ],
+  "entities": [
+    {
+      "asset_id": "panda-v1",
+      "asset_version": "mujoco-menagerie-panda",
+      "entity_id": "panda-main",
+      "schema_version": "entity-instance-v1"
+    },
+    {
+      "asset_id": "square-peg-v1",
+      "asset_version": "nut-assembly-peg-v1",
+      "entity_id": "square-peg-instance",
+      "schema_version": "entity-instance-v1"
+    }
+  ],
+  "frames": [
+    {
+      "entity_id": "panda-main",
+      "frame_id": "hand",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "left_finger",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link0",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link1",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link2",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link3",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link4",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link5",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link6",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "link7",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "panda-main",
+      "frame_id": "right_finger",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    },
+    {
+      "entity_id": "square-peg-instance",
+      "frame_id": "peg1",
+      "frame_kind": "runtime",
+      "parent": null,
+      "pose_parent": null,
+      "schema_version": "frame-definition-v1"
+    }
+  ],
+  "robots": [
+    {
+      "articulation_roots": [
+        {
+          "entity_id": "panda-main",
+          "frame_id": "link0"
+        }
+      ],
+      "entity_id": "panda-main",
+      "schema_version": "robot-instance-v1"
+    }
+  ],
+  "scene_id": "phase-ii-a05-panda-and-procedural-peg",
+  "schema_version": "scene-definition-v3"
+}
