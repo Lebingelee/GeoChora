@@ -40,8 +40,10 @@ PYTHON
 
 只在学习流程需要时安装 `task_env/requirements-rl.txt`。本轮不重新安装依赖；requirements
 不是已验证的 lockfile。冻结发布可用 `git checkout --detach refs/tags/v1.1.0`；开发应基于当前 develop。
-GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`，Menagerie 为
-`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；不要用上游 HEAD 替代 source identity。
+v1.1.0 的 GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`；当前开发基线为
+`54f40fbfffd945967525aa85801087e7da0b491e`（上游 main 加静态接触兼容修复），同步范围及验证见
+[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。Menagerie 仍为
+`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；复现时使用所属版本的 Gitlink，不以浮动 HEAD 替代。
 
 ```python
 from task_env import make_env

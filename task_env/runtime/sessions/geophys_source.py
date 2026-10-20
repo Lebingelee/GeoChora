@@ -17,4 +17,6 @@ class GeoPhysSourceComposer:
         return native_scene_source(self._source), self.adapter_name
 
     def build_scene_model(self, imported_scene, composition):
-        return imported_scene.build_rigid_scene_model(use_imported_meshes=False)
+        # The public lowering resolves canonical mesh IDs through its imported
+        # resource table; disabling that table leaves IDs as unreadable paths.
+        return imported_scene.build_rigid_scene_model(use_imported_meshes=True)

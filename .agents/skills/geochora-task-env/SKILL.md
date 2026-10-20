@@ -60,6 +60,9 @@ byte-preserved matrix may be tag-only: resolve them through
 IMPLEMENTED != TESTED_BOUNDED != QUALIFIED.
 No new P1.8 FULL/D0-D2, manipulation checkpoint/PPO, native Flora/GeoPhys Rigid Batch or general
 Physics × Renderer qualification. Pendulum learning/RGB smokes are bounded wiring, not convergence.
+The 2026-10-20 GeoPhys development sync has a newer Gitlink than v1.1.0; use the checked-out
+revision and the bounded [sync receipt](../../../docs/module/task_env/runtime-and-providers.md#geophys-开发基线同步2026-10-20).
+Published v1.1.0 qualification/acceptance does not transfer to this provider revision.
 
 Physics and renderer stay separate. Never read provider-private solver/renderer state. Task semantics
 and stages stay task-owned; reuse controller/observation/recording/learner/render contracts.

@@ -1,5 +1,59 @@
 # Runtime、Provider 与控制生命周期
 
+## GeoPhys 开发基线同步（2026-10-20）
+
+本次将三个 Phase II 开发分支与 develop 的 GeoPhys 从
+`c665ce5028a12bb4d2afe49f05e015fa9b684a39` 同步到
+`54f40fbfffd945967525aa85801087e7da0b491e`。目标是已发布的 GeoPhys integration branch
+`codex/geochora-main-sync-20261020`，包含上游 main
+`4436787e` 的全部历史（相对共同基线新增 1,542 个 main 提交）和原有静态接触修复。
+原有 Core main、v1.1.0 分支/tag、冻结 worktree 和 Menagerie Gitlink 不在更新范围。
+
+GeoPhys 合并在 `solver_setup.py` 有一处内容冲突：保留混合场景中固定子树的零逆质量/逆惯量，
+同时保留上游全固定树的处理与 armature 更新。新增三项数组级回归覆盖混合树、无 joint-range
+的全固定树和旧移动树调用；solver 继续在 armature 更新后消除固定体接触 mobility。
+Core selected bridge 改为通过 `ImportedScene.build_rigid_scene_model(use_imported_meshes=True)`
+解析公开 mesh 表。旧的 False 路线在新 Provider 下会将 canonical asset ID 当作文件路径，
+PickCube/NutAssembly reset 因 `mesh_required` 失败；没有采用忽略 mesh、替换 box 或私有状态补救。
+
+本次实际验证范围如下，不转移 v1.1.0 的历史 acceptance/Qualification：
+
+| 验证 | 结果与边界 |
+| --- | --- |
+| A01–A03、reference construction、selected consumers | 86 passed，7.39 s；包含旧 Artifact hash、schema 与 synthetic consumer 回归 |
+| NutAssembly Outcome | 32 passed，146.69 s；现有纯语义/生命周期 detector |
+| Render backend registry | 9 passed、6 subtests passed，4.66 s；native endpoints 替代测试 |
+| GeoPhys 静态接触初始化 | 3 passed；数组级 oracle，不等同完整接触演化验收 |
+| Pendulum × GeoPhys CPU | 真实 construct/reset/2 steps/close 通过，28.90 s |
+| PickCube × GeoPhys CPU，seed 31 | 真实 reset/3 expert intervals/record/read/close 通过，63.07 s |
+| NutAssembly × GeoPhys CPU，seed 19 | 同上，66.63 s；包含 native-rate interval 路线，未完成整段 Expert |
+| PickCube / NutAssembly × MuJoCo CPU | 各 3 intervals 与录制读取通过，约 0.54 / 0.77 s |
+| Camera geometry/admission | 26 个 pure checks 与正/负 admission 通过；跨 Provider pairing 仍拒绝 |
+| GeoPhys CPU native static camera | 32×24 RGB/depth capture 通过，中心 optical-Z=2.0 m，4.93 s |
+
+四条 selected 录制均为 3 transitions/4 boundaries、约 0.03 s；两任务 `world-v0` Artifact hash 保持
+原值。这里的有界 horizon 不表示 task success 或 Expert completion，storage read 不表示 D0 replay。
+没有运行完整 manipulation rollout、randomized feasibility、训练、CUDA、native Flora、一般 batch
+或新的跨 Provider renderer qualification。首次合并套件在 120 s、拆分后的含 Outcome 套件在 90 s
+预算下 TIMEOUT；按 detector 拆分并给 Outcome 240 s 后，上表各项通过，没有删除断言或放宽 tolerance。
+CPU native probes 使用 180 s 墙钟预算，相机 120 s；native peak RSS 仅来自单进程统计，不是进程树上限。
+
+可复现 pytest 路径为 `task_env/diagnostics/tasks/test_phase_ii_{artifact_identity,scene_structure,scene_composition}.py`、
+`test_reference_construction.py`、`test_selected_consumers.py`、`test_nutassembly_outcome.py`（均在同一 tasks 目录）
+及 `task_env/diagnostics/render/test_backend_registry.py`。使用现有 GeoChora Python、
+`PYTHONPATH=GeoPhys/src:.`、`PYTHONDONTWRITEBYTECODE=1`、`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`，
+执行 `python -m pytest -q -p no:cacheprovider <paths>`；无需新增安装方式。
+Provider regression 位于 `GeoPhys/test/verification/rigid/test_static_contact_mobility.py`。
+上述完整收据产生于 Core `a248c9f` 加本次同步补丁；两个较早的规划分支只移植依赖同步和兼容补丁，
+不引入 A01–A03 实现。文档治理检查的链接、锚点和冻结 bytes 未报错；仍报告既有 docs66/task_env22
+数量上限，以及相对 consolidation 基线的七项非文档路径。该检查要求 documentation-only，不能记作全绿。
+原始诊断脚本、初次 mesh 失败、成功录制和各运行日志保留在 ignored
+`workspace/maintenance/geophys_main_sync_20261020/`，不作为发布 Evidence/Judge approval。
+
+模块 Skill 的 public construction、recording 和不支持交集经上述 routes 复核，API 未增加；Skill 只新增
+当前依赖与历史资格区分的路由说明。旧 P00/A04 来源图、跨 checkout 和 dependency evidence 结论绑定
+旧 GeoPhys commit，下一次 A04 审查必须在新 pin 重核；本次同步不启动 A04 实施。
+
 ## 执行边界
 
 稳定路径为 Artifact → ExecutionSpec → capability admission → ResetSample → provider
