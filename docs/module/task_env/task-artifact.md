@@ -33,6 +33,29 @@ Provider-neutral world/semantics 不导入 provider-native API；task adapters �
 高级 strict codec 拒绝未知字段/schema、未声明 semantic references、非 finite values 和未知 capability；
 TaskArtifact identity 只 hash artifact mapping，不接受 execution field；确定性 JSON/YAML roundtrip 保留原值。
 
+Phase II A01 增加 provider-neutral `AssetDefinition`、`EntityInstance`、`SceneDefinition` 值，位于
+`task_env.artifacts`。它们以版本化 ID 和 canonical mapping 表示资产来源与 Scene 内实例关系；
+Scene hash 不依赖声明输入顺序，但会随 scene/entity/asset identity 或 source provenance 改变。
+source SHA-256 是可选 provenance 字段；声明 hash 不证明 importer 读取了该 bytes。A01 不读取资产、
+不执行 importer/materializer，也不将 native handle 写入身份值。原有 `world-v0` 与已冻结
+TaskArtifact bytes/hash 不变；vNext Scene 值不自动投影为 TaskArtifact，也不改变发布能力或 qualification。
+`AssetManifest`、`TaskCompositionSpec`、`ReferenceSpec` 和 `TaskReferences` 保持各自在 assembly、
+注册组合及编译后名称映射中的职责，后续 A04 才定义 source importer 与 identity value 的连接规则。
+Phase II A02 的 `scene-definition-v2` 在同一 `SceneDefinition` owner 下补充 entity-qualified authored fixed
+frames、runtime body/link anchors 与 Articulation/Joint 静态拓扑；`scene-definition-v1` 的 codec、mapping 与 hash
+保持原样。Frame composition 只解析有足够 authored transform 的路径；动态 link pose 留给 D02 canonical state。
+Joint 显式保留 parent/child link 内的 joint-frame transforms、joint-frame axis 及独立的位置/速度 coordinate
+representations。该静态定义不执行 FK、physics lowering 或 control；closed-chain、transmission、joint limits、
+mass/geometry/visual 细节须由后续 importer/materializer 映射、保留为受限来源或拒绝，不能宣称已支持。
+Phase II A03 通过 `scene-definition-v3` 在同一 Scene owner 中组合 `RobotInstance`、Entity-owned
+`ActuatorResourceDefinition` 与 Entity-qualified `ControlGroup`。Robot 身份直接使用 Entity ID，并引用该 Entity
+的 articulation roots；不会另建可能与 Entity 分叉的 Robot ID。`ActuatorReference` 以 `(entity_id, actuator_id)`
+结构化解析，ControlGroup 仅声明静态资源归属，并拒绝未知 actuator、跨 Entity membership 和重复静态 writer。
+这些值不推导 joint/action 维数，不指定 Controller、提交时序或 native actuator binding。v1/v2 codec、mapping 与
+identity hash 保持原样；objects/sensors 仍使用通用 Entity 与 Frame，不引入 Task Role resolver。旧
+`TaskCompositionSpec`、assembly `TaskReferences` 和当前 Env 的单 Robot 执行边界未改变；双 Robot 目前仅有静态
+composition/reference 证据，真实施控须由后续 D01/C02 路线另行验证。
+
 生命周期为 `draft -> candidate -> validated -> frozen -> archived`。
 validated 表示产生检查/feasibility Evidence、等待 Judge；frozen 必须有明确批准。
 拒绝或修改 frozen 任务必须新建版本，不得原地改变语义。

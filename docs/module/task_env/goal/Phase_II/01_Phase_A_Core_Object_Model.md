@@ -1,7 +1,7 @@
 # Phase A — Core Object Model：架构、实施切片与验收
 
-> **PROPOSED / READY FOR SECOND REVIEW。** 2026-10-20 依据源码审阅修订，仅规划变更，未授权代码实施。
-> 源码基准：`develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
+> **STATUS：A01/A02 静态验收通过；A03 静态实现与回归通过，独立报告待维护者验收；A04 实施等待 A03 报告验收。**
+> 本分支 `codex/phase-ii-a` 基于 `develop@8bc95ef4a38b6adbc61166c05b5bb5c2221065a6`；当前改动尚未提交。
 > 总体边界与 20 Goal 依赖图参见 [`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)。
 
 ## A.0 阶段目的与非目标
@@ -195,21 +195,43 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 ### A01 — Asset Definition / Entity Instance / Identity
 
 - **依赖**：P00 Baseline。
-- **任务**：调查现有 AssetManifest/ReferenceSpec/Registry，确定 source provenance、definition id、instance id、hash/version；实现可扩展的最小声明与严格 codec；明示 native handle 不属于定义。
-- **Owner 决议**：扩展既有 artifacts 的 immutable contracts；A Scene 是结构唯一权威，v0 WorldDefinition 只通过兼容层消费。AssetManifest、TaskCompositionSpec、TaskReferences 的用途逐一列明，不能复制为同义 owner。
-- **产出**：最小 typed data contract；source/instance 映射规则；Schema/Compatibility Notes；Unit Fixtures。
-- **验收**：同 Asset→两 Entity IDs；重复实例 ID/缺失资产/非法单位拒绝；定义与实例独立 serialize/deserialize；不发生 Physics import/native construction；旧 `make_agent`/`make_object` 可正常导入。
+- **Owner 决议**：在现有 `task_env.artifacts` strict immutable contract/codec 中增加 `AssetDefinition`、`EntityInstance`、`SceneDefinition`；不新建 Asset Registry、Runtime 或 provider loader。`AssetManifest` 仍提供 assembly 使用的本地 source paths，`ReferenceSpec` 描述编译后 native 名称，`TaskCompositionSpec` 组合注册组件，`TaskReferences` 保存编译后的运行时映射；它们均不拥有此 Scene identity。TaskArtifact `world-v0` 保持原样。
+- **A01 schema v1 范围**：asset identity 由 `(asset_id, asset_version)` 表示，附稳定 source URI、可选 source revision/source SHA-256/license；绝对本地路径、`file:` URI 和 parent traversal 拒绝。`EntityInstance.entity_id` 在单一 Scene 内唯一，并引用精确的 asset id/version。Scene 只列出被实体引用的资产，且以 ID 排序后确定序列化/hash。相同 Asset 可由多个 entity 引用；新增/重命名 entity、scene、asset declaration 或 provenance 都会改变 Scene identity hash。该 hash 是声明内容 hash；可选的 source SHA-256 只记录来源摘要，不能证明 importer 实际消费了对应 bytes。
+- **边界**：v1 只承载 identity 与 provenance，不含 geometry、pose、components、Frame、Registry 映射或 native handle。没有物理量，因此单位/DOF 校验归 A02。A04 才把本契约与 AssetManifest/source importer 连接，并检查实际来源 bytes；本 Goal 不读磁盘、不导入 Physics、不执行 provider 构造。
+- **产出**：typed identity values、严格 mapping codec、独立 Asset/Entity/Scene roundtrip/hash fixtures、与 `world-v0` 的兼容证明。
+- **验收**：同 Asset→两个不同 Entity IDs；重复 Entity ID、重复 asset id/version、未声明资产引用、未使用资产、未知字段/版本、非法或机器本地 source reference 拒绝；声明顺序变化不改变 Scene hash；实体/场景/资产身份变化改变相应 hash；后续修改输入 mapping 不改变已构造值；不加载 Physics/provider；旧 `make_agent`/`make_object` 导入通过；现有 PickCube/NutAssembly `world-v0` Artifact hash 不变。
 - **终止条件**：如需修改 Menagerie Gitlink、复制 Provider importer 或不能保持已有 Reference ID，先 `REVISE`；不把 `asset/` 本身误作 Gitlink。
-- **Codex AUDIT Goal**：列出 AssetManifest、EntityDefinition、Asset Reference 的现有重叠数据，决定扩展的**唯一** owner 和迁移层。
+- **兼容演进**：A02 若加入 structure/components，必须给新结构明确 schema version 和显式旧值投影；不能在 `world-v0` 增字段、复用其 hash 或让 v1 忽略未知字段。
+
+#### A01 验收收据（2026-10-20）
+
+- **结果**：`PASS — static identity contract`；满足进入 A02 的门槛，不授予 Runtime/provider 能力或 Qualification。
+- **实现**：新增 `task_env.artifacts.AssetDefinition`、`EntityInstance`、`SceneDefinition`；仅从 `task_env.artifacts` 导出，没有增加 root facade、Asset Registry 或 loader。
+- **验证**：`test_phase_ii_artifact_identity.py` 与既有 `test_reference_construction.py` 合计 **31 passed**。覆盖版本/字段拒绝、身份 hash/排序、资产引用完整性、mapping roundtrip/防输入突变、旧 factory import、provider-free subprocess，以及冻结身份回归。
+- **Frozen 回归**：PickCube `world-v0` TaskArtifact hash=`fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4`；NutAssembly=`99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe`，与基线一致。
+- **命令**：`PYTHONPATH=GeoPhys/src:. PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider task_env/diagnostics/tasks/test_phase_ii_artifact_identity.py task_env/diagnostics/tasks/test_reference_construction.py`（在 `workspace/maintenance/phase_ii_a_20261020_A01_004/` 有界运行；2.001 s、峰值采样 RSS 约 105 MiB）。
+- **原始记录**：`workspace/maintenance/phase_ii_a_20261020_A01_004/{run.json,stdout.log,stderr.log}`；A01 source digest 清单见同目录 `a01_receipt.json`。
+- **失败保留**：前序夹具修正过程中的失败 stdout/stderr 保留在 `_002`，后续修正版本结果保留在 `_003`；最终 `_004` 覆盖加入 Scene schema 负例后的代码并全绿。
 
 ### A02 — Component Model / Articulation / Frame Graph
 
 - **依赖**：A01。
-- **任务**：最小 Physical/Visual/Joint/Frame/Actuation component contract；Frame Parent 静态关系和 transform composition；无环校验，约束 Joint types 与 DOF 语义。
-- **产出**：可验证的 Frame/Articulation structure、只读结构访问路径、strict failures。
-- **验收**：World→Base→Hand→Camera Mount 的矩阵乘积符合 analytical oracle；循环/不存在 parent/不一致 frame 拒绝；同名 joint 在不同 Robot 中可共存；Free-base position/velocity 维度不能隐式要求相等；不实现 FK Solver。
-- **补充 Gate**：区分 authored fixed Frame 与 runtime link pose；明确 joint position/velocity 的 type、frame 和维数需求，交给提前的 D02a 定契约。当前 Panda 必需的 transmission/constraints 必须保留或有明确受限 source 路径。
-- **Codex AUDIT Goal**：对照 `task_env/assembly/references.py` 与已有 Frame 代码，优先复用。
+- **实现边界修订**：继续扩展唯一的 `task_env.artifacts.SceneDefinition`，以 `scene-definition-v2` 增加静态 Frame/Articulation 结构；保留 v1 identity mapping/hash，不另建 ECS、Robot model、Frame resolver 或 Runtime。暂不添加无消费者的通用 Physical/Visual/Actuation component；Asset 物理/视觉内容归 A04 source importer 与 D01 materialization，控制资源归 C02 binding。
+- **Frame contract**：`FrameReference(entity_id, frame_id)` 消除跨 Robot 同名歧义。`authored_fixed` frame 带相对 parent 的 `PoseWorld`；无 parent 表示直接相对 world。`runtime` frame 是无静态 pose 的动态锚点，可对应 free body 或 articulation link，pose 留给后续 D02 state。只允许在完全 authored-fixed 的路径上解析 world pose；以 runtime frame 为 ancestor 时可求 link-local transform，world 结果明确失败。
+- **Articulation / Joint contract**：一个 entity 可有多个互不重叠的 articulation tree；每棵包含 root link 与无环连通 joint tree，每个 link frame 恰属一个 articulation。Joint 的 parent/child 是 entity-qualified link frame，joint frame 在 parent/child link 内的两组固定变换完整保留；axis 表达于 joint frame。Joint ID 在 entity 内唯一，不同 entity 可以同名。暂支持 fixed/revolute/continuous/prismatic/spherical/floating 六种常见坐标布局；位置/速度 representation 与数组宽度分别声明（例如 spherical 4/3、floating 7/6），不能把宽度当相等的 DOF 数。
+- **产出**：严格 v2 mapping、只读静态 Frame composition、Articulation tree 校验、v1 兼容证明、SOURCE limitations。
+- **验收**：World→Base→Hand→Camera Mount 的旋转/平移符合独立 analytical oracle；Frame parent 缺失/成环/跨实体引用、joint topology 错误及未知 schema/字段拒绝；同名 joint 在两个 Robot 实例可共存；joint origin 变化进入 Scene hash；Free/spherical coordinate 宽度按声明校验；runtime link 不冒充 authored pose；不导入 Provider、不做 FK/physics lowering。
+- **Source limitation**：A02 不表达闭环约束、transmission/tendon/equality、joint limits 或 actuator control；A04 importer 必须逐项映射、显式保留受限 source reference 或 fail closed，不能静默丢弃。D02a 后续定义动态 link state/timebase/lifetime，本 Goal 的 `PoseWorld` 只描述 authored fixed geometry 与 joint frame geometry。
+
+#### A02 验收收据（2026-10-20）
+
+- **结果**：`PASS — static frame/articulation contract`；静态结构 gate 通过，不表示 Provider materialization、FK、physics runtime support 或 Qualification。
+- **实现**：`scene-definition-v2` 在同一 `SceneDefinition` owner 下纳入 `FrameDefinition`、`FrameReference`、`ArticulationDefinition`、`JointDefinition`；v1 mapping/hash 继续由版本专属 codec 保持原样。复用 TaskEnv 既有 WXYZ rotation utilities，不复用 camera owner 或 Panda-specific FK。
+- **验证**：`test_phase_ii_scene_structure.py`、A01 contract tests、`test_reference_construction.py` 合计 **49 passed**。包括独立 World/Base/Hand/Camera Mount oracle、fixed/runtime frame 分离、free-body anchor、多 articulation、entity-qualified 同名 joint、6 类 position/velocity layout、joint-origin hash、cycle/missing/invalid parent 与 schema 拒绝。
+- **旧身份**：PickCube / NutAssembly `world-v0` TaskArtifact hash 仍分别为 `fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4` / `99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe`，同一测试集回归通过。
+- **命令**：`PYTHONPATH=GeoPhys/src:. PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider task_env/diagnostics/tasks/test_phase_ii_scene_structure.py task_env/diagnostics/tasks/test_phase_ii_artifact_identity.py task_env/diagnostics/tasks/test_reference_construction.py`（在 `workspace/maintenance/phase_ii_a_20261020_A02_004/` 有界运行；2.208 s、峰值采样 RSS 约 106 MiB）。
+- **原始记录**：`workspace/maintenance/phase_ii_a_20261020_A02_004/{run.json,stdout.log,stderr.log}`；source digest 清单见同目录 `a02_receipt.json`。
+- **保留限制**：非树/闭环、transmission/tendon/equality、limits、真实质量/几何/视觉和控制 binding 均未实现；后续各 owner 必须映射、保留来源或拒绝。初始 `_001` 失败是负向测试错误地要求现有 `task_env` import 不加载 Panda 专用 kinematics module；修订为只断言本静态路径不加载 Provider/native runtime，最终 `_004` 覆盖多 articulation 与 free-body anchor 全集通过。
 
 ### A03 — Robot / Control Group / Scene Composition
 
@@ -220,15 +242,146 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 - **验收**：两相同 Asset 实例名称隔离、关节资源集合可解析；ControlGroup 指向未知 actuator 失败；同一 Scene 重新解析产生相同 Canonical Identity；静态组合不得触发 native step；**不声称多 Robot 物理执行已支持**。
 - **Codex AUDIT Goal**：区分 Scene Entity、Articulation Link、Task Role 的所有权，不复制 B 的 role resolver。
 
+#### A03 实施收敛与验收收据（2026-10-20）
+
+- **Owner / 版本**：在 `task_env.artifacts.SceneDefinition` 中新增 `scene-definition-v3`；v1/v2 的严格字段集合、mapping 与 identity hash 保持原样。没有新建 Registry、robot factory、Task Role resolver 或 Runtime。
+- **Robot 身份**：`RobotInstance` 以已有 `entity_id` 作为实例身份，不再创建可与 Entity 分叉的第二个 robot ID；它列出该 Entity 全部 articulation roots。一个 Entity 至多标记为一个 RobotInstance；同一个 Asset 可由多个 Entity 独立实例化。
+- **Actuator / Group**：`ActuatorResourceDefinition(entity_id, actuator_id)` 是 entity-local 的资源声明；`ActuatorReference` 是二元结构化引用。`ControlGroup(entity_id, group_id, actuator_refs)` 只声明静态资源集合，并拒绝未知资源、跨 Entity 引用及一个 actuator 被多个 Group 声明 writer。Actuator 不暗示一个 joint、DOF、action width、Controller、命令模式或控制时序。
+- **静态解析**：`SceneDefinition.resolve_robot()`、`resolve_control_group()`、`resolve_actuator()` 在 v3 中按完整 Entity/resource tuple 查询。`/`、`:` 可出现在合法名称中；不通过拼接字符串生成键。旧 `TaskCompositionSpec` / `resolve_task_references()` 和当前 Env 的单 Robot 执行边界均未改变。
+- **Scene 角色与状态**：Objects/Sensors 仍是通用 `EntityInstance`，以既有 Frame 引用关系组合；不新增 B 的 Task Role 或通用 ECS。Scene authored-fixed placement 与 runtime frame 状态分离；A03 不把 B02 reset sample 或 D02 动态 pose 写入 Scene。
+- **结果**：`PASS_STATIC_COMPOSITION — awaiting report acceptance`。单 Robot 与双同型号 Robot、arm/hand 分组、对象和相机 Entity、同名/分隔符歧义资源解析、未知资源/重复 writer 拒绝、顺序无关 hash、v1/v2 hash/codec 保留以及 provider/native-runtime-free import 均通过。该结果不代表 A04 importer、actuator lowering、双 Robot Runtime 或 Qualification。
+- **兼容 oracle**：固定 v1 Scene fixture hash `283fcf2766ce4b0eb1eaf83d27856d2b37472f8f46c92605dd587f0f2a81b36a`，固定 v2 Scene fixture hash `af5618c3404100c82c5083fbf59466230d7bc1b7db8b8ba30bae99f145f81467`；PickCube/NutAssembly `world-v0` Artifact hash 由联合回归再次核对。
+- **验证**：新增 `test_phase_ii_scene_composition.py`；与 A01/A02 静态契约测试和既有 `test_reference_construction.py` 联合 **57 passed**。运行环境 Python 3.12 GeoChora 环境，单进程 CPU/Address Space 分别限 120s/8 GiB，墙钟 120s；pytest 2.31s、supervisor wall 2.467s。采样未覆盖进程树 RSS，不把该结果用作内存性能承诺。
+- **原始记录**：`workspace/maintenance/phase_ii_a_20261020_A03_003/{run.json,stdout.log,stderr.log}`；A03 文件摘要见同目录 `a03_receipt.json`。
+- **未覆盖**：无来源 importer 消费证明、MJCF/URDF 解析、资源到真实 native actuator 的绑定、Controller/action shape、双 Entity 施控、物理或渲染验证。A04 仍须复用现有公开 importer/Registry，并逐项报告未表达语义；A03 不授权提前实施 A04。
+- **审阅报告**：见本文件 [A03 Review Report](#a03-review-report-maintainer-acceptance-required)，等待维护者验收。
+
+#### A03 Review Report: Maintainer Acceptance Required
+
+**审查结论**：A03 在现有 Core artifact owner 内完成了 Robot/ControlGroup/Scene 的静态组合。v1/v2 identity 与
+Frame/Articulation mapping 保留；同一个 Entity-qualified 路径隔离相同 Robot asset 的实例名。当前证据足以接受
+A03 静态契约，不足以声称资产 importer、native actuator binding、Controller 或多 Robot 物理执行已实现。
+A04 实施必须等维护者验收本报告后再开始。
+
+| 关注点 | 本次判断 | 后续边界 |
+| --- | --- | --- |
+| Core/Provider 所有权 | `SceneDefinition` 是唯一静态 Scene owner；不复制 Registry、assembly、Provider importer 或 Runtime | A04 只连接现有 owners；真实 materialization 留给 D01 |
+| Robot identity | Entity ID 是 Robot instance identity；RobotInstance 列举该 Entity 所有 articulation roots | 一 Entity 一个 Robot；不同 Entity 可复用同一 Asset，暂不表示一个 Robot 跨多个 Entity |
+| Actuator/ControlGroup | actuator 是 Entity-local identity，ControlGroup 只声明资源集合；unknown、cross-entity 和重复静态 writer 拒绝 | 不推导 joint/action width，不指定 Controller、command mode、timing 或 native mapping |
+| Reference semantics | resolver 用 `(entity_id, resource_id)` 两段式 key；同名与含 `/`、`:` 的名称无拼接冲突 | 旧 `TaskCompositionSpec`/`TaskReferences` 仍有原先 UID 与 global native-name 边界 |
+| Entity roles / state | object 与 sensor 继续用通用 Entity + Frame；authored placement 与 runtime pose 分离 | 不复制 B 的 Role resolver；reset sample 归 B02，动态 pose 归 D02 |
+| Compatibility | v1/v2 strict mapping/hash oracle、`world-v0` Artifact hash 和旧 factory regression 通过 | v3 仅由 `task_env.artifacts` codec 使用；root facade 和旧 Env behavior 未改变 |
+
+**风险与优先级**：
+
+- **P1 — A03 资源身份尚未绑定真实来源**：当前 actuator declaration 只负责静态引用闭合。A04 必须比对实际 importer
+  输出并校验完整 source graph；否则 Scene v3 的静态成功不能解释为资产已导入或资源已可控。
+- **P1 — 唯一 writer 规则约束重叠分组**：同一 actuator 不能同时加入 arm 子组和 whole-robot 组。若 C02 需要重叠的
+  只读分组，应将资源视图与实际 writer binding 分开建模，并另行版本化审查。
+- **P2 — Robot 必须列出 Entity 的全部 Articulation roots**：避免部分列举造成含糊，但一个 Robot 跨多个 Entity
+  或 Entity 同时承载多个独立 Robot 尚未表达。当前目标限定一 Entity 一个 Robot；需要扩展时先提交真实消费场景。
+- **P2 — 当前生产 reference route 保持旧边界**：assembly resolver 仍按组件 UID/global native names 工作；本轮新增的
+  Entity-qualified resolver 只供静态 Scene v3 使用。不得据此宣称 selected Env 能执行双 Robot。
+- **P3 — 没有 provider/runtime/render 验证**：这是 A03 的静态 scope 选择，不是本轮失败；native construction、双 Entity
+  施控与相机/渲染仍须对应后续 Goal 的正向 Evidence。
+
+**Evidence**：联合回归 **57 passed**（A03 composition、A02 structure、A01 identity、既有 reference construction）；
+固定 v1/v2 Scene fixture hash 与 PickCube/NutAssembly `world-v0` Artifact hash 均匹配。A03 pytest 用时 2.31s，
+supervisor wall 2.467s，单进程 CPU/Address Space 上限 120s/8 GiB；未采样进程树 RSS。原始 stdout/stderr、run metadata
+和 9 个审阅文件的 SHA-256 清单保存在 ignored
+`workspace/maintenance/phase_ii_a_20261020_A03_003/`。静态 subprocess 断言未导入 MuJoCo、GeoPhys、solver、scene
+importer 或 visualization backend。`git diff --check` 通过。
+
+**A04 实施门槛**：A03 报告获维护者验收前，只允许只读审查和设计，不修改 A04 生产代码。验收后先重核分支/HEAD/dirty state，
+再按下节设计实施最小 MJCF source graph 与兼容验证；复用公开 importer 和现有 `AssetManifest`/Registry/assembly，区分纯
+resolution 与 D01 materialization；逐项报告传动、闭环、limits、惯性 frame、contact exclusions 等语义为
+EXACT/APPROXIMATE/UNSUPPORTED，必要语义丢失则拒绝或保留受限引用。实际旧 factory 构造与 unknown/duplicate UID 负例也属于
+A04 验收。
+
 ### A04 — Asset Import / Registry / Factory Migration
 
 - **依赖**：A01–A03。
 - **任务**：组合现有 Registry、assembly 与公开 Provider importer；优先当前 MJCF/source reference，
   URDF 仅在独立 fixture/实际需求成立时纳入。原 source graph、资源 content hash、必要语义映射报告不可丢失。
-- **产出**：统一的 Canonical Construction Path、旧 API 迁移/弃用报告、受限资产导入样例。
+- **产出**：既有构造路径与 owner 映射、受限资产 source-resolution/provenance bridge、旧 API 迁移/弃用报告和 MJCF 样例；不要求把 generic Env 与 selected reference session 合并成一个 Runtime constructor。
 - **验收**：unknown/duplicate UID fail-closed；旧 `make_scene/make_object/make_agent` 保留兼容；构造 Panda/Cube 与已有任务 Recipe 语义一致；导入期间不访问 provider private solver；Asset source/content identity 能写入元数据。
 - **补充 Gate**：同源资产在不同 checkout root 的逻辑 identity 一致；必要属性逐项 EXACT/APPROXIMATE/UNSUPPORTED，原 source→canonical→provider 的信息损失有报告。Registry 不存 native 实例，不为改名强制新增公开 factory。
 - **Codex AUDIT Goal**：判断哪些资产解析应当归外部 `asset/` owner，哪些只能放 Core Assembly；禁止重新造通用 Asset Framework。
+
+#### A04 预审：只读来源图与兼容设计（2026-10-20；实施等待 A03 报告验收）
+
+**状态**：已完成代码路径审查和一次公开 MJCF importer 的只读解析；没有修改 A04 生产代码，也没有构造 scene model、启动
+Provider Runtime 或执行物理 step。此预审不替代 A03 报告验收，也不授权 A04 实施。
+
+**当前 owner 与调用路径**：
+
+- [`AssetDefinition`](../../../../../task_env/artifacts/contracts.py#L155) 只持有稳定声明身份与来源字段；[`AssetManifest`](../../../../../task_env/environment/types.py#L42)
+  持有 assembly 使用的本地 `mjcf_sources`、`asset_roots` 和版本标签，尚无稳定 source URI、revision 或 source graph digest。
+  Panda manifest 使用 Menagerie 本地路径和 `mujoco-menagerie-panda` 标签；当前 Gitlink revision 为
+  `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。仓库内 Nut XML、程序生成的 peg 和 PickCube 合成 source 又有不同来源，不能用
+  一种路径推导规则假定它们共享来源语义。
+- [`ComponentRegistry`](../../../../../task_env/registry.py#L76) 保存组件 class，默认重复 UID 注册失败；factory 在构造边界实例化组件。
+  [`TaskCompositionSpec`](../../../../../task_env/environment/types.py#L102) 拒绝重复 agent/object UID。它们是当前兼容 owner，不应被
+  Asset Registry 替代。
+- [`compile_task_scene()`](../../../../../task_env/assembly/compiler.py#L236) 依次检查 manifest 路径、生成 source、调用 GeoPhys importer、
+  构造 scene model、解析全局名称引用并生成初态。因此它不是纯 Asset loader；物理 materialization 应继续留给 D01。
+  [`resolve_task_references()`](../../../../../task_env/assembly/references.py#L162) 仍把引用按组件 UID/global native name 保存，Panda 分支保留
+  `joint1..joint7`、`actuator1..actuator8` 等既有布局。A03 的 Entity-qualified 静态 resolver 没有迁移此 Runtime 路径。
+- 当前有两条不同的生产构造路线，A04 必须分别守住兼容边界。通用 Core Env 由
+  [`bootstrap_task_runtime()`](../../../../../task_env/runtime/bootstrap.py#L20) 调用 `compile_task_scene()`，再创建 GeoPhys Runtime boundary；
+  选定 PickCube/NutAssembly 则由各自 `build_reference()` 构造 TaskArtifact、`RuntimeSource`、Controller 和 Solution，
+  [`SelectedReferenceEnv.reset()`](../../../../../task_env/tasks/reference_env.py#L119) 再通过 `materialize_control()` 创建 session。
+  后者不经过 `compile_task_scene()`。A04 的目标应是两条路径复用可验证的 source identity/evidence 规则并分别核对 factory、manifest、
+  reference，不应为了“统一”重写 `RuntimeSource`、Task Artifact 或 selected session API。
+- GeoPhys 对 Core 的公开入口是 [`scene.import_scene_source()`](../../../../../GeoPhys/src/scene/__init__.py#L1)。[`ImportedScene`](../../../../../GeoPhys/src/scene/scene_import.py#L173)
+  暴露语义 `source_graph_hash` 和 `dependency_paths`；逐文件 `content_hash` 位于 GeoPhys compilation-cache manifest，未由当前 package-root
+  importer 返回给 Core。[`normalized_source_graph_hash()`](../../../../../GeoPhys/src/scene/compilation_cache.py#L282) 对规范化 IR 求摘要，
+ 不是完整原始文件字节图摘要；对当前 Panda 路线，它也不是跨 checkout 稳定身份。
+
+**当前 Panda source 的只读证据**：在 Menagerie 当前 Gitlink revision 上，用公开 `SceneSource.mjcf_path()` 与
+`import_scene_source(cache=False)` 解析 `franka_emika_panda/panda.xml`。返回 68 个依赖路径（根 XML 与 67 个 OBJ/STL 文件）；IR
+含 8 actuators、8 transmissions、3 constraints。约束包括 fixed tendon、joint equality 和 contact exclusion；capability report 将这些
+条目标为 `SUPPORTED` by `scene_ir.inventory`。同一报告把 `mjcf.light` 标为 `RETAINED`，并提示在 lowering 前注册 typed extension schema。
+MJCF parity report 的 `max_abs_error=0` 只说明该 importer 检查的表示与数值 oracle 一致，不证明 TaskEnv canonical contract 或其他 Provider
+保留了这些语义。当前 [`SceneDefinition v2/v3`](../../../../../task_env/artifacts/contracts.py#L429) 没有 tendon、transmission、equality、
+joint limits、惯性 frame 或 contact-exclusion 字段；A04 必须按 source→TaskEnv contract 的映射再次分类，不能把 GeoPhys IR 的
+`SUPPORTED` 直接记作 Core 已支持。导入后观察到的 68 个依赖文件摘要和 probe metadata 保存在 ignored
+`workspace/maintenance/phase_ii_a_20261020_A04_REVIEW_001/a04_mjcf_import_probe.json`（SHA-256
+`a11c20c4db909937d0086644ab1b0b591720b6c8186c9d0ce7c017f203a0de91`）；该收据明确标注摘要不是 importer 精确读取字节的证明。
+
+**跨 checkout 探针与来源身份设计决议**：将同一 Panda asset tree 复制到两个不同临时根目录后，公开 importer 返回的 68 个依赖集合、
+相对逻辑路径与逐文件字节摘要完全一致；基于“相对路径 + SHA-256”构造的观察摘要也相同（`cc018eef53ac8ec6b67682bf447beb8c02a0d0584500297c3578da3a8d51a23a`）。
+但 GeoPhys `source_graph_hash` 与 `ir_semantic_hash` 均因根目录变化而改变。对 IR 规范化载荷做只读差异定位后，至少 `assets[*].payload.file`
+仍含绝对路径。反过来，仅给根 XML 追加换行会改变观察字节图摘要，而两个 GeoPhys hash 保持不变。这证明当前 `source_graph_hash`
+既不能作为跨 checkout 稳定 Asset identity，也不是完整原始字节图摘要。
+
+A04 应保留并区分三种摘要：(1) `AssetDefinition.identity_hash` 表示声明；(2) GeoPhys hash 表示当前 importer 的 IR/cache identity，保留
+其现有 owner 与用途；(3) A04 来源内容图摘要表示稳定 URI/revision 下 source closure 的原始字节内容。第三种摘要应以稳定 URI/revision
+和相对逻辑路径、逐文件 SHA-256 排序组合，不能包含 checkout 绝对路径；覆盖根 source、MJCF include、mesh/texture 等依赖。当前
+importer 的公开结果没有逐文件哈希。Core 不应导入内部 compilation-cache manifest；若此证据是验收必要条件，应在 GeoPhys 现有 public
+import owner 上增加最小只读 dependency evidence。若先以 Core 侧 post-import 文件哈希实现，结果必须标为“导入后观察摘要”，不得声称证明
+importer 消费了精确字节或不存在导入期间文件变化。
+
+**测试缺口与实施切片**：现有 [G5 cache test](../../../../../GeoPhys/test/verification/scene/test_scene_compilation_cache_g5.py#L190)
+验证根 XML+mesh dependency path 和 mesh 内容变化后的 invalidation，邻近测试检查 texture/heightfield 的 payload content 去重；现有 MJCF
+include fixture 检查解析，但未形成跨 checkout 的完整 MJCF 依赖字节身份验收。本轮只读 probe 已实际通过 PickCube 和 MuJoCo NutAssembly
+`build_runtime_source()` 路线构造旧 scene/agent/object factories，并核对 `AssetManifest` 与 `ReferenceSpec`；结果显示 Panda 是外部
+MJCF，Cube/peg 是 procedural asset，而 Nut 是仓库内 MJCF 副本。未知 agent/object/scene UID 均以 `KeyError` 拒绝；重复
+`TaskCompositionSpec` agent UID 以 `ValueError` 拒绝；独立临时 `ComponentRegistry` 的重复 UID 注册以 `KeyError` 拒绝。这些是只读
+探针结果，尚不是受版本控制的自动化测试。A04 首轮应限于有真实调用方的 MJCF；补充根 XML/include/mesh/texture 依赖枚举、修改任一
+依赖可检测、两个 checkout root 同内容得同逻辑摘要、正式 factory/manifest/reference 测试和 unknown/duplicate UID 负例。
+[`test_reference_construction.py`](../../../../../task_env/diagnostics/tasks/test_reference_construction.py#L1) 已经通过选定 Task 的
+`build_reference()` 路径构造真实旧 factories，但 Phase II identity test 对单独 `make_agent/make_object` 仅检查导出 callable；A04 应增加
+直接 factory/manifest/reference 断言。正式验收应分别覆盖 generic `bootstrap_task_runtime`/assembly 与 selected
+`build_reference`/session 路径；只有修改对应生产 compiler 或 session 时，才为受影响路线增加有界 construct/reset/step 回归。
+
+跨 checkout、factory 和 negative UID 探针的原始结果保存在 ignored
+`workspace/maintenance/phase_ii_a_20261020_A04_REVIEW_001/a04_portability_factory_probe.json`（SHA-256
+`1144f1672f63d40007eb5bc246c77eaedac1f8bdafbe59c01fc04f853ca75310`）。两份 A04 收据均为导入后/构造期观察证据，不是 Runtime、物理或 Qualification 证明。
+
+**边界**：A04 不新建 Asset Registry、Runtime、Provider loader 或第二套 factory；不复制 MJCF parser，不把 GeoPhys IR ABI 强加给其他
+Provider，不将多 Robot 静态组合扩张成现有 Env 的多 Robot 执行能力。A03 报告验收后，实施前仍须重新核对工作树；若来源字节证据不能
+证明 importer 实际消费内容，或必要语义无法表达/保留，则该交集应 fail closed 或标为受限 source reference。
 
 ### A05 — A 阶段集成与保护性迁移
 
