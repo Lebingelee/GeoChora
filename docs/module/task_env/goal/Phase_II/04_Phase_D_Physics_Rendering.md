@@ -239,8 +239,12 @@ Renderer Session；同配置共享 Scene/cache 时，Camera calibration/buffer/s
   提前跑一个新 Scene 表示真实到 Provider 的 microprobe；source、state 和 mapping 必须消费新输入，
   不能仅执行旧 hardcoded recipe。不等待完整 B/C。
 - **D01b**：依赖 D01a/B04b/C01b，完成 vNext、固定拓扑 Role/Reset/realization 接入和
-  GeoPhys/MuJoCo 两 provider 验证。多 Robot 真实 binding 只有在明确 S2 后才准入；拓扑 variant 本基线拒绝。
-- **验收**：命名 Entity/Frame 在 GeoPhys/MuJoCo 支持的限定任务中都能解析；缺必需 Joint/Frame/Geometry fail-closed；相同 Frozen ResetSample realized-state tolerance 检查；无隐式重新采样或 private solver 访问；S2 真实 microprobe。
+  GeoPhys/MuJoCo 两 provider 验证。沿用 TaskArtifact/TaskSource、`RuntimeSession.materialize()`、
+  `EpisodeResetPlanV1` 与现有 provider adapters；TaskArtifact v1 必须引用精确 Scene identity，
+  Role/Reset 产生的同一个 provider-facing ResetSample 在两个 Provider 上分别过 rollout 前测量 gate。
+  当前有界交集是单 RobotInstance、固定拓扑、scalar revolute/prismatic joints；多 Robot、拓扑 variant
+  和 free-body pose reset 不进入本切片。
+- **验收**：命名 Entity/Frame 在 GeoPhys/MuJoCo 支持的限定任务中都能解析；缺必需 Joint/Frame/Geometry fail-closed；同一 hash-bound ResetSample 在 rollout 前执行 realized-state tolerance gate；无隐式重新采样或 private solver 访问；S2 真实 microprobe。
 - **补充 Gate**：realization tolerance 是 rollout 前实际执行的 gate，不只是写入 RealizedInitialState；
   场景改变一个可测属性应改变 provider realization，证明新 Source 真正生效。映射报告包括当前资产必需
   transmission/constraints/inertial-frame/contact 语义，不能将保留但未执行误标 EXACT supported。
@@ -271,11 +275,50 @@ Canonical v3 当前没有几何、惯量、接触、约束或 transmission 字�
 solver description；这不等于它们已经成为可移植的 Canonical contract。接触响应没有被本 probe 验证。映射报告按
 `CANONICAL_REPRESENTED`、`SOURCE_RETAINED`、`APPROXIMATE`、`UNSUPPORTED` 分列，不把 Source Retained 冒充语义执行。
 
-有界验收与负例位于 `task_env/diagnostics/tasks/test_phase_ii_d01a_scene_materialization.py`：4 passed，覆盖
+有界验收与负例位于 `task_env/diagnostics/tasks/test_phase_ii_d01a_scene_materialization.py`：5 passed，覆盖
 真实 GeoPhys main reset/首步、同 ResetSample 的 axis variant、缺 Frame/Joint/Geometry、source-closure 不匹配、
 超容差和 malformed source。Evidence receipt 保存在被忽略的
 `workspace/maintenance/phase_ii_d01a_main_20261020/d01a_microprobe_receipt.json`。该结果不声明 MuJoCo/第二 Provider、
 Controller/action、contact behavior、Task success、D01b、Task Harness 或 Qualification 已通过。
+
+#### D01b bounded vNext two-Provider receipt (2026-10-20)
+
+D01b 在 `codex/phase-ii-c` 的 C01b 后续实现中完成有界接线，没有改写冻结的 TaskArtifact v0 identity/codec，也没有
+新增 Runtime、TaskEnv、Provider 或 Scene manager。`TaskArtifactV1.validate_scene()` 校验精确 Scene schema/id/hash 与
+显式 legacy Frame/Joint bindings；既有 `sample_episode_reset_plan()` 接受 v0/v1 Artifact，但仍只产出现有
+`EpisodeResetPlanV1` 和 provider-facing `ResetSample-v0`。`RuntimeSession.materialize()` 对 v1 进一步核对 Scene、Role
+Task Source identity、单 RobotInstance、scalar reset/state 字段和 native source names；`reset_plan()` 在执行 provider
+reset 前核对 Artifact/TaskSource/Scene identity，继续使用既有 measured-state tolerance gate。
+
+MJCF scalar-axis projection 从 GeoPhys bridge 移至现有 provider-neutral `RuntimeSource` owner，并由 GeoPhys 旧导入路径
+重导出以保留兼容。MuJoCo 现在将相同 canonical Scene 投影应用到其 XML string，按 XML 中明确引用的 asset 文件构造
+有界 VFS bytes，并在 native build 前重算/核对 canonical source-closure digest，再走 `MjModel.from_xml_string()`；构造后核对
+runtime Frame、Joint parent/child body、Joint kind 和 axis。
+不使用 Provider 私有状态做验收。MuJoCo native import/cache key 不公开，因此 Evidence 记录包版本、canonical source closure
+和实测状态，不伪造 cache identity。
+
+真实范围固定为 A05 `scene-definition-v3` Panda RobotInstance + procedural static square peg，在 GeoPhys
+`4436787e9cb85ce519506a2a9af86d1eeec9de2d` CPU 与 MuJoCo `3.8.1` CPU、`p1_2_scalar_cpu_v0` profile 上。
+每一个确切 v1 Artifact/Scene 只生成一个 Role/Reset plan，并将同一 ResetSample 交给两 Provider；两者均在首个 step
+之前通过 joint readback gate。GeoPhys 最大关节误差为 `5.96e-9`，MuJoCo 为 `0`；ResetSample 没有 free-body pose target，
+所以 pose error 的 `0` 是空目标集合结果，不作为 pose reset 证据。actual settle steps 为 `0`；每条路线实际 step 一次。
+改变 `panda-main/joint1` canonical axis 后，两 Provider 都由同一 Scene 的
+v1 Artifact 生成对应 ResetSample，`panda-main/link1` 姿态变化分别为 `0.2462260806`（GeoPhys）和 `0.2462260895`
+（MuJoCo）；相同 Scene 上两 Provider 的 link1 姿态差不超过 `6.42e-9`。Scene 改变会改变 TaskArtifact v1 identity，
+所以不同 Scene 变体必须使用各自 hash-bound sample；“同一 sample”指同一 Scene/Artifact 下跨 Provider 复用。
+
+负例覆盖两 Provider 上缺少必需 Frame/Joint source map、缺失 Panda mesh、Scene identity 错配、无界 source root 和非零
+settle 拒绝。Task Source 使用恰好一个 Panda 与 square-peg role selector；本 probe 不运行 Controller/gripper action，
+不评价接触、任务成功、multi-Robot、Renderer、Qualification，也不把 candidate TaskArtifact v1 宣称为 frozen。
+Asset declaration identity、68-file Panda source closure、canonical Scene identity、materialized source-closure digest
+和 Provider import/cache identity 分别记录。GeoPhys evidence 有 public importer's source-graph/IR hashes；MuJoCo 记录
+engine/package version 与 closure digest，但 native cache key 不公开。当前 Canonical Scene 未声明的几何/惯量/约束/transmission
+仍保持 `SOURCE_RETAINED`，不是可移植执行语义。
+
+定向实现为 `task_env/diagnostics/tasks/test_phase_ii_d01b_vnext_materialization.py` 的 **6 项**；D01b、D01a、B02、
+B04b、C01b、D02b、A04、A05 组合回归为 **40 passed, 0 failed, 0 errors**。本机原始 receipt 位于被忽略的
+`workspace/maintenance/phase_ii_d01b_20261020/d01b_vnext_materialization_receipt.json`。这只关闭执行表序号 19 的
+有界 S2 microprobe gate，不构成通用 Scene/Asset import、控制、接触、Task Harness 或 Qualification 通过。
 
 ### D02 — Typed Canonical State / Requirements / Owner Views（a/b）
 

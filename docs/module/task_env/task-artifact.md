@@ -99,8 +99,12 @@ v1 identity。编译器不复制第二份 Scene/World；v0 的 Action、初始�
 保留字段的来源 Artifact identity 和已表达语义；ExecutionSpec/Provider 不在其中。Timebase 的 native
 `physics_dt × control_substeps == control_dt` gate 原样保留。
 
-该 v1 是有界 candidate codec，不是已接入 `RuntimeSession`、Recorder、Camera、D01b 或新的任务发布路径。它目前
-只桥接既有 v0 semantic fields；B03b temporal-rule declaration 尚未序列化到 TaskArtifact。`ResetSample-v0`、
+该 v1 仍是有界 candidate，不是新的任务发布/freeze 路径。D01b 已通过现有 `RuntimeSession.materialize()` 和
+`EpisodeResetPlanV1` 接入一个受限 S2 路线：精确 Scene-v3、一个固定拓扑 RobotInstance、scalar reset/state、bounded
+source root，且仅验证 GeoPhys/MuJoCo CPU。`TaskArtifactV1.validate_scene()` 核对 Scene 与显式 Frame/Joint bindings；
+Role/Reset 使用同一个 hash-bound `ResetSample-v0` 在两 Provider 上分别执行 rollout 前 measured-state gate。
+该接入不扩展到 Recorder、Camera、通用 free-body reset 或新的任务发布路径。它目前只桥接既有 v0 semantic fields；
+B03b temporal-rule declaration 尚未序列化到 TaskArtifact。`ResetSample-v0`、
 `CanonicalStateView-v0/v1`、CapabilityManifest-v0、CameraGeometry-v0 与三类 trajectory/H5 版本域均保持原 owner
 和 reader；B04b 没有改写这些存储格式。`geophys-transition-h5/v1`、`canonical-trajectory-v0` outer H5 和真正的
 canonical execution v1 bytes 仍缺历史 golden fixture，因此相关 reader compatibility 继续 deferred，不能用合成

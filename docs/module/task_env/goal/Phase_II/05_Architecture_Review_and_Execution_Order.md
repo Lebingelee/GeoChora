@@ -85,7 +85,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 16 | B04b | B04a、B03b | Source→vNext Artifact compiler/codec/hash；嵌套读写/拒绝矩阵 |
 | 17 | B05 | B04b | 旧 samples/traces 语义差分与 legacy route；新版本无 freeze 自动继承 |
 | 18 | C01b | B05、D02b | 实际 Task requirements/actual manifests、动态 admission；兼容配置分支 |
-| 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization |
+| 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | Entity×Group bindings、完整 action/feedback schema、唯一 writer |
 | 21 | C05a | C02a、C01b、D05a | 三类格式各自扩展 action/events/outcome；reader/loader 与 legacy fixtures |
 | 22 | C03a | C02a、D01b、C05a | 现有 ports 的 scalar reset/step/fault；单 controller 兼容执行 |
@@ -400,6 +400,35 @@ C01b 沿用现有 Artifact、RuntimeSession 和 Provider identity owners，不�
 materializer 来检查 admission 前置边界，故本切片不声称 v1 Artifact 的 provider materialization 或任何新的 physics
 qualification。后续序号 19/D01b 未启动。
 
-当前分支关系：`codex/phase-ii-b` 固定在 B 收口 SHA，`codex/phase-ii-c` 自该 SHA 继续；本地 `develop` 与远端
-`develop`/`codex/phase-ii-b` 保持 `b3f8dc4381708b76c5003dde5da138d90518aefa`。本轮只创建本地 C 分支并提交 C01b，
-不 push/merge。
+在 C01b 完成时，`codex/phase-ii-b` 本地固定在 B 收口 SHA `006801074052c51db9845ccf64be1d21fc08609c`，本地
+`develop` 与远端 `develop`/`codex/phase-ii-b` 指向 `b3f8dc4381708b76c5003dde5da138d90518aefa`。随后维护者明确要求
+同步 C01b 提交链；远端 `develop` 和 `codex/phase-ii-b` 因此都前进到 `132eb0999ea9114cf89ffdd36751d4c45fe79ffb`，本地
+`codex/phase-ii-b` 仍为 `0068010`。D01b 在本地 C 分支完成并提交后，经维护者明确要求，将该提交快进同步到远端
+`develop` 与 `codex/phase-ii-b`，两者保持同一提交；本地 B 分支指针不变。
+
+## 11. 序号 19／D01b vNext 双 Provider 有界验收（2026-10-20）
+
+D01b 从 C01b 提交 `132eb0999ea9114cf89ffdd36751d4c45fe79ffb` 继续，仅在 `codex/phase-ii-c` 工作。它扩展现有
+`TaskArtifactV1`、`TaskSourceV1`、`EpisodeResetPlanV1`、`RuntimeSession.materialize()` 与 provider adapters：v1
+Artifact 必须精确绑定 Scene v3；Role/Reset 校验 TaskSource/Scene identity；reset source names 必须逐项对应 canonical
+Frame/Joint；MuJoCo 通过公共 `MjModel.from_xml_string(xml, assets=...)` 消费 Scene-v3 scalar-axis projection，检查
+runtime Frame、Joint 端点/类型/axis 与构造后的 public model。GeoPhys 继续复用既有 composer/importer；provider-neutral
+MJCF projection 位于 RuntimeSource owner，GeoPhys 原模块保留 re-export 兼容路径。
+
+以 A05 Panda + procedural square peg source 为限，在 GeoPhys `4436787e9cb85ce519506a2a9af86d1eeec9de2d` CPU 与
+MuJoCo `3.8.1` CPU 运行 v1 Artifact 构建、固定拓扑 Role/Reset、同一 ResetSample 的 rollout 前 measured-state
+gate 与各一条 physics step。基准 Scene/变体 Scene 的 `link1` canonical axis 改变后，实测 pose delta 分别约
+`0.2462261`；同一 Scene 下跨 Provider pose delta 不超过 `6.42e-9`。不同 Scene identity 产生不同 v1 Artifact hash，
+故各用自身 hash-bound sample；同一 sample 在每一 Scene/Artifact 下跨两个 Provider 原样复用。最大 reset joint error
+为 GeoPhys `5.96e-9`、MuJoCo `0`；ResetSample 没有 free-body pose target，因此 pose error 的 `0` 只是空目标集合结果，
+不作为 pose reset 证据。settle 为 `0`。
+
+`test_phase_ii_d01b_vnext_materialization.py` 有 **6 项**；与 D01a、B02、B04b、C01b、D02b、A04、A05 组合为
+**40 passed**。
+receipt：`workspace/maintenance/phase_ii_d01b_20261020/d01b_vnext_materialization_receipt.json`（本机 ignored evidence）。
+负例覆盖 Scene identity 错配、缺 Frame/Joint 映射、缺 mesh、source root 无界、非零 settle。当前不能据此推及多 Robot、
+自由体 pose reset、controller/gripper action、contact、task success、rendering 或 qualification；Canonical 未声明的
+geometry/inertia/contact/constraint/transmission 仍不得误标为已执行的 portable semantics。
+
+本轮在 `codex/phase-ii-c` 完成本地提交，并将同一提交快进推送到远端 `develop` 与 `codex/phase-ii-b`；本地
+`codex/phase-ii-b` 指针保持 `0068010`。本记录不包含序号 20 的实施。

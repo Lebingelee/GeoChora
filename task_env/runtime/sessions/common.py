@@ -14,6 +14,7 @@ from ...artifacts import (
     JointDefinition,
     PoseWorld,
     SceneDefinition,
+    TaskArtifactV1,
     StateBoundaryIdentity,
     StateRequirements,
     StateSampleClock,
@@ -193,6 +194,11 @@ class _SessionValues:
             raise ValueError('RuntimeSource ID does not bind a canonical Scene identity')
         if scene_hash != plan.role_binding.scene_identity_hash:
             raise ValueError('EpisodeResetPlan Scene identity differs from materialized RuntimeSource')
+        if isinstance(self._artifact, TaskArtifactV1):
+            if plan.role_binding.task_source_identity_hash != self._artifact.task_source_identity_hash:
+                raise ValueError('EpisodeResetPlan Task Source differs from TaskArtifact v1 snapshot')
+            if plan.role_binding.scene_identity_hash != self._artifact.scene_identity_hash:
+                raise ValueError('EpisodeResetPlan Scene differs from TaskArtifact v1 reference')
         if self._source.scene_definition is not None and (
             self._source.scene_definition.identity_hash != plan.role_binding.scene_identity_hash
         ):

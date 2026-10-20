@@ -7,7 +7,7 @@ from .provenance import provider_build_identity
 from ...artifacts import (
     CanonicalStatePublicationV1, CanonicalStateView, CapabilityClaim, ExecutionSpec,
     FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
-    StateRequirements, TaskArtifact, admit_capabilities,
+    StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
 from ...artifacts.execution import EpisodeResetPlanV1, RealizedInitialState, ResetSample
 from .source import RuntimeSource
@@ -48,8 +48,12 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
     )
 
 
-def materialize(artifact: TaskArtifact, execution: ExecutionSpec, *, source: RuntimeSource,
+def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec, *, source: RuntimeSource,
                 manifest: ProviderCapabilityManifest | None = None) -> RuntimeSession:
+    if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
+        raise TypeError('materialize requires TaskArtifact v0 or v1')
+    if isinstance(artifact, TaskArtifactV1):
+        artifact.validate()
     actual = provider_manifest(execution.physics_provider)
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
@@ -64,13 +68,62 @@ def materialize(artifact: TaskArtifact, execution: ExecutionSpec, *, source: Run
         raise ValueError('source execution/timebase mismatch')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
-    if source.scene_definition is not None and execution.physics_provider != 'geophys':
-        raise ValueError('scene-definition-v3 materialization is currently GeoPhys-only')
+    if isinstance(artifact, TaskArtifactV1):
+        _validate_v1_materialization_source(artifact, execution, source)
+    elif source.scene_definition is not None and execution.physics_provider != 'geophys':
+        raise ValueError('scene-definition-v3 v0 compatibility materialization is currently GeoPhys-only')
     if set(source.joints) != set(artifact.initialization.joint_position):
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
     return _materialize_admitted(artifact, execution, source)
+
+
+def _validate_v1_materialization_source(
+    artifact: TaskArtifactV1,
+    execution: ExecutionSpec,
+    source: RuntimeSource,
+) -> None:
+    """Admit only the current single-Robot, scalar-joint Scene-v3 runtime slice."""
+    if execution.physics_provider not in {'geophys', 'mujoco'}:
+        raise ValueError('TaskArtifact v1 D01b materialization supports GeoPhys and MuJoCo only')
+    scene = source.scene_definition
+    if scene is None:
+        raise ValueError('TaskArtifact v1 materialization requires its canonical SceneDefinition')
+    if source.scene_source.base_dir is None:
+        raise ValueError('TaskArtifact v1 materialization requires a bounded source base_dir')
+    if scene.schema_version != 'scene-definition-v3':
+        raise ValueError('TaskArtifact v1 materialization currently requires scene-definition-v3')
+    artifact.validate_scene(scene)
+    expected_source_id = f'{scene.schema_version}:{scene.identity_hash}'
+    if source.scene_source.source_id != expected_source_id:
+        raise ValueError('RuntimeSource ID must bind the exact TaskArtifact v1 Scene')
+    if len(scene.robots or ()) != 1:
+        raise ValueError('D01b v1 materialization currently requires exactly one RobotInstance')
+    if artifact.initialization.poses_world:
+        raise ValueError('D01b v1 materialization does not yet admit free-body pose reset fields')
+    if not set(artifact.semantics.required_joints) <= set(source.joints):
+        raise ValueError('RuntimeSource does not bind every required TaskArtifact v1 Joint')
+
+    for legacy_name in set(artifact.initialization.joint_position) | set(artifact.semantics.required_joints):
+        reference = artifact.legacy_joint_bindings[legacy_name]
+        if source.joints.get(legacy_name) != reference.joint_id:
+            raise ValueError(
+                f'RuntimeSource Joint {legacy_name!r} does not target its canonical Scene Joint'
+            )
+
+    required_frames = set(artifact.semantics.required_poses) | set(artifact.initialization.poses_world)
+    for legacy_name in required_frames:
+        reference = artifact.legacy_frame_bindings[legacy_name]
+        native_targets = [
+            mapping[legacy_name]
+            for mapping in (source.bodies, source.frames)
+            if legacy_name in mapping
+        ]
+        if native_targets != [reference.frame_id]:
+            raise ValueError(
+                f'RuntimeSource Frame {legacy_name!r} does not uniquely target its canonical Scene Frame'
+            )
 
 
 def _materialize_admitted(artifact, execution, source):

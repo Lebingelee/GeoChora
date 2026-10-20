@@ -1035,10 +1035,14 @@ class TaskArtifactV1(Contract):
         _choice(self.task_source_schema_version, {'task-source-v1'}, 'Task Source schema')
         if not _SHA256.fullmatch(self.scene_identity_hash):
             raise ValueError('TaskArtifact Scene reference requires a lowercase SHA-256 identity')
-        for legacy_name, reference in (*self.legacy_frame_bindings.items(), *self.legacy_joint_bindings.items()):
+        for legacy_name, reference in self.legacy_frame_bindings.items():
             _name(legacy_name)
-            if not isinstance(reference, (FrameReference, JointReference)):
-                raise TypeError('legacy Scene bindings require typed FrameReference/JointReference values')
+            if not isinstance(reference, FrameReference):
+                raise TypeError('legacy Frame bindings require FrameReference values')
+        for legacy_name, reference in self.legacy_joint_bindings.items():
+            _name(legacy_name)
+            if not isinstance(reference, JointReference):
+                raise TypeError('legacy Joint bindings require JointReference values')
         if not _SHA256.fullmatch(self.task_source_identity_hash):
             raise ValueError('TaskArtifact Source reference requires a lowercase SHA-256 identity')
         _choice(self.world_convention, {'SI_right_handed_z_up_wxyz'}, 'world convention')
@@ -1067,6 +1071,76 @@ class TaskArtifactV1(Contract):
             raise ValueError('duplicate observation requirements')
         for name in self.observation_requirements:
             _name(name)
+
+    def validate_scene(self, scene: SceneDefinition) -> None:
+        """Validate this v1 Artifact's explicit Frame/Joint references against its Scene.
+
+        This is a structural admission check only. Provider import and physics
+        realization remain owned by the existing RuntimeSession adapters.
+        """
+        self.validate()
+        if not isinstance(scene, SceneDefinition):
+            raise TypeError('TaskArtifact v1 Scene validation requires SceneDefinition')
+        scene.validate()
+        if (
+            scene.schema_version != self.scene_schema_version
+            or scene.scene_id != self.scene_id
+            or scene.identity_hash != self.scene_identity_hash
+        ):
+            raise ValueError('TaskArtifact v1 does not reference this exact canonical Scene')
+
+        if not (
+            set(self.initialization.poses_world) | set(self.semantics.required_poses)
+        ) <= set(self.legacy_frame_bindings):
+            raise ValueError('TaskArtifact v1 required poses need explicit canonical Frame bindings')
+        if not (
+            set(self.initialization.joint_position) | set(self.semantics.required_joints)
+        ) <= set(self.legacy_joint_bindings):
+            raise ValueError('TaskArtifact v1 required joints need explicit canonical Joint bindings')
+
+        frames = {(frame.entity_id, frame.frame_id): frame for frame in scene.frames or ()}
+        joints = {
+            (articulation.entity_id, joint.joint_id): joint
+            for articulation in scene.articulations or ()
+            for joint in articulation.joints
+        }
+        for legacy_name, reference in self.legacy_frame_bindings.items():
+            legacy_entity, separator, _ = legacy_name.partition('/')
+            if separator and legacy_entity != reference.entity_id:
+                raise ValueError(
+                    f'legacy Frame {legacy_name!r} is bound across canonical Scene Entities'
+                )
+            if (reference.entity_id, reference.frame_id) not in frames:
+                raise ValueError(
+                    f'legacy Frame {legacy_name!r} has no canonical Scene target'
+                )
+        required_frames = set(self.initialization.poses_world) | set(self.semantics.required_poses)
+        for legacy_name in required_frames:
+            reference = self.legacy_frame_bindings[legacy_name]
+            if frames[(reference.entity_id, reference.frame_id)].frame_kind != 'runtime':
+                raise ValueError(
+                    f'required Frame {legacy_name!r} is not a runtime Scene Frame'
+                )
+        for legacy_name, reference in self.legacy_joint_bindings.items():
+            legacy_entity, separator, _ = legacy_name.partition('/')
+            if separator and legacy_entity != reference.entity_id:
+                raise ValueError(
+                    f'legacy Joint {legacy_name!r} is bound across canonical Scene Entities'
+                )
+            if (reference.entity_id, reference.joint_id) not in joints:
+                raise ValueError(
+                    f'legacy Joint {legacy_name!r} has no canonical Scene target'
+                )
+        required_joints = set(self.initialization.joint_position) | set(self.semantics.required_joints)
+        for legacy_name in required_joints:
+            joint = joints[(
+                self.legacy_joint_bindings[legacy_name].entity_id,
+                self.legacy_joint_bindings[legacy_name].joint_id,
+            )]
+            if joint.kind not in {'revolute', 'continuous', 'prismatic'}:
+                raise ValueError(
+                    f'required Joint {legacy_name!r} is outside the scalar reset/state route'
+                )
 
     @property
     def identity_hash(self):

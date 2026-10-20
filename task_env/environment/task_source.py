@@ -349,7 +349,7 @@ def resolve_role_binding(
     scene: SceneDefinition,
     *,
     task_seed: int,
-    artifact: TaskArtifact,
+    artifact: TaskArtifact | TaskArtifactV1,
 ) -> RoleBindingV1:
     """Resolve explicit ID candidate lists using independent per-role RNG domains."""
 
@@ -389,7 +389,7 @@ def resolve_role_binding(
 def _validate_role_candidates(
     source: TaskSourceV1,
     scene: SceneDefinition,
-    artifact: TaskArtifact | None = None,
+    artifact: TaskArtifact | TaskArtifactV1 | None = None,
 ) -> None:
     """Validate Source selectors without sampling or committing a binding."""
 
@@ -397,16 +397,16 @@ def _validate_role_candidates(
         raise TypeError("Role validation requires TaskSourceV1 and SceneDefinition")
     source.__post_init__()
     scene.validate()
-    if artifact is not None:
-        if not isinstance(artifact, TaskArtifact):
-            raise TypeError("role validation artifact must be TaskArtifact")
-        artifact.validate()
+    if artifact is not None and not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
+        raise TypeError("role validation artifact must be TaskArtifact v0 or v1")
     if source.scene_ref != scene.scene_id:
         raise ValueError("Task Source Scene reference does not match the canonical Scene")
 
     scene_entities = {entity.entity_id for entity in scene.entities}
     robot_entities = {robot.entity_id for robot in scene.robots or ()}
-    if artifact is not None:
+    artifact_by_id = None
+    if isinstance(artifact, TaskArtifact):
+        artifact.validate()
         if artifact.task_id != source.task_id or artifact.artifact_version != source.version:
             raise ValueError("Task Source identity does not match TaskArtifact identity")
         artifact_entities = {entity.semantic_id for entity in artifact.world.entities}
@@ -441,6 +441,13 @@ def _validate_role_candidates(
                 raise ValueError(
                     f"Scene/TaskArtifact topology mismatch for {entity.entity_id!r}"
                 )
+    elif isinstance(artifact, TaskArtifactV1):
+        artifact.validate_scene(scene)
+        if artifact.task_id != source.task_id or artifact.artifact_version != source.version:
+            raise ValueError("Task Source identity does not match TaskArtifact v1 identity")
+        if artifact.task_source_identity_hash != source.identity_hash:
+            raise ValueError("Task Source identity differs from TaskArtifact v1 snapshot")
+        artifact_entities = scene_entities
     else:
         artifact_entities = scene_entities
 
@@ -458,7 +465,7 @@ def _validate_role_candidates(
             raise ValueError(f"role {role.role_id!r} candidates are not A03 RobotInstances")
         if role.entity_type == "rigid_body" and candidates & robot_entities:
             raise ValueError(f"role {role.role_id!r} cannot bind a RobotInstance as a rigid_body")
-        if artifact is not None:
+        if artifact_by_id is not None:
             for entity_id in candidates:
                 kind = artifact_by_id[entity_id].kind
                 if role.entity_type == "robot" and kind != "embodiment":
@@ -547,16 +554,16 @@ def _sample_dimensions(source: TaskSourceV1, scene: SceneDefinition, artifact: T
 def sample_episode_reset_plan(
     source: TaskSourceV1,
     scene: SceneDefinition,
-    artifact: TaskArtifact,
+    artifact: TaskArtifact | TaskArtifactV1,
     *,
     task_seed: int,
 ) -> EpisodeResetPlanV1:
-    """Build RoleBinding plus the existing v0 provider sample from bounded declarations."""
+    """Build RoleBinding plus the existing provider-facing v0 sample from declarations."""
 
     if not isinstance(source, TaskSourceV1) or not isinstance(scene, SceneDefinition):
         raise TypeError("reset planning requires TaskSourceV1 and SceneDefinition")
-    if not isinstance(artifact, TaskArtifact):
-        raise TypeError("reset plan requires TaskArtifact")
+    if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
+        raise TypeError("reset plan requires TaskArtifact v0 or v1")
     if source.initialization is None:
         raise ValueError("Task Source requires an initialization sampler declaration")
     artifact.validate()

@@ -100,6 +100,19 @@ control step/simulation time、joint position/velocity、body/frame poses
 按 contract 提供；contact/camera/privileged fields 必须各自准入，不以私有 contact arrays 代替。
 `RuntimeSnapshot`、`TaskStateView` 和 `CanonicalStateView` 是既有不同投影，不能假定 storage ABI 相同。
 
+Phase II D01b 在现有 `RuntimeSession.materialize()` 上增加受限 TaskArtifact v1 admission：必须绑定精确
+`scene-definition-v3`、单一 RobotInstance、固定拓扑 scalar reset/state 与 bounded source root；当前只允许 GeoPhys/MuJoCo
+CPU。v1 reset plan 继续传递原有 `ResetSample-v0`，并在 rollout 前核对 TaskArtifact、TaskSource、Scene identity 和
+requested/realized tolerance。MuJoCo 使用 MJCF string 的 `assets` VFS 消费 canonical scalar-axis projection，native build 前
+重算并校验 source-closure digest，并在构造后检查 runtime Frame、Joint parent/child body、kind 和 axis。该路径不支持
+free-body pose reset、拓扑变化或其他 Provider。
+
+2026-10-20 的 TESTED_BOUNDED S2 microprobe 使用 A05 Panda + procedural square peg；同一 Artifact/Scene 的 sample 在两
+Provider 上复用，GeoPhys 最大 reset joint error `5.96e-9`、MuJoCo `0`，均实际 step 一次。改变 canonical `joint1` axis
+后两边 `link1` pose delta 约 `0.246226`，同 Scene 跨 Provider pose delta 不超过 `6.42e-9`。这不证明 Controller/action、
+contact、Task success、Renderer pairing、通用 Scene import 或 Qualification。详细 receipt 在
+[Phase D D01b 记录](goal/Phase_II/04_Phase_D_Physics_Rendering.md#d01b-bounded-vnext-two-provider-receipt-2026-10-20)。
+
 Phase II D02a 在 `task_env.artifacts` 增加 provider-neutral `CanonicalStateViewV1`、typed Joint/Frame、
 consumer `StateRequirements`、sample/boundary clocks、native interval evidence 与 bounded view lifetime
 contracts。现有 `RuntimeSession.snapshot()/step()` 仍返回 `canonical-state-v0`；D02a 不提供 provider

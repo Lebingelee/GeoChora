@@ -3,9 +3,44 @@ from dataclasses import dataclass
 from collections.abc import Mapping
 from types import MappingProxyType
 import re
+import xml.etree.ElementTree as ET
 
 from ...artifacts import SceneDefinition
 from ...assembly.source import TaskSceneSource
+
+
+def project_scene_definition_v3_to_mjcf(source_xml: str, scene_definition: SceneDefinition) -> str:
+    """Apply the bounded v3 scalar-joint projection to an MJCF source.
+
+    The existing provider importers remain responsible for parsing and
+    materializing the projected MJCF. Fields outside this projection remain
+    source-owned and require explicit disposition evidence.
+    """
+
+    scene_definition.validate()
+    if scene_definition.schema_version != 'scene-definition-v3':
+        raise ValueError('canonical MJCF projection requires scene-definition-v3')
+    root = ET.fromstring(source_xml)
+    source_joints: dict[str, list[ET.Element]] = {}
+    for node in root.iter('joint'):
+        name = node.get('name')
+        if name:
+            source_joints.setdefault(name, []).append(node)
+
+    for articulation in scene_definition.articulations or ():
+        for joint in articulation.joints:
+            if joint.kind == 'fixed':
+                continue
+            if joint.kind not in {'revolute', 'continuous', 'prismatic'} or joint.axis is None:
+                raise ValueError(f'unsupported canonical MJCF joint representation: {joint.joint_id!r}')
+            matches = source_joints.get(joint.joint_id, ())
+            if len(matches) != 1:
+                raise ValueError(
+                    f'canonical joint {joint.joint_id!r} must resolve to exactly one MJCF joint; '
+                    f'found {len(matches)}'
+                )
+            matches[0].set('axis', ' '.join(format(float(value), '.17g') for value in joint.axis))
+    return ET.tostring(root, encoding='unicode')
 
 
 @dataclass(frozen=True)

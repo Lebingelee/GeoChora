@@ -10,7 +10,7 @@ With `.codegraph/` present, explore these owners first.
 | Generic lifecycle/resource ownership | `task_env/environment/env.py`, `task_env/environment/lifecycle.py`, `task_env/runtime/boundary.py` | reset/step/done and task-state evaluation; lifecycle closes RuntimeBoundary once, Env closes Camera/UI wrappers |
 | Selected adapter | `task_env/tasks/reference_env.py` | `SelectedReferenceEnv` internal shared owner, public factory consumer; `step_expert`, start/finish recording |
 | Task/Artifact/solution | `task_env/tasks/pick_cube/task.py`, `solution.py`, `config.yaml`; corresponding `task_env/tasks/nut_assembly/` | task-owned recipe/semantics; `build_reference` is advanced, do not assume root re-export |
-| Advanced Artifact/admission | `task_env/artifacts/__init__.py`, `task_env/artifacts/contracts.py` | `TaskArtifact`, legacy `ExecutionSpec`, additive `ExecutionSpecV1`/`decode_execution_spec`, `CanonicalStateView`, `CapabilityAdmissionError`, `admit_capabilities` |
+| Advanced Artifact/admission | `task_env/artifacts/__init__.py`, `task_env/artifacts/contracts.py` | `TaskArtifact` v0, additive `TaskArtifactV1`/`decode_task_artifact()` and exact `validate_scene()`, legacy `ExecutionSpec`, `ExecutionSpecV1`/`decode_execution_spec`, `CanonicalStateView`, `CapabilityAdmissionError`, `admit_capabilities` |
 | D02a canonical state contracts | `task_env/artifacts/state.py`, exported through `task_env.artifacts`; D02b provider owner remains `task_env/runtime/sessions/` | strict v0/v1 state dispatch, explicit scalar v0 projection, consumer requirements, native interval evidence and alias lifetime descriptors; no provider projection/native capability claim |
 | Physics sessions | `task_env/runtime/sessions/api.py`, `task_env/runtime/sessions/control.py` | `RuntimeSession`, `materialize`, `provider_manifest`, `materialize_control`; public provider boundary |
 | Controller/observation | `task_env/controllers/canonical/contracts.py`, `task_env/controllers/canonical/`; `task_env/observations/` | RequestedAction → canonical target → applied control; schema/frame/timebase metadata |
@@ -30,6 +30,7 @@ Symbol-level reference is [task_env/doc/api](../../../../task_env/doc/api/index.
 ## Existing defect-sensitive tests
 
 - `task_env/diagnostics/tasks/test_reference_construction.py`: Artifact/config/source/reset identities, provider-free.
+- `task_env/diagnostics/tasks/test_phase_ii_d01b_vnext_materialization.py`: bounded TaskArtifact v1/Role/Reset route on GeoPhys and MuJoCo CPU; not general scene-import or task qualification.
 - `task_env/diagnostics/tasks/test_nutassembly_outcome.py`: outcome/stage/strict lifecycle distinctions.
 - `task_env/diagnostics/tasks/test_selected_consumers.py`, `test_record_cli_completion.py` in the same directory:
   current public consumers, recording and incomplete-run failure.
@@ -66,3 +67,12 @@ and do not invent a new approval.
 
 `inspect_h5.py` checks a loaded file; its `storage_roundtrip` result does not execute a fresh save/load.
 Keep any actually executed new roundtrip evidence separate from offline load/T+1 validation.
+
+## Current Phase II vNext materialization slice
+
+`sample_episode_reset_plan()` accepts the original TaskArtifact v0 route and the bounded D01b TaskArtifactV1 route.
+For v1, the Task Source snapshot and exact Scene-v3 identity must match; `RuntimeSession.materialize()` also requires
+one RobotInstance, scalar reset/state fields and a bounded source root. Only GeoPhys/MuJoCo CPU is TESTED_BOUNDED for
+the Panda + static square-peg probe. MuJoCo consumes the Scene scalar-axis projection through its existing adapter and
+checks public model Frame/Joint topology. Do not infer multi-Robot, free-body pose reset, contact, controller, render,
+task success or qualification support. Details and receipt are in the [Phase D D01b record](../../../../docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md#d01b-bounded-vnext-two-provider-receipt-2026-10-20).

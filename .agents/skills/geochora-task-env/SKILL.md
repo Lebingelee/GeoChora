@@ -98,9 +98,10 @@ For Phase II B02 reset selection, use `TaskInitializationV1`, `resolve_role_bind
 `EpisodeResetPlanV1` beside the existing `ResetSample` in `task_env.artifacts.execution`. Initialization
 is optional when reading the B01 source shape, but required to build a reset plan. Reuse the Artifact's
 `UniformDimension` bounds and preserve the exact provider-facing ResetSample v0. `resolve_role_binding()` requires
-the matching TaskArtifact v0. The resolver checks explicit candidate IDs, all Artifact Entity and structured
-Scene topology coverage, RobotInstance classification, and
-disjoint role candidates; it does not create tags or an asset registry. Use `RuntimeSession.reset_plan()`
+the matching TaskArtifact v0 on the original B02 route; D01b also admits a TaskArtifactV1 only when its exact
+Scene identity and TaskSource snapshot match. The resolver checks explicit candidate IDs, structured Scene
+topology coverage, RobotInstance classification, and disjoint role candidates; it does not create tags or an
+asset registry. Use `RuntimeSession.reset_plan()`
 for a plan-bound reset: it matches the materialized Scene identity, runs the existing requested/realized
 state gate, and keeps snapshot/step closed if that gate fails. The legacy `reset(sample)` route remains
 available. Current end-to-end B02 evidence covers three free rigid bodies on GeoPhys and MuJoCo CPU plus
@@ -108,6 +109,17 @@ exact PickCube PCG64-v0 and NutAssembly NA-S0 ResetSample compatibility; a separ
 the exact A05 Scene-v3/source-closure input with fixed authored initialization. The randomized three-body
 probe uses bounded direct MJCF/Scene-v2 input and does not qualify general A04 free-body import lowering.
 Do not infer full task rollout or SAPIEN/Genesis qualification from these probes.
+
+For the Phase II D01b vNext materialization slice, compile the candidate with
+`compile_task_artifact_v1()`, build its plan with the matching `TaskSourceV1` and exact Scene-v3 value, then call
+the existing `RuntimeSession.materialize()` and `reset_plan()` APIs. This route is TESTED_BOUNDED only for one
+fixed-topology Panda RobotInstance plus a static square peg on GeoPhys/MuJoCo CPU; MuJoCo consumes the canonical
+MJCF axis projection and bounded VFS assets, and verifies the source-closure digest before native build. It rejects Scene/TaskSource identity drift, missing required
+Frame/Joint/assets, unbounded source roots, multiple RobotInstances, free-body pose reset and nonzero settle.
+The same hash-bound `ResetSample-v0` must be passed to both Providers for one exact Artifact/Scene; changing the
+Scene changes the TaskArtifactV1 identity and therefore needs its own sample. See the
+[D01b bounded receipt](../../../docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md#d01b-bounded-vnext-two-provider-receipt-2026-10-20).
+This does not implement control execution, contact semantics, task success, rendering or qualification.
 
 For Phase II B03a read-only predicates, use `TaskEvaluationContextV1` and call
 `TaskLifecycleAdapter.evaluate_predicates()` explicitly. The context separates the task's requested action and

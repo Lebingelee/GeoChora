@@ -1,9 +1,46 @@
 """Private MuJoCo peer adapter. No comparison/oracle or controller implementation."""
 import xml.etree.ElementTree as ET
 import math
+from pathlib import Path
+import posixpath
 import numpy as np
 
+from ...assembly.assets import _source_closure_digest
 from .common import _SessionValues, pose
+from .source import project_scene_definition_v3_to_mjcf
+
+
+def _source_asset_bytes(base_dir, source_xml):
+    if base_dir is None:
+        raise ValueError('canonical MuJoCo materialization requires a bounded source base_dir')
+    root = Path(base_dir).resolve()
+    if not root.is_dir():
+        raise ValueError('canonical MuJoCo source base_dir must be an existing directory')
+    document = ET.fromstring(source_xml)
+    compiler = document.find('compiler')
+    meshdir = '' if compiler is None else compiler.get('meshdir', '')
+    texturedir = '' if compiler is None else compiler.get('texturedir', '')
+    assets = {}
+    for node in document.iter():
+        raw_path = node.get('file')
+        if raw_path is None:
+            continue
+        if node.tag == 'include':
+            raise ValueError('D01b MuJoCo Scene-v3 materialization does not admit nested MJCF includes')
+        directory = meshdir if node.tag in {'mesh', 'skin'} else texturedir if node.tag == 'texture' else ''
+        logical_path = posixpath.normpath(posixpath.join(directory, raw_path.replace('\\', '/')))
+        if logical_path in {'.', '..'} or logical_path.startswith('../') or logical_path.startswith('/'):
+            raise ValueError(f'MuJoCo source asset path escapes its bounded base_dir: {raw_path!r}')
+        path = root.joinpath(*logical_path.split('/'))
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f'MuJoCo source asset escaped its bounded base_dir: {path}') from exc
+        if not resolved.is_file():
+            raise ValueError(f'MuJoCo source asset is missing: {logical_path!r}')
+        assets[logical_path] = resolved.read_bytes()
+    return assets
 
 
 class _MuJoCoSession(_SessionValues):
@@ -11,7 +48,20 @@ class _MuJoCoSession(_SessionValues):
         self._initialize_values(artifact, source, 'mujoco')
         import mujoco
         self._mj = mujoco
-        root = ET.fromstring(source.scene_source.xml)
+        source_xml = source.scene_source.xml
+        assets = None
+        if source.scene_definition is not None:
+            source_xml = project_scene_definition_v3_to_mjcf(
+                source_xml, source.scene_definition,
+            )
+            assets = _source_asset_bytes(source.scene_source.base_dir, source_xml)
+            measured_closure = _source_closure_digest({
+                'scene.xml': source_xml.encode('utf-8'),
+                **assets,
+            })
+            if measured_closure != source.source_closure_digest:
+                raise ValueError('MuJoCo canonical source closure digest mismatch')
+        root = ET.fromstring(source_xml)
         # Legacy GeoPhys importer accepts extended freejoint attributes. MuJoCo
         # represents these same damping/armature values as a type=free joint.
         for element in root.iter('freejoint'):
@@ -21,7 +71,9 @@ class _MuJoCoSession(_SessionValues):
         # own initialization, so stale source keyframes are not materialized.
         for element in root.findall('keyframe'):
             root.remove(element)
-        self._model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
+        self._model = mujoco.MjModel.from_xml_string(
+            ET.tostring(root, encoding='unicode'), assets=assets,
+        )
         self._data = mujoco.MjData(self._model)
         self._native_steps = 0
         if self._model.opt.timestep != artifact.timebase.physics_dt:
@@ -35,6 +87,69 @@ class _MuJoCoSession(_SessionValues):
         self._frames = {semantic: self._model.site(native).id for semantic, native in source.frames.items()}
         self._target_actuators = {semantic: self._model.actuator(native).id for semantic, native in source.joint_targets.items()}
         self._open_actuators = tuple(self._model.actuator(native).id for native in source.open_actuators)
+        self._validate_canonical_scene_model()
+
+    def _validate_canonical_scene_model(self):
+        scene = self._source.scene_definition
+        if scene is None:
+            return
+        frame_ids = {
+            frame.frame_id
+            for frame in scene.frames or ()
+            if frame.frame_kind == 'runtime'
+        }
+        for name in sorted(frame_ids):
+            body_id = self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_BODY, name)
+            site_id = self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_SITE, name)
+            if body_id < 0 and site_id < 0:
+                raise ValueError(f'canonical runtime Frame {name!r} is absent from the MuJoCo model')
+
+        expected_joint_type = {
+            'revolute': self._mj.mjtJoint.mjJNT_HINGE,
+            'continuous': self._mj.mjtJoint.mjJNT_HINGE,
+            'prismatic': self._mj.mjtJoint.mjJNT_SLIDE,
+        }
+        for articulation in scene.articulations or ():
+            for joint in articulation.joints:
+                if joint.kind == 'fixed':
+                    expected_type = None
+                else:
+                    expected_type = expected_joint_type.get(joint.kind)
+                    if expected_type is None:
+                        raise ValueError(
+                            f'MuJoCo D01b does not admit canonical Joint kind {joint.kind!r}'
+                        )
+                try:
+                    parent_id = self._model.body(joint.parent_frame.frame_id).id
+                    child_id = self._model.body(joint.child_frame.frame_id).id
+                except Exception as exc:
+                    raise ValueError(
+                        f'canonical Joint {joint.joint_id!r} endpoints must resolve to MuJoCo bodies'
+                    ) from exc
+                if int(self._model.body_parentid[child_id]) != parent_id:
+                    raise ValueError(
+                        f'canonical Joint {joint.joint_id!r} parent/child topology differs in MuJoCo'
+                    )
+                if expected_type is None:
+                    continue
+                joint_id = self._mj.mj_name2id(
+                    self._model, self._mj.mjtObj.mjOBJ_JOINT, joint.joint_id,
+                )
+                if joint_id < 0:
+                    raise ValueError(f'canonical Joint {joint.joint_id!r} is absent from MuJoCo')
+                if (
+                    self._model.jnt_type[joint_id] != expected_type
+                    or int(self._model.jnt_bodyid[joint_id]) != child_id
+                ):
+                    raise ValueError(
+                        f'canonical Joint {joint.joint_id!r} type/child binding differs in MuJoCo'
+                    )
+                if not np.allclose(
+                    self._model.jnt_axis[joint_id], joint.axis, rtol=0.0, atol=1.0e-9,
+                ):
+                    raise ValueError(
+                        f'canonical Joint {joint.joint_id!r} axis differs in MuJoCo'
+                    )
 
     def _addresses(self, name, *, free):
         joint = self._model.joint(name).id
