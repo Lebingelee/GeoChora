@@ -1,7 +1,7 @@
-# Phase A — Core Object Model：架构、代码实施与验收（Codex 草案）
+# Phase A — Core Object Model：架构、实施切片与验收
 
-> **PROPOSED / 需 Codex Audit 与维护者确认。** 本文是 Phase II A 阶段代码开发目标，不声称当前仓库已有全部类型/API。  
-> 基准：2026-10-19，`main` HEAD `f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。  
+> **PROPOSED / READY FOR SECOND REVIEW。** 2026-10-20 依据源码审阅修订，仅规划变更，未授权代码实施。
+> 源码基准：`develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体边界与 20 Goal 依赖图参见 [`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)。
 
 ## A.0 阶段目的与非目标
@@ -18,23 +18,43 @@
 4. 用轻量 Typed Components（物理、视觉、关节、Frame、传感器等）表达公共事实，**不**实现通用 ECS Scheduler。
 5. Scene 是空间/组织/结构容器；Task 的 Goal、Success、Failure 归 B，不属于 Scene。
 6. 资产应遵循 `external format → canonical definition → provider materialization`；Runtime Handle 不泄漏到 B/C/D 的公共对象。
-7. 注册和构造 API 扩展当前 `task_env.registry`；`make_agent` 为历史机器人构造术语，未来希望用 `make_robot` 避免与 RL Agent 混淆，但需分阶段迁移。
+7. Registry UID 表示组件类型，Entity ID 表示实例。保留 `make_agent`；`make_robot` 改名不是本阶段交付前提，无独立价值时不新增 alias。
 8. `make_env` 是最终执行 facade，不承担底层资产解析所有权；Scene/Robot 编译不要求启动 Physics。
 
 ## A.1 当前实现基线：已有所有者、断裂与边界
 
 | 当前 owner / 路径 | 已知事实（IMPLEMENTED） | A 阶段拟处理的差距（PROPOSED） |
 | --- | --- | --- |
-| [`task_env/registry.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/registry.py) | `ComponentRegistry`，`make_agent/make_object/make_scene/make_env` | 按 Entity/Asset/Robot 的稳定身份与对象复用规则扩展；不新造平行 registry |
-| [`task_env/environment/protocols.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/protocols.py) | `AgentComponent`、`TaskObjectComponent`、`SceneBuilderComponent`、`TaskEnvironmentComponent` | 明确 robot/entity/components 继承/组合边界与兼容适配 |
-| [`task_env/environment/types.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/types.py) | `AssetManifest`、`ReferenceSpec`、`TaskCompositionSpec`、`TaskReferences` | 从任务专属声明发展到统一实例/Frame/Reference 规则 |
-| [`task_env/assembly/compiler.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/assembly/compiler.py) | MJCF/任务专用组合，生成 `CompiledTaskScene` | 逐步让组合输入由 Canonical Scene 驱动；不在 A 强制重写 D 的 Physics Materializer |
-| [`task_env/assembly/references.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/assembly/references.py) | 以 name/ID 进行任务引用解析 | 保留功能，升级为 `Entity-qualified` refs；native integer IDs 限制在 adapter |
-| [`task_env/robots/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/robots) | Panda、Pendulum 等机器人组件和控制句柄 | 通用 Robot Model/Control Group，不以 Panda 作为唯一 Robot 形状 |
-| [`task_env/tasks/worlds/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/tasks/worlds) | 专用 tabletop/classic 场景 | 场景复用、多个机器人/物体实例声明 |
-| [`asset/external/mujoco_menagerie`](https://github.com/Lebingelee/GeoChora/tree/main/asset/external/mujoco_menagerie) | 仓库中的外部 Gitlink 资产来源 | Asset reference/version/hash；不在 Core 复制第三方大型资产 |
+| [`task_env/registry.py`](../../../../../task_env/registry.py) | `ComponentRegistry`，`make_agent/make_object/make_scene/make_env` | 按 Entity/Asset/Robot 的稳定身份与对象复用规则扩展；不新造平行 registry |
+| [`task_env/environment/protocols.py`](../../../../../task_env/environment/protocols.py) | `AgentComponent`、`TaskObjectComponent`、`SceneBuilderComponent`、`TaskEnvironmentComponent` | 明确 robot/entity/components 继承/组合边界与兼容适配 |
+| [`task_env/environment/types.py`](../../../../../task_env/environment/types.py) | `AssetManifest`、`ReferenceSpec`、`TaskCompositionSpec`、`TaskReferences` | 从任务专属声明发展到统一实例/Frame/Reference 规则 |
+| [`task_env/assembly/compiler.py`](../../../../../task_env/assembly/compiler.py) | MJCF/任务专用组合，生成 `CompiledTaskScene` | 逐步让组合输入由 Canonical Scene 驱动；不在 A 强制重写 D 的 Physics Materializer |
+| [`task_env/assembly/references.py`](../../../../../task_env/assembly/references.py) | 以 name/ID 进行任务引用解析 | 保留功能，升级为 `Entity-qualified` refs；native integer IDs 限制在 adapter |
+| [`task_env/robots/`](../../../../../task_env/robots) | Panda、Pendulum 等机器人组件和控制句柄 | 通用 Robot Model/Control Group，不以 Panda 作为唯一 Robot 形状 |
+| [`task_env/tasks/worlds/`](../../../../../task_env/tasks/worlds) | 专用 tabletop/classic 场景 | 场景复用、多个机器人/物体实例声明 |
+| [`asset/external/mujoco_menagerie`](../../../../../asset/external/mujoco_menagerie) | 仓库中的外部 Gitlink 资产来源 | Asset reference/version/hash；不在 Core 复制第三方大型资产 |
 
 **Codex 必核实**：旧 `make_agent` caller 的实际类型、name→index 映射在 `assembly` 中的生产路径，Scene/XML 构建者是否已经可复用，`asset/` 是否另有外部实际源码。先确定 Owner/CallGraph 再考虑新文件。
+
+### A.1.1 2026-10-20 审阅确认的断点与复用决策
+
+- `TaskCompositionSpec` 拒绝重复 agent/object UID，`resolve_task_references()` 按组件 UID 存储，
+  Panda 分支读取全局 `joint1/hand/actuator1`。实例化需贯穿 composition→命名空间→reference map；
+  不能只在 YAML 增加 entity_id。依据：
+  [types](../../../../../task_env/environment/types.py#L103-L127)、
+  [references](../../../../../task_env/assembly/references.py#L190-L273)。
+- 已有 [EntityDefinition/WorldDefinition](../../../../../task_env/artifacts/contracts.py#L130-L203)。
+  本轮选择 Core artifacts owner 下的不可变 Scene/Entity value contract 作为 vNext 唯一结构权威，
+  文件布局由 A01 audit 决定；v0 保留 codec/projection，不维持两套独立可写世界。
+  AssetManifest 是来源描述，TaskReferences 是编译后映射，二者不取得 Scene 定义权威。
+- [GeoPhys ImportedScene](https://github.com/SCAILab-USTC/GeoPhys/blob/c665ce5028a12bb4d2afe49f05e015fa9b684a39/src/scene/scene_import.py#L296-L363) 已公开 ir、
+  capability_report、solver/render lowering；A04 必须先比较组合公开 importer 与新写 parser 的必要性。
+  Core 不复制 parser，也不要求其他 Provider 使用 GeoPhys IR ABI。
+- 受版本控制的 `asset/` 当前只含 Menagerie Gitlink；`asset/` 本身不是外部 Gitlink，
+  不假设那里已有通用 Asset Framework。来源责任见 [Gitlinks](../../../../../.gitmodules)。
+- Parser 映射必须保留当前资产所需的 transmission/tendon/equality、惯性参考 frame、contact exclusions
+  等语义；不要求全部跨格式支持，但未知必要语义必须拒绝或显式保留为受限 source reference。
+  不得用基础 Rigid/Joint 的构造成功掩盖信息丢失。
 
 ## A.2 推荐概念模型
 
@@ -166,7 +186,9 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 | `task_env/tasks/worlds/` | 已有简单 Scene recipes | 作为兼容参考，后续逐步改以声明式 Scene 构造 |
 | `task_env/diagnostics/` 与适合位置的测试 | Reference/Frame/Codec invariants | 复用并补充小粒度测试，不建立 mega-test |
 
-**静态定义不能持有 native mutable state**；对同一 Asset 重复实例化要不共享实例状态；Runtime Handle 的构造/释放属 D Owner，不应放在 AssetDefinition 的 `__del__` 中。
+**静态定义不能持有 native mutable state**；同 Asset 多实例不共享实例状态；Runtime Handle 的构造/释放属 D Owner。
+逻辑内容 hash 不依赖 checkout 绝对路径；materialized path 留 execution provenance。已有 controller hash
+受 absolute meshdir 影响的限制保留，不改历史 identity，见[发布限制](../../../../releases/v1.1/known-limitations.md)。
 
 ## A.5 分 Goal 实施路线与验收
 
@@ -174,9 +196,10 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 
 - **依赖**：P00 Baseline。
 - **任务**：调查现有 AssetManifest/ReferenceSpec/Registry，确定 source provenance、definition id、instance id、hash/version；实现可扩展的最小声明与严格 codec；明示 native handle 不属于定义。
+- **Owner 决议**：扩展既有 artifacts 的 immutable contracts；A Scene 是结构唯一权威，v0 WorldDefinition 只通过兼容层消费。AssetManifest、TaskCompositionSpec、TaskReferences 的用途逐一列明，不能复制为同义 owner。
 - **产出**：最小 typed data contract；source/instance 映射规则；Schema/Compatibility Notes；Unit Fixtures。
 - **验收**：同 Asset→两 Entity IDs；重复实例 ID/缺失资产/非法单位拒绝；定义与实例独立 serialize/deserialize；不发生 Physics import/native construction；旧 `make_agent`/`make_object` 可正常导入。
-- **终止条件**：如需重写 `asset/` 外部 Gitlink 或不能保持现有 Reference ID，先 `REVISE`。
+- **终止条件**：如需修改 Menagerie Gitlink、复制 Provider importer 或不能保持已有 Reference ID，先 `REVISE`；不把 `asset/` 本身误作 Gitlink。
 - **Codex AUDIT Goal**：列出 AssetManifest、EntityDefinition、Asset Reference 的现有重叠数据，决定扩展的**唯一** owner 和迁移层。
 
 ### A02 — Component Model / Articulation / Frame Graph
@@ -185,6 +208,7 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 - **任务**：最小 Physical/Visual/Joint/Frame/Actuation component contract；Frame Parent 静态关系和 transform composition；无环校验，约束 Joint types 与 DOF 语义。
 - **产出**：可验证的 Frame/Articulation structure、只读结构访问路径、strict failures。
 - **验收**：World→Base→Hand→Camera Mount 的矩阵乘积符合 analytical oracle；循环/不存在 parent/不一致 frame 拒绝；同名 joint 在不同 Robot 中可共存；Free-base position/velocity 维度不能隐式要求相等；不实现 FK Solver。
+- **补充 Gate**：区分 authored fixed Frame 与 runtime link pose；明确 joint position/velocity 的 type、frame 和维数需求，交给提前的 D02a 定契约。当前 Panda 必需的 transmission/constraints 必须保留或有明确受限 source 路径。
 - **Codex AUDIT Goal**：对照 `task_env/assembly/references.py` 与已有 Frame 代码，优先复用。
 
 ### A03 — Robot / Control Group / Scene Composition
@@ -192,15 +216,18 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 - **依赖**：A02。
 - **任务**：Robot Instance + ControlGroup 资源声明；Scene 独立组合多个 Robot/Objects/Sensors；保留固定 Frame/可视结构。
 - **产出**：单 Panda、双 Panda、arm+hand（可以仅用结构 fixture）三种示例；Entity-qualified references。
+- **边界**：双 Robot 的结构与实际 reference resolver 都要测试；首个基线仅承诺其静态契约。后续 C02b 若请求真实双 Robot，须先有 D01b binding 和 S2；没有该证据则明确 unsupported/deferred，不可沿用单 Panda 动力学结论。
 - **验收**：两相同 Asset 实例名称隔离、关节资源集合可解析；ControlGroup 指向未知 actuator 失败；同一 Scene 重新解析产生相同 Canonical Identity；静态组合不得触发 native step；**不声称多 Robot 物理执行已支持**。
 - **Codex AUDIT Goal**：区分 Scene Entity、Articulation Link、Task Role 的所有权，不复制 B 的 role resolver。
 
 ### A04 — Asset Import / Registry / Factory Migration
 
 - **依赖**：A01–A03。
-- **任务**：在现有 Registry 上新增/适配 Asset/Robot 构造；受限支持当前真实用到的 MJCF/URDF/source reference；列明无法无损转换的字段与变换。
+- **任务**：组合现有 Registry、assembly 与公开 Provider importer；优先当前 MJCF/source reference，
+  URDF 仅在独立 fixture/实际需求成立时纳入。原 source graph、资源 content hash、必要语义映射报告不可丢失。
 - **产出**：统一的 Canonical Construction Path、旧 API 迁移/弃用报告、受限资产导入样例。
 - **验收**：unknown/duplicate UID fail-closed；旧 `make_scene/make_object/make_agent` 保留兼容；构造 Panda/Cube 与已有任务 Recipe 语义一致；导入期间不访问 provider private solver；Asset source/content identity 能写入元数据。
+- **补充 Gate**：同源资产在不同 checkout root 的逻辑 identity 一致；必要属性逐项 EXACT/APPROXIMATE/UNSUPPORTED，原 source→canonical→provider 的信息损失有报告。Registry 不存 native 实例，不为改名强制新增公开 factory。
 - **Codex AUDIT Goal**：判断哪些资产解析应当归外部 `asset/` owner，哪些只能放 Core Assembly；禁止重新造通用 Asset Framework。
 
 ### A05 — A 阶段集成与保护性迁移
@@ -210,6 +237,8 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 - **产出**：A 阶段 Contract/Compatibility Receipt、正负测试集、残余 Unsupported List。
 - **验收**：Pendulum 及受限 Panda/PickCube Scene 描述不退化；旧 selected reference Asset/ID 解析不丢；单/双机器人静态例子；测试真实命令/来源清楚。需要 Runtime 验证的能力不能用静态构造标成 verified runtime。
 - **Codex AUDIT Goal**：判断是否已经具有可让 B 编译 Task 的最小 SceneContract；如果物理转换仍待 D，明确 deferred boundary。
+- **顺序决议**：A05 后立即执行 D01a/D02b 的最小真实闭环，再进入 B01；A05 只完成静态 gate，
+  D01a 必须证明新的 Scene 表示真实被 Provider 消费，不能仅重跑旧 recipe。完整切片依赖见 [`05`](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 
 ## A.6 阶段 Gate：推荐最低证据
 
@@ -242,7 +271,7 @@ Codex 必须比较使用当前 `ComponentRegistry` 扩展/适配与引入新 Ass
 2. `ComponentRegistry` 的 expected_base 限制应如何迁移到 Robot/Entity？保留 `make_agent` 多久？
 3. Frame 用 Entity-qualified 字符串引用是否足够；何种情况需要显式 `FrameId` 类型？避免重命名导致既有记录失效。
 4. 现有 MJCF 特化 Assembly 能安全抽出多少共享 Scene 结构？哪些细节必须留给 D materializer？
-5. `asset/` gitlink 的维护/依赖许可是否影响新 Asset Registry 的职责？
+5. Menagerie source/version/license 如何经现有 registry/assembly 保存；是否仍存在足以证明新 Asset Registry 必要性的缺口？
 6. 多 Robot 静态场景是否存在生产路径能验证，不允许把构造成功错误提升为 multi-robot physics qualification。
 
 **A 阶段出口**：`Canonical Asset/Entity/Scene/Frame` 能作为 B 的任务声明和 D 的 Materialization 输入，但 A 本身不宣称物理仿真器之间的动力学等价。

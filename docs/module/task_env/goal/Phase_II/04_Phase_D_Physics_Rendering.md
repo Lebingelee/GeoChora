@@ -1,7 +1,7 @@
-# Phase D — Physics / Rendering Independence：架构、代码实施与验收（Codex 草案）
+# Phase D — Physics / Rendering Independence：架构、实施切片与验收
 
-> **PROPOSED / 需 Codex Audit 与维护者确认；不是现有多 Provider/Renderer 资格声明。**  
-> 编制基准：2026-10-19，`main` HEAD `f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。  
+> **PROPOSED / READY FOR SECOND REVIEW；仅修订规划，不是多 Provider/Renderer 实现或资格声明。**
+> 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体蓝图：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；A/B/C 输入见相邻阶段文件。
 
 ## D.0 讨论结论与范围
@@ -22,17 +22,31 @@
 
 | owner | IMPLEMENTED | 必须保留的限制 |
 | --- | --- | --- |
-| [`task_env/assembly/compiler.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/assembly/compiler.py)、`assembly/references.py` | 有界源与具名 task scene/source mapping | 仍含明显 MJCF/task-specific 组合，非通用 Canonical Scene materializer |
-| [`task_env/runtime/sessions/api.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/runtime/sessions/api.py) | `RuntimeSession`, `provider_manifest`, `materialize`；GeoPhys/MuJoCo/SAPIEN/Genesis adapter | 适配器存在不代表同等支持或 selected-task qualification |
-| [`task_env/artifacts/contracts.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/artifacts/contracts.py) | `CanonicalStateView(canonical-state-v0)`、`ExecutionSpec`, Manifest/Admission | v0 标量 joint maps，不代表 floating-base typed state 全支持 |
-| [`task_env/observations/canonical_camera/contracts.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/observations/canonical_camera/contracts.py) | `CameraGeometry`, `ResolvedCameraMetadata`，Mount/Optical、Step/time、FOV/K | 当前 `camera-observation-v0` 仅明确 RGB/Depth、post-control-step |
-| [`task_env/observations/canonical_camera/images.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/observations/canonical_camera/images.py) | RGB/Depth strict normalize + `CanonicalCameraObservation` | Segmentation 与 async capture meta 未通用实现 |
-| [`task_env/render/camera/source.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/render/camera/source.py) | `camera-static-triangles-v0`；World-space 静态 closed triangles | 不可当成动态 Articulation/Deformable 完整 Visual Scene |
-| [`task_env/render/camera/api.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/render/camera/api.py) | `CameraRenderSession` 与 `admit_render` | 当前 `physics_provider == render_provider` 且 GeoPhys/MuJoCo CPU/native pairing；不支持任意组合 |
-| [`task_env/render/base/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/render/base) | `RenderBackend` registry 与 `UiRenderProvider` 等独立 contract | UI presentation 与 Camera Sensor 不能混为一体；Flora fake tests 不是 native Flora acceptance |
-| [`task_env/runtime/sessions/control.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/runtime/sessions/control.py) | Panda specific controlled session capabilities | 特定 Panda joint/actuator 数量约束，不等于通用 multi-robot control |
+| [`task_env/assembly/compiler.py`](../../../../../task_env/assembly/compiler.py)、`assembly/references.py` | 有界源与具名 task scene/source mapping | 仍含明显 MJCF/task-specific 组合，非通用 Canonical Scene materializer |
+| [`task_env/runtime/sessions/api.py`](../../../../../task_env/runtime/sessions/api.py) | `RuntimeSession`, `provider_manifest`, `materialize`；GeoPhys/MuJoCo/SAPIEN/Genesis adapter | 适配器存在不代表同等支持或 selected-task qualification |
+| [`task_env/artifacts/contracts.py`](../../../../../task_env/artifacts/contracts.py) | `CanonicalStateView(canonical-state-v0)`、`ExecutionSpec`, Manifest/Admission | v0 标量 joint maps，不代表 floating-base typed state 全支持 |
+| [`task_env/observations/canonical_camera/contracts.py`](../../../../../task_env/observations/canonical_camera/contracts.py) | `CameraGeometry`, `ResolvedCameraMetadata`，Mount/Optical、Step/time、FOV/K | 当前 `camera-observation-v0` 仅明确 RGB/Depth、post-control-step |
+| [`task_env/observations/canonical_camera/images.py`](../../../../../task_env/observations/canonical_camera/images.py) | RGB/Depth strict normalize + `CanonicalCameraObservation` | Segmentation 与 async capture meta 未通用实现 |
+| [`task_env/render/camera/source.py`](../../../../../task_env/render/camera/source.py) | `camera-static-triangles-v0`；World-space 静态 closed triangles | 不可当成动态 Articulation/Deformable 完整 Visual Scene |
+| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | `CameraRenderSession` 与 `admit_render` | 当前 `physics_provider == render_provider` 且 GeoPhys/MuJoCo CPU/native pairing；不支持任意组合 |
+| [`task_env/render/base/`](../../../../../task_env/render/base) | `RenderBackend` registry 与 `UiRenderProvider` 等独立 contract | UI presentation 与 Camera Sensor 不能混为一体；Flora fake tests 不是 native Flora acceptance |
+| [`task_env/runtime/sessions/control.py`](../../../../../task_env/runtime/sessions/control.py) | Panda specific controlled session capabilities | 特定 Panda joint/actuator 数量约束，不等于通用 multi-robot control |
 
 **现有文档的硬性 Convention**：SI；right-handed Z-up；Quaternion wxyz；`T_world_from_camera` 与逆；Optical Frame +X right、+Y down、+Z forward；Depth `float32` metre **optical-Z**、0 invalid；RGB HWC/CHW 和 dtype/range 必须声明。先保护，后版本化扩展；不随 Renderer 私有约定改变。
+
+### D.1.1 审阅补充的复用入口与选择维度
+
+- [Core compiler](../../../../../task_env/assembly/compiler.py#L236-L269) 已调用公开 import_scene_source；
+  [ImportedScene](https://github.com/SCAILab-USTC/GeoPhys/blob/c665ce5028a12bb4d2afe49f05e015fa9b684a39/src/scene/scene_import.py#L296-L363) 已提供 ir/capability_report
+  和独立 solver/render lowering。D01/D03 先评估这些 owner，不能默认从 static triangle bridge 重写全 pipeline。
+- Core Scene 身份和 Provider Scene IR 不是两个可写物理世界：前者定义任务结构意图，
+  adapter 映射到后者公开 lowering；不把 GeoPhys IR/array storage 规定为所有 Provider 的 ABI。
+- [ExecutionSpec](../../../../../task_env/artifacts/contracts.py#L338-L352) 的 render_provider 为 scalar；
+  [Camera admission](../../../../../task_env/render/camera/api.py#L17-L45) 当前用 geophys/mujoco 且强制同名，
+  [UI backend](../../../../../task_env/render/base/contracts.py#L19-L25) 则用 raytracer/rasterizer/flora。
+  Provider、backend、profile、device/runtime identity 必须分层；rasterizer 不能冒充 provider 名。
+- EXACT/APPROXIMATE/UNSUPPORTED 是属性映射保真度，IMPLEMENTED/TESTED_BOUNDED/QUALIFIED 是实现/证据状态，
+  两者不能互换。必要 source semantics 不允许因为 canonical schema 暂无字段而静默丢弃。
 
 ## D.2 整体推荐架构：一份 Scene，两类 Materialization
 
@@ -114,6 +128,8 @@ Canonical State Boundary
 - Revolute/Prismatic joint 有标量 position/velocity；Spherical/Free-base 不能被 `Mapping[str,float]` 强制等长。Free-base pose 应允许采用 SE(3)，velocity 用声明 frame 的 6D Twist。
 - `state.joints["robot_left/joint1"]` 与按 Entity 的 `state.entities["robot_left"].joints["joint1"]` 是**同一只读数据视图的两个投影**，不能双写/复制出两个权威值。
 - 未支持 Contact Force ≠ 真实 Contact Force 为 0；强制 Required/Optional 分开，缺失明确 unavailable。
+- Quaternion 位置参数、角速度所在 frame、Twist 的参考点与表达 frame 必须明确；free joint 的 position/velocity
+  不同维数需要真实 adapter 测量，不能只验证类型构造。零拷贝 view 不能被 Recorder 跨步持有后随 native buffer 改写。
 - Task、Controller、Observation、Renderer 分别声明 State Requirements（field/frame/units/sampling/capability）；Environment/Runtime 汇总需求，在同一 Boundary 生成一致的 Canonical Projection，避免每个消费者各自读出不同时刻的状态。
 - 真实 Runtime State 与可恢复 Checkpoint 不同；没有包含 controller/semantic/solution/RNG/renderer memory 的证据就不能称为完整 restore。
 
@@ -142,6 +158,10 @@ RenderStateFrame
 
 Phase II 必须完成 **Rigid / Articulation Transform Sync**；Deformable/Particle 可在 Type/Capability 上预留，但实际完全实现仍 DEFERRED。多个 Renderer 各自记录 `last_seen_transform_version`；不能由一个 Renderer 消费后清除全局 dirty flag，使另一个遗漏更新。Renderer 仅按 Camera/Visual Demand 同步，不强制无 Camera 的 RL 每步渲染。
 
+D03 的真实 Oracle 必须看到运动物体/link 的像素投影改变，而不只是 metadata version 增长；
+same-step pose write、reset、两个 consumer 的消费顺序都要覆盖。先评估公开 render description/transform
+接口；没有公开动态上传能力时，报告 Provider gap 并走 owner-reviewed 扩展，不能私读 renderer cache。
+
 ## D.6 D3.2 实施细化：Camera/Sensor & Modalities
 
 ### D.6.1 Camera Definition 和 Observation 分离
@@ -157,6 +177,8 @@ Phase II 必须完成 **Rigid / Articulation Transform Sync**；Deformable/Parti
 - Segmentation：Semantic Category ID 与 Entity/Link Instance ID 分离；输出整数 mask + canonical label mapping，background/unknown ID 明确；Renderer 原生 indices 不外泄。Colorized Mask 仅用于 UI/诊断。
 - Camera Parent Frame：Fixed World、Wrist、Robot Head、Dynamic Attach 均走 D2 Frame Graph；不让 Renderer 独立 FK。
 - 默认同步 Capture；低频 Camera 可声明 hold-last 并带真实 capture step/time；异步预留 capture time ≠ return time，重置后旧 pending frame 必须失效。
+- 首个实现限定 pinhole、同步 capture、既有 RGB/optical-Z Depth，并增加受限 segmentation。
+  任意 K/skew、distortion/fisheye、真实 async scheduling 不由字段存在推断支持，未实现时明确拒绝。
 - 缺失 required modality/时间新鲜度时 Admission 拒绝或合法执行失败，不能删除字段、填零并假称有效。
 
 ### D.6.2 Obs/public 组织继续归 C
@@ -172,13 +194,16 @@ Phase II 必须完成 **Rigid / Articulation Transform Sync**；Deformable/Parti
 execution:
   physics: {provider: geophys, backend: cpu, profile: declared_v1}
   renderer:
-    default: {provider: rasterizer, profile: fast}
+    default: {provider: geophys, backend: rasterizer, profile: fast}
     cameras:
-      wrist: {provider: rasterizer, profile: fast, outputs: [rgb, depth]}
-      overview: {provider: other_renderer, profile: quality, outputs: [rgb]}
+      wrist: {provider: geophys, backend: rasterizer, profile: fast, outputs: [rgb, depth]}
+      overview: {provider: mujoco, backend: native, profile: declared_rgb, outputs: [rgb]}
 ```
 
-一套 Scene，不是多个 Physics；多个 Camera 可选择不同 Renderer。但 Phase II 实际可用 pairing 由 manifest/admission 逐一决定，不能由配置解析成功推断支持。`other_renderer` 是示意，不代表当前注册。
+一套 Scene，不是多个 Physics；多个 Camera 可选择不同 Renderer。示例 backend/profile 是 vNext 候选，
+不表示当前 registered/admitted。D05a 必须给出旧 scalar ExecutionSpec 的读写矩阵和 per-camera selection
+的版本方案，复用现有 manifests/registry，不另建 Provider 框架。只有 distinct resolved selection 才需新
+Renderer Session；同配置共享 Scene/cache 时，Camera calibration/buffer/schedule 和 refcount/close 仍独立。
 
 ### D.7.2 Admission 不是一个布尔值
 
@@ -191,6 +216,12 @@ execution:
 
 能力不应只用 `GeoPhys+RendererA=True` 声称；至少声明具体 `Task/Geometry/Modalities/Timing/Profile`。**当前 `CameraRenderSession` 严格同名 physics/render provider，不可因本路线而误报已解耦。**
 
+**本轮首选工程目标**：GeoPhys CPU physics × MuJoCo native renderer × rigid calibration scene，
+先验证 RGB/Depth、动态 transform、mounted camera 与 capture 不推进 physics。该 cross pairing 当前会被拒绝，
+需要真实 adapter/materialization/sync Evidence，不能只删除同名 gate。Segmentation 单独按 capability 准入。
+异名样例有助于验证 portability，但 independence 的判据是共同 Scene 身份、独立实例化、canonical state
+输入及正确时间同步；字符串相同/不同本身都不是充分证明。首选不成立时明确 blocker，替代目标需重新声明范围。
+
 ### D.7.3 Resource sharing 与异步
 
 相同 Renderer 实例配置可以共享 Render Scene 和 Renderer-native caches，不同 Camera 仍有独立 Calibration、Capture Schedule、Buffers、Pending Events。不同 Renderers 可能各自复制 Visual Scene/GPU data；允许 Renderer Cache 重复，禁止 Physics Authority 重复。没有独立 GPU/多线程 lifetime Evidence，不强制在 Phase II 同时运行所有 Renderer。
@@ -199,40 +230,61 @@ execution:
 
 ## D.8 五个 Implementation Goals
 
-### D01 — Physics Scene Materialization / Binding
+### D01 — Physics Scene Materialization / Binding（a/b）
 
-- **依赖**：A05、B04、C01。
-- **任务**：现有 `assembly`/`RuntimeSession` 上建立 Canonical Scene→Provider Source/Native Handle 的有界路径；单/双 Entity 可分辨，Exact/Approximate/Unsupported mapping reports；支持 Scene Instance/Reset Variant 生命周期。
+- **D01a**：依赖 A05/B04a/C01a，用 v0 schema 的新 candidate microfixture 或经证明等价的只读 projection，
+  保持旧 frozen Artifact/hash 不变；使用既有 ExecutionSpec 和受限 compatibility bridge，
+  提前跑一个新 Scene 表示真实到 Provider 的 microprobe；source、state 和 mapping 必须消费新输入，
+  不能仅执行旧 hardcoded recipe。不等待完整 B/C。
+- **D01b**：依赖 D01a/B04b/C01b，完成 vNext、固定拓扑 Role/Reset/realization 接入和
+  GeoPhys/MuJoCo 两 provider 验证。多 Robot 真实 binding 只有在明确 S2 后才准入；拓扑 variant 本基线拒绝。
 - **验收**：命名 Entity/Frame 在 GeoPhys/MuJoCo 支持的限定任务中都能解析；缺必需 Joint/Frame/Geometry fail-closed；相同 Frozen ResetSample realized-state tolerance 检查；无隐式重新采样或 private solver 访问；S2 真实 microprobe。
+- **补充 Gate**：realization tolerance 是 rollout 前实际执行的 gate，不只是写入 RealizedInitialState；
+  场景改变一个可测属性应改变 provider realization，证明新 Source 真正生效。映射报告包括当前资产必需
+  transmission/constraints/inertial-frame/contact 语义，不能将保留但未执行误标 EXACT supported。
 - **Codex AUDIT**：确定现有 MJCF-centered `assembly/compiler.py` 能复用的构造边界，以及哪些 conversions 必须 deferred；不得以“架构完整”名义重写 solver。
 
-### D02 — Typed Canonical State / Requirements / Owner Views
+### D02 — Typed Canonical State / Requirements / Owner Views（a/b）
 
-- **依赖**：D01 与 C04 的现有 view 兼容规划。
+- **D02a**：依赖 A02，提前规定 requirements、state type/frame、clock/sample/boundary identity、
+  native interval evidence、validity/alias lifetime 和 v0 projections，供 B04a/C01a 使用。
+- **D02b**：依赖 D02a/D01a，在既有 runtime/artifacts owner 实现受限 typed projections，
+  供 B02/B03/C04/C05c 消费，不反过来等待 C04 才设计必需状态。
 - **任务**：在既有 `CanonicalStateView` 上版本化支持 Typed Joint/Frame、Entity-oriented read views、State Requirements、Sampling/Time/Validity；保留旧 scalar state decode。
 - **验收**：v0 roundtrip 不变；joint scalar/free-base type 结构测试，frame SI/wxyz/Z-up；同 boundary consumer state 一致；缺失 required contact 不返回零；相同 data 不双写；真实 provider read/release 生命周期测试。
+- **真实 Gate**：至少一个 moving free-body 或 spherical-joint probe，检验不同 qpos/qvel 维数、Twist/frame
+  与时间。S1 覆盖数学 oracle；S2 证明 adapter 真正执行。跨 step/reset 后 view 失效行为和 Recorder 自有存储可测。
 - **Codex AUDIT**：与通用 `RuntimeSnapshot/TaskStateView` 做 owner 对照，不要求两种 session 共享内存 ABI。
 
 ### D03 — Visual Materialization / Sync Versioning
 
-- **依赖**：D02。
+- **依赖**：D02b、D01b、D05a；不硬性依赖 selected Solution 的 C05c 迁移。
 - **任务**：复用现有 `render` abstraction，构造 Visual Instance refs 与 Render State Projection；Transform/Geometry 更新分别版本化；Renderer 只按需消费。
 - **验收**：相同 Canvas 的多个 renderer-consumer 不相互清 dirty；physics step 不变的 pose write 也可触发更新；静态物体不重复重建 mesh；camera capture 不推进 physics；unsupported deformable 明确拒绝。
 - **Codex AUDIT**：是否可以在 `CameraRenderSource` 的 static mesh bridge 上**增量扩展**，还是确需受限新 visual binding？不能新建第二个 authoritative scene。
+- **复用 Gate**：对照 GeoPhys public ImportedScene/render lowering、Core UI 和 canonical camera 三条路径，
+  说明选择现有桥接/组合/新增受限 binding 的原因；不从内部 renderer arrays 取状态补缺口。
 
 ### D04 — Camera Contract / RGB/Depth/Segmentation
 
-- **依赖**：D03。
+- **依赖**：D03、C04、C05a；沿用 D05a 的 selection/capture identity 版本契约。
 - **任务**：扩展既有 Canonical Camera Schema、同步 capture、RGB/Depth/Segmentation normalization、metadata/camera frame/quality、低频/async future contract。
 - **验收**：landmark projection、depth backprojection、fixed/mounted moving camera same-state-time；sRGB/linear 声明分离；Seg IDs 指向 canonical names；旧 v0 RGB/Depth 兼容；缺 output fail-closed，reset pending frame 不串 Episode。
+- **切片策略**：先 RGB/Depth 兼容和动态 capture，再受限 segmentation；同 capture 的 mask/label map、
+  scene-instance identity 必须一起保存。仅 metadata 正确而物体像素不动不得过关；未完成 segmentation 不标完整 D04。
 - **Codex AUDIT**：优先增量扩展 `CameraGeometry`、`ResolvedCameraMetadata`、`CanonicalCameraObservation`，新 schema version 和数据复用路径有明确证据。
 
-### D05 — Pairing Config / Capability / Bounded Integration Gate
+### D05 — Renderer Selection / Pairing Integration（a/b）
 
-- **依赖**：D03–D04、C01。
-- **任务**：Environment default Renderer + per Camera overrides 配置解析；Provider/Renderer Pairing admission；物理/视觉 Scene Binding 验证；有界真实运行与失败报告。
+- **D05a**：依赖 C01a/A02，提前交付 provider/backend/profile/device selection、
+  per-camera overrides、manifest/capture identity 和 ExecutionSpec 版本策略，供 C05a/D03 使用。
+- **D05b**：依赖 D05a/D04/C01b，执行实际 Pairing admission/materialization/sync/capture、
+  native dependency 和资源失败检查；完整 task/provider/renderer/geometry/outputs/time/source 明确。
 - **验收**：非法组合/缺 NativeDeps/输出模态、临时资源泄漏均被检测；至少确定一个**已实现的真实在线 Camera 交集**并给出完整 task/provider/renderer/geometry/outputs/time/source/evidence；如果目标是证明跨独立 Provider 组合，应包含 `physics_provider != renderer_provider` 的真实 route，否则只能标记为 interface-ready/accepted-deferred，不能称 complete independence。
 - **Codex AUDIT**：列出当前 GeoPhys/MuJoCo/rasterizer/Flora/CameraSource 的真实组合状态和资源/许可依赖，建议先完成**最小的异名 Physics×Renderer 组合**；不把 fake Flora 测试算作 Native Qualification。
+- **退出规则**：首选 cross pairing 无真实 Evidence 时 D05b 为 blocked/accepted-deferred，不能将整个父目标
+  或完整 independence 标完成。接口可读、同名 native capture 通过和独立动态 pairing 通过分别报告。
+  唯一切片顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 
 ## D.9 验收矩阵：先确保语义正确，再验证组合性能
 

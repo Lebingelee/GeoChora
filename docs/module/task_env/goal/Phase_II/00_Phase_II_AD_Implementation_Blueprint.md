@@ -1,24 +1,24 @@
-# GeoChora Phase II — A–D 代码实施总蓝图（Codex 审阅草案）
+# GeoChora Phase II — A–D 实施蓝图（架构审阅修订版）
 
-> **状态：PROPOSED / REVIEW REQUIRED；非已批准开发排期，非现有能力声明。**  
-> **编制基准：2026-10-19；GitHub `main` HEAD `f292df149f41520b484ff27cf2ff78a584903013`；`develop` 在本次核对时同 SHA。**  
-> **发布基线：v1.1.0（`7ed9e78a60d407fa1150c99209e06c70bfa0ed87`）。**  
-> **阅读顺序：本文件 → `01_Phase_A_Core_Object_Model.md` → `02_Phase_B_Task_Semantics.md` → `03_Phase_C_Execution_Lifecycle.md` → `04_Phase_D_Physics_Rendering.md`。**  
-> **作用：供 Codex 首轮代码调查、架构审阅、逐 Goal 实施及维护者验收；不代替仓库 canonical docs、源代码或 Evidence。**
+> **状态：PROPOSED / READY FOR SECOND REVIEW；本次授权仅修订、提交和推送规划，不启动代码实施。**
+> **修订日期：2026-10-20；源码审阅基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`。**
+> **发布基线：v1.1.0（`7ed9e78a60d407fa1150c99209e06c70bfa0ed87`）。**
+> **阅读顺序：本文件 → [审阅决策与执行顺序](05_Architecture_Review_and_Execution_Order.md) → A/B/C/D 阶段文档。**
+> **原始五份草案在提交 `a299d8b` 原样保存；修订不代替 canonical docs、源代码、Evidence 或实现批准。**
 
 ## 0. 使用与事实来源
 
-1. 将本文件与另外四个 Markdown **放在同一个目录**，建议临时放入 `docs/plans/phase_ii_ad/` 的 topic branch；路径仅为提交建议，是否归档至该目录由维护者决定。相互引用使用同目录文件名。
+1. 本组规划保存在 `docs/module/task_env/goal/Phase_II/`。`00` 定义范围，`01–04` 定义各 Goal 契约，`05` 是实施切片顺序、决策和审阅事实的唯一入口；不是新的 canonical capability matrix。
 2. **每次执行 Goal 之前重新读取目标分支最新源代码、文档、调用者与测试**；此文固定于上述审阅基准，不假定未来 `develop` 仍与 `main` 相同。
 3. 仓库事实优先级：**当前源码与可复现实证 > 当前 canonical docs > tests/qualification > 本草案和历史讨论**。遇到冲突要报告，不得静默“按草案修正”既有行为。
-4. 基础引用：[`AGENTS.md`](https://github.com/Lebingelee/GeoChora/blob/main/AGENTS.md)、[`docs/global/architecture.md`](https://github.com/Lebingelee/GeoChora/blob/main/docs/global/architecture.md)、[`docs/global/ownership.md`](https://github.com/Lebingelee/GeoChora/blob/main/docs/global/ownership.md)、[`docs/module/task_env/public-api.md`](https://github.com/Lebingelee/GeoChora/blob/main/docs/module/task_env/public-api.md)、[`docs/module/task_env/qualification.md`](https://github.com/Lebingelee/GeoChora/blob/main/docs/module/task_env/qualification.md)、[`docs/roadmap/README.md`](https://github.com/Lebingelee/GeoChora/blob/main/docs/roadmap/README.md)。
+4. 基础引用：[`AGENTS.md`](../../../../../AGENTS.md)、[`docs/global/architecture.md`](../../../../global/architecture.md)、[`docs/global/ownership.md`](../../../../global/ownership.md)、[`docs/module/task_env/public-api.md`](../../public-api.md)、[`docs/module/task_env/qualification.md`](../../qualification.md)、[`docs/roadmap/README.md`](../../../../roadmap/README.md)。
 5. 状态用语：**IMPLEMENTED**（源码存在）、**TESTED_BOUNDED**（限定真实交集验证）、**QUALIFIED**（独立 Decision 与充分 Evidence）、**PROPOSED**（本文设计）、**DEFERRED**（明确推迟）。编译通过/注册成功 ≠ 可运行 ≠ 合格。
 
 ## 1. Phase II 本轮范围决议
 
-**与当前仓库 Roadmap 的优先级差异（明确待维护者决议）**：现有 `docs/roadmap/README.md` 将 LIBERO + Panda + MuJoCo 的 bounded benchmark/Oracle 对照列为近期首选，且强调先完成评审后再建设 Task Harness。**用户本轮提出新的实施顺序：先开发 A–D，待新版本形成后再设计 E。** 本草案以用户最新规划组织 *proposal*，但**不会静默改写当前 canonical Roadmap**；Codex 首轮审阅必须提交 Roadmap 取舍与影响说明，待维护者批准后再同步正式文档。
+**规划取舍**：维护者于 2026-10-20 授权按架构审阅建议调整 A–D 规划并推送 `develop`，供后续二审。保留 A–D 优先、E 延后的候选工程方向；现有 canonical Roadmap 的 LIBERO + Panda + MuJoCo bounded Oracle 研究方向保持原记录，可为未来需求提供反例。此文档提交不启动 benchmark adapter、Harness 或代码实施；进入工程时再按批准范围同步 canonical Roadmap。
 
-**只开发 A–D，E 延后至 A–D 新版本发布/形成稳定实施基线后。**
+**后续工程范围限 A–D；E 延后。首个实现基线采取固定拓扑、精确既有时间配方、单 Robot 真实主线、双 Robot 静态契约，以及一个真实独立 Physics × Renderer 目标交集。** 多 Robot 动力学须另有实际 S2 才可声明；拓扑变体不隐式改变 spaces。新任务 Stage-1 validation/randomized feasibility/Human Judge 不随 Harness 延后。
 
 | 阶段 | 必须产出 | 不在本轮要求 |
 | --- | --- | --- |
@@ -68,54 +68,57 @@ Physics Provider        Rendering Provider
 | `task_env/recorders` H5 v2 与 T/T+1 对齐已有约束 | Stop Event、Controller Switch 与 Capture Meta 必须版本化记录，不能造假 transition |
 | 仓库无根 `pyproject.toml/setup.py` | 不默认使用 `pip install -e .`；按当前依赖与 `PYTHONPATH=GeoPhys/src:.` 执行 |
 
+当前源码还包括 GeoPhys 公开 `ImportedScene.ir/capability_report/build_render_scene_desc()`，
+以及 Core 的三类录制格式。A04/D01/D03 先评估这些 owner 的组合；C05a 先处理 action 存储兼容，
+不能把 generic H5 v2、canonical outer 和 execution stream 统称为一个可自由扩展的 H5。
+
 ## 3. 20 个 Implementation Goals — 推荐拆分
 
-**含义：20 个目标是可独立审查的工作单元，并非 20 次必定可独立合并的单提交。** 每个 Goal 先 Audit/Design Review，维护者认可后才 Implement；允许提出 `SPLIT`、`ACCEPTED-DEFERRED`。
+**20 个编号保持稳定，表示父目标，不表示提交顺序或 20 个小提交。** 大目标拆成有退出条件的后缀切片，
+每次授权一个有界切片。下表只索引目标；精确前置依赖和建议执行顺序以 [`05`](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序) 为准。
 
-| 顺序 | Goal | 核心结果 | 依赖 | 主权责 | 必须通过的代表性 Gate |
+| 编号 | Goal | 核心结果 | 切片/主要输入 | 主权责 | 必须通过的代表性 Gate |
 | ---: | --- | --- | --- | --- | --- |
 | 01 | **A01** 定义与实例身份 | Asset Definition / Entity Instance / 资源引用 / 版本身份 | P00 | Core + `asset/` 边界 | 相同 Asset 多实例唯一 ID；codec/非法引用 |
 | 02 | **A02** Components & Frames | Rigid/Collision/Joint/Frame 与轻量组件契约 | A01 | Core | Frame 图无环、单位/坐标规范、非法引用拒绝 |
 | 03 | **A03** Robot & Scene Composition | Robot 特化、Articulation、Control Group、Scene 组合 | A02 | Core | 多 Robot 名字隔离、资源无冲突、Scene 可复现 |
-| 04 | **A04** Asset/Registry Public Path | import→canonical→factory→Scene，复用现有 registry | A01–A03 | `asset/` 引用、`task_env/registry.py` | 旧 UID 行为保护、unknown/duplicate fail-closed |
+| 04 | **A04** Asset/Registry Public Path | Registry + public importer 组合，保留源语义 | A01–A03 | registry/assembly/provider public importer | source/hash、映射报告、旧 UID 行为 |
 | 05 | **A05** A 集成与迁移 Gate | 静态单/双 Robot + 空/简单任务场景 smoke | A01–A04 | assembly/diagnostics | PickCube/NutAssembly 资产/身份非回归、无并行化承诺 |
-| 06 | **B01** Task Declarative Source | YAML 主体 + 受约束 Python Hook 解析与版本 | A05 | task/tasks/artifacts | strict parsing、Hook 依赖声明、roundtrip |
-| 07 | **B02** Roles & Init | Role Binding、Scene Variant、ResetSample 确定性解析 | B01 | Core sampler | seed 重现、cardinality、无隐式 provider 重采样 |
-| 08 | **B03** Semantic Evaluator | typed predicates、时间逻辑、显式 semantic memory | B02 | Task Semantics | sequence/dwell/rising-edge，missing≠False |
-| 09 | **B04** Artifact Identity Evolution | 复用 TaskArtifact，冻结完整语义/Hook/time requirements | B01–B03 | artifacts | 新旧版本各自 strict roundtrip/hash，不重写 v0 |
-| 10 | **B05** B Reference Regression | 将现有两 selected task 的“语义”迁移或适配 | B01–B04 | tasks | 成功判定/ResetSample 与基线对照；不抢先重构 expert loop |
-| 11 | **C01** Execution Config & Plan | YAML 默认 + Override 归一；Admission 分层 | A/B | environment/runtime | Provider/Controller/Renderer 错配前置拒绝 |
-| 12 | **C02** Multi-controller Bindings | Entity×Control Group 绑定、structured actions、safepoint 切换 | A03、C01 | controllers/environment | 同实体臂+手配置、不同 robot 绑定、资源冲突拒绝 |
-| 13 | **C03** Unified Scalar Lifecycle | `BaseTaskEnv` thin facade、reset/step/stop、termination policy | B05、C01–C02 | lifecycle/environment | success/stop/horizon 正确 flags；无伪物理 Step |
-| 14 | **C04** Observation & Diagnostics | public/privileged obs schema、控制 feedback 可选、时钟对齐 | C03 | observations/controllers | obs shape/time、诊断关不影响算法、missing 拒绝 |
-| 15 | **C05** Solution & Recorder Migration | external Solution 统一 step，NutAssembly Guard 保真；事件录制 | C03–C04 | selected tasks/recorders | 两 provider selected regression、T/T+1、旧 API 安全退役 |
-| 16 | **D01** Physics Materialization | Canonical Scene → GeoPhys/MuJoCo 受限实例化与映射 | A05、B04、C01 | assembly/runtime adapters | Scene/Frame identity、失配拒绝、real microprobe |
-| 17 | **D02** Canonical State vNext | typed joint/frame/state requirements、只读投影 | D01、C04 | runtime/artifacts | 多自由度、单位/Frame、consumer 时钟一致 |
-| 18 | **D03** Render State Synchronization | visual materialization、transform/geometry versions、按需 sync | D02 | render/observations | 两消费者版本独立，reset/同 step 修改可见 |
-| 19 | **D04** Camera & Modalities | camera model、RGB/Depth/Segmentation/metadata 的扩展 | D03 | observations/render | 投影+反投影、seg ID、capture provenance |
-| 20 | **D05** Renderer Composition Gate | physics/renderer 组合准入 + **受限真实交集**验证 | D03–D04、C01 | render/runtime/diagnostics | 至少可声明的独立 pairing；失败路径；资格不虚报 |
+| 06 | **B01** Task Declarative Source | YAML 主体 + 受约束 Python Hook 解析与版本 | A05/B04a/D01a/D02b | task/tasks/artifacts | strict parsing、Hook 依赖声明、roundtrip |
+| 07 | **B02** Roles & Init | 固定拓扑 Role/ResetSample 与 realization | B01/B04a/D01a/D02b | Core sampler/runtime | RNG/version、cardinality、realization gate |
+| 08 | **B03** Semantic Evaluator | B03a 只读谓词；B03b 时序提交与 action context | B02/D02b | TaskDefinition/Evaluator | exactly-once、action reward、missing≠False |
+| 09 | **B04** Artifact Identity Evolution | B04a 提前确定嵌套版本；B04b 编译/codec | A02；B04b 另需 B03b | artifacts/现有 readers | v0 及嵌套 schema/identity 全链保护 |
+| 10 | **B05** B Reference Regression | 将现有两 selected task 的“语义”迁移或适配 | B04b | tasks | 成功判定/ResetSample 与基线对照；不抢先重构 expert loop |
+| 11 | **C01** Execution Config & Plan | C01a 静态计划；C01b 实际 requirements/admission | A02/B04a/D02a；C01b 另需 B05 | environment/runtime | actual manifest 不扩权、动态失败回收 |
+| 12 | **C02** Multi-controller Bindings | C02a schema；C02b 原子执行；C02c 兼容切换 | A03/C01b；执行另需 C05a/C04/D01b | controllers/environment | 全动作先校验、唯一 writer、memory/space 一致 |
+| 13 | **C03** Scalar Lifecycle | C03a 现有 ports/fault policy；C03b Stop/termination | C02a/D01b/C05a；Stop 另需 C04 | 现有 lifecycle/environment | fault 禁止续步、flags、零时间 Stop |
+| 14 | **C04** Observation & Diagnostics | public/privileged/private schema、必要反馈与可选诊断 | C03a/D02b | observations/controllers | 同 boundary、非 Panda、重复读取不改语义 |
+| 15 | **C05** Recorder & Solution Migration | C05a 存储前移；C05b PickCube；C05c NutAssembly | 存储需 C02a；Solution 需 C02b/C03b/C04 | 既有 recorder/tasks/controllers | action tree/events、hold/ramp/native Guard 保真 |
+| 16 | **D01** Physics Materialization | D01a 提前真实桥接；D01b vNext 完整接入 | A05/C01a/B04a；D01b 另需 B04b/C01b | assembly/runtime adapters | 新表示真实被消费、realization、两 provider |
+| 17 | **D02** Canonical State vNext | D02a 契约提前；D02b runtime projection | A02；D02b 另需 D01a | runtime/artifacts | 真实多 DOF、Frame/Twist、alias lifetime |
+| 18 | **D03** Render State Synchronization | visual materialization、transform/geometry versions、按需 sync | D01b/D02b/D05a | render/observations | 两消费者版本独立，reset/同 step 修改可见 |
+| 19 | **D04** Camera & Modalities | camera model、RGB/Depth/Segmentation/metadata 的扩展 | D03/C04/C05a | observations/render | 投影+反投影、seg ID、capture provenance |
+| 20 | **D05** Renderer Composition Gate | D05a selection/manifest；D05b 真实 pairing | C01a/A02；集成另需 D04/C01b | render/runtime/diagnostics | provider/backend 分层、真实同步、资格不虚报 |
 
-**注意几个跨阶段依赖：** C01 可以先依靠既有 Advanced RuntimeSession 做受限 Admission，D01 后才完成更通用的 Scene Materialization；C05 迁移不得等待所有 D 阶段高保真 Renderer；D02 进一步丰富的 State/Frame 将按版本回灌 C 的 observation/feedback，而不是修改过去已经冻结的任务语义。A05/B05/C05/D05 是阶段验收 Goal，不等于发布全部功能已合格。
+**前移的是契约和最小真实闭环，不是同时重写所有 subsystem。** D01a 使用 v0 schema 新 candidate microfixture
+或经证明等价的只读 projection，不改变旧 frozen Artifact/hash；
+D01b 才接入完整 vNext。B05 先保护语义，D01b/P99 再验证新版端到端，不能提前宣称新版 frozen。
+C05a 必须早于 structured action 的开放；C05c 不等待高保真 Renderer。A05/B05/D05 是 gate，不另建运行时。
 
 ## 4. 依赖分层与阶段边界
 
 ```text
-P00: Baseline Audit / public-contract inventory / regression fixtures
-  │
-  ├─ A01 → A02 → A03 → A04 → A05
-  │                          │
-  │                          ▼
-  └──────────────────────── B01 → B02 → B03 → B04 → B05
-                                       │             │
-                                       └─────────────┴── C01 → C02 → C03 → C04 → C05
-                                                               │                 │
-                                                               └──── D01 → D02 → D03 → D04 → D05
-                                                                                           │
-                                                                                           ▼
-                                                              P99: Integrated A–D Gate / docs/skills review
+P00 → A01/A02 → B04a/D02a/C01a/D05a contracts
+    → A03/A04/A05 → D01a/D02b real microprobe
+    → B01/B02/B03a/B03b/B04b/B05
+    → C01b/D01b/C02a/C05a storage
+    → C03a/C04/C02b/C03b
+    → C05b/C05c; C02c after the selected regression gate
+    → D03/D04/D05b → P99
 ```
 
-此图是**建议的主干顺序**，不是禁止多个独立 audit 在不同分支并行。具体代码提交按受影响的 owner 和数据契约安排；避免同时大幅改 `TaskArtifact`、RuntimeSession、Recorder H5 和 Renderer API，导致无法定位回归。
+这是导航图，斜杠不表示相互独立或可同时合并；逐切片前置条件在 `05` 的有序依赖表中定义。
+每个父 Goal 需全部必需切片完成才能标记 implemented；deferred 明示范围缩减，blocked 不可计完成。
 
 ## 5. P00：启动前 Baseline / Compatibility Gate（不算实施 Goal）
 
@@ -126,6 +129,7 @@ Codex 在第一次动手前必须交付：
 - 真实运行基线：`examples/tasks/pick_cube.py`、`examples/tasks/nut_assembly.py`，适用的 Pendulum 与 Native Camera bounded cases；报告硬件/依赖是否满足，**不得捏造 PASS**。
 - 确定可使用的 `tests`/diagnostics 命令、最小 provider test 成本、resource constraints/超时及重跑条件；已有 `task_env/diagnostics/` 不能被静默丢弃。
 - 当前已知缺陷（如 `single_inline` 等）和历史未通过 gates 单独列出；不将其误认成本阶段新引入回归，也不能在迁移中掩盖。
+- 2026-10-20 审阅发现部分 P1.1/P1.4/lifecycle/Guard detector 引用退休模块；逐条判断其保护义务，迁移或补回有效检测需单独批准，不能以跳过/删断言制造全绿。已有运行事实见 `05`，不作为未来提交的复验结果。
 - **Human review：**签署受保护的 golden-path/contract fixtures 列表后进入 A01。
 
 ## 6. Goal 级工作模式：Audit → Approve → Implement → Evidence → Integrate
@@ -133,7 +137,8 @@ Codex 在第一次动手前必须交付：
 **用户计划让 Codex 在每个 Goal 执行 Goal 模式，建议固定以下交互协议，而不绑定某一客户端的私有命令：**
 
 1. **AUDIT_ONLY**：读取当前代码，映射 owner/调用链/测试；指出本文与源码冲突，列出 1–3 种方案和需维护者决策的问题；不修改代码。输出 `APPROVE / REVISE / DEFER / SPLIT` 建议。
-2. **APPROVED_IMPLEMENTATION**：收到明确批准和限定范围后，实施**一个** Goal；不以“顺手”理由提前实施下一个 Goal。
+2. **APPROVED_IMPLEMENTATION**：收到明确批准和限定范围后，实施**一个**有界切片；父 Goal 有多个切片时，
+   批准范围须指明后缀，不以“顺手”理由启动下一切片。
 3. **EVIDENCE**：先 S0/S1，按需要 S2/S3；报告每条命令真实结果、修改前/后的差异、未测部分、可复现失败。
 4. **REVIEW**：维护者/二审通过才能合入 `develop`；评估是否同步 canonical docs/module skill/public exports；不得自动更改已冻结 Decision/Capability Matrix。
 5. **NEXT_GOAL**：下一 Goal 从最新 `develop` 重新 audit，而不是假定前一 Goal 的临时工作树即事实。
@@ -143,7 +148,8 @@ Codex 在第一次动手前必须交付：
 ```text
 $geochora-architecture-refactor
 Project: GeoChora Phase II A–D
-Goal: <A01 ... D05>
+Goal: <parent A01 ... D05>
+Slice: <e.g. B04a / C05c; unsplit Goal repeats its parent ID>
 Mode: AUDIT_ONLY    # 维护者批准后改为 APPROVED_IMPLEMENTATION
 
 Read first:
@@ -172,6 +178,7 @@ Constraints:
 ```yaml
 # 概念模板，非运行时契约
 phase_goal: C03
+slice: C03a
 base_commit: <SHA>
 result_commit: <SHA or uncommitted>
 disposition: implemented | accepted_deferred | blocked
@@ -220,8 +227,8 @@ review_required: true
 1. **Add → Adapt → Migrate Callers → Deprecate/Retire**：A 的 `make_agent`、B 的 `task-artifact-v0`、C 的 `step_expert`、D 的 static Camera route 均先证明迁移，再决定是否退役。
 2. 不让一个 Goal 同时破坏旧 API、旧 Artifact 和旧 H5；如确需突破，由维护者批准 Version/Adapter 和测例。
 3. 当前 selected NutAssembly 需要 Native Guard 证据；外部 Solution 必须能够消费标准化、真实采样的必要 feedback，不能因为“去耦合”将 Guard 悄悄降级成 outer 100 Hz。
-4. Timebase 的 `physics_dt` 在当前 v0 Artifact 内；未来拆出 native physics step 是**带 identity 影响的版本迁移**，不可当成自由配置覆盖。
-5. 动态 Controller 更改：同 Action Schema/控制资源兼容时只在安全 Control Boundary 切换；不兼容时 Reset 边界重绑定，版本化 event。Provider 不热切换。
+4. 首个 vNext 基线保留当前精确 Timebase；task demand/native dt 的进一步拆分需独立证据和版本迁移，不承诺跨 dt 等价。
+5. 同 Action Schema/资源/单位/时序的 Controller 只在安全 Boundary 切换；schema 改变则重新构造 Env 及依赖其 spaces 的 wrapper/learner，不以 reset 偷换 spaces。Provider 不热切换。
 6. 当前 UI Renderer 与 Camera Observation 路由不同；D 不得通过 UI Frame 假冒 Camera 契约或使用 fake Flora 证明 native pairing。
 
 ## 9. P99：A–D 结束条件（不算实施 Goal）
@@ -229,7 +236,8 @@ review_required: true
 - A–D 四份阶段文档所列各 Goal 有明确 `implemented / accepted_deferred / blocked` 结果和 review receipt；不能以尚有 blocked 时默认“已完成 Phase II”。
 - 至少一条**受限真实**主干能从声明的 Scene/Task 经 `make_env → reset → step → observation → record` 跑通；selected PickCube/NutAssembly 的适用行为回归清晰，未通过者如实列残余。
 - 新旧 Artifact/Config/Observation/H5 兼容策略与拒绝行为均经过保护性测试；核心身份、时间、状态、终止语义有证据。
-- 至少有一个物理场景和相机组合的实际 GeoPhys 或 MuJoCo Runtime Evidence；**不要求在没有设备/依赖时造出多个合格 Renderer**，但对应 Goal 须标明 accepted-deferred/blocked，不能虚报 completion。
+- 对新 Task 的发布冻结，必须完成现有 Stage-1 validation、randomized feasibility 和独立 Human Judge；脚本即可执行，不依赖 E。未达 gate 的新版只能是 candidate。
+- 以 GeoPhys CPU physics × MuJoCo native renderer × rigid calibration RGB/Depth 为首选工程目标，提供动态同步的真实独立 pairing；此为待实现目标，当前 admission 会拒绝。若仅同名 pairing 通过，不能将 D05b 或完整 independence 标完成；必须明确缩减范围/延期。
 - 公共 API 导航、canonical docs、`task_env/.agents` 与仓库 module skills 根据真实变更同步；缺少实际证据的能力保留为 PLANNED/TESTED_BOUNDED。
 - 变更经过维护者/独立审阅，进入 `develop` 后进行新的代码二审；**不得自动合并 main、改写 frozen v1.1.0、扩大资格矩阵**。
 - E 阶段由新版本事实再启动；不得把暂留的 E1–E5 抽象偷偷并入 Core 实现。
@@ -255,4 +263,6 @@ review_required: true
 - C： [Gymnasium](https://github.com/Farama-Foundation/Gymnasium)、[Isaac Lab](https://github.com/isaac-sim/IsaacLab)、[ManiSkill](https://github.com/mani-skill/ManiSkill)。
 - D： [Isaac Lab multi-backend `develop`](https://github.com/isaac-sim/IsaacLab/tree/develop)、[Gazebo Rendering](https://github.com/gazebosim/gz-rendering)、[Genesis](https://github.com/Genesis-Embodied-AI/genesis-world)、[SAPIEN](https://github.com/haosulab/SAPIEN)、[robosuite USD workflow](https://github.com/ARISE-Initiative/robosuite)。
 
-**提交 Codex 审阅时，要求它先提供一份独立的 REVIEW 文档/PR 评论**：明确哪些 Goal 可复用现有代码、哪些必须拆分、是否存在严重遗漏、实际调用方与测试证据、建议先开发的最小闭环，以及每条意见对应的源文件和 commit；在维护者批准前，不擅自把这五份草案标成 canonical architecture。
+**二审入口为 [05](05_Architecture_Review_and_Execution_Order.md)**：复核复用/拆分、源码与测试依据、
+切片依赖和最小真实闭环；每条新增意见绑定 source/commit。规划被提交或推送不自动成为 canonical
+architecture，不授权后续实施，也不创建新的 Qualification Decision。

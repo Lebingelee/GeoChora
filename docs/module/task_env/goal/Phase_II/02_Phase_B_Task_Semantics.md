@@ -1,7 +1,7 @@
-# Phase B — Task Representation & Semantics：架构、代码实施与验收（Codex 草案）
+# Phase B — Task Representation & Semantics：架构、实施切片与验收
 
-> **PROPOSED / 需 Codex Audit 与维护者确认；不等于新的 Task Artifact 已实现。**  
-> 编制基准：2026-10-19，`main` HEAD `f292df149f41520b484ff27cf2ff78a584903013`，v1.1.0。  
+> **PROPOSED / READY FOR SECOND REVIEW；仅修订规划，不等于新的 Task Artifact 已实现或已批准冻结。**
+> 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，v1.1.0。
 > 相关文件：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)、[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)。
 
 ## B.0 阶段目标与四条已达成的设计决议
@@ -13,7 +13,9 @@
 本轮沿用此前 B-R1–B-R4：
 
 - **B-R1 Role / Sampling**：Task Role 的 selection rule/cardinality/randomization 进入冻结声明；每 Episode 在 Core reset 时解析成不可变 Role Binding，并记录 provenance。
-- **B-R2 Stateful Semantics**：时序评估器写成 `(semantic_memory_next, evaluation) = F(canonical_state, semantic_memory, frozen_params)`；明确 sequence/dwell/rising_edge；缺失 State 是 unavailable/error 而不是 `False`。
+- **B-R2 Stateful Semantics**：`(memory_next, evaluation) = F(evaluation_context, memory, frozen_params)`；
+  context 显式含前后 canonical state、所声明的 action 层与 measured interval。按 sampling contract 一次提交；
+  只读 observation/diagnostics 不推进记忆。缺失 State 是 unavailable/error，而不是 `False`。
 - **B-R3 YAML + Restricted Hooks**：声明式为主；Python Hooks 仅做已声明的 Authoring/Initialization/Semantic 扩展，确定性要求、State/Capability Dependencies、版本/内容 hash 必须显式。
 - **B-R4 Frozen Artifact / Experiment 分离**：任务定义与 Evaluation Contract 归 Artifact；Provider/Policy/样本次数/训练预算/rollout/record 配置归 Experiment/Execution；不新建第二个 Artifact 系统。Task 的时间需求与原生 Physics `dt` 的拆分需保护旧 `Timebase` v0 身份。
 
@@ -21,15 +23,30 @@
 
 | owner / 路径 | IMPLEMENTED（当前事实） | 计划差距 |
 | --- | --- | --- |
-| [`task_env/artifacts/contracts.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/artifacts/contracts.py) | `TaskArtifact(task-artifact-v0)`，`WorldDefinition`、`InitializationContract`、`SemanticDefinition`、`Timebase`、`RequiredCapabilitySet`，strict hashing | Frozen Roles/Temporal Semantics/Hook Identity/Requirements 需**版本迁移**，不能静默扩 v0 bytes |
-| [`task_env/artifacts/execution.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/artifacts/execution.py) | `ResetSample(reset-sample-v0)`、`RealizedInitialState` | Scene Variant/Role Binding 的 per-episode identity/provenance 尚非通用契约 |
-| [`task_env/tasks/pick_cube/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/tasks/pick_cube) | task.py/solution.py/config.yaml，lift-only success 及任务随机化 | 语义及 reset recipe 适配新声明系统，不改历史 task identity |
-| [`task_env/tasks/nut_assembly/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/tasks/nut_assembly) | Task Semantics、11-stage Solution、Guard、Outcome Completion V1 | 分开 Task Success 与 Expert Completion；不通过 B 更改 Guard Controller |
-| [`task_env/environment/task_definition.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/task_definition.py) | 既有 TaskDefinition/TaskStateView/evaluation 路线 | 归一化 Semantic Evaluator 输入与反馈；不能绕开已有 TaskDefinition |
-| [`task_env/environment/lifecycle.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/lifecycle.py) | TaskLifecycleAdapter reset/evaluate/obs normalization | B 仅提供 Evaluation Contract，终止策略执行归 C |
-| [`task_env/environment/configuration.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/configuration.py) | YAML loader/strict config 合并等 | 复用现有 loader；明确 new source schema 与 frozen compiled artifact |
+| [`task_env/artifacts/contracts.py`](../../../../../task_env/artifacts/contracts.py) | `TaskArtifact(task-artifact-v0)`，`WorldDefinition`、`InitializationContract`、`SemanticDefinition`、`Timebase`、`RequiredCapabilitySet`，strict hashing | Frozen Roles/Temporal Semantics/Hook Identity/Requirements 需**版本迁移**，不能静默扩 v0 bytes |
+| [`task_env/artifacts/execution.py`](../../../../../task_env/artifacts/execution.py) | `ResetSample(reset-sample-v0)`、`RealizedInitialState` | Scene Variant/Role Binding 的 per-episode identity/provenance 尚非通用契约 |
+| [`task_env/tasks/pick_cube/`](../../../../../task_env/tasks/pick_cube) | task.py/solution.py/config.yaml，lift-only success 及任务随机化 | 语义及 reset recipe 适配新声明系统，不改历史 task identity |
+| [`task_env/tasks/nut_assembly/`](../../../../../task_env/tasks/nut_assembly) | Task Semantics、11-stage Solution、Guard、Outcome Completion V1 | 分开 Task Success 与 Expert Completion；不通过 B 更改 Guard Controller |
+| [`task_env/environment/task_definition.py`](../../../../../task_env/environment/task_definition.py) | 既有 TaskDefinition/TaskStateView/evaluation 路线 | 归一化 Semantic Evaluator 输入与反馈；不能绕开已有 TaskDefinition |
+| [`task_env/environment/lifecycle.py`](../../../../../task_env/environment/lifecycle.py) | TaskLifecycleAdapter reset/evaluate/obs normalization | B 仅提供 Evaluation Contract，终止策略执行归 C |
+| [`task_env/environment/configuration.py`](../../../../../task_env/environment/configuration.py) | YAML loader/strict config 合并等 | 复用现有 loader；明确 new source schema 与 frozen compiled artifact |
 
 **特别风险**：目前先进路径把 `physics_dt × control_substeps` 纳入 `TaskArtifact.timebase`。以前讨论希望任务只声明所需控制/评价时间需求，但若在 B 直接删除 physics_dt，就会破坏已发布 hash 与 Provider Source Admission。必须版本化并同时保护旧 decode/execution。
+
+### B.1.1 审阅补充：已有语义与待实现契约
+
+- [PendulumTaskDefinition](../../../../../task_env/tasks/pendulum.py#L316-L333) 已有 scalar/batch 语义记忆；
+  [torque cost](../../../../../task_env/tasks/pendulum.py#L169-L189) 依赖 action。
+  B03 复用 TaskDefinition 的 action/previous_state/elapsed_steps 路线，不仅用瞬时 pose 重写全部评价。
+- selected [observation()](../../../../../task_env/tasks/reference_env.py#L157-L169) 内直接 evaluate，
+  [native Guard callback](../../../../../task_env/tasks/reference_env.py#L203-L225) 还会再次调用它。
+  无状态实现可这样读取；stateful evaluator 不可直接替换，否则每个 outer step 多次提交 memory。
+- [ResetSample](../../../../../task_env/artifacts/execution.py#L19-L62) 的 v0 control/velocity policy
+  带机械臂约束，CanonicalStateView 仅标量 joint map；version plan 必须覆盖 nested codecs/readers，
+  不仅 TaskArtifact 外层字符串。RealizedInitialState 容器也不等于已执行 tolerance gate。
+- 新版声明可以是可解析 candidate。frozen 状态仍按
+  [现有 Stage-1 contract](../../task-artifact.md#任务-contract-与冻结) 产生 validation、
+  randomized feasibility 和 Human Judge。Harness 延后不豁免这些要求。
 
 ## B.2 推荐数据流与 owner 划分
 
@@ -50,7 +67,7 @@ Task Authoring Source (YAML + declared Hook references)
            C: Execution Planning
                   │
                   ▼
-Reset(time + seed) → Core selection/Role Binding → ResetSample
+Reset(seed + admitted episode identity) → Core selection/Role Binding → ResetSample
                   │ apply to one Provider (D)
                   ▼
        Canonical State + Semantic Memory
@@ -140,16 +157,27 @@ Frozen Initialization Contract + Task Seed
 
 Task 可声明合法 Scene Variant 分布，但必须冻结其 selection envelope（允许对象数、资产类别、位置边界等）。Episode 内若仅选择已有实体的初始位姿，不一定需要 native scene recreate；若实体拓扑变化，C/D 必须选择合法的 materialization/reset path，并在记录中体现 scene-instance ID。
 
+**首个基线决定**：只执行固定拓扑的 Role/pose randomization。候选集合排序、各随机量的 RNG stream/domain、
+sampler/version 和 sample 内容进入 provenance，不让新增 role 改变无关采样序列。拓扑变化保留为显式
+unsupported/deferred；以后需要它时，新建 Env/SceneInstance 并重建依赖 spaces 的 wrapper，或独立设计有界 mask。
+不能在 reset 中静默改变 action/observation shape；原声明不得因此被自动标为 supported。
+
 ## B.4 Temporal Semantics：有状态但不依赖 Solution
 
 推荐 Formal Contract：
 
 \[
-(m_{t+1}, e_t) = F(s_t^{\text{canonical}}, m_t, \theta_{\text{frozen}}),
+(m_{t+1}, e_t) = F(c_t^{\text{evaluation}}, m_t, \theta_{\text{frozen}}),
 \quad e_t=(r_t,\text{success}_t,\text{failure}_t,\text{metrics}_t).
 \]
 
 Semantic Memory 的 Owner 是 Task Semantic Evaluator，不是 Controller、Solution、Recorder。独立 Solution 可以有完全不同的规划 Stage。
+
+Evaluation Context 包含已声明的前后 state、requested/canonical/applied action 层、有效 measured interval、
+episode/boundary/sample identity；字段缺失不得隐式补零。选择哪一 action 层计算 effort/reward 属冻结语义。
+Evaluator 每个合法 semantic sample 只提交一次；重复/乱序提交需幂等读取或明确拒绝，不能再累计 dwell。
+Native Guard 的只读物理判据与 outer Task Evaluation 分开；渲染、observation、诊断不得改变 memory。
+无 evaluator、unavailable 和已评价为 False 是三个状态，vNext 要有明确有效性表示及 v0 compatibility projection。
 
 | Predicate 类型 | 必需行为 | 需要保护的边界 |
 | --- | --- | --- |
@@ -175,7 +203,9 @@ Semantic Memory 的 Owner 是 Task Semantic Evaluator，不是 Controller、Solu
 
 每个 Hook 至少声明 `hook_id`、`version/code_hash`、`inputs`、`required_capabilities`、`determinism`、`evaluation_phase`、`pure_or_stateful`，构造时 strict validation。禁止 hook 在 runtime 悄悄依赖系统时间、随机全局状态或私有 solver array 来改变 Frozen Evaluation Contract。**这是可审计/可复现性约束，不是安全沙箱。**
 
-Hook 变更涉及语义时须新 Artifact Identity；源码无法保证复现时，标记不可复现/不准正式 benchmark，而不是只记函数名。
+Hook 变更涉及语义时须新 Artifact Identity；记录可恢复的 source reference、所需文件/资源的内容 hash、
+依赖版本和参数，而不是只记函数名或单个文件 hash。Authoring hook 编译结果也进入规范化身份。
+源码/依赖闭包无法恢复时，标记不可复现/不准正式 benchmark；不新建包管理器或声称 Python 安全沙箱。
 
 ## B.6 Task Artifact 版本、身份和时间要求
 
@@ -191,7 +221,9 @@ vNext 候选冻结范围：
 - Evaluation protocol + Stop/Termination permitted policies（终止执行归 C）；
 - Task-owned control/semantic time requirements。
 
-**Timebase 迁移**：当前 v0 冻结了 `physics_dt`；不能在 B 阶段让 `physics_dt` 任意变动却保持同一 hash。可选策略由 Codex 审阅：
+**本轮 Timebase 决议**：首个 vNext 基线保留既有 exact Timebase，包含 native dt/substeps/sampling。
+将 task demand 与 native dt 完全拆分仍是后续有版本的扩展，需独立 Guard/control/recorder Evidence；
+不得把相同 control_dt 当作跨 native dt 等价。以下为未来扩展边界，不是本次实现的自由选择：
 
 - **兼容保留**：v0 保留 exact `physics_dt × substeps`；vNext 把 task-level required `control_dt` 与 Provider native dt/profile 区分，vNext 通过 C/D admission 检查兼容性。
 - **边界策略**：若暂不能证明新时间模型与现有 Guard/Recorder 兼容，vNext 先保留现有 Timebase 并标注后续迁移，不得提前承诺跨 dt 同一任务等价。
@@ -200,40 +232,54 @@ Experiment、Provider、Controller 的具体实例参数、Policy/Training Budge
 
 ## B.7 五个 Implementation Goals
 
+父编号不变；B03/B04 的后缀切片及跨阶段顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
+
 ### B01 — YAML Task Source / Hook Declaration
 
-- **依赖**：A05。
+- **依赖**：A05、B04a，以及 D01a/D02b 的最小真实闭环；不是要求完整 D 阶段先完成。
 - **任务**：复用 `load_yaml_mapping` 与现有 TaskDefinition Source 路线，引入严格 Task Source Schema；无未知字段静默接受；定义 hooks 的允许位置/依赖声明。
-- **验收**：相同 YAML 解析结果确定；未知 key/type/role fail-closed；无 Provider import；当前 PickCube 样例可**通过兼容适配**加载，不改变其冻结 v0 Artifacts。
+- **验收**：相同 YAML 解析结果确定；未知 key/type/role、重复 mapping key fail-closed；
+  无 native Provider import；当前 PickCube 可通过兼容适配加载，不改 v0。保留既有 loader/merge owner，
+  明确新 Task Source 与 Execution Config 的字段边界，不把 safe_load 当完整 strict semantic parser。
 - **风险**：YAML Schema 与 `ResolvedEnvConfig` 重复，或把 executable hooks 当成通用 Python 包机制。
 - **Codex AUDIT Prompt**：列出当前任务 config 中 `recipe`/`environment` 与新 task-source 字段的映射差异，提出可增量迁移的最小 schema。
 
 ### B02 — Role Binding / Scene Variant / Deterministic Reset
 
-- **依赖**：B01；A 的 Entity Identity/Frame。
+- **依赖**：B01、B04a、D01a、D02b；A 的 Entity Identity/Frame。
 - **任务**：Role Cardinality/Selector 与 per-reset immutable RoleBinding；初始化参数 hard bounds、sampler/version；Sample/realized provenance。
-- **验收**：同 Task Seed 生成相同 Role/Sample；非法 cardinality/不存在资源/overlap policy 失败；Provider 不替换 sample；记录 Role IDs；无隐式 settle。需要 native 实现时先保留 D materialization TODO，不伪称已实测。
+- **验收**：同 seed/version/Scene 得到相同 Role/Sample；候选重排与独立 RNG domain 可测；
+  非法 cardinality/资源/overlap 失败；Provider 不替换 sample；requested/realized tolerance 在 rollout 前核验。
+  缺 D01a realization 证据不得将完整 B02 标完成；拓扑变化必须明确拒绝。
 - **Codex AUDIT Prompt**：对比现有 `ResetSample`、`RealizedInitialState`、PickCube `sample_reset` 与 NutAssembly `NA-S0`，确定需新增的最少字段和 version strategy。
 
 ### B03 — Typed Predicate / Temporal Evaluator
 
-- **依赖**：B02。
-- **任务**：统一 Task Evaluation pure/stateful 规范、Predicate evaluator、Temporal Memory、`unavailable` 处理；不直接决定 `terminated/truncated`。
-- **验收**：sequence/dwell/rising-edge 合成 trace 的 exact state transitions；Reset 清除 Memory；缺测/clock gap 失败或清连续性；zero/invalid state 不被当 Success；现有 PickCube lift-only 成功条件不改变。
+- **切片**：B03a 扩展既有 TaskDefinition 的只读 typed predicates/action context；B03b 增加受限 temporal memory/提交规则。依赖 B02/D02b，B03b 另需 B03a。
+- **验收**：除 sequence/dwell/rising-edge trace 外，必须保护 Pendulum action cost 和已有窗口；
+  reset 清 memory；重复 observation/diagnostics 不推进语义；同 boundary 重复/乱序 commit 拒绝或幂等；
+  native Guard 读取不当作 outer sample；missing/no-evaluator/False 可区分，PickCube lift-only 不变。
 - **Codex AUDIT Prompt**：先比较 `TaskLifecycleAdapter` 与 `task_env/tasks/guarded_transition.py`，只复用可复用语义，不把 Expert Guard 偷换成一般 Task Predicate。
 
 ### B04 — Existing TaskArtifact vNext / Identity Migration
 
-- **依赖**：B01–B03。
-- **任务**：将声明语义版本化保存至现有 Artifact；含 role/sampling/hook/time/evaluation 身份；严格 codec/hash；保护 v0 source hashes 与 data readers。
+- **切片**：B04a 在 A02 后先交付 schema/version/read-write/migration 矩阵与 legacy fixtures 策略；
+  B04b 在 B01/B02/B03b 后实现声明编译、codec/hash，沿用 TaskArtifact owner。
+- **覆盖范围**：World/Scene、ResetSample/Role、RealizedInitialState、State、ExecutionSpec、
+  Timebase、CapabilityManifest、Camera 以及三类 trajectory metadata/readers 的嵌套引用。
+  ExecutionSpec 当前无 schema discriminator；新版本路由必须有明确识别，不靠猜 key 静默转换。
 - **验收**：旧 Frozen Artifact 反序列化前后内容/Hash 与发布基线相同；vNext roundtrip/hash deterministic；ExecutionSpec 的 provider 替换不改变 Task Semantic Identity；试图覆盖 Frozen 字段必须新版本或拒绝；compatibility behavior documented。
+- **补充 Gate**：存储原文件 bytes 保持只读；codec 比较规范化 mapping/hash，不能误把 YAML 格式化后字节视为原文件。
+  Legacy decode/new write/explicit migration/reject 的组合逐项可测；新增 segmentation 等 capability 不扩权旧 manifest。
 - **Codex AUDIT Prompt**：评审 timebase v0 拆分方案是否会影响 `materialize()` 精确 dt gate；缺真实兼容证据可选择 defer，仅输出有限的新版 Artifact。
 
 ### B05 — Reference Task Semantics Migration / Gate
 
-- **依赖**：B04。
+- **依赖**：B04b。
 - **任务**：迁移或桥接 PickCube 与 NutAssembly 的 Task Semantics、Role/Reset，而不抢先把 Solution/Controller/Guard 合并进新 Task 定义；保留 task.py/solution.py 的职责区分。
 - **验收**：相同冻结 Sample 下 success/reward/metrics 与受保护 baseline 等价；NutAssembly success ≠ 11-stage Expert Completion；旧 reference env 仍可调用，任何 physical behavior drift 有归因。新增 `TaskArtifact` 不继承旧 identity（除非旧 bytes 完全不变）。
+- **Gate 分工**：本切片完成语义差分与 legacy 路由保护；vNext 新执行主链在 D01b/P99 验证。
+  没有完整 Stage-1 证据的新版本继续为 candidate，不能因 B05 通过自动 freeze。
 - **Codex AUDIT Prompt**：提供“旧 predicate/参数 → 新 predicate/参数”的逐字段对照及 sample trace；未证明的近似必须标明。
 
 ## B.8 验收 Oracle 与质量标准
@@ -247,7 +293,10 @@ Experiment、Provider、Controller 的具体实例参数、Policy/Training Budge
 | v0→vNext Artifact | 原发布字节/Hash + strict codec | legacy fixtures + new codec roundtrip |
 | PickCube/NutAssembly | 既有有界评估 route 与对应 Evaluation Outcome | 定位准确的 S2/S3，未跑不算 pass |
 
-**禁止以 Expert 执行失败直接判定 Task 不可行**；同样不能以一次 Expert 成功证明全 Reset Distribution 可行。完整 randomized feasibility 与冻结审批归 E，因此本轮 B05 仅做足以保护核心语义的有界回归。
+**禁止以 Expert 失败直接判定 Task 不可行，也不能以一次成功证明全 Reset Distribution 可行。**
+E 只延后统一编排，不延后新任务首次 Stage-1 release 的 randomized reset probe 和 Human Judge；
+通过已有脚本、task-local validation 即可形成证据。若本轮只做 legacy 适配，有界回归足以支持相应工程结论；
+若声明新 frozen task，则必须先完成现有冻结要求，范围和样本/分布准确记录。
 
 ## B.9 参考项目
 

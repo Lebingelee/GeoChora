@@ -1,7 +1,7 @@
-# Phase C — Execution API & Runtime Lifecycle：架构、代码实施与验收（Codex 草案）
+# Phase C — Execution API & Runtime Lifecycle：架构、实施切片与验收
 
-> **PROPOSED / 需 Codex Audit 与维护者确认；不是目前的统一 API 实现。**  
-> 基准：2026-10-19，`main` HEAD `f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。  
+> **PROPOSED / READY FOR SECOND REVIEW；本次仅修订规划，不启动统一 API 实施。**
+> 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体与依赖：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；输入：[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)、[`02_Phase_B_Task_Semantics.md`](02_Phase_B_Task_Semantics.md)。
 
 ## C.0 设计目标 / Phase II 有效范围
@@ -12,7 +12,8 @@
 
 用户已认可的 C 边界：
 
-1. `BaseTaskEnv` 最终统一 scalar 公共契约，但保持**薄 Environment Facade**；复用已有 `TaskLifecycleAdapter`/`SingleTaskLifecycleAdapter`，不创建第二套 Lifecycle Manager。
+1. 先统一 scalar 公共行为和 lifecycle policy；通过既有 RuntimeBoundary/RuntimeSession 的适配保留薄 facade。
+   不要求 selected 立即继承当前 `BaseTaskEnv`，不强制统一 storage/solver ABI，复用现有 Lifecycle Adapter。
 2. `step_expert()` 不作为新标准 Env API：**Task/Environment 接收 Action、返回 Observation；外部 Solution 使用 obs/privileged state 推理动作**。PickCube/NutAssembly 旧方法在真实迁移前保留受限兼容。
 3. Phase II 只设计 Single Environment；一个 Scene 内可以有多个 Robot，并非多个 Environment。
 4. `obs` 可以同时包含 `state/privileged_state/rgb/depth/...`；`info` 放 Task/Execution Facts 与可选 Diagnostics。不因暂不做安全控制就混淆 Observation 语义。
@@ -25,18 +26,32 @@
 
 | 模块 | IMPLEMENTED | Phase II 拟修改的行为 |
 | --- | --- | --- |
-| [`task_env/registry.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/registry.py) | `make_env(uid, config, ...)`；selected 和 generic 两分支 | 一个配置解析/准入入口，不暗改旧 UID |
-| [`task_env/environment/env.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/env.py) | `BaseTaskEnv` 组合 Scene/Robot/Task/Runtime/Observations | 统一 facade；迁移多 Controller/B 语义，避免巨大 God Object |
-| [`task_env/environment/lifecycle.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/lifecycle.py) | `TaskLifecycleAdapter` 共用语义，`SingleTaskLifecycleAdapter` 有 reset/step；success/failure 可终止 | 策略化 termination、stop/metadata，不另建 manager |
-| [`task_env/tasks/reference_env.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/tasks/reference_env.py) | `SelectedReferenceEnv` own `step_expert()`/`_step()`/recording | 外部 Solution 接管 expert lifecycle，公用 `env.step(action)`；回归验证后退休兼容方法 |
-| [`task_env/environment/config.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/config.py) | 当前 `RobotControllerConfig` 基本是单 Robot controller | 扩展为 Entity/ControlGroup→Controller Binding，含 YAML 默认 |
-| [`task_env/runtime/sessions/api.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/runtime/sessions/api.py) | advanced `RuntimeSession(reset/snapshot/step/close)`、Provider admission | 构造规划/Session reuse；无 native ABI 强制统一 |
-| [`task_env/environment/protocols.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/environment/protocols.py) | 通用 `RuntimeBoundary` 与 advanced Session 是不同的集成协议 | 适配而非强行把两套接口“合并为一个 solver” |
-| [`task_env/controllers/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/controllers) | Panda pose/joint/gripper 控制、Canonical Feedback | Group Binding、控制状态所有权、切换 safepoint |
-| [`task_env/observations/state.py`](https://github.com/Lebingelee/GeoChora/blob/main/task_env/observations/state.py) | State/Privileged/Private/Vision field builders 和 schema | 保留现有 obs 分组，对不同 robot 扩展 typed schemas |
-| [`task_env/recorders/`](https://github.com/Lebingelee/GeoChora/tree/main/task_env/recorders) | `TransitionRecordWrapper`、H5 v2、T/T+1 规则 | Stop/Controller switch/Solution metadata 使用版本化事件，不能伪造物理 step |
+| [`task_env/registry.py`](../../../../../task_env/registry.py) | `make_env(uid, config, ...)`；selected 和 generic 两分支 | 一个配置解析/准入入口，不暗改旧 UID |
+| [`task_env/environment/env.py`](../../../../../task_env/environment/env.py) | `BaseTaskEnv` 组合 Scene/Robot/Task/Runtime/Observations | 统一公共行为，允许薄 facade 过渡；避免巨大 God Object |
+| [`task_env/environment/lifecycle.py`](../../../../../task_env/environment/lifecycle.py) | `TaskLifecycleAdapter` 共用语义，`SingleTaskLifecycleAdapter` 有 reset/step；success/failure 可终止 | 策略化 termination、stop/metadata，不另建 manager |
+| [`task_env/tasks/reference_env.py`](../../../../../task_env/tasks/reference_env.py) | `SelectedReferenceEnv` own `step_expert()`/`_step()`/recording | 外部 Solution 接管 expert lifecycle，公用 `env.step(action)`；回归验证后退休兼容方法 |
+| [`task_env/environment/config.py`](../../../../../task_env/environment/config.py) | 当前 `RobotControllerConfig` 基本是单 Robot controller | 扩展为 Entity/ControlGroup→Controller Binding，含 YAML 默认 |
+| [`task_env/runtime/sessions/api.py`](../../../../../task_env/runtime/sessions/api.py) | advanced `RuntimeSession(reset/snapshot/step/close)`、Provider admission | 构造规划/Session reuse；无 native ABI 强制统一 |
+| [`task_env/environment/protocols.py`](../../../../../task_env/environment/protocols.py) | 通用 `RuntimeBoundary` 与 advanced Session 是不同的集成协议 | 适配而非强行把两套接口“合并为一个 solver” |
+| [`task_env/controllers/`](../../../../../task_env/controllers) | Panda pose/joint/gripper 控制、Canonical Feedback | Group Binding、控制状态所有权、切换 safepoint |
+| [`task_env/observations/state.py`](../../../../../task_env/observations/state.py) | State/Privileged/Private/Vision field builders 和 schema | 保留现有 obs 分组，对不同 robot 扩展 typed schemas |
+| [`task_env/recorders/`](../../../../../task_env/recorders) | `TransitionRecordWrapper`、H5 v2、T/T+1 规则 | Stop/Controller switch/Solution metadata 使用版本化事件，不能伪造物理 step |
 
 **关键回归风险**：当前 NutAssembly 禁止 external action，并依赖旧 `step_expert()` 获取真实 Native-rate Guard Evidence、Readiness、11-stage Solution 所需反馈；如果仅把 `solution.act()` 移到外部却删除底层必要测量，属于功能破坏。旧 selected route 的成功后继续执行、录制和 terminal 不同于 Generic Gym Success Stop，不能一律改成 `terminated=success`。
+
+### C.1.1 审阅建立的额外耦合
+
+- [BaseTaskEnv](../../../../../task_env/environment/env.py#L113-L159) 直接 bootstrap GeoPhys，且拒绝多个
+  resolved robots；[ControlledRuntimeSession](../../../../../task_env/runtime/sessions/control.py#L18-L35)
+  限定七 arm targets 和一个 0.08 m gripper binding。统一继承不是接口适配的替代。
+- NutAssembly [构造](../../../../../task_env/tasks/nut_assembly/task.py#L300-L371) 共享 arm_hold；
+  Solution 修改 locked，ReferenceArmSchedule 读 `_lift_released` 决定 native ramp，
+  controller identity 还包含 Solution identity。外置 Solution 必须迁移这些施控契约，不能只迁移 act/observe。
+- [TransitionRecorder](../../../../../task_env/recorders/recorder.py#L104-L145) 将 action 转成 NumPy vector，
+  [H5 writer](../../../../../task_env/recorders/h5.py#L150-L157) 按固定 components 堆叠。
+  当前并不支持本页 proposed action tree；C05a 的存储工作必须前移。
+- [scalar lifecycle](../../../../../task_env/environment/lifecycle.py#L468-L501) 在物理推进后仍可能于
+  evaluation/capture 出错；新公共行为必须明确 fault/reset/close，不能在未知施控状态继续下一动作。
 
 ## C.2 分层代码架构
 
@@ -52,7 +67,7 @@ Config Resolution & Capability Admission
 Execution Plan (resolved bindings, timebase, owner identities)
                │
                ▼
-BaseTaskEnv / Single Environment Facade
+Existing thin Scalar Facade(s) / shared public behavior
  ├─ Scalar Lifecycle Adapter (reuse existing)
  ├─ Physics Runtime Adapter / RuntimeSession
  ├─ Controller Bindings (zero or more per Robot)
@@ -89,7 +104,8 @@ External Solution / Human / Script / Future Experiment
 # PROPOSED; exact parsing/schema to be approved in C01/C02
 execution:
   physics: {provider: geophys, backend: cpu}
-  renderer: {default: rasterizer}
+  renderer:
+    default: {provider: geophys, backend: rasterizer, profile: declared_rgb}
   controllers:
     robot_left:
       arm: {type: cartesian_pose, reference_frame: robot_left/base}
@@ -105,6 +121,10 @@ execution:
 ```
 
 `robot_left` 等来自 A 的 Entity Instance，`arm/hand` 来自其 Control Groups。Asset 不应硬编码任务实例默认 Controller；Task 可以声明允许的 Action/Controller Requirements，具体 Binding 属 Execution Configuration。多 Controller 如果写同一组 Actuator，需显式 coordinator/arbitration，否则 Admission 拒绝。
+
+首个基线默认拒绝 multi-writer，不建设通用 arbitration framework。Renderer provider 与 backend 是不同维度，
+示例 profile 为待准入值，不代表当前已注册。固定拓扑内 Entity/Group 和 spaces 在 Env 生命周期内稳定；
+新增拓扑 variant 或不同 action schema 需要重新构造 Env/wrapper。
 
 ### C.3.2 简洁/高级构造必须共用一个 Normalize Path
 
@@ -125,16 +145,22 @@ make_env("pick_cube", execution={"physics": {"provider": "mujoco"},
 # Candidate structured action; old Panda vector can remain adapter input
 {
   "robot_left":  {"arm": left_ee_target, "hand": left_finger_targets},
-  "robot_right": {"arm": right_joint_targets}
+  "robot_right": {"arm": right_joint_targets, "hand": right_finger_targets}
 }
 ```
 
 动作维数/单位/参考 frame 由绑定的 Controller Action Contract 定义。单机械臂可有兼容向量入口；不能强制所有任务有 8D Panda Action。
 
+Action Contract 还需声明所有 enabled groups 的必填/可选规则：默认缺失即拒绝；只有冻结 schema
+显式允许时才 hold-last，并携带 target epoch/有效性。先校验全部 group 的 key、shape、finite、frame、
+资源与 capability，再改变任一 controller memory 或施控。C05a 保留 raw action tree 与 schema identity，
+不能通过 learner flatten 伪装存储兼容；target/applied 各自记录。
+
 **建议 runtime controller replacement**（暂不冻结函数签名）：
 
 - **兼容切换**：同一 Control Group、同一外部 Action Schema/Unit/Reference/Timing/Actuator Ownership，在完整 Control Interval 边界提交；验证新 Controller required feedback，初始化新 Controller State，避免遗留 target/force。
-- **非兼容切换**：例如 Cartesian Target ↔ Joint Position 更换 Action Schema，必须结束当前 Episode 或通过 Reset 边界重绑定，并向调用者明确提供更新后的 `action_space`/contract；**不**在已运行的 Episode 中悄悄改输入形状。
+- **非兼容切换**：Cartesian Target ↔ Joint Position 等 schema 变化，重新构造 Env 及依赖 spaces 的
+  wrapper/learner；本基线不提供仅 reset 后更换 shape 的捷径。旧 Env 不在 Episode 中偷换输入形状。
 - **记录**：Controller identity、参数 hash、effective boundary、旧/新 binding、switch reason、readiness 与任何 discontinuity warning；不可默默影响 Frozen Experiment 比较。
 - **失败原子性**：Admission 失败不得先丢弃旧有效 Controller；切换应用失败必须 fail-closed 标记 Episode/Runtime 状态，不能继续未知施控。
 - **Provider hot-swap**：Phase II 明确不做；通过重新 `make_env()` 构造新 Runtime。
@@ -164,6 +190,11 @@ CREATED → PREPARED/ADMITTED → READY (after reset)
 
 不得 step-before-reset、step-after-ended。执行异常（solver NaN/Capability missing/Controller crash）不算真实 Task Failure Episode；需单独 Execution Error，并提供异常后可否 reset/close 的显式规则。
 
+失败原子性按实际完成边界报告：action validation 失败不改 owner memory/clock；control 已应用或部分 native
+substeps 已完成后发生异常，进入 FAULTED，禁止再 step，不补造完整 transition。仅 owner 明确提供受验证
+恢复路线时允许 reset，否则 close/recreate；记录最后完整 boundary、已知 native application receipts 与错误阶段。
+多资源构造失败按已取得资源逐一 rollback；close 幂等且保持 exactly-once teardown，不引入第二个 lifecycle manager。
+
 ### C.5.2 Task Success / Solution Complete / Episode End 严格区分
 
 | 事件 | 负责判断 | 是否天然触发 `terminated` | 说明 |
@@ -191,12 +222,20 @@ outcome = env.stop(reason="solution_completed")
 
 **Recorder T/T+1**：不因 Stop 生成零时间伪 Action/Transition；现有记录仅有真实 `step` 增量。`stop()` 对调用者返回 Episode Outcome 的具体类型待实现审议，避免强制伪造 Gymnasium 五元组。
 
+**本轮选择**：Stop 产生独立、版本化 Boundary Event 与 EpisodeOutcome，绑定 episode/boundary/event sequence，
+保留此前已返回 transition 的原 flags；不回写消费者已经读到的数据。常规 external stop 的 outcome 标记
+truncation，loader/learner 必须按冻结 policy 从 final outcome 得到 end/bootstrap mask，不能只看最后 transition。
+C05a 要让此解释在 raw file、reader、training conversion 中一致，并显式拒绝旧 reader 无法表达的新格式。
+S1 包含 T=0、重复 Stop、reset 前/terminal 后 Stop、Stop 后 finalize/reset、切换与 capture 同 boundary 排序。
+本基线为同步单调用路径；重入/并发 step-stop 请求明确拒绝，不暗示线程安全。
+
 ## C.6 Observation / Feedback / Wall Clock
 
 - 标准：`reset(seed,options) → obs,info`；`step(action) → obs,reward,terminated,truncated,info`。
 - **obs**：schema 统一的 `state`, `privileged_state`, optional `rgb`, `depth`, `segmentation`；保留现有 `private_state` 含义，不能未经迁移视为 privileged 的别名。
 - **info**：基本 `task_metrics`, success/termination facts, elapsed clocks；高级 `execution_feedback` 与 diagnostics **可选**。Controller 内部必需反馈不得因用户关闭 Diagnostics 而消失。
 - `Provider Native State` ≠ `Canonical State` ≠ `Public/Privileged Observation`；Task Success 可依赖真实 Canonical State 而不要求 Policy 也能看到该状态。
+- 无 evaluator、unavailable、已评价 False 分开表示；v0 bool 字段经显式兼容投影保留，不以缺测为失败样本。
 - Observation Schema 对每个 field 声明 shape/dtype/unit/frame/sampling/required capabilities；必需字段缺失 fail-closed，不被静默省略；Session/Capture 的时间边界按 D2/D3。
 - 内层真实 Feedback：Panda gripper force / native Guard samples 必须与实际完成的物理区间对齐；不能用 Outer Snapshot 插值假装 500Hz 实测。
 - LLM/slow Solution 推理等待时一般 **`simulation_time` 不推进**；wall-clock latency 分开记录；若某 Experiment 需要实时 Deadline，则独立声明、归上层执行协调者。
@@ -227,42 +266,67 @@ External Solution (planner/RL/VLA/LLM/privileged policy)
 3. Task success（物理谓词）、Solution completion（11-stage/retreat）、env terminated/truncated 分别记录；不可把 strict failure 重写成 pass。
 4. NutAssembly 当前 external action 被拒，迁移必须**先完成可安全受控的 Control Action Admission**，必要时通过受限 Solution Control Plan 对外暴露，而不是删除 `external_action_error` 直接解禁所有输入。
 5. 典型用户 loop 归用户脚本/未来 Experiment Runner；本轮可以更新 `examples/` 演示，不新增通用 `Runner(env,policy).run()`。
+6. Solution 不再持有 Controller 的共享可变 hold 对象；在既有 action/control contract 内表达受限、
+   版本化的 hold/release/ramp profile 请求，由 Controller 在 admitted boundary 应用并返回 acknowledgement。
+   具体字段由 C05c 先 audit；Provider 不认识任务 stage，不能把私有 `_lift_released` 作为跨边界接口。
+7. Native measurement producer 按声明需求提供原始 state/force/clock/validity；
+   task-owned Solution 将它们组成 Guard 条件。必要采样与用户 diagnostics 开关无关，
+   Controller/Runtime 不回调 Solution 来决定是否采样，测量本身不推进 Task semantic memory。
+8. 新 controller/solution/execution identity 各自记录，不追求旧字符串相等；等价声明保护实际算法、sample、
+   时钟、应用层、readiness warning/strict failure 和 task outcome，历史 H5 不改写。
 
 ## C.8 五个 Implementation Goals
 
-### C01 — Resolved Execution Config / Admission Plan
+### C01 — Resolved Execution Config / Admission Plan（a/b）
 
-- **依赖**：A/B 的 identity 与 Task Requirements。
-- **任务**：将用户 YAML defaults 和 `make_env` override 解析为同一个 immutable 结果；Provider、Controller、Renderer、Timebase 分层 admission；支持在 `reset()` 才需 dynamic Scene Variant materialize 的明确路径。
+- **切片**：C01a 在 A02/B04a/D02a 后明确 normalize precedence、静态 plan 和 resource ownership；
+  C01b 在 B05/B04b/D02b 后接入实际 requirements、actual manifests 与动态 realization。两切片均扩展现有 factory/config owner。
+- **任务**：YAML defaults/override 共用 normalize；静态 admission→materialization→reset realization 分层。
+  固定拓扑 variant 在 reset 解析；拓扑变化明确拒绝。D01a 可先用 v0 compatibility bridge，C01b 不要求新增 runtime。
 - **验收**：同源配置得到同一 resolved identity；legacy selected/generic configs 仍清晰 fail-closed；不支持的 controller/provider/renderer 前置拒绝；没有构造一半 Runtime 就泄漏资源；支持切换 Provider 实例而不修改 Frozen Artifact。
 - **Codex AUDIT**：对比 registry 的 `from_reference_config` 分流与 `resolve_env_config`，提出不复制 factory 的迁移方案。
 
-### C02 — Multi-Entity Controller Binding / Safe Switch
+### C02 — Controller Binding / Atomic Execution / Safe Switch（a/b/c）
 
-- **依赖**：A03、C01。
-- **任务**：建立 Entity×ControlGroup→ControllerBinding，声明 typed Action Schema/feedback needs，controller memory owner；设计运行时 safepoint switch 并显式记录事件。
-- **验收**：arm+hand/双臂可静态配置，资源重叠且无 arbitration 拒绝；同 schema 安全切换、不同 schema Reset-boundary 切换/拒绝；旧 Panda pose/joint/gripper 输出不改变；失败原子性。物理多机器人未验证不得称已支持。
+- **切片**：C02a 在 A03/C01b/D02b 后确定 bindings、完整 action/feedback schema；
+  C02b 在 C03a/C04/C05a/D01b 后开放实际原子执行；C02c 在 selected C05b/C05c 回归后做同 schema 安全切换。
+- **验收**：arm+hand 有真实受限 S2；双臂先静态，实际支持另需 D01b 双 Robot binding/S2。
+  缺 Group/extra key/NaN 必须在任何 owner mutation 前拒绝；重叠 writer 拒绝；
+  同 schema switch 的 initialization、effective boundary、applied acknowledgement、failure atomicity 可测。
+  非兼容 schema 必须新 Env/wrapper。旧 Panda 输出保护，未测 multi-robot 不宣称执行支持。
 - **Codex AUDIT**：精确追踪已有 `RobotControllerHandle`, `ProductionCanonicalPandaController` 以及 `ControlledRuntimeSession` 的 owner/feedback 状态，不复制控制代码。
 
-### C03 — Unified Scalar BaseTaskEnv & Termination Policy
+### C03 — Scalar Execution / Fault Policy / Stop（a/b）
 
-- **依赖**：B05、C01–C02。
-- **任务**：复用现有 Lifecycle Adapter，统一两 scalar routes 的公共行为与 env metadata；可选 success evaluator、`stop_on_success`、failure、horizon、external_stop；明确异常/终态处理。
+- **切片**：C03a 在 C02a/D01b/C05a 后以现有 ports/adapter 接入 reset/step/fault，
+  先保留单 controller 兼容执行；C03b 在 C03a/C04/C05a 后加入 termination policy 和 Stop。
+- **任务**：先统一公共行为，允许两薄 facade 过渡，不强制 selected 继承旧 BaseTaskEnv；
+  保留 generic ignore_done、selected success 后动作及默认 horizon 的既有语义。
 - **验收**：Gymnasium 5-tuple、reset-before-step、post-terminal guard、success-post-success、no-success、stop-early/horizon 的 flags 和 clock；Stop 不产生物理 step/伪 transition；旧 UID 按兼容路由保持行为至 C05 迁移。
+- **补充 Gate**：故障后禁止续步；partial interval 不保存为成功 transition；Stop outcome/loader bootstrap 一致；
+  共享 TaskLifecycleAdapter 修改需 Pendulum scalar/batch targeted regression，不因 Phase III 延后而豁免。
 - **Codex AUDIT**：指出 `SingleTaskLifecycleAdapter.resolve_scalar_done` 与 Selected `_step` 的主要差异；不能用一次强制成功终止破坏 NutAssembly。
 
 ### C04 — Unified Observation & Optional Diagnostics
 
-- **依赖**：C03；D2/D3 更丰富状态尚可按版本后补。
+- **依赖**：C03a、D02b；Camera 先消费 D05a 的 metadata/selection 契约，D04 后补真实模态实现。
 - **任务**：统一 public+privileged obs schema 与 `info`；标准执行事实、必要 feedback、用户可选 Diagnostics 分开；Renderer Camera metadata 的位置/引用契约明确。
 - **验收**：`observation_space.contains(obs)`、字段必需缺失失败、Reset/Step 同 Schema、frame/time 符合 S1；打开/关闭 diagnostics 不改变 Controller 物理结果；已有 `private_state` 行为保护。
 - **Codex AUDIT**：现有 `StateObservationBuilder` 是否足以扩展，不要造第二个大型 Obs Pipeline。
 
-### C05 — External Solution & Recorder Migration Gate
+### C05 — Storage Compatibility / External Solutions（a/b/c）
 
-- **依赖**：C03–C04。
-- **任务**：将 PickCube/NutAssembly expert loop 调用迁移到 Env 外部；统一 Action Transition；保护 Guard/Native Samples；Recorder 关联 Solution Identity、Controller Events、Stop Outcome；完整识别旧方法的生产调用方与退役次序。
+- **C05a**：依赖 C02a/C01b/D05a，在 C03a/C02b 前完成 structured request、target/applied、
+  Boundary Event、EpisodeOutcome 的版本化存储/reader 及训练转换规则。扩展三类已有格式的实际 owner，
+  不新建 Recorder。旧 vector H5 和旧 canonical/execution fixtures 只读保护。
+- **C05b**：依赖 C02b/C03b/C04，先迁移 PickCube 的 external Solution，证明 action→step→record 路线。
+- **C05c**：依赖 C05b/D02b，先审定 native feedback/hold/ramp 契约再迁移 NutAssembly；
+  分别证明 measured 500 Hz、Guard、arm schedule、Outcome V1 与 strict warning/failure 保真。
+  无法证明时保留旧 step_expert，不能仅删除 external_action_error。
 - **验收**：同 frozen sample/config 在 GeoPhys/MuJoCo 已实现的受限 selected route 上，success/current-success/expert outcome/Guard/clock/recording 与旧基线有据可查；记录 T/T+1、Stop Events；不宣称完整 checkpoint replay；S2/S3 未跑标记缺口；兼容方法在所有 caller 迁移前不能删除。
+- **完整 C05 Gate**：C05a/b/c 分别有 receipt，真实采集/读取及适用的 replay validity 独立报告；
+  旧方法退休另需 production callers/examples/tests/docs 迁移及非回归，不与“新接口已存在”绑定。
+  精确依赖及顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 - **Codex AUDIT**：提供旧 `step_expert → solution.act → _step → controller → feedback → solution.observe → recorder` 的完整调用图，逐步证明等价。
 
 ## C.9 质量门与直接可测问题
