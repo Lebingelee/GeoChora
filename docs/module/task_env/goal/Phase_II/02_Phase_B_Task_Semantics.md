@@ -429,6 +429,44 @@ Scene/Task/Execution/Recorder 是不同版本域，`v1` 不代表全局兼容。
 
 B04a 只增加上述基线夹具与 strict compatibility tests，不改 production schema、TaskDefinition、Recorder writer/reader，不编译 Task Source，不迁移 Artifact。A04/A05 复测留待后续开发完善后执行；本切片的测试不替代它们。
 
+#### B04a — source-bound Evidence 重建（2026-10-20，cmd-0001）
+
+**状态：SELF_CHECKED_PENDING_REVIEW。** 在 `codex/phase-ii-b` 的受测实现 `f9543b8725d2990966743f49cebf9d68493b6b06`（tree
+`ffd78e99f96f75c5c338fa9a297a7032a6d786c6`）上，仅重跑现有 provider-free S1 detector；GeoPhys pin 为
+`4436787e9cb85ce519506a2a9af86d1eeec9de2d`，Menagerie pin 为
+`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。未改实现、测试或 fixture。测试命令：
+
+```text
+/home/lly/miniconda3/envs/geochora/bin/python -m pytest -q -p no:cacheprovider --basetemp=workspace/phase_ii_coordination/evidence/cmd-0001/worker/pytest-temp task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py
+```
+
+结果为 **6 passed, 0 failed, 0 errors**，exit 0、未 timeout；环境覆盖为 `PYTHONDONTWRITEBYTECODE=1`、
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`、`OMP_NUM_THREADS=1`、`OPENBLAS_NUM_THREADS=1`、`MKL_NUM_THREADS=1`、
+`NUMEXPR_NUM_THREADS=1`、`PYTHONPATH=GeoPhys/src:.`，预算为 wall 120s、单进程 CPU 90s、address space 8 GiB，
+process-tree RSS 未设限。该检测覆盖两份 v0 fixture 的原 bytes/mapping/hash、canonical identity 和当前 builder 一致性、
+nested contract roundtrip、未知版本/字段拒绝及独立 reader version routing；不能证明 provider/runtime 行为。
+
+源码与原始结果引用如下（均为仓库相对路径）：
+
+| Evidence | SHA-256 |
+| --- | --- |
+| 原始 stdout：`workspace/phase_ii_coordination/evidence/cmd-0001/worker/stdout.log` | `d23ba7a7244a561a7e47aaba2d7106faf62d830b682490b5adf75890ec6c60a8` |
+| 原始 stderr：`workspace/phase_ii_coordination/evidence/cmd-0001/worker/stderr.log` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| 命令、环境、受测身份和计时：`workspace/phase_ii_coordination/evidence/cmd-0001/worker/run_metadata.json` | `7dd71a134e4878ee891d245f7bcb32464eb15e5cef213c279e14fe7f5fd4d788` |
+| detector：`task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py` | `0550d3a66193f82c7ac8d455b711c8d0461cf9ae9f21e23aa918db9ebcfa4c62` |
+| baseline：`task_env/diagnostics/tasks/reference_construction_baseline.json` | `96aad056c1a71c6448e43c3366304988e1d676099b7f215557304717f2cf962e` |
+| PickCube fixture：`task_env/diagnostics/tasks/fixtures/phase_ii_b04a/pick_cube_task_artifact_v0.json` | `5ce44d4deaa30071fee0de3cb98aee17878c566e9f32b9216bd48b3e6934b135` |
+| NutAssembly fixture：`task_env/diagnostics/tasks/fixtures/phase_ii_b04a/nut_assembly_task_artifact_v0.json` | `e25bb363bd9e6e59b41c0dd6b14316f2e840913c714cd0f4646df05e6374ea09` |
+| 已验收静态前置：`workspace/maintenance/phase_ii_a_20261020_A02_004/a02_receipt.json` | `ced0dd3e610086bd722edb89f9a9968039dc769cadec1bad551d7e91739ef054` |
+
+旧 aggregate `workspace/maintenance/phase_ii_next_gate_review_20261020_001/pytest.log`（SHA-256
+`94c8336c73d87898fe7f00fc34ec0816311d4c75b5f748863eff0feddc87481c`，91 passed）及其
+`review_receipt.json`（SHA-256 `b37aff9e14041cdb4e7c8955b9f568c970944b613bad129024021a9ddd38f8df`）绑定
+`b24cd9707f27b70d09d28565125dd48f65444dd2`，没有当前全部 owner hashes，故不作为 `f9543b8` 的本轮验收证据。
+`geophys-transition-h5/v1` 原始文件及 canonical trajectory outer H5 golden bytes 仍缺；synthetic H5 不作为历史兼容
+证据，缺口继续 DEFERRED。此次仅恢复 B04a 的 source-bound S1 证据；B04a 工程验收、B 阶段收口、C01b 开放以及
+Human Judge/Qualification 均待独立审查或原有 gate，不由本次自检替代。
+
 <a id="b04b-taskartifact-v1"></a>
 
 #### B04b — bounded Source → TaskArtifact v1 compiler/codec (2026-10-20)

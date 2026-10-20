@@ -333,3 +333,39 @@ Core 源码链接使用仓库相对路径，便于在 develop 二审；GeoPhys �
 本轮 D01a 增加了内部 RuntimeSource→GeoPhys public importer 的有界桥接与定向测试，并更新了 Phase II 计划记录；
 没有修改 canonical contracts、module Skills、capability matrix、历史 Decisions 或 Provider 实现。若后续改变 public
 API/ownership/capability，须按仓库治理同步 canonical docs/module Skills 并重新取得相应 review。
+
+## 7. 后续协作、进度记录与阶段分支（2026-10-20维护者约定）
+
+后续总审查Agent与施工Agent使用仓库本地ignored `workspace/phase_ii_coordination/` 交接命令、报告和审查决定。
+本节只记录维护者批准的协作规则，不表示两个Agent/定时任务已启动，也不改变前文切片依赖或验收级别。
+总Agent每15分钟审查进展；施工Agent为唯一源码和阶段文档写入者，每次实施命令最多包含两个已具备前置条件的序号，默认一个。
+
+公共目录中的完整report不能替代本目录的进度记录。每个实施/返工切片仍按仓库既有documentation/test/module
+Skills，在对应01–04阶段文档的既有Goal下追加适当说明：日期、分支和受测实现身份、owner/实际范围、测试命令及
+真实结果、证据等级和相对Evidence引用、未跑/失败/timeout、风险及下一步。05记录跨阶段里程碑和阻塞，00仅在
+蓝图事实变化时更新。原始日志/图像/H5留在workspace，不复制进规划文档；自检待审、工程接受、Human Judge与
+Qualification保持区分。总Agent只写交接目录；阶段文档的后续review状态由施工Agent在获派命令或受限DOC_SYNC中同步。
+
+B阶段收口需逐项核对B01、B02、B03a、B03b、B04a、B04b、B05的既定gate和验收记录。B闭合是有界工程出口，
+不代替D01b/P99完整执行链或新Task Artifact的Stage-1/Human Judge。已到序号17/B05后，应在序号18/C01b开始前，
+先完成B收口审查及阶段文档提交；如发现B必要缺口则先在B修正。
+
+总Agent接受B收口提交后，向施工Agent发出明确的本地分支交接命令：从该精确提交创建并切换到
+`codex/phase-ii-c`。施工Agent报告B/C ref、tree、Provider pin和验收引用；交接瞬间两分支必须指向同一收口SHA。
+该最终冻结SHA记录在公共目录的不可改写handoff receipt，避免在提交自身文档中嵌入本提交SHA的循环依赖。
+后续序号18–32及必要返工在C进行；`codex/phase-ii-b`固定在该验收提交，不继续写入、移动或删除，保留供后续
+回退比对和维护者授权的Phase II分支合并。后续B功能修正也先在C，解冻/回填/合并另待维护者明确指令。
+此为分支工作流冻结，不声称设置远端保护、发布新tag或授予任务资格；不自动push/merge，也不修改已有release冻结refs。
+
+本次仅补充上述规则；B尚未因本节而自动冻结，C分支也未由本轮创建。正式进度以对应阶段验收记录和实际source/evidence为准。
+
+## 8. B04a source-bound Evidence 重建里程碑（2026-10-20，cmd-0001）
+
+B04a 已在受测实现 `f9543b8725d2990966743f49cebf9d68493b6b06` 上重建单项 provider-free S1 Evidence：现有
+`test_phase_ii_b04a_legacy_matrix.py` 检测 **6 passed**，原始命令、环境、owner/fixture hashes 与日志见
+[02 阶段文档](02_Phase_B_Task_Semantics.md)的 B04a 记录及本地报告。此状态是
+`SELF_CHECKED_PENDING_REVIEW`，只覆盖该 detector，不声称 provider/runtime 或旧 H5 兼容已验证。
+
+本命令没有补跑其他 B/D02b 检测；bootstrap review 中其余 B 切片与 D02b 的 `REWORK_REQUIRED` 状态仍待分别处理。
+B 阶段尚未闭合，`codex/phase-ii-c` 尚未交接创建，18/C01b 不开放。旧 H5 golden-byte 缺口保持 DEFERRED；本里程碑不
+改变 Task Artifact Stage-1、Human Judge 或 Qualification gate。
