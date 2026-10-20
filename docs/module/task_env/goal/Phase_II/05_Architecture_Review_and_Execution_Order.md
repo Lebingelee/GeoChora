@@ -369,3 +369,19 @@ B04a 已在受测实现 `f9543b8725d2990966743f49cebf9d68493b6b06` 上重建单�
 本命令没有补跑其他 B/D02b 检测；bootstrap review 中其余 B 切片与 D02b 的 `REWORK_REQUIRED` 状态仍待分别处理。
 B 阶段尚未闭合，`codex/phase-ii-c` 尚未交接创建，18/C01b 不开放。旧 H5 golden-byte 缺口保持 DEFERRED；本里程碑不
 改变 Task Artifact Stage-1、Human Judge 或 Qualification gate。
+
+## 9. B 工程出口与 C01b 开放（2026-10-20）
+
+在上述 B04a 单项里程碑之后，针对当前 `codex/phase-ii-b` 基线
+`b3f8dc4381708b76c5003dde5da138d90518aefa`（tree `58340bab90620d417692342f6dc7e5cc1c92039b`）复跑 B01–B05、
+D02b 与 C01a 的必要定向集合，结果 **56 passed, 0 failed, 0 errors**。完整命令、environment、Provider pins、
+日志和 stdout digest 见 [B 阶段收口记录](02_Phase_B_Task_Semantics.md#b11-b-阶段有界工程收口2026-10-20)。因此 B 的有界工程
+出口和 18/C01b 的直接前置已满足；这里不把工程出口等同于 B04a 历史 H5 缺口解决、TaskArtifact freeze、Stage-1、
+Human Judge、Qualification 或 D01b 完整执行链。
+
+分支交接按既定规则执行：先把本节与 B 阶段收口记录提交在 `codex/phase-ii-b`，再从该精确提交创建本地
+`codex/phase-ii-c`；交接后 B 指针固定在收口 SHA，C 从同一 SHA 继续。该交接只改变本地工作分支，不 push/merge，
+也不移动 `develop`、远端 refs、Provider pins 或冻结 refs。后续 18/C01b 仅在 C 实施。
+
+**cmd-0001-attempt-02 报告勘误**：同目录 JSON 的 `final_commit` 和远端 ref 核验均为 `b3f8dc4381708b76c5003dde5da138d90518aefa`；
+Markdown“远端同步”段写作 `1fb3a55…` 属记录笔误，详见 02 阶段文档的 B.11。原报告不可变，不回写历史记录。

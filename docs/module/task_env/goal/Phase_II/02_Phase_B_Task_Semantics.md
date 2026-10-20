@@ -563,3 +563,39 @@ E 只延后统一编排，不延后新任务首次 Stage-1 release 的 randomize
 6. 双机器人/复杂 Scene 的 Role Selector 何处解析？不能让 Task 每次依据 Provider object id 直接查询。
 
 **B 阶段出口**：一个声明式 Task 能经 A 的 Scene 解析出冻结语义、per-episode ResetSample/Role Binding，并对 D 规范化 State 做 Task Evaluation；**并不**要求完成统一任务作者工作流、自动 Judge 或跨 Provider 正式 Qualification。
+
+### B.11 B 阶段有界工程收口（2026-10-20）
+
+在 `codex/phase-ii-b` 的基线 `b3f8dc4381708b76c5003dde5da138d90518aefa`
+（tree `58340bab90620d417692342f6dc7e5cc1c92039b`）上，复用各 Goal 已记录的 bounded receipts，
+并重新运行当前源码的 B01–B05、D02b 必要前置和 C01a 兼容回归。组合命令覆盖：
+
+```text
+python -m pytest -q -p no:cacheprovider \
+  task_env/diagnostics/tasks/test_phase_ii_b01_task_source.py \
+  task_env/diagnostics/tasks/test_phase_ii_b02_reset_plan.py \
+  task_env/diagnostics/tasks/test_phase_ii_b03a_predicates.py \
+  task_env/diagnostics/tasks/test_phase_ii_b03b_temporal_commit.py \
+  task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py \
+  task_env/diagnostics/tasks/test_phase_ii_b04b_task_artifact.py \
+  task_env/diagnostics/tasks/test_phase_ii_b05_reference_semantics.py \
+  task_env/diagnostics/tasks/test_phase_ii_d02b_typed_runtime_state.py \
+  task_env/diagnostics/tasks/test_phase_ii_c01a_execution_plan.py
+```
+
+结果 **56 passed, 0 failed, 0 errors**，exit 0，未 timeout（22.22 秒）；原始 stdout SHA-256 为
+`4b09b9fa2d1913cffd199073b868d240adebc31891ac00a2375c1de627af47bc`，stderr 为空。完整 argv、环境、
+预算、Provider pins 和日志由本地 `workspace/maintenance/phase_ii_closure_20261020_001/run_metadata.json`
+及相邻日志保存。受测 pins：GeoPhys `4436787e9cb85ce519506a2a9af86d1eeec9de2d`、Menagerie
+`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。
+
+本结果满足本轮 B 工程出口及 C01b 的 D02b/C01a 前置检查：B01、B02、B03a/b、B04a/b、B05 的定向 gates
+在该源码基线上通过，D02b typed-state 必要检测通过，C01a 旧配置/静态 plan 回归通过。B04a 已明确记录的
+`geophys-transition-h5/v1` 与 canonical trajectory outer-H5 历史 golden bytes 缺口仍为 DEFERRED；这次工程收口不把
+缺失历史样本冒称兼容证据。新 TaskArtifact 仍为 candidate，不授予 Stage-1、Human Judge 或 Qualification；也不表示
+D01b、vNext 完整执行链或 B 后续返工已经完成。
+
+**报告勘误**：本地 `workspace/phase_ii_coordination/reports/cmd-0001-attempt-02/report.md` 的“远端同步”段将
+远端 ref SHA 写成 `1fb3a55…`；同目录 `report.json` 的 `final_commit` 为 `b3f8dc4381708b76c5003dde5da138d90518aefa`，
+且本次只读 `git ls-remote public` 核验 `develop` 与 `codex/phase-ii-b` 均为该 SHA。以 JSON 和 ref 核验结果为准；
+该 Markdown 行为笔误，不影响所记录的 B04a detector 结果。
