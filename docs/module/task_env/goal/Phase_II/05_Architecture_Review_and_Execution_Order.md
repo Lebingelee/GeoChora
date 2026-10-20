@@ -88,7 +88,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
 | 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
-| 22 | C03a | C02a、D01b、C05a | **bounded implemented**：现有 ports/两 Env 路径的 scalar reset/step/fault；62 项 fault/Pendulum 回归，真实 Panda 双 Provider 兼容 11 passed；partial receipt 不回滚/不入 transition，详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
+| 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt 已窄修正**：现有 ports/两 Env 路径的 scalar reset/step/fault；receipt 分离 public-clock 物理进度、observer/Recorder 子步证据与 transition 状态；修正回归 70 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
 | 23 | C04 | C03a、D02b | 固定 public/privileged/private schemas、必要反馈/诊断分离、capture 引用 |
 | 24 | C02b | C02a、C03a、C04、C05a、D01b | 原子 group 执行，真实 arm+hand S2；缺 group/局部失败不留未知施控 |
 | 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |

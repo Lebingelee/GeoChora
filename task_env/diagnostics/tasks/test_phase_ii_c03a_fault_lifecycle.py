@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 
 from task_env.environment.lifecycle import SingleTaskLifecycleAdapter
-from task_env.environment.types import AppliedControl, ControlCommand, RuntimeSnapshot
+from task_env.environment.types import (
+    AppliedControl,
+    ControlCommand,
+    ExecutionFaultV1,
+    RuntimeSnapshot,
+)
 
 
 class FaultInjectingRuntime:
@@ -155,6 +160,85 @@ def test_unreadable_boundary_after_failed_step_is_reported_as_unknown():
     assert receipt is not None
     assert receipt.physical_progress == "unknown"
     assert receipt.readback_error.startswith("RuntimeError:")
+
+
+def test_observer_count_without_public_clock_does_not_claim_physical_progress():
+    receipt = ExecutionFaultV1.from_exception(
+        "physics_step",
+        RuntimeError("observer returned but boundary clock is unavailable"),
+        expected_control_dt_s=0.2,
+        interval_attempted=True,
+        observer_confirmed_substeps=2,
+        recorder_confirmed_substeps=2,
+        native_substeps_expected=2,
+        transition_status="incomplete",
+    )
+    assert receipt.physical_progress == "unknown"
+    assert receipt.observer_confirmed_substeps == 2
+    assert receipt.recorder_confirmed_substeps == 2
+    assert receipt.transition_status == "incomplete"
+
+
+def test_public_clock_conflicting_with_completed_interval_is_unknown():
+    receipt = ExecutionFaultV1.from_exception(
+        "snapshot_readback",
+        RuntimeError("returned interval disagrees with public clock"),
+        control_step_before=0,
+        control_step_after=1,
+        simulation_time_before_s=0.0,
+        simulation_time_after_s=0.1,
+        expected_control_dt_s=0.2,
+        interval_attempted=True,
+        interval_completed=True,
+    )
+    assert receipt.physical_progress == "unknown"
+    assert receipt.interval_completed
+
+
+def test_recorder_count_conflicting_with_observer_count_is_unknown():
+    receipt = ExecutionFaultV1.from_exception(
+        "physics_step",
+        RuntimeError("Recorder evidence exceeds observer evidence"),
+        control_step_before=0,
+        control_step_after=0,
+        simulation_time_before_s=0.0,
+        simulation_time_after_s=0.2,
+        expected_control_dt_s=0.2,
+        interval_attempted=True,
+        observer_confirmed_substeps=1,
+        recorder_confirmed_substeps=2,
+        native_substeps_expected=2,
+    )
+    assert receipt.physical_progress == "unknown"
+    assert receipt.observer_confirmed_substeps == 1
+    assert receipt.recorder_confirmed_substeps == 2
+
+
+def test_public_clock_and_substep_evidence_remain_separate():
+    receipt = ExecutionFaultV1.from_exception(
+        "physics_step",
+        RuntimeError("final physical step advanced before throwing"),
+        control_step_before=0,
+        control_step_after=0,
+        simulation_time_before_s=1.0,
+        simulation_time_after_s=1.2,
+        expected_control_dt_s=0.2,
+        interval_attempted=True,
+        observer_confirmed_substeps=1,
+        recorder_confirmed_substeps=1,
+        native_substeps_expected=2,
+        transition_status="incomplete",
+    )
+    assert receipt.physical_progress == "advanced"
+    assert receipt.observer_confirmed_substeps == 1
+    assert receipt.recorder_confirmed_substeps == 1
+    assert receipt.interval_completed is False
+    assert receipt.transition_status == "incomplete"
+    mapping = receipt.to_mapping()
+    assert mapping["physical_progress"] == "advanced"
+    assert mapping["observer_confirmed_substeps"] == 1
+    assert mapping["recorder_confirmed_substeps"] == 1
+    assert mapping["transition_status"] == "incomplete"
 
 
 def test_physics_failure_before_advance_is_distinguished_from_partial_advance():

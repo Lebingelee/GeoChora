@@ -33,9 +33,13 @@ Selected reference 同一 episode 不可混用 expert 和 external action；NutA
 失败的 reset/step 在各自 lifecycle owner 中 fail-closed：需要成功 reset 才能再次 step，环境不会假设 provider 物理状态
 可以回滚。`BaseTaskEnv` 与 selected reference 的 `execution_fault` 提供当前故障 receipt；构造期间失败时原异常对象
 附带 `execution_fault`。`ExecutionFaultV1.physical_progress` 只描述当前控制区间的可观测进展
-（`not_advanced`、`partially_advanced`、`advanced`、`unknown`），不替代 provider 状态快照。Native interval receipt
-可带已确认完成的 substep 数；缺少可靠 readback 时必须保留 `unknown`。未完整完成的区间不生成 transition，selected
-execution Recorder 的 pending interval 继续由既有 `freeze()` 拒绝。该诊断不承诺故障后的物理恢复。
+（`not_advanced`、`partially_advanced`、`advanced`、`unknown`），依据可信 public 前后 simulation clock 与预期
+control dt；区间返回状态和 `control_step` 只用于交叉验证，不替代时钟。Native interval receipt 分开记录
+`observer_confirmed_substeps`、`recorder_confirmed_substeps` 和 `native_substeps_expected`，回调/Recorder 数量不是
+精确物理完成数。时钟缺失、执行证据冲突或信息不足时必须保留 `unknown`。`transition_status` 独立说明当前 owner
+是否评估了 transition（`not_assessed`）、没有录制（`not_recorded`）、录制未完成、append 被拒绝或 transition
+已确认有效；物理区间已完整推进也不能使不完整 Recorder evidence 成为有效 transition。
+selected execution Recorder 的 pending interval 继续由既有 `freeze()` 拒绝。该诊断不承诺故障后的物理恢复。
 若未完成的 selected recording 阻止 reset，当前 route 要求关闭并重建环境；C03a 没有新增丢弃 recording 的 API。
 
 通用构造先解析 task-owned YAML defaults，再深合并调用方 mapping/YAML（调用方字段优先），最后只允许

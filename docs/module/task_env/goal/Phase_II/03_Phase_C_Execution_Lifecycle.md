@@ -413,15 +413,19 @@ outer v1 当 replay 输入。
 在 lifecycle 失败后可读 `env.execution_fault`；construction 失败保留原异常类型并附带 `exception.execution_fault`。
 receipt 记录失败 phase、原异常类型/消息、可读到的前后控制步和 simulation clock、native substeps 计数及
 readback error。`physical_progress` 只表达**当前控制区间**的可观测进展：`not_advanced`、`partially_advanced`、
-`advanced` 或 `unknown`；不表示物理回滚能力。Generic Runtime 用预期 control interval 与 public snapshot clock
-比较；selected native interval 复用 interval observer 已确认完成的 substep 数。若 native step 异常且既无完成回调
-也无可读边界状态，结果为 `unknown`，不把未知伪报成未推进。
+`advanced` 或 `unknown`；不表示物理回滚能力。Generic Runtime 与 selected route 都以可信 public snapshot 的
+前后 simulation clock、预期 control dt 为进度依据；interval 是否返回、control-step 边界及 observer/Recorder
+计数仅作交叉验证。receipt 分别记录 `observer_confirmed_substeps`、`recorder_confirmed_substeps` 和
+`native_substeps_expected`，绝不把 callback 数直接当成精确物理完成数。时钟不可读、时钟与执行证据冲突、
+或不足以判断区间进度时均为 `unknown`。
 
 两条 route 在 reset/step 构造或后处理失败后均 fail-closed：保留触发时异常类型，设置 fault，后续 step 必须先
 成功 reset。Generic action conversion 发生在任何施控前；selected expert proposal/内部 action 校验失败也会闭锁，
 而既有 selected 外部/Expert 模式边界保持兼容。Reset 成功才清除故障。控制区间只要未完整返回，就不会生成有效
-transition：generic wrapper 仅在 env step 成功后 append；selected execution Recorder 保留 pending partial interval，
-其既有 `freeze()` 明确拒绝 `incomplete effective interval`。该 pending recording 也会阻止 reset；当前 route 需 close/recreate，
+transition：generic wrapper 仅在 env step 成功后 append；selected execution Recorder 保留 pending interval，
+其既有 `freeze()` 明确拒绝 `incomplete effective interval`。receipt 的 `transition_status` 独立标注 owner 是否
+评估（`not_assessed`）、没有录制（`not_recorded`）、`incomplete`、`rejected` 或已确认的 `valid`；物理区间即使完整推进，
+只要 Recorder 证据未形成完整 transition，仍保留 pending 并拒绝 freeze。该 pending recording 也会阻止 reset；当前 route 需 close/recreate，
 C03a 不新增丢弃 API。代码不会回滚 provider 已推进的物理状态。
 
 正常 gate 由真实 Pendulum GeoPhys CPU `reset → 两次 step → close` 覆盖：返回 5-tuple、声明 timebase clock、horizon
@@ -437,6 +441,34 @@ TaskEnv module Skill 已按现有 failure behavior 刷新；`check_module_skill.
 证据仅覆盖现有 generic Pendulum scalar CPU 与 A05 Panda selected legacy compatibility 交集，以及合成故障注入的
 生命周期边界；它不是新 Provider qualification、partial-state recovery、全 selected source S2、C03b Stop policy、
 C04 observation 契约或 C02b group dispatch 的证据。C04 与 C02b 仍待单独执行；C03b 仍按原依赖延后。
+
+#### C03a fault-receipt correction（2026-10-21）
+
+在 `codex/phase-ii-c` 上对 C03a receipt 做受限修正，没有进入 C04，也未改变 Runtime、Controller、Provider、
+Recorder 的所有权。receipt 分开报告 public clock 推断的 `physical_progress`、native observer 的
+`observer_confirmed_substeps`、Recorder pending/transition 内确认的 `recorder_confirmed_substeps`，以及
+`transition_status`。回调/Recorder 计数是独立执行证据，不充当物理完成数量；仅有回调或 `interval_completed`
+而缺少可信前后时钟时标 `unknown`。时钟进度与成功回调的最低进度不符、完整返回却 clock 未完整、或 Recorder
+计数与 observer 顺序证据冲突时也标 `unknown`。
+
+定向故障注入新增：最后子步物理推进后抛错、中途推进后抛错、故障边界 public clock 不可读、回调与边界时钟冲突、
+以及完整物理推进后最终 Recorder receipt 缺失。最后一种情况必须保留 `physical_progress=advanced` 与不相等的
+observer/Recorder 计数，同时 `transition_status=incomplete`、不追加 transition、既有 `freeze()` 继续拒绝；Env
+仍 faulted 并禁止续步。receipt 更新不清除 pending，也不提供物理恢复或 rollback 语义。
+
+修正后定向组合 `test_phase_ii_c03a_fault_lifecycle.py`、`test_selected_consumers.py`、Pendulum B03a/B03b 为
+**70 passed**（一个上游 Taichi locale deprecation warning）。其中真实 GeoPhys CPU Pendulum 覆盖 scalar
+reset/step/horizon/terminal 与后处理故障；selected 最后子步、中途子步、不可读边界、clock/observer 冲突及
+Recorder receipt 缺失用现有 FakeSession 与公开快照面注入。它不构成 selected Provider fault qualification。
+日志保存在 ignored `workspace/maintenance/phase_ii_c03a_20261021/c03a_fault_receipt_correction.log`。
+
+TaskEnv module Skill refresh receipt（2026-10-21）：module=`task_env`，mode=`refresh`；从 `9bec437` 的
+`ExecutionFaultV1`、`SingleTaskLifecycleAdapter`、`SelectedReferenceEnv`、`ExecutionRecorder`、当前 C03a/C05a
+测试和 public API contract 对照原有 fault 路由，确认差异是 callback 被误作物理步数、receipt 未区分 Recorder
+确认量和 transition 完整性。修复归类为 `FIX_EXISTING`：沿用现有 lifecycle receipt 与 Recorder pending/append owner，
+没有新 Runtime/Recorder/recovery API。冷启动按 AGENTS + TaskEnv Skill 路由到现有 `execution_fault` 和 selected
+recording owner，并能找到“clock 决定进度、两种计数仅作证据、pending 阻止 freeze、close/recreate”的处理；
+`check_module_skill.py .agents/skills/geochora-task-env` 静态检查通过。该 Skill 描述更新不升级 provider 能力或 qualification。
 
 ## C.9 质量门与直接可测问题
 

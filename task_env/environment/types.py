@@ -19,11 +19,11 @@ class StageUnavailableError(RuntimeError):
 
 @dataclass(frozen=True)
 class ExecutionFaultV1:
-    """A failed scalar lifecycle operation with its observed physics progress.
+    """A failed scalar lifecycle operation with separate execution evidence.
 
-    ``physical_progress`` describes the control interval, not reset-state
-    mutation or controller-memory mutation. A fault is diagnostic evidence;
-    it does not imply that the provider can roll physical state back.
+    ``physical_progress`` is inferred from public clock readback. Observer and
+    Recorder substep counts are separate evidence; neither is an exact physics
+    count. A fault receipt does not imply that the provider can roll state back.
     """
 
     phase: str
@@ -34,8 +34,13 @@ class ExecutionFaultV1:
     control_step_after: int | None = None
     simulation_time_before_s: float | None = None
     simulation_time_after_s: float | None = None
-    native_substeps_completed: int | None = None
+    observer_confirmed_substeps: int | None = None
+    recorder_confirmed_substeps: int | None = None
     native_substeps_expected: int | None = None
+    expected_control_dt_s: float | None = None
+    interval_attempted: bool = False
+    interval_completed: bool = False
+    transition_status: str = "not_assessed"
     readback_error: str | None = None
     schema_version: str = "task-execution-fault-v1"
 
@@ -57,18 +62,26 @@ class ExecutionFaultV1:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative int or None")
-        for name in ("native_substeps_completed", "native_substeps_expected"):
+        for name in (
+            "observer_confirmed_substeps",
+            "recorder_confirmed_substeps",
+            "native_substeps_expected",
+        ):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a non-negative int or None")
         if self.native_substeps_expected == 0:
             raise ValueError("native_substeps_expected must be positive or None")
-        if (
-            self.native_substeps_completed is not None
-            and self.native_substeps_expected is not None
-            and self.native_substeps_completed > self.native_substeps_expected
-        ):
-            raise ValueError("completed native substeps cannot exceed the expected count")
+        if type(self.interval_attempted) is not bool or type(self.interval_completed) is not bool:
+            raise ValueError("interval execution evidence must be bool")
+        if self.transition_status not in {
+            "not_assessed",
+            "not_recorded",
+            "incomplete",
+            "rejected",
+            "valid",
+        }:
+            raise ValueError("unknown execution fault transition status")
         for name in ("simulation_time_before_s", "simulation_time_after_s"):
             value = getattr(self, name)
             if value is not None:
@@ -76,6 +89,11 @@ class ExecutionFaultV1:
                 if not math.isfinite(normalized):
                     raise ValueError(f"{name} must be finite or None")
                 object.__setattr__(self, name, normalized)
+        if self.expected_control_dt_s is not None:
+            normalized_dt = float(self.expected_control_dt_s)
+            if not math.isfinite(normalized_dt) or normalized_dt <= 0.0:
+                raise ValueError("expected_control_dt_s must be finite and positive or None")
+            object.__setattr__(self, "expected_control_dt_s", normalized_dt)
         object.__setattr__(self, "phase", str(self.phase))
         object.__setattr__(self, "exception_type", str(self.exception_type))
         object.__setattr__(self, "message", str(self.message))
@@ -95,60 +113,95 @@ class ExecutionFaultV1:
         expected_control_dt_s: float | None = None,
         interval_attempted: bool = False,
         interval_completed: bool = False,
-        native_substeps_completed: int | None = None,
+        observer_confirmed_substeps: int | None = None,
+        recorder_confirmed_substeps: int | None = None,
         native_substeps_expected: int | None = None,
+        transition_status: str = "not_assessed",
         readback_error: str | None = None,
     ) -> "ExecutionFaultV1":
-        before_time = simulation_time_before_s
-        after_time = simulation_time_after_s
+        def finite_clock(value: float | None) -> float | None:
+            if value is None:
+                return None
+            try:
+                normalized = float(value)
+            except (TypeError, ValueError, OverflowError):
+                return None
+            return normalized if math.isfinite(normalized) else None
+
+        before_time = finite_clock(simulation_time_before_s)
+        after_time = finite_clock(simulation_time_after_s)
+        expected_dt = finite_clock(expected_control_dt_s)
+        if expected_dt is not None and expected_dt <= 0.0:
+            expected_dt = None
         progress = "unknown"
-        if interval_completed:
-            progress = "advanced"
-        elif not interval_attempted:
-            progress = "not_advanced"
-        elif (
-            native_substeps_completed is not None
+        evidence_conflict = (
+            observer_confirmed_substeps is not None
+            and recorder_confirmed_substeps is not None
+            and recorder_confirmed_substeps > observer_confirmed_substeps
+        )
+        if (
+            observer_confirmed_substeps is not None
             and native_substeps_expected is not None
-            and native_substeps_completed > 0
+            and observer_confirmed_substeps > native_substeps_expected
+        ) or (
+            recorder_confirmed_substeps is not None
+            and native_substeps_expected is not None
+            and recorder_confirmed_substeps > native_substeps_expected
         ):
-            progress = (
-                "advanced"
-                if native_substeps_completed == native_substeps_expected
-                else "partially_advanced"
-            )
-        elif before_time is not None and after_time is not None:
+            evidence_conflict = True
+        step_delta = (
+            None
+            if control_step_before is None or control_step_after is None
+            else int(control_step_after) - int(control_step_before)
+        )
+        if not interval_attempted:
+            if before_time is not None and after_time is not None:
+                delta = after_time - before_time
+                tolerance = max(1.0e-12, 1.0e-9 * abs(expected_dt or 0.0))
+                if abs(delta) > tolerance or step_delta not in (None, 0):
+                    evidence_conflict = True
+            progress = "unknown" if evidence_conflict else "not_advanced"
+        elif before_time is not None and after_time is not None and expected_dt is not None:
             delta = float(after_time) - float(before_time)
             tolerance = max(
                 1.0e-12,
-                1.0e-9 * abs(float(expected_control_dt_s or 0.0)),
+                1.0e-9 * abs(expected_dt),
             )
-            step_delta = (
-                None
-                if control_step_before is None or control_step_after is None
-                else int(control_step_after) - int(control_step_before)
+            full_interval = math.isclose(
+                delta, expected_dt, rel_tol=1.0e-9, abs_tol=tolerance
             )
-            if abs(delta) <= tolerance and step_delta in (None, 0):
+            if step_delta is not None and step_delta not in (0, 1):
+                evidence_conflict = True
+            if step_delta == 1 and not full_interval:
+                evidence_conflict = True
+            if interval_completed and (not full_interval or step_delta == 0):
+                evidence_conflict = True
+            if interval_completed and (
+                observer_confirmed_substeps is not None
+                and native_substeps_expected is not None
+                and observer_confirmed_substeps != native_substeps_expected
+            ):
+                evidence_conflict = True
+            if observer_confirmed_substeps is not None and native_substeps_expected:
+                substep_dt = expected_dt / native_substeps_expected
+                if delta + tolerance < observer_confirmed_substeps * substep_dt:
+                    evidence_conflict = True
+            if abs(delta) <= tolerance:
+                if interval_completed or step_delta == 1:
+                    evidence_conflict = True
                 progress = "not_advanced"
-            elif step_delta is not None and step_delta > 1:
-                progress = "unknown"
-            elif expected_control_dt_s is not None:
-                expected = float(expected_control_dt_s)
-                if expected <= 0.0 or not math.isfinite(expected):
-                    raise ValueError("expected control interval must be finite and positive")
-                if math.isclose(delta, expected, rel_tol=1.0e-9, abs_tol=tolerance):
-                    progress = "advanced"
-                elif 0.0 < delta < expected - tolerance:
-                    progress = "partially_advanced"
-                else:
-                    progress = "unknown"
-            elif delta > tolerance:
+            elif full_interval:
+                progress = "advanced"
+            elif 0.0 < delta < expected_dt - tolerance and not interval_completed:
                 progress = "partially_advanced"
-            elif step_delta is not None and step_delta == 1:
-                progress = "advanced"
-        elif control_step_before is not None and control_step_after is not None:
-            delta = int(control_step_after) - int(control_step_before)
-            if delta == 1:
-                progress = "advanced"
+            else:
+                progress = "unknown"
+            if evidence_conflict:
+                progress = "unknown"
+        else:
+            # Callback counts and a returned step call cannot replace a usable
+            # public clock boundary when an interval was attempted.
+            progress = "unknown"
         return cls(
             phase=phase,
             physical_progress=progress,
@@ -156,10 +209,15 @@ class ExecutionFaultV1:
             message=str(error),
             control_step_before=control_step_before,
             control_step_after=control_step_after,
-            simulation_time_before_s=simulation_time_before_s,
-            simulation_time_after_s=simulation_time_after_s,
-            native_substeps_completed=native_substeps_completed,
+            simulation_time_before_s=before_time,
+            simulation_time_after_s=after_time,
+            observer_confirmed_substeps=observer_confirmed_substeps,
+            recorder_confirmed_substeps=recorder_confirmed_substeps,
             native_substeps_expected=native_substeps_expected,
+            expected_control_dt_s=expected_dt,
+            interval_attempted=interval_attempted,
+            interval_completed=interval_completed,
+            transition_status=transition_status,
             readback_error=readback_error,
         )
 
@@ -172,8 +230,13 @@ class ExecutionFaultV1:
             "control_step_after": self.control_step_after,
             "simulation_time_before_s": self.simulation_time_before_s,
             "simulation_time_after_s": self.simulation_time_after_s,
-            "native_substeps_completed": self.native_substeps_completed,
+            "observer_confirmed_substeps": self.observer_confirmed_substeps,
+            "recorder_confirmed_substeps": self.recorder_confirmed_substeps,
             "native_substeps_expected": self.native_substeps_expected,
+            "expected_control_dt_s": self.expected_control_dt_s,
+            "interval_attempted": self.interval_attempted,
+            "interval_completed": self.interval_completed,
+            "transition_status": self.transition_status,
             "exception_type": self.exception_type,
             "message": self.message,
             "readback_error": self.readback_error,

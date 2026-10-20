@@ -232,9 +232,16 @@ def test_native_partial_interval_fault_is_recorded_without_a_transition(fake, tm
 
     receipt=env.execution_fault
     assert receipt.phase == 'physics_step'
-    assert receipt.physical_progress == 'partially_advanced'
-    assert receipt.native_substeps_completed == 1
+    # The FakeSession exposes only its last completed control boundary here.
+    # One observer/Recorder receipt conflicts with that unchanged public clock,
+    # so physical progress must stay unknown instead of being inferred from a
+    # callback count.
+    assert receipt.physical_progress == 'unknown'
+    assert receipt.observer_confirmed_substeps == 1
+    assert receipt.recorder_confirmed_substeps == 1
     assert receipt.native_substeps_expected == env.artifact.timebase.control_substeps
+    assert receipt.transition_status == 'incomplete'
+    assert receipt.interval_attempted and not receipt.interval_completed
     assert env.recorder.pending is not None
     assert env.recorder.pending['native_step_count'] == 1
     assert env.recorder.value['transitions'] == []
@@ -245,6 +252,150 @@ def test_native_partial_interval_fault_is_recorded_without_a_transition(fake, tm
         env.finish_recording('failed')
     with pytest.raises(RuntimeError, match='finalize current recording before reset'):
         env.reset(seed=19)
+    env.close()
+
+
+def _expose_fake_physics_clock(env, *, should_fail=None):
+    from dataclasses import replace
+
+    original_snapshot = env.session.snapshot
+
+    def public_snapshot():
+        if should_fail is not None and should_fail():
+            raise RuntimeError('injected public clock readback failure')
+        state = original_snapshot()
+        return replace(state, simulation_time=float(env.session.time))
+
+    env.session.snapshot = public_snapshot
+
+
+def _assert_faulted_recording_has_no_transition(env, *, transition_status='incomplete'):
+    assert env.execution_fault.transition_status == transition_status
+    assert env.recorder.value['transitions'] == []
+    assert env.recorder.pending is not None
+    with pytest.raises(ValueError, match='incomplete effective interval'):
+        env.finish_recording('failed')
+    with pytest.raises(RuntimeError, match='faulted; reset'):
+        env.step_expert()
+
+
+def test_native_last_substep_advances_then_raises_uses_public_clock(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'last-step-raised.h5')
+    _expose_fake_physics_clock(env)
+    expected=env.artifact.timebase.control_substeps
+    calls=0
+    original_step=env.session._step_physics_once
+
+    def advance_then_raise_on_last():
+        nonlocal calls
+        calls += 1
+        if calls == expected:
+            env.session.time += env.artifact.timebase.physics_dt
+            raise RuntimeError('injected failure after last physical advancement')
+        original_step()
+
+    env.session._step_physics_once=advance_then_raise_on_last
+    with pytest.raises(RuntimeError, match='last physical advancement'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.physical_progress == 'advanced'
+    assert receipt.observer_confirmed_substeps == expected - 1
+    assert receipt.recorder_confirmed_substeps == expected - 1
+    assert receipt.simulation_time_after_s - receipt.simulation_time_before_s == pytest.approx(
+        env.artifact.timebase.control_dt
+    )
+    _assert_faulted_recording_has_no_transition(env)
+    env.close()
+
+
+def test_native_mid_interval_advance_then_raise_reports_partial_clock(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'mid-step-raised.h5')
+    _expose_fake_physics_clock(env)
+    calls=0
+    original_step=env.session._step_physics_once
+
+    def advance_then_raise_mid_interval():
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            env.session.time += env.artifact.timebase.physics_dt
+            raise RuntimeError('injected mid-interval physical advancement failure')
+        original_step()
+
+    env.session._step_physics_once=advance_then_raise_mid_interval
+    with pytest.raises(RuntimeError, match='mid-interval physical advancement'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.physical_progress == 'partially_advanced'
+    assert receipt.observer_confirmed_substeps == 1
+    assert receipt.recorder_confirmed_substeps == 1
+    assert receipt.simulation_time_after_s - receipt.simulation_time_before_s == pytest.approx(
+        2 * env.artifact.timebase.physics_dt
+    )
+    _assert_faulted_recording_has_no_transition(env)
+    env.close()
+
+
+def test_unreadable_fault_boundary_keeps_counts_but_progress_unknown(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'unreadable-boundary.h5')
+    faulted=False
+    _expose_fake_physics_clock(env, should_fail=lambda: faulted)
+    original_step=env.session._step_physics_once
+    calls=0
+
+    def fail_second_step_before_advancing():
+        nonlocal calls, faulted
+        calls += 1
+        if calls == 2:
+            faulted=True
+            raise RuntimeError('injected mid-interval provider failure')
+        original_step()
+
+    env.session._step_physics_once=fail_second_step_before_advancing
+    with pytest.raises(RuntimeError, match='mid-interval provider failure'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.physical_progress == 'unknown'
+    assert receipt.observer_confirmed_substeps == 1
+    assert receipt.recorder_confirmed_substeps == 1
+    assert receipt.readback_error.startswith('RuntimeError: injected public clock')
+    _assert_faulted_recording_has_no_transition(env)
+    env.close()
+
+
+def test_full_physics_with_missing_final_recorder_receipt_is_not_a_transition(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'missing-final-recorder-receipt.h5')
+    _expose_fake_physics_clock(env)
+    expected=env.artifact.timebase.control_substeps
+    original_record=env.recorder.applied_substep
+
+    def fail_final_recorder_receipt(index, *args):
+        if index == expected - 1:
+            raise RuntimeError('injected final Recorder receipt failure')
+        return original_record(index, *args)
+
+    env.recorder.applied_substep=fail_final_recorder_receipt
+    with pytest.raises(RuntimeError, match='final Recorder receipt failure'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.physical_progress == 'advanced'
+    assert receipt.observer_confirmed_substeps == expected
+    assert receipt.recorder_confirmed_substeps == expected - 1
+    assert receipt.transition_status == 'incomplete'
+    assert receipt.interval_completed is False
+    _assert_faulted_recording_has_no_transition(env)
     env.close()
 
 

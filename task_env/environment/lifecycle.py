@@ -811,6 +811,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         interval_attempted: bool = False,
         interval_completed: bool = False,
         readback_error: str | None = None,
+        transition_status: str = "not_assessed",
     ) -> ExecutionFaultV1:
         fault = ExecutionFaultV1.from_exception(
             phase,
@@ -822,6 +823,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
             expected_control_dt_s=self.expected_control_dt_s,
             interval_attempted=interval_attempted,
             interval_completed=interval_completed,
+            transition_status=transition_status,
             readback_error=readback_error,
         )
         self._execution_fault = fault

@@ -130,8 +130,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         after_state=None,
         interval_attempted=False,
         interval_completed=False,
-        native_substeps_completed=None,
+        observer_confirmed_substeps=None,
+        recorder_confirmed_substeps=None,
         native_substeps_expected=None,
+        transition_status='not_assessed',
         readback_error=None,
     ):
         fault = ExecutionFaultV1.from_exception(
@@ -152,8 +154,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             expected_control_dt_s=self.artifact.timebase.control_dt,
             interval_attempted=interval_attempted,
             interval_completed=interval_completed,
-            native_substeps_completed=native_substeps_completed,
+            observer_confirmed_substeps=observer_confirmed_substeps,
+            recorder_confirmed_substeps=recorder_confirmed_substeps,
             native_substeps_expected=native_substeps_expected,
+            transition_status=transition_status,
             readback_error=readback_error,
         )
         self._execution_fault = fault
@@ -310,9 +314,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         guard_samples = []
         substeps = []
         before_state = self.state
+        transition_counts_before = self._recording_counts(self.recorder)
         phase = 'recorder_interval_begin'
         interval_attempted = False
         interval_completed = False
+        record_append_attempted = False
         try:
             if self.recorder is not None and self.binding.recorder_mode == 'execution':
                 self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
@@ -361,6 +367,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._stopped = bool(self._stopped or terminated or truncated)
             if self.recorder is not None:
                 phase = 'record_interval'
+                record_append_attempted = True
                 self._record_interval(request, canonical, target, applied, stage, diagnostics,
                                       terminated, truncated, substeps)
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
@@ -373,6 +380,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self.state = after_state
                 except BaseException as snapshot_error:
                     readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            transition_status = self._fault_transition_status(
+                self.recorder,
+                transition_counts_before,
+                append_attempted=record_append_attempted,
+            )
+            observer_count = (
+                len(substeps) if self.binding.interval_mode == 'native' else None
+            )
+            recorder_count = self._recorder_substep_count(
+                self.recorder, transition_counts_before
+            )
             self._latch_fault(
                 phase,
                 error,
@@ -380,14 +398,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 after_state=after_state,
                 interval_attempted=interval_attempted,
                 interval_completed=interval_completed,
-                native_substeps_completed=(
-                    len(substeps) if self.binding.interval_mode == 'native' else None
-                ),
+                observer_confirmed_substeps=observer_count,
+                recorder_confirmed_substeps=recorder_count,
                 native_substeps_expected=(
                     self.artifact.timebase.control_substeps
                     if self.binding.interval_mode == 'native'
                     else None
                 ),
+                transition_status=transition_status,
                 readback_error=readback_error,
             )
             if self.binding.abort_solution_on_runtime_error:
@@ -399,6 +417,51 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         add_note(f'expert abort after execution fault also failed: {abort_error!r}')
             # An incomplete interval cannot be finalized as a valid trajectory.
             raise
+
+    @staticmethod
+    def _recording_counts(recorder):
+        if recorder is None:
+            return None
+        value = getattr(recorder, 'value', None)
+        if isinstance(value, dict):
+            return len(value.get('transitions', ())), len(value.get('boundaries', ()))
+        transitions = getattr(recorder, 'transitions', None)
+        boundaries = getattr(recorder, 'boundaries', None)
+        if transitions is not None and boundaries is not None:
+            return len(transitions), len(boundaries)
+        return None
+
+    @classmethod
+    def _fault_transition_status(cls, recorder, before, *, append_attempted):
+        if recorder is None:
+            return 'not_recorded'
+        if not append_attempted:
+            return 'incomplete'
+        after = cls._recording_counts(recorder)
+        if before is not None and after == (before[0] + 1, before[1] + 1):
+            if getattr(recorder, 'pending', None) is None:
+                return 'valid'
+        return 'rejected'
+
+    @staticmethod
+    def _recorder_substep_count(recorder, transition_counts_before=None):
+        pending = getattr(recorder, 'pending', None)
+        if isinstance(pending, dict):
+            count = pending.get('native_step_count')
+            if type(count) is int and count >= 0:
+                return count
+            return len(pending.get('substeps', ()))
+        value = getattr(recorder, 'value', None)
+        if isinstance(value, dict) and transition_counts_before is not None:
+            transitions = value.get('transitions', ())
+            if len(transitions) == transition_counts_before[0] + 1:
+                interval = transitions[-1].get('interval')
+                if isinstance(interval, dict):
+                    count = interval.get('native_step_count')
+                    if type(count) is int and count >= 0:
+                        return count
+                    return len(interval.get('substeps', ()))
+        return None
 
     def close(self):
         if self.session is not None:

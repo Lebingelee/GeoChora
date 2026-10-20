@@ -37,10 +37,14 @@ must not be erased by successful outcome. Do not stop a required retreat at firs
 After a failed reset/step, inspect the existing Env owner's `execution_fault` (`ExecutionFaultV1`); a
 construction exception may carry the same receipt as `exception.execution_fault`. Faulted environments
 require a successful reset before another step. `physical_progress` describes only observable progress
-of the current control interval; `unknown` is valid when public readback cannot establish the boundary.
-The receipt does not imply physics rollback or recovery, and an incomplete selected execution interval
-must remain pending so the existing Recorder refuses to freeze it. If that pending recording blocks reset,
-close and recreate the environment; C03a adds no recording-discard API.
+of the current control interval and is inferred from trusted public before/after simulation clocks against
+the expected control dt. Interval return, control-step boundaries, `observer_confirmed_substeps`, and
+`recorder_confirmed_substeps` are separate corroborating evidence; callback or Recorder counts never stand
+in for an exact physical substep count. Missing or conflicting evidence yields `unknown`. `transition_status`
+independently reports whether the owner assessed a transition, recording was absent, incomplete, rejected, or
+confirmed valid; full physical progress does not make an incomplete transition valid. The receipt does not imply physics rollback or recovery,
+and an incomplete selected execution interval must remain pending so the existing Recorder refuses to freeze it.
+If that pending recording blocks reset, close and recreate the environment; C03a adds no recording-discard API.
 
 For selected expert recording use `examples/recording/record_expert.py` or
 `task_env.script.trajectory.record`, which reuse the selected env's recorder owner.
