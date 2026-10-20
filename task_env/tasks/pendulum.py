@@ -18,6 +18,10 @@ from ..environment import (
     TaskBatchEvaluation,
     TaskStateView,
     TaskEvaluation,
+    TaskEvaluationContextV1,
+    TaskPredicateEvaluationV1,
+    TaskPredicateResultV1,
+    TemporalPredicateRuleV1,
     as_task_state_view,
     freeze_observation,
 )
@@ -399,6 +403,78 @@ class PendulumTaskDefinition(TaskDefinitionBase):
                     },
                 ),
             )
+        )
+
+    def evaluate_predicates(
+        self, context: TaskEvaluationContextV1
+    ) -> TaskPredicateEvaluationV1:
+        """Expose the instantaneous upright predicate without touching its window."""
+
+        if not isinstance(context, TaskEvaluationContextV1):
+            raise TypeError("Pendulum predicates require TaskEvaluationContextV1")
+        state = context.state
+        qpos = np.asarray(state.qpos)
+        qvel = np.asarray(state.qvel)
+        if state.is_batch:
+            valid_shape = (
+                qpos.ndim == 2
+                and qvel.ndim == 2
+                and qpos.shape[0] == qvel.shape[0] == state.batch_size
+                and qpos.shape[1] > self.qpos_id
+                and qvel.shape[1] > self.qvel_id
+            )
+            if not valid_shape:
+                upright = TaskPredicateResultV1.unavailable(
+                    "required_hinge_state_unavailable"
+                )
+            elif not (
+                np.isfinite(qpos[:, self.qpos_id]).all()
+                and np.isfinite(qvel[:, self.qvel_id]).all()
+            ):
+                upright = TaskPredicateResultV1.unavailable(
+                    "required_hinge_state_nonfinite"
+                )
+            else:
+                theta = (qpos[:, self.qpos_id] + math.pi) % (2.0 * math.pi) - math.pi
+                theta_dot = qvel[:, self.qvel_id]
+                upright = TaskPredicateResultV1.available(
+                    (np.abs(theta) <= self._semantics.upright_angle_rad)
+                    & (np.abs(theta_dot) <= self._semantics.upright_angular_velocity)
+                )
+        else:
+            qpos = qpos.reshape(-1)
+            qvel = qvel.reshape(-1)
+            if qpos.size <= self.qpos_id or qvel.size <= self.qvel_id:
+                upright = TaskPredicateResultV1.unavailable(
+                    "required_hinge_state_unavailable"
+                )
+            elif not (
+                np.isfinite(qpos[self.qpos_id])
+                and np.isfinite(qvel[self.qvel_id])
+            ):
+                upright = TaskPredicateResultV1.unavailable(
+                    "required_hinge_state_nonfinite"
+                )
+            else:
+                theta = _wrap_angle(qpos[self.qpos_id])
+                theta_dot = float(qvel[self.qvel_id])
+                upright = TaskPredicateResultV1.available(
+                    self._semantics._is_upright(theta, theta_dot)
+                )
+        return TaskPredicateEvaluationV1.available(
+            {
+                "upright": upright,
+            }
+        )
+
+    def temporal_predicate_rules(self) -> tuple[TemporalPredicateRuleV1, ...]:
+        return (
+            TemporalPredicateRuleV1(
+                output_name="task_success",
+                kind="dwell",
+                source_predicates=("upright",),
+                required_samples=self.success_window_steps,
+            ),
         )
 
     def reset(

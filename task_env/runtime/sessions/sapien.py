@@ -154,6 +154,7 @@ class _SapienSession(_SessionValues):
         builder._geochora_expected_shapes=expected
 
     def reset(self,sample):
+        self._begin_reset()
         self._validate_sample(sample)
         for a in self._articulations:
             a.set_qpos(np.zeros(a.dof));a.set_qvel(np.zeros(a.dof));a.set_qf(np.zeros(a.dof))
@@ -239,7 +240,7 @@ class _SapienSession(_SessionValues):
         if self._scene.get_timestep()!=self._native_timestep['expected_native_dt']:raise ValueError('native timestep changed')
         for _ in range(self._artifact.timebase.control_substeps):
             self._apply_native_forces();self._scene.step();self._native_steps+=1
-        self._control_step+=1;return self.snapshot()
+        self._control_step+=1;self._state_revision+=1;return self.snapshot()
 
     def close(self):
         if not self._closed:

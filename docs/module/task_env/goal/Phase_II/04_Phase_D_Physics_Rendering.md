@@ -312,6 +312,34 @@ required unavailable 失败，optional unavailable 必须有原因记录，不�
 materialization/generation 并在 mutation/reset/close 失效的声明；实际失效检查和真实 free/spherical probe 留在
 D02b。定向验证位于 `task_env/diagnostics/tasks/test_phase_ii_d02a_state_contracts.py`。
 
+#### D02b bounded typed publication slice (2026-10-20)
+
+在现有 `RuntimeSession`/`_SessionValues` owner 增加 `snapshot_v1()`，并以
+`CanonicalStatePublicationV1` 将一个 `CanonicalStateViewV1` 与匹配的 `StateViewLifetime` 绑定；旧
+`snapshot()`、`RealizedInitialState` 与 TaskArtifact v0 均保持原样。调用方必须提供与
+`RuntimeSource.scene_source.source_id` 完全一致的 Scene identity、显式 Joint/Frame bindings 和
+`StateRequirements`。标量值组合 `project_canonical_state_v0()`；GeoPhys/MuJoCo CPU 的真实 free-body
+探针通过现有 provider session readback 发布 7D pose/6D twist，明确把线速度变换到 child frame，并验证
+跨 provider 的时间、frame、reset episode/state revision 和 step readback。所有输出均为 owned tuple
+snapshot；不开放 provider alias，不把 contact 填零，required contact 与 native interval request 失败关闭。
+
+定向证据：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 OMP_NUM_THREADS=1 \\
+  OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 PYTHONPATH=GeoPhys/src:. \\
+  python -m pytest -q -p no:cacheprovider \\
+  task_env/diagnostics/tasks/test_phase_ii_d02b_typed_runtime_state.py
+```
+
+在已配置的 TaskEnv Python 3.12 环境中，GeoPhys 与 MuJoCo 两项 S2 free-body projection 均通过；测试另验证
+同一 boundary 的重复 consumer read 一致、legacy v0 snapshot、reset 后新 episode identity、close 后 owned view
+仍有效，以及现有 `TransitionRecorder` 的内存 observation copy 不受输入 mapping 后续变更影响。该 Recorder
+检查不扩展 H5/v1/v2 schema，也不声称 typed state 已持久化。当前明确范围仅限 GeoPhys/MuJoCo CPU scalar/free-base
+evaluation-boundary projection；SAPIEN/Genesis、native interval evidence、contact readback、spherical native state
+及跨 provider qualification 仍未实现。D02a state-contracts、当前 D01a/B02 integration 与 D02b typed-publication
+三个定向文件合计 **14 passed**；GeoPhys Taichi 依赖报告一条上游 `locale.getdefaultlocale` deprecation warning。
+
 ### D03 — Visual Materialization / Sync Versioning
 
 - **依赖**：D02b、D01b、D05a；不硬性依赖 selected Solution 的 C05c 迁移。

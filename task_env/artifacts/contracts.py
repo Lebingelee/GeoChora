@@ -47,6 +47,8 @@ def _nonempty(values, label):
 
 def _decode(annotation, value):
     origin, args = get_origin(annotation), get_args(annotation)
+    if annotation is object:
+        return _decode_json_value(value)
     if origin in (UnionType, Union) and len(args) == 2 and type(None) in args:
         if value is None:
             return None
@@ -88,9 +90,26 @@ def _encode(value):
         return value.to_mapping()
     if isinstance(value, Mapping):
         return {k: _encode(v) for k, v in sorted(value.items())}
-    if isinstance(value, tuple):
+    if isinstance(value, (tuple, list)):
         return [_encode(v) for v in value]
     return value
+
+
+def _decode_json_value(value):
+    """Freeze one strict JSON value used by versioned Source snapshots."""
+    if value is None or type(value) in (str, bool, int):
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError('JSON snapshot numbers must be finite')
+        return value
+    if isinstance(value, Mapping):
+        if any(type(key) is not str for key in value):
+            raise TypeError('JSON snapshot object keys must be strings')
+        return MappingProxyType({key: _decode_json_value(item) for key, item in value.items()})
+    if isinstance(value, (tuple, list)):
+        return tuple(_decode_json_value(item) for item in value)
+    raise TypeError(f'unsupported JSON snapshot value: {type(value).__name__}')
 
 
 class Contract:
@@ -224,6 +243,18 @@ class FrameReference(Contract):
     def validate(self):
         _name(self.entity_id)
         _name(self.frame_id)
+
+
+@dataclass(frozen=True)
+class JointReference(Contract):
+    """An entity-qualified identity for one canonical Scene joint."""
+
+    entity_id: str
+    joint_id: str
+
+    def validate(self):
+        _name(self.entity_id)
+        _name(self.joint_id)
 
 
 @dataclass(frozen=True)
@@ -929,6 +960,126 @@ class TaskArtifact(Contract):
     def identity_hash(self):
         canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
         return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class TaskArtifactV1(Contract):
+    """Compiled task declaration that references the canonical Scene by identity.
+
+    This value deliberately retains only the task-facing contracts from the
+    legacy artifact. The imported Scene remains owned and serialized by
+    ``SceneDefinition``; provider execution provenance remains outside task
+    semantic identity.
+    """
+
+    schema_version: str
+    artifact_id: str
+    task_id: str
+    artifact_version: str
+    source_artifact_schema_version: str
+    source_artifact_identity_hash: str
+    source_retained_v0_fields: tuple[str, ...]
+    scene_schema_version: str
+    scene_id: str
+    scene_identity_hash: str
+    legacy_frame_bindings: Mapping[str, FrameReference]
+    legacy_joint_bindings: Mapping[str, JointReference]
+    task_source_schema_version: str
+    task_source: Mapping[str, object]
+    task_source_identity_hash: str
+    action: ActionIntent
+    world_convention: str
+    observation_requirements: tuple[str, ...]
+    initialization: InitializationContract
+    semantics: SemanticDefinition
+    timebase: Timebase
+    required_capabilities: RequiredCapabilitySet
+
+    def validate(self):
+        _choice(self.schema_version, {'task-artifact-v1'}, 'artifact schema')
+        for value in (self.artifact_id, self.task_id, self.artifact_version, self.scene_id):
+            _name(value)
+        _choice(self.source_artifact_schema_version, {'task-artifact-v0'}, 'source Artifact schema')
+        if not _SHA256.fullmatch(self.source_artifact_identity_hash):
+            raise ValueError('TaskArtifact source requires a lowercase v0 Artifact identity')
+        if not self.source_retained_v0_fields or len(set(self.source_retained_v0_fields)) != len(self.source_retained_v0_fields):
+            raise ValueError('TaskArtifact v1 must explicitly retain each unmapped v0 World field')
+        if any(
+            type(pointer) is not str or not pointer.startswith('/world/entities/')
+            for pointer in self.source_retained_v0_fields
+        ):
+            raise ValueError('source-retained v0 field pointers must identify legacy World Entities')
+        _choice(
+            self.scene_schema_version,
+            {'scene-definition-v1', 'scene-definition-v2', 'scene-definition-v3'},
+            'TaskArtifact Scene reference schema',
+        )
+        _choice(self.task_source_schema_version, {'task-source-v1'}, 'Task Source schema')
+        if not _SHA256.fullmatch(self.scene_identity_hash):
+            raise ValueError('TaskArtifact Scene reference requires a lowercase SHA-256 identity')
+        for legacy_name, reference in (*self.legacy_frame_bindings.items(), *self.legacy_joint_bindings.items()):
+            _name(legacy_name)
+            if not isinstance(reference, (FrameReference, JointReference)):
+                raise TypeError('legacy Scene bindings require typed FrameReference/JointReference values')
+        if not _SHA256.fullmatch(self.task_source_identity_hash):
+            raise ValueError('TaskArtifact Source reference requires a lowercase SHA-256 identity')
+        _choice(self.world_convention, {'SI_right_handed_z_up_wxyz'}, 'world convention')
+        if not isinstance(self.task_source, Mapping) or not self.task_source:
+            raise ValueError('TaskArtifact Source snapshot must be a nonempty mapping')
+        try:
+            source = _encode(self.task_source)
+            canonical_source = json.dumps(
+                source, sort_keys=True, separators=(',', ':'), allow_nan=False,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError('TaskArtifact Source snapshot must be strict JSON data') from exc
+        if hashlib.sha256(canonical_source.encode('utf-8')).hexdigest() != self.task_source_identity_hash:
+            raise ValueError('TaskArtifact Source snapshot identity mismatch')
+        if source.get('schema_version') != self.task_source_schema_version:
+            raise ValueError('TaskArtifact Source snapshot schema mismatch')
+        identity, scene_reference = source.get('identity'), source.get('scene')
+        if not isinstance(identity, Mapping) or identity.get('task_id') != self.task_id:
+            raise ValueError('TaskArtifact Source snapshot task identity mismatch')
+        if identity.get('version') != self.artifact_version:
+            raise ValueError('TaskArtifact Source snapshot version mismatch')
+        if not isinstance(scene_reference, Mapping) or scene_reference.get('ref') != self.scene_id:
+            raise ValueError('TaskArtifact Source snapshot Scene reference mismatch')
+        _nonempty(self.observation_requirements, 'observations')
+        if len(set(self.observation_requirements)) != len(self.observation_requirements):
+            raise ValueError('duplicate observation requirements')
+        for name in self.observation_requirements:
+            _name(name)
+
+    @property
+    def identity_hash(self):
+        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
+    @property
+    def task_source_mapping(self) -> Mapping:
+        """Return a fresh mapping; callers re-decode it through TaskSourceV1."""
+        return json.loads(json.dumps(_encode(self.task_source), sort_keys=True, separators=(',', ':')))
+
+
+def decode_task_artifact(values: Mapping | TaskArtifact | TaskArtifactV1) -> TaskArtifact | TaskArtifactV1:
+    """Decode the one TaskArtifact version domain by its exact discriminator.
+
+    ``TaskArtifact.from_mapping`` remains the frozen v0-only codec. This
+    dispatcher never infers versions from field shape or upgrades input.
+    """
+    if isinstance(values, (TaskArtifact, TaskArtifactV1)):
+        return values
+    if not isinstance(values, Mapping):
+        raise TypeError('TaskArtifact decoder requires a mapping or typed TaskArtifact')
+    schema_version = values.get('schema_version')
+    codecs = {
+        'task-artifact-v0': TaskArtifact,
+        'task-artifact-v1': TaskArtifactV1,
+    }
+    codec = codecs.get(schema_version)
+    if codec is None:
+        raise ValueError(f'unsupported TaskArtifact schema: {schema_version!r}')
+    return codec.from_mapping(values)
 
 
 @dataclass(frozen=True)

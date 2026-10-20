@@ -96,7 +96,7 @@ def _deep_merge(
 
 
 def load_yaml_mapping(path: str | Path) -> Mapping[str, object]:
-    """Load a config mapping with PyYAML's safe loader only."""
+    """Load a safe YAML mapping and reject duplicate keys before they collapse."""
 
     config_path = Path(path)
     try:
@@ -105,8 +105,37 @@ def load_yaml_mapping(path: str | Path) -> Mapping[str, object]:
         raise RuntimeError(
             "YAML TaskEnv config requires PyYAML; install the project dependencies."
         ) from exc
+    class UniqueKeySafeLoader(yaml.SafeLoader):
+        def construct_mapping(self, node, deep=False):
+            if isinstance(node, yaml.MappingNode):
+                explicit_keys = set()
+                for key_node, _ in node.value:
+                    if key_node.tag == "tag:yaml.org,2002:merge":
+                        continue
+                    key = self.construct_object(key_node, deep=deep)
+                    try:
+                        duplicate = key in explicit_keys
+                    except TypeError as exc:
+                        raise yaml.constructor.ConstructorError(
+                            "while constructing a mapping",
+                            node.start_mark,
+                            "found an unhashable mapping key",
+                            key_node.start_mark,
+                        ) from exc
+                    if duplicate:
+                        raise yaml.constructor.ConstructorError(
+                            "while constructing a mapping",
+                            node.start_mark,
+                            f"found duplicate key {key!r}",
+                            key_node.start_mark,
+                        )
+                    explicit_keys.add(key)
+                self.flatten_mapping(node)
+                return super().construct_mapping(node, deep=deep)
+            return super().construct_mapping(node, deep=deep)
+
     with config_path.open("r", encoding="utf-8") as stream:
-        loaded = yaml.safe_load(stream)
+        loaded = yaml.load(stream, Loader=UniqueKeySafeLoader)
     if loaded is None:
         return {}
     if not isinstance(loaded, Mapping):

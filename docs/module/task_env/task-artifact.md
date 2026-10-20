@@ -87,6 +87,25 @@ D05a 在现有 Camera Source owner 新增 `CameraCaptureIdentityV1`，其 `captu
 生成图像；旧 camera/source mapping 和 `create_camera_session()` 行为不变。实际 pairing、device/runtime identity
 解析、capture receipt、资源共享和 teardown 留给 D05b/D03。
 
+Phase II B04b 在同一 `task_env.artifacts` owner 增加 `TaskArtifactV1` 与 `decode_task_artifact()`。旧
+`TaskArtifact.from_mapping()` 仍是严格的 `task-artifact-v0` codec；dispatcher 只按精确 `schema_version`
+解码 v0/v1，未知或缺失版本拒绝，绝不自动迁移。`compile_task_artifact_v1()` 由现有 Task Source owner 显式组合
+已验证的 `TaskSourceV1`、结构化 A Scene 和现有 v0 semantic bridge。Entity 名称必须精确存在于 Scene；Frame/Joint
+引用精确匹配或由调用方显式提供类型化的 `FrameReference`/`JointReference` 绑定，不按名称猜测别名。解析结果参与
+v1 identity。编译器不复制第二份 Scene/World；v0 的 Action、初始化、SemanticDefinition、Observation
+要求、Timebase 和 RequiredCapabilitySet 由原有 typed contracts 表达。旧 World Entity 中尚不能由 Scene 精确表达的
+`kind`、`asset_reference`、`geometry`、`collision_intent`、`parameters_si` 以 source v0 Artifact identity 及逐字段
+`source_retained_v0_fields` 指针显式保留，不能静默删除。v1 identity 绑定 Task Source snapshot、Scene identity、这些
+保留字段的来源 Artifact identity 和已表达语义；ExecutionSpec/Provider 不在其中。Timebase 的 native
+`physics_dt × control_substeps == control_dt` gate 原样保留。
+
+该 v1 是有界 candidate codec，不是已接入 `RuntimeSession`、Recorder、Camera、D01b 或新的任务发布路径。它目前
+只桥接既有 v0 semantic fields；B03b temporal-rule declaration 尚未序列化到 TaskArtifact。`ResetSample-v0`、
+`CanonicalStateView-v0/v1`、CapabilityManifest-v0、CameraGeometry-v0 与三类 trajectory/H5 版本域均保持原 owner
+和 reader；B04b 没有改写这些存储格式。`geophys-transition-h5/v1`、`canonical-trajectory-v0` outer H5 和真正的
+canonical execution v1 bytes 仍缺历史 golden fixture，因此相关 reader compatibility 继续 deferred，不能用合成
+数据宣称旧文件兼容。B04b 的 S1 codec/编译测试不构成 Stage-1、freeze、Provider qualification 或历史存储完整验收。
+
 生命周期为 `draft -> candidate -> validated -> frozen -> archived`。
 validated 表示产生检查/feasibility Evidence、等待 Judge；frozen 必须有明确批准。
 拒绝或修改 frozen 任务必须新建版本，不得原地改变语义。

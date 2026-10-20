@@ -8,7 +8,16 @@ import json
 
 from typing import get_type_hints
 
-from .contracts import CanonicalStateView, Contract, PoseWorld, _decode, _encode, _name
+from .contracts import (
+    CanonicalStateView,
+    Contract,
+    PoseWorld,
+    _SHA256,
+    _choice,
+    _decode,
+    _encode,
+    _name,
+)
 
 
 def canonical_json(value: Mapping) -> str:
@@ -60,6 +69,70 @@ class ResetSample(Contract):
                    for k, v in values.items() if k != 'sample_id'}
         digest = hashlib.sha256(canonical_json(payload).encode()).hexdigest()
         return cls.from_mapping({**payload, 'sample_id': 'reset-' + digest})
+
+
+@dataclass(frozen=True)
+class RoleBindingV1(Contract):
+    """Immutable Core selection result for one source and canonical Scene."""
+
+    schema_version: str
+    task_source_identity_hash: str
+    scene_identity_hash: str
+    task_seed: int
+    selection_policy_id: str
+    selection_policy_version: str
+    bindings: Mapping[str, str]
+
+    def validate(self):
+        _choice(self.schema_version, {'role-binding-v1'}, 'RoleBinding schema')
+        if not _SHA256.fullmatch(self.task_source_identity_hash):
+            raise ValueError('RoleBinding requires a Task Source identity hash')
+        if not _SHA256.fullmatch(self.scene_identity_hash):
+            raise ValueError('RoleBinding requires a canonical Scene identity hash')
+        if type(self.task_seed) is not int or self.task_seed < 0:
+            raise ValueError('RoleBinding task_seed must be a nonnegative integer')
+        _name(self.selection_policy_id)
+        _name(self.selection_policy_version)
+        if len(set(self.bindings.values())) != len(self.bindings):
+            raise ValueError('RoleBinding requires exclusive Entity bindings')
+        for role_id, entity_id in self.bindings.items():
+            _name(role_id)
+            _name(entity_id)
+
+    @property
+    def identity_hash(self) -> str:
+        return hashlib.sha256(canonical_json(self.to_mapping()).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class EpisodeResetPlanV1(Contract):
+    """Bind a Core Role selection to the existing provider-facing v0 ResetSample."""
+
+    schema_version: str
+    role_binding: RoleBindingV1
+    reset_sample: ResetSample
+    sampling_domain: str
+
+    def validate(self):
+        _choice(self.schema_version, {'episode-reset-plan-v1'}, 'episode reset plan schema')
+        _choice(self.sampling_domain, {'training', 'feasibility', 'evaluation'}, 'sampling domain')
+        if self.role_binding.task_seed != self.reset_sample.task_seed:
+            raise ValueError('RoleBinding and ResetSample must use the same task_seed')
+
+    @property
+    def identity_hash(self) -> str:
+        return hashlib.sha256(canonical_json(self.to_mapping()).encode()).hexdigest()
+
+    def to_provider_sample(self) -> ResetSample:
+        """Pass the exact existing v0 sample to RuntimeSession; no provider rewrite."""
+
+        return self.reset_sample
+
+    def validate_realization_identity(self, realized: 'RealizedInitialState') -> None:
+        if not isinstance(realized, RealizedInitialState):
+            raise TypeError('EpisodeResetPlan realization must be RealizedInitialState')
+        if realized.reset_sample_id != self.reset_sample.sample_id:
+            raise ValueError('realized state does not belong to this EpisodeResetPlanV1')
 
 
 @dataclass(frozen=True)

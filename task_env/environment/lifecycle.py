@@ -10,8 +10,11 @@ observation fallback, and episode outcome calculation.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any
 
 import numpy as np
@@ -19,7 +22,11 @@ import numpy as np
 from .task_definition import (
     TaskBatchEvaluation,
     TaskDefinitionBase,
+    TaskEvaluationContextV1,
+    TaskPredicateEvaluationV1,
+    TaskPredicateResultV1,
     TaskStateView,
+    TemporalPredicateRuleV1,
     as_task_state_view,
 )
 from .types import (
@@ -29,6 +36,285 @@ from .types import (
     StageUnavailableError,
     TaskEvaluation,
 )
+
+
+@dataclass
+class _TemporalRuleMemory:
+    dwell_count: int = 0
+    sequence_index: int = 0
+    previous_values: dict[str, bool | None] | None = None
+
+    def __post_init__(self) -> None:
+        if self.previous_values is None:
+            self.previous_values = {}
+
+    def clear(self) -> None:
+        self.dwell_count = 0
+        self.sequence_index = 0
+        self.previous_values = {}
+
+
+class _TemporalPredicateCommitState:
+    """Lifecycle-owned bounded memory for explicit evaluation-boundary commits."""
+
+    def __init__(self, rules: tuple[TemporalPredicateRuleV1, ...]) -> None:
+        if any(not isinstance(rule, TemporalPredicateRuleV1) for rule in rules):
+            raise TypeError("TaskDefinition temporal rules must be TemporalPredicateRuleV1")
+        if len({rule.output_name for rule in rules}) != len(rules):
+            raise ValueError("temporal predicate output names must be unique")
+        self.rules = tuple(rules)
+        self.reset()
+
+    def reset(self) -> None:
+        self._memory = self._fresh_memory()
+        self._owner_identity = None
+        self._last_control_step = None
+        self._last_simulation_time_s = None
+        self._last_boundary_id = None
+        self._last_input_digest = None
+        self._last_result = None
+
+    def _fresh_memory(self) -> dict[str, _TemporalRuleMemory]:
+        return {rule.output_name: _TemporalRuleMemory() for rule in self.rules}
+
+    @staticmethod
+    def _owner(boundary) -> tuple[str, ...]:
+        return (
+            boundary.episode_id,
+            boundary.reset_sample_id,
+            boundary.scene_identity_hash,
+            boundary.scene_instance_id,
+            boundary.provider_materialization_id,
+        )
+
+    @staticmethod
+    def _stable_value(value):
+        if isinstance(value, np.ndarray):
+            return _TemporalPredicateCommitState._stable_value(value.tolist())
+        if isinstance(value, np.generic):
+            return _TemporalPredicateCommitState._stable_value(value.item())
+        if isinstance(value, Mapping):
+            return {
+                str(name): _TemporalPredicateCommitState._stable_value(child)
+                for name, child in sorted(value.items(), key=lambda item: str(item[0]))
+            }
+        if isinstance(value, (tuple, list)):
+            return [_TemporalPredicateCommitState._stable_value(child) for child in value]
+        if isinstance(value, float) and not np.isfinite(value):
+            return {"nonfinite": repr(value)}
+        if value is None or isinstance(value, (str, bool, int, float)):
+            return value
+        raise TypeError(f"unsupported commit fingerprint value: {type(value).__name__}")
+
+    @classmethod
+    def _input_digest(
+        cls,
+        context: TaskEvaluationContextV1,
+        evaluation: TaskPredicateEvaluationV1,
+    ) -> str:
+        def encode_result(result):
+            return {
+                "status": result.status,
+                "value": cls._stable_value(result.value),
+                "reason": result.reason,
+            }
+
+        def encode_state(state):
+            if state is None:
+                return None
+            names = (
+                "qpos",
+                "qvel",
+                "qacc",
+                "ctrl",
+                "actuator_force",
+                "body_xpos",
+                "body_xquat",
+                "site_xpos",
+                "site_xquat",
+            )
+            return {
+                name: cls._stable_value(value)
+                for name in names
+                if (value := getattr(state, name, None)) is not None
+            }
+
+        applied = context.applied_control
+        payload = {
+            "boundary_id": context.boundary_identity.boundary_id,
+            "sample_clock": context.sample_clock.to_mapping(),
+            "current_state": encode_state(context.state),
+            "previous_state": encode_state(context.previous_state),
+            "requested_action": cls._stable_value(context.requested_action),
+            "action_schema_id": context.action_schema_id,
+            "applied_control": None
+            if applied is None
+            else {
+                "requested_ctrl": cls._stable_value(applied.requested_ctrl),
+                "applied_ctrl": cls._stable_value(applied.applied_ctrl),
+                "clipped": bool(applied.clipped),
+            },
+            "elapsed_steps": cls._stable_value(context.elapsed_steps),
+            "timebase": None if context.timebase is None else context.timebase.to_mapping(),
+            "native_interval": None
+            if context.native_interval is None
+            else context.native_interval.to_mapping(),
+            "evaluator_status": evaluation.evaluator_status,
+            "predicates": {
+                name: encode_result(result)
+                for name, result in sorted(evaluation.predicates.items())
+            },
+        }
+        payload = cls._stable_value(payload)
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def commit(
+        self,
+        context: TaskEvaluationContextV1,
+        evaluation: TaskPredicateEvaluationV1,
+    ) -> TaskPredicateEvaluationV1:
+        boundary = context.boundary_identity
+        clock = context.sample_clock
+        if boundary is None or clock is None:
+            raise ValueError(
+                "temporal predicate commit requires a typed state boundary and sample clock"
+            )
+        if context.state.is_batch:
+            raise StageUnavailableError(
+                "temporal predicate commits currently require a scalar evaluation boundary"
+            )
+
+        control_step = int(boundary.control_step)
+        boundary_id = boundary.boundary_id
+        input_digest = self._input_digest(context, evaluation)
+        owner = self._owner(boundary)
+        if self._owner_identity is not None and owner != self._owner_identity:
+            raise ValueError("temporal predicate identity changed without lifecycle reset")
+        gap = False
+        if self._last_control_step is not None:
+            if control_step == self._last_control_step:
+                if (
+                    boundary_id == self._last_boundary_id
+                    and input_digest == self._last_input_digest
+                ):
+                    return self._last_result
+                raise ValueError("evaluation boundary was already committed with different input")
+            if control_step < self._last_control_step:
+                raise ValueError("temporal predicate boundaries must be committed in order")
+            if clock.simulation_time_s <= self._last_simulation_time_s:
+                raise ValueError("temporal predicate evaluation clock must move forward")
+            if control_step > self._last_control_step + 1:
+                gap = True
+
+        next_memory = copy.deepcopy(self._memory)
+        if gap:
+            for memory in next_memory.values():
+                memory.clear()
+        if evaluation.evaluator_status == "no_evaluator":
+            for memory in next_memory.values():
+                memory.clear()
+            result = evaluation
+        else:
+            collisions = set(evaluation.predicates) & {
+                rule.output_name for rule in self.rules
+            }
+            if collisions:
+                raise ValueError(
+                    "temporal output collides with read-only predicate: "
+                    + ", ".join(sorted(collisions))
+                )
+            outputs = {}
+            for rule in self.rules:
+                outputs[rule.output_name] = self._commit_rule(
+                    rule, next_memory[rule.output_name], evaluation
+                )
+            merged = dict(evaluation.predicates)
+            for name, output in outputs.items():
+                merged[name] = output
+            result = TaskPredicateEvaluationV1.available(merged)
+
+        self._memory = next_memory
+        self._owner_identity = owner
+        self._last_control_step = control_step
+        self._last_simulation_time_s = float(clock.simulation_time_s)
+        self._last_boundary_id = boundary_id
+        self._last_input_digest = input_digest
+        self._last_result = result
+        return result
+
+    @staticmethod
+    def _commit_rule(
+        rule: TemporalPredicateRuleV1,
+        memory: _TemporalRuleMemory,
+        evaluation: TaskPredicateEvaluationV1,
+    ) -> TaskPredicateResultV1:
+        values = {
+            name: evaluation.resolve(name) for name in set(rule.source_predicates)
+        }
+        if rule.kind == "rising_edge":
+            name = rule.source_predicates[0]
+            source = values[name]
+            if source.status != "available":
+                memory.previous_values[name] = None
+                return TaskPredicateResultV1.unavailable(source.reason or "source_unavailable")
+            current = bool(source.value)
+            previous = memory.previous_values.get(name)
+            memory.previous_values[name] = current
+            if current and previous is None:
+                return TaskPredicateResultV1.unavailable("edge_baseline_unavailable")
+            return TaskPredicateResultV1.available(current and previous is False)
+
+        if rule.kind == "dwell":
+            name = rule.source_predicates[0]
+            source = values[name]
+            if source.status != "available":
+                memory.dwell_count = 0
+                return TaskPredicateResultV1.unavailable(source.reason or "source_unavailable")
+            if bool(source.value):
+                memory.dwell_count += 1
+            else:
+                memory.dwell_count = 0
+            return TaskPredicateResultV1.available(
+                memory.dwell_count >= int(rule.required_samples)
+            )
+
+        statuses = [values[name] for name in rule.source_predicates]
+        missing = next((value for value in statuses if value.status != "available"), None)
+        if missing is not None:
+            memory.sequence_index = 0
+            memory.previous_values.clear()
+            return TaskPredicateResultV1.unavailable(
+                missing.reason or "sequence_source_unavailable"
+            )
+
+        edges = []
+        unknown_baseline = False
+        for name in dict.fromkeys(rule.source_predicates):
+            current = bool(values[name].value)
+            previous = memory.previous_values.get(name)
+            if current and previous is None:
+                unknown_baseline = True
+            elif current and previous is False:
+                edges.append(name)
+            memory.previous_values[name] = current
+        if unknown_baseline:
+            memory.sequence_index = 0
+            return TaskPredicateResultV1.unavailable("sequence_baseline_unavailable")
+        if len(edges) > 1:
+            memory.sequence_index = 0
+            return TaskPredicateResultV1.available(False)
+        if edges:
+            edge = edges[0]
+            expected = rule.source_predicates[memory.sequence_index]
+            if edge == expected:
+                memory.sequence_index += 1
+            else:
+                memory.sequence_index = 1 if edge == rule.source_predicates[0] else 0
+            if memory.sequence_index == len(rule.source_predicates):
+                memory.sequence_index = 0
+                return TaskPredicateResultV1.available(True)
+        return TaskPredicateResultV1.available(False)
 
 
 class TaskLifecycleAdapter:
@@ -51,6 +337,9 @@ class TaskLifecycleAdapter:
         self.task_definition = task_definition
         self.horizon = int(horizon)
         self.ignore_done = bool(ignore_done)
+        rules_method = getattr(task_definition, "temporal_predicate_rules", None)
+        rules = tuple(rules_method()) if callable(rules_method) else ()
+        self._temporal_predicate_state = _TemporalPredicateCommitState(rules)
 
     def reset_task(
         self,
@@ -63,6 +352,7 @@ class TaskLifecycleAdapter:
 
         view = as_task_state_view(state)
         definition = self.task_definition
+        self._temporal_predicate_state.reset()
         if definition is None:
             return self.placeholder_evaluation(batch_size=view.batch_size if view.is_batch else None)
 
@@ -140,6 +430,71 @@ class TaskLifecycleAdapter:
                 legacy_current_snapshot,
             )
         return self.normalize_evaluation(evaluation, view)
+
+    def evaluate_predicates(
+        self, context: TaskEvaluationContextV1
+    ) -> TaskPredicateEvaluationV1:
+        """Explicitly read task predicates without invoking reward evaluation.
+
+        This method is intentionally not called by ``step`` or observation
+        construction. Callers may inspect a result repeatedly; committing any
+        temporal state remains a distinct lifecycle action.
+        """
+
+        if not isinstance(context, TaskEvaluationContextV1):
+            raise TypeError("predicate evaluation requires TaskEvaluationContextV1")
+        definition = self.task_definition
+        evaluate = getattr(definition, "evaluate_predicates", None)
+        if not callable(evaluate):
+            return TaskPredicateEvaluationV1.no_evaluator()
+        result = evaluate(context)
+        if not isinstance(result, TaskPredicateEvaluationV1):
+            raise TypeError(
+                "task predicate evaluator must return TaskPredicateEvaluationV1"
+            )
+        if context.state.is_batch:
+            for name, predicate in result.predicates.items():
+                if predicate.status == "available":
+                    if not isinstance(predicate.value, np.ndarray):
+                        raise ValueError(
+                            f"batch predicate {name!r} must return one bool per environment"
+                        )
+                    if predicate.value.shape != (context.state.batch_size,):
+                        raise ValueError(
+                            f"batch predicate {name!r} has the wrong leading dimension"
+                        )
+        elif any(
+            predicate.status == "available"
+            and isinstance(predicate.value, np.ndarray)
+            for predicate in result.predicates.values()
+        ):
+            raise ValueError("scalar predicate evaluation cannot return batch values")
+        return result
+
+    def commit_temporal_predicates(
+        self, context: TaskEvaluationContextV1
+    ) -> TaskPredicateEvaluationV1:
+        """Commit one task predicate sample at its explicit state boundary.
+
+        Repeated reads remain pure; only this explicit method advances the
+        lifecycle-owned temporal memory. Exact duplicate commits are idempotent,
+        while conflicting or out-of-order commits fail closed.
+        """
+
+        if not isinstance(context, TaskEvaluationContextV1):
+            raise TypeError("temporal commit requires TaskEvaluationContextV1")
+        if context.boundary_identity is None or context.sample_clock is None:
+            raise ValueError(
+                "temporal predicate commit requires a typed state boundary and sample clock"
+            )
+        if self._temporal_predicate_state.rules and context.state.is_batch:
+            raise StageUnavailableError(
+                "temporal predicate commits currently require a scalar evaluation boundary"
+            )
+        evaluation = self.evaluate_predicates(context)
+        if not self._temporal_predicate_state.rules:
+            return evaluation
+        return self._temporal_predicate_state.commit(context, evaluation)
 
     def build_observation(
         self,
@@ -512,6 +867,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         )
 
     def close(self) -> None:
+        self._temporal_predicate_state.reset()
         self.runtime.close()
 
     def _get_episode_limits(self) -> tuple[int, bool]:

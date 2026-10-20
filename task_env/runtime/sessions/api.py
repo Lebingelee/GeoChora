@@ -1,12 +1,15 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
-from .provenance import provider_build_identity
+from collections.abc import Mapping
 from typing import Protocol
 
+from .provenance import provider_build_identity
+
 from ...artifacts import (
-    CanonicalStateView, CapabilityClaim, ExecutionSpec, ProviderCapabilityManifest,
-    TaskArtifact, admit_capabilities,
+    CanonicalStatePublicationV1, CanonicalStateView, CapabilityClaim, ExecutionSpec,
+    FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
+    StateRequirements, TaskArtifact, admit_capabilities,
 )
-from ...artifacts.execution import RealizedInitialState, ResetSample
+from ...artifacts.execution import EpisodeResetPlanV1, RealizedInitialState, ResetSample
 from .source import RuntimeSource
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
@@ -16,7 +19,16 @@ PROFILE = 'p1_2_scalar_cpu_v0'
 
 class RuntimeSession(Protocol):
     def reset(self, sample: ResetSample) -> RealizedInitialState: ...
+    def reset_plan(self, plan: EpisodeResetPlanV1) -> RealizedInitialState: ...
     def snapshot(self) -> CanonicalStateView: ...
+    def snapshot_v1(
+        self,
+        *,
+        scene: SceneDefinition,
+        joint_bindings: Mapping[str, JointDefinition],
+        frame_bindings: Mapping[str, FrameReference],
+        requirements: StateRequirements,
+    ) -> CanonicalStatePublicationV1: ...
     def step(self) -> CanonicalStateView: ...
     def close(self) -> None: ...
 

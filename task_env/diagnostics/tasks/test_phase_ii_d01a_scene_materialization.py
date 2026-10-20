@@ -33,7 +33,14 @@ from task_env.artifacts.execution import ResetSample
 from task_env.diagnostics.tasks.test_phase_ii_a04_asset_evidence import (
     MENAGERIE_REVISION,
 )
-from task_env.environment import ReferenceSpec, TaskCompositionSpec
+from task_env.environment import (
+    ReferenceSpec,
+    TaskCompositionSpec,
+    TaskInitializationV1,
+    TaskRoleDeclarationV1,
+    TaskSourceV1,
+    sample_episode_reset_plan,
+)
 from task_env.environment.configuration import resolve_env_config
 from task_env.objects.nut_assembly import SquarePegObject
 from task_env.robots.panda import PandaAgent
@@ -582,3 +589,47 @@ def test_d01a_reset_tolerance_rejects_over_tolerance_and_build_failure(tmp_path)
     )
     with pytest.raises(ET.ParseError):
         materialize(artifact, _execution(), source=malformed_source)
+
+
+def test_b02_plan_consumes_the_exact_a05_v3_scene_identity(tmp_path):
+    """Join B02's rollout gate to D01a's real A05 Scene-v3 materialization."""
+    scene_module = pytest.importorskip("scene", reason="GeoPhys public scene importer is required")
+    scene_definition = _a05_scene()
+    artifact, _ = _artifact_and_sample(scene_definition)
+    source, imported, closure_digest, _, _ = _source_input(
+        scene_module, tmp_path / "b02-a05-v3", scene_definition, artifact,
+    )
+    task_source = TaskSourceV1(
+        artifact.task_id,
+        artifact.artifact_version,
+        scene_definition.scene_id,
+        (
+            TaskRoleDeclarationV1("manipulator", "robot", "ids", ("panda-main",), "exactly_one"),
+            TaskRoleDeclarationV1(
+                "target_peg", "rigid_body", "ids", ("square-peg-instance",), "exactly_one",
+            ),
+        ),
+        TaskInitializationV1(
+            "phase-ii-b02-a05-fixed", "frozen-authored-v0", "training",
+            "zero_named_joint_and_entity_velocities", "arm_targets_at_initial_joints_gripper_open",
+        ),
+    )
+    plan = sample_episode_reset_plan(task_source, scene_definition, artifact, task_seed=31)
+    assert plan.role_binding.scene_identity_hash == scene_definition.identity_hash
+    assert plan.role_binding.bindings == {
+        "manipulator": "panda-main", "target_peg": "square-peg-instance",
+    }
+    assert source.scene_definition.identity_hash == plan.role_binding.scene_identity_hash
+    assert source.source_closure_digest == closure_digest
+    assert imported is not None
+
+    session = materialize(artifact, _execution(), source=source)
+    try:
+        realized = session.reset_plan(plan)
+        evidence = session.reset_plan_evidence
+        assert realized.reset_sample_id == plan.reset_sample.sample_id
+        assert evidence["scene_identity_hash"] == scene_definition.identity_hash
+        assert evidence["role_bindings"] == dict(plan.role_binding.bindings)
+        assert session.step().control_step == 1
+    finally:
+        session.close()

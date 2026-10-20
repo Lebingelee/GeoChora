@@ -29,7 +29,7 @@ class _MuJoCoSession(_SessionValues):
         self._joint_addresses = {
             semantic: self._addresses(native, free=False) for semantic, native in source.joints.items()
         }
-        self._free_addresses = {semantic: self._addresses(native, free=True)[0]
+        self._free_addresses = {semantic: self._addresses(native, free=True)
                                 for semantic, native in source.free_joints.items()}
         self._bodies = {semantic: self._model.body(native).id for semantic, native in source.bodies.items()}
         self._frames = {semantic: self._model.site(native).id for semantic, native in source.frames.items()}
@@ -44,13 +44,14 @@ class _MuJoCoSession(_SessionValues):
         return int(self._model.jnt_qposadr[joint]), int(self._model.jnt_dofadr[joint])
 
     def reset(self, sample):
+        self._begin_reset()
         self._validate_sample(sample)
         self._mj.mj_resetData(self._model, self._data)
         self._native_steps = 0
         for name, value in sample.joint_position.items():
             self._data.qpos[self._joint_addresses[name][0]] = value
         for name, requested in sample.poses_world.items():
-            address = self._free_addresses[name]
+            address = self._free_addresses[name][0]
             self._data.qpos[address:address+7] = (*requested.position, *requested.quaternion_wxyz)
         self._data.qvel[:] = 0
         self._data.act[:] = 0
@@ -62,7 +63,7 @@ class _MuJoCoSession(_SessionValues):
         self._completed_actuator_force = self._data.actuator_force.copy()
         return self._realized(sample)
 
-    def snapshot(self):
+    def _snapshot_with_native_free_joints(self):
         self._require_reset()
         data = self._data
         positions = {name: float(data.qpos[address[0]]) for name, address in self._joint_addresses.items()}
@@ -90,7 +91,19 @@ class _MuJoCoSession(_SessionValues):
             time = self._control_step * self._artifact.timebase.control_dt
         elif self._inner_interval_active:
             time = float(data.time)
-        return self._state(positions, velocities, poses, time)
+        state = self._state(positions, velocities, poses, time)
+        free_joint_native = {
+            name: (
+                tuple(float(value) for value in data.qpos[qpos:qpos + 7]),
+                tuple(float(value) for value in data.qvel[dof:dof + 6]),
+            )
+            for name, (qpos, dof) in self._free_addresses.items()
+        }
+        return state, free_joint_native
+
+    def snapshot(self):
+        self._require_reset()
+        return self._snapshot_with_native_free_joints()[0]
 
     def control_feedback(self, state):
         from .control import feedback_value
@@ -131,6 +144,7 @@ class _MuJoCoSession(_SessionValues):
                 self._completed_actuator_force = self._data.actuator_force.copy()
         self._mj.mj_forward(self._model, self._data)
         self._control_step += 1
+        self._state_revision += 1
         return self.snapshot()
 
     def _step_physics_once(self):

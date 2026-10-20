@@ -233,6 +233,61 @@ D01a 的 4 项定向测试全部通过，receipt 明确限定为一个 provider/
 不构成 MuJoCo、contact、controller/task success、D01b 或 Qualification 证据。接下来按依赖图可进入 D02b；B01/B02
 须等待 D02b，不能仅凭 D01a 提前越过其直接前置。
 
+### 5.3 D02b 实际切片与后续顺序（2026-10-20）
+
+D02b 在 D01a 后按表 3 完成有界实现。真实 GeoPhys/MuJoCo CPU free-body probe 和现有 Recorder 内存副本
+边界测试通过；本轮只证明 consumer/Recorder in-memory ownership，不触及 H5 schema。为保持职责与依赖清晰，
+不将 C05a 整体前移，也不让 D02b 依赖未来的 typed-state persistence：C05a 仍在 C02a、C01b、D05a 后扩展
+三种既有存储格式；若将来需要将 typed state 作为持久化字段，应在该切片内版本化并单独验收。
+
+因此后续实际顺序按依赖图而非 Goal 编号推进：**B01 → B02 → B03a → B03b → B04b → B05**。
+B04a 已在早期切片完成，D02b 是 B01/B02 的真实 provider 前置；B02 必须等待 B01 和 D02b，B03b 必须等待
+B03a，B04b 必须等待 B03b，B05 必须等待 B04b。B 完成后再回到表 3 的 C01b，而不是提前启动 C05a。
+
+截至 2026-10-20，B01 和 B02 已按此调整顺序完成 bounded implementation。B02 保留 `ResetSample` v0，扩展
+现有 `RuntimeSession.reset_plan()` 做 Scene identity 与 rollout 前 realization gate；GeoPhys/MuJoCo CPU 三刚体
+probe、PickCube PCG64-v0/NutAssembly NA-S0 sample 相等检查，以及 A05 `scene-definition-v3`/source-closure
+GeoPhys fixed-reset integration 均通过。自由刚体随机化 probe 本身不代表通用 A04 importer lowering。
+详细范围与限制见
+[B02 bounded slice](02_Phase_B_Task_Semantics.md#b02-bounded-rolereset-plan-slice-2026-10-20)。
+B03a 现已通过显式只读 predicate/action-context contract 与现有 Reward Oracle 定向回归：它复用
+`TaskDefinitionBase` / `TaskLifecycleAdapter`，让 false、unavailable 与 no-evaluator 可区分；Pendulum 的
+windowed success 仍留给一次性 temporal commit，不在 predicate read 中累计。新增 B03a 与 PickCube/NutAssembly
+selected consumer/reference construction 回归合计 **50 passed**；B01/B02/D01a/D02b 与 B03a 组合回归另 **25 passed**，
+只有一条 Taichi 上游 deprecation warning。详细实现范围与测试记录见
+[B03a slice](02_Phase_B_Task_Semantics.md#b03a-read-only-predicate-action-interval-context)。
+B03b 现已完成：TemporalRule 仅声明 rising-edge、样本计数 dwell 和有序 edge sequence，mutable progress 留在
+现有 lifecycle owner；reset、gap、missing、duplicate/conflicting boundary 与乱序均有明确处置。B03a/B03b 与
+reference/selected consumers 回归 **55 passed**；B01/B02/D01a/D02b 与两切片合计 **30 passed**，仍只有一条 Taichi
+上游 deprecation warning。临时 sample-count dwell 不冒充物理连续时间；边界身份/clock来自 D02b 契约，真实 Provider
+NativeIntervalEvidence 与 batch temporal commit 保持未支持。详细范围见
+[B03b slice](02_Phase_B_Task_Semantics.md#b03b-bounded-temporal-memory-boundary-commit)。
+B04b 已按依赖完成 bounded Source→TaskArtifact v1 compiler/codec/hash；冻结 TaskArtifact v0 和未证明的历史轨迹
+reader 均保持原样。新编译器只产 candidate，不接现有 Runtime/Recorder 主链。随后完成 B05 reference task 语义差分与
+旧路线保护；B 阶段收尾后按依赖返回表 3 的 C01b。
+
+B04b 在原定依赖上完成：`TaskArtifactV1` 与 exact-schema `decode_task_artifact()` 留在现有 artifact owner；
+编译器复用 strict B01 Source、A Scene identity、B02 role-candidate validation 与旧 v0 semantic bridge。旧 Entity
+identity 必须精确存在；非同名 Frame/Joint 只接受显式类型化绑定，绑定进入 v1 identity。它用逐字段
+`source_retained_v0_fields` 和 source Artifact identity 指针显式保留尚不能由 Canonical Scene 精确表达的旧 World
+数据，不复制 Scene、Entity topology 或 Provider Runtime。B04b+B04a codec fixture/roundtrip/reject 合计 **9 passed**；
+与 B01/B02/B03a/B03b、reference construction、selected consumers 定向回归合计 **77 passed**，包含一条 Taichi 上游
+弃用警告。没有改 Timebase 精确 gate、ResetSample/State/Camera/
+Trajectory/H5 reader，也没有真实旧 H5 golden bytes，因此这些 reader compatibility 继续 deferred。详细边界见
+[B04b slice](02_Phase_B_Task_Semantics.md#b04b-taskartifact-v1)。
+
+B05 已按上述顺序完成 bounded semantic gate：NutAssembly 使用 A05 source-backed Scene projection，PickCube 使用 A04 实际
+Panda imported structure，并把任务局部 table/cube 几何留在源 TaskArtifact identity 下；两个 v1 candidate 均在固定
+`CanonicalStateView` fixture 上保持 legacy evaluator 的 success/reward/metrics。原 SelectedReferenceEnv、ResetSample 与
+NutAssembly Outcome/Expert 分离路线继续由既有回归保护。B01–B05 加 A05/D01a/D02b、B04a、reference construction、
+selected consumers、NutAssembly outcome 定向集合为 **123 passed**，仅一条 Taichi 上游弃用警告。此证据不接通 v1
+Runtime/Recorder 路线，也不代表实际 trajectory replay、Stage-1、Provider qualification。B 阶段后按依赖返回 **C01b**；
+C05a 不提前于 C01b、D05a 和 C02a。
+
+B01 的实际源契约只收显式 Entity-ID 候选；当前 A `EntityInstance` 没有 tags owner，因此 tags 选择不能作为 B02
+前置假设，也不能临时新增第二套 registry。B02 负责把候选解析到 A03 Robot/Entity 声明并证明 reset-time
+selection；若 region/type selector 在现有 Scene 中无法解析，应保留为 unsupported/deferred，而非静默按名称猜测。
+
 ## 6. 原稿保存、文档验证与二审交接
 
 原稿只通过第一次提交保存，不在活动目录创建第二份 canonical 副本。第一次提交五个文件的 SHA-256：

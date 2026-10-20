@@ -244,14 +244,75 @@ Experiment、Provider、Controller 的具体实例参数、Policy/Training Budge
 - **风险**：YAML Schema 与 `ResolvedEnvConfig` 重复，或把 executable hooks 当成通用 Python 包机制。
 - **Codex AUDIT Prompt**：列出当前任务 config 中 `recipe`/`environment` 与新 task-source 字段的映射差异，提出可增量迁移的最小 schema。
 
+#### B01 bounded source and hook declaration slice (2026-10-20)
+
+在 `task_env.environment` owner 中新增 provider-free `TaskSourceV1`、严格 loader 和 hook metadata contract；
+这是 authoring input，不是新 TaskDefinition runtime、TaskArtifact 或 config resolver。首版只收
+`identity`、Canonical Scene ref、Role declarations 与 Hook declarations；初始化/语义/交互/time requirements
+仍由后续 B02/B03 slices 扩展。未知字段和 schema/version/type/cardinality/role/hook placement 不匹配均拒绝。
+
+为贴合当前 A Scene owner，Role selector 只接受显式 Entity-ID 候选列表；不接受 tags，因为 canonical
+`EntityInstance` 尚无 tags/selector metadata owner。B02 可直接在这些候选上实现确定性 reset selection，候选必须
+在 A Scene 中解析；不得为此另建 tags registry。当前 parser 的 cardinality 限于 `exactly_one`；更广 cardinality
+仅在 B02 的实际需求和 oracle 明确后加入。`entity_type` 是 Task Source selector 的受限提示，B02 必须用 A03
+`RobotInstance`/Entity refs 验证候选，不构造第二份 Scene taxonomy。
+
+Hook declarations 仅记录 kind、稳定 ID/version/code hash、输入、capability dependencies、determinism、phase
+及 pure/stateful 标记。authoring/initialization/semantic 分别绑定 source_compile/reset_sample/evaluation_boundary；
+seeded hook 必须声明 `task_seed`，前两类必须 pure。任何 Hook 都不动态 import 或执行；其可恢复源码闭包和最终
+TaskArtifact identity 归 B04b 收敛。
+
+既有 `environment.configuration.load_yaml_mapping()` 继续是公共 YAML loader；现增加 SafeLoader duplicate-key
+拒绝，并保留 YAML merge-key 的本地覆盖语义。当前 PickCube legacy adapter 只投影 recipe 中的 task/version/Scene
+和固定 agent/object IDs，`environment` 仍留给原 config resolver，且不重写 TaskArtifact v0。
+定向验证：`task_env/diagnostics/tasks/test_phase_ii_b01_task_source.py` 6 passed；与 B04a legacy fixtures、C01a
+config/execution-plan、reference construction 合计 **35 passed**。子进程 import probe 未加载 GeoPhys/MuJoCo/SAPIEN/
+Genesis/Taichi；尚未执行任意 Hook、Role resolution、Artifact compilation 或 native runtime。
+
 ### B02 — Role Binding / Scene Variant / Deterministic Reset
 
 - **依赖**：B01、B04a、D01a、D02b；A 的 Entity Identity/Frame。
-- **任务**：Role Cardinality/Selector 与 per-reset immutable RoleBinding；初始化参数 hard bounds、sampler/version；Sample/realized provenance。
+- **任务**：Role Cardinality/Selector 与 per-reset immutable RoleBinding；初始化参数 hard bounds、sampler/version；Sample/realized provenance。沿用现有 `ResetSample` v0 与 `RuntimeSession`，只增 plan wrapper 和 rollout gate。
 - **验收**：同 seed/version/Scene 得到相同 Role/Sample；候选重排与独立 RNG domain 可测；
   非法 cardinality/资源/overlap 失败；Provider 不替换 sample；requested/realized tolerance 在 rollout 前核验。
+  `RuntimeSource` Scene hash 不匹配、Artifact 声明 topology 缺失或 reset realization 超 tolerance 必须 fail closed；
   缺 D01a realization 证据不得将完整 B02 标完成；拓扑变化必须明确拒绝。
 - **Codex AUDIT Prompt**：对比现有 `ResetSample`、`RealizedInitialState`、PickCube `sample_reset` 与 NutAssembly `NA-S0`，确定需新增的最少字段和 version strategy。
+
+#### B02 bounded Role/reset-plan slice (2026-10-20)
+
+此切片只扩展现有 `task_env.environment.TaskSourceV1` 与 `task_env.artifacts.execution`：增加可选的
+`TaskInitializationV1`、`RoleBindingV1` 和 `EpisodeResetPlanV1`。B01 未含 initialization 的 YAML 仍可读取；
+只有构造 reset plan 时才要求初始化声明。Role selector 仍限显式 Entity IDs 和 `exactly_one`；按规范化候选
+与 per-role `SHA-256 → PCG64` domain 选取，增加无关 disjoint role 不改变既有 binding。
+
+Role resolution 要求显式传入精确 task/version 对应的 TaskArtifact v0 和 Scene ref；全部 Artifact Entity 及其声明的
+Frame/Joint 子拓扑都必须在 structured A Scene 中找到，即使某实体不是本轮 Role 候选也不能漏掉。`robot` 候选必须
+是 A03 `RobotInstance` 且 Artifact kind 为 `embodiment`；`rigid_body` 候选只接受 Artifact `static`/`movable` kind。
+Scene identity hash 绑定完整结构及 Scene variant。
+此处不把 A AssetDeclaration identity 与旧 Artifact `asset_reference` 混成一个身份 owner；A04/D01a 继续负责源资产
+映射和 importer evidence。随机化只读取现有 `InitializationContract.randomization`/`UniformDimension`：`pcg64-v0`
+复用 PickCube 的顺序 PCG64 draw、`pcg64-domain-v1` 为每个 dimension 独立派生 RNG、`frozen-authored-v0`
+只接受空随机化集；其余版本显式拒绝。现支持位置 x/y/z 与已声明 semantic/role joint position，其他 dimension
+语义保持 unsupported，不猜测映射。
+
+`EpisodeResetPlanV1.to_provider_sample()` 返回原有同一 `ResetSample` v0；不改旧 Artifact、sample hash 或 Provider reset ABI。
+现有 `RuntimeSession.reset_plan()` 先确认 materialized source ID 与 plan 所绑 Scene hash 相同，再调用原 `reset(sample)`；
+只有既有 `validate_reset_realization()` 的 requested/measured tolerance 通过，session 才开放后续 snapshot/step。
+传统 `reset(sample)` 入口仍可用，显式走 B02 的调用方应使用 `reset_plan()`。
+
+定向验收：`test_phase_ii_b01_task_source.py` 与 `test_phase_ii_b02_reset_plan.py` **13 passed**，覆盖
+候选重排、RNG domain 隔离、包括非 Role Artifact Entity 在内的 Scene/Artifact topology 缺口、rigid_body/Robot 类型错配、
+resolver 缺失 TaskArtifact 的拒绝、overlap、hard bounds、reset plan identity、Scene hash gate，
+以及 GeoPhys/MuJoCo CPU 三自由刚体 reset；并逐字段确认现有 PickCube PCG64-v0 和 NutAssembly NA-S0
+factory sample 与 plan 中的 ResetSample v0 完全相等。`test_b02_plan_consumes_the_exact_a05_v3_scene_identity`
+在 D01a 已验证的 A05 v3 Scene/source-closure 路径上另通过 GeoPhys reset-plan gate；这个集成 probe 使用固定
+authored initialization，不代表 A04 importer 已验证任意 free-body topology。三自由刚体随机化 probe 使用直接构造的
+bounded MJCF source 与 Scene-v2 identity，不代替真实 Asset import/closure 证据。新增 reset-plan gate rejection 使 session 在 rollout 前锁定；
+合并重跑 B01/B02/D01a/D02b 四个定向文件的最终命令 **20 passed**；B04a/C01a/reference construction 回归
+**29 passed**。GeoPhys 用例有 Taichi 上游 `locale.getdefaultlocale` 弃用警告。证据仅覆盖 candidate Artifact、
+固定 topology、CPU 和两个已实测 Provider；
+不代表 freeze/Judge、完整 PickCube/NutAssembly rollout、通用 importer free-joint projection 或 SAPIEN/Genesis 支持。
 
 ### B03 — Typed Predicate / Temporal Evaluator
 
@@ -260,6 +321,71 @@ Experiment、Provider、Controller 的具体实例参数、Policy/Training Budge
   reset 清 memory；重复 observation/diagnostics 不推进语义；同 boundary 重复/乱序 commit 拒绝或幂等；
   native Guard 读取不当作 outer sample；missing/no-evaluator/False 可区分，PickCube lift-only 不变。
 - **Codex AUDIT Prompt**：先比较 `TaskLifecycleAdapter` 与 `task_env/tasks/guarded_transition.py`，只复用可复用语义，不把 Expert Guard 偷换成一般 Task Predicate。
+
+<a id="b03a-read-only-predicate-action-interval-context"></a>
+
+#### B03a — 只读 Predicate 与 Action/Interval Context（2026-10-20）
+
+在现有 `TaskDefinitionBase` 与 `TaskLifecycleAdapter` 上增加显式只读入口，没有新增 predicate engine 或第二套 evaluator：
+`TaskEvaluationContextV1` 包含当前/前一 `TaskStateView`、typed requested action/schema、既有 `AppliedControl`、elapsed step、
+已有 `Timebase` 和可选 `NativeIntervalEvidence`；action payload 为复制后的只读值。声明 cadence 与 measured interval 分开，
+未提供 interval evidence 时不从配置或 sample 数推导“实测”时间。`TaskLifecycleAdapter.evaluate_predicates()` 必须由调用方显式调用，
+step、observation 和 diagnostics 路径不会暗中触发，也不提交 task memory。
+
+`TaskPredicateEvaluationV1.resolve()` 返回 `available` + bool value（False 不是缺测）、`unavailable`（含明确原因）、
+`no_evaluator` 三类可区分结果；已声明 evaluator 未产出某名字时为 `unavailable/predicate_not_produced`。
+PickCube `cube_lifted` 逐项复用 `_evaluate_values()`，成功仍仅由 lift 决定。Pendulum 只读暴露瞬时 `upright`；
+纯读取不会推断其依赖窗口的 `task_success`，B03b 可在单独 temporal commit 中给出该结果。
+旧 `TaskDefinition.evaluate()`、Pendulum torque-cost、scalar/batch 五步窗口、PickCube reward/metrics 和 selected-reference
+native Guard 回调不变。Expert Guard 仍归 task solution，不成为通用 Predicate API。
+
+定向验收 `test_phase_ii_b03a_predicates.py` 覆盖 requested/applied action 区分所依托的既有值类型、action 只读复制、声明/实测
+interval、false/missing/no-evaluator 区分、PickCube lift-only oracle 和 Pendulum scalar/batch 重复只读调用不推进窗口，且核对
+torque cost 与第五步 success。与 `test_reference_construction.py`、`test_selected_consumers.py` 一起 **50 passed**；
+另与 B01/B02/D01a/D02b 四份依赖切片一起 **25 passed**（含一条 Taichi 上游 deprecation warning）。本切片不构成新 task/provider qualification。
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=GeoPhys/src:. python -m pytest -q -p no:cacheprovider \
+  task_env/diagnostics/tasks/test_phase_ii_b03a_predicates.py \
+  task_env/diagnostics/tasks/test_reference_construction.py \
+  task_env/diagnostics/tasks/test_selected_consumers.py
+```
+
+<a id="b03b-bounded-temporal-memory-boundary-commit"></a>
+
+#### B03b — 有界 Temporal Memory 与显式边界提交（2026-10-20）
+
+继续扩展 `TaskDefinitionBase` 与 `TaskLifecycleAdapter`，不改变任何 provider/runtime 或 reward evaluator：TaskDefinition
+只声明 `TemporalPredicateRuleV1`（`rising_edge`、连续 outer-sample `dwell`、有序 rising-edge `sequence`）；可变进度和
+last-commit identity 由其现有 `TaskLifecycleAdapter` 持有，并随 `reset_task()` 清除。暂不扩展成 Artifact DSL、
+continuous-time guard 或新的 state manager。`commit_temporal_predicates()` 是唯一推进点，必须提供既有
+`StateBoundaryIdentity` 与 evaluation-boundary `StateSampleClock`；单纯 `evaluate_predicates()`、observation、诊断读取、
+Runtime native substeps 均不推进 temporal memory。
+
+精确相同 boundary/input 重复 commit 幂等回传同一结果；同 boundary 的状态/action/interval/predicate 变化拒绝，乱序拒绝。
+control-step gap、missing/unavailable source 与 reset 清除相关连续进度；identity 更换未经过 reset 也拒绝。Dwell 的
+`required_samples` 明确为 evaluation-boundary 数，非物理秒/native substep；sequence 以不同 boundary 上的 rising edge 顺序匹配，
+baseline 缺失、同时 edge 或缺测不伪造成功。Temporal commit 当前限 scalar evaluation boundary，batch 只保留 B03a 的只读
+predicate array；在没有 per-environment boundary identity 前 fail closed。
+
+Pendulum 声明 `upright` 的五-sample dwell 输出 `task_success`，只在 explicit commit 结果中可见；既有
+`PendulumTaskDefinition.evaluate()` 仍是 reward/success 的当前 owner，`torque_cost` 与 scalar/batch `_upright_steps`
+窗口原样保留。对同一输入 trace，定向测试逐步比较 temporal `task_success` 与旧 reward oracle；测试还覆盖 dwell/sequence/edge、
+25 个重复 predicate reads 后仅一次 commit、重复 commit、冲突 boundary、乱序/gap/missing/reset、native interval 内
+25 个 substeps 只计一个 outer sample。selected Expert Guard 与 native callback 不接入此提交点。
+
+`test_phase_ii_b03b_temporal_commit.py` **5 passed**；与 B03a、reference construction 和 selected consumers 合计
+**55 passed**。B01/B02/D01a/D02b 与 B03a/B03b 六份定向文件合计 **30 passed**，含一条 Taichi 上游
+`locale.getdefaultlocale` 弃用警告。当前仅是 scalar boundary 的 S1 语义契约/旧 consumer 回归，不代表有真实 provider
+输出 NativeIntervalEvidence、batch temporal commit、TaskArtifact 序列化、selected native callback 集成或 qualification。
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=GeoPhys/src:. python -m pytest -q -p no:cacheprovider \
+  task_env/diagnostics/tasks/test_phase_ii_b03a_predicates.py \
+  task_env/diagnostics/tasks/test_phase_ii_b03b_temporal_commit.py \
+  task_env/diagnostics/tasks/test_reference_construction.py \
+  task_env/diagnostics/tasks/test_selected_consumers.py
+```
 
 ### B04 — Existing TaskArtifact vNext / Identity Migration
 
@@ -300,6 +426,38 @@ Scene/Task/Execution/Recorder 是不同版本域，`v1` 不代表全局兼容。
 
 B04a 只增加上述基线夹具与 strict compatibility tests，不改 production schema、TaskDefinition、Recorder writer/reader，不编译 Task Source，不迁移 Artifact。A04/A05 复测留待后续开发完善后执行；本切片的测试不替代它们。
 
+<a id="b04b-taskartifact-v1"></a>
+
+#### B04b — bounded Source → TaskArtifact v1 compiler/codec (2026-10-20)
+
+在既有 `task_env.artifacts` owner 增加 `TaskArtifactV1` 和 `decode_task_artifact()`；原
+`TaskArtifact.from_mapping()` 仍只接受 `task-artifact-v0`，不通过字段形状猜版本，也不自动升级。新
+`compile_task_artifact_v1()` 位于现有 Task Source owner，必须显式接收 strict `TaskSourceV1`、结构化 A Scene
+与对应的 legacy v0 semantic bridge。它复用 B02 的 role-candidate 静态验证，不抽样、不创建 RoleBinding 或
+ResetSample；要求 source/task/scene identity 一致，旧 Artifact Entity 必须精确存在于 Scene，旧 Frame/Joint 必须
+精确匹配或由调用方提供类型化、逐项显式的 `FrameReference`/`JointReference` 绑定。编译结果保存解析后的绑定，绑定参与
+TaskArtifact v1 identity；不按字符串推测别名。Scene 只以 `schema_version + scene_id + identity_hash` 引用，不拷贝
+Scene 或旧 World entity topology。
+
+v1 精确保留现有 ActionIntent、world convention、Observation requirements、InitializationContract、
+SemanticDefinition、Timebase 和 RequiredCapabilitySet。旧 v0 Entity 的 `kind`、`asset_reference`、`geometry`、
+`collision_intent`、`parameters_si` 暂不能在 Canonical Scene 中精确表达；v1 记录 legacy v0 Artifact identity
+和逐字段 `source_retained_v0_fields` 指针，数据仍由原 v0 source 保有。没有近似映射；任何 Entity/Frame/Joint
+目标不匹配均拒绝。ExecutionSpec/Provider identity 不进入 Task Semantic Identity，Timebase 原 `physics_dt ×
+control_substeps == control_dt` gate 不变。
+
+这是 bounded candidate codec，不是 selected Task 的新默认 Artifact，也没有接入 `RuntimeSession`、Recorder、Camera、
+D01b 或 Task freeze。`TaskSourceV1` 当前不声明完整 predicate/Reward/Action requirements，因此该 candidate 仍从
+现有 v0 semantic bridge 取得相应字段；B03b temporal rules 尚未落盘。Capability manifest、ResetSample、State、Camera
+和三类 trajectory/H5 codec/readers 保持各自 owner。历史 H5/canonical-execution-v1 golden bytes 仍缺时，这些 reader
+不改并继续 DEFERRED；B04b 不把合成样本描述成旧文件兼容证据。完整 Stage-1/新主线由 B05 与后续 D01b/P99 gate 验证。
+
+B04b 新增 `test_phase_ii_b04b_task_artifact.py`，覆盖 Source/Scene/v0 编译链接、v1 roundtrip/hash、精确版本路由、
+未知字段/identity 拒绝与 topology mismatch；与 B04a codec 基线合计 **9 passed**。再与 B01/B02/B03a/B03b、
+reference construction、selected consumers 定向回归合计 **77 passed**，仅一条 Taichi 上游
+`locale.getdefaultlocale` 弃用警告。该结果仅是 bounded candidate codec 与旧 consumer/provider regressions，不证明新 v1
+进入现有执行链。
+
 ### B05 — Reference Task Semantics Migration / Gate
 
 - **依赖**：B04b。
@@ -308,6 +466,21 @@ B04a 只增加上述基线夹具与 strict compatibility tests，不改 producti
 - **Gate 分工**：本切片完成语义差分与 legacy 路由保护；vNext 新执行主链在 D01b/P99 验证。
   没有完整 Stage-1 证据的新版本继续为 candidate，不能因 B05 通过自动 freeze。
 - **Codex AUDIT Prompt**：提供“旧 predicate/参数 → 新 predicate/参数”的逐字段对照及 sample trace；未证明的近似必须标明。
+
+#### B05 bounded execution receipt (2026-10-20)
+
+B05 的语义桥接检查复用 A04/A05 现有 source-backed receipts，并只扩展 TaskArtifact candidate/测试路径：NutAssembly
+投影使用真实 Panda MJCF、procedural square peg 和 legacy factory evidence 组合的 A05 `scene-definition-v3`；对
+`panda-v1/base → panda-v1/link0` 等非同名结构引用要求显式 Frame/Joint 映射。PickCube candidate 使用 A04 真实
+Panda imported structure，table/cube 的几何与接触参数仍通过 v0 source Artifact identity 显式保留。两条路径都调用
+现有 v0 evaluator，对相同固定 `CanonicalStateView` 比较旧 Artifact 与 v1 candidate 的 success、reward、metrics；
+PickCube 还固定核对已接受边界的距离与 reward 数值。旧 SelectedReferenceEnv、ResetSample、NutAssembly Outcome/Expert
+分离路径仍由原有 reference/selected-consumer/outcome regression 覆盖，没有把 Task success 升格为 Expert completion。
+
+本次 B01–B05 与 A05/D01a/D02b、B04a、reference construction、selected consumers、NutAssembly outcome 定向集合为
+**123 passed**，一条 Taichi 上游 `locale.getdefaultlocale` 弃用警告。这里的 `CanonicalStateView` 是确定性语义
+fixture；它不构成 v1 Runtime/Recorder 主链、实际重放 trace、Stage-1 randomized feasibility、Stage-1 Judge、物理漂移
+归因或 Provider qualification。新 v1 仍为 candidate；TaskArtifact v0 identity 和 legacy execution routes 均未变。
 
 ## B.8 验收 Oracle 与质量标准
 

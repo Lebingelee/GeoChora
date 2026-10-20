@@ -1,0 +1,27 @@
+schema_version: task-source-v1
+identity:
+  task_id: place-red-block-v1
+  version: v1
+scene:
+  ref: scenes/tabletop-dual-arm@v1
+roles:
+  manipulator:
+    entity_type: robot
+    selection:
+      ids: [robot-left]
+    cardinality: exactly_one
+  target_block:
+    entity_type: rigid_body
+    selection:
+      ids: [red-block-a, red-block-b]
+    cardinality: exactly_one
+hooks:
+  - kind: semantic_hook
+    hook_id: place_red_block.success
+    version: v1
+    code_hash: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    inputs: [canonical_state, semantic_memory, frozen_params]
+    required_capabilities: [joint_state_query]
+    determinism: deterministic
+    evaluation_phase: evaluation_boundary
+    pure_or_stateful: stateful

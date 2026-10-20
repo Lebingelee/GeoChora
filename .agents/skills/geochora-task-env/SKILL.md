@@ -80,13 +80,49 @@ authorize implementation changes. Review Skill drift after API/registry/ownershi
 retirement/test/failure changes, using the maintainer refresh procedure and bounded validation.
 
 For advanced canonical state contracts, use the existing `task_env.artifacts` owner. `CanonicalStateView`
-remains the strict scalar `canonical-state-v0` route; D02a's `CanonicalStateViewV1`, typed Joint/Frame,
-StateRequirements, sample/boundary clocks, native interval evidence, and view lifetime values are
-provider-neutral S1 contracts. Use `decode_canonical_state_view()` for exact version dispatch and
-`project_canonical_state_v0()` only with explicit Scene v2/v3 plus legacy-name bindings. These values do
-not mean RuntimeSession/provider projections, contact readback, alias invalidation, Recorder storage, or
-moving free/spherical execution have been implemented; those require the D02b owner and evidence.
-Requirement capability IDs describe what a consumer needs and never add claims to a provider manifest.
+remains the strict scalar `canonical-state-v0` route; D02a added `CanonicalStateViewV1`, typed Joint/Frame,
+StateRequirements, sample/boundary clocks, native interval evidence, and view lifetime values. Use
+`decode_canonical_state_view()` for exact version dispatch and `project_canonical_state_v0()` only with
+explicit Scene plus legacy-name bindings. D02b adds `RuntimeSession.snapshot_v1()` and
+`CanonicalStatePublicationV1` on the existing GeoPhys/MuJoCo CPU sessions: the caller supplies the exact
+Scene identity, explicit Joint/Frame bindings, and StateRequirements; scalar state is projected from v0,
+and the bounded floating-joint path reads 7-position/6-velocity values into an owned snapshot. Legacy
+`snapshot()` remains v0. Optional unsupported contact is explicit unavailable; required contact and
+native-interval requests fail closed. SAPIEN/Genesis typed projection, spherical native readback, contact
+readback, and a versioned H5 state format are not implemented. The existing TransitionRecorder in-memory
+copy path has a bounded owned-storage probe; this does not claim typed-state H5 persistence. Requirement
+capability IDs describe what a consumer needs and never add claims to a provider manifest.
+
+For Phase II B02 reset selection, use `TaskInitializationV1`, `resolve_role_binding()`, and
+`sample_episode_reset_plan()` in `task_env.environment`; keep `RoleBindingV1` and
+`EpisodeResetPlanV1` beside the existing `ResetSample` in `task_env.artifacts.execution`. Initialization
+is optional when reading the B01 source shape, but required to build a reset plan. Reuse the Artifact's
+`UniformDimension` bounds and preserve the exact provider-facing ResetSample v0. `resolve_role_binding()` requires
+the matching TaskArtifact v0. The resolver checks explicit candidate IDs, all Artifact Entity and structured
+Scene topology coverage, RobotInstance classification, and
+disjoint role candidates; it does not create tags or an asset registry. Use `RuntimeSession.reset_plan()`
+for a plan-bound reset: it matches the materialized Scene identity, runs the existing requested/realized
+state gate, and keeps snapshot/step closed if that gate fails. The legacy `reset(sample)` route remains
+available. Current end-to-end B02 evidence covers three free rigid bodies on GeoPhys and MuJoCo CPU plus
+exact PickCube PCG64-v0 and NutAssembly NA-S0 ResetSample compatibility; a separate GeoPhys probe consumes
+the exact A05 Scene-v3/source-closure input with fixed authored initialization. The randomized three-body
+probe uses bounded direct MJCF/Scene-v2 input and does not qualify general A04 free-body import lowering.
+Do not infer full task rollout or SAPIEN/Genesis qualification from these probes.
+
+For Phase II B03a read-only predicates, use `TaskEvaluationContextV1` and call
+`TaskLifecycleAdapter.evaluate_predicates()` explicitly. The context separates the task's requested action and
+schema from the existing `AppliedControl`; declared `Timebase` cadence is not measured interval evidence, which
+must come from `NativeIntervalEvidence`. Resolve predicates through `TaskPredicateEvaluationV1.resolve()`:
+`available` with `value=False`, missing/unavailable data, and `no_evaluator` are distinct outcomes. Predicate reads
+must be pure and may repeat at one boundary; ordinary step and observation paths do not call them automatically.
+Current bounded task projections are PickCube lift-only and Pendulum instantaneous upright. Pendulum's windowed
+`task_success` is unavailable on a pure read; B03b exposes it through an explicit temporal commit. Declare only
+`TemporalPredicateRuleV1` rising-edge, sample-count dwell, or rising-edge sequence rules on the existing
+TaskDefinition. Call `TaskLifecycleAdapter.commit_temporal_predicates()` with the matching
+`StateBoundaryIdentity` and evaluation `StateSampleClock`: exact duplicate commits are idempotent, conflicts/order errors
+fail closed, and reset/gaps/missing inputs clear progress. Dwell counts outer evaluation samples, never seconds or native
+substeps. This route currently commits scalar boundaries only and is S1 contract evidence. Do not replace the existing
+reward `evaluate()` contract or reuse the stateful Expert Guard as a general predicate engine.
 
 For generic execution configuration, inspect the normalized `BaseTaskEnv.execution_plan` before assuming
 provider support. Known unsupported generic selections (including multi-agent materialization and a Panda
@@ -102,3 +138,22 @@ overrides replace the complete renderer selection, while other cameras use the e
 contracts and `CameraRenderSource.capture_identity()` are static request descriptions only. Current
 `RuntimeSession.materialize()` and `create_camera_session()` still consume the legacy selection/admission
 route; no arbitrary cross-provider pairing, actual device realization, or capture is implied.
+
+For Phase II B01 authoring input, use `task_env.environment.TaskSourceV1` and `load_task_source()` from the existing
+environment owner. The current strict envelope accepts task identity, a Scene reference, typed role selectors,
+and hook declarations; loading it does not alter `ResolvedEnvConfig` and never imports or executes a declared hook.
+`load_yaml_mapping()` rejects duplicate YAML mapping keys. Keep execution settings in the existing config resolver.
+`adapt_legacy_recipe_task_source()` is a compatibility projection for the old `recipe`/`environment` shape; it does
+not change PickCube's v0 Artifact identity. Role candidates are explicit Entity IDs because A's canonical
+`EntityInstance` has no tag metadata owner; B02 owns reset-time selection.
+
+For Phase II B04b's bounded compile, call `compile_task_artifact_v1()` with a validated Source, structured canonical
+Scene, and the existing v0 semantic bridge. It statically checks role candidates and exact legacy Entity references;
+legacy Frame/Joint aliases require explicit typed `FrameReference`/`JointReference` bindings and are included in the
+candidate identity. Compilation does not draw a reset sample. The resulting `TaskArtifactV1` references Scene schema/id/hash, snapshots
+the normalized Task Source mapping, carries the existing typed action/initialization/semantics/timebase/capability
+contracts, and identifies unrepresented v0 World fields through `source_retained_v0_fields` plus the source Artifact
+identity. Do not embed a second Scene/World copy, infer an approximate mapping, or treat the result as a RuntimeSession,
+Recorder, qualification, or freeze route. `TaskArtifact.from_mapping()` remains v0-only; use
+`task_env.artifacts.decode_task_artifact()` for exact v0/v1 dispatch. H5/trajectory/state/camera readers retain their
+independent version routes until real historical fixtures are available.

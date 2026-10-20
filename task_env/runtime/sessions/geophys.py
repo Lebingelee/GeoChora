@@ -28,7 +28,8 @@ class _GeoPhysSession(_SessionValues):
                        int(data['jnt_dofadr'][names.joints[native]]))
             for semantic, native in source.joints.items()
         }
-        self._free_addresses = {semantic: int(data['jnt_qposadr'][names.joints[native]])
+        self._free_addresses = {semantic: (int(data['jnt_qposadr'][names.joints[native]]),
+                                           int(data['jnt_dofadr'][names.joints[native]]))
                                 for semantic, native in source.free_joints.items()}
         self._bodies = {semantic: names.bodies[native] for semantic, native in source.bodies.items()}
         self._frames = {semantic: names.sites[native] for semantic, native in source.frames.items()}
@@ -38,6 +39,7 @@ class _GeoPhysSession(_SessionValues):
         self._initial = runtime.boundary.initial_state
 
     def reset(self, sample):
+        self._begin_reset()
         self._validate_sample(sample)
         initial = self._initial
         positions = np.array(initial.qpos, copy=True)
@@ -45,7 +47,7 @@ class _GeoPhysSession(_SessionValues):
         for name, value in sample.joint_position.items():
             positions[self._joint_addresses[name][0]] = value
         for name, requested in sample.poses_world.items():
-            address = self._free_addresses[name]
+            address = self._free_addresses[name][0]
             positions[address:address+7] = (*requested.position, *requested.quaternion_wxyz)
         for name, actuator in self._target_actuators.items():
             targets[actuator] = sample.joint_position[name]
@@ -57,7 +59,7 @@ class _GeoPhysSession(_SessionValues):
         ))
         return self._realized(sample)
 
-    def snapshot(self):
+    def _snapshot_with_native_free_joints(self):
         self._require_reset()
         readback = self._boundary.read_snapshot(SnapshotRequest(
             qacc=False, ctrl=False, body_pose=True, site_pose=True, simulation_time=True,
@@ -66,7 +68,19 @@ class _GeoPhysSession(_SessionValues):
         velocities = {name: float(readback.qvel[address[1]]) for name, address in self._joint_addresses.items()}
         poses = {name: pose(readback.body_xpos[index], readback.body_xquat[index]) for name, index in self._bodies.items()}
         poses.update({name: pose(readback.site_xpos[index], readback.site_xquat[index]) for name, index in self._frames.items()})
-        return self._state(positions, velocities, poses, readback.simulation_time)
+        state = self._state(positions, velocities, poses, readback.simulation_time)
+        free_joint_native = {
+            name: (
+                tuple(float(value) for value in readback.qpos[qpos:qpos + 7]),
+                tuple(float(value) for value in readback.qvel[dof:dof + 6]),
+            )
+            for name, (qpos, dof) in self._free_addresses.items()
+        }
+        return state, free_joint_native
+
+    def snapshot(self):
+        self._require_reset()
+        return self._snapshot_with_native_free_joints()[0]
 
     def control_feedback(self, state):
         from .control import feedback_value
@@ -100,6 +114,7 @@ class _GeoPhysSession(_SessionValues):
         self._require_reset()
         self._boundary.step(substeps=self._artifact.timebase.control_substeps)
         self._control_step += 1
+        self._state_revision += 1
         return self.snapshot()
 
     def _step_physics_once(self):

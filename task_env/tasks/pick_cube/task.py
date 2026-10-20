@@ -22,9 +22,16 @@ from ...artifacts.execution import ResetSample
 from ...assembly import TaskReferences
 from ...controllers.canonical import ProductionCanonicalPandaController
 from ...controllers.canonical.contracts import digest
-from ...environment import RuntimeSnapshot, TaskCompositionSpec, TaskEvaluation
+from ...environment import (
+    RuntimeSnapshot,
+    TaskCompositionSpec,
+    TaskEvaluation,
+    TaskEvaluationContextV1,
+    TaskPredicateEvaluationV1,
+    TaskPredicateResultV1,
+)
 from ...environment.configuration import overlay_public_env_config, resolve_env_config
-from ...environment.task_definition import TaskDefinitionBase
+from ...environment.task_definition import TaskDefinitionBase, as_task_state_view
 from ...registry import make_agent, make_object, make_scene, register_env
 from ...robots.panda import PandaAgent
 from ...runtime.sessions.source import RuntimeSource
@@ -148,14 +155,84 @@ class PickCubeTaskDefinition(TaskDefinitionBase):
         return self._evaluate_snapshot(current_snapshot)
 
     def _evaluate_snapshot(self, snapshot):
+        return self._evaluate_state_view(as_task_state_view(snapshot))
+
+    def _evaluate_state_view(self, state, *, batch_index=None):
         panda = self.references.agents["panda-v1"]
         cube_ref = self.references.objects["cube-v1"]
-        if snapshot.site_xpos is None or snapshot.body_xpos is None:
+        if state.site_xpos is None or state.body_xpos is None:
             raise ValueError("PickCube evaluation requires site_xpos and body_xpos")
-        cube_pos = snapshot.body_xpos[int(cube_ref.body_ids[0])]
-        eef_pos = snapshot.site_xpos[int(panda.eef_site_id)]
-        opening = float(np.sum(snapshot.qpos[panda.gripper_qpos_ids]))
+        if state.is_batch:
+            if batch_index is None:
+                raise ValueError("batch PickCube state requires an explicit row")
+            cube_pos = state.body_xpos[batch_index, int(cube_ref.body_ids[0])]
+            eef_pos = state.site_xpos[batch_index, int(panda.eef_site_id)]
+            opening = float(np.sum(state.qpos[batch_index, panda.gripper_qpos_ids]))
+        else:
+            cube_pos = state.body_xpos[int(cube_ref.body_ids[0])]
+            eef_pos = state.site_xpos[int(panda.eef_site_id)]
+            opening = float(np.sum(state.qpos[panda.gripper_qpos_ids]))
         return _evaluate_values(cube_pos, eef_pos, opening)
+
+    def evaluate_predicates(
+        self, context: TaskEvaluationContextV1
+    ) -> TaskPredicateEvaluationV1:
+        """Expose the existing lift oracle as a read-only typed predicate."""
+
+        if not isinstance(context, TaskEvaluationContextV1):
+            raise TypeError("PickCube predicates require TaskEvaluationContextV1")
+        state = context.state
+        if state.body_xpos is None or state.site_xpos is None:
+            return TaskPredicateEvaluationV1.available(
+                {
+                    "cube_lifted": TaskPredicateResultV1.unavailable(
+                        "required_pickcube_state_unavailable"
+                    )
+                }
+            )
+        try:
+            if state.is_batch:
+                evaluations = [
+                    self._evaluate_state_view(state, batch_index=index)
+                    for index in range(state.batch_size)
+                ]
+                values = np.asarray(
+                    [
+                        evaluation.success for evaluation in evaluations
+                    ],
+                    dtype=np.bool_,
+                )
+            else:
+                evaluation = self._evaluate_state_view(state)
+                evaluations = [evaluation]
+                values = evaluation.success
+        except IndexError:
+            return TaskPredicateEvaluationV1.available(
+                {
+                    "cube_lifted": TaskPredicateResultV1.unavailable(
+                        "required_pickcube_state_unavailable"
+                    )
+                }
+            )
+        if any(
+            not np.isfinite(
+                [
+                    evaluation.metrics["cube_lift"],
+                    evaluation.metrics["eef_to_cube_dist"],
+                ]
+            ).all()
+            for evaluation in evaluations
+        ):
+            return TaskPredicateEvaluationV1.available(
+                {
+                    "cube_lifted": TaskPredicateResultV1.unavailable(
+                        "required_pickcube_state_nonfinite"
+                    )
+                }
+            )
+        return TaskPredicateEvaluationV1.available(
+            {"cube_lifted": TaskPredicateResultV1.available(values)}
+        )
 
 
 def build_artifact() -> TaskArtifact:

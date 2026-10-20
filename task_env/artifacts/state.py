@@ -581,6 +581,22 @@ class StateViewLifetime(Contract):
         return self.storage_kind == "owned_snapshot" and self.valid_until == "retained"
 
 
+@dataclass(frozen=True)
+class CanonicalStatePublicationV1(Contract):
+    """Bind one canonical state view to the owner and lifetime of its storage."""
+
+    schema_version: str
+    view: CanonicalStateViewV1
+    lifetime: StateViewLifetime
+
+    def validate(self):
+        _choice(self.schema_version, {"canonical-state-publication-v1"}, "state publication schema")
+        if self.lifetime.boundary != self.view.boundary:
+            raise ValueError("state publication view and lifetime must share one boundary")
+        if self.lifetime.owner_id != self.view.boundary.provider_materialization_id:
+            raise ValueError("state publication lifetime owner must match its provider materialization")
+
+
 def decode_canonical_state_view(values: Mapping):
     """Dispatch only by an exact canonical state schema discriminator."""
     if not isinstance(values, Mapping):

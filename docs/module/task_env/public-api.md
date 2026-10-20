@@ -48,13 +48,19 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `resolve_env_config` | `task_env` | 解析并冻结公共配置；task-specific overlay 走 factory 分支 |
 | `AssetManifest` | `task_env.environment` | assembly 资产声明；保留本地 source/root 与版本字段，可选稳定 source reference/revision 和 procedural generator 元数据；构造时不读文件，也不证明 importer 消费了对应 bytes |
 | `make_parallel_env`, `register_parallel_env` | `task_env` | optional homogeneous factory，与 scalar 无互相 fallback |
-| `TaskArtifact`, `ExecutionSpec`, `CanonicalStateView`, `admit_capabilities` | `task_env.artifacts` | advanced data/admission contracts；不从 root 假造导出 |
+| `TaskArtifact`, `TaskArtifactV1`, `decode_task_artifact`, `ExecutionSpec`, `CanonicalStateView`, `admit_capabilities` | `task_env.artifacts` | advanced data/admission contracts；TaskArtifact dispatcher 按精确 discriminator 解码，不自动升级；不从 root 假造导出 |
+| `TaskSourceV1`, `TaskRoleDeclarationV1`, `TaskHookDeclarationV1`, `load_task_source` | `task_env.environment` | B01 strict authoring-input envelope；只含 identity/Scene reference/explicit Entity-ID role candidates/hook declarations，不执行 hooks，也不接收 execution config |
+| `compile_task_artifact_v1` | `task_env.environment` | B04b bounded compiler；组合已验证 Source、结构化 A Scene 与现有 v0 semantic bridge，旧 Frame/Joint 别名只能通过显式类型化绑定解析，输出引用 Scene identity 的 TaskArtifact v1 candidate；不创建 Runtime，也不代表 D01b/qualification 支持 |
+| `TaskInitializationV1`, `resolve_role_binding`, `sample_episode_reset_plan` | `task_env.environment` | B02 在现有 Task Source owner 中增加可选初始化声明及确定性 Role selection；采样必须使用结构化 A Scene 与对应 TaskArtifact v0，边界由 `UniformDimension` 持有 |
+| `RoleBindingV1`, `EpisodeResetPlanV1`, `ResetSample` | `task_env.artifacts.execution` | `EpisodeResetPlanV1` 仅包装 Role/Scene provenance 和现有 `ResetSample` v0；`to_provider_sample()` 原样返回同一 v0 对象，不改冻结 Artifact/sample schema |
+| `TaskEvaluationContextV1`, `TaskPredicateEvaluationV1`, `TaskPredicateResultV1`, `TemporalPredicateRuleV1`, `TaskLifecycleAdapter.evaluate_predicates`, `TaskLifecycleAdapter.commit_temporal_predicates` | `task_env.environment` | B03a 只读 predicate 与 B03b 显式 temporal commit；action/AppliedControl、声明 Timebase、实测 NativeIntervalEvidence、boundary/clock 均引用既有类型；step/observation 不自动调用。当前 temporal commit 限 scalar evaluation boundaries |
+| `adapt_legacy_recipe_task_source` | `task_env.environment` | 只读兼容投影：从旧 `recipe`/`environment` mapping 提取 task identity、Scene 与固定 agent/object role；environment 仍由既有 `ResolvedEnvConfig` 路径解析，不改 TaskArtifact v0 |
 | `ExecutionSpecV1`, `RendererSelectionV1`, `CameraRendererOverrideV1`, `decode_execution_spec` | `task_env.artifacts` | D05a 的显式版本化静态选择；保留旧 `ExecutionSpec` 无版本映射，v1 不自动降为 v0，也不表示已 admission/materialization |
-| `CanonicalStateViewV1`, `TypedJointStateValue`, `TypedFrameStateValue`, `StateRequirements`, `NativeIntervalEvidence`, `StateViewLifetime` | `task_env.artifacts` | D02a provider-neutral contracts 与显式 v0 projection；requirement ID 不扩展 Provider manifest，契约可用不代表 provider projection/native contact 已实现 |
+| `CanonicalStateViewV1`, `CanonicalStatePublicationV1`, `TypedJointStateValue`, `TypedFrameStateValue`, `StateRequirements`, `NativeIntervalEvidence`, `StateViewLifetime` | `task_env.artifacts` | D02a contracts；D02b publication 原子绑定 boundary/lifetime。当前只有 GeoPhys/MuJoCo CPU `RuntimeSession.snapshot_v1()` 有界支持 scalar/free-base readback；不增加 contact manifest 能力或 H5 state format |
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
-| `RuntimeSession`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile |
+| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。`reset_plan()` 校验 materialized Scene hash，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step；GeoPhys/MuJoCo CPU 有界验证通过。`snapshot_v1()` 另要求精确 Scene identity、Joint/Frame bindings 与 StateRequirements；contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 
@@ -68,6 +74,38 @@ Camera Sensor selection。现有 provider-capability-v0 mapping 原样保留；�
 配置公共 sections 包含 asset、scene、agents、objects、runtime、robot、action、observation、render、task、episode。
 通用 action mode 包括 `absolute_pose`、`delta_pose`、`absolute_joint`；以每个 task/robot 的
 `ExternalActionContract` 和 observation schema 为准，不能给 non-arm 强加 Panda 维度。
+
+`load_yaml_mapping()` 继续由 `environment.configuration` 所有，并使用 PyYAML SafeLoader 拒绝重复 mapping
+keys。B01 `TaskSourceV1` 是 task authoring input，不是 `ResolvedEnvConfig` 或自行完成的 `TaskArtifact`；B04b
+只能通过显式 `compile_task_artifact_v1()` 与现有 v0 semantic bridge 编译。其当前角色候选仅使用 explicit Entity IDs，
+因为 A 的 canonical `EntityInstance` 尚无 tags/selector metadata owner。
+未知 source/environment 混用字段会失败，hook
+引用不会触发 Python import 或执行。当前 PickCube `recipe`/`environment` 兼容适配仅投影 identity、Scene 与
+固定 entity roles；执行配置仍沿旧 resolver，legacy TaskArtifact v0 bytes/hash 不变。
+
+B02 的 `TaskInitializationV1` 对 B01 YAML 为可选字段；缺省保持旧 B01 输入可读，但 reset-plan 构造要求显式声明。
+`resolve_role_binding()` 要求显式传入匹配的 TaskArtifact v0，只接受显式 ID 候选，按排序候选和 per-role RNG domain
+生成 immutable binding；全部 Artifact Entity 与声明的 Frame/Joint 子拓扑都必须在 A Scene 中，Scene 可含 v0 未表达的额外结构。
+AssetDeclaration identity 与旧 Artifact `asset_reference` 分属各自 owner，不由 B02 合并比较。`RuntimeSession.reset_plan()`
+继续使用现有 `ResetSample` v0，并在 Scene identity 和 requested/realized tolerance gate 成功后才允许后续 snapshot/step；
+原 `reset(sample)` 兼容入口仍保留。B02 证据为 GeoPhys/MuJoCo CPU 三刚体 synthetic reset probe，加 PickCube PCG64-v0 与
+NutAssembly NA-S0 的逐字段 ResetSample 相等检查；另以 A05 `scene-definition-v3` 和真实 source closure 在 GeoPhys
+验证了固定 authored reset-plan 集成。随机化三刚体 probe 使用 bounded direct MJCF/Scene-v2，不代表 A04 importer
+已覆盖通用 free-body topology；不声称 TaskArtifact freeze、完整任务 rollout 或 SAPIEN/Genesis qualification。
+
+B03a 的谓词结果把已计算的 bool（包括 `False`）、缺测/未生成的 `unavailable` 和无 evaluator 的
+`no_evaluator` 明确区分。`TaskEvaluationContextV1` 复制冻结 requested-action payload；`AppliedControl`
+仍表示现有 runtime 控制结果。`Timebase.control_dt` 仅为声明 cadence，`measured_control_interval_s`
+只有输入现有 `NativeIntervalEvidence` 时才有值。当前 PickCube `cube_lifted` 复用其 lift-only reward oracle；
+Pendulum 暴露瞬时 `upright`，纯谓词读取不会推断依赖窗口的 `task_success`。谓词读取是 lifecycle 的显式调用，
+不会替代或改变旧 `TaskDefinition.evaluate()`、reward、Pendulum scalar/batch 窗口或 selected-reference native callbacks。
+
+B03b 的 `TemporalPredicateRuleV1` 只声明 rising-edge、连续 evaluation-boundary sample dwell 和按 rising-edge 匹配的 sequence；
+progress 由现有 `TaskLifecycleAdapter` 持有，并在 `reset_task()` 清除。调用 `commit_temporal_predicates()` 才会提交一个
+`StateBoundaryIdentity` + `StateSampleClock`；精确重复输入幂等返回，不同输入/乱序拒绝，boundary gap 或 unavailable source
+清除相应连续进度。dwell 的 `required_samples` 是外层 evaluation sample 数，不是物理秒或 native substep 数；NativeIntervalEvidence
+仍只为该 outer boundary 提供时间/来源证据，不把其内部 native samples 当作多次 task commit。当前为 scalar-only S1 contract，
+Temporal rule 不进入冻结 TaskArtifact v0，也不建立持续时间 Guard 或自动接入 observation/native callback。
 
 ## Parallel、退休和缺失路线
 
