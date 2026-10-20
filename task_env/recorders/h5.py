@@ -17,6 +17,13 @@ import yaml
 from .contracts import RecorderConfig
 from .trajectory import FrozenTrajectory
 from task_env.trajectory.metadata import dump_metadata, load_metadata, plain_metadata
+from task_env.trajectory.canonical.episode import (
+    BoundaryEventV1,
+    EpisodeOutcomeV1,
+    StructuredControlTransitionV1,
+    single_writer_training_actions,
+    validate_episode_records,
+)
 
 
 def h5_string_dtype():
@@ -159,7 +166,7 @@ def _write_action(root, actions: tuple[np.ndarray, ...], schema: Mapping[str, An
     return result
 
 
-def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, Any]], action_leaves: list[dict[str, Any]]) -> dict[str, Any]:
+def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, Any]], action_leaves: list[dict[str, Any]], *, h5_version: str = "v2") -> dict[str, Any]:
     metadata = trajectory.record_metadata
     raw = metadata.get("env_metadata", {})
     if not isinstance(raw, Mapping):
@@ -247,7 +254,7 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         }
     )
     result = {
-        "schema": {"id": "task-env-h5", "version": "v2"},
+        "schema": {"id": "task-env-h5", "version": h5_version},
         "environment": {"name": raw.get("env_name"), "task_name": raw.get("task_name"), "task_version": raw.get("task_version"), "scene_uid": raw.get("scene_uid"), "agent_uids": raw.get("agent_uids", ())},
         "timebase": {
             "physics_dt": raw.get("physics_dt"), "control_substeps": raw.get("control_substeps"),
@@ -336,6 +343,39 @@ def _save_v2(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
         })
 
 
+def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None:
+    if trajectory.outcome is None:
+        raise ValueError("task-env-h5 v3 requires EpisodeOutcomeV1")
+    if trajectory.transition_count and (
+        len(trajectory.structured_controls) != trajectory.transition_count
+        or any(control is None for control in trajectory.structured_controls)
+    ):
+        raise ValueError("task-env-h5 v3 requires structured control evidence for every transition")
+    validate_episode_records(trajectory.boundary_events, trajectory.outcome, trajectory.transition_count)
+    root.attrs.update(
+        schema_id="task-env-h5", schema_version="v3",
+        transition_count=trajectory.transition_count,
+        observation_count=len(trajectory.observations), episode_complete=True,
+        stop_reason=trajectory.stop_reason,
+    )
+    leaves = _write_raw_observations(root, trajectory.observations, config, trajectory.record_metadata)
+    action_leaves = _write_action(root, trajectory.actions, _action_schema(trajectory.record_metadata))
+    _write_common_transition_data(root, trajectory)
+    meta = root.require_group("meta")
+    env_meta = _env_meta(trajectory, leaves, action_leaves, h5_version="v3")
+    _yaml_dataset(meta, "env_meta", env_meta)
+    _yaml_dataset(meta, "env_cfg", trajectory.record_metadata.get("resolved_config", {}))
+    controls = [None if item is None else item.to_mapping() for item in trajectory.structured_controls]
+    _json_dataset(meta, "structured_controls_v1_json", controls)
+    _json_dataset(meta, "boundary_events_v1_json", [event.to_mapping() for event in trajectory.boundary_events])
+    _json_dataset(meta, "episode_outcome_v1_json", trajectory.outcome.to_mapping())
+    _json_dataset(meta, "training_projection_v1_json", {
+        "rule": "explicit-single-writer-schema-v1",
+        "source": "structured_controls_v1_json",
+        "automatic_flattening": False,
+    })
+
+
 def _save_v1(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None:
     """Historical writer retained for its fixed v1 regression fixture only."""
     root.attrs.update(schema_id=config.schema_id, schema_version=config.schema_version, transition_count=trajectory.transition_count, observation_count=len(trajectory.observations), episode_complete=True, stop_reason=trajectory.stop_reason)
@@ -385,6 +425,8 @@ def save_trajectory_h5(trajectory: FrozenTrajectory, config: RecorderConfig, *, 
         with h5py.File(temporary, "w") as root:
             if config.schema_version == "v2":
                 _save_v2(root, trajectory, config)
+            elif config.schema_version == "v3":
+                _save_v3(root, trajectory, config)
             else:
                 _save_v1(root, trajectory, config)
         os.replace(temporary, target)
@@ -536,16 +578,93 @@ def inspect_trajectory_h5(path: Path | str) -> dict[str, Any]:
                 "trajectories": trajectories,
             }
         result = {"schema_id": str(root.attrs.get("schema_id", "")), "schema_version": str(root.attrs.get("schema_version", "")), "transition_count": int(root.attrs.get("transition_count", 0)), "observation_count": int(root.attrs.get("observation_count", 0))}
-        if result["schema_version"] == "v2":
+        if result["schema_version"] in {"v2", "v3"}:
             result.update(_inspect_v2_group(root))
         elif "meta/layout_json" in root:
             result["layout"] = json.loads(_read_text(root, "meta/layout_json"))
-        return result
+    return result
+
+
+def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
+    """Read and validate the v3 structured-control/event/outcome payload."""
+    import h5py
+
+    with h5py.File(Path(path), "r") as root:
+        if str(root.attrs.get("schema_id", "")) != "task-env-h5" or str(root.attrs.get("schema_version", "")) != "v3":
+            raise ValueError("structured control reader requires task-env-h5/v3")
+        episode_complete = root.attrs.get("episode_complete")
+        if not isinstance(episode_complete, (bool, np.bool_)) or not bool(episode_complete):
+            raise ValueError("task-env-h5/v3 reader requires a finalized episode")
+        required = {
+            "meta/structured_controls_v1_json", "meta/boundary_events_v1_json",
+            "meta/episode_outcome_v1_json", "meta/training_projection_v1_json", "meta/env_meta",
+        }
+        if any(name not in root for name in required):
+            raise ValueError("task-env-h5/v3 structured records are incomplete")
+        controls_raw = json.loads(_read_text(root, "meta/structured_controls_v1_json"))
+        events_raw = json.loads(_read_text(root, "meta/boundary_events_v1_json"))
+        outcome_raw = json.loads(_read_text(root, "meta/episode_outcome_v1_json"))
+        training_projection = json.loads(_read_text(root, "meta/training_projection_v1_json"))
+        env_meta = load_metadata(_read_text(root, "meta/env_meta"))
+        transition_count = int(root.attrs["transition_count"])
+        observation_count = int(root.attrs["observation_count"])
+        stop_reason = str(root.attrs.get("stop_reason", ""))
+    if observation_count != transition_count + 1 or len(controls_raw) != transition_count:
+        raise ValueError("task-env-h5/v3 T/T+1 or structured control count mismatch")
+    if transition_count and any(item is None for item in controls_raw):
+        raise ValueError("task-env-h5/v3 has an unrecorded structured control transition")
+    controls = tuple(
+        None if item is None else StructuredControlTransitionV1.from_mapping(item)
+        for item in controls_raw
+    )
+    events = tuple(BoundaryEventV1.from_mapping(item) for item in events_raw)
+    outcome = EpisodeOutcomeV1.from_mapping(outcome_raw)
+    validate_episode_records(events, outcome, transition_count)
+    if outcome.end_reason != stop_reason:
+        raise ValueError("EpisodeOutcome end_reason does not match the stored stop reason")
+    return {
+        "schema_id": "task-env-h5", "schema_version": "v3",
+        "transition_count": transition_count, "observation_count": observation_count,
+        "env_meta": env_meta, "structured_controls": controls,
+        "boundary_events": events, "outcome": outcome,
+        "training_projection": training_projection,
+    }
+
+
+def load_structured_training_actions_h5(path: Path | str) -> tuple[tuple[float, ...], ...]:
+    """Apply the explicit lossless one-writer rule; never flatten arbitrary trees."""
+    loaded = load_structured_control_records_h5(path)
+    if loaded["training_projection"] != {
+        "rule": "explicit-single-writer-schema-v1",
+        "source": "structured_controls_v1_json",
+        "automatic_flattening": False,
+    }:
+        raise ValueError("unknown structured training projection rule")
+    schema = loaded["env_meta"].get("action_schema", {})
+    schema_id = schema.get("schema_id")
+    components = schema.get("order", ())
+    if not schema_id or not components:
+        raise ValueError("training conversion requires an explicit action schema identity and component order")
+    controls = loaded["structured_controls"]
+    if any(control is None for control in controls):
+        raise ValueError("training conversion requires structured controls for every transition")
+    projected = single_writer_training_actions(controls, action_schema_id=schema_id, components=components)
+    import h5py
+    with h5py.File(Path(path), "r") as root:
+        stored = np.stack(
+            [np.asarray(root[f"action/{name}"]).reshape(-1) for name in components], axis=1
+        ) if components else np.empty((len(projected), 0), dtype=np.float32)
+    expected = np.asarray(projected, dtype=np.float32).reshape(len(projected), len(components))
+    if stored.shape != expected.shape or not np.array_equal(stored, expected):
+        raise ValueError("stored action vector does not equal the explicit structured projection")
+    return projected
 
 
 __all__ = [
     "append_trajectory_collection_h5",
     "inspect_trajectory_h5",
+    "load_structured_control_records_h5",
+    "load_structured_training_actions_h5",
     "save_trajectory_collection_h5",
     "save_trajectory_h5",
 ]

@@ -2,10 +2,12 @@
 import json,os
 from pathlib import Path
 import numpy as np
-from .contracts import CanonicalTrajectory
+from .contracts import CanonicalTrajectory,CanonicalTrajectoryV1
 from ...controllers.canonical.kinematics import ARM
+from .episode import single_writer_training_actions
 
 FILE_SCHEMA='task-env-canonical-trajectory-v0'
+FILE_SCHEMA_V1='task-env-canonical-trajectory-v1'
 
 
 def arrays(trajectory):
@@ -28,7 +30,8 @@ def save(path,trajectory):
     if path.exists() or temporary.exists():raise FileExistsError('refusing trajectory overwrite')
     try:
         with h5py.File(temporary,'x') as h:
-            h.attrs['schema']=FILE_SCHEMA;h.attrs['logical_hash']=trajectory.identity_hash
+            version_one=isinstance(trajectory,CanonicalTrajectoryV1)
+            h.attrs['schema']=FILE_SCHEMA_V1 if version_one else FILE_SCHEMA;h.attrs['logical_hash']=trajectory.identity_hash
             h.create_dataset('logical_json',data=json.dumps(trajectory.to_mapping(),sort_keys=True,separators=(',',':'),allow_nan=False),dtype=h5py.string_dtype('utf-8'))
             group=h.create_group('numeric')
             for name,value in arrays(trajectory).items():group.create_dataset(name,data=value)
@@ -42,8 +45,13 @@ def save(path,trajectory):
 def load(path):
     import h5py
     with h5py.File(path,'r') as h:
-        if set(h)!={'logical_json','numeric'} or h.attrs.get('schema')!=FILE_SCHEMA:raise ValueError('unsupported/unknown canonical file schema')
-        value=CanonicalTrajectory.from_mapping(json.loads(h['logical_json'].asstr()[()]))
+        file_schema=h.attrs.get('schema')
+        if set(h)!={'logical_json','numeric'} or file_schema not in (FILE_SCHEMA,FILE_SCHEMA_V1):raise ValueError('unsupported/unknown canonical file schema')
+        raw=json.loads(h['logical_json'].asstr()[()])
+        if file_schema==FILE_SCHEMA:
+            value=CanonicalTrajectory.from_mapping(raw)
+        else:
+            value=CanonicalTrajectoryV1.from_mapping(raw)
         if h.attrs.get('logical_hash')!=value.identity_hash:raise ValueError('logical content hash mismatch')
         expected=arrays(value)
         if set(h['numeric'])!=set(expected):raise ValueError('numeric schema mismatch')
@@ -51,3 +59,10 @@ def load(path):
             stored=h['numeric'][name]
             if stored.dtype!=array.dtype or stored.shape!=array.shape or not np.array_equal(stored[:],array):raise ValueError('numeric shape/dtype/content mismatch: '+name)
     return value
+
+
+def training_actions(trajectory,*,action_schema_id,components):
+    """Explicit lossless training projection for one writer; reject action trees."""
+    if not isinstance(trajectory,CanonicalTrajectoryV1):raise ValueError('structured training conversion requires canonical trajectory v1')
+    trajectory.validate()
+    return single_writer_training_actions(trajectory.structured_controls,action_schema_id=action_schema_id,components=components)

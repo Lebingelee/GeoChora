@@ -22,6 +22,32 @@ T 个 transitions 必须有 T+1 个 observations/boundaries；action/reward/succ
 SB3 flatten 不改变存储 contract。RGB 可按既有规则量化为 uint8，其他 leaves 不改变。
 具体 layout/shape 由实际 observation schema 和 universal_action_schema 声明，不能给 non-arm 填 Panda 八维。
 
+Phase II C05a 添加通用 H5 v3：通过原 `TransitionRecorder` 的 `structured_control` 扩展槽保存 typed
+`StructuredControlTransitionV1`，并在同一格式 owner 保存版本化 `BoundaryEventV1` 和必须显式提供的
+`EpisodeOutcomeV1`。T 条控制记录对齐 T transitions，事件只引用 0..T 的现有 boundary；T=0 可以只有初始
+observation、事件和 outcome，不生成伪 action。v3 仍保存 raw action/universal-action datasets；
+`load_structured_control_records_h5()` 读取并校验结构化记录，
+`load_structured_training_actions_h5()` 只允许单一 writer、完全相同的 action schema id/component order，
+并逐值核对训练向量与已落盘 action dataset。多 writer 或投影不一致均拒绝；不能自动 flatten action tree。
+旧 task-env-h5/v2 与 geophys-transition-h5/v1 的写入、读取和 fixture 不变；现有 Stage 11 transcode 明确拒绝
+v3，Collection v1 仍只包装完整 v2 episode。
+
+Selected canonical outer 也保留既有 `canonical-trajectory-v0`，新增 `canonical-trajectory-v1`，在相同
+`CanonicalRecorder`/H5 owner 中版本化结构化控制、事件和 outcome；v1 的单 writer action/target/applied 必须与
+现有 Panda `TransitionRecord` 完全一致。`canonical.h5.load()` 负责 v0/v1 精确 dispatch；
+`canonical.h5.training_actions()` 仅执行声明 schema/component order 的无损单 writer 投影。
+Execution stream 从 v1/v2 保留原 schema，新增 v3：现有 `ExecutionRecorder` 接收每个有效 interval 的结构化控制，
+并在真实 boundary 记录事件、在 freeze 时要求 outcome；resident 与 streaming reader 都做版本、T/T+1、完整
+substep、目标/施控链接、事件顺序和 outcome 校验。partial interval 不能 freeze。
+
+`EpisodeOutcomeV1` 不回写最后一个 transition 的 `terminated/truncated`。`terminated` 必须关闭 bootstrap；
+`truncated` 的 bootstrap 必须显式声明，不能由最后一条 transition flag 推断；两个 flags 都为 false 表示记录终止
+不等同 episode 终止，并保留显式 bootstrap 决策。H5/JSON roundtrip 只证明存储完整性，不证明物理 replay、D0
+恢复或 qualification。当前 selected replay 路线明确不消费 canonical outer v1 的新控制/事件/outcome。
+
+这些 C05a schema 是存储契约，不开放 structured action 的 Runtime dispatch，也不实现 C03b Stop；三个既有 Recorder
+仍是各自格式的唯一 owner。
+
 通用 wrapper states：UNRESET、ARMED、READY、RECORDING、STOPPED_TERMINAL、STOPPED_MANUAL。
 reset 前 start 为 ARMED；READY start 包含当前 observation；terminal recording 需 reset 后 restart；
 重复开始、未 begin append/end 或非法状态抛 RuntimeError；capacity 溢出分别为 OverflowError/MemoryError。

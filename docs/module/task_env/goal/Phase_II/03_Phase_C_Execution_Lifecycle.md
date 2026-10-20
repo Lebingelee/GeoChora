@@ -382,6 +382,26 @@ MuJoCo CPU 上各执行一步。与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A0
   精确依赖及顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 - **Codex AUDIT**：提供旧 `step_expert → solution.act → _step → controller → feedback → solution.observe → recorder` 的完整调用图，逐步证明等价。
 
+#### C05a bounded storage receipt（2026-10-21）
+
+三个既有格式 owner 均采用 additive version dispatch：generic `task-env-h5/v3`、canonical outer
+`canonical-trajectory-v1`、execution `canonical-execution-trajectory-v3`。共享的
+`BoundaryEventV1` / `EpisodeOutcomeV1` / `StructuredControlTransitionV1` 是 value contracts，不新增 Recorder。
+每种 writer/reader 都保留自己的旧 layout，旧 H5/JSON fixtures 没有迁写；generic H5 的现有 Training
+projection 只接受 one-writer 且 Action schema id/component order 精确一致，并要求投影值逐项等于现有 action
+dataset；canonical/execution 的专用 converter 同样拒绝多 writer。新的 stored outcome 与先前返回的
+transition flags 分离；终止后禁止 bootstrap，截断 bootstrap 显式决定。Events 只能在 0..T boundary 排序；T=0
+仅含 outcome/event 是有效存储，没有伪 transition；execution pending interval 一律禁止 freeze。
+
+专项 `test_phase_ii_c05a_structured_recording.py` 为 **7 passed**，覆盖三种真实 H5 write/read、streaming exact
+roundtrip、T=0、outcome/bootstrap、单 writer conversion 与不匹配 action dataset 拒绝、partial interval 和旧 schema
+版本界定。最终定向组合包含 C05a、record CLI、selected consumers 与 execution streaming，结果为 **82 passed、2
+deselected**；两项 deselected runner 依赖已退休的 `task_env.tasks.nut_assembly.assets`。此前未排除它们的较小组合为
+**52 passed、2 failed**，失败均发生在导入该历史 integration runner 时，不涉及本次执行路径。这些结果证明存储/reader
+契约和 legacy route 回归，不是 selected v3 真实采集、D0 replay 或正式 Qualification。现有
+`validate_trajectory()` transcode 仍只接受 v2，已对 v3 给出明确拒绝；selected reference replay 也不把 canonical
+outer v1 当 replay 输入。
+
 ## C.9 质量门与直接可测问题
 
 | 检测 | 预期行为 | 证据等级 |

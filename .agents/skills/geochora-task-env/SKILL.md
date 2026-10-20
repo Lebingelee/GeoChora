@@ -38,10 +38,24 @@ For selected expert recording use `examples/recording/record_expert.py` or
 `task_env.script.trajectory.record`, which reuse the selected env's recorder owner.
 `start_recording(path)` is at reset boundary; finalize before another reset. Inspect with
 `examples/recording/inspect_h5.py`; T transitions require T+1 boundaries. Generic wrappers use
-`task_env.recorders`; selected canonical/execution formats differ from generic raw H5 v2.
+`task_env.recorders`; selected canonical/execution formats differ from generic raw H5. Generic default v2,
+canonical outer v0, and execution v1/v2 stay readable with their original schemas; Phase II C05a adds
+opt-in generic H5 v3, canonical outer v1, and execution stream v3 within those same Recorder owners.
 The inspector validates loaded storage/T+1; its `storage_roundtrip` field does not mean it
 performed a new save/load roundtrip. H5 roundtrip itself is storage integrity, not D0 restoration
 or formal replay qualification.
+
+For generic structured recording, configure `RecorderConfig(schema_version="v3")`, pass one typed
+`StructuredControlTransitionV1` per actual transition, record `BoundaryEventV1` only at the current 0..T
+boundary, and finalize with explicit `EpisodeOutcomeV1`. A v3 file with T=0 has one initial observation and
+may contain boundary events/outcome without a pseudo action. Use `load_structured_control_records_h5()` to
+read the typed payload. `load_structured_training_actions_h5()` is a narrow lossless conversion: the recorded
+request must have one writer, an exact schema id/component order, and values equal to the stored action dataset.
+Multi-writer trees and schema mismatches reject; the existing Stage 11 transcode remains v2-only and rejects v3.
+Canonical outer v1 uses `CanonicalRecorder(schema_version="canonical-trajectory-v1")` and
+`canonical.h5.load()`; execution stream v3 uses the existing `ExecutionRecorder(..., schema=STRUCTURED_SCHEMA)`
+and resident/streaming readers. These are storage contracts only: they do not add Runtime dispatch or prove
+physical replay. The current selected reference replay deliberately rejects canonical outer v1.
 
 For task construction/freeze, randomized feasibility, Experiments, evaluation report, explicit Human
 Judge and Evidence packaging, load the existing
@@ -169,3 +183,19 @@ identity. Do not embed a second Scene/World copy, infer an approximate mapping, 
 Recorder, qualification, or freeze route. `TaskArtifact.from_mapping()` remains v0-only; use
 `task_env.artifacts.decode_task_artifact()` for exact v0/v1 dispatch. H5/trajectory/state/camera readers retain their
 independent version routes until real historical fixtures are available.
+
+## Phase II C02a / C05a bounded routes
+
+`compile_control_binding_plan()` in `task_env.runtime.sessions.control` resolves A03 Scene-v3 ControlGroups to
+existing Controller writers, existing `ActionModeSpec`, and existing `StateRequirements`. It is static admission and
+`prepare_structured_action()` is a pure all-groups preflight returning existing `RequestedAction` values. It does not
+dispatch to Runtime or support multi-robot execution. Bounded Panda arm+gripper legacy control remains on the existing
+single writer/provider route.
+
+C05a versioned storage is opt-in. Generic H5 v3 is read with
+`task_env.recorders.load_structured_control_records_h5()`; training projection is accepted only by
+`load_structured_training_actions_h5()` after exact one-writer schema/order and stored numeric-value checks.
+Canonical outer v1 is decoded by `task_env.trajectory.canonical.load()` and can use its `training_actions()` explicit
+projection. Execution stream v3 uses `task_env.trajectory.canonical.execution.load()` or its bounded
+`streaming.load_streaming()` reader. The old generic H5, canonical outer, and execution schemas keep separate readers;
+do not use storage equality as replay evidence. See the C02a/C05a receipts in the Phase II C and execution-order docs.

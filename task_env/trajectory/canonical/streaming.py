@@ -125,7 +125,7 @@ def logical_chunks(value, chunk_bytes=BUFFER_BYTES):
 def save_streaming(path, value, *, chunk_bytes=BUFFER_BYTES):
     """Validate and atomically save the old schema with bounded encoding buffers."""
     import h5py
-    from .execution import FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, validate
+    from .execution import FILE_SCHEMA, STRUCTURED_FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, STRUCTURED_SCHEMA, LEGACY_SCHEMA, validate
 
     path = Path(path)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -138,7 +138,7 @@ def save_streaming(path, value, *, chunk_bytes=BUFFER_BYTES):
     count = 0
     try:
         with h5py.File(temporary, "x") as handle:
-            handle.attrs["schema"] = FILE_SCHEMA if value["schema"] == SCHEMA else LEGACY_FILE_SCHEMA
+            handle.attrs["schema"] = {SCHEMA: FILE_SCHEMA, STRUCTURED_SCHEMA: STRUCTURED_FILE_SCHEMA, LEGACY_SCHEMA: LEGACY_FILE_SCHEMA}[value["schema"]]
             dataset = handle.create_dataset(
                 "logical_json_utf8", shape=(0,), maxshape=(None,), dtype=np.uint8,
                 chunks=(chunk_bytes,), compression="gzip", compression_opts=4,
@@ -171,14 +171,14 @@ def verify_roundtrip(path, value, *, chunk_bytes=BUFFER_BYTES):
     deserializing a second episode. It does not replace a live D0/D1/D2 check.
     """
     import h5py
-    from .execution import FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA
+    from .execution import FILE_SCHEMA, STRUCTURED_FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, STRUCTURED_SCHEMA, LEGACY_SCHEMA
 
     started = perf_counter()
     digest = hashlib.sha256()
     count = 0
     with h5py.File(path, "r") as handle:
         _check_container(handle)
-        expected_schema = FILE_SCHEMA if value["schema"] == SCHEMA else LEGACY_FILE_SCHEMA
+        expected_schema = {SCHEMA: FILE_SCHEMA, STRUCTURED_SCHEMA: STRUCTURED_FILE_SCHEMA, LEGACY_SCHEMA: LEGACY_FILE_SCHEMA}[value["schema"]]
         if handle.attrs["schema"] != expected_schema:
             raise ValueError("H5/logical version mismatch")
         dataset = handle["logical_json_utf8"]
@@ -233,9 +233,9 @@ def verify_payload_integrity(path, *, chunk_bytes=BUFFER_BYTES):
 
 
 def _check_container(handle):
-    from .execution import FILE_SCHEMA, LEGACY_FILE_SCHEMA
+    from .execution import FILE_SCHEMA, STRUCTURED_FILE_SCHEMA, LEGACY_FILE_SCHEMA
     if set(handle) != {"logical_json_utf8", "control_step", "native_step_index"} or (
-            handle.attrs.get("schema") not in (FILE_SCHEMA, LEGACY_FILE_SCHEMA)):
+            handle.attrs.get("schema") not in (FILE_SCHEMA, STRUCTURED_FILE_SCHEMA, LEGACY_FILE_SCHEMA)):
         raise ValueError("H5 execution schema")
     for name in ("control_step", "native_step_index"):
         if handle[name].ndim != 1 or handle[name].dtype != np.dtype(np.int64):
@@ -402,14 +402,14 @@ def load_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
     checked, and the canonical logical hash is recomputed from every record.
     """
     import h5py
-    from .execution import FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, validate
+    from .execution import FILE_SCHEMA, STRUCTURED_FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, STRUCTURED_SCHEMA, LEGACY_SCHEMA, validate
     if type(chunk_bytes) is not int or chunk_bytes <= 0:
         raise ValueError("positive integer I/O chunk size required")
     started = perf_counter()
     with h5py.File(path, "r") as handle:
         _check_container(handle)
         value = _JsonCursor(handle["logical_json_utf8"], chunk_bytes).episode()
-        expected_schema = FILE_SCHEMA if value["schema"] == SCHEMA else LEGACY_FILE_SCHEMA
+        expected_schema = {SCHEMA: FILE_SCHEMA, STRUCTURED_SCHEMA: STRUCTURED_FILE_SCHEMA, LEGACY_SCHEMA: LEGACY_FILE_SCHEMA}[value["schema"]]
         if handle.attrs["schema"] != expected_schema:
             raise ValueError("H5/logical version mismatch")
         expected_hash = handle.attrs["logical_hash"]
@@ -442,9 +442,10 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
     from .clock import ClockStreamValidator
     from .contracts import EpisodeMetadata
     from .execution import (
-        FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, LEGACY_SCHEMA,
+        FILE_SCHEMA, STRUCTURED_FILE_SCHEMA, LEGACY_FILE_SCHEMA, SCHEMA, STRUCTURED_SCHEMA, LEGACY_SCHEMA,
         validate_boundary_record, validate_transition_record,
     )
+    from .episode import BoundaryEventV1,EpisodeOutcomeV1,StructuredControlTransitionV1,validate_episode_records
 
     if type(chunk_bytes) is not int or chunk_bytes <= 0:
         raise ValueError("positive integer I/O chunk size required")
@@ -531,18 +532,25 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
         canonical_hash.update(b"}")
         if canonical_hash.hexdigest() != expected_hash:
             raise ValueError("noncanonical logical encoding/hash")
-        if keys != {"schema", "metadata", "recipe", "boundaries", "transitions", "blobs", "stop_reason"}:
-            raise ValueError("execution trajectory schema")
         schema = globals_["schema"]
-        if schema not in (SCHEMA, LEGACY_SCHEMA):
+        base_keys={"schema", "metadata", "recipe", "boundaries", "transitions", "blobs", "stop_reason"}
+        expected_keys=base_keys | {"structured_controls", "events", "outcome"} if schema==STRUCTURED_SCHEMA else base_keys
+        if keys != expected_keys or schema not in (SCHEMA, STRUCTURED_SCHEMA, LEGACY_SCHEMA):
             raise ValueError("execution trajectory schema")
-        expected_schema = FILE_SCHEMA if schema == SCHEMA else LEGACY_FILE_SCHEMA
+        expected_schema = {SCHEMA: FILE_SCHEMA, STRUCTURED_SCHEMA: STRUCTURED_FILE_SCHEMA, LEGACY_SCHEMA: LEGACY_FILE_SCHEMA}[schema]
         if handle.attrs["schema"] != expected_schema:
             raise ValueError("H5/logical version mismatch")
         metadata = EpisodeMetadata.from_mapping(globals_["metadata"])
         recipe = globals_["recipe"]
         if not recipe or not globals_["stop_reason"]:
             raise ValueError("recipe/stop provenance required")
+        if schema==STRUCTURED_SCHEMA:
+            controls=tuple(StructuredControlTransitionV1.from_mapping(item) for item in globals_["structured_controls"])
+            events=tuple(BoundaryEventV1.from_mapping(item) for item in globals_["events"])
+            outcome=EpisodeOutcomeV1.from_mapping(globals_["outcome"])
+            if len(controls)!=counts["transitions"]:raise ValueError("structured control T alignment")
+            validate_episode_records(events,outcome,counts["transitions"])
+            if outcome.end_reason!=globals_["stop_reason"]:raise ValueError("outcome/stop reason mismatch")
         blobs = globals_["blobs"]
         if not isinstance(blobs, dict):
             raise ValueError("owner blobs mapping required")
@@ -568,7 +576,7 @@ def validate_streaming(path, *, chunk_bytes=BUFFER_BYTES, profile=None):
         last_task_success = None
         last_lifecycle_state = None
         last_simulation_time_s = None
-        clock = ClockStreamValidator(globals_["metadata"], recipe) if schema == SCHEMA else None
+        clock = ClockStreamValidator(globals_["metadata"], recipe) if schema in (SCHEMA,STRUCTURED_SCHEMA) else None
         semantic_keys = set()
         previous_key = None
         if cursor.peek() != "}":

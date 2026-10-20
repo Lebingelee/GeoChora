@@ -87,7 +87,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 18 | C01b | B05、D02b | 实际 Task requirements/actual manifests、动态 admission；兼容配置分支 |
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
-| 21 | C05a | C02a、C01b、D05a | 三类格式各自扩展 action/events/outcome；reader/loader 与 legacy fixtures |
+| 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
 | 22 | C03a | C02a、D01b、C05a | 现有 ports 的 scalar reset/step/fault；单 controller 兼容执行 |
 | 23 | C04 | C03a、D02b | 固定 public/privileged/private schemas、必要反馈/诊断分离、capture 引用 |
 | 24 | C02b | C02a、C03a、C04、C05a、D01b | 原子 group 执行，真实 arm+hand S2；缺 group/局部失败不留未知施控 |
@@ -300,6 +300,22 @@ provider 的 legacy action/output 各执行一步；这保护既有路径，不�
 因此本证据仅关闭序号 20 的静态 mapping/schema/preflight 部分。C02b 的多组施控、双机器人执行和 actuator-force
 provider capability 均未由此获得支持；当前 CAPABILITIES 对 `actuator_force_query` 的缺口仍按 admission limitation
 处理。下一项可并行前置工作为 C05a 的三类旧格式版本化存储与 reader/loader 验收，执行写入须仍等待 C03a/C04/C02b。
+
+### 5.5 C05a bounded storage evidence（2026-10-21）
+
+C05a 在原三个格式 owner 内添加 generic H5 v3、canonical outer v1、execution stream v3，并复用共用的版本化
+BoundaryEvent、EpisodeOutcome、StructuredControlTransition 值。新 reader 精确按 version dispatch；旧通用 v1/v2、
+canonical outer v0、execution v1/v2 的格式和历史 fixtures 保持原状。Training projection 必须是一条完整单 writer
+schema/component order 映射，并与 generic H5 已存 action 数值逐项一致；multi-writer 与任意树 flatten 明确拒绝。
+T=0 outcome/event 不产生 pseudo transition，execution incomplete interval 仍拒绝 finalize。详细规则见
+[recording-and-learning](../../recording-and-learning.md#复用现有录制-owner)。
+
+新增 C05a 专项 **7 passed**；C05a、record CLI、selected consumers 与 execution streaming 的最终定向组合为
+**82 passed、2 deselected**。两项 deselected runner 依赖已经退休的 `task_env.tasks.nut_assembly.assets`；此前较小的
+未排除组合为 **52 passed、2 failed**，失败均是该 historical import error。现有两类实测 selected route 仍沿用旧
+canonical/execution schema；C05a 新存储 roundtrip 不声称新 structured Runtime dispatch、物理 D0 replay 或
+Qualification。有关旧格式 fixture 的完整命令结果和失败边界见
+[Phase C C05a receipt](03_Phase_C_Execution_Lifecycle.md#c05a-bounded-storage-receipt-2026-10-21)。
 
 ## 6. 原稿保存、文档验证与二审交接
 

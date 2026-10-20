@@ -7,6 +7,12 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
+from task_env.trajectory.canonical.episode import (
+    BoundaryEventV1,
+    EpisodeOutcomeV1,
+    StructuredControlTransitionV1,
+    validate_episode_records,
+)
 
 
 def copy_tree(value: Any) -> Any:
@@ -44,6 +50,9 @@ class FrozenTrajectory:
     reset_info: dict[str, Any]
     record_metadata: dict[str, Any]
     stop_reason: str
+    structured_controls: tuple[StructuredControlTransitionV1 | None, ...] = ()
+    boundary_events: tuple[BoundaryEventV1, ...] = ()
+    outcome: EpisodeOutcomeV1 | None = None
 
     @property
     def transition_count(self) -> int:
@@ -56,6 +65,12 @@ class FrozenTrajectory:
         for name in ("universal_actions", "rewards", "successes", "terminated", "truncated", "infos"):
             if len(getattr(self, name)) != count:
                 raise ValueError(f"trajectory {name} must contain T values")
+        if self.structured_controls and len(self.structured_controls) != count:
+            raise ValueError("trajectory structured_controls must contain T values")
+        if self.outcome is not None:
+            validate_episode_records(self.boundary_events, self.outcome, count)
+        elif self.boundary_events:
+            raise ValueError("BoundaryEvents require a versioned EpisodeOutcome")
 
 
 __all__ = ["FrozenTrajectory", "copy_tree", "tree_nbytes"]

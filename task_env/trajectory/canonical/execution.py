@@ -9,18 +9,24 @@ import os
 from pathlib import Path
 import numpy as np
 from .contracts import EpisodeMetadata, BoundaryRecord, TransitionRecord
-from ...controllers.canonical.contracts import CanonicalControlTarget, AppliedCanonicalControl, digest
+from ...controllers.canonical.contracts import CanonicalControlTarget, AppliedCanonicalControl, RequestedAction, CanonicalAction, digest
+from .episode import BoundaryEventV1,EpisodeOutcomeV1,StructuredControlTransitionV1,validate_episode_records,single_writer_training_actions
 
 SCHEMA = 'canonical-execution-trajectory-v2'
+STRUCTURED_SCHEMA = 'canonical-execution-trajectory-v3'
 LEGACY_SCHEMA = 'canonical-execution-trajectory-v1'
 FILE_SCHEMA = 'task-env-canonical-execution-v2'
+STRUCTURED_FILE_SCHEMA = 'task-env-canonical-execution-v3'
 LEGACY_FILE_SCHEMA = 'task-env-canonical-execution-v1'
 
 
 def validate(value):
     import hashlib
     from .streaming import _json_bytes
-    if set(value) != {'schema','metadata','recipe','boundaries','transitions','blobs','stop_reason'} or value['schema'] not in (SCHEMA, LEGACY_SCHEMA):
+    base_keys={'schema','metadata','recipe','boundaries','transitions','blobs','stop_reason'}
+    schema=value.get('schema')
+    expected_keys=base_keys | {'structured_controls','events','outcome'} if schema==STRUCTURED_SCHEMA else base_keys
+    if set(value) != expected_keys or schema not in (SCHEMA, STRUCTURED_SCHEMA, LEGACY_SCHEMA):
         raise ValueError('execution trajectory schema')
     metadata = EpisodeMetadata.from_mapping(value['metadata'])
     boundaries, transitions = value['boundaries'], value['transitions']
@@ -41,9 +47,26 @@ def validate(value):
         raise ValueError('realized reset mismatch')
     for i, transition in enumerate(transitions):
         validate_transition_record(transition, i, len(transitions), metadata, value['recipe'])
-    if value['schema'] == SCHEMA:
+    if schema in (SCHEMA,STRUCTURED_SCHEMA):
         from .clock import validate_clock
         validate_clock(value)
+    if schema==STRUCTURED_SCHEMA:
+        controls=tuple(StructuredControlTransitionV1.from_mapping(item) for item in value['structured_controls'])
+        events=tuple(BoundaryEventV1.from_mapping(item) for item in value['events'])
+        outcome=EpisodeOutcomeV1.from_mapping(value['outcome'])
+        if len(controls)!=len(transitions):raise ValueError('structured control T alignment')
+        validate_episode_records(events,outcome,len(transitions))
+        if outcome.end_reason!=value['stop_reason']:raise ValueError('outcome/stop reason mismatch')
+        for control,transition in zip(controls,transitions,strict=True):
+            if len(control.writer_controls)!=1:raise ValueError('execution trajectory v3 requires the existing single Controller writer route')
+            writer=control.writer_controls[0]
+            record=TransitionRecord.from_mapping(transition['record'])
+            if RequestedAction.from_mapping(writer['requested_action'])!=record.requested_action:raise ValueError('structured/execution requested action mismatch')
+            if CanonicalAction.from_mapping(writer['canonical_action'])!=record.canonical_action:raise ValueError('structured/execution canonical action mismatch')
+            target=writer['controller_target']
+            applied=writer['applied_control']
+            if target['identity_hash']!=record.controller_target.identity_hash or CanonicalControlTarget.from_mapping(target['payload'])!=record.controller_target:raise ValueError('structured/execution target mismatch')
+            if applied['target_hash']!=record.applied_control.target_hash or AppliedCanonicalControl.from_mapping(applied['payload'])!=record.applied_control:raise ValueError('structured/execution applied control mismatch')
     return value
 
 
@@ -138,7 +161,8 @@ def expand_snapshot(snapshot, blobs):
 
 class ExecutionRecorder:
     """Own the opt-in episode data; receive actual completed application events."""
-    def __init__(self, metadata, recipe, *, content_fields=None, owner_content_fields=None):
+    def __init__(self, metadata, recipe, *, content_fields=None, owner_content_fields=None, schema=SCHEMA):
+        if schema not in (SCHEMA,STRUCTURED_SCHEMA):raise ValueError('unsupported execution recorder schema')
         self.content_fields = frozenset(('_actions',) if content_fields is None else content_fields)
         if not self.content_fields or any(type(field) is not str for field in self.content_fields):
             raise ValueError('named content-addressed owner fields required')
@@ -147,8 +171,10 @@ class ExecutionRecorder:
                any(type(part) is not str or not part for part in pair) for pair in scoped):
             raise ValueError('named owner/field content-addressed selectors required')
         self.owner_content_fields = frozenset(tuple(pair) for pair in scoped)
-        self.value={'schema':SCHEMA,'metadata':metadata.to_mapping(),'recipe':copy.deepcopy(recipe),
+        self.value={'schema':schema,'metadata':metadata.to_mapping(),'recipe':copy.deepcopy(recipe),
                     'boundaries':[],'transitions':[],'blobs':{},'stop_reason':''}
+        if schema==STRUCTURED_SCHEMA:
+            self.value.update(structured_controls=[],events=[],outcome=None)
         from .clock import SCHEMA as CLOCK_SCHEMA
         self.value['recipe']['clock_contract']=CLOCK_SCHEMA
         self.pending=None
@@ -185,16 +211,35 @@ class ExecutionRecorder:
             'updated':bool(diagnostics['inner_update_performed'])})
         p['native_step_count']+=1
 
-    def append(self, transition, boundary, owners, stage, audit, task_metrics=None, native_time=None):
+    def event(self,event):
+        if self.frozen:raise RuntimeError('recorder frozen')
+        if self.value['schema']!=STRUCTURED_SCHEMA:raise ValueError('BoundaryEvent requires execution trajectory v3')
+        if not isinstance(event,BoundaryEventV1) or event.boundary_index!=len(self.value['boundaries'])-1:raise ValueError('event must reference the current completed boundary')
+        same=[item for item in self.value['events'] if item['boundary_index']==event.boundary_index]
+        if event.event_sequence!=len(same):raise ValueError('boundary event sequence')
+        if self.value['events'] and event.episode_id!=self.value['events'][0]['episode_id']:raise ValueError('event episode identity mismatch')
+        self.value['events'].append(event.to_mapping())
+
+    def append(self, transition, boundary, owners, stage, audit, task_metrics=None, native_time=None, *, structured_control=None):
         if self.pending is None or len(self.value['boundaries'])!=len(self.value['transitions'])+1:
             raise ValueError('recording alignment')
+        if self.value['schema']==STRUCTURED_SCHEMA:
+            if not isinstance(structured_control,StructuredControlTransitionV1):raise ValueError('execution trajectory v3 requires structured control evidence for each transition')
+        elif structured_control is not None:raise ValueError('structured control requires execution trajectory v3')
         self.value['transitions'].append({'record':transition.to_mapping(),'interval':self.pending,'native_audit':copy.deepcopy(audit)})
+        if self.value['schema']==STRUCTURED_SCHEMA:self.value['structured_controls'].append(structured_control.to_mapping())
         self.pending=None
         self.boundary(boundary,owners,stage,task_metrics,native_time)
 
-    def freeze(self, stop_reason):
+    def freeze(self, stop_reason, *, outcome=None):
         if self.pending is not None:raise ValueError('incomplete effective interval')
-        self.value['stop_reason']=stop_reason;validate(self.value);self.frozen=True
+        self.value['stop_reason']=stop_reason
+        if self.value['schema']==STRUCTURED_SCHEMA:
+            if not isinstance(outcome,EpisodeOutcomeV1):raise ValueError('execution trajectory v3 requires EpisodeOutcomeV1')
+            if outcome.end_reason!=stop_reason:raise ValueError('outcome/stop reason mismatch')
+            self.value['outcome']=outcome.to_mapping()
+        elif outcome is not None:raise ValueError('EpisodeOutcome requires execution trajectory v3')
+        validate(self.value);self.frozen=True
         return self.value
 
 
@@ -203,9 +248,10 @@ def save(path, value):
     validate(value);path=Path(path);temporary=path.with_suffix(path.suffix+'.tmp')
     if path.exists() or temporary.exists():raise FileExistsError('no overwrite')
     raw=json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
+    file_schema={SCHEMA:FILE_SCHEMA,STRUCTURED_SCHEMA:STRUCTURED_FILE_SCHEMA,LEGACY_SCHEMA:LEGACY_FILE_SCHEMA}[value['schema']]
     try:
         with h5py.File(temporary,'x') as h:
-            h.attrs['schema']=FILE_SCHEMA if value['schema']==SCHEMA else LEGACY_FILE_SCHEMA;h.attrs['logical_hash']=digest(value)
+            h.attrs['schema']=file_schema;h.attrs['logical_hash']=digest(value)
             h.create_dataset('logical_json_utf8',data=np.frombuffer(raw,dtype=np.uint8),compression='gzip',compression_opts=4)
             h.create_dataset('control_step',data=np.arange(len(value['boundaries']),dtype=np.int64))
             h.create_dataset('native_step_index',data=np.asarray([b['native_step_index'] for b in value['boundaries']],dtype=np.int64))
@@ -219,12 +265,20 @@ def save(path, value):
 def load(path):
     import h5py
     with h5py.File(path,'r') as h:
-        if set(h)!={'logical_json_utf8','control_step','native_step_index'} or h.attrs['schema'] not in (FILE_SCHEMA,LEGACY_FILE_SCHEMA):
+        if set(h)!={'logical_json_utf8','control_step','native_step_index'} or h.attrs['schema'] not in (FILE_SCHEMA,STRUCTURED_FILE_SCHEMA,LEGACY_FILE_SCHEMA):
             raise ValueError('H5 execution schema')
         value=json.loads(h['logical_json_utf8'][:].tobytes());validate(value)
-        expected_schema=FILE_SCHEMA if value['schema']==SCHEMA else LEGACY_FILE_SCHEMA
+        expected_schema={SCHEMA:FILE_SCHEMA,STRUCTURED_SCHEMA:STRUCTURED_FILE_SCHEMA,LEGACY_SCHEMA:LEGACY_FILE_SCHEMA}[value['schema']]
         if h.attrs['schema']!=expected_schema:raise ValueError('H5/logical version mismatch')
         if h.attrs['logical_hash']!=digest(value):raise ValueError('logical hash')
         for name,expected in [('control_step',np.arange(len(value['boundaries']),dtype=np.int64)),('native_step_index',np.asarray([b['native_step_index'] for b in value['boundaries']],dtype=np.int64))]:
             if h[name].dtype!=expected.dtype or not np.array_equal(h[name][:],expected):raise ValueError('numeric projection')
     return value
+
+
+def training_actions(value,*,action_schema_id,components):
+    """Create a lossless legacy-vector projection only for an exact one-writer route."""
+    validate(value)
+    if value['schema']!=STRUCTURED_SCHEMA:raise ValueError('structured training conversion requires execution trajectory v3')
+    controls=tuple(StructuredControlTransitionV1.from_mapping(item) for item in value['structured_controls'])
+    return single_writer_training_actions(controls,action_schema_id=action_schema_id,components=components)

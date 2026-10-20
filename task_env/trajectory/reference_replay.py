@@ -18,7 +18,12 @@ def reexecute_selected(path, *, output):
     from task_env.tasks.nut_assembly.task import REFERENCE_ENV_ID as NA
     SELECTED_ENV_IDS = (PC, NA)
     with h5py.File(path, 'r') as handle:
-        outer = handle.attrs.get('schema') == 'task-env-canonical-trajectory-v0'
+        outer_schema = handle.attrs.get('schema')
+        if outer_schema == 'task-env-canonical-trajectory-v1':
+            raise ValueError('canonical trajectory v1 stores structured controls/events/outcome; selected reference replay does not yet reproduce that execution contract')
+        if outer_schema == 'task-env-canonical-execution-v3':
+            raise ValueError('execution trajectory v3 stores structured controls/events/outcome; selected reference replay does not yet compare that contract')
+        outer = outer_schema == 'task-env-canonical-trajectory-v0'
     if outer:
         from task_env.trajectory.canonical.h5 import load
         value = load(path).to_mapping()

@@ -42,6 +42,7 @@ class RecorderConfig:
             raise ValueError("recording capacity limits must be positive")
         supported = {
             ("task-env-h5", "v2"),
+            ("task-env-h5", "v3"),
             # Kept solely for reading/regression fixtures written before 10.5.
             ("geophys-transition-h5", "v1"),
         }
@@ -51,6 +52,8 @@ class RecorderConfig:
             raise ValueError("H5 supports gzip compression levels 0 through 9 only")
         if self.schema_version == "v2" and (paths or self.flatten_action):
             raise ValueError("task-env-h5 v2 records raw observations and actions without flattening")
+        if self.schema_version == "v3" and (paths or self.flatten_action):
+            raise ValueError("task-env-h5 v3 preserves the same raw observation/action leaves as v2")
         object.__setattr__(self, "flatten_observation_paths", paths)
 
 

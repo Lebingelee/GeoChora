@@ -270,7 +270,13 @@ def validate_trajectory(path: str | os.PathLike[str]) -> dict[str, Any]:
     import h5py
 
     with h5py.File(Path(path), "r") as root:
-        if str(root.attrs.get("schema_id", "")) != "task-env-h5" or str(root.attrs.get("schema_version", "")) != "v2":
+        schema_id = str(root.attrs.get("schema_id", ""))
+        schema_version = str(root.attrs.get("schema_version", ""))
+        if (schema_id, schema_version) == ("task-env-h5", "v3"):
+            raise TrajectoryValidationError(
+                "Stage 11 transcode does not flatten task-env-h5/v3; use the structured reader and explicit training projection"
+            )
+        if (schema_id, schema_version) != ("task-env-h5", "v2"):
             raise TrajectoryValidationError("Stage 11 conversion requires task-env-h5/v2")
         transition_count = int(root.attrs.get("transition_count", -1))
         observation_count = int(root.attrs.get("observation_count", -1))

@@ -9,6 +9,12 @@ import numpy as np
 
 from .contracts import RecorderConfig
 from .trajectory import FrozenTrajectory, copy_tree, tree_nbytes
+from task_env.trajectory.canonical.episode import (
+    BoundaryEventV1,
+    EpisodeOutcomeV1,
+    StructuredControlTransitionV1,
+    validate_episode_records,
+)
 
 
 def _recording_copy(value: Any, *, in_rgb_branch: bool = False) -> Any:
@@ -68,6 +74,9 @@ class TransitionRecorder:
         self._infos: list[dict[str, Any]] = []
         self._reset_info: dict[str, Any] = {}
         self._record_metadata: dict[str, Any] = {}
+        self._structured_controls: list[StructuredControlTransitionV1 | None] = []
+        self._boundary_events: list[BoundaryEventV1] = []
+        self._outcome: EpisodeOutcomeV1 | None = None
         self._save_index = 0
 
     @property
@@ -89,6 +98,9 @@ class TransitionRecorder:
         self._universal_actions = []
         self._rewards, self._successes, self._terminated, self._truncated, self._infos = [], [], [], [], []
         self._reset_info, self._record_metadata = copy_tree(reset_info), copy_tree(record_metadata)
+        self._structured_controls = []
+        self._boundary_events = []
+        self._outcome = None
         self._append_observation(initial_obs)
 
     def _append_observation(self, observation: Any) -> None:
@@ -111,9 +123,15 @@ class TransitionRecorder:
         terminated: bool,
         truncated: bool,
         info: dict[str, Any],
+        *,
+        structured_control: StructuredControlTransitionV1 | None = None,
     ) -> None:
         if not self._active:
             raise RuntimeError("begin_episode() must be called before append_transition()")
+        if structured_control is not None and not isinstance(structured_control, StructuredControlTransitionV1):
+            raise TypeError("structured_control must be StructuredControlTransitionV1 or None")
+        if self._structured_controls and (self._structured_controls[0] is None) != (structured_control is None):
+            raise ValueError("structured control evidence must be present for every transition or none")
         if len(self._actions) >= self.config.max_transitions:
             raise OverflowError("recording exceeds max_transitions")
         action_value = np.asarray(action, dtype=np.float32).copy()
@@ -136,6 +154,7 @@ class TransitionRecorder:
             + universal_value.nbytes
         )
         self._actions.append(action_value)
+        self._structured_controls.append(structured_control)
         self._universal_actions.append(universal_value)
         self._rewards.append(float(reward))
         self._successes.append(bool(success))
@@ -144,9 +163,33 @@ class TransitionRecorder:
         self._infos.append(copy_tree(info))
         self._append_observation(next_obs)
 
-    def end_episode(self, reason: str) -> FrozenTrajectory:
+    def add_boundary_event(self, event: BoundaryEventV1) -> None:
+        """Append an event at the recorder's current real control boundary."""
+        if not self._active:
+            raise RuntimeError("boundary events require an active recording")
+        if not isinstance(event, BoundaryEventV1):
+            raise TypeError("event must be BoundaryEventV1")
+        if event.boundary_index != len(self._actions):
+            raise ValueError("boundary event must target the current control boundary")
+        same_boundary = [item for item in self._boundary_events if item.boundary_index == event.boundary_index]
+        if event.event_sequence != len(same_boundary):
+            raise ValueError("boundary event sequence must be contiguous")
+        if self._boundary_events and event.episode_id != self._boundary_events[0].episode_id:
+            raise ValueError("boundary event episode identity mismatch")
+        self._boundary_events.append(event)
+
+    def end_episode(self, reason: str, *, outcome: EpisodeOutcomeV1 | None = None) -> FrozenTrajectory:
         if not self._active:
             raise RuntimeError("no active recording to end")
+        if self.config.schema_version == "v3" and not isinstance(outcome, EpisodeOutcomeV1):
+            raise ValueError("task-env-h5 v3 requires an explicit EpisodeOutcomeV1")
+        if outcome is not None:
+            if not isinstance(outcome, EpisodeOutcomeV1):
+                raise TypeError("outcome must be EpisodeOutcomeV1 or None")
+            if outcome.end_reason != str(reason):
+                raise ValueError("EpisodeOutcome end_reason must match recorder stop reason")
+            validate_episode_records(self._boundary_events, outcome, len(self._actions))
+        self._outcome = outcome
         self._active = False
         trajectory = FrozenTrajectory(
             tuple(self._observations),
@@ -160,6 +203,9 @@ class TransitionRecorder:
             self._reset_info,
             self._record_metadata,
             str(reason),
+            tuple(self._structured_controls),
+            tuple(self._boundary_events),
+            self._outcome,
         )
         trajectory.validate()
         self._frozen = trajectory
