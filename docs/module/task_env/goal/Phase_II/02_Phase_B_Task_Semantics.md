@@ -374,10 +374,13 @@ Pendulum 声明 `upright` 的五-sample dwell 输出 `task_success`，只在 exp
 25 个重复 predicate reads 后仅一次 commit、重复 commit、冲突 boundary、乱序/gap/missing/reset、native interval 内
 25 个 substeps 只计一个 outer sample。selected Expert Guard 与 native callback 不接入此提交点。
 
-`test_phase_ii_b03b_temporal_commit.py` **5 passed**；与 B03a、reference construction 和 selected consumers 合计
-**55 passed**。B01/B02/D01a/D02b 与 B03a/B03b 六份定向文件合计 **30 passed**，含一条 Taichi 上游
+`test_phase_ii_b03b_temporal_commit.py` **15 passed**；覆盖全部公开 `RuntimeSnapshot` 字段的重复 boundary 指纹，
+以及 action/applied-control/Timebase/NativeInterval/predicate 输入冲突和 no-evaluator 清进度。与 B03a、reference
+construction 和 selected consumers 合计 **65 passed**。B01/B02/D01a/D02b 与 B03a/B03b 六份定向文件合计
+**40 passed**，含一条 Taichi 上游
 `locale.getdefaultlocale` 弃用警告。当前仅是 scalar boundary 的 S1 语义契约/旧 consumer 回归，不代表有真实 provider
 输出 NativeIntervalEvidence、batch temporal commit、TaskArtifact 序列化、selected native callback 集成或 qualification。
+下文 B04b/B05 的 aggregate 数字记录各自先前运行；本次 B03b follow-up 未重跑那两组更宽的组合。
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=GeoPhys/src:. python -m pytest -q -p no:cacheprovider \

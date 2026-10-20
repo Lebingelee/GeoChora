@@ -1,10 +1,12 @@
 """B03b bounded temporal rules and exactly-once outer-boundary commits."""
 
 import math
+from dataclasses import replace
 
 import numpy as np
 import pytest
 
+from task_env.artifacts.contracts import Timebase
 from task_env.artifacts.state import (
     NativeIntervalEvidence,
     NativeIntervalSample,
@@ -13,6 +15,7 @@ from task_env.artifacts.state import (
     UnavailableStateValue,
 )
 from task_env.environment import (
+    AppliedControl,
     RuntimeSnapshot,
     TaskEvaluation,
     TaskEvaluationContextV1,
@@ -22,6 +25,7 @@ from task_env.environment import (
     TemporalPredicateRuleV1,
     StageUnavailableError,
 )
+from task_env.environment.types import ContactSummary
 from task_env.environment.task_definition import TaskDefinitionBase
 from task_env.runtime.contracts import BatchState
 from task_env.tasks.pendulum import PendulumTaskDefinition
@@ -56,6 +60,27 @@ class _TemporalProbeDefinition(TaskDefinitionBase):
             else:
                 predicates[name] = TaskPredicateResultV1.available(bool(value))
         return TaskPredicateEvaluationV1.available(predicates)
+
+
+class _MutablePredicateDefinition(_TemporalProbeDefinition):
+    def __init__(self):
+        self.ready_override = False
+
+    def evaluate_predicates(self, context):
+        evaluation = super().evaluate_predicates(context)
+        predicates = dict(evaluation.predicates)
+        predicates["ready"] = TaskPredicateResultV1.available(self.ready_override)
+        return TaskPredicateEvaluationV1.available(predicates)
+
+
+class _ToggleNoEvaluatorDefinition(_TemporalProbeDefinition):
+    def __init__(self):
+        self.has_evaluator = True
+
+    def evaluate_predicates(self, context):
+        if not self.has_evaluator:
+            return TaskPredicateEvaluationV1.no_evaluator()
+        return super().evaluate_predicates(context)
 
 
 def _boundary(
@@ -202,7 +227,7 @@ def test_temporal_commit_is_explicit_idempotent_ordered_and_one_per_outer_bounda
     assert lifecycle.commit_temporal_predicates(native_step) is committed
 
     conflicting = _context(
-        [0.0, 1.0, 0.0], 1, native_substeps=25, state_revision=99
+        [0.0, 1.0, 0.0], 1, native_substeps=25
     )
     with pytest.raises(ValueError, match="already committed with different input"):
         lifecycle.commit_temporal_predicates(conflicting)
@@ -213,6 +238,76 @@ def test_temporal_commit_is_explicit_idempotent_ordered_and_one_per_outer_bounda
     assert completed.resolve("ready_dwell").value is True
     with pytest.raises(ValueError, match="committed in order"):
         lifecycle.commit_temporal_predicates(native_step)
+
+
+@pytest.mark.parametrize(
+    "changed_field",
+    (
+        {"site_jacp": np.asarray([[0.0, 0.0, 0.0]], dtype=np.float32)},
+        {"site_jacr": np.asarray([[0.0, 0.0, 0.0]], dtype=np.float32)},
+        {"contact_summary": ContactSummary({"robot/object": 1})},
+        {"simulation_time": 0.025},
+    ),
+)
+def test_duplicate_boundary_rejects_changes_to_any_runtime_snapshot_field(changed_field):
+    lifecycle = _adapter()
+    original = _context([0.0, 0.0, 0.0], 0)
+    committed = lifecycle.commit_temporal_predicates(original)
+    changed_state = RuntimeSnapshot(
+        qpos=np.asarray(original.state.qpos),
+        qvel=np.asarray(original.state.qvel),
+        **changed_field,
+    )
+    changed = TaskEvaluationContextV1(
+        state=changed_state,
+        elapsed_steps=original.elapsed_steps,
+        boundary_identity=original.boundary_identity,
+        sample_clock=original.sample_clock,
+    )
+    assert lifecycle.evaluate_predicates(changed) == lifecycle.evaluate_predicates(original)
+    with pytest.raises(ValueError, match="already committed with different input"):
+        lifecycle.commit_temporal_predicates(changed)
+    assert lifecycle.commit_temporal_predicates(original) is committed
+
+
+@pytest.mark.parametrize(
+    "updates",
+    (
+        {
+            "requested_action": np.asarray([1.0], dtype=np.float32),
+            "action_schema_id": "test-action-v1",
+        },
+        {
+            "applied_control": AppliedControl(
+                requested_ctrl=np.asarray([1.0], dtype=np.float32),
+                applied_ctrl=np.asarray([0.5], dtype=np.float32),
+                clipped=True,
+            )
+        },
+        {"timebase": Timebase(physics_dt=0.001, control_substeps=25, control_dt=0.025)},
+        {"native_interval": _native_interval(1, control_substeps=25)},
+    ),
+)
+def test_duplicate_boundary_rejects_changed_action_and_interval_inputs(updates):
+    lifecycle = _adapter()
+    original = _context([0.0, 0.0, 0.0], 1)
+    lifecycle.commit_temporal_predicates(original)
+    changed = replace(original, **updates)
+    assert lifecycle.evaluate_predicates(changed) == lifecycle.evaluate_predicates(original)
+    with pytest.raises(ValueError, match="already committed with different input"):
+        lifecycle.commit_temporal_predicates(changed)
+
+
+def test_duplicate_boundary_rejects_changed_predicate_result():
+    definition = _MutablePredicateDefinition()
+    lifecycle = TaskLifecycleAdapter(
+        task_definition=definition, horizon=20, ignore_done=False
+    )
+    context = _context([0.0, 0.0, 0.0], 0)
+    lifecycle.commit_temporal_predicates(context)
+    definition.ready_override = True
+    with pytest.raises(ValueError, match="already committed with different input"):
+        lifecycle.commit_temporal_predicates(context)
 
 
 def test_temporal_gap_missing_sample_and_reset_have_explicit_memory_behavior():
@@ -263,6 +358,28 @@ def test_temporal_gap_missing_sample_and_reset_have_explicit_memory_behavior():
         )
     )
     assert fresh_episode.resolve("ready_dwell").value is False
+
+
+def test_no_evaluator_is_distinct_and_clears_temporal_progress():
+    definition = _ToggleNoEvaluatorDefinition()
+    lifecycle = TaskLifecycleAdapter(
+        task_definition=definition, horizon=20, ignore_done=False
+    )
+    first = lifecycle.commit_temporal_predicates(_context([1.0, 0.0, 0.0], 0))
+    assert first.resolve("ready_dwell").value is False
+
+    definition.has_evaluator = False
+    unavailable = lifecycle.commit_temporal_predicates(
+        _context([1.0, 0.0, 0.0], 1)
+    )
+    assert unavailable.resolve("ready").status == "no_evaluator"
+    assert unavailable.resolve("ready_dwell").status == "no_evaluator"
+
+    definition.has_evaluator = True
+    after_unavailable = lifecycle.commit_temporal_predicates(
+        _context([1.0, 0.0, 0.0], 2)
+    )
+    assert after_unavailable.resolve("ready_dwell").value is False
 
 
 def test_sequence_advances_on_ordered_rising_edges_and_restarts_after_interruption():

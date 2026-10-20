@@ -132,12 +132,33 @@ class _TemporalPredicateCommitState:
                 "body_xquat",
                 "site_xpos",
                 "site_xquat",
+                "site_jacp",
+                "site_jacr",
+                "contact_summary",
+                "simulation_time",
             )
-            return {
-                name: cls._stable_value(value)
-                for name in names
-                if (value := getattr(state, name, None)) is not None
-            }
+            values = {}
+            getter = getattr(state, "get", None)
+            for name in names:
+                value = getattr(state, name, None)
+                if value is None and callable(getter):
+                    try:
+                        value = getter(name)
+                    except KeyError:
+                        continue
+                if value is None:
+                    continue
+                if name == "contact_summary":
+                    pair_counts = getattr(value, "pair_counts", None)
+                    if pair_counts is None and isinstance(value, Mapping):
+                        pair_counts = value
+                    if not isinstance(pair_counts, Mapping):
+                        raise TypeError(
+                            "contact_summary must expose stable pair_counts"
+                        )
+                    value = {"pair_counts": pair_counts}
+                values[name] = cls._stable_value(value)
+            return values
 
         applied = context.applied_control
         payload = {
