@@ -437,7 +437,7 @@ B04a 只增加上述基线夹具与 strict compatibility tests，不改 producti
 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。未改实现、测试或 fixture。测试命令：
 
 ```text
-/home/lly/miniconda3/envs/geochora/bin/python -m pytest -q -p no:cacheprovider --basetemp=workspace/phase_ii_coordination/evidence/cmd-0001/worker/pytest-temp task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py
+python -m pytest -q -p no:cacheprovider --basetemp=workspace/phase_ii_coordination/evidence/cmd-0001/worker/pytest-temp task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py
 ```
 
 结果为 **6 passed, 0 failed, 0 errors**，exit 0、未 timeout；环境覆盖为 `PYTHONDONTWRITEBYTECODE=1`、
