@@ -86,7 +86,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 17 | B05 | B04b | 旧 samples/traces 语义差分与 legacy route；新版本无 freeze 自动继承 |
 | 18 | C01b | B05、D02b | 实际 Task requirements/actual manifests、动态 admission；兼容配置分支 |
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
-| 20 | C02a | A03、C01b、D02b | Entity×Group bindings、完整 action/feedback schema、唯一 writer |
+| 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
 | 21 | C05a | C02a、C01b、D05a | 三类格式各自扩展 action/events/outcome；reader/loader 与 legacy fixtures |
 | 22 | C03a | C02a、D01b、C05a | 现有 ports 的 scalar reset/step/fault；单 controller 兼容执行 |
 | 23 | C04 | C03a、D02b | 固定 public/privileged/private schemas、必要反馈/诊断分离、capture 引用 |
@@ -288,6 +288,18 @@ C05a 不提前于 C01b、D05a 和 C02a。
 B01 的实际源契约只收显式 Entity-ID 候选；当前 A `EntityInstance` 没有 tags owner，因此 tags 选择不能作为 B02
 前置假设，也不能临时新增第二套 registry。B02 负责把候选解析到 A03 Robot/Entity 声明并证明 reset-time
 selection；若 region/type selector 在现有 Scene 中无法解析，应保留为 unsupported/deferred，而非静默按名称猜测。
+
+### 5.4 C02a bounded implementation evidence（2026-10-21）
+
+C02a 在 `codex/phase-ii-c` 基于 D01b/A03/C01b/D02b 完成了静态 Controller binding 编译及 structured action
+全量预检，详细契约和边界见 [Phase C C02a receipt](03_Phase_C_Execution_Lifecycle.md#c02a-bounded-implementation-receipt-2026-10-21)。
+专项测试 **11 passed**；与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A05、B04b 和 selected consumers 的定向交叉
+回归 **87 passed**，`git diff --check` 通过。A05 Panda arm+gripper group 映射到一个现有生产 writer，两个受测
+provider 的 legacy action/output 各执行一步；这保护既有路径，不代表 structured group action 已进入 Runtime dispatch。
+
+因此本证据仅关闭序号 20 的静态 mapping/schema/preflight 部分。C02b 的多组施控、双机器人执行和 actuator-force
+provider capability 均未由此获得支持；当前 CAPABILITIES 对 `actuator_force_query` 的缺口仍按 admission limitation
+处理。下一项可并行前置工作为 C05a 的三类旧格式版本化存储与 reader/loader 验收，执行写入须仍等待 C03a/C04/C02b。
 
 ## 6. 原稿保存、文档验证与二审交接
 

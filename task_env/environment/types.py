@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from collections import OrderedDict
 from collections.abc import Mapping as MappingABC
+import math
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
@@ -300,6 +301,8 @@ class ActionModeSpec:
         high = tuple(float(value) for value in self.high)
         if len(components) != len(low) or len(components) != len(high):
             raise ValueError("action components and bounds must have equal lengths")
+        if any(math.isnan(value) for value in (*low, *high)):
+            raise ValueError("action bounds cannot contain NaN")
         if any(lower > upper for lower, upper in zip(low, high, strict=True)):
             raise ValueError("action lower bound cannot exceed upper bound")
         if self.controller_kind == "delta_pose":

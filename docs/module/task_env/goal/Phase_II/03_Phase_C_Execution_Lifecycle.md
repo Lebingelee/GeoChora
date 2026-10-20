@@ -326,6 +326,29 @@ Qualification；这些仍须各自满足后续 Goal 的真实 provider gates。
   非兼容 schema 必须新 Env/wrapper。旧 Panda 输出保护，未测 multi-robot 不宣称执行支持。
 - **Codex AUDIT**：精确追踪已有 `RobotControllerHandle`, `ProductionCanonicalPandaController` 以及 `ControlledRuntimeSession` 的 owner/feedback 状态，不复制控制代码。
 
+#### C02a bounded implementation receipt（2026-10-21）
+
+`task_env/runtime/sessions/control.py` 现在提供 Scene-v3 validated `ControlBindingPlanV1` 编译及纯
+`prepare_structured_action()` 预检：每个 Entity×ControlGroup 恰有一个现有 Controller writer，每个 writer 的
+现有 `ActionModeSpec` components 被各组精确分区，actuator resource 唯一归属；反馈声明复用已有
+`StateRequirements`，并验证其引用落在声明的 Scene Entity/Joint/Frame/Actuator。绑定 identity 同时覆盖
+Scene、action schema、feedback requirements 和 writer/group 映射。完整请求必须匹配 Scene 与 binding identity，
+并提供所有 group 一次且仅一次；schema、维数、finite 值和 quaternion 均预检后，才返回按现有 writer 组合的
+`RequestedAction`。非法请求不调用或改写 Controller/Runtime。
+
+回归命令 `PYTHONPATH=GeoPhys/src:. /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q
+task_env/diagnostics/tasks/test_phase_ii_c02a_controller_bindings.py` 为 **11 passed**；含 A05 Panda arm+gripper
+由同一个现有生产 Controller 接收的绑定、拒绝路径，以及 legacy 8D action/feedback/output 在 GeoPhys CPU 和
+MuJoCo CPU 上各执行一步。与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A05、B04b、selected consumer 的定向
+交叉回归为 **87 passed**；`git diff --check` 通过。仅有 Taichi 上游 `locale.getdefaultlocale` deprecation warning。
+
+该结果只关闭 C02a 静态绑定与 action preflight gate：没有 dispatch 多个 group、没有实现 C02b 原子多组执行，
+没有证明双机器人控制，也未扩展 provider manifest。现有 `StateRequirements` 可以表达 actuator-force feedback，
+但当前 provider `CAPABILITIES` 尚未声明 `actuator_force_query`；该 feedback 在相关 provider 上仍需 admission
+拒绝或由后续 provider capability 切片补齐。实现和测试位于
+[`control.py`](../../../../../task_env/runtime/sessions/control.py) 与
+[`test_phase_ii_c02a_controller_bindings.py`](../../../../../task_env/diagnostics/tasks/test_phase_ii_c02a_controller_bindings.py)。
+
 ### C03 — Scalar Execution / Fault Policy / Stop（a/b）
 
 - **切片**：C03a 在 C02a/D01b/C05a 后以现有 ports/adapter 接入 reset/step/fault，

@@ -1,5 +1,6 @@
 """Additive control readback; canonical-state-v0 and task identity stay unchanged."""
 from dataclasses import dataclass
+import math
 from ...artifacts.contracts import Contract, _name
 
 
@@ -11,6 +12,8 @@ class CanonicalGripperFeedback(Contract):
 
     def validate(self):
         _name(self.semantic_id)
+        if not math.isfinite(self.opening_m) or not math.isfinite(self.closing_force_N):
+            raise ValueError('control feedback values must be finite')
         if self.opening_m < 0 or self.closing_force_N < 0:
             raise ValueError('nonnegative physical opening/closing-force magnitude required')
 
@@ -25,6 +28,8 @@ class CanonicalControlFeedback(Contract):
     def validate(self):
         if self.schema_version != 'canonical-control-feedback-v0':
             raise ValueError('unsupported feedback schema')
+        if not math.isfinite(self.simulation_time):
+            raise ValueError('feedback simulation time must be finite')
         if self.control_step < 0 or self.simulation_time < 0:
             raise ValueError('invalid feedback boundary')
 
