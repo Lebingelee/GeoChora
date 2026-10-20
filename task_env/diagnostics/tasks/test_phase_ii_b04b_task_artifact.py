@@ -136,6 +136,20 @@ def test_v1_codec_rejects_identity_drift_unknown_fields_and_implicit_v0_upgrade(
         TaskArtifactV1.from_mapping({**raw, "task_source_identity_hash": "0" * 64})
     with pytest.raises(ValueError, match="unknown TaskArtifactV1 fields"):
         TaskArtifactV1.from_mapping({**raw, "world": _legacy_artifact().world.to_mapping()})
+    with pytest.raises(ValueError, match="unknown ActionIntent fields"):
+        TaskArtifactV1.from_mapping(
+            {**raw, "action": {**raw["action"], "unrecognized": True}}
+        )
+    with pytest.raises(ValueError, match="unknown InitializationContract fields"):
+        TaskArtifactV1.from_mapping(
+            {
+                **raw,
+                "initialization": {
+                    **raw["initialization"],
+                    "unrecognized": True,
+                },
+            }
+        )
     with pytest.raises(ValueError, match="unsupported TaskArtifact schema"):
         decode_task_artifact({**raw, "schema_version": "task-artifact-v9"})
 
@@ -171,6 +185,41 @@ def test_compiler_rejects_scene_source_and_legacy_topology_mismatch():
     )
     with pytest.raises(ValueError, match="no valid canonical Scene binding"):
         compile_task_artifact_v1(source, scene, wrong_legacy)
+
+
+def test_compiler_rejects_rigid_body_role_for_scene_kind_legacy_entity():
+    source, scene, legacy = _source(), _scene(), _legacy_artifact()
+    wrong_kind = replace(
+        legacy,
+        world=replace(
+            legacy.world,
+            entities=tuple(
+                replace(entity, kind="scene")
+                if entity.semantic_id == "block-a"
+                else entity
+                for entity in legacy.world.entities
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="rigid-body TaskArtifact Entity"):
+        compile_task_artifact_v1(source, scene, wrong_kind)
+
+
+def test_v1_codec_rejects_malformed_or_incomplete_source_retained_pointers():
+    compiled = compile_task_artifact_v1(_source(), _scene(), _legacy_artifact())
+    with pytest.raises(ValueError, match="source-retained v0 field pointer"):
+        replace(
+            compiled,
+            source_retained_v0_fields=(
+                "/world/entities/0/unrecognized",
+                *compiled.source_retained_v0_fields[1:],
+            ),
+        )
+    with pytest.raises(ValueError, match="complete legacy World Entity fields"):
+        replace(
+            compiled,
+            source_retained_v0_fields=compiled.source_retained_v0_fields[:-1],
+        )
 
 
 def test_compiler_requires_explicit_binding_for_renamed_scene_frames():

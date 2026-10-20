@@ -72,6 +72,8 @@ def test_nutassembly_a05_projection_compiles_with_explicit_reference_map_and_kee
     assert candidate.legacy_joint_bindings == joint_bindings
     assert candidate.semantics == legacy.semantics
 
+    # Frozen canonical terminal-state input for semantic comparison; this is
+    # not a claim that the v1 candidate has run through a provider rollout.
     state = CanonicalStateView(
         "canonical-state-v0",
         "SI_right_handed_z_up_wxyz",
@@ -97,6 +99,20 @@ def test_nutassembly_a05_projection_compiles_with_explicit_reference_map_and_kee
     assert new_result.success is True
     assert new_result.metrics["task_success"] is True
     assert new_result.reward_terms == old_result.reward_terms
+    assert new_result.reward == 1.254820316853445
+    assert new_result.metrics["aligned_with_peg"] is True
+    assert new_result.metrics["inserted_on_peg"] is True
+    assert new_result.metrics["released_nut"] is True
+    assert new_result.metrics["eef_to_handle_dist"] == 0.1850540461594937
+    assert dict(new_result.reward_terms) == {
+        "reach": 0.004820316853445051,
+        "grasp": 0.0,
+        "lift": 0.0,
+        "hover": 0.0,
+        "insert": 0.15,
+        "release": 0.1,
+        "success": 1.0,
+    }
 
 
 def test_pickcube_a04_panda_scene_candidate_keeps_pinned_legacy_metrics(tmp_path):
@@ -199,5 +215,7 @@ def test_pickcube_a04_panda_scene_candidate_keeps_pinned_legacy_metrics(tmp_path
     assert candidate.source_artifact_identity_hash == legacy.identity_hash
     assert candidate.identity_hash != legacy.identity_hash
     assert new_result == old_result
+    assert new_result.success is False
     assert new_result.metrics["eef_to_cube_dist"] == 0.09966140700877033
+    assert new_result.metrics["cube_lift"] == 0.000627475181531223
     assert new_result.reward == 0.026493052593642232

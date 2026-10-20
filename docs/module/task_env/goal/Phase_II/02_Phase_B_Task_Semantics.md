@@ -456,8 +456,9 @@ D01b 或 Task freeze。`TaskSourceV1` 当前不声明完整 predicate/Reward/Act
 不改并继续 DEFERRED；B04b 不把合成样本描述成旧文件兼容证据。完整 Stage-1/新主线由 B05 与后续 D01b/P99 gate 验证。
 
 B04b 新增 `test_phase_ii_b04b_task_artifact.py`，覆盖 Source/Scene/v0 编译链接、v1 roundtrip/hash、精确版本路由、
-未知字段/identity 拒绝与 topology mismatch；与 B04a codec 基线合计 **9 passed**。再与 B01/B02/B03a/B03b、
-reference construction、selected consumers 定向回归合计 **77 passed**，仅一条 Taichi 上游
+嵌套未知字段/identity 拒绝、topology mismatch、v0 `scene` Entity 不能绑定 rigid_body Role，以及完整 source-retained
+World Entity field pointers；与 B04a codec 基线合计 **12 passed**。再与 B01/B02/B03a/B03b、D01a/D02b、
+reference construction、selected consumers 定向回归合计 **97 passed**，仅一条 Taichi 上游
 `locale.getdefaultlocale` 弃用警告。该结果仅是 bounded candidate codec 与旧 consumer/provider regressions，不证明新 v1
 进入现有执行链。
 
@@ -480,10 +481,11 @@ Panda imported structure，table/cube 的几何与接触参数仍通过 v0 sourc
 PickCube 还固定核对已接受边界的距离与 reward 数值。旧 SelectedReferenceEnv、ResetSample、NutAssembly Outcome/Expert
 分离路径仍由原有 reference/selected-consumer/outcome regression 覆盖，没有把 Task success 升格为 Expert completion。
 
-本次 B01–B05 与 A05/D01a/D02b、B04a、reference construction、selected consumers、NutAssembly outcome 定向集合为
-**123 passed**，一条 Taichi 上游 `locale.getdefaultlocale` 弃用警告。这里的 `CanonicalStateView` 是确定性语义
-fixture；它不构成 v1 Runtime/Recorder 主链、实际重放 trace、Stage-1 randomized feasibility、Stage-1 Judge、物理漂移
-归因或 Provider qualification。新 v1 仍为 candidate；TaskArtifact v0 identity 和 legacy execution routes 均未变。
+B05 专项 `test_phase_ii_b05_reference_semantics.py` **2 passed**；NutAssembly outcome、reference construction 与
+selected consumer 定向回归 **80 passed**。这里的 `CanonicalStateView` 是确定性语义 fixture，比较的是同一状态输入下
+旧 v0 evaluator 与从 candidate 携带的语义；它不构成 v1 Runtime/Recorder 主链、实际 trajectory replay、Stage-1
+randomized feasibility、Stage-1 Judge、物理漂移归因或 Provider qualification。新 v1 仍为 candidate；TaskArtifact v0
+identity 和 legacy execution routes 均未变。
 
 ## B.8 验收 Oracle 与质量标准
 

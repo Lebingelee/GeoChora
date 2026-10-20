@@ -257,8 +257,9 @@ selected consumer/reference construction 回归合计 **50 passed**；B01/B02/D0
 只有一条 Taichi 上游 deprecation warning。详细实现范围与测试记录见
 [B03a slice](02_Phase_B_Task_Semantics.md#b03a-read-only-predicate-action-interval-context)。
 B03b 现已完成：TemporalRule 仅声明 rising-edge、样本计数 dwell 和有序 edge sequence，mutable progress 留在
-现有 lifecycle owner；reset、gap、missing、duplicate/conflicting boundary 与乱序均有明确处置。B03a/B03b 与
-reference/selected consumers 回归 **55 passed**；B01/B02/D01a/D02b 与两切片合计 **30 passed**，仍只有一条 Taichi
+现有 lifecycle owner；reset、gap、missing、duplicate/conflicting boundary 与乱序均有明确处置；重复提交 fingerprint
+覆盖公开 RuntimeSnapshot 字段和 action/applied/interval/predicate 输入。B03a/B03b 与 reference/selected consumers
+回归 **65 passed**；B01/B02/D01a/D02b 与两切片合计 **40 passed**，仍只有一条 Taichi
 上游 deprecation warning。临时 sample-count dwell 不冒充物理连续时间；边界身份/clock来自 D02b 契约，真实 Provider
 NativeIntervalEvidence 与 batch temporal commit 保持未支持。详细范围见
 [B03b slice](02_Phase_B_Task_Semantics.md#b03b-bounded-temporal-memory-boundary-commit)。
@@ -270,17 +271,17 @@ B04b 在原定依赖上完成：`TaskArtifactV1` 与 exact-schema `decode_task_a
 编译器复用 strict B01 Source、A Scene identity、B02 role-candidate validation 与旧 v0 semantic bridge。旧 Entity
 identity 必须精确存在；非同名 Frame/Joint 只接受显式类型化绑定，绑定进入 v1 identity。它用逐字段
 `source_retained_v0_fields` 和 source Artifact identity 指针显式保留尚不能由 Canonical Scene 精确表达的旧 World
-数据，不复制 Scene、Entity topology 或 Provider Runtime。B04b+B04a codec fixture/roundtrip/reject 合计 **9 passed**；
-与 B01/B02/B03a/B03b、reference construction、selected consumers 定向回归合计 **77 passed**，包含一条 Taichi 上游
+数据，不复制 Scene、Entity topology 或 Provider Runtime。B04b+B04a codec fixture/roundtrip/reject 合计 **12 passed**；
+另拒绝 v0 `scene` Entity 作为 `rigid_body` Role、source-retained pointer 形状/字段不完整和嵌套未知字段。与
+B01/B02/B03a/B03b、D01a/D02b、reference construction、selected consumers 定向回归合计 **97 passed**，包含一条 Taichi 上游
 弃用警告。没有改 Timebase 精确 gate、ResetSample/State/Camera/
 Trajectory/H5 reader，也没有真实旧 H5 golden bytes，因此这些 reader compatibility 继续 deferred。详细边界见
 [B04b slice](02_Phase_B_Task_Semantics.md#b04b-taskartifact-v1)。
 
 B05 已按上述顺序完成 bounded semantic gate：NutAssembly 使用 A05 source-backed Scene projection，PickCube 使用 A04 实际
 Panda imported structure，并把任务局部 table/cube 几何留在源 TaskArtifact identity 下；两个 v1 candidate 均在固定
-`CanonicalStateView` fixture 上保持 legacy evaluator 的 success/reward/metrics。原 SelectedReferenceEnv、ResetSample 与
-NutAssembly Outcome/Expert 分离路线继续由既有回归保护。B01–B05 加 A05/D01a/D02b、B04a、reference construction、
-selected consumers、NutAssembly outcome 定向集合为 **123 passed**，仅一条 Taichi 上游弃用警告。此证据不接通 v1
+`CanonicalStateView` fixture 上保持 legacy evaluator 的 success/reward/metrics。`test_phase_ii_b05_reference_semantics.py`
+**2 passed**；NutAssembly outcome、reference construction、selected consumer 定向回归 **80 passed**。此证据不接通 v1
 Runtime/Recorder 路线，也不代表实际 trajectory replay、Stage-1、Provider qualification。B 阶段后按依赖返回 **C01b**；
 C05a 不提前于 C01b、D05a 和 C02a。
 

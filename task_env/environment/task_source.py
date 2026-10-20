@@ -699,8 +699,14 @@ def compile_task_artifact_v1(
             entity = legacy_entities.get(entity_id)
             if entity is None:
                 raise ValueError(f"role {role.role_id!r} candidate is absent from the v0 semantic bridge")
-            if (role.entity_type == "robot") != (entity.kind == "embodiment"):
-                raise ValueError(f"role {role.role_id!r} candidate type differs in the v0 semantic bridge")
+            if role.entity_type == "robot" and entity.kind != "embodiment":
+                raise ValueError(
+                    f"role {role.role_id!r} candidate is not an embodiment TaskArtifact Entity"
+                )
+            if role.entity_type == "rigid_body" and entity.kind not in {"static", "movable"}:
+                raise ValueError(
+                    f"role {role.role_id!r} candidate is not a rigid-body TaskArtifact Entity"
+                )
 
     source_mapping = source.to_mapping()
     source_retained_fields = tuple(

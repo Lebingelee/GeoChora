@@ -1004,11 +1004,29 @@ class TaskArtifactV1(Contract):
             raise ValueError('TaskArtifact source requires a lowercase v0 Artifact identity')
         if not self.source_retained_v0_fields or len(set(self.source_retained_v0_fields)) != len(self.source_retained_v0_fields):
             raise ValueError('TaskArtifact v1 must explicitly retain each unmapped v0 World field')
-        if any(
-            type(pointer) is not str or not pointer.startswith('/world/entities/')
-            for pointer in self.source_retained_v0_fields
+        retained_by_entity: dict[int, set[str]] = {}
+        for pointer in self.source_retained_v0_fields:
+            match = re.fullmatch(
+                r'/world/entities/(0|[1-9][0-9]*)/'
+                r'(kind|asset_reference|geometry|collision_intent|parameters_si)',
+                pointer,
+            )
+            if match is None:
+                raise ValueError('invalid source-retained v0 field pointer')
+            entity_index, field_name = int(match.group(1)), match.group(2)
+            retained_by_entity.setdefault(entity_index, set()).add(field_name)
+        required_fields = {
+            'kind', 'asset_reference', 'geometry', 'collision_intent', 'parameters_si',
+        }
+        entity_indices = sorted(retained_by_entity)
+        if (
+            entity_indices != list(range(len(entity_indices)))
+            or any(
+                field_names != required_fields
+                for field_names in retained_by_entity.values()
+            )
         ):
-            raise ValueError('source-retained v0 field pointers must identify legacy World Entities')
+            raise ValueError('source-retained pointers must enumerate complete legacy World Entity fields')
         _choice(
             self.scene_schema_version,
             {'scene-definition-v1', 'scene-definition-v2', 'scene-definition-v3'},
