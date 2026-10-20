@@ -385,3 +385,21 @@ Human Judge、Qualification 或 D01b 完整执行链。
 
 **cmd-0001-attempt-02 报告勘误**：同目录 JSON 的 `final_commit` 和远端 ref 核验均为 `b3f8dc4381708b76c5003dde5da138d90518aefa`；
 Markdown“远端同步”段写作 `1fb3a55…` 属记录笔误，详见 02 阶段文档的 B.11。原报告不可变，不回写历史记录。
+
+## 10. 序号 18／C01b 动态 Admission（2026-10-20）
+
+从 B 收口 SHA `006801074052c51db9845ccf64be1d21fc08609c` 创建本地 `codex/phase-ii-c` 后，完成序号 18/C01b
+有界 admission slice。现有 `RuntimeSession.materialize()` 已用 TaskArtifact 的真实 requirement set 对所选 Provider 的
+build-bound manifest 做 admission；本轮新增定向测试验证真实 PickCube/NutAssembly v0 Artifact 对当前 GeoPhys/MuJoCo
+manifest 的正向交集，以及 caller-manifest 扩权、requirements 缺失、backend mismatch、unsupported renderer 的拒绝点。
+legacy C01a config/plan、selected-reference construction 和 consumers 回归也通过，合计 **59 passed**。实现与证据范围见
+[C 阶段 C01b 记录](03_Phase_C_Execution_Lifecycle.md#c01b-bounded-dynamic-admission-receipt2026-10-20)及本地 run metadata。
+
+C01b 沿用现有 Artifact、RuntimeSession 和 Provider identity owners，不增加 production abstraction；通用 `BaseTaskEnv`
+静态计划仍是 C01a 的 GeoPhys-only route，selected legacy routes 未迁移或重写。测试只 monkeypatch 既有 native
+materializer 来检查 admission 前置边界，故本切片不声称 v1 Artifact 的 provider materialization 或任何新的 physics
+qualification。后续序号 19/D01b 未启动。
+
+当前分支关系：`codex/phase-ii-b` 固定在 B 收口 SHA，`codex/phase-ii-c` 自该 SHA 继续；本地 `develop` 与远端
+`develop`/`codex/phase-ii-b` 保持 `b3f8dc4381708b76c5003dde5da138d90518aefa`。本轮只创建本地 C 分支并提交 C01b，
+不 push/merge。

@@ -286,6 +286,36 @@ External Solution (planner/RL/VLA/LLM/privileged policy)
 - **验收**：同源配置得到同一 resolved identity；legacy selected/generic configs 仍清晰 fail-closed；不支持的 controller/provider/renderer 前置拒绝；没有构造一半 Runtime 就泄漏资源；支持切换 Provider 实例而不修改 Frozen Artifact。
 - **Codex AUDIT**：对比 registry 的 `from_reference_config` 分流与 `resolve_env_config`，提出不复制 factory 的迁移方案。
 
+#### C01b bounded dynamic admission receipt（2026-10-20）
+
+C01b 复用现有 [`RuntimeSession.materialize()`](../../../../../task_env/runtime/sessions/api.py#L51-L73) 和
+[`provider_manifest()`](../../../../../task_env/runtime/sessions/api.py#L36-L48)：Runtime admission 读取实际 selected
+TaskArtifact 的 `required_capabilities`，按 `ExecutionSpec.physics_provider` 解析 manifest，并在任何 native
+materializer 调用之前完成 capability、ExecutionSpec、source timebase/backend、Artifact identity 与 bindings 检查。
+Manifest 的 provider version 由
+[`provider_build_identity()`](../../../../../task_env/runtime/sessions/provenance.py#L8-L47) 绑定当前 GeoPhys checkout 或
+MuJoCo package identity；它的 evidence 仍标为 `implementation_only_no_qualification`，不是 provider qualification。
+
+当前实现已具备该 admission 路径，因此本切片不增加生产 API、Provider manifest registry、第二套 Runtime/TaskEnv 或
+config-to-runtime factory；新增 `test_phase_ii_c01b_dynamic_admission.py` 锁定跨 owner 行为。PickCube 与 NutAssembly
+真实 selected v0 Artifact 的七项 requirements 分别通过当前 GeoPhys 与 MuJoCo manifest admission（同一 Artifact
+requirements 不因 provider 选择改变）。负向检查证明：将 `contact_detection` 加入实际 Task requirements，即使调用者
+提供扩大后的 manifest，当前 provider manifest 仍拒绝；调用者的 restrictive manifest 可拒绝 `frame_pose_query`；
+CUDA backend 与当前 CPU manifest 不匹配，以及非 `none` renderer 均在 native materializer 之前明确拒绝。
+
+C01b、C01a、selected reference construction/consumer 定向回归组合 **59 passed, 0 failed, 0 errors**；当前受测实现为
+`006801074052c51db9845ccf64be1d21fc08609c`，GeoPhys pin 为 `4436787e9cb85ce519506a2a9af86d1eeec9de2d`，MuJoCo
+package version 为 `3.8.1`。PickCube / NutAssembly v0 Artifact identities 分别为
+`fd5bc96821ca44adcbe507bfd702bf5288ee6bcb045c584c92df7cd4800a54c4` /
+`99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe`；GeoPhys / MuJoCo manifest identity hashes 为
+`f3b70b029a1514e0aeedd2a61125387f8a6b0c64c25eed0d13f5de479b7f9ab6` /
+`af5368b98f1b28101ab989e3334032599e0d0d8d1ccbeecf3d0e88e60a48760f`。完整 argv、environment、测试源码 SHA-256、
+stdout/stderr hashes 和完整 Provider build identities 见本地
+`workspace/maintenance/phase_ii_c01b_20261020_001/run_metadata.json`。C01a 的静态 `ExecutionPlan` 和旧
+`ResolvedEnvConfig` 路由保持原样；SelectedReferenceEnv 仍经原有 task factory。序号 18 的验证只证明 v0 Artifact 的
+动态 admission 与兼容路径，不证明 TaskArtifact v1 native materialization、D01b、SAPIEN/Genesis、完整 rollout 或
+Qualification；这些仍须各自满足后续 Goal 的真实 provider gates。
+
 ### C02 — Controller Binding / Atomic Execution / Safe Switch（a/b/c）
 
 - **切片**：C02a 在 A03/C01b/D02b 后确定 bindings、完整 action/feedback schema；
