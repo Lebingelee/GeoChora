@@ -112,7 +112,7 @@ recipe:
         rotation_acceleration_rad_s2: 27.0
         settle_duration_s: 0.26666666666666666
   solution:
-    version: nutassembly-r5-v5-guarded-outcome-solution-v2
+    version: nutassembly-r5-v5-guarded-outcome-solution-v3
     config:
       grasp_offset: [0.0, 0.0, 0.045895]
       grasp_quaternion_wxyz: [0.0038, 0.99993765, 0.0, 0.0105]

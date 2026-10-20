@@ -23,15 +23,21 @@ OUTCOME_COMPLETION = OUTCOME_POLICY_ID
 
 
 class Hold:
-    locked = False
-    def lock(self): self.locked = True
+    def __init__(self):
+        self.locked = False
+        self.lock_calls = 0
+
+    def lock(self):
+        self.lock_calls += 1
+        self.locked = True
 
 
 class Ideal:
-    def __init__(self, *, residual=-.00022, release=True, authorize=True):
+    def __init__(self, *, residual=0.0, release=True, authorize=True):
         value = build_reference()
+        self.arm_hold = Hold()
         self.solution = NutAssemblyOutcomeSolutionV1(config=value['solution_config'],
-            control_dt=.01, physics_dt_s=.002, arm_hold=Hold())
+            control_dt=.01, physics_dt_s=.002, arm_hold=self.arm_hold)
         self.ee = np.array([.5,-.075,.7,*value['solution_config'].grasp_quaternion_wxyz])
         self.nut = np.array([.5085,-.075,.473,0.,0.,0.,1.])
         self.peg = np.array([.58,.045,.5,1.,0.,0.,0.])
@@ -84,23 +90,18 @@ class Ideal:
         raise AssertionError('unbounded fixture')
 
 
-def test_warning_advances_without_diagnostic_override_and_retains_original_gate_measurements():
-    f=Ideal(); f.until('close_gripper');s=f.solution
-    assert s.stage=='close_gripper' and not s.failed and not s.outcome_complete
-    warning,=s.readiness_warnings
-    assert warning['reason']=='stable_height_mismatch'
-    assert warning['height_residual_m']==pytest.approx(-.00022,abs=1e-12)
-    assert warning['strict_tolerance_m']==.0001 and warning['sample_count']>=20
-    assert s.original_expert_lifecycle_status['expert_failed']
+def test_tracking_rmse_gate_blocks_close_when_height_error_remains_above_limit():
+    f=Ideal(residual=-.00022); f.until('close_gripper'); s=f.solution
+    assert s.failed and s.failure_reason=='preclose_motion_stability_timeout'
+    assert s.stage=='descend_to_handle' and not s.readiness_warnings
+    assert not any(e['event']=='tracking_rmse_satisfied' for e in s.events)
     assert not s.original_expert_lifecycle_status['expert_complete']
-    strict=build_reference()['solution']
-    assert not strict._stable_height_ready(.5,.50022)
 
 
 @pytest.mark.parametrize('residual',[-.00030001,.00030001])
 def test_outside_height_warning_bound_still_fails(residual):
     f=Ideal(residual=residual);f.until('close_gripper')
-    assert f.solution.failed and f.solution.failure_reason=='stable_height_mismatch'
+    assert f.solution.failed and f.solution.failure_reason=='preclose_motion_stability_timeout'
     assert not f.solution.readiness_warnings
 
 
@@ -173,7 +174,8 @@ def test_full_authored_trajectory_measured_insertion_release_and_retreat_require
     receipt=s.outcome_report()['stage_execution_receipts'][-1]
     assert receipt['stage']=='release_retreat' and receipt['planned_actions_executed']==receipt['planned_actions']
     assert receipt['actions_executed']>=receipt['planned_actions']>0 and receipt['endpoint_pass']
-    assert s.original_expert_lifecycle_status['expert_failed']
+    assert not s.original_expert_lifecycle_status['expert_failed']
+    assert s.original_expert_lifecycle_status['expert_complete']
     # Late recording/runtime failure cannot leave the new outcome marked complete.
     s.abort('recording_error');assert not s.outcome_complete
 
@@ -199,10 +201,43 @@ def test_default_and_source_policy_identity_and_complete_checkpoint_fields():
             control_dt=.01,physics_dt_s=.002,arm_hold=Hold())
 
 
-@pytest.mark.parametrize('residual',[-.00029999,.00029999])
-def test_admission_inside_explicit_height_bound(residual):
+def test_descend_command_z_matches_acceptance_height_target():
+    f = Ideal(); f.until('descend_to_handle'); s = f.solution
+    assert s.descend_endpoint_command_bias_m == s.servo_height_compensation_m
+    assert s._actions[-1, 2] == pytest.approx(
+        s._goal[2] - s.servo_height_compensation_m, abs=1e-7)
+    assert s.outcome_policy_mapping['endpoint_z_alignment']['aligned'] is True
+    assert f.solution.identity != ''
+
+
+@pytest.mark.parametrize('residual',[-.00008,.00008])
+def test_admission_inside_tracking_and_height_tolerances(residual):
     f=Ideal(residual=residual);f.until('close_gripper')
-    assert f.solution.stage=='close_gripper' and len(f.solution.readiness_warnings)==1
+    assert f.solution.stage=='close_gripper' and not f.solution.failed
+    event, = [e for e in f.solution.events if e['event']=='tracking_rmse_satisfied']
+    assert event['rolling_position_rmse_m'] < f.solution.tracking_position_rmse_limit_m
+    assert not f.solution.readiness_warnings
+
+
+def test_descend_waits_for_tracking_rmse_then_closes_with_cartesian_feedback():
+    f=Ideal();f.until('descend_to_handle');s=f.solution
+    start_step=None
+    def converge(obs,info):
+        nonlocal start_step
+        if s._index>=len(s._actions):
+            if start_step is None:
+                start_step=s._emitted
+            elapsed=s._emitted-start_step
+            error=max(0.,.00020-max(0,elapsed-40)*.00001)
+            target_z=s._goal[2]-s.descend_endpoint_command_bias_m
+            obs['state']['ee_pose'][2]=target_z+error
+    for _ in range(1000):
+        if s.failed or s.stage!='descend_to_handle':break
+        f.step(converge)
+    assert s.stage=='close_gripper' and not s.failed
+    passed, = [e for e in s.events if e['event']=='tracking_rmse_satisfied']
+    assert passed['rolling_position_rmse_m'] < .0001
+    assert f.arm_hold.lock_calls==0 and not f.arm_hold.locked
 
 
 @pytest.mark.parametrize('fault',['pose_error','unstable'])
@@ -217,12 +252,30 @@ def test_original_pose_and_measured_stability_are_required(fault):
     assert f.solution.failed and not f.solution.readiness_warnings
 
 
+def test_grasp_closure_keeps_cartesian_feedback_without_joint_target_lock():
+    f = Ideal(); f.until('close_gripper'); s = f.solution
+    assert not s.failed and s.stage == 'close_gripper'
+    assert f.arm_hold.lock_calls == 0 and not f.arm_hold.locked
+    target = s._actions[0, :7].copy()
+    assert np.allclose(s._actions[:, :7], target[None, :], atol=0., rtol=0.)
+    while s.stage == 'close_gripper' and not s.failed:
+        stage, _, _ = f.step()
+        assert stage == 'close_gripper'
+        assert f.arm_hold.lock_calls == 0 and not f.arm_hold.locked
+    assert not s.failed and s.stage == 'verify_lift'
+
+
 def test_repeat_warning_or_warning_at_another_stage_is_not_admitted():
-    f=Ideal();f.until('close_gripper');s=f.solution
-    s._observing=True
-    assert not s._stable_height_ready(.5,.50022)
-    s._stage_index=1
-    assert not s._stable_height_ready(.5,.50022)
+    f=Ideal();f.until('descend_to_handle');s=f.solution
+    expected=s._goal[2]-s.servo_height_compensation_m
+    achieved=expected-.00022
+    pose=s._goal.copy();pose[2]=achieved
+    s._index=len(s._actions);s._emitted=120;s._stability.start=.5
+    s._stability.history=[(1.01+i*.01,pose.copy()) for i in range(20)]
+    assert s._stable_height_ready(achieved,expected)
+    assert not s._stable_height_ready(achieved,expected)
+    s._stage_index=2
+    assert not s._stable_height_ready(achieved,expected)
     assert len(s.readiness_warnings)==1
 
 

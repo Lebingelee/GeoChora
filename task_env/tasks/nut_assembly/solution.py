@@ -82,7 +82,7 @@ class NutAssemblySolutionConfig:
 class NutAssemblyOutcomeSolutionV1:
     """One task-owned implementation of guarded V2/V5/R3 Outcome V1 behavior."""
 
-    version = "nutassembly-r5-v5-guarded-outcome-solution-v2"
+    version = "nutassembly-r5-v5-guarded-outcome-solution-v3"
     STAGES = (
         "approach_nut", "descend_to_handle", "close_gripper", "verify_lift",
         "raise_for_transport", "move_above_square_peg", "align_nut_yaw",
@@ -94,13 +94,14 @@ class NutAssemblyOutcomeSolutionV1:
     })
     height_warning_limit_m = 0.0003
     outward_handle_offset_m = 0.024
-    descend_endpoint_command_bias_m = 0.0001605
+    servo_height_compensation_m = 0.0006514767471602623
+    descend_endpoint_command_bias_m = servo_height_compensation_m
     minimum_pose_wait_s = 0.5
     pose_window_s = 0.2
+    tracking_position_rmse_limit_m = 0.0001
     pose_span_m = 0.0001
     pose_speed_m_s = 0.002
     postclose_hold_s = 0.1
-    servo_height_compensation_m = 0.0006514767471602623
     stable_height_tolerance_m = 0.0001
     close_authorization_deadline_s = 1.5
     primary_guard_id = "primary_controller_close_ready"
@@ -163,6 +164,22 @@ class NutAssemblyOutcomeSolutionV1:
             ).hexdigest()})
         self.outcome_policy_mapping = {
             "policy_id": OUTCOME_POLICY_ID, "rate_hz": 100,
+            "grasp_control": {
+                "target": "fixed_world_pose",
+                "controller_update": "recompute_each_control_boundary",
+                "joint_target_hold_during_close": False,
+            },
+            "endpoint_z_alignment": {
+                "command_bias_m": self.descend_endpoint_command_bias_m,
+                "acceptance_compensation_m": self.servo_height_compensation_m,
+                "aligned": self.descend_endpoint_command_bias_m == self.servo_height_compensation_m,
+            },
+            "tracking_gate": {
+                "metric": "rolling_rms_euclidean_tcp_position_error",
+                "window_s": self.pose_window_s,
+                "minimum_samples": self._ticks(self.pose_window_s),
+                "strict_limit_m": self.tracking_position_rmse_limit_m,
+            },
             "allowlist": [{"stage": "descend_to_handle", "reason": "stable_height_mismatch",
                 "maximum_occurrences": 1, "maximum_height_residual_m": self.height_warning_limit_m,
                 "pose_position_ready_m": self.config.pose_position_ready_m,
@@ -209,6 +226,7 @@ class NutAssemblyOutcomeSolutionV1:
         self._opening_history = []
         self._stability = PoseStabilityWindow()
         self._pose_wait_start = None
+        self._tracking_rmse_passed = False
         self._postclose_hold_ticks = 0
         self._lift_released = False
         self._close_gate = None
@@ -606,6 +624,14 @@ class NutAssemblyOutcomeSolutionV1:
                 "policy_identity": self.outcome_policy_identity})
         return bool(allowed)
 
+    def _tracking_position_rmse(self, now, target_xyz):
+        window = [x for x in self._stability.history
+                  if x[0] >= now - self.pose_window_s - 1e-8]
+        if len(window) < self._ticks(self.pose_window_s):
+            return math.inf
+        errors = np.asarray([pose[:3] - target_xyz for _, pose in window], dtype=np.float64)
+        return float(np.sqrt(np.mean(np.einsum("ij,ij->i", errors, errors))))
+
     def _observe_stage(self, obs, info, readiness):
         receipt = self._stage_receipts[-1]
         if (self._index != receipt["planned_actions_executed"]
@@ -704,11 +730,22 @@ class NutAssemblyOutcomeSolutionV1:
             pose = self._ee(obs)
             if self._pose_wait_start is None:
                 self._pose_wait_start = now
-                self.arm_hold.lock()
             stable, span, speeds = self._stability.is_stable(now, pose,
                 minimum_wait_s=self.minimum_pose_wait_s, window_s=self.pose_window_s,
                 minimum_samples=self._ticks(self.pose_window_s), axis_span_m=self.pose_span_m,
                 speed_m_s=self.pose_speed_m_s)
+            tracking_target = self._goal[:3].copy()
+            tracking_target[2] -= self.descend_endpoint_command_bias_m
+            tracking_rmse = self._tracking_position_rmse(now, tracking_target)
+            if (tracking_rmse < self.tracking_position_rmse_limit_m
+                    and not self._tracking_rmse_passed):
+                self._tracking_rmse_passed = True
+                self.events.append({"event": "tracking_rmse_satisfied", "t": now,
+                    "target_xyz_m": tracking_target.tolist(),
+                    "rolling_position_rmse_m": tracking_rmse,
+                    "window_s": self.pose_window_s,
+                    "sample_count": self._ticks(self.pose_window_s)})
+            stable = stable and self._tracking_rmse_passed
             if stable:
                 expected = self._goal[2] - self.servo_height_compensation_m
                 if not self._stable_height_ready(pose[2], expected):
@@ -716,6 +753,7 @@ class NutAssemblyOutcomeSolutionV1:
                 self.events.append({"event": "pose_stable", "t": now, "pose": pose.tolist(),
                     "wait_s": now - self._pose_wait_start, "position_span_m": span.tolist(),
                     "maximum_speed_m_s": max(speeds, default=math.inf),
+                    "tracking_position_rmse_m": tracking_rmse,
                     "stable_height_goal_m": expected})
                 self._grasp_pose = pose.copy()
                 self._stable_ticks = self._ticks(self.config.readiness_stable_s) - 1
