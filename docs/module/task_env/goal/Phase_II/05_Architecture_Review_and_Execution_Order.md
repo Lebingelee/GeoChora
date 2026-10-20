@@ -88,7 +88,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
 | 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
-| 22 | C03a | C02a、D01b、C05a | 现有 ports 的 scalar reset/step/fault；单 controller 兼容执行 |
+| 22 | C03a | C02a、D01b、C05a | **bounded implemented**：现有 ports/两 Env 路径的 scalar reset/step/fault；62 项 fault/Pendulum 回归，真实 Panda 双 Provider 兼容 11 passed；partial receipt 不回滚/不入 transition，详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
 | 23 | C04 | C03a、D02b | 固定 public/privileged/private schemas、必要反馈/诊断分离、capture 引用 |
 | 24 | C02b | C02a、C03a、C04、C05a、D01b | 原子 group 执行，真实 arm+hand S2；缺 group/局部失败不留未知施控 |
 | 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |
@@ -107,6 +107,10 @@ D03 不以 C05c 为硬依赖；表中排在其后是建议主干，不要求 Ren
 B05 可以完成 legacy semantics 适配，但 vNext 全链执行要到 D01b/P99 验证；
 D01a 只证明有限新 Scene bridge，不冒充完整 D01。父目标 implemented 必须覆盖其全部必需切片。
 P00/P99 是 gate，不增设新的 Framework/Harness；当前提交不执行表中代码实施。
+
+截至 2026-10-21，序号 22／C03a 已按其 bounded acceptance 完成；序号 23／C04 与 24／C02b 仍待各自命令及
+交接 gate，序号 25／C03b 的 termination/Stop policy 也未实现。C03a 提交未 push/merge，不改变冻结的
+`codex/phase-ii-b` 指针。
 
 ### 3.1 粒度与工作量
 
@@ -292,7 +296,7 @@ selection；若 region/type selector 在现有 Scene 中无法解析，应保留
 ### 5.4 C02a bounded implementation evidence（2026-10-21）
 
 C02a 在 `codex/phase-ii-c` 基于 D01b/A03/C01b/D02b 完成了静态 Controller binding 编译及 structured action
-全量预检，详细契约和边界见 [Phase C C02a receipt](03_Phase_C_Execution_Lifecycle.md#c02a-bounded-implementation-receipt-2026-10-21)。
+全量预检，详细契约和边界见 [Phase C C02a receipt](03_Phase_C_Execution_Lifecycle.md#c02a-bounded-implementation-receipt2026-10-21)。
 专项测试 **11 passed**；与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A05、B04b 和 selected consumers 的定向交叉
 回归 **87 passed**，`git diff --check` 通过。A05 Panda arm+gripper group 映射到一个现有生产 writer，两个受测
 provider 的 legacy action/output 各执行一步；这保护既有路径，不代表 structured group action 已进入 Runtime dispatch。
@@ -315,7 +319,7 @@ T=0 outcome/event 不产生 pseudo transition，execution incomplete interval �
 未排除组合为 **52 passed、2 failed**，失败均是该 historical import error。现有两类实测 selected route 仍沿用旧
 canonical/execution schema；C05a 新存储 roundtrip 不声称新 structured Runtime dispatch、物理 D0 replay 或
 Qualification。有关旧格式 fixture 的完整命令结果和失败边界见
-[Phase C C05a receipt](03_Phase_C_Execution_Lifecycle.md#c05a-bounded-storage-receipt-2026-10-21)。
+[Phase C C05a receipt](03_Phase_C_Execution_Lifecycle.md#c05a-bounded-storage-receipt2026-10-21)。
 
 ## 6. 原稿保存、文档验证与二审交接
 

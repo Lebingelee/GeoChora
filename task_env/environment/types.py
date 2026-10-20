@@ -17,6 +17,180 @@ class StageUnavailableError(RuntimeError):
     """当前 Stage 尚未提供可执行能力。"""
 
 
+@dataclass(frozen=True)
+class ExecutionFaultV1:
+    """A failed scalar lifecycle operation with its observed physics progress.
+
+    ``physical_progress`` describes the control interval, not reset-state
+    mutation or controller-memory mutation. A fault is diagnostic evidence;
+    it does not imply that the provider can roll physical state back.
+    """
+
+    phase: str
+    physical_progress: str
+    exception_type: str
+    message: str
+    control_step_before: int | None = None
+    control_step_after: int | None = None
+    simulation_time_before_s: float | None = None
+    simulation_time_after_s: float | None = None
+    native_substeps_completed: int | None = None
+    native_substeps_expected: int | None = None
+    readback_error: str | None = None
+    schema_version: str = "task-execution-fault-v1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "task-execution-fault-v1":
+            raise ValueError("unsupported execution fault schema")
+        if not str(self.phase).strip():
+            raise ValueError("execution fault phase must be nonempty")
+        if self.physical_progress not in {
+            "not_advanced",
+            "partially_advanced",
+            "advanced",
+            "unknown",
+        }:
+            raise ValueError("unknown execution fault physical progress")
+        if not str(self.exception_type).strip():
+            raise ValueError("execution fault exception type must be nonempty")
+        for name in ("control_step_before", "control_step_after"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError(f"{name} must be a non-negative int or None")
+        for name in ("native_substeps_completed", "native_substeps_expected"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError(f"{name} must be a non-negative int or None")
+        if self.native_substeps_expected == 0:
+            raise ValueError("native_substeps_expected must be positive or None")
+        if (
+            self.native_substeps_completed is not None
+            and self.native_substeps_expected is not None
+            and self.native_substeps_completed > self.native_substeps_expected
+        ):
+            raise ValueError("completed native substeps cannot exceed the expected count")
+        for name in ("simulation_time_before_s", "simulation_time_after_s"):
+            value = getattr(self, name)
+            if value is not None:
+                normalized = float(value)
+                if not math.isfinite(normalized):
+                    raise ValueError(f"{name} must be finite or None")
+                object.__setattr__(self, name, normalized)
+        object.__setattr__(self, "phase", str(self.phase))
+        object.__setattr__(self, "exception_type", str(self.exception_type))
+        object.__setattr__(self, "message", str(self.message))
+        if self.readback_error is not None:
+            object.__setattr__(self, "readback_error", str(self.readback_error))
+
+    @classmethod
+    def from_exception(
+        cls,
+        phase: str,
+        error: BaseException,
+        *,
+        control_step_before: int | None = None,
+        control_step_after: int | None = None,
+        simulation_time_before_s: float | None = None,
+        simulation_time_after_s: float | None = None,
+        expected_control_dt_s: float | None = None,
+        interval_attempted: bool = False,
+        interval_completed: bool = False,
+        native_substeps_completed: int | None = None,
+        native_substeps_expected: int | None = None,
+        readback_error: str | None = None,
+    ) -> "ExecutionFaultV1":
+        before_time = simulation_time_before_s
+        after_time = simulation_time_after_s
+        progress = "unknown"
+        if interval_completed:
+            progress = "advanced"
+        elif not interval_attempted:
+            progress = "not_advanced"
+        elif (
+            native_substeps_completed is not None
+            and native_substeps_expected is not None
+            and native_substeps_completed > 0
+        ):
+            progress = (
+                "advanced"
+                if native_substeps_completed == native_substeps_expected
+                else "partially_advanced"
+            )
+        elif before_time is not None and after_time is not None:
+            delta = float(after_time) - float(before_time)
+            tolerance = max(
+                1.0e-12,
+                1.0e-9 * abs(float(expected_control_dt_s or 0.0)),
+            )
+            step_delta = (
+                None
+                if control_step_before is None or control_step_after is None
+                else int(control_step_after) - int(control_step_before)
+            )
+            if abs(delta) <= tolerance and step_delta in (None, 0):
+                progress = "not_advanced"
+            elif step_delta is not None and step_delta > 1:
+                progress = "unknown"
+            elif expected_control_dt_s is not None:
+                expected = float(expected_control_dt_s)
+                if expected <= 0.0 or not math.isfinite(expected):
+                    raise ValueError("expected control interval must be finite and positive")
+                if math.isclose(delta, expected, rel_tol=1.0e-9, abs_tol=tolerance):
+                    progress = "advanced"
+                elif 0.0 < delta < expected - tolerance:
+                    progress = "partially_advanced"
+                else:
+                    progress = "unknown"
+            elif delta > tolerance:
+                progress = "partially_advanced"
+            elif step_delta is not None and step_delta == 1:
+                progress = "advanced"
+        elif control_step_before is not None and control_step_after is not None:
+            delta = int(control_step_after) - int(control_step_before)
+            if delta == 1:
+                progress = "advanced"
+        return cls(
+            phase=phase,
+            physical_progress=progress,
+            exception_type=type(error).__name__,
+            message=str(error),
+            control_step_before=control_step_before,
+            control_step_after=control_step_after,
+            simulation_time_before_s=simulation_time_before_s,
+            simulation_time_after_s=simulation_time_after_s,
+            native_substeps_completed=native_substeps_completed,
+            native_substeps_expected=native_substeps_expected,
+            readback_error=readback_error,
+        )
+
+    def to_mapping(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "phase": self.phase,
+            "physical_progress": self.physical_progress,
+            "control_step_before": self.control_step_before,
+            "control_step_after": self.control_step_after,
+            "simulation_time_before_s": self.simulation_time_before_s,
+            "simulation_time_after_s": self.simulation_time_after_s,
+            "native_substeps_completed": self.native_substeps_completed,
+            "native_substeps_expected": self.native_substeps_expected,
+            "exception_type": self.exception_type,
+            "message": self.message,
+            "readback_error": self.readback_error,
+        }
+
+
+def attach_execution_fault(error: BaseException, fault: ExecutionFaultV1) -> None:
+    """Expose a construction/lifecycle receipt while preserving the original error type."""
+
+    try:
+        setattr(error, "execution_fault", fault)
+    except (AttributeError, TypeError):
+        add_note = getattr(error, "add_note", None)
+        if callable(add_note):
+            add_note(f"execution fault: {fault.to_mapping()!r}")
+
+
 def _unique_names(values: tuple[str, ...], *, field_name: str) -> tuple[str, ...]:
     normalized = tuple(str(value).strip() for value in values)
     if any(not value for value in normalized):

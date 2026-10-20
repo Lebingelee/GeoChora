@@ -30,6 +30,14 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 horizon 产生 truncation；selected expert 的 stop/completion policy 必须单独读取。
 Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly external action 明确拒绝。
 
+失败的 reset/step 在各自 lifecycle owner 中 fail-closed：需要成功 reset 才能再次 step，环境不会假设 provider 物理状态
+可以回滚。`BaseTaskEnv` 与 selected reference 的 `execution_fault` 提供当前故障 receipt；构造期间失败时原异常对象
+附带 `execution_fault`。`ExecutionFaultV1.physical_progress` 只描述当前控制区间的可观测进展
+（`not_advanced`、`partially_advanced`、`advanced`、`unknown`），不替代 provider 状态快照。Native interval receipt
+可带已确认完成的 substep 数；缺少可靠 readback 时必须保留 `unknown`。未完整完成的区间不生成 transition，selected
+execution Recorder 的 pending interval 继续由既有 `freeze()` 拒绝。该诊断不承诺故障后的物理恢复。
+若未完成的 selected recording 阻止 reset，当前 route 要求关闭并重建环境；C03a 没有新增丢弃 recording 的 API。
+
 通用构造先解析 task-owned YAML defaults，再深合并调用方 mapping/YAML（调用方字段优先），最后只允许
 覆盖公开 environment sections；task topology/semantics 不接受 overlay。传入现成 `ResolvedEnvConfig`
 时它本身是权威 resolved 值，不再叠加默认 YAML。`BaseTaskEnv.execution_plan` 暴露
@@ -44,7 +52,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | --- | --- | --- |
 | `make_env`, `make_agent`, `make_object`, `make_scene` | `task_env` | 注册组件构造，不证明执行能力 |
 | `ENV_REGISTRY`, `AGENT_REGISTRY`, `OBJECT_REGISTRY`, `SCENE_REGISTRY` | `task_env` | 用 `uids()` 查询；扩展注册见 `task_env.registry` |
-| `BaseTaskEnv`, `TaskEvaluation`, `RuntimeBoundary`, `ResolvedEnvConfig`, `ExecutionPlan` | `task_env.environment` | environment/config 生命周期；ExecutionPlan 仅记录静态准入阶段 |
+| `BaseTaskEnv`, `TaskEvaluation`, `RuntimeBoundary`, `ResolvedEnvConfig`, `ExecutionPlan`, `ExecutionFaultV1` | `task_env.environment` | environment/config 生命周期；ExecutionPlan 仅记录静态准入阶段；fault receipt 不创建第二套 Runtime 或恢复接口 |
 | `resolve_env_config` | `task_env` | 解析并冻结公共配置；task-specific overlay 走 factory 分支 |
 | `AssetManifest` | `task_env.environment` | assembly 资产声明；保留本地 source/root 与版本字段，可选稳定 source reference/revision 和 procedural generator 元数据；构造时不读文件，也不证明 importer 消费了对应 bytes |
 | `make_parallel_env`, `register_parallel_env` | `task_env` | optional homogeneous factory，与 scalar 无互相 fallback |

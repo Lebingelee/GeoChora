@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 from typing import Any
 
 import numpy as np
@@ -32,9 +33,11 @@ from .task_definition import (
 from .types import (
     AppliedControl,
     ControlCommand,
+    ExecutionFaultV1,
     RuntimeSnapshot,
     StageUnavailableError,
     TaskEvaluation,
+    attach_execution_fault,
 )
 
 
@@ -745,6 +748,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         convert_action: Callable[[Any, RuntimeSnapshot], ControlCommand],
         observation_fallback: Callable[[RuntimeSnapshot], Any],
         episode_limits: Callable[[], tuple[int, bool]] | None = None,
+        expected_control_dt_s: float | None = None,
     ) -> None:
         super().__init__(
             task_definition=task_definition,
@@ -753,8 +757,16 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         )
         if int(control_substeps) < 1:
             raise ValueError("scalar task lifecycle control_substeps must be positive")
+        if expected_control_dt_s is not None and (
+            not math.isfinite(float(expected_control_dt_s))
+            or float(expected_control_dt_s) <= 0.0
+        ):
+            raise ValueError("expected_control_dt_s must be finite and positive")
         self.runtime = runtime
         self.control_substeps = int(control_substeps)
+        self.expected_control_dt_s = (
+            None if expected_control_dt_s is None else float(expected_control_dt_s)
+        )
         self._sample_reset_state = sample_reset_state
         self._snapshot_request = snapshot_request
         self._reset_components = reset_components
@@ -765,6 +777,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         self._last_evaluation: TaskEvaluation | None = None
         self._elapsed_steps = 0
         self._episode_finished = False
+        self._execution_fault: ExecutionFaultV1 | None = None
 
     @property
     def last_snapshot(self) -> RuntimeSnapshot | None:
@@ -782,6 +795,45 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
     def last_evaluation(self) -> TaskEvaluation | None:
         return self._last_evaluation
 
+    @property
+    def execution_fault(self) -> ExecutionFaultV1 | None:
+        return self._execution_fault
+
+    def _latch_fault(
+        self,
+        phase: str,
+        error: BaseException,
+        *,
+        before_snapshot: Any = None,
+        after_snapshot: Any = None,
+        control_step_before: int | None = None,
+        control_step_after: int | None = None,
+        interval_attempted: bool = False,
+        interval_completed: bool = False,
+        readback_error: str | None = None,
+    ) -> ExecutionFaultV1:
+        fault = ExecutionFaultV1.from_exception(
+            phase,
+            error,
+            control_step_before=control_step_before,
+            control_step_after=control_step_after,
+            simulation_time_before_s=getattr(before_snapshot, "simulation_time", None),
+            simulation_time_after_s=getattr(after_snapshot, "simulation_time", None),
+            expected_control_dt_s=self.expected_control_dt_s,
+            interval_attempted=interval_attempted,
+            interval_completed=interval_completed,
+            readback_error=readback_error,
+        )
+        self._execution_fault = fault
+        attach_execution_fault(error, fault)
+        return fault
+
+    def _read_fault_snapshot(self) -> tuple[RuntimeSnapshot | None, str | None]:
+        try:
+            return self.runtime.read_snapshot(self._snapshot_request()), None
+        except BaseException as error:
+            return None, f"{type(error).__name__}: {error}"
+
     def reset(
         self,
         *,
@@ -790,102 +842,170 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         rng: np.random.Generator,
     ) -> SingleTaskResetResult:
         del options
-        reset_state, reset_parameters = self._sample_reset_state(seed, rng)
-        if not isinstance(reset_parameters, Mapping):
-            raise TypeError("episode reset sampler must return a mapping of parameters")
-        on_reset_sample = getattr(self.task_definition, "on_reset_sample", None)
-        if callable(on_reset_sample):
-            on_reset_sample(
-                parameters=reset_parameters,
-                seeds=(None if seed is None else (int(seed),)),
+        before_snapshot = self._last_snapshot
+        before_elapsed_steps = self._elapsed_steps
+        phase = "reset_sampling"
+        reset_state_applied = False
+        snapshot: RuntimeSnapshot | None = None
+        try:
+            reset_state, reset_parameters = self._sample_reset_state(seed, rng)
+            if not isinstance(reset_parameters, Mapping):
+                raise TypeError("episode reset sampler must return a mapping of parameters")
+            on_reset_sample = getattr(self.task_definition, "on_reset_sample", None)
+            if callable(on_reset_sample):
+                phase = "reset_task_sample"
+                on_reset_sample(
+                    parameters=reset_parameters,
+                    seeds=(None if seed is None else (int(seed),)),
+                    reset_mask=np.ones(1, dtype=np.bool_),
+                )
+            from ..runtime.contracts import build_world_randomization_batch
+
+            phase = "reset_randomization_prepare"
+            world_randomization = build_world_randomization_batch(
+                (reset_parameters,),
                 reset_mask=np.ones(1, dtype=np.bool_),
             )
-        from ..runtime.contracts import build_world_randomization_batch
-
-        world_randomization = build_world_randomization_batch(
-            (reset_parameters,),
-            reset_mask=np.ones(1, dtype=np.bool_),
-        )
-        if world_randomization is not None:
-            apply_randomization = getattr(self.runtime, "apply_world_randomization", None)
-            if not callable(apply_randomization):
-                raise StageUnavailableError(
-                    "reset sampler requested world randomization but scalar runtime "
-                    "does not expose apply_world_randomization()"
+            if world_randomization is not None:
+                apply_randomization = getattr(self.runtime, "apply_world_randomization", None)
+                if not callable(apply_randomization):
+                    raise StageUnavailableError(
+                        "reset sampler requested world randomization but scalar runtime "
+                        "does not expose apply_world_randomization()"
+                    )
+                phase = "reset_randomization_apply"
+                apply_randomization(
+                    payload=world_randomization,
+                    mask=np.ones(1, dtype=np.bool_),
                 )
-            apply_randomization(
-                payload=world_randomization,
-                mask=np.ones(1, dtype=np.bool_),
+            phase = "reset_state_apply"
+            self.runtime.apply_reset_state(reset_state)
+            reset_state_applied = True
+            phase = "reset_readback"
+            snapshot = self.runtime.read_snapshot(self._snapshot_request())
+            phase = "reset_components"
+            self._reset_components(snapshot)
+            phase = "reset_task_evaluation"
+            evaluation = self.reset_task(
+                state=snapshot,
+                reset_mask=np.ones(1, dtype=np.bool_),
+                legacy_snapshot=snapshot,
             )
-        self.runtime.apply_reset_state(reset_state)
-        self._elapsed_steps = 0
-        self._episode_finished = False
-        snapshot = self.runtime.read_snapshot(self._snapshot_request())
-        self._last_snapshot = snapshot
-        self._reset_components(snapshot)
-        evaluation = self.reset_task(
-            state=snapshot,
-            reset_mask=np.ones(1, dtype=np.bool_),
-            legacy_snapshot=snapshot,
-        )
-        evaluation = self.coerce_scalar_evaluation(evaluation)
-        self._last_evaluation = evaluation
-        observation = self.build_observation(
-            snapshot,
-            fallback=lambda: self._observation_fallback(snapshot),
-        )
-        return SingleTaskResetResult(
-            snapshot=snapshot,
-            evaluation=evaluation,
-            observation=observation,
-            reset_parameters=dict(reset_parameters),
-        )
+            evaluation = self.coerce_scalar_evaluation(evaluation)
+            phase = "reset_observation"
+            observation = self.build_observation(
+                snapshot,
+                fallback=lambda: self._observation_fallback(snapshot),
+            )
+            self._last_snapshot = snapshot
+            self._last_evaluation = evaluation
+            self._elapsed_steps = 0
+            self._episode_finished = False
+            self._execution_fault = None
+            return SingleTaskResetResult(
+                snapshot=snapshot,
+                evaluation=evaluation,
+                observation=observation,
+                reset_parameters=dict(reset_parameters),
+            )
+        except BaseException as error:
+            readback_error = None
+            if reset_state_applied and snapshot is None:
+                snapshot, readback_error = self._read_fault_snapshot()
+            self._last_snapshot = snapshot
+            self._last_evaluation = None
+            self._latch_fault(
+                phase,
+                error,
+                before_snapshot=before_snapshot,
+                after_snapshot=snapshot,
+                control_step_before=before_elapsed_steps,
+                control_step_after=None,
+                readback_error=readback_error,
+            )
+            raise
 
     def step(self, action: Any) -> SingleTaskStepResult:
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                "scalar task lifecycle is faulted; reset() is required "
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
         if self._episode_finished:
             raise RuntimeError("reset() must be called before stepping after episode end")
         if self._last_snapshot is None:
             raise RuntimeError("reset() must be called before step()")
         previous_snapshot = self._last_snapshot
         command = self._convert_action(action, previous_snapshot)
-        applied = self.runtime.apply_control(command)
-        self.runtime.step(substeps=self.control_substeps)
-        self._elapsed_steps += 1
-        snapshot = self.runtime.read_snapshot(self._snapshot_request())
-        evaluation = self.evaluate_task(
-            state=snapshot,
-            action=command.external_action,
-            elapsed_steps=self._elapsed_steps,
-            previous_state=previous_snapshot,
-            legacy_previous_snapshot=previous_snapshot,
-            legacy_current_snapshot=snapshot,
-        )
-        evaluation = self.coerce_scalar_evaluation(evaluation)
-        observation = self.build_observation(
-            snapshot,
-            fallback=lambda: self._observation_fallback(snapshot),
-        )
-        horizon, ignore_done = self._get_episode_limits()
-        terminated, truncated = self.resolve_scalar_done(
-            evaluation,
-            self._elapsed_steps,
-            horizon=horizon,
-            ignore_done=ignore_done,
-        )
-        self._last_snapshot = snapshot
-        self._last_evaluation = evaluation
-        self._episode_finished = bool(terminated or truncated)
-        return SingleTaskStepResult(
-            previous_snapshot=previous_snapshot,
-            snapshot=snapshot,
-            evaluation=evaluation,
-            observation=observation,
-            command=command,
-            applied=applied,
-            terminated=terminated,
-            truncated=truncated,
-            elapsed_steps=self._elapsed_steps,
-        )
+        phase = "control_application"
+        interval_attempted = False
+        interval_completed = False
+        snapshot: RuntimeSnapshot | None = None
+        before_elapsed_steps = self._elapsed_steps
+        try:
+            applied = self.runtime.apply_control(command)
+            phase = "physics_step"
+            interval_attempted = True
+            self.runtime.step(substeps=self.control_substeps)
+            interval_completed = True
+            self._elapsed_steps += 1
+            phase = "snapshot_readback"
+            snapshot = self.runtime.read_snapshot(self._snapshot_request())
+            phase = "task_evaluation"
+            evaluation = self.evaluate_task(
+                state=snapshot,
+                action=command.external_action,
+                elapsed_steps=self._elapsed_steps,
+                previous_state=previous_snapshot,
+                legacy_previous_snapshot=previous_snapshot,
+                legacy_current_snapshot=snapshot,
+            )
+            evaluation = self.coerce_scalar_evaluation(evaluation)
+            phase = "observation"
+            observation = self.build_observation(
+                snapshot,
+                fallback=lambda: self._observation_fallback(snapshot),
+            )
+            horizon, ignore_done = self._get_episode_limits()
+            terminated, truncated = self.resolve_scalar_done(
+                evaluation,
+                self._elapsed_steps,
+                horizon=horizon,
+                ignore_done=ignore_done,
+            )
+            self._last_snapshot = snapshot
+            self._last_evaluation = evaluation
+            self._episode_finished = bool(terminated or truncated)
+            return SingleTaskStepResult(
+                previous_snapshot=previous_snapshot,
+                snapshot=snapshot,
+                evaluation=evaluation,
+                observation=observation,
+                command=command,
+                applied=applied,
+                terminated=terminated,
+                truncated=truncated,
+                elapsed_steps=self._elapsed_steps,
+            )
+        except BaseException as error:
+            readback_error = None
+            if interval_attempted and snapshot is None:
+                snapshot, readback_error = self._read_fault_snapshot()
+            if snapshot is not None:
+                self._last_snapshot = snapshot
+            self._latch_fault(
+                phase,
+                error,
+                before_snapshot=previous_snapshot,
+                after_snapshot=snapshot,
+                control_step_before=before_elapsed_steps,
+                control_step_after=self._elapsed_steps,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                readback_error=readback_error,
+            )
+            raise
 
     def close(self) -> None:
         self._temporal_predicate_state.reset()

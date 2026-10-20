@@ -1,6 +1,6 @@
 # Phase C — Execution API & Runtime Lifecycle：架构、实施切片与验收
 
-> **PROPOSED / READY FOR SECOND REVIEW；本次仅修订规划，不启动统一 API 实施。**
+> **Phase C remaining design: PROPOSED.** The bounded C03a lifecycle/fault implementation is recorded below; this does not complete C03b, C04, C02b, or a unified Environment migration.
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体与依赖：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；输入：[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)、[`02_Phase_B_Task_Semantics.md`](02_Phase_B_Task_Semantics.md)。
 
@@ -401,6 +401,42 @@ deselected**；两项 deselected runner 依赖已退休的 `task_env.tasks.nut_a
 契约和 legacy route 回归，不是 selected v3 真实采集、D0 replay 或正式 Qualification。现有
 `validate_trajectory()` transcode 仍只接受 v2，已对 v3 给出明确拒绝；selected reference replay 也不把 canonical
 outer v1 当 replay 输入。
+
+#### C03a bounded scalar lifecycle and fault receipt（2026-10-21）
+
+在 `codex/phase-ii-c` 的受测提交基线 `7139eba31a979e062043cbfa3a20316258f31dd4` 上，C03a 仅扩展现有
+`SingleTaskLifecycleAdapter`、`BaseTaskEnv` 与 `SelectedReferenceEnv`，未引入第二套 Runtime、Lifecycle Manager、
+具体 Env 基类或 Provider 抽象。Generic route 继续使用 `RuntimeBoundary`；selected route 继续使用现有
+`RuntimeSession` / interval callback，保留单个现有 Controller 的执行方式。
+
+新增 `ExecutionFaultV1` 作为 owner-local、可序列化的失败 receipt，并由 `task_env.environment` 导出。已构造 Env
+在 lifecycle 失败后可读 `env.execution_fault`；construction 失败保留原异常类型并附带 `exception.execution_fault`。
+receipt 记录失败 phase、原异常类型/消息、可读到的前后控制步和 simulation clock、native substeps 计数及
+readback error。`physical_progress` 只表达**当前控制区间**的可观测进展：`not_advanced`、`partially_advanced`、
+`advanced` 或 `unknown`；不表示物理回滚能力。Generic Runtime 用预期 control interval 与 public snapshot clock
+比较；selected native interval 复用 interval observer 已确认完成的 substep 数。若 native step 异常且既无完成回调
+也无可读边界状态，结果为 `unknown`，不把未知伪报成未推进。
+
+两条 route 在 reset/step 构造或后处理失败后均 fail-closed：保留触发时异常类型，设置 fault，后续 step 必须先
+成功 reset。Generic action conversion 发生在任何施控前；selected expert proposal/内部 action 校验失败也会闭锁，
+而既有 selected 外部/Expert 模式边界保持兼容。Reset 成功才清除故障。控制区间只要未完整返回，就不会生成有效
+transition：generic wrapper 仅在 env step 成功后 append；selected execution Recorder 保留 pending partial interval，
+其既有 `freeze()` 明确拒绝 `incomplete effective interval`。该 pending recording 也会阻止 reset；当前 route 需 close/recreate，
+C03a 不新增丢弃 API。代码不会回滚 provider 已推进的物理状态。
+
+正常 gate 由真实 Pendulum GeoPhys CPU `reset → 两次 step → close` 覆盖：返回 5-tuple、声明 timebase clock、horizon
+`truncated=True`、terminal 后禁止续步；真实 A05 Panda arm+hand legacy action/feedback 在 GeoPhys CPU 与 MuJoCo CPU 的
+C02a 定向执行回归为 **11 passed**。Fault/compatibility 定向组合为 **62 passed**，含 construction、control apply、
+physics 前置失败、partial substep、readback/evaluation 故障、闭锁/reset 恢复、selected pending recorder 拒绝，及
+selected Task success 后 Expert 继续至 Expert 自己完成；Pendulum B03a/B03b scalar/batch semantics 回归包含其中。
+C05a/record CLI/selected consumers/streaming 组合为 **85 passed、2 deselected**；两项仍因 historical runner 导入已退休
+`task_env.tasks.nut_assembly.assets` 而 deselect。日志留在本地 ignored
+`workspace/maintenance/phase_ii_c03a_20261021/`，命令和输出文件清单见 `run_metadata.json`。
+TaskEnv module Skill 已按现有 failure behavior 刷新；`check_module_skill.py` 静态校验通过。
+
+证据仅覆盖现有 generic Pendulum scalar CPU 与 A05 Panda selected legacy compatibility 交集，以及合成故障注入的
+生命周期边界；它不是新 Provider qualification、partial-state recovery、全 selected source S2、C03b Stop policy、
+C04 observation 契约或 C02b group dispatch 的证据。C04 与 C02b 仍待单独执行；C03b 仍按原依赖延后。
 
 ## C.9 质量门与直接可测问题
 

@@ -15,6 +15,7 @@ from gymnasium.spaces import Box, Dict
 from ..artifacts import ExecutionSpec
 from ..controllers.canonical.contracts import RequestedAction, digest
 from ..environment.protocols import TaskEnvironmentComponent
+from ..environment.types import ExecutionFaultV1, attach_execution_fault
 from ..planners.completion import ExpertExecutionInfo
 from ..runtime.sessions.api import PROFILE
 from ..runtime.sessions.control import ControlBinding, materialize_control
@@ -86,7 +87,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
         self.provider, self.horizon = provider, horizon
-        self.value = self.binding.build(provider)
+        self._execution_fault = None
+        try:
+            self.value = self.binding.build(provider)
+        except BaseException as error:
+            fault = ExecutionFaultV1.from_exception(
+                'selected_construction', error
+            )
+            self._execution_fault = fault
+            attach_execution_fault(error, fault)
+            raise
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         self.controller = self.value['controller']
@@ -106,6 +116,52 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.recording_path = None
 
     @property
+    def execution_fault(self):
+        """Return the latched selected-route execution fault, if any."""
+
+        return self._execution_fault
+
+    def _latch_fault(
+        self,
+        phase,
+        error,
+        *,
+        before_state=None,
+        after_state=None,
+        interval_attempted=False,
+        interval_completed=False,
+        native_substeps_completed=None,
+        native_substeps_expected=None,
+        readback_error=None,
+    ):
+        fault = ExecutionFaultV1.from_exception(
+            phase,
+            error,
+            control_step_before=(
+                None if before_state is None else int(before_state.control_step)
+            ),
+            control_step_after=(
+                None if after_state is None else int(after_state.control_step)
+            ),
+            simulation_time_before_s=(
+                None if before_state is None else before_state.simulation_time
+            ),
+            simulation_time_after_s=(
+                None if after_state is None else after_state.simulation_time
+            ),
+            expected_control_dt_s=self.artifact.timebase.control_dt,
+            interval_attempted=interval_attempted,
+            interval_completed=interval_completed,
+            native_substeps_completed=native_substeps_completed,
+            native_substeps_expected=native_substeps_expected,
+            readback_error=readback_error,
+        )
+        self._execution_fault = fault
+        self._stopped = True
+        attach_execution_fault(error, fault)
+        return fault
+
+    @property
     def composition_spec(self):
         return self.value['source'].composition
 
@@ -116,38 +172,57 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise ValueError('selected reference reset options are not supported')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
-        if self.session is not None:
-            self.session.close()
-        self.session = None
         self._stopped = True
-        # A new construction resets all controller/arm-hold/servo owner memory.
-        self.value = self.binding.build(self.provider)
-        if self.value['artifact'] != self.artifact:
-            raise ValueError('selected Artifact changed between construction and reset')
-        seed = self.binding.reset_seed(seed)
-        self.solution, self.controller = self.value['solution'], self.value['controller']
-        self.sample = self.binding.reset_sample(self.artifact, seed)
-        self.execution = ExecutionSpec(self.provider, PROFILE, 'none', 'cpu', 0, 'strict')
-        self.session = materialize_control(self.artifact, self.execution,
-            source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08))
+        previous_session, self.session = self.session, None
+        phase = 'reset_close'
         try:
+            if previous_session is not None:
+                previous_session.close()
+            phase = 'selected_reconstruction'
+            # A new construction resets all controller/arm-hold/servo owner memory.
+            self.value = self.binding.build(self.provider)
+            if self.value['artifact'] != self.artifact:
+                raise ValueError('selected Artifact changed between construction and reset')
+            phase = 'reset_seed'
+            seed = self.binding.reset_seed(seed)
+            self.solution, self.controller = self.value['solution'], self.value['controller']
+            phase = 'reset_sample'
+            self.sample = self.binding.reset_sample(self.artifact, seed)
+            self.execution = ExecutionSpec(self.provider, PROFILE, 'none', 'cpu', 0, 'strict')
+            phase = 'session_materialization'
+            self.session = materialize_control(self.artifact, self.execution,
+                source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08))
+            phase = 'runtime_reset'
             self.realized = self.session.reset(self.sample)
+            phase = 'snapshot_readback'
             self.state = self.session.snapshot()
+            phase = 'controller_feedback'
             self.feedback = self.session.control_feedback(self.state)
             self.controller.reset(self.state, self.feedback)
+            phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             if self.state.control_step != 0 or self.state.simulation_time != 0:
                 raise ValueError('reference reset must not advance physics')
+            phase = 'solution_reset'
             self.solution.reset(self.obs, self.info, self.metadata,
                                 **self.binding.reset_expert_kwargs(self))
+            phase = 'arm_schedule_reset'
             self.arm_schedule = (self.binding.schedule_factory(self)
                                  if self.binding.schedule_factory is not None else None)
             self._stopped, self._episode_mode = False, None
             self.recorder = None
+            self._execution_fault = None
             return self.obs, self.info
-        except BaseException:
-            self.session.close()
-            self.session = None
+        except BaseException as error:
+            failed_session, self.session = self.session, None
+            if failed_session is not None:
+                try:
+                    failed_session.close()
+                except BaseException as cleanup_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'selected reset cleanup also failed: {cleanup_error!r}')
+            self._latch_fault(phase, error)
             raise
 
     def _execution_info(self):
@@ -169,6 +244,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         return obs, info, evaluation
 
     def step(self, action):
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode == 'expert':
@@ -177,30 +258,68 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         return self._step(action)
 
     def step_expert(self):
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
         if self._stopped or self._episode_mode == 'external':
             raise RuntimeError('reset required; external and expert execution cannot be mixed')
         self._episode_mode = 'expert'
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')
-        proposal = self.solution.act()
+        try:
+            proposal = self.solution.act()
+        except BaseException as error:
+            self._latch_fault('expert_proposal', error, before_state=self.state)
+            if self.binding.abort_solution_on_runtime_error:
+                try:
+                    self.solution.abort('runtime_error')
+                except BaseException as abort_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'expert abort after proposal failure also failed: {abort_error!r}')
+            raise
         return self._step(proposal.action, proposal=proposal)
 
     def _step(self, action, *, proposal=None):
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
         if self._stopped or self.session is None:
             raise RuntimeError('reset required or episode already stopped')
-        vector = np.asarray(action, dtype=float)
-        if vector.shape != (8,) or not np.isfinite(vector).all():
-            raise ValueError('finite eight-dimensional absolute pose action required')
+        try:
+            vector = np.asarray(action, dtype=float)
+            if vector.shape != (8,) or not np.isfinite(vector).all():
+                raise ValueError('finite eight-dimensional absolute pose action required')
+        except BaseException as error:
+            if proposal is not None:
+                self._latch_fault('expert_action_validation', error, before_state=self.state)
+            raise
         request = RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
+        requested_mode = 'expert' if proposal is not None else 'external'
+        if self._episode_mode is not None and self._episode_mode != requested_mode:
+            raise RuntimeError('cannot mix external actions with selected expert execution')
+        self._episode_mode = requested_mode
         stage = proposal.stage if proposal is not None else 'external'
         diagnostics = dict(proposal.diagnostics) if proposal is not None else {}
         guard_samples = []
         substeps = []
-        if self.recorder is not None and self.binding.recorder_mode == 'execution':
-            self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
-                                self.artifact.timebase.control_substeps)
+        before_state = self.state
+        phase = 'recorder_interval_begin'
+        interval_attempted = False
+        interval_completed = False
         try:
+            if self.recorder is not None and self.binding.recorder_mode == 'execution':
+                self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
+                                    self.artifact.timebase.control_substeps)
+            phase = 'controller_compute'
             canonical, target = self.controller.compute(self.state, self.feedback, request)
+
             def observe(index, state, feedback, effective, applied, diag):
                 substeps.append((index, effective, applied))
                 if self.recorder is not None and self.binding.record_native_substeps:
@@ -209,18 +328,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     _, info, _ = self.observation(state)
                     guard_samples.append(self.solution.make_native_guard_sample(state, info, diag))
             if self.binding.interval_mode == 'native':
+                phase = 'physics_step'
+                interval_attempted = True
                 self.state, target, applied, _ = self.session.step_control_interval(
                     target, self.controller, interval_observer=observe, arm_schedule=self.arm_schedule)
+                interval_completed = True
             else:
                 # Preserve historical P1.6 grouped control-interval stepping,
                 # including the provider's boundary clock accumulation.
+                phase = 'control_application'
                 applied = self.session.apply_control(target)
+                phase = 'physics_step'
+                interval_attempted = True
                 self.state = self.session.step()
+                interval_completed = True
+            phase = 'control_feedback'
             self.feedback = self.session.control_feedback(self.state)
+            phase = 'observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
             if proposal is not None:
+                phase = 'solution_observation'
                 extra = self.binding.observe_expert_kwargs(self, guard_samples)
                 self.solution.observe(self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra)
                 if hasattr(self.solution, 'outcome_report'):
@@ -231,13 +360,43 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._stopped = self.solution.done or self.solution.failed
             self._stopped = bool(self._stopped or terminated or truncated)
             if self.recorder is not None:
+                phase = 'record_interval'
                 self._record_interval(request, canonical, target, applied, stage, diagnostics,
                                       terminated, truncated, substeps)
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
-        except BaseException:
-            self._stopped = True
+        except BaseException as error:
+            after_state = None
+            readback_error = None
+            if interval_attempted:
+                try:
+                    after_state = self.session.snapshot()
+                    self.state = after_state
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            self._latch_fault(
+                phase,
+                error,
+                before_state=before_state,
+                after_state=after_state,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                native_substeps_completed=(
+                    len(substeps) if self.binding.interval_mode == 'native' else None
+                ),
+                native_substeps_expected=(
+                    self.artifact.timebase.control_substeps
+                    if self.binding.interval_mode == 'native'
+                    else None
+                ),
+                readback_error=readback_error,
+            )
             if self.binding.abort_solution_on_runtime_error:
-                self.solution.abort('runtime_error')
+                try:
+                    self.solution.abort('runtime_error')
+                except BaseException as abort_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'expert abort after execution fault also failed: {abort_error!r}')
             # An incomplete interval cannot be finalized as a valid trajectory.
             raise
 

@@ -18,10 +18,12 @@ from .protocols import TaskEnvironmentComponent
 from .lifecycle import SingleTaskLifecycleAdapter, TaskLifecycleAdapter
 from .types import (
     ControlCommand,
+    ExecutionFaultV1,
     SnapshotRequest,
     StageUnavailableError,
     TaskCompositionSpec,
     TaskEvaluation,
+    attach_execution_fault,
 )
 
 
@@ -331,6 +333,10 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                 runtime=self._runtime,
                 task_definition=self._task_definition,
                 control_substeps=self.config.runtime.control_substeps,
+                expected_control_dt_s=(
+                    self.config.runtime.physics_dt
+                    * self.config.runtime.control_substeps
+                ),
                 horizon=self.config.episode.horizon,
                 ignore_done=self.config.episode.ignore_done,
                 sample_reset_state=self._sample_episode_reset_state_for_lifecycle,
@@ -344,6 +350,13 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                 ),
             )
         except BaseException as construction_error:
+            attach_execution_fault(
+                construction_error,
+                ExecutionFaultV1.from_exception(
+                    "runtime_construction",
+                    construction_error,
+                ),
+            )
             try:
                 self.close()
             except BaseException as cleanup_error:
@@ -511,6 +524,13 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             )
         return self._task_lifecycle
 
+    @property
+    def execution_fault(self) -> ExecutionFaultV1 | None:
+        """Return the latched receipt after an incomplete lifecycle operation."""
+
+        lifecycle = self._task_lifecycle
+        return None if lifecycle is None else lifecycle.execution_fault
+
     def _snapshot_request(self) -> SnapshotRequest:
         return SnapshotRequest(
             site_jacobians=self._robot is not None,
@@ -588,25 +608,54 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._elapsed_steps = lifecycle.elapsed_steps
         self._episode_finished = lifecycle.episode_finished
         self._last_task_evaluation = evaluation
-        return result.observation, {
-            "seed": seed,
-            "reset_parameters": reset_parameters,
-            "task_uid": self.config.task.task_uid,
-            "stage": "stage4_gym_contract",
-            "is_success": evaluation.success,
-            "elapsed_steps": self._elapsed_steps,
-            "task_metrics": evaluation.metrics,
-            "reward_terms": evaluation.reward_terms,
-            "task_reward": evaluation.reward,
-            "task_failure": evaluation.failure,
-            "success_definition": self.config.task.success_definition,
-            "resolved_control_metadata": self.metadata["action_schema"],
-            "observation_schema": self._observation_builder.schema,
-        }
+        try:
+            return result.observation, {
+                "seed": seed,
+                "reset_parameters": reset_parameters,
+                "task_uid": self.config.task.task_uid,
+                "stage": "stage4_gym_contract",
+                "is_success": evaluation.success,
+                "elapsed_steps": self._elapsed_steps,
+                "task_metrics": evaluation.metrics,
+                "reward_terms": evaluation.reward_terms,
+                "task_reward": evaluation.reward,
+                "task_failure": evaluation.failure,
+                "success_definition": self.config.task.success_definition,
+                "resolved_control_metadata": self.metadata["action_schema"],
+                "observation_schema": self._observation_builder.schema,
+            }
+        except BaseException as error:
+            lifecycle._latch_fault(
+                "gymnasium_reset_result",
+                error,
+                after_snapshot=snapshot,
+                control_step_before=0,
+                control_step_after=0,
+            )
+            raise
 
     def step(self, action):
         lifecycle = self._require_task_lifecycle()
         result = lifecycle.step(action)
+        try:
+            return self._format_step_result(lifecycle, result)
+        except BaseException as error:
+            lifecycle._latch_fault(
+                "gymnasium_result",
+                error,
+                before_snapshot=result.previous_snapshot,
+                after_snapshot=result.snapshot,
+                control_step_before=max(0, result.elapsed_steps - 1),
+                control_step_after=result.elapsed_steps,
+                interval_attempted=True,
+                interval_completed=True,
+            )
+            self._last_snapshot = result.snapshot
+            self._elapsed_steps = result.elapsed_steps
+            self._episode_finished = lifecycle.episode_finished
+            raise
+
+    def _format_step_result(self, lifecycle, result):
         snapshot = result.snapshot
         evaluation = result.evaluation
         command = result.command

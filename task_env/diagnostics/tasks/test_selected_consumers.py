@@ -207,8 +207,102 @@ def test_failed_reset_closes_old_runtime_and_requires_new_reset(fake):
     env=make_env(IDS[1]);env.reset(seed=19);old=env.session
     with pytest.raises(ValueError):env.reset(seed=31)
     assert old.closed and env.session is None and env._stopped
+    assert env.execution_fault.phase == 'reset_seed'
+    assert env.execution_fault.physical_progress == 'not_advanced'
     with pytest.raises(RuntimeError):env.step_expert()
     env.reset(seed=19);env.step_expert();env.close()
+
+
+def test_native_partial_interval_fault_is_recorded_without_a_transition(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'partial-interval.h5')
+    completed_substeps=[]
+
+    def fail_during_second_native_step():
+        if not completed_substeps:
+            env.session.time += .002
+            completed_substeps.append(1)
+            return
+        raise RuntimeError('injected native-step failure after one completed step')
+
+    env.session._step_physics_once=fail_during_second_native_step
+    with pytest.raises(RuntimeError, match='native-step failure'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.phase == 'physics_step'
+    assert receipt.physical_progress == 'partially_advanced'
+    assert receipt.native_substeps_completed == 1
+    assert receipt.native_substeps_expected == env.artifact.timebase.control_substeps
+    assert env.recorder.pending is not None
+    assert env.recorder.pending['native_step_count'] == 1
+    assert env.recorder.value['transitions'] == []
+    assert len(env.recorder.value['boundaries']) == 1
+    with pytest.raises(RuntimeError, match='faulted; reset'):
+        env.step_expert()
+    with pytest.raises(ValueError, match='incomplete effective interval'):
+        env.finish_recording('failed')
+    with pytest.raises(RuntimeError, match='finalize current recording before reset'):
+        env.reset(seed=19)
+    env.close()
+
+
+def test_expert_proposal_exception_faults_before_physics_and_blocks_step(fake):
+    env=make_env(IDS[0]);env.reset(seed=19)
+
+    def fail_proposal():
+        raise RuntimeError('injected expert proposal failure')
+
+    env.solution.act=fail_proposal
+    with pytest.raises(RuntimeError, match='expert proposal failure'):
+        env.step_expert()
+    assert env.execution_fault.phase == 'expert_proposal'
+    assert env.execution_fault.physical_progress == 'not_advanced'
+    applied_calls=len(env.session.calls)
+    with pytest.raises(RuntimeError, match='faulted; reset'):
+        env.step_expert()
+    assert len(env.session.calls) == applied_calls
+    env.close()
+
+
+def test_task_success_does_not_stop_expert_before_solution_completion(fake):
+    from task_env.environment.types import TaskEvaluation
+
+    class Expert:
+        done=False
+        failed=False
+        failure_reason=None
+        def __init__(self, action):
+            self.action=action
+            self.observed=0
+        def act(self):
+            return SimpleNamespace(stage='post_success', diagnostics={}, action=self.action)
+        def observe(self, *_args, **_kwargs):
+            self.observed += 1
+            self.done = self.observed == 2
+
+    env=make_env(IDS[0]);env.reset(seed=19)
+    ee=env.state.pose_world['panda-v1/ee']
+    expert=Expert(np.asarray((*ee.position,*ee.quaternion_wxyz,0.0),dtype=float))
+    env.solution=expert
+    original_observation=env.observation
+    def successful_observation(state):
+        obs, info, _ = original_observation(state)
+        info['is_success']=True
+        return obs, info, TaskEvaluation(reward=1.0,success=True,failure=False)
+    env.observation=successful_observation
+
+    first=env.step_expert()
+    assert first[2] is False
+    assert first[4]['is_success'] is True
+    assert not env._stopped
+    second=env.step_expert()
+    assert second[2] is False
+    assert second[4]['is_success'] is True
+    assert expert.done and expert.observed == 2 and env._stopped
+    assert env.state.control_step == 2
+    env.close()
 
 
 def test_nutassembly_public_example_does_not_admit_external_gripper_actions():
