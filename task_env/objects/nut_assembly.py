@@ -40,6 +40,8 @@ class SquareNutObject(BaseTaskObject):
             mjcf_sources=(NUT_ASSET_ROOT / "square-nut.xml",),
             asset_roots=(NUT_ASSET_ROOT,),
             asset_version="robosuite-square-nut-local-copy",
+            source_reference="geochora-task-asset://nut-assembly/square-nut.xml",
+            source_revision="robosuite-square-nut-local-copy",
         )
 
     def reference_spec(self) -> ReferenceSpec:
@@ -64,6 +66,15 @@ class SquarePegObject(BaseTaskObject):
             owner_uid=self.uid,
             asset_kind="procedural_task_object",
             asset_version="nut-assembly-peg-v1",
+            source_reference="geochora-procedural://nut-assembly/peg/square",
+            source_revision="nut-assembly-peg-v1",
+            generator_id="task_env.assembly.nut_assembly.build_nut_assembly_model_xml",
+            generator_version="nut-assembly-peg-v1",
+            generator_parameters={
+                "shape": "square",
+                "half_height_m": PEG_HALF_HEIGHT,
+                "half_width_m": SQUARE_PEG_HALF_WIDTH,
+            },
         )
 
     def reference_spec(self) -> ReferenceSpec:
@@ -82,6 +93,15 @@ class RoundPegObject(BaseTaskObject):
             owner_uid=self.uid,
             asset_kind="procedural_task_object",
             asset_version="nut-assembly-peg-v1",
+            source_reference="geochora-procedural://nut-assembly/peg/round",
+            source_revision="nut-assembly-peg-v1",
+            generator_id="task_env.assembly.nut_assembly.build_nut_assembly_model_xml",
+            generator_version="nut-assembly-peg-v1",
+            generator_parameters={
+                "shape": "round",
+                "half_height_m": PEG_HALF_HEIGHT,
+                "radius_m": ROUND_PEG_RADIUS,
+            },
         )
 
     def reference_spec(self) -> ReferenceSpec:

@@ -25,6 +25,8 @@ class PandaAgent(BaseAgent):
             mjcf_sources=(PANDA_ASSET_ROOT / "panda.xml",),
             asset_roots=(PANDA_ASSET_ROOT,),
             asset_version="mujoco-menagerie-panda",
+            source_reference="mujoco-menagerie://franka_emika_panda/panda.xml",
+            source_revision="b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
         )
 
     def reference_spec(self) -> ReferenceSpec:

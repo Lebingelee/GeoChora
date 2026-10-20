@@ -41,13 +41,22 @@ def _readonly_array(
 
 @dataclass(frozen=True)
 class AssetManifest:
-    """组件资产声明；构造时不访问磁盘。"""
+    """组件资产声明；构造时不访问磁盘。
+
+    Optional stable source and generator provenance supplements the local
+    source paths; it does not attest to importer consumption or source bytes.
+    """
 
     owner_uid: str
     asset_kind: str
     mjcf_sources: tuple[Path, ...] = ()
     asset_roots: tuple[Path, ...] = ()
     asset_version: str = "stage0"
+    source_reference: str | None = None
+    source_revision: str | None = None
+    generator_id: str | None = None
+    generator_version: str | None = None
+    generator_parameters: Mapping[str, object] | tuple[tuple[str, object], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.owner_uid.strip():
@@ -64,6 +73,60 @@ class AssetManifest:
             "asset_roots",
             tuple(Path(path) for path in self.asset_roots),
         )
+        if self.source_reference is not None:
+            reference = str(self.source_reference)
+            if not reference or reference != reference.strip():
+                raise ValueError("source_reference must be a stable nonempty token")
+            object.__setattr__(self, "source_reference", reference)
+        if self.source_revision is not None:
+            revision = str(self.source_revision)
+            if not revision or revision != revision.strip():
+                raise ValueError("source_revision must be a stable nonempty token")
+            if self.source_reference is None:
+                raise ValueError("source_revision requires source_reference")
+            object.__setattr__(self, "source_revision", revision)
+
+        generator_id = self.generator_id
+        generator_version = self.generator_version
+        if (generator_id is None) != (generator_version is None):
+            raise ValueError("generator_id and generator_version must be declared together")
+        for name, value in (("generator_id", generator_id), ("generator_version", generator_version)):
+            if value is not None and (not str(value).strip() or str(value) != str(value).strip()):
+                raise ValueError(f"{name} must be a stable nonempty token")
+        if generator_id is not None:
+            if self.source_reference is None:
+                raise ValueError("generator provenance requires source_reference")
+            object.__setattr__(self, "generator_id", str(generator_id))
+            object.__setattr__(self, "generator_version", str(generator_version))
+
+        raw_parameters = self.generator_parameters
+        items = raw_parameters.items() if isinstance(raw_parameters, MappingABC) else raw_parameters
+        normalized_parameters = []
+        seen_parameters = set()
+        for item in items:
+            if not isinstance(item, (tuple, list)) or len(item) != 2:
+                raise ValueError("generator_parameters must contain name/value pairs")
+            raw_name, raw_value = item
+            name = str(raw_name).strip()
+            if not name or name in seen_parameters:
+                raise ValueError("generator parameter names must be nonempty and unique")
+            if type(raw_value) not in (str, int, float, bool):
+                raise TypeError("generator parameter values must be scalar strings, numbers, or booleans")
+            if isinstance(raw_value, str):
+                value = raw_value.strip()
+                if not value:
+                    raise ValueError("generator parameter strings must be nonempty")
+            elif isinstance(raw_value, float):
+                if not np.isfinite(raw_value):
+                    raise ValueError("generator parameter floats must be finite")
+                value = 0.0 if raw_value == 0.0 else float(raw_value)
+            else:
+                value = raw_value
+            seen_parameters.add(name)
+            normalized_parameters.append((name, value))
+        if normalized_parameters and generator_id is None:
+            raise ValueError("generator_parameters require generator_id and generator_version")
+        object.__setattr__(self, "generator_parameters", tuple(sorted(normalized_parameters)))
 
 
 @dataclass(frozen=True)

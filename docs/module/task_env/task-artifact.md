@@ -40,7 +40,12 @@ source SHA-256 是可选 provenance 字段；声明 hash 不证明 importer 读�
 不执行 importer/materializer，也不将 native handle 写入身份值。原有 `world-v0` 与已冻结
 TaskArtifact bytes/hash 不变；vNext Scene 值不自动投影为 TaskArtifact，也不改变发布能力或 qualification。
 `AssetManifest`、`TaskCompositionSpec`、`ReferenceSpec` 和 `TaskReferences` 保持各自在 assembly、
-注册组合及编译后名称映射中的职责，后续 A04 才定义 source importer 与 identity value 的连接规则。
+注册组合及编译后名称映射中的职责。`AssetManifest` 可选声明稳定 `source_reference` / `source_revision`，
+procedural source 还可声明 generator ID/version 与规范化 scalar 参数；这些字段不触发磁盘访问，且不替代本地
+`mjcf_sources` / `asset_roots`。A04 的逐次 Evidence 分开记录 `AssetDefinition.identity_hash`（声明身份）、
+同一受控输入快照的 Source Closure Digest（文件依赖按逻辑相对路径和精确字节摘要，或 procedural 生成内容摘要）
+及 provider/importer-scoped identity。当前 public importer 未导出逐文件消费哈希，因此 Core 侧摘要仅在输入快照被
+固定并验证后才能声称绑定到该次导入；GeoPhys 的 source/IR hash 仍是 provider 自有身份，不能替代来源字节摘要。
 Phase II A02 的 `scene-definition-v2` 在同一 `SceneDefinition` owner 下补充 entity-qualified authored fixed
 frames、runtime body/link anchors 与 Articulation/Joint 静态拓扑；`scene-definition-v1` 的 codec、mapping 与 hash
 保持原样。Frame composition 只解析有足够 authored transform 的路径；动态 link pose 留给 D02 canonical state。
