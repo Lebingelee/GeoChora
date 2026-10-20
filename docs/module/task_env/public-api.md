@@ -23,12 +23,20 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 
 `reset(seed=...) -> (observation, info)` 在首次 step 前调用；
 `step(action) -> (observation, reward, terminated, truncated, info)`。
-终端后需 reset，不能继续 step；使用 `try/finally: env.close()` 释放资源。
+终端后需 reset，不能继续 step；使用 `try/finally: env.close()` 关闭资源。
 通用 `BaseTaskEnv` 组合 task definition、reset sampler、runtime、action、observation 和 rendering。
 `TaskEvaluation` 提供 reward、success、failure、metrics、reward_terms；reward 与
 `info["is_success"]` 不能替代 Judge。通用 `ignore_done=False` 时 success/failure 可终止 episode，
 horizon 产生 truncation；selected expert 的 stop/completion policy 必须单独读取。
 Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly external action 明确拒绝。
+
+通用构造先解析 task-owned YAML defaults，再深合并调用方 mapping/YAML（调用方字段优先），最后只允许
+覆盖公开 environment sections；task topology/semantics 不接受 overlay。传入现成 `ResolvedEnvConfig`
+时它本身是权威 resolved 值，不再叠加默认 YAML。`BaseTaskEnv.execution_plan` 暴露
+`execution-plan-v0` 静态投影：包含 resolved configuration identity、timebase、当前 controller selection、
+renderer selection 与 resource owner identities。计划在 GeoPhys bootstrap 前生成；它不代表实际 Provider
+manifest admission、native materialization 或 reset realization。Selected-reference 的窄配置及 factory
+分支继续作为兼容入口，暂未投影为同一个 normalized config schema。
 
 ## Facade、扩展与 advanced contracts
 
@@ -36,16 +44,24 @@ Selected reference 同一 episode 不可混用 expert 和 external action；NutA
 | --- | --- | --- |
 | `make_env`, `make_agent`, `make_object`, `make_scene` | `task_env` | 注册组件构造，不证明执行能力 |
 | `ENV_REGISTRY`, `AGENT_REGISTRY`, `OBJECT_REGISTRY`, `SCENE_REGISTRY` | `task_env` | 用 `uids()` 查询；扩展注册见 `task_env.registry` |
-| `BaseTaskEnv`, `TaskEvaluation`, `RuntimeBoundary`, `ResolvedEnvConfig` | `task_env` | environment/config/snapshot 生命周期 |
+| `BaseTaskEnv`, `TaskEvaluation`, `RuntimeBoundary`, `ResolvedEnvConfig`, `ExecutionPlan` | `task_env.environment` | environment/config 生命周期；ExecutionPlan 仅记录静态准入阶段 |
 | `resolve_env_config` | `task_env` | 解析并冻结公共配置；task-specific overlay 走 factory 分支 |
 | `AssetManifest` | `task_env.environment` | assembly 资产声明；保留本地 source/root 与版本字段，可选稳定 source reference/revision 和 procedural generator 元数据；构造时不读文件，也不证明 importer 消费了对应 bytes |
 | `make_parallel_env`, `register_parallel_env` | `task_env` | optional homogeneous factory，与 scalar 无互相 fallback |
 | `TaskArtifact`, `ExecutionSpec`, `CanonicalStateView`, `admit_capabilities` | `task_env.artifacts` | advanced data/admission contracts；不从 root 假造导出 |
+| `ExecutionSpecV1`, `RendererSelectionV1`, `CameraRendererOverrideV1`, `decode_execution_spec` | `task_env.artifacts` | D05a 的显式版本化静态选择；保留旧 `ExecutionSpec` 无版本映射，v1 不自动降为 v0，也不表示已 admission/materialization |
+| `CanonicalStateViewV1`, `TypedJointStateValue`, `TypedFrameStateValue`, `StateRequirements`, `NativeIntervalEvidence`, `StateViewLifetime` | `task_env.artifacts` | D02a provider-neutral contracts 与显式 v0 projection；requirement ID 不扩展 Provider manifest，契约可用不代表 provider projection/native contact 已实现 |
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile |
+| `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
+
+D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeSession.materialize()` 和当前
+`create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变
+`admit_render`、Provider manifest capability claims 或 native construction，也不允许 UI `render_mode` 冒充
+Camera Sensor selection。现有 provider-capability-v0 mapping 原样保留；其 `identity_hash` 只绑定精确 mapping。
 
 `TaskDefinition` 只消费公开 snapshot/state，不访问 solver。
 `BaseTaskEnv` 的 scene/reset/task-definition hooks 是 Extension API，不是第二套 task factory。

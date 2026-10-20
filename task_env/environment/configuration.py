@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import fields, is_dataclass, replace
+from dataclasses import asdict, fields, is_dataclass, replace
+import hashlib
+import json
 from pathlib import Path
 from typing import Mapping, TypeVar
 
@@ -11,6 +13,7 @@ from .config import (
     AgentConfig,
     AssetConfig,
     EpisodeConfig,
+    ExecutionPlan,
     GripperConfig,
     ObjectConfig,
     ObservationConfig,
@@ -208,8 +211,10 @@ def resolve_task_env_config(
     """Resolve task defaults plus an optional public YAML/mapping override.
 
     A pre-resolved config is retained as the compatibility entry point for
-    earlier Stage 0--9 callers; mapping/YAML users cannot replace task-owned
-    scene, object, agent, or success-definition fields.
+    earlier Stage 0--9 callers and is authoritative as supplied. Otherwise task
+    defaults are deep-merged with the caller override (caller values win), then
+    only public environment-owned sections are overlaid. Mapping/YAML users
+    cannot replace task-owned scene, object, agent, or success-definition fields.
     """
 
     if isinstance(config, ResolvedEnvConfig):
@@ -225,6 +230,145 @@ def resolve_task_env_config(
             raise TypeError("TaskEnv config must be ResolvedEnvConfig, mapping, or YAML path")
         merged = _deep_merge(merged, override)
     return overlay_public_env_config(base, merged)
+
+
+def _identity_value(value):
+    """Convert resolved configuration values to deterministic JSON values."""
+
+    if is_dataclass(value):
+        return _identity_value(asdict(value))
+    if isinstance(value, Mapping):
+        if any(not isinstance(key, str) for key in value):
+            raise TypeError("resolved configuration identity requires string mapping keys")
+        return {key: _identity_value(value[key]) for key in sorted(value)}
+    if isinstance(value, (tuple, list)):
+        return [_identity_value(item) for item in value]
+    if isinstance(value, Path):
+        return str(value)
+    if value is None or isinstance(value, (str, bool, int, float)):
+        return value
+    # NumPy arrays/scalars are used by a small number of direct configuration
+    # callers. Convert their data values without importing NumPy on the public
+    # configuration path.
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        return _identity_value(tolist())
+    item = getattr(value, "item", None)
+    if callable(item):
+        return _identity_value(item())
+    raise TypeError(
+        "resolved configuration identity only supports data values; "
+        f"got {type(value).__name__}"
+    )
+
+
+def _resolved_config_identity(config: ResolvedEnvConfig) -> str:
+    payload = json.dumps(
+        _identity_value(asdict(config)),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def resolve_execution_plan(
+    environment_type,
+    config: ResolvedEnvConfig,
+    *,
+    agents=(),
+    render_mode=None,
+    state_requirements=None,
+) -> ExecutionPlan:
+    """Build the current generic route's immutable static execution plan.
+
+    This performs config-level admission only. It deliberately does not inspect
+    provider manifests, materialize native resources, or claim reset
+    realization. Selected-reference tasks retain their separate strict config
+    route in ``SelectedReferenceEnv.from_reference_config``.
+    """
+
+    if not isinstance(config, ResolvedEnvConfig):
+        raise TypeError("static execution planning requires a ResolvedEnvConfig")
+    agent_uids = tuple(
+        str(getattr(agent, "uid", agent)) for agent in (agents or config.agents.agent_uids)
+    )
+    if len(agent_uids) > 1:
+        from .types import StageUnavailableError
+
+        raise StageUnavailableError(
+            "current BaseTaskEnv statically admits at most one agent; "
+            "multi-agent materialization is not implemented"
+        )
+
+    controller_selections: tuple[tuple[str, str, str | None], ...] = ()
+    if "panda-v1" in agent_uids:
+        controller = config.robot.controller
+        if controller is None:
+            from .types import StageUnavailableError
+
+            raise StageUnavailableError(
+                "robot TaskEnv requires an explicit robot.controller config"
+            )
+        if controller.kind not in {"absolute_joint", "absolute_pose", "delta_pose"}:
+            from .types import StageUnavailableError
+
+            raise StageUnavailableError(
+                f"unsupported robot controller kind {controller.kind!r}"
+            )
+        controller_selections = (
+            ("panda-v1", controller.kind, controller.reference),
+        )
+
+    if state_requirements is not None:
+        from ..artifacts.state import StateRequirements
+
+        if not isinstance(state_requirements, StateRequirements):
+            raise TypeError("state_requirements must be StateRequirements")
+
+    normalized_render_mode = None
+    if render_mode is not None:
+        from ..render.base.contracts import normalize_render_mode
+
+        normalized_render_mode = normalize_render_mode(render_mode).value
+
+    environment_uid = str(
+        getattr(environment_type, "uid", environment_type.__qualname__)
+    )
+    camera_owner = (
+        "task_env.observations.capture.CameraObservationProvider"
+        if config.render.camera_obs
+        else "none"
+    )
+    ui_owner = (
+        "task_env.render.providers.single.TaskEnvRenderProvider"
+        if normalized_render_mode is not None
+        else "none"
+    )
+    return ExecutionPlan(
+        schema_version="execution-plan-v0",
+        environment_uid=environment_uid,
+        task_uid=config.task.task_uid,
+        scene_uid=config.scene.scene_uid,
+        agent_uids=agent_uids,
+        object_uids=config.objects.object_uids,
+        physics_provider="geophys",
+        backend=config.runtime.backend,
+        physics_dt=config.runtime.physics_dt,
+        control_substeps=config.runtime.control_substeps,
+        render_mode=normalized_render_mode,
+        render_backend=config.render.backend,
+        controller_selections=controller_selections,
+        resource_owner_identities=(
+            ("environment", f"{environment_type.__module__}.{environment_type.__qualname__}"),
+            ("episode_lifecycle", "task_env.environment.lifecycle.SingleTaskLifecycleAdapter"),
+            ("physics_boundary", "task_env.runtime.GeoPhysRuntimeBoundary"),
+            ("camera_capture", camera_owner),
+            ("ui_render", ui_owner),
+        ),
+        configuration_identity=_resolved_config_identity(config),
+        state_requirements=state_requirements,
+    )
 
 
 def resolve_env_config(

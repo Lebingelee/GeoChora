@@ -6,17 +6,19 @@ With `.codegraph/` present, explore these owners first.
 | Need | Current owner / reader | Contract |
 | --- | --- | --- |
 | Public facade/factories | `task_env/__init__.py`, `task_env/registry.py`; callers `examples/tasks/pick_cube.py`, `examples/tasks/nut_assembly.py` | flat selected config vs nested generic config |
-| Generic lifecycle | `task_env/environment/env.py`, `task_env/environment/lifecycle.py`, `task_env/environment/task_definition.py` | reset/step/done and task-state evaluation |
+| Generic config/plan | `task_env/environment/configuration.py`, `config.py`; `BaseTaskEnv.execution_plan` in `env.py` | defaults → caller override → public-section overlay; immutable static plan precedes GeoPhys bootstrap, not actual manifest admission or reset realization |
+| Generic lifecycle/resource ownership | `task_env/environment/env.py`, `task_env/environment/lifecycle.py`, `task_env/runtime/boundary.py` | reset/step/done and task-state evaluation; lifecycle closes RuntimeBoundary once, Env closes Camera/UI wrappers |
 | Selected adapter | `task_env/tasks/reference_env.py` | `SelectedReferenceEnv` internal shared owner, public factory consumer; `step_expert`, start/finish recording |
 | Task/Artifact/solution | `task_env/tasks/pick_cube/task.py`, `solution.py`, `config.yaml`; corresponding `task_env/tasks/nut_assembly/` | task-owned recipe/semantics; `build_reference` is advanced, do not assume root re-export |
-| Advanced Artifact/admission | `task_env/artifacts/__init__.py`, `task_env/artifacts/contracts.py` | `TaskArtifact`, `ExecutionSpec`, `CanonicalStateView`, `CapabilityAdmissionError`, `admit_capabilities` |
+| Advanced Artifact/admission | `task_env/artifacts/__init__.py`, `task_env/artifacts/contracts.py` | `TaskArtifact`, legacy `ExecutionSpec`, additive `ExecutionSpecV1`/`decode_execution_spec`, `CanonicalStateView`, `CapabilityAdmissionError`, `admit_capabilities` |
+| D02a canonical state contracts | `task_env/artifacts/state.py`, exported through `task_env.artifacts`; D02b provider owner remains `task_env/runtime/sessions/` | strict v0/v1 state dispatch, explicit scalar v0 projection, consumer requirements, native interval evidence and alias lifetime descriptors; no provider projection/native capability claim |
 | Physics sessions | `task_env/runtime/sessions/api.py`, `task_env/runtime/sessions/control.py` | `RuntimeSession`, `materialize`, `provider_manifest`, `materialize_control`; public provider boundary |
 | Controller/observation | `task_env/controllers/canonical/contracts.py`, `task_env/controllers/canonical/`; `task_env/observations/` | RequestedAction → canonical target → applied control; schema/frame/timebase metadata |
 | Generic recording | `task_env/recorders/__init__.py`, `wrapper.py`, `vector.py` | `RecorderConfig`, `TransitionRecordWrapper`, `VectorTransitionRecorder`, `FrozenTrajectory` |
 | Selected recording/inspection | `task_env/trajectory/canonical/`, `examples/recording/record_expert.py`, `examples/recording/inspect_h5.py` | canonical outer vs execution stream; T/T+1; no complete D0 owner restore |
 | Offline trajectory | `task_env/trajectory/__init__.py`, `task_env/script/trajectory/` | validate/inspect/transcode/replay; explicit historical replay is separate |
 | Parallel | `task_env/vectorization/registry.py`, `task_env/vectorization/parallel.py` | explicit homogeneous tasks, local/remote spawn, masked reset/autoreset |
-| Learner/render | `task_env/alg/`, `task_env/render/`, `task_env/observations/canonical_camera/` | learner flatten boundaries; camera vs UI; renderer admission independent of physics |
+| Learner/render | `task_env/alg/`, `task_env/render/`, `task_env/observations/canonical_camera/` | learner flatten boundaries; camera vs UI; D05a static `CameraCaptureIdentityV1` is request identity only; active native admission still requires physics/render provider match |
 
 Detailed maintained contracts: [public API](../../../../docs/module/task_env/public-api.md),
 [runtime](../../../../docs/module/task_env/runtime-and-providers.md),

@@ -1,0 +1,194 @@
+{
+  "artifact_id": "pick-cube-v1/p1_6_experimental_100hz",
+  "artifact_version": "ver_p1_6_experimental_100hz",
+  "initialization": {
+    "inherited_state_policy": "zero_named_joint_and_entity_velocities_arm_targets_at_initial_joints_gripper_open",
+    "joint_position": {
+      "panda-v1/finger_joint1": 0.04,
+      "panda-v1/finger_joint2": 0.04,
+      "panda-v1/joint1": -0.17,
+      "panda-v1/joint2": 0.0,
+      "panda-v1/joint3": 0.0,
+      "panda-v1/joint4": -1.57079,
+      "panda-v1/joint5": 0.0,
+      "panda-v1/joint6": 1.57079,
+      "panda-v1/joint7": -0.7853
+    },
+    "poses_world": {
+      "cube-v1": {
+        "position": [
+          0.5544999837875366,
+          0.0,
+          0.48800000000000004
+        ],
+        "quaternion_wxyz": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "randomization": [
+      {
+        "distribution": "uniform",
+        "evaluation_bounds": [
+          0.45449998378753664,
+          0.6544999837875366
+        ],
+        "feasibility_bounds": [
+          0.45449998378753664,
+          0.6544999837875366
+        ],
+        "hard_bounds": [
+          0.45449998378753664,
+          0.6544999837875366
+        ],
+        "name": "cube-v1.position_world.x",
+        "training_bounds": [
+          0.45449998378753664,
+          0.6544999837875366
+        ]
+      },
+      {
+        "distribution": "uniform",
+        "evaluation_bounds": [
+          -0.1,
+          0.1
+        ],
+        "feasibility_bounds": [
+          -0.1,
+          0.1
+        ],
+        "hard_bounds": [
+          -0.1,
+          0.1
+        ],
+        "name": "cube-v1.position_world.y",
+        "training_bounds": [
+          -0.1,
+          0.1
+        ]
+      }
+    ],
+    "reset_validity": "cube_free_pose_in_declared_xy_envelope_fixed_z_identity_wxyz",
+    "schema_version": "initialization-v0",
+    "settle_steps": 0
+  },
+  "required_capabilities": {
+    "names": [
+      "articulated_robot",
+      "body_pose_query",
+      "frame_pose_query",
+      "free_body",
+      "joint_position_actuation",
+      "joint_state_query",
+      "rigid_body"
+    ]
+  },
+  "schema_version": "task-artifact-v0",
+  "semantics": {
+    "evaluator": "pick_cube_lift_v0",
+    "parameters_si": {
+      "gripper_closed_opening": 0.045,
+      "lift_height": 0.1,
+      "reach_distance": 0.09,
+      "rest_height": 0.48700000000000004
+    },
+    "required_joints": [
+      "panda-v1/finger_joint1",
+      "panda-v1/finger_joint2"
+    ],
+    "required_poses": [
+      "cube-v1",
+      "panda-v1/ee"
+    ],
+    "schema_version": "semantics-v0",
+    "success_definition": "cube_lifted_v1"
+  },
+  "task_id": "pick-cube-v1",
+  "timebase": {
+    "action_hold": "zero_order_hold",
+    "control_dt": 0.01,
+    "control_substeps": 5,
+    "observation_sampling": "post_control_step",
+    "physics_dt": 0.002,
+    "semantic_sampling": "post_control_step"
+  },
+  "world": {
+    "action": {
+      "controller_target": "arm_joint_position_and_gripper",
+      "mode": "absolute_pose",
+      "reference": "world",
+      "rotation_representation": "quaternion_wxyz"
+    },
+    "convention": "SI_right_handed_z_up_wxyz",
+    "entities": [
+      {
+        "asset_reference": "tabletop-v1/task-local",
+        "collision_intent": "support_contact",
+        "frames": [
+          "tabletop-v1/top"
+        ],
+        "geometry": "box",
+        "joints": [],
+        "kind": "static",
+        "parameters_si": {
+          "half_size_x": 0.28,
+          "half_size_y": 0.2,
+          "half_size_z": 0.01,
+          "top_z": 0.462
+        },
+        "semantic_id": "tabletop-v1"
+      },
+      {
+        "asset_reference": "mujoco_menagerie/b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda.xml",
+        "collision_intent": "arm_hand_finger_collision",
+        "frames": [
+          "panda-v1/base",
+          "panda-v1/ee"
+        ],
+        "geometry": "referenced_articulation",
+        "joints": [
+          "panda-v1/joint1",
+          "panda-v1/joint2",
+          "panda-v1/joint3",
+          "panda-v1/joint4",
+          "panda-v1/joint5",
+          "panda-v1/joint6",
+          "panda-v1/joint7",
+          "panda-v1/finger_joint1",
+          "panda-v1/finger_joint2"
+        ],
+        "kind": "embodiment",
+        "parameters_si": {},
+        "semantic_id": "panda-v1"
+      },
+      {
+        "asset_reference": "cube-v1/task-local",
+        "collision_intent": "table_hand_contact",
+        "frames": [],
+        "geometry": "free_box",
+        "joints": [],
+        "kind": "movable",
+        "parameters_si": {
+          "half_size": 0.025,
+          "inertia_x": 3.5e-05,
+          "inertia_y": 3.5e-05,
+          "inertia_z": 3.5e-05,
+          "mass": 0.08
+        },
+        "semantic_id": "cube-v1"
+      }
+    ],
+    "observation_requirements": [
+      "task-env-state-v2",
+      "privileged_state"
+    ],
+    "randomization_dimensions": [
+      "cube-v1.position_world.x",
+      "cube-v1.position_world.y"
+    ],
+    "schema_version": "world-v0"
+  }
+}

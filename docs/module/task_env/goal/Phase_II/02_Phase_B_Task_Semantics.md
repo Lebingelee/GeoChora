@@ -273,6 +273,33 @@ Experiment、Provider、Controller 的具体实例参数、Policy/Training Budge
   Legacy decode/new write/explicit migration/reject 的组合逐项可测；新增 segmentation 等 capability 不扩权旧 manifest。
 - **Codex AUDIT Prompt**：评审 timebase v0 拆分方案是否会影响 `materialize()` 精确 dt gate；缺真实兼容证据可选择 defer，仅输出有限的新版 Artifact。
 
+#### B04a — 当前版本/读写/迁移矩阵（基线，不是 vNext 实现）
+
+本切片仅冻结当前事实与下一版路由规则；当前生产 schema 不改，不为没有消费者的字段添加 discriminator，也不建立第二套 Artifact/Recorder owner。
+
+| Contract / data family | 当前版本与身份 | 当前读写者/真实调用 | B04a 兼容规则与后续版本策略 |
+| --- | --- | --- | --- |
+| TaskArtifact / World | `task-artifact-v0`；嵌套 `world-v0`、`initialization-v0`、`semantics-v0`；`identity_hash` 是完整 `to_mapping()` 的 sorted compact JSON SHA-256 | `TaskArtifact.from_mapping()` strict decode；PickCube/NutAssembly `build_artifact()` 构造；没有统一 artifact 文件 writer/reader | v0 codec、mapping、identity 原样保留；`from_mapping()` 不自动升级。单一 artifacts-owner dispatcher 按精确 `schema_version` 选择 v0 或未来 decoder，缺失/未知版本拒绝。显式 v0→v1 migration 只产生新 Artifact/新 identity，并回报每字段去向；不得覆盖原 bytes 或自动标为 frozen。 |
+| Scene / World mapping | A owner 的 `scene-definition-v1/v2/v3` 与 B Artifact 的 `world-v0` 是不同 contract；SceneDefinition 每个版本有独立 strict field set | `SceneDefinition.from_mapping()` 按 `schema_version` 验证；Artifact `WorldDefinition` 仍存其自身的 entity mapping | 不把 `world-v0` 伪装为 `scene-definition-v3`。vNext TaskArtifact 应显式引用 Scene identity/version；迁移不能复制第二份 Scene owner。 |
+| Reset / Role | `reset-sample-v0`；sample ID 由除 `sample_id` 外的 canonical mapping 得出，含 frozen Artifact hash；通用 RoleBinding/SceneVariant 尚未实现 | `ResetSample.create()` 归一化后计算 identity；`from_mapping()` strict decode；PickCube/NA-S0 `sample_reset()` 是实际 caller | v0 的采样语义和 hash 不改；新 RoleBinding/Variant 使用有版本的独立值，不能把字段 append 到 v0 或从字段形状猜测版本。旧 sample 仅按 v0 解码；migration 显式记录源 Artifact/sample identity。 |
+| Realized state / canonical state | `realized-initial-state-v0` 嵌入 `canonical-state-v0`；state 是标量 joint position/velocity 与 `pose_world` map | `RealizedInitialState.from_mapping()`、P1.2 runtime receipt、canonical trajectory reader | v0 保持 strict 且不 reinterpret 为 typed multi-DOF state；vNext 如改变 state representation 必须新 discriminator，并由其 Episode/trajectory parent 明确选择。 |
+| ExecutionSpec / Timebase | ExecutionSpec 没有自身 discriminator；Timebase 也没有。TaskArtifact Timebase 固定 `physics_dt × control_substeps == control_dt`（容许 1 ULP），并显式记录 action/sampling policy | 两者是 strict `Contract.from_mapping()` 子对象；EpisodeMetadata v0 嵌入 ExecutionSpec/Timebase；TaskArtifact v0 嵌入 Timebase。ExecutionSpec 不在 TaskArtifact identity 内 | 旧映射缺少版本字段是合法 v0 事实，不得回填字段以“补齐”版本。未来新形状经明确的 parent v1 codec 路由，或采用单独 versioned child；不得根据 key 集合猜测。Provider 替换只改变 Execution provenance，不改变 Task Semantic Identity；Timebase native `dt/substeps` 在证明 Guard/materialize 兼容前不得拆除。 |
+| Capability manifest | `provider-capability-v0`；CapabilityClaim 本身无版本，能力名称由固定集合校验 | `ProviderCapabilityManifest.from_mapping()` strict decode；`admit_capabilities()` 使用其声明 | 未知能力（含新 segmentation 等）在 v0 失败；不得扩展旧 manifest 的解释范围。新能力集合/字段由明确新 manifest version 承载，不授予既有 Evidence 新资格。 |
+| Camera | `camera-observation-v0` 的 `CameraGeometry` 链接 TaskArtifact hash；`ResolvedCameraMetadata` 无 discriminator | `CameraGeometry.from_mapping()` strict decode；canonical camera resolve/project/back-project 使用者读其值 | 已冻结的 RGB/Depth convention 保持不变；新增 modality、capture timing 或 metadata 语义必须通过明确版本/parent route 读取，旧 camera 不能因 decoder 忽略未知字段而扩权。 |
+| 通用 H5 trajectory | 默认写 `task-env-h5/v2`；另有显式 `geophys-transition-h5/v1` 兼容 config/写出分支。env metadata 新写 YAML，`load_metadata()` 仍接受历史 JSON 文档 | `save_trajectory_h5()`、collection writer、`inspect_trajectory_h5()`、replay/transcode/collection readers；`env_meta` 是普通 mapping，非 TaskArtifact codec | 不改变既有 H5 v1/v2 bytes/dataset。只在 container layout 或 reader semantics 改变时升级 H5 outer version；embedded mapping 的 YAML/JSON 原文件 bytes、normalized mapping 和 Artifact identity 分别记录。`inspect_trajectory_h5()` 当前是 summary reader，不等价于全语义 validator。 |
+| Canonical trajectory | Logical `canonical-trajectory-v0` + `canonical-trajectory-metadata-v0`；H5 outer `task-env-canonical-trajectory-v0`，含 logical JSON 与核对用 numeric projection | `task_env.trajectory.canonical.h5.save/load()`；`CanonicalTrajectory.identity_hash` 覆盖 logical mapping | v0 outer/logical bytes 与 hash保持；nested metadata/state 改变必须有新 logical/outer 路由和 reader oracle，不得同名覆盖旧 file schema。 |
+| Canonical execution stream | `canonical-execution-trajectory-v1` 为旧读版本；当前 writer 为 `canonical-execution-trajectory-v2`，H5 file 分别为 `task-env-canonical-execution-v1/v2`；v2 增加 versioned clock validation | resident 与 streaming save/load/validate 共用 logical mapping 和 semantic validators；当前 tracked `execution_prefix_fixture.json.gz` 是 v2 | 保留 v1 read path、v2 当前读写语义；未来 nested contract 改变需要新的 logical/file discriminator 和显式 reader dispatch。当前测试把 v2 fixture 的 schema 字段改成 v1 做 smoke，**不是原始 v1 bytes fixture**；B04b 前须取得真正历史 v1 bytes/hash，或把其 reader migration 标记 DEFERRED。 |
+
+Scene/Task/Execution/Recorder 是不同版本域，`v1` 不代表全局兼容。新 TaskArtifact 由 exact top-level discriminator 选择 decoder；nested typed contracts 验证自己的 discriminator，未独立版本化的 child 由显式 parent codec 解释。未知版本/字段一律拒绝，不做“尽力读取”或默认回填。迁移 API 只能在调用点明确命名目标版本，并返回 `{source_schema, source_identity, target_schema, target_identity, field_dispositions}`；`SOURCE_RETAINED`、`APPROXIMATE`、`UNSUPPORTED` 必须可见，必需字段无安全投影时停止迁移。
+
+#### B04a — Legacy fixtures 与本切片边界（2026-10-20）
+
+新增 `task_env/diagnostics/tasks/fixtures/phase_ii_b04a/` 两份当前 PickCube/NutAssembly `task-artifact-v0` mapping fixture。测试分别 pin fixture 原文件 SHA-256、解码/重编码后的 mapping、canonical identity 和当前 builder 输出；另以不同 YAML bytes 解出同一 mapping，证明“原文件 bytes”不等同于 Artifact identity。现有 `reference_construction_baseline.json` 中 PickCube reset seed 11 继续作为 `reset-sample-v0` fixture。
+
+已知 fixture 缺口需保留为明确 gate：仓库没有已发现的 `geophys-transition-h5/v1` 文件 fixture，也没有 `canonical-trajectory-v0` outer H5 golden file；canonical execution 的当前压缩 fixture 是 v2，现有 v1 测试通过改写其 schema 字段生成。B04b 若触及这些 reader，先从历史已保存的原始 bytes/已批准归档获取并 pin SHA-256；拿不到真实 v1 bytes 时只可保留/defer 旧 reader，不可把合成 v2 样本宣称为历史 v1 兼容证据。TaskArtifact v0 fixture 是 mapping fixture，不声称对应某个先前落盘文件。
+
+B04a 只增加上述基线夹具与 strict compatibility tests，不改 production schema、TaskDefinition、Recorder writer/reader，不编译 Task Source，不迁移 Artifact。A04/A05 复测留待后续开发完善后执行；本切片的测试不替代它们。
+
 ### B05 — Reference Task Semantics Migration / Gate
 
 - **依赖**：B04b。

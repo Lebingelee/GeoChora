@@ -13,6 +13,9 @@ For the source/contract/test map read [routes](references/routes.md) when implem
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",
   config={"runtime":{"backend":"cpu"}})`. Call reset before step and always close in finally.
+  Task defaults are deep-merged with caller mapping/YAML before public-section overlay; an existing
+  `ResolvedEnvConfig` is authoritative. `env.execution_plan` is a provider-free `execution-plan-v0`
+  static projection only: it does not establish actual manifest support, runtime materialization, or reset realization.
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
@@ -75,3 +78,27 @@ establish the limitation, and evaluate repair/extension/composition. Use
 never add duplicate Runtime/Recorder/Controller/factory/provider/Skill. Documentation requests do not
 authorize implementation changes. Review Skill drift after API/registry/ownership/workflow/status/bugfix/
 retirement/test/failure changes, using the maintainer refresh procedure and bounded validation.
+
+For advanced canonical state contracts, use the existing `task_env.artifacts` owner. `CanonicalStateView`
+remains the strict scalar `canonical-state-v0` route; D02a's `CanonicalStateViewV1`, typed Joint/Frame,
+StateRequirements, sample/boundary clocks, native interval evidence, and view lifetime values are
+provider-neutral S1 contracts. Use `decode_canonical_state_view()` for exact version dispatch and
+`project_canonical_state_v0()` only with explicit Scene v2/v3 plus legacy-name bindings. These values do
+not mean RuntimeSession/provider projections, contact readback, alias invalidation, Recorder storage, or
+moving free/spherical execution have been implemented; those require the D02b owner and evidence.
+Requirement capability IDs describe what a consumer needs and never add claims to a provider manifest.
+
+For generic execution configuration, inspect the normalized `BaseTaskEnv.execution_plan` before assuming
+provider support. Known unsupported generic selections (including multi-agent materialization and a Panda
+without an explicit Controller) fail before `bootstrap_task_runtime`. The plan's owner identities are static
+contracts: BaseTaskEnv closes camera/UI wrappers, `SingleTaskLifecycleAdapter` closes the runtime boundary,
+and the current GeoPhys boundary does not destroy Taichi's process-wide runtime. Selected-reference configs
+remain on their separate provider/backend/horizon compatibility route.
+
+For D05a execution selections, import the advanced `ExecutionSpecV1`, `RendererSelectionV1`,
+`CameraRendererOverrideV1`, and `decode_execution_spec` from `task_env.artifacts`. Missing discriminator
+continues to mean the exact legacy `ExecutionSpec` mapping; do not rewrite frozen v0 values. Per-camera
+overrides replace the complete renderer selection, while other cameras use the explicit default. These
+contracts and `CameraRenderSource.capture_identity()` are static request descriptions only. Current
+`RuntimeSession.materialize()` and `create_camera_session()` still consume the legacy selection/admission
+route; no arbitrary cross-provider pairing, actual device realization, or capture is implied.

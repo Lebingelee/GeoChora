@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 from gymnasium.spaces import Box
 
-from .configuration import resolve_env_config
+from .configuration import resolve_env_config, resolve_execution_plan
 from ..registry import AGENT_REGISTRY, OBJECT_REGISTRY, SCENE_REGISTRY
 from .config import ResolvedEnvConfig
 from .gym_compat import GymEnvBase
@@ -90,6 +90,12 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             placement_notes=self.placement_notes(),
             success_definition=self.config.task.success_definition,
         )
+        self._execution_plan = resolve_execution_plan(
+            type(self),
+            self.config,
+            agents=self.agents,
+            render_mode=self.render_mode,
+        )
         self._env_metadata = build_stage0_metadata(self.uid, self.config)
         self._runtime_assembly = None
         self._runtime = None
@@ -111,13 +117,10 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             self.metadata["reference_profile"] = reference_profile
         self._configure_render_metadata()
         if build_runtime:
-            if (
-                any(agent.uid == "panda-v1" for agent in self.agents)
-                and self.config.robot.controller is None
-            ):
-                raise StageUnavailableError(
-                    "robot TaskEnv requires an explicit robot.controller config"
-                )
+            self._build_runtime_with_rollback()
+
+    def _build_runtime_with_rollback(self) -> None:
+        try:
             from ..runtime import bootstrap_task_runtime
 
             self._reset_sampler = self.create_reset_sampler()
@@ -340,6 +343,14 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                     self.config.episode.ignore_done,
                 ),
             )
+        except BaseException as construction_error:
+            try:
+                self.close()
+            except BaseException as cleanup_error:
+                add_note = getattr(construction_error, "add_note", None)
+                if callable(add_note):
+                    add_note(f"construction rollback also failed: {cleanup_error!r}")
+            raise
 
     @classmethod
     def default_config(cls) -> ResolvedEnvConfig:
@@ -402,6 +413,12 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
     @property
     def composition_spec(self) -> TaskCompositionSpec:
         return self._composition_spec
+
+    @property
+    def execution_plan(self):
+        """Return the static plan resolved before provider construction."""
+
+        return self._execution_plan
 
     @property
     def robot(self):
@@ -724,13 +741,30 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def close(self) -> None:
-        if self._ui_render_provider is not None:
-            self._ui_render_provider.close()
-            self._ui_render_provider = None
-        if self._sensor_provider is not None:
-            self._sensor_provider.close()
-            self._sensor_provider = None
-        if self._task_lifecycle is not None:
-            self._task_lifecycle.close()
-        if self._runtime is not None:
-            self._runtime.close()
+        ui_provider = getattr(self, "_ui_render_provider", None)
+        sensor_provider = getattr(self, "_sensor_provider", None)
+        lifecycle = getattr(self, "_task_lifecycle", None)
+        runtime = getattr(self, "_runtime", None)
+        self._ui_render_provider = None
+        self._sensor_provider = None
+        self._task_lifecycle = None
+        self._runtime = None
+        self._runtime_assembly = None
+
+        owners = [ui_provider, sensor_provider]
+        # SingleTaskLifecycleAdapter is the sole closer of the RuntimeBoundary.
+        # Before it exists (including partial construction), the environment
+        # falls back to closing a boundary that was already returned by bootstrap.
+        owners.append(lifecycle if lifecycle is not None else runtime)
+        first_error: BaseException | None = None
+        for owner in owners:
+            close = getattr(owner, "close", None)
+            if not callable(close):
+                continue
+            try:
+                close()
+            except BaseException as exc:
+                if first_error is None:
+                    first_error = exc
+        if first_error is not None:
+            raise first_error

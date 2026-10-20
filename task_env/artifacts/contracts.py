@@ -949,6 +949,122 @@ class ExecutionSpec(Contract):
 
 
 @dataclass(frozen=True)
+class RendererSelectionV1(Contract):
+    """One fully named renderer choice; selection is not provider admission."""
+
+    schema_version: str
+    provider: str
+    backend: str
+    profile: str
+    device: str | None = None
+
+    def validate(self):
+        _choice(self.schema_version, {'renderer-selection-v1'}, 'renderer selection schema')
+        for value in (self.provider, self.backend, self.profile):
+            _name(value)
+        if self.device is not None:
+            _name(self.device)
+
+    @property
+    def identity_hash(self) -> str:
+        payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class CameraRendererOverrideV1(Contract):
+    """An explicit, complete renderer selection for one declared camera ID."""
+
+    schema_version: str
+    camera_id: str
+    renderer: RendererSelectionV1
+
+    def validate(self):
+        _choice(self.schema_version, {'camera-renderer-override-v1'}, 'camera renderer override schema')
+        _name(self.camera_id)
+
+
+@dataclass(frozen=True)
+class ExecutionSpecV1(Contract):
+    """Versioned static physics/render selection, before admission or materialization."""
+
+    schema_version: str
+    physics_provider: str
+    physics_backend: str
+    physics_profile: str
+    provider_seed: int
+    determinism_mode: str
+    render_default: RendererSelectionV1
+    physics_device: str | None = None
+    camera_overrides: tuple[CameraRendererOverrideV1, ...] = ()
+
+    def validate(self):
+        _choice(self.schema_version, {'execution-spec-v1'}, 'execution schema')
+        for value in (self.physics_provider, self.physics_backend, self.physics_profile):
+            _name(value)
+        if self.physics_device is not None:
+            _name(self.physics_device)
+        if type(self.provider_seed) is not int or self.provider_seed < 0:
+            raise ValueError('provider_seed must be a nonnegative integer')
+        _choice(self.determinism_mode, {'strict', 'best_effort', 'none'}, 'determinism')
+        camera_ids = tuple(item.camera_id for item in self.camera_overrides)
+        if len(camera_ids) != len(set(camera_ids)):
+            raise ValueError('duplicate per-camera renderer override')
+        object.__setattr__(
+            self,
+            'camera_overrides',
+            tuple(sorted(self.camera_overrides, key=lambda item: item.camera_id)),
+        )
+
+    def renderer_for_camera(self, camera_id: str) -> RendererSelectionV1:
+        """Resolve an explicit camera override or the declared default selection."""
+
+        _name(camera_id)
+        for override in self.camera_overrides:
+            if override.camera_id == camera_id:
+                return override.renderer
+        return self.render_default
+
+    def resolve_camera_renderers(
+        self, camera_ids: tuple[str, ...] | list[str]
+    ) -> tuple[tuple[str, RendererSelectionV1], ...]:
+        """Resolve a known camera set and reject dangling overrides."""
+
+        normalized = tuple(camera_ids)
+        for camera_id in normalized:
+            _name(camera_id)
+        if len(normalized) != len(set(normalized)):
+            raise ValueError('duplicate declared camera ID')
+        unknown = {item.camera_id for item in self.camera_overrides} - set(normalized)
+        if unknown:
+            raise ValueError(f'per-camera renderer override references unknown camera IDs: {sorted(unknown)}')
+        return tuple(
+            (camera_id, self.renderer_for_camera(camera_id))
+            for camera_id in sorted(normalized)
+        )
+
+    @property
+    def identity_hash(self) -> str:
+        payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def decode_execution_spec(values: Mapping | ExecutionSpec | ExecutionSpecV1) -> ExecutionSpec | ExecutionSpecV1:
+    """Dispatch only exact legacy-v0 (missing discriminator) or declared v1 mappings."""
+
+    if isinstance(values, (ExecutionSpec, ExecutionSpecV1)):
+        return values
+    if not isinstance(values, Mapping):
+        raise TypeError('execution spec decoder requires a validated spec or mapping')
+    version = values.get('schema_version')
+    if version is None:
+        return ExecutionSpec.from_mapping(values)
+    if version == 'execution-spec-v1':
+        return ExecutionSpecV1.from_mapping(values)
+    raise ValueError(f'unsupported execution spec schema: {version!r}')
+
+
+@dataclass(frozen=True)
 class CapabilityClaim(Contract):
     name: str
     status: str
@@ -987,6 +1103,13 @@ class ProviderCapabilityManifest(Contract):
             raise ValueError('contradictory capability claims')
         object.__setattr__(self, 'capabilities', tuple(sorted(self.capabilities, key=lambda c: c.name)))
         object.__setattr__(self, 'known_unsupported', tuple(sorted(set(self.known_unsupported))))
+
+    @property
+    def identity_hash(self) -> str:
+        """Identity of the exact existing manifest mapping, with no schema change."""
+
+        payload = json.dumps(self.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return hashlib.sha256(payload.encode()).hexdigest()
 
 
 class CapabilityAdmissionError(ValueError):

@@ -61,6 +61,32 @@ identity hash 保持原样；objects/sensors 仍使用通用 Entity 与 Frame，
 `TaskCompositionSpec`、assembly `TaskReferences` 和当前 Env 的单 Robot 执行边界未改变；双 Robot 目前仅有静态
 composition/reference 证据，真实施控须由后续 D01/C02 路线另行验证。
 
+Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
+values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
+explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，
+TaskArtifact v0 不新增 state fields，State 不进入 TaskArtifact identity。v0→v1 projection 必须调用者显式提供
+`scene-definition-v2/v3`、legacy-name→Joint/Frame bindings、episode/sample/boundary identities；只可精确映射
+标量 joint，不从字符串猜 Entity/Frame，也不把旧 scalar 值扩成 spherical/free-base state。缺少 required contact
+必须 admission/read failure，optional 缺失则记录 unavailable，不能写成零。Provider-native view alias 由其
+materialization/generation 和失效事件限定；Recorder 跨步保留数据须使用 owned snapshot/copy。此切片只有
+provider-free S1 contract evidence；真实 provider projection、moving free/spherical state 与 alias invalidation
+仍属于 D02b，不构成 runtime capability 或 qualification。`StateFieldRequirement.required_capability` 是消费方
+的需求名称；它不会向 ProviderCapabilityManifest v0 添加新声明，当前 manifest 未知的需求必须被 admission 拒绝。
+
+Phase II D05a 在同一 Artifact owner 增加 `ExecutionSpecV1`、完整 `RendererSelectionV1` 和
+`CameraRendererOverrideV1`。旧 `ExecutionSpec` 继续使用没有 `schema_version` 的既有 mapping；
+`decode_execution_spec()` 仅将缺失版本精确路由至旧 codec、将 `execution-spec-v1` 路由至新 codec，未知版本拒绝。
+v1 的每相机 override 替换整组 provider/backend/profile/device，未覆盖相机才继承显式 default；绑定已知相机集合时
+拒绝重复或悬空 camera ID。静态选择值可记录不同 Physics 与 Renderer provider，但不准入该组合，也不投影到旧
+`RuntimeSession.materialize()`。现有 `provider-capability-v0` mapping 未增加字段，新增 `identity_hash` 是该 mapping
+的 SHA-256，不是更高 capability 或 Evidence 等级。
+
+D05a 在现有 Camera Source owner 新增 `CameraCaptureIdentityV1`，其 `capture_identity()` 将确切 CameraGeometry、
+静态 RenderSource、ExecutionSpecV1、Renderer selection、Provider manifest mapping、canonical state boundary/clock
+和输出 modality 绑定为一个稳定 identity。它表示 planned capture request，不证明已构造 renderer、执行 capture 或
+生成图像；旧 camera/source mapping 和 `create_camera_session()` 行为不变。实际 pairing、device/runtime identity
+解析、capture receipt、资源共享和 teardown 留给 D05b/D03。
+
 生命周期为 `draft -> candidate -> validated -> frozen -> archived`。
 validated 表示产生检查/feasibility Evidence、等待 Judge；frozen 必须有明确批准。
 拒绝或修改 frozen 任务必须新建版本，不得原地改变语义。

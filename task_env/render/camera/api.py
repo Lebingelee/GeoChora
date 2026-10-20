@@ -1,6 +1,6 @@
 """Render-specific admission before native construction; physics admission unchanged."""
 from typing import Protocol
-from ...artifacts import CapabilityAdmissionError, CapabilityClaim, ProviderCapabilityManifest
+from ...artifacts import CapabilityAdmissionError, CapabilityClaim, ExecutionSpec, ProviderCapabilityManifest
 from ...runtime.sessions.provenance import provider_build_identity
 from ...observations.canonical_camera import resolve_camera, CanonicalCameraObservation
 from ...observations.canonical_camera.geometry import optical_depth
@@ -25,6 +25,8 @@ def render_manifest(provider):
 
 
 def admit_render(camera, execution, manifest):
+    if not isinstance(execution, ExecutionSpec):
+        raise TypeError('current camera admission requires the legacy ExecutionSpec contract')
     if execution.render_provider not in ('geophys','mujoco'):
         raise CapabilityAdmissionError('unsupported render provider; no fallback')
     if (execution.render_provider != manifest.provider_name or execution.backend != manifest.backend
@@ -39,6 +41,8 @@ def admit_render(camera, execution, manifest):
 
 
 def create_camera_session(camera, execution, *, source, manifest=None):
+    if not isinstance(execution, ExecutionSpec):
+        raise TypeError('current camera session requires the legacy ExecutionSpec contract')
     actual = render_manifest(execution.render_provider)
     if manifest is not None:
         admit_render(camera, execution, manifest)

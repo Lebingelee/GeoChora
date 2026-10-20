@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+import hashlib
+import json
 from math import isfinite, pi
 from typing import Any, Literal
 
@@ -549,3 +551,126 @@ class ResolvedEnvConfig:
     render: RenderConfig = field(default_factory=RenderConfig)
     task: TaskConfig = field(default_factory=TaskConfig)
     episode: EpisodeConfig = field(default_factory=EpisodeConfig)
+
+
+@dataclass(frozen=True)
+class ExecutionPlan:
+    """Immutable static projection of the current generic TaskEnv route.
+
+    This records normalized selection and ownership before provider
+    materialization.  It is not a provider manifest, dynamic admission result,
+    or reset realization receipt.
+    """
+
+    schema_version: str
+    environment_uid: str
+    task_uid: str
+    scene_uid: str
+    agent_uids: tuple[str, ...]
+    object_uids: tuple[str, ...]
+    physics_provider: str
+    backend: str
+    physics_dt: float
+    control_substeps: int
+    render_mode: str | None
+    render_backend: str
+    controller_selections: tuple[tuple[str, str, str | None], ...]
+    resource_owner_identities: tuple[tuple[str, str], ...]
+    configuration_identity: str
+    state_requirements: Any | None = None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "execution-plan-v0":
+            raise ValueError("unsupported execution plan schema")
+        for name, value in (
+            ("environment_uid", self.environment_uid),
+            ("task_uid", self.task_uid),
+            ("scene_uid", self.scene_uid),
+            ("physics_provider", self.physics_provider),
+            ("backend", self.backend),
+            ("render_backend", self.render_backend),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"execution plan {name} must be a non-empty string")
+        if self.physics_provider != "geophys":
+            raise ValueError("execution-plan-v0 supports the generic GeoPhys route only")
+        if self.backend not in {"cpu", "vulkan", "cuda"}:
+            raise ValueError("execution plan backend is unsupported")
+        if not isfinite(float(self.physics_dt)) or self.physics_dt <= 0.0:
+            raise ValueError("execution plan physics_dt must be finite and positive")
+        if (
+            not isinstance(self.control_substeps, int)
+            or isinstance(self.control_substeps, bool)
+            or self.control_substeps < 1
+        ):
+            raise ValueError("execution plan control_substeps must be a positive integer")
+        if self.render_mode not in {None, "human", "rgb_array"}:
+            raise ValueError("execution plan render_mode is unsupported")
+        if self.render_backend not in {
+            "raytracer",
+            "rasterizer",
+            "flora",
+            "mujoco_reference",
+        }:
+            raise ValueError("execution plan render_backend is unsupported")
+        if len(self.configuration_identity) != 64 or any(
+            char not in "0123456789abcdef" for char in self.configuration_identity
+        ):
+            raise ValueError("execution plan configuration_identity must be SHA-256")
+        if len(self.resource_owner_identities) != len(
+            {role for role, _ in self.resource_owner_identities}
+        ):
+            raise ValueError("execution plan resource owner roles must be unique")
+        if any(not role or not owner for role, owner in self.resource_owner_identities):
+            raise ValueError("execution plan resource owners require non-empty identities")
+        if self.state_requirements is not None:
+            from ..artifacts.state import StateRequirements
+
+            if not isinstance(self.state_requirements, StateRequirements):
+                raise TypeError("state_requirements must be StateRequirements")
+
+    def to_mapping(self) -> dict[str, Any]:
+        requirements = self.state_requirements
+        if requirements is not None:
+            to_mapping = getattr(requirements, "to_mapping", None)
+            if not callable(to_mapping):
+                raise TypeError("state_requirements must expose to_mapping()")
+            requirements = to_mapping()
+        return {
+            "schema_version": self.schema_version,
+            "environment_uid": self.environment_uid,
+            "task_uid": self.task_uid,
+            "scene_uid": self.scene_uid,
+            "agent_uids": list(self.agent_uids),
+            "object_uids": list(self.object_uids),
+            "physics_provider": self.physics_provider,
+            "backend": self.backend,
+            "timebase": {
+                "physics_dt": self.physics_dt,
+                "control_substeps": self.control_substeps,
+                "control_dt": self.physics_dt * self.control_substeps,
+            },
+            "render_mode": self.render_mode,
+            "render_backend": self.render_backend,
+            "controller_selections": [
+                {
+                    "agent_uid": agent_uid,
+                    "kind": kind,
+                    "reference": reference,
+                }
+                for agent_uid, kind, reference in self.controller_selections
+            ],
+            "resource_owner_identities": {
+                role: owner for role, owner in self.resource_owner_identities
+            },
+            "configuration_identity": self.configuration_identity,
+            "state_requirements": requirements,
+            "admission_stage": "static_config",
+        }
+
+    @property
+    def identity_hash(self) -> str:
+        payload = json.dumps(
+            self.to_mapping(), sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()

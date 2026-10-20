@@ -41,8 +41,9 @@
   和独立 solver/render lowering。D01/D03 先评估这些 owner，不能默认从 static triangle bridge 重写全 pipeline。
 - Core Scene 身份和 Provider Scene IR 不是两个可写物理世界：前者定义任务结构意图，
   adapter 映射到后者公开 lowering；不把 GeoPhys IR/array storage 规定为所有 Provider 的 ABI。
-- [ExecutionSpec](../../../../../task_env/artifacts/contracts.py#L338-L352) 的 render_provider 为 scalar；
-  [Camera admission](../../../../../task_env/render/camera/api.py#L17-L45) 当前用 geophys/mujoco 且强制同名，
+- 旧 [ExecutionSpec](../../../../../task_env/artifacts/contracts.py#L935-L949) 的 render_provider 为 scalar；D05a
+  在同一 Artifact owner 增加带版本的静态选择值，但不接入旧 materialize/camera session。
+  [Camera admission](../../../../../task_env/render/camera/api.py#L17-L45) 当前仍用 geophys/mujoco 且强制同名，
   [UI backend](../../../../../task_env/render/base/contracts.py#L19-L25) 则用 raytracer/rasterizer/flora。
   Provider、backend、profile、device/runtime identity 必须分层；rasterizer 不能冒充 provider 名。
 - EXACT/APPROXIMATE/UNSUPPORTED 是属性映射保真度，IMPLEMENTED/TESTED_BOUNDED/QUALIFIED 是实现/证据状态，
@@ -200,9 +201,10 @@ execution:
       overview: {provider: mujoco, backend: native, profile: declared_rgb, outputs: [rgb]}
 ```
 
-一套 Scene，不是多个 Physics；多个 Camera 可选择不同 Renderer。示例 backend/profile 是 vNext 候选，
-不表示当前 registered/admitted。D05a 必须给出旧 scalar ExecutionSpec 的读写矩阵和 per-camera selection
-的版本方案，复用现有 manifests/registry，不另建 Provider 框架。只有 distinct resolved selection 才需新
+一套 Scene，不是多个 Physics；多个 Camera 可选择不同 Renderer。此 YAML 仍是**未接入运行时的示意配置**；
+示例 backend/profile 不表示当前 registered/admitted。D05a 已在既有 Artifact/Camera owners 下交付旧 scalar
+`ExecutionSpec` v0 原样保留、显式 v1 decoder、完整 per-camera selection 与静态 identity。它复用现有
+ProviderCapabilityManifest，不另建 Provider 框架。只有 distinct resolved selection 才需新
 Renderer Session；同配置共享 Scene/cache 时，Camera calibration/buffer/schedule 和 refcount/close 仍独立。
 
 ### D.7.2 Admission 不是一个布尔值
@@ -256,6 +258,29 @@ Renderer Session；同配置共享 Scene/cache 时，Camera calibration/buffer/s
   与时间。S1 覆盖数学 oracle；S2 证明 adapter 真正执行。跨 step/reset 后 view 失效行为和 Recorder 自有存储可测。
 - **Codex AUDIT**：与通用 `RuntimeSnapshot/TaskStateView` 做 owner 对照，不要求两种 session 共享内存 ABI。
 
+#### D02a contract slice (2026-10-20)
+
+在 `task_env.artifacts` owner 中保留 `CanonicalStateView(canonical-state-v0)` 原样，并新增
+`CanonicalStateViewV1(canonical-state-v1)`、`TypedJointStateValue`、`TypedFrameStateValue`、
+`StateRequirements`/`StateFieldRequirement`、`StateSampleClock`、`StateBoundaryIdentity`、
+`NativeIntervalEvidence` 与 `StateViewLifetime`。精确 schema dispatch 由 `decode_canonical_state_view()` 执行；
+`project_canonical_state_v0()` 只接受 Scene v2/v3 和调用者明确提供的 legacy name bindings。v0 的 scalar maps
+只能转成声明为 scalar 的 JointDefinition；multi-DOF 值、缺少 identity 或未声明 Frame 必须拒绝。
+
+每个可见状态 publication 由 `state_revision` 区分，即使 `control_step` 不变；evaluation clock 必须与该
+boundary 对齐。Native evidence 固定每个物理 interval 的 `[t,t+physics_dt)` 起止和 native index，不允许
+interpolation 补采样；native 起始 index 是显式 provider clock 值，不从 `control_step × substeps` 推算，以容纳
+reset settle 与 native clock offset；interval evidence 另带完整 raw evidence reference。Required/Optional 仅改变缺失处置：
+required unavailable 失败，optional unavailable 必须有原因记录，不能把未支持 contact 编成零。typed values
+在 canonical view 中只存一次，`joints_for_entity()`/`frames_for_entity()` 返回同一不可变值的只读投影。
+`required_capability` 是消费方的 requirement ID，不是 Provider manifest claim；例如当前 v0 manifest 不认识
+`actuator_force_query`，所以对应需求在 admission 时必须失败，不能借 D02a 的新字符串扩权旧 manifest。
+
+此切片是 provider-free S1 contract，不改变 `RuntimeSession`、`RuntimeSnapshot`、Provider manifest、Recorder
+格式或 native state owner。`StateViewLifetime` 冻结 owned snapshot 可保留、provider alias 必须绑定
+materialization/generation 并在 mutation/reset/close 失效的声明；实际失效检查和真实 free/spherical probe 留在
+D02b。定向验证位于 `task_env/diagnostics/tasks/test_phase_ii_d02a_state_contracts.py`。
+
 ### D03 — Visual Materialization / Sync Versioning
 
 - **依赖**：D02b、D01b、D05a；不硬性依赖 selected Solution 的 C05c 迁移。
@@ -285,6 +310,28 @@ Renderer Session；同配置共享 Scene/cache 时，Camera calibration/buffer/s
 - **退出规则**：首选 cross pairing 无真实 Evidence 时 D05b 为 blocked/accepted-deferred，不能将整个父目标
   或完整 independence 标完成。接口可读、同名 native capture 通过和独立动态 pairing 通过分别报告。
   唯一切片顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
+
+#### D05a static contract delivery (2026-10-20)
+
+`task_env.artifacts` 现在有 `ExecutionSpecV1`、`RendererSelectionV1`、`CameraRendererOverrideV1` 与
+`decode_execution_spec()`。没有 `schema_version` 的 mapping 仍交给原 `ExecutionSpec` strict codec；只有
+`execution-spec-v1` 才进入新 codec，未知版本/字段拒绝。v1 区分 Physics provider/backend/profile/device 与
+Renderer provider/backend/profile/device；每 camera override 是完整选择，未覆盖 camera 才用显式 default，绑定
+Scene camera ID 集合时 duplicate/dangling ID 失败。旧 provider-capability-v0 mapping 不变，仅增加其 exact mapping
+`identity_hash`。新静态选择可表达独立 Physics × Renderer，但没有给组合 admission。
+
+既有 `CameraRenderSource.capture_identity()` 生成 `CameraCaptureIdentityV1`，绑定 TaskArtifact hash、
+CameraGeometry/source identities、ExecutionSpec/renderer selection、实际传入的 Provider manifest exact identity、
+canonical state boundary 与 evaluation clock、capture modalities。该值是 planned request identity，不是 capture
+receipt；v0 manifest 没有 device/runtime identity 字段，设备解析仍是 D05b admission/materialization 工作。
+`RuntimeSession.materialize()`、`render_manifest()`、`admit_render()`、`create_camera_session()` 与其
+strict same-provider gate 未改变。D05a 只通过 provider-free S1 contract 验证；不声称 native cross pairing、真实
+device realization、共享 session 生命周期或 camera pixels 已验证。
+
+定向证据：`task_env/diagnostics/tasks/test_phase_ii_d05a_execution_contracts.py` 与
+`test_phase_ii_b04a_legacy_matrix.py`，运行于 TaskEnv Python、`PYTHONPATH=GeoPhys/src:.`；13 passed。
+其中显式断言 v1 selection 不能进入当前 `admit_render()`/`create_camera_session()`，legacy 同 Provider
+准入仍成功、异名 Physics×Renderer 仍在 native construction 前拒绝。
 
 ## D.9 验收矩阵：先确保语义正确，再验证组合性能
 

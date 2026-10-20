@@ -68,6 +68,20 @@ selected manipulation 通过 `task_env.runtime.sessions.control.materialize_cont
 当前 production callers 包括 `task_env/registry.py`、`task_env/tasks/reference_env.py`、
 `task_env/environment/env.py` 和 root examples；具体 source owner 见[ownership](../../global/ownership.md)。
 
+通用 `BaseTaskEnv` 在调用 `bootstrap_task_runtime` 前生成只读的
+`execution-plan-v0`（`env.execution_plan`）。其身份覆盖 normalized config、精确 timebase、当前单 Agent
+Controller 选择、RenderConfig 选择和资源 owner identities。已知不支持的多 Agent 与缺失 Panda Controller
+会在 native bootstrap 前拒绝。此 Plan 只证明静态配置通过；没有读取 Provider manifest、实例化 solver、
+验证 Renderer backend 可用性或执行 reset realization。C01b 才连接 Artifact/task requirements 与实际
+manifest admission，后续 D/B 切片分别验证 materialization 和 realization。
+
+当前通用资源归属为：`BaseTaskEnv` 管理 CameraObservationProvider 与懒创建的 UI TaskEnvRenderProvider；
+`SingleTaskLifecycleAdapter` 是 `RuntimeBoundary` 的唯一 close 调用者；`GeoPhysRuntimeBoundary` 持有
+GeoPhys runtime-facing 对象。BaseTaskEnv 构造在 bootstrap 返回后失败时会关闭已创建的 Core wrappers，
+重复 `env.close()` 不会再次关闭它们。当前 GeoPhys boundary 的 `close()` 是空操作，因为 Taichi runtime
+为进程级资源；这条路径不声称每个 Env 都释放/销毁一个独立 native solver。Selected reference 自己拥有并关闭
+其 advanced `RuntimeSession`，没有被该静态资源表改写。
+
 ## Admission、Reset 与 state
 
 Provider manifest 绑定 provider/version、adapter、backend、physics/render profile、determinism、
@@ -85,6 +99,20 @@ zero/non-finite/明显非单位 quaternion 拒绝；这是 representation bound�
 control step/simulation time、joint position/velocity、body/frame poses
 按 contract 提供；contact/camera/privileged fields 必须各自准入，不以私有 contact arrays 代替。
 `RuntimeSnapshot`、`TaskStateView` 和 `CanonicalStateView` 是既有不同投影，不能假定 storage ABI 相同。
+
+Phase II D02a 在 `task_env.artifacts` 增加 provider-neutral `CanonicalStateViewV1`、typed Joint/Frame、
+consumer `StateRequirements`、sample/boundary clocks、native interval evidence 与 bounded view lifetime
+contracts。现有 `RuntimeSession.snapshot()/step()` 仍返回 `canonical-state-v0`；D02a 不提供 provider
+projection、native contact readback 或 alias invalidation。v0→v1 仅通过显式 Scene/legacy-name bindings 投影，
+真实 adapter projection 与跨 step/reset lifetime enforcement 留在 D02b。
+
+Phase II D05a 在既有 Artifact 与 Camera Source owners 下提供 `ExecutionSpecV1`、每相机完整
+RendererSelection override、精确旧 v0/v1 decoder，以及将 source/camera/execution/manifest/state boundary/clock
+组合成 planned capture identity 的 contract。该静态 API 不改变 `RuntimeSession.materialize()`、
+`provider_manifest()` 或 `create_camera_session()` 的旧 `ExecutionSpec` 路由；当前 camera admission 仍限制
+GeoPhys/MuJoCo CPU 且要求 physics/render provider 同名。Manifest v0 identity 只 hash 原 mapping；设备选择目前
+没有 provider manifest 对应字段，因而 capture identity 绑定的是声明设备，实际解析设备与 pairing 留给 D05b。
+CameraCaptureIdentityV1 是请求身份，不是 capture receipt，也不表示输出能力已准入。
 
 `control_dt = physics_dt * control_substeps`；当前 selected 100 Hz 配方以 0.002 s native step、
 5 substeps 构成一个 outer boundary。decimal/JSON timebase representation 仅允许一个 ULP 差异；action hold、观测与语义采样必须保持显式。
@@ -106,6 +134,20 @@ native actuation interval measurement，sign/index 转换留 adapter；不宣称
 Selected reference 使用 finite 8D world absolute pose request；PickCube 可用 external action 或 expert，
 同一 episode 不能混用；NutAssembly external action 拒绝，必须用 `step_expert()`。
 Selected reset 重建 controller/solution owner 状态，不推进物理，录制需先 finalize 再 reset。
+
+### NutAssembly selected Solution B
+
+NutAssembly Outcome Solution v3 的抓取下降命令偏置与高度验收补偿相同，TaskArtifact v0 mapping/hash 不变。
+末端到达下降终点后，Solution 保持固定 world absolute-pose 请求，由现有 Controller 在每个 100 Hz control
+boundary 重新计算目标；只有 20 个样本、0.2 s 窗口内的欧氏位置 RMSE 严格低于 0.1 mm，且原有等待、位置稳定、
+高度和姿态门槛通过后才开始闭合。未在原 `max_pose_hold_s` 内达到跟踪误差门槛会以
+`preclose_motion_stability_timeout` 失败并停止抓取。闭合期间继续笛卡尔反馈，不锁定关节目标；现有 500 Hz
+gripper Guard、10 N 力目标/上限和后续 11-stage Expert 生命周期保持原 owner。
+
+该 B 路线已在 NutAssembly seed 19、GeoPhys main `4436787e`、CPU 上完成一次全 Expert 轨迹及 recorder round-trip；
+单次执行证据仅适用于该交集。它没有升级 v1.1.0 capability matrix 或授予 Qualification，也没有验证 root Gitlink
+`54f40fbf`、其他 seed/provider、D0 replay 或动态相机。Selected NutAssembly 仍是 state-only；当前 native camera
+source 只覆盖静态 triangle scene，不能作为这条轨迹的动态相机验收。
 
 Camera mount frame 与 optical frame 分离，显式记录 `T_world_from_camera`/逆变换、K/FOV、near/far、
 尺寸、RGB layout/dtype、depth unit/convention、timestamp。几何验证检查 landmark projection、
