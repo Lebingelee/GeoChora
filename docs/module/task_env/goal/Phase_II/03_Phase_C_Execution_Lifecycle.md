@@ -624,11 +624,16 @@ admission 并绑定原 `ControlBinding`。C02a 已有测试继续保护完整 Gr
 `workspace/maintenance/phase_ii_c02b_20261021/c04_c02a_admission_gate_20261021.log` 和
 `workspace/maintenance/phase_ii_c02b_20261021/c02b_admission_compat_20261021.log`。
 
-**C02b 尚未验收。** 尚无 structured Group 到 Controller/Runtime 的执行 dispatch、applied acknowledgement、分组执行区间及
-C05a 真实录制读取，也没有真实 arm+hand S2。当前 public feedback capability 缺失令计划绑定的 Runtime 在施控前拒绝构造；
-不得以 fake manifest、Provider-private 状态、静默填零或移除 required feedback 继续。解除此 gate 需要拥有者公开并验证
-actuator-force feedback capability（含语义、单位、边界与两 Provider manifest admission），然后再实施/验证 dispatch 和
-真实执行录制。此 receipt 仅报告 admission 失败边界，不将序号 24 标为完成，不宣称双 Robot 支持，也不进入序号 25。
+**当前状态：BLOCKED（序号 24／C02b）。** 这不是实现或测试失败，而是计划绑定的 Runtime admission 所需
+`actuator_force_query` 没有当前可用的公开 Provider 能力：GeoPhys 与 MuJoCo manifest 均未声明该能力，GeoPhys
+`read_actuator_force()` 仅限诊断/测试且 API registry 不公开该符号。现有 fail-closed 测试证明 Runtime 在施控前拒绝构造；
+不能用 fake manifest、Provider-private 状态、静默填零或删除 required feedback 绕过边界。
+
+**阻塞影响与解除条件：** C02b 的 Group dispatch、applied acknowledgement、分组执行区间、C05a 真实录制读取及真实 arm+hand
+S2 均未开始/验收，因此序号 24 不得标为完成，也不能宣称双 Robot 支持。继续前需由维护者与 Provider/API owner 确认并提供
+可验证的解法：公开并定义 actuator-force feedback（语义、单位、采样边界及 GeoPhys/MuJoCo manifest admission），或基于
+公开且充分的执行证据正式调整 A05/C02b 的 required-feedback 契约。完成该决策和能力证据后，才可继续 dispatch、真实执行和录制验收。
+本 receipt 仅证明 admission 失败边界，不代表物理能力已支持；在阻塞解除前不进入依赖 C02b 的后续目标。
 
 ## C.9 质量门与直接可测问题
 
