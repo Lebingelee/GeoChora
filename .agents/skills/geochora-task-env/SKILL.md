@@ -42,9 +42,13 @@ the expected control dt. Interval return, control-step boundaries, `observer_con
 `recorder_confirmed_substeps` are separate corroborating evidence; callback or Recorder counts never stand
 in for an exact physical substep count. Missing or conflicting evidence yields `unknown`. `transition_status`
 independently reports whether the owner assessed a transition, recording was absent, incomplete, rejected, or
-confirmed valid; full physical progress does not make an incomplete transition valid. The receipt does not imply physics rollback or recovery,
-and an incomplete selected execution interval must remain pending so the existing Recorder refuses to freeze it.
-If that pending recording blocks reset, close and recreate the environment; C03a adds no recording-discard API.
+confirmed valid; full physical progress does not make an incomplete transition valid. For selected native
+execution, the existing `SelectedReferenceEnv` checks the Recorder's pending control step, timebase, substep
+counter and ordered payload rows before append. The counter is accepted only when it agrees with the rows;
+missing rows reject append, while an internally conflicting count is reported as unknown. The receipt does
+not imply physics rollback or recovery, and an incomplete selected execution interval must remain pending so
+the existing Recorder refuses to freeze it. If that pending recording blocks reset, close and recreate the
+environment; C03a adds no recording-discard API.
 
 For selected expert recording use `examples/recording/record_expert.py` or
 `task_env.script.trajectory.record`, which reuse the selected env's recorder owner.

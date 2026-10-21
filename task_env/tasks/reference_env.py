@@ -445,22 +445,29 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     @staticmethod
     def _recorder_substep_count(recorder, transition_counts_before=None):
+        def confirmed_count(interval):
+            if not isinstance(interval, dict):
+                return None
+            substeps = interval.get('substeps')
+            if not isinstance(substeps, (list, tuple)):
+                return None
+            count = interval.get('native_step_count')
+            if count is not None and (type(count) is not int or count != len(substeps)):
+                return None
+            return len(substeps)
+
         pending = getattr(recorder, 'pending', None)
         if isinstance(pending, dict):
-            count = pending.get('native_step_count')
-            if type(count) is int and count >= 0:
-                return count
-            return len(pending.get('substeps', ()))
+            return confirmed_count(pending)
         value = getattr(recorder, 'value', None)
         if isinstance(value, dict) and transition_counts_before is not None:
             transitions = value.get('transitions', ())
             if len(transitions) == transition_counts_before[0] + 1:
-                interval = transitions[-1].get('interval')
-                if isinstance(interval, dict):
-                    count = interval.get('native_step_count')
-                    if type(count) is int and count >= 0:
-                        return count
-                    return len(interval.get('substeps', ()))
+                transition = transitions[-1]
+                if not isinstance(transition, dict):
+                    return None
+                interval = transition.get('interval')
+                return confirmed_count(interval)
         return None
 
     def close(self):
@@ -545,6 +552,35 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         count = self.artifact.timebase.control_substeps
         if self.binding.record_native_substeps and (len(substeps) != count or [x[0] for x in substeps] != list(range(count))):
             raise ValueError('missing native application receipts')
+        if (self.binding.record_native_substeps and self.recorder is not None
+                and self.binding.recorder_mode == 'execution'):
+            pending = getattr(self.recorder, 'pending', None)
+            recorded = pending.get('substeps') if isinstance(pending, dict) else None
+            start_step = self.state.control_step - 1
+            expected_native_indices = [start_step * count + index + 1 for index in range(count)]
+            required_fields = {
+                'index', 'native_step_index', 'native_start_time', 'state',
+                'feedback', 'target', 'applied', 'updated',
+            }
+            if (
+                not isinstance(pending, dict)
+                or type(pending.get('control_step')) is not int
+                or pending.get('control_step') != start_step
+                or pending.get('physics_dt') != self.artifact.timebase.physics_dt
+                or type(pending.get('control_substeps')) is not int
+                or pending.get('control_substeps') != count
+                or type(pending.get('native_step_count')) is not int
+                or pending.get('native_step_count') != count
+                or not isinstance(recorded, list)
+                or len(recorded) != count
+                or any(not isinstance(item, dict) or not required_fields.issubset(item)
+                       for item in recorded)
+                or any(type(item['index']) is not int or type(item['native_step_index']) is not int
+                       for item in recorded)
+                or [item['index'] for item in recorded] != list(range(count))
+                or [item['native_step_index'] for item in recorded] != expected_native_indices
+            ):
+                raise ValueError('incomplete native Recorder application receipts')
         wait = bool(diagnostics.get('readiness_hold', False))
         transition = TransitionRecord(request, canonical, target, applied, float(self.evaluation.reward),
             terminated, truncated, stage, {k: json.dumps(v, sort_keys=True) for k, v in diagnostics.items()}, not wait, wait)

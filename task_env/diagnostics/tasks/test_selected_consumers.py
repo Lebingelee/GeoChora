@@ -399,6 +399,64 @@ def test_full_physics_with_missing_final_recorder_receipt_is_not_a_transition(fa
     env.close()
 
 
+def test_full_physics_with_silent_recorder_omission_cannot_append_transition(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'silent-recorder-omission.h5')
+    _expose_fake_physics_clock(env)
+    expected=env.artifact.timebase.control_substeps
+    original_record=env.recorder.applied_substep
+
+    def omit_final_recorder_receipt(index, *args):
+        if index == expected - 1:
+            return None
+        return original_record(index, *args)
+
+    env.recorder.applied_substep=omit_final_recorder_receipt
+    with pytest.raises(ValueError, match='incomplete native Recorder application receipts'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.phase == 'record_interval'
+    assert receipt.physical_progress == 'advanced'
+    assert receipt.observer_confirmed_substeps == expected
+    assert receipt.recorder_confirmed_substeps == expected - 1
+    assert receipt.interval_completed is True
+    assert receipt.transition_status == 'rejected'
+    assert env.recorder.pending['native_step_count'] == expected - 1
+    _assert_faulted_recording_has_no_transition(env, transition_status='rejected')
+    env.close()
+
+
+def test_conflicting_recorder_counter_is_unknown_and_cannot_append_transition(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'conflicting-recorder-counter.h5')
+    _expose_fake_physics_clock(env)
+    expected=env.artifact.timebase.control_substeps
+    original_record=env.recorder.applied_substep
+
+    def conflict_final_counter(index, *args):
+        result=original_record(index, *args)
+        if index == expected - 1:
+            env.recorder.pending['native_step_count'] += 1
+        return result
+
+    env.recorder.applied_substep=conflict_final_counter
+    with pytest.raises(ValueError, match='incomplete native Recorder application receipts'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.physical_progress == 'advanced'
+    assert receipt.observer_confirmed_substeps == expected
+    assert receipt.recorder_confirmed_substeps is None
+    assert receipt.transition_status == 'rejected'
+    assert env.recorder.pending['native_step_count'] == expected + 1
+    assert len(env.recorder.pending['substeps']) == expected
+    _assert_faulted_recording_has_no_transition(env, transition_status='rejected')
+    env.close()
+
+
 def test_expert_proposal_exception_faults_before_physics_and_blocks_step(fake):
     env=make_env(IDS[0]);env.reset(seed=19)
 

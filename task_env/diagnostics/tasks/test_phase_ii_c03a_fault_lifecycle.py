@@ -214,6 +214,25 @@ def test_recorder_count_conflicting_with_observer_count_is_unknown():
     assert receipt.recorder_confirmed_substeps == 2
 
 
+def test_public_clock_shorter_than_confirmed_substep_evidence_is_unknown():
+    receipt = ExecutionFaultV1.from_exception(
+        "physics_step",
+        RuntimeError("public clock advances less than observer evidence requires"),
+        control_step_before=0,
+        control_step_after=0,
+        simulation_time_before_s=0.0,
+        simulation_time_after_s=0.05,
+        expected_control_dt_s=0.2,
+        interval_attempted=True,
+        observer_confirmed_substeps=2,
+        recorder_confirmed_substeps=2,
+        native_substeps_expected=4,
+    )
+    assert receipt.physical_progress == "unknown"
+    assert receipt.observer_confirmed_substeps == 2
+    assert receipt.recorder_confirmed_substeps == 2
+
+
 def test_public_clock_and_substep_evidence_remain_separate():
     receipt = ExecutionFaultV1.from_exception(
         "physics_step",

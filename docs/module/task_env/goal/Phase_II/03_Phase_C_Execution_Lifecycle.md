@@ -470,6 +470,37 @@ TaskEnv module Skill refresh receipt（2026-10-21）：module=`task_env`，mode=
 recording owner，并能找到“clock 决定进度、两种计数仅作证据、pending 阻止 freeze、close/recreate”的处理；
 `check_module_skill.py .agents/skills/geochora-task-env` 静态检查通过。该 Skill 描述更新不升级 provider 能力或 qualification。
 
+#### C03a Recorder completeness fence follow-up (2026-10-21)
+
+复核发现，原 selected native 录制检查只校验 observer 回调序列；若 `ExecutionRecorder.applied_substep()` 静默漏记一行，
+物理区间和 observer 都完整时，旧路径仍可能把含不完整 pending interval 的 transition 追加到 Recorder。现有
+`SelectedReferenceEnv._record_interval()` 在 append 前再核对 Recorder pending 的起始 control step、physics dt、预期
+substep 数、计数器与实际 rows 的一致性、完整有序的 index/native-step index，以及每行的 state/feedback/target/applied
+字段。Recorder 计数器与实际 rows 冲突时，receipt 的 `recorder_confirmed_substeps` 为 `None`；缺行或字段不全时在
+append 前拒绝 transition。此修正只使用现有 selected Env 与 ExecutionRecorder owners，不清除 pending、不新增 recovery
+或 discard API，也不改变 C04、Controller、Runtime、Provider 或 Recorder 所有权。
+
+新增负例覆盖“物理区间完整但 Recorder 静默漏掉最终子步”和“Recorder 计数器与实际 rows 冲突”。两者均证明公开 clock
+可确认 `physical_progress=advanced`，而 transition 不追加、`transition_status=rejected`、pending 保留且 Env 继续 faulted；
+冲突计数不会被当成 Recorder 确认数量。C03a contract 另新增 public clock 小于 observer 已确认最小进度时标 `unknown` 的
+冲突用例。末子步推进后抛错、中途推进后抛错、边界不可读和已有回调/时钟冲突用例继续通过。
+
+定向命令 `PYTHONPATH=GeoPhys/src:. /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q`
+覆盖 `test_phase_ii_c03a_fault_lifecycle.py`、`test_selected_consumers.py`、C05a structured Recorder、B03a/B03b；
+结果 **80 passed**，仅一个上游 Taichi `locale.getdefaultlocale` deprecation warning。真实 GeoPhys CPU Pendulum scalar
+reset/step/horizon/terminal 测试在集合内；selected fault injection 使用既有 FakeSession 与公开快照面，不构成 Provider
+fault qualification。完整输出保存在 ignored `workspace/maintenance/phase_ii_c03a_20261021/c03a_fault_receipt_final_20261021.log`；
+`check_module_skill.py .agents/skills/geochora-task-env` 结果为 PASS，`git diff --check` 通过。
+
+TaskEnv Skill refresh receipt（2026-10-21 follow-up）：module=`task_env`，mode=`refresh`；在 clean 基线
+`a447e49` 上检查 `SelectedReferenceEnv` 的 native interval/append caller、`ExecutionRecorder` pending 行、相关 public
+failure receipt、C03a/C05a/B03a/B03b tests 与现有 Skill。漂移为 selected append gate 未核对实际 Recorder rows，且计数器不一致
+仍会被当成子步数；修复沿用现有 owners，分类为 `FIX_EXISTING`。Skill 已补充 pending payload/计数器一致性、clock 物理进度与
+transition 有效性分离；冷启动沿现有 `make_env` → `reset` → selected `start_recording`/`step_expert` 和 `execution_fault`
+路径可定位，无新 API/示例需迁移。`check_module_skill.py` 对 frontmatter、markdown links 和 source paths 静态检查通过；
+冷启动不是 Provider qualification。没有运行真实 Panda Provider fault campaign；无 public API、Provider capability 或 qualification 声明变更，maintainer review
+按常规提交审阅处理。
+
 #### C04 bounded observation and info receipt (2026-10-21)
 
 C04 扩展现有 `ObservationFieldSpec` / `ObservationSchema` / `StateObservationBuilder` 和 task-owned Pendulum、TwoWheel
