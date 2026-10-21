@@ -45,9 +45,11 @@ independently reports whether the owner assessed a transition, recording was abs
 confirmed valid; full physical progress does not make an incomplete transition valid. For selected native
 execution, the existing `SelectedReferenceEnv` checks the Recorder's pending control step, timebase, substep
 counter and ordered payload rows before append. The counter is accepted only when it agrees with the rows;
-missing rows reject append, while an internally conflicting count is reported as unknown. The receipt does
-not imply physics rollback or recovery, and an incomplete selected execution interval must remain pending so
-the existing Recorder refuses to freeze it. If that pending recording blocks reset, close and recreate the
+missing rows reject append, while an internally conflicting count is reported as unknown. The existing
+`ExecutionRecorder` prepares the transition and following boundary before committing either; a boundary
+serialization failure leaves the interval pending and does not leave an orphan transition row. The receipt
+does not imply physics rollback or recovery, and an incomplete selected execution interval must remain pending
+so the existing Recorder refuses to freeze it. If that pending recording blocks reset, close and recreate the
 environment; C03a adds no recording-discard API.
 
 For selected expert recording use `examples/recording/record_expert.py` or

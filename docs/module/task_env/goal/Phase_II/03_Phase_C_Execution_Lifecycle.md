@@ -501,6 +501,26 @@ transition 有效性分离；冷启动沿现有 `make_env` → `reset` → selec
 冷启动不是 Provider qualification。没有运行真实 Panda Provider fault campaign；无 public API、Provider capability 或 qualification 声明变更，maintainer review
 按常规提交审阅处理。
 
+#### C03a append commit boundary follow-up（2026-10-21）
+
+本次限定修正继续复用 `SelectedReferenceEnv` 与现有 `ExecutionRecorder`。复核发现，Recorder 原先先写 transition 并清空
+pending，再构造下一条 boundary；若 boundary owner/序列化失败，receipt 会拒绝 transition，但 Recorder 内存里仍留有孤立
+transition row。现在 append 先准备 transition、pending interval 的 owned copy、structured control、post-boundary 和
+content blobs；这些准备全部成功后才提交 transition/boundary 并清空 pending。任何准备失败都保持 transition/boundary 对齐、
+保留 pending，并令 fault receipt 的 `transition_status=rejected`。没有新增 Runtime、Recorder、恢复/discard API，也不清除
+pending，不代表物理状态可回滚。
+
+新增 selected integration 负例使用 FakeSession 与可读 public clock 完成全部物理区间及两类子步 receipt，然后注入 post-boundary
+序列化失败。验收要求且实测为 `physical_progress=advanced`、observer/Recorder 数量独立完整、transition row 数仍为零、pending
+保留、`transition_status=rejected`、faulted 后禁止续步且 freeze 拒绝。复跑末子步推进后抛错、中途推进后抛错、故障边界不可读、
+observer/Recorder 证据冲突及完整物理推进但 Recorder 缺行/计数冲突用例。
+
+定向命令覆盖 `test_phase_ii_c03a_fault_lifecycle.py`、`test_selected_consumers.py`、C05a structured Recorder、Pendulum B03a/B03b，
+结果 **81 passed**，仅一项上游 Taichi locale deprecation warning。真实 GeoPhys CPU Pendulum scalar reset/step/horizon/terminal
+回归在集合内；selected failure injection 走 FakeSession/public snapshot seam，不构成 Panda Provider fault qualification。完整输出位于
+ignored `workspace/maintenance/phase_ii_c03a_20261021/c03a_atomic_append_followup.log`。TaskEnv module Skill refresh 按当前
+`ExecutionRecorder.append` owner 更新原 Skill；Skill checker 与 `git diff --check` 结果见本次提交验证，不涉及 C04。
+
 #### C04 bounded observation and info receipt (2026-10-21)
 
 C04 扩展现有 `ObservationFieldSpec` / `ObservationSchema` / `StateObservationBuilder` 和 task-owned Pendulum、TwoWheel

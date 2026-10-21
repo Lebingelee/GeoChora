@@ -88,7 +88,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
 | 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
-| 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt 与 append completeness 再窄修正**：物理进度、observer/Recorder 子步证据和 transition 状态分离；pending rows/counter 不完整时 append 前拒绝；C03a/C05a/B03a/B03b 定向回归 80 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
+| 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt、Recorder completeness 与 append commit boundary 再窄修正**：物理时钟进度、observer/Recorder 子步证据和 transition 有效性分离；不完整行/边界拒绝 transition 且保留 pending；C03a/C05a/B03a/B03b 定向回归 81 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
 | 23 | C04 | C03a、D02b | **bounded implemented；C02b gate re-audited**：现有 observation/info owners 固定 schema 元数据、clock、required feedback/optional diagnostics；privileged/private Frame/time 与缺字段负例受保护；最新交叉 gate 103 passed，真实 Panda TaskEnv 与 D04 Camera 仍是明确缺口，详见 [C04 receipt](03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21) |
 | 24 | C02b | C02a、C03a、C04、C05a、D01b | 原子 group 执行，真实 arm+hand S2；缺 group/局部失败不留未知施控 |
 | 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |

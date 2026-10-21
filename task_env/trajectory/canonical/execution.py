@@ -180,11 +180,12 @@ class ExecutionRecorder:
         self.pending=None
         self.frozen=False
 
-    def boundary(self, record, owners, stage, task_metrics=None, native_time=None):
+    def _prepare_boundary(self, record, owners, stage, task_metrics=None, native_time=None):
         for owner_name, field in self.owner_content_fields:
             if owner_name not in owners['owners'] or field not in owners['owners'][owner_name]['fields']:
                 raise ValueError('unknown content-addressed owner field')
         snap=copy.deepcopy(owners)
+        blobs={}
         # Lossless content-addressed stage plans; no duplicated mutable owner.
         for owner_name, owner in snap['owners'].items():
             for field,entry in owner['fields'].items():
@@ -192,12 +193,18 @@ class ExecutionRecorder:
                         (owner_name, field) in self.owner_content_fields) and entry['present']:
                     h=digest(entry['value'])
                     if h not in self.value['blobs']:
-                        self.value['blobs'][h]=entry['value']
+                        blobs[h]=entry['value']
                     entry['value']={'kind':'content-ref','sha256':h}
-        self.value['boundaries'].append({'record':record.to_mapping(),'owners':snap,'stage':stage,
+        entry={'record':record.to_mapping(),'owners':snap,'stage':stage,
             'native_step_index':record.control_step*self.value['metadata']['timebase']['control_substeps'],
             'task_metrics_raw':copy.deepcopy(task_metrics if task_metrics is not None else dict(record.task_metrics)),
-            'native_time':float(record.simulation_time if native_time is None else native_time)})
+            'native_time':float(record.simulation_time if native_time is None else native_time)}
+        return entry, blobs
+
+    def boundary(self, record, owners, stage, task_metrics=None, native_time=None):
+        entry, blobs = self._prepare_boundary(record, owners, stage, task_metrics, native_time)
+        self.value['blobs'].update(blobs)
+        self.value['boundaries'].append(entry)
 
     def begin(self, step, physics_dt, substeps):
         if self.pending is not None or self.frozen:raise RuntimeError('pending/frozen interval')
@@ -226,10 +233,24 @@ class ExecutionRecorder:
         if self.value['schema']==STRUCTURED_SCHEMA:
             if not isinstance(structured_control,StructuredControlTransitionV1):raise ValueError('execution trajectory v3 requires structured control evidence for each transition')
         elif structured_control is not None:raise ValueError('structured control requires execution trajectory v3')
-        self.value['transitions'].append({'record':transition.to_mapping(),'interval':self.pending,'native_audit':copy.deepcopy(audit)})
-        if self.value['schema']==STRUCTURED_SCHEMA:self.value['structured_controls'].append(structured_control.to_mapping())
+        transition_entry={'record':transition.to_mapping(),'interval':copy.deepcopy(self.pending),'native_audit':copy.deepcopy(audit)}
+        structured_entry=(structured_control.to_mapping() if self.value['schema']==STRUCTURED_SCHEMA else None)
+        boundary_entry, blobs = self._prepare_boundary(boundary,owners,stage,task_metrics,native_time)
+        transitions=self.value.get('transitions')
+        boundaries=self.value.get('boundaries')
+        stored_blobs=self.value.get('blobs')
+        controls=self.value.get('structured_controls') if self.value['schema']==STRUCTURED_SCHEMA else None
+        if not isinstance(transitions,list) or not isinstance(boundaries,list) or not isinstance(stored_blobs,dict):
+            raise ValueError('execution recorder storage containers')
+        if self.value['schema']==STRUCTURED_SCHEMA and not isinstance(controls,list):
+            raise ValueError('execution recorder structured control storage')
+        # Prepare all serialized rows before mutating the stream. A rejected
+        # boundary must leave the observed interval pending and uncommitted.
+        stored_blobs.update(blobs)
+        transitions.append(transition_entry)
+        if controls is not None:controls.append(structured_entry)
+        boundaries.append(boundary_entry)
         self.pending=None
-        self.boundary(boundary,owners,stage,task_metrics,native_time)
 
     def freeze(self, stop_reason, *, outcome=None):
         if self.pending is not None:raise ValueError('incomplete effective interval')

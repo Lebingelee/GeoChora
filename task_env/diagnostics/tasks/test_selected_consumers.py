@@ -457,6 +457,33 @@ def test_conflicting_recorder_counter_is_unknown_and_cannot_append_transition(fa
     env.close()
 
 
+def test_full_physics_with_invalid_post_boundary_keeps_transition_uncommitted(fake, tmp_path):
+    env=make_env(IDS[1], config={'provider':'mujoco','horizon':4})
+    env.reset(seed=19)
+    env.start_recording(tmp_path/'invalid-post-boundary.h5')
+    _expose_fake_physics_clock(env)
+    expected=env.artifact.timebase.control_substeps
+
+    class InvalidBoundary:
+        def to_mapping(self):
+            raise RuntimeError('injected post-boundary serialization failure')
+
+    env._boundary=lambda: InvalidBoundary()
+    with pytest.raises(RuntimeError, match='post-boundary serialization failure'):
+        env.step_expert()
+
+    receipt=env.execution_fault
+    assert receipt.physical_progress == 'advanced'
+    assert receipt.observer_confirmed_substeps == expected
+    assert receipt.recorder_confirmed_substeps == expected
+    assert receipt.transition_status == 'rejected'
+    assert env.recorder.value['transitions'] == []
+    assert len(env.recorder.value['boundaries']) == 1
+    assert env.recorder.pending['native_step_count'] == expected
+    _assert_faulted_recording_has_no_transition(env, transition_status='rejected')
+    env.close()
+
+
 def test_expert_proposal_exception_faults_before_physics_and_blocks_step(fake):
     env=make_env(IDS[0]);env.reset(seed=19)
 
