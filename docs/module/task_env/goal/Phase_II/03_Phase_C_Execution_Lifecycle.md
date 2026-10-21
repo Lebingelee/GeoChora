@@ -521,6 +521,28 @@ observer/Recorder 证据冲突及完整物理推进但 Recorder 缺行/计数冲
 ignored `workspace/maintenance/phase_ii_c03a_20261021/c03a_atomic_append_followup.log`。TaskEnv module Skill refresh 按当前
 `ExecutionRecorder.append` owner 更新原 Skill；Skill checker 与 `git diff --check` 结果见本次提交验证，不涉及 C04。
 
+#### C03a fault-evidence semantics re-audit（2026-10-21）
+
+在 `codex/phase-ii-c`、基线 `9e4fc3e` 上复核故障 receipt 契约。`ExecutionFaultV1`、selected interval observer、现有
+`ExecutionRecorder` pending/append gate 及本节前述故障注入已实现所需分离，因此本次没有重复实现 lifecycle、Runtime 或
+Recorder 行为。公开前后 simulation clock 与预期 control dt、interval/control-step 证据决定可观测 `physical_progress`；
+observer 和 Recorder 只分别报告已确认的子步 receipt。时钟不可读，或时钟与已完成区间、控制边界、最小已确认推进证据矛盾时，
+物理进度为 `unknown`。若可信 clock 已显示完整推进而 Recorder 缺失/冲突，仅保留可校验的 Recorder 数量（无法校验时为
+unknown），现有 interval/append validation 仍将该 transition 留为不完整或拒绝；不得用完整物理推进推导录制完整，也不得
+清除 pending 或解锁 faulted Env。
+
+复跑最后子步推进后抛错、中途推进后抛错、故障边界不可读、clock/执行证据冲突、完整物理推进但 Recorder 缺项/计数冲突及
+原子 append 失败用例；并覆盖 selected consumers、C05a structured Recorder、B03a/B03b 与真实 GeoPhys CPU Pendulum
+scalar reset/step/horizon/terminal 回归。命令覆盖 `test_phase_ii_c03a_fault_lifecycle.py`、`test_selected_consumers.py`、
+`test_phase_ii_c05a_structured_recording.py`、`test_phase_ii_b03a_predicates.py`、`test_phase_ii_b03b_temporal_commit.py`，
+结果 **81 passed**，仅一项上游 Taichi `locale.getdefaultlocale` deprecation warning。selected fault injection 使用既有
+FakeSession 和公开 snapshot seam，不构成 Provider fault qualification。完整输出保存在 ignored
+`workspace/maintenance/phase_ii_c03a_20261021/c03a_fault_receipt_reaudit_20261021.log`。
+
+TaskEnv Skill 同步澄清：Recorder evidence 不完整不反向抹去可信 public clock 已确认的物理进度，但仍使 transition 无效；
+物理边界证据不可读或互相矛盾时才将 `physical_progress` 标为 `unknown`。本次未进入 C04，也未修改/清除既有的 C02b
+工作区内容；未使用 Provider 私有状态、物理回滚或新的恢复接口。
+
 #### C04 bounded observation and info receipt (2026-10-21)
 
 C04 扩展现有 `ObservationFieldSpec` / `ObservationSchema` / `StateObservationBuilder` 和 task-owned Pendulum、TwoWheel

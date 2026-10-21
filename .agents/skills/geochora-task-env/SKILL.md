@@ -38,9 +38,12 @@ After a failed reset/step, inspect the existing Env owner's `execution_fault` (`
 construction exception may carry the same receipt as `exception.execution_fault`. Faulted environments
 require a successful reset before another step. `physical_progress` describes only observable progress
 of the current control interval and is inferred from trusted public before/after simulation clocks against
-the expected control dt. Interval return, control-step boundaries, `observer_confirmed_substeps`, and
-`recorder_confirmed_substeps` are separate corroborating evidence; callback or Recorder counts never stand
-in for an exact physical substep count. Missing or conflicting evidence yields `unknown`. `transition_status`
+the expected control dt, checked against interval-return and control-step boundary evidence. An unreadable
+clock, conflict between observer and Recorder count claims, or contradiction between clock and execution
+boundary evidence yields `unknown`. The independently reported
+`observer_confirmed_substeps` and `recorder_confirmed_substeps` are evidence counts, never exact physical
+completion counts. A missing or inconsistent Recorder receipt can leave physical progress clock-confirmed
+while making the Recorder count unavailable and the transition incomplete or rejected. `transition_status`
 independently reports whether the owner assessed a transition, recording was absent, incomplete, rejected, or
 confirmed valid; full physical progress does not make an incomplete transition valid. For selected native
 execution, the existing `SelectedReferenceEnv` checks the Recorder's pending control step, timebase, substep
