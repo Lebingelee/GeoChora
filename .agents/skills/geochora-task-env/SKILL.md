@@ -213,6 +213,13 @@ existing Controller writers, existing `ActionModeSpec`, and existing `StateRequi
 dispatch to Runtime or support multi-robot execution. Bounded Panda arm+gripper legacy control remains on the existing
 single writer/provider route.
 
+`materialize_control(..., controller_binding_plan=plan)` is the fail-closed admission route for a bound Controller: the
+source must carry the plan's exact Scene identity, and every required feedback capability must be supported by both the
+actual Provider manifest and any caller-supplied restricting manifest before Runtime materialization. The current A05
+binding requires `actuator_force_query`, which neither current GeoPhys nor MuJoCo manifest claims; this route rejects
+before Runtime construction. Omitting the optional plan preserves the existing legacy route. This check is admission only,
+not Group dispatch, an applied acknowledgement, or real arm+hand execution evidence.
+
 C05a versioned storage is opt-in. Generic H5 v3 is read with
 `task_env.recorders.load_structured_control_records_h5()`; training projection is accepted only by
 `load_structured_training_actions_h5()` after exact one-writer schema/order and stored numeric-value checks.

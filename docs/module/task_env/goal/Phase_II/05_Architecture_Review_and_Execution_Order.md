@@ -90,7 +90,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
 | 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt、Recorder completeness 与 append commit boundary 再窄修正**：物理时钟进度、observer/Recorder 子步证据和 transition 有效性分离；不完整行/边界拒绝 transition 且保留 pending；C03a/C05a/B03a/B03b 定向回归 81 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
 | 23 | C04 | C03a、D02b | **bounded implemented；C02b gate re-audited**：现有 observation/info owners 固定 schema 元数据、clock、required feedback/optional diagnostics；privileged/private Frame/time 与缺字段负例受保护；最新交叉 gate 103 passed，真实 Panda TaskEnv 与 D04 Camera 仍是明确缺口，详见 [C04 receipt](03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21) |
-| 24 | C02b | C02a、C03a、C04、C05a、D01b | 原子 group 执行，真实 arm+hand S2；缺 group/局部失败不留未知施控 |
+| 24 | C02b | C02a、C03a、C04、C05a、D01b | **未完成；fail-closed admission 已验证**：A05 必需 `actuator_force_query` 不在 GeoPhys/MuJoCo manifest，Runtime 在施控前拒绝；Group dispatch、applied acknowledgement 与真实 arm+hand S2/录制读取仍未实现，见 [C02b admission receipt](03_Phase_C_Execution_Lifecycle.md#c02b-admission-gate-receipt-2026-10-21) |
 | 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |
 | 26 | C05b | C02b、C03b、C04 | PickCube 外置 Solution 的实际 step/record 路线，两 provider 回归 |
 | 27 | C05c | C05b、D02b | NutAssembly feedback/hold/ramp 契约及迁移；500 Hz/Guard/Outcome/strict status |
@@ -108,7 +108,8 @@ B05 可以完成 legacy semantics 适配，但 vNext 全链执行要到 D01b/P99
 D01a 只证明有限新 Scene bridge，不冒充完整 D01。父目标 implemented 必须覆盖其全部必需切片。
 P00/P99 是 gate，不增设新的 Framework/Harness；当前提交不执行表中代码实施。
 
-截至 2026-10-21，序号 22／C03a 与 23／C04 已按 bounded acceptance 完成；序号 24／C02b 仍待实施与交接 gate，
+截至 2026-10-21，序号 22／C03a 与 23／C04 已按 bounded acceptance 完成；序号 24／C02b 已确认缺少必需的公开
+actuator-force feedback admission，目前仅有 fail-closed gate 与兼容回归，Group dispatch/S2/录制读取仍待实施与交接 gate，
 序号 25／C03b 的 termination/Stop policy 也未实现。C03a/C04 在 `codex/phase-ii-c` 分别本地提交，均未 push/merge，
 不改变冻结的 `codex/phase-ii-b` 指针。
 

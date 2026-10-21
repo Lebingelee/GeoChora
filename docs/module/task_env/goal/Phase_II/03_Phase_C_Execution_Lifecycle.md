@@ -601,6 +601,33 @@ C05a 与 D01b 定向测试，结果 **103 passed**，一个上游 Taichi `locale
 ignored `workspace/maintenance/phase_ii_c04_20261021/c04_gate_after_c03a_20261021.log`。观测契约 gate 与 feedback-independence
 gate 均通过；因此 C04 放行 C02b。该 S1/bounded 证据不声称真实 Panda TaskEnv、D04 camera 或新的 Provider qualification。
 
+#### C02b admission gate receipt（2026-10-21）
+
+C04 两条放行准则保持通过。本轮复核 A05 `ControlBindingPlanV1` 的真实 provider admission：所需
+`StateRequirements` 包含必需 `actuator_force`，对应 consumer requirement ID `actuator_force_query`。当前 GeoPhys 与 MuJoCo
+`provider_manifest()` 均只声明 `rigid_body`、`free_body`、`articulated_robot`、`joint_position_actuation`、
+`joint_state_query`、`body_pose_query` 和 `frame_pose_query`；Core capability schema 也不含 `actuator_force_query`。
+D02a 已明确 requirement ID 不是 Provider claim，admission 必须 fail-closed。GeoPhys 的 `read_actuator_force()` 源码注释
+限定为诊断/测试；因此不能用该路径为正式 Controller feedback 补造能力声明，也不能跳过现有 required feedback。
+
+沿现有 `task_env.runtime.sessions.control.materialize_control()` 增加可选 plan-bound admission：先核对 RuntimeSource 与
+Scene identity，再将每项必需 feedback capability 与实际 Provider manifest 及可选限制 manifest 求交，缺项在调用现有
+`materialize()` 前抛 `CapabilityAdmissionError`。旧调用者不传 plan 时保持原有兼容路线。新测试对 GeoPhys/MuJoCo 两份实际
+manifest 验证 `actuator_force_query` 缺失时 Runtime materialization 调用数为零；另验证不传 plan 的旧调用仍通过既有
+admission 并绑定原 `ControlBinding`。C02a 已有测试继续保护完整 Group request 预检失败时无 Controller/Runtime 局部施控。
+
+本轮执行 `test_phase_ii_c04_observation_contract.py`、C02a binding、C02b admission 与 D02a state contract，**26 passed**；
+随后追加 legacy-call compatibility case 后，C02a/C02b 专项为 **14 passed**。两次均只有 Taichi 上游
+`locale.getdefaultlocale` deprecation warning。日志分别保存在 ignored
+`workspace/maintenance/phase_ii_c02b_20261021/c04_c02a_admission_gate_20261021.log` 和
+`workspace/maintenance/phase_ii_c02b_20261021/c02b_admission_compat_20261021.log`。
+
+**C02b 尚未验收。** 尚无 structured Group 到 Controller/Runtime 的执行 dispatch、applied acknowledgement、分组执行区间及
+C05a 真实录制读取，也没有真实 arm+hand S2。当前 public feedback capability 缺失令计划绑定的 Runtime 在施控前拒绝构造；
+不得以 fake manifest、Provider-private 状态、静默填零或移除 required feedback 继续。解除此 gate 需要拥有者公开并验证
+actuator-force feedback capability（含语义、单位、边界与两 Provider manifest admission），然后再实施/验证 dispatch 和
+真实执行录制。此 receipt 仅报告 admission 失败边界，不将序号 24 标为完成，不宣称双 Robot 支持，也不进入序号 25。
+
 ## C.9 质量门与直接可测问题
 
 | 检测 | 预期行为 | 证据等级 |

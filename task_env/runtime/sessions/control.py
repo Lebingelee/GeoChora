@@ -14,11 +14,13 @@ from ...controllers.canonical.contracts import (
 )
 from ...artifacts import (
     ActuatorReference,
+    CapabilityAdmissionError,
     RequiredCapabilitySet,
     SceneDefinition,
     StateRequirements,
     admit_capabilities,
 )
+from ...artifacts.contracts import SUPPORTED_STATUSES
 from ...environment.types import ActionModeSpec
 from .api import materialize,provider_manifest
 
@@ -345,9 +347,39 @@ class ControlBinding:
         if self.opening_range_m!=.08:raise ValueError('only audited 0.08m tendon gripper mapping implemented')
 
 
-def materialize_control(artifact,execution,*,source,binding,manifest=None):
+def materialize_control(
+    artifact,
+    execution,
+    *,
+    source,
+    binding,
+    manifest=None,
+    controller_binding_plan: ControlBindingPlanV1 | None = None,
+):
+    actual_manifest=provider_manifest(execution.physics_provider)
     if manifest is not None:admit_capabilities(CONTROL_REQUIRED,manifest,execution)
-    admit_capabilities(CONTROL_REQUIRED,provider_manifest(execution.physics_provider),execution)
+    admit_capabilities(CONTROL_REQUIRED,actual_manifest,execution)
+    if controller_binding_plan is not None:
+        if not isinstance(controller_binding_plan, ControlBindingPlanV1) or not controller_binding_plan._compiled:
+            raise ValueError('control materialization requires a Scene-validated ControllerBinding plan')
+        scene=getattr(source,'scene_definition',None)
+        if not isinstance(scene,SceneDefinition) or scene.identity_hash!=controller_binding_plan.scene_identity_hash:
+            raise ValueError('ControllerBinding Scene identity does not match RuntimeSource')
+        required_feedback={
+            requirement.required_capability
+            for controller_binding in controller_binding_plan.controller_bindings
+            for requirement in controller_binding.feedback_requirements.requirements
+            if requirement.requiredness=='required'
+        }
+        supported={claim.name for claim in actual_manifest.capabilities if claim.status in SUPPORTED_STATUSES}
+        if manifest is not None:
+            supported &= {claim.name for claim in manifest.capabilities if claim.status in SUPPORTED_STATUSES}
+        missing=required_feedback-supported
+        if missing:
+            raise CapabilityAdmissionError(
+                f'missing supported Controller feedback capabilities for '
+                f'{execution.physics_provider}: {sorted(missing)}'
+            )
     if len(source.joint_targets)!=7 or len(source.open_actuators)!=1:raise ValueError('unsupported control source bindings')
     session=materialize(artifact,execution,source=source,manifest=manifest)
     session._control_binding=binding
