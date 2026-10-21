@@ -267,6 +267,60 @@ class DynamicCameraRenderSourceV1:
         }
         return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
+    def capture_identity(
+        self,
+        camera: CameraGeometry,
+        execution: ExecutionSpecV1,
+        manifest: ProviderCapabilityManifest,
+        state: CanonicalStateViewV1,
+    ) -> 'CameraCaptureIdentityV1':
+        """Bind one successful dynamic capture to its exact public publication."""
+
+        self.validate()
+        if not isinstance(camera, CameraGeometry):
+            raise TypeError('capture identity requires CameraGeometry')
+        if not isinstance(execution, ExecutionSpecV1):
+            raise TypeError('capture identity requires execution-spec-v1')
+        if not isinstance(manifest, ProviderCapabilityManifest):
+            raise TypeError('capture identity requires an existing provider manifest')
+        if not isinstance(state, CanonicalStateViewV1):
+            raise TypeError('capture identity requires canonical-state-v1')
+        if camera.task_artifact_hash != self.task_artifact_hash:
+            raise ValueError('camera/render source TaskArtifact linkage mismatch')
+        selection = execution.renderer_for_camera(camera.camera_id)
+        if (
+            manifest.provider_name != selection.provider
+            or manifest.backend != selection.backend
+            or manifest.render_profile != selection.profile
+            or manifest.determinism_mode != execution.determinism_mode
+        ):
+            raise ValueError('manifest identity does not describe the selected renderer contract')
+        if state.boundary.scene_identity_hash != self.scene_identity_hash:
+            raise ValueError('capture identity state Scene differs from the dynamic render source')
+        if state.sample_clock.clock_domain != 'evaluation_boundary':
+            raise ValueError('camera capture identity requires an evaluation boundary state clock')
+        if state.sample_clock.sample_index != state.boundary.control_step:
+            raise ValueError('camera capture state clock does not match its boundary')
+        modalities = tuple(
+            modality
+            for modality, enabled in (('rgb', camera.rgb), ('depth', camera.depth))
+            if enabled
+        )
+        return CameraCaptureIdentityV1(
+            schema_version='camera-capture-identity-v1',
+            task_artifact_hash=camera.task_artifact_hash,
+            camera_id=camera.camera_id,
+            camera_geometry_identity_hash=camera.identity_hash,
+            render_source_identity_hash=self.identity_hash,
+            execution_spec_identity_hash=execution.identity_hash,
+            renderer_selection=selection,
+            provider_manifest_identity_hash=manifest.identity_hash,
+            state_boundary=state.boundary,
+            sample_clock=state.sample_clock,
+            modalities=modalities,
+            capture_phase=camera.capture_phase,
+        )
+
 
 @dataclass(frozen=True)
 class RenderStateProjectionV1:

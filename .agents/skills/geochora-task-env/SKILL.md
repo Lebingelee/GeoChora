@@ -201,12 +201,17 @@ continues to mean the exact legacy `ExecutionSpec` mapping; do not rewrite froze
 overrides replace the complete renderer selection, while other cameras use the explicit default. These
 contracts and `CameraRenderSource.capture_identity()` are static request descriptions only. Current
 `RuntimeSession.materialize()` and `create_camera_session()` still consume the legacy selection/admission
-route. The separate advanced `create_dynamic_camera_session()` route admits only the D03 first bounded
-intersection: GeoPhys CPU Scene-v3 scalar-joint state rendered by MuJoCo native OpenGL RGB from a verified
-`DynamicCameraRenderSourceV1` and initial `CanonicalStateViewV1`. It binds Entity/Frame to source body and
-renderer geometry, and tracks geometry/publication/transform versions per consumer. It rejects free joints,
-Depth/Segmentation, other provider/backend pairs, and incomplete mappings; it is not general D05b admission,
-does not call Controller or advance physics, and is not a Qualification.
+route. The separate advanced `create_dynamic_camera_session()` route has two exact profiles over the same
+verified `DynamicCameraRenderSourceV1` and initial `CanonicalStateViewV1`: D03 admits GeoPhys CPU Scene-v3
+scalar-joint state to MuJoCo native OpenGL RGB; D04 admits the same source intersection for synchronous
+RGB/optical-Z Depth. It binds Entity/Frame to source body and renderer geometry, resolves a mounted camera only
+when its parent Frame is unique, and tracks geometry/publication/transform versions per consumer. D04 Depth is
+H×W float32 metres along optical +Z with zero for invalid/clipped/background. A successful
+`CanonicalCameraObservation` carries the existing `CameraCaptureIdentityV1` for its exact boundary/clock/modalities.
+The route rejects free joints, Segmentation, other provider/backend pairs, and incomplete mappings; it is not
+general D05b admission, does not call Controller or advance physics, and is not a Qualification. MuJoCo exposes
+no public renderer context handle; GL strings observed after capture are diagnostic only and do not pin or admit
+a device.
 
 For Phase II B01 authoring input, use `task_env.environment.TaskSourceV1` and `load_task_source()` from the existing
 environment owner. The current strict envelope accepts task identity, a Scene reference, typed role selectors,

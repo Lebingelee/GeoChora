@@ -1,6 +1,7 @@
 """Public MuJoCo Renderer translation; native models/IDs remain adapter-private."""
 import math
 import os
+import threading
 import uuid
 import xml.etree.ElementTree as ET
 import numpy as np
@@ -80,19 +81,38 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
     It never steps or evaluates the renderer model's dynamics.
     """
 
-    native_depth_convention = 'optical_z_m'
+    native_depth_convention = 'optical_z_m_far_invalid_v1'
 
-    def __init__(self, camera, source: DynamicCameraRenderSourceV1, initial_projection: RenderStateProjectionV1):
+    def __init__(
+        self,
+        camera,
+        source: DynamicCameraRenderSourceV1,
+        initial_projection: RenderStateProjectionV1,
+        *,
+        execution,
+        manifest,
+    ):
         import mujoco
 
         self._initialize(camera)
         self._mj = mujoco
         self._source = source
+        self._execution = execution
+        self._manifest = manifest
         self._consumer_id = f'mujoco-render-consumer-{uuid.uuid4().hex}'
         self._geometry_build_count = 0
         self._renderer = None
         self._last_projection = None
         self._last_sync = None
+        self._has_rendered = False
+        self._last_render_thread_id = None
+        initial_boundary = initial_projection.state_boundary
+        self._active_episode_key = (initial_boundary.episode_id, initial_boundary.reset_sample_id)
+        self._seen_episode_keys = {self._active_episode_key}
+        self._materialization_identity = (
+            initial_boundary.scene_instance_id,
+            initial_boundary.provider_materialization_id,
+        )
         try:
             from ...runtime.sessions.source import lower_mujoco_scene_source
 
@@ -127,6 +147,13 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             self._model = mujoco.MjModel.from_xml_string(
                 ET.tostring(root, encoding='unicode'), assets=assets,
             )
+            if camera.depth:
+                extent = float(self._model.stat.extent)
+                if not math.isfinite(extent) or extent <= 0:
+                    raise ValueError('D04 optical-Z depth requires a finite positive MuJoCo model extent')
+                # MuJoCo scales these visual clipping distances by model extent.
+                self._model.vis.map.znear = camera.near / extent
+                self._model.vis.map.zfar = camera.far / extent
             self._data = mujoco.MjData(self._model)
             self._camera_index = self._model.camera(self._native_camera_name).id
             self._joint_qpos_addresses = self._resolve_joint_addresses()
@@ -233,15 +260,22 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         if projection.geometry_version != self._source.geometry_version:
             raise ValueError('render projection geometry version changed after materialization')
         previous = self._last_projection
+        boundary = projection.state_boundary
+        materialization = (boundary.scene_instance_id, boundary.provider_materialization_id)
+        episode_key = (boundary.episode_id, boundary.reset_sample_id)
+        episode_transition = episode_key != self._active_episode_key
+        if not episode_transition and materialization != self._materialization_identity:
+            raise ValueError('dynamic camera refused state from another provider materialization')
         if previous is not None:
-            same_episode = (
-                projection.state_boundary.episode_id == previous.state_boundary.episode_id
-                and projection.state_boundary.reset_sample_id == previous.state_boundary.reset_sample_id
-            )
-            if same_episode and (
-                projection.state_boundary.control_step < previous.state_boundary.control_step
-                or (projection.state_boundary.control_step == previous.state_boundary.control_step
-                    and projection.state_boundary.state_revision < previous.state_boundary.state_revision)
+            if episode_transition:
+                if episode_key in self._seen_episode_keys:
+                    raise ValueError('dynamic camera refused a Canonical State from a previous episode')
+                if boundary.control_step != 0:
+                    raise ValueError('dynamic camera requires a new episode publication to begin at reset step zero')
+            elif (
+                boundary.control_step < previous.state_boundary.control_step
+                or (boundary.control_step == previous.state_boundary.control_step
+                    and boundary.state_revision < previous.state_boundary.state_revision)
             ):
                 raise ValueError('dynamic camera refused a stale Canonical State publication')
             if projection.publication_version == previous.publication_version and (
@@ -267,6 +301,10 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
                 self._data.time = old_time
                 self._mj.mj_kinematics(self._model, self._data)
             raise
+        if episode_transition:
+            self._seen_episode_keys.add(episode_key)
+            self._active_episode_key = episode_key
+            self._materialization_identity = materialization
         self._last_projection = projection
         self._last_sync = RenderStateSyncReceiptV1(
             'render-state-sync-receipt-v1', self._consumer_id,
@@ -306,9 +344,23 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
     def _before_capture(self, state):
         self.sync_state(state)
 
+    def _capture_identity(self, state):
+        if self._last_projection is None:
+            raise RuntimeError('dynamic camera has no consumed Canonical State publication')
+        if (
+            state.boundary.boundary_id != self._last_projection.state_boundary.boundary_id
+            or state.sample_clock != self._last_projection.sample_clock
+        ):
+            raise RuntimeError('camera capture identity does not match the consumed Canonical State publication')
+        return self._source.capture_identity(
+            self._geometry, self._execution, self._manifest, state,
+        )
+
     def _render(self, metadata):
         if self._last_projection is None:
             raise RuntimeError('dynamic camera has no consumed Canonical State publication')
+        self._has_rendered = False
+        self._last_render_thread_id = None
         transform = np.asarray(metadata.T_world_from_camera, dtype=np.float64)
         native_rotation = transform[:3, :3] @ np.diag([1.0, -1.0, -1.0])
         quaternion = np.zeros(4, dtype=np.float64)
@@ -322,34 +374,49 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         self._mj.mj_camlight(self._model, self._data)
         self._renderer.update_scene(self._data, camera=self._native_camera_name)
         rgb = depth = None
-        if self._geometry.rgb:
+        self._renderer.disable_depth_rendering()
+        try:
+            if self._geometry.rgb:
+                rgb = self._renderer.render().copy()
+            if self._geometry.depth:
+                self._renderer.enable_depth_rendering()
+                depth = self._renderer.render().copy()
+        finally:
             self._renderer.disable_depth_rendering()
-            rgb = self._renderer.render().copy()
-        if self._geometry.depth:
-            self._renderer.enable_depth_rendering()
-            depth = self._renderer.render().copy()
-            self._renderer.disable_depth_rendering()
+        self._has_rendered = True
+        self._last_render_thread_id = threading.get_ident()
         return rgb, depth
 
     def graphics_device_info(self):
-        """Read the current native GL context identity for the bounded receipt."""
+        """Observe the current GL context after this session has rendered.
+
+        MuJoCo does not expose a public Renderer context handle or a public
+        make-current method. Call this synchronously on the rendering thread
+        immediately after capture. This is diagnostic observation only; it is
+        not device-pinning or pairing admission evidence.
+        """
 
         if self._closed:
             raise RuntimeError('camera session is closed')
-        self._renderer._gl_context.make_current()
+        if not self._has_rendered or threading.get_ident() != self._last_render_thread_id:
+            raise RuntimeError('graphics device info requires the current rendering thread after capture')
         from OpenGL import GL
 
         def decode(value):
             return None if value is None else value.decode('utf-8', errors='replace')
 
-        return {
+        values = {
             'render_api': 'MuJoCo native OpenGL Renderer',
             'mujoco_gl_selection': os.environ.get('MUJOCO_GL', 'MuJoCo default GL selection'),
             'display': os.environ.get('DISPLAY'),
             'vendor': decode(GL.glGetString(GL.GL_VENDOR)),
             'renderer': decode(GL.glGetString(GL.GL_RENDERER)),
             'version': decode(GL.glGetString(GL.GL_VERSION)),
+            'observation_scope': 'current OpenGL context immediately after successful MuJoCo capture; diagnostic only',
         }
+        if values['vendor'] is None or values['renderer'] is None or values['version'] is None:
+            raise RuntimeError('current OpenGL context did not expose vendor, renderer, and version strings')
+        return values
 
     def close(self):
         if not self._closed:

@@ -13,6 +13,7 @@ from .source import DynamicCameraRenderSourceV1, project_render_state_v1
 PROFILE = 'p1_4_native_camera_cpu_v0'
 D03_PHYSICS_PROFILE = 'geophys-scene-v3-runtime-v1'
 D03_DYNAMIC_PROFILE = 'd03_mujoco_native_dynamic_opengl_v1'
+D04_DYNAMIC_PROFILE = 'd04_mujoco_native_dynamic_opengl_rgbd_v1'
 
 
 class CameraRenderSession(Protocol):
@@ -71,8 +72,31 @@ def dynamic_render_manifest():
     )
 
 
+def dynamic_rgbd_render_manifest():
+    """Manifest for the first bounded RGB/optical-Z D04 intersection."""
+
+    return ProviderCapabilityManifest(
+        'provider-capability-v0', 'mujoco',
+        provider_build_identity('mujoco')['manifest_version'],
+        'd04-dynamic-camera-rgbd-v1', 'native-opengl',
+        'geophys-cpu-to-mujoco-native-opengl', D04_DYNAMIC_PROFILE, 'best_effort',
+        (
+            CapabilityClaim('rgb_camera', 'implemented', 'task_env/render/camera/dynamic-v1'),
+            CapabilityClaim('depth_camera', 'implemented', 'task_env/render/camera/dynamic-v1'),
+        ), (), 'implementation_only_no_qualification',
+    )
+
+
+def _dynamic_manifest_for_profile(profile):
+    if profile == D03_DYNAMIC_PROFILE:
+        return dynamic_render_manifest()
+    if profile == D04_DYNAMIC_PROFILE:
+        return dynamic_rgbd_render_manifest()
+    raise CapabilityAdmissionError(f'unsupported dynamic camera profile: {profile!r}')
+
+
 def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
-    """Fail-closed admission for the D03 scalar Scene-v3 render intersection."""
+    """Fail-closed admission for the D03 RGB or D04 RGB/Depth intersection."""
 
     if not isinstance(execution, ExecutionSpecV1):
         raise TypeError('dynamic camera admission requires execution-spec-v1')
@@ -81,29 +105,41 @@ def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
     camera.validate()
     source.validate()
     selected = execution.renderer_for_camera(camera.camera_id)
+    actual = _dynamic_manifest_for_profile(selected.profile)
     if (
         execution.physics_provider != 'geophys'
         or execution.physics_backend != 'cpu'
         or execution.physics_profile != D03_PHYSICS_PROFILE
         or selected.provider != 'mujoco'
         or selected.backend != 'native-opengl'
-        or selected.profile != D03_DYNAMIC_PROFILE
+        or selected.profile not in {D03_DYNAMIC_PROFILE, D04_DYNAMIC_PROFILE}
         or selected.device is not None
         or execution.determinism_mode != 'best_effort'
     ):
         raise CapabilityAdmissionError(
-            'D03 dynamic camera admits only GeoPhys CPU physics with the MuJoCo native OpenGL render route'
+            'dynamic camera admits only GeoPhys CPU physics with the bounded MuJoCo native OpenGL render route'
         )
     if camera.task_artifact_hash != source.task_artifact_hash:
         raise CapabilityAdmissionError('camera/render source TaskArtifact linkage mismatch')
-    if manifest is not None and manifest.identity_hash != dynamic_render_manifest().identity_hash:
-        raise CapabilityAdmissionError('dynamic camera manifest does not match the admitted D03 route')
-    actual = dynamic_render_manifest()
+    if manifest is not None and manifest.identity_hash != actual.identity_hash:
+        raise CapabilityAdmissionError('dynamic camera manifest does not match the admitted profile route')
     claims = {claim.name: claim.status for claim in actual.capabilities}
     requested = tuple(name for name, enabled in (('rgb_camera', camera.rgb), ('depth_camera', camera.depth)) if enabled)
     missing = [name for name in requested if claims.get(name) != 'implemented' or name in actual.known_unsupported]
     if missing:
-        raise CapabilityAdmissionError(f'missing D03 dynamic render capability: {missing}')
+        if selected.profile == D03_DYNAMIC_PROFILE:
+            raise CapabilityAdmissionError(f'missing D03 dynamic render capability: {missing}')
+        raise CapabilityAdmissionError(f'missing D04 dynamic render capability: {missing}')
+
+    if camera.parent_frame != 'world':
+        matches = [
+            item for item in source.frame_bindings
+            if item.frame_id == camera.parent_frame
+        ]
+        if len(matches) != 1:
+            raise CapabilityAdmissionError(
+                'dynamic camera parent Frame must resolve to exactly one Entity-qualified source Frame'
+            )
 
 
 def create_dynamic_camera_session(
@@ -118,8 +154,12 @@ def create_dynamic_camera_session(
 
     admit_dynamic_camera(camera, execution, source=source, manifest=manifest)
     initial_projection = project_render_state_v1(source, initial_state)
+    selected = execution.renderer_for_camera(camera.camera_id)
+    actual_manifest = _dynamic_manifest_for_profile(selected.profile)
     from .mujoco import MuJoCoDynamicCameraSession
-    return MuJoCoDynamicCameraSession(camera, source, initial_projection)
+    return MuJoCoDynamicCameraSession(
+        camera, source, initial_projection, execution=execution, manifest=actual_manifest,
+    )
 
 
 def _construct_admitted(camera, execution, source):
@@ -141,12 +181,18 @@ class CameraSessionValues:
         self._before_capture(state)
         metadata = resolve_camera(self._geometry, state)
         native_rgb, native_depth = self._render(metadata)
+        capture_identity = self._capture_identity(state)
         return CanonicalCameraObservation(
             normalize_rgb(native_rgb,self._geometry) if self._geometry.rgb else None,
             optical_depth(native_depth,metadata,native_convention=self.native_depth_convention) if self._geometry.depth else None,
-            metadata)
+            metadata, capture_identity)
 
     def _before_capture(self, state):
         """Optional read-only source synchronization for dynamic camera consumers."""
+
+        return None
+
+    def _capture_identity(self, state):
+        """Legacy renderers keep their existing metadata-only observation contract."""
 
         return None

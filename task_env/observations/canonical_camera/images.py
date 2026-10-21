@@ -27,6 +27,7 @@ class CanonicalCameraObservation:
     rgb: np.ndarray | None
     depth: np.ndarray | None
     metadata: ResolvedCameraMetadata
+    capture_identity: object | None = None
 
     def __post_init__(self):
         c = self.metadata.camera
@@ -47,3 +48,21 @@ class CanonicalCameraObservation:
                 raise ValueError('depth schema mismatch')
             values.setflags(write=False)
             object.__setattr__(self,name,values)
+        if self.capture_identity is not None:
+            from ...render.camera.source import CameraCaptureIdentityV1
+
+            if not isinstance(self.capture_identity, CameraCaptureIdentityV1):
+                raise TypeError('camera capture identity must use camera-capture-identity-v1')
+            identity = self.capture_identity
+            identity.validate()
+            if (
+                identity.camera_id != c.camera_id
+                or identity.camera_geometry_identity_hash != c.identity_hash
+                or identity.state_boundary.control_step != self.metadata.capture_control_step
+                or identity.sample_clock.simulation_time_s != self.metadata.capture_simulation_time
+                or set(identity.modalities) != {
+                    name for name, value in (('rgb', self.rgb), ('depth', self.depth))
+                    if value is not None
+                }
+            ):
+                raise ValueError('camera observation data and capture identity do not match')

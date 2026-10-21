@@ -1,9 +1,9 @@
 # Phase D — Physics / Rendering Independence：架构、实施切片与验收
 
 > **ACTIVE bounded implementation record；Phase D remains incomplete and carries no new Qualification.**
-> 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
+> 修订于 2026-10-22；源码审阅基准仍为规划期 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体蓝图：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；A/B/C 输入见相邻阶段文件。
-> **当前状态（2026-10-21）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL、Position candidate RGB 动态同步首个交集已通过 S1/S2。D04、完整 D05b、广泛 Renderer/Scene 支持及 Phase II 均未完成。
+> **当前状态（2026-10-22）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL RGB 动态同步首个交集已通过；序号 32／D04 的 RGB/Optical-Z Depth、固定/hand-mounted camera 首个有界切片已通过 S1/S2。Segmentation、完整 D04/D03/D05b、广泛 Renderer/Scene 支持及 Phase II 均未完成。
 
 ## D.0 讨论结论与范围
 
@@ -29,7 +29,7 @@
 | [`task_env/observations/canonical_camera/contracts.py`](../../../../../task_env/observations/canonical_camera/contracts.py) | `CameraGeometry`, `ResolvedCameraMetadata`，Mount/Optical、Step/time、FOV/K | 当前 `camera-observation-v0` 仅明确 RGB/Depth、post-control-step |
 | [`task_env/observations/canonical_camera/images.py`](../../../../../task_env/observations/canonical_camera/images.py) | RGB/Depth strict normalize + `CanonicalCameraObservation` | Segmentation 与 async capture meta 未通用实现 |
 | [`task_env/render/camera/source.py`](../../../../../task_env/render/camera/source.py) | 保留 `camera-static-triangles-v0`；另有 D03 `camera-dynamic-source-v1` 的 Scene-v3 scalar Joint/Frame binding 与 typed state projection | 动态源只接受确切 Scene/source closure 与一一映射；不支持 free-joint、变形体或通用 Visual Scene |
-| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | 旧 `create_camera_session()` 与 `admit_render()` 不变；新增 `create_dynamic_camera_session()` 的 GeoPhys CPU → MuJoCo native OpenGL RGB bounded admission | 新路由限 D03 first intersection；不是通用 D05b pairing admission，也不启用 D04 Depth/Segmentation |
+| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | 旧 `create_camera_session()` 与 `admit_render()` 不变；dynamic route 以独立 D03 RGB / D04 RGB-Depth profile admission GeoPhys CPU → MuJoCo native OpenGL | 仅限 Scene-v3 scalar-joint Position candidate 与同步 pinhole；不是通用 D05b pairing admission，不启用 Segmentation |
 | [`task_env/render/base/`](../../../../../task_env/render/base) | `RenderBackend` registry 与 `UiRenderProvider` 等独立 contract | UI presentation 与 Camera Sensor 不能混为一体；Flora fake tests 不是 native Flora acceptance |
 | [`task_env/runtime/sessions/control.py`](../../../../../task_env/runtime/sessions/control.py) | Panda specific controlled session capabilities | 特定 Panda joint/actuator 数量约束，不等于通用 multi-robot control |
 
@@ -453,6 +453,62 @@ camera attachment/async scheduling、deformable visuals、其它 renderer/physic
 - **切片策略**：先 RGB/Depth 兼容和动态 capture，再受限 segmentation；同 capture 的 mask/label map、
   scene-instance identity 必须一起保存。仅 metadata 正确而物体像素不动不得过关；未完成 segmentation 不标完整 D04。
 - **Codex AUDIT**：优先增量扩展 `CameraGeometry`、`ResolvedCameraMetadata`、`CanonicalCameraObservation`，新 schema version 和数据复用路径有明确证据。
+
+#### D04 first bounded RGB/Depth receipt (2026-10-22)
+
+本切片 **EXTEND_EXISTING**：复用 `CameraGeometry`、`ResolvedCameraMetadata`、`CanonicalCameraObservation`、
+`DynamicCameraRenderSourceV1` 和 `MuJoCoDynamicCameraSession`。旧 `camera-observation-v0` mapping/hash、旧
+`create_camera_session()` 与 D03 RGB profile 不变；新增精确的
+`d04_mujoco_native_dynamic_opengl_rgbd_v1` admission/manifest，仍只准入 GeoPhys CPU、Scene-v3 scalar-joint
+Position source 与 MuJoCo native OpenGL。没有改冻结 A05 source/fixture，也没有改写 MuJoCo Renderer depth branch。
+
+实际 S2 继续使用 D03/C02b `phase-ii-c02b-position-servo-v1` candidate、同一 TaskArtifact
+`a56b6cbac66bc570c43d38b8eb5a7e3098873cc196015242d3e46df76dd0364c`、Scene
+`047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e`、source closure
+`aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47`，Controller
+`panda-main/position-servo-v1`。Render source 与实际 graphics 仍分别记录：GeoPhys/Taichi 0.6.2 x64 CPU physics；
+MuJoCo 3.8.1 native OpenGL Renderer，实测 current GL context 为 NVIDIA Corporation / GeForce RTX 5060 / OpenGL
+4.6.0 NVIDIA 595.84。MuJoCo 没有公开 Renderer context handle，因此此设备值只在成功 capture 后从当前 GL context
+即时读取并作为诊断事实；不读取 `_gl_context`，不把它当作 device pinning 或 admission 证据。
+
+相机与影像 contract 沿用现有值：optical frame 为 `+X right, +Y down, +Z forward`；
+`T_world_from_camera = T_world_from_parent @ T_parent_from_mount @ T_mount_from_camera`；居中 pinhole `K` 由
+321×241 resolution 与 vertical FOV 90° 推导，实际矩阵为
+`[[120.5,0,160.5],[0,120.5,120.5],[0,0,1]]`；像素坐标采用 image-edge convention、pixel center 为
+`(column+0.5,row+0.5)`。S2 的 RGB 是 HWC float32 `[0,1]`；Depth 是 H×W float32、单位 m、沿 optical `+Z`。
+MuJoCo 3.8.1 `Renderer.render()` 的 depth 分支已反投影为米制 view-Z；adapter 按 `model.stat.extent` 设置 near/far，
+并将 near-clipped、far plane 及 background 归一为 `0.0` invalid。D04 profile 采用 exclusive far plane；旧
+`optical_z_m` / `ray_distance_m` 的 inclusive far-plane normalization 保持原样。
+
+两个真实相机均从同一个 Canonical State boundary 构造 capture：fixed world camera `d04-fixed-square-peg-calibration-v1`，
+以及父 Frame 明确解析为 `panda-main/hand` 的 `d04-panda-hand-mounted-camera-v1`。Observation 携带现有
+`CameraCaptureIdentityV1`，identity 的 boundary/clock/modalities 必须与已渲染 buffer、metadata step/time 一致；它
+只作为成功返回 Observation 的数据关联，不单独声称 identity 类型可证明渲染。同步、render、device readback 都没有调用
+Controller、GeoPhys step、MuJoCo `mj_step` 或 `mj_forward`。S1 覆盖缺 Frame admission 前拒绝、depth sentinel、RGB/Depth
+shape/dtype、挂载位姿、reset 后旧 episode state 拒绝、capture failure 与 sibling consumer/资源隔离；双 consumer 版本游标
+另由 D03 S1 复测。
+
+独立几何 oracle 使用**未修改**的 A05 square-peg box（半尺寸 `(0.016, 0.016, 0.06) m`），不用 Renderer geometry buffer
+反推预测值。固定相机的 peg-center 投影正好是主点 `(160.5,120.5)`；analytic front-surface Z `1.484000 m`，实测
+`1.48399997 m`，backprojection 误差 `3.3e-8 m`。mounted 相机的初始/运动后深度误差分别约 `1.413 mm` / `1.348 mm`，
+backprojection 误差分别约 `1.413 mm` / `1.351 mm`；运行前界定的阈值为 depth `2 mm`、backprojection `3 mm`。12 个
+10 ms outer intervals 的 public clock 给出 60 个完成的 2 ms native steps。手部移动 `0.08044 m`，fixed/mounted RGB 分别有
+1183 / 1165 个变化像素，Depth 分别有 1187 / 15843 个变化像素。父 Frame 外参误差为 0；mounted camera 平移 `0.07990 m`，
+fixed camera 外参不变。每个 capture 前后物理 clock 不变。reset 后两路 RGB 与 Depth 均逐元素重现 reset 初帧，同时新 episode
+capture identity 改变；旧 episode state 被拒绝。
+
+S1：`test_phase_ii_d04_rgbd_camera.py` **2 passed**；随后 D03 S1、D04 S1、camera/capability legacy pin 与
+D05a execution contracts 定向回归 **12 passed**（1 Taichi deprecation warning）；真实 S2：
+`d04_rgbd_camera_s2_probe.py` **D04_RGBD_FIXED_MOUNTED_S2_BOUNDED_PASS**。较宽 B04a legacy reader compatibility sweep
+另有两个失败并已单独复现：TaskEnv H5 unknown-schema case 未抛预期的 `ValueError`，canonical trajectory unknown-schema
+case 则以缺少必需字段的 `TypeError` 退出。D04 改动不触及 H5/trajectory readers；这两项留作既有 reader owner 的独立缺口，
+不计入相机通过范围。Skill 刷新已核对 Camera API、dynamic source/session、公开调用路径、相关 S1/S2 与当前限制；模块
+Skill checker 与 `quick_validate.py` 均通过。cold-start 独立新 Agent 演练未运行，API/Qualification 语义保留 Human review。
+
+receipt、PNG、Depth `.npy` 和原始日志位于 ignored
+`workspace/maintenance/d04_rgbd_camera_20261022/`。定向 pytest 日志在 `verification/`，真实 S2 receipt 在
+`s2_geophys_mujoco/d04_rgbd_s2_receipt.json`。D04 RGB/Depth 首个有界交集可复核；没有实施或验证 Segmentation、
+free-joint、Assembly、跨其它 provider/backend、async capture、完整 D05b pairing 或 Formal Qualification。
 
 ### D05 — Renderer Selection / Pairing Integration（a/b）
 

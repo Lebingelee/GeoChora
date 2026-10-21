@@ -79,6 +79,13 @@ def back_project_world(metadata, pixels, depth):
 
 
 def optical_depth(native, metadata, *, native_convention):
+    """Return H×W float32 optical-Z metres; invalid/clipped samples are zero.
+
+    ``optical_z_m_far_invalid_v1`` is the D04 MuJoCo dynamic-renderer route.
+    The existing ``optical_z_m`` and ``ray_distance_m`` routes retain their
+    inclusive far-plane behavior for compatibility.
+    """
+
     camera = metadata.camera
     values = np.asarray(native, dtype=np.float64)
     if values.shape != (camera.height,camera.width) or not np.isfinite(values).all():
@@ -87,9 +94,13 @@ def optical_depth(native, metadata, *, native_convention):
         yy,xx = np.indices(values.shape)
         K = np.array(metadata.K)
         values = values / np.sqrt(1+((xx+.5-K[0,2])/K[0,0])**2+((yy+.5-K[1,2])/K[1,1])**2)
-    elif native_convention != 'optical_z_m':
+        values = np.where((values >= camera.near) & (values <= camera.far), values, 0)
+    elif native_convention == 'optical_z_m':
+        values = np.where((values >= camera.near) & (values <= camera.far), values, 0)
+    elif native_convention == 'optical_z_m_far_invalid_v1':
+        values = np.where((values >= camera.near) & (values < camera.far), values, 0)
+    else:
         raise ValueError('unknown native depth convention')
-    values = np.where((values >= camera.near) & (values <= camera.far), values, 0)
     return np.ascontiguousarray(values, dtype=np.float32)
 
 
