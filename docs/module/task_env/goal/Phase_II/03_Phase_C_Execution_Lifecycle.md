@@ -608,7 +608,9 @@ C04 两条放行准则保持通过。本轮复核 A05 `ControlBindingPlanV1` 的
 `provider_manifest()` 均只声明 `rigid_body`、`free_body`、`articulated_robot`、`joint_position_actuation`、
 `joint_state_query`、`body_pose_query` 和 `frame_pose_query`；Core capability schema 也不含 `actuator_force_query`。
 D02a 已明确 requirement ID 不是 Provider claim，admission 必须 fail-closed。GeoPhys 的 `read_actuator_force()` 源码注释
-限定为诊断/测试；因此不能用该路径为正式 Controller feedback 补造能力声明，也不能跳过现有 required feedback。
+限定为诊断/测试；`geophys.api_registry.query_public_api()` 对该 bare symbol 和 fully-qualified implementation symbol
+均返回 `unknown-symbol`。因此当前没有可接入的 GeoPhys public API route，不能用该内部读数为正式 Controller feedback 补造能力声明，
+也不能跳过现有 required feedback。
 
 沿现有 `task_env.runtime.sessions.control.materialize_control()` 增加可选 plan-bound admission：先核对 RuntimeSource 与
 Scene identity，再将每项必需 feedback capability 与实际 Provider manifest 及可选限制 manifest 求交，缺项在调用现有
