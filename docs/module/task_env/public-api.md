@@ -92,6 +92,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。v0 legacy route 保持；v1 仅支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 另要求精确 Scene identity、Joint/Frame bindings 与 StateRequirements；contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
+| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, `dynamic_render_manifest` | `task_env.render.camera` | D03 advanced bounded route：GeoPhys CPU Scene-v3 scalar-joint state → MuJoCo native OpenGL RGB；source closure 与 Entity/Frame→body/geometry mapping 必须完整，geometry/publication/transform versions 分开、每个 consumer 独立消费；当前不接受 free-joint、Depth/Segmentation 或其它 pairings，不属于 root facade/通用 D05b admission |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
@@ -117,6 +118,10 @@ D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeS
 `create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变
 `admit_render`、Provider manifest capability claims 或 native construction，也不允许 UI `render_mode` 冒充
 Camera Sensor selection。现有 provider-capability-v0 mapping 原样保留；其 `identity_hash` 只绑定精确 mapping。
+D03 另在同一 Camera owner 增加 `create_dynamic_camera_session(camera, execution, source=..., initial_state=..., manifest=None)`；
+它只 admission GeoPhys CPU Scene-v3 scalar-joint Position source 与 MuJoCo `native-opengl` RGB，使用现有
+`RuntimeSource` lowering、`CanonicalStateViewV1` 和 CameraGeometry，不调用 Controller 或推进物理。此单一 bounded
+route 不让旧 `create_camera_session()` 接受 ExecutionSpec v1，也不构成完整 D05b pairings、D04 modalities 或 Qualification。
 
 `TaskDefinition` 只消费公开 snapshot/state，不访问 solver。
 `BaseTaskEnv` 的 scene/reset/task-definition hooks 是 Extension API，不是第二套 task factory。

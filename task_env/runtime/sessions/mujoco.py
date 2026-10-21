@@ -1,46 +1,16 @@
 """Private MuJoCo peer adapter. No comparison/oracle or controller implementation."""
 import xml.etree.ElementTree as ET
 import math
-from pathlib import Path
-import posixpath
 import numpy as np
 
-from ...assembly.assets import _source_closure_digest
 from .common import _SessionValues, pose
-from .source import project_scene_definition_v3_to_mjcf
+from .source import lower_mujoco_scene_source, source_asset_bytes
 
 
 def _source_asset_bytes(base_dir, source_xml):
-    if base_dir is None:
-        raise ValueError('canonical MuJoCo materialization requires a bounded source base_dir')
-    root = Path(base_dir).resolve()
-    if not root.is_dir():
-        raise ValueError('canonical MuJoCo source base_dir must be an existing directory')
-    document = ET.fromstring(source_xml)
-    compiler = document.find('compiler')
-    meshdir = '' if compiler is None else compiler.get('meshdir', '')
-    texturedir = '' if compiler is None else compiler.get('texturedir', '')
-    assets = {}
-    for node in document.iter():
-        raw_path = node.get('file')
-        if raw_path is None:
-            continue
-        if node.tag == 'include':
-            raise ValueError('D01b MuJoCo Scene-v3 materialization does not admit nested MJCF includes')
-        directory = meshdir if node.tag in {'mesh', 'skin'} else texturedir if node.tag == 'texture' else ''
-        logical_path = posixpath.normpath(posixpath.join(directory, raw_path.replace('\\', '/')))
-        if logical_path in {'.', '..'} or logical_path.startswith('../') or logical_path.startswith('/'):
-            raise ValueError(f'MuJoCo source asset path escapes its bounded base_dir: {raw_path!r}')
-        path = root.joinpath(*logical_path.split('/'))
-        resolved = path.resolve()
-        try:
-            resolved.relative_to(root)
-        except ValueError as exc:
-            raise ValueError(f'MuJoCo source asset escaped its bounded base_dir: {path}') from exc
-        if not resolved.is_file():
-            raise ValueError(f'MuJoCo source asset is missing: {logical_path!r}')
-        assets[logical_path] = resolved.read_bytes()
-    return assets
+    """Backward-compatible private spelling for the shared source owner."""
+
+    return source_asset_bytes(base_dir, source_xml)
 
 
 class _MuJoCoSession(_SessionValues):
@@ -48,29 +18,23 @@ class _MuJoCoSession(_SessionValues):
         self._initialize_values(artifact, source, 'mujoco')
         import mujoco
         self._mj = mujoco
-        source_xml = source.scene_source.xml
         assets = None
         if source.scene_definition is not None:
-            source_xml = project_scene_definition_v3_to_mjcf(
-                source_xml, source.scene_definition,
+            source_xml, assets = lower_mujoco_scene_source(
+                source.scene_source,
+                source.scene_definition,
+                source.source_closure_digest,
             )
-            assets = _source_asset_bytes(source.scene_source.base_dir, source_xml)
-            measured_closure = _source_closure_digest({
-                'scene.xml': source_xml.encode('utf-8'),
-                **assets,
-            })
-            if measured_closure != source.source_closure_digest:
-                raise ValueError('MuJoCo canonical source closure digest mismatch')
+        else:
+            source_xml = source.scene_source.xml
+            legacy_root = ET.fromstring(source_xml)
+            for element in legacy_root.iter('freejoint'):
+                element.tag = 'joint'
+                element.set('type', 'free')
+            for element in legacy_root.findall('keyframe'):
+                legacy_root.remove(element)
+            source_xml = ET.tostring(legacy_root, encoding='unicode')
         root = ET.fromstring(source_xml)
-        # Legacy GeoPhys importer accepts extended freejoint attributes. MuJoCo
-        # represents these same damping/armature values as a type=free joint.
-        for element in root.iter('freejoint'):
-            element.tag = 'joint'
-            element.set('type', 'free')
-        # Asset home keyframes precede composed free bodies; execution requests
-        # own initialization, so stale source keyframes are not materialized.
-        for element in root.findall('keyframe'):
-            root.remove(element)
         self._model = mujoco.MjModel.from_xml_string(
             ET.tostring(root, encoding='unicode'), assets=assets,
         )

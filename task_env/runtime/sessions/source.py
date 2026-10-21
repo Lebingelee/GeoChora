@@ -2,6 +2,8 @@
 from dataclasses import dataclass
 from collections.abc import Mapping
 from types import MappingProxyType
+from pathlib import Path
+import posixpath
 import re
 import xml.etree.ElementTree as ET
 
@@ -41,6 +43,75 @@ def project_scene_definition_v3_to_mjcf(source_xml: str, scene_definition: Scene
                 )
             matches[0].set('axis', ' '.join(format(float(value), '.17g') for value in joint.axis))
     return ET.tostring(root, encoding='unicode')
+
+
+def source_asset_bytes(base_dir, source_xml: str) -> dict[str, bytes]:
+    """Read bounded external bytes referenced by one MJCF source document."""
+
+    if base_dir is None:
+        raise ValueError('canonical MuJoCo materialization requires a bounded source base_dir')
+    root = Path(base_dir).resolve()
+    if not root.is_dir():
+        raise ValueError('canonical MuJoCo source base_dir must be an existing directory')
+    document = ET.fromstring(source_xml)
+    compiler = document.find('compiler')
+    meshdir = '' if compiler is None else compiler.get('meshdir', '')
+    texturedir = '' if compiler is None else compiler.get('texturedir', '')
+    assets: dict[str, bytes] = {}
+    for node in document.iter():
+        raw_path = node.get('file')
+        if raw_path is None:
+            continue
+        if node.tag == 'include':
+            raise ValueError('Scene-v3 MuJoCo materialization does not admit nested MJCF includes')
+        directory = meshdir if node.tag in {'mesh', 'skin'} else texturedir if node.tag == 'texture' else ''
+        logical_path = posixpath.normpath(posixpath.join(directory, raw_path.replace('\\', '/')))
+        if logical_path in {'.', '..'} or logical_path.startswith('../') or logical_path.startswith('/'):
+            raise ValueError(f'MuJoCo source asset path escapes its bounded base_dir: {raw_path!r}')
+        path = root.joinpath(*logical_path.split('/'))
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f'MuJoCo source asset escaped its bounded base_dir: {path}') from exc
+        if not resolved.is_file():
+            raise ValueError(f'MuJoCo source asset is missing: {logical_path!r}')
+        assets[logical_path] = resolved.read_bytes()
+    return assets
+
+
+def lower_mujoco_scene_source(scene_source, scene_definition, expected_closure_digest: str):
+    """Apply the shared Scene-v3 MJCF lowering and verify its source closure.
+
+    Runtime physics materialization and the D03 visual consumer use this same
+    source path. Returned XML contains the current MuJoCo compatibility lowering;
+    a renderer may append its camera/light settings after this boundary.
+    """
+
+    if not isinstance(scene_source, TaskSceneSource):
+        raise TypeError('MuJoCo Scene lowering requires the public TaskSceneSource value')
+    if not isinstance(scene_definition, SceneDefinition):
+        raise TypeError('MuJoCo Scene lowering requires the canonical SceneDefinition')
+    if not re.fullmatch(r'[0-9a-f]{64}', str(expected_closure_digest)):
+        raise ValueError('MuJoCo Scene lowering requires a source closure SHA-256')
+    source_xml = project_scene_definition_v3_to_mjcf(scene_source.xml, scene_definition)
+    assets = source_asset_bytes(scene_source.base_dir, source_xml)
+    from ...assembly.assets import _source_closure_digest
+    measured_closure = _source_closure_digest({
+        'scene.xml': source_xml.encode('utf-8'),
+        **assets,
+    })
+    if measured_closure != expected_closure_digest:
+        raise ValueError('MuJoCo canonical source closure digest mismatch')
+    root = ET.fromstring(source_xml)
+    # GeoPhys accepts extended freejoint attributes; MuJoCo expects type=free.
+    for element in root.iter('freejoint'):
+        element.tag = 'joint'
+        element.set('type', 'free')
+    # ResetPlan owns initialization; stale source keyframes are not materialized.
+    for element in root.findall('keyframe'):
+        root.remove(element)
+    return ET.tostring(root, encoding='unicode'), assets
 
 
 @dataclass(frozen=True)

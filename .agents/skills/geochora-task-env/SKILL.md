@@ -201,7 +201,12 @@ continues to mean the exact legacy `ExecutionSpec` mapping; do not rewrite froze
 overrides replace the complete renderer selection, while other cameras use the explicit default. These
 contracts and `CameraRenderSource.capture_identity()` are static request descriptions only. Current
 `RuntimeSession.materialize()` and `create_camera_session()` still consume the legacy selection/admission
-route; no arbitrary cross-provider pairing, actual device realization, or capture is implied.
+route. The separate advanced `create_dynamic_camera_session()` route admits only the D03 first bounded
+intersection: GeoPhys CPU Scene-v3 scalar-joint state rendered by MuJoCo native OpenGL RGB from a verified
+`DynamicCameraRenderSourceV1` and initial `CanonicalStateViewV1`. It binds Entity/Frame to source body and
+renderer geometry, and tracks geometry/publication/transform versions per consumer. It rejects free joints,
+Depth/Segmentation, other provider/backend pairs, and incomplete mappings; it is not general D05b admission,
+does not call Controller or advance physics, and is not a Qualification.
 
 For Phase II B01 authoring input, use `task_env.environment.TaskSourceV1` and `load_task_source()` from the existing
 environment owner. The current strict envelope accepts task identity, a Scene reference, typed role selectors,

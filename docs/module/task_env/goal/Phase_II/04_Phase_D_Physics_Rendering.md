@@ -1,8 +1,9 @@
 # Phase D — Physics / Rendering Independence：架构、实施切片与验收
 
-> **PROPOSED / READY FOR SECOND REVIEW；仅修订规划，不是多 Provider/Renderer 实现或资格声明。**
+> **ACTIVE bounded implementation record；Phase D remains incomplete and carries no new Qualification.**
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体蓝图：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；A/B/C 输入见相邻阶段文件。
+> **当前状态（2026-10-21）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL、Position candidate RGB 动态同步首个交集已通过 S1/S2。D04、完整 D05b、广泛 Renderer/Scene 支持及 Phase II 均未完成。
 
 ## D.0 讨论结论与范围
 
@@ -27,8 +28,8 @@
 | [`task_env/artifacts/contracts.py`](../../../../../task_env/artifacts/contracts.py) | `CanonicalStateView(canonical-state-v0)`、`ExecutionSpec`, Manifest/Admission | v0 标量 joint maps，不代表 floating-base typed state 全支持 |
 | [`task_env/observations/canonical_camera/contracts.py`](../../../../../task_env/observations/canonical_camera/contracts.py) | `CameraGeometry`, `ResolvedCameraMetadata`，Mount/Optical、Step/time、FOV/K | 当前 `camera-observation-v0` 仅明确 RGB/Depth、post-control-step |
 | [`task_env/observations/canonical_camera/images.py`](../../../../../task_env/observations/canonical_camera/images.py) | RGB/Depth strict normalize + `CanonicalCameraObservation` | Segmentation 与 async capture meta 未通用实现 |
-| [`task_env/render/camera/source.py`](../../../../../task_env/render/camera/source.py) | `camera-static-triangles-v0`；World-space 静态 closed triangles | 不可当成动态 Articulation/Deformable 完整 Visual Scene |
-| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | `CameraRenderSession` 与 `admit_render` | 当前 `physics_provider == render_provider` 且 GeoPhys/MuJoCo CPU/native pairing；不支持任意组合 |
+| [`task_env/render/camera/source.py`](../../../../../task_env/render/camera/source.py) | 保留 `camera-static-triangles-v0`；另有 D03 `camera-dynamic-source-v1` 的 Scene-v3 scalar Joint/Frame binding 与 typed state projection | 动态源只接受确切 Scene/source closure 与一一映射；不支持 free-joint、变形体或通用 Visual Scene |
+| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | 旧 `create_camera_session()` 与 `admit_render()` 不变；新增 `create_dynamic_camera_session()` 的 GeoPhys CPU → MuJoCo native OpenGL RGB bounded admission | 新路由限 D03 first intersection；不是通用 D05b pairing admission，也不启用 D04 Depth/Segmentation |
 | [`task_env/render/base/`](../../../../../task_env/render/base) | `RenderBackend` registry 与 `UiRenderProvider` 等独立 contract | UI presentation 与 Camera Sensor 不能混为一体；Flora fake tests 不是 native Flora acceptance |
 | [`task_env/runtime/sessions/control.py`](../../../../../task_env/runtime/sessions/control.py) | Panda specific controlled session capabilities | 特定 Panda joint/actuator 数量约束，不等于通用 multi-robot control |
 
@@ -391,6 +392,58 @@ evaluation-boundary projection；SAPIEN/Genesis、native interval evidence、con
 - **Codex AUDIT**：是否可以在 `CameraRenderSource` 的 static mesh bridge 上**增量扩展**，还是确需受限新 visual binding？不能新建第二个 authoritative scene。
 - **复用 Gate**：对照 GeoPhys public ImportedScene/render lowering、Core UI 和 canonical camera 三条路径，
   说明选择现有桥接/组合/新增受限 binding 的原因；不从内部 renderer arrays 取状态补缺口。
+
+#### D03 first bounded intersection receipt (2026-10-21)
+
+本次选择 **EXTEND_EXISTING / COMPOSE_EXISTING**：保留静态三角形 source 和旧 `create_camera_session()`；在现有
+Camera source/API 与 MuJoCo adapter 内增加一条精确受限的动态 visual consumer。physics 唯一 authority 仍是
+GeoPhys RuntimeSession 的公开 `CanonicalStateViewV1`。新 renderer model 只从现有 `RuntimeSource` 的
+Scene-v3 `TaskSceneSource`、source closure 和 entity-qualified binding lowering 构造一次；每次同步只将公开
+scalar Joint positions 写到 renderer-owned MuJoCo data，再用 `mj_kinematics`/`mj_camlight` 计算视觉变换，
+不执行 `mj_step`、`mj_forward`、Controller 或 Provider state access。MuJoCo renderer 是视觉 consumer，不是第二个物理 authority。
+
+实际 S2 使用 C02b `phase-ii-c02b-position-servo-v1` candidate：GeoPhys CPU（Taichi 0.6.2 x64 CPU），
+`panda-main/position-servo-v1` Controller；TaskArtifact `a56b6cbac66bc570c43d38b8eb5a7e3098873cc196015242d3e46df76dd0364c`，
+Canonical Scene `047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e`，source closure
+`aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47`。Renderer 是 MuJoCo 3.8.1 native
+OpenGL Renderer；实际 context 报告 NVIDIA Corporation、NVIDIA GeForce RTX 5060/PCIe/SSE2、OpenGL 4.6.0
+NVIDIA 595.84。GeoPhys physics backend 的 `cpu` 与 Renderer selection 的 `native-opengl` 分开记录；此结果不是软件渲染。
+诊断相机复用既有 `CameraGeometry`/RGB contract，固定 world camera、160×120 RGB；peg 在该 Position source 中是静态对象，
+本次真实运动证据来自 Panda arm，不声称 peg/object movement。
+
+`DynamicCameraRenderSourceV1` 把每个 Canonical Entity/Joint 映射到 source MJCF Joint 名称，每个 Entity/Frame 映射到
+source body，并由已编译 renderer model 枚举到相应 geometry instance names。Source identity hash 同时绑定
+TaskArtifact、Scene identity、source identity/closure 与 Joint/Frame names。版本分开记录：
+
+- `geometry_version` 固定绑定 canonical Scene-v3 source closure 和 renderer lowering；本次每个 consumer 的静态几何 build count 为 1，12 个外层区间未重建。
+- `publication_version` 使用 `StateBoundaryIdentity.boundary_id`，包括 reset identity、control step 和 state revision。
+- `transform_version` 对实体化的 scalar joint positions 与其 Entity-qualified Frame poses 计算 digest；同一步新 revision 可消费同一步的新变换。
+- 每个 Camera session 自己保存最后消费的 publication/transform 版本。两个 MuJoCo consumer 的 S1 顺序测试证明 A 消费不会清掉 B 的更新；reset 后两者各自消费新 episode publication。
+
+Frame 对照阈值在运行前固定为位置 5e-4 m、四元数符号不变 L2 1e-3。S2 初始最大误差分别为约
+4.94e-8 m 与 2.53e-8；12 个 10 ms outer intervals 由公开 clock 对应 60 个完成的 2 ms native steps。
+hand-origin 移动 0.08044 m；以单通道差异大于 1/255 计，RGB 有 327 个变化像素（最小观测阈值 8）。
+捕获前后均为 `(control_step=12, simulation_time=0.12 s)`；capture 时 Controller compute、GeoPhys step、
+MuJoCo `mj_step`、MuJoCo `mj_forward` 调用数都是 0。Provider step API 被调用 12 次（每个 outer interval 一次）；
+native 完成数来自公开 simulation clock 对照，而非把 API 调用数冒充子步数。
+
+定向证据：`test_phase_ii_d03_visual_sync.py` **2 passed**（版本/身份、缺 Frame 映射 admission 前拒绝、同一步变换 publication、
+双 consumer、reset、只读 capture/sync、close 隔离）；`d03_visual_sync_s2_probe.py` **D03_S2_BOUNDED_PASS**。
+完整 JSON、RGB PNG 与原始日志保存在 ignored `workspace/maintenance/d03_visual_sync_20261021/s2_geophys_mujoco/`。
+同一步变换 S1 使用同一 source MJCF 生成并 frame-pose 一致性校验的 canonical-state-v1 fixture；它证明合法新 revision/transform
+不会被版本游标吞掉，但不声称 GeoPhys 提供了同一步手工 pose-write publisher。GeoPhys 实际外层控制运动由 S2 验证。
+
+TaskEnv module Skill refresh receipt：mode=`refresh`，更新现有 `geochora-task-env` 的 camera routes，未新建 Skill。
+复核了 `task_env.render.camera` 的实现、公开 exports、D03 S1/S2、D01b/D02b/D05a callers/tests 与
+[`public-api.md`](../../public-api.md)；分类为 EXTEND_EXISTING/COMPOSE_EXISTING。Skill checker 与
+system `quick_validate.py` 均通过；冷启动 route 从 Skill 的 Learner/render owner 表到新 admission 入口，明确写出
+GeoPhys CPU × MuJoCo native OpenGL RGB、Scene-v3 scalar-joint 与不支持范围。API/qualification-sensitive 变更仍待维护者 review；
+上述检查不构成 D04/D05b 或 Formal Qualification。
+
+本 bounded route 只准入 GeoPhys CPU、Scene-v3 scalar-joint Position source 与 MuJoCo native OpenGL RGB；不允许 free-joint、
+缺失/重复 canonical binding 或 closure mismatch。没有扩展 `camera-static-triangles-v0`，没有开启 Depth/Segmentation、
+camera attachment/async scheduling、deformable visuals、其它 renderer/physics pairs、双 Entity、完整 D05b resource/pairing admission，
+也没有正式 Qualification。D03 本轮首个刚性 articulation 交集可复核；完整 D03/D04/D05b 与 Phase II 保持未完成。
 
 ### D04 — Camera Contract / RGB/Depth/Segmentation
 

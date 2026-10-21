@@ -18,7 +18,7 @@ With `.codegraph/` present, explore these owners first.
 | Selected recording/inspection | `task_env/trajectory/canonical/`, `examples/recording/record_expert.py`, `examples/recording/inspect_h5.py` | canonical outer v0/v1 vs execution stream v1/v2/v3; T/T+1; strict interval validation; no complete D0 owner restore |
 | Offline trajectory | `task_env/trajectory/__init__.py`, `task_env/script/trajectory/` | validate/inspect/transcode/replay; explicit historical replay is separate |
 | Parallel | `task_env/vectorization/registry.py`, `task_env/vectorization/parallel.py` | explicit homogeneous tasks, local/remote spawn, masked reset/autoreset |
-| Learner/render | `task_env/alg/`, `task_env/render/`, `task_env/observations/canonical_camera/` | learner flatten boundaries; camera vs UI; D05a static `CameraCaptureIdentityV1` is request identity only; active native admission still requires physics/render provider match |
+| Learner/render | `task_env/alg/`, `task_env/render/`, `task_env/observations/canonical_camera/` | learner flatten boundaries; camera vs UI; D05a static `CameraCaptureIdentityV1` is request identity only; legacy `create_camera_session()` remains same-provider; D03 `create_dynamic_camera_session()` admits only GeoPhys CPU Scene-v3 scalar state → MuJoCo native OpenGL RGB |
 
 Detailed maintained contracts: [public API](../../../../docs/module/task_env/public-api.md),
 [runtime](../../../../docs/module/task_env/runtime-and-providers.md),

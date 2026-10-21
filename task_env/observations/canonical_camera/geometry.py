@@ -3,6 +3,7 @@ import math
 import numpy as np
 from ...utils.rotation import quat_wxyz_to_matrix
 from .contracts import CameraGeometry, ResolvedCameraMetadata, MOUNT_FROM_CAMERA, rigid_transform
+from ...artifacts.state import CanonicalStateViewV1
 
 
 def matrix_tuple(value):
@@ -29,14 +30,31 @@ def fov_x(camera):
 def resolve_camera(camera, state):
     parent = np.eye(4)
     if camera.parent_frame != 'world':
-        pose = state.pose_world[camera.parent_frame]  # fail closed missing semantic frame
+        if isinstance(state, CanonicalStateViewV1):
+            matches = [
+                item.pose_world for item in state.frames
+                if item.frame.frame_id == camera.parent_frame
+            ]
+            if len(matches) != 1:
+                raise ValueError(
+                    'canonical camera parent Frame must resolve to exactly one Entity-qualified state Frame'
+                )
+            pose = matches[0]
+        else:
+            pose = state.pose_world[camera.parent_frame]  # fail closed missing semantic frame
         parent[:3,:3] = quat_wxyz_to_matrix(pose.quaternion_wxyz)
         parent[:3,3] = pose.position
     mount = parent @ camera.T_parent_from_mount
     optical = mount @ camera.T_mount_from_camera
+    if isinstance(state, CanonicalStateViewV1):
+        control_step = state.boundary.control_step
+        simulation_time = state.sample_clock.simulation_time_s
+    else:
+        control_step = state.control_step
+        simulation_time = state.simulation_time
     return ResolvedCameraMetadata(camera, matrix_tuple(mount), matrix_tuple(optical),
         matrix_tuple(inverse_transform(optical)), matrix_tuple(intrinsics(camera)), fov_x(camera),
-        state.control_step, state.simulation_time)
+        control_step, simulation_time)
 
 
 def project_world(metadata, points):
