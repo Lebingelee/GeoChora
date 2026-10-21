@@ -30,6 +30,20 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 horizon 产生 truncation；selected expert 的 stop/completion policy 必须单独读取。
 Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly external action 明确拒绝。
 
+通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
+unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined
+privileged/evaluation data。`private_state` 保留既有独立语义与路径（例如
+`private_state.robot_base_pose_world`），不能当作 `privileged_state` 的别名。当前 builder 中声明的 leaf
+均为必需字段；缺少 RuntimeSnapshot 所需来源时明确失败，不以零值补齐。
+
+`metadata["info_schema"]` 描述 reset/step 的 execution facts、required feedback 和 optional diagnostics。
+reset/step `info["simulation_time_s"]` 必须来自对应 RuntimeSnapshot 的有限公开 simulation clock；缺失或无效时
+结果构造失败，并由现有 lifecycle fault 闭锁。`ObservationConfig.include_diagnostics` 默认 `True` 以保留旧输出；设为
+`False` 只省略 action/ctrl clipping 诊断标记，不省略 requested/external action、controller target、requested/applied
+control、universal action、task evaluation 或 clock，也不影响施控路径。TaskEnv info 的 camera capture 引用（若存在）
+位于可选 `camera_capture`，来源为 `SensorObservation.camera_metadata`，并标注对应的 elapsed step 与 simulation time；
+图像/新模态的实现仍由 D04 管理。
+
 失败的 reset/step 在各自 lifecycle owner 中 fail-closed：需要成功 reset 才能再次 step，环境不会假设 provider 物理状态
 可以回滚。`BaseTaskEnv` 与 selected reference 的 `execution_fault` 提供当前故障 receipt；构造期间失败时原异常对象
 附带 `execution_fault`。`ExecutionFaultV1.physical_progress` 只描述当前控制区间的可观测进展

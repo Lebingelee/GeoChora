@@ -439,8 +439,8 @@ C05a/record CLI/selected consumers/streaming 组合为 **85 passed、2 deselecte
 TaskEnv module Skill 已按现有 failure behavior 刷新；`check_module_skill.py` 静态校验通过。
 
 证据仅覆盖现有 generic Pendulum scalar CPU 与 A05 Panda selected legacy compatibility 交集，以及合成故障注入的
-生命周期边界；它不是新 Provider qualification、partial-state recovery、全 selected source S2、C03b Stop policy、
-C04 observation 契约或 C02b group dispatch 的证据。C04 与 C02b 仍待单独执行；C03b 仍按原依赖延后。
+生命周期边界；它不是新 Provider qualification、partial-state recovery、全 selected source S2、C03b Stop policy
+或 C02b group dispatch 的证据。C04 与 C02b 各自有独立 receipt；C03b 仍按原依赖延后。
 
 #### C03a fault-receipt correction（2026-10-21）
 
@@ -469,6 +469,44 @@ TaskEnv module Skill refresh receipt（2026-10-21）：module=`task_env`，mode=
 没有新 Runtime/Recorder/recovery API。冷启动按 AGENTS + TaskEnv Skill 路由到现有 `execution_fault` 和 selected
 recording owner，并能找到“clock 决定进度、两种计数仅作证据、pending 阻止 freeze、close/recreate”的处理；
 `check_module_skill.py .agents/skills/geochora-task-env` 静态检查通过。该 Skill 描述更新不升级 provider 能力或 qualification。
+
+#### C04 bounded observation and info receipt (2026-10-21)
+
+C04 扩展现有 `ObservationFieldSpec` / `ObservationSchema` / `StateObservationBuilder` 和 task-owned Pendulum、TwoWheel
+builders，没有新增 observation pipeline。`metadata["observation_schema"]` 逐 leaf 发布 path、shape、dtype、unit、frame、
+reset/step boundary time reference、requiredness 与 visibility；`state`、`privileged_state`、`private_state` 的语义分开，
+并保留 `private_state.robot_base_pose_world` 原名、shape 和 world pose 内容。Task info 的声明复用 `environment.metadata`
+owner，以 `info_schema` 标明 reset/step execution facts、required feedback、optional diagnostics、每字段 shape/dtype/
+unit/frame/time/requiredness；同一 owner 的 `validate_task_info()` 对必需字段和 finite simulation clock 做 fail-closed 校验。
+
+通用 `BaseTaskEnv` reset/step 的 `simulation_time_s` 来自返回 observation 所用的 RuntimeSnapshot。缺失或无效 clock 会让
+结果格式化失败，继续由现有 lifecycle fault 闭锁。新增 `ObservationConfig.include_diagnostics` 默认 `True`，旧 clipping
+诊断键默认保持；设为 `False` 只省略 action/ctrl clipping 标记，所有 task evaluation 和 requested/external action、
+controller target、requested/applied control、universal action 与时钟保持可用。相机 metadata 只从现有
+`SensorObservation.camera_metadata` 透出到可选 `info["camera_capture"]`，引用同一 elapsed step 和 simulation time；不实现
+新 image/depth modality。RGB/depth observation 叶仍由现有 renderer/Camera owners 构建；depth 单位与 frame 标为 provider
+passthrough，TaskEnv 不伪称重解释。
+
+新增 `test_phase_ii_c04_observation_contract.py`。真实 Pendulum GeoPhys CPU route 覆盖
+reset/step schema、`observation_space.contains`、有限且对齐的时钟、同 seed/action 下 diagnostics 开关前后的 observation、
+reward/task metrics、控制反馈相等。Panda synthetic builder 覆盖现有 private-state 路径、space membership、required body/site
+来源缺失失败及 schema 缺字段失败；controller-call/feedback probe 覆盖 diagnostics 开关不改变传给既有 Controller 的
+RuntimeSnapshot 且不删除必需 target/applied 字段。Camera 检查沿 Env fallback 保存已有 `SensorObservation` metadata，
+核对来源与同一 boundary reference。组合 `test_phase_ii_c04_observation_contract.py`、C03a lifecycle、B03a/B03b、C02a
+Controller bindings、C05a recording 为 **57 passed**，有一个上游 Taichi `locale.getdefaultlocale` deprecation warning；日志见
+ignored `workspace/maintenance/phase_ii_c04_20261021/c04_regression.log`。
+
+证据边界：当前 generic Panda `BaseTaskEnv` 真实 runtime 构造在 Stage 1 `compile_task_scene` 处以
+`NotImplementedError: no Stage 1 scene composition adapter` 失败，因此没有报告真实 Panda Controller/physics A/B 验收或
+Panda GeoPhys/MuJoCo S2。Panda 的本轮证据限合成 RuntimeSnapshot builder、controller-call 与 info-packaging probes；实际
+物理 A/B 由现有非 Panda Pendulum CPU 路径验证。Camera 只测 metadata carrier/reference，不构成 D04 动态图像、深度语义或
+Provider pairing 验收。C04 不合并 selected-reference Env 类型，不改其独立兼容路线。
+
+TaskEnv module Skill refresh receipt（2026-10-21）：module=`task_env`，mode=`refresh`；对照当前 BaseTaskEnv/
+ObservationBuilder、Pendulum/TwoWheel builder、RuntimeSnapshot、Camera metadata carrier、C04 定向测试及 public API contract，
+刷新了 schema/info/diagnostics/camera 使用说明。复用归类为 `EXTEND_EXISTING`：沿用 metadata、field spec、builder 与已有
+`SensorObservation` owner；未新建 InfoSchema 类、Recorder、Controller 或 camera runtime。Skill 静态校验及示例/源码链接校验
+记录在 `workspace/maintenance/phase_ii_c04_20261021/`。该 receipt 不升级 Panda、camera、Provider 或 qualification claims。
 
 ## C.9 质量门与直接可测问题
 

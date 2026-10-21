@@ -353,10 +353,13 @@ class RobotConfig:
 class ObservationConfig:
     schema_version: str = "task-env-state-v1"
     include_privileged_state: bool = True
+    include_diagnostics: bool = True
 
     def __post_init__(self) -> None:
         if not self.schema_version.strip():
             raise ValueError("schema_version cannot be empty")
+        if type(self.include_diagnostics) is not bool:
+            raise TypeError("include_diagnostics must be a boolean")
 
 
 @dataclass(frozen=True)

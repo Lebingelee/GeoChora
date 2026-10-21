@@ -923,6 +923,10 @@ class ObservationFieldSpec:
     shape: tuple[int, ...]
     dtype: str = "float32"
     semantic: str = ""
+    unit: str = "unspecified"
+    frame: str = "unspecified"
+    time_reference: str = "same_reset_or_step_boundary"
+    required: bool = True
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -933,6 +937,11 @@ class ObservationFieldSpec:
         object.__setattr__(self, "shape", tuple(int(dim) for dim in self.shape))
         object.__setattr__(self, "dtype", str(np.dtype(self.dtype)))
         object.__setattr__(self, "semantic", str(self.semantic))
+        object.__setattr__(self, "unit", str(self.unit))
+        object.__setattr__(self, "frame", str(self.frame))
+        object.__setattr__(self, "time_reference", str(self.time_reference))
+        if type(self.required) is not bool:
+            raise TypeError("observation field required must be a boolean")
 
 
 @dataclass(frozen=True)

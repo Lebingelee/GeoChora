@@ -211,3 +211,23 @@ Canonical outer v1 is decoded by `task_env.trajectory.canonical.load()` and can 
 projection. Execution stream v3 uses `task_env.trajectory.canonical.execution.load()` or its bounded
 `streaming.load_streaming()` reader. The old generic H5, canonical outer, and execution schemas keep separate readers;
 do not use storage equality as replay evidence. See the C02a/C05a receipts in the Phase II C and execution-order docs.
+
+## Phase II C04 observation and info contract
+
+Generic `BaseTaskEnv` uses its existing ObservationBuilder and `ObservationSchema`; inspect
+`env.metadata["observation_schema"]` for required leaf paths, shape, dtype, unit, frame, boundary-time reference, and
+visibility. Exact group membership and order are enforced. `state`, `privileged_state`, and the historical
+`private_state` namespace have distinct meanings; preserve `private_state.robot_base_pose_world` and fail when a required
+snapshot source is unavailable instead of substituting zeros.
+
+`env.metadata["info_schema"]` declares reset/step facts, required action/control feedback, optional diagnostics, and optional
+camera capture references. Reset and step `info["simulation_time_s"]` comes from that boundary's RuntimeSnapshot; an absent or
+invalid public clock fails result construction and leaves the existing lifecycle faulted. `ObservationConfig.include_diagnostics`
+defaults to `True` for output compatibility. Turning it off omits clipping flags only; task metrics/evaluation, requested and
+applied control feedback, controller targets, universal action, physics and clocks remain available and unchanged.
+`info["camera_capture"]`, when present, points to `SensorObservation.camera_metadata` and identifies the same elapsed-step/time
+boundary. This is a metadata reference only; it does not establish D04 image/depth behavior.
+
+The C04 bounded receipt records real Pendulum GeoPhys CPU reset/step schema, time and diagnostics checks plus Panda builder-level
+private-state contract checks. The generic Panda `BaseTaskEnv` route currently fails earlier at missing Stage 1 scene composition;
+do not report this receipt as real Panda Controller/physics qualification. See the [C04 receipt](../../../docs/module/task_env/goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21).

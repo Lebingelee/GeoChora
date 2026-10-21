@@ -159,6 +159,9 @@ class TwoWheelBalanceObservationBuilder:
                         "sin(pitch), cos(pitch), pitch_rate, left_wheel_position, "
                         "right_wheel_position, left_wheel_rate, right_wheel_rate"
                     ),
+                    unit="1, 1, rad/s, rad, rad, rad/s, rad/s",
+                    frame="declared pitch and wheel joint coordinates",
+                    time_reference="same_reset_or_step_boundary",
                 ),
             ),
             groups=("state",),
@@ -179,7 +182,7 @@ class TwoWheelBalanceObservationBuilder:
             right_qpos_id=self._ids["right"][0],
             right_qvel_id=self._ids["right"][1],
         )
-        return freeze_observation(
+        observation = freeze_observation(
             (
                 (
                     "state",
@@ -200,6 +203,8 @@ class TwoWheelBalanceObservationBuilder:
                 ),
             )
         )
+        self._schema.validate(observation)
+        return observation
 
 
 @dataclass

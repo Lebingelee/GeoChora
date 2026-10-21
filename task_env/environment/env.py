@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import asdict, is_dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +13,12 @@ from .configuration import resolve_env_config, resolve_execution_plan
 from ..registry import AGENT_REGISTRY, OBJECT_REGISTRY, SCENE_REGISTRY
 from .config import ResolvedEnvConfig
 from .gym_compat import GymEnvBase
-from .metadata import TaskEnvMetadata, build_stage0_metadata, gym_metadata_dict
+from .metadata import (
+    TaskEnvMetadata,
+    build_stage0_metadata,
+    gym_metadata_dict,
+    validate_task_info,
+)
 from .protocols import TaskEnvironmentComponent
 from .lifecycle import SingleTaskLifecycleAdapter, TaskLifecycleAdapter
 from .types import (
@@ -110,6 +115,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._last_task_evaluation = None
         self._camera_sensors = ()
         self._sensor_provider = None
+        self._last_camera_metadata = {}
         self._last_snapshot = None
         self._elapsed_steps = 0
         self._episode_finished = False
@@ -583,10 +589,35 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
     def _build_observation_fallback(self, snapshot):
         if self._observation_builder is None:
             raise StageUnavailableError("This environment has no Stage 3 ObservationBuilder.")
+        self._last_camera_metadata = {}
         sensor_observation = None
         if self._sensor_provider is not None:
             sensor_observation = self._sensor_provider.capture(snapshot)
+            self._last_camera_metadata = dict(sensor_observation.camera_metadata)
         return self._observation_builder.build(snapshot, sensor_observation)
+
+    @staticmethod
+    def _require_simulation_time_s(snapshot) -> float:
+        value = getattr(snapshot, "simulation_time", None)
+        if value is None or not np.isfinite(float(value)):
+            raise ValueError("TaskEnv info requires finite simulation_time_s from RuntimeSnapshot")
+        return float(value)
+
+    def _camera_capture_info(self, *, elapsed_steps: int, simulation_time_s: float):
+        if not self._last_camera_metadata:
+            return None
+        cameras = {
+            str(name): _json_value(asdict(value) if is_dataclass(value) else value)
+            for name, value in self._last_camera_metadata.items()
+        }
+        return {
+            "source": "SensorObservation.camera_metadata",
+            "observation_boundary": {
+                "elapsed_steps": int(elapsed_steps),
+                "simulation_time_s": float(simulation_time_s),
+            },
+            "cameras": cameras,
+        }
 
     def reset(
         self,
@@ -595,6 +626,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         options: dict[str, Any] | None = None,
     ):
         super().reset(seed=seed)
+        self._last_camera_metadata = {}
         lifecycle = self._require_task_lifecycle()
         result = lifecycle.reset(
             seed=seed,
@@ -609,7 +641,8 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._episode_finished = lifecycle.episode_finished
         self._last_task_evaluation = evaluation
         try:
-            return result.observation, {
+            simulation_time_s = self._require_simulation_time_s(snapshot)
+            info = {
                 "seed": seed,
                 "reset_parameters": reset_parameters,
                 "task_uid": self.config.task.task_uid,
@@ -623,7 +656,16 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                 "success_definition": self.config.task.success_definition,
                 "resolved_control_metadata": self.metadata["action_schema"],
                 "observation_schema": self._observation_builder.schema,
+                "simulation_time_s": simulation_time_s,
             }
+            camera_capture = self._camera_capture_info(
+                elapsed_steps=self._elapsed_steps,
+                simulation_time_s=simulation_time_s,
+            )
+            if camera_capture is not None:
+                info["camera_capture"] = camera_capture
+            validate_task_info(info, phase="reset")
+            return result.observation, info
         except BaseException as error:
             lifecycle._latch_fault(
                 "gymnasium_reset_result",
@@ -636,6 +678,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
 
     def step(self, action):
         lifecycle = self._require_task_lifecycle()
+        self._last_camera_metadata = {}
         result = lifecycle.step(action)
         try:
             return self._format_step_result(lifecycle, result)
@@ -670,11 +713,17 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             "controller_target": command.controller_target,
             "requested_ctrl": applied.requested_ctrl,
             "applied_ctrl": applied.applied_ctrl,
-            "clipped": bool(command.action_clipped or applied.clipped),
-            "action_clipped": command.action_clipped,
-            "ctrl_clipped": applied.clipped,
             "mode": command.mode,
         }
+        if self.config.observation.include_diagnostics:
+            action_info.update(
+                {
+                    "clipped": bool(command.action_clipped or applied.clipped),
+                    "action_clipped": command.action_clipped,
+                    "ctrl_clipped": applied.clipped,
+                }
+            )
+        simulation_time_s = self._require_simulation_time_s(snapshot)
         info = {
             "is_success": evaluation.success,
             "elapsed_steps": self._elapsed_steps,
@@ -689,16 +738,25 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             "controller_target": command.controller_target,
             "requested_ctrl": applied.requested_ctrl,
             "applied_ctrl": applied.applied_ctrl,
-            "action_clipped": command.action_clipped,
-            "ctrl_clipped": applied.clipped,
             "observation_schema": self._observation_builder.schema,
+            "simulation_time_s": simulation_time_s,
         }
+        if self.config.observation.include_diagnostics:
+            info["action_clipped"] = command.action_clipped
+            info["ctrl_clipped"] = applied.clipped
         # ``universal_action`` is the one canonical action after the
         # controller/native adapter boundary.  Its schema is task-family
         # specific: Panda keeps its historical eight-dimensional layout,
         # while native non-arm tasks expose their runtime actuator vector.
         info["universal_action"] = command.universal_action
         action_info["universal_action"] = command.universal_action
+        camera_capture = self._camera_capture_info(
+            elapsed_steps=self._elapsed_steps,
+            simulation_time_s=simulation_time_s,
+        )
+        if camera_capture is not None:
+            info["camera_capture"] = camera_capture
+        validate_task_info(info, phase="step")
         return result.observation, evaluation.reward, result.terminated, result.truncated, info
 
     def get_record_metadata(self) -> dict[str, Any]:

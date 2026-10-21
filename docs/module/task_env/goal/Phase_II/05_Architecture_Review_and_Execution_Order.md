@@ -89,7 +89,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
 | 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
 | 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt 已窄修正**：现有 ports/两 Env 路径的 scalar reset/step/fault；receipt 分离 public-clock 物理进度、observer/Recorder 子步证据与 transition 状态；修正回归 70 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
-| 23 | C04 | C03a、D02b | 固定 public/privileged/private schemas、必要反馈/诊断分离、capture 引用 |
+| 23 | C04 | C03a、D02b | **bounded implemented**：现有 observation/info owners 固定 schema 元数据、clock、required feedback/optional diagnostics；real Pendulum + builder/negative probes 57 项组合回归；真实 Panda TaskEnv 与 D04 Camera 仍是明确缺口，详见 [C04 receipt](03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21) |
 | 24 | C02b | C02a、C03a、C04、C05a、D01b | 原子 group 执行，真实 arm+hand S2；缺 group/局部失败不留未知施控 |
 | 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |
 | 26 | C05b | C02b、C03b、C04 | PickCube 外置 Solution 的实际 step/record 路线，两 provider 回归 |
@@ -108,9 +108,9 @@ B05 可以完成 legacy semantics 适配，但 vNext 全链执行要到 D01b/P99
 D01a 只证明有限新 Scene bridge，不冒充完整 D01。父目标 implemented 必须覆盖其全部必需切片。
 P00/P99 是 gate，不增设新的 Framework/Harness；当前提交不执行表中代码实施。
 
-截至 2026-10-21，序号 22／C03a 已按其 bounded acceptance 完成；序号 23／C04 与 24／C02b 仍待各自命令及
-交接 gate，序号 25／C03b 的 termination/Stop policy 也未实现。C03a 提交未 push/merge，不改变冻结的
-`codex/phase-ii-b` 指针。
+截至 2026-10-21，序号 22／C03a 与 23／C04 已按 bounded acceptance 完成；序号 24／C02b 仍待实施与交接 gate，
+序号 25／C03b 的 termination/Stop policy 也未实现。C03a/C04 在 `codex/phase-ii-c` 分别本地提交，均未 push/merge，
+不改变冻结的 `codex/phase-ii-b` 指针。
 
 ### 3.1 粒度与工作量
 

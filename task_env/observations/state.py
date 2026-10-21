@@ -172,21 +172,29 @@ class StateObservationBuilder:
                 name="state.qpos",
                 shape=(7,),
                 semantic="panda arm joint positions",
+                unit="rad",
+                frame="panda-v1 arm joint coordinates",
             ),
             ObservationFieldSpec(
                 name="state.qvel",
                 shape=(7,),
                 semantic="panda arm joint velocities",
+                unit="rad/s",
+                frame="panda-v1 arm joint coordinates",
             ),
             ObservationFieldSpec(
                 name="state.gripper_qpos",
                 shape=(2,),
                 semantic="panda gripper joint positions",
+                unit="m",
+                frame="panda-v1 gripper joint coordinates",
             ),
             ObservationFieldSpec(
                 name="state.ee_pose",
                 shape=(7,),
                 semantic="end-effector pose as xpos[3]+xquat_wxyz[4]",
+                unit="m + unit_quaternion",
+                frame="world",
             ),
         ]
         if self._state_v2:
@@ -197,6 +205,8 @@ class StateObservationBuilder:
                     name="state.ee_pose_world",
                     shape=(7,),
                     semantic="end-effector world pose as xpos[3]+xquat_wxyz[4]",
+                    unit="m + unit_quaternion",
+                    frame="world",
                 )
             )
         return fields
@@ -218,6 +228,8 @@ class StateObservationBuilder:
                         ),
                         dtype=camera.rgb_dtype,
                         semantic=f"{camera.name} RGB image",
+                        unit=("uint8[0,255]" if camera.rgb_dtype == "uint8" else "float[0,1]"),
+                        frame=f"camera:{camera.name}/pixel_grid",
                     )
                 )
             if camera.depth:
@@ -229,7 +241,11 @@ class StateObservationBuilder:
                             else f"vision.depth.{camera.name}"
                         ),
                         shape=(camera.height, camera.width),
-                        semantic=f"{camera.name} depth image",
+                        semantic=(
+                            f"{camera.name} provider depth values passed through without reinterpretation"
+                        ),
+                        unit="provider-defined; TaskEnv passthrough",
+                        frame=f"camera:{camera.name}/provider_depth_frame",
                     )
                 )
         return fields
@@ -295,6 +311,8 @@ class StateObservationBuilder:
                 name="private_state.robot_base_pose_world",
                 shape=(7,),
                 semantic="resolved robot base world pose as xpos[3]+xquat_wxyz[4]",
+                unit="m + unit_quaternion",
+                frame="world",
             )
         ]
 
@@ -325,6 +343,8 @@ class StateObservationBuilder:
                         name=f"{prefix}.{_object_key(refs.uid, 'qpos')}",
                         shape=(int(refs.qpos_ids.size),),
                         semantic=f"{refs.uid} free/object joint qpos",
+                        unit="joint-defined SI coordinates",
+                        frame=f"{refs.uid} joint coordinates",
                     )
                 )
             if refs.body_ids.size:
@@ -333,6 +353,8 @@ class StateObservationBuilder:
                         name=f"{prefix}.{_object_key(refs.uid, 'body_pose')}",
                         shape=(int(refs.body_ids.size), 7),
                         semantic=f"{refs.uid} body poses as xpos[3]+xquat_wxyz[4]",
+                        unit="m + unit_quaternion",
+                        frame="world",
                     )
                 )
             if refs.site_ids.size:
@@ -341,6 +363,8 @@ class StateObservationBuilder:
                         name=f"{prefix}.{_object_key(refs.uid, 'site_pos')}",
                         shape=(int(refs.site_ids.size), 3),
                         semantic=f"{refs.uid} task site world positions",
+                        unit="m",
+                        frame="world",
                     )
                 )
         if self.references.objects and self._panda is not None:
@@ -350,11 +374,15 @@ class StateObservationBuilder:
                         name="privileged_state.first_object_to_ee_pos",
                         shape=(3,),
                         semantic="first object body position minus end-effector position",
+                        unit="m",
+                        frame="world vector",
                     ),
                     ObservationFieldSpec(
                         name="privileged_state.first_object_to_ee_dist",
                         shape=(1,),
                         semantic="euclidean distance from first object body to end-effector",
+                        unit="m",
+                        frame="scalar distance; world-invariant",
                     ),
                 ]
             )

@@ -287,6 +287,9 @@ class PendulumObservationBuilder:
                     shape=(3,),
                     dtype="float32",
                     semantic="cos(theta), sin(theta), theta_dot; theta=0 is upright",
+                    unit="1, 1, rad/s",
+                    frame="pendulum_hinge joint coordinates",
+                    time_reference="same_reset_or_step_boundary",
                 ),
             ),
             groups=("state",),
@@ -303,7 +306,7 @@ class PendulumObservationBuilder:
             qpos_id=self._qpos_id,
             qvel_id=self._qvel_id,
         )
-        return freeze_observation(
+        observation = freeze_observation(
             (
                 (
                     "state",
@@ -315,6 +318,8 @@ class PendulumObservationBuilder:
                 ),
             )
         )
+        self._schema.validate(observation)
+        return observation
 
 
 @dataclass
