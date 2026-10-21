@@ -6,6 +6,10 @@
 > **阅读顺序：本文件 → [审阅决策与执行顺序](05_Architecture_Review_and_Execution_Order.md) → A/B/C/D 阶段文档。**
 > **原始五份草案在提交 `a299d8b` 原样保存；修订不代替 canonical docs、源代码、Evidence 或实现批准。**
 
+> **2026-10-21 恢复修订**：维护者已授权本轮规划修订、提交及推送，供网页二审决定是否开始实施；没有授权本轮修改生产代码。
+> 当前计划采用 **20 个父 Goal、33 个实施切片 + P00/P99**；唯一当前顺序表见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
+> 独立恢复审阅、消费链缺口及实施进入条件见 [C02b Recovery Review](C02b_Recovery_Architecture_Review.md)。旧日期、序号和验收结果保留历史含义。
+
 ## 0. 使用与事实来源
 
 1. 本组规划保存在 `docs/module/task_env/goal/Phase_II/`。`00` 定义范围，`01–04` 定义各 Goal 契约，`05` 是实施切片顺序、决策和审阅事实的唯一入口；不是新的 canonical capability matrix。
@@ -90,14 +94,14 @@ Physics Provider        Rendering Provider
 | 09 | **B04** Artifact Identity Evolution | B04a 提前确定嵌套版本；B04b 编译/codec | A02；B04b 另需 B03b | artifacts/现有 readers | v0 及嵌套 schema/identity 全链保护 |
 | 10 | **B05** B Reference Regression | 将现有两 selected task 的“语义”迁移或适配 | B04b | tasks | 成功判定/ResetSample 与基线对照；不抢先重构 expert loop |
 | 11 | **C01** Execution Config & Plan | C01a 静态计划；C01b 实际 requirements/admission | A02/B04a/D02a；C01b 另需 B05 | environment/runtime | actual manifest 不扩权、动态失败回收 |
-| 12 | **C02** Multi-controller Bindings | C02a schema；C02b 原子执行；C02c 兼容切换 | A03/C01b；执行另需 C05a/C04/D01b | controllers/environment | 全动作先校验、唯一 writer、memory/space 一致 |
-| 13 | **C03** Scalar Lifecycle | C03a 现有 ports/fault policy；C03b Stop/termination | C02a/D01b/C05a；Stop 另需 C04 | 现有 lifecycle/environment | fault 禁止续步、flags、零时间 Stop |
+| 12 | **C02** Multi-controller Bindings | C02a schema；C02b 原子执行（内部 P/E 检查点）；C02c 兼容切换 | 执行需 C02a/C03a/C04/C05a2/D01b；切换另需 C03b | controllers/environment | 全动作先校验、唯一 writer、实际 Profile identity/feedback、memory/space 一致 |
+| 13 | **C03** Scalar Lifecycle | C03a 现有 ports/fault policy；C03b Stop/termination | C02a/D01b/C05a2；Stop 另需 C04 | 现有 lifecycle/environment | fault 禁止续步、flags、零时间 Stop |
 | 14 | **C04** Observation & Diagnostics | public/privileged/private schema、必要反馈与可选诊断 | C03a/D02b | observations/controllers | 同 boundary、非 Panda、重复读取不改语义 |
-| 15 | **C05** Recorder & Solution Migration | C05a 存储前移；C05b PickCube；C05c NutAssembly | 存储需 C02a；Solution 需 C02b/C03b/C04 | 既有 recorder/tasks/controllers | action tree/events、hold/ramp/native Guard 保真 |
+| 15 | **C05** Recorder & Solution Migration | C05a1 值/版本/finalizer 契约；a2 generic H5/最低 loader；a3 canonical/execution；b PickCube；c NutAssembly | 存储需 C02a/C01b/D05a；Solution 需 C02b/C03b/C04/C05a3 | 既有 recorder/tasks/controllers | 既有 C05a 证据逐项映射、不重复实现；action tree/events、hold/ramp/native Guard 保真 |
 | 16 | **D01** Physics Materialization | D01a 提前真实桥接；D01b vNext 完整接入 | A05/C01a/B04a；D01b 另需 B04b/C01b | assembly/runtime adapters | 新表示真实被消费、realization、两 provider |
 | 17 | **D02** Canonical State vNext | D02a 契约提前；D02b runtime projection | A02；D02b 另需 D01a | runtime/artifacts | 真实多 DOF、Frame/Twist、alias lifetime |
 | 18 | **D03** Render State Synchronization | visual materialization、transform/geometry versions、按需 sync | D01b/D02b/D05a | render/observations | 两消费者版本独立，reset/同 step 修改可见 |
-| 19 | **D04** Camera & Modalities | camera model、RGB/Depth/Segmentation/metadata 的扩展 | D03/C04/C05a | observations/render | 投影+反投影、seg ID、capture provenance |
+| 19 | **D04** Camera & Modalities | camera model、RGB/Depth/Segmentation/metadata 的扩展 | D03/C04/C05a2 | observations/render | 投影+反投影、seg ID、capture provenance |
 | 20 | **D05** Renderer Composition Gate | D05a selection/manifest；D05b 真实 pairing | C01a/A02；集成另需 D04/C01b | render/runtime/diagnostics | provider/backend 分层、真实同步、资格不虚报 |
 
 **前移的是契约和最小真实闭环，不是同时重写所有 subsystem。** D01a 使用 v0 schema 新 candidate microfixture
@@ -111,14 +115,27 @@ C05a 必须早于 structured action 的开放；C05c 不等待高保真 Renderer
 P00 → A01/A02 → B04a/D02a/C01a/D05a contracts
     → A03/A04/A05 → D01a/D02b real microprobe
     → B01/B02/B03a/B03b/B04b/B05
-    → C01b/D01b/C02a/C05a storage
+    → C01b/D01b/C02a/C05a1/C05a2/C05a3 storage
     → C03a/C04/C02b/C03b
-    → C05b/C05c; C02c after the selected regression gate
+    → C02c after C02b/C03b/C05a2; C05b/C05c retain task-specific gates
     → D03/D04/D05b → P99
 ```
 
 这是导航图，斜杠不表示相互独立或可同时合并；逐切片前置条件在 `05` 的有序依赖表中定义。
 每个父 Goal 需全部必需切片完成才能标记 implemented；deferred 明示范围缩减，blocked 不可计完成。
+
+**C02b 恢复路线**：同一 Panda Entity 的 arm/gripper Groups 先采用新身份的 position-based Profile 候选，
+复用已有 DLS 与位置型 gripper servo；在完整 reset/step/record 路径证明不查询测量力后，按真实 Joint/Frame
+需求准入。旧 `panda-main/production-r1` 的 required raw force、拒绝测试和 reset stale-force 缺陷保留。
+位置控制仍可下发 physical force limit；这是 command，不是 measured-force query。新 Profile 不等价于 R1，
+也不自动满足 C05b/C05c 的旧 Solution/readiness/Guard 回归。C02b-P（审计/确定 Profile）和 C02b-E（真实执行/证据）
+是同一切片内部检查点，不增加切片数，C02b 目前仍为 BLOCKED。
+
+**Assembly 后置**：Logical Assembly 与 Physical Attachment 分离，只记录未来 A03/D01 的候选扩展；
+现有 Scene v3/RobotInstance/ControlGroup 和已完成验收不重开。Robot preset/leaf overrides 最终展开为唯一
+不可变 Effective ControlBindingPlan，父 preset 不占有第二份 actuator writer。跨 Entity attachment、递归配置、
+whole-body IK 和 topology hot swap 均不是当前 C02b 前置。最小双 Entity 隔离施控仍是 P00/P99 的独立验收义务，
+它不等于把两个 Entity 物理装配起来。
 
 ## 5. P00：启动前 Baseline / Compatibility Gate（不算实施 Goal）
 

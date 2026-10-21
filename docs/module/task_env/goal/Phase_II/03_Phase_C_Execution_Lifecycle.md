@@ -1,6 +1,10 @@
 # Phase C — Execution API & Runtime Lifecycle：架构、实施切片与验收
 
-> **Phase C remaining design: PROPOSED.** The bounded C03a lifecycle/fault implementation is recorded below; this does not complete C03b, C04, C02b, or a unified Environment migration.
+> **Phase C remaining design: PROPOSED.** C02a/C05a/C03a/C04 have bounded implementation receipts below;
+> C02b remains BLOCKED, C03b/C02c and unified Environment migration remain incomplete.
+> **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；仅授权本轮文档修订/发布，代码实施等待二审。
+> 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
+> 源码审阅与进入条件见 [Recovery Review](C02b_Recovery_Architecture_Review.md)。历史收据不改写。
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体与依赖：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；输入：[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)、[`02_Phase_B_Task_Semantics.md`](02_Phase_B_Task_Semantics.md)。
 
@@ -319,12 +323,64 @@ Qualification；这些仍须各自满足后续 Goal 的真实 provider gates。
 ### C02 — Controller Binding / Atomic Execution / Safe Switch（a/b/c）
 
 - **切片**：C02a 在 A03/C01b/D02b 后确定 bindings、完整 action/feedback schema；
-  C02b 在 C03a/C04/C05a/D01b 后开放实际原子执行；C02c 在 selected C05b/C05c 回归后做同 schema 安全切换。
+  C02b 在 C02a/C03a/C04/C05a2/D01b 后开放实际原子执行；内部先 P（Profile 审计与进入条件）、后 E（执行与证据）。
+  C02c 在 C02b/C03b/C05a2 后做受限同 schema 安全切换，不要求等待完整 C05c；具名任务未经验证的切换仍拒绝。
 - **验收**：arm+hand 有真实受限 S2；双臂先静态，实际支持另需 D01b 双 Robot binding/S2。
   缺 Group/extra key/NaN 必须在任何 owner mutation 前拒绝；重叠 writer 拒绝；
   同 schema switch 的 initialization、effective boundary、applied acknowledgement、failure atomicity 可测。
   非兼容 schema 必须新 Env/wrapper。旧 Panda 输出保护，未测 multi-robot 不宣称执行支持。
 - **Codex AUDIT**：精确追踪已有 `RobotControllerHandle`, `ProductionCanonicalPandaController` 以及 `ControlledRuntimeSession` 的 owner/feedback 状态，不复制控制代码。
+
+#### C02b-P / C02b-E recovery contract（2026-10-21，规划；未实施）
+
+**状态**：C02b 仍为 BLOCKED。新的 position-based Profile 是待实现/验收的另一条路线，不能把现有
+`panda-main/production-r1` 的 raw `actuator_force` requirement 删除、改 optional 或填零。两者保留不同的
+writer/profile/binding identity，force-aware reset freshness 缺陷不因位置路线通过而关闭。
+
+**C02b-P — Profile 与完整消费链**：先复用 `CanonicalPandaController` 的 DLS/position servo，
+或在现有 Controller owner 中组合已有位置型 gripper；不重写控制算法。首条候选为同一 Panda Entity、arm/gripper
+两个 Group、一个既有 writer、CPU、100 Hz 外层/五个 2 ms native steps。真实 required state 包括 arm/finger
+joint positions 和 EE world pose；绑定 source/kinematic model、frame、unit、clock 与 reset 有效性，
+不以静态 writer 字符串代替实际 Controller instance/config/identity 校验。
+
+须明确解决以下现有调用耦合，不能只替换 Controller 类：
+
+- `SelectedReferenceEnv.reset/_step` 无条件读取 `control_feedback()`，并使用 R1 reset/compute/readiness 接口。
+  新位置路线不能直接复用这些调用；在既有执行 owner 内明确 Profile 所需的接口和受限适配，不新建 Env/Runtime。
+- GeoPhys `snapshot()` 默认不请求力，但 `control_feedback()` 请求 raw force；MuJoCo reset 和 controlled step
+  还会复制 `actuator_force` 缓存。新 Profile 全链不得进行此测量查询/复制；legacy 默认路径保持兼容。
+  Provider 内部正常计算执行器力属于物理求解，和 Core/Controller 读取该信号是不同操作。
+- 旧 canonical `BoundaryRecord` 强制包含 force feedback/readiness，不能用零值冒充位置路线数据。
+  首条候选优先使用现有 `CanonicalStatePublicationV1`/state 与 generic H5 v3 structured controls/events/outcome，
+  明确记录测得的位置、请求、target/applied 和边界。旧 canonical/execution bytes 与 readers 保持；
+  若未来需要其支持 position-only boundary，须在原 owner 内另审版本化扩展。
+
+`force_limit_N` 仍可作为 position servo 配置及 physical actuator cap 下发；这不意味着查询 measured force。
+新 Profile 必须显式记录其限幅/servo 参数，不冒称与 R1 的 30 N 闭环、readiness 或任务行为等价。
+Composite preset/leaf override 在未来展开为一个不可变 Effective Plan，父 preset 不增加 writer；
+递归 Robot Assembly、跨 Entity attachment、whole-body IK 不属于本检查点。
+
+**C02b-E — 实际执行**：复用 `compile_control_binding_plan()`/`prepare_structured_action()`，实现完整请求
+→全组预检→按 writer 一次 compute→完整 apply/ack→真实 native interval→state publication→版本化录制/读取。
+除声明的 state requirements 外，还应核对实际 Controller/target identity 与 effective plan，拒绝跨 Profile/stale target。
+动作/身份/资源预检失败不得改 Controller memory、施控或时钟；部分施控后失败复用 C03a fault receipt/闭锁，
+不假装回滚物理、不发布成功 transition。exactly-once apply/ack 与 Recorder T/T+1 分开验收。
+
+**验收层次**：S1 以抛错 sentinel 覆盖 force 查询路径，证明新 Profile 的 reset/compute/apply/step/record 不读力，
+并保留旧 R1 缺能力时 fail-closed；缺组/extra key/NaN/错误 identity 在 owner mutation 前拒绝。
+S2 在同一版本化 candidate/source 与 hash-bound ResetSample 下，分别验证 GeoPhys/MuJoCo CPU 的真实 arm/hand
+运动、reset、五个 native steps、ack、只读 state 和 H5 v3 回读。S3 是适用的短 public execution/record/read 主线，
+不是完整 PickCube/NutAssembly Expert qualification。本轮仅列 gate，不声称这些实验已执行。
+
+**完成边界**：C02b-P/E 不增加正式切片数。单 Panda position-profile S2 只关闭其声明交集；P00 要求的最小双 Entity
+隔离施控另需真实 D01/C02 evidence，不能以 Assembly 后置删除，也不能以 first Panda PASS 标为完整多机器人支持。
+未覆盖必需交集时明确 partial，P99 不得标 complete。C05b/C05c 的旧 Solution/readiness/Native Guard 保真另验；
+需要 force 的 consumer 仍受 freshness gate 约束。
+
+**C02c**：同外部 action schema/frame/unit/timing/resource ownership 的切换只在完整控制边界生效；
+新 Profile required state、memory 初始化、effective identity/ack/events 先验收，失败保留旧 Controller 或 fail-closed。
+父 preset 的 preset/partially_overridden/custom 状态由有效配置推导，不成为第二个可漂移 authority。
+不兼容 schema 重建 Env/wrapper；未验证 NutAssembly 切换保持拒绝。
 
 #### C02a bounded implementation receipt（2026-10-21）
 
@@ -351,8 +407,8 @@ MuJoCo CPU 上各执行一步。与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A0
 
 ### C03 — Scalar Execution / Fault Policy / Stop（a/b）
 
-- **切片**：C03a 在 C02a/D01b/C05a 后以现有 ports/adapter 接入 reset/step/fault，
-  先保留单 controller 兼容执行；C03b 在 C03a/C04/C05a 后加入 termination policy 和 Stop。
+- **切片**：C03a 在 C02a/D01b/C05a2 后以现有 ports/adapter 接入 reset/step/fault，
+  先保留单 controller 兼容执行；C03b 在 C03a/C04/C05a2 后加入 termination policy 和 Stop。
 - **任务**：先统一公共行为，允许两薄 facade 过渡，不强制 selected 继承旧 BaseTaskEnv；
   保留 generic ignore_done、selected success 后动作及默认 horizon 的既有语义。
 - **验收**：Gymnasium 5-tuple、reset-before-step、post-terminal guard、success-post-success、no-success、stop-early/horizon 的 flags 和 clock；Stop 不产生物理 step/伪 transition；旧 UID 按兼容路由保持行为至 C05 迁移。
@@ -367,17 +423,23 @@ MuJoCo CPU 上各执行一步。与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A0
 - **验收**：`observation_space.contains(obs)`、字段必需缺失失败、Reset/Step 同 Schema、frame/time 符合 S1；打开/关闭 diagnostics 不改变 Controller 物理结果；已有 `private_state` 行为保护。
 - **Codex AUDIT**：现有 `StateObservationBuilder` 是否足以扩展，不要造第二个大型 Obs Pipeline。
 
-### C05 — Storage Compatibility / External Solutions（a/b/c）
+### C05 — Storage Compatibility / External Solutions（a1/a2/a3/b/c）
 
-- **C05a**：依赖 C02a/C01b/D05a，在 C03a/C02b 前完成 structured request、target/applied、
-  Boundary Event、EpisodeOutcome 的版本化存储/reader 及训练转换规则。扩展三类已有格式的实际 owner，
-  不新建 Recorder。旧 vector H5 和旧 canonical/execution fixtures 只读保护。
-- **C05b**：依赖 C02b/C03b/C04，先迁移 PickCube 的 external Solution，证明 action→step→record 路线。
+- **C05a1**：依赖 C02a/C01b/D05a；structured request、target/applied、Boundary Event、EpisodeOutcome 的
+  版本/值语义和 Stop finalizer 合同。已有共用值契约直接复用；实际 Stop/finalizer 行为在 C03b 验收。
+- **C05a2**：依赖 C05a1；在既有 generic H5 owner 提供 vNext、reader/最低训练 loader、T/T+1 和
+  end/bootstrap 准入。已有 H5 v3/单 writer 投影证据复用，non-arm 和 outcome 消费缺口逐项补证，不默认全通过。
+- **C05a3**：依赖 C05a1/C05a2；既有 canonical/execution 格式适配、未知版本拒绝和各自 legacy detector。
+  已有 outer v1/stream v3 实现复用，不重复建设 Recorder 或改历史 bytes。
+- **状态映射**：原 C05a 完成收据保持原样；它是 bounded storage evidence，不自动等于新三切片的全部 P00 退出条件。
+  [05 的映射表](05_Architecture_Review_and_Execution_Order.md#32-c05a-既有证据与三切片映射)逐项列明已有/未证实范围，
+  不因拆分撤销 C03a/C04 已有受限验收，也不把未证实的 consumer gate 记为通过。
+- **C05b**：依赖 C02b/C03b/C04/C05a3，迁移 PickCube external Solution，证明 action→step→record 路线。
 - **C05c**：依赖 C05b/D02b，先审定 native feedback/hold/ramp 契约再迁移 NutAssembly；
   分别证明 measured 500 Hz、Guard、arm schedule、Outcome V1 与 strict warning/failure 保真。
   无法证明时保留旧 step_expert，不能仅删除 external_action_error。
 - **验收**：同 frozen sample/config 在 GeoPhys/MuJoCo 已实现的受限 selected route 上，success/current-success/expert outcome/Guard/clock/recording 与旧基线有据可查；记录 T/T+1、Stop Events；不宣称完整 checkpoint replay；S2/S3 未跑标记缺口；兼容方法在所有 caller 迁移前不能删除。
-- **完整 C05 Gate**：C05a/b/c 分别有 receipt，真实采集/读取及适用的 replay validity 独立报告；
+- **完整 C05 Gate**：C05a1/a2/a3/b/c 分别有退出证据映射或 receipt，真实采集/读取及适用的 replay validity 独立报告；
   旧方法退休另需 production callers/examples/tests/docs 迁移及非回归，不与“新接口已存在”绑定。
   精确依赖及顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 - **Codex AUDIT**：提供旧 `step_expert → solution.act → _step → controller → feedback → solution.observe → recorder` 的完整调用图，逐步证明等价。

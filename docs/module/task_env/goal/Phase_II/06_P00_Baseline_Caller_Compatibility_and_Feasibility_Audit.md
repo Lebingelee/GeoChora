@@ -290,3 +290,29 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=GeoPhys/src:. "$TASKENV_PYTHON" -m pytest -
 完成后复核相对链接、`diff --check`、原有738文件、Gitlinks、冻结refs和用户二审文件。
 
 **停止点：P00 审查完成；等待维护者命令进入 A01 → A02。没有启动实施、commit、push、merge 或任何 S4 campaign。**
+
+## 8. 当前恢复规划与历史收据的对应（2026-10-21，文档修订）
+
+以上 P00 source、实验、停止点及 20 父 Goal/33 切片收敛结论是当时事实，保持原样。
+维护者本轮授权将当前 [05 执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)
+同步为 33 实施切片 + P00/P99（35 节点）；当前实现是否成立仍由源码与相应 Evidence 决定。
+旧序号映射和 C05a1/a2/a3 的已有证据/退出缺口见 05 §3/§3.2，不把旧 C05a 合并收据虚记为三个完整 PASS。
+已有受限验收直接复用，不重做 A–D，也不把 P00 所列 limitation 因改号而清除。
+
+**C02b 恢复调整**：内部采用 C02b-P（position-profile 实际消费链/identity/required state/录制路径）→
+C02b-E（dispatch/ack/fault/真实 S2/读取），都属于当前 26／C02b，不增加正式切片数。
+原 `panda-main/production-r1` 仍 required raw force，其 reset stale sample 缺陷、有效性要求与拒绝测试保留。
+独立位置 Profile 在证明完整路径不查询测量力后可采用真实 Joint/Frame requirements；不能删原 required、
+改 hash、假造 capability 或给旧 feedback 填 0。审阅发现的 selected reset/step、MuJoCo force cache 和
+canonical force/readiness recording 耦合须在现有 owner 内解决，不能只审 `compute()`。
+
+**保持已有依赖决议**：C02c←C02b/C03b/C05a2；C05b←C02b/C03b/C04/C05a3；C05c←C05b/D02b。
+不以完整 C05c 阻塞所有同 schema 切换，也不允许未经验证的 NutAssembly 切换。C03b/D03 可按原依赖独立推进。
+
+**范围保护**：最小双 Entity 隔离施控是本 P00 已有的 C02/P99 验收义务，不要求跨 Entity Robot Assembly，
+不能借 Assembly 延后而删除。真正跨 Entity Logical Assembly/Physical Attachment 是 DEFERRED 候选，
+须另审 Scene 版本、Provider materialization/reset/collision gate；原 A03/D01b 收据不授予该能力。
+如果必需交集缺 Evidence，明确 partial，不标完整 A–D。
+
+本次恢复审阅及后续测试设计见 [Recovery Review](C02b_Recovery_Architecture_Review.md)。
+这次文档提交不执行新的 P00/native campaign，不批准代码实施，不修改旧实验、判定、冻结 refs 或 raw bytes。

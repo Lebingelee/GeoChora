@@ -478,3 +478,32 @@ A.6 的现有任务场景兼容要求由冻结的 NutAssembly `world-v0` TaskArt
 6. 多 Robot 静态场景是否存在生产路径能验证，不允许把构造成功错误提升为 multi-robot physics qualification。
 
 **A 阶段出口**：`Canonical Asset/Entity/Scene/Frame` 能作为 B 的任务声明和 D 的 Materialization 输入，但 A 本身不宣称物理仿真器之间的动力学等价。
+
+## A.9 Logical Robot Assembly 扩展候选（2026-10-21，仅规划）
+
+本次只补未来扩展方向，不重开 A01–A05、不更改已验收 Scene v1/v2/v3 mapping/hash。
+现有 `RobotInstance(entity_id, articulation_roots)`、Joint endpoints 和 ControlGroup actuator refs 仍受同 Entity 边界约束。
+跨 Entity Joint 不能塞入现行 v3。当前恢复主线先维持一个 Panda Entity 的 arm/gripper Groups，见
+[C02b 恢复契约](03_Phase_C_Execution_Lifecycle.md#c02b-p--c02b-e-recovery-contract2026-10-21规划未实施)。
+
+**Logical Assembly**：未来可在现有 Scene/artifacts owner 中审阅轻量版本化 member relation，引用独立 Entity 或
+已有 Entity 内的逻辑 control subpart；集成 Panda 的 hand link 不因此变成第二个 Entity。
+资产定义可以多次实例化，物理 Entity 实例和可写 actuator 不得因嵌套/alias 被重复占有。递归仅作为未来候选，
+必须拒绝 cycle、悬挂引用、歧义路径和重复有效 writer；不立即实现通用 Robot Framework。
+
+**Physical Attachment**：与逻辑成员分开声明 parent/child Entity、mount Frame、明确方向的相对 SE(3)、
+fixed attachment、collision-filter intent 和 articulation-root 处理。初期物理 attachment 采用无环、唯一物理父级的结构；
+independent roots 不隐式生成“自由连接”。mount Frame 必须解析到有效物理 link/anchor，不能仅改 parent Frame
+就声称 fixed-joint 动力学成立。dynamic attach/detach、闭环装配、runtime topology hot swap 暂缓。
+
+**控制配置**：Robot preset + 声明的 leaf overrides 展开到唯一带 identity 的 Effective ControlBindingPlan；
+父级 preset 不是 writer，不拥有第二份 native state。preset/partially_overridden/custom 由配置差分推导。
+具体 Controller implementation、required feedback 和 source/config hash 归 C，不把实例/函数指针存入 Asset。
+
+**Provider-neutral 边界**：Canonical Entity/Joint/Frame/Actuator 身份保持稳定，单或多个 native articulations
+只能在 Provider 支持、物理约束和 reset/state mapping 经验证时选择。多 Entity 装配须另审 Scene 版本及 A03/D01 扩展，
+当前仅 DEFERRED 候选，不进入 C02b 前置。最小双 Entity 独立施控仍按 P00/P99 验收，与此扩展无依赖关系。
+
+参考：[Isaac Sim Robot Assembler API](https://docs.isaacsim.omniverse.nvidia.com/latest/py/source/extensions/isaacsim.robot_setup.assembler/docs/index.html)、
+[6.2 装配教程](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/robot_setup/assemble_robots.html)。仅借鉴 mount alignment、
+fixed joint、root handling、collision filtering/variant；不将 USD/Kit/PhysX 作为 Core ABI，当前 API 细节以引用版本为限。

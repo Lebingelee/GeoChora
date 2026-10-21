@@ -2,6 +2,10 @@
 
 日期：2026-10-21。状态：**C02b 仍为 BLOCKED**。本记录只覆盖源码审计、一个受限 GeoPhys CPU 诊断 Probe、相关 admission 定向检查和执行顺序修订；不实现 structured dispatch，也不增加生产 capability 或 Qualification。
 
+> **后续规划范围说明（同日，非新实验）**：本报告的 PROVIDER CONTRACT GAP 针对已声明 raw-force 的 R1 路线。
+> 后续恢复审阅允许另审新身份的位置 Profile；它必须在完整消费链不查询测量力，不能改写本报告或声称 R1 解阻。
+> 见 [恢复审阅](C02b_Recovery_Architecture_Review.md)和 Phase C 当前恢复契约。下列 Probe 数据及原始结论保留历史范围。
+
 ## 结论
 
 整体结论为 **PROVIDER CONTRACT GAP**。GeoPhys 已有公开、稳定、已文档化的 `RobotArmObservationReader`；本轮用临时诊断 adapter 证明，现有 Provider bootstrap/boundary owner 可以在 100 Hz 外层组合 raw actuator-force snapshot，不需要 Core 穿透 session/boundary 去读 solver 私有状态。该组合尚未成为生产接线。先前“GeoPhys 没有公开 API route”的说法过宽：裸 `read_actuator_force` 未公开，不等于公开 Observation Reader 不存在。
@@ -129,3 +133,15 @@ C02b 后续进入完整实施前须同时满足：
 - 公开 API registry：bare symbol unknown；Reader 与 Config exact/stable/documented。
 - 定向 C02a/C02b admission 测试：**14 passed**，1 个 Taichi 上游 `locale.getdefaultlocale` deprecation warning；日志见 ignored `targeted_admission_tests.log`。这些测试只验证既有静态绑定与 fail-closed admission，不验收 C02b。
 - 未运行完整 Phase II 回归、双 Provider physics suite、完整 R1 反馈行为、structured dispatch 或 Qualification。
+
+## 恢复审阅补充：证据边界（2026-10-21，未复跑）
+
+此次公开 Reader 的 reset 残留读数是受限真实诊断事实；R1 误激活仍是源码推断。
+脚本的 wrapper counter 在调用前累加请求步数，reset 的增量字段为诊断填入的 0，并不是独立的 Provider
+完成步计数器。当前五步/无 reset 步进判断结合正常返回、公开 boundary clock 和已审阅执行路径，
+不应扩张为每个 native tick 均有独立 completion receipt。后续执行验收须提供完成证据，并在不可判定时保留 unknown。
+
+ResetSample.sample_id 是输入内容身份；重复使用同一样本不会产生新的 sample ID，不等于新的 episode generation。
+后续 freshness gate 应在 Core 绑定 episode/materialization generation，由 Provider 提供原生测量有效性/相位/状态版本，
+不要求 GeoPhys 引入 GeoChora 的 Scene/ResetSample/Controller 类型。仅返回 invalid 可防止误用，
+但在 R1 首次 compute 需要 required feedback 时并不能单独解除阻塞；仍须有合法的初始测量路线。

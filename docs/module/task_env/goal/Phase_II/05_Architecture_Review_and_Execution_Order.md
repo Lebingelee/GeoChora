@@ -6,6 +6,11 @@
 > 原始五份草案由提交 [a299d8b](https://github.com/Lebingelee/GeoChora/commit/a299d8b) 按原字节保存。
 > 本文是本组规划的决策/执行顺序入口；`01–04` 是各父 Goal 的详细契约。都不是新的能力矩阵或 Qualification Decision。
 
+> **当前规划修订（2026-10-21）**：维护者授权文档整理、提交并推送 develop，供网页二审判断是否实施。
+> 下方当前表已采用 P00 的 **20 父 Goal / 33 实施切片 + P00/P99**；历史 receipts 保留当时编号与结论。
+> C02b 恢复分为内部 P/E 检查点，C02b 仍 BLOCKED；position-only 候选尚未接线或验收，R1 force 缺陷仍保留。
+> 见 [恢复审阅报告](C02b_Recovery_Architecture_Review.md)与 [Phase C 当前契约](03_Phase_C_Execution_Lifecycle.md#c02--controller-binding--atomic-execution--safe-switchabc)。
+
 ## 1. 审阅结论与事实边界
 
 结论为 **REVISE**：保留 A–D 分工及 20 个父编号，先定跨阶段契约、先跑最小真实闭环，
@@ -82,23 +87,25 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 13 | B02 | B01、D01a、D02b | 固定拓扑 Role/sample、RNG/version、rollout 前 realization gate |
 | 14 | B03a | B02、D02b | 只读 predicates + action/interval evaluation context；现有 reward Oracle |
 | 15 | B03b | B03a | dwell/sequence/edge memory；一次提交、重复/乱序/reset/缺测行为 |
-| 16 | B04b | B04a、B03b | Source→vNext Artifact compiler/codec/hash；嵌套读写/拒绝矩阵 |
+| 16 | B04b | B04a、B03b、D05a | Source→vNext Artifact compiler/codec/hash；嵌套读写/拒绝矩阵 |
 | 17 | B05 | B04b | 旧 samples/traces 语义差分与 legacy route；新版本无 freeze 自动继承 |
 | 18 | C01b | B05、D02b | 实际 Task requirements/actual manifests、动态 admission；兼容配置分支 |
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
-| 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
-| 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt、Recorder completeness 与 append commit boundary 再窄修正**：物理时钟进度、observer/Recorder 子步证据和 transition 有效性分离；不完整行/边界拒绝 transition 且保留 pending；C03a/C05a/B03a/B03b 定向回归 81 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
-| 23 | C04 | C03a、D02b | **bounded implemented；C02b gate re-audited**：现有 observation/info owners 固定 schema 元数据、clock、required feedback/optional diagnostics；privileged/private Frame/time 与缺字段负例受保护；最新交叉 gate 103 passed，真实 Panda TaskEnv 与 D04 Camera 仍是明确缺口，详见 [C04 receipt](03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21) |
-| 24 | C02b | C02a、C03a、C04、C05a、D01b | **BLOCKED；fail-closed admission 与真实 reset stale-force 已验证**：公开 `RobotArmObservationReader` 可在 Provider adapter 做外层 readback，但 GeoPhys reset 后可能残留上一 episode 的 actuator8 force（−30 N）；Reader 无 freshness/reset/sample clock，required `actuator_force_query` 也未进入 manifest/typed publication。需 Provider owner 补 force refresh/validity/sampling 合同，再闭合 Core raw typed publication/admission。Group dispatch、applied acknowledgement、真实 R1 behavior、arm+hand S2 与录制读取均未验收，见 [C02b audit](C02b_Feedback_Source_and_Sampling_Audit.md) |
-| 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |
-| 26 | C05b | C02b、C03b、C04 | PickCube 外置 Solution 的实际 step/record 路线，两 provider 回归 |
-| 27 | C05c | C05b、D02b | NutAssembly feedback/hold/ramp 契约及迁移；500 Hz/Guard/Outcome/strict status |
-| 28 | C02c | C02b、C05b、C05c | 同 schema switch 的 memory initialization、ack/events、原子失败与真实控制检查 |
-| 29 | D03 | D01b、D02b、D05a | public visual lowering + rigid/articulation sync；像素运动、same-step、双 consumer |
-| 30 | D04 | D03、C04、C05a | RGB/Depth 兼容→segmentation；mounted camera/depth Oracle、reset freshness |
-| 31 | D05b | D05a、D04、C01b | 独立动态 pairing、first realization、依赖/资源失败测试；精确支持范围 |
-| 32 | P99 | A05、B05、C02c、C05c、D05b | 所有必需切片及其传递依赖 receipt；真实新主线、Stage-1、docs/Skills/回归复审 |
+| 21 | C05a1 | C02a、C01b、D05a | **bounded evidence mapped；退出待复核**：已有 Action/Event/Outcome 值与版本约束；Stop finalizer 合同/consumer gate 见 §3.2，不撤销原 C05a 收据 |
+| 22 | C05a2 | C05a1 | **bounded evidence mapped；退出待复核**：已有 generic H5 v3、T/T+1、单 writer 投影；最低 non-arm loader/end/bootstrap 消费按 §3.2 补证 |
+| 23 | C05a3 | C05a1、C05a2 | **bounded evidence mapped；退出待复核**：已有 outer v1/stream v3 与旧读者拒绝；保留各格式 owner 和 historical detector 边界，见 §3.2 |
+| 24 | C03a | C02a、D01b、C05a2 | **bounded implemented**：scalar lifecycle、fault receipt、Recorder interval 完整性；历史证据见原文收据 |
+| 25 | C04 | C03a、D02b | **bounded implemented**：observation/info schemas、feedback 与 diagnostics 分离；历史收据有效 |
+| 26 | C02b | C02a、C03a、C04、C05a2、D01b | **BLOCKED**：内部 C02b-P 先审核真实 position-only Profile/新 identity/required state；C02b-E 完成真实 group dispatch、native actuation、applied ack/fault/record/S2。Force-aware R1 保留独立 blocked |
+| 27 | C03b | C03a、C04、C05a2 | wrapper-visible Stop、EpisodeOutcome、T/T+1、bootstrap；独立于 C02b 可先授权 |
+| 28 | C02c | C02b、C03b、C05a2 | 受限同外部 schema/safepoint 的 Controller safe switch、memory/identity/ack/events；不等待整项 C05c，NutAssembly 未验证仍拒绝 |
+| 29 | C05b | C02b、C03b、C04、C05a3 | PickCube external Solution、真实 step/record 和两 Provider 指定交集回归 |
+| 30 | C05c | C05b、D02b | NutAssembly native Guard/hold/ramp/500 Hz/force freshness 与严格 Outcome 回归；不能靠 position-only Profile 替代 |
+| 31 | D03 | D01b、D02b、D05a | 独立 Renderer 的 Visual Source/动态 Transform/Geometry Sync 与版本证据 |
+| 32 | D04 | D03、C04、C05a2 | Camera RGB/Depth/受限 Segmentation 与 reset/mount freshness；旧 camera schema 保持 |
+| 33 | D05b | D05a、D04、C01b | 真实动态 Physics×Renderer pairing、资源失败与精确 admitted envelope |
+| 34 | P99 | A05、B05、C02c、C05c、D05b | 20 父 Goal 的必需切片、真实新主线、最小双 Entity 隔离施控、D05b pairing；缺证据为 partial，不暗授 Assembly/force-profile 资格 |
 
 D03 不以 C05c 为硬依赖；表中排在其后是建议主干，不要求 Renderer 等待全部 expert campaign。
 相反，C05c 不等待高保真 Renderer。C05a 提前定义 events/outcome 存储，C03b 实现相应生命周期，
@@ -108,11 +115,25 @@ B05 可以完成 legacy semantics 适配，但 vNext 全链执行要到 D01b/P99
 D01a 只证明有限新 Scene bridge，不冒充完整 D01。父目标 implemented 必须覆盖其全部必需切片。
 P00/P99 是 gate，不增设新的 Framework/Harness；当前提交不执行表中代码实施。
 
-截至 2026-10-21，序号 22／C03a 与 23／C04 已按 bounded acceptance 完成；序号 24／C02b 当前仍 **BLOCKED**：fail-closed gate
-和 GeoPhys CPU reset stale-force Probe 已验证。公开 Reader route 存在，但首样可能是上一 episode 的 −30 N，且缺少 freshness/sample
-identity；raw `actuator_force_query` 仍未 admission/typed publication。Group dispatch、R1 behavior、双 Provider S2 与录制读取尚未验收。
-解除阻塞先需 Provider owner 补刷新/有效性/采样合同，并由 Core 版本化发布真实 raw force。序号 25／C03b 的 termination/Stop policy 也未实现。
-C03a/C04 在 `codex/phase-ii-c` 分别本地提交，不改变冻结的 `codex/phase-ii-b` 指针。
+截至本次文档修订，当前序号 24／C03a 与 25／C04 保持已有 bounded acceptance；26／C02b 仍 **BLOCKED**。
+force-aware R1 的 fail-closed gate 和 GeoPhys CPU reset stale-force Probe 已验证；公开 Reader route 存在，
+但 reset 后仍可能读到上一 episode 的 −30 N，raw force 尚未闭合 admission/typed publication。
+该缺陷继续阻塞 R1；位置 Profile 候选若在完整消费链不查询力，可独立验证，无须先修 GeoPhys force API。
+C02b-P 须先确定实际 writer/identity/required state 和 force-free reset/step/record 路线，C02b-E 再完成
+dispatch、ack、fault、两 Provider 受限 S2 与录制回读。目前均未据此授予新能力；27／C03b 也尚未实施。
+既有 C03a/C04 验收不会因序号同步失效，本地冻结 `codex/phase-ii-b` 保持 `0068010`。
+
+**旧/新序号对照**（Goal ID 为主键，历史记录不改号）：
+
+| 旧 31 切片表 | 当前 33 切片表 | 处理 |
+| --- | --- | --- |
+| 00–20（至 C02a） | 00–20 | 序号不变；B04b 补记已有 P00 的 D05a 直接前置 |
+| 21／C05a | 21／C05a1、22／C05a2、23／C05a3 | 仅细化退出条件，已有实现/证据见 §3.2 |
+| 22／C03a、23／C04 | 24／C03a、25／C04 | 保留既有 bounded receipts |
+| 24／C02b、25／C03b | 26／C02b、27／C03b | 实施未完成；P/E 不额外计数 |
+| 28／C02c | 28／C02c | 前置改为 C02b/C03b/C05a2，不等待完整 C05c |
+| 26／C05b、27／C05c | 29／C05b、30／C05c | task-specific force/readiness/Guard 仍独立验收 |
+| 29／D03、30／D04、31／D05b、32／P99 | 31／D03、32／D04、33／D05b、34／P99 | Renderer 不等待 C05c；保留最小双 Entity 施控 gate |
 
 ### 3.1 粒度与工作量
 
@@ -131,6 +152,24 @@ A05/B05/D05b 是集成 gate，不能再借机重构。make_robot 命名迁移可
 估计包含定向测试、兼容和文档同步；不含新增 solver/native renderer 功能、全格式 parser、
 真实双 Robot 全任务动力学承诺、大规模 qualification、E 或 Phase III。
 无法证明的能力单列 deferred；不能为了符合人日估计降低验收。
+
+### 3.2 C05a 既有证据与三切片映射
+
+P00 已定义 a1/a2/a3，但后续工程按旧表将实现合并在一个 C05a 收据中；这里进行 evidence crosswalk，
+不撤销历史验收、不复制代码、不把未测试的完整退出条件自动标 DONE。旧收据见
+[Phase C C05a](03_Phase_C_Execution_Lifecycle.md#c05a-bounded-storage-receipt2026-10-21)及本文 §5.5。
+
+| 当前切片 | 可直接复用的现有实现/证据 | 尚需明确的退出证据 |
+| --- | --- | --- |
+| C05a1 | 既有 BoundaryEventV1/EpisodeOutcomeV1/StructuredControlTransitionV1、版本拒绝、T=0、boundary sequence、terminal bootstrap 值约束 | Stop finalizer 唯一 owner、调用次数及 consumer 合同；实际 Stop 行为在 C03b 检验，不能由 storage roundtrip 代替 |
+| C05a2 | generic H5 v3、T/T+1、显式单 writer schema/order/value projection、finalized-episode reader | P00 最低 non-arm loader、未知版本拒绝与实际 end/bootstrap 消费的具体 fixture/consumer；未在现有 Panda-centric 专项证明的部分定向补证 |
+| C05a3 | canonical outer v1、execution stream v3、structured reader/projection、旧 layout 拒绝及 pending interval 不可 freeze | 各旧格式独立兼容 detector 与新 Profile 可用交集；历史退休 import/campaign 缺口单列，不恢复 alias 或删除断言求绿 |
+
+`test_phase_ii_c05a_structured_recording.py` 的旧 7 项及旧组合 41 项通过是当时有界结果，本次未重跑。
+不能将它们重新计数为三个切片全部完成。对现有明确覆盖的条目直接继承 evidence；缺口只在相应真实 consumer
+首次依赖前定向补证，不重新执行 A–D、重新审 SHA 或重造存储系统。已有 C03a/C04 的受限行为与证据保持成立。
+generic H5 v3 是 C02b 位置路线的首选受限存储候选；canonical BoundaryRecord 目前强制 force/readiness，
+若未来承载该 Profile 须另审原 owner 的版本扩展，不能填零或把 force-aware 记录解释为位置记录。
 
 ## 4. 风险、源码依据与修订落点
 
@@ -325,6 +364,9 @@ Qualification。有关旧格式 fixture 的完整命令结果和失败边界见
 
 ## 6. 原稿保存、文档验证与二审交接
 
+> 本节保留 2026-10-20 规划提交时的检查结果（当时 31 切片），不是当前 33 切片表的验证收据。
+> 2026-10-21 的恢复修订与当前校验见 §12 及恢复审阅报告；历史检查数字不回写。
+
 原稿只通过第一次提交保存，不在活动目录创建第二份 canonical 副本。第一次提交五个文件的 SHA-256：
 
 | 文件 | 原稿 SHA-256 |
@@ -466,3 +508,25 @@ geometry/inertia/contact/constraint/transmission 仍不得误标为已执行的 
 
 本轮在 `codex/phase-ii-c` 完成本地提交，并将同一提交快进推送到远端 `develop` 与 `codex/phase-ii-b`；本地
 `codex/phase-ii-b` 指针保持 `0068010`。本记录不包含序号 20 的实施。
+
+## 12. C02b 恢复规划修订（2026-10-21；实现等待二审）
+
+维护者授权保全现有审计工作、修订文档并推送 develop；本轮不实施 Profile、dispatch、Provider API 或 Assembly。
+独立源码审阅结论、六文档处置、完整消费链与精确后续 gate 见
+[C02b Recovery Architecture Review](C02b_Recovery_Architecture_Review.md)。当前执行顺序仍仅由 §3 的表定义。
+
+- **RA-01 Profile 分流**：为新位置 Profile 生成独立 writer/config/source/binding identity，只要求实际算法消费的
+  Joint/Frame state；保留 R1 raw-force required、拒绝测试与 reset stale-force 缺陷。位置 servo 的 physical force cap
+  是 command，不是 query；position-only 不等价于 R1。
+- **RA-02 P/E 检查点**：C02b-P 明确实际 Controller identity、state/admission、force-free reset/step/record 路线；
+  C02b-E 完成全组预检、按 writer dispatch、真实 actuation、ack、fault、两 Provider bounded S2 和读取证据。
+  完成 P 不等于完成 C02b；首次单 Panda PASS 不等于全部必需交集或正式资格。
+- **RA-03 反馈/存储接口**：旧 selected consumer 和 canonical BoundaryRecord 仍依赖 force/readiness。
+  首条位置路线优先复用已有 state projection 与 generic H5 v3；不调用旧 force feedback、不伪造零力，
+  MuJoCo 的 reset/step force cache 也须在既有 owner 内按新 Profile 明确处理，legacy 默认行为保持。
+- **RA-04 依赖同步**：采用 P00 的 33 切片表、C05a evidence crosswalk、C02c←C02b/C03b/C05a2。
+  C03b/D03 无 C02b 硬依赖，可以另行授权；C05b/C05c 的实际 Solution/Guard 保真不能由位置 Profile 代替。
+- **RA-05 Assembly 后置**：Logical members/preset 与 Physical Attachment 分开；跨 Entity fixed-joint 装配另审版本与
+  Provider S2，不改变现行 Scene v3 或历史收据，不成为 C02b 新前置。P00/P99 最小双 Entity 隔离施控义务保留。
+- **RA-06 发布边界**：本次只发布修订后的规划和审阅事实。C02b、force-aware 缺陷、C03b/C02c、通用 Panda TaskEnv
+  Stage 1 composition 缺口均未被文档修改消除；是否进入实现由后续网页二审及维护者命令决定。

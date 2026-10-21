@@ -394,7 +394,7 @@ evaluation-boundary projection；SAPIEN/Genesis、native interval evidence、con
 
 ### D04 — Camera Contract / RGB/Depth/Segmentation
 
-- **依赖**：D03、C04、C05a；沿用 D05a 的 selection/capture identity 版本契约。
+- **依赖**：D03、C04、C05a2；沿用 D05a 的 selection/capture identity 版本契约。C05a 的旧证据逐项映射，不重做已有实现。
 - **任务**：扩展既有 Canonical Camera Schema、同步 capture、RGB/Depth/Segmentation normalization、metadata/camera frame/quality、低频/async future contract。
 - **验收**：landmark projection、depth backprojection、fixed/mounted moving camera same-state-time；sRGB/linear 声明分离；Seg IDs 指向 canonical names；旧 v0 RGB/Depth 兼容；缺 output fail-closed，reset pending frame 不串 Episode。
 - **切片策略**：先 RGB/Depth 兼容和动态 capture，再受限 segmentation；同 capture 的 mask/label map、
@@ -486,3 +486,27 @@ device realization、共享 session 生命周期或 camera pixels 已验证。
 9. 当前 UI `render_mode`、Camera Obs、Offline Re-render 是否真正分离？
 
 **D 阶段出口**：Canonically authored Scene 可以经有界 Physics Materialization 获取统一 State，并由独立 Camera/Renderer 消费正确身份、几何与时间；Pairing Capability 会明确拒绝不支持的组合，并提供**范围准确的**真实验证。**不要求**实现 D4/D5 的全量算法/资格 campaign，也不在没有 Evidence 时声称任意 Provider 可自由互换。
+
+## D.13 Physical Attachment 与 C02b 恢复边界（2026-10-21，规划）
+
+本次恢复不重开 D01a/D01b/D02b/D05a，不更改其 source closure、Scene identity、reset sample 或历史证据。
+C02b 的新位置 Profile 优先复用现有 position actuation 和 Joint/Frame publication，完整消费链无测量力查询时，
+不要求先新增 GeoPhys raw-force API。旧 force-aware Profile 的 freshness/initial-force 缺陷继续保留，
+不能因新 Profile 通过而追加 `actuator_force_query` 能力声明。
+
+未来 Physical Attachment 消费 [A.9 logical members/attachment intent](01_Phase_A_Core_Object_Model.md#a9-logical-robot-assembly-扩展候选2026-10-21仅规划)，
+由现有 D01 Provider materialization owner 处理 mount 对齐、fixed joint、root joint/root articulation 和 collision filter 映射。
+必要的 Canonical Joint/Frame/Actuator 均需明确 native mapping；不能让 Renderer、Assembly 或 Controller 复制物理 authority。
+不支持的 Provider/组合明确拒绝，不用 Frame parenting 冒充物理连接，也不把多个 independent roots 自动变成 free joints。
+
+该扩展未来至少需要：mount-transform Oracle、根约束无冲突、装配约束稳定性、明确的 self/external collision
+过滤范围、reset realization 和 source/mapping identity。一个或多个 native articulations 是受验证的实现选择，
+不能因 Isaac Sim 的某个模式存在就假设 GeoPhys/MuJoCo 都支持。拓扑变化需按新 Scene/Env 生命周期审阅，
+不得在现行 v3 上原地添加跨 Entity joint、动态 attach/detach 或热切换 topology。
+
+真实多 Entity attachment 当前 DEFERRED，不是 C02b、D03/D04/D05b 的新增硬前置。
+P00/P99 的最小双 Entity 隔离施控是另一项尚需独立 evidence 的要求；未完成不得以 attachment 后置为由静默删除。
+如将来正式实施装配，再明确新版本和额外 gate，不追溯授予旧 A03/D01b 收据新能力。
+
+参考：[Isaac Sim Robot Assembler](https://docs.isaacsim.omniverse.nvidia.com/latest/py/source/extensions/isaacsim.robot_setup.assembler/docs/index.html)。
+该资料只解释设计借鉴，不证明本仓库任何新的物理或渲染支持范围。
