@@ -7,7 +7,11 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from task_env.artifacts import CapabilityAdmissionError
+from task_env.artifacts import (
+    CapabilityAdmissionError,
+    ExecutionSpecV1,
+    RendererSelectionV1,
+)
 from task_env.diagnostics.tasks.c02b_position_candidate import build_position_candidate
 from task_env.diagnostics.tasks.c02b_position_s2_probe import _request, _typed_hand_and_joints
 from task_env.diagnostics.tasks.d04_rgbd_camera_s2_probe import (
@@ -21,6 +25,9 @@ from task_env.diagnostics.tasks.d04_rgbd_camera_s2_probe import (
     mounted_hand_camera,
 )
 from task_env.observations.canonical_camera import (
+    CanonicalCameraObservation,
+    CanonicalEntityInstanceSegmentationV1,
+    CanonicalEntityLabelV1,
     back_project_world,
     intrinsics,
     project_world,
@@ -28,12 +35,16 @@ from task_env.observations.canonical_camera import (
 )
 from task_env.observations.canonical_camera.geometry import optical_depth
 from task_env.render.camera import (
+    D04_ENTITY_SEGMENTATION_PROFILE,
+    D03_PHYSICS_PROFILE,
     DynamicCameraRenderSourceV1,
     admit_dynamic_camera,
     create_dynamic_camera_session,
     dynamic_render_manifest,
     dynamic_rgbd_render_manifest,
+    dynamic_entity_instance_segmentation_manifest,
 )
+from task_env.render.camera.mujoco import _resolve_canonical_entity_geometry_labels
 
 
 def _candidate(tmp_path: Path, *, horizon=4):
@@ -153,6 +164,8 @@ def test_d04_same_publication_identity_reset_and_failure_are_consumer_local(tmp_
             assert np.all(observation.depth >= 0)
             assert np.any(observation.depth == 0)
             assert observation.capture_identity.state_boundary.boundary_id == initial_state.boundary.boundary_id
+            assert observation.segmentation is None
+            assert set(observation.capture_identity.modalities) == {'rgb', 'depth'}
             assert observation.metadata.capture_control_step == initial_state.boundary.control_step
             assert observation.metadata.capture_simulation_time == initial_state.sample_clock.simulation_time_s
         assert fixed.consumer_id != sibling.consumer_id
@@ -192,5 +205,123 @@ def test_d04_same_publication_identity_reset_and_failure_are_consumer_local(tmp_
         assert sibling.capture(reset_state).rgb.shape == (CAMERA_HEIGHT, CAMERA_WIDTH, 3)
     finally:
         for session in sessions:
+            session.close()
+        env.close()
+
+
+def test_d04_entity_segmentation_mapping_contract_and_publication_binding(tmp_path):
+    candidate = _candidate(tmp_path, horizon=8)
+    env = candidate.env
+    session = None
+    try:
+        source = DynamicCameraRenderSourceV1.from_runtime_source(candidate.source)
+        state = env.typed_state.view
+        camera = fixed_calibration_camera(candidate, state)
+        renderer = RendererSelectionV1(
+            'renderer-selection-v1', 'mujoco', 'native-opengl',
+            D04_ENTITY_SEGMENTATION_PROFILE, None,
+        )
+        execution = ExecutionSpecV1(
+            'execution-spec-v1', 'geophys', 'cpu', D03_PHYSICS_PROFILE,
+            32, 'best_effort', renderer, physics_device='cpu:0',
+        )
+        manifest = dynamic_entity_instance_segmentation_manifest()
+        claims = {claim.name for claim in manifest.capabilities}
+        assert claims == {'rgb_camera', 'depth_camera', 'entity_instance_segmentation'}
+        admit_dynamic_camera(camera, execution, source=source, manifest=manifest)
+
+        rgb_only = replace(camera, camera_id='d04-segmentation-rgb-only-v1', depth=False)
+        rgb_only_execution = replace(
+            execution,
+            render_default=replace(renderer),
+            camera_overrides=(),
+        )
+        # The selection profile makes the extra modality mandatory; the old
+        # CameraGeometry v0 remains an RGB/Depth-only value.
+        with pytest.raises(CapabilityAdmissionError, match='requires RGB and Depth'):
+            admit_dynamic_camera(rgb_only, rgb_only_execution, source=source, manifest=manifest)
+
+        geom_labels, label_entries = _resolve_canonical_entity_geometry_labels(
+            (0, 1, 1),
+            (('panda-main', 1),),
+            ('panda-main',),
+        )
+        assert geom_labels == {0: 0, 1: 1, 2: 1}
+        assert tuple((item.label, item.entity_id) for item in label_entries) == ((1, 'panda-main'),)
+        with pytest.raises(ValueError, match='no Canonical Frame mapping'):
+            _resolve_canonical_entity_geometry_labels((7,), (), ('panda-main',))
+        with pytest.raises(ValueError, match='only the canonical world Frame'):
+            _resolve_canonical_entity_geometry_labels((0,), (('panda-main', 0),), ('panda-main',))
+        with pytest.raises(ValueError, match='ambiguous Canonical Entity mapping'):
+            _resolve_canonical_entity_geometry_labels(
+                (1,), (('panda-main', 1), ('square-peg-instance', 1)),
+                ('panda-main', 'square-peg-instance'),
+            )
+        with pytest.raises(ValueError, match='positive uint32'):
+            CanonicalEntityLabelV1(0, 'panda-main').validate()
+
+        session = create_dynamic_camera_session(
+            camera, execution, source=source, initial_state=state, manifest=manifest,
+        )
+        import mujoco
+        with (
+            patch.object(type(env.controller), 'compute', side_effect=AssertionError('capture called Controller')) as compute,
+            patch.object(type(env.session), 'step', side_effect=AssertionError('capture stepped Provider')) as step,
+            patch.object(mujoco, 'mj_step', side_effect=AssertionError('capture advanced MuJoCo')) as mj_step,
+            patch.object(mujoco, 'mj_forward', side_effect=AssertionError('capture forwarded MuJoCo')) as mj_forward,
+        ):
+            observation = session.capture(state)
+        compute.assert_not_called()
+        step.assert_not_called()
+        mj_step.assert_not_called()
+        mj_forward.assert_not_called()
+
+        segmentation = observation.segmentation
+        assert isinstance(segmentation, CanonicalEntityInstanceSegmentationV1)
+        assert segmentation.mask.shape == (CAMERA_HEIGHT, CAMERA_WIDTH)
+        assert segmentation.mask.dtype == np.uint32
+        assert not segmentation.mask.flags.writeable
+        assert segmentation.background_label == 0
+        assert segmentation.mask.flags.c_contiguous
+        assert np.any(segmentation.mask == 0)
+        assert set(np.unique(segmentation.mask).tolist()).issubset(
+            {0, *(item.label for item in segmentation.label_map.labels)}
+        )
+        mapped_entities = {item.entity_id for item in segmentation.label_map.labels}
+        assert {'panda-main', 'square-peg-instance'}.issubset(mapped_entities)
+        identity = observation.capture_identity
+        label_map = segmentation.label_map
+        assert set(identity.modalities) == {'rgb', 'depth', 'entity_instance_segmentation'}
+        assert label_map.capture_identity_hash == identity.identity_hash
+        assert label_map.scene_instance_id == identity.state_boundary.scene_instance_id
+        assert label_map.state_boundary_id == state.boundary.boundary_id
+        assert label_map.state_revision == state.boundary.state_revision
+        assert label_map.control_step == state.boundary.control_step
+        assert label_map.simulation_time_s == state.sample_clock.simulation_time_s
+        assert label_map.render_source_identity_hash == source.identity_hash
+
+        invalid_label = max(item.label for item in label_map.labels) + 1
+        invalid_mask = np.full(segmentation.mask.shape, invalid_label, dtype=np.uint32)
+        with pytest.raises(ValueError, match='absent from its label map'):
+            CanonicalEntityInstanceSegmentationV1(
+                'canonical-entity-instance-segmentation-v1', invalid_mask, 0, label_map,
+            )
+        stale_map = replace(label_map, scene_instance_id='stale-scene-instance')
+        stale_segmentation = replace(segmentation, label_map=stale_map)
+        with pytest.raises(ValueError, match='different state publications'):
+            CanonicalCameraObservation(
+                observation.rgb, observation.depth, observation.metadata,
+                observation.capture_identity, stale_segmentation,
+            )
+
+        env.reset()
+        reset_state = env.typed_state.view
+        reset_observation = session.capture(reset_state)
+        assert reset_observation.capture_identity.state_boundary.boundary_id == reset_state.boundary.boundary_id
+        assert reset_observation.capture_identity.identity_hash != observation.capture_identity.identity_hash
+        with pytest.raises(ValueError, match='previous episode'):
+            session.capture(state)
+    finally:
+        if session is not None:
             session.close()
         env.close()

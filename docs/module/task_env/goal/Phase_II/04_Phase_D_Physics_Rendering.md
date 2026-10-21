@@ -3,7 +3,7 @@
 > **ACTIVE bounded implementation record；Phase D remains incomplete and carries no new Qualification.**
 > 修订于 2026-10-22；源码审阅基准仍为规划期 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体蓝图：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；A/B/C 输入见相邻阶段文件。
-> **当前状态（2026-10-22）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL RGB 动态同步首个交集已通过；序号 32／D04 的 RGB/Optical-Z Depth、固定/hand-mounted camera 首个有界切片已通过 S1/S2。Segmentation、完整 D04/D03/D05b、广泛 Renderer/Scene 支持及 Phase II 均未完成。
+> **当前状态（2026-10-22）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL RGB 动态同步首个交集已通过；序号 32／D04 的 RGB/Optical-Z Depth 与固定/hand-mounted camera 已通过 S1/S2，Entity Instance Segmentation 也完成受限首个交集 S1/S2。完整 D04/D03/D05b、广泛 Renderer/Scene 支持及 Phase II 均未完成。
 
 ## D.0 讨论结论与范围
 
@@ -27,9 +27,9 @@
 | [`task_env/runtime/sessions/api.py`](../../../../../task_env/runtime/sessions/api.py) | `RuntimeSession`, `provider_manifest`, `materialize`；GeoPhys/MuJoCo/SAPIEN/Genesis adapter | 适配器存在不代表同等支持或 selected-task qualification |
 | [`task_env/artifacts/contracts.py`](../../../../../task_env/artifacts/contracts.py) | `CanonicalStateView(canonical-state-v0)`、`ExecutionSpec`, Manifest/Admission | v0 标量 joint maps，不代表 floating-base typed state 全支持 |
 | [`task_env/observations/canonical_camera/contracts.py`](../../../../../task_env/observations/canonical_camera/contracts.py) | `CameraGeometry`, `ResolvedCameraMetadata`，Mount/Optical、Step/time、FOV/K | 当前 `camera-observation-v0` 仅明确 RGB/Depth、post-control-step |
-| [`task_env/observations/canonical_camera/images.py`](../../../../../task_env/observations/canonical_camera/images.py) | RGB/Depth strict normalize + `CanonicalCameraObservation` | Segmentation 与 async capture meta 未通用实现 |
+| [`task_env/observations/canonical_camera/images.py`](../../../../../task_env/observations/canonical_camera/images.py) | RGB/Depth strict normalize + `CanonicalCameraObservation`；D04 增加 versioned Entity-instance mask/label-map values | Segmentation 仅限已准入的 exact profile；Semantic labels、Link IDs 与 async capture meta 未通用实现 |
 | [`task_env/render/camera/source.py`](../../../../../task_env/render/camera/source.py) | 保留 `camera-static-triangles-v0`；另有 D03 `camera-dynamic-source-v1` 的 Scene-v3 scalar Joint/Frame binding 与 typed state projection | 动态源只接受确切 Scene/source closure 与一一映射；不支持 free-joint、变形体或通用 Visual Scene |
-| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | 旧 `create_camera_session()` 与 `admit_render()` 不变；dynamic route 以独立 D03 RGB / D04 RGB-Depth profile admission GeoPhys CPU → MuJoCo native OpenGL | 仅限 Scene-v3 scalar-joint Position candidate 与同步 pinhole；不是通用 D05b pairing admission，不启用 Segmentation |
+| [`task_env/render/camera/api.py`](../../../../../task_env/render/camera/api.py) | 旧 `create_camera_session()` 与 `admit_render()` 不变；dynamic route 有独立 D03 RGB、D04 RGB-Depth、D04 Entity-instance profile，均 admission GeoPhys CPU → MuJoCo native OpenGL | 仅限 Scene-v3 scalar-joint Position source 与同步 pinhole；不是通用 D05b pairing admission，不支持 semantic segmentation/free-joint |
 | [`task_env/render/base/`](../../../../../task_env/render/base) | `RenderBackend` registry 与 `UiRenderProvider` 等独立 contract | UI presentation 与 Camera Sensor 不能混为一体；Flora fake tests 不是 native Flora acceptance |
 | [`task_env/runtime/sessions/control.py`](../../../../../task_env/runtime/sessions/control.py) | Panda specific controlled session capabilities | 特定 Panda joint/actuator 数量约束，不等于通用 multi-robot control |
 
@@ -499,16 +499,95 @@ capture identity 改变；旧 episode state 被拒绝。
 
 S1：`test_phase_ii_d04_rgbd_camera.py` **2 passed**；随后 D03 S1、D04 S1、camera/capability legacy pin 与
 D05a execution contracts 定向回归 **12 passed**（1 Taichi deprecation warning）；真实 S2：
-`d04_rgbd_camera_s2_probe.py` **D04_RGBD_FIXED_MOUNTED_S2_BOUNDED_PASS**。较宽 B04a legacy reader compatibility sweep
-另有两个失败并已单独复现：TaskEnv H5 unknown-schema case 未抛预期的 `ValueError`，canonical trajectory unknown-schema
-case 则以缺少必需字段的 `TypeError` 退出。D04 改动不触及 H5/trajectory readers；这两项留作既有 reader owner 的独立缺口，
-不计入相机通过范围。Skill 刷新已核对 Camera API、dynamic source/session、公开调用路径、相关 S1/S2 与当前限制；模块
-Skill checker 与 `quick_validate.py` 均通过。cold-start 独立新 Agent 演练未运行，API/Qualification 语义保留 Human review。
+`d04_rgbd_camera_s2_probe.py` **D04_RGBD_FIXED_MOUNTED_S2_BOUNDED_PASS**。当时的 B04a sweep 有两个测试失败，
+但后续兼容性审阅确认是测试把已支持的版本误标为未知：TaskEnv H5/v3 已有 Recorder/structured reader 路径；
+canonical trajectory/v1 也已支持，原 case 的 `{}` logical payload 才引发 `TypeError`。未建立生产 reader 缺陷。
+测试更正与真 unsupported-version 拒绝证据见下方 D04 compatibility erratum。Skill 刷新已核对 Camera API、dynamic
+source/session、公开调用路径、相关 S1/S2 与当前限制；模块 Skill checker 与 `quick_validate.py` 均通过。
+cold-start 独立新 Agent 演练未运行，API/Qualification 语义保留 Human review。
 
 receipt、PNG、Depth `.npy` 和原始日志位于 ignored
 `workspace/maintenance/d04_rgbd_camera_20261022/`。定向 pytest 日志在 `verification/`，真实 S2 receipt 在
-`s2_geophys_mujoco/d04_rgbd_s2_receipt.json`。D04 RGB/Depth 首个有界交集可复核；没有实施或验证 Segmentation、
-free-joint、Assembly、跨其它 provider/backend、async capture、完整 D05b pairing 或 Formal Qualification。
+`s2_geophys_mujoco/d04_rgbd_s2_receipt.json`。该 RGB/Depth 首个有界 receipt 当时没有实施或验证 Segmentation；
+后续受限 Entity-instance slice 见下方 receipt。该次仍未覆盖 free-joint、Assembly、其它 provider/backend、async
+capture、完整 D05b pairing 或 Formal Qualification。
+
+#### D04 compatibility erratum (2026-10-22)
+
+Follow-up inspection corrected the prior B04a failure attribution. The stale TaskEnv H5 test used `v3` as an
+unknown version even though `RecorderConfig` accepts `task-env-h5/v3`; the stale canonical trajectory case used
+the supported `task-env-canonical-trajectory-v1` file schema with malformed `{}` logical content, so the reader
+reported a payload `TypeError` after recognizing the schema. The corrected matrix uses `v99` and checks refusal at
+the actual `load_structured_control_records_h5()` typed-reader boundary plus `load_canonical_trajectory()`; the
+generic `inspect_trajectory_h5()` remains metadata-only and may report an arbitrary version without decoding it.
+Corrected focused result: `test_phase_ii_b04a_legacy_matrix.py` **2 passed**. No production H5 or trajectory reader
+defect was confirmed; the earlier diagnostic logs remain as historical evidence and must not be interpreted as
+reader failures.
+
+#### D04 bounded Entity Instance Segmentation receipt (2026-10-22)
+
+This slice is **EXTEND_EXISTING**: it adds an exact `D04_ENTITY_SEGMENTATION_PROFILE` and
+`dynamic_entity_instance_segmentation_manifest()` to the existing Camera admission/session owner, and versioned
+values to `CanonicalCameraObservation`. It uses MuJoCo's public segmentation-rendering methods and native
+`Renderer.render()` output; Core maps native geom IDs internally through the existing dynamic source
+Frame→renderer Body binding and the source's declared canonical Entity IDs. A non-world geom without exactly one
+Entity owner, a non-world Entity bound to MuJoCo world Body 0, an ambiguous body owner, an unsupported native
+object type, malformed background, or an unknown geom ID fails closed. Native geometry IDs do not cross the
+canonical observation boundary. World-body geometry maps to background.
+
+The output contracts are `canonical-entity-instance-segmentation-v1` and
+`canonical-entity-label-map-v1`. The mask is immutable H×W `uint32`; 0 is background and dense positive labels are
+assigned deterministically by sorted canonical Entity ID. The label map binds the TaskArtifact and Scene/source
+hashes, camera, provider materialization, SceneInstance, episode/reset, exact state boundary/revision/control step/
+simulation time, and the exact capture-identity hash. The camera identity declares RGB, Depth, and
+`entity_instance_segmentation` together. `CanonicalCameraObservation` rejects a map from another camera,
+SceneInstance, Episode, boundary, clock, source, or capture identity. The old RGB/Depth profile remains a separate
+route and returns `segmentation=None`; its existing output and identity contract is protected by the D04
+compatibility test.
+
+S1: `test_phase_ii_d04_rgbd_camera.py` covers missing/ambiguous body mapping, illegal label 0, mask labels absent
+from the map, non-world→world-body mapping, mismatched label-map publication, stale previous-Episode capture,
+segmentation admission requiring the co-captured RGB and Depth channels, and old RGB/Depth behavior. The corrected
+B04a sweep verifies `task-env-h5/v3` is accepted by the existing recorder contract, a truly unsupported v99 is
+rejected at the typed structured H5 reader, canonical v1 remains a recognized schema, and v99 is rejected by the
+actual canonical reader. `inspect_trajectory_h5()` is intentionally only a metadata summary. The targeted
+D03/D04/B04a/D05a regression was **18 passed**, followed by a final D04 S1 rerun after hardening the world-Body
+mapping rule (**3 passed**) and the final segmentation contract case (**1 passed**); each D04 run had one Taichi
+`locale.getdefaultlocale` deprecation warning. Existing C05a supported-version read/write cases for generic H5 v3
+and canonical v1 also passed (**2 passed**).
+
+Real S2 used the unchanged Position candidate and existing source closure: TaskArtifact
+`a56b6cbac66bc570c43d38b8eb5a7e3098873cc196015242d3e46df76dd0364c`, Scene
+`047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e`, closure
+`aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47`, source identity
+`ed51c2470eb4d1b9dacc60a2a373bf9b75ae8ae32b57089867646df7f23ab41b`, and controller profile
+`panda-main/position-servo-v1` (identity `3c8fae3e65515f4a62a0c2ba9c5b09d11e8b67ff724642948371b2539050836e`).
+Physics was GeoPhys / Taichi 0.6.2 x64 CPU. Rendering was MuJoCo 3.8.1 native OpenGL; the successful-capture GL
+query observed NVIDIA GeForce RTX 5060, OpenGL 4.6.0 NVIDIA 595.84. Device strings are post-capture diagnostics,
+not device pinning or admission evidence. GeoPhys gitlink remains `4436787e9cb85ce519506a2a9af86d1eeec9de2d`.
+The fixed camera is the versioned diagnostic source
+`d04-entity-seg-fixed-occlusion-v1`; the mounted camera is `d04-panda-hand-mounted-camera-v1`, parented to the
+declared `panda-main/hand` Frame. No frozen A05 fixture or source closure was modified.
+
+The 100 Hz outer route completed 12 intervals, each with five actual 2 ms native steps (60 total); hand-origin
+displacement was `0.08666 m`. Fixed and mounted captures changed RGB/Depth/mask by respectively 2251/2154/913 and
+1171/15010/754 pixels. The fixed camera pose stayed constant; the mounted pose followed its parent by `0.08652 m`.
+An independent ray/OBB calculation for the existing square peg found 12 pixels whose label changed from
+`square-peg-instance` to nearer `panda-main`; analytic peg surface optical-Z was `1.464745 m`, while captured
+foreground Depth was `0.827117 m`. This is visual occlusion evidence, not a contact-force or task-success claim.
+Capture instrumentation observed zero Controller compute, Provider step, `mj_step`, or `mj_forward` calls.
+
+For fixed and mounted cameras, reset reproduced the initial uint32 mask element-for-element while producing a new
+Episode/SceneInstance and capture identity; stale pre-reset state was rejected. The mask `.npy`, label-map JSON,
+and capture-identity JSON were written and read back for both cameras at initial, moved, and reset boundaries
+(six captures); disk dtype, values, mask checksum, label-map identity and publication hashes matched. Receipt,
+masks, maps, RGB/Depth diagnostic files and S1 logs are in ignored
+`workspace/maintenance/d04_entity_segmentation_20261022/`.
+
+This passes only the bounded Entity **instance** mask slice for this Position source/provider/backend/camera
+intersection. Semantic categories, links, free-joints, Assembly, other provider/backend pairs, async capture,
+resource/device qualification, full D04/D05b, and Phase II remain unsupported or unverified. No production reader
+defect was found; no D05b work was started.
 
 ### D05 — Renderer Selection / Pairing Integration（a/b）
 

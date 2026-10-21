@@ -196,7 +196,9 @@ def test_current_camera_and_capability_v0_values_are_strict_and_pinned_to_artifa
         )
 
 
-def test_unrecognized_versions_and_unversioned_extensions_fail_closed():
+def test_unsupported_versions_and_unversioned_extensions_fail_closed(tmp_path):
+    import h5py
+
     artifact_mapping = json.loads((FIXTURE_DIR / _ARTIFACT_FIXTURES[0][0]).read_bytes())
     with pytest.raises(ValueError, match="artifact schema"):
         TaskArtifact.from_mapping({**artifact_mapping, "schema_version": "task-artifact-v1"})
@@ -275,7 +277,19 @@ def test_unrecognized_versions_and_unversioned_extensions_fail_closed():
         ProviderCapabilityManifest.from_mapping(manifest_v1)
 
     with pytest.raises(ValueError, match="unsupported TaskEnv H5 schema"):
-        RecorderConfig(schema_id="task-env-h5", schema_version="v3")
+        RecorderConfig(schema_id="task-env-h5", schema_version="v99")
+
+    # v3 is supported by this recorder owner; use a real unsupported H5
+    # version at the typed reader boundary rather than treating the generic
+    # metadata inspector as a payload decoder.
+    assert RecorderConfig(schema_id="task-env-h5", schema_version="v3").schema_version == "v3"
+    from task_env.recorders.h5 import load_structured_control_records_h5
+    unknown_structured = tmp_path / "unknown-structured-version.h5"
+    with h5py.File(unknown_structured, "w") as handle:
+        handle.attrs["schema_id"] = "task-env-h5"
+        handle.attrs["schema_version"] = "v99"
+    with pytest.raises(ValueError, match="structured control reader requires task-env-h5/v3"):
+        load_structured_control_records_h5(unknown_structured)
 
 
 def test_trajectory_readers_keep_independent_version_routes(tmp_path):
@@ -289,7 +303,10 @@ def test_trajectory_readers_keep_independent_version_routes(tmp_path):
         SCHEMA as EXECUTION_SCHEMA,
         validate as validate_execution,
     )
-    from task_env.trajectory.canonical.h5 import FILE_SCHEMA as CANONICAL_FILE_SCHEMA
+    from task_env.trajectory.canonical.h5 import (
+        FILE_SCHEMA as CANONICAL_FILE_SCHEMA,
+        FILE_SCHEMA_V1 as CANONICAL_FILE_SCHEMA_V1,
+    )
     from task_env.trajectory.canonical.h5 import load as load_canonical_trajectory
 
     assert (RecorderConfig().schema_id, RecorderConfig().schema_version) == ("task-env-h5", "v2")
@@ -302,6 +319,7 @@ def test_trajectory_readers_keep_independent_version_routes(tmp_path):
         "task-env-canonical-execution-v2",
     )
     assert CANONICAL_FILE_SCHEMA == "task-env-canonical-trajectory-v0"
+    assert CANONICAL_FILE_SCHEMA_V1 == "task-env-canonical-trajectory-v1"
 
     with pytest.raises(ValueError, match="execution trajectory schema"):
         validate_execution(
@@ -318,7 +336,7 @@ def test_trajectory_readers_keep_independent_version_routes(tmp_path):
 
     unknown_canonical = tmp_path / "unknown-canonical.h5"
     with h5py.File(unknown_canonical, "w") as handle:
-        handle.attrs["schema"] = "task-env-canonical-trajectory-v1"
+        handle.attrs["schema"] = "task-env-canonical-trajectory-v99"
         handle.create_dataset("logical_json", data="{}")
         handle.create_group("numeric")
     with pytest.raises(ValueError, match="unsupported/unknown canonical file schema"):

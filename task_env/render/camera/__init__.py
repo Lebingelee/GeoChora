@@ -2,8 +2,9 @@
 from .api import (
     CameraRenderSession, create_camera_session, render_manifest, admit_render,
     D03_DYNAMIC_PROFILE, D03_PHYSICS_PROFILE, admit_dynamic_camera,
-    D04_DYNAMIC_PROFILE, create_dynamic_camera_session, dynamic_render_manifest,
-    dynamic_rgbd_render_manifest,
+    D04_DYNAMIC_PROFILE, D04_ENTITY_SEGMENTATION_PROFILE,
+    create_dynamic_camera_session, dynamic_render_manifest,
+    dynamic_rgbd_render_manifest, dynamic_entity_instance_segmentation_manifest,
 )
 from .source import (
     CameraCaptureIdentityV1, CameraRenderSource, TriangleMesh,
@@ -20,7 +21,9 @@ __all__ = [
     'RenderStateSyncReceiptV1', 'RenderVisualInstanceBindingV1',
     'TriangleMesh', 'create_camera_session', 'render_manifest', 'admit_render',
     'D03_DYNAMIC_PROFILE', 'D03_PHYSICS_PROFILE', 'D04_DYNAMIC_PROFILE',
+    'D04_ENTITY_SEGMENTATION_PROFILE',
     'admit_dynamic_camera', 'create_dynamic_camera_session',
     'dynamic_render_manifest', 'dynamic_rgbd_render_manifest',
+    'dynamic_entity_instance_segmentation_manifest',
     'project_render_state_v1',
 ]

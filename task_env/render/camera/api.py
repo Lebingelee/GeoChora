@@ -14,6 +14,7 @@ PROFILE = 'p1_4_native_camera_cpu_v0'
 D03_PHYSICS_PROFILE = 'geophys-scene-v3-runtime-v1'
 D03_DYNAMIC_PROFILE = 'd03_mujoco_native_dynamic_opengl_v1'
 D04_DYNAMIC_PROFILE = 'd04_mujoco_native_dynamic_opengl_rgbd_v1'
+D04_ENTITY_SEGMENTATION_PROFILE = 'd04_mujoco_native_dynamic_opengl_entity_instance_segmentation_v1'
 
 
 class CameraRenderSession(Protocol):
@@ -87,16 +88,35 @@ def dynamic_rgbd_render_manifest():
     )
 
 
+def dynamic_entity_instance_segmentation_manifest():
+    """Manifest for the bounded D04 RGB/Depth/Entity-mask intersection."""
+
+    return ProviderCapabilityManifest(
+        'provider-capability-v0', 'mujoco',
+        provider_build_identity('mujoco')['manifest_version'],
+        'd04-dynamic-camera-entity-segmentation-v1', 'native-opengl',
+        'geophys-cpu-to-mujoco-native-opengl', D04_ENTITY_SEGMENTATION_PROFILE,
+        'best_effort',
+        (
+            CapabilityClaim('rgb_camera', 'implemented', 'task_env/render/camera/dynamic-v1'),
+            CapabilityClaim('depth_camera', 'implemented', 'task_env/render/camera/dynamic-v1'),
+            CapabilityClaim('entity_instance_segmentation', 'implemented', 'task_env/render/camera/dynamic-v1'),
+        ), (), 'implementation_only_no_qualification',
+    )
+
+
 def _dynamic_manifest_for_profile(profile):
     if profile == D03_DYNAMIC_PROFILE:
         return dynamic_render_manifest()
     if profile == D04_DYNAMIC_PROFILE:
         return dynamic_rgbd_render_manifest()
+    if profile == D04_ENTITY_SEGMENTATION_PROFILE:
+        return dynamic_entity_instance_segmentation_manifest()
     raise CapabilityAdmissionError(f'unsupported dynamic camera profile: {profile!r}')
 
 
 def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
-    """Fail-closed admission for the D03 RGB or D04 RGB/Depth intersection."""
+    """Fail-closed admission for the bounded D03/D04 dynamic camera profiles."""
 
     if not isinstance(execution, ExecutionSpecV1):
         raise TypeError('dynamic camera admission requires execution-spec-v1')
@@ -112,7 +132,9 @@ def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
         or execution.physics_profile != D03_PHYSICS_PROFILE
         or selected.provider != 'mujoco'
         or selected.backend != 'native-opengl'
-        or selected.profile not in {D03_DYNAMIC_PROFILE, D04_DYNAMIC_PROFILE}
+        or selected.profile not in {
+            D03_DYNAMIC_PROFILE, D04_DYNAMIC_PROFILE, D04_ENTITY_SEGMENTATION_PROFILE,
+        }
         or selected.device is not None
         or execution.determinism_mode != 'best_effort'
     ):
@@ -121,10 +143,16 @@ def admit_dynamic_camera(camera, execution, *, source, manifest=None) -> None:
         )
     if camera.task_artifact_hash != source.task_artifact_hash:
         raise CapabilityAdmissionError('camera/render source TaskArtifact linkage mismatch')
+    if selected.profile == D04_ENTITY_SEGMENTATION_PROFILE and not (camera.rgb and camera.depth):
+        raise CapabilityAdmissionError(
+            'D04 Entity segmentation profile requires RGB and Depth on the same CameraGeometry capture'
+        )
     if manifest is not None and manifest.identity_hash != actual.identity_hash:
         raise CapabilityAdmissionError('dynamic camera manifest does not match the admitted profile route')
     claims = {claim.name: claim.status for claim in actual.capabilities}
     requested = tuple(name for name, enabled in (('rgb_camera', camera.rgb), ('depth_camera', camera.depth)) if enabled)
+    if selected.profile == D04_ENTITY_SEGMENTATION_PROFILE:
+        requested += ('entity_instance_segmentation',)
     missing = [name for name in requested if claims.get(name) != 'implemented' or name in actual.known_unsupported]
     if missing:
         if selected.profile == D03_DYNAMIC_PROFILE:
@@ -159,6 +187,7 @@ def create_dynamic_camera_session(
     from .mujoco import MuJoCoDynamicCameraSession
     return MuJoCoDynamicCameraSession(
         camera, source, initial_projection, execution=execution, manifest=actual_manifest,
+        entity_segmentation=(selected.profile == D04_ENTITY_SEGMENTATION_PROFILE),
     )
 
 
@@ -180,12 +209,17 @@ class CameraSessionValues:
             raise RuntimeError('camera session is closed')
         self._before_capture(state)
         metadata = resolve_camera(self._geometry, state)
-        native_rgb, native_depth = self._render(metadata)
+        rendered = self._render(metadata)
+        if not isinstance(rendered, tuple) or len(rendered) not in (2, 3):
+            raise RuntimeError('camera renderer returned an invalid modality bundle')
+        native_rgb, native_depth = rendered[:2]
+        native_segmentation = rendered[2] if len(rendered) == 3 else None
         capture_identity = self._capture_identity(state)
+        segmentation = self._canonical_segmentation(native_segmentation, state, capture_identity)
         return CanonicalCameraObservation(
             normalize_rgb(native_rgb,self._geometry) if self._geometry.rgb else None,
             optical_depth(native_depth,metadata,native_convention=self.native_depth_convention) if self._geometry.depth else None,
-            metadata, capture_identity)
+            metadata, capture_identity, segmentation)
 
     def _before_capture(self, state):
         """Optional read-only source synchronization for dynamic camera consumers."""
@@ -195,4 +229,9 @@ class CameraSessionValues:
     def _capture_identity(self, state):
         """Legacy renderers keep their existing metadata-only observation contract."""
 
+        return None
+
+    def _canonical_segmentation(self, native, state, capture_identity):
+        if native is not None:
+            raise RuntimeError('renderer returned Entity segmentation outside an admitted segmentation profile')
         return None

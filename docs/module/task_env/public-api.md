@@ -93,7 +93,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。v0 legacy route 保持；v1 仅支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 另要求精确 Scene identity、Joint/Frame bindings 与 StateRequirements；contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
-| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, `dynamic_render_manifest`, `dynamic_rgbd_render_manifest` | `task_env.render.camera` | D03 RGB 与 D04 RGB/Depth 是独立 versioned profile；均限 GeoPhys CPU Scene-v3 scalar-joint source → MuJoCo native OpenGL。D04 为同步 centered-pinhole RGB 与 H×W float32 optical-Z metres（invalid/background=0）；Source closure 与 Entity/Frame→body/geometry mapping 必须完整，geometry/publication/transform versions 分开、每个 consumer 独立消费。当前不接受 free-joint、Segmentation 或其它 pairings；不属于 root facade/通用 D05b admission |
+| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；segmentation only admits GeoPhys CPU Scene-v3 scalar-joint Position source → MuJoCo native OpenGL, requires RGB+Depth in the same capture, and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes and general D05b admission are unsupported |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
@@ -120,12 +120,15 @@ D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeS
 `admit_render`、Provider manifest capability claims 或 native construction，也不允许 UI `render_mode` 冒充
 Camera Sensor selection。现有 provider-capability-v0 mapping 原样保留；其 `identity_hash` 只绑定精确 mapping。
 D03/D04 在同一 Camera owner 复用 `create_dynamic_camera_session(camera, execution, source=..., initial_state=..., manifest=None)`；
-选择 D03 profile 时只准 RGB，D04 profile `D04_DYNAMIC_PROFILE` 配合 `dynamic_rgbd_render_manifest()` 准入同步 RGB/Depth。
+选择 D03 profile 时只准 RGB，D04 profile `D04_DYNAMIC_PROFILE` 配合 `dynamic_rgbd_render_manifest()` 准入同步 RGB/Depth；
+`D04_ENTITY_SEGMENTATION_PROFILE` 配合 `dynamic_entity_instance_segmentation_manifest()` 另行准入同 capture RGB/Depth/Entity mask。
 它们只 admission GeoPhys CPU Scene-v3 scalar-joint Position source 与 MuJoCo `native-opengl`，使用现有 `RuntimeSource`
 lowering、`CanonicalStateViewV1`、CameraGeometry/metadata 与 Renderer session；挂载相机 parent Frame 必须能唯一解析。
-Depth 为光学 +Z 米制 float32，invalid/clipped/background 为 0；capture identity 与实际返回 buffer 的同一 boundary 绑定。
-capture/sync 不调用 Controller 或推进物理。该 route 不让旧 `create_camera_session()` 接受 ExecutionSpec v1，也不构成
-Segmentation、完整 D04/D05b pairings 或 Qualification。MuJoCo 未公开 Renderer context handle；current GL device query 仅为
+Depth 为光学 +Z 米制 float32，invalid/clipped/background 为 0；Entity mask 为 `canonical-entity-instance-segmentation-v1` 的
+H×W uint32、背景 0，label map 使用 `canonical-entity-label-map-v1`，正标签稠密、按 canonical Entity ID 确定性排序，并与同 capture
+identity/source/boundary/SceneInstance 绑定。Native geom ID 不得成为公开标签；缺失、歧义或非 geom 映射均拒绝。capture identity
+声明 RGB、Depth、Entity-instance-segmentation 三个共采模态。capture/sync 不调用 Controller 或推进物理。该 route 不让旧
+`create_camera_session()` 接受 ExecutionSpec v1，也不构成语义分割、free-joint、完整 D04/D05b pairings 或 Qualification。MuJoCo 未公开 Renderer context handle；current GL device query 仅为
 capture 后的诊断观察，不参与设备准入或 pinning。
 
 `TaskDefinition` 只消费公开 snapshot/state，不访问 solver。

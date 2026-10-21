@@ -11,7 +11,7 @@
 > C02b 恢复分为内部 P/E 检查点，C02b 仍 BLOCKED；Position-only candidate 的 S2/H5 只覆盖单 Panda force-free 交集，R1 force 缺陷仍保留。S2 与 H5 v3 是 E 的后层退出标准，不是启动前置。
 > 见 [恢复审阅报告](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)与 [Phase C 当前契约](03_Phase_C_Execution_Lifecycle.md#c02--controller-binding--atomic-execution--safe-switchabc)。
 > **D03 current bounded result**：序号 31 已通过 GeoPhys CPU × MuJoCo native OpenGL 的 Position candidate RGB transform-sync S1/S2；仅覆盖 Scene-v3 scalar joints、Position arm movement 和单路 camera，不覆盖 D04 或完整 D05b。见 [Phase D D03 receipt](04_Phase_D_Physics_Rendering.md#d03-first-bounded-intersection-receipt-2026-10-21)。
-> **D04 current bounded result**：序号 32 已通过同交集的 RGB/optical-Z Depth、fixed/hand-mounted camera 与 reset freshness S1/S2；不覆盖 Segmentation、完整 D04/D05b 或 Qualification。见 [Phase D D04 receipt](04_Phase_D_Physics_Rendering.md#d04-first-bounded-rgbdepth-receipt-2026-10-22)。
+> **D04 current bounded result**：序号 32 已通过同交集的 RGB/optical-Z Depth 与 Entity-instance segmentation；fixed/hand-mounted camera、遮挡、reset freshness、mask/label-map 磁盘回读均有 S1/S2。只准入 Scene-v3 scalar-joint Position source → GeoPhys CPU × MuJoCo native OpenGL。Semantic segmentation、free-joint、完整 D04/D05b 与 Qualification 仍未覆盖。见 [Phase D D04 receipt](04_Phase_D_Physics_Rendering.md#d04-bounded-entity-instance-segmentation-receipt-2026-10-22)。
 
 ## 1. 审阅结论与事实边界
 
@@ -34,7 +34,7 @@
 | Reset | v0 ResetSample/RealizedInitialState 可记录请求/实测 | 容器存在不证明通用 tolerance gate 已执行 |
 | Provider lowering | ImportedScene 已有 ir/capability_report/solver/render descriptions | 优先组合，不复制 importer 或公开 native storage |
 | Recording | generic H5 v2、canonical outer、execution stream 是不同格式 | structured action/events/outcome 需版本化扩展 |
-| Camera | v0 RGB/Depth 与 static triangles 保留；D03 新增受限动态 RGB source/sync，D04 增加同一 GeoPhys CPU → MuJoCo native OpenGL 交集的 RGB/optical-Z Depth fixed/hand-mounted slice | 仅 Scene-v3 scalar-joint Position source、同步 pinhole 和已测 fixed/唯一绑定 Frame 相机；Segmentation 与完整 D05b pairing 仍未准入 |
+| Camera | v0 RGB/Depth 与 static triangles 保留；D03 dynamic RGB、D04 dynamic RGB/optical-Z Depth 与 Entity-instance mask 在同一 GeoPhys CPU → MuJoCo native OpenGL Position-source 交集有 bounded S1/S2 | 仅同步 pinhole、Scene-v3 scalar-joint Position source 与已测 fixed/唯一绑定 Frame 相机；Semantic segmentation、free-joint 与完整 D05b pairing 不准入 |
 | Freeze | TaskArtifact 是 immutable data/hash，不自动成为 approved frozen task | Stage-1 validation/feasibility/Human Judge 继续适用 |
 
 基准 GeoPhys checkout/Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`，
@@ -62,7 +62,7 @@ Menagerie 为 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。它们不能用当前
 | Controller switch | 同 schema/资源/单位/时序才允许 safepoint 替换 | schema 改变需要新 Env/wrapper/learner；默认拒绝 multi-writer，不建设通用 arbitration |
 | NutAssembly | measured interval feedback + Controller-owned hold/ramp 受限请求 | Solution 不共享可变 hold，不跨边界读私有 stage；保留 500 Hz 和 strict failure/warning |
 | Camera | pinhole、同步、RGB/optical-Z Depth；受限 segmentation 单独准入 | 任意 K、fisheye、真实 async/deformable 不因字段存在而支持 |
-| Pairing 目标 | GeoPhys CPU physics × MuJoCo native renderer × rigid calibration RGB/Depth | 当前会被 admission 拒绝；需真实动态同步；segmentation 单独证明 |
+| Pairing 目标 | GeoPhys CPU physics × MuJoCo native renderer 已有 D03 RGB、D04 RGB/Depth 和 bounded Entity-instance mask 的真实 Position-source 交集 | 仅这些 exact synchronous profiles 有证据；任意 source、provider/backend、geometry 或 modality 不自动准入；完整 D05b 仍需独立 pairing/资源验收 |
 | 未达 gate | 必需切片缺证据不标 implemented；deferred 明示范围缩减 | 不以接口就绪/同名 capture 通过声称完整 independence 或完整 A–D |
 
 ## 3. 切片依赖与推荐执行顺序
@@ -105,7 +105,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 29 | C05b | C02b、C03b、C04、C05a3 | PickCube external Solution、真实 step/record 和两 Provider 指定交集回归 |
 | 30 | C05c | C05b、D02b | NutAssembly native Guard/hold/ramp/500 Hz/force freshness 与严格 Outcome 回归；不能靠 position-only Profile 替代 |
 | 31 | D03 | D01b、D02b、D05a | **bounded implemented — first intersection**：Position scalar Scene-v3、canonical Frame→renderer mapping、独立 consumer versions、reset/same-step RGB S1/S2；详见 [D03 receipt](04_Phase_D_Physics_Rendering.md#d03-first-bounded-intersection-receipt-2026-10-21)。D04/full D05b remain open |
-| 32 | D04 | D03、C04、C05a2 | **bounded implemented — RGB/Depth first slice**：GeoPhys CPU × MuJoCo native OpenGL fixed/hand-mounted camera、光学 Z 深度与 reset capture identity；Segmentation/full D04 remain open。详见 [D04 receipt](04_Phase_D_Physics_Rendering.md#d04-first-bounded-rgbdepth-receipt-2026-10-22) |
+| 32 | D04 | D03、C04、C05a2 | **bounded implemented — RGB/Depth + Entity-instance segmentation slices**：GeoPhys CPU × MuJoCo native OpenGL fixed/hand-mounted capture、canonical Entity labels、运动/遮挡/reset 与 mask/map 磁盘回读有 S1/S2；semantic segmentation/full D04/D05b remain open。详见 [D04 receipt](04_Phase_D_Physics_Rendering.md#d04-bounded-entity-instance-segmentation-receipt-2026-10-22) |
 | 33 | D05b | D05a、D04、C01b | 真实动态 Physics×Renderer pairing、资源失败与精确 admitted envelope |
 | 34 | P99 | A05、B05、C02c、C05c、D05b | 20 父 Goal 的必需切片、真实新主线、最小双 Entity 隔离施控、D05b pairing；缺证据为 partial，不暗授 Assembly/force-profile 资格 |
 

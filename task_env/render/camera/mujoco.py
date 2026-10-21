@@ -6,6 +6,11 @@ import uuid
 import xml.etree.ElementTree as ET
 import numpy as np
 from .api import CameraSessionValues
+from ...observations.canonical_camera.images import (
+    CanonicalEntityLabelV1,
+    CanonicalEntityLabelMapV1,
+    CanonicalEntityInstanceSegmentationV1,
+)
 from .source import (
     DynamicCameraRenderSourceV1,
     RenderStateProjectionV1,
@@ -17,6 +22,70 @@ from .source import (
 
 D03_FRAME_POSITION_ATOL_M = 5.0e-4
 D03_FRAME_QUATERNION_SIGN_INVARIANT_L2_ATOL = 1.0e-3
+
+
+def _resolve_canonical_entity_geometry_labels(
+    geom_body_ids,
+    frame_body_bindings,
+    declared_entity_ids,
+):
+    """Translate private geom IDs to dense labels backed by canonical Entities.
+
+    Geometries on MuJoCo world body 0 are treated as unlabeled background.
+    Every other rendered geometry must resolve through exactly one Entity ID.
+    """
+
+    declared = set(declared_entity_ids)
+    if not declared or any(not isinstance(value, str) or not value for value in declared):
+        raise ValueError('Entity segmentation requires declared canonical Scene Entity IDs')
+    body_entities = {}
+    for entity_id, body_id in frame_body_bindings:
+        if entity_id == 'world':
+            if type(body_id) is not int or body_id != 0:
+                raise ValueError('canonical world Frame must bind MuJoCo world Body 0')
+            continue
+        if entity_id not in declared:
+            raise ValueError(f'Entity segmentation Frame binding references undeclared Entity {entity_id!r}')
+        if type(body_id) is not int or body_id < 0:
+            raise ValueError('Entity segmentation Frame binding contains an invalid renderer Body')
+        if body_id == 0:
+            if entity_id == 'world':
+                continue
+            raise ValueError('only the canonical world Frame may bind MuJoCo world Body 0')
+        body_entities.setdefault(body_id, set()).add(entity_id)
+
+    geom_entities = {}
+    used_entities = set()
+    for geom_id, body_id in enumerate(geom_body_ids):
+        body_id = int(body_id)
+        if body_id == 0:
+            geom_entities[geom_id] = None
+            continue
+        owners = body_entities.get(body_id, set())
+        if not owners:
+            raise ValueError(f'Entity segmentation has no Canonical Frame mapping for renderer geometry {geom_id}')
+        if len(owners) != 1:
+            raise ValueError(f'Entity segmentation has ambiguous Canonical Entity mapping for renderer geometry {geom_id}')
+        entity_id = next(iter(owners))
+        geom_entities[geom_id] = entity_id
+        used_entities.add(entity_id)
+
+    ordered_entities = tuple(sorted(used_entities))
+    if not ordered_entities:
+        raise ValueError('Entity segmentation source contains no Entity-bound renderer geometry')
+    labels = {
+        entity_id: index
+        for index, entity_id in enumerate(ordered_entities, start=1)
+    }
+    geom_labels = {
+        geom_id: 0 if entity_id is None else labels[entity_id]
+        for geom_id, entity_id in geom_entities.items()
+    }
+    label_entries = tuple(
+        CanonicalEntityLabelV1(labels[entity_id], entity_id)
+        for entity_id in ordered_entities
+    )
+    return geom_labels, label_entries
 
 
 def _numbers(values):
@@ -91,6 +160,7 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         *,
         execution,
         manifest,
+        entity_segmentation: bool = False,
     ):
         import mujoco
 
@@ -99,6 +169,15 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         self._source = source
         self._execution = execution
         self._manifest = manifest
+        if type(entity_segmentation) is not bool:
+            raise TypeError('Entity segmentation selection must be bool')
+        self._entity_segmentation_enabled = entity_segmentation
+        self._native_geom_entity_labels = {}
+        self._entity_label_entries = ()
+        if entity_segmentation and not callable(
+            getattr(mujoco.Renderer, 'enable_segmentation_rendering', None)
+        ):
+            raise RuntimeError('installed MuJoCo Renderer does not expose public segmentation rendering')
         self._consumer_id = f'mujoco-render-consumer-{uuid.uuid4().hex}'
         self._geometry_build_count = 0
         self._renderer = None
@@ -159,6 +238,21 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             self._joint_qpos_addresses = self._resolve_joint_addresses()
             self._body_ids = self._resolve_body_ids()
             self._visual_instance_bindings = self._resolve_visual_instances()
+            if self._entity_segmentation_enabled:
+                frame_body_bindings = tuple(
+                    (
+                        binding.entity_id,
+                        self._body_ids[(binding.entity_id, binding.frame_id)],
+                    )
+                    for binding in source.frame_bindings
+                )
+                self._native_geom_entity_labels, self._entity_label_entries = (
+                    _resolve_canonical_entity_geometry_labels(
+                        self._model.geom_bodyid,
+                        frame_body_bindings,
+                        (entity.entity_id for entity in source.scene_definition.entities),
+                    )
+                )
             self._renderer = mujoco.Renderer(self._model, height=camera.height, width=camera.width)
             self._geometry_build_count = 1
             if initial_projection.geometry_version != source.geometry_version:
@@ -354,6 +448,65 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             raise RuntimeError('camera capture identity does not match the consumed Canonical State publication')
         return self._source.capture_identity(
             self._geometry, self._execution, self._manifest, state,
+            additional_modalities=(
+                ('entity_instance_segmentation',) if self._entity_segmentation_enabled else ()
+            ),
+        )
+
+    def _canonical_segmentation(self, native, state, capture_identity):
+        if not self._entity_segmentation_enabled:
+            if native is not None:
+                raise RuntimeError('MuJoCo returned Entity segmentation outside the admitted profile')
+            return None
+        if native is None:
+            raise RuntimeError('admitted Entity segmentation profile produced no native segmentation image')
+        values = np.asarray(native)
+        if values.shape != (self._geometry.height, self._geometry.width, 2) or values.dtype != np.dtype(np.int32):
+            raise ValueError('MuJoCo segmentation output must be H×W×2 int32 object ID/type pairs')
+
+        object_ids = values[:, :, 0]
+        object_types = values[:, :, 1]
+        background = (object_ids == -1) & (object_types == -1)
+        partial_background = (object_ids == -1) ^ (object_types == -1)
+        if np.any(partial_background):
+            raise ValueError('MuJoCo segmentation returned a malformed partial background pair')
+        geometry_type = int(self._mj.mjtObj.mjOBJ_GEOM)
+        foreground = ~background
+        if np.any(object_types[foreground] != geometry_type):
+            raise ValueError('Entity segmentation only supports MuJoCo geom objects in this profile')
+        visible_geom_ids = tuple(int(value) for value in np.unique(object_ids[foreground]))
+        unknown_geom_ids = set(visible_geom_ids).difference(self._native_geom_entity_labels)
+        if unknown_geom_ids:
+            raise ValueError(
+                f'MuJoCo segmentation exposed geometries without canonical Entity mapping: {sorted(unknown_geom_ids)}'
+            )
+
+        mask = np.zeros((self._geometry.height, self._geometry.width), dtype=np.uint32)
+        for geom_id in visible_geom_ids:
+            mask[object_ids == geom_id] = np.uint32(self._native_geom_entity_labels[geom_id])
+        boundary = capture_identity.state_boundary
+        label_map = CanonicalEntityLabelMapV1(
+            schema_version='canonical-entity-label-map-v1',
+            task_artifact_hash=capture_identity.task_artifact_hash,
+            scene_identity_hash=boundary.scene_identity_hash,
+            render_source_identity_hash=capture_identity.render_source_identity_hash,
+            camera_id=capture_identity.camera_id,
+            scene_instance_id=boundary.scene_instance_id,
+            provider_materialization_id=boundary.provider_materialization_id,
+            episode_id=boundary.episode_id,
+            reset_sample_id=boundary.reset_sample_id,
+            state_boundary_id=boundary.boundary_id,
+            state_revision=boundary.state_revision,
+            control_step=boundary.control_step,
+            simulation_time_s=capture_identity.sample_clock.simulation_time_s,
+            capture_identity_hash=capture_identity.identity_hash,
+            labels=self._entity_label_entries,
+        )
+        return CanonicalEntityInstanceSegmentationV1(
+            schema_version='canonical-entity-instance-segmentation-v1',
+            mask=mask,
+            background_label=0,
+            label_map=label_map,
         )
 
     def _render(self, metadata):
@@ -373,7 +526,7 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
         self._mj.mj_kinematics(self._model, self._data)
         self._mj.mj_camlight(self._model, self._data)
         self._renderer.update_scene(self._data, camera=self._native_camera_name)
-        rgb = depth = None
+        rgb = depth = segmentation = None
         self._renderer.disable_depth_rendering()
         try:
             if self._geometry.rgb:
@@ -381,10 +534,18 @@ class MuJoCoDynamicCameraSession(CameraSessionValues):
             if self._geometry.depth:
                 self._renderer.enable_depth_rendering()
                 depth = self._renderer.render().copy()
+            if self._entity_segmentation_enabled:
+                self._renderer.disable_depth_rendering()
+                self._renderer.enable_segmentation_rendering()
+                segmentation = self._renderer.render().copy()
         finally:
             self._renderer.disable_depth_rendering()
+            if self._entity_segmentation_enabled:
+                self._renderer.disable_segmentation_rendering()
         self._has_rendered = True
         self._last_render_thread_id = threading.get_ident()
+        if self._entity_segmentation_enabled:
+            return rgb, depth, segmentation
         return rgb, depth
 
     def graphics_device_info(self):

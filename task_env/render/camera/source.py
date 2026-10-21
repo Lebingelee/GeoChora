@@ -273,6 +273,8 @@ class DynamicCameraRenderSourceV1:
         execution: ExecutionSpecV1,
         manifest: ProviderCapabilityManifest,
         state: CanonicalStateViewV1,
+        *,
+        additional_modalities: tuple[str, ...] = (),
     ) -> 'CameraCaptureIdentityV1':
         """Bind one successful dynamic capture to its exact public publication."""
 
@@ -305,7 +307,9 @@ class DynamicCameraRenderSourceV1:
             modality
             for modality, enabled in (('rgb', camera.rgb), ('depth', camera.depth))
             if enabled
-        )
+        ) + tuple(additional_modalities)
+        if len(modalities) != len(set(modalities)):
+            raise ValueError('capture identity modalities must be unique')
         return CameraCaptureIdentityV1(
             schema_version='camera-capture-identity-v1',
             task_artifact_hash=camera.task_artifact_hash,
@@ -472,7 +476,7 @@ class CameraCaptureIdentityV1(Contract):
         if not self.modalities or len(self.modalities) != len(set(self.modalities)):
             raise ValueError('camera capture modalities must be nonempty and unique')
         for modality in self.modalities:
-            _choice(modality, {'rgb', 'depth'}, 'camera output modality')
+            _choice(modality, {'rgb', 'depth', 'entity_instance_segmentation'}, 'camera output modality')
         object.__setattr__(self, 'modalities', tuple(sorted(self.modalities)))
 
     @property
