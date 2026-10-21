@@ -3,7 +3,7 @@
 > **ACTIVE bounded implementation record；Phase D remains incomplete and carries no new Qualification.**
 > 修订于 2026-10-22；源码审阅基准仍为规划期 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体蓝图：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；A/B/C 输入见相邻阶段文件。
-> **当前状态（2026-10-22）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL RGB 动态同步首个交集已通过；序号 32／D04 的 RGB/Optical-Z Depth 与固定/hand-mounted camera 已通过 S1/S2，Entity Instance Segmentation 也完成受限首个交集 S1/S2。完整 D04/D03/D05b、广泛 Renderer/Scene 支持及 Phase II 均未完成。
+> **当前状态（2026-10-22）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL RGB 动态同步首个交集已通过；序号 32／D04 的 RGB/Optical-Z Depth 与固定/hand-mounted camera 已通过 S1/S2，Entity Instance Segmentation 也完成受限首个交集 S1/S2；序号 33／D05b 已完成该 exact 交集的 selection→admission→materialization→sync→capture→close S1/S2。完整 D04/D05b、Env policy/Recorder consumer 接线、广泛 Renderer/Scene 支持及 Phase II 均未完成。
 
 ## D.0 讨论结论与范围
 
@@ -600,6 +600,7 @@ defect was found; no D05b work was started.
 - **退出规则**：首选 cross pairing 无真实 Evidence 时 D05b 为 blocked/accepted-deferred，不能将整个父目标
   或完整 independence 标完成。接口可读、同名 native capture 通过和独立动态 pairing 通过分别报告。
   唯一切片顺序见 [执行表](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
+  单一真实 cross-provider pairing 可关闭其有界交集 gate；不要求本轮扩展到完整 Env policy observation、Recorder、任意 provider/backend 或 Qualification。
 
 #### D05a static contract delivery (2026-10-20)
 
@@ -622,6 +623,74 @@ device realization、共享 session 生命周期或 camera pixels 已验证。
 `test_phase_ii_b04a_legacy_matrix.py`，运行于 TaskEnv Python、`PYTHONPATH=GeoPhys/src:.`；13 passed。
 其中显式断言 v1 selection 不能进入当前 `admit_render()`/`create_camera_session()`，legacy 同 Provider
 准入仍成功、异名 Physics×Renderer 仍在 native construction 前拒绝。
+
+#### D05b bounded cross-provider pairing receipt (2026-10-22)
+
+**Bounded result: S1/S2 passed for one exact online Camera pairing; the D05b parent Goal remains partial.**
+This is `COMPOSE_EXISTING`: no production Runtime, TaskEnv, Provider, Camera, Renderer, or Recorder owner changed.
+The diagnostic path builds the existing `phase-ii-c02b-position-servo-v1` candidate through
+`SelectedReferenceEnv.from_position_candidate()` on GeoPhys CPU; its normal selected lifecycle materializes the
+existing controlled `RuntimeSession`. It converts that actual `RuntimeSource` to `DynamicCameraRenderSourceV1`,
+then calls `create_dynamic_camera_session()`, whose existing owner performs `admit_dynamic_camera()`, projects the
+reset `CanonicalStateViewV1`, lowers the existing Scene/source closure, creates one MuJoCo renderer-only model per
+camera, consumes typed state via `sync_state()`, captures `CanonicalCameraObservation`, and releases resources through
+each session's `close()`.
+
+Exact identities: TaskArtifact `a56b6cbac66bc570c43d38b8eb5a7e3098873cc196015242d3e46df76dd0364c`; Scene
+`047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e`; source closure
+`aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47`; dynamic source identity
+`ed51c2470eb4d1b9dacc60a2a373bf9b75ae8ae32b57089867646df7f23ab41b`; Controller
+`panda-main/position-servo-v1`, identity `3c8fae3e65515f4a62a0c2ba9c5b09d11e8b67ff724642948371b2539050836e`.
+Physics is GeoPhys/Taichi 0.6.2 x64 CPU. Renderer is MuJoCo 3.8.1 native OpenGL, with an observed post-capture
+NVIDIA GeForce RTX 5060 and OpenGL 4.6.0 NVIDIA 595.84. The GL strings are diagnostic observations, not device
+pinning or admission criteria. The GeoPhys gitlink remains `4436787e9cb85ce519506a2a9af86d1eeec9de2d`.
+
+`ExecutionSpecV1` identity is `1662901cdfc8ad75277a0d0a8bf539ab7b165bb394efa118a1535b8347f0c530`.
+The fixed world camera `d04-entity-seg-fixed-occlusion-v1` resolves the declared renderer default; the mounted
+camera `d04-panda-hand-mounted-camera-v1` resolves its explicit per-camera override. Both capture identities report
+the same exact admitted selection (`mujoco` / `native-opengl` /
+`d04_mujoco_native_dynamic_opengl_entity_instance_segmentation_v1`, selection hash
+`6a3dd18fc407f29111406780f2677b327a102faf5afc58f33aaf98e606133723`) because it is the only selection currently
+admitted for this intersection. The actual Renderer manifest identity in the returned capture identity is
+`678a853e1b3bc70eef9558a63f90ec71a8fd12d0d6553c4accdf9f9199ce9682`. The override origin and effective selection
+were both recorded. Its parent selector `hand` resolves uniquely to the existing canonical Frame
+`panda-main/hand` and native source body `hand`.
+
+The real run completed 12 × 10 ms outer intervals, each with five 2 ms native steps (60 completed steps from the
+public clock). The hand moved `0.08666 m`. Fixed/mounted RGB, Depth and mask changed respectively 2251/1171,
+2154/15010 and 913/754 pixels. Six successful initial/moved/reset captures were written and read back; every
+capture identity matched its own sync publication, evaluation boundary, SceneInstance and GeoPhys materialization.
+The reset created a new episode/materialization identity and reproduced the same reset outputs; old-episode state
+was rejected. Capture instrumentation recorded zero Controller compute, GeoPhys provider step, `mj_step`, or
+`mj_forward` calls. Two independent camera consumers each built static geometry once and each called native
+`Renderer.close()` once. S1 also injected wrong selection/provider/backend/device, missing RGB/Depth requirements,
+wrong source/Frame/publication, absent MuJoCo package, post-allocation constructor failure, sync failure and capture
+failure. Invalid requests produced no CameraObservation and no physical/Controller advancement; a failed consumer
+did not prevent its sibling from capturing, and repeated session close did not repeat its Renderer close. The
+receipt intentionally does not require process-wide GL allocator memory to reach zero.
+
+Targeted command results: `test_phase_ii_d05b_pairing_integration.py` **3 passed**; combined D05b/D05a/D04/D03/B04a
+regression **21 passed**, one Taichi `locale.getdefaultlocale` deprecation warning. The final real receipt records
+Core `ab73f78af39601ce55fc21f85160fffcbc209520`, GeoPhys
+`4436787e9cb85ce519506a2a9af86d1eeec9de2d`, Python 3.12.14, Taichi Forge 0.6.2 and MuJoCo 3.8.1. The receipt,
+raw capture files and probe stdout are under ignored
+`workspace/maintenance/d05b_pairing_20261022/s2_geophys_mujoco_final2/` and
+`workspace/maintenance/d05b_pairing_20261022/s2_d05b_probe_stdout.log`; the final S1 log is
+`workspace/maintenance/d05b_pairing_20261022/s1_d05b_pytest_final.log`.
+
+**Consumer boundary:** these captured `CanonicalCameraObservation` values are currently consumed directly by the
+diagnostic probe. Generic `BaseTaskEnv` can publish configured RGB/Depth leaves through its separate existing
+`CameraObservationProvider` and `StateObservationBuilder`, but that route does not instantiate these D05b dynamic
+sessions or provide Entity masks. The Position candidate's dynamic camera buffers are not connected to its policy
+observation or `TransitionRecorder`; diagnostic file readback is not Environment observation or trajectory recording
+evidence. This does not block the bounded pairing S1/S2 gate, but it blocks any end-to-end visuomotor/recorded-data
+claim. The minimal follow-up is to connect existing admitted CameraSession outputs through the existing observation
+owner with same-boundary RGB/Depth/mask and capture identity fields, then exercise existing TransitionRecorder on
+those observation leaves. No parallel renderer or recorder owner is indicated.
+
+This receipt closes only the first bounded GeoPhys CPU × MuJoCo native OpenGL Position/Scene-v3 pairing. It does not
+close the full D05b matrix, full D04, Environment policy/Recorder integration, other pairings, D05 qualification or
+Phase II.
 
 ## D.9 验收矩阵：先确保语义正确，再验证组合性能
 

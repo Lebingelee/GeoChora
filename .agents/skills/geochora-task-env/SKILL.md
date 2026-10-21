@@ -217,6 +217,20 @@ unsupported. It does not call Controller or advance physics and is not a Qualifi
 no public renderer context handle; GL strings observed after capture are diagnostic only and do not pin or admit
 a device.
 
+**D05b first bounded pairing (2026-10-22):**
+`task_env/diagnostics/tasks/d05b_pairing_s2_probe.py` composes the existing Position candidate's GeoPhys CPU
+`RuntimeSession`/`RuntimeSource` with the existing `ExecutionSpecV1` and `create_dynamic_camera_session()` owner.
+It exercises the default selection for a fixed camera and a per-camera override for the hand-mounted camera; both
+resolve to the one exact admitted MuJoCo native OpenGL Entity-instance profile and their successful capture identities
+bind the same ExecutionSpec and each camera's sync publication. Targeted S1 and real S2 passed for this single
+Scene-v3 scalar-joint candidate. See the [D05b receipt](../../../docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md#d05b-bounded-cross-provider-pairing-receipt-2026-10-22).
+
+This bounded pair remains a direct CameraSession diagnostic route. `BaseTaskEnv` policy RGB/Depth currently use the
+separate configured `CameraObservationProvider` → `StateObservationBuilder` route; the D05b dynamic session does not
+feed those observations or `TransitionRecorder`, and its diagnostic files are not policy/trajectory data. Do not
+claim visuomotor observation or recorded-camera integration. A future connection belongs in the existing observation
+owner and must bind RGB/Depth/mask plus capture identity to the same runtime boundary before using the existing recorder.
+
 For Phase II B01 authoring input, use `task_env.environment.TaskSourceV1` and `load_task_source()` from the existing
 environment owner. The current strict envelope accepts task identity, a Scene reference, typed role selectors,
 and hook declarations; loading it does not alter `ResolvedEnvConfig` and never imports or executes a declared hook.
