@@ -92,13 +92,13 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 18 | C01b | B05、D02b | 实际 Task requirements/actual manifests、动态 admission；兼容配置分支 |
 | 19 | D01b | D01a、B04b、C01b | vNext 与两 provider 固定拓扑 materialization/reset/realization；本分支有界 S2 receipt 见 §11 与 Phase D D01b |
 | 20 | C02a | A03、C01b、D02b | **bounded implemented**：Scene-v3 Entity×Group binding 与完整 action preflight；单 writer；87 项交叉回归，未开放 group dispatch |
-| 21 | C05a1 | C02a、C01b、D05a | **bounded evidence mapped；退出待复核**：已有 Action/Event/Outcome 值与版本约束；Stop finalizer 合同/consumer gate 见 §3.2，不撤销原 C05a 收据 |
-| 22 | C05a2 | C05a1 | **bounded evidence mapped；退出待复核**：已有 generic H5 v3、T/T+1、单 writer 投影；最低 non-arm loader/end/bootstrap 消费按 §3.2 补证 |
+| 21 | C05a1 | C02a、C01b、D05a | **bounded evidence mapped**：既有值契约加 C03b lifecycle finalizer/调用次数与 End Event 验收；不撤销原 C05a 收据，也不代表全 consumer 迁移 |
+| 22 | C05a2 | C05a1 | **bounded evidence mapped**：generic H5 v3、T/T+1、单 writer 投影及 `load_structured_training_episode_h5()` 的 end/bootstrap 消费已定向验证；未声明结构化 action 的 wrapper/env 明确拒绝 |
 | 23 | C05a3 | C05a1、C05a2 | **bounded evidence mapped；退出待复核**：已有 outer v1/stream v3 与旧读者拒绝；保留各格式 owner 和 historical detector 边界，见 §3.2 |
 | 24 | C03a | C02a、D01b、C05a2 | **bounded implemented**：scalar lifecycle、fault receipt、Recorder interval 完整性；历史证据见原文收据 |
 | 25 | C04 | C03a、D02b | **bounded implemented**：observation/info schemas、feedback 与 diagnostics 分离；历史收据有效 |
 | 26 | C02b | C02a、C03a、C04、C05a2、D01b | **BLOCKED**：P 审阅完成；单 Panda Position candidate 的 S1、GeoPhys/MuJoCo CPU S2 与 Generic H5 v3 state readback bounded 通过。Force-aware R1 raw-force/reset freshness 与其他必需交集仍 blocked |
-| 27 | C03b | C03a、C04、C05a2 | wrapper-visible Stop、EpisodeOutcome、T/T+1、bootstrap；独立于 C02b 可先授权 |
+| 27 | C03b | C03a、C04、C05a2 | **bounded implemented**：现有 generic/Position scalar lifecycle、EpisodeEnd、v3 reader consumer；Pendulum GeoPhys S2 与双 Provider Position Stop/H5 通过；selected R1、vector、全部算法和 MuJoCo generic Pendulum 未支持。详见 [C03b receipt](C03b_Stop_Outcome_Receipt_2026-10-21.md) |
 | 28 | C02c | C02b、C03b、C05a2 | 受限同外部 schema/safepoint 的 Controller safe switch、memory/identity/ack/events；不等待整项 C05c，NutAssembly 未验证仍拒绝 |
 | 29 | C05b | C02b、C03b、C04、C05a3 | PickCube external Solution、真实 step/record 和两 Provider 指定交集回归 |
 | 30 | C05c | C05b、D02b | NutAssembly native Guard/hold/ramp/500 Hz/force freshness 与严格 Outcome 回归；不能靠 position-only Profile 替代 |
@@ -119,7 +119,7 @@ P00/P99 是 gate，不增设新的 Framework/Harness；当前提交不执行表�
 force-aware R1 的 fail-closed gate 和 GeoPhys CPU reset stale-force Probe 已验证；公开 Reader route 存在，
 但 reset 后仍可能读到上一 episode 的 −30 N，raw force 尚未闭合 admission/typed publication。
 该缺陷继续阻塞 R1；位置 Profile 候选若在完整消费链不查询力，可独立验证，无须先修 GeoPhys force API。
-C02b-P 已确定实际 writer/identity/required state 和 force-free reset/step/record 路线；E-S1/S2/H5 已实跑同一 candidate/sample、两 Provider 位置控制与 H5 v3 磁盘读回。结果只关闭该声明交集，不打开 production capability、不关闭 required-force R1 或其他场景；27／C03b 也尚未实施。
+C02b-P 已确定实际 writer/identity/required state 和 force-free reset/step/record 路线；E-S1/S2/H5 已实跑同一 candidate/sample、两 Provider 位置控制与 H5 v3 磁盘读回。结果只关闭该声明交集，不打开 production capability、不关闭 required-force R1 或其他场景。C03b 后续已在有界 scalar lifecycle 内完成，仍不改变 C02b/R1 阻塞或完整 Phase II 状态。
 既有 C03a/C04 验收不会因序号同步失效，本地冻结 `codex/phase-ii-b` 保持 `0068010`。
 
 **旧/新序号对照**（Goal ID 为主键，历史记录不改号）：
@@ -129,7 +129,7 @@ C02b-P 已确定实际 writer/identity/required state 和 force-free reset/step/
 | 00–20（至 C02a） | 00–20 | 序号不变；B04b 补记已有 P00 的 D05a 直接前置 |
 | 21／C05a | 21／C05a1、22／C05a2、23／C05a3 | 仅细化退出条件，已有实现/证据见 §3.2 |
 | 22／C03a、23／C04 | 24／C03a、25／C04 | 保留既有 bounded receipts |
-| 24／C02b、25／C03b | 26／C02b、27／C03b | 实施未完成；P/E 不额外计数 |
+| 24／C02b、25／C03b | 26／C02b、27／C03b | 编表时实施未完成；P/E 不额外计数。C03b 后续 bounded receipt 见序号 27；C02b 仍 BLOCKED |
 | 28／C02c | 28／C02c | 前置改为 C02b/C03b/C05a2，不等待完整 C05c |
 | 26／C05b、27／C05c | 29／C05b、30／C05c | task-specific force/readiness/Guard 仍独立验收 |
 | 29／D03、30／D04、31／D05b、32／P99 | 31／D03、32／D04、33／D05b、34／P99 | Renderer 不等待 C05c；保留最小双 Entity 施控 gate |
@@ -160,8 +160,8 @@ P00 已定义 a1/a2/a3，但后续工程按旧表将实现合并在一个 C05a �
 
 | 当前切片 | 可直接复用的现有实现/证据 | 尚需明确的退出证据 |
 | --- | --- | --- |
-| C05a1 | 既有 BoundaryEventV1/EpisodeOutcomeV1/StructuredControlTransitionV1、版本拒绝、T=0、boundary sequence、terminal bootstrap 值约束 | Stop finalizer 唯一 owner、调用次数及 consumer 合同；实际 Stop 行为在 C03b 检验，不能由 storage roundtrip 代替 |
-| C05a2 | generic H5 v3、T/T+1、显式单 writer schema/order/value projection、finalized-episode reader | P00 最低 non-arm loader、未知版本拒绝与实际 end/bootstrap 消费的具体 fixture/consumer；未在现有 Panda-centric 专项证明的部分定向补证 |
+| C05a1 | 既有 BoundaryEventV1/EpisodeOutcomeV1/StructuredControlTransitionV1、版本拒绝、T=0、boundary sequence、terminal bootstrap 值约束；C03b 复用同一 Event/Outcome owner 并验证 lifecycle exactly-once finalizer | 非受限生产 consumer 的 Stop 适配；storage/finalizer 证据仍不等于完整算法迁移 |
+| C05a2 | generic H5 v3、T/T+1、显式单 writer schema/order/value projection、finalized-episode reader；C03b 的 `load_structured_training_episode_h5()` 返回原 step flags 加 final outcome/bootstrap | 仅显式声明 typed structured controls 的 wrapper 可走 v3；当前无真实 generic TaskEnv 声明该能力，普通 Pendulum v3/v2-active-Stop 组合明确拒绝 |
 | C05a3 | canonical outer v1、execution stream v3、structured reader/projection、旧 layout 拒绝及 pending interval 不可 freeze | 各旧格式独立兼容 detector 与新 Profile 可用交集；历史退休 import/campaign 缺口单列，不恢复 alias 或删除断言求绿 |
 
 `test_phase_ii_c05a_structured_recording.py` 的旧 7 项及旧组合 41 项通过是当时有界结果，本次未重跑。
@@ -520,8 +520,8 @@ Recovery Review 原始文档修订授权与 C02b-P 审阅结论见
 - **RA-02 P/E 检查点**：C02b-P 与 E-S1/S2/H5 已完成 Position identity/state mapping、force-free dispatch、双 Provider native actuation/ack、C03a fault evidence 与 H5 磁盘 state readback。S2/H5 是 E 的分层退出标准，不是开工前置；P/E 的这条单 Panda 路线不等于完成 C02b。记录见 [Position-based Profile Review](C02b_P_Position_Based_Profile_Review.md)、[S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md) 与 [S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md)。
 - **RA-03 反馈/存储接口**：旧 selected R1 consumer 和 canonical BoundaryRecord 仍依赖 force/readiness；Position candidate 复用 typed state projection，现已接既有 Generic H5 v3 真写读。GeoPhys Position 路径不调用旧 force feedback；MuJoCo 按 plan policy 在 reset/step 不复制 force cache，legacy force-aware 默认行为保持。R1 raw-force 与 reset freshness 仍 blocked。
 - **RA-04 依赖同步**：采用 P00 的 33 切片表、C05a evidence crosswalk、C02c←C02b/C03b/C05a2。
-  C03b/D03 无 C02b 硬依赖，可以另行授权；C05b/C05c 的实际 Solution/Guard 保真不能由位置 Profile 代替。
+  C03b 已完成 bounded scalar Stop/Outcome 路线且无 C02b 硬依赖；C05b/C05c 的实际 Solution/Guard 保真不能由位置 Profile 或本次 Stop 证据代替。
 - **RA-05 Assembly 后置**：Logical members/preset 与 Physical Attachment 分开；跨 Entity fixed-joint 装配另审版本与
   Provider S2，不改变现行 Scene v3 或历史收据，不成为 C02b 新前置。P00/P99 最小双 Entity 隔离施控义务保留。
-- **RA-06 发布边界**：当前工作树包含 E 实现与 S1/S2/H5 验收记录，尚未提交。C02b、force-aware 缺陷、C03b/C02c、通用 Panda TaskEnv
-  Stage 1 composition 缺口均未关闭；没有 Assembly 或 qualification。
+- **RA-06 发布边界**：C02b E 的本地 checkpoint 为 `d99941c`；C03b 改动尚未提交或推送。C02b、force-aware 缺陷、C02c、通用 Panda TaskEnv
+  Stage 1 composition 缺口均未关闭；没有 Assembly 或 Phase II qualification。

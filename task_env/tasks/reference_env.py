@@ -16,7 +16,7 @@ from gymnasium.spaces import Box, Dict
 from ..artifacts import ExecutionSpec
 from ..controllers.canonical.contracts import RequestedAction, digest
 from ..environment.protocols import TaskEnvironmentComponent
-from ..environment.types import ExecutionFaultV1, attach_execution_fault
+from ..environment.types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
 from ..planners.completion import ExpertExecutionInfo
 from ..runtime.sessions.api import PROFILE
 from ..runtime.sessions.control import ControlBinding, materialize_control
@@ -148,6 +148,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._closed = False
         self._episode_mode = None
         self._stopped = True
+        self._position_episode_end = None
+        self._published_position_state = None
+        self._published_position_typed_state = None
+        self._published_position_obs = None
+        self._published_position_info = None
+        self._published_position_evaluation = None
         self.recorder = None
         self.recording_path = None
 
@@ -225,6 +231,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
+        previous_episode_end = self._position_episode_end
+        if (getattr(self, 'position_profile', False) and self.session is not None
+                and self._published_position_typed_state is not None
+                and previous_episode_end is None):
+            previous_episode_end = self.stop('reset')
+        if getattr(self, 'position_profile', False):
+            self._position_episode_end = None
+            self._published_position_state = None
+            self._published_position_typed_state = None
+            self._published_position_obs = None
+            self._published_position_info = None
+            self._published_position_evaluation = None
         self._stopped = True
         previous_session, self.session = self.session, None
         phase = 'reset_close'
@@ -318,6 +336,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.position_profile:
                 self._position_reset_info = self._position_record_reset_info()
                 self.info.update(self._position_reset_info)
+                if previous_episode_end is not None:
+                    self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
             if self.state.control_step != 0 or self.state.simulation_time != 0:
                 raise ValueError('reference reset must not advance physics')
             if self.solution is not None:
@@ -328,6 +348,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.arm_schedule = (self.binding.schedule_factory(self)
                                  if self.binding.schedule_factory is not None else None)
             self._stopped, self._episode_mode = False, None
+            self._position_episode_end = None
+            self._published_position_state = self.state
+            self._published_position_typed_state = getattr(self, 'typed_state', None)
+            self._published_position_obs = self.obs
+            self._published_position_info = dict(self.info)
+            self._published_position_evaluation = self.evaluation
             self.recorder = None
             self._execution_fault = None
             return self.obs, self.info
@@ -483,6 +509,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._record_position_transition(
                     request, canonical, target, applied, terminated=terminated, truncated=truncated,
                 )
+            # Publish the boundary only after the complete step and any active
+            # recorder append have succeeded. A partially advanced fault is
+            # diagnostic evidence, never a synthetic T transition.
+            self._published_position_state = self.state
+            self._published_position_typed_state = self.typed_state
+            self._published_position_obs = self.obs
+            self._published_position_info = dict(self.info)
+            self._published_position_evaluation = self.evaluation
+            if terminated or truncated:
+                self._position_episode_end = self._make_position_episode_end(
+                    'task_terminal' if terminated else 'horizon_reached',
+                    terminated=bool(terminated),
+                    truncated=not bool(terminated),
+                    bootstrap_allowed=not bool(terminated),
+                )
+                self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
         except BaseException as error:
             after_state = None
@@ -725,10 +767,112 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         return None
 
     def close(self):
-        if self.session is not None:
-            self.session.close()
-            self.session = None
-        self._closed, self._stopped = True, True
+        if self._closed:
+            return
+        if not getattr(self, 'position_profile', False):
+            if self.session is not None:
+                self.session.close()
+                self.session = None
+            self._closed, self._stopped = True, True
+            return
+        first_error = None
+        if self._published_position_state is not None:
+            try:
+                if self._position_episode_end is None:
+                    self.stop('environment_close')
+                if self.recorder is not None and getattr(self.recorder, 'active', False):
+                    self.finish_recording(self._position_episode_end.outcome.end_reason)
+            except BaseException as error:
+                first_error = error
+        try:
+            if self.session is not None:
+                self.session.close()
+                self.session = None
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+        finally:
+            self._closed, self._stopped = True, True
+        if first_error is not None:
+            raise first_error
+
+    def _make_position_episode_end(
+        self, end_reason, *, terminated, truncated, bootstrap_allowed,
+        task_success=None, payload=None,
+    ):
+        from ..trajectory.canonical.episode import make_episode_end_v1
+
+        typed = self._published_position_typed_state
+        state = self._published_position_state
+        if typed is None or state is None:
+            raise RuntimeError('Position Stop requires a successfully returned reset boundary')
+        boundary = typed.view.boundary
+        details = {
+            'control_step': int(state.control_step),
+            'simulation_time_s': float(state.simulation_time),
+            'state_boundary_id': boundary.boundary_id,
+            'source_closure_digest': self.value['source'].source_closure_digest,
+            'controller_identity': self.controller.identity,
+            'profile_id': self.controller.profile_id,
+        }
+        details.update(dict(payload or {}))
+        success = (
+            bool(self._published_position_evaluation.success)
+            if task_success is None and self._published_position_evaluation is not None
+            else task_success
+        )
+        return make_episode_end_v1(
+            episode_id=boundary.episode_id,
+            final_boundary=int(state.control_step),
+            end_reason=end_reason,
+            terminated=terminated,
+            truncated=truncated,
+            bootstrap_allowed=bootstrap_allowed,
+            source='task_env.selected_reference.position_servo_v1',
+            payload=details,
+            task_success=success,
+        )
+
+    def stop(self, reason='external_stop'):
+        """Finish the Position candidate at its last fully returned boundary."""
+
+        if self._closed:
+            raise RuntimeError('cannot stop a closed selected environment')
+        if not getattr(self, 'position_profile', False):
+            raise StageUnavailableError(
+                'Stop/Outcome is only admitted for the PositionServoV1 candidate; '
+                'legacy selected production-r1 behavior is unchanged'
+            )
+        if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
+            raise ValueError('Stop reason must be a trimmed non-empty string')
+        if self._position_episode_end is not None:
+            return self._position_episode_end
+        if self.session is None or self._published_position_typed_state is None:
+            raise RuntimeError('reset() must complete before Stop')
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            self._position_episode_end = self._make_position_episode_end(
+                'execution_fault', terminated=False, truncated=True,
+                bootstrap_allowed=False, task_success=None,
+                payload={
+                    'requested_reason': reason,
+                    'fault': fault.to_mapping(),
+                    'observed_runtime_clock': {
+                        'control_step': int(self.state.control_step),
+                        'simulation_time_s': float(self.state.simulation_time),
+                    },
+                },
+            )
+        else:
+            self._position_episode_end = self._make_position_episode_end(
+                'external_stop',
+                terminated=False,
+                truncated=True,
+                bootstrap_allowed=True,
+                payload={'requested_reason': reason},
+            )
+        self._stopped = True
+        return self._position_episode_end
 
     def _boundary(self):
         from ..trajectory.canonical.contracts import BoundaryRecord
@@ -755,7 +899,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from ..trajectory.canonical.execution import ExecutionRecorder
         from ..runtime.sessions.provenance import provider_build_identity
         from ..runtime.sessions import common as session_common
-        if self.session is None or self.state.control_step != 0 or self.recorder is not None:
+        if (self.session is None or self.state.control_step != 0 or self.recorder is not None
+                or self._stopped or self._position_episode_end is not None):
             raise RuntimeError('recording starts exactly once at reset boundary')
         if getattr(self, 'position_profile', False):
             from ..recorders import RecorderConfig, TransitionRecorder
@@ -865,19 +1010,32 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def finish_recording(self, reason):
         if getattr(self, 'position_profile', False):
             from ..recorders import load_structured_control_records_h5
-            from ..trajectory.canonical.episode import EpisodeOutcomeV1
-
             if self.recorder is None or not getattr(self.recorder, 'active', False):
                 raise RuntimeError('no active recording')
+            if self._position_episode_end is None:
+                self.stop(str(reason))
+            episode_end = self._position_episode_end
+            outcome = episode_end.outcome
+            allowed_reasons = {
+                outcome.end_reason,
+                str(episode_end.boundary_event.payload.get('requested_reason', '')),
+            }
+            if outcome.end_reason == 'horizon_reached':
+                allowed_reasons.add('horizon')
+            if str(reason) not in allowed_reasons:
+                raise ValueError('recording finalization reason disagrees with EpisodeOutcome')
+
             transition_count = self.recorder.transition_count
-            terminated = bool(self._last_position_terminated)
-            truncated = bool(self._last_position_truncated)
-            outcome = EpisodeOutcomeV1(
-                'episode-outcome-v1', self.typed_state.view.boundary.episode_id,
-                transition_count, str(reason), terminated, truncated,
-                not terminated, bool(self.evaluation.success), None,
+            if transition_count != outcome.final_boundary:
+                raise RuntimeError(
+                    'recording T does not match the last complete Position boundary; '
+                    'an incomplete interval cannot be finalized'
+                )
+            trajectory = self.recorder.end_episode(
+                outcome.end_reason,
+                outcome=outcome,
+                end_event=episode_end.boundary_event,
             )
-            trajectory = self.recorder.end_episode(str(reason), outcome=outcome)
             output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
             loaded = load_structured_control_records_h5(output)
             if (loaded['transition_count'] != trajectory.transition_count

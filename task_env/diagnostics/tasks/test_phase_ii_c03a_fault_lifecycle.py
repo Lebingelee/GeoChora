@@ -376,5 +376,11 @@ def test_real_pendulum_scalar_env_preserves_five_tuple_clock_and_terminal_guard(
         with pytest.raises(RuntimeError, match="faulted; reset"):
             env.step(action)
         assert env._last_snapshot.simulation_time == advanced_time
+        stop_end = env.stop("after_result_packaging_fault")
+        assert stop_end.outcome.end_reason == "execution_fault"
+        assert stop_end.outcome.final_boundary == 0
+        assert stop_end.outcome.bootstrap_allowed is False
+        assert stop_end.boundary_event.payload["fault"]["physical_progress"] == "advanced"
+        assert env._last_snapshot.simulation_time == advanced_time
     finally:
         env.close()

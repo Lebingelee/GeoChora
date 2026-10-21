@@ -24,6 +24,9 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 `reset(seed=...) -> (observation, info)` 在首次 step 前调用；
 `step(action) -> (observation, reward, terminated, truncated, info)`。
 终端后需 reset，不能继续 step；使用 `try/finally: env.close()` 关闭资源。
+通用 scalar lifecycle 另提供 `env.stop(reason="external_stop") -> EpisodeEndV1`：Stop 只在最后一个完整公开边界结束 episode，不调用 Controller、不施控、不推进 Runtime，也不伪造 Gym transition。默认 external Stop 是 `truncated=True, bootstrap_allowed=True`；horizon 是可 bootstrap 的截断；task terminal 是 `terminated=True, bootstrap_allowed=False`；execution fault 是不可 bootstrap 的 fault outcome。现有 step flags 保持原值；同时发生 task terminal 与 horizon 时，EpisodeOutcome 以 task terminal 为最终结果，但不回写已返回的五元组。
+对成功 reset 后尚未结束的 episode 调用 reset，会先在旧边界生成 Stop，并在新 reset info 的 `previous_episode_end_v1` 返回旧结果；close 也会在 teardown 前结束活动 lifecycle。reset 前 Stop、Stop/step 在 close 后均拒绝；同一 episode 重复 Stop 返回缓存的同一 `EpisodeEndV1`。execution fault 后 Stop 记录 fault 且停在最后完整边界，不把已推进但未完成公开 transition 的间隔补成 transition。
+`SelectedReferenceEnv` 仅对显式 PositionServoV1 candidate 实现此 Stop；旧 selected production-R1 路径的 Stop 明确拒绝，旧 Controller identity、反馈要求与执行行为保持原样。
 通用 `BaseTaskEnv` 组合 task definition、reset sampler、runtime、action、observation 和 rendering。
 `TaskEvaluation` 提供 reward、success、failure、metrics、reward_terms；reward 与
 `info["is_success"]` 不能替代 Judge。通用 `ignore_done=False` 时 success/failure 可终止 episode，
@@ -71,6 +74,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `make_env`, `make_agent`, `make_object`, `make_scene` | `task_env` | 注册组件构造，不证明执行能力 |
 | `ENV_REGISTRY`, `AGENT_REGISTRY`, `OBJECT_REGISTRY`, `SCENE_REGISTRY` | `task_env` | 用 `uids()` 查询；扩展注册见 `task_env.registry` |
 | `BaseTaskEnv`, `TaskEvaluation`, `RuntimeBoundary`, `ResolvedEnvConfig`, `ExecutionPlan`, `ExecutionFaultV1` | `task_env.environment` | environment/config 生命周期；ExecutionPlan 仅记录静态准入阶段；fault receipt 不创建第二套 Runtime 或恢复接口 |
+| `EpisodeTerminationPolicyV1`, `SingleTaskLifecycleAdapter`, `EpisodeEndV1` | `task_env.environment` / `task_env.trajectory.canonical`（分别导入） | task-owned success/failure、horizon 与 external Stop policy；`EpisodeEndV1` 配对有序 `BoundaryEventV1` 与最终 `EpisodeOutcomeV1`。通用默认与 Position candidate 有界支持；legacy selected R1 与 vector Stop 明确不支持 |
 | `resolve_env_config` | `task_env` | 解析并冻结公共配置；task-specific overlay 走 factory 分支 |
 | `AssetManifest` | `task_env.environment` | assembly 资产声明；保留本地 source/root 与版本字段，可选稳定 source reference/revision 和 procedural generator 元数据；构造时不读文件，也不证明 importer 消费了对应 bytes |
 | `make_parallel_env`, `register_parallel_env` | `task_env` | optional homogeneous factory，与 scalar 无互相 fallback |
@@ -89,6 +93,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。v0 legacy route 保持；v1 仅支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 另要求精确 Scene identity、Joint/Frame bindings 与 StateRequirements；contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
+| `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
 ## C02b Position Profile candidate status (2026-10-21)
 

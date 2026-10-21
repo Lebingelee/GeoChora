@@ -54,6 +54,9 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
     agent_uids: tuple[str, ...] = ()
     object_uids: tuple[str, ...] = ()
     success_definition = "none"
+    # A generic TaskEnv step does not yet publish StructuredControlTransitionV1.
+    # The v3 transition wrapper checks this declaration before recording.
+    supports_structured_control_recording = False
 
     metadata = {
         "render_modes": [],
@@ -70,6 +73,8 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         render_mode=None,
         build_runtime: bool = True,
     ) -> None:
+        self._closed = False
+        self._last_episode_end = None
         self.config = config if config is not None else self.default_config()
         # Import only the lightweight render contract during environment
         # construction. Concrete renderer backends stay out of the physics
@@ -537,6 +542,15 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         lifecycle = self._task_lifecycle
         return None if lifecycle is None else lifecycle.execution_fault
 
+    @property
+    def episode_end(self):
+        """Return the most recent immutable Event/Outcome finalizer result."""
+
+        lifecycle = self._task_lifecycle
+        if lifecycle is not None and lifecycle.episode_end is not None:
+            return lifecycle.episode_end
+        return self._last_episode_end
+
     def _snapshot_request(self) -> SnapshotRequest:
         return SnapshotRequest(
             site_jacobians=self._robot is not None,
@@ -625,6 +639,8 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         seed: int | None = None,
         options: dict[str, Any] | None = None,
     ):
+        if self._closed:
+            raise RuntimeError("environment is closed")
         super().reset(seed=seed)
         self._last_camera_metadata = {}
         lifecycle = self._require_task_lifecycle()
@@ -640,6 +656,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         self._elapsed_steps = lifecycle.elapsed_steps
         self._episode_finished = lifecycle.episode_finished
         self._last_task_evaluation = evaluation
+        self._last_episode_end = None
         try:
             simulation_time_s = self._require_simulation_time_s(snapshot)
             info = {
@@ -657,7 +674,11 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
                 "resolved_control_metadata": self.metadata["action_schema"],
                 "observation_schema": self._observation_builder.schema,
                 "simulation_time_s": simulation_time_s,
+                "episode_id": lifecycle.episode_id,
+                "termination_policy": lifecycle.termination_policy.to_mapping(),
             }
+            if result.previous_episode_end is not None:
+                info["previous_episode_end_v1"] = result.previous_episode_end.to_mapping()
             camera_capture = self._camera_capture_info(
                 elapsed_steps=self._elapsed_steps,
                 simulation_time_s=simulation_time_s,
@@ -677,12 +698,15 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             raise
 
     def step(self, action):
+        if self._closed:
+            raise RuntimeError("environment is closed")
         lifecycle = self._require_task_lifecycle()
         self._last_camera_metadata = {}
         result = lifecycle.step(action)
         try:
             return self._format_step_result(lifecycle, result)
         except BaseException as error:
+            lifecycle.revoke_unpublished_step(result)
             lifecycle._latch_fault(
                 "gymnasium_result",
                 error,
@@ -741,6 +765,9 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             "observation_schema": self._observation_builder.schema,
             "simulation_time_s": simulation_time_s,
         }
+        if result.episode_end is not None:
+            self._last_episode_end = result.episode_end
+            info["episode_end_v1"] = result.episode_end.to_mapping()
         if self.config.observation.include_diagnostics:
             info["action_clipped"] = command.action_clipped
             info["ctrl_clipped"] = applied.clipped
@@ -758,6 +785,17 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             info["camera_capture"] = camera_capture
         validate_task_info(info, phase="step")
         return result.observation, evaluation.reward, result.terminated, result.truncated, info
+
+    def stop(self, reason: str = "external_stop"):
+        """Stop at the last complete public boundary without compute or step."""
+
+        if self._closed:
+            raise RuntimeError("cannot stop a closed environment")
+        lifecycle = self._require_task_lifecycle()
+        result = lifecycle.stop(reason)
+        self._last_episode_end = result
+        self._episode_finished = lifecycle.episode_finished
+        return result
 
     def get_record_metadata(self) -> dict[str, Any]:
         """Return the JSON-compatible public projection used by recorders only."""
@@ -848,6 +886,9 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
         )
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         ui_provider = getattr(self, "_ui_render_provider", None)
         sensor_provider = getattr(self, "_sensor_provider", None)
         lifecycle = getattr(self, "_task_lifecycle", None)
@@ -873,5 +914,7 @@ class BaseTaskEnv(GymEnvBase, TaskEnvironmentComponent):
             except BaseException as exc:
                 if first_error is None:
                     first_error = exc
+        if lifecycle is not None and lifecycle.episode_end is not None:
+            self._last_episode_end = lifecycle.episode_end
         if first_error is not None:
             raise first_error

@@ -1,8 +1,8 @@
 # Phase C — Execution API & Runtime Lifecycle：架构、实施切片与验收
 
-> **Phase C remaining design: PROPOSED.** C02a/C05a/C03a/C04 have bounded implementation receipts below;
-> C02b remains BLOCKED, C03b/C02c and unified Environment migration remain incomplete.
-> **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；仅授权本轮文档修订/发布，代码实施等待二审。
+> **Phase C remaining design: PROPOSED.** C02a/C05a/C03a/C03b/C04 have bounded implementation receipts below;
+> C02b remains BLOCKED, C02c and unified Environment migration remain incomplete.
+> **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；之后维护者分别授权 C02b-P/E 与 C03b 有界实现。
 > 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
 > Recovery Review 及后续 E-S1/S2 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md) 与 [C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)。C02b 仍 BLOCKED；历史收据不改写。
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
@@ -404,13 +404,59 @@ MuJoCo CPU 上各执行一步。与 C01a/C01b、D01a/D01b、D02b、D05a、A04/A0
 ### C03 — Scalar Execution / Fault Policy / Stop（a/b）
 
 - **切片**：C03a 在 C02a/D01b/C05a2 后以现有 ports/adapter 接入 reset/step/fault，
-  先保留单 controller 兼容执行；C03b 在 C03a/C04/C05a2 后加入 termination policy 和 Stop。
+  先保留单 controller 兼容执行；C03b 在 C03a/C04/C05a2 后于现有 lifecycle/Recorder/Environment owners 加入 termination policy 和 Stop（bounded receipt 在本节下方）。
 - **任务**：先统一公共行为，允许两薄 facade 过渡，不强制 selected 继承旧 BaseTaskEnv；
   保留 generic ignore_done、selected success 后动作及默认 horizon 的既有语义。
 - **验收**：Gymnasium 5-tuple、reset-before-step、post-terminal guard、success-post-success、no-success、stop-early/horizon 的 flags 和 clock；Stop 不产生物理 step/伪 transition；旧 UID 按兼容路由保持行为至 C05 迁移。
 - **补充 Gate**：故障后禁止续步；partial interval 不保存为成功 transition；Stop outcome/loader bootstrap 一致；
   共享 TaskLifecycleAdapter 修改需 Pendulum scalar/batch targeted regression，不因 Phase III 延后而豁免。
 - **Codex AUDIT**：指出 `SingleTaskLifecycleAdapter.resolve_scalar_done` 与 Selected `_step` 的主要差异；不能用一次强制成功终止破坏 NutAssembly。
+
+#### C03b bounded Stop/Outcome receipt（2026-10-21）
+
+在本地 C02b 检查点 `d99941c` 之上，只扩展现有 `SingleTaskLifecycleAdapter`、`BaseTaskEnv`、显式 Position candidate、
+`TransitionRecorder`、`TransitionRecordWrapper` 与 Generic H5 v3 reader；未新增 Lifecycle Manager、Environment、Recorder 或
+Provider 抽象。`EpisodeTerminationPolicyV1` 由既有 `TaskDefinitionBase` 提供：default success/failure terminal，external Stop
+truncated/bootstrap allowed，horizon truncated/bootstrap allowed；terminated outcome 禁止 bootstrap。step 仍返回旧 Gymnasium
+flags；当 terminal 与 horizon 同时为真时，Outcome 选 task terminal，但不改写 step flags。Selected Position candidate
+保留 success 后继续控制；旧 selected `production-r1` 的行为/identity/required force feedback 不变，Stop 显式拒绝。
+
+`env.stop(reason)` 返回 `EpisodeEndV1`（有序 `episode_ended` BoundaryEvent 与 EpisodeOutcome），只引用最后完整公开边界，不调用
+Controller、不施控、不推进物理。T=0 Stop、重复 Stop、terminal/horizon 后 Stop、reset 前 Stop、fault 后 Stop、close 后 Stop 均有
+确定行为。generic reset 在结束当前 active episode 后创建新 episode，并在新 reset info 返回 `previous_episode_end_v1`；close
+在 teardown 前结束 active lifecycle。Generic Step 的公开结果构造失败时，先撤销未返回 step 的 finalizer boundary，再锁存
+execution fault；fault Event 保留真实 after-clock，而 Stop 与 Outcome 留在前一条可见边界。Position candidate 以同样的 published
+boundary 区分物理 after-clock 与成功提交的 transition。
+
+Recorder `end_episode(..., end_event=...)` 在一次性提交前校验 T/T+1、outcome/event identity、boundary 与 sequence；重复 finalize
+拒绝。`TransitionRecordWrapper` 保留 v2 路径，active v2 Stop/close 明确拒绝；v3 仅接受显式声明每步发布 typed
+`StructuredControlTransitionV1` 的环境，external Stop/自然结束都用 Event/Outcome finalization，active reset/manual v3 end
+拒绝。当前没有 generic TaskEnv 被声明支持该 wrapper v3 route；Position candidate 通过其现有 direct Generic H5 v3 route
+写入。Vector wrapper、legacy R1 Stop 和无 structured control 的 Pendulum v3 wrapper 明确拒绝。
+
+`load_structured_training_episode_h5()` 在既有 exact one-writer action projection 上组合读取 raw transition terminated/truncated、
+final outcome 和 bootstrap policy；external Stop 不回写先前 `step()` flags，返回的 per-transition effective bootstrap 单独使用
+final Outcome 覆盖最后一个 transition decision。
+
+缺陷敏感 S1：`test_phase_ii_c03b_stop_outcome.py` 覆盖 T=0/idempotent Stop、reset/close/fault、terminal+horizon 同时 flags、reset
+自动 end、v2 Stop 拒绝前无 mutation、v3 wrapper typed-control gate、Event/Outcome atomic finalizer、H5 outcome/action/flag/bootstrap
+consumer。结合 Position close 的 active v3 recording exactly-once 回归、C03a fault lifecycle、C05a structured recording、C02b Position H5 和 selected consumers，定向组合 **78 passed**；
+仅有上游 Taichi `locale.getdefaultlocale` 弃用告警。真实 S2 脚本为
+[`c03b_stop_s2_probe.py`](../../../../../task_env/diagnostics/tasks/c03b_stop_s2_probe.py)，GeoPhys 与 MuJoCo 由独立进程运行，输出位于
+ignored `workspace/maintenance/c03b_stop_20261021/final_run/{geophys,mujoco}/c03b-stop-s2-report.json`。
+
+S2 两 Provider 的 C02b Position candidate 均通过 T=0 与 T=1 Stop：Stop 前后 Controller compute、apply、native step 计数为零；
+T/T+1 与 Event/Outcome 在 Generic H5 v3 真写读一致；外部 Stop 后 transition flags 仍为 false/false，最终 Outcome 是
+`truncated=true, bootstrap_allowed=true`，training loader 保留两类语义。成功 task predicate 继续执行且在 external Stop Outcome 中
+保留 `task_success=true`。另外在每 Provider 注入一次真实物理 step 后的 Recorder append 故障：Runtime clock 已到 1/10 ms，Stop
+final boundary 仍为已发布的 0，fault 为 `advanced/transition_status=rejected`，H5 为 T=0/T+1=1，无伪 transition，fault Outcome
+禁止 bootstrap。
+
+Pendulum 仅通过现有 GeoPhys CPU scalar `BaseTaskEnv` 路径测试 T=0/T=1 Stop 的 clock 不变、reset 后携带上一 EpisodeEnd、重复
+Stop 与 Stop 后 step 拒绝；Gym v2 活跃录制 Stop 在调用 Env 前明确拒绝。通用 `ExecutionPlan` 固定声明 GeoPhys provider，因此
+MuJoCo Pendulum 为 `NOT_ADMITTED`，不是失败或支持结论。structured v3 wrapper 正常写读只用显式 contract fixture 验证；当前没有
+真实 generic Env 声明该能力。未运行 learner 全算法迁移、vectorized Stop、NutAssembly R3 Guard、双 Entity、Assembly、R1 force
+refresh、完整 C02b 或 Phase II qualification。C02b 仍 **BLOCKED**；本 receipt 不将其或 Phase II 标为完成。
 
 ### C04 — Unified Observation & Optional Diagnostics
 
@@ -498,7 +544,8 @@ TaskEnv module Skill 已按现有 failure behavior 刷新；`check_module_skill.
 
 证据仅覆盖现有 generic Pendulum scalar CPU 与 A05 Panda selected legacy compatibility 交集，以及合成故障注入的
 生命周期边界；它不是新 Provider qualification、partial-state recovery、全 selected source S2、C03b Stop policy
-或 C02b group dispatch 的证据。C04 与 C02b 各自有独立 receipt；C03b 仍按原依赖延后。
+或 C02b group dispatch 的证据。C04 与 C02b 各自有独立 receipt。该段记录 C03a receipt 当时未覆盖 C03b；后续 C03b
+有界验收见 [C03b Stop/Outcome receipt](C03b_Stop_Outcome_Receipt_2026-10-21.md)。
 
 #### C03a fault-receipt correction（2026-10-21）
 

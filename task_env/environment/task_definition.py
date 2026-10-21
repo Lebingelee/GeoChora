@@ -68,6 +68,41 @@ class TaskBatchEvaluation:
     reward_terms: Mapping[str, np.ndarray] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class EpisodeTerminationPolicyV1:
+    """Task-owned terminal decisions, separate from an external Stop call."""
+
+    terminate_on_success: bool = True
+    terminate_on_failure: bool = True
+    external_stop_terminated: bool = False
+    bootstrap_on_external_stop: bool = True
+    bootstrap_on_horizon: bool = True
+    schema_version: str = "episode-termination-policy-v1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "episode-termination-policy-v1":
+            raise ValueError("unsupported EpisodeTerminationPolicy schema")
+        for name in (
+            "terminate_on_success", "terminate_on_failure",
+            "external_stop_terminated", "bootstrap_on_external_stop",
+            "bootstrap_on_horizon",
+        ):
+            if type(getattr(self, name)) is not bool:
+                raise TypeError(f"{name} must be bool")
+        if self.external_stop_terminated and self.bootstrap_on_external_stop:
+            raise ValueError("a terminated external stop cannot bootstrap")
+
+    def to_mapping(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "terminate_on_success": self.terminate_on_success,
+            "terminate_on_failure": self.terminate_on_failure,
+            "external_stop_terminated": self.external_stop_terminated,
+            "bootstrap_on_external_stop": self.bootstrap_on_external_stop,
+            "bootstrap_on_horizon": self.bootstrap_on_horizon,
+        }
+
+
 def _freeze_action_value(value: Any, *, path: str = "requested_action") -> Any:
     """Copy a task-specific action value into an immutable context payload."""
 
@@ -554,6 +589,11 @@ class TaskDefinitionBase:
     # 只追加这里显式声明的字段。
     device_state_required_fields: ClassVar[tuple[str, ...]] = ()
     device_state_optional_fields: ClassVar[tuple[str, ...]] = ()
+
+    def termination_policy(self) -> EpisodeTerminationPolicyV1:
+        """Return the versioned task terminal policy used by scalar lifecycle."""
+
+        return EpisodeTerminationPolicyV1()
 
     def on_reset_sample(
         self,

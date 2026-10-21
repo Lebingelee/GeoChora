@@ -34,6 +34,16 @@ Task predicate, Outcome V1 completion, strict Expert lifecycle, termination/trun
 and Judge approval are different facts. NutAssembly GeoPhys accepted readiness warning/strict failure
 must not be erased by successful outcome. Do not stop a required retreat at first task success.
 
+The generic scalar lifecycle exposes `env.stop(reason="external_stop") -> EpisodeEndV1`, pairing the existing
+`BoundaryEventV1` and `EpisodeOutcomeV1` at the last complete boundary. Stop does not call a Controller, apply
+control, advance Runtime, or change flags from an already-returned Gymnasium transition. Defaults: external Stop
+and horizon truncate with bootstrap allowed; task terminal terminates without bootstrap; execution fault truncates
+without bootstrap and carries the `ExecutionFaultV1`. Terminal takes precedence in the final outcome when a legacy
+step returns both flags, while the returned flags remain untouched. Repeated Stop returns its cached result; Stop
+before reset and Stop after close fail. Reset of an active generic episode first finalizes Stop(`reset`) and returns
+that result in `previous_episode_end_v1`; close ends an active lifecycle before resource teardown. The selected
+`production-r1` route explicitly rejects Stop; only the opt-in PositionServoV1 candidate has its own bounded Stop.
+
 After a failed reset/step, inspect the existing Env owner's `execution_fault` (`ExecutionFaultV1`); a
 construction exception may carry the same receipt as `exception.execution_fault`. Faulted environments
 require a successful reset before another step. `physical_progress` describes only observable progress
@@ -73,6 +83,13 @@ may contain boundary events/outcome without a pseudo action. Use `load_structure
 read the typed payload. `load_structured_training_actions_h5()` is a narrow lossless conversion: the recorded
 request must have one writer, an exact schema id/component order, and values equal to the stored action dataset.
 Multi-writer trees and schema mismatches reject; the existing Stage 11 transcode remains v2-only and rejects v3.
+`load_structured_training_episode_h5()` composes the same exact action projection with the stored per-transition
+`terminated`/`truncated` arrays and the final EpisodeOutcome/bootstrap policy. It never rewrites transition flags;
+the final effective bootstrap decision is returned separately. The v3 `TransitionRecordWrapper` requires an Env
+that explicitly declares `supports_structured_control_recording is True` and emits a typed control on every step.
+No current generic TaskEnv is so declared: Pendulum remains GeoPhys-only and v2 recording rejects active Stop
+before forwarding it. Manual v3 `end_record`, active v2 Stop/close, and vector Stop are explicitly unavailable.
+The Position candidate currently uses its existing direct Generic H5 v3 recorder, not the Gym wrapper.
 Canonical outer v1 uses `CanonicalRecorder(schema_version="canonical-trajectory-v1")` and
 `canonical.h5.load()`; execution stream v3 uses the existing `ExecutionRecorder(..., schema=STRUCTURED_SCHEMA)`
 and resident/streaming readers. These are storage contracts only: they do not add Runtime dispatch or prove

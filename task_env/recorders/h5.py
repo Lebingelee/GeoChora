@@ -660,11 +660,52 @@ def load_structured_training_actions_h5(path: Path | str) -> tuple[tuple[float, 
     return projected
 
 
+def load_structured_training_episode_h5(path: Path | str) -> dict[str, Any]:
+    """Load the declared v3 action/end consumer without rewriting step flags.
+
+    Per-transition Gymnasium flags remain exactly as stored. The final outcome
+    and bootstrap decision are returned separately because an external Stop
+    does not retroactively turn the last already-returned transition into a
+    truncation.
+    """
+    import h5py
+
+    loaded = load_structured_control_records_h5(path)
+    actions = load_structured_training_actions_h5(path)
+    transition_count = loaded["transition_count"]
+    with h5py.File(Path(path), "r") as root:
+        terminated = np.asarray(root["terminated"], dtype=np.bool_)
+        truncated = np.asarray(root["truncated"], dtype=np.bool_)
+    if terminated.shape != (transition_count,) or truncated.shape != (transition_count,):
+        raise ValueError("structured training episode transition flags must have length T")
+    outcome = loaded["outcome"]
+    if outcome.final_boundary != transition_count:
+        raise ValueError("structured training episode outcome boundary does not match T")
+    bootstrap = np.logical_not(np.logical_or(terminated, truncated))
+    if transition_count:
+        # Outcome is the final boundary policy, while the transition arrays
+        # retain the original Gymnasium result returned by env.step().
+        bootstrap[-1] = outcome.bootstrap_allowed
+    return {
+        "actions": actions,
+        "transition_terminated": tuple(bool(value) for value in terminated),
+        "transition_truncated": tuple(bool(value) for value in truncated),
+        "transition_bootstrap_allowed": tuple(bool(value) for value in bootstrap),
+        "final_outcome": outcome,
+        "final_boundary": outcome.final_boundary,
+        "end_reason": outcome.end_reason,
+        "terminated": outcome.terminated,
+        "truncated": outcome.truncated,
+        "bootstrap_allowed": outcome.bootstrap_allowed,
+    }
+
+
 __all__ = [
     "append_trajectory_collection_h5",
     "inspect_trajectory_h5",
     "load_structured_control_records_h5",
     "load_structured_training_actions_h5",
+    "load_structured_training_episode_h5",
     "save_trajectory_collection_h5",
     "save_trajectory_h5",
 ]

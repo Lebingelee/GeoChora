@@ -195,19 +195,41 @@ class TransitionRecorder:
             raise ValueError("boundary event episode identity mismatch")
         self._boundary_events.append(event)
 
-    def end_episode(self, reason: str, *, outcome: EpisodeOutcomeV1 | None = None) -> FrozenTrajectory:
+    def end_episode(
+        self,
+        reason: str,
+        *,
+        outcome: EpisodeOutcomeV1 | None = None,
+        end_event: BoundaryEventV1 | None = None,
+    ) -> FrozenTrajectory:
         if not self._active:
             raise RuntimeError("no active recording to end")
         if self.config.schema_version == "v3" and not isinstance(outcome, EpisodeOutcomeV1):
             raise ValueError("task-env-h5 v3 requires an explicit EpisodeOutcomeV1")
+        candidate_events = list(self._boundary_events)
+        if end_event is not None:
+            if not isinstance(end_event, BoundaryEventV1):
+                raise TypeError("end_event must be BoundaryEventV1 or None")
+            if outcome is None:
+                raise ValueError("end_event requires its EpisodeOutcomeV1")
+            if end_event.event_type != "episode_ended":
+                raise ValueError("final BoundaryEvent must use event_type='episode_ended'")
+            if end_event.boundary_index != len(self._actions):
+                raise ValueError("final BoundaryEvent must target the current control boundary")
+            same_boundary = [item for item in candidate_events if item.boundary_index == end_event.boundary_index]
+            if end_event.event_sequence != len(same_boundary):
+                raise ValueError("final BoundaryEvent sequence must be contiguous")
+            if candidate_events and end_event.episode_id != candidate_events[0].episode_id:
+                raise ValueError("final BoundaryEvent episode identity mismatch")
+            candidate_events.append(end_event)
         if outcome is not None:
             if not isinstance(outcome, EpisodeOutcomeV1):
                 raise TypeError("outcome must be EpisodeOutcomeV1 or None")
             if outcome.end_reason != str(reason):
                 raise ValueError("EpisodeOutcome end_reason must match recorder stop reason")
-            validate_episode_records(self._boundary_events, outcome, len(self._actions))
-        self._outcome = outcome
-        self._active = False
+            validate_episode_records(candidate_events, outcome, len(self._actions))
+        elif candidate_events != self._boundary_events:
+            raise ValueError("BoundaryEvent finalizer requires EpisodeOutcomeV1")
         trajectory = FrozenTrajectory(
             tuple(self._observations),
             tuple(self._actions),
@@ -221,10 +243,13 @@ class TransitionRecorder:
             self._record_metadata,
             str(reason),
             tuple(self._structured_controls),
-            tuple(self._boundary_events),
-            self._outcome,
+            tuple(candidate_events),
+            outcome,
         )
         trajectory.validate()
+        self._boundary_events = candidate_events
+        self._outcome = outcome
+        self._active = False
         self._frozen = trajectory
         return trajectory
 

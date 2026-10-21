@@ -29,6 +29,7 @@ from .lifecycle import (
 )
 from .task_definition import (
     BatchTaskStateView,
+    EpisodeTerminationPolicyV1,
     ScalarTaskStateView,
     TaskBatchEvaluation,
     TaskDefinitionBase,
@@ -104,6 +105,7 @@ __all__ = [
     "EpisodeConfig",
     "ExecutionPlan",
     "EpisodePhysicsState",
+    "EpisodeTerminationPolicyV1",
     "ExternalActionContract",
     "GYMNASIUM_AVAILABLE",
     "GripperConfig",

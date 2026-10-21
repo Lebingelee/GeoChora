@@ -17,12 +17,14 @@ import hashlib
 import json
 import math
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 
 from .task_definition import (
     TaskBatchEvaluation,
     TaskDefinitionBase,
+    EpisodeTerminationPolicyV1,
     TaskEvaluationContextV1,
     TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
@@ -39,6 +41,10 @@ from .types import (
     TaskEvaluation,
     attach_execution_fault,
 )
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..trajectory.canonical.episode import EpisodeEndV1
 
 
 @dataclass
@@ -657,6 +663,7 @@ class TaskLifecycleAdapter:
         *,
         horizon: int | None = None,
         ignore_done: bool | None = None,
+        policy: EpisodeTerminationPolicyV1 | None = None,
     ) -> tuple[bool, bool]:
         effective_horizon = self.horizon if horizon is None else int(horizon)
         effective_ignore_done = (
@@ -664,7 +671,13 @@ class TaskLifecycleAdapter:
         )
         if effective_ignore_done:
             return False, False
-        terminated = bool(evaluation.success or evaluation.failure)
+        effective_policy = policy or EpisodeTerminationPolicyV1()
+        if not isinstance(effective_policy, EpisodeTerminationPolicyV1):
+            raise TypeError("scalar termination policy must be EpisodeTerminationPolicyV1")
+        terminated = bool(
+            (evaluation.success and effective_policy.terminate_on_success)
+            or (evaluation.failure and effective_policy.terminate_on_failure)
+        )
         truncated = bool(
             getattr(evaluation, "truncated", False)
             or int(elapsed_steps) >= effective_horizon
@@ -712,6 +725,7 @@ class SingleTaskResetResult:
     evaluation: TaskEvaluation
     observation: Any
     reset_parameters: Mapping[str, Any]
+    previous_episode_end: EpisodeEndV1 | None = None
 
 
 @dataclass(frozen=True)
@@ -727,6 +741,7 @@ class SingleTaskStepResult:
     terminated: bool
     truncated: bool
     elapsed_steps: int
+    episode_end: EpisodeEndV1 | None = None
 
 
 class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
@@ -749,6 +764,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         observation_fallback: Callable[[RuntimeSnapshot], Any],
         episode_limits: Callable[[], tuple[int, bool]] | None = None,
         expected_control_dt_s: float | None = None,
+        termination_policy: EpisodeTerminationPolicyV1 | None = None,
     ) -> None:
         super().__init__(
             task_definition=task_definition,
@@ -773,11 +789,22 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         self._convert_action = convert_action
         self._observation_fallback = observation_fallback
         self._episode_limits_provider = episode_limits
+        if termination_policy is None:
+            policy_factory = getattr(task_definition, "termination_policy", None)
+            termination_policy = policy_factory() if callable(policy_factory) else EpisodeTerminationPolicyV1()
+        if not isinstance(termination_policy, EpisodeTerminationPolicyV1):
+            raise TypeError("termination_policy must be EpisodeTerminationPolicyV1")
+        self.termination_policy = termination_policy
         self._last_snapshot: RuntimeSnapshot | None = None
+        self._boundary_snapshot: RuntimeSnapshot | None = None
         self._last_evaluation: TaskEvaluation | None = None
         self._elapsed_steps = 0
         self._episode_finished = False
         self._execution_fault: ExecutionFaultV1 | None = None
+        self._episode_id: str | None = None
+        self._episode_boundary = 0
+        self._episode_end: EpisodeEndV1 | None = None
+        self._closed = False
 
     @property
     def last_snapshot(self) -> RuntimeSnapshot | None:
@@ -798,6 +825,14 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
     @property
     def execution_fault(self) -> ExecutionFaultV1 | None:
         return self._execution_fault
+
+    @property
+    def episode_id(self) -> str | None:
+        return self._episode_id
+
+    @property
+    def episode_end(self) -> EpisodeEndV1 | None:
+        return self._episode_end
 
     def _latch_fault(
         self,
@@ -843,7 +878,18 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
         options: Mapping[str, Any] | None,
         rng: np.random.Generator,
     ) -> SingleTaskResetResult:
+        if self._closed:
+            raise RuntimeError("scalar task lifecycle is closed")
         del options
+        previous_episode_end = self._episode_end
+        if self._episode_id is not None and self._boundary_snapshot is not None and previous_episode_end is None:
+            previous_episode_end = self.stop("reset")
+        # A failed reset must never let Stop re-use the preceding episode's
+        # identity or re-stamp its boundary as a new episode.
+        self._episode_id = None
+        self._boundary_snapshot = None
+        self._episode_end = None
+        self._episode_boundary = 0
         before_snapshot = self._last_snapshot
         before_elapsed_steps = self._elapsed_steps
         phase = "reset_sampling"
@@ -900,8 +946,12 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 fallback=lambda: self._observation_fallback(snapshot),
             )
             self._last_snapshot = snapshot
+            self._boundary_snapshot = snapshot
             self._last_evaluation = evaluation
             self._elapsed_steps = 0
+            self._episode_boundary = 0
+            self._episode_id = uuid4().hex
+            self._episode_end = None
             self._episode_finished = False
             self._execution_fault = None
             return SingleTaskResetResult(
@@ -909,6 +959,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 evaluation=evaluation,
                 observation=observation,
                 reset_parameters=dict(reset_parameters),
+                previous_episode_end=previous_episode_end,
             )
         except BaseException as error:
             readback_error = None
@@ -928,6 +979,8 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
             raise
 
     def step(self, action: Any) -> SingleTaskStepResult:
+        if self._closed:
+            raise RuntimeError("scalar task lifecycle is closed")
         if self._execution_fault is not None:
             fault = self._execution_fault
             raise RuntimeError(
@@ -975,10 +1028,34 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 self._elapsed_steps,
                 horizon=horizon,
                 ignore_done=ignore_done,
+                policy=self.termination_policy,
             )
             self._last_snapshot = snapshot
             self._last_evaluation = evaluation
+            self._boundary_snapshot = snapshot
+            self._episode_boundary = self._elapsed_steps
             self._episode_finished = bool(terminated or truncated)
+            episode_end = None
+            if self._episode_finished:
+                if terminated:
+                    end_reason = "task_terminal"
+                    outcome_terminated, outcome_truncated = True, False
+                    bootstrap_allowed = False
+                elif bool(getattr(evaluation, "truncated", False)):
+                    end_reason = "task_truncated"
+                    outcome_terminated, outcome_truncated = False, True
+                    bootstrap_allowed = True
+                else:
+                    end_reason = "horizon_reached"
+                    outcome_terminated, outcome_truncated = False, True
+                    bootstrap_allowed = self.termination_policy.bootstrap_on_horizon
+                episode_end = self._finish_episode(
+                    end_reason,
+                    terminated=outcome_terminated,
+                    truncated=outcome_truncated,
+                    bootstrap_allowed=bootstrap_allowed,
+                    task_success=bool(evaluation.success),
+                )
             return SingleTaskStepResult(
                 previous_snapshot=previous_snapshot,
                 snapshot=snapshot,
@@ -989,6 +1066,7 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
                 terminated=terminated,
                 truncated=truncated,
                 elapsed_steps=self._elapsed_steps,
+                episode_end=episode_end,
             )
         except BaseException as error:
             readback_error = None
@@ -1009,9 +1087,108 @@ class SingleTaskLifecycleAdapter(TaskLifecycleAdapter):
             )
             raise
 
+    def revoke_unpublished_step(self, result: SingleTaskStepResult) -> None:
+        """Restore the public finalizer boundary when an outer Env facade fails.
+
+        Physics may have advanced, and the fault receipt retains that clock.
+        The failed facade call returned no transition, so Stop must remain at
+        the preceding published boundary and must not manufacture one.
+        """
+
+        if not isinstance(result, SingleTaskStepResult):
+            raise TypeError("result must be SingleTaskStepResult")
+        if self._boundary_snapshot is not result.snapshot:
+            raise RuntimeError("cannot revoke a step that is not the current lifecycle boundary")
+        self._boundary_snapshot = result.previous_snapshot
+        self._episode_boundary = max(0, int(result.elapsed_steps) - 1)
+        if result.episode_end is not None and self._episode_end is result.episode_end:
+            self._episode_end = None
+        self._episode_finished = False
+
+    def _finish_episode(
+        self,
+        end_reason: str,
+        *,
+        terminated: bool,
+        truncated: bool,
+        bootstrap_allowed: bool,
+        task_success: bool | None,
+        payload: Mapping[str, object] | None = None,
+    ) -> EpisodeEndV1:
+        from ..trajectory.canonical.episode import make_episode_end_v1
+
+        if self._episode_end is not None:
+            return self._episode_end
+        if self._episode_id is None or self._boundary_snapshot is None:
+            raise RuntimeError("episode end requires a successfully reset lifecycle")
+        details = {
+            "control_step": self._episode_boundary,
+            "simulation_time_s": float(self._boundary_snapshot.simulation_time),
+            "termination_policy": self.termination_policy.to_mapping(),
+        }
+        details.update(dict(payload or {}))
+        result = make_episode_end_v1(
+            episode_id=self._episode_id,
+            final_boundary=self._episode_boundary,
+            end_reason=end_reason,
+            terminated=terminated,
+            truncated=truncated,
+            bootstrap_allowed=bootstrap_allowed,
+            source="task_env.lifecycle",
+            payload=details,
+            task_success=task_success,
+        )
+        self._episode_end = result
+        self._episode_finished = True
+        return result
+
+    def stop(self, reason: str = "external_stop") -> EpisodeEndV1:
+        """End at the last published boundary without a Controller or Runtime step."""
+
+        if self._closed:
+            raise RuntimeError("cannot stop a closed scalar task lifecycle")
+        if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
+            raise ValueError("Stop reason must be a trimmed non-empty string")
+        if self._episode_end is not None:
+            return self._episode_end
+        if self._last_snapshot is None or self._episode_id is None:
+            raise RuntimeError("reset() must complete before Stop")
+        if self._execution_fault is not None:
+            return self._finish_episode(
+                "execution_fault",
+                terminated=False,
+                truncated=True,
+                bootstrap_allowed=False,
+                task_success=None,
+                payload={"fault": self._execution_fault.to_mapping()},
+            )
+        is_terminated = self.termination_policy.external_stop_terminated
+        return self._finish_episode(
+            "external_stop",
+            terminated=is_terminated,
+            truncated=not is_terminated,
+            bootstrap_allowed=(
+                self.termination_policy.bootstrap_on_external_stop and not is_terminated
+            ),
+            task_success=(
+                None if self._last_evaluation is None else bool(self._last_evaluation.success)
+            ),
+            payload={"requested_reason": reason},
+        )
+
     def close(self) -> None:
-        self._temporal_predicate_state.reset()
-        self.runtime.close()
+        if self._closed:
+            return
+        try:
+            if self._boundary_snapshot is not None and self._episode_end is None:
+                # Record the lifecycle end while its final public boundary is
+                # still available. Runtime teardown remains guaranteed if
+                # event construction or a task policy rejects the Stop.
+                self.stop("environment_close")
+        finally:
+            self._closed = True
+            self._temporal_predicate_state.reset()
+            self.runtime.close()
 
     def _get_episode_limits(self) -> tuple[int, bool]:
         if self._episode_limits_provider is None:

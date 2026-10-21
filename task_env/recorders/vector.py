@@ -15,6 +15,7 @@ import numpy as np
 from gymnasium.spaces.utils import flatten
 
 from ..utils.tree import tree_copy, tree_index
+from ..environment.types import StageUnavailableError
 from .contracts import RecorderConfig
 from .recorder import TransitionRecorder
 
@@ -164,6 +165,12 @@ class VectorTransitionRecorder:
         if self.record_enabled:
             self._new_recorders(observation, self.reset_infos)
         return observation
+
+    def stop(self, reason: str = "external_stop"):
+        del reason
+        raise StageUnavailableError(
+            "vector Stop/Outcome is unsupported; no per-slot synchronized Stop contract is declared"
+        )
 
     def step_async(self, actions: Any) -> None:
         if self._pending_actions is not None:

@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import re
+from uuid import uuid4
 
 from ...artifacts.contracts import Contract
 from ...controllers.canonical.contracts import StructuredActionRequestV1
@@ -101,6 +102,88 @@ class EpisodeOutcomeV1(Contract):
                             ("solution_completed", self.solution_completed)):
             if value is not None and type(value) is not bool:
                 raise ValueError(f"EpisodeOutcome {name} must be bool or None")
+
+
+@dataclass(frozen=True)
+class EpisodeEndV1(Contract):
+    """One lifecycle finalizer result, pairing its boundary event and outcome."""
+
+    schema_version: str
+    boundary_event: BoundaryEventV1
+    outcome: EpisodeOutcomeV1
+
+    def validate(self) -> None:
+        if self.schema_version != "episode-end-v1":
+            raise ValueError("unsupported EpisodeEnd schema")
+        if not isinstance(self.boundary_event, BoundaryEventV1):
+            raise TypeError("EpisodeEnd requires BoundaryEventV1")
+        if not isinstance(self.outcome, EpisodeOutcomeV1):
+            raise TypeError("EpisodeEnd requires EpisodeOutcomeV1")
+        self.boundary_event.validate()
+        self.outcome.validate()
+        if self.boundary_event.episode_id != self.outcome.episode_id:
+            raise ValueError("EpisodeEnd event/outcome episode identity mismatch")
+        if self.boundary_event.boundary_index != self.outcome.final_boundary:
+            raise ValueError("EpisodeEnd event/outcome final boundary mismatch")
+        if self.boundary_event.event_type != "episode_ended":
+            raise ValueError("EpisodeEnd requires an episode_ended BoundaryEvent")
+        if self.boundary_event.payload.get("end_reason") != self.outcome.end_reason:
+            raise ValueError("EpisodeEnd event/outcome reason mismatch")
+        for field_name in ("terminated", "truncated", "bootstrap_allowed"):
+            if self.boundary_event.payload.get(field_name) is not getattr(self.outcome, field_name):
+                raise ValueError(f"EpisodeEnd event/outcome {field_name} mismatch")
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> "EpisodeEndV1":
+        expected = {"schema_version", "boundary_event", "outcome"}
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise ValueError("EpisodeEnd mapping fields")
+        result = cls(
+            str(value["schema_version"]),
+            BoundaryEventV1.from_mapping(value["boundary_event"]),
+            EpisodeOutcomeV1.from_mapping(value["outcome"]),
+        )
+        result.validate()
+        return result
+
+
+def make_episode_end_v1(
+    *,
+    episode_id: str,
+    final_boundary: int,
+    end_reason: str,
+    terminated: bool,
+    truncated: bool,
+    bootstrap_allowed: bool,
+    source: str,
+    payload: Mapping[str, object] | None = None,
+    event_sequence: int = 0,
+    task_success: bool | None = None,
+    solution_completed: bool | None = None,
+) -> EpisodeEndV1:
+    """Build the existing Event/Outcome pair for one real final boundary."""
+
+    event_payload: dict[str, object] = {
+        "end_reason": end_reason,
+        "terminated": terminated,
+        "truncated": truncated,
+        "bootstrap_allowed": bootstrap_allowed,
+    }
+    for key, value in dict(payload or {}).items():
+        if key in event_payload:
+            raise ValueError(f"episode end payload cannot override {key!r}")
+        event_payload[key] = value
+    event = BoundaryEventV1(
+        "boundary-event-v1", episode_id, final_boundary, event_sequence,
+        uuid4().hex, "episode_ended", source, event_payload,
+    )
+    outcome = EpisodeOutcomeV1(
+        "episode-outcome-v1", episode_id, final_boundary, end_reason,
+        terminated, truncated, bootstrap_allowed, task_success, solution_completed,
+    )
+    result = EpisodeEndV1("episode-end-v1", event, outcome)
+    result.validate()
+    return result
 
 
 @dataclass(frozen=True)
@@ -220,6 +303,7 @@ def validate_episode_records(
     seen_ids: set[str] = set()
     next_sequence: dict[int, int] = {}
     previous_order = (-1, -1)
+    end_event_count = 0
     for event in events:
         if not isinstance(event, BoundaryEventV1):
             raise TypeError("trajectory events must be BoundaryEventV1")
@@ -227,6 +311,15 @@ def validate_episode_records(
             raise ValueError("BoundaryEvent/EpisodeOutcome episode identity mismatch")
         if event.boundary_index > transition_count:
             raise ValueError("BoundaryEvent points beyond final boundary")
+        if event.event_type == "episode_ended":
+            end_event_count += 1
+            if end_event_count > 1 or event.boundary_index != transition_count:
+                raise ValueError("episode_ended must occur once at the final boundary")
+            if event.payload.get("end_reason") != outcome.end_reason:
+                raise ValueError("episode_ended reason does not match EpisodeOutcome")
+            for field_name in ("terminated", "truncated", "bootstrap_allowed"):
+                if event.payload.get(field_name) is not getattr(outcome, field_name):
+                    raise ValueError(f"episode_ended {field_name} does not match EpisodeOutcome")
         if event.event_id in seen_ids:
             raise ValueError("duplicate BoundaryEvent identity")
         seen_ids.add(event.event_id)
@@ -262,6 +355,6 @@ def single_writer_training_actions(
 
 
 __all__ = [
-    "BoundaryEventV1", "EpisodeOutcomeV1", "StructuredControlTransitionV1",
-    "single_writer_training_actions", "validate_episode_records",
+    "BoundaryEventV1", "EpisodeEndV1", "EpisodeOutcomeV1", "StructuredControlTransitionV1",
+    "make_episode_end_v1", "single_writer_training_actions", "validate_episode_records",
 ]
