@@ -609,8 +609,8 @@ C04 两条放行准则保持通过。本轮复核 A05 `ControlBindingPlanV1` 的
 `joint_state_query`、`body_pose_query` 和 `frame_pose_query`；Core capability schema 也不含 `actuator_force_query`。
 D02a 已明确 requirement ID 不是 Provider claim，admission 必须 fail-closed。GeoPhys 的 `read_actuator_force()` 源码注释
 限定为诊断/测试；`geophys.api_registry.query_public_api()` 对该 bare symbol 和 fully-qualified implementation symbol
-均返回 `unknown-symbol`。因此当前没有可接入的 GeoPhys public API route，不能用该内部读数为正式 Controller feedback 补造能力声明，
-也不能跳过现有 required feedback。
+均返回 `unknown-symbol`。这证明了裸底层 symbol 没有独立公开路由；当时据此写出的“没有可接入的 GeoPhys public API route”超出了查询范围。
+本 receipt 的 admission 结论仍成立，API route 结论由下方 2026-10-21 勘误和真实 Probe 记录更正。
 
 沿现有 `task_env.runtime.sessions.control.materialize_control()` 增加可选 plan-bound admission：先核对 RuntimeSource 与
 Scene identity，再将每项必需 feedback capability 与实际 Provider manifest 及可选限制 manifest 求交，缺项在调用现有
@@ -634,6 +634,18 @@ S2 均未开始/验收，因此序号 24 不得标为完成，也不能宣称双
 可验证的解法：公开并定义 actuator-force feedback（语义、单位、采样边界及 GeoPhys/MuJoCo manifest admission），或基于
 公开且充分的执行证据正式调整 A05/C02b 的 required-feedback 契约。完成该决策和能力证据后，才可继续 dispatch、真实执行和录制验收。
 本 receipt 仅证明 admission 失败边界，不代表物理能力已支持；在阻塞解除前不进入依赖 C02b 的后续目标。
+
+#### C02b feedback source & sampling audit（2026-10-21）
+
+**勘误：**上一段 public API 结论只查了裸/底层 `read_actuator_force` symbol；没有可据此推出“GeoPhys 完全没有公开 force-read route”。同一 GeoPhys pin 的 official registry 将 `control.robot_arm.RobotArmObservationReader` 和 `control.robot_arm.RobotArmObservationConfig` 标为 exact、stable、documented。公开 Reader 的 `read_cpu_snapshot()` 支持 `actuator_force=True`，适用于低频评估/agent 外层读取；不应用于每个 physics substep。本勘误保留上一 receipt 的 registry 原始结果和 admission 判断，不把发现的 Reader 路线等同于 capability admission。
+
+本轮在 PickCube 实际 GeoPhys CPU source 上经 Provider bootstrap/boundary adapter 使用公开 Reader。初次 reset 首样为 `0 N`；一次 `100 Hz` 外层 interval 精确推进五个 `2 ms` native steps 后，actuator8 raw signed force 为 `−30 N`；之后 reset 到 seed 73 与重复 reset 到 seed 31，两个新 boundary 的时间均为 `0 s`、reset 无新增物理步，但 Reader 都仍返回 `−30 N`。连续 Reader readback 未改变 Provider-measured state/time 或 ctrl；两次完整运行的稳态 CPU readback median 分别约 `99.6 μs` 与 `267.1 μs`，不设性能阈值。Probe 无 R1 `.compute()`；若经现有 `feedback_value()` 投影，旧值会成为 `+30 N` closing magnitude，超过当前 R1 3 N force-mode 激活阈值，此为源码推断而非行为已触发。
+
+**结论仍为 BLOCKED，且阻塞原因进一步精确为 PROVIDER CONTRACT GAP。** 公开 Reader 提供可组合的外层 raw snapshot，但不携带 validity/freshness、reset identity、native sample index/time 或 phase；GeoPhys restore/reset 后未刷新 actuator force，首样可以是上一 episode 的旧值。Reader route 本身不需要 Core 私有穿透；但 Provider 必须先由现有 rigid state/reset lifecycle 与 observation owner 定义 reset force refresh（不加物理步）或显式 invalid、样本 identity/clock/phase/freshness。若继续保留 raw `actuator_force` typed requirement，Core 还须版本化现有 `snapshot_v1` typed-state owner 发布真实 raw N 值，不能只增 manifest capability。required feedback 保持不变。
+
+前置有效性失败后，R1 compute、打开/闭合/受阻闭合/force hold/重开、MuJoCo native comparison、完整双 Provider 反馈、真实 `panda-main/production-r1` dispatch、ack、录制读取均 blocked/not run。C02b structured dispatch 与真实 arm+hand S2 仍未验收，不将此 Probe 记作完成。
+
+完整 source/config/identities、数据表、采样语义、CPU 计时、Provider owner 合同和下一步进入准则见 [C02b Feedback Source & Sampling Audit](C02b_Feedback_Source_and_Sampling_Audit.md)。诊断脚本与原始输出保存在 ignored `workspace/maintenance/c02b_feedback_source_sampling_audit_20261021_001/`。
 
 ## C.9 质量门与直接可测问题
 

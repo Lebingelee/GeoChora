@@ -90,7 +90,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 21 | C05a | C02a、C01b、D05a | **bounded implemented**：三个旧格式 owner 各自版本化，structured records/events/outcome；41 项新/旧 reader 回归，非 replay qualification |
 | 22 | C03a | C02a、D01b、C05a | **bounded implemented；fault receipt、Recorder completeness 与 append commit boundary 再窄修正**：物理时钟进度、observer/Recorder 子步证据和 transition 有效性分离；不完整行/边界拒绝 transition 且保留 pending；C03a/C05a/B03a/B03b 定向回归 81 passed，真实 Panda 双 Provider 兼容既有 11 passed；详见 [C03a receipt](03_Phase_C_Execution_Lifecycle.md#c03a-bounded-scalar-lifecycle-and-fault-receipt2026-10-21) |
 | 23 | C04 | C03a、D02b | **bounded implemented；C02b gate re-audited**：现有 observation/info owners 固定 schema 元数据、clock、required feedback/optional diagnostics；privileged/private Frame/time 与缺字段负例受保护；最新交叉 gate 103 passed，真实 Panda TaskEnv 与 D04 Camera 仍是明确缺口，详见 [C04 receipt](03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21) |
-| 24 | C02b | C02a、C03a、C04、C05a、D01b | **BLOCKED；fail-closed admission 已验证**：必需 `actuator_force_query` 不在 GeoPhys/MuJoCo manifest，当前没有可用的公开反馈 API route；Runtime 在施控前拒绝。需维护者/Provider API owner 决定公开并验证该能力，或以充分公开证据调整 required-feedback 契约。Group dispatch、applied acknowledgement、真实 arm+hand S2 与录制读取均未验收，见 [C02b admission receipt](03_Phase_C_Execution_Lifecycle.md#c02b-admission-gate-receipt-2026-10-21) |
+| 24 | C02b | C02a、C03a、C04、C05a、D01b | **BLOCKED；fail-closed admission 与真实 reset stale-force 已验证**：公开 `RobotArmObservationReader` 可在 Provider adapter 做外层 readback，但 GeoPhys reset 后可能残留上一 episode 的 actuator8 force（−30 N）；Reader 无 freshness/reset/sample clock，required `actuator_force_query` 也未进入 manifest/typed publication。需 Provider owner 补 force refresh/validity/sampling 合同，再闭合 Core raw typed publication/admission。Group dispatch、applied acknowledgement、真实 R1 behavior、arm+hand S2 与录制读取均未验收，见 [C02b audit](C02b_Feedback_Source_and_Sampling_Audit.md) |
 | 25 | C03b | C03a、C04、C05a | termination/Stop/EpisodeOutcome；T/T+1、bootstrap 和 fault/terminal guards |
 | 26 | C05b | C02b、C03b、C04 | PickCube 外置 Solution 的实际 step/record 路线，两 provider 回归 |
 | 27 | C05c | C05b、D02b | NutAssembly feedback/hold/ramp 契约及迁移；500 Hz/Guard/Outcome/strict status |
@@ -108,9 +108,10 @@ B05 可以完成 legacy semantics 适配，但 vNext 全链执行要到 D01b/P99
 D01a 只证明有限新 Scene bridge，不冒充完整 D01。父目标 implemented 必须覆盖其全部必需切片。
 P00/P99 是 gate，不增设新的 Framework/Harness；当前提交不执行表中代码实施。
 
-截至 2026-10-21，序号 22／C03a 与 23／C04 已按 bounded acceptance 完成；序号 24／C02b 当前为 **BLOCKED**：必需的公开
-actuator-force feedback admission 能力缺失，仅 fail-closed gate 与兼容回归通过，Group dispatch/S2/录制读取尚未验收。解除阻塞
-需先由维护者与 Provider/API owner 确认能力公开路径或调整契约并提供证据。序号 25／C03b 的 termination/Stop policy 也未实现。
+截至 2026-10-21，序号 22／C03a 与 23／C04 已按 bounded acceptance 完成；序号 24／C02b 当前仍 **BLOCKED**：fail-closed gate
+和 GeoPhys CPU reset stale-force Probe 已验证。公开 Reader route 存在，但首样可能是上一 episode 的 −30 N，且缺少 freshness/sample
+identity；raw `actuator_force_query` 仍未 admission/typed publication。Group dispatch、R1 behavior、双 Provider S2 与录制读取尚未验收。
+解除阻塞先需 Provider owner 补刷新/有效性/采样合同，并由 Core 版本化发布真实 raw force。序号 25／C03b 的 termination/Stop policy 也未实现。
 C03a/C04 在 `codex/phase-ii-c` 分别本地提交，不改变冻结的 `codex/phase-ii-b` 指针。
 
 ### 3.1 粒度与工作量
