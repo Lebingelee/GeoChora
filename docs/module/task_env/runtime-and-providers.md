@@ -148,6 +148,23 @@ Selected reference 使用 finite 8D world absolute pose request；PickCube 可�
 同一 episode 不能混用；NutAssembly external action 拒绝，必须用 `step_expert()`。
 Selected reset 重建 controller/solution owner 状态，不推进物理，录制需先 finalize 再 reset。
 
+### C02b Position Profile candidate (2026-10-21)
+
+`PandaPositionServoProfileV1` is an internal candidate composed in the existing canonical controller,
+plan-bound session and selected lifecycle owners. It consumes typed Panda Joint positions and the A05
+`panda-main/hand` frame through the versioned hand-origin TCP profile. Its Required State omits measured
+actuator force, so plan-bound GeoPhys execution does not call `control_feedback()` and the MuJoCo session
+does not copy its force cache during reset/step. A required-force R1 plan still fails admission when the
+actual provider manifest lacks `actuator_force_query`; legacy no-plan behavior remains compatible.
+
+This candidate has no registered default task selection. Its explicit diagnostic constructor reuses the existing
+`SelectedReferenceEnv` lifecycle and `ReferenceTaskBinding`; the bounded route uses existing Generic H5 v3 recording.
+GeoPhys CPU and MuJoCo CPU native S2 passed for one Panda candidate, including motion, clock/boundary evidence,
+force-free reads, structured control readers and direct H5 joint/hand/identity state-leaf readback. This is not a
+production capability or qualification, and it does not close R1 reset-force freshness. See the
+[C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md) and
+[S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md).
+
 ### NutAssembly selected Solution B
 
 NutAssembly Outcome Solution v3 的抓取下降命令偏置与高度验收补偿相同，TaskArtifact v0 mapping/hash 不变。

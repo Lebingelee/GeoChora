@@ -4,7 +4,7 @@
 > C02b remains BLOCKED, C03b/C02c and unified Environment migration remain incomplete.
 > **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；仅授权本轮文档修订/发布，代码实施等待二审。
 > 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
-> 源码审阅与进入条件见 [Recovery Review](C02b_Recovery_Architecture_Review.md)。历史收据不改写。
+> Recovery Review 及后续 E-S1/S2 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md) 与 [C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)。C02b 仍 BLOCKED；历史收据不改写。
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体与依赖：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；输入：[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)、[`02_Phase_B_Task_Semantics.md`](02_Phase_B_Task_Semantics.md)。
 
@@ -331,13 +331,14 @@ Qualification；这些仍须各自满足后续 Goal 的真实 provider gates。
   非兼容 schema 必须新 Env/wrapper。旧 Panda 输出保护，未测 multi-robot 不宣称执行支持。
 - **Codex AUDIT**：精确追踪已有 `RobotControllerHandle`, `ProductionCanonicalPandaController` 以及 `ControlledRuntimeSession` 的 owner/feedback 状态，不复制控制代码。
 
-#### C02b-P / C02b-E recovery contract（2026-10-21，规划；未实施）
+#### C02b-P / C02b-E recovery contract（2026-10-21，Position candidate S1/S2/H5 bounded；完整 C02b 未完成）
 
-**状态**：C02b 仍为 BLOCKED。新的 position-based Profile 是待实现/验收的另一条路线，不能把现有
-`panda-main/production-r1` 的 raw `actuator_force` requirement 删除、改 optional 或填零。两者保留不同的
-writer/profile/binding identity，force-aware reset freshness 缺陷不因位置路线通过而关闭。
+**状态**：C02b 仍为 BLOCKED。Position candidate 已完成 S1、GeoPhys/MuJoCo CPU native S2 与 Generic H5 v3 真写读；force-aware `production-r1` 与完整 C02b 交集仍未完成。它与现有
+`panda-main/production-r1` 保留不同的 writer/profile/binding identity；R1 raw `actuator_force` requirement 未删除、未改 optional、未填零，force-aware reset freshness 缺陷不因位置路线通过而关闭。
 
-**C02b-P — Profile 与完整消费链**：先复用 `CanonicalPandaController` 的 DLS/position servo，
+C02b-P 源码审阅与 C02b-E S1/S2/H5 验收分别见 [Position-based Profile Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md) 和 [C02b-E S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md)。A05 hand-origin TCP 勘误和 S1/S2/H5 分层退出标准以这些记录为准。
+
+**C02b-P — Profile 与完整消费链**：已复用 `CanonicalPandaController` 的 DLS/position servo，
 或在现有 Controller owner 中组合已有位置型 gripper；不重写控制算法。首条候选为同一 Panda Entity、arm/gripper
 两个 Group、一个既有 writer、CPU、100 Hz 外层/五个 2 ms native steps。真实 required state 包括 arm/finger
 joint positions 和 EE world pose；绑定 source/kinematic model、frame、unit、clock 与 reset 有效性，
@@ -360,17 +361,12 @@ joint positions 和 EE world pose；绑定 source/kinematic model、frame、unit
 Composite preset/leaf override 在未来展开为一个不可变 Effective Plan，父 preset 不增加 writer；
 递归 Robot Assembly、跨 Entity attachment、whole-body IK 不属于本检查点。
 
-**C02b-E — 实际执行**：复用 `compile_control_binding_plan()`/`prepare_structured_action()`，实现完整请求
-→全组预检→按 writer 一次 compute→完整 apply/ack→真实 native interval→state publication→版本化录制/读取。
-除声明的 state requirements 外，还应核对实际 Controller/target identity 与 effective plan，拒绝跨 Profile/stale target。
-动作/身份/资源预检失败不得改 Controller memory、施控或时钟；部分施控后失败复用 C03a fault receipt/闭锁，
-不假装回滚物理、不发布成功 transition。exactly-once apply/ack 与 Recorder T/T+1 分开验收。
+**C02b-E — 实际执行**：Position candidate 通过 `SelectedReferenceEnv.from_position_candidate()` 显式进入既有 `ReferenceTaskBinding`/SelectedReferenceEnv lifecycle；没有新增默认 registry。沿用 `compile_control_binding_plan()`/`prepare_structured_action()` 全组预检、单 writer compute/apply、source-bound target/boundary identity、现有 `RuntimeSession.step()`、typed publication 与 C03a fault latch。fixed ResetPlan 的 omitted seed 使用绑定 seed；不匹配的显式 seed 在修改 live Position session 前拒绝。
+GeoPhys/MuJoCo CPU 两个独立进程用相同 hash-bound candidate/sample 完成 64 个真实 outer controls 和每区间五个 2 ms 的 native-clock evidence。Generic H5 v3 记录 reset observation、64 个 structured controls、65 个 boundary observations 与 outcome；结构化 reader、training projection 和磁盘 joint/hand/boundary identity leaves 均回读通过。clock 的五步数由公开 native-time delta 推断，不冒称 RuntimeSession 提供独立 native completion counter。apply、post-step、record fault injection 均复用 C03a fault latch；record failure 不留半条 transition。
 
-**验收层次**：S1 以抛错 sentinel 覆盖 force 查询路径，证明新 Profile 的 reset/compute/apply/step/record 不读力，
-并保留旧 R1 缺能力时 fail-closed；缺组/extra key/NaN/错误 identity 在 owner mutation 前拒绝。
-S2 在同一版本化 candidate/source 与 hash-bound ResetSample 下，分别验证 GeoPhys/MuJoCo CPU 的真实 arm/hand
-运动、reset、五个 native steps、ack、只读 state 和 H5 v3 回读。S3 是适用的短 public execution/record/read 主线，
-不是完整 PickCube/NutAssembly Expert qualification。本轮仅列 gate，不声称这些实验已执行。
+最终定向回归覆盖 Position profile/execution/H5、C02b admission、C02a controller bindings、C03a fault lifecycle、C05a structured recording、D02b typed runtime state 与 selected consumers：**92 passed**，一条上游 `taichi_forge` `locale.getdefaultlocale` 弃用告警。未运行完整仓库回归。
+
+**验收层次**：S1 Profile/source identity、typed adapter、全组 preflight、target freshness、force sentinel 与 R1 admission compatibility 通过；S2/H5 已通过单 Panda Position candidate 声明交集。receipt 不覆盖 obstructed/force-hold、force-aware R1、NutAssembly Guard 或 full Expert。S3/其他真实 task 主线与完整 C02b qualification 尚未通过；S2/H5 是 E 的后层退出标准，不是开工前置。
 
 **完成边界**：C02b-P/E 不增加正式切片数。单 Panda position-profile S2 只关闭其声明交集；P00 要求的最小双 Entity
 隔离施控另需真实 D01/C02 evidence，不能以 Assembly 后置删除，也不能以 first Panda PASS 标为完整多机器人支持。
@@ -708,6 +704,12 @@ S2 均未开始/验收，因此序号 24 不得标为完成，也不能宣称双
 前置有效性失败后，R1 compute、打开/闭合/受阻闭合/force hold/重开、MuJoCo native comparison、完整双 Provider 反馈、真实 `panda-main/production-r1` dispatch、ack、录制读取均 blocked/not run。C02b structured dispatch 与真实 arm+hand S2 仍未验收，不将此 Probe 记作完成。
 
 完整 source/config/identities、数据表、采样语义、CPU 计时、Provider owner 合同和下一步进入准则见 [C02b Feedback Source & Sampling Audit](C02b_Feedback_Source_and_Sampling_Audit.md)。诊断脚本与原始输出保存在 ignored `workspace/maintenance/c02b_feedback_source_sampling_audit_20261021_001/`。
+
+#### C02b-E Position Profile 第一轮验收（2026-10-21）
+
+维护者后续授权 Position Profile 第一轮实现与 S2/H5 继续工作。S1 后的窄修正将 RuntimeSource/ResetSample/Provider target 统一到 `panda-main/joint*`，并在复用的 legacy DLS 输出边界显式适配；旧 `production-r1` 不变。双 Provider 各自 64 transitions、65 H5 observations、FK/Jacobian、motion、read-only sampling、clock、fault latch 和磁盘 leaf 回读通过。专项测试 **88 passed**；之后对最后新增的 live fixed-seed guard 单独复核，完整受影响专项结果见 S2 acceptance 与本轮执行记录。Generic recorder append capacity failure atomicity 与 selected consumer 兼容通过。
+
+**当前仍为 BLOCKED**：单 Panda Position S2/H5 不提供 required raw actuator force，也不关闭 GeoPhys reset-force freshness，因此 C02b/R1 保持 BLOCKED。未实施 C02c、Assembly 或 GeoPhys force refresh；NutAssembly 500 Hz Guard 与 Phase II 未被此 bounded result 覆盖。
 
 ## C.9 质量门与直接可测问题
 

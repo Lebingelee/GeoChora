@@ -90,6 +90,24 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 
+## C02b Position Profile candidate status (2026-10-21)
+
+The C02b-E first-round candidate adds an internal, opt-in
+`PandaPositionServoProfileV1` (`task_env.controllers.canonical.position_profile`) path. It reuses
+`CanonicalPandaController`, `ControlBindingPlanV1`, `RuntimeSession` and the existing selected lifecycle;
+`materialize_control(..., controller_binding_plan=plan, controller_profile=profile)` admits its exact
+force-free typed Joint/hand requirements on GeoPhys/MuJoCo CPU only. Its versioned target binds the actual
+Profile identity, source closure, plan and state boundary. The current A05 candidate uses the explicit
+`panda-main/hand-origin-tcp-v1` transform and 100 Hz / five 2 ms steps. This is not a default task-factory
+selection, registered production capability or qualification. Its explicit `SelectedReferenceEnv.from_position_candidate()`
+constructor uses an existing `ReferenceTaskBinding`, and its bounded selected-lifecycle route writes Generic H5 v3.
+GeoPhys CPU and MuJoCo CPU S2 plus structured-control/action-projection and raw state-leaf disk readback have passed
+for the single-Panda candidate only.
+The independent `panda-main/production-r1` contract remains required-force and continues to reject before
+Runtime materialization when `actuator_force_query` is unavailable. See the
+[C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md) and
+[S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md).
+
 D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeSession.materialize()` 和当前
 `create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变
 `admit_render`、Provider manifest capability claims 或 native construction，也不允许 UI `render_mode` 冒充

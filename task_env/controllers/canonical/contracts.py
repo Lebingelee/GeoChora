@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 import hashlib,json
 from ...artifacts.contracts import Contract,PoseWorld,_name
+from ...artifacts.state import StateBoundaryIdentity,StateSampleClock
 
 
 def digest(value):
@@ -72,6 +73,48 @@ class CanonicalControlTarget(Contract):
 
     @property
     def identity_hash(self):return digest(self.to_mapping())
+
+
+@dataclass(frozen=True)
+class PositionControlTargetV1(Contract):
+    """Canonical position target bound to one writer, plan, and source boundary."""
+
+    schema_version: str
+    writer_id: str
+    controller_identity: str
+    binding_identity_hash: str
+    source_closure_digest: str
+    source_boundary: StateBoundaryIdentity
+    sample_clock: StateSampleClock
+    target: CanonicalControlTarget
+
+    def validate(self):
+        import re
+        if self.schema_version != 'position-control-target-v1':
+            raise ValueError('unsupported position control target schema')
+        _name(self.writer_id)
+        for value in (self.controller_identity,self.binding_identity_hash,self.source_closure_digest):
+            if not re.fullmatch(r'[0-9a-f]{64}',value):
+                raise ValueError('position control target requires SHA-256 identities')
+        if not isinstance(self.source_boundary,StateBoundaryIdentity) or not isinstance(self.sample_clock,StateSampleClock):
+            raise TypeError('position target requires typed source boundary and sample clock')
+        if not isinstance(self.target,CanonicalControlTarget):
+            raise TypeError('position target requires the existing canonical control target')
+        self.source_boundary.validate()
+        self.sample_clock.validate()
+        self.target.validate()
+        if (self.target.controller_identity != self.controller_identity
+                or self.target.task_artifact_hash == ''):
+            raise ValueError('position target Controller/Artifact identity mismatch')
+        if self.source_boundary.scene_identity_hash == '' or (
+            self.sample_clock.clock_domain != 'evaluation_boundary'
+            or self.sample_clock.sample_index != self.source_boundary.control_step
+        ):
+            raise ValueError('position target source boundary and evaluation clock disagree')
+
+    @property
+    def identity_hash(self):
+        return digest(self.to_mapping())
 
 
 @dataclass(frozen=True)

@@ -87,6 +87,14 @@ class TransitionRecorder:
     def frozen(self) -> FrozenTrajectory | None:
         return self._frozen
 
+    @property
+    def transition_count(self) -> int:
+        return len(self._actions)
+
+    @property
+    def observation_count(self) -> int:
+        return len(self._observations)
+
     def begin_episode(self, initial_obs: Any, reset_info: dict[str, Any], record_metadata: dict[str, Any]) -> None:
         if self._active:
             raise RuntimeError("recording is already active")
@@ -149,19 +157,28 @@ class TransitionRecorder:
                     "universal_action shape does not match its schema: "
                     f"got {universal_value.shape}, expected {(expected_dimension,)}"
                 )
-        self._reserve(
-            action_value.nbytes
-            + universal_value.nbytes
-        )
+        # Prepare every potentially failing copy and capacity check before
+        # mutating any aligned transition list. A rejected append must leave
+        # the trajectory at its prior T / T+1 boundary.
+        observation_value = _recording_copy(next_obs)
+        info_value = copy_tree(info)
+        reward_value = float(reward)
+        success_value = bool(success)
+        terminated_value = bool(terminated)
+        truncated_value = bool(truncated)
+        required_bytes = action_value.nbytes + universal_value.nbytes + tree_nbytes(observation_value)
+        if self._bytes + required_bytes > self.config.max_buffer_bytes:
+            raise MemoryError("recording buffer exceeds max_buffer_bytes")
+        self._bytes += required_bytes
         self._actions.append(action_value)
         self._structured_controls.append(structured_control)
         self._universal_actions.append(universal_value)
-        self._rewards.append(float(reward))
-        self._successes.append(bool(success))
-        self._terminated.append(bool(terminated))
-        self._truncated.append(bool(truncated))
-        self._infos.append(copy_tree(info))
-        self._append_observation(next_obs)
+        self._rewards.append(reward_value)
+        self._successes.append(success_value)
+        self._terminated.append(terminated_value)
+        self._truncated.append(truncated_value)
+        self._infos.append(info_value)
+        self._observations.append(observation_value)
 
     def add_boundary_event(self, event: BoundaryEventV1) -> None:
         """Append an event at the recorder's current real control boundary."""

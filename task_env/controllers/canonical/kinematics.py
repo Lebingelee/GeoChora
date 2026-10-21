@@ -1,9 +1,11 @@
 """Geochora-owned audited Panda chain FK/Jacobian from neutral source bytes."""
 import hashlib
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 import numpy as np
 from ...utils.rotation import quat_wxyz_to_matrix,rotvec_to_matrix,matrix_to_quat_wxyz
 from ...artifacts import PoseWorld
+from ...artifacts.contracts import Contract
 
 ARM=tuple(f'panda-v1/joint{i}' for i in range(1,8))
 FINGERS=('panda-v1/finger_joint1','panda-v1/finger_joint2')
@@ -16,8 +18,46 @@ def transform(element):
     return t
 
 
+@dataclass(frozen=True)
+class PandaTcpProfileV1(Contract):
+    """Versioned hand-local TCP transform used by a source-bound Panda profile."""
+
+    schema_version: str
+    tcp_id: str
+    hand_frame_id: str
+    position_m: tuple[float, float, float]
+    quaternion_wxyz: tuple[float, float, float, float]
+
+    def validate(self):
+        if self.schema_version != 'panda-tcp-profile-v1':
+            raise ValueError('unsupported Panda TCP profile schema')
+        if self.tcp_id != 'panda-main/hand-origin-tcp-v1' or self.hand_frame_id != 'hand':
+            raise ValueError('unsupported Panda TCP identity/frame')
+        if tuple(self.position_m) != (0.0, 0.0, 0.0) or tuple(self.quaternion_wxyz) != (1.0, 0.0, 0.0, 0.0):
+            raise ValueError('hand-origin TCP v1 is the identity transform from hand')
+
+    @property
+    def identity_hash(self):
+        import json
+        return hashlib.sha256(json.dumps(
+            self.to_mapping(),sort_keys=True,separators=(',',':'),allow_nan=False,
+        ).encode('utf-8')).hexdigest()
+
+    def local_transform(self):
+        value = np.eye(4)
+        value[:3, :3] = quat_wxyz_to_matrix(np.asarray(self.quaternion_wxyz, dtype=float))
+        value[:3, 3] = np.asarray(self.position_m, dtype=float)
+        return value
+
+
+PANDA_HAND_ORIGIN_TCP_V1 = PandaTcpProfileV1(
+    'panda-tcp-profile-v1', 'panda-main/hand-origin-tcp-v1', 'hand',
+    (0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0),
+)
+
+
 class PandaKinematics:
-    def __init__(self,xml):
+    def __init__(self,xml,*,tcp_profile=None):
         self.source_sha256=hashlib.sha256(xml.encode()).hexdigest();root=ET.fromstring(xml)
         if root.find('compiler').get('angle','degree')!='radian':raise ValueError('kinematic source must use radians')
         body=root.find(".//body[@name='link0']");self.base_transform=transform(body);self.chain=[];self.limits=[]
@@ -32,8 +72,24 @@ class PandaKinematics:
             axis=np.fromstring(j.get('axis','0 0 1'),sep=' ');axis/=np.linalg.norm(axis)
             pivot=np.fromstring(j.get('pos','0 0 0'),sep=' ')
             self.chain.append((transform(next_body),axis,pivot));self.limits.append(np.fromstring(j['range'],sep=' '));body=next_body
-        hand=body.find("body[@name='hand']");site=hand.find("site[@name='nutassembly_ee_site']")
-        self.tip=transform(hand)@transform(site);self.limits=np.array(self.limits)
+        hand=body.find("body[@name='hand']")
+        if hand is None:
+            raise ValueError('Panda source is missing the declared hand body')
+        if tcp_profile is None:
+            site=hand.find("site[@name='nutassembly_ee_site']")
+            if site is None:
+                raise ValueError('legacy Panda kinematics requires nutassembly_ee_site; provide an explicit TCP profile')
+            self.tip=transform(hand)@transform(site)
+            self.tcp_profile=None
+        else:
+            if not isinstance(tcp_profile,PandaTcpProfileV1):
+                raise TypeError('Panda kinematics TCP must be PandaTcpProfileV1')
+            tcp_profile.validate()
+            if tcp_profile.hand_frame_id != hand.get('name'):
+                raise ValueError('Panda TCP frame is not the materialized hand body')
+            self.tip=transform(hand)@tcp_profile.local_transform()
+            self.tcp_profile=tcp_profile
+        self.limits=np.array(self.limits)
 
     def fk_jacobian(self,q):
         q=np.asarray(q,dtype=float)

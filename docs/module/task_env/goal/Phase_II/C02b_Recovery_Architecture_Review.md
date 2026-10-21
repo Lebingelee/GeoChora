@@ -6,7 +6,18 @@ GeoPhys `4436787e9cb85ce519506a2a9af86d1eeec9de2d`。结论：**REVISE_PLAN → 
 
 当前顺序与状态唯一入口是 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)；
 本报告记录恢复决策的源码依据、风险、消费链和后续验收设计，不建立第二套 capability matrix。
-C02b 仍 BLOCKED，C02b-P/E 未完成，没有因改文档获得任何新 Qualification。
+本报告形成时 C02b-P/E 尚未实施；后续状态见下方补记。C02b 仍 BLOCKED，没有因改文档获得任何新 Qualification。
+
+### 后续实施状态补记（2026-10-21）
+
+上方结论与 §2/§6/§8 的“未实施/未运行”均是本报告形成时的历史状态（Core `cddee96`），现由后续
+[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md)、
+[Phase C](03_Phase_C_Execution_Lifecycle.md) 与 [执行顺序](05_Architecture_Review_and_Execution_Order.md) 更新。
+维护者已另行授权 E 第一轮：Position Profile/source-state/force-free Core 接线与 S1 已完成；当时双 Provider native S2、
+Generic H5 v3 真写读及 state-leaf 回读尚未完成。后续 C02b-E S2/H5 已对单 Panda Position candidate 完成 bounded
+GeoPhys/MuJoCo CPU 实跑和磁盘回读，见 [S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md)。这些结果不关闭
+force-aware `production-r1`、reset force freshness、其他任务或完整 C02b。A05 Panda hand 下没有 `nutassembly_ee_site`；
+candidate 使用版本化 hand-origin TCP，未修改冻结 A05 fixture。S2/H5 是 E 的分层退出层，不是启动 E 的前置。
 
 ## 1. 来源、基线与受保护内容
 

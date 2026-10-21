@@ -355,6 +355,7 @@ def materialize_control(
     binding,
     manifest=None,
     controller_binding_plan: ControlBindingPlanV1 | None = None,
+    controller_profile=None,
 ):
     actual_manifest=provider_manifest(execution.physics_provider)
     if manifest is not None:admit_capabilities(CONTROL_REQUIRED,manifest,execution)
@@ -380,9 +381,51 @@ def materialize_control(
                 f'missing supported Controller feedback capabilities for '
                 f'{execution.physics_provider}: {sorted(missing)}'
             )
+    if controller_profile is not None:
+        from ...controllers.canonical.position_profile import (
+            POSITION_GRIPPER_SEMANTIC,
+            POSITION_PROFILE_ID,
+            PandaPositionServoProfileV1,
+        )
+        if not isinstance(controller_profile, PandaPositionServoProfileV1):
+            raise TypeError('unsupported explicit Controller profile')
+        if execution.physics_provider not in {'geophys', 'mujoco'} or execution.backend != 'cpu':
+            raise ValueError('PositionServoV1 materialization is limited to GeoPhys/MuJoCo CPU')
+        if controller_binding_plan is None:
+            raise ValueError('PositionServoV1 requires a compiled ControlBindingPlanV1')
+        controller_profile._validate_plan(controller_binding_plan)
+        if artifact.identity_hash != controller_profile.artifact.identity_hash:
+            raise ValueError('PositionServoV1 materialization source/Artifact differs from its Controller instance')
+        controller_profile._validate_source(source)
+        if controller_profile.writer_id != POSITION_PROFILE_ID:
+            raise ValueError('PositionServoV1 writer identity mismatch')
+        if binding.gripper_semantic_id != POSITION_GRIPPER_SEMANTIC:
+            raise ValueError('PositionServoV1 requires panda-main/gripper semantic binding')
+        expected_targets = {f'panda-main/joint{index}': f'actuator{index}' for index in range(1, 8)}
+        if dict(source.joint_targets) != expected_targets or tuple(source.open_actuators) != ('actuator8',):
+            raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
     if len(source.joint_targets)!=7 or len(source.open_actuators)!=1:raise ValueError('unsupported control source bindings')
     session=materialize(artifact,execution,source=source,manifest=manifest)
     session._control_binding=binding
+    if controller_binding_plan is not None:
+        force_required = any(
+            item.field_name == 'actuator_force' and item.requiredness == 'required'
+            for controller_binding in controller_binding_plan.controller_bindings
+            for item in controller_binding.feedback_requirements.requirements
+        )
+        # No-plan compatibility keeps the historical measured-force cache.
+        session._force_feedback_required = force_required
+        session._control_binding_plan = controller_binding_plan
+    else:
+        session._force_feedback_required = True
+        session._control_binding_plan = None
+    if controller_profile is not None:
+        session._position_profile_id = controller_profile.profile_id
+        session._position_profile_identity = controller_profile.identity
+        session._position_writer_id = controller_profile.writer_id
+        session._position_binding_identity_hash = controller_binding_plan.identity_hash
+        session._position_source_closure_digest = source.source_closure_digest
+        session._position_applied_boundary_ids = set()
     return session
 
 
@@ -390,6 +433,10 @@ def validate_target(session,target):
     if not isinstance(target, CanonicalControlTarget):raise TypeError("CanonicalControlTarget required")
     session._require_reset()
     if not hasattr(session,'_control_binding'):raise ValueError('control session admission required')
+    if hasattr(session, '_position_profile_identity'):
+        if (getattr(session, '_position_target_in_flight', None) != target.identity_hash
+                or target.controller_identity != session._position_profile_identity):
+            raise ValueError('PositionServoV1 target must pass source-bound boundary validation')
     if (target.task_artifact_hash!=session._artifact.identity_hash or set(target.arm_joint_order)!=set(session._target_actuators)
         or target.gripper.semantic_id!=session._control_binding.gripper_semantic_id):raise ValueError('canonical control binding mismatch')
 
@@ -410,3 +457,113 @@ def feedback_value(session, state, native_force):
     return CanonicalControlFeedback('canonical-control-feedback-v0', state.control_step,
         state.simulation_time, CanonicalGripperFeedback(session._control_binding.gripper_semantic_id,
         max(0., float(sum(state.joint_position[n] for n in FINGERS))), max(0., -float(native_force))))
+
+
+def _validate_position_source_boundary(
+    session, controller_profile, plan, publication, *, scene,
+    joint_bindings, frame_bindings,
+):
+    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+    from ...controllers.canonical.contracts import PositionControlTargetV1
+
+    if not isinstance(controller_profile, PandaPositionServoProfileV1):
+        raise TypeError('PositionServoV1 dispatch requires its actual Controller instance')
+    controller_profile._validate_source(controller_profile.source)
+    plan_identity = controller_profile._validate_plan(plan)
+    if (getattr(session, '_position_profile_identity', None) != controller_profile.identity
+            or getattr(session, '_position_profile_id', None) != controller_profile.profile_id
+            or getattr(session, '_position_writer_id', None) != controller_profile.writer_id
+            or getattr(session, '_position_binding_identity_hash', None) != plan_identity
+            or getattr(session, '_position_source_closure_digest', None) != controller_profile.source.source_closure_digest):
+        raise ValueError('RuntimeSession/Controller/plan identity mismatch')
+    if publication.view.boundary.scene_identity_hash != plan.scene_identity_hash:
+        raise ValueError('position state publication/plan Scene identity mismatch')
+    fresh = session.snapshot_v1(
+        scene=scene, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+        requirements=controller_profile.requirements,
+    )
+    if (fresh.view.boundary.boundary_id != publication.view.boundary.boundary_id
+            or fresh.view.sample_clock != publication.view.sample_clock):
+        raise ValueError('position state publication is stale for the RuntimeSession boundary')
+    return plan_identity
+
+
+def apply_position_control_target(
+    session,
+    target,
+    *,
+    controller_profile,
+    plan,
+    publication,
+    scene,
+    joint_bindings,
+    frame_bindings,
+):
+    """Validate a source-bound position target, then lower it once via the existing session."""
+    from ...controllers.canonical.contracts import PositionControlTargetV1
+
+    if not isinstance(target, PositionControlTargetV1):
+        raise TypeError('PositionControlTargetV1 required')
+    target.validate()
+    plan_identity = _validate_position_source_boundary(
+        session, controller_profile, plan, publication, scene=scene,
+        joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+    )
+    boundary = publication.view.boundary
+    if (target.writer_id != controller_profile.writer_id
+            or target.controller_identity != controller_profile.identity
+            or target.binding_identity_hash != plan_identity
+            or target.source_closure_digest != controller_profile.source.source_closure_digest
+            or target.source_boundary.boundary_id != boundary.boundary_id
+            or target.sample_clock != publication.view.sample_clock
+            or target.target.controller_identity != controller_profile.identity
+            or target.target.task_artifact_hash != controller_profile.artifact.identity_hash):
+        raise ValueError('position target writer/Profile/plan/source boundary mismatch')
+    if target.target.gripper.semantic_id != controller_profile.profile_id.rsplit('/', 1)[0] + '/gripper':
+        raise ValueError('position target gripper semantic binding mismatch')
+    consumed = session._position_applied_boundary_ids
+    if boundary.boundary_id in consumed:
+        raise ValueError('position target for this state boundary was already applied')
+    # Close the same-boundary replay window before crossing into the Provider.
+    consumed.add(boundary.boundary_id)
+    session._position_target_in_flight = target.target.identity_hash
+    try:
+        acknowledgement = session.apply_control(target.target)
+    finally:
+        session._position_target_in_flight = None
+    if acknowledgement.target_hash != target.target.identity_hash:
+        raise ValueError('Provider acknowledgement does not match the applied canonical target')
+    return acknowledgement
+
+
+def execute_position_control_interval(
+    session,
+    controller_profile,
+    plan,
+    request,
+    publication,
+    *,
+    scene,
+    joint_bindings,
+    frame_bindings,
+):
+    """Preflight both groups, compute/apply once, then advance one outer interval."""
+    prepared = prepare_structured_action(plan, request)
+    if len(prepared) != 1 or prepared[0][0] != controller_profile.writer_id:
+        raise ValueError('PositionServoV1 requires exactly one matching structured-action writer')
+    _validate_position_source_boundary(
+        session, controller_profile, plan, publication, scene=scene,
+        joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+    )
+    canonical, target = controller_profile.compute(publication, prepared[0][1], plan)
+    applied = apply_position_control_target(
+        session, target, controller_profile=controller_profile, plan=plan,
+        publication=publication, scene=scene, joint_bindings=joint_bindings,
+        frame_bindings=frame_bindings,
+    )
+    state = session.step()
+    next_publication = session.snapshot_v1(
+        scene=scene, joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+        requirements=controller_profile.requirements,
+    )
+    return canonical, target, applied, state, next_publication

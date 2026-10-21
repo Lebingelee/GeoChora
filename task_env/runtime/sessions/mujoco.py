@@ -89,6 +89,13 @@ class _MuJoCoSession(_SessionValues):
         self._open_actuators = tuple(self._model.actuator(native).id for native in source.open_actuators)
         self._validate_canonical_scene_model()
 
+    def _cache_completed_actuator_force(self):
+        """Read force only when the admitted Controller state contract requires it."""
+        if getattr(self, '_force_feedback_required', False):
+            self._completed_actuator_force = self._data.actuator_force.copy()
+        else:
+            self._completed_actuator_force = None
+
     def _validate_canonical_scene_model(self):
         scene = self._source.scene_definition
         if scene is None:
@@ -175,7 +182,7 @@ class _MuJoCoSession(_SessionValues):
         for actuator in self._open_actuators:
             self._data.ctrl[actuator] = self._model.actuator_ctrlrange[actuator, 1]
         self._mj.mj_forward(self._model, self._data)
-        self._completed_actuator_force = self._data.actuator_force.copy()
+        self._cache_completed_actuator_force()
         return self._realized(sample)
 
     def _snapshot_with_native_free_joints(self):
@@ -225,6 +232,8 @@ class _MuJoCoSession(_SessionValues):
         self._require_reset()
         if not hasattr(self, '_control_binding'):
             raise ValueError('control session admission required')
+        if not getattr(self, '_force_feedback_required', False):
+            raise ValueError('actuator-force feedback is not admitted for this Controller profile')
         return feedback_value(self, state, self._completed_actuator_force[self._open_actuators[0]])
 
     def apply_control(self, target):
@@ -255,8 +264,7 @@ class _MuJoCoSession(_SessionValues):
         for _ in range(self._artifact.timebase.control_substeps):
             self._mj.mj_step(self._model, self._data)
             self._native_steps += 1
-            if hasattr(self, '_control_binding'):
-                self._completed_actuator_force = self._data.actuator_force.copy()
+            self._cache_completed_actuator_force()
         self._mj.mj_forward(self._model, self._data)
         self._control_step += 1
         self._state_revision += 1
@@ -266,8 +274,7 @@ class _MuJoCoSession(_SessionValues):
         self._require_reset()
         self._mj.mj_step(self._model, self._data)
         self._native_steps += 1
-        if hasattr(self, '_control_binding'):
-            self._completed_actuator_force = self._data.actuator_force.copy()
+        self._cache_completed_actuator_force()
         self._mj.mj_forward(self._model, self._data)
 
     def close(self):

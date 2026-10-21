@@ -181,6 +181,8 @@ class _SessionValues:
         self._reset_plan_gate_required = False
         self._reset_plan_gate_open = False
         self._reset_plan_evidence = None
+        if hasattr(self, '_position_applied_boundary_ids'):
+            self._position_applied_boundary_ids.clear()
 
     def reset_plan(self, plan: EpisodeResetPlanV1) -> RealizedInitialState:
         """Reset from a Core plan and open rollout only after Scene/readback checks."""

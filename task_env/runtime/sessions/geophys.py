@@ -87,6 +87,8 @@ class _GeoPhysSession(_SessionValues):
         self._require_reset()
         if not hasattr(self, '_control_binding'):
             raise ValueError('control session admission required')
+        if not getattr(self, '_force_feedback_required', False):
+            raise ValueError('actuator-force feedback is not admitted for this Controller profile')
         native = self._boundary.read_snapshot(SnapshotRequest(qacc=False, ctrl=False,
             body_pose=False, site_pose=False, actuator_force=True))
         return feedback_value(self, state, native.actuator_force[self._open_actuators[0]])

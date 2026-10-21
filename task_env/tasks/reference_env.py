@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import hashlib
 import json
+from types import SimpleNamespace
 from typing import Callable
 import numpy as np
 from gymnasium.spaces import Box, Dict
@@ -23,6 +24,7 @@ from ..runtime.sessions.control import ControlBinding, materialize_control
 METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1',
     'schema_version': 1, 'controller_kind': 'absolute_pose', 'reference': 'world',
     'rotation_representation': 'quaternion_wxyz', 'dimension': 8}}
+_RESET_SEED_UNSET = object()
 
 
 def _identity_seed(seed):
@@ -79,11 +81,36 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise ValueError('selected reference config admits provider/backend/horizon only; legacy overlays are incompatible')
         return cls(**values)
 
-    def __init__(self, *, provider='geophys', backend='cpu', horizon=6000):
+    @classmethod
+    def from_position_candidate(
+        cls, binding: ReferenceTaskBinding, *, provider='geophys', backend='cpu', horizon=6000,
+    ):
+        """Explicitly construct a bounded Position profile through the selected binding."""
+        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+
+        if not isinstance(binding, ReferenceTaskBinding):
+            raise TypeError('PositionServoV1 candidate requires the existing ReferenceTaskBinding')
+        candidate_type = cls
+        if not hasattr(cls, 'uid'):
+            candidate_type = type(
+                'PositionCandidateSelectedReferenceEnv', (cls,),
+                {'uid': 'c02b-position-servo-candidate-v1'},
+            )
+        env = candidate_type(provider=provider, backend=backend, horizon=horizon, _binding=binding)
+        if not isinstance(env.controller, PandaPositionServoProfileV1):
+            env.close()
+            raise TypeError('candidate binding did not construct PandaPositionServoProfileV1')
+        return env
+
+    def __init__(self, *, provider='geophys', backend='cpu', horizon=6000, _binding=None):
         if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
             raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
+        if _binding is not None:
+            if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
+                raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
+            self.binding = _binding
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
         self.provider, self.horizon = provider, horizon
@@ -100,13 +127,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         self.controller = self.value['controller']
+        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+        self.position_profile = isinstance(self.controller, PandaPositionServoProfileV1)
         self.metadata = {**METADATA, 'action_schema': dict(METADATA['action_schema']), 'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
             'control_dt': self.artifact.timebase.control_dt}
         self.action_space = Box(-np.inf, np.inf, (8,), dtype=np.float64)
         keys = [key for _, key in self.binding.object_poses]
-        self.observation_space = Dict({'state': Dict({'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}),
+        state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
+        if self.position_profile:
+            state_spaces.update({
+                'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
+                'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
+            })
+        self.observation_space = Dict({'state': Dict(state_spaces),
             'privileged_state': Dict({k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32) for k in keys})})
         self.session = None
         self._closed = False
@@ -169,11 +205,24 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def composition_spec(self):
         return self.value['source'].composition
 
-    def reset(self, *, seed=19, options=None):
+    def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
         if self._closed:
             raise RuntimeError('environment is closed')
         if options:
             raise ValueError('selected reference reset options are not supported')
+        if seed is _RESET_SEED_UNSET:
+            if getattr(self, 'position_profile', False):
+                seed = self.value['reset_plan'].reset_sample.task_seed
+            else:
+                seed = 19
+        if getattr(self, 'position_profile', False):
+            # Validate the fixed ResetPlan seed before closing/reconstructing a
+            # live RuntimeSession. Legacy selected bindings keep their existing
+            # reconstruction-before-seed-validation lifecycle below.
+            seed = self.binding.reset_seed(seed)
+            reset_plan = self.value.get('reset_plan')
+            if reset_plan is None or seed != reset_plan.reset_sample.task_seed:
+                raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
         self._stopped = True
@@ -188,28 +237,93 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.value['artifact'] != self.artifact:
                 raise ValueError('selected Artifact changed between construction and reset')
             phase = 'reset_seed'
-            seed = self.binding.reset_seed(seed)
+            if not getattr(self, 'position_profile', False):
+                seed = self.binding.reset_seed(seed)
             self.solution, self.controller = self.value['solution'], self.value['controller']
+            from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+            self.position_profile = isinstance(self.controller, PandaPositionServoProfileV1)
             phase = 'reset_sample'
-            self.sample = self.binding.reset_sample(self.artifact, seed)
+            if self.position_profile:
+                reset_plan = self.value.get('reset_plan')
+                if reset_plan is None:
+                    raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlanV1')
+                self.sample = reset_plan.reset_sample
+            else:
+                self.sample = self.binding.reset_sample(self.artifact, seed)
             self.execution = ExecutionSpec(self.provider, PROFILE, 'none', 'cpu', 0, 'strict')
             phase = 'session_materialization'
-            self.session = materialize_control(self.artifact, self.execution,
-                source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08))
+            if self.position_profile:
+                from ..runtime.sessions.control import (
+                    ControlBindingPlanV1,
+                    compile_control_binding_plan,
+                )
+                self.position_scene = self.value['source'].scene_definition
+                self.position_plan = self.value.get('controller_binding_plan')
+                if self.position_plan is None:
+                    self.position_plan = compile_control_binding_plan(
+                        self.position_scene, (self.controller.controller_binding(),),
+                    )
+                if not isinstance(self.position_plan, ControlBindingPlanV1):
+                    raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
+                self.position_joint_bindings = {
+                    f'{articulation.entity_id}/{joint.joint_id}': joint
+                    for articulation in self.position_scene.articulations or ()
+                    for joint in articulation.joints
+                    if joint.kind != 'fixed'
+                }
+                from ..artifacts import FrameReference
+                self.position_frame_bindings = {
+                    semantic: FrameReference(entity, frame)
+                    for semantic, (entity, frame) in {
+                        name: tuple(name.split('/', 1))
+                        for name in (*self.value['source'].bodies, *self.value['source'].frames)
+                    }.items()
+                }
+                self.session = materialize_control(
+                    self.artifact, self.execution, source=self.value['source'],
+                    binding=ControlBinding('panda-main/gripper', .08),
+                    controller_binding_plan=self.position_plan,
+                    controller_profile=self.controller,
+                )
+            else:
+                self.position_profile = False
+                self.session = materialize_control(self.artifact, self.execution,
+                    source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08))
             phase = 'runtime_reset'
-            self.realized = self.session.reset(self.sample)
+            if self.position_profile:
+                reset_plan = self.value.get('reset_plan')
+                self.realized = self.session.reset_plan(reset_plan)
+            else:
+                self.realized = self.session.reset(self.sample)
             phase = 'snapshot_readback'
             self.state = self.session.snapshot()
-            phase = 'controller_feedback'
-            self.feedback = self.session.control_feedback(self.state)
-            self.controller.reset(self.state, self.feedback)
+            if self.position_profile:
+                self.typed_state = self.session.snapshot_v1(
+                    scene=self.position_scene,
+                    joint_bindings=self.position_joint_bindings,
+                    frame_bindings=self.position_frame_bindings,
+                    requirements=self.controller.requirements,
+                )
+                self.controller.reset(self.typed_state, self.position_plan)
+                self.feedback = None
+            else:
+                phase = 'controller_feedback'
+                self.feedback = self.session.control_feedback(self.state)
+                self.controller.reset(self.state, self.feedback)
             phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
+            self._last_position_terminated = False
+            self._last_position_truncated = False
+            self._last_position_request = None
+            if self.position_profile:
+                self._position_reset_info = self._position_record_reset_info()
+                self.info.update(self._position_reset_info)
             if self.state.control_step != 0 or self.state.simulation_time != 0:
                 raise ValueError('reference reset must not advance physics')
-            phase = 'solution_reset'
-            self.solution.reset(self.obs, self.info, self.metadata,
-                                **self.binding.reset_expert_kwargs(self))
+            if self.solution is not None:
+                phase = 'solution_reset'
+                self.solution.reset(self.obs, self.info, self.metadata,
+                                    **self.binding.reset_expert_kwargs(self))
             phase = 'arm_schedule_reset'
             self.arm_schedule = (self.binding.schedule_factory(self)
                                  if self.binding.schedule_factory is not None else None)
@@ -234,10 +348,45 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.state.simulation_time, self.controller.readiness(self.state, self.feedback))
 
     def observation(self, state):
-        evaluation = self.binding.evaluate(state, self.artifact.semantics)
-        ee = state.pose_world['panda-v1/ee']
-        obs = {'state': {'ee_pose': np.array((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)},
-               'privileged_state': {}}
+        if getattr(self, 'position_profile', False):
+            adapted = self.controller._adapt_publication(self.typed_state)
+            evaluation_state = SimpleNamespace(
+                control_step=state.control_step,
+                simulation_time=state.simulation_time,
+                joint_position={**state.joint_position, **adapted.joint_position},
+                joint_velocity=state.joint_velocity,
+                pose_world={**state.pose_world, **adapted.pose_world},
+            )
+            evaluation = self.binding.evaluate(evaluation_state, self.artifact.semantics)
+            ee = adapted.pose_world['panda-v1/ee']
+        else:
+            evaluation = self.binding.evaluate(state, self.artifact.semantics)
+            ee = state.pose_world['panda-v1/ee']
+        state_obs = {'ee_pose': np.array((*ee.position, *ee.quaternion_wxyz), dtype=np.float32)}
+        obs = {'state': state_obs, 'privileged_state': {}}
+        if getattr(self, 'position_profile', False):
+            view = self.typed_state.view
+            boundary = view.boundary
+            joints = {
+                value.joint_id: value for value in view.joints if value.entity_id == 'panda-main'
+            }
+            hand = next(
+                value for value in view.frames
+                if value.frame.entity_id == 'panda-main' and value.frame.frame_id == 'hand'
+            )
+            identity_hex = boundary.boundary_id.removeprefix('state-boundary-')
+            state_obs.update({
+                'joint_position': np.asarray([
+                    joints[name].position[0] for name in (
+                        'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7',
+                        'finger_joint1', 'finger_joint2',
+                    )
+                ], dtype=np.float32),
+                'hand_pose': np.asarray(
+                    (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz), dtype=np.float32,
+                ),
+                'boundary_identity_sha256': np.frombuffer(bytes.fromhex(identity_hex), dtype=np.uint8).copy(),
+            })
         for semantic, key in self.binding.object_poses:
             pose = state.pose_world[semantic]
             obs['privileged_state'][key + '_body_pose'] = np.array(
@@ -245,9 +394,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         info = {'is_success': bool(evaluation.success), 'task_failure': bool(evaluation.failure),
             'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
             'simulation_time_s': float(state.simulation_time)}
+        if getattr(self, 'position_profile', False):
+            boundary = self.typed_state.view.boundary
+            info['state_boundary_identity'] = boundary.to_mapping()
+            info['state_boundary_id'] = boundary.boundary_id
+            info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
         return obs, info, evaluation
 
     def step(self, action):
+        if getattr(self, '_closed', False):
+            raise RuntimeError('environment is closed')
         if self._execution_fault is not None:
             fault = self._execution_fault
             raise RuntimeError(
@@ -258,8 +414,100 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode == 'expert':
             raise RuntimeError('cannot mix external actions with selected expert execution')
+        from ..controllers.canonical.contracts import StructuredActionRequestV1
+        if getattr(self, 'position_profile', False):
+            if self._stopped or self.session is None:
+                raise RuntimeError('reset required or episode already stopped')
+            if self.state.control_step >= self.horizon:
+                self._stopped = True
+                raise RuntimeError('selected PositionServoV1 horizon is exhausted')
+            if not isinstance(action, StructuredActionRequestV1):
+                raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
+            from ..runtime.sessions.control import prepare_structured_action
+            # Reject bad action and plan identities before changing episode mode,
+            # Controller memory, Recorder state, or the Provider.
+            prepare_structured_action(self.position_plan, action)
+            return self._step_position_profile(action)
+        if isinstance(action, StructuredActionRequestV1):
+            raise TypeError('structured ControllerGroup actions require PositionServoV1')
         self._episode_mode = 'external'
         return self._step(action)
+
+    def _step_position_profile(self, request):
+        """Run one source-bound Position interval through the selected lifecycle latch."""
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
+        if not getattr(self, 'position_profile', False) or self.session is None:
+            raise RuntimeError('PositionServoV1 reset and RuntimeSession are required')
+        if getattr(self, '_closed', False):
+            raise RuntimeError('environment is closed')
+        if self._stopped or self.state.control_step >= self.horizon:
+            self._stopped = True
+            raise RuntimeError('reset required or PositionServoV1 horizon is exhausted')
+        from ..runtime.sessions.control import execute_position_control_interval
+
+        before_state = self.state
+        interval_attempted = False
+        interval_completed = False
+        transition_counts_before = self._recording_counts(self.recorder)
+        record_append_attempted = False
+        phase = 'position_control_preflight'
+        try:
+            interval_attempted = True
+            phase = 'position_control_compute_apply_step'
+            canonical, target, applied, self.state, self.typed_state = execute_position_control_interval(
+                self.session, self.controller, self.position_plan, request, self.typed_state,
+                scene=self.position_scene,
+                joint_bindings=self.position_joint_bindings,
+                frame_bindings=self.position_frame_bindings,
+            )
+            interval_completed = True
+            self.feedback = None
+            self.last_position_transition = (canonical, target, applied)
+            phase = 'position_observation'
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            terminated = bool(self.evaluation.failure)
+            truncated = self.state.control_step >= self.horizon
+            self._stopped = bool(terminated or truncated)
+            self._episode_mode = 'external'
+            self._last_position_terminated = terminated
+            self._last_position_truncated = truncated
+            self._last_position_request = request
+            if self.recorder is not None:
+                phase = 'record_position_transition'
+                record_append_attempted = True
+                self._record_position_transition(
+                    request, canonical, target, applied, terminated=terminated, truncated=truncated,
+                )
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+        except BaseException as error:
+            after_state = None
+            readback_error = None
+            if interval_attempted:
+                try:
+                    after_state = self.session.snapshot()
+                    self.state = after_state
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            if (after_state is not None and before_state is not None
+                    and after_state.control_step == before_state.control_step + 1):
+                interval_completed = True
+            self._latch_fault(
+                phase, error, before_state=before_state, after_state=after_state,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                transition_status=self._fault_transition_status(
+                    self.recorder, transition_counts_before,
+                    append_attempted=record_append_attempted,
+                ),
+                readback_error=readback_error,
+            )
+            raise
 
     def step_expert(self):
         if self._execution_fault is not None:
@@ -270,6 +518,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             )
         if self._stopped or self._episode_mode == 'external':
             raise RuntimeError('reset required; external and expert execution cannot be mixed')
+        if self.solution is None or getattr(self, 'position_profile', False):
+            raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
         self._episode_mode = 'expert'
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')
@@ -422,6 +672,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _recording_counts(recorder):
         if recorder is None:
             return None
+        transition_count = getattr(recorder, 'transition_count', None)
+        observation_count = getattr(recorder, 'observation_count', None)
+        if type(transition_count) is int and type(observation_count) is int:
+            return transition_count, observation_count
         value = getattr(recorder, 'value', None)
         if isinstance(value, dict):
             return len(value.get('transitions', ())), len(value.get('boundaries', ()))
@@ -503,6 +757,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from ..runtime.sessions import common as session_common
         if self.session is None or self.state.control_step != 0 or self.recorder is not None:
             raise RuntimeError('recording starts exactly once at reset boundary')
+        if getattr(self, 'position_profile', False):
+            from ..recorders import RecorderConfig, TransitionRecorder
+
+            path = Path(path)
+            if path.suffix != '.h5':
+                path = path.with_name(path.name + '.h5')
+            if path.exists():
+                raise FileExistsError(path)
+            recorder = TransitionRecorder(RecorderConfig(
+                schema_version='v3', max_transitions=max(self.horizon, 1),
+            ))
+            recorder.begin_episode(
+                self.obs, dict(self._position_reset_info), self._position_record_metadata(),
+            )
+            self.recording_path = path
+            self.recorder = recorder
+            return
         path = Path(path)
         if path.exists():
             raise FileExistsError(path)
@@ -592,6 +863,33 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.info['task_metrics'])
 
     def finish_recording(self, reason):
+        if getattr(self, 'position_profile', False):
+            from ..recorders import load_structured_control_records_h5
+            from ..trajectory.canonical.episode import EpisodeOutcomeV1
+
+            if self.recorder is None or not getattr(self.recorder, 'active', False):
+                raise RuntimeError('no active recording')
+            transition_count = self.recorder.transition_count
+            terminated = bool(self._last_position_terminated)
+            truncated = bool(self._last_position_truncated)
+            outcome = EpisodeOutcomeV1(
+                'episode-outcome-v1', self.typed_state.view.boundary.episode_id,
+                transition_count, str(reason), terminated, truncated,
+                not terminated, bool(self.evaluation.success), None,
+            )
+            trajectory = self.recorder.end_episode(str(reason), outcome=outcome)
+            output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
+            loaded = load_structured_control_records_h5(output)
+            if (loaded['transition_count'] != trajectory.transition_count
+                    or loaded['observation_count'] != len(trajectory.observations)
+                    or loaded['outcome'] != outcome):
+                raise ValueError('PositionServoV1 Generic H5 v3 readback mismatch')
+            return {
+                'schema_id': 'task-env-h5', 'schema_version': 'v3',
+                'transition_count': loaded['transition_count'],
+                'observation_count': loaded['observation_count'],
+                'outcome': outcome.to_mapping(), 'path': str(output),
+            }
         from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
         if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('no active recording')
@@ -606,3 +904,118 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'scope': 'canonical-v0 outer boundary; no native-substep or D0 claim'}
         save_streaming(self.recording_path, value)
         return verify_roundtrip(self.recording_path, value)
+
+    def _position_record_reset_info(self):
+        plan = self.value['reset_plan']
+        boundary = self.typed_state.view.boundary
+        return {
+            'seed': int(plan.reset_sample.task_seed),
+            'options': {},
+            'reset_sample_id': plan.reset_sample.sample_id,
+            'reset_plan_identity_hash': plan.identity_hash,
+            'role_binding_identity_hash': plan.role_binding.identity_hash,
+            'state_boundary_identity': boundary.to_mapping(),
+            'state_boundary_id': boundary.boundary_id,
+            'state_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
+            'source_closure_digest': self.value['source'].source_closure_digest,
+        }
+
+    def _position_record_metadata(self):
+        from dataclasses import asdict
+
+        profile = self.controller
+        action_schema = profile.controller_binding().action_schema
+        action_contract = asdict(action_schema)
+        env_metadata = {
+            'env_name': 'SelectedReferenceEnv.PositionServoV1',
+            'task_name': self.artifact.task_id,
+            'task_version': self.artifact.artifact_version,
+            'scene_uid': self.position_scene.scene_id,
+            'agent_uids': ('panda-main',),
+            'physics_dt': self.artifact.timebase.physics_dt,
+            'control_substeps': self.artifact.timebase.control_substeps,
+            'control_frequency': 1.0 / self.artifact.timebase.control_dt,
+            'action_schema': action_contract,
+            'observation_schema': {'leaf_specs': [
+                {'path': 'state.ee_pose', 'semantic': 'hand_origin_tcp_pose'},
+                {'path': 'state.joint_position', 'semantic': 'required_panda_joint_position'},
+                {'path': 'state.hand_pose', 'semantic': 'provider_measured_panda_hand_pose'},
+                {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
+                *[
+                    {'path': f'privileged_state.{key}_body_pose', 'semantic': 'scene_body_pose'}
+                    for _, key in self.binding.object_poses
+                ],
+            ]},
+            'reference_profile': {
+                'profile_id': profile.profile_id,
+                'writer_id': profile.writer_id,
+                'controller_identity': profile.identity,
+                'control_binding_plan_identity_hash': self.position_plan.identity_hash,
+                'task_artifact_identity_hash': self.artifact.identity_hash,
+                'scene_identity_hash': self.position_scene.identity_hash,
+                'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+                'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
+                'source_closure_digest': self.value['source'].source_closure_digest,
+                'tcp_profile': profile.tcp_profile.to_mapping(),
+                'force_feedback': 'not_consumed',
+            },
+        }
+        universal_schema = {
+            'version': 'panda-position-servo-universal-action-v1',
+            'dimension': len(action_schema.components),
+            'components': tuple(action_schema.components),
+        }
+        return {
+            'env_metadata': env_metadata,
+            'universal_action_schema': universal_schema,
+            'resolved_config': {
+                'provider': self.provider, 'backend': 'cpu', 'horizon': self.horizon,
+                'controller_profile': profile.profile_id,
+            },
+            'candidate_identity': {
+                'task_artifact_identity_hash': self.artifact.identity_hash,
+                'source_closure_digest': self.value['source'].source_closure_digest,
+                'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+            },
+        }
+
+    def _record_position_transition(self, request, canonical, target, applied, *, terminated, truncated):
+        from ..trajectory.canonical.episode import StructuredControlTransitionV1
+
+        schema = self.controller.controller_binding().action_schema
+        groups = {(group.entity_id, group.group_id): group for group in request.groups}
+        arm = groups[('panda-main', 'arm')]
+        gripper = groups[('panda-main', 'gripper')]
+        action_values = np.asarray((*arm.values, *gripper.values), dtype=np.float32)
+        target_payload = target.target.to_mapping()
+        target_hash = target.target.identity_hash
+        applied_payload = applied.to_mapping()
+        control = StructuredControlTransitionV1(
+            'structured-control-transition-v1', request, ({
+                'writer_id': self.controller.writer_id,
+                'action_schema_id': schema.schema_id,
+                'components': tuple(schema.components),
+                'groups': (
+                    {'entity_id': 'panda-main', 'group_id': 'arm',
+                     'action_components': tuple(schema.components[:7])},
+                    {'entity_id': 'panda-main', 'group_id': 'gripper',
+                     'action_components': (schema.components[7],)},
+                ),
+                'requested_action': canonical.requested.to_mapping(),
+                'canonical_action': canonical.to_mapping(),
+                'controller_target': {
+                    'schema_version': target.target.schema_version,
+                    'payload': target_payload, 'identity_hash': target_hash,
+                },
+                'applied_control': {
+                    'schema_version': applied.schema_version,
+                    'payload': applied_payload, 'target_hash': applied.target_hash,
+                },
+            },),
+        )
+        control.validate()
+        self.recorder.append_transition(
+            action_values, action_values, self.obs, float(self.evaluation.reward),
+            bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
+            structured_control=control,
+        )
