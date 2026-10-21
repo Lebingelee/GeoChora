@@ -110,6 +110,8 @@ def test_real_pendulum_reset_step_schema_clock_and_diagnostics_independence():
         assert enabled.observation_space.contains(step_on[0])
         assert disabled.observation_space.contains(step_off[0])
         assert step_on[1:4] == step_off[1:4]
+        assert step_on[4]["is_success"] == step_off[4]["is_success"]
+        assert step_on[4]["task_failure"] == step_off[4]["task_failure"]
         assert step_on[4]["task_metrics"] == step_off[4]["task_metrics"]
         assert step_on[4]["reward_terms"] == step_off[4]["reward_terms"]
         assert step_on[4]["task_reward"] == step_off[4]["task_reward"]
@@ -192,6 +194,8 @@ def test_panda_private_state_keeps_legacy_name_meaning_and_fails_on_missing_sour
     assert private_spec["visibility"] == "private"
     assert private_spec["unit"] == "m + unit_quaternion"
     assert private_spec["frame"] == "world"
+    assert private_spec["time_reference"] == "same_reset_or_step_boundary"
+    assert private_spec["required"] is True
     assert metadata["group_semantics"]["private_state"].startswith("legacy private")
     assert "private_state.robot_base_pose_world" in builder.schema.leaf_field_names
 
@@ -217,6 +221,67 @@ def test_panda_private_state_keeps_legacy_name_meaning_and_fails_on_missing_sour
     malformed["private_state"] = OrderedDict()
     with pytest.raises(ValueError, match="keys do not match schema"):
         builder.schema.validate(malformed)
+
+
+def test_privileged_object_pose_is_world_frame_boundary_data():
+    panda = SimpleNamespace(
+        arm_qpos_ids=np.arange(7),
+        arm_dof_ids=np.arange(7),
+        gripper_qpos_ids=np.asarray([7, 8]),
+        base_body_id=0,
+        eef_site_id=0,
+    )
+    cube = SimpleNamespace(
+        uid="cube-v1",
+        qpos_ids=np.asarray([], dtype=np.int64),
+        body_ids=np.asarray([1], dtype=np.int64),
+        site_ids=np.asarray([], dtype=np.int64),
+    )
+    references = SimpleNamespace(agents={"panda-v1": panda}, objects={"cube": cube})
+    builder = StateObservationBuilder(
+        references=references,
+        config=ObservationConfig(schema_version="task-env-state-v2"),
+        render_config=RenderConfig(),
+    )
+    snapshot = RuntimeSnapshot(
+        qpos=np.arange(9, dtype=np.float32),
+        qvel=np.arange(7, dtype=np.float32),
+        body_xpos=np.asarray([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]], dtype=np.float32),
+        body_xquat=np.asarray([[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], dtype=np.float32),
+        site_xpos=np.asarray([[4.0, 5.0, 6.0]], dtype=np.float32),
+        site_xquat=np.asarray([[1.0, 0.0, 0.0, 0.0]], dtype=np.float32),
+    )
+
+    observation = builder.build(snapshot)
+    assert builder.observation_space.contains(observation)
+    assert tuple(observation) == ("state", "privileged_state", "private_state")
+    np.testing.assert_array_equal(
+        observation["privileged_state"]["cube_v1_body_pose"],
+        np.asarray([[1, 2, 3, 1, 0, 0, 0]], dtype=np.float32),
+    )
+    metadata = observation_schema_metadata(builder.schema)
+    privileged_spec = next(
+        field for field in metadata["leaf_specs"]
+        if field["path"] == "privileged_state.cube_v1_body_pose"
+    )
+    assert privileged_spec["shape"] == (1, 7)
+    assert privileged_spec["dtype"] == "float32"
+    assert privileged_spec["unit"] == "m + unit_quaternion"
+    assert privileged_spec["frame"] == "world"
+    assert privileged_spec["time_reference"] == "same_reset_or_step_boundary"
+    assert privileged_spec["required"] is True
+    assert privileged_spec["visibility"] == "privileged"
+    assert metadata["group_semantics"]["privileged_state"] == "task-defined privileged/evaluation observation"
+
+    missing_body_source = RuntimeSnapshot(
+        qpos=snapshot.qpos,
+        qvel=snapshot.qvel,
+        body_xquat=snapshot.body_xquat,
+        site_xpos=snapshot.site_xpos,
+        site_xquat=snapshot.site_xquat,
+    )
+    with pytest.raises(ValueError, match="privileged observation requires body pose"):
+        builder.build(missing_body_source)
 
 
 def test_required_info_clock_and_required_fields_fail_explicitly():
@@ -320,6 +385,10 @@ def test_controller_snapshot_and_required_feedback_survive_diagnostics_toggle():
     np.testing.assert_allclose(without_diagnostics["applied_ctrl"], [0.35])
     assert "action_clipped" in with_diagnostics and "action_clipped" not in without_diagnostics
     validate_task_info(without_diagnostics, phase="step")
+    missing_required_feedback = dict(without_diagnostics)
+    del missing_required_feedback["applied_ctrl"]
+    with pytest.raises(ValueError, match="missing required field applied_ctrl"):
+        validate_task_info(missing_required_feedback, phase="step")
 
 
 def test_camera_capture_reference_uses_sensor_metadata_and_same_boundary():

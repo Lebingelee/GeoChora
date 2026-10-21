@@ -223,6 +223,9 @@ Generic `BaseTaskEnv` uses its existing ObservationBuilder and `ObservationSchem
 visibility. Exact group membership and order are enforced. `state`, `privileged_state`, and the historical
 `private_state` namespace have distinct meanings; preserve `private_state.robot_base_pose_world` and fail when a required
 snapshot source is unavailable instead of substituting zeros.
+The bounded Panda builder contract also uses `privileged_state.<object>_body_pose` for the object's measured world pose
+at the same reset/step boundary; it does not alias or absorb the legacy private robot-base pose. Required `applied_ctrl`
+feedback is part of step info and its absence fails validation.
 
 `env.metadata["info_schema"]` declares reset/step facts, required action/control feedback, optional diagnostics, and optional
 camera capture references. Reset and step `info["simulation_time_s"]` comes from that boundary's RuntimeSnapshot; an absent or

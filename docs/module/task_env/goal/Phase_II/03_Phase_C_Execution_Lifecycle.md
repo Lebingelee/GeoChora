@@ -539,6 +539,26 @@ ObservationBuilder、Pendulum/TwoWheel builder、RuntimeSnapshot、Camera metada
 `SensorObservation` owner；未新建 InfoSchema 类、Recorder、Controller 或 camera runtime。Skill 静态校验及示例/源码链接校验
 记录在 `workspace/maintenance/phase_ii_c04_20261021/`。该 receipt 不升级 Panda、camera、Provider 或 qualification claims。
 
+#### C04 acceptance re-audit for C02b gate (2026-10-21)
+
+在当前 `codex/phase-ii-c` / C03a append-completeness 修正后重新核验 C04→C02b 两条 gate。补强的 Panda builder
+测试现用一个 object body，保护 `privileged_state.cube_v1_body_pose` 的 `(1,7)` / `float32`、`m + unit_quaternion`、
+`world` frame、同一 reset/step boundary、required/privileged visibility 及 group semantics；缺少 body pose 明确失败。
+既有测试继续保护 public Pendulum field、`private_state.robot_base_pose_world` 的独立 legacy private 含义、缺 site/body
+源失败、schema 键缺失失败，并新增 required step `applied_ctrl` 缺失失败。
+
+真实 GeoPhys CPU Pendulum 用相同 seed/action 对比 diagnostics 开/关：reset/step observation、`observation_space.contains`、
+时钟、reward/termination flags、task metrics/evaluation 以及 requested/target/requested/applied/universal feedback 一致；
+关闭后只省略 clipping diagnostics。Camera 仍只验证 `SensorObservation.camera_metadata` 的来源与同 boundary 引用，不实现
+图像/深度新模态。generic Panda 真实 TaskEnv 的 Stage 1 composition adapter 缺口保持原状；selected pending recording 的
+close/recreate 限制仍由 C03a 记录。Skill checker 只验证 frontmatter、本地 Markdown links 和显式 source paths，不是行为或
+Provider validator；本轮未扩展 checker、恢复框架或相关治理规则。
+
+新增 C04 direct contract 集合为 **6 passed**。交叉 gate 执行 C04、C03a lifecycle/selected consumers、B03a/B03b、C02a、
+C05a 与 D01b 定向测试，结果 **103 passed**，一个上游 Taichi `locale.getdefaultlocale` deprecation warning；完整日志见
+ignored `workspace/maintenance/phase_ii_c04_20261021/c04_gate_after_c03a_20261021.log`。观测契约 gate 与 feedback-independence
+gate 均通过；因此 C04 放行 C02b。该 S1/bounded 证据不声称真实 Panda TaskEnv、D04 camera 或新的 Provider qualification。
+
 ## C.9 质量门与直接可测问题
 
 | 检测 | 预期行为 | 证据等级 |
