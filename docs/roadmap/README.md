@@ -65,3 +65,25 @@ OpenUSD interchange、real → sim → policy → real 与真实机器人部署�
 用于历史 rationale；本页为当前方向唯一入口。每次新工程提案先通过 owner/API/implementation/
 callers/tests/limitation/extendability 的复用 gate，随后冻结边界和 Oracle，再执行最小证据路线，
 最后由维护者决定是否 promote。文档采纳不产生 capability admission 或正式 qualification。
+
+
+<a id="phase-ii-01-candidate-handoff"></a>
+
+## Phase II 有界基线冻结与 Phase II-01 候选交接
+
+2026-10-23，维护者已接受 [Phase II 有界工程范围](../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)，
+当前入口仍为 [05](../module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md)。
+`v2.0.0` 是 Phase II 预期冻结版本，尚须独立 Release Gate；`v2.0.1` 仅为后续 Phase II-01 规划目标。
+以下六项是继承既有实现的候选主题，不是最终 Goal 数量、实施切片、DAG、开发承诺或本轮授权；不新建下一阶段 Goal 文件。
+
+| 候选主题 | 后续需另定的范围 | 现有基础/owner 定位 |
+| --- | --- | --- |
+| Logical Robot Assembly | 多 Entity 成员关系、递归嵌套、身份/引用；不得回写旧 Scene mapping/hash | `task_env/artifacts/contracts.py` 与 [A 契约](../module/task_env/goal/Phase_II/01_Phase_A_Core_Object_Model.md)；版本化扩展须先核对实际 owner |
+| Composite Control Profiles | 整机快捷/子组件独立模式、局部 override、唯一执行器 writer；不假定已有通用仲裁 | `task_env/controllers/canonical/`、`task_env/runtime/sessions/control.py` 与 [C02](../module/task_env/goal/Phase_II/C_Development_Record.md#c02a) |
+| Physical Attachment | 按维护者指定，将 Isaac Sim Robot Assembler 的 Mount Frame、Fixed Joint、Articulation Root、Collision Filtering 作为待研究参考；受限真实装配须另行验证 | 既有 Scene/source 与 `task_env/assembly/` / RuntimeSession materialization；不新建 solver/Runtime |
+| Dynamic Camera Consumer Integration | 将动态 RGB/Depth/Mask 及同 boundary capture identity 接入 policy observation/TransitionRecorder | `task_env/observations/`、`task_env/render/camera/`、`task_env/recorders/`；[D consumer 边界](../module/task_env/goal/Phase_II/D_Development_Record.md#consumer-边界与未准入范围) |
+| GeoPhys Native-rate Feedback Contract | 在现有 Provider observation owner 定义高频 value/phase/freshness/invalidations/cadence，再由 Core 绑定 episode/reset | `GeoPhys/src/control/robot_arm_observation.py`、`task_env/runtime/sessions/`；[C05c 诊断例外](../module/task_env/goal/Phase_II/C_Development_Record.md#c05c) |
+| Compatibility / Regression Governance | 历史 H5 原件恢复或 reader retirement 的独立决定、当前 pin 跨场景回归与受限兼容 | 三 recorder reader owners、[B04a](../module/task_env/goal/Phase_II/B_Development_Record.md#b04a)、[Evidence 索引](../maintenance/phase_ii_scope_freeze_20261023/evidence_index.json) |
+
+Robot Assembly 应优先考虑独立版本化 Contract 与现有 Materialization owner 扩展；不得自行改变已冻结 Scene v1/v2/v3 mapping/hash。
+这些候选不回写为 Phase II 已接受范围的强制阻塞，也不扩大现有 Provider Capability 或授予新 Qualification。

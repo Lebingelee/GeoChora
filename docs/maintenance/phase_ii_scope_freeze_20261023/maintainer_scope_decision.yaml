@@ -1,0 +1,124 @@
+decision_id: GEOCHORA-PHASE-II-SCOPE-2026-10-23
+date: '2026-10-23'
+scope: GeoChora-Phase-II-Scoped-Engineering-Baseline
+maintainer_scope_decision: ACCEPTED_SCOPED_CORE
+term_reuse: Reuses docs/releases/v1.0/release_scope_decision.yaml; scope here is Phase II Scoped Engineering
+  Acceptance, not a new capability/Qualification status taxonomy.
+decision_source:
+  kind: explicit_maintainer_authorization_in_conversation
+  request_title: GeoChora Phase II — Scoped Acceptance & Baseline Freeze
+  recorded_by: Codex acting on the maintainer instruction
+  independent_human_judge_signature: null
+  qualification_decision: null
+source_baseline:
+  core_commit: 90071ace71e4aa921d9460b87a73162318b12979
+  core_tree: 9749a975d8da0eeb985b8e38b3be5a5128fc7b9e
+  branch: develop
+  reviewed_main_commit: f292df149f41520b484ff27cf2ff78a584903013
+  geophys_gitlink: a53a8cfed7c9d6464274b5c96fca601271dc4ee4
+  menagerie_gitlink: b846dd12bc459d776cccb3dee0b1d02acbf7a9c7
+  ref_check: Fetched public/develop and public/main; equal to reviewed commits. Remote is public, not origin.
+  freeze_document_commit: Read from the commit containing this decision; remote readback is retained off-repository
+    to avoid source self-reference.
+engineering_scope_frozen: true
+accepted_scope_complete: true
+original_phase_ii_unrestricted_breadth_complete: false
+counts:
+  parent_goals: 20
+  implementation_slices: 33
+  additional_gates:
+  - P00
+  - P99
+current_status_entry: docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md
+evidence_index:
+  path: docs/maintenance/phase_ii_scope_freeze_20261023/evidence_index.json
+  sha256: 2904b07f9c9eb7700cc2e2a0dd432dd620c34322f4d178fd473f251b8d732b53
+  receipt_semantics: Original S0/S1/S2/S3 receipts retain exact signing-time source/pin and results; no blanket
+    current-pin requalification.
+accepted_phase_dispositions:
+  A: A01-A05 declared Asset/Entity/Scene/Frame/Joint/Group/source/legacy-projection bounded exits. No recursive
+    Assembly/arbitrary composition/physical attachment support.
+  B: B01-B05 Task Source,Role/ResetPlan,Predicate/Temporal Semantics,Artifact compiler and legacy semantics
+    bounded exits. Historical H5 originals remain ACCEPTED-DEFERRED.
+  C: C01-C05 declared tested intersections. C02b Position/structured R1 exit accepted; single/dual Position
+    retain original pin. C02c only single Panda Position same-schema switch. C05b both Provider PickCube external
+    Solution/real H5. C05c precise MuJoCo and four GeoPhys diagnostic cells accepted.
+  D: D01-D05 declared materialization/typed state/dynamic sync/RGB/Depth/Entity-mask/pairing intersections.
+    P99 pair is GeoPhys a53 CPU x MuJoCo3.8.1 Native OpenGL/EGL; no policy/TransitionRecorder dynamic Camera
+    consumer integration.
+accepted_deferred:
+- id: B04a
+  items:
+  - geophys-transition-h5/v1 original H5
+  - canonical trajectory outer-v0 original H5
+  - canonical-execution-v1 original H5
+  reason: Historical original bytes absent; codec/new-format tests are not historical bytes compatibility.
+  disposition: ACCEPTED-DEFERRED
+  followup: Possible recovery from approved archive or separately approved reader retirement; neither performed.
+- id: C02c-breadth
+  disposition: ACCEPTED-DEFERRED
+  reason: Only tested single Panda Position same-schema switch accepted; no general switching.
+- id: D04-D05-consumers-and-breadth
+  disposition: ACCEPTED-DEFERRED
+  reason: Direct CameraSession accepted; dynamic policy observation/TransitionRecorder and broad renderer matrix
+    not implemented.
+- id: C05c-normal-native-rate-contract
+  disposition: ACCEPTED-DEFERRED
+  reason: Successful host Reader diagnostic runs do not establish a normal per-substep Provider contract.
+diagnostic_exceptions:
+- id: C05c-GeoPhys-native-host-reader
+  approved_for: original GeoPhys a53 CPU/CUDA x gripper100/500Hz four-cell experiment
+  call: RobotArmObservationReader.read_cpu_snapshot() at every native substep
+  normal_frequency_contract_extended: false
+  generic_provider_capability_extended: false
+  device_resident_controller_claimed: false
+historical_provenance_limitations:
+- Early eb870f6f typed-force JSON original bytes remain MISSING_RAW_EVIDENCE; no replacement made.
+- Dual Panda Position S2 keeps its 4436787e pin; current single Panda/public/pairing evidence is not a dual-Panda
+  a53 rerun.
+- Historical failed/exploratory/X11/readback-checker logs keep their original results.
+not_supported_or_unverified:
+- recursive Logical Robot Assembly/arbitrary asset composition
+- cross-Entity Physical Attachment/topology hot swap
+- general Composite Control Profile arbitration
+- dual-Entity R1/CUDA R1/unadmitted source,transmission,MuJoCo build
+- dynamic Camera policy observation/TransitionRecorder integration
+- normal GeoPhys high-frequency host feedback contract
+- semantic segmentation/free-joint/async/general pairing matrix
+- new Task freeze/randomized feasibility/Human Judge approval
+- D0 complete owner reconstruction/general replay qualification
+qualification:
+  S4_campaign: NOT_RUN
+  new_formal_qualification: false
+  published_matrix_modified: false
+  task_candidate_promoted_to_frozen: false
+release_publication:
+  expected_phase_ii_version: v2.0.0
+  next_phase_planning_target: v2.0.1
+  release_promotion_allowed: false
+  separate_release_gate_required: true
+  merge_main_authorized: false
+  create_v2_tag_authorized: false
+  publish_github_release_authorized: false
+  develop_docs_push_authorized: true
+phase_ii_01_handoff:
+  implementation_authorized: false
+  new_goal_file_authorized: false
+  final_goal_count_slices_or_dag_frozen: false
+  candidate_topics:
+  - Logical Robot Assembly
+  - Composite Control Profiles
+  - Physical Attachment
+  - Dynamic Camera Consumer Integration
+  - GeoPhys Native-rate Feedback Contract
+  - Compatibility / Regression Governance
+  location: docs/roadmap/README.md#phase-ii-01-candidate-handoff
+  invariant: Do not rewrite Scene v1/v2/v3 mapping/hash; prefer independent versioned contracts and existing
+    materialization-owner extensions.
+validation_receipt: docs/maintenance/phase_ii_scope_freeze_20261023/validation_receipt.json
+notes:
+- This is a maintainer scope decision recorded from explicit conversation authorization, not an independent
+  Human Judge signature.
+- Engineering acceptance/scope freeze, release promotion, task freeze and Formal Qualification are separate
+  decisions.
+- Deferred/future candidates do not retroactively block this approved Phase II scope.

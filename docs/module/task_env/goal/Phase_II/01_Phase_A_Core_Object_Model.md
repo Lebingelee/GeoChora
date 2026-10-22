@@ -2,7 +2,7 @@
 
 > 文档整合：2026-10-22。本文保留父 Goal 的目标、所有权与验收要求；逐项当前状态以 [05 总审阅表](05_Architecture_Review_and_Execution_Order.md) 为准，开发与验收核心事实集中在 [A 开发记录](A_Development_Record.md)。
 > 下文“规划起点”、设计示例和 PROPOSED API 是原始设计语境，不代表当前支持清单。实际 capability 仍由源码、精确来源的 Evidence 及 [qualification](../../qualification.md) 约束。
-> 当前工程基线为 GeoPhys `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；旧 pin 的历史收据保持原身份。当前范围是有界工程交付待二审，尚未发布 v2.0.0。
+> 当前工程基线为 GeoPhys `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；旧 pin 的历史收据保持原身份。维护者于 2026-10-23 已接受声明交集的有界工程出口并冻结范围，见 [Maintainer Scope Decision](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)；不等于原规划全部广度或 Formal Qualification，v2.0.0 仍须独立 Release Gate。
 
 ## A.0 阶段目的与非目标
 

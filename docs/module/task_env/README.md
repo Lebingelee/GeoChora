@@ -42,7 +42,7 @@ PYTHON
 不是已验证的 lockfile。冻结发布可用 `git checkout --detach refs/tags/v1.1.0`；开发应基于当前 develop。
 v1.1.0 的 GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`；2026-10-20 的
 `54f40fbfffd945967525aa85801087e7da0b491e` 同步记录是历史开发基线，见
-[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。2026-10-22 的 Phase II 实现与验收记录已保全到 `a5ba537`，本轮整理后由 develop 承载，供独立二审。
+[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。2026-10-22 的 Phase II 实现与验收记录已保全到 `a5ba537`，整理后由 develop 承载；维护者于 2026-10-23 已接受 Phase II 的有界工程范围并冻结，见 [正式范围决定](../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)。发布和 Formal Qualification 仍独立。
 GeoPhys Gitlink 与检出固定为
 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。指定 legacy PickCube external Solution 在 GeoPhys CPU 与 MuJoCo 3.8.1 CPU
 的 S2/S3 通过有独立收据；C02b 的声明交集工程出口已满足，其他任务/Provider、Qualification 与发布接受范围仍单列。

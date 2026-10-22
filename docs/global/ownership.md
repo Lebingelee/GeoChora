@@ -4,6 +4,8 @@ Canonical repository：[Lebingelee/GeoChora](https://github.com/Lebingelee/GeoCh
 当前发布 v1.1.0；日常集成分支为 `develop`。源码、真实调用者与可复现 Evidence
 决定当前行为；canonical contract 描述规范，历史计划不能建立当前能力。
 
+2026-10-23 的 [Phase II Maintainer Scope Decision](../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 已接受 20 父 Goal/33 切片/P00/P99 的声明交集及明确延期、诊断例外。现有 owners 与依赖方向不变；后续候选仅在 Roadmap 登记，工程 freeze 不授权新阶段实现、main/tag/Release 或 Qualification。
+
 ## 模块与公共 API owner
 
 | 范围 | Canonical owner | 消费方式 |

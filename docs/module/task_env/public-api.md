@@ -1,5 +1,7 @@
 # TaskEnv 公共 API
 
+Phase II 有界工程范围已由 [维护者决定](../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 接受并冻结；API 交集限制、candidate 状态与 Formal Qualification 分开。
+
 以当前 source 与[唯一发布矩阵](capability_matrix_v1_1_0_candidate.json)为准。
 Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)，
 组件创建见 [`registry.py`](../../../task_env/registry.py)。未知 UID 抛 `KeyError`；
@@ -257,7 +259,7 @@ verified single-Panda Position GeoPhys CPU/MuJoCo CPU intersection; reset
 reconstructs the candidate builder's original profile. Dual-Entity switching, production-R1/force-aware switching,
 NutAssembly, Assembly, Camera integration, other providers and generic arbitration remain unsupported. This closes only the declared
 Position-switch slice; general C02c switching remains deferred. C02b's declared engineering exits are recorded separately;
-Phase II final acceptance is pending. See the [C02c bounded acceptance receipt](goal/Phase_II/C_Development_Record.md#c02c).
+Phase II scoped engineering acceptance is recorded by the maintainer; release and Formal Qualification remain separate gates. See the [C02c bounded acceptance receipt](goal/Phase_II/C_Development_Record.md#c02c).
 
 D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeSession.materialize()` 和当前
 `create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变

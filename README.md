@@ -3,7 +3,10 @@
 面向具身任务的多仿真器、多渲染器 API 与工具中枢。
 当前公开基线为 [v1.1.0](docs/releases/v1.1/README.md)，于 2026-10-18 发布。
 本版本整合 Core、selected task authoring 和开发工作流；带 documented breaking API changes，
-不宣称 strict SemVer，也不代表 Phase II 完成。
+不宣称 strict SemVer；该已发布版本不代表后续 Phase II 状态。
+
+2026-10-23，维护者已接受并冻结 [Phase II 有界工程范围](docs/maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)。
+`v2.0.0` 为预期版本，main/tag/Release 仍须独立 Release Gate；本次无新 Formal Qualification。
 
 `task_env/` 是 Core 唯一 owner。PhysPi 负责外部 Agent 编排、记忆、经验和 Skill 演进，
 通过 GeoChora 公共 API 使用 Core；Core 再依赖 provider 公共/runtime-facing API。

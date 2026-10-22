@@ -1,8 +1,14 @@
-# Phase II Architecture Review — 当前状态、验收范围与二审入口
+# Phase II — 已接受的有界工程范围、冻结基线与历史入口
 
-日期：2026-10-22。本文是 **20 个父 Goal、33 个实施切片及 P00/P99** 的唯一当前处置表。
-本轮以 2.18 MB 轻量二审包为审阅入口，对照整合前源码 `a5ba537`（其中受审功能源码 `52c61dc`）、canonical docs 和原始收据，整理文档与分支；没有新增实现或重新授予 Qualification。
-**结论：全部 Goal 已逐项处置，但并非原规划所有广度都已实现。声明交集的工程出口与两项 P99 运行 gate 已有有界证据；延期/诊断例外的最终接受以及 v2.0.0 发布仍待网页独立二审与维护者决定。**
+更新：2026-10-23（原文档整合 2026-10-22）。本文是 **20 个父 Goal、33 个实施切片及 P00/P99** 的唯一当前处置表。
+维护者已在本次对话明确批准 **Scoped Engineering Acceptance**；复用既有治理名称 **ACCEPTED_SCOPED_CORE**，scope 为 Phase II。
+正式 [Maintainer Scope Decision](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)、[固定 Evidence 索引](../../../../maintenance/phase_ii_scope_freeze_20261023/evidence_index.json) 和
+[本轮校验收据](../../../../maintenance/phase_ii_scope_freeze_20261023/validation_receipt.json) 是该决定的落库记录。
+**结论：Phase II 在本文件列明的有界工程范围内已接受，开发交付范围冻结；不表示原设计全部扩展广度实现。**
+原独立审阅基线与当前抓取的 develop 均为 `90071ace71e4aa921d9460b87a73162318b12979`（tree `9749a975d8da0eeb985b8e38b3be5a5128fc7b9e`）；
+GeoPhys `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`、Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` 不变。
+冻结文档的提交 SHA/远端 readback 另存本地 receipt，避免自指。`v2.0.0` 是预期冻结版本，未因此发布；下一步必须独立 Release Gate。
+本次授权只推送冻结文档至 develop，不合 main、不创建 v2 tag/Release、不授予 Formal Qualification。
 
 <a id="scope"></a>
 
@@ -24,7 +30,7 @@ canonical 入口：[architecture](../../../../global/architecture.md)、[ownersh
 ## 2. 20 个父 Goal 的当前处置
 
 “有界出口满足”表示对应精确交集的工程证据齐备，不代表原设计所有可扩展方向均实现，也不是 QUALIFIED。
-ACCEPTED-DEFERRED 是已有工程延期处置，发布是否接受该范围仍待维护者；没有把缺失证据改写为 PASS。
+ACCEPTED-DEFERRED 及下表精确范围已获维护者工程接受；原始证据缺口不变，发布仍须独立 Gate，没有把缺失证据改写为 PASS。
 
 | 父 Goal | 核心目标 | 当前工程处置 | 关键边界 / Evidence |
 | --- | --- | --- | --- |
@@ -115,27 +121,27 @@ P00 是额外启动审计，不计入 20/33。它建立 owner/caller、legacy ro
 | 当前 pin Physics×Renderer | a53 GeoPhys CPU × MuJoCo 3.8.1 native OpenGL/NVIDIA EGL；双 camera、6 captures、S1 3 passed、S2/consumer isolation/close 通过 | PASS_BOUNDED；dynamic CameraSession 直接消费者 |
 | 旧格式 compatibility | codec/identity/negative tests 与当前轨迹回读有界通过 | 三类历史 H5 golden 继续 ACCEPTED-DEFERRED |
 | 完整原规划广度 | 当前表明确列出范围与未实现/未准入项 | 不标全部 full-complete |
-| 独立二审/维护者接受 | 本次提交供网页 reviewer 评估 | PENDING_REVIEW |
-| v2.0.0 / Qualification | 尚无 release tag、发布 freeze 或新 qualification decision | 本轮不执行 |
+| 维护者范围接受 | 对话中明确授权；独立 Judge signature=null | ACCEPTED_SCOPED_CORE：Phase II Scoped Engineering Acceptance |
+| 工程范围 freeze / Release / Qualification | 本轮冻结有界工程基线；v2.0.0 为预期版本；无新 qualification decision | 工程冻结已接受；Release Promotion 与 S4/Qualification 未授权、未执行 |
 
-运行缺口已关闭；没有外部 blocker 机械阻止审阅。是否将这些有界交集和显式延期作为 v2.0.0 接受范围，需要二审明确决定。
+两项有界运行出口与显式延期已由维护者接受。该决定关闭当前工程范围的接受关口；不把 candidate 变为新 frozen Task，不自动满足 Release Gate。
 
 <a id="risks"></a>
 
-## 6. 风险优先级与维护者决策
+## 6. 已接受的延期、诊断例外与后续职责
 
-| 优先级 | 问题 / 原因与影响 | 二审应作的具体决定 |
+| 优先级 | 问题 / 原因与影响 | 本次接受处置 / 后续独立工作 |
 | --- | --- | --- |
-| P1 | B04a 三类历史原 H5 缺 bytes，现有 synthetic/新 H5 不能证明历史 reader 兼容 | 接受精确 reader 延期、授权恢复批准原件或另审 retirement；不能默认为 PASS |
-| P1 | GeoPhys C05c 四格每 2 ms 调用 public CPU snapshot，与通常低频指引不同；实际成功不等于常规合同 | 是否接受 diagnostic-only 阶段范围；常规支持另由现有 Provider owner 补合同和受影响 CPU/CUDA 验证 |
-| P1 | dynamic Camera 输出未进 policy observation/TransitionRecorder | 是否把相机任务闭环/录制留作下一阶段；当前只能接受 direct CameraSession pairing |
-| P1 | P99 与 release/Qualification 不同 | 审阅确认当前 20/33 的有界范围与延期后，再独立决定 v2.0.0，不能由本次整理自动发布 |
+| P1 | B04a 三类历史原 H5 缺 bytes，现有 synthetic/新 H5 不能证明历史 reader 兼容 | 已接受精确 reader 延期；后续可审恢复批准原件或 retirement，两者尚未授权实施，不能写成兼容 PASS |
+| P1 | GeoPhys C05c 四格每 2 ms 调用 public CPU snapshot，与通常低频指引不同；实际成功不等于常规合同 | 已接受原四格 diagnostic-only 结果及逐子步 Reader 诊断例外；常规支持另由原 Provider owner 建合同并验证 |
+| P1 | dynamic Camera 输出未进 policy observation/TransitionRecorder | 已接受 direct CameraSession pairing；policy observation/TransitionRecorder consumer 集成延期，为后续候选 |
+| P1 | P99 与 release/Qualification 不同 | 20/33/P00/P99 有界工程范围与延期已接受；v2.0.0 的 main/tag/Release 仍须独立 Release Gate |
 | P2 | typed R1 admission 绑定 source/Controller/TCP/plan/build/pin；其他构建未准入 | 后续变化做精确 delta audit + targeted S1/S2；不只替换 SHA，不扩 shared manifest |
-| P2 | dual Position 历史 S2 绑定 4436787e；当前 pin 的替代公开单 Panda/pairing 不等于双 Entity 重跑 | 接受历史精确交集或要求单独 a53 dual probe；不要求无批准依据的 dual R1 |
-| P2 | C02c 只实现同 schema 单 Panda Position switch，D04/D05 只覆盖受限 source/modality/pairing | 明确通用切换、semantic/free-joint/async、广泛 pairing 是后续范围 |
-| P2 | 一份早期 eb870 JSON 原件已丢失，当前 pin 有独立替代证据 | 接受该历史 provenance 限制；不重造“恢复原件” |
+| P2 | dual Position 历史 S2 绑定 4436787e；当前 pin 的替代公开单 Panda/pairing 不等于双 Entity 重跑 | 已接受原 pin 的历史精确交集；当前 pin 的跨场景回归为后续候选，不新增 dual R1 阻塞 |
+| P2 | C02c 只实现同 schema 单 Panda Position switch，D04/D05 只覆盖受限 source/modality/pairing | 已明确接受限定交集；通用切换、semantic/free-joint/async、广泛 pairing 留作后续未准入范围 |
+| P2 | 一份早期 eb870 JSON 原件已丢失，当前 pin 有独立替代证据 | 已接受该历史 provenance 限制，标记 MISSING_RAW_EVIDENCE；不重造“恢复原件” |
 
-建议二审先审这些范围决定，再审错误 identity/故障/版本拒绝与真实回读链。若要求新增实现，按上述风险分成一至两个 owner 切片，另行授权；本轮停止在整理交付。
+上述延期与诊断例外不再作为当前已批准 Phase II 有界范围的强制阻塞。后续候选清单仅登记在 [Roadmap](../../../../roadmap/README.md#phase-ii-01-candidate-handoff)，不固定下一阶段 Goal 数量、切片或 DAG，也不授权实施。
 
 ### 本轮状态勘误
 
@@ -202,16 +208,16 @@ S0 为 static/schema；S1 为 contract/identity/failure；S2 为最小真实 Pro
 
 <a id="branches"></a>
 
-## 9. 分支整理与 v2.0.0 审阅安排
+## 9. 历史分支整理与当前冻结授权
 
 维护者已授权将本轮整理后的最新提交正常快进到 develop，并清理中间开发分支；main 与历史 v1 分支/tags 保留原 SHA。
 此前 phase-ii-b 冻结指针属于已完成协作的历史约定；本轮新的清理授权以可恢复 bundle 保全其原 SHA，不修改旧提交内容或冻结发布 refs。
 父仓库最终只保留 develop、main 和既有 v1.1.0 分支；Provider 子模块的分支、pin 与历史 detached worktrees 不在本轮清理范围。
-只使用正常提交/快进与明确分支删除，不重写 develop/main 历史。网页独立二审后再决定 v2.0.0；本轮不打 v2 tag，不把 develop 合入 main。
+只使用正常提交/快进与明确分支删除，不重写 develop/main 历史。该段记录 2026-10-22 的整理授权；2026-10-23 当前仅批准有界工程范围冻结文档提交/推送 develop，不再次清理分支，不打 v2 tag，不把 develop 合入 main。
 
 <a id="preservation"></a>
 
-## 10. 保全与本轮复核
+## 10. 历史保全与 2026-10-22 整理复核
 
 原始 25 份 Markdown bytes、每文件 SHA、所有分支 refs/worktrees 和完整可恢复 Git bundle 保存在 ignored
 `workspace/maintenance/phase_ii_docs_consolidation_20261022_001/`：`original_phase_ii_docs.tar.gz`、`preservation_before.json`、`refs_before.txt`、`worktrees_before.txt`、`branches_before.bundle`。
@@ -222,3 +228,13 @@ bundle 已验证为完整历史；独立恢复 checkout 可从 bundle 原 refs �
 本轮文档/Goal 静态复核：九文件布局、20 父 Goal/33 切片拓扑、450 个本地链接/锚点及两项 Skill 检查通过；原轻量包 CRC/SHA 与旧文档备份核对通过。
 完整 `validate_docs.py` 退出 1，仅报告历史 docs/task_env 数量上限（当前 67/23，历史限制 66/22）及相对旧 consolidation 基线的 139 项既有非文档路径；无链接/锚点/冻结数据错误。
 本次相对 `a5ba537` 没有生产 Python、Provider 或 gitlink 差异；不为获得全绿而改写历史 validator/inventory。
+
+
+## 11. 2026-10-23 冻结校验与停止边界
+
+维护者决定的来源是对话中的明确授权，不补造独立 Human Judge 签名或 Qualification Decision。
+本次只运行版本/目录/20+33+DAG/引用/历史迁移/原件存在性与哈希、Skill、既有 Document Validator 和轻量 pin/receipt 回归。
+旧 S0/S1/S2/S3 结果按原签发 source/pin 保留；完整 A–D、NutAssembly 四格、485 区间 R1、native pairing 与 S4 不重跑。
+旧 validator 的历史数量/旧 docs-only scope 失败如实保留，不修改阈值取得表面全绿。
+三类 B04a 原始 H5 及早期 eb870 JSON bytes 的 MISSING_RAW_EVIDENCE 限制仍成立，任何摘要都不能恢复原件。
+本轮提交仅冻结文档/索引/导航；远端 develop readback 后停止。main、v2.0.0 Tag、GitHub Release、正式 Qualification 均不在授权范围。

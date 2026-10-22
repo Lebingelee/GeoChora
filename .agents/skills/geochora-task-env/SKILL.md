@@ -387,8 +387,7 @@ The Skill identifies both exact CPU intersections, same-file H5 v3 readback, res
 **P99 / C02b current status (2026-10-22):** C02b's approved bounded engineering exits remain satisfied.
 The two P99 runtime gaps now have PASS_BOUNDED Evidence: public single Position candidate mainline and current
 `a53a8cfe` GeoPhys CPU × MuJoCo native OpenGL pairing. B04a's original `geophys-transition-h5/v1`, canonical outer-v0
-and canonical-execution-v1 H5 byte fixtures remain ACCEPTED-DEFERRED separately. Final P99 scope and independent
-review await the maintainer; no Qualification or Phase II completion is declared. See
+and canonical-execution-v1 H5 byte fixtures remain ACCEPTED-DEFERRED separately. The maintainer accepted and froze the Phase II scoped engineering envelope on 2026-10-23; unrestricted breadth, release promotion and Formal Qualification are separate. See
 [P99 readiness](../../../docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#p99) and
 [run/Skill receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#public-candidate).
 
@@ -567,3 +566,17 @@ for source commits, precise commands, limits and pending Human decisions. This i
 ## Phase II documentation consolidation navigation (2026-10-22)
 
 The maintained Phase II directory now contains 01–05 plus A/B/C/D development records. Goal contracts, current dispositions and historical evidence have separate owners; use [05](../../../docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md) for the 20-parent/33-slice status and precise deferred/diagnostic boundaries. Old report links now resolve to the relevant development section; original full reports remain recoverable at Core a5ba537. This refresh changes documentation navigation/status wording only. It reuses the existing public factory, RuntimeSession, typed-state, external Solution, Recorder and Camera owners, introduces no new API or capability, and leaves qualification review to the maintainer. Static Skill/link checks and the consolidation receipt are under ignored workspace/maintenance/phase_ii_docs_consolidation_20261022_001/. No native campaign was rerun for this navigation change.
+
+
+## Phase II maintainer scope freeze (2026-10-23)
+
+The [scope decision](../../../docs/maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)
+reuses ACCEPTED_SCOPED_CORE for Phase II Scoped Engineering Acceptance at Core 90071ace / GeoPhys a53a8cfe / pinned Menagerie.
+The [05 current status entry](../../../docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md)
+remains canonical for 20 parents/33 slices/P00/P99. Both P99 bounded runtime exits are accepted; the candidate is not a newly frozen Task.
+B04a historical H5 originals remain ACCEPTED-DEFERRED/MISSING_RAW_EVIDENCE. C05c native host Reader is an accepted diagnostic exception,
+not a normal-frequency contract. Camera policy/TransitionRecorder consumers and general switching/Assembly remain outside the accepted implementation envelope.
+Historical refresh receipts saying review was pending retain their signing-time meaning; the current scoped acceptance is the decision above.
+Release promotion/main/tag/GitHub Release and new Formal Qualification are not authorized by this freeze.
+Six next-stage themes are candidates only in the existing [Roadmap](../../../docs/roadmap/README.md#phase-ii-01-candidate-handoff);
+do not create or implement Phase II-01 Goals without separate authorization. This refresh changes status navigation only, no API/example behavior.

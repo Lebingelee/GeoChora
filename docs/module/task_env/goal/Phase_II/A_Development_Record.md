@@ -1,5 +1,7 @@
 # Phase A 开发记录 — Object Model、来源与兼容
 
+> **2026-10-23 范围决定**：本记录声明的交集按 [维护者决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 获有界工程接受；历史 S0/S1/S2/S3、失败、原 pin 与缺失原件记录保持原义。本次范围冻结不产生新 Task freeze、发布或 Qualification。
+
 日期：2026-10-22。当前处置：A01–A05 的声明静态工程出口满足；真实 materialization、施控和渲染的证据分别归 C/D。
 目标契约见 [01_Phase_A_Core_Object_Model.md](01_Phase_A_Core_Object_Model.md)；统一状态见 [05](05_Architecture_Review_and_Execution_Order.md)。
 

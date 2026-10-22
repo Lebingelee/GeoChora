@@ -1,0 +1,110 @@
+{
+  "decision_id": "GEOCHORA-PHASE-II-SCOPE-2026-10-23",
+  "scope": "governance-only validation; no Core/Provider/test/Artifact algorithm changes",
+  "reviewed_source": "90071ace71e4aa921d9460b87a73162318b12979",
+  "performed": {
+    "git_submodule_identity": "PASS; public/develop and public/main fetched and match reviewed refs; no origin remote configured",
+    "nine_phase_documents": "PASS",
+    "parent_goals": 20,
+    "implementation_slices": 33,
+    "DAG": "PASS; predecessor/order/uniqueness",
+    "historical_migration_targets": 25,
+    "original_indexed_evidence_files_hash_verified": 421,
+    "prior_archives": "PASS; both prior ZIP CRCs readable",
+    "light_regression": {
+      "result": "PASS",
+      "passed": 8,
+      "deselected": 5,
+      "native_campaign": false,
+      "elapsed_seconds": 0.36,
+      "command": "PYTHONPATH=GeoPhys/src:. python -m pytest -q -p no:cacheprovider task_env/diagnostics/tasks/test_phase_ii_d01a_scene_materialization.py -k 'evidence_pin or historical_applicability or receipt_rejects'",
+      "log": "workspace/maintenance/phase_ii_scope_freeze_20261023_001/light_regression.log"
+    },
+    "document_validator_before_edit": {
+      "exit_code": 1,
+      "counts": {
+        "docs": 67,
+        "task_env": 23
+      },
+      "configured_historical_limits": {
+        "docs": 58,
+        "task_env": 35
+      },
+      "errors": {
+        "count_limit_exceeded": 1,
+        "historical_non_documentation_paths": 139,
+        "other": 0
+      },
+      "interpretation": "preexisting consolidation-count/docs-only-scope failures; not hidden, bypassed, or fixed by relaxing validator"
+    },
+    "document_validator_final": {
+      "exit_code": 1,
+      "counts": {
+        "docs": 70,
+        "task_env": 23,
+        "markdown": 30,
+        "task_env_markdown": 16,
+        "machine_or_other": 40
+      },
+      "configured_historical_limits": {
+        "docs": 58,
+        "task_env": 35
+      },
+      "errors": {
+        "count_limit_exceeded": 1,
+        "historical_non_documentation_paths": 139,
+        "other": 0
+      },
+      "same_error_list_as_before_edit": true,
+      "interpretation": "Existing validator is for v1.1 docs-only consolidation. Count already exceeded before edit; this governance commit adds 3 metadata documents. No threshold/rule/test changed; no link, anchor, frozen-data or newly introduced scope error.",
+      "log": "workspace/maintenance/phase_ii_scope_freeze_20261023_001/document_validator_final.json"
+    },
+    "local_links_and_anchors": {
+      "result": "PASS",
+      "local_links": 309,
+      "markdown_files": 18,
+      "fixed_commit_links_and_anchors": 31
+    },
+    "module_skill_checker": "PASS",
+    "system_quick_validate": "PASS",
+    "git_diff_check": "PASS",
+    "skill_navigation_refresh": {
+      "result": "read-only navigation completed; one stale C05c approval statement corrected",
+      "mode": "refresh/status navigation only",
+      "source_baseline": "90071ace...",
+      "actual_behavior_change": false,
+      "acceptance_authority": "explicit maintainer instruction, not this walkthrough",
+      "native_example_rerun": false
+    },
+    "raw_entry_existence_checks": 20,
+    "release_ref_read_only_checks": {
+      "remote_main": "f292df149f41520b484ff27cf2ff78a584903013",
+      "v2.0.0_remote_tag": "absent from exact ls-remote tag query",
+      "v2.0.0_github_release": "GET returned 404; repository read access independently confirmed",
+      "release_operations": "NOT_EXECUTED"
+    }
+  },
+  "preserved_limitations": [
+    "MISSING_RAW_EVIDENCE: three B04a historical original H5 goldens",
+    "MISSING_RAW_EVIDENCE: early eb870 original JSON bytes lost by historical overwrite; current file is not original"
+  ],
+  "previous_receipts_not_rerun": "S0/S1/S2/S3 results retained at original exact source/provider/config identity, not recast as new checks",
+  "not_run": [
+    "full A-D",
+    "NutAssembly matrix",
+    "485 interval R1",
+    "native public candidate/pairing campaign",
+    "S4/Qualification",
+    "new Task freeze/Judge",
+    "main merge",
+    "v2.0.0 tag",
+    "GitHub Release"
+  ],
+  "release_promotion_allowed": false,
+  "source_self_reference": "final freeze commit and remote readback retained off-repository after push",
+  "reproducibility": {
+    "validation_tools": "existing Document Validator, check_module_skill.py, system skill-creator quick_validate.py; supporting checker retained under local freeze workspace",
+    "logs": "workspace/maintenance/phase_ii_scope_freeze_20261023_001/",
+    "document_validator_rule_changes": false
+  }
+}

@@ -3,6 +3,8 @@
 基线：2026-10-18 已发布的 v1.1.0，source `7ed9e78a60d407fa1150c99209e06c70bfa0ed87`。
 当前能力取自[发布记录](../releases/v1.1/README.md)及其原始矩阵；架构方向本身不构成实现或资格证明。
 
+2026-10-23，维护者已接受并冻结 [Phase II 声明交集的有界工程范围](../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)，源码基线 `90071ace…`。这是开发基线的 Scoped Engineering Acceptance；已发布 v1.1.0 的资格矩阵不变，v2.0.0 尚须独立 Release Gate，不代表所有设计广度或新 Formal Qualification。
+
 ## 定位与依赖方向
 
 GeoChora 是面向具身任务的多仿真器、多渲染器 API 与工具中枢。

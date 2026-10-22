@@ -1,7 +1,9 @@
 # Phase C 开发记录 — Execution、Lifecycle、Solution 与 Recording
 
+> **2026-10-23 范围决定**：本记录声明的交集按 [维护者决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 获有界工程接受；历史 S0/S1/S2/S3、失败、原 pin 与缺失原件记录保持原义。本次范围冻结不产生新 Task freeze、发布或 Qualification。
+
 日期：2026-10-22。当前状态：C02b **声明交集的有界工程出口满足**；C02c 通用切换、C05c 常规 native-rate Reader 合同及未准入组合单列。
-旧 BLOCKED 报告属于逐步解阻过程，不作为当前结论；P99 最终接受与 v2.0.0 发布仍待独立二审。
+旧 BLOCKED 报告属于逐步解阻过程，不作为当前结论；P99 两项有界运行出口已由维护者接受；v2.0.0 发布仍须独立 Release Gate。
 目标契约见 [03_Phase_C_Execution_Lifecycle.md](03_Phase_C_Execution_Lifecycle.md)；唯一状态/依赖入口为 [05](05_Architecture_Review_and_Execution_Order.md)。
 
 ## C01
@@ -45,7 +47,7 @@ Artifact `e02cc46b7810a481680c1b93951632745393e6769c6b9eb3c7ca77fcaa4be7b7`。
 历史 GeoPhys `4436787e` CPU 与 MuJoCo CPU 各 30 interval/31 boundaries；完整 request/两 target/两 ack/state 数值 H5 回读和重复 reset 通过。
 first-writer 已 apply、second-writer 失败时，物理未推进但控制已部分提交，C03a 闭锁；不声称原生原子回滚。
 17 项 Position tests、83 项相邻回归通过。Evidence：`workspace/maintenance/c02b_dual_entity_20261022/s2-final-geophys-r2/` 与 `s2-final-mujoco-r2/`。
-这是原 pin 的有界证据，不伪装成 a53 当前 pin 重跑；当前二审需明确其适用范围。
+这是原 pin 的有界证据，不伪装成 a53 当前 pin 重跑；维护者已接受其原 pin 的精确工程范围，不外推为 a53 双 Entity 重跑。
 
 ### Reset freshness 与 typed raw-force
 

@@ -1,6 +1,8 @@
 # Phase D 开发记录 — Materialization、Typed State、Camera 与 Pairing
 
-日期：2026-10-22。当前声明交集已有有界实现/验证；D04/D05 的 consumer 接线和广泛组合仍待后续范围决定。
+> **2026-10-23 范围决定**：本记录声明的交集按 [维护者决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 获有界工程接受；历史 S0/S1/S2/S3、失败、原 pin 与缺失原件记录保持原义。本次范围冻结不产生新 Task freeze、发布或 Qualification。
+
+日期：2026-10-22。当前声明交集已有有界实现/验证；D04/D05 consumer 接线和广泛组合已在本次范围中接受延期，后续另行决定实施。
 目标契约见 [04_Phase_D_Physics_Rendering.md](04_Phase_D_Physics_Rendering.md)；统一状态见 [05](05_Architecture_Review_and_Execution_Order.md)。
 
 ## D01

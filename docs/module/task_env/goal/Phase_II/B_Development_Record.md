@@ -1,5 +1,7 @@
 # Phase B 开发记录 — Task Source、Reset、Semantics 与 Artifact
 
+> **2026-10-23 范围决定**：本记录声明的交集按 [维护者决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 获有界工程接受；历史 S0/S1/S2/S3、失败、原 pin 与缺失原件记录保持原义。本次范围冻结不产生新 Task freeze、发布或 Qualification。
+
 日期：2026-10-22。B01–B05 的有界工程记录齐备；B04a 三类历史 H5 golden 为 **ACCEPTED-DEFERRED**，不能写成全部历史 bytes 兼容已通过。
 目标契约见 [02_Phase_B_Task_Semantics.md](02_Phase_B_Task_Semantics.md)；统一状态见 [05](05_Architecture_Review_and_Execution_Order.md)。
 
@@ -82,4 +84,4 @@ Evidence：`workspace/maintenance/phase_ii_closure_20261020_001/run_metadata.jso
 当时 frozen `codex/phase-ii-b` 指针是历史协作记录；维护者本轮授权在备份后清理中间分支，不改变这些 Evidence 的 source identity。
 本轮只整合文档，没有重跑这些历史组合。
 
-原始完整契约/命令/收据：[整合前 B 文档](https://github.com/Lebingelee/GeoChora/blob/a5ba5376e90804a3681d4e9535128bcd705457d3/docs/module/task_env/goal/Phase_II/02_Phase_B_Task_Semantics.md)。兼容延期的最终接受范围与恢复/退休决定仍待二审。
+原始完整契约/命令/收据：[整合前 B 文档](https://github.com/Lebingelee/GeoChora/blob/a5ba5376e90804a3681d4e9535128bcd705457d3/docs/module/task_env/goal/Phase_II/02_Phase_B_Task_Semantics.md)。三类历史 H5 的 ACCEPTED-DEFERRED 已获本次范围接受；恢复原件或 reader retirement 仍须后续独立决定，均未实施。

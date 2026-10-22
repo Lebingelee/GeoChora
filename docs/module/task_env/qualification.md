@@ -1,5 +1,7 @@
 # 能力、测试与资格治理
 
+Phase II 已于 2026-10-23 获 [Scoped Engineering Acceptance](../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)。该维护者范围决定不改本页的 Qualification 层级、不修改唯一发布矩阵、不伪装成独立 Human Judge 签名；S4/新 Formal Qualification 未执行、未授予，Release Promotion 仍须独立 Gate。
+
 ## 唯一发布基线
 
 [v1.1.0 capability matrix](capability_matrix_v1_1_0_candidate.json) 保留已发布原始 bytes、schema、
