@@ -5,7 +5,8 @@ from typing import Protocol
 from .provenance import provider_build_identity
 
 from ...artifacts import (
-    CanonicalStatePublicationV1, CanonicalStateView, CapabilityClaim, ExecutionSpec,
+    CanonicalStatePublicationV1, CanonicalStatePublicationV2,
+    CanonicalStateView, CapabilityClaim, ExecutionSpec,
     FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
     StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
@@ -30,6 +31,14 @@ class RuntimeSession(Protocol):
         frame_bindings: Mapping[str, FrameReference],
         requirements: StateRequirements,
     ) -> CanonicalStatePublicationV1: ...
+    def snapshot_v2(
+        self,
+        *,
+        scene: SceneDefinition,
+        joint_bindings: Mapping[str, JointDefinition],
+        frame_bindings: Mapping[str, FrameReference],
+        requirements: StateRequirements,
+    ) -> CanonicalStatePublicationV2: ...
     def step(self) -> CanonicalStateView: ...
     def close(self) -> None: ...
 

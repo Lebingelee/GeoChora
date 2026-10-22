@@ -1,5 +1,23 @@
 # Runtime、Provider 与控制生命周期
 
+## 当前开发基线与有界证据（2026-10-22）
+
+本地 `codex/phase-ii-c03b` 的 Core 检查点为 `ec2dd24`，GeoPhys Gitlink 与实际检出均为
+`eb870f6f8812abea9022594b702df0c395d98d48`。最新 typed-force 实现和收据仍未提交；本地及远端
+develop 为 `e0d235c`，未包含这些后续开发结果。下文 2026-10-20 的 `54f40fbf` 同步范围和测试数字
+保留为当时 Evidence，不作为当前 topic 分支的 Provider pin 或全链能力声明。
+
+当前证据分为两个交集：旧 selected PickCube 的 GeoPhys CPU reset-force freshness 已有有界修复收据；
+新的 Scene-v3 Panda R1 candidate 另有 `snapshot_v2()` typed raw-force publication、精确 admission
+和一个真实 100 Hz interval。它们不互相转移 Artifact/source/Controller/plan 身份，也不授予 MuJoCo
+typed-force、通用 `actuator_force_query`、完整 C02b 或 C05b 能力。见
+[freshness 收据](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md)和
+[typed-force 收据](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。
+
+Provider 修复分支的 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4` 是下一次基线对齐的固定候选，
+尚未成为当前 Core 的 pin 或已验收交集。迁移须保全当前检查点、评估受影响的上游差异，并重跑精确
+admission、typed-force S1、同 candidate S2 与 legacy PickCube reset freshness；不能仅替换 SHA 常量。
+
 ## GeoPhys 开发基线同步（2026-10-20）
 
 本次将三个 Phase II 开发分支与 develop 的 GeoPhys 从
@@ -182,10 +200,16 @@ seed 31, at 100 Hz / five 2 ms native steps, including a nonzero force sample,
 two same-session resets, source-law comparison and the first actual R1 closing
 compute. MuJoCo CPU supplied a separate reset/step sampling-semantics comparison;
 force values are not compared across providers. This closes only the R1 reset
-freshness prerequisite for this legacy route. The structured plan-bound raw
-force requirement remains required and rejected: `provider_manifest()` still
-does not advertise `actuator_force_query`, and `snapshot_v1()` still has no typed
-raw-force publication. See the [acceptance receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
+freshness prerequisite for this legacy route. At that receipt's checkpoint,
+plan-bound typed raw-force admission was still missing. The later
+[`snapshot_v2()` candidate receipt](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)
+adds one source/Controller/plan-bound GeoPhys CPU route on `eb870f6f`; it does not
+rebind the old selected PickCube source or enable MuJoCo typed force. The shared
+`provider_manifest()` still makes no generic `actuator_force_query` claim, and
+`snapshot_v1()` remains force-free. C02b remains BLOCKED and C05b is unstarted;
+public lifecycle S1 can precede full PickCube execution/recording S2/S3 without
+requiring a second Provider's typed-force implementation. See the
+[freshness receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
 
 ### NutAssembly selected Solution B
 

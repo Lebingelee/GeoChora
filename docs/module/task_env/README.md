@@ -40,10 +40,15 @@ PYTHON
 
 只在学习流程需要时安装 `task_env/requirements-rl.txt`。本轮不重新安装依赖；requirements
 不是已验证的 lockfile。冻结发布可用 `git checkout --detach refs/tags/v1.1.0`；开发应基于当前 develop。
-v1.1.0 的 GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`；当前开发基线为
-`54f40fbfffd945967525aa85801087e7da0b491e`（上游 main 加静态接触兼容修复），同步范围及验证见
-[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。Menagerie 仍为
-`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；复现时使用所属版本的 Gitlink，不以浮动 HEAD 替代。
+v1.1.0 的 GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`；2026-10-20 的
+`54f40fbfffd945967525aa85801087e7da0b491e` 同步记录是历史开发基线，见
+[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。2026-10-22 的本地
+`codex/phase-ii-c03b` 在 Core 检查点 `ec2dd24` 使用 GeoPhys
+`eb870f6f8812abea9022594b702df0c395d98d48`；其后未提交的 typed-force 结果仅覆盖新 Panda R1
+candidate，不表示 develop 已集成或其他任务/Provider 已获支持。修复分支候选 `a53a8cfe` 尚未在此 Core
+路线完成迁移复验；详见[当前开发基线与有界证据](runtime-and-providers.md#当前开发基线与有界证据2026-10-22)。
+Menagerie 仍为 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；复现时使用所属 Core 提交的
+Gitlink 与对应 Evidence，不以浮动 HEAD 替代。
 
 ```python
 from task_env import make_env

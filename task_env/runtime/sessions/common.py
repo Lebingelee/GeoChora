@@ -7,8 +7,10 @@ from uuid import uuid4
 import numpy as np
 
 from ...artifacts import (
+    CanonicalStatePublicationV2,
     CanonicalStatePublicationV1,
     CanonicalStateView,
+    CanonicalStateViewV2,
     CanonicalStateViewV1,
     FrameReference,
     JointDefinition,
@@ -394,6 +396,75 @@ class _SessionValues:
         )
         return CanonicalStatePublicationV1(
             'canonical-state-publication-v1', view, lifetime,
+        )
+
+    def snapshot_v2(
+        self,
+        *,
+        scene: SceneDefinition,
+        joint_bindings: Mapping[str, JointDefinition],
+        frame_bindings: Mapping[str, FrameReference],
+        requirements: StateRequirements,
+    ) -> CanonicalStatePublicationV2:
+        """Publish the additive typed force state alongside the existing view.
+
+        Joint/Frame projection and identity remain owned by snapshot_v1. Only
+        the provider adapter may supply actuator-force values; an unsupported
+        provider returns explicit unavailability, which required requirements
+        reject below.
+        """
+        self._require_reset()
+        if not isinstance(requirements, StateRequirements):
+            raise TypeError('typed state v2 requires StateRequirements')
+        if any(item.sample_domain != 'evaluation_boundary' for item in requirements.requirements):
+            raise ValueError('snapshot_v2 accepts evaluation-boundary requirements only')
+        force_requirements = tuple(
+            item for item in requirements.requirements if item.field_name == 'actuator_force'
+        )
+        base_requirements = StateRequirements(
+            requirements.schema_version,
+            requirements.consumer_kind,
+            requirements.consumer_id,
+            tuple(item for item in requirements.requirements if item.field_name != 'actuator_force'),
+        )
+        base = self.snapshot_v1(
+            scene=scene,
+            joint_bindings=joint_bindings,
+            frame_bindings=frame_bindings,
+            requirements=base_requirements,
+        )
+        forces = ()
+        force_unavailable = ()
+        if force_requirements:
+            reader = getattr(self, '_snapshot_typed_actuator_force_values', None)
+            if callable(reader):
+                forces, force_unavailable = reader(
+                    base.view.boundary, base.view.sample_clock, force_requirements,
+                )
+            else:
+                force_unavailable = tuple(UnavailableStateValue(
+                    'unavailable-state-value-v1', item.field_name, item.subject_kind,
+                    item.entity_id, item.subject_id, item.sample_domain,
+                    f'{self._provider} RuntimeSession has no admitted typed actuator-force route',
+                ) for item in force_requirements)
+        view = CanonicalStateViewV2(
+            'canonical-state-v2',
+            base.view.convention,
+            base.view.boundary,
+            base.view.sample_clock,
+            base.view.joints,
+            base.view.frames,
+            tuple(forces),
+            tuple(base.view.unavailable) + tuple(force_unavailable),
+        )
+        view.validate_against_scene(scene)
+        view.validate_requirements(requirements)
+        lifetime = StateViewLifetime(
+            'state-view-lifetime-v1', self._provider_materialization_id,
+            view.boundary, self._state_revision, 'owned_snapshot', 'retained',
+        )
+        return CanonicalStatePublicationV2(
+            'canonical-state-publication-v2', view, lifetime,
         )
 
     def step_control_interval(self, held_target, gripper_inner_servo, *, audit=None,

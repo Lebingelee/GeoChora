@@ -254,16 +254,17 @@ independent version routes until real historical fixtures are available.
 
 `compile_control_binding_plan()` in `task_env.runtime.sessions.control` resolves A03 Scene-v3 ControlGroups to
 existing Controller writers, existing `ActionModeSpec`, and existing `StateRequirements`. It is static admission and
-`prepare_structured_action()` is a pure all-groups preflight returning existing `RequestedAction` values. It does not
-dispatch to Runtime or support multi-robot execution. Bounded Panda arm+gripper legacy control remains on the existing
-single writer/provider route.
+`prepare_structured_action()` is a pure all-groups preflight returning existing `RequestedAction` values. These two
+functions do not dispatch to Runtime. The separate existing session execution paths have the exact single/dual Position
+and single R1 candidate evidence described below; static compilation alone does not grant multi-robot support.
 
 `materialize_control(..., controller_binding_plan=plan)` is the fail-closed admission route for a bound Controller: the
 source must carry the plan's exact Scene identity, and every required feedback capability must be supported by both the
-actual Provider manifest and any caller-supplied restricting manifest before Runtime materialization. The current A05
-binding requires `actuator_force_query`, which neither current GeoPhys nor MuJoCo manifest claims; this route rejects
-before Runtime construction. Omitting the optional plan preserves the existing legacy route. This check is admission only,
-not Group dispatch, an applied acknowledgement, or real arm+hand execution evidence.
+actual Provider capability envelope and any caller-supplied restricting manifest before Runtime materialization. The
+original C02a A05 required-force binding remains rejected by the generic GeoPhys/MuJoCo manifests. The new R1 candidate
+has a separate, exact call-specific claim bound to its source/Controller/plan and clean GeoPhys `eb870f6f` CPU build;
+it does not make the original binding or a generic manifest supported. Omitting the optional plan preserves the legacy
+route. Admission alone is not Group dispatch, an applied acknowledgement, or real execution evidence.
 
 **C02b-E Position Profile candidates (2026-10-22):** use
 `PandaPositionServoProfileV1.from_source(artifact, source)` only for the explicit A05 candidate, then compile the
@@ -281,8 +282,9 @@ readback passed for both the single- and dual-Panda candidates. Wrong Entity, mi
 contract, overlap, stale target and boundary mismatch are rejected before compute/apply/step; an injected second-writer
 apply failure uses the C03a latch and emits no partial transition. Do not substitute this profile into PickCube R1, weaken its required-force contract,
 or treat the candidate as a default registered capability. The legacy PickCube R1 reset-force freshness prerequisite
-has a separate GeoPhys CPU receipt; plan-bound raw-force admission, NutAssembly Guard and full C02b remain
-blocked. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
+has a separate GeoPhys CPU receipt; one new candidate now has exact plan-bound GeoPhys CPU raw-force admission and a
+single real interval, but the legacy selected Artifact/source is not rebound by that evidence. NutAssembly Guard and full
+C02b remain blocked. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
 [single-profile S2/H5](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
 [dual-Entity acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
 
@@ -296,9 +298,57 @@ previous receipt, and the required R1 consumer rejects invalid or mismatched
 identity/boundary samples. Core preserves signed raw force until the existing
 `control_feedback()` maps the Panda closing direction. Evidence is bounded to
 PickCube seed 31 on GeoPhys CPU; MuJoCo CPU is a sampling-semantics comparison.
-This does not provide plan-bound `actuator_force_query` manifest admission or
-`snapshot_v1()` raw-force publication, so structured required-force admission
-still rejects. See the [C02b-R1 receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
+
+**C02b-R1 typed raw-force admission (2026-10-22):** `CanonicalStateViewV2` /
+`CanonicalStatePublicationV2` add typed raw signed force without changing v0/v1
+state bytes or hashes. `RuntimeSession.snapshot_v2()` composes the existing
+Joint/Frame view with a Provider-owned sample. A call-specific admission claim
+is produced only for the new Panda R1 Scene-v3 candidate on clean GeoPhys CPU
+revision `eb870f6f8812abea9022594b702df0c395d98d48`, exact source closure,
+`panda-main/actuator8` tendon, actual `ProductionCanonicalPandaController` /
+hand-origin TCP, and exact `ControlBindingPlanV1`. The required value retains
+signed force and binds unit, Provider sample revisions/phase/native clock,
+source closure, materialization, episode/reset and evaluation boundary.
+`snapshot_v1()` remains force-free; legacy no-plan APIs remain compatible;
+generic Provider manifests do not claim `actuator_force_query`. One real
+100 Hz GeoPhys CPU plan-bound R1 interval and next typed publication passed.
+This does not transfer to the old PickCube selected Artifact/source, MuJoCo
+typed-force support, other transmissions, full C02b, or C05b. See the
+[freshness receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md)
+and [typed-force receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md).
+
+**Documentation alignment (2026-10-22, task_env / refresh):** on Core `ec2dd24`, corrected the routing text and
+`references/routes.md` to distinguish original static admission, exact candidate typed-force admission, and actual
+execution. Owners/callers and retained S1/S2 evidence are those in the typed-force refresh receipt below; no implementation,
+Provider pin or capability was changed by this alignment. C05b public lifecycle S1 can precede complete PickCube S2/S3
+and does not require MuJoCo typed force. A future `a53a8cfe` migration needs its own affected-path verification; it has
+not happened here. Independent Agent cold-start and new native tests are NOT_RUN in this documentation-only pass.
+Validation used the repository's GeoChora Python environment: module Skill checker, system `quick_validate.py`,
+documented v1/v2 state/session import checks, and local-link/anchor checks passed. These are documentation/static checks,
+not a new native acceptance or capability review; the typed-force claim still retains the Human review boundary below.
+
+**Skill refresh receipt — 2026-10-22, task_env / refresh:** source checkpoint at start was
+`ec2dd2438da5c0bd1b79ed58c3900e54bb7433ca` on `codex/phase-ii-c03b`; the listed Core files are local changes,
+GeoPhys remains clean at `eb870f6f8812abea9022594b702df0c395d98d48`. The refresh was triggered by new typed state,
+RuntimeSession, Controller identity-readout and capability-admission behavior. Owners inspected: `task_env.artifacts.state`,
+`RuntimeSession.snapshot_v1/v2`, `materialize_control`, the GeoPhys session adapter, the existing R1 Controller, public
+`RobotArmObservationReader`, selected force consumers, State/Admission/Position tests and the targeted native probe.
+Reuse classification: `EXTEND_EXISTING` state/session/Controller owners plus `COMPOSE_EXISTING` public observation and
+control-feedback route; no parallel Runtime, measurement store or Provider abstraction.
+
+Drift repaired: the earlier Skill entry said typed plan-bound admission did not exist. The actual state is now an additive
+v2 publication and one call-specific admission route restricted to the new Panda candidate and repaired GeoPhys CPU revision;
+`snapshot_v1`, v0/v1 hashes, legacy no-plan behavior and shared Provider capability lists remain unchanged. S1 regression was
+**35 passed, 1 deselected**, including C02a, old R1/Position and dual-Position consumers; S2 was **1 passed** for one native
+100 Hz interval. Fresh-interpreter imports, skill link/metadata validation and their outputs are recorded with the acceptance
+receipt. Evidence envelope: candidate Artifact/Scene/source closure, actual R1 Controller/TCP and plan identities from
+[typed-force receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md), GeoPhys CPU
+`eb870f6f...`; raw evidence remains under ignored
+`workspace/maintenance/c02b_r1_typed_force_20261022/`. Cold-start route: construct the explicit candidate, compile its
+ControllerBindingPlan, call `materialize_control(..., controller_binding_plan=plan, controller_profile=controller)`, reset
+with its EpisodeResetPlan, then call `snapshot_v2()` and the bounded plan-bound interval owner. MuJoCo typed force, old selected
+PickCube plan identity, other actuators/backends, full C02b, C05b, Guard and qualification were not run or enabled. Human review
+of this API/capability-sensitive bounded claim remains pending.
 
 ## C02c bounded Position instance switch
 

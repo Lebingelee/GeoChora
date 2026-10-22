@@ -34,6 +34,36 @@ class ProductionCanonicalPandaController:
             'feedback': 'nonnegative_closing_magnitude_completed_interval'})
         self._expected_step = None
 
+    @property
+    def source_artifact_hash(self):
+        """Artifact identity used to construct this Controller instance."""
+        return self._arm.artifact_hash
+
+    @property
+    def source_xml_sha256(self):
+        """Hash of the exact kinematics source bytes used by this Controller."""
+        return self._arm.model.source_sha256
+
+    @property
+    def tcp_profile_identity(self):
+        """Identity of the explicit TCP profile, or None for the legacy site path."""
+        profile = getattr(self._arm.model, 'tcp_profile', None)
+        return None if profile is None else profile.identity_hash
+
+    @property
+    def source_kinematics_identity(self):
+        """Hash the source bytes and explicit TCP profile consumed by this Controller."""
+        return digest({
+            'schema': 'panda-r1-source-kinematics-v1',
+            'source_xml_sha256': self.source_xml_sha256,
+            'tcp_profile_identity_hash': self.tcp_profile_identity,
+        })
+
+    @property
+    def expected_control_step(self):
+        """Current Controller boundary, or None until reset."""
+        return self._expected_step
+
     @classmethod
     def from_source(cls, artifact, source):
         """Production construction: gripper authority is the resolved robot owner."""

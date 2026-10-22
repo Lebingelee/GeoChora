@@ -365,7 +365,7 @@ def test_v0_decoder_remains_exact_and_unknown_schema_does_not_guess():
     assert decode_canonical_state_view(old.to_mapping()) == old
     assert CanonicalStateView.from_mapping(old.to_mapping()).to_mapping() == old.to_mapping()
     with pytest.raises(ValueError, match="unsupported canonical state schema"):
-        decode_canonical_state_view({"schema_version": "canonical-state-v2"})
+        decode_canonical_state_view({"schema_version": "canonical-state-v9"})
 
     typed = CanonicalStateViewV1(
         "canonical-state-v1", "SI_right_handed_z_up_wxyz", _boundary(), _clock(), (), ()

@@ -22,7 +22,7 @@ CAPABILITY_NAMES = frozenset({
     'rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
     'joint_state_query', 'body_pose_query', 'frame_pose_query', 'rgb_camera',
     'depth_camera', 'entity_instance_segmentation',
-    'contact_detection', 'contact_impulse',
+    'contact_detection', 'contact_impulse', 'actuator_force_query',
 })
 SUPPORTED_STATUSES = frozenset({'implemented', 'tested', 'qualified'})
 # Eight float32 epsilons cover normalization and four-component norm-squared

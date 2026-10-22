@@ -11,7 +11,9 @@ from .contracts import (
     admit_capabilities, decode_execution_spec, decode_task_artifact,
 )
 from .state import (
+    CanonicalStatePublicationV2,
     CanonicalStatePublicationV1,
+    CanonicalStateViewV2,
     CanonicalStateViewV1,
     NativeIntervalEvidence,
     NativeIntervalSample,
@@ -21,9 +23,11 @@ from .state import (
     StateRequirements,
     StateSampleClock,
     StateViewLifetime,
+    TypedActuatorForceStateValue,
     TypedFrameStateValue,
     TypedJointStateValue,
     UnavailableStateValue,
+    decode_canonical_state_publication,
     decode_canonical_state_view,
     project_canonical_state_v0,
 )
@@ -31,7 +35,8 @@ from .state import (
 __all__ = [
     'ActionIntent', 'ActuatorReference', 'ActuatorResourceDefinition',
     'ArticulationDefinition', 'AssetDefinition', 'CameraRendererOverrideV1',
-    'CanonicalStatePublicationV1', 'CanonicalStateView', 'CanonicalStateViewV1',
+    'CanonicalStatePublicationV1', 'CanonicalStatePublicationV2',
+    'CanonicalStateView', 'CanonicalStateViewV1', 'CanonicalStateViewV2',
     'CapabilityAdmissionError', 'CapabilityClaim', 'ControlGroup', 'EntityDefinition', 'EntityInstance',
     'ExecutionSpec', 'ExecutionSpecV1', 'FrameDefinition', 'FrameReference', 'InitializationContract',
     'JointDefinition', 'JointReference', 'PoseWorld',
@@ -40,8 +45,9 @@ __all__ = [
     'RendererSelectionV1', 'RobotInstance', 'SceneDefinition', 'TaskArtifact', 'TaskArtifactV1',
     'Timebase', 'UniformDimension', 'WorldDefinition',
     'StateBoundaryIdentity', 'StateFieldRequirement', 'StateRequirements', 'StateSampleClock',
-    'StateViewLifetime', 'TypedFrameStateValue', 'TypedJointStateValue', 'UnavailableStateValue',
+    'StateViewLifetime', 'TypedActuatorForceStateValue', 'TypedFrameStateValue',
+    'TypedJointStateValue', 'UnavailableStateValue',
     'admit_capabilities', 'decode_execution_spec', 'decode_task_artifact',
-    'decode_canonical_state_view',
+    'decode_canonical_state_publication', 'decode_canonical_state_view',
     'project_canonical_state_v0',
 ]
