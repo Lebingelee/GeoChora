@@ -637,10 +637,10 @@ clock/request/target/applied/state boundary；faulted/pending recording 必须�
 本轮没有确认 C05a storage production defect；没有改 frozen Artifact 或父仓库 Provider pin。C05a3 在 C05b 实际格式范围的
 补证完成。C02b-R1 后续关闭了旧记录的 GeoPhys reset freshness 前置，新 Scene-v3 candidate 又有 typed publication、
 精确 admission 与一个真实 interval 的有界证据，见 [typed-force 收据](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。
-C05b 本身在此审计时仍未启动；实际 PickCube S2/S3 仍需选择并验证对应 consumer 的 source/feedback/admission 路线；旧 legacy smoke 和新 candidate
-interval 都不能算作 external Solution 或完整 recording 验收。
+C05b 本身在此审计时仍未启动；实际 PickCube S2/S3 仍需选择并验证对应 consumer 的 source/feedback/admission 路线。旧 legacy smoke 和新 candidate
+interval 都不能算作 external Solution 或完整 recording 验收。后续 S1 及真实 S2/S3 状态见下方分阶段收据。
 
-#### C05b public lifecycle S1 acceptance（2026-10-22）
+#### C05b public lifecycle S1 acceptance（2026-10-22；该收据记录当时的 S1 范围）
 
 **范围与路线选择。** Provider 基线先对齐到 GeoPhys `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`，重跑精确 typed-force/admission S1、同一 Scene-v3 candidate 的一个真实 CPU 控制区间，以及 PickCube legacy seed-31 reset freshness/first-closing Probe；新基线 Evidence 见 [typed-force receipt](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。C05b public S1 随后明确走旧 `pick-cube-p16-reference-v1` legacy source/Artifact/R1 contract，保留 `task-env-pick-cube` source、旧 `panda-v1/ee` TCP、required `actuator8` feedback 与 canonical-trajectory-v0 Recorder。没有把新的 `panda-main` Scene-v3/ControlBindingPlan identity 移植给冻结 PickCube source，也没有迁移 C02b typed-force admission 到该 source；full execution 之前不伪造两条路线已经统一。
 
@@ -652,7 +652,15 @@ Reset 和每个 R1 evaluation boundary 的 info 无条件发布 `expert_executio
 
 **S1 证据。** `test_selected_consumers.py` 新增 normal internal/external 同配置对照、重复 reset episode identity、reset 无 applied ack、外部 Solution 唯一 state owner、缺失/过期 readiness、错误 boundary/source、foreign Solution identity、observer failure、Recorder append failure 和 observe-before-append 检查；使用测试专用 `FakeSession`，因此只验证 Core 控制/lifecycle 合同，不冒称物理 S2。实际 GeoPhys a53 seed-31 freshness 与 candidate interval 的 native 证据分属前述 Provider receipt。此次定向回归、命令及原始输出见 [C05b S1 receipt](C05b_Public_Lifecycle_S1_Acceptance.md)。旧 internal `step_expert()` 与 external `step_with_solution()` 在同 sample/state/action/target/applied/Task flags/一次 10 ms boundary 与 canonical T/T+1 上相符。
 
-**仍开放的边界。** 本轮只关闭 public readiness/application receipt 和受控 external Solution reset/observe/Recorder pre-append S1。完整 Expert 真实闭环、contact/readiness 阶段验证、GeoPhys/MuJoCo 分进程 S2、canonical-v0 磁盘真写读 S3 与 faulted-recording 的完成收据尚未运行。真实执行前采用的路线目前仍是现有 legacy PickCube entry；其 typed-force plan admission 没有通过，也没有借新 candidate identity 补造合同。C02b、NutAssembly 500 Hz Guard、C05c、Assembly、full Expert 和 Qualification 仍未完成。
+**当时仍开放的边界。** 本收据只关闭 public readiness/application receipt 和受控 external Solution reset/observe/Recorder pre-append S1。完整 Expert 真实闭环、GeoPhys/MuJoCo 分进程 S2、canonical-v0 磁盘真写读 S3 与 faulted-recording 的完成收据在签发时尚未运行；后续关闭状态见紧随其后的 S2/S3 收据。真实执行沿用现有 legacy PickCube entry，没有借新 candidate identity 补造合同。C02b、NutAssembly 500 Hz Guard、C05c、Assembly 和 Qualification 不由 S1 收据关闭。
+
+#### C05b legacy PickCube external Solution S2/S3 acceptance（2026-10-22）
+
+后续按上述 legacy 路线完成了真实 S2 与 canonical-v0 S3；S1 收据中的“仍开放”是其签发时状态，现由[本验收报告](C05b_External_Solution_S2_S3_Acceptance.md)更新。两条 Provider 路线分别在独立进程中使用 `pick-cube-p16-reference-v1`、旧 `task-env-pick-cube` composed source、`ProductionCanonicalPandaController` / `panda-production-control-r1`、`panda-v1/ee`、task-owned `build_readiness_solution()` 与 seed-31 ResetSample。GeoPhys 使用固定 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4` CPU；MuJoCo 使用 3.8.1 CPU。两者均为 100 Hz 外层、五个 2 ms native steps，保留 required R1 feedback 和旧 canonical-trajectory-v0 Recorder，没有借用 Scene-v3 plan identity。
+
+GeoPhys 完成 148 个 control interval，MuJoCo 完成 470 个；reset force、首次 closing feedback、boundary clock、真实 target/applied acknowledgement、R1 force mode/readiness、Solution stage、Task success 与 Expert completion 分别记录。Task 的 0.10 m success 与 Expert 的 0.105 m completion 标准未改动。每个 transition 都先完成 `Solution.observe()` 再 append。磁盘 reader 分别逐项核对 T/T+1 状态数值、时间、身份、request→canonical action→target→ack、readiness/feedback、metrics 和 flags。GeoPhys 是 148/149，MuJoCo 是 470/471；实际 H5、逻辑 identity/hash、首次诊断失败及修正后对同一 GeoPhys 文件的独立读回均见报告 Evidence 路径。
+
+observer 与 Recorder append 故障的定向测试复用 C03a fault latch，确认物理区间已推进但 transition 不存在、faulted canonical recording 不能 freeze/export、不会创建 H5；不宣称回滚。legacy selected R1 的 Stop/Event/Outcome 仍不支持，canonical-v0 也无对应字段。此结果关闭指定 legacy PickCube × GeoPhys CPU/MuJoCo CPU 的 C05b S2/S3；不关闭完整 C02b、MuJoCo typed-force、NutAssembly Guard、C05c、Qualification 或 Phase II。
 
 #### C03a bounded scalar lifecycle and fault receipt（2026-10-21）
 

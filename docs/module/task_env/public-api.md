@@ -33,7 +33,7 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 horizon 产生 truncation；selected expert 的 stop/completion policy 必须单独读取。
 Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly external action 明确拒绝。
 
-PickCube selected `production-r1` 另有一个有界 C05b public Solution S1 调用序列：
+PickCube selected `production-r1` 另有一个有界 C05b public Solution 调用序列：
 `from task_env.tasks.pick_cube import build_readiness_solution` 构造 task-owned Solution，
 `env.reset_for_solution(solution, seed=31)` 在现有 Artifact/source/controller/readiness identity 下 reset 并初始化该实例，
 然后每个控制区间调用 `env.step_with_solution(solution)`。外部 caller 保留 Solution 对象作为唯一 stage-state owner；不读取
@@ -48,8 +48,11 @@ request/evaluation boundary、target/applied hash 的 `control_application_v1`�
 续步，fault receipt 描述已发生的物理进度，不承诺 Provider/Controller 回滚。S1 对比 internal `step_expert()`，并覆盖缺失/过期
 readiness、错误边界、observer 与 append 失败。此调用面仍使用冻结 PickCube legacy Artifact、`task-env-pick-cube` source、
 `panda-v1/ee` TCP、required R1 feedback 和 canonical-trajectory-v0；不会借用新 Scene-v3 A05 candidate/plan identity，
-不修改旧 Stop 拒绝、Task success/Expert completion 区分或历史录制语义。它只关闭 C05b public lifecycle S1；完整 Expert 的
-真实 GeoPhys/MuJoCo S2、canonical-v0 真实保存回读 S3、NutAssembly Guard、C02b 与 Qualification 均未由此完成。
+不修改旧 Stop 拒绝、Task success/Expert completion 区分或历史录制语义。S1 公共生命周期已通过；之后的真实 external Expert S2
+与 canonical-v0 磁盘读回 S3 又在 GeoPhys `a53a8cf` CPU 和 MuJoCo 3.8.1 CPU 分进程通过，同一 seed-31 ResetSample 下
+分别记录 148/149 与 470/471 个 transition/boundary，并核对状态数值、身份和 action→target→ack。详见
+[C05b S2/S3 acceptance](../../../docs/module/task_env/goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
+该有界结果不支持 legacy R1 Stop/Event/Outcome、MuJoCo typed-force、NutAssembly Guard、完整 C02b 或 Qualification。
 
 通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
 unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined

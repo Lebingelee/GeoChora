@@ -361,11 +361,25 @@ The Environment calls the supplied Solution's `observe()` before its existing ca
 readiness, boundary mismatch, observer exceptions and Recorder append failure reject/latch before another step; a fault does not
 imply physics rollback.
 
-This is public lifecycle S1 only. The verified S1 uses the legacy `task-env-pick-cube` source, frozen PickCube Artifact,
-`panda-v1/ee` TCP, required production-r1 feedback and canonical-trajectory-v0; it does not borrow the separate A05 Scene-v3
-`panda-main` plan identity. Full GeoPhys/MuJoCo R1 Expert S2 and canonical-v0 disk readback S3 were not run. Legacy selected
-`stop()` remains unsupported; Task success, Expert completion and existing stop/recording semantics remain distinct. See the
-[public lifecycle S1 receipt](../../../docs/module/task_env/goal/Phase_II/C05b_Public_Lifecycle_S1_Acceptance.md).
+This paragraph records the public lifecycle S1 acceptance at that checkpoint. It used the legacy `task-env-pick-cube` source,
+frozen PickCube Artifact, `panda-v1/ee` TCP, required production-r1 feedback and canonical-trajectory-v0; it did not borrow the
+separate A05 Scene-v3 `panda-main` plan identity. At that checkpoint S2/S3 had not run; they were subsequently completed for
+the bounded GeoPhys/MuJoCo CPU routes below. Legacy selected `stop()` remains unsupported; Task success, Expert completion and
+existing stop/recording semantics remain distinct. See the [public lifecycle S1 receipt](../../../docs/module/task_env/goal/Phase_II/C05b_Public_Lifecycle_S1_Acceptance.md).
+
+**C05b legacy external Solution S2/S3 (2026-10-22):** for the fixed `pick-cube-p16-reference-v1` legacy Artifact/source,
+construct the task-owned Solution with `build_readiness_solution()`, call `reset_for_solution(solution, seed=31)`, then
+`step_with_solution(solution)` at each 100 Hz control boundary. Keep the exact actual Controller, source ID/XML hash, Core
+episode, Solution and ResetSample identities; this source has no Scene closure or plan identity. The bounded external Expert
+and canonical-v0 disk readback passed in separate processes on GeoPhys `a53a8cf` CPU and MuJoCo 3.8.1 CPU, using five 2 ms
+steps per interval. Each route has its own T/T+1, feedback/readiness, stage, Task success, Expert completion, action→target→ack,
+flags and H5 readback evidence in [the S2/S3 receipt](../../../docs/module/task_env/goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md).
+Observer/append failures reuse the C03a fault latch and cannot finalize an incomplete canonical recording. This does not create
+legacy R1 Stop/Event/Outcome, migrate candidate plan-bound typed force, enable MuJoCo typed force, close C02b, or grant
+Qualification.
+
+For the latest local route baseline, use GeoPhys `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`; the older `eb870f6f` refresh
+receipts below are historical and remain useful only for their original evidence provenance.
 
 **Follow-up Skill refresh receipt — 2026-10-22, task_env / refresh:** Core checkpoint at start was
 `1eac5649afaa25b077afdd58de5f480a0a213245` on `codex/phase-ii-c03b`, preserving the uncommitted typed-force work; Core

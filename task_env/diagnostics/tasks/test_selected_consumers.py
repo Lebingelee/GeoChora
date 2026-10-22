@@ -229,6 +229,14 @@ def test_c05b_public_solution_lifecycle_and_control_ack_match_internal(fake, tmp
         assert external.expert_execution_info().control_readiness.to_mapping() == external_reset['control_readiness_v1']
         internal.start_recording(tmp_path/'internal.h5')
         external.start_recording(tmp_path/'external.h5')
+        recorded_source = external.recorder.metadata.source_provenance
+        external_boundary = external_reset['expert_execution_boundary_v1']
+        assert recorded_source['runtime_source_id'] == external_boundary['source_id']
+        assert recorded_source['runtime_source_xml_sha256'] == external_boundary['source_xml_sha256']
+        if external_boundary['source_closure_digest'] is None:
+            assert 'runtime_source_closure_digest' not in recorded_source
+        else:
+            assert recorded_source['runtime_source_closure_digest'] == external_boundary['source_closure_digest']
 
         append_order = []
         append = external.recorder.append
@@ -384,6 +392,42 @@ def test_c05b_recorder_append_failure_latches_after_observe_without_valid_transi
         with pytest.raises(RuntimeError, match='faulted'):
             env.step_with_solution(solution)
         assert env.state.control_step == 1 and len(env.session.calls) == 1
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('failure_point', ['observer', 'append'])
+def test_c05b_faulted_canonical_recording_cannot_be_exported(fake, tmp_path, failure_point):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    solution = build_readiness_solution()
+    output = tmp_path / f'{failure_point}-fault.h5'
+    try:
+        env.reset_for_solution(solution, seed=19)
+        env.start_recording(output)
+        if failure_point == 'observer':
+            def fail_observe(*args, **kwargs):
+                raise RuntimeError('injected observer failure before recording')
+            solution.observe = fail_observe
+        else:
+            def fail_append(*args, **kwargs):
+                raise RuntimeError('injected append failure before transition commit')
+            env.recorder.append = fail_append
+
+        with pytest.raises(RuntimeError, match='injected .* failure'):
+            env.step_with_solution(solution)
+        assert env.execution_fault is not None
+        assert env.execution_fault.physical_progress == 'advanced'
+        assert env.state.control_step == 1
+        assert not env.recorder.transitions
+
+        with pytest.raises(RuntimeError, match='faulted selected recording'):
+            env.finish_recording('injected_failure')
+        assert not output.exists()
+        assert not env.recorder._frozen
+        assert not env.recorder.transitions
+        assert env.state.control_step == 1  # recording rejection does not roll physics back
     finally:
         env.close()
 

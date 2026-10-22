@@ -43,10 +43,12 @@ PYTHON
 v1.1.0 的 GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`；2026-10-20 的
 `54f40fbfffd945967525aa85801087e7da0b491e` 同步记录是历史开发基线，见
 [依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。2026-10-22 的本地
-`codex/phase-ii-c03b` 在 Core 检查点 `ec2dd24` 使用 GeoPhys
-`eb870f6f8812abea9022594b702df0c395d98d48`；其后未提交的 typed-force 结果仅覆盖新 Panda R1
-candidate，不表示 develop 已集成或其他任务/Provider 已获支持。修复分支候选 `a53a8cfe` 尚未在此 Core
-路线完成迁移复验；详见[当前开发基线与有界证据](runtime-and-providers.md#当前开发基线与有界证据2026-10-22)。
+`codex/phase-ii-c03b` 已在 Core 检查点 `b3fc42e` 保全 Provider pin 迁移与 C05b public lifecycle S1；当前工作区继续包含 C05b
+S2/S3 诊断、必要的 faulted-recording finalization guard 和验收文档。GeoPhys Gitlink 与检出固定为
+`a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。指定 legacy PickCube external Solution 在 GeoPhys CPU 与 MuJoCo 3.8.1 CPU
+的 S2/S3 通过有独立收据；这些是本地 topic 分支的 bounded evidence，不表示 develop 已集成、完整 C02b 或其他任务/Provider
+获支持。详见[当前开发基线与有界证据](runtime-and-providers.md#当前开发基线与有界证据2026-10-22)与
+[C05b S2/S3 acceptance](goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
 Menagerie 仍为 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；复现时使用所属 Core 提交的
 Gitlink 与对应 Evidence，不以浮动 HEAD 替代。
 

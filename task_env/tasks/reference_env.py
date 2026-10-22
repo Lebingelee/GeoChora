@@ -1460,12 +1460,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'backend': 'cpu', 'horizon': self.horizon}, sort_keys=True),
         }
         if 'source_revision' in self.value:
+            runtime_source = self.value['source']
+            runtime_source_xml = runtime_source.scene_source.xml.encode()
             source_provenance.update({
                 'geochora_revision': str(self.value['source_revision']),
                 'artifact_identity': self.artifact.identity_hash,
                 'controller_identity': self.controller.identity,
                 'solution_identity': self._active_solution_identity(),
+                'runtime_source_id': runtime_source.scene_source.source_id,
+                'runtime_source_xml_sha256': hashlib.sha256(runtime_source_xml).hexdigest(),
             })
+            if runtime_source.source_closure_digest is not None:
+                source_provenance['runtime_source_closure_digest'] = runtime_source.source_closure_digest
             source_provenance.update({f"source_sha256:{name}": value
                 for name, value in self.value.get('source_sha256', {}).items()})
         solution_identity = self._active_solution_identity()
@@ -1580,6 +1586,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
         if self.recorder is None or getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('no active recording')
+        if self.binding.recorder_mode == 'canonical' and self._execution_fault is not None:
+            raise RuntimeError(
+                'cannot finalize a faulted selected recording as a complete trajectory; '
+                'reset is required'
+            )
         value = self.recorder.freeze(reason)
         if self.binding.recorder_mode == 'canonical':
             from ..trajectory.canonical.h5 import save, load
