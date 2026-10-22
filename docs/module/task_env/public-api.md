@@ -125,6 +125,23 @@ Runtime materialization when `actuator_force_query` is unavailable. See the
 [S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
 [Dual Entity acceptance](goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
 
+**C02c bounded Position instance switch (2026-10-22):** the explicit
+`SelectedReferenceEnv.from_position_candidate()` route also exposes
+`switch_position_controller(candidate)` for a single `panda-main` Position candidate. It requires an active Generic H5 v3
+recording and the last complete, live evaluation boundary. The fresh replacement Profile must have a distinct identity and
+ActionConfig while retaining the exact action schema, Frame/TCP, unit, timebase, required state, source closure and actuator
+ownership. Preparation is side-effect-free; the final RuntimeSession commit initializes its cursor at the live control step
+without calling `reset()` (which remains step-0-only). The current Position algorithm is stateless; the Profile carries only
+plan/episode/reset/next-step/activation-boundary cursor memory. The switch records a BoundaryEventV1 at T and does not compute, apply,
+step physics or append a transition. The first ordinary T→T+1 step carries the new identity target and matching applied ack;
+old-identity targets are refused. A second switch is refused until the first replacement has one complete target/ack transition;
+that transition carries the switch ID. Ending the episode first records effective/not-applied in its end event. A postcommit
+event-write failure trips the existing C03a latch and preserves a failure receipt. This is episode-scoped and limited to the
+verified single-Panda Position GeoPhys CPU/MuJoCo CPU intersection; reset
+reconstructs the candidate builder's original profile. Dual-Entity switching, production-R1/force-aware switching,
+NutAssembly, Assembly, Camera integration, other providers and generic arbitration remain unsupported. This does not complete
+C02b, C02c or Phase II. See the [C02c bounded acceptance receipt](goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c02c-bounded-single-panda-position-receipt2026-10-22).
+
 D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeSession.materialize()` 和当前
 `create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变
 `admit_render`、Provider manifest capability claims 或 native construction，也不允许 UI `render_mode` 冒充

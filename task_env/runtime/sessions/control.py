@@ -556,6 +556,106 @@ def _validate_position_source_boundary(
     return plan_identity
 
 
+def _prepare_position_profile_replacement(
+    session, current_profile, candidate_profile, plan, publication, *, scene,
+    joint_bindings, frame_bindings,
+):
+    """Validate one single-Entity Position instance replacement without mutation."""
+    from ...controllers.canonical.position_profile import PandaPositionServoProfileV1
+
+    if (type(current_profile) is not PandaPositionServoProfileV1
+            or type(candidate_profile) is not PandaPositionServoProfileV1):
+        raise TypeError('PositionServoV1 replacement requires exact existing Profile instances')
+    for profile in (current_profile, candidate_profile):
+        if (profile.identity != profile._constructed_identity
+                or profile.config != profile._constructed_config
+                or profile._algorithm.identity != profile._constructed_algorithm_identity
+                or profile._algorithm.config != profile._constructed_config):
+            raise ValueError('PositionServoV1 identity/configuration changed after construction')
+    admitted = getattr(session, '_position_profiles_by_writer', None)
+    if (not isinstance(admitted, dict) or len(admitted) != 1
+            or admitted.get(current_profile.writer_id) is not current_profile):
+        raise ValueError('PositionServoV1 replacement requires the admitted single active writer')
+    if len(plan.controller_bindings) != 1:
+        raise ValueError('PositionServoV1 replacement is single-writer only')
+
+    current_profile._validate_source(session._source)
+    candidate_profile._validate_source(candidate_profile.source)
+    plan_identity = current_profile._validate_plan(plan)
+    if candidate_profile._validate_plan(plan) != plan_identity:
+        raise ValueError('replacement Controller plan identity changed')
+    if (current_profile._plan_identity_hash != plan_identity
+            or current_profile._episode_id != publication.view.boundary.episode_id
+            or current_profile._reset_sample_id != publication.view.boundary.reset_sample_id
+            or current_profile._next_control_step != publication.view.boundary.control_step):
+        raise ValueError('active PositionServoV1 memory is not at the published boundary')
+
+    compatible_fields = (
+        'profile_id', 'writer_id', 'entity_id', 'joint_ids', 'finger_joint_ids',
+        'hand_frame_id', 'native_prefix', 'actuator_prefix', '_source_joint_ids',
+        '_target_bindings', 'open_actuator', 'gripper_semantic_id', 'requirements',
+        '_source_bindings',
+    )
+    for field_name in compatible_fields:
+        if getattr(current_profile, field_name) != getattr(candidate_profile, field_name):
+            raise ValueError(f'PositionServoV1 replacement changes owned binding field {field_name}')
+    if (current_profile.artifact.identity_hash != candidate_profile.artifact.identity_hash
+            or current_profile.scene.identity_hash != candidate_profile.scene.identity_hash
+            or current_profile.source.source_closure_digest != candidate_profile.source.source_closure_digest
+            or current_profile.model.source_sha256 != candidate_profile.model.source_sha256
+            or current_profile.artifact.timebase != candidate_profile.artifact.timebase
+            or current_profile.tcp_profile.to_mapping() != candidate_profile.tcp_profile.to_mapping()
+            or current_profile.controller_binding() != candidate_profile.controller_binding()):
+        raise ValueError('PositionServoV1 replacement changes schema, source, frame, unit, timebase or ownership')
+    if candidate_profile.identity == current_profile.identity or candidate_profile.config == current_profile.config:
+        raise ValueError('PositionServoV1 replacement must select a distinct parameterized instance')
+
+    _validate_position_source_boundary(
+        session, current_profile, plan, publication, scene=scene,
+        joint_bindings=joint_bindings, frame_bindings=frame_bindings,
+    )
+    activation = candidate_profile._prepare_switch_activation(publication, plan)
+    replacement_profiles = dict(admitted)
+    replacement_profiles[candidate_profile.writer_id] = candidate_profile
+    replacement_identities = dict(getattr(session, '_position_profile_identities', {}))
+    replacement_identities[candidate_profile.writer_id] = candidate_profile.identity
+    return {
+        'current_profile': current_profile,
+        'candidate_profile': candidate_profile,
+        'activation': activation,
+        'profiles_by_writer': replacement_profiles,
+        'profile_identities': replacement_identities,
+        'profile_identity': candidate_profile.identity,
+        'profile_id': candidate_profile.profile_id,
+        'writer_id': candidate_profile.writer_id,
+    }
+
+
+def _commit_position_profile_replacement(session, prepared):
+    """Commit the prepared active-writer projection at a selected safe boundary."""
+    current = prepared['current_profile']
+    candidate = prepared['candidate_profile']
+    if session._position_profiles_by_writer.get(current.writer_id) is not current:
+        raise ValueError('active PositionServoV1 writer changed before replacement commit')
+    # All candidate/profile/source/schema checks happened during preparation.
+    # Seed the fresh candidate's cursor only after this last session-owner guard;
+    # plain field assignment below then makes it the admitted writer.
+    candidate._activate_switch_memory(prepared['activation'])
+    (
+        session._position_profiles_by_writer,
+        session._position_profile_identities,
+        session._position_profile_identity,
+        session._position_profile_id,
+        session._position_writer_id,
+    ) = (
+        prepared['profiles_by_writer'],
+        prepared['profile_identities'],
+        prepared['profile_identity'],
+        prepared['profile_id'],
+        prepared['writer_id'],
+    )
+
+
 def apply_position_control_target(
     session,
     target,

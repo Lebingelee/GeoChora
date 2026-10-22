@@ -285,6 +285,37 @@ blocked. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C02
 [single-profile S2/H5](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
 [dual-Entity acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
 
+## C02c bounded Position instance switch
+
+Only the explicit single-Panda `SelectedReferenceEnv.from_position_candidate()` route has a bounded
+`switch_position_controller(candidate)` operation. Start Generic H5 v3 recording at reset, execute to a complete
+nonterminal boundary, then pass a fresh `PandaPositionServoProfileV1` built from the same Artifact/source with a distinct
+ActionConfig. The switch requires identical Action schema, hand-origin Frame/TCP, Scene/Artifact/source closure, required
+state, 100 Hz / five 2 ms timebase and actuator/writer ownership. It validates before mutating the current Profile or its
+memory; the current Position algorithm has no accumulated control-law state, and its Profile cursor carries plan,
+episode/reset identity, next step and activation boundary. The final RuntimeSession commit seeds that cursor at the current
+control step without calling `reset()`.
+`reset()` remains restricted to step 0/time 0. Switching itself emits one existing BoundaryEventV1 at T but does not compute,
+apply, step physics or append a transition. The next ordinary T→T+1 step is the first new target and applied acknowledgement.
+An old-identity target must fail before Provider dispatch. Another switch is refused until the new instance has one complete
+target/ack transition; that transition records the switch ID. If the episode ends first, its end event says effective/not-applied.
+If event recording fails after the active Profile commit, the existing C03a fault latch blocks more steps and the EpisodeEnd
+event carries request/identity/boundary details and a failure receipt; no physical rollback is claimed. The selection lasts for
+the active episode; reset rebuilds the candidate builder's configured Profile.
+
+This route requires an active Generic H5 v3 Recorder and a live, aligned public boundary. It is tested only for the explicit
+single `panda-main` Position candidate on GeoPhys CPU and MuJoCo CPU. It does not enable dual-Entity switching, R1/force-aware
+switching, NutAssembly Guard, Assembly, Camera observation, another Profile/provider/backend or general arbitration, and
+does not complete C02b/C02c. See the [C02c acceptance receipt](../../../docs/module/task_env/goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c02c-bounded-single-panda-position-receipt2026-10-22).
+
+**Refresh receipt (2026-10-22):** source checkpoint `5610f8a` on `codex/phase-ii-c03b`; public caller is the explicit
+`SelectedReferenceEnv.from_position_candidate()` route; owners inspected are `PandaPositionServoProfileV1`,
+`RuntimeSession` control admission, `SelectedReferenceEnv`, and `TransitionRecorder`/Generic H5 v3. Cold-start route verified:
+build the existing A05 Position candidate, start v3 recording at reset, switch only at an aligned complete boundary, step once,
+then verify event/transition/state with `load_structured_control_records_h5()`. Evidence is bounded to the two recorded CPU
+provider intersections; 16 S1 checks and independent GeoPhys/MuJoCo S2 probes pass. Skill metadata/link checker passes; the
+system `quick_validate.py` is not installed on this host. Maintainer review remains pending.
+
 C05a versioned storage is opt-in. Generic H5 v3 is read with
 `task_env.recorders.load_structured_control_records_h5()`; training projection is accepted only by
 `load_structured_training_actions_h5()` after exact one-writer schema/order and stored numeric-value checks.

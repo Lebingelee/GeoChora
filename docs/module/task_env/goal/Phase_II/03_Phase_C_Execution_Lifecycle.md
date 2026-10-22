@@ -373,10 +373,51 @@ GeoPhys/MuJoCo CPU 两个独立进程用相同 hash-bound candidate/sample 完�
 未覆盖必需交集时明确 partial，P99 不得标 complete。C05b/C05c 的旧 Solution/readiness/Native Guard 保真另验；
 需要 force 的 consumer 仍受 freshness gate 约束。
 
-**C02c**：同外部 action schema/frame/unit/timing/resource ownership 的切换只在完整控制边界生效；
-新 Profile required state、memory 初始化、effective identity/ack/events 先验收，失败保留旧 Controller 或 fail-closed。
-父 preset 的 preset/partially_overridden/custom 状态由有效配置推导，不成为第二个可漂移 authority。
-不兼容 schema 重建 Env/wrapper；未验证 NutAssembly 切换保持拒绝。
+**C02c 契约**：同外部 action schema/frame/unit/timebase/actuator ownership 的实例切换只在最后一个完整、
+非 terminal 的公开控制边界生效。切换前验证现有 Profile 类型、构造 identity/config、required state、source closure、
+source/resource binding、Scene/Artifact、Action schema、Frame/TCP 与 ControlBindingPlan；拒绝路径不得改变 active
+Profile/session admission 或其 memory。切换要求活动 Generic H5 v3 Recorder，以既有 BoundaryEventV1 记录请求、
+切换前后 identity、参数、结果、effective boundary 与 clock。新 Profile 的 mid-episode memory 只在最终 RuntimeSession
+提交点以该 boundary 初始化，不调用 reset()；reset() 仍只接受 step 0/time 0。切换本身不 compute、不 apply、不 step、
+不追加 transition；T boundary 的切换事件之后，T→T+1 的首个普通 step 才记录新 Profile target 和对应 applied ack。
+旧 identity target 在切换后拒绝。一个 switch 的首个完整 step/ack 记录前禁止再次 switch；该 transition 通过同一
+switch ID 关联 event、source boundary、target 和 applied acknowledgement。episode 在首个 step 前结束时，EpisodeEnd 明确记录
+“effective, not applied”。Recorder Event 在实际提交后写入失败时，复用 C03a fault latch、禁止续步，并把提交已生效、
+Event 缺失及首个控制未尝试的 receipt 写入 EpisodeEnd；不承诺 Provider 原生回滚。非兼容 schema/frame/unit/timebase/
+ownership、新 Env terminal/faulted/stopped/closed/horizon 状态和无效 boundary 均拒绝。父 preset 状态仍由有效配置推导，
+不增加第二个 authority；未验证 NutAssembly、R1/force-aware、双 Entity 切换仍拒绝。
+
+#### C02c bounded single-Panda Position receipt（2026-10-22）
+
+本轮只在已验证的单 Panda Position C02b 交集实现实例替换：复用
+`PandaPositionServoProfileV1`、`ControlBindingPlanV1`、`SelectedReferenceEnv` lifecycle、既有 RuntimeSession 和
+Generic H5 v3 Recorder，没有新增 Runtime、TaskEnv、Recorder、Provider 或切换 registry。只允许 `panda-main` 单 writer、
+GeoPhys CPU/MuJoCo CPU、A05 Scene-v3 固定 ResetPlan 的显式 Position candidate；需先启动 v3 recording，且当前状态、
+typed publication、public clock 与 Recorder T/T+1 对齐。替换 Profile 的 ActionConfig 必须与当前实例不同，identity 也必须不同；
+action schema、Scene/Artifact/source closure、required state、hand-origin TCP/frame、100 Hz/五个 2 ms timebase、joint 与
+actuator 资源映射和 writer ownership 必须完全一致。切换仅在当前 episode 有效，reset 按原 candidate builder 重建基线 Profile。
+
+切换准备是无副作用校验，候选 memory 在 RuntimeSession 最终提交前保持 fresh；提交初始化 memory cursor 为 T，并同步 session、
+SelectedReferenceEnv 当前 Profile 指针。当前 `CanonicalPandaController` 对 Position candidate 是 stateless 的；Profile memory
+仅含 plan identity、episode/reset identity、next control step 和 activation boundary，不继承或复制旧实例的 memory。
+BoundaryEventV1 在 T 记录 request、old/new identity 与 ActionConfig、validated/effective
+状态和确切 StateBoundary/clock。首个 T→T+1 真实控制记录新 identity 的 source-bound target、匹配 ack 和 switch ID；在这条完整
+transition 前再次切换被拒绝。旧 Profile 即使为同一 T 边界生成 shadow target，也在 Provider apply 前因 identity 不符而拒绝。
+episode 若在首步之前结束，end Event 标记 effective/not-applied。提交后的 Recorder 写入故障用 C03a latch 锁住当前环境；
+EpisodeEnd event 保留 request、两侧 Profile/config、boundary/clock 和 failure receipt，零 transition 不会伪增。
+
+S1：`test_phase_ii_c02c_position_switch.py` **16 passed**，覆盖 step-0 reset 合同、合法中途切换、无 dispatch/物理/transition、
+旧 target、schema/frame/required-state/source/resource/timebase/identity/config 拒绝、无 active recorder 与错位 boundary、
+closed/faulted/stopped/horizon guard 和提交后 Event 写入故障。S2：GeoPhys CPU 与 MuJoCo CPU 各由独立进程完成真实
+step→切换→step；参数 `ik_position_gain` 从 0.9 改为 0.45，同一请求下实际 arm target 不同，切换时 compute/apply/step 均为 0，
+下一步各为 1，公开时钟从 T=1/0.010 s 到 T+1=2/0.020 s 并对应五个 2 ms 子步。H5 v3 读回 2 transitions/3 observations、
+切换 Event、switch ID→target/ack 关联与 boundary、关节/hand/boundary identity 三组 state leaves。最终版忽略 Evidence receipts
+位于 `workspace/maintenance/c02c_single_position_switch_20261022-r3/{geophys,mujoco}/`，定向回归 stdout 位于
+`workspace/maintenance/c02c_single_position_switch_20261022-r3/test-results/targeted-regressions.log`。
+
+此 receipt 只关闭 C02c 的单 Panda Position/GeoPhys CPU/MuJoCo CPU bounded slice；完整 C02c 仍未完成。未覆盖 dual Entity
+同时切换、R1/force-aware 切换、NutAssembly Guard、Assembly、Camera observation、其他 Profile/provider/backend 或一般 Controller
+arbitration。完整 C02b 仍 BLOCKED，Phase II 未完成。
 
 #### C02a bounded implementation receipt（2026-10-21）
 

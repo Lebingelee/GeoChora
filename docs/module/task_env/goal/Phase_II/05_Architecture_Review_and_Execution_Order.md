@@ -102,7 +102,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 25 | C04 | C03a、D02b | **bounded implemented**：observation/info schemas、feedback 与 diagnostics 分离；历史收据有效 |
 | 26 | C02b | C02a、C03a、C04、C05a2、D01b | **BLOCKED**：单 Panda Position 与 P00/P99 最小双 Entity Position-only 子项的 S1、GeoPhys/MuJoCo CPU S2、Generic H5 v3 state readback bounded 通过。Force-aware R1 raw-force/reset freshness、Guard/其他必需交集与完整 qualification 仍 blocked；见 [双 Entity receipt](C02b_Dual_Entity_Position_Acceptance.md) |
 | 27 | C03b | C03a、C04、C05a2 | **bounded implemented**：现有 generic/Position scalar lifecycle、EpisodeEnd、v3 reader consumer；Pendulum GeoPhys S2 与双 Provider Position Stop/H5 通过；selected R1、vector、全部算法和 MuJoCo generic Pendulum 未支持。详见 [C03b receipt](C03b_Stop_Outcome_Receipt_2026-10-21.md) |
-| 28 | C02c | C02b、C03b、C05a2 | 受限同外部 schema/safepoint 的 Controller safe switch、memory/identity/ack/events；不等待整项 C05c，NutAssembly 未验证仍拒绝 |
+| 28 | C02c | C02b、C03b、C05a2 | **bounded slice passed only**：单 `panda-main` Position Profile、GeoPhys CPU/MuJoCo CPU 的同 schema 实例切换与 H5 v3 evidence；dual Entity/R1/Guard/Assembly/Camera/general arbitration 和完整 C02b/C02c 仍 open。见 Phase C C02c receipt |
 | 29 | C05b | C02b、C03b、C04、C05a3 | PickCube external Solution、真实 step/record 和两 Provider 指定交集回归 |
 | 30 | C05c | C05b、D02b | NutAssembly native Guard/hold/ramp/500 Hz/force freshness 与严格 Outcome 回归；不能靠 position-only Profile 替代 |
 | 31 | D03 | D01b、D02b、D05a | **bounded implemented — first intersection**：Position scalar Scene-v3、canonical Frame→renderer mapping、独立 consumer versions、reset/same-step RGB S1/S2；详见 [D03 receipt](04_Phase_D_Physics_Rendering.md#d03-first-bounded-intersection-receipt-2026-10-21)。D04/full D05b remain open |

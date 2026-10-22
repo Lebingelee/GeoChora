@@ -10,6 +10,7 @@ import hashlib
 import json
 from types import SimpleNamespace
 from typing import Callable
+from uuid import uuid4
 import numpy as np
 from gymnasium.spaces import Box, Dict
 
@@ -190,6 +191,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._published_position_obs = None
         self._published_position_info = None
         self._published_position_evaluation = None
+        self._position_controller_switch_fault_receipt = None
+        self._pending_position_switch = None
         self.recorder = None
         self.recording_path = None
 
@@ -285,6 +288,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             previous_episode_end = self.stop('reset')
         if getattr(self, 'position_profile', False):
             self._position_episode_end = None
+            self._position_controller_switch_fault_receipt = None
+            self._pending_position_switch = None
             self._published_position_state = None
             self._published_position_typed_state = None
             self._published_position_obs = None
@@ -517,6 +522,186 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise TypeError('structured ControllerGroup actions require PositionServoV1')
         self._episode_mode = 'external'
         return self._step(action)
+
+    def switch_position_controller(self, candidate):
+        """Replace the single Panda Position instance at the current real boundary.
+
+        The existing Generic H5 v3 Recorder is required so the preparation,
+        effective identity and boundary are observable. This operation never
+        computes, applies, steps or appends a transition; the next ordinary
+        ``step`` is the first opportunity for the new instance to control.
+        """
+        if self._closed:
+            raise RuntimeError('cannot switch a closed selected environment')
+        if self._execution_fault is not None:
+            raise RuntimeError('cannot switch a faulted selected environment; reset() is required')
+        if not getattr(self, 'position_profile', False) or self.dual_entity_position:
+            raise RuntimeError('Controller instance switching is limited to the single Panda Position candidate')
+        if self._stopped or self._position_episode_end is not None:
+            raise RuntimeError('Controller switching requires a live, nonterminal episode')
+        if getattr(self, '_pending_position_switch', None) is not None:
+            raise RuntimeError('the current Controller switch must be applied by one complete step before another switch')
+        if self.session is None or self._published_position_typed_state is None:
+            raise RuntimeError('Controller switching requires a completed reset boundary')
+        if self.state.control_step >= self.horizon:
+            raise RuntimeError('Controller switching is not allowed at or beyond the horizon')
+
+        recorder = self.recorder
+        if (recorder is None or not recorder.active
+                or recorder.config.schema_version != 'v3'):
+            raise RuntimeError('Controller switching requires an active Generic H5 v3 recording')
+        boundary = self._published_position_typed_state.view.boundary
+        clock = self._published_position_typed_state.view.sample_clock
+        if (self.typed_state is None
+                or self.typed_state.view.boundary.boundary_id != boundary.boundary_id
+                or self.state.control_step != boundary.control_step
+                or self._published_position_state is None
+                or self._published_position_state.control_step != boundary.control_step
+                or self._published_position_state.simulation_time != self.state.simulation_time
+                or clock.clock_domain != 'evaluation_boundary'
+                or clock.sample_index != boundary.control_step
+                or getattr(self.session, '_inner_interval_active', False)
+                or getattr(self.session, '_position_target_in_flight', None) is not None):
+            raise RuntimeError('Controller switching requires the last complete public control boundary')
+        if (recorder.transition_count != boundary.control_step
+                or recorder.observation_count != recorder.transition_count + 1
+                or getattr(recorder, 'pending', None) is not None):
+            raise RuntimeError('Controller switching requires a complete recorded T/T+1 boundary')
+
+        current = self.position_profiles[0]
+        from ..runtime.sessions.control import (
+            _commit_position_profile_replacement,
+            _prepare_position_profile_replacement,
+        )
+
+        prepared = _prepare_position_profile_replacement(
+            self.session, current, candidate, self.position_plan, self.typed_state,
+            scene=self.position_scene,
+            joint_bindings=self.position_joint_bindings,
+            frame_bindings=self.position_frame_bindings,
+        )
+        from dataclasses import asdict
+        from ..trajectory.canonical.episode import BoundaryEventV1
+
+        switch_id = uuid4().hex
+        event = BoundaryEventV1(
+            'boundary-event-v1', boundary.episode_id, recorder.transition_count,
+            recorder.next_boundary_event_sequence(recorder.transition_count),
+            f'controller-switch-{switch_id}', 'controller_instance_switch',
+            'task_env.selected_reference.position_servo_v1',
+            {
+                'switch_id': switch_id,
+                'request': {
+                    'operation': 'replace_position_controller_instance',
+                    'requested_profile_id': candidate.profile_id,
+                    'requested_writer_id': candidate.writer_id,
+                    'requested_controller_identity': candidate.identity,
+                    'action_config': asdict(candidate.config),
+                },
+                'previous_controller': {
+                    'profile_id': current.profile_id,
+                    'writer_id': current.writer_id,
+                    'controller_identity': current.identity,
+                    'action_config': asdict(current.config),
+                },
+                'effective_controller': {
+                    'profile_id': candidate.profile_id,
+                    'writer_id': candidate.writer_id,
+                    'controller_identity': candidate.identity,
+                    'action_config': asdict(candidate.config),
+                },
+                'result': {
+                    'preparation': 'validated',
+                    'switch': 'effective',
+                    'first_control_application': 'pending_next_step',
+                },
+                'effective_boundary': {
+                    **boundary.to_mapping(), 'boundary_id': boundary.boundary_id,
+                },
+                'effective_clock': clock.to_mapping(),
+                'binding_identity_hash': self.position_plan.identity_hash,
+                'source_closure_digest': self.value['source'].source_closure_digest,
+            },
+        )
+        event.validate()
+        recorder.validate_boundary_event(event)
+
+        before_state = self.state
+        committed = False
+        try:
+            _commit_position_profile_replacement(self.session, prepared)
+            committed = True
+            self.position_profiles = (candidate,)
+            self.controller = candidate
+            self.value['controller'] = candidate
+            recorder.add_boundary_event(event)
+            self._pending_position_switch = {
+                'switch_id': switch_id,
+                'controller_identity': candidate.identity,
+                'effective_boundary_id': boundary.boundary_id,
+                'effective_control_step': boundary.control_step,
+            }
+        except BaseException as error:
+            admitted_profiles = getattr(self.session, '_position_profiles_by_writer', None)
+            if (not committed and isinstance(admitted_profiles, dict)
+                    and admitted_profiles.get(candidate.writer_id) is candidate):
+                committed = True
+            if not committed:
+                raise
+            # If a later pointer projection failed after RuntimeSession admitted
+            # the candidate, keep the Env and session owners aligned before latching.
+            self.position_profiles = (candidate,)
+            self.controller = candidate
+            self.value['controller'] = candidate
+            after_state = None
+            readback_error = None
+            try:
+                after_state = self.session.snapshot()
+                self.state = after_state
+            except BaseException as snapshot_error:
+                readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            fault = self._latch_fault(
+                'position_controller_switch_record', error,
+                before_state=before_state, after_state=after_state,
+                interval_attempted=False, interval_completed=False,
+                transition_status='not_assessed', readback_error=readback_error,
+            )
+            self._position_controller_switch_fault_receipt = {
+                'switch_id': switch_id,
+                'result': 'committed_but_effective_event_record_failed',
+                'request': {
+                    'operation': 'replace_position_controller_instance',
+                    'requested_profile_id': candidate.profile_id,
+                    'requested_writer_id': candidate.writer_id,
+                    'requested_controller_identity': candidate.identity,
+                    'action_config': asdict(candidate.config),
+                },
+                'previous_controller': {
+                    'profile_id': current.profile_id,
+                    'writer_id': current.writer_id,
+                    'controller_identity': current.identity,
+                    'action_config': asdict(current.config),
+                },
+                'effective_controller': {
+                    'profile_id': candidate.profile_id,
+                    'writer_id': candidate.writer_id,
+                    'controller_identity': candidate.identity,
+                    'action_config': asdict(candidate.config),
+                },
+                'previous_controller_identity': current.identity,
+                'active_controller_identity': self.controller.identity,
+                'effective_boundary': {
+                    **boundary.to_mapping(), 'boundary_id': boundary.boundary_id,
+                },
+                'effective_clock': clock.to_mapping(),
+                'preparation_succeeded': True,
+                'switch_effective': True,
+                'effective_event_recorded': False,
+                'first_control_application': 'not_attempted',
+                'execution_fault': fault.to_mapping(),
+            }
+            raise
+        return event
 
     def _step_position_profile(self, request):
         """Run one source-bound Position interval through the selected lifecycle latch."""
@@ -902,12 +1087,43 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'writer_id': profile.writer_id,
                 'controller_identity': profile.identity,
             } for profile in self.position_profiles)
+        if self._position_controller_switch_fault_receipt is not None:
+            details['controller_switch_fault_receipt'] = dict(
+                self._position_controller_switch_fault_receipt,
+            )
+        if self._pending_position_switch is not None:
+            switch_application = {
+                **self._pending_position_switch,
+            }
+            switch_application['status'] = (
+                'not_attempted_before_episode_end'
+                if (self._execution_fault is None
+                    and int(state.control_step) == self._pending_position_switch['effective_control_step'])
+                else 'not_confirmed_in_complete_transition'
+            )
+            last = getattr(self, 'last_position_transition', None)
+            if (isinstance(last, tuple) and len(last) == 3
+                    and getattr(last[1], 'controller_identity', None)
+                    == self._pending_position_switch['controller_identity']
+                    and getattr(last[1].source_boundary, 'boundary_id', None)
+                    == self._pending_position_switch['effective_boundary_id']
+                    and getattr(last[2], 'target_hash', None) == last[1].target.identity_hash):
+                switch_application.update({
+                    'status': 'target_ack_observed_but_transition_not_recorded',
+                    'target_identity_hash': last[1].target.identity_hash,
+                    'applied_target_hash': last[2].target_hash,
+                    'observed_runtime_boundary': int(self.state.control_step),
+                })
+            details['pending_controller_switch_application'] = switch_application
         details.update(dict(payload or {}))
         success = (
             bool(self._published_position_evaluation.success)
             if task_success is None and self._published_position_evaluation is not None
             else task_success
         )
+        event_sequence = 0
+        if self.recorder is not None and getattr(self.recorder, 'active', False):
+            event_sequence = self.recorder.next_boundary_event_sequence(int(state.control_step))
         return make_episode_end_v1(
             episode_id=boundary.episode_id,
             final_boundary=int(state.control_step),
@@ -917,6 +1133,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             bootstrap_allowed=bootstrap_allowed,
             source='task_env.selected_reference.position_servo_v1',
             payload=details,
+            event_sequence=event_sequence,
             task_success=success,
         )
 
@@ -1271,6 +1488,24 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         target_payload = target.target.to_mapping()
         target_hash = target.target.identity_hash
         applied_payload = applied.to_mapping()
+        canonical_action = {
+            **canonical.to_mapping(),
+            'position_target_v1': target.to_mapping(),
+            'position_target_identity_hash': target.identity_hash,
+        }
+        pending_switch = self._pending_position_switch
+        if pending_switch is not None:
+            if (target.controller_identity != pending_switch['controller_identity']
+                    or target.source_boundary.boundary_id != pending_switch['effective_boundary_id']):
+                raise ValueError('first post-switch target does not match the committed Controller/boundary')
+            canonical_action['controller_switch_application'] = {
+                'switch_id': pending_switch['switch_id'],
+                'status': 'target_and_applied_ack_recorded',
+                'controller_identity': target.controller_identity,
+                'effective_boundary_id': pending_switch['effective_boundary_id'],
+                'target_identity_hash': target.target.identity_hash,
+                'applied_target_hash': applied.target_hash,
+            }
         control = StructuredControlTransitionV1(
             'structured-control-transition-v1', request, ({
                 'writer_id': self.controller.writer_id,
@@ -1283,7 +1518,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                      'action_components': (schema.components[7],)},
                 ),
                 'requested_action': canonical.requested.to_mapping(),
-                'canonical_action': canonical.to_mapping(),
+                'canonical_action': canonical_action,
                 'controller_target': {
                     'schema_version': target.target.schema_version,
                     'payload': target_payload, 'identity_hash': target_hash,
@@ -1300,6 +1535,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
             structured_control=control,
         )
+        if pending_switch is not None:
+            self._pending_position_switch = None
 
     def _record_dual_position_transition(self, request, position_records, *, terminated, truncated):
         """Store both Entity writers in the existing Generic H5 v3 transition."""

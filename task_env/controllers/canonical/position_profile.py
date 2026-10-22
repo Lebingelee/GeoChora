@@ -188,10 +188,14 @@ class PandaPositionServoProfileV1:
                 'actuator_prefix': self.actuator_prefix,
             })
         self.identity = digest(identity_payload)
+        self._constructed_identity = self.identity
+        self._constructed_config = config
+        self._constructed_algorithm_identity = self._algorithm.identity
         self._plan_identity_hash = None
         self._episode_id = None
         self._reset_sample_id = None
         self._next_control_step = None
+        self._activation_boundary_id = None
 
     def _validate_source(self, source):
         expected_source_id = f'{self.scene.schema_version}:{self.scene.identity_hash}'
@@ -399,7 +403,51 @@ class PandaPositionServoProfileV1:
         self._episode_id = boundary.episode_id
         self._reset_sample_id = boundary.reset_sample_id
         self._next_control_step = 0
+        self._activation_boundary_id = boundary.boundary_id
         return boundary.boundary_id
+
+    def _prepare_switch_activation(self, publication, plan):
+        """Prepare fresh instance memory for a live, already-complete boundary.
+
+        This deliberately does not call ``reset()``: reset remains an episode
+        initialization contract and continues to accept only the step-zero
+        publication. The returned tuple is inert until the selected lifecycle
+        commits this instance as the active writer.
+        """
+        if any(value is not None for value in (
+            self._plan_identity_hash, self._episode_id, self._reset_sample_id,
+            self._next_control_step, self._activation_boundary_id,
+        )):
+            raise ValueError('PositionServoV1 switch candidate must be a fresh instance')
+        if (self.identity != self._constructed_identity
+                or self.config != self._constructed_config
+                or self._algorithm.identity != self._constructed_algorithm_identity
+                or self._algorithm.config != self._constructed_config):
+            raise ValueError('PositionServoV1 candidate identity or algorithm parameters changed after construction')
+        self._validate_source(self.source)
+        plan_identity = self._validate_plan(plan)
+        self._adapt_publication(publication)
+        boundary = publication.view.boundary
+        clock = publication.view.sample_clock
+        if (clock.clock_domain != 'evaluation_boundary'
+                or clock.sample_index != boundary.control_step
+                or boundary.control_step < 0):
+            raise ValueError('PositionServoV1 switch requires a complete evaluation boundary')
+        return (
+            self.identity, plan_identity, boundary.episode_id,
+            boundary.reset_sample_id, boundary.control_step, boundary.boundary_id,
+        )
+
+    def _activate_switch_memory(self, prepared):
+        """Install prevalidated mid-episode cursor state on this fresh instance."""
+        identity, plan_identity, episode_id, reset_sample_id, control_step, boundary_id = prepared
+        if identity != self.identity or self._next_control_step is not None:
+            raise ValueError('PositionServoV1 prepared switch activation no longer matches this instance')
+        self._plan_identity_hash, self._episode_id, self._reset_sample_id = (
+            plan_identity, episode_id, reset_sample_id,
+        )
+        self._next_control_step = control_step
+        self._activation_boundary_id = boundary_id
 
     def compute(self, publication, requested: RequestedAction, plan):
         self._validate_source(self.source)

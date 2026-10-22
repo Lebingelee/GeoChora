@@ -180,12 +180,23 @@ class TransitionRecorder:
         self._infos.append(info_value)
         self._observations.append(observation_value)
 
-    def add_boundary_event(self, event: BoundaryEventV1) -> None:
-        """Append an event at the recorder's current real control boundary."""
+    def next_boundary_event_sequence(self, boundary_index: int) -> int:
+        """Return the next event sequence at the current complete T/T+1 boundary."""
+        if not self._active:
+            raise RuntimeError("boundary events require an active recording")
+        if type(boundary_index) is not int or boundary_index != len(self._actions):
+            raise ValueError("boundary event must target the current control boundary")
+        if len(self._observations) != len(self._actions) + 1:
+            raise ValueError("boundary events require a complete T/T+1 recorder boundary")
+        return sum(item.boundary_index == boundary_index for item in self._boundary_events)
+
+    def validate_boundary_event(self, event: BoundaryEventV1) -> None:
+        """Validate an event without changing the active recording."""
         if not self._active:
             raise RuntimeError("boundary events require an active recording")
         if not isinstance(event, BoundaryEventV1):
             raise TypeError("event must be BoundaryEventV1")
+        event.validate()
         if event.boundary_index != len(self._actions):
             raise ValueError("boundary event must target the current control boundary")
         same_boundary = [item for item in self._boundary_events if item.boundary_index == event.boundary_index]
@@ -193,6 +204,10 @@ class TransitionRecorder:
             raise ValueError("boundary event sequence must be contiguous")
         if self._boundary_events and event.episode_id != self._boundary_events[0].episode_id:
             raise ValueError("boundary event episode identity mismatch")
+
+    def add_boundary_event(self, event: BoundaryEventV1) -> None:
+        """Append an event at the recorder's current real control boundary."""
+        self.validate_boundary_event(event)
         self._boundary_events.append(event)
 
     def end_episode(
