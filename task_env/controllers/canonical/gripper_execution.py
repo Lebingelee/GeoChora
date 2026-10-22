@@ -11,6 +11,9 @@ class EqualRateGripperServo:
         self._update=controller.inner_gripper_step
         self._last_control_step=None; self._last_target=None; self._last_diagnostics=None
         self.update_count=0; self.held_count=0
+    def reset(self):
+        self._last_control_step=None; self._last_target=None; self._last_diagnostics=None
+        self.update_count=0; self.held_count=0
     def __getattr__(self,name): return getattr(self.controller,name)
     def inner_gripper_step(self,state,feedback):
         due=state.control_step != self._last_control_step

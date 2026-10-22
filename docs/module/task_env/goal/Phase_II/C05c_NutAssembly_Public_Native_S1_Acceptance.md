@@ -1,7 +1,7 @@
 # C05c NutAssembly Public Native S1 Acceptance
 
 **Date:** 2026-10-22  
-**Current status (2026-10-22 continuation):** the contract-level S1 and defect-sensitive sampling regressions pass. The one-interval GeoPhys CPU evidence is **diagnostic-only** because its public CPU snapshot API explicitly disallows a read at every simulation substep. The exact MuJoCo 3.8.1 CPU route passed full external Expert S2 and canonical execution H5 S3. GeoPhys full S2/S3 remains blocked on a Provider-owned native-rate host sampling contract; C05c is not closed across Providers.
+**Current status (2026-10-22):** the specified GeoPhys NutAssembly experiment passed full external Expert S2 and same-file execution H5 S3 on CPU/CUDA × gripper 100/500 Hz. The experiment deliberately read the public CPU snapshot on every native step, beyond its normal low-frequency guidance; these results are diagnostic-only and do not expand the Provider contract, capability manifest, device-resident support, Qualification or complete C05c approval. The earlier MuJoCo 3.8.1 CPU route also passed its exact bounded S2/S3. See the [four-cell cadence comparison](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md).
 
 ## Preserved baseline and scope
 
@@ -111,7 +111,7 @@ The defect-sensitive S1 command covering full authored Guard policy, native samp
 
 Final targeted verification reran the combined command for those paths: **24 passed**. Python compilation for the changed Core/task/test modules, `git diff --check`, the TaskEnv Skill checker, and the new C05c report-anchor check passed. The repository-wide `validate_docs.py` was also attempted; it reports the existing Phase A link to an absent C02b anchor, the checked-in documentation inventory count limit, and a documentation-only scope mismatch: it compares against an older inventory baseline and therefore rejects this authorized Core/test work plus other implementation changes already on the branch. No new C05c receipt link failed the targeted anchor check. No broad repository regression or Qualification run was performed.
 
-### Provider-split exit status
+### Provider-split exit status at the time of the MuJoCo continuation
 
 | Provider/backend | C05c native sample contract | External NutAssembly Expert S2 | H5 S3 | Result |
 | --- | --- | --- | --- | --- |
@@ -119,3 +119,9 @@ Final targeted verification reran the combined command for those paths: **24 pas
 | MuJoCo 3.8.1 / CPU | Per-substep signed sample, phase and identity exercised by the existing RuntimeSession path | Passed, seed 19; task success and strict Expert completion both separately recorded | Passed on the same file with state/time, identity, target/ack, full native stream, T/T+1, outcome and guard authorization readback | **Passed for this exact bounded intersection** |
 
 No GeoPhys code or pin, frozen Artifact, old `step_expert()` route, Guard threshold or Outcome policy changed. Full C05c across both Providers, Assembly, C02b and Qualification remain open.
+
+## GeoPhys 100/500 Hz × CPU/CUDA cadence comparison (2026-10-22)
+
+The four requested GeoPhys groups have now each passed a two-interval native Probe, full external Solution S2 and same-run execution Recorder H5 S3: CPU/100 Hz, CPU/500 Hz, CUDA/100 Hz and CUDA/500 Hz. All used the same fixed `a53a8cf` Provider, TaskArtifact/source/ResetSample seed 19, 100 Hz outer control, five 2 ms physics steps, R3, 10 N force target/cap and unchanged 8 N / 0.1 s Guard. The measured update/hold counts were exactly 2,443/9,772 for the 100 Hz groups and 12,210/0 for the 500 Hz groups. Each produced task success, planned Outcome completion and strict Expert completion without warning; Guard used 50 consecutive samples and authorized at 5.17 s, consumed at 5.18 s. Full counts, source/config identities, cost measurements, exact H5 hashes and preserved early CPU 100 Hz contract-failure attempts are in the [comparison report](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) and ignored `workspace/maintenance/nutassembly_gripper_cadence_geophys_20261022/comparison.json`.
+
+The four-cell result is an authorized diagnostic exception to the Reader's usual low-frequency guidance: the existing public `read_cpu_snapshot()` was called at every native substep. It does not establish generic GeoPhys per-substep support, a general CUDA capability, device-resident control, or formal qualification. No Provider source/pin, TaskArtifact, Guard/Outcome policy or legacy `step_expert()` behavior changed. Complete C05c approval and qualification remain open.

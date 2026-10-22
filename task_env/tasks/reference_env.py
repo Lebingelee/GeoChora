@@ -29,6 +29,16 @@ METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1'
 _RESET_SEED_UNSET = object()
 
 
+def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
+                                       physics_dt_s, native_steps):
+    """Bound binary clock drift from native increments plus boundary subtraction."""
+    clock_ulp = max(
+        math.ulp(float(start_time_s)), math.ulp(float(end_time_s)),
+        math.ulp(float(expected_dt_s)), math.ulp(float(physics_dt_s)),
+    )
+    return (int(native_steps) + 2) * clock_ulp
+
+
 def _identity_seed(seed):
     return seed
 
@@ -67,6 +77,7 @@ class ReferenceTaskBinding:
     build_external: Callable | None = None
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
+    build_gripper_cadence_diagnostic: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -146,9 +157,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.position_profile = False
             self.controller = raw
 
-    def __init__(self, *, provider='geophys', backend='cpu', horizon=6000, _binding=None):
-        if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
-            raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
+    def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
+                 _binding=None, _diagnostic_gripper_control_hz=None):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
         if _binding is not None:
@@ -157,10 +167,29 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.binding = _binding
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
-        self.provider, self.horizon = provider, horizon
+        if _diagnostic_gripper_control_hz is None:
+            if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
+                raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
+            self._diagnostic_profile = None
+            build_value = lambda: self.binding.build(provider)
+        else:
+            if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
+                    or type(_diagnostic_gripper_control_hz) is not int
+                    or _diagnostic_gripper_control_hz not in {100, 500}
+                    or self.binding.build_gripper_cadence_diagnostic is None):
+                raise ValueError(
+                    'gripper cadence diagnostic requires the opted-in GeoPhys NutAssembly binding, '
+                    'CPU/CUDA, and 100/500 Hz'
+                )
+            self._diagnostic_profile = 'nutassembly-gripper-cadence-v1'
+            self._diagnostic_gripper_control_hz = _diagnostic_gripper_control_hz
+            build_value = lambda: self.binding.build_gripper_cadence_diagnostic(
+                provider, backend, _diagnostic_gripper_control_hz, True,
+            )
+        self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
         try:
-            self.value = self.binding.build(provider)
+            self.value = build_value()
         except BaseException as error:
             fault = ExecutionFaultV1.from_exception(
                 'selected_construction', error
@@ -336,8 +365,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 previous_session.close()
             phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
-            self.value = (self.binding.build_external(self.provider)
-                          if external_solution is not None else self.binding.build(self.provider))
+            if self._diagnostic_profile is not None:
+                self.value = self.binding.build_gripper_cadence_diagnostic(
+                    self.provider, self.backend, self._diagnostic_gripper_control_hz,
+                    external_solution is None,
+                )
+            else:
+                self.value = (self.binding.build_external(self.provider)
+                              if external_solution is not None else self.binding.build(self.provider))
             if self.value['artifact'] != self.artifact:
                 raise ValueError('selected Artifact changed between construction and reset')
             if external_solution is not None:
@@ -358,7 +393,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             else:
                 self.sample = self.binding.reset_sample(self.artifact, seed)
                 self._selected_episode_id = uuid4().hex
-            self.execution = ExecutionSpec(self.provider, PROFILE, 'none', 'cpu', 0, 'strict')
+            self.execution = ExecutionSpec(self.provider, PROFILE, 'none', self.backend, 0, 'strict')
             phase = 'session_materialization'
             if self.position_profile:
                 from ..runtime.sessions.control import (
@@ -397,7 +432,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             else:
                 self.position_profile = False
                 self.session = materialize_control(self.artifact, self.execution,
-                    source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08))
+                    source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08),
+                    diagnostic_profile=(self._diagnostic_profile
+                                        if self.backend == 'cuda' else None))
             phase = 'runtime_reset'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
@@ -560,10 +597,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         expected_dt = self.artifact.timebase.control_dt
         actual_dt = (receipt['evaluation_boundary']['simulation_time_s']
                      - receipt['request_boundary']['simulation_time_s'])
-        tolerance = max(
-            math.ulp(receipt['evaluation_boundary']['simulation_time_s']),
-            math.ulp(receipt['request_boundary']['simulation_time_s']),
-            math.ulp(expected_dt),
+        tolerance = _boundary_interval_clock_tolerance(
+            receipt['request_boundary']['simulation_time_s'],
+            receipt['evaluation_boundary']['simulation_time_s'],
+            expected_dt,
+            self.artifact.timebase.physics_dt,
+            self.artifact.timebase.control_substeps,
         )
         if abs(actual_dt - expected_dt) > tolerance:
             raise ValueError('control acknowledgement does not match the selected control timebase')

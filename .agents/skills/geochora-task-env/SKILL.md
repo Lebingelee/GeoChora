@@ -22,11 +22,11 @@ For the source/contract/test map read [routes](references/routes.md) when implem
   Keep guarded `step_expert()` for the retained internal route. A task-owned external Solution is available
   through `from task_env.tasks.nut_assembly import build_outcome_solution`, `reset_for_solution(solution, seed=19)`,
   and `step_with_solution(solution)`. The bounded full external Expert + execution H5 S2/S3 result is accepted
-  only for MuJoCo 3.8.1 CPU and the exact C05c source/profile in its receipt. GeoPhys `a53a8cf` CPU single-interval
-  evidence is diagnostic-only because its public `read_cpu_snapshot()` contract forbids every-substep reads; do not
-  claim GeoPhys 500 Hz host-servo support or run this full route until the Provider observation owner supplies the
-  required native sample value/phase/freshness contract; the Core RuntimeSession binds Provider samples to its
-  episode/reset/evaluation-boundary identity. Neither route admits raw external actions.
+  only for the exact C05c source/profile in its receipt. The GeoPhys `a53a8cf` CPU/CUDA × 100/500 Hz comparison
+  also passed full diagnostic S2/S3, but deliberately called public `read_cpu_snapshot()` on every native step
+  despite its general low-frequency guidance. This does not establish a generally supported 500 Hz host-servo
+  contract, change a manifest, or establish device-resident control. RuntimeSession binds samples to its
+  materialization and episode/reset/evaluation-boundary identity. Neither route admits raw external actions.
 - Selected config accepts provider/backend/horizon only: geophys/mujoco, scalar CPU, horizon integer 1–6000.
   No render, legacy overlays, SAPIEN/Genesis or implicit batch support. Generic parallel must have explicit
   homogeneous registration and merged_scene layout; no scalar fallback.
@@ -35,12 +35,15 @@ For the bounded NutAssembly external Solution route, caller owns the active Solu
 selected Environment publishes its actual reset/runtime boundary, `step_with_solution()` supplies the
 native RuntimeSession sample/ack contract, and the existing execution Recorder persists substep samples.
 Keep the Panda `actuator8` signed-force/N mapping, reset-forward versus completed-step pre-integration
-phase, and five 2 ms updates per 100 Hz interval. Do not read `env.solution`, private Solution stage,
+phase, and five 2 ms native samples per 100 Hz interval. Do not read `env.solution`, private Solution stage,
 or a mutable hold/ramp object. The MuJoCo receipt verifies task success, Expert/Outcome completion,
 the original 8 N / 0.1 s close Guard, Controller-owned hold/ramp acknowledgements and same-file H5 readback
-for 2,377 intervals. GeoPhys's current public CPU snapshot is diagnostic-only at native rate; the exact
-Provider gap and S2/S3 evidence are in the
-[C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md).
+for 2,377 intervals. The explicit `NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(backend, gripper_control_hz)`
+and `build_gripper_cadence_diagnostic_solution(...)` reuse those owners for the exact GeoPhys cadence comparison.
+They completed CPU/CUDA × 100/500 Hz S2/S3, using host snapshots at each native step as an authorized diagnostic
+exception. The default selected constructor remains CPU-only; do not infer generic capability or GPU-resident
+control. Update counts, timing and H5 hashes are in the [cadence report](../../../docs/module/task_env/goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)
+and [C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md).
 
 Use [examples](../../../examples/README.md) for exact current CLI commands. Preserve fresh output paths,
 resource bounds and provenance. Repository has no root packaging metadata: dependencies via requirements,

@@ -16,6 +16,11 @@ MuJoCo typed-force、通用 `actuator_force_query`、完整 C02b、其他任务�
 [typed-force 收据](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)和
 [C05b S2/S3 收据](goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
 
+C05c 另有独立 NutAssembly `OutcomeSolutionV1` 证据：MuJoCo 3.8.1 CPU 原 external Expert/H5 S2/S3，以及 GeoPhys
+`a53a8cf` CPU/CUDA × gripper 100/500 Hz 四格真实 S2/S3 都通过。GeoPhys 对照特意逐 native 子步调用公开
+`read_cpu_snapshot()`，属于本次 diagnostic exception；不修改 Provider pin/manifest，不转为一般 per-substep API
+支持，也不声称 CUDA device-resident Controller。详见 [C05c cadence comparison](goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
+
 ## GeoPhys 开发基线同步（2026-10-20）
 
 本次将三个 Phase II 开发分支与 develop 的 GeoPhys 从
@@ -162,11 +167,13 @@ native actuation interval measurement，sign/index 转换留 adapter；不宣称
 
 Selected reference 使用 finite 8D world absolute pose request；PickCube 可用 external action 或 expert，
 同一 episode 不能混用；NutAssembly raw external action 拒绝，并保留 `step_expert()`。NutAssembly
-task-owned external Solution 的 MuJoCo 3.8.1 CPU full Expert S2 与 execution H5 S3 已在精确 source/profile
-上 bounded 通过。GeoPhys `a53a8cf` CPU 单 interval 数据仅为 diagnostic：其公开 `read_cpu_snapshot()`
-明确禁止每个 native substep 读取，故完整 500 Hz 外部路线未运行；Provider observation owner 仍需提供
-host-readable 的 native sample value/phase/freshness 合同，Core RuntimeSession 再绑定 materialization 与
-episode/reset/evaluation-boundary identity。详见 [C05c receipt](goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
+task-owned external Solution 的 MuJoCo 3.8.1 CPU full Expert S2/H5 S3 已在精确 source/profile 上 bounded 通过。
+额外的显式诊断入口 `NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(...)` 已在 GeoPhys `a53a8cf`
+CPU/CUDA 的 100/500 Hz cadence 四格完成 Probe、full Expert、Guard 与同文件 H5 S2/S3；它逐 native 子步调用公开
+`read_cpu_snapshot()`，所以不扩展该 Reader 的常规使用合同、selected 默认入口、global capability 或 device-resident control。
+CUDA 读回仍经 CPU host sample。source/config/每组成本与原始 H5 见
+[C05c cadence receipt](goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) 与
+[C05c receipt](goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
 Selected reset 重建 controller/solution owner 状态，不推进物理，录制需先 finalize 再 reset。
 
 ### C02b Position Profile candidate (2026-10-21)

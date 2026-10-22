@@ -501,8 +501,15 @@ def materialize_control(
     manifest=None,
     controller_binding_plan: ControlBindingPlanV1 | None = None,
     controller_profile=None,
+    diagnostic_profile=None,
 ):
-    actual_manifest = provider_manifest(execution.physics_provider)
+    if diagnostic_profile is None:
+        actual_manifest = provider_manifest(execution.physics_provider)
+    else:
+        from .api import _diagnostic_manifest
+        if manifest is not None:
+            raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
+        actual_manifest = _diagnostic_manifest(artifact, execution, source, diagnostic_profile)
     if manifest is not None:
         admit_capabilities(CONTROL_REQUIRED, manifest, execution)
     admit_capabilities(CONTROL_REQUIRED, actual_manifest, execution)
@@ -609,6 +616,7 @@ def materialize_control(
         artifact, execution, source=source,
         manifest=admission_manifest,
         _materialization_authority=materialization_authority,
+        _diagnostic_profile=diagnostic_profile,
     )
     session._control_binding = binding
     if controller_binding_plan is not None:

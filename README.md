@@ -31,7 +31,10 @@ python examples/tasks/pick_cube.py --provider mujoco --seed 31
 
 完整环境准备、selected public API、expert/record/inspect 命令及失败行为见
 [TaskEnv 入口](docs/module/task_env/README.md)和[examples](examples/README.md)。
-Selected NutAssembly 必须通过 guarded `step_expert()`；task outcome 与 Expert completion 分开记录。
+Selected NutAssembly CLI 保留 guarded `step_expert()`；另有 task-owned external Solution 路线，task outcome 与
+Expert completion 分开记录。其 GeoPhys CPU/CUDA × gripper 100/500 Hz S2/S3 是逐子步公开 host snapshot 的
+diagnostic comparison，不扩大 Provider capability 或 Qualification，详见
+[C05c cadence report](docs/module/task_env/goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
 
 ## 当前能力边界
 

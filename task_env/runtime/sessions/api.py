@@ -20,6 +20,8 @@ CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
+_GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
+_GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
 
 
 class RuntimeSession(Protocol):
@@ -68,16 +70,65 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
     )
 
 
+def _diagnostic_manifest(artifact, execution, source, profile_id):
+    """Return a process-local admission view for one non-capability diagnostic.
+
+    This does not change ``provider_manifest`` or any production registry. It
+    is deliberately tied to the frozen NutAssembly v0 source and the exact
+    GeoPhys CUDA cadence experiment requested for C05c.
+    """
+    from dataclasses import replace
+
+    if profile_id != _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE:
+        raise ValueError('unknown RuntimeSession diagnostic admission profile')
+    if not isinstance(artifact, TaskArtifact):
+        raise ValueError('NutAssembly cadence diagnostic requires the frozen TaskArtifact v0')
+    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
+            or artifact.task_id != 'nut-assembly-square-v1'
+            or artifact.timebase.physics_dt != 0.002
+            or artifact.timebase.control_dt != 0.01
+            or artifact.timebase.control_substeps != 5
+            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
+        raise ValueError('diagnostic admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
+    if (execution.physics_provider != 'geophys' or execution.backend != 'cuda'
+            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
+            or execution.determinism_mode != 'strict'):
+        raise ValueError('diagnostic admission is limited to GeoPhys CUDA with the existing scalar profile')
+    if (source.task_artifact_hash != artifact.identity_hash
+            or source.scene_source.source_id !=
+            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
+            or source.config.runtime.backend != 'cuda'
+            or source.config.runtime.physics_dt != 0.002
+            or source.config.runtime.control_substeps != 5
+            or source.config.render.camera_obs
+            or len(source.joint_targets) != 7
+            or tuple(source.open_actuators) != ('actuator8',)):
+        raise ValueError('diagnostic admission source does not match the exact NutAssembly R3 execution source')
+    build = provider_build_identity('geophys')
+    if build['repository_revision'] != _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION:
+        raise ValueError('diagnostic admission requires the fixed GeoPhys a53a8cf repair baseline')
+    cpu_manifest = provider_manifest('geophys')
+    return replace(
+        cpu_manifest,
+        adapter_version='task-env-c05c-geophys-cuda-cadence-diagnostic-v1',
+        backend='cuda',
+        evidence_reference='diagnostic-only-no-capability-or-qualification',
+    )
+
+
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec, *, source: RuntimeSource,
                 manifest: ProviderCapabilityManifest | None = None,
-                _materialization_authority=None) -> RuntimeSession:
+                _materialization_authority=None, _diagnostic_profile=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
-    actual = provider_manifest(execution.physics_provider)
+    actual = (provider_manifest(execution.physics_provider) if _diagnostic_profile is None
+              else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile))
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
+        if _diagnostic_profile is not None:
+            raise ValueError('diagnostic admission cannot be combined with a caller-supplied manifest')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)
     if execution.render_provider != 'none':

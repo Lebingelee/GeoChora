@@ -141,10 +141,16 @@ class NutAssemblyNativeFeedbackSampleV1:
         if abs(self.sample_time_s - expected_time) > 1e-10:
             raise ValueError("native force sample is stale beyond its documented pre-integration phase")
         diagnostics = self.controller_diagnostics
-        if (diagnostics.get("inner_update_performed") is not True
-                or diagnostics.get("configured_inner_rate_hz") != 500
-                or diagnostics.get("inner_update_period_s") != 0.002):
-            raise ValueError("native feedback sample lacks a performed 500 Hz Controller update")
+        rate_hz = diagnostics.get("configured_inner_rate_hz")
+        update_performed = diagnostics.get("inner_update_performed")
+        update_period_s = diagnostics.get("inner_update_period_s")
+        expected_update = True if rate_hz == 500 else self.substep_index == 0
+        expected_period_s = 0.002 if rate_hz == 500 else 0.01
+        if (rate_hz not in (100, 500)
+                or type(update_performed) is not bool
+                or update_performed is not expected_update
+                or update_period_s != expected_period_s):
+            raise ValueError("native feedback sample does not match the declared 100/500 Hz gripper update cadence")
         measured_force = float(self.feedback.gripper.closing_force_N)
         if (not math.isfinite(measured_force)
                 or diagnostics.get("closing_force_N") != measured_force
@@ -264,6 +270,29 @@ class NutAssemblyNativeIntervalReceiptV1:
         identities = (self.provider, self.task_artifact_hash, self.source_id,
                       self.source_xml_sha256, self.controller_identity, self.solution_identity,
                       self.provider_materialization_id)
+        configured_rates = {
+            sample.controller_diagnostics.get("configured_inner_rate_hz")
+            for sample in self.samples
+        }
+        if len(configured_rates) != 1 or next(iter(configured_rates)) not in (100, 500):
+            raise ValueError("native interval gripper cadence is missing or changes within the interval")
+        gripper_rate_hz = next(iter(configured_rates))
+        if gripper_rate_hz == 100:
+            first = self.samples[0]
+            first_opening = first.controller_diagnostics.get("commanded_opening_m")
+            first_applied_opening = float(
+                first.applied_acknowledgement.get("gripper_servo_opening_m", math.nan)
+            )
+            if (not math.isfinite(float(first_opening))
+                    or not math.isfinite(first_applied_opening)
+                    or any(
+                        abs(float(sample.controller_diagnostics.get(
+                            "commanded_opening_m", math.nan)) - float(first_opening)) > 1e-12
+                        or abs(float(sample.applied_acknowledgement.get(
+                            "gripper_servo_opening_m", math.nan)) - first_applied_opening) > 1e-8
+                        for sample in self.samples[1:]
+                    )):
+                raise ValueError("100 Hz gripper target was not held across the remaining four native substeps")
         last_sequence = None
         for index, sample in enumerate(self.samples):
             sample.validate()
@@ -1263,9 +1292,15 @@ class NativeRateGripperServo(EqualRateGripperServo):
 
 class ReferenceExecutionController:
     """Existing Controller owner for the selected R3 arm and gripper execution."""
-    def __init__(self, hold, control_dt):
+    def __init__(self, hold, control_dt, *, gripper_rate_hz=500):
         self.hold = hold
-        self.inner = NativeRateGripperServo(hold.controller, 500, control_dt)
+        if gripper_rate_hz == 500:
+            self.inner = NativeRateGripperServo(hold.controller, 500, control_dt)
+        elif gripper_rate_hz == 100:
+            self.inner = EqualRateGripperServo(hold.controller, 100, control_dt)
+        else:
+            raise ValueError('NutAssembly R3 diagnostic gripper cadence must be 100 or 500 Hz')
+        self.gripper_rate_hz = int(gripper_rate_hz)
     def __getattr__(self, name): return getattr(self.hold, name)
     def reset(self, state, feedback):
         self.inner.reset()

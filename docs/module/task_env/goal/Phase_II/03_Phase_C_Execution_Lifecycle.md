@@ -2,7 +2,7 @@
 
 > **Phase C remaining design: PROPOSED.** C02a/C05a/C03a/C03b/C04 have bounded implementation receipts below;
 > C02b remains BLOCKED, C02c and unified Environment migration remain incomplete.
-> C05c has a provider-split result: MuJoCo 3.8.1 CPU full external Expert S2 and H5 S3 passed for the recorded NutAssembly source; GeoPhys `a53a8cf` CPU native sampling remains diagnostic-only because its public CPU snapshot disallows per-substep use. See [C05c continuation receipt](C05c_NutAssembly_Public_Native_S1_Acceptance.md#c05c-continuation-sampling-contract-and-mujoco-s2s3-2026-10-22).
+> C05c has a bounded four-cell diagnostic comparison: GeoPhys `a53a8cf` CPU/CUDA × gripper 100/500 Hz full external Expert S2 and same-file H5 S3 passed. The run intentionally used public `read_cpu_snapshot()` every native step despite its normal low-frequency guidance; it does not expand generic Provider support or Qualification. See [cadence comparison](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) and [C05c receipt](C05c_NutAssembly_Public_Native_S1_Acceptance.md).
 > **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；之后维护者分别授权 C02b-P/E 与 C03b 有界实现。
 > 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
 > Recovery Review 及后续 E-S1/S2、R1 freshness/typed-force 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)、[dual Entity Position receipt](C02b_Dual_Entity_Position_Acceptance.md)、[C02b-R1 reset-force freshness](C02b_R1_Reset_Force_Freshness_Acceptance.md) 与 [C02b-R1 typed-force admission](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。C02b 仍 BLOCKED；历史收据不改写。
@@ -42,7 +42,7 @@
 | [`task_env/observations/state.py`](../../../../../task_env/observations/state.py) | State/Privileged/Private/Vision field builders 和 schema | 保留现有 obs 分组，对不同 robot 扩展 typed schemas |
 | [`task_env/recorders/`](../../../../../task_env/recorders) | `TransitionRecordWrapper`、H5 v2、T/T+1 规则 | Stop/Controller switch/Solution metadata 使用版本化事件，不能伪造物理 step |
 
-**初始审阅的关键回归风险**：当时 NutAssembly 禁止 external action，并依赖旧 `step_expert()` 获取真实 Native-rate Guard Evidence、Readiness、11-stage Solution 所需反馈；如果仅把 `solution.act()` 移到外部却删除底层必要测量，属于功能破坏。C05c S1 后现已接通受控 task-owned external Solution native contract 与单 interval Probe；完整 Expert/Guard S2/S3 仍 open。旧 selected route 的成功后继续执行、录制和 terminal 不同于 Generic Gym Success Stop，不能一律改成 `terminated=success`。
+**初始审阅的关键回归风险**：当时 NutAssembly 禁止 external action，并依赖旧 `step_expert()` 获取真实 Native-rate Guard Evidence、Readiness、11-stage Solution 所需反馈；如果仅把 `solution.act()` 移到外部却删除底层必要测量，属于功能破坏。C05c S1 后接通受控 task-owned external Solution native contract；之后指定的 MuJoCo CPU 路线及 GeoPhys CPU/CUDA × 100/500 Hz 诊断矩阵完成 full Expert/Guard S2/S3。GeoPhys 矩阵逐 native step 调用公开 Reader，属于明确诊断例外，不扩大其通常使用合同。旧 selected route 的成功后继续执行、录制和 terminal 不同于 Generic Gym Success Stop，不能一律改成 `terminated=success`。
 
 ### C.1.1 审阅建立的额外耦合
 
@@ -51,7 +51,7 @@
   限定七 arm targets 和一个 0.08 m gripper binding。统一继承不是接口适配的替代。
 - NutAssembly 初始构造共享 arm_hold；初始审阅发现 Solution 修改 locked、ReferenceArmSchedule 读 `_lift_released` 决定 native ramp。
   C05c S1 已将受限 track/hold/ramp 请求表达在既有 action contract，由 Controller 保有单一 ack 状态，且 RuntimeSession
-  样本身份绑定到同一 reset episode；外部路线不依赖私有 stage/可变 hold。完整 Guard/Outcome external rollout 仍待 S2/S3。
+  样本身份绑定到同一 reset episode；外部路线不依赖私有 stage/可变 hold。之后完成的指定 Guard/Outcome external rollout S2/S3 见 [C05c cadence comparison](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)；GeoPhys 部分仅为逐子步 host Reader 的诊断证据。
 - [TransitionRecorder](../../../../../task_env/recorders/recorder.py#L104-L145) 将 action 转成 NumPy vector，
   [H5 writer](../../../../../task_env/recorders/h5.py#L150-L157) 按固定 components 堆叠。
   当前并不支持本页 proposed action tree；C05a 的存储工作必须前移。
@@ -267,7 +267,7 @@ External Solution (planner/RL/VLA/LLM/privileged policy)
 要求：
 
 1. `step_expert` **不进入 vNext 标准 public API**，但旧 `SelectedReferenceEnv` 过渡期保留至所有生产调用迁移/相应回归通过。
-2. 为 NutAssembly 独立 Solution 保留 Native Guard Samples、 Readiness/Warn/Stage 事实；不要让 Env 自行推断 Solution Completion。C05c S1 已持久化单 interval 的真实 samples；尚未通过 full Expert S2/S3。
+2. 为 NutAssembly 独立 Solution 保留 Native Guard Samples、 Readiness/Warn/Stage 事实；不要让 Env 自行推断 Solution Completion。C05c 指定路线已有真实 full Expert S2/S3；GeoPhys CPU/CUDA × cadence 证据使用每个 native step 的公开 host snapshot，范围与限制见对应报告。
 3. Task success（物理谓词）、Solution completion（11-stage/retreat）、env terminated/truncated 分别记录；不可把 strict failure 重写成 pass。
 4. NutAssembly raw external action 仍被拒绝；受控的 task-owned Solution route 已有 bounded C05c S1，不是任意 Control Action Admission，也不应删除 `external_action_error` 解禁所有输入。
 5. 典型用户 loop 归用户脚本/未来 Experiment Runner；本轮可以更新 `examples/` 演示，不新增通用 `Runner(env,policy).run()`。
@@ -525,7 +525,7 @@ refresh、完整 C02b 或 Phase II qualification。C02b 仍 **BLOCKED**；本 re
   [05 的映射表](05_Architecture_Review_and_Execution_Order.md#32-c05a-既有证据与三切片映射)逐项列明已有/未证实范围，
   不因拆分撤销 C03a/C04 已有受限验收，也不把未证实的 consumer gate 记为通过。
 - **C05b**：依赖 C02b/C03b/C04/C05a3，迁移 PickCube external Solution，证明 action→step→record 路线。
-- **C05c**：依赖 C05b/D02b。2026-10-22 的首个受限切片已在现有 owners 内接通 native sample/phase/reset identity、Controller-owned hold/ramp request+ack 与 execution Recorder 保存，并在 GeoPhys `a53a8cf` CPU、MuJoCo 3.8.1 CPU 各完成一段真实 native interval。旧 `step_expert` 保留；full external Expert、真实 close Guard authorization、Outcome/strict warning-failure full campaign 和 S2/S3 留待后续授权。
+- **C05c**：依赖 C05b/D02b。首个受限切片在现有 owners 内接通 native sample/phase/reset identity、Controller-owned hold/ramp request+ack 与 execution Recorder 保存，并保留旧 `step_expert`。其后 MuJoCo 3.8.1 CPU 原 external Expert S2/S3 bounded passed；2026-10-22 的独立诊断又在 GeoPhys `a53a8cf` CPU/CUDA × 100/500 Hz 四格完成 full external Expert、真实 close Guard、Outcome/strict completion 与同文件 H5 S3。该四格违反 Reader 的常规 per-substep 低频指导，明确仅为 diagnostic-only，不打开通用 capability 或 Qualification；完整 C05c approval 仍开放，见 [cadence receipt](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
 - **验收**：同 frozen sample/config 在 GeoPhys/MuJoCo 已实现的受限 selected route 上，success/current-success/Expert outcome/适用时的 Guard/clock/recording 与旧基线有据可查；记录 T/T+1。PickCube 当前没有 native Guard callback；C05b 复用其 readiness policy，不新增 Guard。对 PickCube 既有 R1 路线，先保留 `stop()` 不支持及 canonical-v0 无 Event/Outcome 的当前语义；只有经单独契约修订和授权扩展 C03b-R1 后，才可要求 R1 Stop Events。不得因 C03b Position 已支持 Stop 而静默改变 R1。不得宣称完整 checkpoint replay；S2/S3 未跑标记缺口；兼容方法在所有 caller 迁移前不能删除。
 - **完整 C05 Gate**：C05a1/a2/a3/b/c 分别有退出证据映射或 receipt，真实采集/读取及适用的 replay validity 独立报告；
   旧方法退休另需 production callers/examples/tests/docs 迁移及非回归，不与“新接口已存在”绑定。
@@ -976,7 +976,7 @@ S2 均未开始/验收，因此序号 24 不得标为完成，也不能宣称双
 
 **C02b 仍 BLOCKED 的具体 gate：** (1) Scene-v3 Panda R1 GeoPhys candidate 虽有 typed raw-force、精确 plan admission 和一条真 interval，仍欠完整 structured R1 open/close/obstructed-close/force-hold/reopen 与 action/feedback/target/ack/state 录制；(2) MuJoCo 缺 R1 required typed raw-force publication、精确 admission 与真实 plan-bound interval；(3) dual Entity Position S2/H5 是 force-free；(4) Qualification 未通过。legacy PickCube `production-r1` C05b S1/S2/S3 在其原身份上已通过，不要求迁移为 Scene-v3 candidate。完整列表见 C05c S1 acceptance 和 [执行顺序表 §3](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 
-## C.12.1 C05c 连续 native 验证与 MuJoCo S2/S3（2026-10-22）
+## C.12.1 C05c 连续 native 验证与 MuJoCo S2/S3（2026-10-22；当时的状态记录）
 
 **状态：MuJoCo CPU 的指定交集 bounded S2/S3 通过；GeoPhys CPU 完整 S2/S3 因公开采样合同冲突未运行，保留 diagnostic-only。** 本轮检查点为本地 `389951c`，GeoPhys pin 仍为 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。完整依据、身份与 raw Evidence 位置见 [C05c continuation receipt](C05c_NutAssembly_Public_Native_S1_Acceptance.md#c05c-continuation-sampling-contract-and-mujoco-s2s3-2026-10-22)。
 
@@ -989,3 +989,9 @@ MuJoCo 3.8.1 CPU 在独立真实进程沿现有 task-owned `OutcomeSolutionV1` �
 直接 GeoPhys adapter sampling 回归 **17 passed**：接受连续 native 读取与跨五个 native steps 的连续外层读取；拒绝同状态 sample 变化、sequence/index 跳号、provider/evaluation 时间错配及 reset 串样。NutAssembly Guard/receipt/fault/incomplete-freeze 定向回归 **7 passed**。多区间的全部 MuJoCo samples、Guard rows、target 和 ack 已在 H5 逐条读取，不以最后一个样本代表中间步骤。
 
 **范围边界：** GeoPhys 未做 full S2/S3；MuJoCo 结果仅适用于本收据指定 source/profile/backend，不扩展到 GeoPhys、其他 Provider/backend、MuJoCo R1 typed-force admission、C02b、Assembly、Qualification 或 Phase II。完整 C05c 跨 Provider 关闭仍待 GeoPhys Provider owner 增补并验证 native-rate CPU host sample 合同后再单独执行。
+
+## C.12.2 C05c GeoPhys gripper cadence comparison（2026-10-22）
+
+**指定诊断矩阵 S2/S3 通过：** GeoPhys `a53a8cf` 的 CPU/CUDA backend 各完成 100 Hz 与 500 Hz gripper law 四个独立进程。任务均使用 NutAssembly frozen TaskArtifact/source、NA-S0 seed 19 和同一 ResetSample、R3、100 Hz 外层、5×2 ms native clock、10 N force target/cap、原 8 N / 0.1 s Guard 与原 Outcome/strict policy。每格先做两 interval native Probe，再完成真实 task-owned external Solution、Recorder 与同文件 H5 回读。100 Hz 的真实更新/保持计数为 2,443/9,772；500 Hz 为 12,210/0；四格 Task success、planned Outcome 和 strict Expert completion 均通过，Guard 均由 50 个连续 500 Hz 样本于 5.17 s 授权、5.18 s 消费。精确时钟、force、stage、ack、cost、H5 hash 及保留的早期 checker/contract failures 见 [cadence report](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) 与 ignored `workspace/maintenance/nutassembly_gripper_cadence_geophys_20261022/comparison.json`。
+
+本实验明确以 public GeoPhys `RobotArmObservationReader.read_cpu_snapshot()` 每个 2 ms 子步读取，尽管其常规文档限制该读取为低频用途。CUDA 实际初始化 Taichi `cuda` 并使用 RTX 5060；控制与 force readback 仍在 CPU host，不是 device-resident Controller。该越界用于执行本次诊断矩阵，不授予通用 per-substep Provider 能力，不改变 manifest、Provider pin 或 Reader 使用合同；没有私读 solver。结果不把四个 S2/S3 诊断自动提升为完整 C05c approval、Qualification、C02b 或 Phase II。

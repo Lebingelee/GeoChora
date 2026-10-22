@@ -215,27 +215,31 @@ def sample_reset(artifact: TaskArtifact, task_seed: int = 19) -> ResetSample:
         settle_steps=int(_recipe()["reset"]["settle_steps"]))
 
 
-def _environment_config():
+def _environment_config(*, backend='cpu', diagnostic=False):
     recipe = _recipe()
     base = resolve_env_config(task_uid=recipe["task_uid"], scene_uid=recipe["scene_uid"],
         agent_uids=tuple(recipe["agent_uids"]), object_uids=tuple(recipe["object_uids"]),
         success_definition=recipe["success_definition"])
     config = overlay_public_env_config(base, _configuration()["environment"])
-    return replace(config, runtime=replace(config.runtime, backend="cpu", prewarm=False,
+    if backend != 'cpu' and not (diagnostic and backend == 'cuda'):
+        raise ValueError('NutAssembly selected construction is CPU-only outside the cadence diagnostic')
+    return replace(config, runtime=replace(config.runtime, backend=backend, prewarm=False,
         physics_dt=float(recipe["physics_dt"]), control_substeps=int(recipe["control_substeps"])),
         render=replace(config.render, camera_obs=False),
         robot=replace(config.robot, controller=replace(config.robot.controller,
             kind="absolute_pose", reference="world", rotation_representation="quaternion_wxyz")))
 
 
-def build_runtime_source(artifact: TaskArtifact, provider="geophys"):
+def build_runtime_source(artifact: TaskArtifact, provider="geophys", *, backend='cpu', _diagnostic=False):
     if artifact.to_mapping() != build_artifact().to_mapping():
         raise ValueError("selected nominal NutAssembly Artifact required")
     if provider not in {"geophys", "mujoco"}:
         raise ValueError("selected provider must be geophys or mujoco")
+    if backend != 'cpu' and not (_diagnostic and provider == 'geophys' and backend == 'cuda'):
+        raise ValueError('selected NutAssembly source is CPU-only outside the GeoPhys CUDA diagnostic')
     recipe = _recipe()
     source_config = recipe["controller"]
-    config = _environment_config()
+    config = _environment_config(backend=backend, diagnostic=_diagnostic)
     config = replace(config,
         action=replace(config.action, **source_config["action_overrides"]),
         robot=replace(config.robot,
@@ -298,12 +302,14 @@ def _source_identity_files():
     return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
-def build_reference(*, provider="mujoco", include_solution=True):
+def _build_reference(*, provider, include_solution, backend, gripper_control_hz, diagnostic):
     """Build the single selected 100 Hz route without importing native providers."""
     from ...controllers.canonical.contracts import digest
     recipe = _recipe()
     artifact = build_artifact()
-    source, contact_profile = build_runtime_source(artifact, provider)
+    source, contact_profile = build_runtime_source(
+        artifact, provider, backend=backend, _diagnostic=diagnostic,
+    )
     dynamic = recipe["controller"]["dynamic_profile"]
     controller = ProductionCanonicalPandaControllerR3.from_source(artifact, source, profile=dynamic)
     # The accepted R3 route fixes a 10 N force target/cap while preserving its
@@ -326,14 +332,22 @@ def build_reference(*, provider="mujoco", include_solution=True):
         require_native_feedback_contract=True)
     source_files = _source_identity_files()
     construction_id = recipe["construction_id"]
-    controller.identity = digest({"construction_id": construction_id,
+    controller_identity = {"construction_id": construction_id,
         "base_controller_identity": base_controller_identity,
         "solution_identity": solution.identity,
         "construction_source_sha256": source_files["task_env/tasks/nut_assembly/task.py"],
         "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
-        "cadence": "native-gripper-500hz-v1",
+        "cadence": ("native-gripper-500hz-v1" if gripper_control_hz == 500
+                    else "equal-gripper-100hz-v1"),
         "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
-        "native_feedback_contract": "nutassembly-native-feedback-sample-v1"})
+        "native_feedback_contract": "nutassembly-native-feedback-sample-v1"}
+    if diagnostic:
+        controller_identity.update({
+            'diagnostic_experiment': 'nutassembly-gripper-cadence-v1',
+            'physics_backend': backend,
+            'gripper_control_hz': gripper_control_hz,
+        })
+    controller.identity = digest(controller_identity)
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
@@ -356,6 +370,10 @@ def build_reference(*, provider="mujoco", include_solution=True):
         "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
         "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
         "gripper_feedback_hz": 500,
+        **({"diagnostic_experiment": "nutassembly-gripper-cadence-v1",
+            "physics_backend": backend,
+            "gripper_control_hz": gripper_control_hz}
+           if diagnostic else {}),
         "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
         "provider_contact_profile": contact_profile,
         "source_xml_sha256": hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
@@ -365,7 +383,9 @@ def build_reference(*, provider="mujoco", include_solution=True):
             "joints", "bodies", "frames", "free_joints", "joint_targets")},
         "runtime_open_actuators": list(source.open_actuators)}
     return {"construction_id": construction_id, "artifact": artifact, "source": source,
-        "controller": ReferenceExecutionController(holder, artifact.timebase.control_dt),
+        "controller": ReferenceExecutionController(
+            holder, artifact.timebase.control_dt, gripper_rate_hz=gripper_control_hz,
+        ),
         "controller_identity": controller.identity,
         "solution": solution if include_solution else None,
         "solution_identity": solution.identity, "solution_config": solution_config,
@@ -381,6 +401,28 @@ def build_reference(*, provider="mujoco", include_solution=True):
         "_contact_profile": contact_profile}
 
 
+def build_reference(*, provider="mujoco", include_solution=True):
+    """Build the unchanged selected 100 Hz/500 Hz reference route."""
+    return _build_reference(
+        provider=provider, include_solution=include_solution,
+        backend='cpu', gripper_control_hz=500, diagnostic=False,
+    )
+
+
+def build_gripper_cadence_diagnostic_reference(
+    *, backend, gripper_control_hz, include_solution=True,
+):
+    """Build the exact GeoPhys CPU/CUDA R3 cadence experiment, not a capability."""
+    if backend not in {'cpu', 'cuda'}:
+        raise ValueError('GeoPhys cadence diagnostic backend must be cpu or cuda')
+    if gripper_control_hz not in {100, 500}:
+        raise ValueError('GeoPhys cadence diagnostic gripper cadence must be 100 or 500 Hz')
+    return _build_reference(
+        provider='geophys', include_solution=include_solution,
+        backend=backend, gripper_control_hz=gripper_control_hz, diagnostic=True,
+    )
+
+
 def _reset_seed(seed):
     if seed not in (19, None):
         raise ValueError("selected NutAssembly NA-S0 has fixed provenance seed19")
@@ -390,6 +432,13 @@ def _reset_seed(seed):
 def build_outcome_solution(*, provider="mujoco"):
     """Build the task-owned external Solution for its matching selected source."""
     return build_reference(provider=provider)["solution"]
+
+
+def build_gripper_cadence_diagnostic_solution(*, backend, gripper_control_hz):
+    """Build the task-owned Solution instance bound to one diagnostic cadence."""
+    return build_gripper_cadence_diagnostic_reference(
+        backend=backend, gripper_control_hz=gripper_control_hz,
+    )["solution"]
 
 
 def _validate_external_solution(value, solution):
@@ -491,6 +540,11 @@ def _binding():
         native_sample_factory=_native_feedback_sample,
         native_interval_receipt_factory=_native_interval_receipt,
         build_external=lambda provider: build_reference(provider=provider, include_solution=False),
+        build_gripper_cadence_diagnostic=lambda provider, backend, gripper_control_hz, include_solution:
+            build_gripper_cadence_diagnostic_reference(
+                backend=backend, gripper_control_hz=gripper_control_hz,
+                include_solution=include_solution,
+            ),
         validate_external_solution=_validate_external_solution,
         control_request_required=True,
         expert_uses_public_observation=True,
@@ -503,7 +557,14 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
     uid = REFERENCE_ENV_ID
     binding = _binding()
 
+    @classmethod
+    def for_gripper_cadence_diagnostic(cls, *, backend, gripper_control_hz, horizon=6000):
+        """Create the explicit bounded GeoPhys cadence experiment selection."""
+        return cls(provider='geophys', backend=backend, horizon=horizon,
+                   _diagnostic_gripper_control_hz=gripper_control_hz)
+
 
 __all__ = ["NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
     "build_reference", "build_outcome_solution", "build_runtime_source", "evaluate",
-    "sample_reset", "semantic_definition"]
+    "sample_reset", "semantic_definition", "build_gripper_cadence_diagnostic_reference",
+    "build_gripper_cadence_diagnostic_solution"]

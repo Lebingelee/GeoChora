@@ -11,7 +11,7 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | --- | --- | --- |
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
 | PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
-| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution Expert S2 and execution H5 S3 are bounded passed; GeoPhys CPU native 500 Hz external route remains diagnostic-only |
+| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution and GeoPhys `a53a8cf` CPU/CUDA cadence S2/S3 are bounded diagnostic results; the GeoPhys matrix deliberately uses host snapshot at every native step and does not expand generic support |
 
 两条 selected route 只接受 `provider`、`backend`、`horizon`：provider 仅
 `geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
@@ -57,8 +57,10 @@ readiness、错误边界、observer 与 append 失败。此调用面仍使用冻
 NutAssembly 的 C05c 另有一个 task-owned `OutcomeSolutionV1` 路线：
 `from task_env.tasks.nut_assembly import build_outcome_solution`，然后调用
 `env.reset_for_solution(solution, seed=19)` 和 `env.step_with_solution(solution)`。
-它保留内部 `step_expert()`，不允许任意 raw action。MuJoCo 3.8.1 CPU 的 seed-19 full external Expert、close Guard 授权与同一 execution H5 的 S2/S3 已在所记录 source/Profile 上 bounded passed。GeoPhys `a53a8cf` CPU 的单 interval run 仅为 diagnostic evidence：其公开 `RobotArmObservationReader.read_cpu_snapshot()` 明确禁止每个 simulation substep 调用，当前 Core native host-servo 路径每个 2 ms 子步读取，因此 GeoPhys 的 full external Expert S2/S3 未运行。GeoPhys 需由现有 Provider observation owner 增加 native-rate CPU host sample 与 freshness/phase 合同；Core RuntimeSession 再将 Provider sample 绑定当前 materialization、episode/reset/evaluation boundary identity 后验证。该结果不扩展到其他 Provider/backend、R1 typed-force、完整 C05c、C02b 或 Qualification。详见
+它保留内部 `step_expert()`，不允许任意 raw action。MuJoCo 3.8.1 CPU 的 seed-19 full external Expert、close Guard 授权与同一 execution H5 的 S2/S3 已在所记录 source/Profile 上 bounded passed。之后 GeoPhys `a53a8cf` CPU/CUDA × gripper 100/500 Hz 四格也完成指定诊断 S2/S3，真实测得更新/保持计数并通过 same-file H5 回读。该矩阵为本次授权诊断而在每个 native step 调用公开 `RobotArmObservationReader.read_cpu_snapshot()`，尽管其通常使用指导限定为低频；不改变 Provider 的一般 native-rate 使用合同。若要将 host-servo 的 native-rate Reader 用途转为常规支持，仍需由现有 Provider observation owner 明确 value/phase/freshness 合同，再由 Core RuntimeSession 绑定 materialization、episode/reset/evaluation boundary identity 并验证。结果不扩展到其他 Provider/backend、R1 typed-force、完整 C05c、C02b 或 Qualification。详见
 [C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
+
+用于本次诊断矩阵的显式入口是 `NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(backend, gripper_control_hz)` 与 task-owned `build_gripper_cadence_diagnostic_solution(...)`。该入口只接受 GeoPhys CPU/CUDA 与 100/500 Hz，并复用同一 Artifact/source/Outcome/Guard/Recorder owners；默认 `make_env()` 与通用 selected admission 仍不接受 CUDA。四格 S2/S3 为授权诊断性证据：每个 2 ms native step 调用公开 `read_cpu_snapshot()`，不改变其通常低频使用合同，不增加全局 capability，也不证明 device-resident Controller。完整配置、结果与 H5 哈希见 [cadence comparison](../../../docs/module/task_env/goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
 
 通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
 unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined

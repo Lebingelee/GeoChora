@@ -21,7 +21,7 @@ IDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1')
 
 class FakeSession(_SessionValues):
     """Frozen physical state, real canonical controller and five native ticks."""
-    def __init__(self, artifact, execution, *, source, binding):
+    def __init__(self, artifact, execution, *, source, binding, **_diagnostic_options):
         self._initialize_values(artifact, source, execution.physics_provider)
         # This synthetic adapter models the NutAssembly binding's required
         # actuator-force contract so its external lifecycle tests exercise the
@@ -203,6 +203,74 @@ def test_nutassembly_native_receipt_rejects_stale_or_incomplete_samples(fake):
     with pytest.raises(ValueError, match='incomplete'):
         NutAssemblyNativeIntervalReceiptV1.from_mapping(incomplete)
     env.close()
+
+
+def test_nutassembly_native_receipt_accepts_100hz_update_then_four_holds(fake):
+    from task_env.tasks.nut_assembly.task import (
+        NutAssemblyReferenceEnv, build_gripper_cadence_diagnostic_solution,
+    )
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(
+        backend='cpu', gripper_control_hz=100, horizon=3,
+    )
+    solution = build_gripper_cadence_diagnostic_solution(
+        backend='cpu', gripper_control_hz=100,
+    )
+    try:
+        env.reset_for_solution(solution, seed=19)
+        env.step_with_solution(solution)
+        mapping = env.info['native_interval_receipt_v1']
+        receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(mapping)
+        assert [sample.controller_diagnostics['inner_update_performed']
+                for sample in receipt.samples] == [True, False, False, False, False]
+        assert [sample.controller_diagnostics['configured_inner_rate_hz']
+                for sample in receipt.samples] == [100] * 5
+
+        # The arm target may evolve independently within an interval. Its
+        # identity hash therefore need not remain fixed when the 100 Hz
+        # gripper servo holds its own applied opening.
+        moving_arm_targets = dict(mapping)
+        moving_arm_targets['samples'] = [dict(row) for row in mapping['samples']]
+        for index, row in enumerate(moving_arm_targets['samples'][1:], start=1):
+            changed_hash = f'arm-target-{index}'
+            row['target_hash'] = changed_hash
+            row['applied_acknowledgement'] = dict(
+                row['applied_acknowledgement'], target_hash=changed_hash,
+            )
+        NutAssemblyNativeIntervalReceiptV1.from_mapping(moving_arm_targets)
+
+        updated_mid_interval = dict(mapping)
+        updated_mid_interval['samples'] = [dict(row) for row in mapping['samples']]
+        updated_mid_interval['samples'][2]['controller_diagnostics'] = dict(
+            updated_mid_interval['samples'][2]['controller_diagnostics'],
+            inner_update_performed=True,
+        )
+        with pytest.raises(ValueError, match='100/500 Hz'):
+            NutAssemblyNativeIntervalReceiptV1.from_mapping(updated_mid_interval)
+
+        changed_held_target = dict(mapping)
+        changed_held_target['samples'] = [dict(row) for row in mapping['samples']]
+        changed_held_target['samples'][3]['controller_diagnostics'] = dict(
+            changed_held_target['samples'][3]['controller_diagnostics'],
+            commanded_opening_m=(
+                changed_held_target['samples'][3]['controller_diagnostics']['commanded_opening_m']
+                + 1e-4
+            ),
+        )
+        with pytest.raises(ValueError, match='target was not held'):
+            NutAssemblyNativeIntervalReceiptV1.from_mapping(changed_held_target)
+
+        changed_applied_gripper = dict(mapping)
+        changed_applied_gripper['samples'] = [dict(row) for row in mapping['samples']]
+        changed_applied_gripper['samples'][4]['applied_acknowledgement'] = dict(
+            changed_applied_gripper['samples'][4]['applied_acknowledgement'],
+            gripper_servo_opening_m=0.001,
+        )
+        with pytest.raises(ValueError, match='target was not held'):
+            NutAssemblyNativeIntervalReceiptV1.from_mapping(changed_applied_gripper)
+    finally:
+        env.close()
 
 
 @pytest.mark.parametrize('fault_point', [

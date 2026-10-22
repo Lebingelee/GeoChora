@@ -71,11 +71,12 @@ PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py   --env-id p
 PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/new-run/pickcube.h5
 ```
 
-使用新的输出路径。NutAssembly 保留 guarded `step_expert()`；task-owned external Solution 的完整 Expert
-与 execution H5 S2/S3 仅在 MuJoCo 3.8.1 CPU 指定交集 bounded 通过。GeoPhys `a53a8cf` CPU 的
-single-interval Probe 仍是 diagnostic-only：公开 `read_cpu_snapshot()` 不允许每个 native substep 读取，
-故完整 GeoPhys external Expert 未验收。禁止 raw external actions；提前截断不构成成功，task outcome、
-Expert completion 和 termination/truncation 分开报告。
+使用新的输出路径。NutAssembly 保留 guarded `step_expert()`；task-owned external Solution 的 full Expert
+与 execution H5 S2/S3 在 MuJoCo 3.8.1 CPU bounded 通过。GeoPhys `a53a8cf` CPU/CUDA × gripper 100/500 Hz
+四格也完成真实 diagnostic S2/S3；实验逐 native substep 调用公开 `read_cpu_snapshot()`，因此不扩展该 Reader
+的通常低频使用合同、通用 capability 或 device-resident control。禁止 raw external actions；提前截断不构成成功，task outcome、
+Expert completion 和 termination/truncation 分开报告。具体数值、设备、成本和 H5 hashes 见
+[C05c cadence report](goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
 离线 H5 integrity 不证明 replay/D0。完整选项与有界资源语义见
 [examples](../../../examples/README.md)。Linux `RLIMIT_AS` 是每进程虚拟地址空间限额，
 不是 RSS 或整个进程树内存上限。
