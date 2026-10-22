@@ -29,7 +29,7 @@ For the source/contract/test map read [routes](references/routes.md) when implem
   The task/source owner is `task_env/tasks/position_candidate/`; the old diagnostic builder forwards there.
   No public runtime path imports test modules. The same public environment passed 64 real intervals/65 observations
   and same-file request/target/ack/state readback; task success, freeze/Judge and Qualification are separate.
-  R1 and dual-Entity candidates remain diagnostic. See [P99 run receipt](../../../docs/module/task_env/goal/Phase_II/P99_Runtime_Closure_2026-10-22.md).
+  R1 and dual-Entity candidates remain diagnostic. See [P99 run receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#public-candidate).
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
@@ -56,8 +56,8 @@ for 2,377 intervals. The explicit `NutAssemblyReferenceEnv.for_gripper_cadence_d
 and `build_gripper_cadence_diagnostic_solution(...)` reuse those owners for the exact GeoPhys cadence comparison.
 They completed CPU/CUDA × 100/500 Hz S2/S3, using host snapshots at each native step as an authorized diagnostic
 exception. The default selected constructor remains CPU-only; do not infer generic capability or GPU-resident
-control. Update counts, timing and H5 hashes are in the [cadence report](../../../docs/module/task_env/goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)
-and [C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md).
+control. Update counts, timing and H5 hashes are in the [cadence report](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05c)
+and [C05c receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05c).
 
 Use [examples](../../../examples/README.md) for exact current CLI commands. Preserve fresh output paths,
 resource bounds and provenance. Repository has no root packaging metadata: dependencies via requirements,
@@ -205,7 +205,7 @@ MJCF axis projection and bounded VFS assets, and verifies the source-closure dig
 Frame/Joint/assets, unbounded source roots, multiple RobotInstances, free-body pose reset and nonzero settle.
 The same hash-bound `ResetSample-v0` must be passed to both Providers for one exact Artifact/Scene; changing the
 Scene changes the TaskArtifactV1 identity and therefore needs its own sample. See the
-[D01b bounded receipt](../../../docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md#d01b-bounded-vnext-two-provider-receipt-2026-10-20).
+[D01b bounded receipt](../../../docs/module/task_env/goal/Phase_II/D_Development_Record.md#d01).
 This does not implement control execution, contact semantics, task success, rendering or qualification.
 
 For Phase II B03a read-only predicates, use `TaskEvaluationContextV1` and call
@@ -261,7 +261,7 @@ bind the same ExecutionSpec and each camera's sync publication. The receipt's ta
 single Scene-v3 scalar-joint candidate on GeoPhys gitlink `4436787e…`. A separate current-pin S1/S2 now passes on
 `a53a8cfe…` with MuJoCo 3.8.1, real NVIDIA EGL / RTX 5060 / OpenGL 4.6.0 driver 595.84. S1 includes failure/teardown;
 S2 includes 12 intervals, six fixed/mounted captures, exact capture/state identities, RGB/Depth/Entity-mask change,
-zero capture-time Controller/physics calls and exactly-once native Renderer close. Preserve the old receipt identity. See the [D05b receipt and applicability addendum](../../../docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md#d05b-applicability-addendum--provider-pin-changed-after-the-original-s2-2026-10-22).
+zero capture-time Controller/physics calls and exactly-once native Renderer close. Preserve the old receipt identity. See the [D05b receipt and applicability addendum](../../../docs/module/task_env/goal/Phase_II/D_Development_Record.md#d05).
 
 This bounded pair remains a direct CameraSession diagnostic route. `BaseTaskEnv` policy RGB/Depth currently use the
 separate configured `CameraObservationProvider` → `StateObservationBuilder` route; the D05b dynamic session does not
@@ -323,9 +323,9 @@ apply failure uses the C03a latch and emits no partial transition. Do not substi
 or treat the candidate as a default registered capability. The legacy PickCube R1 reset-force freshness prerequisite
 has a separate GeoPhys CPU receipt; one new candidate now has exact plan-bound GeoPhys CPU and MuJoCo CPU raw-force
 admission and a single real interval on each route, but the legacy selected Artifact/source is not rebound by that evidence. NutAssembly Guard and full
-C02b remained open at this Position receipt's checkpoint. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
-[single-profile S2/H5](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
-[dual-Entity acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
+C02b remained open at this Position receipt's checkpoint. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b),
+[single-profile S2/H5](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b), and
+[dual-Entity acceptance](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b).
 
 **C02b-R1 reset-force freshness (2026-10-22):** the legacy selected PickCube
 `production-r1` GeoPhys adapter consumes the public
@@ -353,8 +353,8 @@ generic Provider manifests do not claim `actuator_force_query`. One real
 100 Hz GeoPhys CPU plan-bound R1 interval and next typed publication passed.
 This does not transfer to the old PickCube selected Artifact/source, other
 transmissions, full C02b, or C05b. The later MuJoCo build-bound addendum is recorded below. See the
-[freshness receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md)
-and [typed-force receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md).
+[freshness receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b)
+and [typed-force receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b).
 
 **C02b single-Panda structured R1 behavior (2026-10-22):** the Scene-v3
 `production-r1` candidate ran in independent GeoPhys `a53a8cfe` CPU and exact
@@ -378,19 +378,19 @@ intersections.
 P00/P99's minimum dual-Entity requirement is already covered by the Position
 S2 evidence; no approved basis was found to require dual-Entity R1. CUDA R1,
 alternate source/build/transmission and broader capability remain unadmitted;
-Qualification is separate and unrun. See [structured R1 S2/S3 receipt](../../../docs/module/task_env/goal/Phase_II/C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md).
+Qualification is separate and unrun. See [structured R1 S2/S3 receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b).
 
 **C02b structured R1 Skill refresh receipt (2026-10-22):** baseline at review start was Core `9280b589685bb80d6c484aea51c99a90f2640cfb` on `codex/phase-ii-c03b`, with the GeoPhys checkout clean at `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`; all current implementation/report changes remain local. The trigger was completing the exact candidate's continuous force-mode/recording probe and finding old Skill text that still described structured execution, MuJoCo typed force, or dual-Entity R1 as current blockers. Inspected owners/callers: `build_r1_force_candidate`, `materialize_control`, `execute_plan_bound_r1_control_interval`, `RuntimeSession.snapshot_v2()` and `control_feedback()`, `TransitionRecorder`/Generic H5 v3 readers, the diagnostic runner, and its S1/C03a tests. Reuse result is `COMPOSE_EXISTING` runtime/Controller/Recorder owners plus a task-local diagnostic runner; no public registry, Runtime, Provider, Controller, or Recorder was added.
 
-The Skill identifies both exact CPU intersections, same-file H5 v3 readback, reset/step force phase semantics, stale-reapply refusal, and the passing final arm-pose comparisons. The current C02b wording is now “declared-intersection bounded engineering exit satisfied”; unadmitted extensions and Qualification are separate. At that historical checkpoint P00's minimum dual-Entity requirement was covered by Position-only evidence and P99 still lacked a candidate `make_env()` mainline; the later P99 run receipt supersedes that route gap. Targeted regressions were 69 passed, then 2 updated native stale-reapply tests passed; the Evidence-overwrite refusal regression and static Skill metadata/local-link/source-path checker also passed. Independent cold-start/Agent review and system `quick_validate.py` were NOT_RUN; Human review remains pending. Full config, raw evidence hashes, exploratory failures and output-preservation declaration are in the [structured R1 receipt](../../../docs/module/task_env/goal/Phase_II/C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md).
+The Skill identifies both exact CPU intersections, same-file H5 v3 readback, reset/step force phase semantics, stale-reapply refusal, and the passing final arm-pose comparisons. The current C02b wording is now “declared-intersection bounded engineering exit satisfied”; unadmitted extensions and Qualification are separate. At that historical checkpoint P00's minimum dual-Entity requirement was covered by Position-only evidence and P99 still lacked a candidate `make_env()` mainline; the later P99 run receipt supersedes that route gap. Targeted regressions were 69 passed, then 2 updated native stale-reapply tests passed; the Evidence-overwrite refusal regression and static Skill metadata/local-link/source-path checker also passed. Independent cold-start/Agent review and system `quick_validate.py` were NOT_RUN; Human review remains pending. Full config, raw evidence hashes, exploratory failures and output-preservation declaration are in the [structured R1 receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b).
 
 **P99 / C02b current status (2026-10-22):** C02b's approved bounded engineering exits remain satisfied.
 The two P99 runtime gaps now have PASS_BOUNDED Evidence: public single Position candidate mainline and current
 `a53a8cfe` GeoPhys CPU × MuJoCo native OpenGL pairing. B04a's original `geophys-transition-h5/v1`, canonical outer-v0
 and canonical-execution-v1 H5 byte fixtures remain ACCEPTED-DEFERRED separately. Final P99 scope and independent
 review await the maintainer; no Qualification or Phase II completion is declared. See
-[P99 readiness](../../../docs/module/task_env/goal/Phase_II/P99_Readiness_Review_2026-10-22.md) and
-[run/Skill receipt](../../../docs/module/task_env/goal/Phase_II/P99_Runtime_Closure_2026-10-22.md).
+[P99 readiness](../../../docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#p99) and
+[run/Skill receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#public-candidate).
 
 **Documentation alignment (2026-10-22, task_env / refresh):** on Core `ec2dd24`, corrected the routing text and
 `references/routes.md` to distinguish original static admission, exact candidate typed-force admission, and actual
@@ -417,7 +417,7 @@ v2 publication and one call-specific admission route restricted to the new Panda
 **35 passed, 1 deselected**, including C02a, old R1/Position and dual-Position consumers; S2 was **1 passed** for one native
 100 Hz interval. Fresh-interpreter imports, skill link/metadata validation and their outputs are recorded with the acceptance
 receipt. Evidence envelope for that historical refresh: candidate Artifact/Scene/source closure, actual R1 Controller/TCP and
-plan identities from [typed-force receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md),
+plan identities from [typed-force receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b),
 GeoPhys CPU `eb870f6f...`; raw evidence remains under ignored
 `workspace/maintenance/c02b_r1_typed_force_20261022/`. Cold-start route: construct the explicit candidate, compile its
 ControllerBindingPlan, call `materialize_control(..., controller_binding_plan=plan, controller_profile=controller)`, reset
@@ -440,7 +440,7 @@ This paragraph records the public lifecycle S1 acceptance at that checkpoint. It
 frozen PickCube Artifact, `panda-v1/ee` TCP, required production-r1 feedback and canonical-trajectory-v0; it did not borrow the
 separate A05 Scene-v3 `panda-main` plan identity. At that checkpoint S2/S3 had not run; they were subsequently completed for
 the bounded GeoPhys/MuJoCo CPU routes below. Legacy selected `stop()` remains unsupported; Task success, Expert completion and
-existing stop/recording semantics remain distinct. See the [public lifecycle S1 receipt](../../../docs/module/task_env/goal/Phase_II/C05b_Public_Lifecycle_S1_Acceptance.md).
+existing stop/recording semantics remain distinct. See the [public lifecycle S1 receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05b).
 
 **C05b legacy external Solution S2/S3 (2026-10-22):** for the fixed `pick-cube-p16-reference-v1` legacy Artifact/source,
 construct the task-owned Solution with `build_readiness_solution()`, call `reset_for_solution(solution, seed=31)`, then
@@ -448,7 +448,7 @@ construct the task-owned Solution with `build_readiness_solution()`, call `reset
 episode, Solution and ResetSample identities; this source has no Scene closure or plan identity. The bounded external Expert
 and canonical-v0 disk readback passed in separate processes on GeoPhys `a53a8cf` CPU and MuJoCo 3.8.1 CPU, using five 2 ms
 steps per interval. Each route has its own T/T+1, feedback/readiness, stage, Task success, Expert completion, action→target→ack,
-flags and H5 readback evidence in [the S2/S3 receipt](../../../docs/module/task_env/goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md).
+flags and H5 readback evidence in [the S2/S3 receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05b).
 Observer/append failures reuse the C03a fault latch and cannot finalize an incomplete canonical recording. This does not create
 legacy R1 Stop/Event/Outcome or migrate the legacy PickCube route to the separate candidate plan-bound typed-force identity,
 close C02b, or grant Qualification.
@@ -475,7 +475,7 @@ API/capability-sensitive route remains pending.
 `_MuJoCoSession` reset/completed-step cache for the exact Scene-v3 Panda R1 candidate. Admission is call-specific and
 requires the exact Artifact/Scene/source closure and XML, actual `ProductionCanonicalPandaController` with hand-origin TCP,
 compiled `ControlBindingPlanV1`, `panda-main/actuator8` signed N, strict MuJoCo CPU profile at 100 Hz / five 2 ms steps, and
-MuJoCo package/runtime 3.8.1 plus the audited native binding/core SHA-256 values in the [receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md).
+MuJoCo package/runtime 3.8.1 plus the audited native binding/core SHA-256 values in the [receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b).
 Reset uses the existing `mj_forward()` over the final reset state; each native step preserves its pre-integration actuator-force
 cache. Typed reads do not call `mj_forward()` or advance physics. Existing `control_feedback()` remains the sole signed-to-closing
 conversion. Shared provider manifests and `snapshot_v1()` stay force-free; legacy no-plan and Position routes remain compatible.
@@ -508,7 +508,7 @@ the active episode; reset rebuilds the candidate builder's configured Profile.
 This route requires an active Generic H5 v3 Recorder and a live, aligned public boundary. It is tested only for the explicit
 single `panda-main` Position candidate on GeoPhys CPU and MuJoCo CPU. It does not enable dual-Entity switching, R1/force-aware
 switching, NutAssembly Guard, Assembly, Camera observation, another Profile/provider/backend or general arbitration, and
-does not complete C02b/C02c. See the [C02c acceptance receipt](../../../docs/module/task_env/goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c02c-bounded-single-panda-position-receipt2026-10-22).
+does not grant general C02c switching or Qualification; C02b bounded exits are recorded separately. See the [C02c acceptance receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02c).
 
 **Refresh receipt (2026-10-22):** source checkpoint `5610f8a` on `codex/phase-ii-c03b`; public caller is the explicit
 `SelectedReferenceEnv.from_position_candidate()` route; owners inspected are `PandaPositionServoProfileV1`,
@@ -547,7 +547,7 @@ boundary. This is a metadata reference only; it does not establish D04 image/dep
 
 The C04 bounded receipt records real Pendulum GeoPhys CPU reset/step schema, time and diagnostics checks plus Panda builder-level
 private-state contract checks. The generic Panda `BaseTaskEnv` route currently fails earlier at missing Stage 1 scene composition;
-do not report this receipt as real Panda Controller/physics qualification. See the [C04 receipt](../../../docs/module/task_env/goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21).
+do not report this receipt as real Panda Controller/physics qualification. See the [C04 receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c04).
 
 
 ## D01a evidence-baseline test routing
@@ -560,5 +560,10 @@ The same owner's `test_b02_plan_consumes_the_exact_a05_v3_scene_identity` now re
 source/reset/realization/step/close. Existing closure/Frame/Joint/identity/tolerance rejection tests still run.
 Public candidate/H5 and dynamic pairing retain their P99/D05b owners above; a historical skip does not prove either route.
 The preparation run reports 12 passed / 1 historical-not-applicable; expensive native campaigns were not rerun.
-See the [independent-review handoff](../../../docs/module/task_env/goal/Phase_II/Phase_II_Independent_Second_Review_2026-10-22.md)
+See the [independent-review handoff](../../../docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#evidence)
 for source commits, precise commands, limits and pending Human decisions. This is test/document routing maintenance, no new feature.
+
+
+## Phase II documentation consolidation navigation (2026-10-22)
+
+The maintained Phase II directory now contains 01–05 plus A/B/C/D development records. Goal contracts, current dispositions and historical evidence have separate owners; use [05](../../../docs/module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md) for the 20-parent/33-slice status and precise deferred/diagnostic boundaries. Old report links now resolve to the relevant development section; original full reports remain recoverable at Core a5ba537. This refresh changes documentation navigation/status wording only. It reuses the existing public factory, RuntimeSession, typed-state, external Solution, Recorder and Camera owners, introduces no new API or capability, and leaves qualification review to the maintainer. Static Skill/link checks and the consolidation receipt are under ignored workspace/maintenance/phase_ii_docs_consolidation_20261022_001/. No native campaign was rerun for this navigation change.

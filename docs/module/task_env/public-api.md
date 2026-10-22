@@ -52,16 +52,16 @@ readiness、错误边界、observer 与 append 失败。此调用面仍使用冻
 不修改旧 Stop 拒绝、Task success/Expert completion 区分或历史录制语义。S1 公共生命周期已通过；之后的真实 external Expert S2
 与 canonical-v0 磁盘读回 S3 又在 GeoPhys `a53a8cf` CPU 和 MuJoCo 3.8.1 CPU 分进程通过，同一 seed-31 ResetSample 下
 分别记录 148/149 与 470/471 个 transition/boundary，并核对状态数值、身份和 action→target→ack。详见
-[C05b S2/S3 acceptance](../../../docs/module/task_env/goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
+[C05b S2/S3 acceptance](goal/Phase_II/C_Development_Record.md#c05b)。
 该 legacy PickCube 有界结果不建立 Scene-v3 plan 身份、legacy R1 Stop/Event/Outcome、NutAssembly Guard、完整 C02b 或 Qualification；MuJoCo typed-force 另有新 Scene-v3 candidate 的精确 CPU build/source/Controller/plan 路线，不能转移到该 legacy Artifact/source。
 
 NutAssembly 的 C05c 另有一个 task-owned `OutcomeSolutionV1` 路线：
 `from task_env.tasks.nut_assembly import build_outcome_solution`，然后调用
 `env.reset_for_solution(solution, seed=19)` 和 `env.step_with_solution(solution)`。
 它保留内部 `step_expert()`，不允许任意 raw action。MuJoCo 3.8.1 CPU 的 seed-19 full external Expert、close Guard 授权与同一 execution H5 的 S2/S3 已在所记录 source/Profile 上 bounded passed。之后 GeoPhys `a53a8cf` CPU/CUDA × gripper 100/500 Hz 四格也完成指定诊断 S2/S3，真实测得更新/保持计数并通过 same-file H5 回读。该矩阵为本次授权诊断而在每个 native step 调用公开 `RobotArmObservationReader.read_cpu_snapshot()`，尽管其通常使用指导限定为低频；不改变 Provider 的一般 native-rate 使用合同。若要将 host-servo 的 native-rate Reader 用途转为常规支持，仍需由现有 Provider observation owner 明确 value/phase/freshness 合同，再由 Core RuntimeSession 绑定 materialization、episode/reset/evaluation boundary identity 并验证。结果不扩展到其他 Provider/backend、R1 typed-force、完整 C05c、C02b 或 Qualification。详见
-[C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
+[C05c receipt](goal/Phase_II/C_Development_Record.md#c05c)。
 
-用于本次诊断矩阵的显式入口是 `NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(backend, gripper_control_hz)` 与 task-owned `build_gripper_cadence_diagnostic_solution(...)`。该入口只接受 GeoPhys CPU/CUDA 与 100/500 Hz，并复用同一 Artifact/source/Outcome/Guard/Recorder owners；默认 `make_env()` 与通用 selected admission 仍不接受 CUDA。四格 S2/S3 为授权诊断性证据：每个 2 ms native step 调用公开 `read_cpu_snapshot()`，不改变其通常低频使用合同，不增加全局 capability，也不证明 device-resident Controller。完整配置、结果与 H5 哈希见 [cadence comparison](../../../docs/module/task_env/goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
+用于本次诊断矩阵的显式入口是 `NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(backend, gripper_control_hz)` 与 task-owned `build_gripper_cadence_diagnostic_solution(...)`。该入口只接受 GeoPhys CPU/CUDA 与 100/500 Hz，并复用同一 Artifact/source/Outcome/Guard/Recorder owners；默认 `make_env()` 与通用 selected admission 仍不接受 CUDA。四格 S2/S3 为授权诊断性证据：每个 2 ms native step 调用公开 `read_cpu_snapshot()`，不改变其通常低频使用合同，不增加全局 capability，也不证明 device-resident Controller。完整配置、结果与 H5 哈希见 [cadence comparison](goal/Phase_II/C_Development_Record.md#c05c)。
 
 通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
 unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined
@@ -128,7 +128,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
-| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 历史收据在 GeoPhys gitlink `4436787e…` × MuJoCo native OpenGL 上对单 Panda Position/Scene-v3 scalar-joint source 验证 default/override、双相机 materialization/sync/capture/close S1/S2。当前 `a53a8cfe…` pin 已另行完成真实 NVIDIA EGL pairing S1/S2 与资源关闭复验，见 [P99 运行收据](goal/Phase_II/P99_Runtime_Closure_2026-10-22.md)；旧 `4436787e` 收据独立保留。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification remain unsupported or unverified |
+| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 历史收据在 GeoPhys gitlink `4436787e…` × MuJoCo native OpenGL 上对单 Panda Position/Scene-v3 scalar-joint source 验证 default/override、双相机 materialization/sync/capture/close S1/S2。当前 `a53a8cfe…` pin 已另行完成真实 NVIDIA EGL pairing S1/S2 与资源关闭复验，见 [P99 运行收据](goal/Phase_II/C_Development_Record.md#public-candidate)；旧 `4436787e` 收据独立保留。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification remain unsupported or unverified |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
@@ -154,9 +154,9 @@ candidates. The dual S1 rejects wrong Entity, missing Group, overlapping writers
 stale target, and materialization-boundary mismatch before compute/apply/step.
 The independent `panda-main/production-r1` contract remains required-force and continues to reject before
 Runtime materialization when `actuator_force_query` is unavailable. See the
-[C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
-[S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
-[Dual Entity acceptance](goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
+[C02b-E S1 acceptance](goal/Phase_II/C_Development_Record.md#c02b),
+[S2/H5 acceptance](goal/Phase_II/C_Development_Record.md#c02b), and
+[Dual Entity acceptance](goal/Phase_II/C_Development_Record.md#c02b).
 
 **C02b-R1 reset freshness and typed admission (2026-10-22):** the existing PickCube
 legacy route has a bounded GeoPhys reset-forward freshness receipt. Separately,
@@ -171,9 +171,9 @@ sequence on the same exact GeoPhys CPU and MuJoCo 3.8.1 CPU/native-build interse
 readback. Both final runs passed the predeclared force-mode, arm-pose, dispatch and recording checks. The current C02b
 disposition is that declared-intersection bounded engineering exits are satisfied; unadmitted extensions and Qualification
 are separate. P00/P99's minimum dual-Entity requirement is covered by Position-only S2;
-dual-Entity R1 has no approved basis as a required gate. See the [freshness receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md),
-[typed-force receipt](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md), and
-[structured R1 S2/S3 receipt](goal/Phase_II/C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md).
+dual-Entity R1 has no approved basis as a required gate. See the [freshness receipt](goal/Phase_II/C_Development_Record.md#c02b),
+[typed-force receipt](goal/Phase_II/C_Development_Record.md#c02b), and
+[structured R1 S2/S3 receipt](goal/Phase_II/C_Development_Record.md#c02b).
 
 **Scene-v3 candidate construction boundary:** the single Position candidate now has the explicit public UID
 `panda-position-servo-candidate-v1`. `make_env()` reuses the task-owned construction in
@@ -191,8 +191,8 @@ returned from `reset()`/`step()` with boundary/time info. `start_recording(path)
 `finish_recording(reason)` uses the existing Generic H5 v3 owner; read the same path with
 `load_structured_control_records_h5()` / `load_structured_training_actions_h5()` from `task_env.recorders`.
 Always close in `finally`. No Expert/task-success or freeze approval is implied. See
-[P99 readiness](goal/Phase_II/P99_Readiness_Review_2026-10-22.md) and the
-[implementation/run receipt](goal/Phase_II/P99_Runtime_Closure_2026-10-22.md).
+[P99 readiness](goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#p99) and the
+[implementation/run receipt](goal/Phase_II/C_Development_Record.md#public-candidate).
 
 For this explicit selected candidate, `env.position_plan` after reset is the read-only typed action contract
 used by the existing dispatch owner. Do not mutate it. Gripper input is normalized in [-1,1] (+1 open / -1 close);
@@ -255,8 +255,9 @@ that transition carries the switch ID. Ending the episode first records effectiv
 event-write failure trips the existing C03a latch and preserves a failure receipt. This is episode-scoped and limited to the
 verified single-Panda Position GeoPhys CPU/MuJoCo CPU intersection; reset
 reconstructs the candidate builder's original profile. Dual-Entity switching, production-R1/force-aware switching,
-NutAssembly, Assembly, Camera integration, other providers and generic arbitration remain unsupported. This does not complete
-C02b, C02c or Phase II. See the [C02c bounded acceptance receipt](goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c02c-bounded-single-panda-position-receipt2026-10-22).
+NutAssembly, Assembly, Camera integration, other providers and generic arbitration remain unsupported. This closes only the declared
+Position-switch slice; general C02c switching remains deferred. C02b's declared engineering exits are recorded separately;
+Phase II final acceptance is pending. See the [C02c bounded acceptance receipt](goal/Phase_II/C_Development_Record.md#c02c).
 
 D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeSession.materialize()` 和当前
 `create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变

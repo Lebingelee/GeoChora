@@ -42,13 +42,12 @@ PYTHON
 不是已验证的 lockfile。冻结发布可用 `git checkout --detach refs/tags/v1.1.0`；开发应基于当前 develop。
 v1.1.0 的 GeoPhys Gitlink 为 `c665ce5028a12bb4d2afe49f05e015fa9b684a39`；2026-10-20 的
 `54f40fbfffd945967525aa85801087e7da0b491e` 同步记录是历史开发基线，见
-[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。2026-10-22 的本地
-`codex/phase-ii-c03b` 已在 Core 检查点 `b3fc42e` 保全 Provider pin 迁移与 C05b public lifecycle S1；当前工作区继续包含 C05b
-S2/S3 诊断、必要的 faulted-recording finalization guard 和验收文档。GeoPhys Gitlink 与检出固定为
+[依赖同步记录](runtime-and-providers.md#geophys-开发基线同步2026-10-20)。2026-10-22 的 Phase II 实现与验收记录已保全到 `a5ba537`，本轮整理后由 develop 承载，供独立二审。
+GeoPhys Gitlink 与检出固定为
 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。指定 legacy PickCube external Solution 在 GeoPhys CPU 与 MuJoCo 3.8.1 CPU
-的 S2/S3 通过有独立收据；这些是本地 topic 分支的 bounded evidence，不表示 develop 已集成、完整 C02b 或其他任务/Provider
-获支持。详见[当前开发基线与有界证据](runtime-and-providers.md#当前开发基线与有界证据2026-10-22)与
-[C05b S2/S3 acceptance](goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
+的 S2/S3 通过有独立收据；C02b 的声明交集工程出口已满足，其他任务/Provider、Qualification 与发布接受范围仍单列。
+Phase II 九份文档的统一状态见[当前审阅与 Goal 处置表](goal/Phase_II/05_Architecture_Review_and_Execution_Order.md)。详见[当前开发基线与有界证据](runtime-and-providers.md#当前开发基线与有界证据2026-10-22)与
+[C05b S2/S3 acceptance](goal/Phase_II/C_Development_Record.md#c05b)。
 Menagerie 仍为 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；复现时使用所属 Core 提交的
 Gitlink 与对应 Evidence，不以浮动 HEAD 替代。
 
@@ -76,7 +75,7 @@ PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspa
 四格也完成真实 diagnostic S2/S3；实验逐 native substep 调用公开 `read_cpu_snapshot()`，因此不扩展该 Reader
 的通常低频使用合同、通用 capability 或 device-resident control。禁止 raw external actions；提前截断不构成成功，task outcome、
 Expert completion 和 termination/truncation 分开报告。具体数值、设备、成本和 H5 hashes 见
-[C05c cadence report](goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
+[C05c cadence report](goal/Phase_II/C_Development_Record.md#c05c)。
 离线 H5 integrity 不证明 replay/D0。完整选项与有界资源语义见
 [examples](../../../examples/README.md)。Linux `RLIMIT_AS` 是每进程虚拟地址空间限额，
 不是 RSS 或整个进程树内存上限。

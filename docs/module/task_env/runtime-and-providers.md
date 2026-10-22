@@ -2,33 +2,33 @@
 
 ## 当前开发基线与有界证据（2026-10-22）
 
-本地 `codex/phase-ii-c03b` 当前 Core 保全检查点为 `1e3b558`，包含 C02b typed raw-force 与 structured R1 实现、测试和收据；本轮开始审计时 Core 无 dirty tracked/untracked paths。GeoPhys Gitlink 与实际检出固定在
+Phase II 实现与交付已保全到 Core `a5ba537`；本轮九文档整合后由 develop 承载，原中间分支及文档在清理前另有完整恢复 bundle。GeoPhys Gitlink 与实际检出固定在
 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。此前 `ec2dd24`/`eb870f6f` 内容描述的是迁移前状态；2026-10-20 的
-`54f40fbf` 同步范围和测试数字仍保留为历史 Evidence，不作为当前 topic 分支 Provider pin 或全链能力声明。
+`54f40fbf` 同步范围和测试数字仍保留为历史 Evidence，不作为当前 develop Provider pin 或全链能力声明。
 
 当前有界证据包括：旧 selected PickCube GeoPhys CPU reset-force freshness；新的 Scene-v3 Panda R1 candidate 在 GeoPhys
 `a53a8cf` CPU 与精确 MuJoCo 3.8.1 CPU/native build 上各有 `snapshot_v2()` typed raw-force publication、精确 admission
 与一个真实 100 Hz interval；以及旧 PickCube legacy external Solution 在 GeoPhys CPU 与 MuJoCo CPU 的真实 S2、
 canonical-v0 磁盘 S3。三者使用不同的 Artifact/source/Controller 路线，不能互相转移 plan identity。legacy PickCube S2/S3
 只证明指定旧 consumer 路线；不授予通用 `actuator_force_query`、完整 C02b、其他任务或 Qualification。见
-[freshness 收据](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md)、
-[typed-force 收据](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)和
-[C05b S2/S3 收据](goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
+[freshness 收据](goal/Phase_II/C_Development_Record.md#c02b)、
+[typed-force 收据](goal/Phase_II/C_Development_Record.md#c02b)和
+[C05b S2/S3 收据](goal/Phase_II/C_Development_Record.md#c05b)。
 
 随后单 Panda Scene-v3 structured R1 在上述精确 GeoPhys CPU 与 MuJoCo 3.8.1 CPU/native-build 路线完成真实
 force-mode/open/reopen 行为和 Generic H5 v3 同文件回读；最终预先声明的行为、arm-pose、dispatch 与同文件回读检查均通过。
 C02b 声明交集的有界工程退出满足；该收据只覆盖指定 candidate/build。P00/P99 最小双 Entity 项已由双 Position S2/H5 覆盖，
 dual-Entity R1 没有作为必需退出项的批准依据。完整细节、精确哈希与剩余跟踪误差见
-[C02b structured R1 收据](goal/Phase_II/C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
+[C02b structured R1 收据](goal/Phase_II/C_Development_Record.md#c02b)。
 
 structured R1 的连续执行和 H5 回读仍来自 task-local diagnostic lifecycle。另一个既有单 Panda Position candidate
 现以 `panda-position-servo-candidate-v1` 接入公开 `make_env()`，已在当前 GeoPhys CPU 上完成同一环境的连续执行/H5 回读；详见
-[P99 readiness review](goal/Phase_II/P99_Readiness_Review_2026-10-22.md)。
+[P99 readiness review](goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#p99)。
 
 C05c 另有独立 NutAssembly `OutcomeSolutionV1` 证据：MuJoCo 3.8.1 CPU 原 external Expert/H5 S2/S3，以及 GeoPhys
 `a53a8cf` CPU/CUDA × gripper 100/500 Hz 四格真实 S2/S3 都通过。GeoPhys 对照特意逐 native 子步调用公开
 `read_cpu_snapshot()`，属于本次 diagnostic exception；不修改 Provider pin/manifest，不转为一般 per-substep API
-支持，也不声称 CUDA device-resident Controller。详见 [C05c cadence comparison](goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md)。
+支持，也不声称 CUDA device-resident Controller。详见 [C05c cadence comparison](goal/Phase_II/C_Development_Record.md#c05c)。
 
 ## GeoPhys 开发基线同步（2026-10-20）
 
@@ -141,7 +141,7 @@ free-body pose reset、拓扑变化或其他 Provider。
 Provider 上复用，GeoPhys 最大 reset joint error `5.96e-9`、MuJoCo `0`，均实际 step 一次。改变 canonical `joint1` axis
 后两边 `link1` pose delta 约 `0.246226`，同 Scene 跨 Provider pose delta 不超过 `6.42e-9`。这不证明 Controller/action、
 contact、Task success、Renderer pairing、通用 Scene import 或 Qualification。详细 receipt 在
-[Phase D D01b 记录](goal/Phase_II/04_Phase_D_Physics_Rendering.md#d01b-bounded-vnext-two-provider-receipt-2026-10-20)。
+[Phase D D01b 记录](goal/Phase_II/D_Development_Record.md#d01)。
 
 Phase II D02a 在 `task_env.artifacts` 增加 provider-neutral `CanonicalStateViewV1`、typed Joint/Frame、
 consumer `StateRequirements`、sample/boundary clocks、native interval evidence 与 bounded view lifetime
@@ -181,8 +181,8 @@ task-owned external Solution 的 MuJoCo 3.8.1 CPU full Expert S2/H5 S3 已在精
 CPU/CUDA 的 100/500 Hz cadence 四格完成 Probe、full Expert、Guard 与同文件 H5 S2/S3；它逐 native 子步调用公开
 `read_cpu_snapshot()`，所以不扩展该 Reader 的常规使用合同、selected 默认入口、global capability 或 device-resident control。
 CUDA 读回仍经 CPU host sample。source/config/每组成本与原始 H5 见
-[C05c cadence receipt](goal/Phase_II/C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) 与
-[C05c receipt](goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
+[C05c cadence receipt](goal/Phase_II/C_Development_Record.md#c05c) 与
+[C05c receipt](goal/Phase_II/C_Development_Record.md#c05c)。
 Selected reset 重建 controller/solution owner 状态，不推进物理，录制需先 finalize 再 reset。
 
 ### C02b Position Profile candidate (2026-10-21)
@@ -199,8 +199,8 @@ The explicit single-Panda UID `panda-position-servo-candidate-v1` now reuses the
 GeoPhys CPU and MuJoCo CPU native S2 passed for one Panda candidate, including motion, clock/boundary evidence,
 force-free reads, structured control readers and direct H5 joint/hand/identity state-leaf readback. This is not a
 production capability or qualification, and it does not close R1 reset-force freshness. See the
-[C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md) and
-[S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md).
+[C02b-E S1 acceptance](goal/Phase_II/C_Development_Record.md#c02b) and
+[S2/H5 acceptance](goal/Phase_II/C_Development_Record.md#c02b).
 
 ### C02b-R1 reset-force freshness (2026-10-22)
 
@@ -221,7 +221,7 @@ compute. MuJoCo CPU supplied a separate reset/step sampling-semantics comparison
 force values are not compared across providers. This closes only the R1 reset
 freshness prerequisite for this legacy route. At that receipt's checkpoint,
 plan-bound typed raw-force admission was still missing. The later
-[`snapshot_v2()` candidate receipt](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)
+[`snapshot_v2()` candidate receipt](goal/Phase_II/C_Development_Record.md#c02b)
 adds one source/Controller/plan-bound GeoPhys CPU route on `a53a8cf`; it does not
 rebind the old selected PickCube source. A subsequent MuJoCo bounded slice adds
 typed force only for the same candidate on the audited 3.8.1 CPU Python/native
@@ -229,11 +229,11 @@ build, with exact source/Controller/TCP/plan identity; it does not enable the
 legacy PickCube route or generic MuJoCo capability. The shared
 `provider_manifest()` still makes no generic `actuator_force_query` claim, and
 `snapshot_v1()` remains force-free. At the issuance of this typed-force receipt, C02b structured execution was still open;
-its later single-Panda behavior and current PARTIAL / IN PROGRESS status are recorded above. The bounded C05b
+its later single-Panda behavior and current declared-intersection bounded engineering exit are recorded above. The bounded C05b
 legacy external Expert S2 and canonical-v0 S3 use the old selected route and do
 not migrate the candidate plan identity.
 See the
-[freshness receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
+[freshness receipt](goal/Phase_II/C_Development_Record.md#c02b).
 
 ### NutAssembly selected Solution B
 
