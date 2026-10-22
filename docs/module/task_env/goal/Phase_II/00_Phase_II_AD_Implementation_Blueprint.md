@@ -129,7 +129,7 @@ P00 → A01/A02 → B04a/D02a/C01a/D05a contracts
 需求准入。旧 `panda-main/production-r1` 的 required raw force、拒绝测试和 reset stale-force 缺陷保留。
 位置控制仍可下发 physical force limit；这是 command，不是 measured-force query。新 Profile 不等价于 R1，
 也不自动满足 C05b/C05c 的旧 Solution/readiness/Guard 回归。C02b-P（审计/确定 Profile）和 C02b-E（真实执行/证据）
-是同一切片内部检查点，不增加切片数，C02b 目前仍为 BLOCKED。
+是同一切片内部检查点，不增加切片数；本蓝图签发时记录 C02b 为 BLOCKED。后续有界状态见[执行顺序表](05_Architecture_Review_and_Execution_Order.md)与 Phase C 最新收据，本勘误不将 Phase II 标为完成。
 
 **Assembly 后置**：Logical Assembly 与 Physical Attachment 分离，只记录未来 A03/D01 的候选扩展；
 现有 Scene v3/RobotInstance/ControlGroup 和已完成验收不重开。Robot preset/leaf overrides 最终展开为唯一

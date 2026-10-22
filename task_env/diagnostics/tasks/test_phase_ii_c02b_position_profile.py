@@ -426,10 +426,10 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
     mujoco._reset_plan_gate_open = False
     mujoco._control_step = 0
     mujoco._state_revision = 0
-    mujoco._artifact = SimpleNamespace(timebase=SimpleNamespace(control_substeps=5))
+    mujoco._artifact = SimpleNamespace(timebase=SimpleNamespace(control_substeps=5, physics_dt=0.002))
     mujoco._model = object()
     mujoco._data = SimpleNamespace(
-        qpos=np.zeros(0), qvel=np.zeros(0), act=np.zeros(0), ctrl=np.zeros(0),
+        qpos=np.zeros(0), qvel=np.zeros(0), act=np.zeros(0), ctrl=np.zeros(1),
         actuator_force=sentinel,
     )
     mj_steps = []
@@ -441,6 +441,12 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
     )
     mujoco._target_actuators = {}
     mujoco._open_actuators = ()
+    mujoco._source = SimpleNamespace(open_actuators=('actuator8',))
+    mujoco._episode_id = 'episode-position-sentinel'
+    mujoco._reset_sample_id = 'reset-position-sentinel'
+    mujoco._native_steps = 0
+    mujoco._force_sample_sequence = 0
+    mujoco._force_configuration_revision = 0
     mujoco._control_binding = object()
     mujoco._begin_reset = lambda: None
     mujoco._validate_sample = lambda _sample: None
@@ -459,6 +465,7 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
 
     # Legacy no-plan force-aware sessions still retain the cache by default.
     mujoco._force_feedback_required = True
+    mujoco._open_actuators = (0,)
     mujoco._data.actuator_force = np.array([2.0])
     mujoco._cache_completed_actuator_force()
     assert mujoco._completed_actuator_force.tolist() == [2.0]

@@ -394,27 +394,86 @@ _C02B_R1_PLAN_IDENTITY = 'b4838ab8c954f462066cdb07356e5a90ad3f9c521c9f9b53ce9c93
 _C02B_R1_SOURCE_XML_SHA256 = '2521356a6c925e8756e8d5309d68532aabce497654a7bd410cabac8533312aa3'
 _C02B_R1_TCP_IDENTITY = 'b27be18d500ddaa548f7a588d61a3756ae7663679ca66b3272aa268183461ff8'
 _C02B_R1_TASK_ID = 'phase-ii-c02b-r1-typed-force'
+_C02B_R1_MUJOCO_PACKAGE_VERSION = '3.8.1'
+_C02B_R1_MUJOCO_RUNTIME_VERSION = '3.8.1'
+_C02B_R1_MUJOCO_PYTHON_ORIGIN_SHA256 = 'f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497'
+_C02B_R1_MUJOCO_BINDING_SHA256 = '9067239d3126392729430d12d077ab4b298c61d2ea1209c9333823be410359e3'
+_C02B_R1_MUJOCO_CORE_SHA256 = '8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592'
+
+
+def _mujoco_r1_build_identity():
+    """Return the installed Python package and native MuJoCo build identity."""
+    from importlib.util import find_spec
+    from pathlib import Path
+    import hashlib
+    import mujoco
+
+    build = dict(provider_build_identity('mujoco'))
+    runtime_version = str(mujoco.mj_versionString())
+    package_root = Path(mujoco.__file__).resolve().parent
+    binding_spec = find_spec('mujoco._functions')
+    binding_path = None if binding_spec is None or binding_spec.origin is None else Path(binding_spec.origin).resolve()
+    core_candidates = tuple(
+        path.resolve() for path in package_root.glob('libmujoco.*')
+        if path.is_file() and runtime_version in path.name
+    )
+    if binding_path is not None and binding_path.is_file():
+        build['native_binding_origin'] = str(binding_path)
+        build['native_binding_sha256'] = hashlib.sha256(binding_path.read_bytes()).hexdigest()
+    if len(core_candidates) == 1:
+        core_path = core_candidates[0]
+        build['native_core_origin'] = str(core_path)
+        build['native_core_sha256'] = hashlib.sha256(core_path.read_bytes()).hexdigest()
+    else:
+        build['native_core_origin'] = None
+        build['native_core_sha256'] = None
+    return build, runtime_version
 
 
 def _c02b_r1_force_capability_manifest(artifact, execution, source, plan, controller, binding):
-    """Build exact admission evidence for one patched Provider/source/Controller tuple."""
+    """Build exact admission evidence for one audited Provider/source/Controller tuple."""
     from ...controllers.canonical.production import ProductionCanonicalPandaController
     from ...artifacts import TaskArtifactV1
     import hashlib
 
     if type(controller) is not ProductionCanonicalPandaController:
         raise CapabilityAdmissionError('actuator_force_query requires the actual bounded R1 Controller instance')
-    if execution.physics_provider != 'geophys' or execution.backend != 'cpu':
-        raise CapabilityAdmissionError('typed R1 actuator force is admitted only on GeoPhys CPU')
+    if execution.backend != 'cpu':
+        raise CapabilityAdmissionError('typed R1 actuator force is limited to audited CPU Providers')
     if (execution.render_provider != 'none' or execution.physics_profile != PROFILE
             or execution.determinism_mode != 'strict'):
         raise CapabilityAdmissionError('typed R1 actuator force execution profile is unsupported')
-    build = provider_build_identity('geophys')
-    if (build.get('repository_revision') != _C02B_R1_GEO_PHYS_REVISION
-            or build.get('dirty_build_sha256') is not None):
+    provider = execution.physics_provider
+    if provider == 'geophys':
+        build = provider_build_identity('geophys')
+        runtime_version = None
+        if (build.get('repository_revision') != _C02B_R1_GEO_PHYS_REVISION
+                or build.get('dirty_build_sha256') is not None):
+            raise CapabilityAdmissionError(
+                'typed R1 actuator force requires clean GeoPhys repair commit '
+                f'{_C02B_R1_GEO_PHYS_REVISION}'
+            )
+        provider_evidence = f'geophys=git:{_C02B_R1_GEO_PHYS_REVISION}'
+    elif provider == 'mujoco':
+        build, runtime_version = _mujoco_r1_build_identity()
+        if (build.get('package_version') != _C02B_R1_MUJOCO_PACKAGE_VERSION
+                or runtime_version != _C02B_R1_MUJOCO_RUNTIME_VERSION
+                or build.get('origin_sha256') != _C02B_R1_MUJOCO_PYTHON_ORIGIN_SHA256
+                or build.get('native_binding_sha256') != _C02B_R1_MUJOCO_BINDING_SHA256
+                or build.get('native_core_sha256') != _C02B_R1_MUJOCO_CORE_SHA256):
+            raise CapabilityAdmissionError(
+                'typed R1 actuator force requires the audited MuJoCo Python/native build '
+                f'{_C02B_R1_MUJOCO_PACKAGE_VERSION}'
+            )
+        provider_evidence = (
+            f'mujoco=package:{build["package_version"]}/runtime:{runtime_version}/'
+            f'python_origin_sha256:{build["origin_sha256"]}/'
+            f'native_binding_sha256:{build["native_binding_sha256"]}/'
+            f'native_core_sha256:{build["native_core_sha256"]}'
+        )
+    else:
         raise CapabilityAdmissionError(
-            'typed R1 actuator force requires clean GeoPhys repair commit '
-            f'{_C02B_R1_GEO_PHYS_REVISION}'
+            'typed R1 actuator force is limited to the audited GeoPhys and MuJoCo CPU intersections'
         )
     scene = getattr(source, 'scene_definition', None)
     if not isinstance(scene, SceneDefinition) or scene.identity_hash != _C02B_R1_SCENE_IDENTITY:
@@ -477,16 +536,16 @@ def _c02b_r1_force_capability_manifest(artifact, execution, source, plan, contro
         force_requirements[0].unit, force_requirements[0].sample_domain,
     ) != ('panda-main', 'actuator8', 'N', 'evaluation_boundary'):
         raise CapabilityAdmissionError('R1 Controller must require raw N force for panda-main/actuator8')
-    generic = provider_manifest('geophys')
+    generic = provider_manifest(provider)
     evidence = (
         'C02b-R1-typed-force-v1/'
         f'artifact={artifact.identity_hash}/scene={scene.identity_hash}/'
         f'source={source.source_closure_digest}/controller={controller.identity}/plan={plan.identity_hash}/'
-        f'geophys=git:{_C02B_R1_GEO_PHYS_REVISION}'
+        f'{provider_evidence}'
     )
     claim = CapabilityClaim('actuator_force_query', 'tested', evidence)
     return ProviderCapabilityManifest(
-        'provider-capability-v0', 'geophys', build['manifest_version'],
+        'provider-capability-v0', provider, build['manifest_version'],
         'task-env-c02b-r1-typed-force-v1', 'cpu', PROFILE, 'none', 'strict',
         tuple(generic.capabilities) + (claim,), generic.known_unsupported, evidence,
     )
@@ -1041,7 +1100,7 @@ def execute_plan_bound_r1_control_interval(
     """Run one exact single-Entity R1 interval through existing Core owners.
 
     This bounded route consumes the actual typed raw force publication, lets
-    the existing GeoPhys session perform the canonical feedback projection,
+    the existing Provider session perform the canonical feedback projection,
     computes one real R1 target, applies it through the admitted session, and
     returns the next typed state publication.
     """

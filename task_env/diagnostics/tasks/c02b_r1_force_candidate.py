@@ -159,6 +159,7 @@ def build_r1_force_candidate(workspace: Path | str):
         reset_plan=reset_plan,
         scene=scene,
         source=source,
+        kinematics=model,
         task_source=task_source,
         writer_id=R1_WRITER_ID,
     )

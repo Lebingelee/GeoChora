@@ -65,12 +65,31 @@ class _MuJoCoSession(_SessionValues):
             self._completed_actuator_ctrl = self._data.ctrl.copy()
             self._force_sample_sequence += 1
             from ...environment.types import ActuatorForceMeasurementV1
+            actuator_index = self._open_actuators[0]
+            signed_force = float(self._completed_actuator_force[actuator_index])
+            actuator_ctrl = float(self._completed_actuator_ctrl[actuator_index])
+            valid = math.isfinite(signed_force) and math.isfinite(actuator_ctrl)
+            native_sample_time = (
+                0.0 if self._native_steps == 0
+                else float(self._native_steps - 1) * self._artifact.timebase.physics_dt
+            )
             self._completed_force_measurement = ActuatorForceMeasurementV1(
-                'task-env-actuator-force-sample-v1', 1,
-                self._force_sample_sequence, self._native_steps,
-                self._force_configuration_revision, self._native_steps,
-                'reset_forward' if self._native_steps == 0 else 'native_step_pre_integration',
-                True, 'N', None,
+                schema_version='task-env-actuator-force-sample-v1',
+                source_generation=1,
+                sample_sequence=self._force_sample_sequence,
+                state_revision=self._native_steps,
+                configuration_revision=self._force_configuration_revision,
+                native_step_index=self._native_steps,
+                phase='reset_forward' if self._native_steps == 0 else 'native_step_pre_integration',
+                valid=valid,
+                force_unit='N',
+                invalid_reason=None if valid else 'MuJoCo completed actuator-force cache is non-finite',
+                episode_id=str(self._episode_id) if self._episode_id is not None else None,
+                reset_sample_id=str(self._reset_sample_id) if self._reset_sample_id is not None else None,
+                actuator_id=str(self._source.open_actuators[0]),
+                actuator_ctrl=actuator_ctrl if valid else None,
+                signed_force_N=signed_force if valid else None,
+                native_sample_time_s=native_sample_time,
             )
         else:
             self._completed_actuator_force = None
@@ -149,11 +168,14 @@ class _MuJoCoSession(_SessionValues):
     def reset(self, sample):
         self._begin_reset()
         self._validate_sample(sample)
+        self._last_typed_force_publication = None
         self._mj.mj_resetData(self._model, self._data)
         self._native_steps = 0
         self._force_sample_sequence = 0
         self._force_configuration_revision = 0
         self._last_force_limit_N = None
+        self._completed_actuator_force = None
+        self._completed_actuator_ctrl = None
         self._completed_force_measurement = None
         for name, value in sample.joint_position.items():
             self._data.qpos[self._joint_addresses[name][0]] = value
@@ -168,8 +190,9 @@ class _MuJoCoSession(_SessionValues):
             self._data.ctrl[actuator] = self._model.actuator_ctrlrange[actuator, 1]
         self._current_ctrl = self._data.ctrl.copy()
         self._mj.mj_forward(self._model, self._data)
+        realized = self._realized(sample)
         self._cache_completed_actuator_force()
-        return self._realized(sample)
+        return realized
 
     def _snapshot_with_native_free_joints(self):
         self._require_reset()
@@ -213,41 +236,170 @@ class _MuJoCoSession(_SessionValues):
         self._require_reset()
         return self._snapshot_with_native_free_joints()[0]
 
-    def control_feedback(self, state):
+    def control_feedback(self, state, *, actuator_force=None):
         from .control import feedback_value
         self._require_reset()
         if not hasattr(self, '_control_binding'):
             raise ValueError('control session admission required')
         if not getattr(self, '_force_feedback_required', False):
             raise ValueError('actuator-force feedback is not admitted for this Controller profile')
-        return feedback_value(self, state, self._completed_actuator_force[self._open_actuators[0]])
+        if self._completed_actuator_force is None or self._completed_force_measurement is None:
+            raise ValueError('MuJoCo required actuator-force cache is unavailable')
+        measurement = self._completed_force_measurement
+        if not measurement.valid or measurement.signed_force_N is None:
+            raise ValueError(
+                'MuJoCo required actuator-force cache is invalid: '
+                f'{measurement.invalid_reason or "unknown reason"}'
+            )
+        if getattr(self, '_r1_force_admitted', False):
+            from ...artifacts import TypedActuatorForceStateValue
+
+            if not isinstance(actuator_force, TypedActuatorForceStateValue):
+                raise ValueError('plan-bound R1 feedback requires its current typed force publication')
+            if actuator_force != getattr(self, '_last_typed_force_publication', None):
+                raise ValueError('typed actuator-force value is not the current RuntimeSession publication')
+            actuator_index = self._open_actuators[0]
+            if (
+                not actuator_force.valid
+                or actuator_force.entity_id != 'panda-main'
+                or actuator_force.actuator_id != self._source.open_actuators[0]
+                or actuator_force.unit != measurement.force_unit
+                or actuator_force.signed_value != measurement.signed_force_N
+                or actuator_force.actuator_control_value != measurement.actuator_ctrl
+                or actuator_force.source_generation != measurement.source_generation
+                or actuator_force.sample_sequence != measurement.sample_sequence
+                or actuator_force.source_state_revision != measurement.state_revision
+                or actuator_force.configuration_revision != measurement.configuration_revision
+                or actuator_force.source_closure_digest != self._source.source_closure_digest
+                or actuator_force.provider_materialization_id != self._provider_materialization_id
+                or actuator_force.native_step_index != measurement.native_step_index
+                or actuator_force.sample_phase != measurement.phase
+                or actuator_force.episode_id != self._episode_id
+                or actuator_force.reset_sample_id != self._reset_sample_id
+                or actuator_force.evaluation_control_step != state.control_step
+                or actuator_force.evaluation_simulation_time_s != state.simulation_time
+                or actuator_force.actuator_control_value != float(self._data.ctrl[actuator_index])
+            ):
+                raise ValueError('typed actuator-force publication differs from the current MuJoCo cache')
+            signed_force = float(actuator_force.signed_value)
+        else:
+            if actuator_force is not None:
+                raise ValueError('typed actuator-force injection is reserved for exact plan-bound R1 admission')
+            signed_force = float(measurement.signed_force_N)
+        return feedback_value(self, state, signed_force)
+
+    def _snapshot_typed_actuator_force_values(self, boundary, sample_clock, requirements):
+        """Project the existing reset/step force cache without running another forward pass."""
+        from ...artifacts import TypedActuatorForceStateValue, UnavailableStateValue
+
+        if not getattr(self, '_r1_force_admitted', False):
+            return (), tuple(UnavailableStateValue(
+                'unavailable-state-value-v1', item.field_name, item.subject_kind,
+                item.entity_id, item.subject_id, item.sample_domain,
+                'MuJoCo typed actuator force is limited to the exact admitted Panda R1 candidate',
+            ) for item in requirements)
+        if self._inner_interval_active:
+            raise ValueError('MuJoCo typed actuator-force publication requires an evaluation boundary')
+        state = self.snapshot()
+        if (state.control_step != boundary.control_step
+                or float(state.simulation_time) != sample_clock.simulation_time_s
+                or sample_clock.clock_domain != 'evaluation_boundary'):
+            raise ValueError('MuJoCo typed force readback boundary changed during state publication')
+
+        values = []
+        unavailable = []
+        for item in requirements:
+            if (item.entity_id, item.subject_id, item.unit) != (
+                'panda-main', self._source.open_actuators[0], 'N',
+            ):
+                unavailable.append(UnavailableStateValue(
+                    'unavailable-state-value-v1', item.field_name, item.subject_kind,
+                    item.entity_id, item.subject_id, item.sample_domain,
+                    'MuJoCo bounded R1 force route only maps panda-main/actuator8 in N',
+                ))
+                continue
+            measurement = self._completed_force_measurement
+            if (measurement is None or self._completed_actuator_force is None
+                    or self._completed_actuator_ctrl is None):
+                unavailable.append(UnavailableStateValue(
+                    'unavailable-state-value-v1', item.field_name, item.subject_kind,
+                    item.entity_id, item.subject_id, item.sample_domain,
+                    'MuJoCo completed actuator-force cache is unavailable',
+                ))
+                continue
+
+            physics_dt = float(self._artifact.timebase.physics_dt)
+            native_ratio = float(state.simulation_time) / physics_dt
+            expected_native_step = int(round(native_ratio))
+            if (not math.isfinite(native_ratio)
+                    or abs(native_ratio - expected_native_step) > 1.0e-7):
+                raise ValueError('MuJoCo force evaluation boundary is not on the native-step clock')
+            expected_control_native = int(state.control_step) * self._artifact.timebase.control_substeps
+            if expected_native_step != expected_control_native:
+                raise ValueError('MuJoCo force native index differs from the evaluation boundary')
+            expected_phase = 'reset_forward' if expected_native_step == 0 else 'native_step_pre_integration'
+            expected_sample_time = (
+                0.0 if expected_native_step == 0
+                else float(expected_native_step - 1) * physics_dt
+            )
+            if (
+                measurement.episode_id != self._episode_id
+                or measurement.reset_sample_id != self._reset_sample_id
+                or measurement.actuator_id != item.subject_id
+                or measurement.sample_sequence != expected_native_step + 1
+                or measurement.native_step_index != expected_native_step
+                or measurement.state_revision != expected_native_step
+                or measurement.configuration_revision != self._force_configuration_revision
+                or measurement.phase != expected_phase
+                or measurement.native_sample_time_s != expected_sample_time
+            ):
+                raise ValueError('MuJoCo completed force cache is stale or belongs to another reset/boundary')
+
+            actuator_index = self._open_actuators[0]
+            cached_control = float(self._completed_actuator_ctrl[actuator_index])
+            current_control = float(self._data.ctrl[actuator_index])
+            if not math.isfinite(current_control) or cached_control != current_control:
+                raise ValueError('MuJoCo completed force cache does not match the current actuator input')
+            force = measurement.signed_force_N
+            valid = measurement.valid and force is not None and math.isfinite(float(force))
+            if valid and (not math.isfinite(cached_control) or measurement.force_unit != 'N'):
+                valid = False
+            invalid_reason = measurement.invalid_reason
+            if not valid and not invalid_reason:
+                invalid_reason = 'MuJoCo required actuator-force cache is non-finite or has an unsupported unit'
+            value = TypedActuatorForceStateValue(
+                'typed-actuator-force-state-v1', item.entity_id, item.subject_id,
+                measurement.force_unit, float(force) if valid else None,
+                cached_control if valid else None, valid, invalid_reason,
+                measurement.source_generation, measurement.sample_sequence,
+                measurement.state_revision, measurement.configuration_revision,
+                self._source.source_closure_digest, self._provider_materialization_id,
+                measurement.phase, measurement.native_step_index, physics_dt,
+                expected_sample_time, str(self._episode_id), str(self._reset_sample_id),
+                boundary.boundary_id, int(state.control_step), float(state.simulation_time),
+            )
+            values.append(value)
+            self._last_typed_force_publication = value
+        return tuple(values), tuple(unavailable)
 
     def native_control_feedback_sample(self, state, feedback):
         """Publish provenance for the exact cached force used by control_feedback()."""
         from ...controllers.canonical.feedback import NativeControlFeedbackSampleV1
-        from ...environment.types import ActuatorForceMeasurementV1
+        from dataclasses import replace
 
         self._require_reset()
         index = self._open_actuators[0]
         if (not getattr(self, '_force_feedback_required', False)
                 or self._completed_actuator_force is None
                 or self._completed_actuator_ctrl is None
-                or self._completed_force_measurement is None):
+                or self._completed_force_measurement is None
+                or not self._completed_force_measurement.valid):
             raise ValueError('MuJoCo native force sample is not admitted for this Controller profile')
-        signed_force = float(self._completed_actuator_force[index])
-        actuator_ctrl = float(self._completed_actuator_ctrl[index])
-        native_index = int(self._native_steps)
-        sample_time = (0.0 if native_index == 0 else
-                       float(native_index - 1) * self._artifact.timebase.physics_dt)
-        measurement = ActuatorForceMeasurementV1(
-            'task-env-actuator-force-sample-v1', 1,
-            self._completed_force_measurement.sample_sequence,
-            self._state_revision if native_index == 0 else native_index,
-            self._force_configuration_revision, native_index,
-            'reset_forward' if native_index == 0 else 'native_step_pre_integration',
-            True, 'N', None, str(self._episode_id), str(self._reset_sample_id),
-            int(state.control_step), float(state.simulation_time),
-            str(self._source.open_actuators[0]), actuator_ctrl, signed_force, sample_time,
+        signed_force = float(self._completed_force_measurement.signed_force_N)
+        measurement = replace(
+            self._completed_force_measurement,
+            evaluation_control_step=int(state.control_step),
+            evaluation_simulation_time_s=float(state.simulation_time),
         )
         if feedback.gripper.closing_force_N != max(0.0, -signed_force):
             raise ValueError('MuJoCo native force sample differs from canonical Controller feedback')

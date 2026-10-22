@@ -1,11 +1,11 @@
 # Phase C — Execution API & Runtime Lifecycle：架构、实施切片与验收
 
 > **Phase C remaining design: PROPOSED.** C02a/C05a/C03a/C03b/C04 have bounded implementation receipts below;
-> C02b remains BLOCKED, C02c and unified Environment migration remain incomplete.
+> C02b is **PARTIAL / IN PROGRESS**: the single-Panda structured R1 force/record loop now passes its declared behavior and same-file H5 checks on the bounded GeoPhys CPU and MuJoCo 3.8.1 CPU/native-build routes. Broader profiles and Qualification remain outside this receipt. C02c and unified Environment migration remain incomplete.
 > C05c has a bounded four-cell diagnostic comparison: GeoPhys `a53a8cf` CPU/CUDA × gripper 100/500 Hz full external Expert S2 and same-file H5 S3 passed. The run intentionally used public `read_cpu_snapshot()` every native step despite its normal low-frequency guidance; it does not expand generic Provider support or Qualification. See [cadence comparison](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) and [C05c receipt](C05c_NutAssembly_Public_Native_S1_Acceptance.md).
 > **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；之后维护者分别授权 C02b-P/E 与 C03b 有界实现。
 > 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
-> Recovery Review 及后续 E-S1/S2、R1 freshness/typed-force 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)、[dual Entity Position receipt](C02b_Dual_Entity_Position_Acceptance.md)、[C02b-R1 reset-force freshness](C02b_R1_Reset_Force_Freshness_Acceptance.md) 与 [C02b-R1 typed-force admission](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。C02b 仍 BLOCKED；历史收据不改写。
+> Recovery Review 及后续 E-S1/S2、R1 freshness/typed-force 与 structured behavior 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)、[dual Entity Position receipt](C02b_Dual_Entity_Position_Acceptance.md)、[C02b-R1 reset-force freshness](C02b_R1_Reset_Force_Freshness_Acceptance.md)、[typed-force admission](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md) 与 [structured R1 S2/S3](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。较早 BLOCKED 状态保留为历史签发时结论。
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体与依赖：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；输入：[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)、[`02_Phase_B_Task_Semantics.md`](02_Phase_B_Task_Semantics.md)。
 
@@ -332,9 +332,9 @@ Qualification；这些仍须各自满足后续 Goal 的真实 provider gates。
   非兼容 schema 必须新 Env/wrapper。旧 Panda 输出保护，未测 multi-robot 不宣称执行支持。
 - **Codex AUDIT**：精确追踪已有 `RobotControllerHandle`, `ProductionCanonicalPandaController` 以及 `ControlledRuntimeSession` 的 owner/feedback 状态，不复制控制代码。
 
-#### C02b-P / C02b-E recovery contract（2026-10-22，Position 单/双 Entity 有界切片通过；完整 C02b 未完成）
+#### C02b-P / C02b-E recovery contract（2026-10-22；本节保留签发时状态，最新总结见 C.12.4）
 
-**状态**：C02b 仍为 BLOCKED。单 Panda Position candidate 与最小双 Entity Position candidate 已分别完成其声明范围的 S1、GeoPhys/MuJoCo CPU native S2 与 Generic H5 v3 真写读；完整 force-aware `production-r1` 与 C02b 交集仍未完成。双 Entity 是两个独立 Scene root，不构成 Assembly。它与现有
+**签发时状态**：C02b 当时为 BLOCKED。单 Panda Position candidate 与最小双 Entity Position candidate 已分别完成其声明范围的 S1、GeoPhys/MuJoCo CPU native S2 与 Generic H5 v3 真写读；完整 force-aware `production-r1` 与 C02b 交集尚未完成。双 Entity 是两个独立 Scene root，不构成 Assembly。它与现有
 `panda-main/production-r1` 保留不同的 writer/profile/binding identity；R1 raw `actuator_force` requirement 未删除、未改 optional、未填零。PickCube legacy GeoPhys reset freshness 已由独立收据关闭；新的 exact candidate 也通过一次 plan-bound GeoPhys CPU raw-force publication/compute/apply/step/publication，但这两项都不等于完整 C02b 或跨 Provider required-force 支持。
 
 C02b-P 源码审阅与 C02b-E S1/S2/H5 验收分别见 [Position-based Profile Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md) 和 [C02b-E S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md)。A05 hand-origin TCP 勘误和 S1/S2/H5 分层退出标准以这些记录为准。
@@ -378,7 +378,7 @@ GeoPhys/MuJoCo CPU 两个独立进程用相同 hash-bound candidate/sample 完�
 
 新增 `CanonicalStateViewV2` / `CanonicalStatePublicationV2`，以原 state/publication owner 发布 signed raw force 与 source closure、Provider materialization、episode/reset、evaluation boundary、native sample phase/time、validity 和 unit。v0/v1 mapping/hash 与 `snapshot_v1()` 行为保持；没有把能力加入共享 Provider manifest 列表。`materialize_control()` 只对新 Panda R1 candidate 的 GeoPhys CPU 修复 revision、实际 `ProductionCanonicalPandaController` / hand-origin TCP、精确 Artifact/Scene/source closure 与 compiled `ControlBindingPlanV1` 生成受限 `actuator_force_query` admission。单一 100 Hz / 5×2 ms plan-bound interval 已在 GeoPhys `a53a8cfe` 下重新完成 reset→typed sample→R1 compute/apply→step→typed sample，收据见 [C02b-R1 typed-force admission](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。
 
-这是一个 source-bound candidate 的 publication、静态 admission 和一次真实执行证据；不转移到旧 selected PickCube Artifact/source，不代表 MuJoCo typed force、其他 actuator transmission、GPU、NutAssembly Guard 或 full Expert。C02b 继续 BLOCKED。之后完成的 C05b public lifecycle S1 使用 legacy selected PickCube R1 route，不借用此 candidate 身份；完整执行前的 legacy/plan-bound 路线选择与 S2/S3 门槛见下方新收据。不能借用本 candidate 身份或强制改写冻结 Artifact。
+这是一个 source-bound candidate 的 publication、静态 admission 和一次真实执行证据；不转移到旧 selected PickCube Artifact/source，不代表当时尚未完成的 MuJoCo typed force、其他 actuator transmission、GPU、NutAssembly Guard 或 full Expert。该历史收据签发时 C02b 仍 BLOCKED；之后的 MuJoCo 和 structured R1 状态见 C.12.3–C.12.4。C05b public lifecycle S1 使用 legacy selected PickCube R1 route，不借用此 candidate 身份；不能借用本 candidate 身份或强制改写冻结 Artifact。
 
 **C02c 契约**：同外部 action schema/frame/unit/timebase/actuator ownership 的实例切换只在最后一个完整、
 非 terminal 的公开控制边界生效。切换前验证现有 Profile 类型、构造 identity/config、required state、source closure、
@@ -424,7 +424,7 @@ step→切换→step；参数 `ik_position_gain` 从 0.9 改为 0.45，同一请
 
 此 receipt 只关闭 C02c 的单 Panda Position/GeoPhys CPU/MuJoCo CPU bounded slice；完整 C02c 仍未完成。未覆盖 dual Entity
 同时切换、R1/force-aware 切换、NutAssembly Guard、Assembly、Camera observation、其他 Profile/provider/backend 或一般 Controller
-arbitration。完整 C02b 仍 BLOCKED，Phase II 未完成。
+arbitration。完整 C02b 在该 C02c receipt 签发时仍 BLOCKED，Phase II 未完成；当前 C02b 状态见 C.12.4。
 
 #### C02a bounded implementation receipt（2026-10-21）
 
@@ -504,7 +504,7 @@ Pendulum 仅通过现有 GeoPhys CPU scalar `BaseTaskEnv` 路径测试 T=0/T=1 S
 Stop 与 Stop 后 step 拒绝；Gym v2 活跃录制 Stop 在调用 Env 前明确拒绝。通用 `ExecutionPlan` 固定声明 GeoPhys provider，因此
 MuJoCo Pendulum 为 `NOT_ADMITTED`，不是失败或支持结论。structured v3 wrapper 正常写读只用显式 contract fixture 验证；当前没有
 真实 generic Env 声明该能力。未运行 learner 全算法迁移、vectorized Stop、NutAssembly R3 Guard、双 Entity、Assembly、R1 force
-refresh、完整 C02b 或 Phase II qualification。C02b 仍 **BLOCKED**；本 receipt 不将其或 Phase II 标为完成。
+refresh、完整 C02b 或 Phase II qualification。C02b 在该 C03b receipt 签发时为 **BLOCKED**；本 receipt 不将其或 Phase II 标为完成。后续状态见 C.12.4。
 
 ### C04 — Unified Observation & Optional Diagnostics
 
@@ -974,7 +974,7 @@ S2 均未开始/验收，因此序号 24 不得标为完成，也不能宣称双
 
 **不在本轮范围：** full external Expert/full internal Expert rollout、真实 Guard close 授权、完整 recording S2/S3、Outcome success/strict warning-failure campaign、其他 Provider/backend/profile、C02c、Assembly 和 camera integration。具体实现、source/config 身份和证据位置见验收报告；本收据不授予完整 C05c、C02b 或 Phase II 状态。
 
-**C02b 仍 BLOCKED 的具体 gate：** (1) Scene-v3 Panda R1 GeoPhys candidate 虽有 typed raw-force、精确 plan admission 和一条真 interval，仍欠完整 structured R1 open/close/obstructed-close/force-hold/reopen 与 action/feedback/target/ack/state 录制；(2) MuJoCo 缺 R1 required typed raw-force publication、精确 admission 与真实 plan-bound interval；(3) dual Entity Position S2/H5 是 force-free；(4) Qualification 未通过。legacy PickCube `production-r1` C05b S1/S2/S3 在其原身份上已通过，不要求迁移为 Scene-v3 candidate。完整列表见 C05c S1 acceptance 和 [执行顺序表 §3](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
+**C02b blockers recorded at this C05c receipt's issuance:** (1) Scene-v3 Panda R1 GeoPhys candidate 有 typed raw-force、精确 plan admission 和一条真 interval，仍欠完整 structured R1 open/close/obstructed-close/force-hold/reopen 与 action/feedback/target/ack/state 录制；(2) 当时 MuJoCo 尚无 R1 required typed raw-force publication、精确 admission 与真实 plan-bound interval，此项由下文 C.12.3 关闭；(3) dual Entity Position S2/H5 是 force-free；(4) Qualification 未通过。legacy PickCube `production-r1` C05b S1/S2/S3 在其原身份上已通过，不要求迁移为 Scene-v3 candidate。当前状态见 C.12.3 与[执行顺序表 §3](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。
 
 ## C.12.1 C05c 连续 native 验证与 MuJoCo S2/S3（2026-10-22；当时的状态记录）
 
@@ -995,3 +995,29 @@ MuJoCo 3.8.1 CPU 在独立真实进程沿现有 task-owned `OutcomeSolutionV1` �
 **指定诊断矩阵 S2/S3 通过：** GeoPhys `a53a8cf` 的 CPU/CUDA backend 各完成 100 Hz 与 500 Hz gripper law 四个独立进程。任务均使用 NutAssembly frozen TaskArtifact/source、NA-S0 seed 19 和同一 ResetSample、R3、100 Hz 外层、5×2 ms native clock、10 N force target/cap、原 8 N / 0.1 s Guard 与原 Outcome/strict policy。每格先做两 interval native Probe，再完成真实 task-owned external Solution、Recorder 与同文件 H5 回读。100 Hz 的真实更新/保持计数为 2,443/9,772；500 Hz 为 12,210/0；四格 Task success、planned Outcome 和 strict Expert completion 均通过，Guard 均由 50 个连续 500 Hz 样本于 5.17 s 授权、5.18 s 消费。精确时钟、force、stage、ack、cost、H5 hash 及保留的早期 checker/contract failures 见 [cadence report](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) 与 ignored `workspace/maintenance/nutassembly_gripper_cadence_geophys_20261022/comparison.json`。
 
 本实验明确以 public GeoPhys `RobotArmObservationReader.read_cpu_snapshot()` 每个 2 ms 子步读取，尽管其常规文档限制该读取为低频用途。CUDA 实际初始化 Taichi `cuda` 并使用 RTX 5060；控制与 force readback 仍在 CPU host，不是 device-resident Controller。该越界用于执行本次诊断矩阵，不授予通用 per-substep Provider 能力，不改变 manifest、Provider pin 或 Reader 使用合同；没有私读 solver。结果不把四个 S2/S3 诊断自动提升为完整 C05c approval、Qualification、C02b 或 Phase II。
+
+## C.12.3 C02b-R1 MuJoCo typed-force bounded slice (2026-10-22)
+
+**签发时状态：指定 MuJoCo CPU candidate sub-item bounded passed；完整 structured R1 尚未运行。** 本轮先保全 C05c cadence code/tests/report/docs 到本地检查点 `9280b58`，未推送；GeoPhys checkout cleanly 对齐到父仓库原有 pin `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`，未改父 gitlink、Provider source 或其 branch pointer。C05c 四格实验和原始 ignored Evidence 未纳入本轮 Probe。其后状态见 C.12.4。
+
+在现有 `_MuJoCoSession` cache、`snapshot_v2()` 与 `materialize_control()` exact-admission owners 内，补充 raw signed N typed publication。准入只针对上方 C02b-R1 candidate、真实 `panda-main/production-r1` Controller/hand-origin TCP、精确 compiled plan/source/Artifact/XML/actuator8 mapping、CPU 100 Hz/5×2 ms strict route，以及实测 MuJoCo 3.8.1 Python package origin、native binding 与 native core library digest。每次构造 call-specific claim；generic MuJoCo manifest 与 shared capability list 不增加 `actuator_force_query`。旧 no-plan 和 Position force-free 分支行为保持。
+
+reset 清除旧缓存、写入完整 ResetSample state 并使用原有 `mj_forward()` 得到 `reset_forward` sample；完成新 episode/reset realization 后才为该样本附上 identity。每个实际 `mj_step()` 后保留对应的 `native_step_pre_integration` force cache，随后外层已有的 `mj_forward()` 仅用于同步状态，不覆盖该缓存。`snapshot_v2()` 读取缓存并检查 force/control、sample sequence/native index/phase/time、config revision、episode/reset/source/materialization/evaluation boundary；不会再调用 `mj_forward()` 或推进物理。原始签名保留，唯一 canonical 转换仍在 `control_feedback()`。
+
+独立 MuJoCo CPU process 使用 seed 31 实际完成 `reset → snapshot_v2 → R1 structured compute/apply → 5 × 2 ms native steps → next snapshot_v2`。初始 `actuator8` raw force 为 `+4.00000000005 N`、ctrl 255、reset-forward index/time 0/0，canonical closing magnitude `0 N`；真实首次 closing compute 未进入 force mode。一步后 raw force 为 `−0.0004669455855541107 N`、ctrl 0、pre-integration index 5、native sample time `0.008 s`，evaluation boundary 是 control step 1 / `0.010 s`；现有映射得到 `+0.0004669455855541107 N`。target/ack 与实际 R1 及七个 arm actuators 对齐，真实 arm state 改变。重复发布/反馈读取不推进 clock 或 cache sequence。
+
+typed publication/admission/reset-cache S1、旧 no-plan/Position、H5、C02a 与 GeoPhys candidate 的受影响定向集合 **35 passed**（1 upstream Taichi deprecation warning）；MuJoCo 真实 S2 独立进程 **1 passed**。具体 build/source/Controller/TCP/plan identities、边界、样本数值、S1/S2 logs 与 JSON 见 [更新后的 C02b typed-force receipt](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md) 和 ignored `workspace/maintenance/c02b_r1_mujoco_typed_force_20261022/`。
+
+本轮关闭 MuJoCo 这一精确 candidate/build 的 typed publication、精确 admission 与 one-interval gate。签发时完整 structured R1 与 request/feedback/target/ack/state 录制仍未运行；后续行为/H5 结果见 C.12.4。没有重跑 NutAssembly 四格、没有 CUDA typed-force、没有 legacy PickCube plan migration；本结果不完成完整 C02b、C05c 或 Phase II。
+
+## C.12.4 单 Panda structured R1 连续行为与 Generic H5 v3 回读（2026-10-22）
+
+**本请求切片：PASS；C02b 总体仍 PARTIAL / IN PROGRESS，无外部 blocker。** 在单 Panda Scene-v3 `production-r1` candidate 上，分别以独立进程运行 GeoPhys `a53a8cf` CPU 和精确准入的 MuJoCo 3.8.1 CPU/native build。沿用同一 source/Artifact、Controller/TCP/plan、seed-31 ResetSample、现有 source peg、100 Hz 外层和每区间五个 2 ms native steps；没有改冻结 Artifact、GeoPhys pin 或 source 几何。最终 runner 结果为 GeoPhys `geophys_cpu_run_018` 与 MuJoCo `mujoco_cpu_run_005`，两者均为 `PASS`。完整身份、配置和证据路径见[验收报告](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
+
+两条路线各完成 485 个 structured interval 与 486 个边界，顺序为 open、free-space close、open/approach、obstructed close、force hold、reopen。每区间五步依据 Provider native sample sequence/index 增量和 10 ms 外层时钟核对；RuntimeSession 未提供独立完成子步计数器，因此不把该推断写成独立计数器证据。reset-forward 的 `+4 N` 首样有效并由既有 `control_feedback()` 转换为 0 N closing force；受阻闭合时实际负 signed force 分别达到 GeoPhys `−3.0923 N`、MuJoCo `−3.0658 N`，进入真实 R1 并触发 force mode，Controller target 与 applied acknowledgement 对齐。Force mode 在 0.10 s hold 的 10/10 interval 保持；30 N readiness 仍为 false，单独记录；reopen 清除 force mode。没有把 readiness、force mode、任务成功或 Expert 完成互相替代。
+
+每条路线都由现有 Generic H5 v3 Recorder 实写，再从同一 H5 通过 structured-control/action readers 读回 request、raw/canonical feedback、target、ack、state、身份、时钟及 T/T+1；两个回读均通过。GeoPhys H5 SHA-256 `b8324a790a01ee8c1cb86c3ceffaa92fa29a3583b3cff2b684afbcb9f2356a4b`，MuJoCo H5 SHA-256 `93cf0fd14a46ae1e21d577a2758fc73dfa92dabc93fd056e4f4c5189d49e34a0`。
+
+最终 action target 使用本 candidate 的 FK 一致姿态，将原有 peg 中心置于 hand-local `[0, +0.0105, +0.1285] m`；source、几何、Artifact、控制器配置及所有预先声明阈值保持不变。两路辅助 arm-pose 比较均在 6 mm / 0.035 rad 内：GeoPhys 为 2.671 mm / 0.030374 rad，MuJoCo 为 3.391 mm / 0.030208 rad。此前探索目标的失败输出保留在 Evidence 中，不作为最终结果。缺失/过期样本、重复 apply 与已有 C03a fault latch 有定向证据；本收据没有宣称注入新的 native apply failure。
+
+**C02b 退出范围收敛：** P00/P99 的最小双 Entity 独立施控要求已由双 Entity Position-only S2/H5 满足；未找到要求 dual-Entity R1 的批准依据，因此它不是必需 gate。当前 P00 所列 Position、reset-force freshness、typed raw-force publication/精确 admission、最小双 Entity Position 隔离与本轮单 Panda structured R1 连续行为/H5 交集均有对应的有界证据；没有已知外部阻断。CUDA R1、dual-Entity R1、其他 source/build/transmission 是未准入扩展；Qualification 单独记录且未运行。C02b 总状态仍为 PARTIAL / IN PROGRESS，不延伸为 Phase II 完成。输出覆盖回归保留历史丢失声明，默认 pytest 使用 `tmp_path`，显式 Evidence 目录/JSON 重用时拒绝覆盖；历史丢失 JSON 未重建。目标化回归 **69 passed**，之后增加的 GeoPhys/MuJoCo stale-repeat native tests **2 passed**，Evidence 防覆盖回归另行通过；更完整文件/哈希/失败探索见[验收报告](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
