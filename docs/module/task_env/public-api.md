@@ -11,7 +11,7 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | --- | --- | --- |
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
 | PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
-| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "geophys", "backend": "cpu", "horizon": 6000})` | Outcome Completion V1；只允许 `step_expert()` |
+| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "geophys", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; bounded task-owned external Solution native S1 is available; full external Expert S2/S3 is not accepted |
 
 两条 selected route 只接受 `provider`、`backend`、`horizon`：provider 仅
 `geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
@@ -31,7 +31,7 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 `TaskEvaluation` 提供 reward、success、failure、metrics、reward_terms；reward 与
 `info["is_success"]` 不能替代 Judge。通用 `ignore_done=False` 时 success/failure 可终止 episode，
 horizon 产生 truncation；selected expert 的 stop/completion policy 必须单独读取。
-Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly external action 明确拒绝。
+Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly raw external actions 明确拒绝。
 
 PickCube selected `production-r1` 另有一个有界 C05b public Solution 调用序列：
 `from task_env.tasks.pick_cube import build_readiness_solution` 构造 task-owned Solution，
@@ -53,6 +53,15 @@ readiness、错误边界、observer 与 append 失败。此调用面仍使用冻
 分别记录 148/149 与 470/471 个 transition/boundary，并核对状态数值、身份和 action→target→ack。详见
 [C05b S2/S3 acceptance](../../../docs/module/task_env/goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
 该有界结果不支持 legacy R1 Stop/Event/Outcome、MuJoCo typed-force、NutAssembly Guard、完整 C02b 或 Qualification。
+
+NutAssembly 的 C05c S1 另有一个 task-owned `OutcomeSolutionV1` 路线：
+`from task_env.tasks.nut_assembly import build_outcome_solution`，然后调用
+`env.reset_for_solution(solution, seed=19)` 和 `env.step_with_solution(solution)`。
+该路线只确认受控的 native Solution/request、RuntimeSession force-sample 和 applied-ack 合同，覆盖
+GeoPhys `a53a8cf` CPU 与 MuJoCo 3.8.1 CPU 的单 native interval Probe，并将五个真实 500 Hz Guard
+samples 写入既有 execution Recorder。它保留内部 `step_expert()`，不允许任意 raw action；完整 NutAssembly
+external Expert、close Guard 真实授权、完整录制 S2/S3 与 Qualification 尚未通过。详见
+[C05c S1 receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
 
 通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
 unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined

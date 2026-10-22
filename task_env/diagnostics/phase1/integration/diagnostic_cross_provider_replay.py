@@ -430,7 +430,8 @@ def replay(source_path: Path, output_path: Path, *, mode: str,
                 target["_diagnostic_replay_ramp_active"]["value"] = active
                 applied_substeps = []
 
-                def capture_substep(subindex, substate, subfeedback, command, ack, diagnostics):
+                def capture_substep(subindex, substate, subfeedback, command, ack,
+                                    diagnostics, native_feedback_sample=None):
                     applied_substeps.append({"target": command.to_mapping(),
                                              "applied": ack.to_mapping(),
                                              "substep_index": subindex})

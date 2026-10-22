@@ -60,8 +60,13 @@ class ReferenceTaskBinding:
     capture_guard_samples: bool = False
     record_native_substeps: bool = False
     abort_solution_on_runtime_error: bool = False
+    native_sample_factory: Callable | None = None
+    native_interval_receipt_factory: Callable | None = None
+    control_request_required: bool = False
+    expert_uses_public_observation: bool = False
     build_external: Callable | None = None
     validate_external_solution: Callable | None = None
+    runtime_episode_identity: bool = False
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -72,6 +77,10 @@ class ReferenceTaskBinding:
             raise ValueError("selected task binding requires an observation pose")
         if (self.build_external is None) != (self.validate_external_solution is None):
             raise ValueError('external Solution construction and validation must be supplied together')
+        if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
+            raise ValueError('native sample and interval receipt factories must be supplied together')
+        if self.control_request_required and self.native_sample_factory is None:
+            raise ValueError('native controller requests require the selected native sample contract')
 
 
 class SelectedReferenceEnv(TaskEnvironmentComponent):
@@ -188,6 +197,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'privileged_state': Dict({k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32) for k in keys})})
         self.session = None
         self._external_solution_owner = None
+        self._active_native_interval_receipt = None
         self._closed = False
         self._episode_mode = None
         self._stopped = True
@@ -394,6 +404,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.realized = self.session.reset_plan(reset_plan)
             else:
                 self.realized = self.session.reset(self.sample)
+            if self.binding.runtime_episode_identity:
+                # Native task samples and the published Solution boundary
+                # must share the RuntimeSession's actual episode identity.
+                self._selected_episode_id = self.session.episode_id
             phase = 'snapshot_readback'
             self.state = self.session.snapshot()
             if self.position_profile:
@@ -412,6 +426,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.controller.reset(self.state, self.feedback)
             phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info['provider'] = self.provider
             if not self.position_profile:
                 self._publish_execution_info(self.info)
             self._last_position_terminated = False
@@ -430,8 +445,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 reset_solution.reset(self.obs, self.info, self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
             phase = 'arm_schedule_reset'
-            self.arm_schedule = (self.binding.schedule_factory(self)
-                                 if self.binding.schedule_factory is not None else None)
+            if all(callable(getattr(self.controller, name, None))
+                   for name in ('begin', 'target', 'applied')):
+                # The Controller itself owns acknowledged arm hold/ramp memory.
+                self.arm_schedule = self.controller
+            else:
+                self.arm_schedule = (self.binding.schedule_factory(self)
+                                     if self.binding.schedule_factory is not None else None)
+            self._active_native_interval_receipt = None
             self._stopped, self._episode_mode = False, None
             self._position_episode_end = None
             self._published_position_state = self.state
@@ -488,6 +509,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'source_id': source_id,
             'source_xml_sha256': source_xml_sha256,
             'source_closure_digest': source.source_closure_digest,
+            'provider_materialization_id': self.session.provider_materialization_id,
             'controller_identity': self.controller.identity,
             'solution_identity': self._active_solution_identity(),
             'reset_sample_id': self.sample.sample_id,
@@ -1036,7 +1058,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._latch_fault('public_execution_readiness', error, before_state=self.state)
                 raise
         try:
-            proposal = self.solution.act()
+            proposal = (self.solution.act(self.obs, self.info)
+                        if self.binding.expert_uses_public_observation
+                        else self.solution.act())
         except BaseException as error:
             self._latch_fault('expert_proposal', error, before_state=self.state)
             if self.binding.abort_solution_on_runtime_error:
@@ -1078,7 +1102,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = requested_mode
         stage = proposal.stage if proposal is not None else 'external'
         diagnostics = dict(proposal.diagnostics) if proposal is not None else {}
-        guard_samples = []
+        native_samples = []
         substeps = []
         before_state = self.state
         transition_counts_before = self._recording_counts(self.recorder)
@@ -1091,19 +1115,50 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._execution_boundary(self.expert_execution_info())
                 if not self.position_profile else None
             )
+            if (self.binding.native_sample_factory is not None
+                    and not callable(getattr(self.session, 'native_control_feedback_sample', None))):
+                raise RuntimeError('selected Provider RuntimeSession does not expose the required native feedback sample contract')
+            if self.binding.control_request_required:
+                phase = 'controller_control_request_validation'
+                if proposal is None or proposal.control_request is None:
+                    raise ValueError('selected NutAssembly control requires its versioned arm execution request')
+                validate_request = getattr(self.controller, 'validate_arm_execution_request', None)
+                if not callable(validate_request):
+                    raise RuntimeError('selected Controller does not own the admitted arm execution request')
+                validate_request(proposal.control_request)
+            elif proposal is not None and getattr(proposal, 'control_request', None) is not None:
+                validate_request = getattr(self.controller, 'validate_arm_execution_request', None)
+                if not callable(validate_request):
+                    raise ValueError('selected Controller does not admit this Solution control request')
+                validate_request(proposal.control_request)
             if self.recorder is not None and self.binding.recorder_mode == 'execution':
+                phase = 'recorder_interval_begin'
                 self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
                                     self.artifact.timebase.control_substeps)
+            if proposal is not None and getattr(proposal, 'control_request', None) is not None:
+                phase = 'controller_control_request'
+                self.controller.request_arm_execution(proposal.control_request)
             phase = 'controller_compute'
             canonical, target = self.controller.compute(self.state, self.feedback, request)
 
-            def observe(index, state, feedback, effective, applied, diag):
+            def observe(index, state, feedback, effective, applied, diag,
+                        provider_feedback_sample=None):
+                observed_diagnostics = dict(diag)
+                if self.binding.native_sample_factory is not None:
+                    if proposal is None or request_boundary is None:
+                        raise RuntimeError('native sample publication requires a source-bound Solution action')
+                    if provider_feedback_sample is None:
+                        raise ValueError('selected native interval lacks Provider force-sample provenance')
+                    native_sample = self.binding.native_sample_factory(
+                        self, stage, index, state, feedback, effective, applied,
+                        observed_diagnostics, provider_feedback_sample, request_boundary,
+                    )
+                    native_samples.append(native_sample)
+                    observed_diagnostics['native_feedback_sample_v1'] = native_sample.to_mapping()
                 substeps.append((index, effective, applied))
                 if self.recorder is not None and self.binding.record_native_substeps:
-                    self.recorder.applied_substep(index, state, feedback, effective, applied, diag)
-                if proposal is not None and stage == 'close_gripper' and self.binding.capture_guard_samples:
-                    _, info, _ = self.observation(state)
-                    guard_samples.append(observer_solution.make_native_guard_sample(state, info, diag))
+                    self.recorder.applied_substep(index, state, feedback, effective, applied,
+                                                   observed_diagnostics)
             if self.binding.interval_mode == 'native':
                 phase = 'physics_step'
                 interval_attempted = True
@@ -1123,17 +1178,30 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.feedback = self.session.control_feedback(self.state)
             phase = 'observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info['provider'] = self.provider
             if not self.position_profile:
                 self._publish_execution_info(self.info)
                 if canonical is not None and target is not None and applied is not None:
                     self._publish_control_application(
                         self.info, request, canonical, target, applied, request_boundary,
                     )
+            interval_receipt = None
+            if self.binding.native_interval_receipt_factory is not None:
+                phase = 'native_interval_receipt'
+                evaluation_boundary = self._execution_boundary(self.expert_execution_info())
+                interval_receipt = self.binding.native_interval_receipt_factory(
+                    self, request_boundary, evaluation_boundary, tuple(native_samples), tuple(substeps),
+                )
+                interval_receipt.validate()
+                self._active_native_interval_receipt = interval_receipt
+                self.info['native_interval_receipt_v1'] = interval_receipt.to_mapping()
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
             if proposal is not None:
                 phase = 'solution_observation'
-                extra = self.binding.observe_expert_kwargs(self, guard_samples)
+                extra = (self.binding.observe_expert_kwargs(self, native_samples, interval_receipt)
+                         if interval_receipt is not None
+                         else self.binding.observe_expert_kwargs(self, native_samples))
                 observer_solution.observe(
                     self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra,
                 )

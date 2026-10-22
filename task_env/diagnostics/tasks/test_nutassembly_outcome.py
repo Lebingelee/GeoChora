@@ -22,22 +22,12 @@ META = {'action_schema': {'controller_kind':'absolute_pose','reference':'world',
 OUTCOME_COMPLETION = OUTCOME_POLICY_ID
 
 
-class Hold:
-    def __init__(self):
-        self.locked = False
-        self.lock_calls = 0
-
-    def lock(self):
-        self.lock_calls += 1
-        self.locked = True
-
-
 class Ideal:
     def __init__(self, *, residual=0.0, release=True, authorize=True):
         value = build_reference()
-        self.arm_hold = Hold()
         self.solution = NutAssemblyOutcomeSolutionV1(config=value['solution_config'],
-            control_dt=.01, physics_dt_s=.002, arm_hold=self.arm_hold)
+            control_dt=.01, physics_dt_s=.002)
+        self.control_requests = []
         self.ee = np.array([.5,-.075,.7,*value['solution_config'].grasp_quaternion_wxyz])
         self.nut = np.array([.5085,-.075,.473,0.,0.,0.,1.])
         self.peg = np.array([.58,.045,.5,1.,0.,0.,0.])
@@ -59,6 +49,7 @@ class Ideal:
 
     def step(self, mutate=None, terminated=False, truncated=False):
         s=self.solution; action=s.act(); stage=action.stage
+        self.control_requests.append((stage, action.control_request.mode))
         self.ee=np.array(action.action[:7],dtype=float)
         if stage=='descend_to_handle' and s._index>=len(s._actions):
             self.ee[2]=s._goal[2]-s.servo_height_compensation_m+self.residual
@@ -198,7 +189,7 @@ def test_default_and_source_policy_identity_and_complete_checkpoint_fields():
     with pytest.raises(TypeError):build_reference(execution_policy='diagnostic')
     with pytest.raises(ValueError,match='unchanged limits and budget'):
         NutAssemblyOutcomeSolutionV1(config=replace(s.config,capture_translation_slip_m=.009),
-            control_dt=.01,physics_dt_s=.002,arm_hold=Hold())
+            control_dt=.01,physics_dt_s=.002)
 
 
 def test_descend_command_z_matches_acceptance_height_target():
@@ -237,7 +228,7 @@ def test_descend_waits_for_tracking_rmse_then_closes_with_cartesian_feedback():
     assert s.stage=='close_gripper' and not s.failed
     passed, = [e for e in s.events if e['event']=='tracking_rmse_satisfied']
     assert passed['rolling_position_rmse_m'] < .0001
-    assert f.arm_hold.lock_calls==0 and not f.arm_hold.locked
+    assert all(mode == 'track' for stage, mode in f.control_requests if stage != 'verify_lift')
 
 
 @pytest.mark.parametrize('fault',['pose_error','unstable'])
@@ -255,13 +246,12 @@ def test_original_pose_and_measured_stability_are_required(fault):
 def test_grasp_closure_keeps_cartesian_feedback_without_joint_target_lock():
     f = Ideal(); f.until('close_gripper'); s = f.solution
     assert not s.failed and s.stage == 'close_gripper'
-    assert f.arm_hold.lock_calls == 0 and not f.arm_hold.locked
     target = s._actions[0, :7].copy()
     assert np.allclose(s._actions[:, :7], target[None, :], atol=0., rtol=0.)
     while s.stage == 'close_gripper' and not s.failed:
         stage, _, _ = f.step()
         assert stage == 'close_gripper'
-        assert f.arm_hold.lock_calls == 0 and not f.arm_hold.locked
+        assert f.control_requests[-1] == ('close_gripper', 'track')
     assert not s.failed and s.stage == 'verify_lift'
 
 

@@ -71,8 +71,9 @@ PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py   --env-id p
 PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/new-run/pickcube.h5
 ```
 
-使用新的输出路径。NutAssembly 只允许 guarded `step_expert()`；提前截断不构成成功，
-task outcome、Expert completion 和 termination/truncation 分开报告。
+使用新的输出路径。NutAssembly 保留 guarded `step_expert()`；受控 external Solution native
+lifecycle 目前只通过 C05c S1/单 interval Probe，不代表完整 external Expert 已验收。禁止 raw
+external actions；提前截断不构成成功，task outcome、Expert completion 和 termination/truncation 分开报告。
 离线 H5 integrity 不证明 replay/D0。完整选项与有界资源语义见
 [examples](../../../examples/README.md)。Linux `RLIMIT_AS` 是每进程虚拟地址空间限额，
 不是 RSS 或整个进程树内存上限。

@@ -41,16 +41,16 @@
 | [`task_env/observations/state.py`](../../../../../task_env/observations/state.py) | State/Privileged/Private/Vision field builders 和 schema | 保留现有 obs 分组，对不同 robot 扩展 typed schemas |
 | [`task_env/recorders/`](../../../../../task_env/recorders) | `TransitionRecordWrapper`、H5 v2、T/T+1 规则 | Stop/Controller switch/Solution metadata 使用版本化事件，不能伪造物理 step |
 
-**关键回归风险**：当前 NutAssembly 禁止 external action，并依赖旧 `step_expert()` 获取真实 Native-rate Guard Evidence、Readiness、11-stage Solution 所需反馈；如果仅把 `solution.act()` 移到外部却删除底层必要测量，属于功能破坏。旧 selected route 的成功后继续执行、录制和 terminal 不同于 Generic Gym Success Stop，不能一律改成 `terminated=success`。
+**初始审阅的关键回归风险**：当时 NutAssembly 禁止 external action，并依赖旧 `step_expert()` 获取真实 Native-rate Guard Evidence、Readiness、11-stage Solution 所需反馈；如果仅把 `solution.act()` 移到外部却删除底层必要测量，属于功能破坏。C05c S1 后现已接通受控 task-owned external Solution native contract 与单 interval Probe；完整 Expert/Guard S2/S3 仍 open。旧 selected route 的成功后继续执行、录制和 terminal 不同于 Generic Gym Success Stop，不能一律改成 `terminated=success`。
 
 ### C.1.1 审阅建立的额外耦合
 
 - [BaseTaskEnv](../../../../../task_env/environment/env.py#L113-L159) 直接 bootstrap GeoPhys，且拒绝多个
   resolved robots；[ControlledRuntimeSession](../../../../../task_env/runtime/sessions/control.py#L18-L35)
   限定七 arm targets 和一个 0.08 m gripper binding。统一继承不是接口适配的替代。
-- NutAssembly [构造](../../../../../task_env/tasks/nut_assembly/task.py#L300-L371) 共享 arm_hold；
-  Solution 修改 locked，ReferenceArmSchedule 读 `_lift_released` 决定 native ramp，
-  controller identity 还包含 Solution identity。外置 Solution 必须迁移这些施控契约，不能只迁移 act/observe。
+- NutAssembly 初始构造共享 arm_hold；初始审阅发现 Solution 修改 locked、ReferenceArmSchedule 读 `_lift_released` 决定 native ramp。
+  C05c S1 已将受限 track/hold/ramp 请求表达在既有 action contract，由 Controller 保有单一 ack 状态，且 RuntimeSession
+  样本身份绑定到同一 reset episode；外部路线不依赖私有 stage/可变 hold。完整 Guard/Outcome external rollout 仍待 S2/S3。
 - [TransitionRecorder](../../../../../task_env/recorders/recorder.py#L104-L145) 将 action 转成 NumPy vector，
   [H5 writer](../../../../../task_env/recorders/h5.py#L150-L157) 按固定 components 堆叠。
   当前并不支持本页 proposed action tree；C05a 的存储工作必须前移。
@@ -266,13 +266,13 @@ External Solution (planner/RL/VLA/LLM/privileged policy)
 要求：
 
 1. `step_expert` **不进入 vNext 标准 public API**，但旧 `SelectedReferenceEnv` 过渡期保留至所有生产调用迁移/相应回归通过。
-2. 为 NutAssembly 独立 Solution 保留 Native Guard Samples、 Readiness/Warn/Stage 事实；不要让 Env 自行推断 Solution Completion。
+2. 为 NutAssembly 独立 Solution 保留 Native Guard Samples、 Readiness/Warn/Stage 事实；不要让 Env 自行推断 Solution Completion。C05c S1 已持久化单 interval 的真实 samples；尚未通过 full Expert S2/S3。
 3. Task success（物理谓词）、Solution completion（11-stage/retreat）、env terminated/truncated 分别记录；不可把 strict failure 重写成 pass。
-4. NutAssembly 当前 external action 被拒，迁移必须**先完成可安全受控的 Control Action Admission**，必要时通过受限 Solution Control Plan 对外暴露，而不是删除 `external_action_error` 直接解禁所有输入。
+4. NutAssembly raw external action 仍被拒绝；受控的 task-owned Solution route 已有 bounded C05c S1，不是任意 Control Action Admission，也不应删除 `external_action_error` 解禁所有输入。
 5. 典型用户 loop 归用户脚本/未来 Experiment Runner；本轮可以更新 `examples/` 演示，不新增通用 `Runner(env,policy).run()`。
 6. Solution 不再持有 Controller 的共享可变 hold 对象；在既有 action/control contract 内表达受限、
    版本化的 hold/release/ramp profile 请求，由 Controller 在 admitted boundary 应用并返回 acknowledgement。
-   具体字段由 C05c 先 audit；Provider 不认识任务 stage，不能把私有 `_lift_released` 作为跨边界接口。
+   C05c S1 已限定 profile/request fields；Provider 不认识任务 stage，不把私有 `_lift_released` 作为跨边界接口。
 7. Native measurement producer 按声明需求提供原始 state/force/clock/validity；
    task-owned Solution 将它们组成 Guard 条件。必要采样与用户 diagnostics 开关无关，
    Controller/Runtime 不回调 Solution 来决定是否采样，测量本身不推进 Task semantic memory。
@@ -524,9 +524,7 @@ refresh、完整 C02b 或 Phase II qualification。C02b 仍 **BLOCKED**；本 re
   [05 的映射表](05_Architecture_Review_and_Execution_Order.md#32-c05a-既有证据与三切片映射)逐项列明已有/未证实范围，
   不因拆分撤销 C03a/C04 已有受限验收，也不把未证实的 consumer gate 记为通过。
 - **C05b**：依赖 C02b/C03b/C04/C05a3，迁移 PickCube external Solution，证明 action→step→record 路线。
-- **C05c**：依赖 C05b/D02b，先审定 native feedback/hold/ramp 契约再迁移 NutAssembly；
-  分别证明 measured 500 Hz、Guard、arm schedule、Outcome V1 与 strict warning/failure 保真。
-  无法证明时保留旧 step_expert，不能仅删除 external_action_error。
+- **C05c**：依赖 C05b/D02b。2026-10-22 的首个受限切片已在现有 owners 内接通 native sample/phase/reset identity、Controller-owned hold/ramp request+ack 与 execution Recorder 保存，并在 GeoPhys `a53a8cf` CPU、MuJoCo 3.8.1 CPU 各完成一段真实 native interval。旧 `step_expert` 保留；full external Expert、真实 close Guard authorization、Outcome/strict warning-failure full campaign 和 S2/S3 留待后续授权。
 - **验收**：同 frozen sample/config 在 GeoPhys/MuJoCo 已实现的受限 selected route 上，success/current-success/Expert outcome/适用时的 Guard/clock/recording 与旧基线有据可查；记录 T/T+1。PickCube 当前没有 native Guard callback；C05b 复用其 readiness policy，不新增 Guard。对 PickCube 既有 R1 路线，先保留 `stop()` 不支持及 canonical-v0 无 Event/Outcome 的当前语义；只有经单独契约修订和授权扩展 C03b-R1 后，才可要求 R1 Stop Events。不得因 C03b Position 已支持 Stop 而静默改变 R1。不得宣称完整 checkpoint replay；S2/S3 未跑标记缺口；兼容方法在所有 caller 迁移前不能删除。
 - **完整 C05 Gate**：C05a1/a2/a3/b/c 分别有退出证据映射或 receipt，真实采集/读取及适用的 replay validity 独立报告；
   旧方法退休另需 production callers/examples/tests/docs 迁移及非回归，不与“新接口已存在”绑定。
@@ -960,3 +958,19 @@ S2 均未开始/验收，因此序号 24 不得标为完成，也不能宣称双
 7. 控制边界是否可能因 Error 产生已施控但未成功返回的区间？如何防止下一 Action 在未知状态继续执行？
 
 **C 阶段出口**：冻结/可复现 Task 可在单 Environment 中通过规范化 Action 执行，用户可按 Control Group 配置 Controller 并进行受限安全切换；外部 Solution 与 Environment 分离，现有 Selected Reference 能力不回归。E 的统一 Runner、自动编排和 Phase III 批量环境不属于本阶段结束条件。
+
+## C.12 C05c 首个受限切片：NutAssembly native contract 与 S1（2026-10-22）
+
+**状态：指定交集 bounded S1 及一段真实 native interval Probe 通过；完整 external Expert S2/S3 未运行。** 本轮之前先将 C05b S2/S3 代码、测试、报告和文档保存在本地检查点 `0255d83`；没有推送、合并或移动冻结引用。GeoPhys pin 仍为 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。
+
+复用 task-owned `build_outcome_solution()`、`reset_for_solution()`、`step_with_solution()`，以及既有 R3 Controller/`NativeRateGripperServo`、RuntimeSession native interval、selected Environment fault lifecycle 和 execution Recorder。Solution 拥有 Guard/stage/outcome memory；Controller 拥有 hold/ramp request 与 applied-ack memory；RuntimeSession 拥有 Provider materialization、episode/reset、force sample phase/clock 与物理状态；Environment 排序 compute/sample/apply/step/observe/append；Recorder 持久化完成的 substep 和 transition。未增加平行 Solution/Runtime/Recorder owner。旧 `step_expert()` 保留。
+
+为了避免样本 identity 与 execution boundary 分叉，RuntimeSession 通过既有 session owner 增加公开 `episode_id` 读取；NutAssembly binding 选择使用实际 RuntimeSession episode identity。PickCube 与其他 binding 行为未随之改变。Native force sample 在两个已声明 CPU Provider 上来自现有 adapter/RuntimeSession；只记录 `panda-v1/actuator8` signed `N` 和同一 `control_feedback()` 的 `max(0, -signed_force)`，不读私有 solver，不重标相位，也不受 diagnostics 开关影响。Execution Recorder 将诊断携带的可选 native Guard sample mapping 挂在原 substep 记录下；五个子步实际写入 H5，既有 writer/reader schema 和旧记录字段兼容。
+
+2026-10-22 两个独立进程的 external Probe 均以同一 Artifact (`99e374bd…`) 和 seed-19 ResetSample 执行 `reset → external Solution step → 5 × 2 ms sample/apply/ack → observe → Recorder finish → H5 readback`。GeoPhys build identity 为 `a53a8cf…`；MuJoCo 为 `3.8.1`。两边均有 5/5 requested/completed substeps，reset 0 s 到 evaluation 0.010 s；evaluation 采样时刻为 `0,.002,.004,.006,.008 s`，对应的原始 force sample time 为 `0,0,.002,.004,.006 s`，phase 为一条 `reset_forward` 加四条 `native_step_pre_integration`，sequence 连续递增，所有 Controller diagnostics 均报告真实 500 Hz update。H5 reader 返回 1 transition、2 boundaries、5 native substeps、5 个可反序列化 Guard samples，最后一条 target hash 与 applied acknowledgement 一致。逐步值及 H5 SHA-256 见 [C05c S1 receipt](C05c_NutAssembly_Public_Native_S1_Acceptance.md) 和 ignored `workspace/maintenance/c05c_nutassembly_native_s1_20261022/rerun_03/`。
+
+真实 Probe 只停留在 `approach_nut`，未执行真实 contact/close Guard authorization 或 force-mode grasp；existing guard authorization、hold/ramp/ack、reset cleanup、缺失/过期 sample、partial interval、Solution observer failure、Recorder append failure 由 defect-sensitive S1 tests 验证。定向命令 `pytest -q task_env/diagnostics/tasks/test_nutassembly_outcome.py task_env/diagnostics/tasks/test_selected_consumers.py` 在 GeoPhys adapter 的 native-gap 检查修正后为 **90 passed**；`pytest -q task_env/diagnostics/tasks/test_phase_ii_c02b_r1_typed_force.py task_env/diagnostics/tasks/test_phase_ii_c02b_position_execution_h5.py` 为 **10 passed**。后者发现外层一步完成五个 native steps 时，采样有效性应按两次评估边界间隔核对 index/sequence；修正后保留缺样、跳号和同边界样本变更拒绝。新运行 external native interval 与 legacy `step_expert()` probes 的 GeoPhys/MuJoCo 四份 JSON 和两个 H5 均在 ignored `workspace/maintenance/c05c_nutassembly_native_s1_20261022/rerun_04/`，原 `rerun_03` 保留。TaskEnv module Skill/route 更新后，`check_module_skill.py .agents/skills/geochora-task-env` 在项目 Python 环境通过；Skill 是路由知识更新，不是 Qualification。
+
+**不在本轮范围：** full external Expert/full internal Expert rollout、真实 Guard close 授权、完整 recording S2/S3、Outcome success/strict warning-failure campaign、其他 Provider/backend/profile、C02c、Assembly 和 camera integration。具体实现、source/config 身份和证据位置见验收报告；本收据不授予完整 C05c、C02b 或 Phase II 状态。
+
+**C02b 仍 BLOCKED 的具体 gate：** (1) Scene-v3 Panda R1 GeoPhys candidate 虽有 typed raw-force、精确 plan admission 和一条真 interval，仍欠完整 structured R1 open/close/obstructed-close/force-hold/reopen 与 action/feedback/target/ack/state 录制；(2) MuJoCo 缺 R1 required typed raw-force publication、精确 admission 与真实 plan-bound interval；(3) dual Entity Position S2/H5 是 force-free；(4) Qualification 未通过。legacy PickCube `production-r1` C05b S1/S2/S3 在其原身份上已通过，不要求迁移为 Scene-v3 candidate。完整列表见 C05c S1 acceptance 和 [执行顺序表 §3](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)。

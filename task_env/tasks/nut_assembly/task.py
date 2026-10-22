@@ -38,8 +38,9 @@ from ...runtime.sessions.source import RuntimeSource
 from ...utils.rotation import quat_wxyz_to_matrix
 from ..reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 from .solution import (
-    ArmRampMemory, NutAssemblyOutcomeSolutionV1, NutAssemblySolutionConfig,
-    OUTCOME_POLICY_ID, ReferenceArmSchedule, ReferenceExecutionController,
+    NutAssemblyNativeFeedbackSampleV1, NutAssemblyNativeIntervalReceiptV1,
+    NutAssemblyOutcomeSolutionV1, NutAssemblySolutionConfig,
+    OUTCOME_POLICY_ID, ReferenceExecutionController,
 )
 
 CONFIG_PATH = Path(__file__).with_name("config.yaml")
@@ -297,7 +298,7 @@ def _source_identity_files():
     return {name: _sha(root / name) for name in sorted(set(relative))}
 
 
-def build_reference(*, provider="mujoco"):
+def build_reference(*, provider="mujoco", include_solution=True):
     """Build the single selected 100 Hz route without importing native providers."""
     from ...controllers.canonical.contracts import digest
     recipe = _recipe()
@@ -314,10 +315,15 @@ def build_reference(*, provider="mujoco"):
     settings["table_top_z_m"] = float(recipe["scene"]["table_top_z"])
     settings["nut_contact_margin_m"] = float(recipe["asset"]["nut_contact_margin_m"])
     solution_config = NutAssemblySolutionConfig(**settings)
-    solution = NutAssemblyOutcomeSolutionV1(config=solution_config,
-        control_dt=artifact.timebase.control_dt, arm_hold=holder,
-        physics_dt_s=artifact.timebase.physics_dt)
     base_controller_identity = controller.identity
+    solution = NutAssemblyOutcomeSolutionV1(config=solution_config,
+        control_dt=artifact.timebase.control_dt, physics_dt_s=artifact.timebase.physics_dt,
+        provider=provider, task_artifact_hash=artifact.identity_hash,
+        source_id=source.scene_source.source_id,
+        source_closure_digest=source.source_closure_digest,
+        source_xml_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+        base_controller_identity=base_controller_identity,
+        require_native_feedback_contract=True)
     source_files = _source_identity_files()
     construction_id = recipe["construction_id"]
     controller.identity = digest({"construction_id": construction_id,
@@ -326,7 +332,8 @@ def build_reference(*, provider="mujoco"):
         "construction_source_sha256": source_files["task_env/tasks/nut_assembly/task.py"],
         "execution_support_sha256": source_files["task_env/tasks/nut_assembly/solution.py"],
         "cadence": "native-gripper-500hz-v1",
-        "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory"})
+        "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+        "native_feedback_contract": "nutassembly-native-feedback-sample-v1"})
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     resolved = {"construction_id": construction_id, "artifact": artifact.to_mapping(),
@@ -346,7 +353,8 @@ def build_reference(*, provider="mujoco"):
         "outcome_policy": solution.outcome_policy_mapping,
         "outcome_policy_identity": solution.outcome_policy_identity,
         "completion_policy": "on_expert_terminal_stage",
-        "arm_schedule": "linear-native-ramp-after-lift-v2-public-ack-memory",
+        "arm_execution_profile": "controller-owned-hold-and-linear-native-ramp-v1",
+        "native_feedback_contract": "nutassembly-native-feedback-sample-v1",
         "gripper_feedback_hz": 500,
         "contact_profile": "MuJoCo NoSlip2" if provider == "mujoco" else "GeoPhys native Row-PGS",
         "provider_contact_profile": contact_profile,
@@ -358,7 +366,8 @@ def build_reference(*, provider="mujoco"):
         "runtime_open_actuators": list(source.open_actuators)}
     return {"construction_id": construction_id, "artifact": artifact, "source": source,
         "controller": ReferenceExecutionController(holder, artifact.timebase.control_dt),
-        "controller_identity": controller.identity, "solution": solution,
+        "controller_identity": controller.identity,
+        "solution": solution if include_solution else None,
         "solution_identity": solution.identity, "solution_config": solution_config,
         "recipe": resolved, "resolved_configuration": resolved,
         "recipe_identity": digest(resolved), "close_authorization_policy": {
@@ -368,7 +377,7 @@ def build_reference(*, provider="mujoco"):
             "diagnostic_continuation": False, "strict_expert_gate": "preserved-with-bounded-readiness-warning",
             "grants_full_expert_pass": False, "outcome_completion": True},
         "source_revision": revision, "source_sha256": source_files,
-        "_arm_schedule_memory": ArmRampMemory(), "_execution_provider": provider,
+        "_execution_provider": provider,
         "_contact_profile": contact_profile}
 
 
@@ -378,13 +387,98 @@ def _reset_seed(seed):
     return 19 if seed is None else seed
 
 
-def _schedule(env):
-    return ReferenceArmSchedule(env.solution, env.value["_arm_schedule_memory"])
+def build_outcome_solution(*, provider="mujoco"):
+    """Build the task-owned external Solution for its matching selected source."""
+    return build_reference(provider=provider)["solution"]
 
 
-def _observe_kwargs(env, guard_samples):
+def _validate_external_solution(value, solution):
+    if not isinstance(solution, NutAssemblyOutcomeSolutionV1):
+        raise TypeError("NutAssembly external lifecycle requires Outcome Solution V1")
+    expected = {
+        "identity": value["solution_identity"],
+        "provider": value["_execution_provider"],
+        "task_artifact_hash": value["artifact"].identity_hash,
+        "source_id": value["source"].scene_source.source_id,
+        "source_closure_digest": value["source"].source_closure_digest,
+        "source_xml_sha256": hashlib.sha256(value["source"].scene_source.xml.encode()).hexdigest(),
+        "base_controller_identity": value["recipe"]["base_controller_identity"],
+    }
+    if (not solution.require_native_feedback_contract
+            or any(getattr(solution, name) != expected_value for name, expected_value in expected.items())):
+        raise ValueError("NutAssembly external Solution identity does not match the selected source/controller")
+
+
+def _native_feedback_sample(env, stage, index, state, feedback, target, applied, diagnostics,
+                            provider_feedback_sample, request_boundary):
+    metrics = None
+    if stage == "close_gripper":
+        _, observation_info, _ = env.observation(state)
+        metrics = observation_info["task_metrics"]
+    ee = state.pose_world["panda-v1/ee"]
+    sample = NutAssemblyNativeFeedbackSampleV1(
+        "nutassembly-native-feedback-sample-v1",
+        env.provider,
+        provider_feedback_sample.provider_materialization_id,
+        env.artifact.identity_hash,
+        env.value["source"].scene_source.source_id,
+        hashlib.sha256(env.value["source"].scene_source.xml.encode()).hexdigest(),
+        request_boundary["controller_identity"],
+        request_boundary["solution_identity"],
+        request_boundary["episode_id"],
+        request_boundary["reset_sample_id"],
+        request_boundary["identity_hash"],
+        float(state.simulation_time),
+        int(state.control_step),
+        int(index),
+        int(provider_feedback_sample.actuator_force_measurement.sample_sequence),
+        float(provider_feedback_sample.actuator_force_measurement.native_sample_time_s),
+        float(env.artifact.timebase.physics_dt),
+        str(provider_feedback_sample.actuator_force_measurement.phase),
+        "valid" if provider_feedback_sample.actuator_force_measurement.valid else "invalid",
+        tuple((*ee.position, *ee.quaternion_wxyz)),
+        feedback,
+        dict(diagnostics),
+        provider_feedback_sample,
+        target.identity_hash,
+        applied.to_mapping(),
+        None if metrics is None else bool(metrics.get("grasped_nut", False)),
+    )
+    return sample
+
+
+def _native_interval_receipt(env, request_boundary, evaluation_boundary, native_samples, substeps):
+    expected = env.artifact.timebase.control_substeps
+    if expected != 5 or len(native_samples) != expected or len(substeps) != expected:
+        raise ValueError("NutAssembly native interval requires five completed 2 ms applications")
+    if tuple(index for index, _, _ in substeps) != tuple(range(expected)):
+        raise ValueError("NutAssembly native interval substeps are missing or out of order")
+    return NutAssemblyNativeIntervalReceiptV1(
+        "nutassembly-native-interval-receipt-v1",
+        env.provider,
+        request_boundary["provider_materialization_id"],
+        env.artifact.identity_hash,
+        env.value["source"].scene_source.source_id,
+        hashlib.sha256(env.value["source"].scene_source.xml.encode()).hexdigest(),
+        request_boundary["controller_identity"],
+        request_boundary["solution_identity"],
+        request_boundary["episode_id"],
+        request_boundary["reset_sample_id"],
+        request_boundary,
+        evaluation_boundary,
+        float(env.artifact.timebase.physics_dt),
+        expected,
+        len(native_samples),
+        tuple(native_samples),
+    )
+
+
+def _observe_kwargs(env, native_samples, receipt):
+    if not isinstance(receipt, NutAssemblyNativeIntervalReceiptV1):
+        raise ValueError("NutAssembly Solution observation requires a completed native interval receipt")
     return {"readiness": env.controller.readiness(env.state, env.feedback),
-        "transition_samples": guard_samples}
+        "native_samples": tuple(native_samples),
+        "native_interval_receipt": receipt}
 
 
 def _binding():
@@ -394,7 +488,13 @@ def _binding():
         external_actions=False, interval_mode="native", recorder_mode="execution",
         external_action_error="selected NutAssembly requires step_expert; unguarded external actions are not admitted",
         reset_seed=_reset_seed, observe_expert_kwargs=_observe_kwargs,
-        schedule_factory=_schedule, capture_guard_samples=True,
+        native_sample_factory=_native_feedback_sample,
+        native_interval_receipt_factory=_native_interval_receipt,
+        build_external=lambda provider: build_reference(provider=provider, include_solution=False),
+        validate_external_solution=_validate_external_solution,
+        control_request_required=True,
+        expert_uses_public_observation=True,
+        runtime_episode_identity=True,
         record_native_substeps=True, abort_solution_on_runtime_error=True)
 
 
@@ -405,4 +505,5 @@ class NutAssemblyReferenceEnv(SelectedReferenceEnv):
 
 
 __all__ = ["NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_artifact",
-    "build_reference", "build_runtime_source", "evaluate", "sample_reset", "semantic_definition"]
+    "build_reference", "build_outcome_solution", "build_runtime_source", "evaluate",
+    "sample_reset", "semantic_definition"]

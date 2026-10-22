@@ -9,7 +9,10 @@ def __getattr__(name):
             "the package-level historical build_reference API is retired; "
             "use task_env.tasks.nut_assembly.task.build_reference for the selected route"
         )
+    if name == "build_outcome_solution":
+        from .task import build_outcome_solution
+        return build_outcome_solution
     raise AttributeError(name)
 
 
-__all__ = ["NutAssemblyReferenceEnv", "REFERENCE_ENV_ID"]
+__all__ = ["NutAssemblyReferenceEnv", "REFERENCE_ENV_ID", "build_outcome_solution"]

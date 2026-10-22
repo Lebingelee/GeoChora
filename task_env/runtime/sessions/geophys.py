@@ -293,10 +293,14 @@ class _GeoPhysSession(_SessionValues):
         expected_native_step = int(round(float(state.simulation_time) / dt))
         if abs(float(state.simulation_time) / dt - expected_native_step) > 1.0e-7:
             raise ValueError('GeoPhys actuator-force sample clock is not on a native-step boundary')
-        expected_from_control = int(state.control_step) * int(
-            self._artifact.timebase.control_substeps
-        )
-        if expected_native_step != expected_from_control:
+        steps_per_control = int(self._artifact.timebase.control_substeps)
+        expected_from_control = int(state.control_step) * steps_per_control
+        if self._inner_interval_active:
+            valid_native_range = range(expected_from_control,
+                                       expected_from_control + steps_per_control)
+            if expected_native_step not in valid_native_range:
+                raise ValueError('GeoPhys actuator-force sample is outside the active native interval')
+        elif expected_native_step != expected_from_control:
             raise ValueError('GeoPhys actuator-force sample clock differs from the control boundary')
         if measurement.native_step_index != expected_native_step:
             raise ValueError('GeoPhys actuator-force sample native index does not match the state boundary')
@@ -305,7 +309,7 @@ class _GeoPhysSession(_SessionValues):
             or measurement.evaluation_simulation_time_s != float(state.simulation_time)
         ):
             raise ValueError('GeoPhys actuator-force sample belongs to another evaluation boundary')
-        if int(state.control_step) == 0:
+        if expected_native_step == 0:
             reset_measurement = self._reset_force_measurement
             if (
                 measurement.phase != 'reset_forward'
@@ -333,15 +337,52 @@ class _GeoPhysSession(_SessionValues):
             if previous is not None:
                 if previous.episode_id != measurement.episode_id:
                     raise ValueError('GeoPhys actuator-force sample belongs to another episode')
-                if previous.evaluation_control_step == int(state.control_step):
+                if previous.evaluation_simulation_time_s == float(state.simulation_time):
                     if (
                         previous.sample_sequence != measurement.sample_sequence
                         or previous.state_revision != measurement.state_revision
                         or previous.configuration_revision != measurement.configuration_revision
                     ):
-                        raise ValueError('GeoPhys force sample changed within one evaluation boundary')
-                elif measurement.sample_sequence <= previous.sample_sequence:
-                    raise ValueError('GeoPhys native force sample did not advance since the previous boundary')
+                        raise ValueError('GeoPhys force sample changed within one native evaluation state')
+                else:
+                    elapsed_native_steps = int(round(
+                        (float(state.simulation_time) - previous.evaluation_simulation_time_s) / dt
+                    ))
+                    if elapsed_native_steps <= 0 or abs(
+                        (float(state.simulation_time) - previous.evaluation_simulation_time_s)
+                        - elapsed_native_steps * dt
+                    ) > 1.0e-10:
+                        raise ValueError('GeoPhys force evaluation boundaries are not separated by native steps')
+                    native_step_advance = measurement.native_step_index - previous.native_step_index
+                    sample_sequence_advance = measurement.sample_sequence - previous.sample_sequence
+                    if (native_step_advance != elapsed_native_steps
+                            or sample_sequence_advance != elapsed_native_steps):
+                        raise ValueError(
+                            'GeoPhys native force sample does not match the completed native-step gap '
+                            f'(expected {elapsed_native_steps}, native index advanced {native_step_advance}, '
+                            f'sample sequence advanced {sample_sequence_advance})'
+                        )
+
+    def native_control_feedback_sample(self, state, feedback):
+        """Return the exact validated force sample consumed by this feedback."""
+        from ...controllers.canonical.feedback import NativeControlFeedbackSampleV1
+
+        self._require_reset()
+        measurement = self._last_actuator_force_measurement
+        if (measurement is None or feedback.control_step != state.control_step
+                or feedback.simulation_time != state.simulation_time
+                or measurement.evaluation_control_step != state.control_step
+                or measurement.evaluation_simulation_time_s != state.simulation_time
+                or feedback.gripper.closing_force_N != max(0.0, -float(measurement.signed_force_N))):
+            raise ValueError('GeoPhys native feedback sample is not the measured Controller input')
+        sample = NativeControlFeedbackSampleV1(
+            'native-control-feedback-sample-v1', self._provider,
+            self._provider_materialization_id, self._source.scene_source.source_id,
+            self._source.source_closure_digest, str(self._episode_id),
+            str(self._reset_sample_id), feedback, measurement,
+        )
+        sample.validate()
+        return sample
 
     def apply_control(self, target):
         from .control import validate_target

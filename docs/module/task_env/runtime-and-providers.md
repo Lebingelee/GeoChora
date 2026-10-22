@@ -161,7 +161,9 @@ native actuation interval measurement，sign/index 转换留 adapter；不宣称
 决定 state/privileged_state/camera 内容，不固定所有任务为 Panda 八维。通用 SB3 flatten 在 learner 边界。
 
 Selected reference 使用 finite 8D world absolute pose request；PickCube 可用 external action 或 expert，
-同一 episode 不能混用；NutAssembly external action 拒绝，必须用 `step_expert()`。
+同一 episode 不能混用；NutAssembly raw external action 拒绝，并保留 `step_expert()`。NutAssembly
+另有有界 task-owned external Solution native S1：GeoPhys `a53a8cf` CPU 与 MuJoCo 3.8.1 CPU 单 interval
+Probe 已通过，完整 external Expert 和录制 S2/S3 未通过；详见 C05c S1 receipt。
 Selected reset 重建 controller/solution owner 状态，不推进物理，录制需先 finalize 再 reset。
 
 ### C02b Position Profile candidate (2026-10-21)

@@ -40,6 +40,11 @@ class _MuJoCoSession(_SessionValues):
         )
         self._data = mujoco.MjData(self._model)
         self._native_steps = 0
+        self._force_sample_sequence = 0
+        self._force_configuration_revision = 0
+        self._last_force_limit_N = None
+        self._completed_actuator_ctrl = None
+        self._completed_force_measurement = None
         if self._model.opt.timestep != artifact.timebase.physics_dt:
             raise ValueError('MuJoCo native timestep mismatch')
         self._joint_addresses = {
@@ -57,8 +62,20 @@ class _MuJoCoSession(_SessionValues):
         """Read force only when the admitted Controller state contract requires it."""
         if getattr(self, '_force_feedback_required', False):
             self._completed_actuator_force = self._data.actuator_force.copy()
+            self._completed_actuator_ctrl = self._data.ctrl.copy()
+            self._force_sample_sequence += 1
+            from ...environment.types import ActuatorForceMeasurementV1
+            self._completed_force_measurement = ActuatorForceMeasurementV1(
+                'task-env-actuator-force-sample-v1', 1,
+                self._force_sample_sequence, self._native_steps,
+                self._force_configuration_revision, self._native_steps,
+                'reset_forward' if self._native_steps == 0 else 'native_step_pre_integration',
+                True, 'N', None,
+            )
         else:
             self._completed_actuator_force = None
+            self._completed_actuator_ctrl = None
+            self._completed_force_measurement = None
 
     def _validate_canonical_scene_model(self):
         scene = self._source.scene_definition
@@ -134,6 +151,10 @@ class _MuJoCoSession(_SessionValues):
         self._validate_sample(sample)
         self._mj.mj_resetData(self._model, self._data)
         self._native_steps = 0
+        self._force_sample_sequence = 0
+        self._force_configuration_revision = 0
+        self._last_force_limit_N = None
+        self._completed_force_measurement = None
         for name, value in sample.joint_position.items():
             self._data.qpos[self._joint_addresses[name][0]] = value
         for name, requested in sample.poses_world.items():
@@ -201,6 +222,44 @@ class _MuJoCoSession(_SessionValues):
             raise ValueError('actuator-force feedback is not admitted for this Controller profile')
         return feedback_value(self, state, self._completed_actuator_force[self._open_actuators[0]])
 
+    def native_control_feedback_sample(self, state, feedback):
+        """Publish provenance for the exact cached force used by control_feedback()."""
+        from ...controllers.canonical.feedback import NativeControlFeedbackSampleV1
+        from ...environment.types import ActuatorForceMeasurementV1
+
+        self._require_reset()
+        index = self._open_actuators[0]
+        if (not getattr(self, '_force_feedback_required', False)
+                or self._completed_actuator_force is None
+                or self._completed_actuator_ctrl is None
+                or self._completed_force_measurement is None):
+            raise ValueError('MuJoCo native force sample is not admitted for this Controller profile')
+        signed_force = float(self._completed_actuator_force[index])
+        actuator_ctrl = float(self._completed_actuator_ctrl[index])
+        native_index = int(self._native_steps)
+        sample_time = (0.0 if native_index == 0 else
+                       float(native_index - 1) * self._artifact.timebase.physics_dt)
+        measurement = ActuatorForceMeasurementV1(
+            'task-env-actuator-force-sample-v1', 1,
+            self._completed_force_measurement.sample_sequence,
+            self._state_revision if native_index == 0 else native_index,
+            self._force_configuration_revision, native_index,
+            'reset_forward' if native_index == 0 else 'native_step_pre_integration',
+            True, 'N', None, str(self._episode_id), str(self._reset_sample_id),
+            int(state.control_step), float(state.simulation_time),
+            str(self._source.open_actuators[0]), actuator_ctrl, signed_force, sample_time,
+        )
+        if feedback.gripper.closing_force_N != max(0.0, -signed_force):
+            raise ValueError('MuJoCo native force sample differs from canonical Controller feedback')
+        sample = NativeControlFeedbackSampleV1(
+            'native-control-feedback-sample-v1', self._provider,
+            self._provider_materialization_id, self._source.scene_source.source_id,
+            self._source.source_closure_digest, str(self._episode_id),
+            str(self._reset_sample_id), feedback, measurement,
+        )
+        sample.validate()
+        return sample
+
     def apply_control(self, target):
         from .control import validate_target
         from ...controllers.canonical.contracts import AppliedCanonicalControl
@@ -217,6 +276,9 @@ class _MuJoCoSession(_SessionValues):
         index = getattr(self, '_open_actuators_by_semantic', {}).get(
             target.gripper.semantic_id, self._open_actuators[0],
         )
+        if self._last_force_limit_N != float(target.gripper.force_limit_N):
+            self._force_configuration_revision += 1
+            self._last_force_limit_N = float(target.gripper.force_limit_N)
         control_binding = getattr(self, '_position_control_bindings_by_semantic', {}).get(
             target.gripper.semantic_id, self._control_binding,
         )

@@ -185,7 +185,8 @@ def _execute(value, provider, session, audit, controller, state, feedback, actio
     native_guard_samples = []
     if hasattr(controller, "inner_gripper_step"):
         native_diagnostic = lambda current: _runtime_diagnostic_readback(current, provider, stage)
-        def observe_substep(index, sample_state, sample_feedback, target, applied, substep_diagnostics):
+        def observe_substep(index, sample_state, sample_feedback, target, applied,
+                            substep_diagnostics, native_feedback_sample=None):
             if recording is not None:
                 recording.recorder.applied_substep(
                     index, sample_state,

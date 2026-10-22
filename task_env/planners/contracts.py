@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Mapping, Protocol
 
 import numpy as np
+from ..controllers.canonical.execution import ArmTargetExecutionRequestV1
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class ExpertAction:
     done: bool = False
     failed: bool = False
     diagnostics: Mapping[str, float | int | bool | str] = field(default_factory=dict)
+    control_request: ArmTargetExecutionRequestV1 | None = None
 
     def __post_init__(self) -> None:
         action = np.asarray(self.action, dtype=np.float32).reshape(-1).copy()
@@ -25,6 +27,10 @@ class ExpertAction:
         object.__setattr__(self, "stage", str(self.stage))
         object.__setattr__(self, "done", bool(self.done))
         object.__setattr__(self, "failed", bool(self.failed))
+        if self.control_request is not None:
+            if not isinstance(self.control_request, ArmTargetExecutionRequestV1):
+                raise TypeError("control_request must be ArmTargetExecutionRequestV1")
+            self.control_request.validate()
         object.__setattr__(
             self,
             "diagnostics",

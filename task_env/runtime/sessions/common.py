@@ -166,6 +166,19 @@ class _SessionValues:
         if option is None or float(option.get('timestep', 'nan')) != artifact.timebase.physics_dt:
             raise ValueError('source/native physics timestep mismatch')
 
+    @property
+    def provider_materialization_id(self):
+        """Public identity of this concrete RuntimeSession materialization."""
+        return self._provider_materialization_id
+
+    @property
+    def episode_id(self):
+        """Provider-owned identity for the latest successfully reset episode."""
+        self._require_reset()
+        if self._episode_id is None:
+            raise RuntimeError('RuntimeSession has no active episode identity')
+        return self._episode_id
+
     def _require_open(self):
         if self._closed:
             raise RuntimeError('session is closed')
@@ -490,6 +503,10 @@ class _SessionValues:
             for substep_index in range(self._artifact.timebase.control_substeps):
                 state = self.snapshot()
                 feedback = self.control_feedback(state)
+                native_feedback_sample = None
+                sample_reader = getattr(self, 'native_control_feedback_sample', None)
+                if callable(sample_reader) and getattr(self, '_force_feedback_required', False):
+                    native_feedback_sample = sample_reader(state, feedback)
                 gripper_target, diagnostics = gripper_inner_servo.inner_gripper_step(state, feedback)
                 target = replace(held_target, gripper=gripper_target)
                 if arm_schedule is not None:
@@ -502,7 +519,8 @@ class _SessionValues:
                 else:
                     audit.execute_inner_substep(target, self._step_physics_once)
                 if interval_observer is not None:
-                    interval_observer(substep_index, state, feedback, target, last_applied, diagnostics)
+                    interval_observer(substep_index, state, feedback, target, last_applied,
+                                      diagnostics, native_feedback_sample)
                 row = dict(diagnostics)
                 row.update({
                     "substep_index": substep_index,

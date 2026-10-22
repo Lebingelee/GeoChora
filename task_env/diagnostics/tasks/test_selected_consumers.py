@@ -13,7 +13,7 @@ from task_env.controllers.canonical.contracts import AppliedCanonicalControl
 from task_env.controllers.canonical.feedback import CanonicalControlFeedback, CanonicalGripperFeedback
 from task_env.controllers.canonical.kinematics import ARM, FINGERS, PandaKinematics
 from task_env.runtime.sessions.common import _SessionValues
-from task_env.tasks.nut_assembly.solution import ReferenceArmSchedule, ArmRampMemory
+from task_env.controllers.canonical.execution import ArmTargetExecutionRequestV1
 from task_env.tasks.reference_env import SelectedReferenceEnv
 
 IDS = ('pick-cube-p16-reference-v1', 'nut-assembly-outcome-reference-v1')
@@ -23,6 +23,10 @@ class FakeSession(_SessionValues):
     """Frozen physical state, real canonical controller and five native ticks."""
     def __init__(self, artifact, execution, *, source, binding):
         self._initialize_values(artifact, source, execution.physics_provider)
+        # This synthetic adapter models the NutAssembly binding's required
+        # actuator-force contract so its external lifecycle tests exercise the
+        # same native-sample callback gate as the production RuntimeSession.
+        self._force_feedback_required = True
         self.model = PandaKinematics(source.scene_source.xml)
         self.time = 0.; self.calls = []; self.closed = False
     def reset(self, sample):
@@ -35,12 +39,32 @@ class FakeSession(_SessionValues):
         if 'square-nut-v1' in self.poses:
             self.poses.setdefault('square-peg-v1', PoseWorld((.58,.045,.5),(1.,0.,0.,0.)))
         self._reset_done = True
+        self._episode_id = 'synthetic-episode'
+        self._reset_sample_id = sample.sample_id
         return RealizedInitialState('realized-initial-state-v0', sample.sample_id, self._provider, self.snapshot(), 0)
     def snapshot(self):
         return self._state(self.q, {k:0. for k in self.q}, self.poses, self.time if self._inner_interval_active else self._control_step*.01)
     def control_feedback(self, state):
         return CanonicalControlFeedback('canonical-control-feedback-v0', state.control_step, state.simulation_time,
             CanonicalGripperFeedback('panda-v1/gripper', sum(state.joint_position[k] for k in FINGERS), 0.))
+    def native_control_feedback_sample(self, state, feedback):
+        from task_env.controllers.canonical.feedback import NativeControlFeedbackSampleV1
+        from task_env.environment.types import ActuatorForceMeasurementV1
+        native_index = round(state.simulation_time / .002)
+        phase = 'reset_forward' if native_index == 0 else 'native_step_pre_integration'
+        measurement = ActuatorForceMeasurementV1(
+            'task-env-actuator-force-sample-v1', 1, native_index + 1,
+            native_index, 0, native_index, phase, True, 'N', None,
+            self._episode_id, self._reset_sample_id, state.control_step,
+            state.simulation_time, 'actuator8', 0., 0.,
+            0. if native_index == 0 else (native_index - 1) * .002,
+        )
+        return NativeControlFeedbackSampleV1(
+            'native-control-feedback-sample-v1', self._provider,
+            self.provider_materialization_id, self._source.scene_source.source_id,
+            self._source.source_closure_digest, self._episode_id,
+            self._reset_sample_id, feedback, measurement,
+        )
     def apply_control(self, target):
         self.calls.append(target)
         return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, self._provider,
@@ -127,23 +151,160 @@ def test_external_expert_modes_and_invalid_actions(uid, fake):
     env.close()
 
 
-def test_arm_schedule_matches_historical_interpolation_and_ack_memory():
+def test_nutassembly_external_solution_publishes_five_bound_native_samples(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    solution = build_outcome_solution(provider='geophys')
+    obs, reset_info = env.reset_for_solution(solution, seed=19)
+    assert env.solution is None
+    assert reset_info['expert_execution_boundary_v1']['reset_sample_id']
+    assert reset_info['expert_execution_boundary_v1']['episode_id'] == env.session.episode_id
+    env.step_with_solution(solution)
+    receipt = NutAssemblyNativeIntervalReceiptV1.from_mapping(
+        env.info['native_interval_receipt_v1'])
+    assert receipt.requested_substeps == receipt.completed_substeps == 5
+    assert [sample.substep_index for sample in receipt.samples] == list(range(5))
+    assert [sample.sample_time_s for sample in receipt.samples] == pytest.approx(
+        [0., 0., .002, .004, .006])
+    assert [sample.sample_phase for sample in receipt.samples] == [
+        'reset_forward', 'native_step_pre_integration', 'native_step_pre_integration',
+        'native_step_pre_integration', 'native_step_pre_integration',
+    ]
+    assert all(sample.validity == 'valid' for sample in receipt.samples)
+    assert all(sample.applied_acknowledgement['target_hash'] == sample.target_hash
+               for sample in receipt.samples)
+    assert receipt.evaluation_boundary['control_step'] == 1
+    assert env.state.control_step == 1 and env.state.simulation_time == pytest.approx(.01)
+    assert env.value['controller'].hold.last_applied_arm is not None
+    env.reset_for_solution(solution, seed=19)
+    assert env.value['controller'].hold.last_applied_arm is None
+    env.close()
+
+
+def test_nutassembly_native_receipt_rejects_stale_or_incomplete_samples(fake):
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+    from task_env.tasks.nut_assembly.solution import NutAssemblyNativeIntervalReceiptV1
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    solution = build_outcome_solution(provider='geophys')
+    env.reset_for_solution(solution, seed=19)
+    env.step_with_solution(solution)
+    mapping = env.info['native_interval_receipt_v1']
+    stale = dict(mapping)
+    stale['samples'] = [dict(row) for row in mapping['samples']]
+    stale['samples'][2]['reset_sample_id'] = 'prior-episode-reset'
+    with pytest.raises(ValueError, match='stale|mismatched'):
+        NutAssemblyNativeIntervalReceiptV1.from_mapping(stale)
+    incomplete = dict(mapping)
+    incomplete['samples'] = list(mapping['samples'][:-1])
+    incomplete['completed_substeps'] = 4
+    with pytest.raises(ValueError, match='incomplete'):
+        NutAssemblyNativeIntervalReceiptV1.from_mapping(incomplete)
+    env.close()
+
+
+@pytest.mark.parametrize('fault_point', [
+    'missing_native_sample', 'stale_native_sample', 'partial_interval',
+    'observer', 'recorder_append',
+])
+def test_nutassembly_external_faults_do_not_commit_incomplete_transition(
+        fault_point, fake, tmp_path):
+    from dataclasses import replace
+    from task_env.tasks.nut_assembly.task import build_outcome_solution
+
+    env = make_env(IDS[1], config={'provider': 'geophys', 'horizon': 3})
+    solution = build_outcome_solution(provider='geophys')
+    output = tmp_path / f'{fault_point}.h5'
+    try:
+        env.reset_for_solution(solution, seed=19)
+        env.start_recording(output)
+        if fault_point in {'missing_native_sample', 'stale_native_sample'}:
+            factory = env.binding.native_sample_factory
+
+            def inject_sample(env_arg, stage, index, *args):
+                sample = factory(env_arg, stage, index, *args)
+                if fault_point == 'missing_native_sample' and index == 1:
+                    return None
+                if fault_point == 'stale_native_sample' and index == 1:
+                    return replace(sample, reset_sample_id='prior-episode-reset')
+                return sample
+
+            env.binding = replace(env.binding, native_sample_factory=inject_sample)
+        elif fault_point == 'partial_interval':
+            original_step = env.session._step_physics_once
+            calls = 0
+
+            def fail_second_native_step():
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise RuntimeError('injected native partial interval failure')
+                original_step()
+
+            env.session._step_physics_once = fail_second_native_step
+        elif fault_point == 'observer':
+            solution.observe = lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError('injected NutAssembly observer failure'))
+        else:
+            env.recorder.append = lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError('injected NutAssembly Recorder append failure'))
+        _expose_fake_physics_clock(env)
+
+        expected = {
+            'missing_native_sample': 'physics_step',
+            'stale_native_sample': 'physics_step',
+            'partial_interval': 'physics_step',
+            'observer': 'solution_observation',
+            'recorder_append': 'record_interval',
+        }[fault_point]
+        with pytest.raises((RuntimeError, ValueError, AttributeError)):
+            env.step_with_solution(solution)
+        assert env.execution_fault.phase == expected
+        assert env.execution_fault.physical_progress in {'partially_advanced', 'advanced'}
+        assert not env.recorder.value['transitions']
+        assert env.recorder.pending is not None
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_with_solution(solution)
+        with pytest.raises(ValueError, match='incomplete effective interval'):
+            env.finish_recording(fault_point)
+        assert not output.exists()
+    finally:
+        env.close()
+
+
+def test_controller_owned_arm_hold_and_ramp_use_applied_acknowledgement():
     from task_env.tasks.nut_assembly.task import build_reference
     from task_env.controllers.canonical.contracts import CanonicalControlTarget, GripperControlTarget
     value = build_reference()
-    solution = SimpleNamespace(_lift_released=True)
-    memory = ArmRampMemory({k:.1 for k in ARM})
-    schedule = ReferenceArmSchedule(solution, memory)
+    controller = value['controller']
     target = CanonicalControlTarget('canonical-control-v0', value['artifact'].identity_hash,
         value['controller_identity'], ARM, {k:.4 for k in ARM}, {k:.4 for k in ARM},
         GripperControlTarget('panda-v1/gripper', .08, 10., .08))
-    schedule.begin(target)
+    with pytest.raises(ValueError):
+        controller.validate_arm_execution_request(ArmTargetExecutionRequestV1(
+            'arm-target-execution-request-v1', 'nutassembly-r3-hold-ramp-v1', 'hold_last_applied'))
+    controller.applied(SimpleNamespace(arm_servo_position={k:.1 for k in ARM}))
+    controller.request_arm_execution(ArmTargetExecutionRequestV1(
+        'arm-target-execution-request-v1', 'nutassembly-r3-hold-ramp-v1', 'hold_last_applied'))
+    held = controller.target(target, 0, 5)
+    assert held.arm_servo_position == {k:.1 for k in ARM}
+    assert held.gripper == target.gripper
+    controller.request_arm_execution(ArmTargetExecutionRequestV1(
+        'arm-target-execution-request-v1', 'nutassembly-r3-hold-ramp-v1', 'ramp_from_last_applied'))
+    controller.begin(target)
     for i in range(5):
-        effective = schedule.target(target, i, 5)
+        effective = controller.target(target, i, 5)
         assert effective.arm_servo_position == {k:.1+(i+1)/5*(.4-.1) for k in ARM}
-        schedule.applied(SimpleNamespace(arm_servo_position=effective.arm_servo_position))
-    assert memory.last_applied_arm == dict(target.arm_servo_position)
-    with pytest.raises(ValueError): ReferenceArmSchedule(solution, ArmRampMemory()).begin(target)
+        controller.applied(SimpleNamespace(arm_servo_position=effective.arm_servo_position))
+    assert controller.hold.last_applied_arm == dict(target.arm_servo_position)
+    controller.request_arm_execution(ArmTargetExecutionRequestV1(
+        'arm-target-execution-request-v1', 'nutassembly-r3-hold-ramp-v1', 'track'))
+    assert controller.target(target, 0, 5) is target
+    with pytest.raises(ValueError):
+        controller.request_arm_execution(ArmTargetExecutionRequestV1(
+            'arm-target-execution-request-v1', 'nutassembly-r3-hold-ramp-v1', 'unsupported'))
 
 
 def test_active_imports_do_not_load_diagnostics_or_native(tmp_path):
@@ -160,7 +321,12 @@ def test_task_bindings_declare_selected_control_and_recording_requirements():
             pickcube.binding.external_actions) == ('grouped', 'canonical', True)
     assert (nutassembly.binding.interval_mode, nutassembly.binding.recorder_mode,
             nutassembly.binding.external_actions, nutassembly.binding.record_native_substeps,
-            nutassembly.binding.capture_guard_samples) == ('native', 'execution', False, True, True)
+            nutassembly.binding.capture_guard_samples) == ('native', 'execution', False, True, False)
+    assert nutassembly.binding.control_request_required
+    assert nutassembly.binding.native_sample_factory is not None
+    assert nutassembly.binding.native_interval_receipt_factory is not None
+    assert callable(nutassembly.binding.build_external)
+    assert callable(nutassembly.binding.validate_external_solution)
     assert nutassembly.value['construction_id'] == 'nut-assembly-outcome-reference-v1'
     pickcube.close()
     nutassembly.close()

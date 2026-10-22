@@ -213,9 +213,15 @@ class ExecutionRecorder:
     def applied_substep(self, index, state, feedback, target, applied, diagnostics):
         p=self.pending
         if p is None or index!=len(p['substeps']):raise ValueError('unobserved/out-of-order application')
-        p['substeps'].append({'index':index,'native_step_index':p['control_step']*p['control_substeps']+index+1,
+        row={'index':index,'native_step_index':p['control_step']*p['control_substeps']+index+1,
             'native_start_time':state.simulation_time,'state':state.to_mapping(),'feedback':feedback.to_mapping(),'target':target.to_mapping(),'applied':applied.to_mapping(),
-            'updated':bool(diagnostics['inner_update_performed'])})
+            'updated':bool(diagnostics['inner_update_performed'])}
+        native_sample=diagnostics.get('native_feedback_sample_v1')
+        if native_sample is not None:
+            if not isinstance(native_sample,dict):
+                raise ValueError('native execution evidence must be a serialized mapping')
+            row['native_feedback_sample_v1']=copy.deepcopy(native_sample)
+        p['substeps'].append(row)
         p['native_step_count']+=1
 
     def event(self,event):

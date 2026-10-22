@@ -11,6 +11,9 @@ from ...artifacts import (
     StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
 from ...artifacts.execution import EpisodeResetPlanV1, RealizedInitialState, ResetSample
+from ...controllers.canonical.feedback import (
+    CanonicalControlFeedback, NativeControlFeedbackSampleV1,
+)
 from .source import RuntimeSource
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
@@ -20,6 +23,10 @@ _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 
 
 class RuntimeSession(Protocol):
+    @property
+    def provider_materialization_id(self) -> str: ...
+    @property
+    def episode_id(self) -> str: ...
     def reset(self, sample: ResetSample) -> RealizedInitialState: ...
     def reset_plan(self, plan: EpisodeResetPlanV1) -> RealizedInitialState: ...
     def snapshot(self) -> CanonicalStateView: ...
@@ -39,6 +46,9 @@ class RuntimeSession(Protocol):
         frame_bindings: Mapping[str, FrameReference],
         requirements: StateRequirements,
     ) -> CanonicalStatePublicationV2: ...
+    def native_control_feedback_sample(
+        self, state: CanonicalStateView, feedback: CanonicalControlFeedback,
+    ) -> NativeControlFeedbackSampleV1: ...
     def step(self) -> CanonicalStateView: ...
     def close(self) -> None: ...
 
