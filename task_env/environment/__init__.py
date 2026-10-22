@@ -63,6 +63,7 @@ from .protocols import (
     TaskObjectComponent,
 )
 from .types import (
+    ActuatorForceMeasurementV1,
     AppliedControl,
     AssetManifest,
     CameraMetadata,
@@ -89,6 +90,7 @@ from .types import (
 
 __all__ = [
     "ActionAdapter",
+    "ActuatorForceMeasurementV1",
     "ActionConfig",
     "ActionModeSpec",
     "AgentComponent",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..environment import (
+    ActuatorForceMeasurementV1,
     AppliedControl,
     ContactSummary,
     ControlCommand,
@@ -30,6 +31,26 @@ class GeoPhysRuntimeBoundary:
     ) -> None:
         self._physics = physics
         self._scheduler = scheduler
+        n_actuators = int(getattr(self._physics, "n_actuators", 0) or 0)
+        self._force_observation_reader = None
+        if n_actuators:
+            from control.robot_arm import (
+                RobotArmObservationConfig,
+                RobotArmObservationReader,
+            )
+
+            self._force_observation_reader = RobotArmObservationReader(
+                self._physics,
+                RobotArmObservationConfig(
+                    qacc=False,
+                    ctrl=True,
+                    actuator_force=True,
+                    sensordata=False,
+                    sites=False,
+                    site_velocity=False,
+                    tendons=False,
+                ),
+            )
         self._physics_dt = float(physics_dt)
         self._ctrl_range = np.asarray(ctrl_range, dtype=np.float32).copy()
         self._actuator_force_limit_overrides: dict[int, float] = {}
@@ -49,7 +70,12 @@ class GeoPhysRuntimeBoundary:
     def initial_state(self) -> EpisodePhysicsState:
         return self._initial_state
 
-    def apply_reset_state(self, state: EpisodePhysicsState) -> None:
+    def apply_reset_state(
+        self,
+        state: EpisodePhysicsState,
+        *,
+        refresh_actuator_force: bool = False,
+    ) -> ActuatorForceMeasurementV1 | None:
         self._physics.restore(self._baseline)
         self._apply_actuator_force_limit_overrides()
         if state.qpos.size:
@@ -62,6 +88,30 @@ class GeoPhysRuntimeBoundary:
             self._physics.write_act(state.act)
         self._physics.synchronize_kinematic_state(update_site_jacobians=False)
         self._simulation_time = 0.0
+        if not refresh_actuator_force or self._force_observation_reader is None:
+            return None
+        return self._to_core_force_measurement(
+            self._force_observation_reader.refresh_reset_force_sample()
+        )
+
+    @staticmethod
+    def _to_core_force_measurement(sample) -> ActuatorForceMeasurementV1:
+        from control.robot_arm import RobotArmActuatorForceSampleV1
+
+        if not isinstance(sample, RobotArmActuatorForceSampleV1):
+            raise TypeError("GeoPhys returned an unsupported actuator-force sample")
+        return ActuatorForceMeasurementV1(
+            schema_version="task-env-actuator-force-sample-v1",
+            source_generation=sample.source_generation,
+            sample_sequence=sample.sample_sequence,
+            state_revision=sample.state_revision,
+            configuration_revision=sample.configuration_revision,
+            native_step_index=sample.native_step_index,
+            phase=sample.phase,
+            valid=sample.valid,
+            force_unit=sample.force_unit,
+            invalid_reason=sample.invalid_reason,
+        )
 
     def set_actuator_force_limits(self, actuator_ids, limit_N: float) -> None:
         """Set persistent symmetric actuator force caps through TaskEnv's public boundary.
@@ -94,6 +144,11 @@ class GeoPhysRuntimeBoundary:
             limited[actuator_id] = 1
         self._physics.act_forcerange_field.from_numpy(ranges)
         self._physics.act_forcelimited_field.from_numpy(limited)
+        if self._force_observation_reader is not None:
+            self._force_observation_reader.invalidate_actuator_force_sample(
+                "actuator force-limit configuration changed",
+                configuration_changed=True,
+            )
 
     def apply_control(self, command: ControlCommand) -> AppliedControl:
         requested = np.asarray(command.actuator_ctrl, dtype=np.float32)
@@ -119,10 +174,21 @@ class GeoPhysRuntimeBoundary:
             clipped=not np.array_equal(requested, applied),
         )
 
-    def step(self, *, substeps: int) -> None:
+    def step(self, *, substeps: int, track_actuator_force: bool = False) -> None:
         if substeps < 1:
             raise ValueError("substeps must be at least 1")
-        self._scheduler.step(substeps)
+        if track_actuator_force and self._force_observation_reader is not None:
+            self._force_observation_reader.invalidate_actuator_force_sample(
+                "native interval in progress"
+            )
+        try:
+            self._scheduler.step(substeps)
+        except BaseException:
+            if track_actuator_force and self._force_observation_reader is not None:
+                self._force_observation_reader.invalidate_actuator_force_sample(
+                    "native interval failed; completion is unverified"
+                )
+            raise
         self._simulation_time += self._physics_dt * int(substeps)
 
     def read_snapshot(self, request: SnapshotRequest) -> RuntimeSnapshot:
@@ -130,6 +196,14 @@ class GeoPhysRuntimeBoundary:
         n_dof = int(getattr(self._physics, "n_dof", 0))
         n_act = int(getattr(self._physics, "n_actuators", 0))
         n_sites = int(getattr(self._physics, "n_sites", 0))
+        force_observation = None
+        force_measurement = None
+        if request.actuator_force and n_act and self._force_observation_reader is not None:
+            force_observation = self._force_observation_reader.read_cpu_snapshot()
+            if force_observation.actuator_force_sample is not None:
+                force_measurement = self._to_core_force_measurement(
+                    force_observation.actuator_force_sample
+                )
         site_jacp = None
         site_jacr = None
         if request.site_jacobians and n_sites:
@@ -137,12 +211,20 @@ class GeoPhysRuntimeBoundary:
             site_jacr = self._physics.read_site_jacr()
         return RuntimeSnapshot(
             qpos=(
-                self._physics.read_qpos()
+                (
+                    force_observation.qpos
+                    if force_observation is not None
+                    else self._physics.read_qpos()
+                )
                 if n_qpos
                 else np.zeros(0, dtype=np.float32)
             ),
             qvel=(
-                self._physics.read_qvel()
+                (
+                    force_observation.qvel
+                    if force_observation is not None
+                    else self._physics.read_qvel()
+                )
                 if n_dof
                 else np.zeros(0, dtype=np.float32)
             ),
@@ -152,12 +234,20 @@ class GeoPhysRuntimeBoundary:
                 else (np.zeros(0, dtype=np.float32) if request.qacc else None)
             ),
             ctrl=(
-                self._physics.read_ctrl()
+                (
+                    force_observation.ctrl
+                    if force_observation is not None
+                    else self._physics.read_ctrl()
+                )
                 if request.ctrl and n_act
                 else (np.zeros(0, dtype=np.float32) if request.ctrl else None)
             ),
             actuator_force=(
-                self._physics.read_actuator_force()
+                (
+                    force_observation.actuator_force
+                    if force_observation is not None
+                    else self._physics.read_actuator_force()
+                )
                 if request.actuator_force and n_act
                 else (
                     np.zeros(0, dtype=np.float32)
@@ -193,6 +283,7 @@ class GeoPhysRuntimeBoundary:
             simulation_time=(
                 self._simulation_time if request.simulation_time else None
             ),
+            actuator_force_measurement=force_measurement,
         )
 
     def snapshot_state(self) -> PhysicsStateSnapshot:

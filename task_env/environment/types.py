@@ -715,6 +715,107 @@ class SnapshotRequest:
 
 
 @dataclass(frozen=True)
+class ActuatorForceMeasurementV1:
+    """Provider-bound validity receipt for signed raw actuator force.
+
+    The force values remain in ``RuntimeSnapshot.actuator_force``. This small
+    receipt identifies whether those values came from the current restored
+    state or from the pre-integration evaluation of a completed native step.
+    It is not a replacement for the broader typed-state publication contract.
+    """
+
+    schema_version: str
+    source_generation: int
+    sample_sequence: int
+    state_revision: int
+    configuration_revision: int
+    native_step_index: int
+    phase: str
+    valid: bool
+    force_unit: str = "N"
+    invalid_reason: str | None = None
+    episode_id: str | None = None
+    reset_sample_id: str | None = None
+    evaluation_control_step: int | None = None
+    evaluation_simulation_time_s: float | None = None
+    actuator_id: str | None = None
+    actuator_ctrl: float | None = None
+    signed_force_N: float | None = None
+    native_sample_time_s: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "task-env-actuator-force-sample-v1":
+            raise ValueError("unsupported TaskEnv actuator-force sample schema")
+        for name in (
+            "source_generation",
+            "sample_sequence",
+            "state_revision",
+            "configuration_revision",
+            "native_step_index",
+        ):
+            value = int(getattr(self, name))
+            if value < 0:
+                raise ValueError(f"{name} must be non-negative")
+            object.__setattr__(self, name, value)
+        if self.phase not in {
+            "uninitialized",
+            "state_restore_forward",
+            "reset_forward",
+            "native_step_pre_integration",
+        }:
+            raise ValueError("unsupported actuator-force sample phase")
+        if self.force_unit != "N":
+            raise ValueError("actuator-force sample unit must be N")
+        object.__setattr__(self, "valid", bool(self.valid))
+        if self.invalid_reason is not None:
+            object.__setattr__(self, "invalid_reason", str(self.invalid_reason))
+        if self.episode_id is not None:
+            episode_id = str(self.episode_id).strip()
+            if not episode_id:
+                raise ValueError("episode_id must be non-empty when supplied")
+            object.__setattr__(self, "episode_id", episode_id)
+        if self.reset_sample_id is not None:
+            sample_id = str(self.reset_sample_id).strip()
+            if not sample_id:
+                raise ValueError("reset_sample_id must be non-empty when supplied")
+            object.__setattr__(self, "reset_sample_id", sample_id)
+        if self.evaluation_control_step is not None:
+            step = int(self.evaluation_control_step)
+            if step < 0:
+                raise ValueError("evaluation_control_step must be non-negative")
+            object.__setattr__(self, "evaluation_control_step", step)
+        if self.evaluation_simulation_time_s is not None:
+            time_s = float(self.evaluation_simulation_time_s)
+            if not math.isfinite(time_s) or time_s < 0.0:
+                raise ValueError("evaluation_simulation_time_s must be finite and non-negative")
+            object.__setattr__(self, "evaluation_simulation_time_s", time_s)
+        if self.actuator_id is not None:
+            actuator_id = str(self.actuator_id).strip()
+            if not actuator_id:
+                raise ValueError("actuator_id must be non-empty when supplied")
+            object.__setattr__(self, "actuator_id", actuator_id)
+        if self.signed_force_N is not None:
+            signed_force = float(self.signed_force_N)
+            if not math.isfinite(signed_force):
+                raise ValueError("signed_force_N must be finite")
+            object.__setattr__(self, "signed_force_N", signed_force)
+            if self.actuator_id is None:
+                raise ValueError("signed_force_N requires actuator_id")
+        if self.native_sample_time_s is not None:
+            sample_time = float(self.native_sample_time_s)
+            if not math.isfinite(sample_time) or sample_time < 0.0:
+                raise ValueError("native_sample_time_s must be finite and non-negative")
+            object.__setattr__(self, "native_sample_time_s", sample_time)
+        if self.actuator_ctrl is not None:
+            actuator_ctrl = float(self.actuator_ctrl)
+            if not math.isfinite(actuator_ctrl):
+                raise ValueError("actuator_ctrl must be finite")
+            if self.actuator_id is None:
+                raise ValueError("actuator_ctrl requires actuator_id")
+            object.__setattr__(self, "actuator_ctrl", actuator_ctrl)
+
+
+@dataclass(frozen=True)
 class ContactSummary:
     """任务层可消费的稳定接触摘要占位契约。"""
 
@@ -782,6 +883,7 @@ class RuntimeSnapshot:
     site_jacr: np.ndarray | None = None
     contact_summary: ContactSummary | None = None
     simulation_time: float | None = None
+    actuator_force_measurement: ActuatorForceMeasurementV1 | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -804,6 +906,12 @@ class RuntimeSnapshot:
                     name,
                     _readonly_array(value, name=name),
                 )
+        if self.actuator_force_measurement is not None and not isinstance(
+            self.actuator_force_measurement, ActuatorForceMeasurementV1
+        ):
+            raise TypeError(
+                "actuator_force_measurement must be ActuatorForceMeasurementV1"
+            )
 
 
 @dataclass(frozen=True)

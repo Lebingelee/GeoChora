@@ -145,3 +145,9 @@ ResetSample.sample_id 是输入内容身份；重复使用同一样本不会产�
 后续 freshness gate 应在 Core 绑定 episode/materialization generation，由 Provider 提供原生测量有效性/相位/状态版本，
 不要求 GeoPhys 引入 GeoChora 的 Scene/ResetSample/Controller 类型。仅返回 invalid 可防止误用，
 但在 R1 首次 compute 需要 required feedback 时并不能单独解除阻塞；仍须有合法的初始测量路线。
+
+## 后续修正：C02b-R1 reset-force freshness（2026-10-22）
+
+上文结论准确描述了 2026-10-21 pin 和当时源码状态，保留作历史证据。之后的受限 C02b-R1 修复在同一 GeoPhys gitlink 上实现了 public Reader sample receipt、输入失效和无步 reset-forward 重算，并在 PickCube seed 31 的 GeoPhys CPU 路线上完成同-session 非零力→重复 reset→R1 首次 closing compute 的 S1/S2。MuJoCo CPU 只作语义对照。复现数据、law oracle、样本相位和运行范围见 [C02b-R1 acceptance](C02b_R1_Reset_Force_Freshness_Acceptance.md)；原始结果另存于 ignored `workspace/maintenance/c02b_r1_reset_force_freshness_20261022/`。
+
+因此，`PROVIDER CONTRACT GAP` 中关于 reset freshness 的部分已在该受限 legacy route 上关闭；“公开 Reader 只能给无 provenance 数组”的描述也仅适用于旧合同，现由 `RobotArmActuatorForceSampleV1` 增加版本化 provenance。**C02b 整体仍 BLOCKED**：计划绑定的 manifest 尚未公开 `actuator_force_query`，`snapshot_v1()` typed publication 也未发布 required signed raw force，因此正式 plan-bound admission 仍失败。没有通过改 optional、零填充或伪造 capability 处理该缺口。

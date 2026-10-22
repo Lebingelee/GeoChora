@@ -280,10 +280,25 @@ selected lifecycle writes Generic H5 v3. GeoPhys CPU and MuJoCo CPU S2 and reque
 readback passed for both the single- and dual-Panda candidates. Wrong Entity, missing Group, altered Profile/group
 contract, overlap, stale target and boundary mismatch are rejected before compute/apply/step; an injected second-writer
 apply failure uses the C03a latch and emits no partial transition. Do not substitute this profile into PickCube R1, weaken its required-force contract,
-or treat the candidate as a default registered capability. R1 force freshness, NutAssembly Guard and full C02b remain
+or treat the candidate as a default registered capability. The legacy PickCube R1 reset-force freshness prerequisite
+has a separate GeoPhys CPU receipt; plan-bound raw-force admission, NutAssembly Guard and full C02b remain
 blocked. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
 [single-profile S2/H5](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
 [dual-Entity acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
+
+**C02b-R1 reset-force freshness (2026-10-22):** the legacy selected PickCube
+`production-r1` GeoPhys adapter consumes the public
+`RobotArmObservationReader` sample contract after restore and writes of the
+final reset state. Reset-forward force is evaluated from current
+qpos/qvel/ctrl/activation/configuration without a physics step; completed-step
+force is separately marked pre-integration. State/config writes invalidate the
+previous receipt, and the required R1 consumer rejects invalid or mismatched
+identity/boundary samples. Core preserves signed raw force until the existing
+`control_feedback()` maps the Panda closing direction. Evidence is bounded to
+PickCube seed 31 on GeoPhys CPU; MuJoCo CPU is a sampling-semantics comparison.
+This does not provide plan-bound `actuator_force_query` manifest admission or
+`snapshot_v1()` raw-force publication, so structured required-force admission
+still rejects. See the [C02b-R1 receipt](../../../docs/module/task_env/goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
 
 ## C02c bounded Position instance switch
 

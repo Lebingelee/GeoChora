@@ -165,6 +165,28 @@ production capability or qualification, and it does not close R1 reset-force fre
 [C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md) and
 [S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md).
 
+### C02b-R1 reset-force freshness (2026-10-22)
+
+The existing PickCube `production-r1` legacy selected route now asks the
+GeoPhys runtime adapter to refresh reset force after restoring and explicitly
+writing the final reset qpos/qvel/ctrl/activation. The adapter uses the public
+`control.robot_arm.RobotArmObservationReader`; its versioned sample receipt
+distinguishes reset-forward force from the last completed native-step
+pre-integration force. A reset-forward refresh evaluates the current actuator
+law and does not integrate or advance the native clock. State/config writes
+invalidate the prior receipt, and required consumers fail closed on invalid,
+wrong-source, wrong-actuator, stale-boundary or non-finite samples.
+
+The bounded real probe passed for the selected PickCube source on GeoPhys CPU,
+seed 31, at 100 Hz / five 2 ms native steps, including a nonzero force sample,
+two same-session resets, source-law comparison and the first actual R1 closing
+compute. MuJoCo CPU supplied a separate reset/step sampling-semantics comparison;
+force values are not compared across providers. This closes only the R1 reset
+freshness prerequisite for this legacy route. The structured plan-bound raw
+force requirement remains required and rejected: `provider_manifest()` still
+does not advertise `actuator_force_query`, and `snapshot_v1()` still has no typed
+raw-force publication. See the [acceptance receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
+
 ### NutAssembly selected Solution B
 
 NutAssembly Outcome Solution v3 的抓取下降命令偏置与高度验收补偿相同，TaskArtifact v0 mapping/hash 不变。

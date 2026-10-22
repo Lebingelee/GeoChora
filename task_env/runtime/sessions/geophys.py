@@ -37,9 +37,22 @@ class _GeoPhysSession(_SessionValues):
         self._open_actuators = tuple(names.actuators[name] for name in source.open_actuators)
         self._ctrl_range = data['actuator_ctrlrange']
         self._initial = runtime.boundary.initial_state
+        self._reset_force_measurement = None
+        self._last_reset_force_sequence = 0
+        self._force_source_generation = None
+        self._last_actuator_force_measurement = None
+
+    @property
+    def actuator_force_measurement(self):
+        """Last adapter-validated signed sample, bound to this Core boundary."""
+        return self._last_actuator_force_measurement
 
     def reset(self, sample):
         self._begin_reset()
+        # A failed reset must not leave a previous episode's validated sample
+        # visible through this adapter's diagnostic property.
+        self._reset_force_measurement = None
+        self._last_actuator_force_measurement = None
         self._validate_sample(sample)
         initial = self._initial
         positions = np.array(initial.qpos, copy=True)
@@ -54,11 +67,38 @@ class _GeoPhysSession(_SessionValues):
         for actuator in self._open_actuators:
             targets[actuator] = self._ctrl_range[actuator, 1]
         self._current_ctrl = np.array(targets, copy=True)
-        self._boundary.apply_reset_state(EpisodePhysicsState(
+        force_measurement = self._boundary.apply_reset_state(EpisodePhysicsState(
             positions, np.zeros_like(initial.qvel), np.zeros_like(initial.qacc),
             targets, np.zeros_like(initial.act),
-        ))
-        return self._realized(sample)
+        ), refresh_actuator_force=bool(getattr(self, '_force_feedback_required', False)))
+        if force_measurement is not None:
+            if not force_measurement.valid or force_measurement.phase != 'reset_forward':
+                raise ValueError('GeoPhys reset did not publish a valid reset-forward actuator-force sample')
+            if force_measurement.native_step_index != 0:
+                raise ValueError('GeoPhys reset-forward force sample must reference native step 0')
+            if force_measurement.sample_sequence <= self._last_reset_force_sequence:
+                raise ValueError('GeoPhys reset reused a prior actuator-force sample')
+            if self._force_source_generation is not None and (
+                force_measurement.source_generation != self._force_source_generation
+            ):
+                raise ValueError('GeoPhys reset actuator-force sample belongs to another solver identity')
+            self._force_source_generation = force_measurement.source_generation
+        realized = self._realized(sample)
+        if force_measurement is not None:
+            from dataclasses import replace
+
+            force_measurement = replace(
+                force_measurement,
+                episode_id=str(self._episode_id),
+                reset_sample_id=str(self._reset_sample_id),
+                evaluation_control_step=0,
+                evaluation_simulation_time_s=0.0,
+                actuator_id=str(self._source.open_actuators[0]),
+            )
+        self._reset_force_measurement = force_measurement
+        if force_measurement is not None:
+            self._last_reset_force_sequence = force_measurement.sample_sequence
+        return realized
 
     def _snapshot_with_native_free_joints(self):
         self._require_reset()
@@ -90,9 +130,113 @@ class _GeoPhysSession(_SessionValues):
             raise ValueError('control session admission required')
         if not getattr(self, '_force_feedback_required', False):
             raise ValueError('actuator-force feedback is not admitted for this Controller profile')
-        native = self._boundary.read_snapshot(SnapshotRequest(qacc=False, ctrl=False,
+        native = self._boundary.read_snapshot(SnapshotRequest(qacc=False, ctrl=True,
             body_pose=False, site_pose=False, actuator_force=True))
-        return feedback_value(self, state, native.actuator_force[self._open_actuators[0]])
+        actuator_index = self._open_actuators[0]
+        signed_force_N = float(native.actuator_force[actuator_index])
+        if native.ctrl is None or not np.isfinite(native.ctrl[actuator_index]):
+            raise ValueError('GeoPhys required actuator-force sample has no finite actuator input')
+        measurement = native.actuator_force_measurement
+        if measurement is None:
+            raise ValueError('GeoPhys required actuator-force sample has no validity contract')
+        dt = float(self._artifact.timebase.physics_dt)
+        native_sample_time_s = (
+            0.0
+            if measurement.phase == 'reset_forward'
+            else max(0.0, float(measurement.native_step_index - 1) * dt)
+        )
+        from dataclasses import replace
+
+        measurement = replace(
+            measurement,
+            episode_id=str(self._episode_id),
+            reset_sample_id=str(self._reset_sample_id),
+            evaluation_control_step=int(state.control_step),
+            evaluation_simulation_time_s=float(state.simulation_time),
+            actuator_id=str(self._source.open_actuators[0]),
+            actuator_ctrl=float(native.ctrl[actuator_index]),
+            signed_force_N=signed_force_N,
+            native_sample_time_s=native_sample_time_s,
+        )
+        self._validate_actuator_force_measurement(state, native, measurement)
+        feedback = feedback_value(self, state, signed_force_N)
+        self._last_actuator_force_measurement = measurement
+        return feedback
+
+    def _validate_actuator_force_measurement(self, state, native, measurement=None):
+        measurement = measurement or native.actuator_force_measurement
+        if measurement is None:
+            raise ValueError('GeoPhys required actuator-force sample has no validity contract')
+        if not measurement.valid:
+            raise ValueError(
+                'GeoPhys required actuator-force sample is invalid: '
+                f'{measurement.invalid_reason or "unknown reason"}'
+            )
+        if measurement.force_unit != 'N':
+            raise ValueError('GeoPhys required actuator-force sample unit must be N')
+        if measurement.actuator_id != self._source.open_actuators[0]:
+            raise ValueError('GeoPhys actuator-force sample has the wrong actuator identity')
+        if measurement.reset_sample_id != self._reset_sample_id:
+            raise ValueError('GeoPhys actuator-force sample belongs to another ResetSample')
+        if self._force_source_generation is None or (
+            measurement.source_generation != self._force_source_generation
+        ):
+            raise ValueError('GeoPhys actuator-force sample belongs to another solver identity')
+        if native.actuator_force is None or not np.all(np.isfinite(native.actuator_force)):
+            raise ValueError('GeoPhys required actuator-force sample is non-finite or missing')
+        dt = float(self._artifact.timebase.physics_dt)
+        expected_native_step = int(round(float(state.simulation_time) / dt))
+        if abs(float(state.simulation_time) / dt - expected_native_step) > 1.0e-7:
+            raise ValueError('GeoPhys actuator-force sample clock is not on a native-step boundary')
+        expected_from_control = int(state.control_step) * int(
+            self._artifact.timebase.control_substeps
+        )
+        if expected_native_step != expected_from_control:
+            raise ValueError('GeoPhys actuator-force sample clock differs from the control boundary')
+        if measurement.native_step_index != expected_native_step:
+            raise ValueError('GeoPhys actuator-force sample native index does not match the state boundary')
+        if (
+            measurement.evaluation_control_step != int(state.control_step)
+            or measurement.evaluation_simulation_time_s != float(state.simulation_time)
+        ):
+            raise ValueError('GeoPhys actuator-force sample belongs to another evaluation boundary')
+        if int(state.control_step) == 0:
+            reset_measurement = self._reset_force_measurement
+            if (
+                measurement.phase != 'reset_forward'
+                or reset_measurement is None
+                or measurement.sample_sequence != reset_measurement.sample_sequence
+                or measurement.state_revision != reset_measurement.state_revision
+                or measurement.configuration_revision != reset_measurement.configuration_revision
+                or measurement.episode_id != reset_measurement.episode_id
+                or measurement.reset_sample_id != reset_measurement.reset_sample_id
+                or float(state.simulation_time) != 0.0
+            ):
+                raise ValueError('first R1 feedback is not the current reset-forward force sample')
+            if measurement.native_sample_time_s != 0.0:
+                raise ValueError('reset-forward force sample must use native time zero')
+        else:
+            if (
+                measurement.phase != 'native_step_pre_integration'
+                or measurement.sample_sequence <= self._last_reset_force_sequence
+            ):
+                raise ValueError('GeoPhys feedback is not from a completed native-step force sample')
+            expected_sample_time = float(expected_native_step - 1) * dt
+            if measurement.native_sample_time_s != expected_sample_time:
+                raise ValueError('GeoPhys force sample phase/time does not match its native-step index')
+            previous = self._last_actuator_force_measurement
+            if previous is not None:
+                if previous.episode_id != measurement.episode_id:
+                    raise ValueError('GeoPhys actuator-force sample belongs to another episode')
+                if previous.evaluation_control_step == int(state.control_step):
+                    if (
+                        previous.sample_sequence != measurement.sample_sequence
+                        or previous.state_revision != measurement.state_revision
+                        or previous.configuration_revision != measurement.configuration_revision
+                    ):
+                        raise ValueError('GeoPhys force sample changed within one evaluation boundary')
+                elif measurement.sample_sequence <= previous.sample_sequence:
+                    raise ValueError('GeoPhys native force sample did not advance since the previous boundary')
 
     def apply_control(self, target):
         from .control import validate_target
@@ -123,7 +267,10 @@ class _GeoPhysSession(_SessionValues):
 
     def step(self):
         self._require_reset()
-        self._boundary.step(substeps=self._artifact.timebase.control_substeps)
+        self._boundary.step(
+            substeps=self._artifact.timebase.control_substeps,
+            track_actuator_force=bool(getattr(self, '_force_feedback_required', False)),
+        )
         self._control_step += 1
         self._state_revision += 1
         return self.snapshot()

@@ -89,6 +89,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `adapt_legacy_recipe_task_source` | `task_env.environment` | 只读兼容投影：从旧 `recipe`/`environment` mapping 提取 task identity、Scene 与固定 agent/object role；environment 仍由既有 `ResolvedEnvConfig` 路径解析，不改 TaskArtifact v0 |
 | `ExecutionSpecV1`, `RendererSelectionV1`, `CameraRendererOverrideV1`, `decode_execution_spec` | `task_env.artifacts` | D05a 的显式版本化静态选择；保留旧 `ExecutionSpec` 无版本映射，v1 不自动降为 v0，也不表示已 admission/materialization |
 | `CanonicalStateViewV1`, `CanonicalStatePublicationV1`, `TypedJointStateValue`, `TypedFrameStateValue`, `StateRequirements`, `NativeIntervalEvidence`, `StateViewLifetime` | `task_env.artifacts` | D02a contracts；D02b publication 原子绑定 boundary/lifetime。当前只有 GeoPhys/MuJoCo CPU `RuntimeSession.snapshot_v1()` 有界支持 scalar/free-base readback；不增加 contact manifest 能力或 H5 state format |
+| `ActuatorForceMeasurementV1`, `RuntimeSnapshot.actuator_force_measurement` | `task_env.environment` | Core Provider-adapter value contract for signed raw actuator force provenance: source generation, sample/config/state revisions, native sample index/phase, validity, and selected-session episode/reset/evaluation boundary. Used by the existing GeoPhys legacy force-aware adapter; it does not add plan-bound `actuator_force_query` admission or publish raw force through `snapshot_v1()` |
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
@@ -124,6 +125,17 @@ Runtime materialization when `actuator_force_query` is unavailable. See the
 [C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
 [S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
 [Dual Entity acceptance](goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
+
+**C02b-R1 reset-force freshness (2026-10-22):** the existing PickCube
+`production-r1` legacy selected route now receives a validated reset-forward
+force sample through the GeoPhys adapter and public `RobotArmObservationReader`
+contract. This bounded prerequisite passed on GeoPhys CPU with seed 31; MuJoCo
+CPU was checked as a sampling-semantics comparison. Raw signed force remains in
+the runtime snapshot and the existing `control_feedback()` mapping remains the
+only canonical closing-force projection. The required plan-bound
+`actuator_force_query` manifest/admission and `snapshot_v1()` typed publication
+are still missing, so the structured R1 route remains fail-closed and C02b
+remains blocked. See the [C02b-R1 receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md).
 
 **C02c bounded Position instance switch (2026-10-22):** the explicit
 `SelectedReferenceEnv.from_position_candidate()` route also exposes
