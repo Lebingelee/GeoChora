@@ -79,3 +79,9 @@ one RobotInstance, scalar reset/state fields and a bounded source root. Only Geo
 the Panda + static square-peg probe. MuJoCo consumes the Scene scalar-axis projection through its existing adapter and
 checks public model Frame/Joint topology. Do not infer multi-Robot, free-body pose reset, contact, controller, render,
 task success or qualification support. Details and receipt are in the [Phase D D01b record](../../../../docs/module/task_env/goal/Phase_II/04_Phase_D_Physics_Rendering.md#d01b-bounded-vnext-two-provider-receipt-2026-10-20).
+
+
+D01a historical/current pin test navigation is documented in the
+[independent-review handoff](../../../../docs/module/task_env/goal/Phase_II/Phase_II_Independent_Second_Review_2026-10-22.md#d01a-历史基线与当前验证入口).
+The exact historical axis-change receipt remains 4436787e-only; the current-pin A05/reset/step test is in the same owner.
+Unknown pins and wrong receipt identity fail; only the known baseline mismatch is explicitly historical-not-applicable.

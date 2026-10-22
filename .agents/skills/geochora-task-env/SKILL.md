@@ -548,3 +548,17 @@ boundary. This is a metadata reference only; it does not establish D04 image/dep
 The C04 bounded receipt records real Pendulum GeoPhys CPU reset/step schema, time and diagnostics checks plus Panda builder-level
 private-state contract checks. The generic Panda `BaseTaskEnv` route currently fails earlier at missing Stage 1 scene composition;
 do not report this receipt as real Panda Controller/physics qualification. See the [C04 receipt](../../../docs/module/task_env/goal/Phase_II/03_Phase_C_Execution_Lifecycle.md#c04-bounded-observation-and-info-receipt-2026-10-21).
+
+
+## D01a evidence-baseline test routing
+
+The historical A05 axis-change test in `task_env/diagnostics/tasks/test_phase_ii_d01a_scene_materialization.py`
+is bound to GeoPhys `4436787e9cb85ce519506a2a9af86d1eeec9de2d`. On the one known current pin `a53a8cfe` it reports
+HISTORICAL_NOT_APPLICABLE before materialization, with explicit replacement-entry navigation; unknown pins still fail.
+Its exact pin assertion remains, and regression receipts use exclusive creation under pytest tmp_path to preserve old Evidence.
+The same owner's `test_b02_plan_consumes_the_exact_a05_v3_scene_identity` now requires `a53a8cfe` and really runs
+source/reset/realization/step/close. Existing closure/Frame/Joint/identity/tolerance rejection tests still run.
+Public candidate/H5 and dynamic pairing retain their P99/D05b owners above; a historical skip does not prove either route.
+The preparation run reports 12 passed / 1 historical-not-applicable; expensive native campaigns were not rerun.
+See the [independent-review handoff](../../../docs/module/task_env/goal/Phase_II/Phase_II_Independent_Second_Review_2026-10-22.md)
+for source commits, precise commands, limits and pending Human decisions. This is test/document routing maintenance, no new feature.

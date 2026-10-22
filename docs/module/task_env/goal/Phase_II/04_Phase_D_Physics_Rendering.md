@@ -804,3 +804,12 @@ mask/label-map/原文件回读与已知几何 depth/遮挡。capture instrumenta
 ignored Evidence：`workspace/maintenance/p99_runtime_closure_20261022/{d05b_s1.log,pairing_s2.log,pairing_s2/}`。
 详见 [P99 运行收据](P99_Runtime_Closure_2026-10-22.md)。Camera policy observation/TransitionRecorder 接线不作为本次复验前置，
 也未因此获得支持。无 fake renderer、断言删除、静默 skip 或换 Provider；不是通用 pairing/Qualification。
+
+
+#### D01a test baseline applicability for independent review (2026-10-22)
+
+原 D01a axis-change test 精确绑定 `4436787e`，不将其 native 收据转移到当前 pin。在已知 `a53a8cfe` 上该单项明确报告
+HISTORICAL_NOT_APPLICABLE，并指向同 owner 的 current-pin `test_b02_plan_consumes_the_exact_a05_v3_scene_identity` 及 P99/D05b
+专门入口；其他未知 pin 仍失败。原精确断言与身份/closure/tolerance 拒绝保护保留，receipt 写入 pytest tmp_path 并拒绝覆盖。
+本轮最小回归 12 passed / 1 historical-not-applicable；没有重跑历史或 expensive campaigns。详见
+[独立二审包](Phase_II_Independent_Second_Review_2026-10-22.md#d01a-历史基线与当前验证入口)。

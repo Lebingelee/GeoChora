@@ -34,7 +34,7 @@ GeoPhys checkout/gitlink 保持 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；Men
 | A–D 父 Goal/全部切片 | 沿用既有逐项处置 | 未重审全量；C02c 通用切换、C05c 常规 native-rate Reader、完整 D04/D05b 等原有未完成/延期项不能自动改成 complete |
 | 新 Task freeze 前置 | 本 candidate 不适用；未来 freeze 必须保留 | 无新 freeze、无 randomized feasibility/Judge；task success 始终 false，真实运动不等于任务成功 |
 | Public API/docs/Skill | 本轮已更新，待 Human review | 公开 UID 与内部扩展 hook/旧诊断入口明确分层，精确交集见收据 |
-| 独立 review / develop 二审 | **待维护者** | 全部仍为本地变更；未推送/合并 |
+| 独立 review / develop 二审 | **待维护者** | 已保全为本地提交；未推送/合并 |
 
 ## C02b 必需退出项映射
 
@@ -50,6 +50,12 @@ GeoPhys checkout/gitlink 保持 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；Men
 据以上映射，原 C02b 必需出口已有实现、测试或真实 Evidence；未发现新的必需缺口。旧报告中的 `BLOCKED` 是各自签发时的准确历史结论，应保留历史语境，但当前状态已由最新 structured R1 收据和本报告收敛。候选 Artifact/source/plan 仍只作为有界候选证据，不转移到旧 PickCube Artifact，不改变冻结内容。
 
 **当前 C02b 表述：声明交集的有界工程退出满足；未准入扩展及 Qualification 单列。** 未准入扩展包括 dual-Entity R1、CUDA R1、其他 source/Artifact/transmission/MuJoCo build、NutAssembly Guard 与通用 capability。Qualification 是独立 gate，本轮未进行。
+
+## 独立二审交付
+
+当前源码与 develop 差异、20 父 Goal/33 切片处置、D01a 历史不适用与当前 pin 回归、
+延期/诊断例外及待维护者决定范围见 [独立二审包](Phase_II_Independent_Second_Review_2026-10-22.md)。
+本包已准备，不表示独立二审通过或 Phase II 完成。
 
 ## 剩余决策
 
