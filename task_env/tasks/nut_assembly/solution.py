@@ -624,6 +624,8 @@ class NutAssemblyOutcomeSolutionV1:
             "original_expert_lifecycle_status": self.original_expert_lifecycle_status,
             "execution_lifecycle_status": self.lifecycle.to_mapping()["status"],
             "stage_execution_receipts": deepcopy(self._stage_receipts),
+            "close_authorization": deepcopy(self._close_authorization),
+            "last_close_guard_decision": deepcopy(self._last_guard_decision),
             "runtime_error": self._runtime_error, "unapproved_override_used": False}
 
     @staticmethod

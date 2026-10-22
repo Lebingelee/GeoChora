@@ -1102,6 +1102,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = requested_mode
         stage = proposal.stage if proposal is not None else 'external'
         diagnostics = dict(proposal.diagnostics) if proposal is not None else {}
+        if (requested_mode == 'external_solution' and proposal is not None
+                and proposal.control_request is not None):
+            control_request = proposal.control_request
+            diagnostics['arm_execution_request_v1'] = {
+                'schema_version': control_request.schema_version,
+                'profile_id': control_request.profile_id,
+                'mode': control_request.mode,
+            }
         native_samples = []
         substeps = []
         before_state = self.state

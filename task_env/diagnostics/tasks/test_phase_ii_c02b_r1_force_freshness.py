@@ -69,6 +69,7 @@ def _session():
     session._episode_id = "episode-a"
     session._reset_sample_id = "sample-a"
     session._last_actuator_force_measurement = None
+    session._inner_interval_active = False
     return session
 
 
@@ -77,7 +78,36 @@ def _snapshot(measurement, force=-30.0):
         qpos=np.zeros(1, dtype=np.float32),
         qvel=np.zeros(1, dtype=np.float32),
         actuator_force=np.asarray([force], dtype=np.float32),
+        simulation_time=(
+            0.0 if measurement is None
+            else float(measurement.evaluation_simulation_time_s)
+        ),
         actuator_force_measurement=measurement,
+    )
+
+
+def _native_snapshot(measurement, simulation_time_s, *, snapshot_time_s=None):
+    if snapshot_time_s is None:
+        snapshot_time_s = simulation_time_s
+    return SimpleNamespace(
+        simulation_time=float(snapshot_time_s),
+        actuator_force=np.asarray([-3.0], dtype=np.float64),
+        actuator_force_measurement=measurement,
+    )
+
+
+def _native_measurement(native_step_index, sample_sequence, evaluation_time_s,
+                        evaluation_control_step, *, reset_sample_id="sample-a",
+                        state_revision=12):
+    return _measurement(
+        sequence=sample_sequence,
+        state_revision=state_revision,
+        native_step_index=native_step_index,
+        phase="native_step_pre_integration",
+        reset_sample_id=reset_sample_id,
+        native_sample_time_s=(native_step_index - 1) * 0.002,
+        evaluation_control_step=evaluation_control_step,
+        evaluation_simulation_time_s=evaluation_time_s,
     )
 
 
@@ -128,28 +158,130 @@ def test_r1_feedback_gate_requires_latest_completed_native_preintegration_sample
     state = SimpleNamespace(control_step=1, simulation_time=0.01)
 
     valid = _measurement(
-        sequence=5,
+        sequence=9,
         native_step_index=5,
         phase="native_step_pre_integration",
+        evaluation_control_step=1,
+        evaluation_simulation_time_s=0.01,
     )
     session._validate_actuator_force_measurement(state, _snapshot(valid))
 
     stale_index = _measurement(
-        sequence=5,
+        sequence=9,
         native_step_index=4,
         phase="native_step_pre_integration",
+        evaluation_control_step=1,
+        evaluation_simulation_time_s=0.01,
     )
     with pytest.raises(ValueError, match="native index"):
         session._validate_actuator_force_measurement(state, _snapshot(stale_index))
 
     wrong_phase = _measurement(
-        sequence=5,
+        sequence=9,
         native_step_index=5,
         phase="reset_forward",
         evaluation_control_step=1,
+        evaluation_simulation_time_s=0.01,
     )
     with pytest.raises(ValueError, match="completed native-step"):
         session._validate_actuator_force_measurement(state, _snapshot(wrong_phase))
+
+def test_r1_sampling_accepts_each_contiguous_native_substep_read():
+    session = _session()
+    session._inner_interval_active = True
+
+    reset_sample = session._reset_force_measurement
+    session._validate_actuator_force_measurement(
+        SimpleNamespace(control_step=0, simulation_time=0.0),
+        _native_snapshot(reset_sample, 0.0),
+    )
+    session._last_actuator_force_measurement = reset_sample
+
+    for native_step_index in range(1, 5):
+        evaluation_time = native_step_index * 0.002
+        measurement = _native_measurement(
+            native_step_index,
+            sample_sequence=4 + native_step_index,
+            evaluation_time_s=evaluation_time,
+            evaluation_control_step=0,
+            state_revision=12 + native_step_index,
+        )
+        session._validate_actuator_force_measurement(
+            SimpleNamespace(control_step=0, simulation_time=evaluation_time),
+            _native_snapshot(measurement, evaluation_time),
+        )
+        session._last_actuator_force_measurement = measurement
+
+
+def test_r1_sampling_accepts_consecutive_outer_reads_across_five_native_steps():
+    session = _session()
+    session._inner_interval_active = False
+
+    for control_step in (1, 2):
+        native_step_index = control_step * 5
+        evaluation_time = control_step * 0.01
+        measurement = _native_measurement(
+            native_step_index,
+            sample_sequence=4 + native_step_index,
+            evaluation_time_s=evaluation_time,
+            evaluation_control_step=control_step,
+            state_revision=12 + native_step_index,
+        )
+        session._validate_actuator_force_measurement(
+            SimpleNamespace(control_step=control_step, simulation_time=evaluation_time),
+            _native_snapshot(measurement, evaluation_time),
+        )
+        session._last_actuator_force_measurement = measurement
+
+
+def test_r1_sampling_rejects_changed_force_sample_for_the_same_evaluation_state():
+    session = _session()
+    session._inner_interval_active = True
+    previous = _native_measurement(1, 5, 0.002, 0, state_revision=17)
+    session._last_actuator_force_measurement = previous
+    changed = _native_measurement(1, 6, 0.002, 0, state_revision=18)
+
+    with pytest.raises(ValueError, match="changed within one native evaluation state"):
+        session._validate_actuator_force_measurement(
+            SimpleNamespace(control_step=0, simulation_time=0.002),
+            _native_snapshot(changed, 0.002),
+        )
+
+
+def test_r1_sampling_rejects_sequence_gap_across_two_native_steps():
+    session = _session()
+    session._inner_interval_active = True
+    session._last_actuator_force_measurement = _native_measurement(1, 5, 0.002, 0)
+    skipped = _native_measurement(3, 8, 0.006, 0)
+
+    with pytest.raises(ValueError, match="sample does not match the completed native-step gap"):
+        session._validate_actuator_force_measurement(
+            SimpleNamespace(control_step=0, simulation_time=0.006),
+            _native_snapshot(skipped, 0.006),
+        )
+
+
+@pytest.mark.parametrize(
+    "measurement, state_time, native_time, message",
+    [
+        (_native_measurement(3, 7, 0.006, 0), 0.006, 0.004,
+         "sample time differs from evaluation boundary"),
+        (_native_measurement(3, 7, 0.004, 0), 0.006, 0.006,
+         "another evaluation boundary"),
+        (_native_measurement(3, 7, 0.006, 0, reset_sample_id="sample-old"), 0.006, 0.006,
+         "another ResetSample"),
+    ],
+)
+def test_r1_sampling_rejects_time_boundary_and_reset_sample_mismatch(
+    measurement, state_time, native_time, message
+):
+    session = _session()
+    session._inner_interval_active = True
+    with pytest.raises(ValueError, match=message):
+        session._validate_actuator_force_measurement(
+            SimpleNamespace(control_step=0, simulation_time=state_time),
+            _native_snapshot(measurement, state_time, snapshot_time_s=native_time),
+        )
 
 
 def test_raw_signed_force_keeps_the_existing_canonical_closing_projection():

@@ -162,8 +162,11 @@ native actuation interval measurement，sign/index 转换留 adapter；不宣称
 
 Selected reference 使用 finite 8D world absolute pose request；PickCube 可用 external action 或 expert，
 同一 episode 不能混用；NutAssembly raw external action 拒绝，并保留 `step_expert()`。NutAssembly
-另有有界 task-owned external Solution native S1：GeoPhys `a53a8cf` CPU 与 MuJoCo 3.8.1 CPU 单 interval
-Probe 已通过，完整 external Expert 和录制 S2/S3 未通过；详见 C05c S1 receipt。
+task-owned external Solution 的 MuJoCo 3.8.1 CPU full Expert S2 与 execution H5 S3 已在精确 source/profile
+上 bounded 通过。GeoPhys `a53a8cf` CPU 单 interval 数据仅为 diagnostic：其公开 `read_cpu_snapshot()`
+明确禁止每个 native substep 读取，故完整 500 Hz 外部路线未运行；Provider observation owner 仍需提供
+host-readable 的 native sample value/phase/freshness 合同，Core RuntimeSession 再绑定 materialization 与
+episode/reset/evaluation-boundary identity。详见 [C05c receipt](goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
 Selected reset 重建 controller/solution owner 状态，不推进物理，录制需先 finalize 再 reset。
 
 ### C02b Position Profile candidate (2026-10-21)

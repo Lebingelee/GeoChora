@@ -167,6 +167,14 @@ def test_full_authored_trajectory_measured_insertion_release_and_retreat_require
     assert receipt['actions_executed']>=receipt['planned_actions']>0 and receipt['endpoint_pass']
     assert not s.original_expert_lifecycle_status['expert_failed']
     assert s.original_expert_lifecycle_status['expert_complete']
+    authorization = s.outcome_report()['close_authorization']
+    assert authorization['authorization_guard_id'] in {
+        s.primary_guard_id, s.alternative_guard_id,
+    }
+    assert authorization['authorization_time_s'] <= authorization[
+        'transition_consumed_at_outer_boundary_s'
+    ]
+    assert s.outcome_report()['last_close_guard_decision']['outcome'] == 'AUTHORIZED'
     # Late recording/runtime failure cannot leave the new outcome marked complete.
     s.abort('recording_error');assert not s.outcome_complete
 

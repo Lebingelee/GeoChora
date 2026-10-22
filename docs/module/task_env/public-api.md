@@ -11,7 +11,7 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | --- | --- | --- |
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
 | PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
-| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "geophys", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; bounded task-owned external Solution native S1 is available; full external Expert S2/S3 is not accepted |
+| NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution Expert S2 and execution H5 S3 are bounded passed; GeoPhys CPU native 500 Hz external route remains diagnostic-only |
 
 两条 selected route 只接受 `provider`、`backend`、`horizon`：provider 仅
 `geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
@@ -54,14 +54,11 @@ readiness、错误边界、observer 与 append 失败。此调用面仍使用冻
 [C05b S2/S3 acceptance](../../../docs/module/task_env/goal/Phase_II/C05b_External_Solution_S2_S3_Acceptance.md)。
 该有界结果不支持 legacy R1 Stop/Event/Outcome、MuJoCo typed-force、NutAssembly Guard、完整 C02b 或 Qualification。
 
-NutAssembly 的 C05c S1 另有一个 task-owned `OutcomeSolutionV1` 路线：
+NutAssembly 的 C05c 另有一个 task-owned `OutcomeSolutionV1` 路线：
 `from task_env.tasks.nut_assembly import build_outcome_solution`，然后调用
 `env.reset_for_solution(solution, seed=19)` 和 `env.step_with_solution(solution)`。
-该路线只确认受控的 native Solution/request、RuntimeSession force-sample 和 applied-ack 合同，覆盖
-GeoPhys `a53a8cf` CPU 与 MuJoCo 3.8.1 CPU 的单 native interval Probe，并将五个真实 500 Hz Guard
-samples 写入既有 execution Recorder。它保留内部 `step_expert()`，不允许任意 raw action；完整 NutAssembly
-external Expert、close Guard 真实授权、完整录制 S2/S3 与 Qualification 尚未通过。详见
-[C05c S1 receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
+它保留内部 `step_expert()`，不允许任意 raw action。MuJoCo 3.8.1 CPU 的 seed-19 full external Expert、close Guard 授权与同一 execution H5 的 S2/S3 已在所记录 source/Profile 上 bounded passed。GeoPhys `a53a8cf` CPU 的单 interval run 仅为 diagnostic evidence：其公开 `RobotArmObservationReader.read_cpu_snapshot()` 明确禁止每个 simulation substep 调用，当前 Core native host-servo 路径每个 2 ms 子步读取，因此 GeoPhys 的 full external Expert S2/S3 未运行。GeoPhys 需由现有 Provider observation owner 增加 native-rate CPU host sample 与 freshness/phase 合同；Core RuntimeSession 再将 Provider sample 绑定当前 materialization、episode/reset/evaluation boundary identity 后验证。该结果不扩展到其他 Provider/backend、R1 typed-force、完整 C05c、C02b 或 Qualification。详见
+[C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md)。
 
 通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
 unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined

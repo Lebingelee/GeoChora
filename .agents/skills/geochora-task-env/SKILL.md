@@ -19,10 +19,14 @@ For the source/contract/test map read [routes](references/routes.md) when implem
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
-  Keep guarded `step_expert()` for the retained internal route. A bounded C05c task-owned external
-  Solution native S1 is available through `from task_env.tasks.nut_assembly import build_outcome_solution`,
-  `reset_for_solution(solution, seed=19)`, and `step_with_solution(solution)`. This does not admit raw external
-  actions or establish a complete external Expert; do not use legacy UIDs/builders.
+  Keep guarded `step_expert()` for the retained internal route. A task-owned external Solution is available
+  through `from task_env.tasks.nut_assembly import build_outcome_solution`, `reset_for_solution(solution, seed=19)`,
+  and `step_with_solution(solution)`. The bounded full external Expert + execution H5 S2/S3 result is accepted
+  only for MuJoCo 3.8.1 CPU and the exact C05c source/profile in its receipt. GeoPhys `a53a8cf` CPU single-interval
+  evidence is diagnostic-only because its public `read_cpu_snapshot()` contract forbids every-substep reads; do not
+  claim GeoPhys 500 Hz host-servo support or run this full route until the Provider observation owner supplies the
+  required native sample value/phase/freshness contract; the Core RuntimeSession binds Provider samples to its
+  episode/reset/evaluation-boundary identity. Neither route admits raw external actions.
 - Selected config accepts provider/backend/horizon only: geophys/mujoco, scalar CPU, horizon integer 1–6000.
   No render, legacy overlays, SAPIEN/Genesis or implicit batch support. Generic parallel must have explicit
   homogeneous registration and merged_scene layout; no scalar fallback.
@@ -32,9 +36,11 @@ selected Environment publishes its actual reset/runtime boundary, `step_with_sol
 native RuntimeSession sample/ack contract, and the existing execution Recorder persists substep samples.
 Keep the Panda `actuator8` signed-force/N mapping, reset-forward versus completed-step pre-integration
 phase, and five 2 ms updates per 100 Hz interval. Do not read `env.solution`, private Solution stage,
-or a mutable hold/ramp object. Only the single-interval S1 Probe is accepted on GeoPhys CPU at
-`a53a8cf` and MuJoCo 3.8.1 CPU; full Expert S2/S3 and close-Guard authorization remain open. See the
-[C05c S1 receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md).
+or a mutable hold/ramp object. The MuJoCo receipt verifies task success, Expert/Outcome completion,
+the original 8 N / 0.1 s close Guard, Controller-owned hold/ramp acknowledgements and same-file H5 readback
+for 2,377 intervals. GeoPhys's current public CPU snapshot is diagnostic-only at native rate; the exact
+Provider gap and S2/S3 evidence are in the
+[C05c receipt](../../../docs/module/task_env/goal/Phase_II/C05c_NutAssembly_Public_Native_S1_Acceptance.md).
 
 Use [examples](../../../examples/README.md) for exact current CLI commands. Preserve fresh output paths,
 resource bounds and provenance. Repository has no root packaging metadata: dependencies via requirements,
