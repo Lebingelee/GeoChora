@@ -368,7 +368,7 @@ def _source_identity_files(controller, solution):
             for path in sorted(files)}
 
 
-def build_reference(*, backend="cpu"):
+def build_reference(*, backend="cpu", include_solution=True):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical import ProductionCanonicalPandaController
     from ...controllers.canonical.contracts import digest
@@ -401,20 +401,40 @@ def build_reference(*, backend="cpu"):
     }
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
-        "readiness": readiness, "controller": controller, "solution": solution,
+        "readiness": readiness, "controller": controller,
+        "solution": solution if include_solution else None,
+        "solution_identity": solution.identity,
         "source_revision": revision, "source_sha256": source_ids,
         "recipe_identity": digest(resolved), "resolved_configuration": resolved,
     }
 
 
+def build_readiness_solution(*, backend="cpu"):
+    """Build the task-owned PickCube readiness Solution for an external driver."""
+    return build_reference(backend=backend)["solution"]
+
+
+def _validate_external_readiness_solution(value, solution):
+    from .solution import PickCubeReadinessSolution
+
+    if not isinstance(solution, PickCubeReadinessSolution):
+        raise TypeError("PickCube external lifecycle requires PickCubeReadinessSolution")
+    if solution.readiness_config.identity != value["readiness"].identity:
+        raise ValueError("external Solution readiness configuration does not match the selected source")
+    if solution.identity != value["solution_identity"]:
+        raise ValueError("external Solution identity does not match the selected task implementation")
+
+
 def make_reference_binding():
     return ReferenceTaskBinding(
         build=lambda provider: build_reference(backend="cpu"),
+        build_external=lambda provider: build_reference(backend="cpu", include_solution=False),
+        validate_external_solution=_validate_external_readiness_solution,
         reset_sample=sample_reset, evaluate=evaluate,
         object_poses=(("cube-v1", "cube_v1"),),
         external_actions=True, interval_mode="grouped", recorder_mode="canonical",
-        reset_expert_kwargs=lambda env: {"execution_info": env._execution_info()},
-        observe_expert_kwargs=lambda env, guard_samples: {"execution_info": env._execution_info()},
+        reset_expert_kwargs=lambda env: {"execution_info": env.expert_execution_info()},
+        observe_expert_kwargs=lambda env, guard_samples: {"execution_info": env.expert_execution_info()},
     )
 
 
@@ -431,6 +451,6 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
 __all__ = [
     "PickCubeReferenceEnv", "PickCubeTaskDefinition",
-    "REFERENCE_ENV_ID", "build_artifact", "build_reference", "build_runtime_source", "evaluate", "make_reference_binding",
+    "REFERENCE_ENV_ID", "build_artifact", "build_readiness_solution", "build_reference", "build_runtime_source", "evaluate", "make_reference_binding",
     "sample_reset", "semantic_definition",
 ]

@@ -1,5 +1,6 @@
 """Provider-neutral completion values for frozen public-action stage plans."""
 from dataclasses import dataclass
+import math
 import numpy as np
 from ..artifacts.contracts import Contract
 from ..controllers.canonical.readiness import CanonicalControlReadiness
@@ -16,6 +17,13 @@ class ExpertExecutionInfo(Contract):
     def validate(self):
         if self.schema_version != 'expert-execution-info-v1':
             raise ValueError('unsupported expert execution metadata')
+        if type(self.control_step) is not int or self.control_step < 0:
+            raise ValueError('invalid expert execution control boundary')
+        if not math.isfinite(self.simulation_time) or self.simulation_time < 0:
+            raise ValueError('invalid expert execution simulation time')
+        if not isinstance(self.control_readiness, CanonicalControlReadiness):
+            raise TypeError('canonical control readiness is required')
+        self.control_readiness.validate()
         self.control_readiness.require_boundary(self.control_step, self.simulation_time)
 
 

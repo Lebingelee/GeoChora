@@ -384,7 +384,7 @@ class ControlBinding:
         if self.opening_range_m!=.08:raise ValueError('only audited 0.08m tendon gripper mapping implemented')
 
 
-_C02B_R1_GEO_PHYS_REVISION = 'eb870f6f8812abea9022594b702df0c395d98d48'
+_C02B_R1_GEO_PHYS_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
 _C02B_R1_ARTIFACT_IDENTITY = '97e0f33d06bc58831a946e3a0cdf277f3f52efe5b2bcf801192a965631c90efd'
 _C02B_R1_SCENE_IDENTITY = '047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e'
 _C02B_R1_SOURCE_CLOSURE = 'aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47'

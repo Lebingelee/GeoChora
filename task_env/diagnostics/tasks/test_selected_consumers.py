@@ -203,6 +203,191 @@ def test_metadata_ownership_is_per_environment():
     a.close();b.close()
 
 
+def test_c05b_public_solution_lifecycle_and_control_ack_match_internal(fake, tmp_path):
+    from task_env.planners.completion import ExpertExecutionInfo
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    internal = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    external = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    try:
+        _, internal_reset = internal.reset(seed=19)
+        solution = build_readiness_solution()
+        _, external_reset = external.reset_for_solution(solution, seed=19)
+        first_episode_id = external_reset['expert_execution_boundary_v1']['episode_id']
+        _, external_reset = external.reset_for_solution(solution, seed=19)
+        assert external_reset['expert_execution_boundary_v1']['episode_id'] != first_episode_id
+
+        for info in (internal_reset, external_reset):
+            execution = ExpertExecutionInfo.from_mapping(info['expert_execution_info_v1'])
+            execution.validate()
+            assert execution.control_step == 0 and execution.simulation_time == 0.
+            assert info['control_readiness_v1'] == execution.control_readiness.to_mapping()
+            assert info['expert_execution_boundary_v1']['control_step'] == 0
+            assert info['expert_execution_boundary_v1']['episode_id']
+            assert 'control_application_v1' not in info
+        assert external.solution is None  # external instance owns all mutable stage state
+        assert external.expert_execution_info().control_readiness.to_mapping() == external_reset['control_readiness_v1']
+        internal.start_recording(tmp_path/'internal.h5')
+        external.start_recording(tmp_path/'external.h5')
+
+        append_order = []
+        append = external.recorder.append
+
+        def observe_before_append(*args, **kwargs):
+            append_order.append((solution._awaiting_observation, solution.total_control_actions_emitted))
+            return append(*args, **kwargs)
+
+        external.recorder.append = observe_before_append
+        internal_result = internal.step_expert()
+        external_result = external.step_with_solution(solution)
+        assert append_order == [(False, 1)]
+        np.testing.assert_array_equal(internal_result[0]['state']['ee_pose'], external_result[0]['state']['ee_pose'])
+        assert internal_result[1:4] == external_result[1:4]
+        external_calls = len(external.session.calls)
+        with pytest.raises(RuntimeError, match='cannot.*mix'):
+            external.step(np.zeros(8))
+        with pytest.raises(RuntimeError, match='cannot.*mix'):
+            external.step_expert()
+        assert external.state.control_step == 1 and len(external.session.calls) == external_calls
+
+        for env, result in ((internal, internal_result), (external, external_result)):
+            info = result[4]
+            application = info['control_application_v1']
+            assert application['schema_version'] == 'selected-control-application-v1'
+            assert application['request_boundary']['control_step'] == 0
+            assert application['evaluation_boundary']['control_step'] == 1
+            assert application['request_boundary']['episode_id'] == info['expert_execution_boundary_v1']['episode_id']
+            assert application['target_identity_hash'] == application['applied_target_hash']
+            assert application['target_identity_hash'] == application['applied']['target_hash']
+            assert application['task_artifact_hash'] == env.artifact.identity_hash
+            assert application['controller_identity'] == env.controller.identity
+            assert info['expert_execution_boundary_v1']['control_step'] == 1
+            assert not info['is_success']
+            assert not info['selected_policy_execution_complete']
+            assert len(env.recorder.transitions) == 1
+            assert len(env.recorder.boundaries) == 2
+        left = internal.recorder.transitions[0]
+        right = external.recorder.transitions[0]
+        assert left.requested_action == right.requested_action
+        assert left.controller_target == right.controller_target
+        assert left.applied_control == right.applied_control
+        assert internal.finish_recording('c05b-s1')['logical_mapping_exact']
+        assert external.finish_recording('c05b-s1')['logical_mapping_exact']
+    finally:
+        internal.close()
+        external.close()
+
+
+@pytest.mark.parametrize('damage', ['missing', 'stale', 'wrong_boundary'])
+def test_c05b_invalid_public_readiness_rejects_before_solution_or_control(damage, fake):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    solution = build_readiness_solution()
+    try:
+        env.reset_for_solution(solution, seed=19)
+        if damage == 'missing':
+            env.info.pop('expert_execution_info_v1')
+        elif damage == 'stale':
+            env.info['expert_execution_info_v1']['simulation_time'] = .01
+        else:
+            env.info['expert_execution_boundary_v1']['source_id'] = 'wrong-source'
+        compute_calls = []
+        compute = env.controller.compute
+
+        def count_compute(*args, **kwargs):
+            compute_calls.append(True)
+            return compute(*args, **kwargs)
+
+        env.controller.compute = count_compute
+        with pytest.raises((ValueError, TypeError)):
+            env.step_with_solution(solution)
+        assert env.execution_fault.phase == 'public_execution_readiness'
+        assert env.state.control_step == 0 and env.state.simulation_time == 0.
+        assert not env.session.calls and not compute_calls
+        assert solution.total_control_actions_emitted == 0
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_with_solution(solution)
+        assert not env.session.calls and not compute_calls
+    finally:
+        env.close()
+
+
+def test_c05b_foreign_solution_identity_rejects_before_reset(fake):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    foreign = build_readiness_solution()
+    foreign.identity = 'f' * 64
+    try:
+        with pytest.raises(ValueError, match='identity'):
+            env.reset_for_solution(foreign, seed=19)
+        assert env.session is None
+        assert env.execution_fault is None
+    finally:
+        env.close()
+
+
+def test_c05b_observer_failure_latches_before_recorder_append(fake, tmp_path):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    solution = build_readiness_solution()
+    try:
+        env.reset_for_solution(solution, seed=19)
+        env.start_recording(tmp_path/'observer-fault.h5')
+        append_calls = []
+        env.recorder.append = lambda *args, **kwargs: append_calls.append(True)
+
+        def fail_observe(*args, **kwargs):
+            raise RuntimeError('injected external observe failure')
+
+        solution.observe = fail_observe
+        with pytest.raises(RuntimeError, match='external observe failure'):
+            env.step_with_solution(solution)
+        assert env.execution_fault.phase == 'solution_observation'
+        assert env.execution_fault.physical_progress == 'advanced'
+        assert env.execution_fault.transition_status == 'incomplete'
+        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert not env.recorder.transitions and len(env.recorder.boundaries) == 1
+        assert not append_calls
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_with_solution(solution)
+        assert env.state.control_step == 1 and len(env.session.calls) == 1
+    finally:
+        env.close()
+
+
+def test_c05b_recorder_append_failure_latches_after_observe_without_valid_transition(fake, tmp_path):
+    from task_env.tasks.pick_cube import build_readiness_solution
+
+    env = make_env(IDS[0], config={'provider':'geophys','horizon':3})
+    solution = build_readiness_solution()
+    try:
+        env.reset_for_solution(solution, seed=19)
+        env.start_recording(tmp_path/'append-fault.h5')
+        append_observations = []
+
+        def fail_append(*args, **kwargs):
+            append_observations.append((solution._awaiting_observation, solution.total_control_actions_emitted))
+            raise RuntimeError('injected canonical Recorder append failure')
+
+        env.recorder.append = fail_append
+        with pytest.raises(RuntimeError, match='Recorder append failure'):
+            env.step_with_solution(solution)
+        assert append_observations == [(False, 1)]
+        assert env.execution_fault.phase == 'record_interval'
+        assert env.execution_fault.physical_progress == 'advanced'
+        assert env.execution_fault.transition_status == 'rejected'
+        assert env.state.control_step == 1 and len(env.session.calls) == 1
+        assert not env.recorder.transitions and len(env.recorder.boundaries) == 1
+        with pytest.raises(RuntimeError, match='faulted'):
+            env.step_with_solution(solution)
+        assert env.state.control_step == 1 and len(env.session.calls) == 1
+    finally:
+        env.close()
+
+
 def test_failed_reset_closes_old_runtime_and_requires_new_reset(fake):
     env=make_env(IDS[1]);env.reset(seed=19);old=env.session
     with pytest.raises(ValueError):env.reset(seed=31)

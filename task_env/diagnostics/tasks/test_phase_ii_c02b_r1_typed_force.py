@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -196,7 +197,7 @@ def test_c02b_r1_force_capability_is_exact_and_unsupported_provider_fails_before
     )
     force_claims = [claim for claim in manifest.capabilities if claim.name == "actuator_force_query"]
     assert len(force_claims) == 1 and force_claims[0].status == "tested"
-    assert "geophys=git:eb870f6f8812abea9022594b702df0c395d98d48" in force_claims[0].evidence_reference
+    assert "geophys=git:a53a8cfed7c9d6464274b5c96fca601271dc4ee4" in force_claims[0].evidence_reference
     assert f"plan={candidate.plan.identity_hash}" in force_claims[0].evidence_reference
     assert "actuator_force_query" not in {claim.name for claim in provider_manifest("geophys").capabilities}
     assert "actuator_force_query" not in session_api.CAPABILITIES
@@ -235,20 +236,27 @@ def test_c02b_r1_force_capability_is_exact_and_unsupported_provider_fails_before
             wrong_controller, ControlBinding("panda-main/gripper", 0.08),
         )
 
-    monkeypatch.setattr(control_sessions, "provider_build_identity", lambda _name: {
-        "repository_revision": "9a43b920",
-        "dirty_build_sha256": None,
-        "manifest_version": "git:9a43b920",
-    })
-    with pytest.raises(CapabilityAdmissionError, match="requires clean GeoPhys repair commit"):
-        _c02b_r1_force_capability_manifest(
-            candidate.artifact, execution, candidate.source, candidate.plan,
-            candidate.controller, ControlBinding("panda-main/gripper", 0.08),
-        )
+    for revision in (
+        "eb870f6f8812abea9022594b702df0c395d98d48",
+        "9a43b92032deee90c1aef3a7f5f15216dc8e4b42",
+    ):
+        monkeypatch.setattr(control_sessions, "provider_build_identity", lambda _name, rev=revision: {
+            "repository_revision": rev,
+            "dirty_build_sha256": None,
+            "manifest_version": f"git:{rev}",
+        })
+        with pytest.raises(CapabilityAdmissionError, match="requires clean GeoPhys repair commit"):
+            _c02b_r1_force_capability_manifest(
+                candidate.artifact, execution, candidate.source, candidate.plan,
+                candidate.controller, ControlBinding("panda-main/gripper", 0.08),
+            )
 
 
 def test_c02b_r1_geophys_cpu_plan_bound_publication_and_control_interval(tmp_path):
-    root = Path("workspace/maintenance/c02b_r1_typed_force_20261022")
+    root = Path(os.environ.get(
+        "C02B_R1_EVIDENCE_DIR",
+        "workspace/maintenance/c02b_r1_typed_force_20261022",
+    ))
     root.mkdir(parents=True, exist_ok=True)
     candidate = build_r1_force_candidate(root / "candidate")
     scene = candidate.scene
@@ -325,10 +333,14 @@ def test_c02b_r1_geophys_cpu_plan_bound_publication_and_control_interval(tmp_pat
         after_feedback = session.control_feedback(stepped, actuator_force=next_force)
         assert after_feedback.gripper.closing_force_N == pytest.approx(max(0.0, -next_force.signed_value))
         assert session.snapshot().simulation_time == pytest.approx(0.01)
+        provider_build = control_sessions.provider_build_identity("geophys")
+        assert provider_build["repository_revision"] == "a53a8cfed7c9d6464274b5c96fca601271dc4ee4"
+        assert provider_build["dirty_build_sha256"] is None
         evidence = {
             "schema": "c02b-r1-typed-force-probe-v1",
             "provider": "geophys",
-            "provider_revision": "eb870f6f8812abea9022594b702df0c395d98d48",
+            "provider_revision": provider_build["repository_revision"],
+            "provider_manifest_version": provider_build["manifest_version"],
             "backend": "cpu",
             "execution": execution.to_mapping(),
             "artifact_identity": candidate.artifact.identity_hash,

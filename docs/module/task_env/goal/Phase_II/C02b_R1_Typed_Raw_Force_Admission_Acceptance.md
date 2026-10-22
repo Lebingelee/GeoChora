@@ -1,13 +1,13 @@
 # C02b-R1 Typed Raw Force Publication and Exact Admission
 
 **Date:** 2026-10-22
-**Status:** bounded typed-publication and one-interval GeoPhys CPU plan-bound slice passed; C02b remains **BLOCKED**.
+**Status:** bounded typed-publication and one-interval GeoPhys CPU plan-bound slice reverified on the aligned GeoPhys `a53a8cfe` baseline; C02b remains **BLOCKED**.
 
 ## Scope and preserved baseline
 
 This slice adds a versioned typed raw-force state publication and exact admission for one new Panda R1 candidate. It does not enter C05b, implement a full Expert, enable NutAssembly Guard, add camera observation, or claim qualification.
 
-At start, Core was on `codex/phase-ii-c03b` at `ec2dd2438da5c0bd1b79ed58c3900e54bb7433ca` with a clean worktree. The parent GeoPhys gitlink and local submodule were both at `eb870f6f8812abea9022594b702df0c395d98d48`; the submodule worktree was clean. No fetch, branch switch, Provider edit, gitlink update, push, or merge was performed. The remote `codex/fix-reset-force-freshness` revision `9a43b920` was not used as a capability baseline.
+The original typed-force receipt was first exercised with Core at `ec2dd2438da5c0bd1b79ed58c3900e54bb7433ca` and GeoPhys `eb870f6f8812abea9022594b702df0c395d98d48`. The follow-up 2026-10-22 baseline-alignment pass is recorded below: the parent GeoPhys gitlink and clean local submodule are now at the explicitly requested fixed commit `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`. The submodule is detached; no Provider branch pointer was moved, no fetch was performed, and nothing was pushed or merged. The unpatched `9a43b92032deee90c1aef3a7f5f15216dc8e4b42` was not used as a capability baseline.
 
 The earlier [reset-force freshness receipt](C02b_R1_Reset_Force_Freshness_Acceptance.md) remains the Provider repair evidence. The current Core adapter consumes its public reset-forward sample contract. This receipt is the next Core typed-state and plan-bound integration layer; it does not rewrite the prior receipt or imply that the Provider repair has been organized on GeoPhys main.
 
@@ -36,7 +36,7 @@ GeoPhys' public `RobotArmObservationReader` sample (`RobotArmActuatorForceSample
 - Added `TypedActuatorForceStateValue` and `CanonicalStateViewV2` / `CanonicalStatePublicationV2`. A value carries Entity/Actuator, explicit unit, signed numeric value, actuator input, validity/reason, Provider generation and sample sequence, state/configuration revisions, source-closure digest, Provider materialization identity, episode/reset, evaluation boundary/clock, native step phase/index/dt/sample time.
 - Required validation rejects missing, invalid, non-finite, zero-sequence, wrong-unit, wrong-boundary, wrong episode/reset/materialization, and unsupported sample-phase values. `snapshot_v1()` remains force-free; `snapshot_v2()` reuses the existing Joint/Frame projection and asks only the existing Provider adapter for its typed raw force.
 - `actuator_force_query` was added to the capability-name vocabulary so the existing contract can express the name. It was **not** added to the shared Provider `CAPABILITIES` list or any generic Provider manifest.
-- Exact `materialize_control()` admission creates a call-specific tested manifest only for the clean GeoPhys repair revision `eb870f6f8812abea9022594b702df0c395d98d48`, GeoPhys CPU, the candidate Artifact/Scene/source bytes/timebase, the actual R1 Controller/TCP, and the exact compiled plan/binding. The known unpatched `9a43b920` identity and an altered Controller/source are rejected. MuJoCo, other profiles, backends, source bindings, actuators, GPU, and 500 Hz Guard remain unsupported by this claim.
+- Exact `materialize_control()` admission creates a call-specific tested manifest only for the clean GeoPhys revision `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`, GeoPhys CPU, the candidate Artifact/Scene/source bytes/timebase, the actual R1 Controller/TCP, and the exact compiled plan/binding. Both the prior `eb870f6f8812abea9022594b702df0c395d98d48` baseline and the unpatched `9a43b92032deee90c1aef3a7f5f15216dc8e4b42` identity are now explicitly rejected by the capability admission test; altered Controller/source are also rejected. MuJoCo, other profiles, backends, source bindings, actuators, GPU, and 500 Hz Guard remain unsupported by this claim.
 - The admitted R1 session requires the current typed value when `control_feedback()` is called. The existing `control_feedback()` remains the sole owner of the canonical mapping `closing_force_N = max(0, -signed_actuator_force)`; no alternate feedback store or sign reconstruction was added. No-plan legacy API and Position force-free behavior remain compatible.
 - The adapter obtains the native sample through the existing GeoPhys runtime boundary and public observation readback. It does not expose solver objects to Controller, Environment, or generic Recorder code. Reset-forward force is refreshed by the pinned Provider repair path after applying the final ResetSample; native execution is not advanced by publication or feedback readback.
 
@@ -50,7 +50,7 @@ The targeted suite passed **35 tests**, with one native S2 test deselected and o
 - generic GeoPhys manifest still lacks `actuator_force_query`;
 - old no-plan control admission, old R1 missing-capability rejection, C02a binding behavior, single/dual Position profile admission, and force-free Position compatibility.
 
-**Result:** typed contract and exact static admission gates passed for the one declared candidate. This does not admit a generic actuator-force capability.
+**Result:** typed contract and exact static admission gates passed for the one declared candidate under the aligned `a53a8cfe` pin (35 passed, 1 native test deselected in the S1-only invocation). This does not admit a generic actuator-force capability.
 
 ## S2: one real plan-bound GeoPhys CPU interval
 
@@ -62,22 +62,34 @@ The structured request included both arm and gripper groups for the actual write
 
 The next valid signed sample was `-0.038249071687459946 N` at actuator input `0`, phase `native_step_pre_integration`, native index 5 and native sample time `0.008 s`; its evaluation boundary was step 1 at `0.010 s`. Existing `control_feedback()` mapped it to `0.038249071687459946 N` closing force. This is the recorded force that drove the most recently completed step, not a post-integration recomputation or five-step average. Repeated publication/feedback reads left the simulation clock unchanged.
 
-**Result:** real plan-bound raw-force publication, canonical conversion and one 100 Hz control interval passed on the exact repaired GeoPhys CPU candidate. The result is tied to GeoPhys commit `eb870f6f...`, not GeoPhys main, the unpatched remote branch, MuJoCo force support, or the four-provider capability list.
+**Result:** real plan-bound raw-force publication, canonical conversion and one 100 Hz control interval passed on the exact repaired GeoPhys CPU candidate after pin alignment. The fresh probe itself recorded the exact provider revision and clean build identity `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`; this result is not inherited from the earlier `eb870f6f...` evidence and does not admit GeoPhys main, the unpatched remote branch, MuJoCo force support, or the four-provider capability list.
 
 ## Evidence and checks
 
-Ignored experiment outputs and logs are preserved under `workspace/maintenance/c02b_r1_typed_force_20261022/`:
+The original `workspace/maintenance/c02b_r1_typed_force_20261022/` evidence remains unchanged as the earlier `eb870f6f` run. The re-run outputs and logs are preserved separately under `workspace/maintenance/c02b_r1_geophys_a53a8cf_20261022/`:
 
 - `s1_pytest.log` — targeted S1 and compatibility regressions.
 - `s2_pytest.log` — native S2 result and warning.
 - `s2_probe.json` — exact candidate/provider/config identities, reset and post-step typed samples, request, target, acknowledgement, joint-state deltas, clock and canonical feedback values.
 - `skill_refresh.log` — fresh import/public-surface and Skill metadata/link validation outputs.
-- `candidate/` — generated source closure for the native probe.
+- `typed_candidate/` — first post-alignment generated source closure and `s2_probe.json`; JSON provider revision is the aligned `a53a8cfe` commit.
+- `typed_candidate_final/s2_probe.json` and `s2_candidate_final_pytest.log` — final rerun of that same candidate interval on the aligned pin.
+- `legacy_pickcube_geophys_s2.json` / `.log` — first post-alignment PickCube seed-31 legacy freshness and first-closing probe, with actual provider build identity.
+- `legacy_pickcube_geophys_s2_final.json` / `.log` — final repeated-reset/first-closing rerun on the aligned pin.
+- `geophys_snapshot_restore_pytest.log` and `geophys_robot_arm_control_runtime_smoke_final.log` — targeted GeoPhys snapshot and repeated-reset force-refresh regression at the fixed commit. An earlier path-only failed invocation is retained separately in `geophys_robot_arm_control_runtime_smoke.log`; it is not counted as a pass.
 
 The diagnostic and contracts live in `task_env/diagnostics/tasks/test_phase_ii_c02b_r1_typed_force.py`, `task_env/diagnostics/tasks/c02b_r1_force_candidate.py`, `task_env/artifacts/state.py`, and the existing `task_env/runtime/sessions/` / Controller owners. No complete repository regression, MuJoCo raw-force S2, R1 reset-repeat S2 in this slice, C05b external Solution, full Expert, NutAssembly Guard, Camera, or Qualification was run.
 
 ## Remaining C02b and C05b boundaries
 
-This receipt closes three bounded gates: (1) versioned typed raw-force publication, (2) source/Controller-bound static admission for one exact GeoPhys CPU intersection, and (3) one real plan-bound R1 interval with next-boundary publication. It does **not** complete C02b. Other required source/profile intersections, broader closed-loop behavior, full selected task execution and qualification remain open.
+This receipt closes three bounded gates: (1) versioned typed raw-force publication, (2) source/Controller-bound static admission for one exact GeoPhys CPU intersection, and (3) one real plan-bound R1 interval with next-boundary publication. The prior claim has been reverified after aligning the local Provider pin; the current capability provenance names only `a53a8cfe`, and historical `eb870f6f` evidence remains distinguishable. It does **not** complete C02b. Other required source/profile intersections, broader closed-loop behavior, full selected task execution and qualification remain open.
 
-C05b remains unstarted. It still needs its separate PickCube external Solution lifecycle and readiness/recording integration against the actual legacy consumer contract, plus the required complete bounded execution evidence. This one-interval candidate does not migrate that Solution, alter canonical-v0 storage, add a Guard, or establish a second Provider's typed-force route.
+C05b public lifecycle S1 has since been implemented and tested on the existing legacy selected PickCube route; see [C05b public lifecycle S1 receipt](C05b_Public_Lifecycle_S1_Acceptance.md). That S1 uses the existing legacy required-force consumer and canonical-v0 Recorder; it does not rebind PickCube to the new candidate's Scene/plan identity. It is not complete Expert execution or recording S2/S3 and does not alter this candidate's bounded force claim, add a Guard, or establish a second Provider's typed-force route.
+
+## Provider baseline alignment addendum (2026-10-22)
+
+The Core submodule was aligned to fixed GeoPhys commit `a53a8cfed7c9d6464274b5c96fca601271dc4ee4` without fetching floating `main`, moving a GeoPhys branch, or editing Provider files. Relative to the previous Core pin `eb870f6f8812abea9022594b702df0c395d98d48`, the target commit is not its descendant and contains a broad upstream delta (67 changed files in the compared histories). The force publication/refresh owner files used by this route—`src/control/robot_arm_observation.py`, `src/solvers/rigid/state/host_io.py`, `src/solvers/rigid/execution/solver_mixin.py`, and `src/control/robot_arm/__init__.py`—are identical between the two commits. The adjacent `src/solvers/rigid/state/snapshot.py` change clears the `body_contact_narrowphase_warning_latched` state during restore; the target adds repeated-reset coverage for the `implicitfast` path and clarifies the Panda-tendon-only N interpretation. These are the relevant delta observations, not a claim that the full upstream diff is a force-only patch.
+
+On the aligned commit, the exact admission test now accepts only the clean `a53a8cfe` revision and rejects both `eb870f6f` and the unpatched `9a43b920` revision. The plan-bound S2 was rerun on the same candidate and wrote fresh evidence under `typed_candidate/`; its manifest provenance reports `git:a53a8cfed7c9d6464274b5c96fca601271dc4ee4`, the actual R1 Controller, exact plan/source hashes, `actuator8`, signed `N`, reset-forward sample and completed native-step sample. The legacy PickCube reset probe was also rerun on the same Provider pin, seed 31, CPU, 100 Hz and five 2 ms steps. It first produced `+0.3766021729 N`, then repeated same-sample resets returned valid reset-forward samples matching the audited tendon law oracle (`4.4703e-6 N`, 0.02 N tolerance); the first closing compute used the last reset sample and did not activate force mode from the previous episode. Read-only reads left clocks and Controller memory unchanged. This legacy route remains distinct from plan-bound admission.
+
+Provider regressions at the aligned revision: GeoPhys `test_rigid_state_snapshot_restore.py` **7 passed**; the corrected `robot_arm_control_runtime_smoke.py` invocation passed, including the repeated-reset/implicitfast force refresh path. The first smoke attempt used an incomplete `PYTHONPATH` and failed to import its test helper; it is preserved but excluded from the pass claim. No broad Provider suite, Core full Expert, MuJoCo typed-force, or NutAssembly Guard was run.

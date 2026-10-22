@@ -5,8 +5,8 @@
 运行方式：分别运行 --provider geophys 与 --provider mujoco，写入独立 ignored JSON 文件。
 
 Run once per provider in a fresh process. This exercises the existing selected
-PickCube source and R1 Controller route; it does not admit the structured
-plan-bound raw-force requirement or qualify C02b.
+PickCube source and legacy R1 Controller route; it does not exercise the
+separate Scene-v3 plan-bound candidate admission or qualify complete C02b.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 from task_env.tasks import PickCubeReferenceEnv
+from task_env.runtime.sessions.provenance import provider_build_identity
 
 
 def _jsonable(value):
@@ -281,6 +282,7 @@ def run_geophys(env):
     return {
         "result": "PASS",
         "provider": "geophys",
+        "provider_build": provider_build_identity("geophys"),
         "backend": "cpu",
         "native_execution_backend": "Taichi CPU x64",
         "task_id": env.artifact.task_id,
@@ -322,8 +324,9 @@ def run_geophys(env):
             "last native step completed at each outer boundary."
         ),
         "admission_note": (
-            "This is the existing selected PickCube production-r1 route. It does not satisfy or "
-            "alter plan-bound structured raw-force admission, which remains blocked."
+            "This is the existing selected PickCube production-r1 legacy route. It does not exercise "
+            "the separate new-candidate plan-bound admission. The legacy PickCube Artifact/source "
+            "is not rebound to that candidate's Scene/ControlBindingPlan identities."
         ),
     }
 

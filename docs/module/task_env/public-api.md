@@ -33,6 +33,24 @@ UID 与序列化 Artifact ID 不同；精确 Artifact/config hashes 只引用发
 horizon 产生 truncation；selected expert 的 stop/completion policy 必须单独读取。
 Selected reference 同一 episode 不可混用 expert 和 external action；NutAssembly external action 明确拒绝。
 
+PickCube selected `production-r1` 另有一个有界 C05b public Solution S1 调用序列：
+`from task_env.tasks.pick_cube import build_readiness_solution` 构造 task-owned Solution，
+`env.reset_for_solution(solution, seed=31)` 在现有 Artifact/source/controller/readiness identity 下 reset 并初始化该实例，
+然后每个控制区间调用 `env.step_with_solution(solution)`。外部 caller 保留 Solution 对象作为唯一 stage-state owner；不读取
+`env.value`、`env.solution`，也不调用私有 `_execution_info()`。reset/step 的 `info` 无条件包含
+`expert_execution_info_v1`、`control_readiness_v1` 与 `expert_execution_boundary_v1`；边界身份注明 Core episode ID、
+Artifact、legacy source ID/XML hash、实际 Controller/Solution、ResetSample 与 control step/time。reset 没有
+`control_application_v1`。完成真实 step 后，step info 才发布带 requested/canonical action、真实 target 与 applied ack、
+request/evaluation boundary、target/applied hash 的 `control_application_v1`。
+
+`step_with_solution()` 会先校验当前公开 readiness/boundary，再调用 Solution `act()`、复用现有 Controller/RuntimeSession，
+在 Recorder append 前调用 `Solution.observe()`。observer 或 Recorder 异常使用现有 C03a execution-fault latch；该区间不允许
+续步，fault receipt 描述已发生的物理进度，不承诺 Provider/Controller 回滚。S1 对比 internal `step_expert()`，并覆盖缺失/过期
+readiness、错误边界、observer 与 append 失败。此调用面仍使用冻结 PickCube legacy Artifact、`task-env-pick-cube` source、
+`panda-v1/ee` TCP、required R1 feedback 和 canonical-trajectory-v0；不会借用新 Scene-v3 A05 candidate/plan identity，
+不修改旧 Stop 拒绝、Task success/Expert completion 区分或历史录制语义。它只关闭 C05b public lifecycle S1；完整 Expert 的
+真实 GeoPhys/MuJoCo S2、canonical-v0 真实保存回读 S3、NutAssembly Guard、C02b 与 Qualification 均未由此完成。
+
 通用 `BaseTaskEnv` 的 `metadata["observation_schema"]` 公布 observation 每个 leaf 的路径、shape、dtype、
 unit、frame、采样边界和 requiredness；`state` 是 public observation，`privileged_state` 是 task-defined
 privileged/evaluation data。`private_state` 保留既有独立语义与路径（例如
@@ -95,7 +113,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
-| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound GeoPhys CPU R1 typed-force admission。后者严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、GeoPhys revision `eb870f6f...` 与 `actuator8`；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 目前只在上述精确 route 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
+| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound GeoPhys CPU R1 typed-force admission。后者严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、GeoPhys revision `a53a8cfe...` 与 `actuator8`；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 目前只在上述精确 route 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
 | `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 已对单 Panda Position/Scene-v3 scalar-joint source → GeoPhys CPU × MuJoCo native OpenGL 验证 default/override、双相机 materialization/sync/capture/close S1/S2。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. This exact pairing is TESTED_BOUNDED only; other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification are unsupported or unverified |
@@ -132,12 +150,12 @@ Runtime materialization when `actuator_force_query` is unavailable. See the
 legacy route has a bounded GeoPhys reset-forward freshness receipt. Separately,
 a new Scene-v3 candidate has a passing `CanonicalStateViewV2` raw-force
 publication and exact plan-bound `actuator_force_query` admission on GeoPhys CPU
-revision `eb870f6f...`, followed by one real 100 Hz R1 interval. Raw signed force
-is preserved, and existing `control_feedback()` remains the only canonical
-closing-force projection. This claim does not transfer to the old selected
-PickCube Artifact/source, MuJoCo typed force, other transmissions, or generic
-Provider manifests. C02b remains blocked on the other required intersections
-and complete execution; C05b has not started. See the [freshness receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md)
+revision `a53a8cfe...`, followed by a fresh real 100 Hz R1 interval on that exact
+Provider pin. Raw signed force is preserved, and existing `control_feedback()`
+remains the only canonical closing-force projection. This claim does not transfer
+to the old selected PickCube Artifact/source, MuJoCo typed force, other
+transmissions, or generic Provider manifests. C02b remains blocked on the other
+required intersections and complete execution. See the [freshness receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md)
 and [typed-force receipt](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md).
 
 **C02c bounded Position instance switch (2026-10-22):** the explicit

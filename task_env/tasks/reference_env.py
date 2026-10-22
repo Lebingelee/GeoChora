@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import hashlib
 import json
+import math
 from types import SimpleNamespace
 from typing import Callable
 from uuid import uuid4
@@ -59,6 +60,8 @@ class ReferenceTaskBinding:
     capture_guard_samples: bool = False
     record_native_substeps: bool = False
     abort_solution_on_runtime_error: bool = False
+    build_external: Callable | None = None
+    validate_external_solution: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -67,6 +70,8 @@ class ReferenceTaskBinding:
             raise ValueError("unknown selected recording requirement")
         if not self.object_poses:
             raise ValueError("selected task binding requires an observation pose")
+        if (self.build_external is None) != (self.validate_external_solution is None):
+            raise ValueError('external Solution construction and validation must be supplied together')
 
 
 class SelectedReferenceEnv(TaskEnvironmentComponent):
@@ -182,6 +187,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.observation_space = Dict({'state': Dict(state_spaces),
             'privileged_state': Dict({k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32) for k in keys})})
         self.session = None
+        self._external_solution_owner = None
         self._closed = False
         self._episode_mode = None
         self._stopped = True
@@ -262,6 +268,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         )
 
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
+        return self._reset(seed=seed, options=options)
+
+    def reset_for_solution(self, solution, *, seed=_RESET_SEED_UNSET, options=None):
+        """Reset this selected route for one caller-owned Solution instance.
+
+        The task binding validates that the supplied mutable Solution matches
+        the actual current Artifact/source/readiness configuration before the
+        existing RuntimeSession is reconstructed.
+        """
+        if self.binding.build_external is None or self.binding.validate_external_solution is None:
+            raise StageUnavailableError('this selected task has no external Solution lifecycle')
+        if self._closed:
+            raise RuntimeError('environment is closed')
+        self.binding.validate_external_solution(self.value, solution)
+        return self._reset(seed=seed, options=options, external_solution=solution)
+
+    def _reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         if self._closed:
             raise RuntimeError('environment is closed')
         if options:
@@ -303,13 +326,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 previous_session.close()
             phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
-            self.value = self.binding.build(self.provider)
+            self.value = (self.binding.build_external(self.provider)
+                          if external_solution is not None else self.binding.build(self.provider))
             if self.value['artifact'] != self.artifact:
                 raise ValueError('selected Artifact changed between construction and reset')
+            if external_solution is not None:
+                self.binding.validate_external_solution(self.value, external_solution)
             phase = 'reset_seed'
             if not getattr(self, 'position_profile', False):
                 seed = self.binding.reset_seed(seed)
-            self.solution = self.value['solution']
+            self.solution = self.value.get('solution')
+            self._external_solution_owner = external_solution
             self._bind_selected_controller(self.value)
             self.dual_entity_position = len(self.position_profiles) == 2
             phase = 'reset_sample'
@@ -320,6 +347,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.sample = reset_plan.reset_sample
             else:
                 self.sample = self.binding.reset_sample(self.artifact, seed)
+                self._selected_episode_id = uuid4().hex
             self.execution = ExecutionSpec(self.provider, PROFILE, 'none', 'cpu', 0, 'strict')
             phase = 'session_materialization'
             if self.position_profile:
@@ -384,6 +412,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.controller.reset(self.state, self.feedback)
             phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
+            if not self.position_profile:
+                self._publish_execution_info(self.info)
             self._last_position_terminated = False
             self._last_position_truncated = False
             self._last_position_request = None
@@ -394,9 +424,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
             if self.state.control_step != 0 or self.state.simulation_time != 0:
                 raise ValueError('reference reset must not advance physics')
-            if self.solution is not None:
+            reset_solution = external_solution if external_solution is not None else self.solution
+            if reset_solution is not None:
                 phase = 'solution_reset'
-                self.solution.reset(self.obs, self.info, self.metadata,
+                reset_solution.reset(self.obs, self.info, self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
             phase = 'arm_schedule_reset'
             self.arm_schedule = (self.binding.schedule_factory(self)
@@ -410,8 +441,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_evaluation = self.evaluation
             self.recorder = None
             self._execution_fault = None
+            if external_solution is not None:
+                # The caller's instance is the only active mutable Solution
+                # owner for this episode; the task value has no active copy.
+                self.solution = None
             return self.obs, self.info
         except BaseException as error:
+            self._external_solution_owner = None
             failed_session, self.session = self.session, None
             if failed_session is not None:
                 try:
@@ -423,9 +459,124 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._latch_fault(phase, error)
             raise
 
+    def expert_execution_info(self):
+        """Return the required, validated R1 readiness at the current boundary."""
+        if (getattr(self, 'state', None) is None or getattr(self, 'feedback', None) is None
+                or getattr(self, 'position_profile', False)):
+            raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
+        result = ExpertExecutionInfo(
+            'expert-execution-info-v1', self.state.control_step,
+            self.state.simulation_time, self.controller.readiness(self.state, self.feedback),
+        )
+        result.validate()
+        return result
+
+    # Kept for existing in-module callers while public callers use the named
+    # expert_execution_info() contract.
     def _execution_info(self):
-        return ExpertExecutionInfo('expert-execution-info-v1', self.state.control_step,
-            self.state.simulation_time, self.controller.readiness(self.state, self.feedback))
+        return self.expert_execution_info()
+
+    def _execution_boundary(self, execution_info=None):
+        execution_info = self.expert_execution_info() if execution_info is None else execution_info
+        source = self.value['source']
+        source_id = source.scene_source.source_id
+        source_xml_sha256 = hashlib.sha256(source.scene_source.xml.encode()).hexdigest()
+        values = {
+            'schema_version': 'selected-expert-boundary-v1',
+            'episode_id': self._selected_episode_id,
+            'task_artifact_hash': self.artifact.identity_hash,
+            'source_id': source_id,
+            'source_xml_sha256': source_xml_sha256,
+            'source_closure_digest': source.source_closure_digest,
+            'controller_identity': self.controller.identity,
+            'solution_identity': self._active_solution_identity(),
+            'reset_sample_id': self.sample.sample_id,
+            'control_step': execution_info.control_step,
+            'simulation_time_s': execution_info.simulation_time,
+        }
+        values['identity_hash'] = digest(values)
+        return values
+
+    def _publish_execution_info(self, info):
+        execution_info = self.expert_execution_info()
+        info['expert_execution_info_v1'] = execution_info.to_mapping()
+        info['control_readiness_v1'] = execution_info.control_readiness.to_mapping()
+        info['expert_execution_boundary_v1'] = self._execution_boundary(execution_info)
+
+    def _publish_control_application(self, info, request, canonical, target, applied,
+                                     request_boundary):
+        if target.identity_hash != applied.target_hash:
+            raise ValueError('applied acknowledgement does not match the computed target')
+        if target.task_artifact_hash != self.artifact.identity_hash:
+            raise ValueError('applied target belongs to another TaskArtifact')
+        if target.controller_identity != self.controller.identity:
+            raise ValueError('applied target belongs to another Controller')
+        if applied.provider_name != self.provider:
+            raise ValueError('applied acknowledgement belongs to another Provider')
+        current_info = ExpertExecutionInfo.from_mapping(info['expert_execution_info_v1'])
+        evaluation_boundary = self._execution_boundary(current_info)
+        if request_boundary is None:
+            raise ValueError('control application acknowledgement requires its source boundary')
+        receipt = {
+            'schema_version': 'selected-control-application-v1',
+            'task_artifact_hash': self.artifact.identity_hash,
+            'source_id': self.value['source'].scene_source.source_id,
+            'controller_identity': self.controller.identity,
+            'reset_sample_id': self.sample.sample_id,
+            'request_boundary': dict(request_boundary),
+            'evaluation_boundary': evaluation_boundary,
+            'requested_action': request.to_mapping(),
+            'canonical_action': canonical.to_mapping(),
+            'target': target.to_mapping(),
+            'target_identity_hash': target.identity_hash,
+            'applied': applied.to_mapping(),
+            'applied_target_hash': applied.target_hash,
+        }
+        if (receipt['request_boundary']['control_step'] + 1 != current_info.control_step
+                or receipt['evaluation_boundary']['control_step'] != current_info.control_step):
+            raise ValueError('control acknowledgement does not span exactly one completed boundary')
+        expected_dt = self.artifact.timebase.control_dt
+        actual_dt = (receipt['evaluation_boundary']['simulation_time_s']
+                     - receipt['request_boundary']['simulation_time_s'])
+        tolerance = max(
+            math.ulp(receipt['evaluation_boundary']['simulation_time_s']),
+            math.ulp(receipt['request_boundary']['simulation_time_s']),
+            math.ulp(expected_dt),
+        )
+        if abs(actual_dt - expected_dt) > tolerance:
+            raise ValueError('control acknowledgement does not match the selected control timebase')
+        info['control_application_v1'] = receipt
+
+    def _require_published_execution_info(self):
+        mapping = self.info.get('expert_execution_info_v1')
+        if not isinstance(mapping, dict):
+            raise ValueError('public expert execution readiness is missing')
+        execution_info = ExpertExecutionInfo.from_mapping(mapping)
+        execution_info.validate()
+        current = self.expert_execution_info()
+        if execution_info != current:
+            raise ValueError('public expert execution readiness is stale or belongs to another boundary')
+        readiness = self.info.get('control_readiness_v1')
+        if readiness != execution_info.control_readiness.to_mapping():
+            raise ValueError('public control readiness is missing or inconsistent')
+        boundary = self.info.get('expert_execution_boundary_v1')
+        if boundary != self._execution_boundary(current):
+            raise ValueError('public expert execution boundary identity is stale or mismatched')
+        return execution_info
+
+    def _active_solution_identity(self):
+        owner = self._external_solution_owner if self._external_solution_owner is not None else self.solution
+        identity = getattr(owner, 'identity', None)
+        if not isinstance(identity, str):
+            identity = self.value.get('solution_identity')
+        if not isinstance(identity, str):
+            raise RuntimeError('selected task has no solution identity for recording')
+        return identity
+
+    def _validate_external_solution(self, solution):
+        if self.binding.validate_external_solution is None:
+            raise StageUnavailableError('this selected task has no external Solution lifecycle')
+        self.binding.validate_external_solution(self.value, solution)
 
     def observation(self, state):
         if getattr(self, 'position_profile', False):
@@ -502,8 +653,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             )
         if not self.binding.external_actions:
             raise RuntimeError(self.binding.external_action_error)
-        if self._episode_mode == 'expert':
-            raise RuntimeError('cannot mix external actions with selected expert execution')
+        if self._episode_mode in {'expert', 'external_solution'}:
+            raise RuntimeError('cannot mix external actions with selected Solution execution')
         from ..controllers.canonical.contracts import StructuredActionRequestV1
         if getattr(self, 'position_profile', False):
             if self._stopped or self.session is None:
@@ -522,6 +673,53 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise TypeError('structured ControllerGroup actions require PositionServoV1')
         self._episode_mode = 'external'
         return self._step(action)
+
+    def step_with_solution(self, solution):
+        """Run one caller-owned Solution action through the selected lifecycle.
+
+        The public readiness payload is checked before calling ``act``. The
+        same Solution instance receives post-step ``observe`` before any
+        canonical Recorder append. The instance remains the sole owner of its
+        mutable stage state.
+        """
+        if self._closed:
+            raise RuntimeError('environment is closed')
+        if self._execution_fault is not None:
+            fault = self._execution_fault
+            raise RuntimeError(
+                'selected execution is faulted; reset() is required '
+                f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
+            )
+        if self._external_solution_owner is None or solution is not self._external_solution_owner:
+            raise ValueError('step_with_solution requires the instance accepted by reset_for_solution')
+        self._validate_external_solution(solution)
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or episode already stopped')
+        if self._episode_mode in {'expert', 'external'}:
+            raise RuntimeError('cannot mix external Solution and other selected execution modes')
+        try:
+            self._require_published_execution_info()
+        except BaseException as error:
+            self._latch_fault('public_execution_readiness', error, before_state=self.state)
+            raise
+        if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
+            raise RuntimeError('external Solution already stopped')
+        try:
+            proposal = solution.act(self.obs, self.info)
+            from ..planners.contracts import ExpertAction
+            if not isinstance(proposal, ExpertAction):
+                raise TypeError('external Solution act() must return ExpertAction')
+        except BaseException as error:
+            self._latch_fault('external_solution_proposal', error, before_state=self.state)
+            if self.binding.abort_solution_on_runtime_error:
+                try:
+                    solution.abort('runtime_error')
+                except BaseException as abort_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'external Solution abort after proposal failure also failed: {abort_error!r}')
+            raise
+        return self._step(proposal.action, proposal=proposal, observer_solution=solution)
 
     def switch_position_controller(self, candidate):
         """Replace the single Panda Position instance at the current real boundary.
@@ -824,13 +1022,19 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'selected execution is faulted; reset() is required '
                 f"(phase={fault.phase}, physical_progress={fault.physical_progress})"
             )
-        if self._stopped or self._episode_mode == 'external':
+        if self._stopped or self._episode_mode in {'external', 'external_solution'}:
             raise RuntimeError('reset required; external and expert execution cannot be mixed')
         if self.solution is None or getattr(self, 'position_profile', False):
             raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
         self._episode_mode = 'expert'
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')
+        if hasattr(self.solution, 'readiness_config'):
+            try:
+                self._require_published_execution_info()
+            except BaseException as error:
+                self._latch_fault('public_execution_readiness', error, before_state=self.state)
+                raise
         try:
             proposal = self.solution.act()
         except BaseException as error:
@@ -843,9 +1047,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     if callable(add_note):
                         add_note(f'expert abort after proposal failure also failed: {abort_error!r}')
             raise
-        return self._step(proposal.action, proposal=proposal)
+        return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)
 
-    def _step(self, action, *, proposal=None):
+    def _step(self, action, *, proposal=None, observer_solution=None):
         if self._execution_fault is not None:
             fault = self._execution_fault
             raise RuntimeError(
@@ -863,7 +1067,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self._latch_fault('expert_action_validation', error, before_state=self.state)
             raise
         request = RequestedAction('absolute_pose', 'world', 'quaternion_wxyz', tuple(map(float, vector)))
-        requested_mode = 'expert' if proposal is not None else 'external'
+        if proposal is not None and observer_solution is None:
+            observer_solution = self.solution
+        requested_mode = (
+            'external_solution' if proposal is not None and observer_solution is self._external_solution_owner
+            else 'expert' if proposal is not None else 'external'
+        )
         if self._episode_mode is not None and self._episode_mode != requested_mode:
             raise RuntimeError('cannot mix external actions with selected expert execution')
         self._episode_mode = requested_mode
@@ -878,6 +1087,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         interval_completed = False
         record_append_attempted = False
         try:
+            request_boundary = (
+                self._execution_boundary(self.expert_execution_info())
+                if not self.position_profile else None
+            )
             if self.recorder is not None and self.binding.recorder_mode == 'execution':
                 self.recorder.begin(self.state.control_step, self.artifact.timebase.physics_dt,
                                     self.artifact.timebase.control_substeps)
@@ -890,7 +1103,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self.recorder.applied_substep(index, state, feedback, effective, applied, diag)
                 if proposal is not None and stage == 'close_gripper' and self.binding.capture_guard_samples:
                     _, info, _ = self.observation(state)
-                    guard_samples.append(self.solution.make_native_guard_sample(state, info, diag))
+                    guard_samples.append(observer_solution.make_native_guard_sample(state, info, diag))
             if self.binding.interval_mode == 'native':
                 phase = 'physics_step'
                 interval_attempted = True
@@ -910,18 +1123,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.feedback = self.session.control_feedback(self.state)
             phase = 'observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
+            if not self.position_profile:
+                self._publish_execution_info(self.info)
+                if canonical is not None and target is not None and applied is not None:
+                    self._publish_control_application(
+                        self.info, request, canonical, target, applied, request_boundary,
+                    )
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
             if proposal is not None:
                 phase = 'solution_observation'
                 extra = self.binding.observe_expert_kwargs(self, guard_samples)
-                self.solution.observe(self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra)
-                if hasattr(self.solution, 'outcome_report'):
-                    self.info.update(self.solution.outcome_report())
-                self.info.update(selected_policy_execution_complete=bool(self.solution.done),
-                                 selected_policy_execution_failed=bool(self.solution.failed),
-                                 expert_failure_reason=self.solution.failure_reason)
-                self._stopped = self.solution.done or self.solution.failed
+                observer_solution.observe(
+                    self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra,
+                )
+                if hasattr(observer_solution, 'outcome_report'):
+                    self.info.update(observer_solution.outcome_report())
+                self.info.update(
+                    selected_policy_execution_complete=bool(observer_solution.done),
+                    selected_policy_execution_failed=bool(observer_solution.failed),
+                    expert_failure_reason=observer_solution.failure_reason,
+                )
+                self._stopped = observer_solution.done or observer_solution.failed
             self._stopped = bool(self._stopped or terminated or truncated)
             if self.recorder is not None:
                 phase = 'record_interval'
@@ -966,9 +1189,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 transition_status=transition_status,
                 readback_error=readback_error,
             )
-            if self.binding.abort_solution_on_runtime_error:
+            failed_solution = observer_solution if observer_solution is not None else self.solution
+            if self.binding.abort_solution_on_runtime_error and failed_solution is not None:
                 try:
-                    self.solution.abort('runtime_error')
+                    failed_solution.abort('runtime_error')
                 except BaseException as abort_error:
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
@@ -1191,7 +1415,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                   'task_outcome': self.info}
         result = {'control_step': self.state.control_step, 'simulation_time': self.state.simulation_time,
             'artifact_hash': self.artifact.identity_hash, 'controller_identity': self.controller.identity,
-            'solution_identity': self.solution.identity, 'provider': self.provider,
+            'solution_identity': self._active_solution_identity(), 'provider': self.provider,
             'owners': {'coordinator': {'version': 'selected-reference-observation-v1',
                 'source_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 'fields': {k: {'present': True, 'value': v} for k, v in fields.items()}}}}
@@ -1240,16 +1464,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'geochora_revision': str(self.value['source_revision']),
                 'artifact_identity': self.artifact.identity_hash,
                 'controller_identity': self.controller.identity,
-                'solution_identity': self.solution.identity,
+                'solution_identity': self._active_solution_identity(),
             })
             source_provenance.update({f"source_sha256:{name}": value
                 for name, value in self.value.get('source_sha256', {}).items()})
+        solution_identity = self._active_solution_identity()
         metadata = EpisodeMetadata('canonical-trajectory-metadata-v0', self.artifact.identity_hash,
             self.sample, self.realized, self.execution,
             {'build': str(provider_build_identity(self.provider))},
             source_provenance,
-            self.artifact.timebase, self.controller.identity, self.solution.identity,
-            digest({'readiness': self.solution.identity}), digest(METADATA), self.sample.task_seed, 'regression')
+            self.artifact.timebase, self.controller.identity, solution_identity,
+            digest({'readiness': solution_identity}), digest(METADATA), self.sample.task_seed, 'regression')
         owners = self._owners()
         recipe = {'factory': type(self).__module__ + '.' + type(self).__name__,
             'artifact': self.artifact.to_mapping(), 'resolved_configuration': config,

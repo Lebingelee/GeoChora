@@ -371,13 +371,13 @@ GeoPhys/MuJoCo CPU 两个独立进程用相同 hash-bound candidate/sample 完�
 
 **完成边界**：C02b-P/E 不增加正式切片数。单/双 Entity position-profile S2 只关闭各自的声明交集；P00/P99 的最小双 Entity position-only 独立施控子项已有真实 D01/C02 Evidence，但不代表任意多 Entity/writer、其他 Provider 或 Assembly 支持，也不能将完整 C02b 标为完成。
 未覆盖必需交集时明确 partial，P99 不得标 complete。C05b/C05c 的旧 Solution/readiness/Native Guard 保真另验；
-其他需要 force 的 consumer 仍受其各自的 freshness、source binding 和 admission gate 约束；本次 exact claim 只覆盖 GeoPhys `eb870f6f...`、CPU、指定 Panda source/Controller/plan 和一个真实 R1 区间。
+其他需要 force 的 consumer 仍受其各自的 freshness、source binding 和 admission gate 约束；当前重新验证的 exact claim 只覆盖 GeoPhys `a53a8cfe...`、CPU、指定 Panda source/Controller/plan 和一个真实 R1 区间。
 
 #### C02b-R1 typed raw-force publication and exact admission（2026-10-22）
 
-新增 `CanonicalStateViewV2` / `CanonicalStatePublicationV2`，以原 state/publication owner 发布 signed raw force 与 source closure、Provider materialization、episode/reset、evaluation boundary、native sample phase/time、validity 和 unit。v0/v1 mapping/hash 与 `snapshot_v1()` 行为保持；没有把能力加入共享 Provider manifest 列表。`materialize_control()` 只对新 Panda R1 candidate 的 GeoPhys CPU 修复 revision、实际 `ProductionCanonicalPandaController` / hand-origin TCP、精确 Artifact/Scene/source closure 与 compiled `ControlBindingPlanV1` 生成受限 `actuator_force_query` admission。单一 100 Hz / 5×2 ms plan-bound interval 已真实完成 reset→typed sample→R1 compute/apply→step→typed sample，收据见 [C02b-R1 typed-force admission](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。
+新增 `CanonicalStateViewV2` / `CanonicalStatePublicationV2`，以原 state/publication owner 发布 signed raw force 与 source closure、Provider materialization、episode/reset、evaluation boundary、native sample phase/time、validity 和 unit。v0/v1 mapping/hash 与 `snapshot_v1()` 行为保持；没有把能力加入共享 Provider manifest 列表。`materialize_control()` 只对新 Panda R1 candidate 的 GeoPhys CPU 修复 revision、实际 `ProductionCanonicalPandaController` / hand-origin TCP、精确 Artifact/Scene/source closure 与 compiled `ControlBindingPlanV1` 生成受限 `actuator_force_query` admission。单一 100 Hz / 5×2 ms plan-bound interval 已在 GeoPhys `a53a8cfe` 下重新完成 reset→typed sample→R1 compute/apply→step→typed sample，收据见 [C02b-R1 typed-force admission](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。
 
-这是一个 source-bound candidate 的 publication、静态 admission 和一次真实执行证据；不转移到旧 selected PickCube Artifact/source，不代表 MuJoCo typed force、其他 actuator transmission、GPU、NutAssembly Guard 或 full Expert。C02b 继续 BLOCKED，C05b 保持未启动；下一受限 goal 可先实施既有 owner 内的 public lifecycle S1，不等待 MuJoCo typed-force。进入完整 PickCube S2/S3 前须明确沿用 legacy 入口并补齐实际 consumer 合同，还是建立 truthful plan/source identity；不能借用本 candidate 身份或强制改写冻结 Artifact。
+这是一个 source-bound candidate 的 publication、静态 admission 和一次真实执行证据；不转移到旧 selected PickCube Artifact/source，不代表 MuJoCo typed force、其他 actuator transmission、GPU、NutAssembly Guard 或 full Expert。C02b 继续 BLOCKED。之后完成的 C05b public lifecycle S1 使用 legacy selected PickCube R1 route，不借用此 candidate 身份；完整执行前的 legacy/plan-bound 路线选择与 S2/S3 门槛见下方新收据。不能借用本 candidate 身份或强制改写冻结 Artifact。
 
 **C02c 契约**：同外部 action schema/frame/unit/timebase/actuator ownership 的实例切换只在最后一个完整、
 非 terminal 的公开控制边界生效。切换前验证现有 Profile 类型、构造 identity/config、required state、source closure、
@@ -553,9 +553,9 @@ deselected**；两项 deselected runner 依赖已退休的 `task_env.tasks.nut_a
 `validate_trajectory()` transcode 仍只接受 v2，已对 v3 给出明确拒绝；selected reference replay 也不把 canonical
 outer v1 当 replay 输入。
 
-#### C05a3 PickCube R1 consumer audit 与定向补证（2026-10-22）
+#### C05a3 PickCube R1 consumer audit 与定向补证（审计基线：2026-10-21/22）
 
-本节只补 C05b 实际依赖的 storage 证据，并审计 PickCube consumer；不启动 C05b 生产实现。
+本节记录 C05b 实施前的 storage 补证与 PickCube consumer 审计；其当时的未启动状态由下方 S1 收据更新。
 
 **实际 PickCube 路线。** `pick-cube-p16-reference-v1` 由 `task_env/tasks/pick_cube/task.py` 的 `build_artifact()`、
 `build_runtime_source()`、`build_reference()` 和 `make_reference_binding()` 构造。Artifact 为
@@ -626,7 +626,7 @@ warning）。被 deselect 的两个历史 runner 仍导入已退役 `task_env.ta
 现有 PickCube 真实 GeoPhys CPU/MuJoCo CPU 一步 reset→step smoke 对相同 Artifact/Controller/Solution identity 与 10 ms
 clock 返回正常，但没有运行完整 Expert、触发测量力 readiness、真实 recording/readback，因此只作有界 construction/step 证据。
 
-**后续实施切片。** C05b S1 需扩展 Task factory/SelectedReferenceEnv 既有 public lifecycle：发布必需 typed readiness 与实际 target/applied
+**审计时提出的实施切片（已由下方 S1 收据部分关闭）。** C05b S1 需扩展 Task factory/SelectedReferenceEnv 既有 public lifecycle：发布必需 typed readiness 与实际 target/applied
 ack，诊断关闭时保持不变；给 external Solution 在 Recorder append 前的 observe 一个受控挂接点，验证旧 internal 与 external drive
 的 stage/task/expert/clock/transition fault 语义相同。S1 另测缺失/过期 readiness、observer exception、record append exception，
 全部不得续步或伪造 transition。plan-bound R1 S2/S3 仍须先完成 typed raw-force publication/manifest admission，然后分进程跑 GeoPhys CPU 与 MuJoCo CPU
@@ -637,9 +637,22 @@ clock/request/target/applied/state boundary；faulted/pending recording 必须�
 本轮没有确认 C05a storage production defect；没有改 frozen Artifact 或父仓库 Provider pin。C05a3 在 C05b 实际格式范围的
 补证完成。C02b-R1 后续关闭了旧记录的 GeoPhys reset freshness 前置，新 Scene-v3 candidate 又有 typed publication、
 精确 admission 与一个真实 interval 的有界证据，见 [typed-force 收据](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。
-C05b 本身仍未启动；下一受限 goal 可先补 public lifecycle S1，不以 MuJoCo typed-force 或完整 C02b 为公共接线前置。
-实际 PickCube S2/S3 仍需选择并验证对应 consumer 的 source/feedback/admission 路线；旧 legacy smoke 和新 candidate
+C05b 本身在此审计时仍未启动；实际 PickCube S2/S3 仍需选择并验证对应 consumer 的 source/feedback/admission 路线；旧 legacy smoke 和新 candidate
 interval 都不能算作 external Solution 或完整 recording 验收。
+
+#### C05b public lifecycle S1 acceptance（2026-10-22）
+
+**范围与路线选择。** Provider 基线先对齐到 GeoPhys `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`，重跑精确 typed-force/admission S1、同一 Scene-v3 candidate 的一个真实 CPU 控制区间，以及 PickCube legacy seed-31 reset freshness/first-closing Probe；新基线 Evidence 见 [typed-force receipt](C02b_R1_Typed_Raw_Force_Admission_Acceptance.md)。C05b public S1 随后明确走旧 `pick-cube-p16-reference-v1` legacy source/Artifact/R1 contract，保留 `task-env-pick-cube` source、旧 `panda-v1/ee` TCP、required `actuator8` feedback 与 canonical-trajectory-v0 Recorder。没有把新的 `panda-main` Scene-v3/ControlBindingPlan identity 移植给冻结 PickCube source，也没有迁移 C02b typed-force admission 到该 source；full execution 之前不伪造两条路线已经统一。
+
+**实现 owner 与调用顺序。** Task-owned `build_readiness_solution()` 复用当前 `PickCubeReadinessConfig.from_source()` 和 `PickCubeReadinessSolution`。`ReferenceTaskBinding` 的现有 builder 增加成对配置的 external build/identity validation callbacks；`SelectedReferenceEnv.reset_for_solution(solution, seed=...)` 在重建 session 前、后验证 exact task Solution identity，调用既有 reset lifecycle 并由 Environment 注入 public typed `ExpertExecutionInfo`。external episode 中 Env 不设置活动 `self.solution`，唯一可变阶段/预算/wait/counter/completion state 由 caller 持有的 Solution instance 拥有；`step_with_solution(solution)` 只接受 reset 注册的同一实例，要求 step 当前 info readiness 与 boundary identity 新鲜，再调用该实例 `act()`。
+
+Reset 和每个 R1 evaluation boundary 的 info 无条件发布 `expert_execution_info_v1`、`control_readiness_v1` 与 `expert_execution_boundary_v1`。该 public boundary 使用独立 Core `episode_id`，并绑定 Artifact hash、真实 legacy source ID/XML SHA/source closure（无 Scene-v3 closure 时保留 null）、实际 R1 Controller identity、Solution identity、ResetSample ID、control step 与 simulation time；它不是 `StateBoundaryIdentity` 或 plan identity。reset 时没有施控，因此不发布 applied acknowledgement。完整单区间施控后 `control_application_v1` 才包含 request/evaluation boundary、requested/canonical action、实际 target/applied values 和 hash，并校验实际 Provider、Artifact、Controller、step delta 与 timebase。readiness/ack 不受 diagnostics 选项控制；当前 selected PickCube config 本身没有 diagnostics 开关。
+
+`step_with_solution()` 在同一 `_step()` lifecycle 内完成 `act → compute/apply/step → fresh feedback/observation → observe → Recorder append`。Observer 或 Recorder append 抛错时进入 C03a execution fault latch；已有物理进度只由故障 receipt 描述，不声称物理回滚。故障后再次调用先拒绝，不额外 compute/apply/推进，也不留下 transition。reset readiness 缺失、过期或 boundary identity 错配在调用 Solution `act()` 前锁存并拒绝；foreign Solution identity 在 Runtime reset/materialization 前拒绝。selected legacy `stop()` 仍拒绝，外部步骤不会改变 Gymnasium flags、task success 与 Expert completion 区分或 canonical-v0 字段。
+
+**S1 证据。** `test_selected_consumers.py` 新增 normal internal/external 同配置对照、重复 reset episode identity、reset 无 applied ack、外部 Solution 唯一 state owner、缺失/过期 readiness、错误 boundary/source、foreign Solution identity、observer failure、Recorder append failure 和 observe-before-append 检查；使用测试专用 `FakeSession`，因此只验证 Core 控制/lifecycle 合同，不冒称物理 S2。实际 GeoPhys a53 seed-31 freshness 与 candidate interval 的 native 证据分属前述 Provider receipt。此次定向回归、命令及原始输出见 [C05b S1 receipt](C05b_Public_Lifecycle_S1_Acceptance.md)。旧 internal `step_expert()` 与 external `step_with_solution()` 在同 sample/state/action/target/applied/Task flags/一次 10 ms boundary 与 canonical T/T+1 上相符。
+
+**仍开放的边界。** 本轮只关闭 public readiness/application receipt 和受控 external Solution reset/observe/Recorder pre-append S1。完整 Expert 真实闭环、contact/readiness 阶段验证、GeoPhys/MuJoCo 分进程 S2、canonical-v0 磁盘真写读 S3 与 faulted-recording 的完成收据尚未运行。真实执行前采用的路线目前仍是现有 legacy PickCube entry；其 typed-force plan admission 没有通过，也没有借新 candidate identity 补造合同。C02b、NutAssembly 500 Hz Guard、C05c、Assembly、full Expert 和 Qualification 仍未完成。
 
 #### C03a bounded scalar lifecycle and fault receipt（2026-10-21）
 
