@@ -1,4 +1,11 @@
-"""D01a: bounded SceneDefinition-v3 to GeoPhys materialization probe."""
+"""D01a materialization tests with explicit evidence-baseline admission.
+
+The original axis-change receipt belongs only to GeoPhys 4436787e. On the known
+a53a8cfe baseline that one historical test reports HISTORICAL_NOT_APPLICABLE;
+unknown revisions still fail. The current-pin reset/realization/step entry is
+test_b02_plan_consumes_the_exact_a05_v3_scene_identity. Public candidate/H5 and
+pairing evidence remain with the P99 and D05b tests/probes.
+"""
 
 from __future__ import annotations
 
@@ -69,6 +76,33 @@ FIXTURE_ROOT = Path(__file__).with_name("fixtures") / "phase_ii_d01a"
 EXPECTED_SCENE_IDENTITY = "047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e"
 EXPECTED_PANDA_CLOSURE = "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a"
 EXPECTED_PEG_CLOSURE = "6fadf3986265a56bbedc99e1546a566641928e612d8839ea94cafaa6f15b19ff"
+HISTORICAL_GEOPHYS_REVISION = "4436787e9cb85ce519506a2a9af86d1eeec9de2d"
+CURRENT_GEOPHYS_REVISION = "a53a8cfed7c9d6464274b5c96fca601271dc4ee4"
+
+
+def _provider_revision(scene_module):
+    provider_root = Path(scene_module.__file__).resolve().parents[2]
+    return subprocess.check_output(
+        ["git", "-C", str(provider_root), "rev-parse", "HEAD"], text=True,
+    ).strip()
+
+
+def _assert_provider_revision(actual, expected):
+    if actual != expected:
+        raise AssertionError(f"D01a evidence pin mismatch: expected {expected}, actual {actual}")
+
+
+def _admit_historical_baseline(actual):
+    if actual == CURRENT_GEOPHYS_REVISION:
+        pytest.skip(
+            "HISTORICAL_NOT_APPLICABLE: D01a axis-change receipt requires GeoPhys "
+            f"{HISTORICAL_GEOPHYS_REVISION}; actual {actual}. Current-pin entry: "
+            "test_b02_plan_consumes_the_exact_a05_v3_scene_identity; public/H5: "
+            "test_p99_public_position_candidate.py and c02b_position_s2_probe --public-factory; "
+            "pairing: test_phase_ii_d05b_pairing_integration.py / d05b_pairing_s2_probe."
+        )
+    # Unknown pins must not silently become another historical skip or pass.
+    _assert_provider_revision(actual, HISTORICAL_GEOPHYS_REVISION)
 
 
 def _execution() -> ExecutionSpec:
@@ -96,16 +130,57 @@ def _pose_difference(left, right) -> float:
 
 
 def _write_receipt(tmp_path, receipt):
-    output = Path("workspace/maintenance/phase_ii_d01a_main_20261020")
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "d01a_microprobe_receipt.json").write_text(
-        json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False) + "\n",
-        encoding="utf-8",
+    _assert_provider_revision(
+        receipt["provider_import_identity"]["provider_revision"], HISTORICAL_GEOPHYS_REVISION,
     )
+    # Regression runs cannot overwrite the original historical Evidence.
+    output = tmp_path / "d01a_microprobe_receipt.json"
+    with output.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False) + "\n")
+    return output
+
+
+@pytest.mark.parametrize("revision", (HISTORICAL_GEOPHYS_REVISION, CURRENT_GEOPHYS_REVISION))
+def test_d01a_exact_evidence_pin_is_admitted(revision):
+    _assert_provider_revision(revision, revision)
+
+
+@pytest.mark.parametrize("actual,expected", (
+    (CURRENT_GEOPHYS_REVISION, HISTORICAL_GEOPHYS_REVISION),
+    (HISTORICAL_GEOPHYS_REVISION, CURRENT_GEOPHYS_REVISION),
+    ("0" * 40, HISTORICAL_GEOPHYS_REVISION),
+    ("0" * 40, CURRENT_GEOPHYS_REVISION),
+))
+def test_d01a_wrong_evidence_pin_is_rejected(actual, expected):
+    with pytest.raises(AssertionError, match="evidence pin mismatch"):
+        _assert_provider_revision(actual, expected)
+
+
+def test_d01a_historical_applicability_is_exact_not_a_global_skip():
+    _admit_historical_baseline(HISTORICAL_GEOPHYS_REVISION)
+    with pytest.raises(pytest.skip.Exception, match="HISTORICAL_NOT_APPLICABLE"):
+        _admit_historical_baseline(CURRENT_GEOPHYS_REVISION)
+    with pytest.raises(AssertionError, match="evidence pin mismatch"):
+        _admit_historical_baseline("0" * 40)
+
+
+def test_d01a_receipt_rejects_wrong_pin_and_preserves_existing_bytes(tmp_path):
+    receipt = {"provider_import_identity": {"provider_revision": CURRENT_GEOPHYS_REVISION}}
+    with pytest.raises(AssertionError, match="evidence pin mismatch"):
+        _write_receipt(tmp_path, receipt)
+    assert not list(tmp_path.iterdir())
+    receipt["provider_import_identity"]["provider_revision"] = HISTORICAL_GEOPHYS_REVISION
+    output = _write_receipt(tmp_path, receipt)
+    original = output.read_bytes()
+    assert json.loads(original) == receipt
+    with pytest.raises(FileExistsError):
+        _write_receipt(tmp_path, receipt)
+    assert output.read_bytes() == original
 
 
 def test_a05_scene_v3_drives_geophys_main_realization_before_rollout(tmp_path):
     scene_module = pytest.importorskip("scene", reason="GeoPhys public scene importer is required")
+    _admit_historical_baseline(_provider_revision(scene_module))
     scene_definition = _a05_scene()
     artifact, sample = _artifact_and_sample(scene_definition)
     source, imported, closure_digest, panda_digest, panda_file_count = _source_input(
@@ -156,7 +231,7 @@ def test_a05_scene_v3_drives_geophys_main_realization_before_rollout(tmp_path):
     provider_revision = subprocess.check_output(
         ["git", "-C", str(provider_root), "rev-parse", "HEAD"], text=True,
     ).strip()
-    assert provider_revision == "4436787e9cb85ce519506a2a9af86d1eeec9de2d"
+    assert provider_revision == HISTORICAL_GEOPHYS_REVISION
     capability_statuses = Counter(entry.status.value for entry in imported.capability_report.entries)
     canonical_semantics = {"frame.body", "joint.kinematic", "actuator.control"}
     semantic_rows = []
@@ -364,8 +439,9 @@ def test_d01a_reset_tolerance_rejects_over_tolerance_and_build_failure(tmp_path)
 
 
 def test_b02_plan_consumes_the_exact_a05_v3_scene_identity(tmp_path):
-    """Join B02's rollout gate to D01a's real A05 Scene-v3 materialization."""
+    """Current a53a8cfe A05 materialization/reset/realization/step entry (no skip)."""
     scene_module = pytest.importorskip("scene", reason="GeoPhys public scene importer is required")
+    _assert_provider_revision(_provider_revision(scene_module), CURRENT_GEOPHYS_REVISION)
     scene_definition = _a05_scene()
     artifact, _ = _artifact_and_sample(scene_definition)
     source, imported, closure_digest, _, _ = _source_input(
