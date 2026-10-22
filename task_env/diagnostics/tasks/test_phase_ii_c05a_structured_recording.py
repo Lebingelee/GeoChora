@@ -348,6 +348,57 @@ def test_execution_v3_resident_streaming_h5_and_training_loaders_preserve_old_ve
     assert len(load_streaming(zero_path)["boundaries"]) == 1
 
 
+def test_execution_h5_readers_reject_unknown_file_version(tmp_path):
+    import h5py
+
+    unknown = tmp_path / "unknown-execution-v99.h5"
+    with h5py.File(unknown, "w") as handle:
+        handle.attrs["schema"] = "task-env-canonical-execution-v99"
+        handle.attrs["logical_hash"] = "0" * 64
+        handle.create_dataset("logical_json_utf8", data=np.asarray([], dtype=np.uint8))
+        handle.create_dataset("control_step", data=np.asarray([], dtype=np.int64))
+        handle.create_dataset("native_step_index", data=np.asarray([], dtype=np.int64))
+
+    with pytest.raises(ValueError, match="H5 execution schema"):
+        load_execution(unknown)
+    with pytest.raises(ValueError, match="H5 execution schema"):
+        load_streaming(unknown)
+
+
+def test_execution_v3_rejects_cross_layer_identity_mismatch():
+    value = _execution_v3()
+
+    wrong_request = copy.deepcopy(value)
+    wrong_request["structured_controls"][0]["writer_controls"][0]["requested_action"]["values"][0] += 0.01
+    with pytest.raises(ValueError, match="does not preserve the complete structured request"):
+        validate_execution(wrong_request)
+
+    wrong_ack = copy.deepcopy(value)
+    wrong_ack["structured_controls"][0]["writer_controls"][0]["applied_control"]["target_hash"] = "f" * 64
+    with pytest.raises(ValueError, match="does not acknowledge its controller target"):
+        validate_execution(wrong_ack)
+
+    wrong_episode = copy.deepcopy(value)
+    wrong_episode["outcome"]["episode_id"] = "another-episode"
+    with pytest.raises(ValueError, match="episode identity mismatch"):
+        validate_execution(wrong_episode)
+
+    wrong_event_boundary = copy.deepcopy(value)
+    wrong_event_boundary["events"][0]["boundary_index"] = len(value["transitions"]) + 1
+    with pytest.raises(ValueError, match="points beyond final boundary"):
+        validate_execution(wrong_event_boundary)
+
+    wrong_boundary = copy.deepcopy(value)
+    wrong_boundary["boundaries"][-1]["record"]["simulation_time"] += 0.001
+    with pytest.raises(ValueError, match="state boundary mismatch"):
+        validate_execution(wrong_boundary)
+
+    wrong_profile = copy.deepcopy(value)
+    wrong_profile["metadata"]["controller_identity"] = "f" * 64
+    with pytest.raises(ValueError, match="owner identity mismatch"):
+        validate_execution(wrong_profile)
+
+
 def test_execution_v3_does_not_finalize_a_partial_native_interval():
     value = _execution_v3()
     recorder = __import__("task_env.trajectory.canonical.execution", fromlist=["ExecutionRecorder"]).ExecutionRecorder(
@@ -382,6 +433,14 @@ def test_canonical_outer_v1_roundtrip_and_v0_file_identity_remains_distinct(tmp_
         (_event(episode_id, len(transitions)),), outcome, "fixture_end",
     )
     value.validate()
+    incompatible_metadata = EpisodeMetadata.from_mapping(
+        {**metadata.to_mapping(), "controller_identity": "f" * 64}
+    )
+    with pytest.raises(ValueError, match="target identity/order mismatch"):
+        CanonicalTrajectoryV1(
+            "canonical-trajectory-v1", incompatible_metadata, boundaries, transitions,
+            tuple(controls), (_event(episode_id, len(transitions)),), outcome, "fixture_end",
+        )
     path = tmp_path / "canonical-v1.h5"
     save_canonical(path, value)
     loaded = load_canonical(path)
