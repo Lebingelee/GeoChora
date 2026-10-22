@@ -1,7 +1,7 @@
 # Phase C — Execution API & Runtime Lifecycle：架构、实施切片与验收
 
 > **Phase C remaining design: PROPOSED.** C02a/C05a/C03a/C03b/C04 have bounded implementation receipts below;
-> C02b is **PARTIAL / IN PROGRESS**: the single-Panda structured R1 force/record loop now passes its declared behavior and same-file H5 checks on the bounded GeoPhys CPU and MuJoCo 3.8.1 CPU/native-build routes. Broader profiles and Qualification remain outside this receipt. C02c and unified Environment migration remain incomplete.
+> C02b 的声明交集有界工程退出满足：单 Panda structured R1 force/record loop 在指定 GeoPhys CPU 和 MuJoCo 3.8.1 CPU/native-build routes 通过连续行为和同文件 H5 检查。未准入 profile 与 Qualification 单列。C02c broader switching 与统一 Environment migration 仍未完成；P99 的显式单 Panda Position candidate public mainline 已在当前 GeoPhys CPU 完成 64 区间与同文件 H5 回读；见 [P99 运行收据](P99_Runtime_Closure_2026-10-22.md)。
 > C05c has a bounded four-cell diagnostic comparison: GeoPhys `a53a8cf` CPU/CUDA × gripper 100/500 Hz full external Expert S2 and same-file H5 S3 passed. The run intentionally used public `read_cpu_snapshot()` every native step despite its normal low-frequency guidance; it does not expand generic Provider support or Qualification. See [cadence comparison](C05c_GeoPhys_Gripper_Cadence_Comparison_2026-10-22.md) and [C05c receipt](C05c_NutAssembly_Public_Native_S1_Acceptance.md).
 > **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；之后维护者分别授权 C02b-P/E 与 C03b 有界实现。
 > 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
@@ -1012,7 +1012,7 @@ typed publication/admission/reset-cache S1、旧 no-plan/Position、H5、C02a �
 
 ## C.12.4 单 Panda structured R1 连续行为与 Generic H5 v3 回读（2026-10-22）
 
-**本请求切片：PASS；C02b 总体仍 PARTIAL / IN PROGRESS，无外部 blocker。** 在单 Panda Scene-v3 `production-r1` candidate 上，分别以独立进程运行 GeoPhys `a53a8cf` CPU 和精确准入的 MuJoCo 3.8.1 CPU/native build。沿用同一 source/Artifact、Controller/TCP/plan、seed-31 ResetSample、现有 source peg、100 Hz 外层和每区间五个 2 ms native steps；没有改冻结 Artifact、GeoPhys pin 或 source 几何。最终 runner 结果为 GeoPhys `geophys_cpu_run_018` 与 MuJoCo `mujoco_cpu_run_005`，两者均为 `PASS`。完整身份、配置和证据路径见[验收报告](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
+**本请求切片：PASS；当前 C02b 结论：声明交集的有界工程退出满足；未准入扩展及 Qualification 单列。** 在单 Panda Scene-v3 `production-r1` candidate 上，分别以独立进程运行 GeoPhys `a53a8cf` CPU 和精确准入的 MuJoCo 3.8.1 CPU/native build。沿用同一 source/Artifact、Controller/TCP/plan、seed-31 ResetSample、现有 source peg、100 Hz 外层和每区间五个 2 ms native steps；没有改冻结 Artifact、GeoPhys pin 或 source 几何。最终 runner 结果为 GeoPhys `geophys_cpu_run_018` 与 MuJoCo `mujoco_cpu_run_005`，两者均为 `PASS`。完整身份、配置和证据路径见[验收报告](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
 
 两条路线各完成 485 个 structured interval 与 486 个边界，顺序为 open、free-space close、open/approach、obstructed close、force hold、reopen。每区间五步依据 Provider native sample sequence/index 增量和 10 ms 外层时钟核对；RuntimeSession 未提供独立完成子步计数器，因此不把该推断写成独立计数器证据。reset-forward 的 `+4 N` 首样有效并由既有 `control_feedback()` 转换为 0 N closing force；受阻闭合时实际负 signed force 分别达到 GeoPhys `−3.0923 N`、MuJoCo `−3.0658 N`，进入真实 R1 并触发 force mode，Controller target 与 applied acknowledgement 对齐。Force mode 在 0.10 s hold 的 10/10 interval 保持；30 N readiness 仍为 false，单独记录；reopen 清除 force mode。没有把 readiness、force mode、任务成功或 Expert 完成互相替代。
 
@@ -1020,4 +1020,19 @@ typed publication/admission/reset-cache S1、旧 no-plan/Position、H5、C02a �
 
 最终 action target 使用本 candidate 的 FK 一致姿态，将原有 peg 中心置于 hand-local `[0, +0.0105, +0.1285] m`；source、几何、Artifact、控制器配置及所有预先声明阈值保持不变。两路辅助 arm-pose 比较均在 6 mm / 0.035 rad 内：GeoPhys 为 2.671 mm / 0.030374 rad，MuJoCo 为 3.391 mm / 0.030208 rad。此前探索目标的失败输出保留在 Evidence 中，不作为最终结果。缺失/过期样本、重复 apply 与已有 C03a fault latch 有定向证据；本收据没有宣称注入新的 native apply failure。
 
-**C02b 退出范围收敛：** P00/P99 的最小双 Entity 独立施控要求已由双 Entity Position-only S2/H5 满足；未找到要求 dual-Entity R1 的批准依据，因此它不是必需 gate。当前 P00 所列 Position、reset-force freshness、typed raw-force publication/精确 admission、最小双 Entity Position 隔离与本轮单 Panda structured R1 连续行为/H5 交集均有对应的有界证据；没有已知外部阻断。CUDA R1、dual-Entity R1、其他 source/build/transmission 是未准入扩展；Qualification 单独记录且未运行。C02b 总状态仍为 PARTIAL / IN PROGRESS，不延伸为 Phase II 完成。输出覆盖回归保留历史丢失声明，默认 pytest 使用 `tmp_path`，显式 Evidence 目录/JSON 重用时拒绝覆盖；历史丢失 JSON 未重建。目标化回归 **69 passed**，之后增加的 GeoPhys/MuJoCo stale-repeat native tests **2 passed**，Evidence 防覆盖回归另行通过；更完整文件/哈希/失败探索见[验收报告](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
+**C02b 退出范围收敛：** P00/P99 的最小双 Entity 独立施控要求已由双 Entity Position-only S2/H5 满足；未找到要求 dual-Entity R1 的批准依据，因此它不是必需 gate。原 C02b 必需范围中的 Position、reset-force freshness、typed raw-force publication/精确 admission、最小双 Entity Position 隔离与本轮单 Panda structured R1 连续行为/H5 交集均有对应的有界证据；未发现尚未满足的已批准工程项。因此当前表述为：**声明交集的有界工程退出满足；未准入扩展及 Qualification 单列。** CUDA R1、dual-Entity R1、其他 source/build/transmission 是未准入扩展；Qualification 单独记录且未运行。此结论不延伸为完整 Phase II 或 P99 完成。输出覆盖回归保留历史丢失声明，默认 pytest 使用 `tmp_path`，显式 Evidence 目录/JSON 重用时拒绝覆盖；历史丢失 JSON 未重建。目标化回归 **69 passed**，之后增加的 GeoPhys/MuJoCo stale-repeat native tests **2 passed**，Evidence 防覆盖回归另行通过；更完整文件/哈希/失败探索见[验收报告](C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
+
+## C.12.5 P99 readiness 与当前剩余主线（2026-10-22）
+
+当前 C02b 有界工程出口满足，不代表 P99 ready。Scene-v3 R1 structured runner 提供了一条真实 reset/连续 step/observation/Recorder/H5 readback 诊断执行，但其 candidate construction 与 plan-bound dispatch 不走公开 `make_env` Task registry；本轮另将单 Position candidate 接入显式公开 UID，并已通过同一环境连续执行和同文件 H5 回读；R1 runner 的诊断边界保持不变。B04a 已登记的 `geophys-transition-h5/v1`、canonical trajectory outer-v0 和 canonical-execution-v1 原始 H5 golden 缺口仍是 accepted-deferred，不能把合成 reader fixture写成历史文件证明。
+
+C02c 的单 Panda Position switch、C05a1–3 的 evidence mapping、C05c 的指定矩阵（逐 native step 调用 GeoPhys `read_cpu_snapshot()` 的诊断例外）及 D05b 历史 GeoPhys CPU × MuJoCo native OpenGL pairing 均按签发时有界范围记录；D05b 当前 pin 已在真实 NVIDIA EGL context 完成单独 S1/S2 与资源关闭复验。未覆盖的通用 consumer、常规 Provider native-rate contract、Camera policy/Recorder 接线与 Qualification 继续单列。具体 P99 条款表、最小后续验收和未运行范围见 [P99 readiness review](P99_Readiness_Review_2026-10-22.md)。
+
+
+### P99 public Position candidate mainline（2026-10-22）
+
+新 UID `panda-position-servo-candidate-v1` 通过同一个 `make_env()` 环境真实完成 reset → 64 continuous steps →
+public observation → existing Generic H5 v3 start/append/finalize → same-file readback（64/65）。构造已从 test helpers
+提取到 task/source owner，诊断入口复用；无新 Runtime/Recorder。GeoPhys pin、Artifact/ResetSample/profile/timebase
+不变。受限 admission、import 无 native 副作用、错误 identity 和录制失败闭锁已测试。详见
+[P99 运行收据](P99_Runtime_Closure_2026-10-22.md)。candidate 不获得 freeze/Judge/Qualification。

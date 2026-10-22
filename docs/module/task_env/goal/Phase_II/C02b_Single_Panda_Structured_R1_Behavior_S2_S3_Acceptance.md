@@ -1,6 +1,6 @@
 # C02b：单 Panda structured R1 连续行为与 Generic H5 v3 回读
 
-日期：2026-10-22。状态：**本请求的双 Provider 行为与录制切片 PASS；C02b 仍 PARTIAL / IN PROGRESS**。本收据记录单 Panda Scene-v3 `production-r1` candidate 的真实行为和 Generic H5 v3 磁盘回读；不授予 Qualification，也不把 Phase II 标为完成。
+日期：2026-10-22。状态：**本请求的双 Provider 行为与录制切片 PASS；C02b 声明交集的有界工程退出满足**。本收据记录单 Panda Scene-v3 `production-r1` candidate 的真实行为和 Generic H5 v3 磁盘回读；未准入扩展及 Qualification 单列，不把 Phase II/P99 标为完成。该 current C02b disposition 由 [P99 readiness review](P99_Readiness_Review_2026-10-22.md) 收敛。
 
 ## 范围与身份
 
@@ -94,4 +94,4 @@ The [P00 baseline audit](06_P00_Baseline_Caller_Compatibility_and_Feasibility_Au
 | Unadmitted extensions | Dual-Entity R1 (not a P00/P99 requirement), CUDA typed force, other source/Artifact/actuator transmissions, other MuJoCo builds, NutAssembly 500 Hz Guard, Assembly and general Provider capability. |
 | Qualification | No Qualification campaign was run or granted. |
 
-The requested single-Panda structured R1 behavior and recording slice is **PASS on both declared provider intersections**. C02b remains **PARTIAL / IN PROGRESS** at the parent-goal level, with no external blocker declared: this evidence closes only the explicit Scene-v3 candidate/build intersections above, while broader profiles stay unadmitted and Qualification is separate and unrun. Dual-Entity R1 has no approved basis as a required item; it is not an outstanding blocker. This receipt does not authorize an automatic transition into C02c or any extension. Phase II remains incomplete.
+The requested single-Panda structured R1 behavior and recording slice is **PASS on both declared provider intersections**. Together with the earlier Position, minimum dual-Entity Position, reset freshness, typed publication and exact-admission receipts, the original C02b engineering exits for the declared intersections are satisfied. The current wording is: **declared-intersection bounded engineering exit satisfied; unadmitted extensions and Qualification are separate**. Dual-Entity R1 has no approved basis as a required item; it is not an outstanding blocker. CUDA, alternate source/build/transmission and other profiles remain unadmitted; Qualification is separate and unrun. This receipt does not authorize an automatic transition into C02c or any extension. P99 and Phase II remain incomplete; see the linked review for the public factory mainline and historical-H5 deferred gaps.

@@ -8,7 +8,7 @@
 
 第一轮完成 Position Profile、Typed State/source adapter、plan-bound force-free dispatch 与缺陷敏感 S1。分类为 **COMPOSE_EXISTING / EXTEND_EXISTING**：DLS 和位置 gripper 计算继续由现有 `CanonicalPandaController` 完成；执行仍走 `ControlBindingPlanV1`、`RuntimeSession` 和 `SelectedReferenceEnv` owner。未增加 Runtime、TaskEnv、Provider、Recorder 或 Controller manager。
 
-**C02b 仍为 BLOCKED。** 本轮 S1 是 C02b-E 的第一层退出证据，不是完整 Goal 验收。此轮没有执行 GeoPhys/MuJoCo 双 Provider native S2，没有生成并回读 Generic H5 v3 真文件，也没有打开新 production registration/capability 或授予 qualification。
+**签发时 C02b 仍为 BLOCKED。** 本轮 S1 是 C02b-E 的第一层退出证据，不是完整 Goal 验收。此轮没有执行 GeoPhys/MuJoCo 双 Provider native S2，没有生成并回读 Generic H5 v3 真文件，也没有打开新 production registration/capability 或授予 qualification。后续 Position/R1 收据与当前有界出口见 [P99 readiness review](P99_Readiness_Review_2026-10-22.md)。
 
 C02b-E 分层退出标准如下，后续工作可以从当前 S1 基础继续，不以尚未实现的后层实验作为开工前置：
 

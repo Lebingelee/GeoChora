@@ -4,7 +4,7 @@
 
 ## C02b-E 第一轮勘误与状态更新（2026-10-21）
 
-本报告主体是实施前的 C02b-P 审阅记录。C02b-E 第一轮现已完成 Position Profile/source-state 接线与 S1；**本节修订优先于下方历史基线中的“尚未实现”表述**。验收事实、candidate identity、定向检查及未执行项见 [C02b-E S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md)。C02b 仍为 **BLOCKED**。
+本报告主体是实施前的 C02b-P 审阅记录。C02b-E 第一轮现已完成 Position Profile/source-state 接线与 S1；**本节修订优先于下方历史基线中的“尚未实现”表述**。原始审阅签发时 C02b 为 **BLOCKED**；后续有界工程退出状态见 [P99 readiness review](P99_Readiness_Review_2026-10-22.md)。验收事实、candidate identity、定向检查及未执行项见 [C02b-E S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md)。
 
 - **A05 TCP 勘误**：A05 Panda `hand` 下不存在 `nutassembly_ee_site`。历史段落关于该 site 的假设不正确。代码采用版本化 `panda-tcp-profile-v1 / panda-main/hand-origin-tcp-v1` identity transform；typed Controller pose 与 FK/Jacobian tip 都使用实际 projected MJCF source 的 `hand` body origin。A05 fixture 和 Panda source closure 未修改。若未来改变 source 几何/TCP，需为新 closure/Artifact/Profile 生成新 identity。
 - **分阶段退出**：此前 sentinel、双 Provider S2、Generic H5 v3 真写读被列在“进入 C02b-E”的准则中，这个先后关系已修正。S1 实现/拒绝边界已通过；双 Provider native S2、Generic H5 v3 控制及 state-leaf 磁盘回读属于后续 C02b-E 退出层，当前未运行。它们不再是启动 E 或实施第一层的前置条件。
@@ -15,7 +15,7 @@
 
 分类为 **COMPOSE_EXISTING / EXTEND_EXISTING**。已有 DLS 位置控制、位置 gripper correction、ControlBindingPlanV1、RuntimeSession reset/state/apply/step，以及 Generic H5 v3 structured writer/reader。第一轮已补独立 position Profile 实例、source/state 适配、受限 plan-bound 执行 owner 和 MuJoCo force-cache 策略；双 Provider native S2 与 H5 v3 真写读仍待做。
 
-本报告原始审阅仅完成 C02b-P，不启动 C02b-E；状态由上方后续修订更新。C02b（执行顺序 26）仍为 **BLOCKED**；没有新增 registered capability、native S2 证据或 qualification。
+本报告原始审阅仅完成 C02b-P，不启动 C02b-E；当时状态由后续实施收据更新。该历史记录没有新增 registered capability 或 qualification。
 
 ## 实际路径与候选范围
 
@@ -163,4 +163,4 @@ GeoPhys CPU 与 MuJoCo CPU 共享 Core identity、action、reset sample、timeba
 3. **H5 v3 / 持久化**：既有 Generic H5 v3 producer 写出结构化控制、T/T+1 boundary 与 outcome；reader 核对控制/ack/hash/outcome，并针对 raw state leaves 做数值和 identity 的真磁盘回读。未运行。
 4. **完整 C02b**：完成 Recovery Review 要求的其余必需交集与生命周期验收；S1/S2/H5 的单 Panda candidate 结果不自动关闭 C02b、R1 force freshness、多 Entity 或正式资格。
 
-后续实施可从任一未完成退出层继续；不要求先完成 S2/H5 才能开始 E 的下层代码。C02b 当前继续 BLOCKED。双 Entity isolated actuation、R1 force freshness、C05b/C05c readiness/Guard、通用 Panda TaskEnv Stage 1 composition 与正式 Qualification 保持独立。
+后续实施可从任一未完成退出层继续；不要求先完成 S2/H5 才能开始 E 的下层代码。该段记录的是 C02b-E 开始前的审阅边界。双 Entity isolated actuation、R1 force freshness、C05b/C05c readiness/Guard、通用 Panda TaskEnv Stage 1 composition 与正式 Qualification 保持独立；当前 C02b 出口见本报告首段链接。

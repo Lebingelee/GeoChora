@@ -99,9 +99,9 @@ wrapper action were corrected; none is counted as a pass or a supported route.
 
 ## Not run and status
 
-Not run: vectorized Stop semantics, every learner/algorithm integration, a real generic v3 wrapper provider,
+Not run at this receipt's issuance: vectorized Stop semantics, every learner/algorithm integration, a real generic v3 wrapper provider,
 MuJoCo generic Pendulum, NutAssembly R3 Guard, dual Entity/Robot Assembly, R1 force refresh, complete C02b, and
-Phase II qualification. C02b remains **BLOCKED**. This bounded C03b receipt does not mark C02b or Phase II complete.
+Phase II qualification. C02b was **BLOCKED** then; its current declared-intersection bounded exit is recorded in the [P99 readiness review](P99_Readiness_Review_2026-10-22.md). This bounded C03b receipt does not mark Phase II complete.
 
 The TaskEnv module Skill static checker and `git diff --check` pass for this update. C03b changes remain uncommitted;
 no push or merge was performed.

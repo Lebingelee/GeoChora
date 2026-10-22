@@ -29,31 +29,13 @@ from task_env.runtime.sessions.api import materialize, provider_manifest
 from task_env.runtime.sessions.geophys_source import validate_canonical_scene_import
 
 
+from task_env.tasks.position_candidate.source import (
+    _task_source,
+)
+
+
 EXPECTED_GEOPHYS_REVISION = "4436787e9cb85ce519506a2a9af86d1eeec9de2d"
 RESET_SEED = 31
-
-
-def _task_source(scene) -> TaskSourceV1:
-    return TaskSourceV1(
-        "phase-ii-d01a-microprobe",
-        "candidate-v0",
-        scene.scene_id,
-        (
-            TaskRoleDeclarationV1(
-                "manipulator", "robot", "ids", ("panda-main",), "exactly_one",
-            ),
-            TaskRoleDeclarationV1(
-                "target_peg", "rigid_body", "ids", ("square-peg-instance",), "exactly_one",
-            ),
-        ),
-        TaskInitializationV1(
-            "phase-ii-d01b-fixed-reset",
-            "frozen-authored-v0",
-            "training",
-            "zero_named_joint_and_entity_velocities",
-            "arm_targets_at_initial_joints_gripper_open",
-        ),
-    )
 
 
 def _execution(provider: str) -> ExecutionSpec:

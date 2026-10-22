@@ -61,7 +61,9 @@ The changed GeoPhys sample validator also received the focused C02b R1 typed-for
 
 The external API examples and status have been refreshed in TaskEnv public docs and Skill. The TaskEnv Skill refresh was checked against current factories, binding, RuntimeSession, Recorder, callers and tests; the check result is recorded in the Phase C execution log. It is knowledge maintenance, not qualification.
 
-## C02b remaining exit items
+## C02b remaining exit items at this receipt's original issuance
+
+The following list records the then-open status before the later typed-force and structured R1 receipts. It is superseded for current C02b status by the [P99 readiness review](P99_Readiness_Review_2026-10-22.md); preserve this list as historical issuance context.
 
 C02b remains **BLOCKED** for specific reasons:
 

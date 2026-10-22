@@ -3,7 +3,7 @@
 > **ACTIVE bounded implementation record；Phase D remains incomplete and carries no new Qualification.**
 > 修订于 2026-10-22；源码审阅基准仍为规划期 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体蓝图：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；A/B/C 输入见相邻阶段文件。
-> **当前状态（2026-10-22）**：D01b/D02b 保持原有 bounded evidence；序号 31／D03 的 GeoPhys CPU × MuJoCo native OpenGL RGB 动态同步首个交集已通过；序号 32／D04 的 RGB/Optical-Z Depth 与固定/hand-mounted camera 已通过 S1/S2，Entity Instance Segmentation 也完成受限首个交集 S1/S2；序号 33／D05b 已完成该 exact 交集的 selection→admission→materialization→sync→capture→close S1/S2。完整 D04/D05b、Env policy/Recorder consumer 接线、广泛 Renderer/Scene 支持及 Phase II 均未完成。
+> **当前状态（2026-10-22）**：旧 D05b `4436787e` 收据保持历史身份；当前 GeoPhys `a53a8cfe` CPU × MuJoCo 3.8.1 native OpenGL 已在 NVIDIA EGL 上另行通过 S1/S2 与资源关闭复验，见 [当前 pin 收据](#d05b-current-pin-revalidation-2026-10-22)。完整 D04/D05b、Camera policy/Recorder consumers 与 Phase II 仍未完成。
 
 ## D.0 讨论结论与范围
 
@@ -692,6 +692,22 @@ This receipt closes only the first bounded GeoPhys CPU × MuJoCo native OpenGL P
 close the full D05b matrix, full D04, Environment policy/Recorder integration, other pairings, D05 qualification or
 Phase II.
 
+#### D05b applicability addendum — Provider pin changed after the original S2 (2026-10-22)
+
+The original D05b S1/S2 receipt above is bound to GeoPhys `4436787e9cb85ce519506a2a9af86d1eeec9de2d` and Core
+`ab73f78af39601ce55fc21f85160fffcbc209520`. The current parent gitlink and checkout use GeoPhys
+`a53a8cfed7c9d6464274b5c96fca601271dc4ee4`, a descendant with a 75-file delta that includes rigid contact,
+solver execution, state host-I/O/snapshot, and unrelated Flora/rendering work. This is not evidence that the D05b
+observable behavior changed; it means the old S2 is not automatically a current-pin realization. A current-Core,
+current-pin run of `test_phase_ii_d05b_pairing_integration.py` produced **2 passed, 1 environment-blocked**: GLFW
+could not open `DISPLAY=:1`, and MuJoCo failed while constructing an OpenGL context before the final test reached its
+cleanup/consumer-isolation assertions. The shell also could not communicate with the NVIDIA driver. Thus the old
+receipt remains valid for its recorded `4436787e` identity, but D05b's current `a53a8cfe` pairing S2 and the remaining
+OpenGL-dependent S1 assertions are **NOT_REVALIDATED**. Logs are preserved at ignored
+`workspace/maintenance/p99_readiness_20261022_001/d05b_regression.log`; the focused C02c regression is in the sibling
+`c02c_regression.log`. Do not transfer the old provider-specific pass to the new pin until the same bounded pairing
+is rerun with an available native OpenGL context.
+
 ## D.9 验收矩阵：先确保语义正确，再验证组合性能
 
 | 分层 | 示例 fixture/oracle | 不可误认 |
@@ -769,3 +785,22 @@ P00/P99 的最小双 Entity position-only 隔离施控已有独立的 GeoPhys/Mu
 
 参考：[Isaac Sim Robot Assembler](https://docs.isaacsim.omniverse.nvidia.com/latest/py/source/extensions/isaacsim.robot_setup.assembler/docs/index.html)。
 该资料只解释设计借鉴，不证明本仓库任何新的物理或渲染支持范围。
+
+
+#### D05b current-pin revalidation (2026-10-22)
+
+上方 applicability addendum 中无 X11 context 的失败是此前审阅时的事实；本轮使用 MuJoCo 支持的 EGL 离屏 context
+完成当前 pin 的真实复验，保留旧 `4436787e` 收据和失败日志。GeoPhys
+`a53a8cfed7c9d6464274b5c96fca601271dc4ee4` CPU × MuJoCo 3.8.1 native OpenGL，Python 3.12.14 / Taichi Forge 0.6.3，
+`MUJOCO_GL=egl PYOPENGL_PLATFORM=egl EGL_PLATFORM=surfaceless`，实际 GL vendor NVIDIA Corporation，renderer
+NVIDIA GeForce RTX 5060/PCIe/SSE2，OpenGL 4.6.0 NVIDIA 595.84；selection device=None（驱动实际选择，非显式 GPU ordinal）。
+
+S1 **3 passed**，含分配后构造失败清理、错误身份、native dependency 缺失、capture 失败与 sibling 隔离、重复 close。
+S2 **PASS_BOUNDED**：原单 Panda Position/source 的同一 RuntimeSession reset → 12 个真实 10 ms interval → sync/capture → reset/capture → close；
+fixed-default 和 hand-mounted override 两个 consumer，共六次 RGB/Depth/Entity-mask capture，验证同 boundary/clock/episode、
+mask/label-map/原文件回读与已知几何 depth/遮挡。capture instrumentation 的 Controller.compute、Provider.step、mj_step、mj_forward 均为 0。
+两个独立 native Renderer 各 close 一次；这不要求进程 GL allocator 全部归零。
+
+ignored Evidence：`workspace/maintenance/p99_runtime_closure_20261022/{d05b_s1.log,pairing_s2.log,pairing_s2/}`。
+详见 [P99 运行收据](P99_Runtime_Closure_2026-10-22.md)。Camera policy observation/TransitionRecorder 接线不作为本次复验前置，
+也未因此获得支持。无 fake renderer、断言删除、静默 skip 或换 Provider；不是通用 pairing/Qualification。

@@ -2,8 +2,7 @@
 
 ## 当前开发基线与有界证据（2026-10-22）
 
-本地 `codex/phase-ii-c03b` 的保全检查点为 `b3fc42e`，包含 Provider pin 迁移与 C05b public lifecycle S1；当前工作区有
-C05b S2/S3 probe、必要的 canonical-recording fault guard、测试及报告改动。GeoPhys Gitlink 与实际检出固定在
+本地 `codex/phase-ii-c03b` 当前 Core 保全检查点为 `1e3b558`，包含 C02b typed raw-force 与 structured R1 实现、测试和收据；本轮开始审计时 Core 无 dirty tracked/untracked paths。GeoPhys Gitlink 与实际检出固定在
 `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`。此前 `ec2dd24`/`eb870f6f` 内容描述的是迁移前状态；2026-10-20 的
 `54f40fbf` 同步范围和测试数字仍保留为历史 Evidence，不作为当前 topic 分支 Provider pin 或全链能力声明。
 
@@ -18,9 +17,13 @@ canonical-v0 磁盘 S3。三者使用不同的 Artifact/source/Controller 路线
 
 随后单 Panda Scene-v3 structured R1 在上述精确 GeoPhys CPU 与 MuJoCo 3.8.1 CPU/native-build 路线完成真实
 force-mode/open/reopen 行为和 Generic H5 v3 同文件回读；最终预先声明的行为、arm-pose、dispatch 与同文件回读检查均通过。
-C02b 仍为 PARTIAL / IN PROGRESS（无外部 blocker），该收据只覆盖指定 candidate/build。P00/P99 最小双 Entity 项已由双 Position S2/H5 覆盖，
+C02b 声明交集的有界工程退出满足；该收据只覆盖指定 candidate/build。P00/P99 最小双 Entity 项已由双 Position S2/H5 覆盖，
 dual-Entity R1 没有作为必需退出项的批准依据。完整细节、精确哈希与剩余跟踪误差见
 [C02b structured R1 收据](goal/Phase_II/C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md)。
+
+structured R1 的连续执行和 H5 回读仍来自 task-local diagnostic lifecycle。另一个既有单 Panda Position candidate
+现以 `panda-position-servo-candidate-v1` 接入公开 `make_env()`，已在当前 GeoPhys CPU 上完成同一环境的连续执行/H5 回读；详见
+[P99 readiness review](goal/Phase_II/P99_Readiness_Review_2026-10-22.md)。
 
 C05c 另有独立 NutAssembly `OutcomeSolutionV1` 证据：MuJoCo 3.8.1 CPU 原 external Expert/H5 S2/S3，以及 GeoPhys
 `a53a8cf` CPU/CUDA × gripper 100/500 Hz 四格真实 S2/S3 都通过。GeoPhys 对照特意逐 native 子步调用公开
@@ -191,7 +194,7 @@ actuator force, so plan-bound GeoPhys execution does not call `control_feedback(
 does not copy its force cache during reset/step. A required-force R1 plan still fails admission when the
 actual provider manifest lacks `actuator_force_query`; legacy no-plan behavior remains compatible.
 
-This candidate has no registered default task selection. Its explicit diagnostic constructor reuses the existing
+The explicit single-Panda UID `panda-position-servo-candidate-v1` now reuses the task-owned builder and existing
 `SelectedReferenceEnv` lifecycle and `ReferenceTaskBinding`; the bounded route uses existing Generic H5 v3 recording.
 GeoPhys CPU and MuJoCo CPU native S2 passed for one Panda candidate, including motion, clock/boundary evidence,
 force-free reads, structured control readers and direct H5 joint/hand/identity state-leaf readback. This is not a

@@ -12,6 +12,7 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
 | PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
 | NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution and GeoPhys `a53a8cf` CPU/CUDA cadence S2/S3 are bounded diagnostic results; the GeoPhys matrix deliberately uses host snapshot at every native step and does not expand generic support |
+| Explicit Position candidate | `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys", "backend":"cpu", "horizon":64})` | single Panda Scene-v3, fixed seed 31, 100 Hz / five 2 ms steps, state-only; candidate without freeze/Judge/Qualification; Generic H5 v3 recording and same-file readback bounded passed |
 
 两条 selected route 只接受 `provider`、`backend`、`horizon`：provider 仅
 `geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
@@ -127,7 +128,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
-| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 已对单 Panda Position/Scene-v3 scalar-joint source → GeoPhys CPU × MuJoCo native OpenGL 验证 default/override、双相机 materialization/sync/capture/close S1/S2。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. This exact pairing is TESTED_BOUNDED only; other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification are unsupported or unverified |
+| `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 历史收据在 GeoPhys gitlink `4436787e…` × MuJoCo native OpenGL 上对单 Panda Position/Scene-v3 scalar-joint source 验证 default/override、双相机 materialization/sync/capture/close S1/S2。当前 `a53a8cfe…` pin 已另行完成真实 NVIDIA EGL pairing S1/S2 与资源关闭复验，见 [P99 运行收据](goal/Phase_II/P99_Runtime_Closure_2026-10-22.md)；旧 `4436787e` 收据独立保留。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification remain unsupported or unverified |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
@@ -167,12 +168,78 @@ remains the only canonical closing-force projection. This claim does not transfe
 to the old selected PickCube Artifact/source, MuJoCo typed force, other
 transmissions, or generic Provider manifests. It was later exercised through the single-Panda Scene-v3 structured R1
 sequence on the same exact GeoPhys CPU and MuJoCo 3.8.1 CPU/native-build intersections, with same-file Generic H5 v3
-readback. Both final runs passed the predeclared force-mode, arm-pose, dispatch and recording checks. This is bounded to
-the exact candidate/build intersections; C02b remains PARTIAL / IN PROGRESS at the parent-goal level, without a known
-external blocker. P00/P99's minimum dual-Entity requirement is covered by Position-only S2;
+readback. Both final runs passed the predeclared force-mode, arm-pose, dispatch and recording checks. The current C02b
+disposition is that declared-intersection bounded engineering exits are satisfied; unadmitted extensions and Qualification
+are separate. P00/P99's minimum dual-Entity requirement is covered by Position-only S2;
 dual-Entity R1 has no approved basis as a required gate. See the [freshness receipt](goal/Phase_II/C02b_R1_Reset_Force_Freshness_Acceptance.md),
 [typed-force receipt](goal/Phase_II/C02b_R1_Typed_Raw_Force_Admission_Acceptance.md), and
 [structured R1 S2/S3 receipt](goal/Phase_II/C02b_Single_Panda_Structured_R1_Behavior_S2_S3_Acceptance.md).
+
+**Scene-v3 candidate construction boundary:** the single Position candidate now has the explicit public UID
+`panda-position-servo-candidate-v1`. `make_env()` reuses the task-owned construction in
+`task_env/tasks/position_candidate/`, existing `ReferenceTaskBinding`, `SelectedReferenceEnv`, RuntimeSession,
+public reset/step observation and Generic H5 v3 Recorder. The same public environment passed 64 real continuous
+intervals and same-file disk readback. Structured R1 and dual-Entity candidates remain diagnostic routes.
+
+Public candidate config admits `provider` (only `geophys`, default), `backend` (only `cpu`, default), `horizon`
+(integer 1–6000, default 6000), and optional `source_workspace` (fresh/empty source snapshot directory).
+Without a path it allocates a fresh directory under ignored `workspace/tasks/phase-ii-c02b-position-servo/candidate-sources/`.
+It rejects render mode, extra kwargs, legacy overlays, alternate provider/backend/profile and nonmatching reset seed
+before runtime materialization. Omitted reset seed resolves to the bound seed 31; this is not a randomizable task.
+Use `StructuredActionRequestV1` with exact Scene/plan IDs and both `panda-main` arm/gripper groups; observation is
+returned from `reset()`/`step()` with boundary/time info. `start_recording(path)` at reset, step, then
+`finish_recording(reason)` uses the existing Generic H5 v3 owner; read the same path with
+`load_structured_control_records_h5()` / `load_structured_training_actions_h5()` from `task_env.recorders`.
+Always close in `finally`. No Expert/task-success or freeze approval is implied. See
+[P99 readiness](goal/Phase_II/P99_Readiness_Review_2026-10-22.md) and the
+[implementation/run receipt](goal/Phase_II/P99_Runtime_Closure_2026-10-22.md).
+
+For this explicit selected candidate, `env.position_plan` after reset is the read-only typed action contract
+used by the existing dispatch owner. Do not mutate it. Gripper input is normalized in [-1,1] (+1 open / -1 close);
+arm pose uses the world hand-origin TCP, metres and wxyz quaternion. A minimal recording example:
+
+```python
+from pathlib import Path
+from task_env import make_env
+from task_env.controllers.canonical.contracts import (
+    ControlGroupActionV1, StructuredActionRequestV1,
+)
+from task_env.recorders import load_structured_control_records_h5
+
+# Use a fresh output directory for every run.
+path = Path('workspace/maintenance/p99_candidate_example/episode.h5')
+if path.parent.exists():
+    raise ValueError('example output directory must be fresh')
+path.parent.mkdir(parents=True)
+env = make_env('panda-position-servo-candidate-v1', config={'horizon': 4})
+try:
+    obs, info = env.reset(seed=31)
+    plan = env.position_plan  # selected candidate's read-only, typed action contract
+    schema_id = plan.controller_bindings[0].action_schema.schema_id
+    # World hand-origin pose: x,y,z,qw,qx,qy,qz. Gripper: +1 open, -1 close.
+    hand = tuple(float(x) for x in obs['state']['hand_pose'])
+    request = StructuredActionRequestV1(
+        'structured-action-request-v1', plan.scene_identity_hash, plan.identity_hash,
+        (
+            ControlGroupActionV1('control-group-action-v1', 'panda-main', 'arm', schema_id, hand),
+            ControlGroupActionV1('control-group-action-v1', 'panda-main', 'gripper', schema_id, (1.0,)),
+        ),
+    )
+    env.start_recording(path)
+    for _ in range(4):
+        obs, reward, terminated, truncated, info = env.step(request)
+    result = env.finish_recording('horizon')
+    loaded = load_structured_control_records_h5(result['path'])
+    assert loaded['transition_count'] == 4 and loaded['observation_count'] == 5
+finally:
+    env.close()
+```
+
+`finish_recording()` must agree with the latched outcome: after horizon use `"horizon"` or `"horizon_reached"`.
+For an early intentional end, use `env.stop("external_stop")` and `env.finish_recording("external_stop")`.
+Mismatching reasons fail. The structured reader returns controls/events/outcome; observation arrays remain in the
+same H5 under `obs/state/{joint_position,hand_pose,boundary_identity_sha256}`.
+
 
 **C02c bounded Position instance switch (2026-10-22):** the explicit
 `SelectedReferenceEnv.from_position_candidate()` route also exposes

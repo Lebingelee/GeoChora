@@ -136,9 +136,24 @@ def _boundary_identity_hash(env):
     return bytes.fromhex(boundary_id.removeprefix('state-boundary-'))
 
 
-def _new_env(root, provider, *, horizon):
-    candidate = build_position_candidate(root, provider=provider, horizon=horizon)
-    return candidate
+def _new_env(root, provider, *, horizon, public_factory=False):
+    if not public_factory:
+        return build_position_candidate(root, provider=provider, horizon=horizon)
+    from types import SimpleNamespace
+    from task_env import make_env
+
+    env = make_env('panda-position-servo-candidate-v1', config={
+        'provider': provider, 'backend': 'cpu', 'horizon': horizon,
+        'source_workspace': str(root),
+    })
+    return SimpleNamespace(
+        env=env, scene=env.value['source'].scene_definition,
+        task_source=env.value['task_source'], artifact=env.artifact,
+        reset_plan=env.value['reset_plan'], source=env.value['source'],
+        controller_binding_plan=env.value['controller_binding_plan'],
+        panda_closure_digest=env.value['panda_closure_digest'],
+        panda_file_count=env.value['panda_file_count'], provider=provider,
+    )
 
 
 def _guard_no_dispatch(env, request, counters, label):
@@ -248,11 +263,13 @@ def _fault_trial(candidate, provider, root, kind, counters):
     return result
 
 
-def run_probe(provider: str, output: Path) -> dict:
+def run_probe(provider: str, output: Path, *, public_factory=False) -> dict:
     output = output.resolve()
+    if output.exists() and any(output.iterdir()):
+        raise ValueError('probe output must be fresh; prior Evidence is preserved')
     output.mkdir(parents=True, exist_ok=True)
     horizon = 64
-    candidate = _new_env(output / 'candidate-source', provider, horizon=horizon)
+    candidate = _new_env(output / 'candidate-source', provider, horizon=horizon, public_factory=public_factory)
     env = candidate.env
     counters = {'compute': 0, 'apply': 0, 'step': 0}
     profile_compute = PandaPositionServoProfileV1.compute
@@ -504,7 +521,7 @@ def run_probe(provider: str, output: Path) -> dict:
         fault_results = []
         for kind in ('apply', 'step', 'record'):
             fault_candidate = _new_env(
-                output / f'fault-{kind}-source', provider, horizon=2,
+                output / f'fault-{kind}-source', provider, horizon=2, public_factory=public_factory,
             )
             try:
                 fault_candidate.env.reset()
@@ -517,6 +534,8 @@ def run_probe(provider: str, output: Path) -> dict:
         return {
             'schema_version': 'geochora.c02b-position-s2-receipt-v1',
             'status': 'PASS_BOUNDED_POSITION_PROFILE_S2',
+            'construction_route': 'task_env.make_env' if public_factory else 'diagnostic builder',
+            'environment_uid': env.uid,
             'provider': provider,
             'backend': 'cpu',
             'task_artifact_identity_hash': candidate.artifact.identity_hash,
@@ -596,10 +615,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--provider', choices=('geophys', 'mujoco'), required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--public-factory', action='store_true')
     args = parser.parse_args(argv)
+    if args.output.exists() and any(args.output.iterdir()):
+        parser.error('output must be fresh; prior Evidence is preserved')
     receipt_path = args.output / f'{args.provider}-receipt.json'
     try:
-        receipt = run_probe(args.provider, args.output)
+        receipt = run_probe(args.provider, args.output, public_factory=args.public_factory)
     except BaseException as error:
         receipt = {
             'schema_version': 'geochora.c02b-position-s2-receipt-v1',

@@ -1,7 +1,7 @@
 # C05b Legacy PickCube External Solution S2/S3 Acceptance
 
 **Date:** 2026-10-22  
-**Status:** The specified legacy PickCube S2 and canonical-v0 S3 passed independently on GeoPhys CPU and MuJoCo CPU. This is a bounded task/provider result; C02b remains **BLOCKED**, and Phase II is not complete.
+**Status at receipt issuance:** The specified legacy PickCube S2 and canonical-v0 S3 passed independently on GeoPhys CPU and MuJoCo CPU. This is a bounded task/provider result; C02b was **BLOCKED** at that time. Current C02b disposition is recorded in the [P99 readiness review](P99_Readiness_Review_2026-10-22.md); Phase II is not complete.
 
 ## Scope and preserved baseline
 
@@ -66,7 +66,7 @@ The two parametrized fault cases are `test_c05b_faulted_canonical_recording_cann
 
 ## Result boundary
 
-This closes the requested legacy PickCube external Solution S2 and canonical-v0 S3 for **GeoPhys `a53a8cf` CPU and MuJoCo 3.8.1 CPU only**, using the exact old Artifact/source/R1/TCP route and seed-31 sample. It does not grant a plan-bound identity to that legacy source, extend typed-force admission to it, or claim MuJoCo typed-force publication. Selected legacy R1 Stop/Outcome remains unsupported; canonical-v0 has no Event/Outcome/native-substep stream. NutAssembly 500 Hz Guard, Assembly, full Expert coverage beyond this PickCube Solution, Qualification, and Phase II completion were not run or granted. C02b remains **BLOCKED** on its independent remaining exits.
+This closes the requested legacy PickCube external Solution S2 and canonical-v0 S3 for **GeoPhys `a53a8cf` CPU and MuJoCo 3.8.1 CPU only**, using the exact old Artifact/source/R1/TCP route and seed-31 sample. It does not grant a plan-bound identity to that legacy source, extend typed-force admission to it, or claim MuJoCo typed-force publication. Selected legacy R1 Stop/Outcome remains unsupported; canonical-v0 has no Event/Outcome/native-substep stream. NutAssembly 500 Hz Guard, Assembly, full Expert coverage beyond this PickCube Solution, Qualification, and Phase II completion were not run or granted. At this receipt's issuance C02b still had independent exits open; its current bounded exit is recorded in the [P99 review](P99_Readiness_Review_2026-10-22.md).
 
 ### Evidence paths
 

@@ -36,6 +36,8 @@ def _execution_spec() -> ExecutionSpecV1:
 
 def run_s2(output: Path | str) -> dict[str, object]:
     output = Path(output).resolve()
+    if output.exists() and any(output.iterdir()):
+        raise ValueError('pairing output must be fresh; prior Evidence is preserved')
     output.mkdir(parents=True, exist_ok=True)
     raw_dir = output / "paired-camera-s2"
     execution = _execution_spec()
@@ -50,6 +52,7 @@ def run_s2(output: Path | str) -> dict[str, object]:
 
     original_create = d04_probe.create_dynamic_camera_session
     sessions = []
+    context_provenance = []
     captures = []
     native_renderer_closes = []
     import mujoco
@@ -72,6 +75,18 @@ def run_s2(output: Path | str) -> dict[str, object]:
 
         session = original_create(camera, execution, **kwargs)
         sessions.append(session)
+        from OpenGL import GL
+        import os
+        context_provenance.append({
+            'camera_id': camera.camera_id,
+            'MUJOCO_GL': os.environ.get('MUJOCO_GL'),
+            'PYOPENGL_PLATFORM': os.environ.get('PYOPENGL_PLATFORM'),
+            'EGL_PLATFORM': os.environ.get('EGL_PLATFORM'),
+            'gl_vendor': GL.glGetString(GL.GL_VENDOR).decode(),
+            'gl_renderer': GL.glGetString(GL.GL_RENDERER).decode(),
+            'gl_version': GL.glGetString(GL.GL_VERSION).decode(),
+            'device_selection': selected.device,
+        })
         capture = session.capture
 
         def tracked_capture(state):
@@ -163,6 +178,7 @@ def run_s2(output: Path | str) -> dict[str, object]:
             ).strip(),
         },
         "scope": d04_receipt["scope"],
+        "actual_graphics_context": context_provenance,
         "execution_spec": execution.to_mapping(),
         "execution_spec_identity_hash": execution.identity_hash,
         "renderer_selection_resolution": {

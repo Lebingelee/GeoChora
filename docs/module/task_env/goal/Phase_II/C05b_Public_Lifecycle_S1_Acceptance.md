@@ -1,7 +1,7 @@
 # C05b Public Lifecycle S1 Acceptance
 
 **Date:** 2026-10-22  
-**Status:** bounded public lifecycle S1 passed; C05b full execution remains open and C02b remains **BLOCKED**.
+**Status at receipt issuance:** bounded public lifecycle S1 passed; C05b full execution remained open and C02b was **BLOCKED** at that time. Later C05b S2/S3 and current C02b disposition are recorded in their separate receipts.
 
 ## Scope and preserved checkpoint
 
@@ -94,6 +94,6 @@ The complete raw commands and outputs are retained in ignored paths `workspace/m
 
 This closes only C05b **public lifecycle S1** and the required GeoPhys baseline re-verification gates. For future full PickCube execution, this slice explicitly selected the existing legacy PickCube source/Artifact/R1 consumer route. It does not transfer the separate candidate's `panda-main` typed-force admission or fabricate a plan-bound identity for PickCube.
 
-Not run: full external PickCube Expert S2 on real GeoPhys and MuJoCo processes; native close/contact/readiness stage comparison; canonical-v0 disk recording and reader S3; failed recording finalization/recovery beyond the injected append boundary; MuJoCo typed-force; NutAssembly Guard; C05c, Assembly, complete C02b, full Expert campaign, and Qualification. C02b remains **BLOCKED**. C05b S2/S3 and Phase II are not complete.
+Not run at this receipt's issuance: full external PickCube Expert S2 on real GeoPhys and MuJoCo processes; native close/contact/readiness stage comparison; canonical-v0 disk recording and reader S3; failed recording finalization/recovery beyond the injected append boundary; MuJoCo typed-force; NutAssembly Guard; C05c, Assembly, complete C02b, full Expert campaign, and Qualification. Later receipts close the specified C05b S2/S3 and C02b engineering intersections; neither grants Qualification or completes Phase II.
 
 **Next bounded target:** decide whether the planned full PickCube S2/S3 continues on the selected legacy entry with its current no-plan R1 required feedback contract, or whether a separate truthful plan/source identity is required first. Any future route must preserve the frozen Artifact and required force, use the actual source/Controller/ResetSample identities, and prove full execution before recording claims. Do not substitute the Scene-v3 candidate receipt for legacy PickCube evidence.

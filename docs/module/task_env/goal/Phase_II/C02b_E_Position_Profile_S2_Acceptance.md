@@ -1,6 +1,6 @@
 # C02b-E Position Profile：双 Provider S2 与 Generic H5 v3 验收
 
-日期：2026-10-21。结论：**PASS_BOUNDED_POSITION_PROFILE_S2；C02b 仍 BLOCKED**。本报告承接 [S1 验收](C02b_E_Position_Profile_S1_Acceptance.md)，不重开架构审阅，也不把单 Panda Position 候选扩写为 R1、NutAssembly Guard 或 Phase II 验收。
+日期：2026-10-21。结论（签发时）：**PASS_BOUNDED_POSITION_PROFILE_S2；C02b 仍 BLOCKED**。本报告承接 [S1 验收](C02b_E_Position_Profile_S1_Acceptance.md)，不重开架构审阅，也不把单 Panda Position 候选扩写为 R1、NutAssembly Guard 或 Phase II 验收。
 
 ## 范围与身份
 
@@ -73,6 +73,6 @@ The per-process H5 files are `workspace/maintenance/c02b_position_s2_20261021/ge
 
 This round adds an explicit `SelectedReferenceEnv.from_position_candidate()` entrypoint that accepts the existing `ReferenceTaskBinding`; it does not register a default production task. Fixed ResetPlan seed checks occur before changing a live Position session. Position lifecycle refuses pre-reset, stopped/horizon, faulted and closed calls before compute/apply/step/record. H5 v3 uses `TransitionRecorder` and makes aligned transition append atomic under capacity/copy errors. Legacy selected reset/recording and `panda-main/production-r1` contracts remain unchanged; a regression caught and preserved the legacy reset reconstruction-before-seed-validation behavior.
 
-The native evidence closes only the Position candidate’s declared single-Panda GeoPhys/MuJoCo CPU intersection and its H5 v3 disk route. It does not close the force-aware `production-r1` raw-force requirement or GeoPhys reset-force freshness gap. No R1 execution, PickCube force-aware behavior, NutAssembly R3 500 Hz Guard, obstructed-force hold, C02c, Assembly, multi-Entity dispatch, full Expert route or Phase II qualification was run. **C02b remains BLOCKED.**
+The native evidence closes only the Position candidate’s declared single-Panda GeoPhys/MuJoCo CPU intersection and its H5 v3 disk route. It did not close the force-aware `production-r1` raw-force requirement or GeoPhys reset-force freshness gap at this receipt's issuance. No R1 execution, PickCube force-aware behavior, NutAssembly R3 500 Hz Guard, obstructed-force hold, C02c, Assembly, multi-Entity dispatch, full Expert route or Phase II qualification was run then. The later bounded engineering exit is recorded in the [P99 readiness review](P99_Readiness_Review_2026-10-22.md); this historical Position receipt still does not grant Qualification.
 
 Final focused regression command covered eight affected groups: Position profile/execution/H5, C02b admission, C02a controller bindings, C03a fault lifecycle, C05a structured recording, D02b typed runtime state and selected consumers. Result: **92 passed**, one upstream `taichi_forge` `locale.getdefaultlocale` deprecation warning; no failures. `git diff --check` also passed. Broad repository regression was not run. The S2 scripts/logs/H5 files remain ignored under `workspace/maintenance/c02b_position_s2_20261021/`; no source artifact, GeoPhys pin, frozen branch or frozen fixture was changed.

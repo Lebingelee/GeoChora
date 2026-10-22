@@ -1,7 +1,7 @@
 # C02b 最小双 Entity Position 隔离施控验收
 
 日期：2026-10-22
-状态：**PASS_BOUNDED_DUAL_ENTITY_POSITION_S2**（GeoPhys CPU、MuJoCo CPU）；C02b 整体仍 **BLOCKED**。
+状态：**PASS_BOUNDED_DUAL_ENTITY_POSITION_S2**（GeoPhys CPU、MuJoCo CPU）。本收据签发时 C02b 仍 BLOCKED；当前声明交集有界工程退出状态见 [P99 readiness review](P99_Readiness_Review_2026-10-22.md)。
 实现基线：D05b 本地检查点 `477ff8054fb57356e8d03414f2356dd0f18ea043`；本轮实现和本文尚未提交、未推送。GeoPhys gitlink 保持原 pin `4436787e9cb85ce519506a2a9af86d1eeec9de2d`。
 
 ## 1. 范围与候选来源

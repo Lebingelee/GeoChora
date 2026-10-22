@@ -1,6 +1,6 @@
 # C02b-R1 Reset Force Freshness — Bounded Acceptance
 
-Date: 2026-10-22. Result: **R1 reset-force freshness prerequisite passed for the existing PickCube legacy route on GeoPhys CPU**. C02b remains **BLOCKED** because plan-bound typed raw-force publication/admission and the full required execution intersection remain incomplete. This receipt does not start C05b or grant qualification.
+Date: 2026-10-22. Result at receipt issuance: **R1 reset-force freshness prerequisite passed for the existing PickCube legacy route on GeoPhys CPU**. At that time plan-bound typed raw-force publication/admission and structured execution remained incomplete. Those later gates are recorded in the typed-force and structured R1 receipts; current C02b status is the declared-intersection bounded engineering exit satisfied. See [P99 readiness review](P99_Readiness_Review_2026-10-22.md). This receipt does not grant qualification.
 
 ## Scope and identities
 

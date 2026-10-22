@@ -1,0 +1,9 @@
+{
+  "asset_declaration_identity": "1af83297a1cb2948251d5f2448067cfa1b72fe1395be6c6d205f383f0f858197",
+  "scene_identity": "047661ff68e18dffa10a8bfe9cabef4e72f397b5280c1da7c7669ebf9e419e6e",
+  "schema_version": "geochora.d01a-asset-source-fixture-v1",
+  "source_closure_digest": "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a",
+  "source_closure_root": "panda.xml",
+  "source_reference": "mujoco-menagerie://franka_emika_panda/panda.xml",
+  "source_revision": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+}
