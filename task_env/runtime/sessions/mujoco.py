@@ -145,6 +145,7 @@ class _MuJoCoSession(_SessionValues):
             self._data.ctrl[actuator] = sample.joint_position[name]
         for actuator in self._open_actuators:
             self._data.ctrl[actuator] = self._model.actuator_ctrlrange[actuator, 1]
+        self._current_ctrl = self._data.ctrl.copy()
         self._mj.mj_forward(self._model, self._data)
         self._cache_completed_actuator_force()
         return self._realized(sample)
@@ -206,19 +207,25 @@ class _MuJoCoSession(_SessionValues):
         validate_target(self, target)
         clipped = False
         realized = {}
-        for name, index in self._target_actuators.items():
-            requested = target.arm_servo_position[name]
+        for name, requested in target.arm_servo_position.items():
+            index = self._target_actuators[name]
             low, high = self._model.actuator_ctrlrange[index]
             value = float(np.clip(requested, low, high)) if self._model.actuator_ctrllimited[index] else requested
             self._data.ctrl[index] = value
             realized[name] = value
             clipped = clipped or value != requested
-        index = self._open_actuators[0]
+        index = getattr(self, '_open_actuators_by_semantic', {}).get(
+            target.gripper.semantic_id, self._open_actuators[0],
+        )
+        control_binding = getattr(self, '_position_control_bindings_by_semantic', {}).get(
+            target.gripper.semantic_id, self._control_binding,
+        )
         low, high = self._model.actuator_ctrlrange[index]
-        opening = float(np.clip(target.gripper.servo_opening_m, 0, self._control_binding.opening_range_m))
-        self._data.ctrl[index] = low + opening/self._control_binding.opening_range_m*(high-low)
+        opening = float(np.clip(target.gripper.servo_opening_m, 0, control_binding.opening_range_m))
+        self._data.ctrl[index] = low + opening/control_binding.opening_range_m*(high-low)
         self._model.actuator_forcelimited[index] = 1
         self._model.actuator_forcerange[index] = (-target.gripper.force_limit_N, target.gripper.force_limit_N)
+        self._current_ctrl = self._data.ctrl.copy()
         return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'mujoco',
             realized, opening, target.gripper.force_limit_N, clipped,
             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')

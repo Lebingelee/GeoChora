@@ -90,6 +90,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
         if not isinstance(binding, ReferenceTaskBinding):
             raise TypeError('PositionServoV1 candidate requires the existing ReferenceTaskBinding')
+        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+
         candidate_type = cls
         if not hasattr(cls, 'uid'):
             candidate_type = type(
@@ -97,10 +99,37 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 {'uid': 'c02b-position-servo-candidate-v1'},
             )
         env = candidate_type(provider=provider, backend=backend, horizon=horizon, _binding=binding)
-        if not isinstance(env.controller, PandaPositionServoProfileV1):
+        profiles = env.position_profiles
+        if (not profiles or len(profiles) > 2
+                or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)
+                or len({profile.writer_id for profile in profiles}) != len(profiles)
+                or len({profile.entity_id for profile in profiles}) != len(profiles)):
             env.close()
-            raise TypeError('candidate binding did not construct PandaPositionServoProfileV1')
+            raise TypeError('candidate binding did not construct one or two Entity-bound PositionServoV1 profiles')
         return env
+
+    def _bind_selected_controller(self, value):
+        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+
+        raw = value['controller']
+        profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
+        if profiles and all(isinstance(item, PandaPositionServoProfileV1) for item in profiles):
+            if len(profiles) > 2 or len({item.writer_id for item in profiles}) != len(profiles):
+                raise ValueError('selected Position route admits one writer or the bounded two-Entity profile set')
+            if len({item.entity_id for item in profiles}) != len(profiles):
+                raise ValueError('selected Position writers must bind distinct Entities')
+            profiles = tuple(sorted(profiles, key=lambda item: item.entity_id))
+            self.position_profiles = profiles
+            self.position_profile = True
+            # Existing callers of selected-reference metadata continue to see
+            # the original Panda profile; dual dispatch uses position_profiles.
+            self.controller = profiles[0]
+        else:
+            if isinstance(raw, (tuple, list)):
+                raise TypeError('legacy selected routes do not accept a Controller profile collection')
+            self.position_profiles = ()
+            self.position_profile = False
+            self.controller = raw
 
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000, _binding=None):
         if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
@@ -126,9 +155,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
-        self.controller = self.value['controller']
-        from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
-        self.position_profile = isinstance(self.controller, PandaPositionServoProfileV1)
+        self._bind_selected_controller(self.value)
+        self.dual_entity_position = len(self.position_profiles) == 2
         self.metadata = {**METADATA, 'action_schema': dict(METADATA['action_schema']), 'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
@@ -142,6 +170,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
                 'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
             })
+            if self.dual_entity_position:
+                state_spaces['entities'] = Dict({
+                    profile.entity_id: Dict({
+                        'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
+                        'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                    })
+                    for profile in self.position_profiles
+                })
         self.observation_space = Dict({'state': Dict(state_spaces),
             'privileged_state': Dict({k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32) for k in keys})})
         self.session = None
@@ -211,6 +247,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def composition_spec(self):
         return self.value['source'].composition
 
+    def _position_requirements(self):
+        from ..artifacts import StateRequirements
+
+        if len(self.position_profiles) == 1:
+            return self.position_profiles[0].requirements
+        return StateRequirements(
+            'state-requirements-v1', 'controller', 'c02b-dual-position-dispatch-v1',
+            tuple(requirement for profile in self.position_profiles
+                  for requirement in profile.requirements.requirements),
+        )
+
     def reset(self, *, seed=_RESET_SEED_UNSET, options=None):
         if self._closed:
             raise RuntimeError('environment is closed')
@@ -257,9 +304,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             phase = 'reset_seed'
             if not getattr(self, 'position_profile', False):
                 seed = self.binding.reset_seed(seed)
-            self.solution, self.controller = self.value['solution'], self.value['controller']
-            from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
-            self.position_profile = isinstance(self.controller, PandaPositionServoProfileV1)
+            self.solution = self.value['solution']
+            self._bind_selected_controller(self.value)
+            self.dual_entity_position = len(self.position_profiles) == 2
             phase = 'reset_sample'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
@@ -279,7 +326,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.position_plan = self.value.get('controller_binding_plan')
                 if self.position_plan is None:
                     self.position_plan = compile_control_binding_plan(
-                        self.position_scene, (self.controller.controller_binding(),),
+                        self.position_scene,
+                        tuple(profile.controller_binding() for profile in self.position_profiles),
                     )
                 if not isinstance(self.position_plan, ControlBindingPlanV1):
                     raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
@@ -301,7 +349,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self.artifact, self.execution, source=self.value['source'],
                     binding=ControlBinding('panda-main/gripper', .08),
                     controller_binding_plan=self.position_plan,
-                    controller_profile=self.controller,
+                    controller_profile=self.position_profiles,
                 )
             else:
                 self.position_profile = False
@@ -320,9 +368,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     scene=self.position_scene,
                     joint_bindings=self.position_joint_bindings,
                     frame_bindings=self.position_frame_bindings,
-                    requirements=self.controller.requirements,
+                    requirements=self._position_requirements(),
                 )
-                self.controller.reset(self.typed_state, self.position_plan)
+                for profile in self.position_profiles:
+                    profile.reset(self.typed_state, self.position_plan)
                 self.feedback = None
             else:
                 phase = 'controller_feedback'
@@ -393,26 +442,36 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if getattr(self, 'position_profile', False):
             view = self.typed_state.view
             boundary = view.boundary
-            joints = {
-                value.joint_id: value for value in view.joints if value.entity_id == 'panda-main'
-            }
-            hand = next(
-                value for value in view.frames
-                if value.frame.entity_id == 'panda-main' and value.frame.frame_id == 'hand'
-            )
+            entity_states = {}
+            for profile in self.position_profiles:
+                joints = {
+                    value.joint_id: value for value in view.joints
+                    if value.entity_id == profile.entity_id
+                }
+                hand = next(
+                    value for value in view.frames
+                    if value.frame.entity_id == profile.entity_id
+                    and value.frame.frame_id == profile.hand_frame_id
+                )
+                entity_states[profile.entity_id] = {
+                    'joint_position': np.asarray([
+                        joints[name].position[0]
+                        for name in (*profile.joint_ids, *profile.finger_joint_ids)
+                    ], dtype=np.float32),
+                    'hand_pose': np.asarray(
+                        (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz),
+                        dtype=np.float32,
+                    ),
+                }
+            primary = self.position_profiles[0]
             identity_hex = boundary.boundary_id.removeprefix('state-boundary-')
             state_obs.update({
-                'joint_position': np.asarray([
-                    joints[name].position[0] for name in (
-                        'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7',
-                        'finger_joint1', 'finger_joint2',
-                    )
-                ], dtype=np.float32),
-                'hand_pose': np.asarray(
-                    (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz), dtype=np.float32,
-                ),
+                'joint_position': entity_states[primary.entity_id]['joint_position'],
+                'hand_pose': entity_states[primary.entity_id]['hand_pose'],
                 'boundary_identity_sha256': np.frombuffer(bytes.fromhex(identity_hex), dtype=np.uint8).copy(),
             })
+            if self.dual_entity_position:
+                state_obs['entities'] = entity_states
         for semantic, key in self.binding.object_poses:
             pose = state.pose_world[semantic]
             obs['privileged_state'][key + '_body_pose'] = np.array(
@@ -485,15 +544,31 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         try:
             interval_attempted = True
             phase = 'position_control_compute_apply_step'
-            canonical, target, applied, self.state, self.typed_state = execute_position_control_interval(
-                self.session, self.controller, self.position_plan, request, self.typed_state,
+            profiles = tuple(getattr(self, 'position_profiles', (self.controller,)))
+            controller_profiles = profiles if len(profiles) == 2 else profiles[0]
+            requirements = (
+                self._position_requirements()
+                if hasattr(self, 'position_profiles')
+                else getattr(self.controller, 'requirements', None)
+            )
+            result = execute_position_control_interval(
+                self.session, controller_profiles, self.position_plan, request, self.typed_state,
                 scene=self.position_scene,
                 joint_bindings=self.position_joint_bindings,
                 frame_bindings=self.position_frame_bindings,
+                requirements=requirements,
             )
+            if self.dual_entity_position:
+                position_records, self.state, self.typed_state = result
+                canonical = target = applied = None
+            else:
+                canonical, target, applied, self.state, self.typed_state = result
+                position_records = ((canonical, target, applied),)
             interval_completed = True
             self.feedback = None
-            self.last_position_transition = (canonical, target, applied)
+            self.last_position_transition = (
+                position_records if self.dual_entity_position else (canonical, target, applied)
+            )
             phase = 'position_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             terminated = bool(self.evaluation.failure)
@@ -506,9 +581,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.recorder is not None:
                 phase = 'record_position_transition'
                 record_append_attempted = True
-                self._record_position_transition(
-                    request, canonical, target, applied, terminated=terminated, truncated=truncated,
-                )
+                if self.dual_entity_position:
+                    self._record_dual_position_transition(
+                        request, position_records, terminated=terminated, truncated=truncated,
+                    )
+                else:
+                    self._record_position_transition(
+                        request, canonical, target, applied,
+                        terminated=terminated, truncated=truncated,
+                    )
             # Publish the boundary only after the complete step and any active
             # recorder append have succeeded. A partially advanced fault is
             # diagnostic evidence, never a synthetic T transition.
@@ -815,6 +896,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'controller_identity': self.controller.identity,
             'profile_id': self.controller.profile_id,
         }
+        if self.dual_entity_position:
+            details['position_writers'] = tuple({
+                'entity_id': profile.entity_id,
+                'writer_id': profile.writer_id,
+                'controller_identity': profile.identity,
+            } for profile in self.position_profiles)
         details.update(dict(payload or {}))
         success = (
             bool(self._published_position_evaluation.success)
@@ -1084,26 +1171,47 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         profile = self.controller
         action_schema = profile.controller_binding().action_schema
         action_contract = asdict(action_schema)
+        position_profiles = self.position_profiles
+        if self.dual_entity_position:
+            action_components = tuple(
+                f'{writer_profile.entity_id}/{component}'
+                for writer_profile in position_profiles
+                for component in writer_profile.controller_binding().action_schema.components
+            )
+            action_contract.update({
+                'schema_id': 'panda-position-dual-entity-action-v1',
+                'schema_version': 'structured-action-schema-v1',
+                'components': action_components,
+            })
+        observation_leaf_specs = [
+            {'path': 'state.ee_pose', 'semantic': 'hand_origin_tcp_pose'},
+            {'path': 'state.joint_position', 'semantic': 'required_panda_joint_position'},
+            {'path': 'state.hand_pose', 'semantic': 'provider_measured_panda_hand_pose'},
+            {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
+        ]
+        if self.dual_entity_position:
+            for writer_profile in position_profiles:
+                observation_leaf_specs.extend((
+                    {'path': f'state.entities.{writer_profile.entity_id}.joint_position',
+                     'semantic': 'entity_qualified_required_joint_position'},
+                    {'path': f'state.entities.{writer_profile.entity_id}.hand_pose',
+                     'semantic': 'entity_qualified_provider_measured_hand_pose'},
+                ))
+        observation_leaf_specs.extend(
+            {'path': f'privileged_state.{key}_body_pose', 'semantic': 'scene_body_pose'}
+            for _, key in self.binding.object_poses
+        )
         env_metadata = {
             'env_name': 'SelectedReferenceEnv.PositionServoV1',
             'task_name': self.artifact.task_id,
             'task_version': self.artifact.artifact_version,
             'scene_uid': self.position_scene.scene_id,
-            'agent_uids': ('panda-main',),
+            'agent_uids': tuple(item.entity_id for item in position_profiles),
             'physics_dt': self.artifact.timebase.physics_dt,
             'control_substeps': self.artifact.timebase.control_substeps,
             'control_frequency': 1.0 / self.artifact.timebase.control_dt,
             'action_schema': action_contract,
-            'observation_schema': {'leaf_specs': [
-                {'path': 'state.ee_pose', 'semantic': 'hand_origin_tcp_pose'},
-                {'path': 'state.joint_position', 'semantic': 'required_panda_joint_position'},
-                {'path': 'state.hand_pose', 'semantic': 'provider_measured_panda_hand_pose'},
-                {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
-                *[
-                    {'path': f'privileged_state.{key}_body_pose', 'semantic': 'scene_body_pose'}
-                    for _, key in self.binding.object_poses
-                ],
-            ]},
+            'observation_schema': {'leaf_specs': observation_leaf_specs},
             'reference_profile': {
                 'profile_id': profile.profile_id,
                 'writer_id': profile.writer_id,
@@ -1118,10 +1226,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'force_feedback': 'not_consumed',
             },
         }
+        universal_components = tuple(action_schema.components)
+        if self.dual_entity_position:
+            universal_components = action_components
         universal_schema = {
             'version': 'panda-position-servo-universal-action-v1',
-            'dimension': len(action_schema.components),
-            'components': tuple(action_schema.components),
+            'dimension': len(universal_components),
+            'components': universal_components,
         }
         return {
             'env_metadata': env_metadata,
@@ -1136,6 +1247,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
             },
         }
+        if self.dual_entity_position:
+            env_metadata['candidate_identity']['scene_identity_hash'] = self.position_scene.identity_hash
+            env_metadata['reference_profile']['writers'] = tuple({
+                'entity_id': item.entity_id,
+                'profile_id': item.profile_id,
+                'writer_id': item.writer_id,
+                'controller_identity': item.identity,
+                'required_state': item.requirements.to_mapping(),
+            } for item in position_profiles)
+            env_metadata['resolved_config']['controller_profiles'] = tuple(
+                item.profile_id for item in position_profiles
+            )
 
     def _record_position_transition(self, request, canonical, target, applied, *, terminated, truncated):
         from ..trajectory.canonical.episode import StructuredControlTransitionV1
@@ -1170,6 +1293,65 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'payload': applied_payload, 'target_hash': applied.target_hash,
                 },
             },),
+        )
+        control.validate()
+        self.recorder.append_transition(
+            action_values, action_values, self.obs, float(self.evaluation.reward),
+            bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
+            structured_control=control,
+        )
+
+    def _record_dual_position_transition(self, request, position_records, *, terminated, truncated):
+        """Store both Entity writers in the existing Generic H5 v3 transition."""
+        from ..trajectory.canonical.episode import StructuredControlTransitionV1
+
+        groups = {(group.entity_id, group.group_id): group for group in request.groups}
+        expected_groups = {
+            (profile.entity_id, group_id)
+            for profile in self.position_profiles for group_id in ('arm', 'gripper')
+        }
+        if set(groups) != expected_groups or len(position_records) != 2:
+            raise ValueError('dual Position recording requires both groups for both admitted Entities')
+        action_values = np.asarray(tuple(
+            value
+            for group_key in sorted(groups)
+            for value in groups[group_key].values
+        ), dtype=np.float32)
+        records_by_writer = {target.writer_id: (canonical, target, applied)
+                             for canonical, target, applied in position_records}
+        writer_controls = []
+        for profile in self.position_profiles:
+            canonical, bound_target, applied = records_by_writer[profile.writer_id]
+            schema = profile.controller_binding().action_schema
+            writer_controls.append({
+                'writer_id': profile.writer_id,
+                'action_schema_id': schema.schema_id,
+                'components': tuple(schema.components),
+                'groups': (
+                    {'entity_id': profile.entity_id, 'group_id': 'arm',
+                     'action_components': tuple(schema.components[:7])},
+                    {'entity_id': profile.entity_id, 'group_id': 'gripper',
+                     'action_components': (schema.components[7],)},
+                ),
+                'requested_action': canonical.requested.to_mapping(),
+                'canonical_action': {
+                    **canonical.to_mapping(),
+                    'position_target_v1': bound_target.to_mapping(),
+                    'position_target_identity_hash': bound_target.identity_hash,
+                },
+                'controller_target': {
+                    'schema_version': bound_target.target.schema_version,
+                    'payload': bound_target.target.to_mapping(),
+                    'identity_hash': bound_target.target.identity_hash,
+                },
+                'applied_control': {
+                    'schema_version': applied.schema_version,
+                    'payload': applied.to_mapping(),
+                    'target_hash': applied.target_hash,
+                },
+            })
+        control = StructuredControlTransitionV1(
+            'structured-control-transition-v1', request, tuple(writer_controls),
         )
         control.validate()
         self.recorder.append_transition(

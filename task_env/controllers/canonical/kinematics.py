@@ -31,7 +31,8 @@ class PandaTcpProfileV1(Contract):
     def validate(self):
         if self.schema_version != 'panda-tcp-profile-v1':
             raise ValueError('unsupported Panda TCP profile schema')
-        if self.tcp_id != 'panda-main/hand-origin-tcp-v1' or self.hand_frame_id != 'hand':
+        entity_id, separator, suffix = self.tcp_id.partition('/')
+        if not separator or not entity_id or suffix != 'hand-origin-tcp-v1' or not self.hand_frame_id:
             raise ValueError('unsupported Panda TCP identity/frame')
         if tuple(self.position_m) != (0.0, 0.0, 0.0) or tuple(self.quaternion_wxyz) != (1.0, 0.0, 0.0, 0.0):
             raise ValueError('hand-origin TCP v1 is the identity transform from hand')
@@ -57,22 +58,23 @@ PANDA_HAND_ORIGIN_TCP_V1 = PandaTcpProfileV1(
 
 
 class PandaKinematics:
-    def __init__(self,xml,*,tcp_profile=None):
+    def __init__(self,xml,*,tcp_profile=None,native_prefix=''):
         self.source_sha256=hashlib.sha256(xml.encode()).hexdigest();root=ET.fromstring(xml)
         if root.find('compiler').get('angle','degree')!='radian':raise ValueError('kinematic source must use radians')
-        body=root.find(".//body[@name='link0']");self.base_transform=transform(body);self.chain=[];self.limits=[]
+        native_prefix=str(native_prefix)
+        body=root.find(f".//body[@name='{native_prefix}link0']");self.base_transform=transform(body);self.chain=[];self.limits=[]
         defaults=root.find(".//default[@class='panda']/joint").attrib
         for i in range(1,8):
-            children=body.findall('body');next_body=next((b for b in children if b.get('name')==f'link{i}'),None)
+            children=body.findall('body');next_body=next((b for b in children if b.get('name')==f'{native_prefix}link{i}'),None)
             if next_body is None:raise ValueError('unsupported Panda chain')
             joints=next_body.findall('joint')
-            if len(joints)!=1 or joints[0].get('name')!=f'joint{i}':raise ValueError('unsupported Panda joint structure')
+            if len(joints)!=1 or joints[0].get('name')!=f'{native_prefix}joint{i}':raise ValueError('unsupported Panda joint structure')
             j=dict(defaults);j.update(joints[0].attrib)
             if j.get('type','hinge')!='hinge' or j.get('ref','0')!='0':raise ValueError('only zero-reference hinges supported')
             axis=np.fromstring(j.get('axis','0 0 1'),sep=' ');axis/=np.linalg.norm(axis)
             pivot=np.fromstring(j.get('pos','0 0 0'),sep=' ')
             self.chain.append((transform(next_body),axis,pivot));self.limits.append(np.fromstring(j['range'],sep=' '));body=next_body
-        hand=body.find("body[@name='hand']")
+        hand=body.find(f"body[@name='{native_prefix}hand']")
         if hand is None:
             raise ValueError('Panda source is missing the declared hand body')
         if tcp_profile is None:
@@ -85,7 +87,7 @@ class PandaKinematics:
             if not isinstance(tcp_profile,PandaTcpProfileV1):
                 raise TypeError('Panda kinematics TCP must be PandaTcpProfileV1')
             tcp_profile.validate()
-            if tcp_profile.hand_frame_id != hand.get('name'):
+            if hand.get('name') != f'{native_prefix}{tcp_profile.hand_frame_id}':
                 raise ValueError('Panda TCP frame is not the materialized hand body')
             self.tip=transform(hand)@tcp_profile.local_transform()
             self.tcp_profile=tcp_profile

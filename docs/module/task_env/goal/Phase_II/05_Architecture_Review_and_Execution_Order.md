@@ -6,10 +6,10 @@
 > 原始五份草案由提交 [a299d8b](https://github.com/Lebingelee/GeoChora/commit/a299d8b) 按原字节保存。
 > 本文是本组规划的决策/执行顺序入口；`01–04` 是各父 Goal 的详细契约。都不是新的能力矩阵或 Qualification Decision。
 
-> **当前规划与实现状态（2026-10-22）**：C02b-P 后续授权 C02b-E；Position candidate 的 GeoPhys/MuJoCo CPU S2、Generic H5 v3 真写读和受影响专项检查已有 bounded evidence，等待维护者复核。
+> **当前规划与实现状态（2026-10-22）**：C02b-P/E 的单 Panda Position 交集和 P00/P99 最小双 Entity Position-only 子项已有 GeoPhys/MuJoCo CPU S2、Generic H5 v3 真写读及定向检查的 bounded evidence，等待维护者复核。
 > 下方当前表已采用 P00 的 **20 父 Goal / 33 实施切片 + P00/P99**；历史 receipts 保留当时编号与结论。
-> C02b 恢复分为内部 P/E 检查点，C02b 仍 BLOCKED；Position-only candidate 的 S2/H5 只覆盖单 Panda force-free 交集，R1 force 缺陷仍保留。S2 与 H5 v3 是 E 的后层退出标准，不是启动前置。
-> 见 [恢复审阅报告](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)与 [Phase C 当前契约](03_Phase_C_Execution_Lifecycle.md#c02--controller-binding--atomic-execution--safe-switchabc)。
+> C02b 恢复分为内部 P/E 检查点，C02b 仍 BLOCKED；单/双 Entity Position-only S2/H5 不关闭 R1 force freshness、其他任务 Guard 或完整 qualification。S2 与 H5 v3 是 E 的后层退出标准，不是启动前置。
+> 见 [恢复审阅报告](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)、[双 Entity Position Acceptance](C02b_Dual_Entity_Position_Acceptance.md)与 [Phase C 当前契约](03_Phase_C_Execution_Lifecycle.md#c02--controller-binding--atomic-execution--safe-switchabc)。
 > **D03 current bounded result**：序号 31 已通过 GeoPhys CPU × MuJoCo native OpenGL 的 Position candidate RGB transform-sync S1/S2；仅覆盖 Scene-v3 scalar joints、Position arm movement 和单路 camera，不覆盖 D04 或完整 D05b。见 [Phase D D03 receipt](04_Phase_D_Physics_Rendering.md#d03-first-bounded-intersection-receipt-2026-10-21)。
 > **D04 current bounded result**：序号 32 已通过同交集的 RGB/optical-Z Depth 与 Entity-instance segmentation；fixed/hand-mounted camera、遮挡、reset freshness、mask/label-map 磁盘回读均有 S1/S2。只准入 Scene-v3 scalar-joint Position source → GeoPhys CPU × MuJoCo native OpenGL。Semantic segmentation、free-joint、完整 D04/D05b 与 Qualification 仍未覆盖。见 [Phase D D04 receipt](04_Phase_D_Physics_Rendering.md#d04-bounded-entity-instance-segmentation-receipt-2026-10-22)。
 > **D05b current bounded result**：序号 33 已通过指定 Position/Scene-v3 scalar-joint 交集的 default + per-camera override、exact admission、双相机 materialization/sync/capture/close S1/S2；Physics 是 GeoPhys CPU，Renderer 是 MuJoCo native OpenGL，输出为 RGB/optical-Z Depth/Entity-instance mask。仅首个 pairing bounded gate 通过；Environment policy observation、TransitionRecorder、完整 D05b 矩阵及 Qualification 未覆盖。见 [Phase D D05b receipt](04_Phase_D_Physics_Rendering.md#d05b-bounded-cross-provider-pairing-receipt-2026-10-22)。
@@ -55,7 +55,7 @@ Menagerie 为 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。它们不能用当前
 | Timebase | 首个 vNext 保留 exact physics_dt/substeps/control_dt/sampling | 同 control_dt 不证明跨 native dt 等价；进一步拆分独立评估 |
 | Task freeze | E 延后只延后编排工具 | 新 frozen task 仍须 validation、randomized feasibility、Human Judge；不达标为 candidate |
 | Variant | 首个基线固定拓扑，仅 Role/pose randomization | 拓扑改变明确拒绝；未来重建 Env/wrapper 或另设计有界 mask |
-| Multi-robot | 双 Robot 静态命名/引用必测；真实主线先单 Robot/arm+hand | 双 Robot 动力学需独立 D01b/C02b S2，否则准确标 unsupported/deferred |
+| Multi-robot | 双 Robot 静态命名/引用必测；真实主线先单 Robot/arm+hand | 两个独立 Panda Position Entity 的 exact Scene-v3/GeoPhys-or-MuJoCo CPU 交集已有 D01/C02 S2；任意 N、Assembly、其他配置/provider/backend 仍 unsupported/deferred |
 | Scalar | 先统一公共行为，经已有 ports/adapter 适配 | 不要求立即同一具体 Env 类，不新造 UniversalRuntime |
 | Semantics | TaskDefinition 适配 evaluation context，一 sample 一次提交 | native Guard 只读判据、observation、render/diagnostics 不改 Task memory |
 | Action/record | structured request 与 target/applied 分层；C05a 前移 | 不把 NumPy vector writer 当 tree writer，不合并三类旧格式 |
@@ -100,7 +100,7 @@ a/b/c 后缀属于原 20 个父目标，不另增同义 subsystem。每个切片
 | 23 | C05a3 | C05a1、C05a2 | **bounded evidence mapped；退出待复核**：已有 outer v1/stream v3 与旧读者拒绝；保留各格式 owner 和 historical detector 边界，见 §3.2 |
 | 24 | C03a | C02a、D01b、C05a2 | **bounded implemented**：scalar lifecycle、fault receipt、Recorder interval 完整性；历史证据见原文收据 |
 | 25 | C04 | C03a、D02b | **bounded implemented**：observation/info schemas、feedback 与 diagnostics 分离；历史收据有效 |
-| 26 | C02b | C02a、C03a、C04、C05a2、D01b | **BLOCKED**：P 审阅完成；单 Panda Position candidate 的 S1、GeoPhys/MuJoCo CPU S2 与 Generic H5 v3 state readback bounded 通过。Force-aware R1 raw-force/reset freshness 与其他必需交集仍 blocked |
+| 26 | C02b | C02a、C03a、C04、C05a2、D01b | **BLOCKED**：单 Panda Position 与 P00/P99 最小双 Entity Position-only 子项的 S1、GeoPhys/MuJoCo CPU S2、Generic H5 v3 state readback bounded 通过。Force-aware R1 raw-force/reset freshness、Guard/其他必需交集与完整 qualification 仍 blocked；见 [双 Entity receipt](C02b_Dual_Entity_Position_Acceptance.md) |
 | 27 | C03b | C03a、C04、C05a2 | **bounded implemented**：现有 generic/Position scalar lifecycle、EpisodeEnd、v3 reader consumer；Pendulum GeoPhys S2 与双 Provider Position Stop/H5 通过；selected R1、vector、全部算法和 MuJoCo generic Pendulum 未支持。详见 [C03b receipt](C03b_Stop_Outcome_Receipt_2026-10-21.md) |
 | 28 | C02c | C02b、C03b、C05a2 | 受限同外部 schema/safepoint 的 Controller safe switch、memory/identity/ack/events；不等待整项 C05c，NutAssembly 未验证仍拒绝 |
 | 29 | C05b | C02b、C03b、C04、C05a3 | PickCube external Solution、真实 step/record 和两 Provider 指定交集回归 |
@@ -520,11 +520,10 @@ Recovery Review 原始文档修订授权与 C02b-P 审阅结论见
 - **RA-01 Profile 分流**：为新位置 Profile 生成独立 writer/config/source/binding identity，只要求实际算法消费的
   Joint/Frame state；保留 R1 raw-force required、拒绝测试与 reset stale-force 缺陷。位置 servo 的 physical force cap
   是 command，不是 query；position-only 不等价于 R1。
-- **RA-02 P/E 检查点**：C02b-P 与 E-S1/S2/H5 已完成 Position identity/state mapping、force-free dispatch、双 Provider native actuation/ack、C03a fault evidence 与 H5 磁盘 state readback。S2/H5 是 E 的分层退出标准，不是开工前置；P/E 的这条单 Panda 路线不等于完成 C02b。记录见 [Position-based Profile Review](C02b_P_Position_Based_Profile_Review.md)、[S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md) 与 [S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md)。
+- **RA-02 P/E 检查点与双 Entity 子项**：C02b-P/E 已完成单 Panda Position candidate 的 identity/state mapping、force-free dispatch、双 Provider native actuation/ack、C03a fault evidence 与 H5 磁盘 state readback。2026-10-22 增加 exact `panda-main`/`panda-secondary` 独立 Position writers，同 RuntimeSession、16 个隔离 actuator resources、Entity-qualified target/ack/state 与 reset/record readback；GeoPhys CPU、MuJoCo CPU 双 Provider S2 和 S1 fault evidence 通过。这只关闭 P00/P99 最小双 Entity position-only 子项，不开放通用多 writer/Assembly/production capability，也不等于完成 C02b。记录见 [Position-based Profile Review](C02b_P_Position_Based_Profile_Review.md)、[S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md)、[S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md) 与 [Dual Entity Acceptance](C02b_Dual_Entity_Position_Acceptance.md)。
 - **RA-03 反馈/存储接口**：旧 selected R1 consumer 和 canonical BoundaryRecord 仍依赖 force/readiness；Position candidate 复用 typed state projection，现已接既有 Generic H5 v3 真写读。GeoPhys Position 路径不调用旧 force feedback；MuJoCo 按 plan policy 在 reset/step 不复制 force cache，legacy force-aware 默认行为保持。R1 raw-force 与 reset freshness 仍 blocked。
 - **RA-04 依赖同步**：采用 P00 的 33 切片表、C05a evidence crosswalk、C02c←C02b/C03b/C05a2。
   C03b 已完成 bounded scalar Stop/Outcome 路线且无 C02b 硬依赖；C05b/C05c 的实际 Solution/Guard 保真不能由位置 Profile 或本次 Stop 证据代替。
-- **RA-05 Assembly 后置**：Logical members/preset 与 Physical Attachment 分开；跨 Entity fixed-joint 装配另审版本与
-  Provider S2，不改变现行 Scene v3 或历史收据，不成为 C02b 新前置。P00/P99 最小双 Entity 隔离施控义务保留。
-- **RA-06 发布边界**：C02b E 的本地 checkpoint 为 `d99941c`；C03b 改动尚未提交或推送。C02b、force-aware 缺陷、C02c、通用 Panda TaskEnv
+- **RA-05 Assembly 后置**：Logical members/preset 与 Physical Attachment 分开；本轮诊断 Scene 中两个 articulated roots 仍独立且无 attachment。跨 Entity fixed-joint 装配另审版本与 Provider S2，不改变现行 Scene v3 或历史收据，不成为 C02b 新前置；不把它与已通过的最小独立施控子项混为一谈。
+- **RA-06 发布边界**：本轮开始前的 D05b 本地检查点为 `477ff8054fb57356e8d03414f2356dd0f18ea043`；本轮 C02b dual Entity 源码与报告保持未提交，未推送/合并。C02b、force-aware 缺陷、C02c、通用 Panda TaskEnv
   Stage 1 composition 缺口均未关闭；没有 Assembly 或 Phase II qualification。

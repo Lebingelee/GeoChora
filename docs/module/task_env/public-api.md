@@ -92,14 +92,14 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
-| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。v0 legacy route 保持；v1 仅支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 另要求精确 Scene identity、Joint/Frame bindings 与 StateRequirements；contact/native-interval 不由此支持 |
+| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有仅供明确的双 Panda Position candidate 使用的 exact two-root admission，任意多 Robot materialization 不开放。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 另要求精确 Scene identity、Joint/Frame bindings 与 StateRequirements；contact/native-interval 不由此支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
 | `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 已对单 Panda Position/Scene-v3 scalar-joint source → GeoPhys CPU × MuJoCo native OpenGL 验证 default/override、双相机 materialization/sync/capture/close S1/S2。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. This exact pairing is TESTED_BOUNDED only; other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification are unsupported or unverified |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
-## C02b Position Profile candidate status (2026-10-21)
+## C02b Position Profile candidate status (2026-10-22)
 
 The C02b-E first-round candidate adds an internal, opt-in
 `PandaPositionServoProfileV1` (`task_env.controllers.canonical.position_profile`) path. It reuses
@@ -108,14 +108,22 @@ The C02b-E first-round candidate adds an internal, opt-in
 force-free typed Joint/hand requirements on GeoPhys/MuJoCo CPU only. Its versioned target binds the actual
 Profile identity, source closure, plan and state boundary. The current A05 candidate uses the explicit
 `panda-main/hand-origin-tcp-v1` transform and 100 Hz / five 2 ms steps. This is not a default task-factory
-selection, registered production capability or qualification. Its explicit `SelectedReferenceEnv.from_position_candidate()`
-constructor uses an existing `ReferenceTaskBinding`, and its bounded selected-lifecycle route writes Generic H5 v3.
-GeoPhys CPU and MuJoCo CPU S2 plus structured-control/action-projection and raw state-leaf disk readback have passed
-for the single-Panda candidate only.
+selection, registered production capability or qualification. The 2026-10-22 bounded dual candidate composes two
+instances of the same existing profile algorithm for exact Entity IDs `panda-main` and `panda-secondary`, with
+Entity-qualified Joint/hand state, disjoint arm/gripper resources (16 actuators total), one complete
+`ControlBindingPlanV1`, and one shared selected RuntimeSession/world. All groups are preflighted before either
+Controller computes; target and applied acknowledgement retain writer, Entity, resource, episode, and source-boundary
+identity. This exact diagnostic admission is not general multi-writer arbitration, arbitrary N-Entity support, Assembly,
+or a registered capability. The explicit `SelectedReferenceEnv.from_position_candidate()` constructor uses an existing
+`ReferenceTaskBinding`, and its bounded selected-lifecycle route writes Generic H5 v3. GeoPhys CPU and MuJoCo CPU S2
+plus H5 v3 request/target/ack and Entity-specific state/boundary disk readback passed for both single- and dual-Panda
+candidates. The dual S1 rejects wrong Entity, missing Group, overlapping writers/resources, wrong binding identity,
+stale target, and materialization-boundary mismatch before compute/apply/step.
 The independent `panda-main/production-r1` contract remains required-force and continues to reject before
 Runtime materialization when `actuator_force_query` is unavailable. See the
-[C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md) and
-[S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md).
+[C02b-E S1 acceptance](goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
+[S2/H5 acceptance](goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
+[Dual Entity acceptance](goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
 
 D05a 的执行选择只新增在 advanced Artifact/Camera owners 下。`RuntimeSession.materialize()` 和当前
 `create_camera_session()` 仍走旧 `ExecutionSpec` 与实际同名 physics/render admission；D05a 没有改变

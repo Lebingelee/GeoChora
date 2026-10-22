@@ -53,6 +53,7 @@ class _GeoPhysSession(_SessionValues):
             targets[actuator] = sample.joint_position[name]
         for actuator in self._open_actuators:
             targets[actuator] = self._ctrl_range[actuator, 1]
+        self._current_ctrl = np.array(targets, copy=True)
         self._boundary.apply_reset_state(EpisodePhysicsState(
             positions, np.zeros_like(initial.qvel), np.zeros_like(initial.qacc),
             targets, np.zeros_like(initial.act),
@@ -98,16 +99,24 @@ class _GeoPhysSession(_SessionValues):
         from ...controllers.canonical.contracts import AppliedCanonicalControl
         from ...environment import ControlCommand
         validate_target(self, target)
-        ctrl = np.array(self._initial.ctrl, copy=True)
-        for name, index in self._target_actuators.items():
-            ctrl[index] = target.arm_servo_position[name]
-        index = self._open_actuators[0]
+        ctrl = np.array(self._current_ctrl, copy=True)
+        for name, value in target.arm_servo_position.items():
+            ctrl[self._target_actuators[name]] = value
+        index = getattr(self, '_open_actuators_by_semantic', {}).get(
+            target.gripper.semantic_id, self._open_actuators[0],
+        )
+        control_binding = getattr(self, '_position_control_bindings_by_semantic', {}).get(
+            target.gripper.semantic_id, self._control_binding,
+        )
         low, high = self._ctrl_range[index]
-        ctrl[index] = low + target.gripper.servo_opening_m / self._control_binding.opening_range_m * (high-low)
+        ctrl[index] = low + target.gripper.servo_opening_m / control_binding.opening_range_m * (high-low)
         self._boundary.set_actuator_force_limits((index,), target.gripper.force_limit_N)
-        applied = self._boundary.apply_control(ControlCommand(ctrl, np.zeros(8), np.zeros(8), ctrl, np.zeros(8), "canonical_position"))
-        realized = {name: float(applied.applied_ctrl[i]) for name, i in self._target_actuators.items()}
-        opening = float((applied.applied_ctrl[index]-low)/(high-low)*self._control_binding.opening_range_m)
+        zeros = np.zeros_like(ctrl)
+        applied = self._boundary.apply_control(ControlCommand(ctrl, zeros, zeros, ctrl, zeros, "canonical_position"))
+        self._current_ctrl = np.array(applied.applied_ctrl, copy=True)
+        realized = {name: float(applied.applied_ctrl[self._target_actuators[name]])
+                    for name in target.arm_joint_order}
+        opening = float((applied.applied_ctrl[index]-low)/(high-low)*control_binding.opening_range_m)
         return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'geophys',
             realized, opening, target.gripper.force_limit_N, applied.clipped,
             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')

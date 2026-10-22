@@ -15,6 +15,7 @@ from .source import RuntimeSource
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
+_DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 
 
 class RuntimeSession(Protocol):
@@ -49,7 +50,8 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
 
 
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec, *, source: RuntimeSource,
-                manifest: ProviderCapabilityManifest | None = None) -> RuntimeSession:
+                manifest: ProviderCapabilityManifest | None = None,
+                _materialization_authority=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
@@ -69,7 +71,12 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
     if isinstance(artifact, TaskArtifactV1):
-        _validate_v1_materialization_source(artifact, execution, source)
+        _validate_v1_materialization_source(
+            artifact, execution, source,
+            _allow_independent_robot_instances=(
+                _materialization_authority is _DUAL_POSITION_MATERIALIZATION_AUTHORITY
+            ),
+        )
     elif source.scene_definition is not None and execution.physics_provider != 'geophys':
         raise ValueError('scene-definition-v3 v0 compatibility materialization is currently GeoPhys-only')
     if set(source.joints) != set(artifact.initialization.joint_position):
@@ -83,6 +90,8 @@ def _validate_v1_materialization_source(
     artifact: TaskArtifactV1,
     execution: ExecutionSpec,
     source: RuntimeSource,
+    *,
+    _allow_independent_robot_instances: bool = False,
 ) -> None:
     """Admit only the current single-Robot, scalar-joint Scene-v3 runtime slice."""
     if execution.physics_provider not in {'geophys', 'mujoco'}:
@@ -98,8 +107,22 @@ def _validate_v1_materialization_source(
     expected_source_id = f'{scene.schema_version}:{scene.identity_hash}'
     if source.scene_source.source_id != expected_source_id:
         raise ValueError('RuntimeSource ID must bind the exact TaskArtifact v1 Scene')
-    if len(scene.robots or ()) != 1:
-        raise ValueError('D01b v1 materialization currently requires exactly one RobotInstance')
+    robot_count = len(scene.robots or ())
+    if robot_count != 1:
+        independent_roots = tuple(
+            root
+            for robot in (scene.robots or ())
+            for root in robot.articulation_roots
+        )
+        if (not _allow_independent_robot_instances or robot_count != 2
+                or len(independent_roots) != 2
+                or len({root.entity_id for root in independent_roots}) != 2):
+            raise ValueError('D01b v1 materialization currently requires exactly one RobotInstance')
+        roots_by_entity = {
+            robot.entity_id: robot.articulation_roots for robot in (scene.robots or ())
+        }
+        if any(len(roots) != 1 for roots in roots_by_entity.values()):
+            raise ValueError('bounded dual Position materialization requires two independent single-root Entities')
     if artifact.initialization.poses_world:
         raise ValueError('D01b v1 materialization does not yet admit free-body pose reset fields')
     if not set(artifact.semantics.required_joints) <= set(source.joints):

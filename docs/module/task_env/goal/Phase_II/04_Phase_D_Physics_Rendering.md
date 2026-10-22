@@ -762,7 +762,9 @@ C02b 的新位置 Profile 优先复用现有 position actuation 和 Joint/Frame 
 不得在现行 v3 上原地添加跨 Entity joint、动态 attach/detach 或热切换 topology。
 
 真实多 Entity attachment 当前 DEFERRED，不是 C02b、D03/D04/D05b 的新增硬前置。
-P00/P99 的最小双 Entity 隔离施控是另一项尚需独立 evidence 的要求；未完成不得以 attachment 后置为由静默删除。
+P00/P99 的最小双 Entity position-only 隔离施控已有独立的 GeoPhys/MuJoCo CPU bounded evidence，见
+[C02b 双 Entity Position receipt](C02b_Dual_Entity_Position_Acceptance.md)。该证据不包含 attachment、跨 Entity joint 或
+更广泛的多 Robot 支持；不得以 attachment 后置为由删除 Assembly 与独立施控之间的边界。
 如将来正式实施装配，再明确新版本和额外 gate，不追溯授予旧 A03/D01b 收据新能力。
 
 参考：[Isaac Sim Robot Assembler](https://docs.isaacsim.omniverse.nvidia.com/latest/py/source/extensions/isaacsim.robot_setup.assembler/docs/index.html)。

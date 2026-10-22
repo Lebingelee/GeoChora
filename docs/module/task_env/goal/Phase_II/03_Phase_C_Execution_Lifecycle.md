@@ -4,7 +4,7 @@
 > C02b remains BLOCKED, C02c and unified Environment migration remain incomplete.
 > **2026-10-21 恢复规划修订**：位置控制候选与旧 force-aware 路线分流；之后维护者分别授权 C02b-P/E 与 C03b 有界实现。
 > 当前 33 切片顺序与旧序号映射见 [05](05_Architecture_Review_and_Execution_Order.md#3-切片依赖与推荐执行顺序)，
-> Recovery Review 及后续 E-S1/S2 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md) 与 [C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md)。C02b 仍 BLOCKED；历史收据不改写。
+> Recovery Review 及后续 E-S1/S2 进展见 [Recovery Review](C02b_Recovery_Architecture_Review.md)、[C02b-P Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1](C02b_E_Position_Profile_S1_Acceptance.md)、[C02b-E S2/H5](C02b_E_Position_Profile_S2_Acceptance.md) 与 [dual Entity Position receipt](C02b_Dual_Entity_Position_Acceptance.md)。C02b 仍 BLOCKED；历史收据不改写。
 > 修订于 2026-10-20；源码基准 `develop@f292df149f41520b484ff27cf2ff78a584903013`，发布 v1.1.0。
 > 总体与依赖：[`00_Phase_II_AD_Implementation_Blueprint.md`](00_Phase_II_AD_Implementation_Blueprint.md)；输入：[`01_Phase_A_Core_Object_Model.md`](01_Phase_A_Core_Object_Model.md)、[`02_Phase_B_Task_Semantics.md`](02_Phase_B_Task_Semantics.md)。
 
@@ -331,12 +331,13 @@ Qualification；这些仍须各自满足后续 Goal 的真实 provider gates。
   非兼容 schema 必须新 Env/wrapper。旧 Panda 输出保护，未测 multi-robot 不宣称执行支持。
 - **Codex AUDIT**：精确追踪已有 `RobotControllerHandle`, `ProductionCanonicalPandaController` 以及 `ControlledRuntimeSession` 的 owner/feedback 状态，不复制控制代码。
 
-#### C02b-P / C02b-E recovery contract（2026-10-21，Position candidate S1/S2/H5 bounded；完整 C02b 未完成）
+#### C02b-P / C02b-E recovery contract（2026-10-22，Position 单/双 Entity 有界切片通过；完整 C02b 未完成）
 
-**状态**：C02b 仍为 BLOCKED。Position candidate 已完成 S1、GeoPhys/MuJoCo CPU native S2 与 Generic H5 v3 真写读；force-aware `production-r1` 与完整 C02b 交集仍未完成。它与现有
+**状态**：C02b 仍为 BLOCKED。单 Panda Position candidate 与最小双 Entity Position candidate 已分别完成其声明范围的 S1、GeoPhys/MuJoCo CPU native S2 与 Generic H5 v3 真写读；force-aware `production-r1` 与完整 C02b 交集仍未完成。双 Entity 是两个独立 Scene root，不构成 Assembly。它与现有
 `panda-main/production-r1` 保留不同的 writer/profile/binding identity；R1 raw `actuator_force` requirement 未删除、未改 optional、未填零，force-aware reset freshness 缺陷不因位置路线通过而关闭。
 
 C02b-P 源码审阅与 C02b-E S1/S2/H5 验收分别见 [Position-based Profile Review](C02b_P_Position_Based_Profile_Review.md)、[C02b-E S1 Acceptance](C02b_E_Position_Profile_S1_Acceptance.md) 和 [C02b-E S2/H5 Acceptance](C02b_E_Position_Profile_S2_Acceptance.md)。A05 hand-origin TCP 勘误和 S1/S2/H5 分层退出标准以这些记录为准。
+本次 P00/P99 最小双 Entity position-only 证据见 [C02b 双 Entity Position Acceptance](C02b_Dual_Entity_Position_Acceptance.md)。
 
 **C02b-P — Profile 与完整消费链**：已复用 `CanonicalPandaController` 的 DLS/position servo，
 或在现有 Controller owner 中组合已有位置型 gripper；不重写控制算法。首条候选为同一 Panda Entity、arm/gripper
@@ -361,15 +362,14 @@ joint positions 和 EE world pose；绑定 source/kinematic model、frame、unit
 Composite preset/leaf override 在未来展开为一个不可变 Effective Plan，父 preset 不增加 writer；
 递归 Robot Assembly、跨 Entity attachment、whole-body IK 不属于本检查点。
 
-**C02b-E — 实际执行**：Position candidate 通过 `SelectedReferenceEnv.from_position_candidate()` 显式进入既有 `ReferenceTaskBinding`/SelectedReferenceEnv lifecycle；没有新增默认 registry。沿用 `compile_control_binding_plan()`/`prepare_structured_action()` 全组预检、单 writer compute/apply、source-bound target/boundary identity、现有 `RuntimeSession.step()`、typed publication 与 C03a fault latch。fixed ResetPlan 的 omitted seed 使用绑定 seed；不匹配的显式 seed 在修改 live Position session 前拒绝。
+**C02b-E — 实际执行**：Position candidate 通过 `SelectedReferenceEnv.from_position_candidate()` 显式进入既有 `ReferenceTaskBinding`/SelectedReferenceEnv lifecycle；没有新增默认 registry。沿用 `compile_control_binding_plan()`/`prepare_structured_action()` 全组预检、source-bound target/boundary identity、现有 `RuntimeSession.step()`、typed publication 与 C03a fault latch。固定 ResetPlan 的 omitted seed 使用绑定 seed；不匹配的显式 seed 在修改 live Position session 前拒绝。既有单 writer Position 路径保持；新增的精确双 Entity candidate 仅准入 `panda-main` 与 `panda-secondary` 两个独立 writer、各自完整 arm/gripper Groups 和互不重叠的 16 个 actuator resources。所有 Entity/Group/action/target/ack/state 均保留 Entity-qualified 身份；两 writer 的动作和 source boundary 全组预检后才 compute/apply。
 GeoPhys/MuJoCo CPU 两个独立进程用相同 hash-bound candidate/sample 完成 64 个真实 outer controls 和每区间五个 2 ms 的 native-clock evidence。Generic H5 v3 记录 reset observation、64 个 structured controls、65 个 boundary observations 与 outcome；结构化 reader、training projection 和磁盘 joint/hand/boundary identity leaves 均回读通过。clock 的五步数由公开 native-time delta 推断，不冒称 RuntimeSession 提供独立 native completion counter。apply、post-step、record fault injection 均复用 C03a fault latch；record failure 不留半条 transition。
 
 最终定向回归覆盖 Position profile/execution/H5、C02b admission、C02a controller bindings、C03a fault lifecycle、C05a structured recording、D02b typed runtime state 与 selected consumers：**92 passed**，一条上游 `taichi_forge` `locale.getdefaultlocale` 弃用告警。未运行完整仓库回归。
 
-**验收层次**：S1 Profile/source identity、typed adapter、全组 preflight、target freshness、force sentinel 与 R1 admission compatibility 通过；S2/H5 已通过单 Panda Position candidate 声明交集。receipt 不覆盖 obstructed/force-hold、force-aware R1、NutAssembly Guard 或 full Expert。S3/其他真实 task 主线与完整 C02b qualification 尚未通过；S2/H5 是 E 的后层退出标准，不是开工前置。
+**验收层次**：单/双 Entity Position 的声明范围内，S1 身份与资源冲突/拒绝边界、target freshness、双 writer 完整预检，及 S2 双 Provider 真执行、状态与 H5 v3 回读通过。双 Entity partial-apply 注入显示首 writer 已 ack、第二 writer apply 被拒、native clock 未推进、C03a fault latch 生效且没有伪 transition；不声称跨 Entity 物理回滚。被动 Entity 的关节可能因物理响应漂移，隔离判断依据是实际资源目标、Entity-local target/ack 与单独的命令关节运动。receipt 不覆盖 obstructed/force-hold、force-aware R1、NutAssembly Guard 或 full Expert。S3/其他真实 task 主线与完整 C02b qualification 尚未通过；S2/H5 是 E 的后层退出标准，不是开工前置。
 
-**完成边界**：C02b-P/E 不增加正式切片数。单 Panda position-profile S2 只关闭其声明交集；P00 要求的最小双 Entity
-隔离施控另需真实 D01/C02 evidence，不能以 Assembly 后置删除，也不能以 first Panda PASS 标为完整多机器人支持。
+**完成边界**：C02b-P/E 不增加正式切片数。单/双 Entity position-profile S2 只关闭各自的声明交集；P00/P99 的最小双 Entity position-only 独立施控子项已有真实 D01/C02 Evidence，但不代表任意多 Entity/writer、其他 Provider 或 Assembly 支持，也不能将完整 C02b 标为完成。
 未覆盖必需交集时明确 partial，P99 不得标 complete。C05b/C05c 的旧 Solution/readiness/Native Guard 保真另验；
 需要 force 的 consumer 仍受 freshness gate 约束。
 

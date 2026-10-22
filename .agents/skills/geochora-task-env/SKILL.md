@@ -265,19 +265,25 @@ binding requires `actuator_force_query`, which neither current GeoPhys nor MuJoC
 before Runtime construction. Omitting the optional plan preserves the existing legacy route. This check is admission only,
 not Group dispatch, an applied acknowledgement, or real arm+hand execution evidence.
 
-**C02b-E Position Profile candidate (2026-10-21):** use
+**C02b-E Position Profile candidates (2026-10-22):** use
 `PandaPositionServoProfileV1.from_source(artifact, source)` only for the explicit A05 candidate, then compile the
 existing `ControlBindingPlanV1` from `profile.controller_binding()` and pass both plan and profile to the existing
 `materialize_control()` owner. The profile identity binds the candidate Artifact/Scene/source closure, projected MJCF,
 hand-origin TCP v1, exact Joint/Frame/actuator mappings, action schema, ActionConfig and 100 Hz / 5×2 ms timebase.
-Its Required State is the nine Panda Joint positions plus `panda-main/hand` Frame at evaluation boundaries; it does
-not consume measured actuator force. Do not substitute this profile into PickCube R1, weaken its required-force contract,
-or treat the candidate as a default registered capability. The explicit diagnostic candidate constructor reuses
-`SelectedReferenceEnv` and `ReferenceTaskBinding`; its bounded route now records Generic H5 v3 controls and typed state.
-GeoPhys CPU and MuJoCo CPU native S2 plus structured-control, action-projection and disk state-leaf readback passed for
-the single-Panda candidate only. It is not a production task-factory selection or qualification, and it does not close
-the force-aware R1/reset-freshness gap. See the [C02b-E S1 acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md)
-and [S2/H5 acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md).
+Its Required State is the entity's nine Panda Joint positions plus its hand Frame at evaluation boundaries; it does
+not consume measured actuator force. The exact bounded dual candidate composes the same existing Profile for
+`panda-main` and `panda-secondary`, 16 entity-local actuator resources and one complete `ControlBindingPlanV1` in one
+selected RuntimeSession/world. Every action Group and source/boundary identity is preflighted before either Controller
+computes. This does not authorize arbitrary multi-writer arbitration, arbitrary N Entities, Assembly or a default
+capability. The explicit diagnostic candidate constructor reuses `SelectedReferenceEnv` and `ReferenceTaskBinding`; the
+selected lifecycle writes Generic H5 v3. GeoPhys CPU and MuJoCo CPU S2 and request/target/ack/state/boundary disk
+readback passed for both the single- and dual-Panda candidates. Wrong Entity, missing Group, altered Profile/group
+contract, overlap, stale target and boundary mismatch are rejected before compute/apply/step; an injected second-writer
+apply failure uses the C03a latch and emits no partial transition. Do not substitute this profile into PickCube R1, weaken its required-force contract,
+or treat the candidate as a default registered capability. R1 force freshness, NutAssembly Guard and full C02b remain
+blocked. See [single-profile S1](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S1_Acceptance.md),
+[single-profile S2/H5](../../../docs/module/task_env/goal/Phase_II/C02b_E_Position_Profile_S2_Acceptance.md), and
+[dual-Entity acceptance](../../../docs/module/task_env/goal/Phase_II/C02b_Dual_Entity_Position_Acceptance.md).
 
 C05a versioned storage is opt-in. Generic H5 v3 is read with
 `task_env.recorders.load_structured_control_records_h5()`; training projection is accepted only by
