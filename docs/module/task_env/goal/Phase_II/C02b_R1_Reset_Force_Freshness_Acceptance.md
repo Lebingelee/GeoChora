@@ -70,3 +70,44 @@ The next minimal Core scope, if authorized, is a versioned extension of the exis
 ## Skill refresh receipt
 
 The TaskEnv Skill now points to the GeoPhys observation sample contract, names the bounded legacy PickCube R1 route, distinguishes completed-step pre-integration from reset-forward samples, and retains the structured admission limitation. Cold-start route: start at the TaskEnv Skill → C02b-R1 route entry → GeoPhys `control.robot_arm` API reference → this acceptance receipt. The Skill describes no new generic runtime, measurement manager or provider capability.
+
+## Checkpoint preservation and upstream-main recheck (2026-10-22)
+
+After maintainer authorization, the local Provider changes were preserved as
+`eb870f6f8812abea9022594b702df0c395d98d48` on
+`codex/r1-force-freshness-checkpoint-20261022`. Core checkpoint
+`89efbe9803335fd0ec1c0d3bac97ec248677d448` records the integration and points its
+GeoPhys gitlink to that local Provider commit. The earlier passing freshness
+evidence exercised base `4436787` **plus the repair**, not the unmodified base.
+Neither checkpoint was pushed.
+
+Fetching GeoPhys main resolved to `9a43b92032deee90c1aef3a7f5f15216dc8e4b42`
+(17 commits after `4436787`). An isolated, unpatched checkout was tested with
+the pre-repair Core `60b3eca` and the original public-Reader diagnostic adapter.
+Imported module paths and Provider HEAD were captured to exclude the local
+repair from this experiment. The PickCube XML SHA-256 remained
+`bdd119833a5ae3c8176daf1f5ef586c3601870f10f4b4b5f6d7aa730fe5f0fed`.
+
+**Result: upstream reset-force staleness reproduced.** After producing signed
+force `-30 N`, resets at seeds 73 and 31 both restored control step/time to
+zero and actuator8 ctrl to 255; both finger positions were approximately
+0.04 m, but the public Reader still returned `-30 N`. No R1 compute was called.
+The upstream Reader has no `refresh_reset_force_sample()` method. This is a
+bounded diagnostic defect reproduction, not a new R1/Expert acceptance.
+The wrapper's requested-substep count and reset zero-step field are not an
+independent Provider completion counter; clock observations and the reviewed
+reset path support the no-step interpretation.
+
+The GeoPhys local main was fast-forwarded to the fetched commit. A clean
+`codex/fix-reset-force-freshness` branch was created there in the isolated
+worktree at `workspace/maintenance/geophys_upstream_reset_20261022_001/geophys-upstream/`.
+The repair has **not** been ported to that branch. The active Core checkout
+continues using the preserved Provider checkpoint, without adopting upstream
+main or changing any frozen reference.
+
+Raw probe, log, structured result and provenance/hash manifest are preserved
+in ignored `workspace/maintenance/geophys_upstream_reset_20261022_001/`
+(`upstream_native_probe.py`, `upstream_native_probe.log`,
+`upstream_probe_result.json`, `verification_manifest.json`). No broad
+regression, GPU, standalone Simulator reset or Qualification was run in this
+upstream check. Typed raw-force publication/admission and C05b remain open.
