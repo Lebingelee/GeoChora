@@ -7,16 +7,17 @@
   "goal_count": 7,
   "slice_count": 22,
   "baseline": {
-    "core_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "core_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
     "geophys_gitlink": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
     "menagerie_gitlink": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
     "main": "f292df149f41520b484ff27cf2ff78a584903013",
-    "remote_develop_readback": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "remote_develop_readback": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
     "v2_tag_local_only": false,
     "v2_tag_object": "4ebd8d536c0c054641c6edc1a31fcd317fa237cc",
-    "previous_planning_core_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "previous_planning_core_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
     "v2_branch_tag_remote_readback": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
-    "engineering_freeze_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec"
+    "engineering_freeze_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "main_reference_check": "local main/public/main only this revision; remote main not freshly fetched"
   },
   "slices": [
     {
@@ -348,19 +349,19 @@
     "retirement_or_new_stage_continued_deferral_approved": false
   },
   "document_sha256": {
-    "00_Phase_II_01_Blueprint.md": "67bfc64859c68908af002c40de32dbe1f06f88ec2ebd83f6fb132a551ce99b01",
+    "00_Phase_II_01_Blueprint.md": "302f0b1705a79b79d0f90aa0174a34a687c8584117a61d2d69e26cbf748afa7f",
     "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
     "03_R03_Physical_Attachment.md": "b62d999a32be4dc32923f65856e1b021e6a20abd927ee24d28072e76e6adabcf",
     "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
     "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "c608590d3e0429690438759382f888f0e767a056a6d563342c34d38805a6eee9",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "0071c7444e9bbd09036ed33b18407b5ab282af225e69ce6dcec6240d6f853328",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "585f3f7adcef7c03d3fa52c804818026eee47326886caa363b2103671c4490a7",
-    "README.md": "e59c49a476e1911b2405e2a7fcbf1f65f2ca7ccc3d76fe33c219d538327dc141"
+    "07_Execution_Order_and_Acceptance.md": "14a2ab87458be06a5f7767560e08c7dfd1ceedec14ced8b08b81895ab12913e4",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
+    "README.md": "f258f9891bbc35cc8acc66429d2c935772d87f6a7c4cf2ad3df7eaa3d4f607f9"
   },
-  "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY",
+  "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY_RECHECK",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -1834,6 +1835,148 @@
         "default_mount": "RethinkMount",
         "Core_admission": "BLOCKED_CORE drive-mode/resource mapping; no actual controller deployment tested"
       }
+    },
+    "revalidation": {
+      "source_audit_receipt_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+      "all_previously_downloaded_source_files_locally_hash_rechecked": 63,
+      "fresh_upstream_text_files_refetched_and_blob_hash_checked": 16,
+      "refetched_files": [
+        {
+          "repo": "libero",
+          "path": "README.md",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "e87d5b284da3d7c127e1bc8282ea80b5da02aad3e9272c13adc96c4eca0eaa41",
+          "git_blob_sha": "96cf5b87eb7bb42be1269581256cc85bd7e21b6f",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "requirements.txt",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "b7d3093bb5e2f424c54396a2731bf26ea185bd3fbff79b561571a92400958130",
+          "git_blob_sha": "2f287f782ea6a1b9582cbb2e83ffe027834692b1",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "setup.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "848de286575e813c0c77cba86aad48de85945d7fce1b163cc13eaa45737c476e",
+          "git_blob_sha": "59d490046d366cbb54f821e9d9165c294c7ce9b2",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/benchmark/__init__.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "4ce6edbb00b3280692f2e2b2e8a14bf6e2d5878965b0484a386c0355a867ecc5",
+          "git_blob_sha": "2b833d0935163fb75a26ca77bf1e38eca6ccc31b",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "381cf12788739624b2037b3cabca34b8efdd7c6397bf38c1af7056caf49d38b7",
+          "git_blob_sha": "0ba2f4cba13a793f303e3261de4ec921c70305ca",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "491835cc2eb6956f7ce3d1ee4e266377116168fe453e6529fe105e3b0333635d",
+          "git_blob_sha": "6530a7778f9413f4b22b291a5a6606c04809d7c0",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_goal/push_the_plate_to_the_front_of_the_stove.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "26f22f8ad39a4b2b344b049115c45661a877fa0b4821fb78246725e7e87d8c0b",
+          "git_blob_sha": "b31490451ee3c938ba45321e4f900a699a20230b",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_goal/open_the_middle_drawer_of_the_cabinet.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "832ab48ec476807c767e8985666e295700f92d1f8daeae1c34eee1e75293769b",
+          "git_blob_sha": "582fa1b35b9d32cf3c11cfb3fe3bdaba4b410bb3",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660c959b",
+          "git_blob_sha": "6438652602192995ca5b3f4343ab475494c7b334",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/envs/object_states/base_object_states.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "ca6f53123336b6487bdb4feb02534ddb3a0627a4b847fe89da4460520ef01366",
+          "git_blob_sha": "300f1daa99487328755820e46260bbe728894e40",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/envs/predicates/base_predicates.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "319137e95330dbb22a266a8dceb8110f18413c2bf17461550222228c4bc310a1",
+          "git_blob_sha": "b8cc0299ba4a53a37ab809db5bcf32eda249865e",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/envs/objects/site_object.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "4907bf2550945c395b85fd92725763ada4da533ad50966eb179e637dabeeebf6",
+          "git_blob_sha": "88eceb274d13b4774307d9d7f69f1674d52adda4",
+          "match": true
+        },
+        {
+          "repo": "robocasa",
+          "path": "README.md",
+          "pin": "2ce1aecdd76e29b52d32fdb160436c5a3e230b07",
+          "sha256": "9958a9def6290c33dcbcb59a8593e566fbe3bf0860a58a575aff4faf53561f8d",
+          "git_blob_sha": "ab7cf853658bb5625f176bebb8ce338ce1b3b212",
+          "match": true
+        },
+        {
+          "repo": "robocasa",
+          "path": "setup.py",
+          "pin": "2ce1aecdd76e29b52d32fdb160436c5a3e230b07",
+          "sha256": "9bb7055c345a50c69417c9978277f82a0d782ae17cb369939a35e5faaa6a83e5",
+          "git_blob_sha": "51ac4a0b9c2a2d1c7888323c75bbf31558b63972",
+          "match": true
+        },
+        {
+          "repo": "robosuite",
+          "path": "robosuite/models/assets/grippers/panda_gripper.xml",
+          "pin": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+          "sha256": "066fd7ae45afb11e1844869360e587646e9768210ba5389aa3cd35292cde29c1",
+          "git_blob_sha": "fb9463484727e1df64cc3db2be2ddb4a8341a22a",
+          "match": true
+        },
+        {
+          "repo": "robosuite",
+          "path": "robosuite/models/assets/robots/panda/robot.xml",
+          "pin": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+          "sha256": "1b83897bbdd11045846aeccd704ad748e1b8c975d782e8ec5cdcf378f4e371d1",
+          "git_blob_sha": "6a8d84fdcb197d2bd894beae516c0b22a570e9c5",
+          "match": true
+        }
+      ],
+      "initialization_binary_files_refetched_this_revision": 0,
+      "upstream_import_or_execution": false,
+      "LIBERO_commit_readback": {
+        "url": "https://api.github.com/repos/Lifelong-Robot-Learning/LIBERO/git/commits/8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "sha": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "tree": "99f4ada3f1d62e026fc9ff2390eb4ff8a1760e60"
+      }
     }
   },
   "cost_measurement_protocol": {
@@ -1888,9 +2031,26 @@
       "libero_goal/push_the_plate_to_the_front_of_the_stove",
       "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
       "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
-    ]
+    ],
+    "measurement_baseline_accounting": {
+      "status": "PROPOSED_TO_FREEZE_IN_R07a",
+      "measurement_baseline_commit": null,
+      "reused_module_revisions": null,
+      "reason": "No deployment authorized or started; planning commit is not a measured deployment baseline",
+      "R07_triggered_Core_extensions": "count as setup/shared or per-task incremental with owner/source/session bindings",
+      "preexisting_R01_R06_foundation": "separate provenance and excluded-cost boundary; no free-implementation or causal cost-reduction inference"
+    }
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "NO_COMMIT_OR_PUSH_PERFORMED"
+  "planning_submission_this_revision": "WORKING_TREE_DOCUMENTATION_DRAFT; no new commit or push in this recheck",
+  "revision_history": [
+    {
+      "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+      "previous_receipt_path": "docs/module/task_env/goal/Phase_II_01/validation_receipt.json",
+      "previous_receipt_sha256": "a7c24cde8537a6a66beff830a95f7c42b611fd9f83f593d78d1a48972efda744",
+      "input_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+      "preservation": "immutable source commit plus local prior_planning_documents.tar.gz; previous signing-time no-commit/no-push fields remain historical"
+    }
+  ]
 }

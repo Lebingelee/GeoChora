@@ -71,3 +71,5 @@ R03 第二Provider若加入required，也须上述scope变更；若GeoPhys修复
 [R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)五Task各锁native文件/BDDL/init/hash，首版均authentic预集成MountedPanda + state-only；各自R02/R03/R04 conditional prerequisites为none，而不是假设任意source已可构造。若选择split leaf /独立Attachment/dynamic public Camera，则仅该Task分别加入R02c/R03c/R04c，并在运行前校验expanded DAG。不得让required task有隐含或未解析dependency；不得添加R04/R05全局前置。任一通用能力缺口交原Core/Provider owner review，不以bench私有补丁过关。
 
 R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agent成本对照属于可选研究；R07c native semantic evaluation仍required，两者不能混淆。没有controlled baseline/design/budget与实际数据，不宣称统计成本下降。P99 required集合保留R01–R06，并新增五LIBERO部署、可审计Agent成本/独立质量review、RoboCasa早期feasibility。当前所有implementation NOT_STARTED；本轮仅source/document检查，不是P00/R07a执行通过。
+
+2026-10-23 复核基线为已推送的 `535ce251…`；此前 `234da21b…` 是首版 R07 修订的输入，不再表述为本轮远端 HEAD。本轮保持上述 22 切片、逐 Task 条件前置与全部 Required Envelope 原值；[收据](validation_receipt.json)区分前轮 63 文件审计、本轮 16 文件重新抓取及本地静态复核。未启动任何 slice，也不以文档校验代替其 Evidence。

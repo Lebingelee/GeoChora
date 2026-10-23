@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。本轮加入独立R07，候选7父Goal/22切片；输入为前版develop@234da21b的规划及本次R07指令。仅文档，尚未批准最终 Goal/DAG，未开始 P00。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，本轮结果见 [validation receipt](validation_receipt.json)。
+2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b）；本轮已fetch/readback该提交，复核同一任务要求并修订基线、审计分账和成本起点说明。仅文档，尚未批准最终 Goal/DAG，未开始 P00。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，本轮结果见 [validation receipt](validation_receipt.json)。
 
 ## 文档入口与责任
 
@@ -73,7 +73,7 @@
 
 ## 输入保全、验证与待批准项
 
-原 ZIP、解压草案与前次审阅文件未覆盖；本机保全与本轮校验在 ignored `workspace/maintenance/phase_ii_01_plan_revision_20261023_001/`。前次原始probe副本在该目录 `prior_review/`，文件hash/逻辑path见 [manifest](planning_manifest.json)。未把这些本地原始探针作为可随Git获取的新运行Evidence；新clone如无原件，应标“indexed but raw unavailable”，不能凭摘要重做成功证明。
+原 ZIP、解压草案与前次审阅文件未覆盖；初版保全在 ignored `workspace/maintenance/phase_ii_01_plan_revision_20261023_001/`，其中 `prior_review/` 保存前次原始 probe 副本。首版 R07 审计在 `workspace/maintenance/phase_ii_01_r07_plan_revision_20261023_001/`；本轮复核与修订前 tar 在 `workspace/maintenance/phase_ii_01_r07_recheck_20261023_002/`。各文件 hash/逻辑 path 见 [manifest](planning_manifest.json)。前轮 source-bound 收据可从固定 `535ce2516e61ecd538d5ff6dccf7493a1cfe2cac` 恢复，不能把旧收据的“尚未提交”快照解释为本轮状态。未把这些本地原始探针作为可随Git获取的新运行Evidence；新clone如无原件，应标“indexed but raw unavailable”，不能凭摘要重做成功证明。
 
 本轮实际检查与既有测试/compile探针严格分栏，见 [validation_receipt](validation_receipt.json)。没有重跑Assembly NativeS2/S3、CameraEGL、Native-rate实验、完整A–D、NutAssembly矩阵、485区间R1或Qualification。当前工作仅文档，不需要修改Skill/API能力说明；TaskEnv Skill做静态检查，原说明仍描述当前实现。
 
@@ -84,7 +84,8 @@
 - [09 R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)包含五Task逐项source/native语义/init/asset审计、ownership、真实部署门槛、Agent成本/独立review与RoboCasa feasibility；native source code读到了不等于Core已支持。
 - R06b新增R03b前置；P99改为R06c+R07d；旧18slice保留目的，其余依赖不变。五Task所选初版R02/R03/R04条件前置各为none；新recipe必须显式加入exact条件边，不能隐含required依赖或全局强加Camera/force。
 - R04澄清现有CHW uint8录制与public HWC float32的量化/转置差异，不改变Recorder；成本协议不以float RGB存储为必要。
-- 本轮基线已fetch：develop/public develop=234da21b…；冻结PhaseII与gitlinks未动。前版validation_receipt由该固定Git提交及本地tar恢复，本轮receipt仅记录本轮检查，不将前次14tests或compile probes重记为新执行。
+- 本轮基线已fetch：develop/public develop=535ce251…；冻结PhaseII与gitlinks未动。首版R07以234da21b为输入、source审计收据已随535ce251保存；本轮receipt只记录本轮检查，并单列16文件重新抓取与63份本地source hash复核，不将前次14tests、init下载或compile probes重记为新执行。
+- 成本实验起点须在R07a另锁真实源码/复用版本；R07引发的Core Extension成本入账，已有R01–R06基础及未计成本边界分栏，避免把规划提交当成测量起点或作因果成本结论。
 
 | 风险 | 状态 / 影响 | 待审议处置 |
 | --- | --- | --- |

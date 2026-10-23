@@ -1,6 +1,6 @@
 # Codex — Revised Phase II-01 Planning Review / Approval Handoff
 
-这是随附原 08 的修订版审阅指令，状态 REVISED_DRAFT。维护者当前只授权规划文档独立提交到本地 develop；最终 Goal/DAG 尚待批准，P00/R01–R07 尚未启动。本文件不能被当成继续实现授权。
+这是随附原 08 的修订版审阅指令，状态 REVISED_DRAFT。维护者当前只授权规划文档审阅/修订；首版 R07 规划已另经明确授权提交并推送为 `535ce251…`。后续提交/推送按当次明确授权，不从此 Prompt 推定；最终 Goal/DAG 尚待批准，P00/R01–R07 尚未启动。本文件不能被当成继续实现授权。
 
 读取 AGENTS、canonical architecture/ownership/Public API/qualification、冻结 Phase II 决定与九文件状态、当前代码/callers与 gitlinks、00–07、09 R07、README、planning_manifest 和 validation_receipt。重新核对实际 Git/ref/dirty paths，保护 ignored Evidence/探针。参考版本固定 Isaac Lab v3.0.0 和 Isaac Sim6.1.0，不用滚动latest推断新能力。
 

@@ -4,7 +4,7 @@
 
 ## 基线与治理
 
-本轮规划基线为已fetch并独立核验的 develop `234da21b0bd9e9ab5a9df3f516840a6422ce936a`（前轮规划提交；原工程冻结仍为 `3759f917…`），远端 public/develop 本轮 readback 相同；main/public/main 为 `f292df149f41520b484ff27cf2ff78a584903013`。GeoPhys gitlink `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。规划文档的新提交不冒充被接受功能源码 `90071ace…` 的新行为证据。
+本轮规划基线为已fetch并独立核验的 develop `535ce2516e61ecd538d5ff6dccf7493a1cfe2cac`（已提交的首版 R07 规划；其输入为 `234da21b…`，原工程冻结仍为 `3759f917…`），远端 public/develop 本轮 readback 相同；本地 main/public/main 记录为 `f292df149f41520b484ff27cf2ff78a584903013`，本轮未重新抓取 main。GeoPhys gitlink `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。规划文档的新提交不冒充被接受功能源码 `90071ace…` 的新行为证据。
 
 本地 v2.0.0 分支和 annotated Tag 均指向 `3759f917…`；Tag 对象 `4ebd8d536c0c054641c6edc1a31fcd317fa237cc`。这两个引用已另经维护者授权推送并回读远端，指向相同冻结提交；本轮不执行 main promotion 或 GitHub Release。本轮不移动它们。[Phase II 范围决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 及[九文件状态入口](../Phase_II/05_Architecture_Review_and_Execution_Order.md) 原样保留；历史“未授权 Tag”描述保留其签署时点含义，后续建立本地引用的授权来自维护者对话。
 
