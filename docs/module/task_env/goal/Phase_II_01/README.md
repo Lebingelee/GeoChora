@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。输入为原 ZIP 规划及 REVISE_PLAN 审阅、本轮维护者逐项修订要求。仅文档，尚未批准最终 Goal/DAG，未开始 P00。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，本轮结果见 [validation receipt](validation_receipt.json)。
+2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。本轮加入独立R07，候选7父Goal/22切片；输入为前版develop@234da21b的规划及本次R07指令。仅文档，尚未批准最终 Goal/DAG，未开始 P00。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，本轮结果见 [validation receipt](validation_receipt.json)。
 
 ## 文档入口与责任
 
@@ -13,8 +13,9 @@
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界 |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
-| [07 执行表](07_Execution_Order_and_Acceptance.md) | 6/18 DAG、required envelope与停止条件 |
+| [07 执行表](07_Execution_Order_and_Acceptance.md) | 7/22 DAG、required envelope与停止条件 |
 | [08 审阅交接](08_Codex_Phase_II_01_Planning_Prompt.md) | 下一轮独立审阅/维护者审批指令 |
+| [R07部署/Agent成本](09_R07_Benchmark_Deployment_and_Agent_Cost.md) | 固定五LIBERO审计/部署与成本协议、RoboCasa feasibility；不隶属R06 |
 | [planning manifest](planning_manifest.json) | 机器可读DAG、source/probe出处与文档hash；非实施receipt |
 
 <a id="references"></a>
@@ -62,7 +63,7 @@
 | P1-3 Camera两条Observation与H5消费 | R04合同/资源、07 | public Env/strict metadata reader/calibration/labels/identity/T/T+1/fault明确；未实现 |
 | P1-4 正式Reader与required envelope | R05、07 | 保持CPU/CUDA×100/500Hz为建议required；owner先批准，不降格diagnostic，失败需scope change |
 | P1-5 恢复/退休不能自动消除延期 | R06原件与gate、07 | 保留B04a/eb870；新阶段恢复/退休/继续延期均需独立决定，未决blocked |
-| P2 版本引用状态 | 00、manifest | 本地v2.0.0 refs已建；未push/main/Release；冻结PhaseII不回写 |
+| P2 版本引用状态 | 00、manifest | v2.0.0分支/Tag已另经授权推送并回读；无main promotion/Release；冻结PhaseII不回写 |
 | P2 dual builder依赖test helpers | 00/R03 publicS3边界 | 未来在现有task/source owner提取，不复制Runtime/Recorder；本轮不改代码 |
 | P2 每slice执行合同不足 | 07逐slice表/通用Gate、R01–R06 | 每slice有前置/owner/证据/Stop；具体run预算和tolerance要在授权P00/开工前冻结，不能伪造已实测 |
 | P2 外部引用滚动版本 | 本页固定参考表 | Lab3.0.0/Sim6.1.0；只借鉴原则 |
@@ -76,4 +77,21 @@
 
 本轮实际检查与既有测试/compile探针严格分栏，见 [validation_receipt](validation_receipt.json)。没有重跑Assembly NativeS2/S3、CameraEGL、Native-rate实验、完整A–D、NutAssembly矩阵、485区间R1或Qualification。当前工作仅文档，不需要修改Skill/API能力说明；TaskEnv Skill做静态检查，原说明仍描述当前实现。
 
-待维护者批准：最终6/18/依赖；MuJoCo CPU首个装配required与GeoPhys第二Provider状态；独立Position leaf最低接口；R04 required Camera消费范围；R05双backend正式host合同范围；历史原件恢复/退休/继续延期的独立处置。未批准前P00 NOT_STARTED，不开始R01–R06或自动发布v2.0.1。
+待维护者批准：最终7/22/依赖；MuJoCo CPU首个装配required与GeoPhys第二Provider状态；独立Position leaf最低接口；R04 required Camera消费范围；R05双backend正式host合同范围；历史原件恢复/退休/继续延期的独立处置。未批准前P00 NOT_STARTED，不开始R01–R07或自动发布v2.0.1。
+
+## 本轮R07修订与Scope Risks
+
+- [09 R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)包含五Task逐项source/native语义/init/asset审计、ownership、真实部署门槛、Agent成本/独立review与RoboCasa feasibility；native source code读到了不等于Core已支持。
+- R06b新增R03b前置；P99改为R06c+R07d；旧18slice保留目的，其余依赖不变。五Task所选初版R02/R03/R04条件前置各为none；新recipe必须显式加入exact条件边，不能隐含required依赖或全局强加Camera/force。
+- R04澄清现有CHW uint8录制与public HWC float32的量化/转置差异，不改变Recorder；成本协议不以float RGB存储为必要。
+- 本轮基线已fetch：develop/public develop=234da21b…；冻结PhaseII与gitlinks未动。前版validation_receipt由该固定Git提交及本地tar恢复，本轮receipt仅记录本轮检查，不将前次14tests或compile probes重记为新执行。
+
+| 风险 | 状态 / 影响 | 待审议处置 |
+| --- | --- | --- |
+| arbitrary BDDL source/reset/admission、contact/site/fixture-joint/evaluator缺口 | 五LIBERO部署当前NOT_RUN，已有BLOCKED_CORE风险；语义不匹配可NOT_REPRESENTABLE | 原task/source/runtime/observation owner扩展review，不能换简单task/用旧UID冒认 |
+| native MountedPanda torque-motor/双finger position actuator/OSC/20Hz与Core候选不同 | 机器人/源/控制身份不能迁移，依赖版本未验证 | 锁actualassets/build/Action/frame/cadence和boundedsmoke，不保证控制器算法等价 |
+| per-asset许可与完整source closure | 检查XML/tree refs≠完整网格bytes/许可验证 | R07b verified manifest gate；外部安装与可分发来源分开 |
+| RoboCasa移动base/复杂fixture/大资产与rolling robosuite依赖 | 仅固定源码feasibility，无五Task执行承诺 | 单独go/no-go建议/版本lock，额外执行另批 |
+| Agent usage/billing/active time缺失、self-score或native成本对照缺位 | 不能估算成测量或宣称因果成本下降 | null/reason、session/log/hash、独立human评审；controlled研究另定预算 |
+
+R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务顺序须部署前冻结；R07c指定五Task之一被阻塞或不可表示，P99保持阻塞，等待维护者精确scope decision。全部七Goal仍candidate；本轮建议审阅结果 **REVISE_PLAN**，理由是许可/依赖/Core语义与构造扩展/成本instrumentation及最终7/22范围尚需维护者批准，不构成新的acceptance decision。

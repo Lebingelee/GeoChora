@@ -32,7 +32,11 @@ Evidence 分三栏：① 原 Phase II 固定 source/pin 收据；② 本轮仅�
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
 | R06a | P00 | 原件/备份可恢复性、版本/缺口 ledger、恢复/退休/继续延期待审批方案 | Audit/S1：缺失不改 PASS；没有本阶段精确决定则 compatibility gate 未关闭 |
-| R06b | R06a,R01c,R02c | 新/旧 Schema、source、profile、native 顺序/coupling、UID/default/admission 正负回归 | S1/S2：错顺序、联动/资源/identity、版本误派发会失败；旧范围不退化 |
+| R06b | R06a,R01c,R02c,R03b | 新/旧 Schema、source、profile、native 顺序/coupling、UID/default/admission 正负回归 | S1/S2：错顺序、联动/资源/identity、版本误派发会失败；旧范围不退化 |
 | R06c | R06b,R03c,R04c,R05c | 汇总所有 required 源码/Provider/backend/camera/reader交集，交付 P99 包 | S1/S2/S3 原始 receipts+checksums，FAIL/NOT_RUN/BLOCKED 分列；缺 required gate 不产生阶段 PASS |
 
 P99 包应有 `acceptance_report.md`、`acceptance.json`、独立 `phase_decision.yaml`；记录 Core/tree、gitlinks/native build、source/closure/Scene/Assembly/profile/mapping identities、seed/reset/horizon、commands/预算、oracle/tolerance、T/T+1/H5/hash、failed/NOT_RUN/unsupported。事实由 evaluator 记录，维护者/Judge 独立决定；本轮不生成该未来 decision。
+
+## 与独立R07的分界
+
+R06b新增R03b前置，以便对真实lowering/root与native顺序映射做回归；原R01–R06目的/required gates保持。Benchmark部署/Agent成本由独立[R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)所有，不并入R06c。R06仍保护旧Scene/Artifact/Recorder/Provider合同；P99同时依赖R06c和R07d，R07不是回写PhaseII兼容结论的理由。

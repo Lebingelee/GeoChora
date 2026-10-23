@@ -1,102 +1,175 @@
 {
-  "kind": "phase-ii-01-planning-validation-v1",
+  "kind": "phase-ii-01-r07-planning-validation-v1",
   "date": "2026-10-23",
+  "mode": "REVISE_PLAN_DOCUMENTATION_ONLY",
+  "advisory_review_result": "REVISE_PLAN",
+  "maintainer_formal_acceptance": null,
   "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
-  "scope": "documentation-only revision; no implementation, P00, native experiments, release or Qualification",
-  "baseline_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
-  "document_commit": "Resolve the commit containing this receipt; no self-referential SHA",
-  "branch": "develop",
-  "push_performed": false,
+  "baseline": {
+    "branch": "develop",
+    "HEAD": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "remote_develop_independently_fetched_and_read_back": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "phase_ii_engineering_freeze": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "scope_decision": "ACCEPTED_SCOPED_CORE; not Formal Qualification",
+    "GeoPhys": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+    "Menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+    "v2_0_0_branch_tag_remote": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "frozen_tag_object": "4ebd8d536c0c054641c6edc1a31fcd317fa237cc"
+  },
+  "historical_receipt_preservation": {
+    "previous_receipt_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "previous_receipt_path": "docs/module/task_env/goal/Phase_II_01/validation_receipt.json",
+    "local_archive": "workspace/maintenance/phase_ii_01_r07_plan_revision_20261023_001/prior_planning_documents.tar.gz",
+    "historical_raw_evidence_overwritten": false
+  },
   "performed": {
-    "git_remote_readback": "PASS; public/develop=3759f917...; public/main=f292df1...; v2.0.0 refs local only",
-    "submodule_identity": "PASS; GeoPhys a53a8cfe... / Menagerie b846dd12... unchanged",
-    "planning_DAG_links_hashes_preservation": {
-      "scope": "planning documents only; no implementation or native run",
-      "goals": 6,
-      "slices": 18,
-      "dag": "PASS",
-      "per_goal_execution_manifest_consistent": true,
-      "local_markdown_links_checked": 70,
+    "git_baseline_and_frozen_refs": "PASS; read-only fetch/readback; no tag/gitlink changes",
+    "planning_checks": {
+      "mode": "REVISE_PLAN_DOCUMENTATION_ONLY",
+      "advisory_result": "REVISE_PLAN",
+      "parent_goals": 7,
+      "implementation_slices": 22,
+      "existing_18_slices_preserved_except_requested_R06b_edge": true,
+      "R06b_dependencies": [
+        "R06a",
+        "R01c",
+        "R02c",
+        "R03b"
+      ],
+      "P99_dependencies": [
+        "R06c",
+        "R07d"
+      ],
+      "DAG_topology_and_per_document_consistency": "PASS",
+      "local_links_checked": 83,
       "anchors_checked": 6,
-      "draft_content_hashes_checked": 10,
-      "preserved_file_hashes_checked": 454,
-      "frozen_Phase_II_markdown_files": 9,
-      "protected_refs_unchanged": true,
+      "document_hashes_checked": 11,
+      "upstream_source_file_hashes_and_git_blobs_checked": 63,
+      "required_task_bddl_init_pairs": 5,
+      "protected_file_hashes_checked": 1276,
+      "protected_refs_and_gitlinks_unchanged": true,
+      "no_global_R04_R05_dependencies_and_conditional_closures_acyclic": true,
       "errors": []
+    },
+    "source_audit": {
+      "LIBERO_inspected_candidate": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+      "LIBERO_verified_files": 46,
+      "BDDL_files": 5,
+      "initialization_files": 8,
+      "required_pruned_init_files": 5,
+      "initialization_inspection": "raw bytes/ZIP/pickle opcodes/shape metadata only; NO deserialization/import/realization",
+      "asset_XMLs": 11,
+      "asset_file_references_resolved_in_tree": 42,
+      "full_mesh_bytes_license_runtime_dependency_verification": "NOT_DONE; deployment manifests not yet verified",
+      "RoboCasa_inspected_candidate": "2ce1aecdd76e29b52d32fdb160436c5a3e230b07",
+      "RoboCasa_verified_source_files": 9,
+      "robosuite_v1_4_0_pin": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+      "robosuite_verified_contact_reference_source_files": 2,
+      "total_verified_source_files": 63,
+      "upstream_code_imported_or_executed": false,
+      "robosuite_verified_robot_gripper_mount_and_additional_variant_XML_files": 6
     },
     "TaskEnv_Skill_Checker": {
       "exit_code": 0,
-      "result": "PASS; static metadata/local references/explicit source paths only",
-      "command": "/home/lly/miniconda3/envs/geochora/bin/python .agents/skills/geochora-module-skill-maintainer/scripts/check_module_skill.py .agents/skills/geochora-task-env"
+      "result": "PASS; static only",
+      "command": "python .agents/skills/geochora-module-skill-maintainer/scripts/check_module_skill.py .agents/skills/geochora-task-env"
     },
-    "document_validator": {
-      "exit_code_before": 1,
-      "exit_code_after": 1,
+    "Document_Validator": {
+      "before_exit_code": 1,
+      "after_exit_code": 1,
       "before_counts": {
-        "docs": 70,
-        "task_env": 23,
-        "markdown": 30,
-        "task_env_markdown": 16,
-        "machine_or_other": 40
-      },
-      "after_counts": {
         "docs": 82,
         "task_env": 35,
         "markdown": 40,
         "task_env_markdown": 26,
         "machine_or_other": 42
       },
-      "error_count_before": 140,
-      "error_count_after": 140,
-      "same_error_list": true,
-      "new_errors": [],
-      "existing_count_limit": {
+      "after_counts": {
+        "docs": 83,
+        "task_env": 36,
+        "markdown": 41,
+        "task_env_markdown": 27,
+        "machine_or_other": 42
+      },
+      "before_errors": 140,
+      "after_errors": 140,
+      "error_strings_unchanged": true,
+      "new_error_strings": [],
+      "existing_errors": {
+        "global_count_limit_exceeded": true,
+        "non_documentation_changes_since_historical_consolidation_baseline": 139
+      },
+      "limits": {
         "docs": 58,
         "task_env": 35
       },
-      "existing_errors": {
-        "count_limit_exceeded": 1,
-        "non_documentation_paths_since_historical_consolidation_baseline": 139
-      },
-      "interpretation": "Existing v1.1 consolidation-count/historical-scope failures remain. New draft adds 12 docs metadata/Markdown files; docs count rises70→82, task_env23→35. No thresholds/rules changed, no new link/anchor/protected-data error. Global validator is not reported PASS.",
-      "command": "/home/lly/miniconda3/envs/geochora/bin/python .agents/skills/geochora-doc-governance/scripts/validate_docs.py"
+      "new_revision_impact": "R07 adds one Markdown. docs82→83 stays beyond58; TaskEnv35→36 NEWLY exceeds35. Same aggregated count-error string does NOT mean no new count violation. No new broken links/anchors/protected-data errors.",
+      "rules_thresholds_changed": false,
+      "result": "FAIL; preserve both existing consolidation-scope failures and new module-count overrun",
+      "command": "python .agents/skills/geochora-doc-governance/scripts/validate_docs.py"
     },
-    "git_diff_check": "PASS; staged documentation only",
-    "submission_scope": "Only docs/module/task_env/goal/Phase_II_01/: 10 Markdown drafts + planning_manifest.json + validation_receipt.json"
+    "git_diff_check": "PASS; staged and working diff checks",
+    "actual_experiment_tests": "NONE; no simulator or deployment tests run"
   },
-  "prior_evidence_not_rerun": {
-    "prior_planning_review_static_regression": "14 passed / 0 skipped, previous turn only; not executed this revision",
-    "MuJoCo3.8.1_MjSpec_attachment": "Prior compile-only success, nq9/nu8/neq1/ntendon1; no attachment Native S2/S3",
-    "GeoPhys_a53_exported_source_import": "Prior real site-size rejection retained; not rerun/repaired",
-    "PhaseII_P99_and_C05c": "Historical source-bound receipts and diagnostic labels unchanged"
-  },
+  "changed_files": [
+    "docs/module/task_env/goal/Phase_II_01/00_Phase_II_01_Blueprint.md",
+    "docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md",
+    "docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md",
+    "docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md",
+    "docs/module/task_env/goal/Phase_II_01/08_Codex_Phase_II_01_Planning_Prompt.md",
+    "docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md",
+    "docs/module/task_env/goal/Phase_II_01/README.md",
+    "docs/module/task_env/goal/Phase_II_01/planning_manifest.json",
+    "docs/module/task_env/goal/Phase_II_01/validation_receipt.json"
+  ],
+  "source_owners_unchanged": [
+    "Core",
+    "Provider",
+    "tests",
+    "asset",
+    "registry",
+    "Controller",
+    "Planner",
+    "Runtime",
+    "Recorder",
+    "Agent orchestration"
+  ],
   "not_run": [
-    "PhaseII-01 P00",
-    "R01-R06 implementation",
-    "new attachment Native S2/S3",
-    "EGL capture or Camera consumer S2/S3",
-    "formal native-rate CPU/CUDA runs",
+    "P00",
+    "R01-R07 implementation",
+    "LIBERO native task construction/reset/step/deployment",
+    "native-versus-Core semantic fixture execution",
+    "RoboCasa runtime/large-asset download",
+    "Agent deployment Session cost measurements",
+    "controlled native-reference Agent cost experiment",
+    "previous14static regression rerun",
+    "old Source/MjSpec/import probe rerun",
+    "EGL capture",
+    "Native-rate feedback campaign",
     "full A-D audit/campaign",
     "NutAssembly four-cell matrix",
-    "485-interval R1 experiment",
-    "S4/Qualification"
+    "485 interval R1",
+    "S4/Formal Qualification"
   ],
-  "unchanged": [
-    "Core/Provider/test algorithms",
-    "PhaseII nine files and Scope Decision/Evidence index",
-    "original Artifacts/Scene definitions/Entity identities",
-    "original source probes and raw Evidence",
-    "GeoPhys/Menagerie pins",
-    "main/v1.0.0/v1.1.0/v2.0.0 frozen refs"
+  "missing_historical_raw_evidence": "B04a three H5 ACCEPTED-DEFERRED/MISSING_RAW_EVIDENCE and eb870 original bytes MISSING_RAW_EVIDENCE unchanged",
+  "unresolved": [
+    "final7/22 Scope/DAG/required task envelopes and budgets",
+    "generic task/source/reset/contact/site/fixture predicates and public Controller/Planner admission extensions",
+    "per-asset license and full source/dependency compatibility",
+    "RoboCasa feasibility recommendation only",
+    "real cost instrumentation and independent human reviewer",
+    "document-count governance; no threshold relaxation performed",
+    "native torque motors and two-finger position drive differ from admitted Position candidate; exact Controller/Runtime owner contract required"
   ],
-  "limitations": [
-    "Historical three H5 originals remain ACCEPTED-DEFERRED/MISSING_RAW_EVIDENCE; bytes compatibility NOT_PROVEN",
-    "Early eb870 typed-force original bytes remain MISSING_RAW_EVIDENCE",
-    "Local prior probe raw files are indexed/preserved, not distributed in this Git docs commit",
-    "External references locked to versioned documentation, not asserted byte-identical to release commit; SceneData API page full fetch intermittent, official indexed content used"
-  ],
-  "maintainer_final_goal_DAG_approval": "PENDING",
-  "P00_started": false,
-  "formal_qualification_granted": false,
-  "local_validation_log_root": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/"
+  "submission": {
+    "commit_created_this_revision": false,
+    "pushed_this_revision": false,
+    "working_state": "9 planning files staged for review; NOT_COMMITTED",
+    "main_merged": false,
+    "tags_changed": false,
+    "release_published": false,
+    "P00_started": false,
+    "formal_qualification_granted": false
+  },
+  "logs_root": "workspace/maintenance/phase_ii_01_r07_plan_revision_20261023_001/"
 }
