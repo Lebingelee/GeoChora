@@ -1,0 +1,306 @@
+{
+  "kind": "phase-ii-01-revised-planning-manifest-v1",
+  "date": "2026-10-23",
+  "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
+  "implementation_authorized": false,
+  "P00": "NOT_STARTED",
+  "goal_count": 6,
+  "slice_count": 18,
+  "baseline": {
+    "core_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "geophys_gitlink": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+    "menagerie_gitlink": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+    "main": "f292df149f41520b484ff27cf2ff78a584903013",
+    "remote_develop_readback": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "v2_tag_local_only": true,
+    "v2_tag_object": "4ebd8d536c0c054641c6edc1a31fcd317fa237cc"
+  },
+  "slices": [
+    {
+      "id": "R03a",
+      "depends_on": [
+        "P00"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1/S2",
+      "stop_condition": "独立fixed dynamics未证明→阻塞b/c"
+    },
+    {
+      "id": "R01a",
+      "depends_on": [
+        "P00"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1",
+      "stop_condition": "旧identity变动或引用契约不明→停止"
+    },
+    {
+      "id": "R05a",
+      "depends_on": [
+        "P00"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "Audit/S1/probe",
+      "stop_condition": "无owner合同→BLOCKED_PROVIDER_CONTRACT"
+    },
+    {
+      "id": "R04a",
+      "depends_on": [
+        "P00"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1",
+      "stop_condition": "身份/metadata reader/资源合同缺失→停止"
+    },
+    {
+      "id": "R06a",
+      "depends_on": [
+        "P00"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "Audit/S1",
+      "stop_condition": "缺原件且无独立处置→compatibility gate blocked"
+    },
+    {
+      "id": "R01b",
+      "depends_on": [
+        "R01a"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1",
+      "stop_condition": "环/重复/悬空/预算失败→停止"
+    },
+    {
+      "id": "R02a",
+      "depends_on": [
+        "R01a"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1",
+      "stop_condition": "required state/TCP/资源不明→停止"
+    },
+    {
+      "id": "R01c",
+      "depends_on": [
+        "R01b"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1",
+      "stop_condition": "隐式物理构造/旧hash变动→停止"
+    },
+    {
+      "id": "R02b",
+      "depends_on": [
+        "R02a",
+        "R01b"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1",
+      "stop_condition": "重叠native writer/部分apply假回滚→停止"
+    },
+    {
+      "id": "R02c",
+      "depends_on": [
+        "R02b",
+        "R01c"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S2/S3",
+      "stop_condition": "只测两个完整Panda或无真实hand驱动→失败"
+    },
+    {
+      "id": "R03b",
+      "depends_on": [
+        "R03a",
+        "R01c"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1/S2",
+      "stop_condition": "wrong mount/root/顺序/约束失败→停止"
+    },
+    {
+      "id": "R03c",
+      "depends_on": [
+        "R03b",
+        "R02c"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S2/S3",
+      "stop_condition": "不同diagnostic路径拼接或不完整H5→失败"
+    },
+    {
+      "id": "R04b",
+      "depends_on": [
+        "R04a"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S2",
+      "stop_condition": "stale/ghost step/teardown失败→停止"
+    },
+    {
+      "id": "R04c",
+      "depends_on": [
+        "R04b"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S3",
+      "stop_condition": "错T/T+1或无semantic reader→失败"
+    },
+    {
+      "id": "R05b",
+      "depends_on": [
+        "R05a"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1/S2",
+      "stop_condition": "错phase/validity或private bypass→停止"
+    },
+    {
+      "id": "R05c",
+      "depends_on": [
+        "R05b"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S2/S3",
+      "stop_condition": "任一required cell失败/未运行→P99 blocked"
+    },
+    {
+      "id": "R06b",
+      "depends_on": [
+        "R06a",
+        "R01c",
+        "R02c"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1/S2",
+      "stop_condition": "旧支持退化/新token混淆→停止"
+    },
+    {
+      "id": "R06c",
+      "depends_on": [
+        "R06b",
+        "R03c",
+        "R04c",
+        "R05c"
+      ],
+      "status": "PLANNED",
+      "execution": "NOT_STARTED",
+      "required_evidence": "S1/S2/S3",
+      "stop_condition": "缺required出口/历史处置→P99 blocked"
+    }
+  ],
+  "P99": {
+    "depends_on": [
+      "R06c"
+    ],
+    "also_requires": "all 18 slice contracts and approved required gates; explicit historical-compatibility disposition",
+    "status": "PLANNED_NOT_STARTED"
+  },
+  "required_envelope": {
+    "R03_first_provider": "MuJoCo 3.8.1 CPU independent Panda Arm/Hand Position fixed attachment",
+    "R03_second_provider": {
+      "provider_pin": "GeoPhys a53a8cfe",
+      "source_route_status": "NOT_ADMITTED_BLOCKED_SITE_SIZE",
+      "native_attachment_S2_S3": "NOT_RUN",
+      "execution_required": false,
+      "formal_qualification": false
+    },
+    "R04": "GeoPhys a53 CPU x MuJoCo3.8.1 native OpenGL/EGL, existing single-Panda source, dual RGB/depth/entity-mask public observation and same H5 semantic readback",
+    "R05": "GeoPhys CPU/CUDA physics x host Controller x 100/500Hz law; formal native sample contract required",
+    "scope_change_requires_explicit_maintainer_decision": true,
+    "automatic_deferral_allowed": false
+  },
+  "prior_review": {
+    "static_regression.log": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/static_regression.log",
+      "sha256": "1ca077c2ebd8061ff04005144e98195bd3ff2353f24dd7be97d759b04622df3f",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "checks.json": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/checks.json",
+      "sha256": "591c46519d02d51a683022ec57f3e7521e722f880f5d81f5d4308e88e39b26bf",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "check_plan.py": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/check_plan.py",
+      "sha256": "c63b9a6a8cae1ef8aaaa955472142af26901b8048531661c7bd31efc17b2a001",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "attachment_feasibility_error.log": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/attachment_feasibility_error.log",
+      "sha256": "593befa15952ba86bd466b7c4bd2a7fd9c380cc141abd114a0bb5d9ea163c37a",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "attachment_feasibility.json": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/attachment_feasibility.json",
+      "sha256": "f7217f74eb078d00de7134e4ebd44896023deec94696f80a40c6944531a39048",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "attachment_feasibility.xml": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/attachment_feasibility.xml",
+      "sha256": "b6b377cb6d2c12180f57ce1c067b98830e9bd0fee1c17b84ab7515d0143aa4fe",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "review.md": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/review.md",
+      "sha256": "d364c3b6bd71d1563cfd49ddec44ee8ab72fe1b4d223460d20cf8547351e8215",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "receipt.json": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/receipt.json",
+      "sha256": "630164855b7c738df6dadf43f3c50f7e070d06db2d75f7ea5b89590c5b29ec21",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    },
+    "asset_compile.json": {
+      "local_path": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/prior_review/asset_compile.json",
+      "sha256": "cc7045620ac5e4e84ddb06797cf491112b4984ab7dec28d1a67a3de2507d6640",
+      "availability": "LOCAL_RAW_PRESERVED_NOT_DISTRIBUTED_WITH_GIT"
+    }
+  },
+  "input_zip_manifest_sha256": "e104cf00b400fb5a7958619f4a8afbb05b62dec1264207a24e18190cd5de11e7",
+  "external_versions": {
+    "IsaacLab": "v3.0.0 official release 2026-10-20; displayed short commit e3f7d9f; full commit not resolved",
+    "IsaacSimRobotAssembler": "6.1.0",
+    "accessed": "2026-10-23",
+    "versioned_docs_not_claimed_release_commit_exact_bytes": true
+  },
+  "missing_raw_evidence": {
+    "B04a": [
+      "geophys-transition-h5/v1",
+      "canonical trajectory outer-v0",
+      "canonical-execution-v1"
+    ],
+    "B04a_disposition": "ACCEPTED-DEFERRED; raw bytes missing; byte compatibility NOT_PROVEN",
+    "early_eb870_typed_force": "MISSING_RAW_EVIDENCE",
+    "retirement_or_new_stage_continued_deferral_approved": false
+  },
+  "document_sha256": {
+    "00_Phase_II_01_Blueprint.md": "04b32a434dcb25a9011d14558c8a394b1344d2d9d3b039766dadcef40d998b87",
+    "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
+    "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
+    "03_R03_Physical_Attachment.md": "b62d999a32be4dc32923f65856e1b021e6a20abd927ee24d28072e76e6adabcf",
+    "04_R04_Dynamic_Camera_Consumer.md": "302ff0698a3b69b334a081b9ecf7a73ae25597d21ef3b82dff9d49d0d5757ed1",
+    "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
+    "06_R06_Compatibility_and_Regression.md": "42e0d60c17d94476acb06b4a67b7420dc48ff95bd2735902e0bbc5c3a8f37859",
+    "07_Execution_Order_and_Acceptance.md": "c601a3ec45d42eeeb3baf106a0a1a4048994e38575e9379362da1dafe3e9604f",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "d086b94e6b20faef42d4369cf8f684413f0c82eb49908ecde69de9e380543d76",
+    "README.md": "8f29db38061448d052e96499558e0b02b736130fcd6d0f79a16460b9b988d702"
+  }
+}

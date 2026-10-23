@@ -1,0 +1,102 @@
+{
+  "kind": "phase-ii-01-planning-validation-v1",
+  "date": "2026-10-23",
+  "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
+  "scope": "documentation-only revision; no implementation, P00, native experiments, release or Qualification",
+  "baseline_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+  "document_commit": "Resolve the commit containing this receipt; no self-referential SHA",
+  "branch": "develop",
+  "push_performed": false,
+  "performed": {
+    "git_remote_readback": "PASS; public/develop=3759f917...; public/main=f292df1...; v2.0.0 refs local only",
+    "submodule_identity": "PASS; GeoPhys a53a8cfe... / Menagerie b846dd12... unchanged",
+    "planning_DAG_links_hashes_preservation": {
+      "scope": "planning documents only; no implementation or native run",
+      "goals": 6,
+      "slices": 18,
+      "dag": "PASS",
+      "per_goal_execution_manifest_consistent": true,
+      "local_markdown_links_checked": 70,
+      "anchors_checked": 6,
+      "draft_content_hashes_checked": 10,
+      "preserved_file_hashes_checked": 454,
+      "frozen_Phase_II_markdown_files": 9,
+      "protected_refs_unchanged": true,
+      "errors": []
+    },
+    "TaskEnv_Skill_Checker": {
+      "exit_code": 0,
+      "result": "PASS; static metadata/local references/explicit source paths only",
+      "command": "/home/lly/miniconda3/envs/geochora/bin/python .agents/skills/geochora-module-skill-maintainer/scripts/check_module_skill.py .agents/skills/geochora-task-env"
+    },
+    "document_validator": {
+      "exit_code_before": 1,
+      "exit_code_after": 1,
+      "before_counts": {
+        "docs": 70,
+        "task_env": 23,
+        "markdown": 30,
+        "task_env_markdown": 16,
+        "machine_or_other": 40
+      },
+      "after_counts": {
+        "docs": 82,
+        "task_env": 35,
+        "markdown": 40,
+        "task_env_markdown": 26,
+        "machine_or_other": 42
+      },
+      "error_count_before": 140,
+      "error_count_after": 140,
+      "same_error_list": true,
+      "new_errors": [],
+      "existing_count_limit": {
+        "docs": 58,
+        "task_env": 35
+      },
+      "existing_errors": {
+        "count_limit_exceeded": 1,
+        "non_documentation_paths_since_historical_consolidation_baseline": 139
+      },
+      "interpretation": "Existing v1.1 consolidation-count/historical-scope failures remain. New draft adds 12 docs metadata/Markdown files; docs count rises70→82, task_env23→35. No thresholds/rules changed, no new link/anchor/protected-data error. Global validator is not reported PASS.",
+      "command": "/home/lly/miniconda3/envs/geochora/bin/python .agents/skills/geochora-doc-governance/scripts/validate_docs.py"
+    },
+    "git_diff_check": "PASS; staged documentation only",
+    "submission_scope": "Only docs/module/task_env/goal/Phase_II_01/: 10 Markdown drafts + planning_manifest.json + validation_receipt.json"
+  },
+  "prior_evidence_not_rerun": {
+    "prior_planning_review_static_regression": "14 passed / 0 skipped, previous turn only; not executed this revision",
+    "MuJoCo3.8.1_MjSpec_attachment": "Prior compile-only success, nq9/nu8/neq1/ntendon1; no attachment Native S2/S3",
+    "GeoPhys_a53_exported_source_import": "Prior real site-size rejection retained; not rerun/repaired",
+    "PhaseII_P99_and_C05c": "Historical source-bound receipts and diagnostic labels unchanged"
+  },
+  "not_run": [
+    "PhaseII-01 P00",
+    "R01-R06 implementation",
+    "new attachment Native S2/S3",
+    "EGL capture or Camera consumer S2/S3",
+    "formal native-rate CPU/CUDA runs",
+    "full A-D audit/campaign",
+    "NutAssembly four-cell matrix",
+    "485-interval R1 experiment",
+    "S4/Qualification"
+  ],
+  "unchanged": [
+    "Core/Provider/test algorithms",
+    "PhaseII nine files and Scope Decision/Evidence index",
+    "original Artifacts/Scene definitions/Entity identities",
+    "original source probes and raw Evidence",
+    "GeoPhys/Menagerie pins",
+    "main/v1.0.0/v1.1.0/v2.0.0 frozen refs"
+  ],
+  "limitations": [
+    "Historical three H5 originals remain ACCEPTED-DEFERRED/MISSING_RAW_EVIDENCE; bytes compatibility NOT_PROVEN",
+    "Early eb870 typed-force original bytes remain MISSING_RAW_EVIDENCE",
+    "Local prior probe raw files are indexed/preserved, not distributed in this Git docs commit",
+    "External references locked to versioned documentation, not asserted byte-identical to release commit; SceneData API page full fetch intermittent, official indexed content used"
+  ],
+  "maintainer_final_goal_DAG_approval": "PENDING",
+  "P00_started": false,
+  "formal_qualification_granted": false,
+  "local_validation_log_root": "workspace/maintenance/phase_ii_01_plan_revision_20261023_001/"
+}
