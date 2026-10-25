@@ -93,6 +93,8 @@
 
 2026-10-25，Sol已复核P00-L01有界审计的输出/source hashes及关键源码guard；结果与既有Core准入边界一致，无需返工本次静态审计。原件及复核事实在同一ignored交接根目录的`luna_p00_l01_001/`和`sol_review_l01_20261025_001/`，由manifest引用；未运行S1/S2/S3/S4、未授予Attachment支持或实施准入。后继建议为先冻结MuJoCo CPU的R03a source/物理可行性probe合同；GeoPhys importer/normalization策略只约束其对应Provider路线，不是MuJoCo-only可行性核查的隐藏前置。Scene-v4仍是待比较方案，不能视为已批准或必需。
 
+2026-10-25，Sol复核P00-L02 attempt001：最新包已依据显式amendment核对Sol的`dd02da4…`七文件文档提交，旧HEAD/hash差异关闭，原历史快照保留。source闭包与raw完整性核对通过；候选草稿存在载荷前快照实际取自末态、积分末态与派生位姿缓存混采、失败时partial progress未及时保留等静态缺陷，须以attempt002返工候选合同/脚本。复核入口为同一ignored根目录的`sol_review_l02_20261025_001/`，由manifest引用。没有运行或批准native probe，R03a仍NOT_STARTED / NOT_READY_SCOPE_ORACLE_BUDGET_PENDING；按[交接规则](07_Execution_Order_and_Acceptance.md#sol-luna-workflow)在Luna执行窗口冻结HEAD和保护输入，Sol摘要提交后再发下一包。
+
 ## 本轮R07修订与Scope Risks
 
 - [09 R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)包含五Task逐项source/native语义/init/asset审计、ownership、真实部署门槛、Agent成本/独立review与RoboCasa feasibility；native source code读到了不等于Core已支持。

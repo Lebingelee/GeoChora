@@ -356,10 +356,10 @@
     "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
     "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "9444be9ceebe5791bfea1ad36d2bc9b0963815199fda30ffea5bff3753192a22",
+    "07_Execution_Order_and_Acceptance.md": "db68f70a1377ed136a09061f8e1db864ded9099b88cce9e8e211b6e7bd4523be",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "65bf1eb3546044177d8b56f1872a2304d29d9acf52270fd81f0bbf5ff79f43a5"
+    "README.md": "e8ade1678c77cd6f1187f64f61828cb5c0829b0097235389a3b6fd3a90b2a878"
   },
   "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY_RECHECK",
   "benchmark_audit": {
@@ -2076,6 +2076,17 @@
       "scope": "One reused phase branch, no per-prompt branches/worktrees, bounded output-to-local-commit linkage, default sequential Sol/Luna/review handoffs following 07.",
       "implementation_scope_or_qualification_approval": false,
       "prior_receipts_and_packages_preserved": true
+    },
+    {
+      "kind": "P00_L02_SOL_REVIEW_AND_PREPARATION_REWORK",
+      "date": "2026-10-25",
+      "input_commit": "dd02da44c8b069a17b377bf891bde3a28be0b3a0",
+      "result": "REWORK_REQUIRED",
+      "baseline": "Exact authorized seven-file docs commit reconciled; prior snapshots preserved.",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261025_001/review_receipt.json",
+      "scope": "Static review of unexecuted candidate contract/script; freeze handoff baseline during Luna execution.",
+      "DAG_required_envelope_unchanged": true,
+      "native_implementation_qualification_approval": false
     }
   ],
   "P00_audit": {
@@ -2099,7 +2110,7 @@
     "formal_qualification_granted": false,
     "technical_audit": "ROUND_1_COMPLETE",
     "scope_decisions": "PENDING",
-    "next_action": "Prepare a precise MuJoCo-only R03a source/dynamics feasibility probe contract for maintainer decision; no new implementation/native run authorized. Optional bounded independent architecture review later.",
+    "next_action": "P00-L02 attempt002 AUDIT_ONLY preparation rework before any native execution proposal; new baseline from Sol summary commit.",
     "luna_review": {
       "task_id": "PHASE-II-01-P00-L01",
       "review_date": "2026-10-25",
@@ -2114,6 +2125,34 @@
       "next_slice": "R03a",
       "next_slice_readiness": "NOT_READY_SCOPE_ORACLE_BUDGET_PENDING",
       "geophys_strategy_is_prerequisite_for_mujoco_only_probe": false
+    },
+    "luna_l02_review": {
+      "task_id": "PHASE-II-01-P00-L02",
+      "attempt": "001",
+      "review_date": "2026-10-25",
+      "reviewer": "Sol",
+      "mode": "AUDIT_ONLY",
+      "result": "REWORK_REQUIRED",
+      "baseline_result": "PASS_RECONCILED_EXACT_SEVEN_DOC_COMMIT",
+      "input_commit": "dd02da44c8b069a17b377bf891bde3a28be0b3a0",
+      "luna_report_sha256": "ecb1f8a6f624b8a542227ce581351c16550420ad5605b9db6f6a827c1e83a5e1",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261025_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261025_001/review_receipt.json",
+      "raw_availability": "LOCAL_IGNORED_NOT_DISTRIBUTED_WITH_GIT",
+      "static_findings": [
+        "post-load state mislabeled as pre-load",
+        "mixed integration/derived-cache boundary",
+        "partial progress not registered before failure",
+        "native library identity incomplete",
+        "units and finger-motion frame",
+        "contract/script/baseline consistency",
+        "resource enforcement language"
+      ],
+      "next_action": "P00-L02 attempt002 AUDIT_ONLY preparation rework before any native execution proposal; new baseline from Sol summary commit.",
+      "native_execution_authorized": false,
+      "implementation_authorized": false,
+      "native_tests": "NOT_RUN",
+      "qualification_granted": false
     }
   },
   "execution_workflow": {
@@ -2178,7 +2217,8 @@
       "one_writer_at_a_time": true,
       "luna_self_reported_pass_is_automatic_acceptance": false,
       "blocked_next_row": "Record blocker; any advance to an independent ready row must record rationale without changing the DAG or scope.",
-      "in_flight_baseline_change": "Preserve original package and provide explicit exact baseline/difference amendment; do not silently ignore hash drift."
+      "in_flight_baseline_change": "Preserve original package and provide explicit exact baseline/difference amendment; do not silently ignore hash drift.",
+      "execution_window_freeze": "Freeze HEAD and protected input bytes while Luna executes, including ignored-only audits. Sol review/summary commits land after report and before next prompt; urgent baseline changes require explicit interrupt/amendment with exact readback."
     },
     "output_commit_policy": {
       "bounded_output_linked_to_local_commits": true,

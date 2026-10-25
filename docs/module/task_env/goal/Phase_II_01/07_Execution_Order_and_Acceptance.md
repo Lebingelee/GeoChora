@@ -32,7 +32,7 @@ R03a直接依赖 **P00**，与R01a同属早期可启动项，不等待R01 codec�
 
 AUDIT_ONLY包若仅允许ignored目录写入，原始日志/草稿仍不提交。Luna交回facts，由Sol这一指定owner将可维护摘要/索引写入既有文档并提交，建立audit→review→commit对应；不要求空提交或为了提交把raw workspace追踪进Git。Sol/Luna不同时改同一文件；各包允许的tracked写入清单及提交owner必须明确。
 
-旧已发Prompt/收据及其HEAD/hash保留签署时点。维护者调整流程/文档使在途包基线变化时，保全原输入并给出精确补充说明或重新下发的包，明确新的HEAD/允许差异和保护路径；不能默默忽略hash漂移，也不把维护者授权的Sol文档提交归因于Luna。后续包基于实际提交后的HEAD生成。
+每个Luna执行窗口冻结HEAD和保护输入bytes，包含仅写ignored输出的AUDIT_ONLY包；Sol在Luna交回后完成复核/摘要/文档提交，再基于真实提交后HEAD发下一包。维护者在途补充先记待处理项；若必须立即改变基线，显式中断或amend该包，列精确commit/diff/hash并经readback后再恢复。旧Prompt/收据及其HEAD/hash保留签署时点；不能默默忽略漂移，也不把Sol文档提交归因于Luna。
 
 该工作流允许有界本地提交；push、合并develop/main、Tag和Release仍按单独授权处理。
 

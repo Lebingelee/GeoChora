@@ -121,6 +121,12 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   Sol reviews the actual diff and available Evidence before sending the next
   slice. Luna's reported PASS is input to that review, not automatic acceptance.
   Keep one writer at a time and use the same phase branch across handoffs.
+- Freeze HEAD and protected input bytes for each Luna execution window,
+  including ignored-output-only audits. Sol lands review/summary/document
+  commits after Luna returns and before issuing the next package. If urgent
+  maintainer steering changes an in-flight baseline, explicitly interrupt or
+  amend that package with the exact commit/diff/hashes; preserve the old
+  snapshot and require readback before resuming.
 - If a gate fails, Sol issues one bounded rework package. If the next table row
   is blocked, record the blocker and any explicit decision to advance an
   independent ready row; do not silently reorder work or add dependencies.
