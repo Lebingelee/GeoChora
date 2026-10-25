@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b）；本轮已fetch/readback该提交，复核同一任务要求并修订基线、审计分账和成本起点说明。仅文档，尚未批准最终 Goal/DAG，未开始 P00。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，本轮结果见 [validation receipt](validation_receipt.json)。
+2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b），本地259f27f完成规划复核。维护者随后通过本地启动指令单独授权P00基线核查和首份Luna工作包准备；P00首轮核查完成，实施准入仍待决，R01–R07均未启动。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，原规划检查保留在 [validation receipt](validation_receipt.json)，新P00核查另记 [manifest](planning_manifest.json) 的 `P00_audit` 与 `revision_history`。
 
 ## 文档入口与责任
 
@@ -17,6 +17,12 @@
 | [08 审阅交接](08_Codex_Phase_II_01_Planning_Prompt.md) | 下一轮独立审阅/维护者审批指令 |
 | [R07部署/Agent成本](09_R07_Benchmark_Deployment_and_Agent_Cost.md) | 固定五LIBERO审计/部署与成本协议、RoboCasa feasibility；不隶属R06 |
 | [planning manifest](planning_manifest.json) | 机器可读DAG、source/probe出处与文档hash；非实施receipt |
+
+## 当前开发流程（维护者2026-10-25补充）
+
+本阶段预先规划**1个开发分支、0个新增worktree**，复用`codex/phase-ii-01-p00-20261023`承载多个子阶段/Goal，不按每份Prompt建分支。默认依[07执行顺序及Sol/Luna闭环](07_Execution_Order_and_Acceptance.md#sol-luna-workflow)：Sol发单slice完整Prompt→Luna执行/验证/本地提交并交报告→Sol核diff/Evidence、记账后发下一包；失败则同分支单包返工。
+
+每个有界产出与相关本地提交对应；audit-only的ignored原件由Sol以既有文档摘要/索引提交关联，raw logs/H5不追踪进Git。只有恢复或独立方案比较/整合等实际需要才评估额外branch/worktree。具体分支计划与步骤由07及manifest记录；这些流程要求已明确，不等于具体功能范围、Provider合同或Qualification批准，push/merge/tag/Release仍另行授权。
 
 <a id="references"></a>
 
@@ -77,7 +83,15 @@
 
 本轮实际检查与既有测试/compile探针严格分栏，见 [validation_receipt](validation_receipt.json)。没有重跑Assembly NativeS2/S3、CameraEGL、Native-rate实验、完整A–D、NutAssembly矩阵、485区间R1或Qualification。当前工作仅文档，不需要修改Skill/API能力说明；TaskEnv Skill做静态检查，原说明仍描述当前实现。
 
-待维护者批准：最终7/22/依赖；MuJoCo CPU首个装配required与GeoPhys第二Provider状态；独立Position leaf最低接口；R04 required Camera消费范围；R05双backend正式host合同范围；历史原件恢复/退休/继续延期的独立处置。未批准前P00 NOT_STARTED，不开始R01–R07或自动发布v2.0.1。
+待维护者批准：最终7/22/依赖；MuJoCo CPU首个装配required与GeoPhys第二Provider状态；独立Position leaf最低接口；R04 required Camera消费范围；R05双backend正式host合同范围；历史原件恢复/退休/继续延期的独立处置。原规划收据的P00 NOT_STARTED保留签署时点含义；后续单独授权仅允许P00核查与准入准备，不开始R01–R07或自动发布v2.0.1。
+
+## P00首轮核查与手工Luna交接（2026-10-23）
+
+本轮输入Core为`259f27f13e0b96067c5f58406271a3339edc0023`；实际fetch/readback的`public/develop`仍为`535ce251…`。保留本地领先提交，并从该HEAD建立`codex/phase-ii-01-p00-20261023`；未push/merge。两个gitlink和v2.0.0冻结refs不变。仅做源码/文档/结构与存储核查，未运行S2/S3/S4，也不把既有Evidence计作新实验。
+
+本地事实报告、精确待决表、原始日志及首份自包含`AUDIT_ONLY` Luna Prompt保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/`，由manifest引用；这些本地bytes不随Git分发，缺少它们的clone必须报告raw unavailable。P00技术核查与实施准入分开：最终Goal/DAG、Required Envelope、Provider owner合同、运行预算及独立Human决定均未代签。首包仅审计attached-pair source/admission的现有owner与缺口，不执行R03a或任何功能实现。08与原validation receipt仍为规划修订时点的输入，不覆盖本轮明确授权。
+
+2026-10-25，Sol已复核P00-L01有界审计的输出/source hashes及关键源码guard；结果与既有Core准入边界一致，无需返工本次静态审计。原件及复核事实在同一ignored交接根目录的`luna_p00_l01_001/`和`sol_review_l01_20261025_001/`，由manifest引用；未运行S1/S2/S3/S4、未授予Attachment支持或实施准入。后继建议为先冻结MuJoCo CPU的R03a source/物理可行性probe合同；GeoPhys importer/normalization策略只约束其对应Provider路线，不是MuJoCo-only可行性核查的隐藏前置。Scene-v4仍是待比较方案，不能视为已批准或必需。
 
 ## 本轮R07修订与Scope Risks
 

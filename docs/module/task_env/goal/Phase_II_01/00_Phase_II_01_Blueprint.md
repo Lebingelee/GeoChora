@@ -1,6 +1,6 @@
 # Phase II-01 — Composite Robot & Core Integration
 
-状态：**REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL**，2026-10-23。目标版本 v2.0.1；本次只提交规划，P00 与 R01–R07 均未启动。7 个候选父 Goal、22 个切片不是已批准实施范围。
+状态：**REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL**，2026-10-23。目标版本 v2.0.1；后续维护者指令单独授权P00核查/实施准入准备和首份Luna工作包，首轮核查完成、实施准入仍待决，R01–R07均未启动。7个候选父Goal、22个切片不是已批准实施范围。原规划基线和下列规划事实保留其签署时点；新P00核查从Core `259f27f…` 起，见 [README](README.md) 与 [manifest](planning_manifest.json)。
 
 ## 基线与治理
 
@@ -10,7 +10,7 @@
 
 Scoped Engineering Acceptance、Task Freeze、Release Promotion、Formal Qualification 分别决议。此草案及文档提交不产生后三者；也不重新打开 Phase II 20/33/P00/P99 的已接受范围。
 
-## 端到端目标与独立分支
+## 端到端目标与独立能力链
 
 首条新执行交集拟定为 **MuJoCo 3.8.1 CPU × Menagerie 独立 panda_nohand.xml + hand.xml × 静态 Fixed Attachment × Arm-only/Hand-only Position Profiles**。未来须由同一公开 Environment 完成 reset→连续真实 step→typed/public observation→既有 Recorder→同 H5 readback→close。预组装完整 Panda 与两个自由 Panda 都不能作为独立 Attachment 成功证据。
 
@@ -27,6 +27,8 @@ Scoped Engineering Acceptance、Task Freeze、Release Promotion、Formal Qualifi
 R07新增4切片；P99建议直接依赖R06c与R07d。R07c每Task的R02/R03/R04条件前置须在配方中明确选择；首版authentic预集成MountedPanda/state-only方案为none，缺Core通用构造/谓词/公开状态能力仍BLOCKED_CORE。
 
 R04、R05 各自独立施工，但按当前建议均为整阶段 P99 的 required gates。某项失败不阻止不依赖它的 Position 子链继续，却阻止最终 P99 通过，除非维护者先批准精确范围变更。R03 第二 Provider 的执行不是默认 required；其拒绝原因和未获 Qualification 的状态必须可追溯。详见[执行表](07_Execution_Order_and_Acceptance.md)。
+
+2026-10-25维护者工作流补充：上述独立能力链不对应逐Goal新建Git分支。Phase II-01复用既有`codex/phase-ii-01-p00-20261023`作为本阶段集成分支，计划内开发分支总数为1、新增worktree为0；原名称保留，其职责覆盖本阶段多个子阶段和Goal。按[07的Sol/Luna顺序与提交闭环](07_Execution_Order_and_Acceptance.md#sol-luna-workflow)逐包推进。该流程偏好已明确，不代替尚待决定的具体实施范围和运行合同。
 
 ## Owner 与组合路线
 
@@ -53,4 +55,4 @@ R07只规划 `asset/benchmarks/`（资产来源/许可/安装验证）与 `bench
 
 不做动态 attach/detach、闭环拓扑热切换、通用 Assembly/仲裁、双臂 IK、所有 Provider/CUDA 矩阵、Camera async/semantic masks、训练/跨引擎 policy transfer、Task Harness、自动 Qualification。保持 Scene v1/v2/v3、旧 Artifact/Entity/Recorder identities 与历史 Evidence；新增合同独立版本化，不向旧 codec 静默增字段。
 
-批准顺序：维护者审阅本规划→批准最终 Goal/DAG/Required Envelope→单独启动 P00→逐 slice 执行与 evidence→独立 P99 scope decision→另行 Release Gate。本轮停在第一步的文档交付。
+原规划批准顺序为：维护者审阅→批准最终Goal/DAG/Required Envelope→单独启动P00→逐slice执行与Evidence→独立P99 scope decision→另行Release Gate。后续明确授权允许P00基线核查和准入准备先行；这不批准最终范围，也不越过逐slice实施gate。相关范围未获明确批准前，工作包只能为AUDIT_ONLY，不能标READY_TO_IMPLEMENT。

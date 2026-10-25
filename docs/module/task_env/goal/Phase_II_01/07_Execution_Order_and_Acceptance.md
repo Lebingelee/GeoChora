@@ -1,12 +1,40 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是新的 7 父 Goal / 22 切片**建议表**，不继承 Phase II 的 PASS，也不因本次文档提交启动 P00。每一 slice 均 PLANNED / NOT_STARTED。
+状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。后续维护者指令已单独授权P00基线核查与准入准备；P00首轮核查完成、实施准入仍待决。下列每一实施slice仍为PLANNED / NOT_STARTED，DAG与Required Envelope未获最终批准。
 
 ## 基线、P00 与证据记账
 
-以 [00 基线](00_Phase_II_01_Blueprint.md) 的 develop/gitlinks 为规划输入；本轮远端 readback 已核对。未来 P00 才重新比较执行时 refs/source/build/env、批准输入/预算/owner、保全工作区与 Evidence，并锁定新的 run manifest。现有编译/import 事实为先前审阅探针，不计作 P00/R03a 通过。
+以 [00 基线](00_Phase_II_01_Blueprint.md) 的develop/gitlinks为规划输入；该次远端readback属于规划复核时点。新P00从Core `259f27f…`重新核查refs/source/build/env，保全工作区与Evidence，并在现有 [manifest](planning_manifest.json) 的P00审计条目及ignored事实收据记账。输入/预算/owner批准仍待决，核查不等于实施准入。现有编译/import事实为先前审阅探针，不计作P00/R03a实验通过。
 
-R03a 直接依赖 **P00**，与 R01a 并列早期启动；不等待 R01 codec。R05a 同样是独立 Provider gate；R04/R05 对 R01/R02/R03 Position 执行**无前置边**。实际推进可并行，下面编号仅是一个合法拓扑序。
+R03a直接依赖 **P00**，与R01a同属早期可启动项，不等待R01 codec。R05a同样是独立Provider gate；R04/R05对R01/R02/R03 Position执行**无前置边**。下面编号是一个合法拓扑序；依维护者2026-10-25要求，默认按此顺序逐包推进，不因DAG允许独立执行就自动并行或逐Goal开新分支。
+
+<a id="sol-luna-workflow"></a>
+
+## 阶段分支、逐包提交与Sol/Luna闭环（2026-10-25）
+
+本节记录维护者已明确的开发流程，复用[仓库规则](../../../../../AGENTS.md#phase-branch-workflow)；不批准尚未获准的slice、Required Envelope、Provider合同或Qualification。
+
+| 计划项 | Phase II-01安排 |
+| --- | --- |
+| 计划内开发topic分支总数 | **1**，P00及后续R01–R07/P99在本阶段共用 |
+| 复用分支 | `codex/phase-ii-01-p00-20261023`；保留既有名称，职责扩展为本阶段集成分支 |
+| 新增worktree | **0**，复用当前checkout；已有历史/冻结worktree原样保留 |
+| 追加分支/worktree的适用情形 | 恢复、需独立保留的方案、网页/独立审阅后确需隔离比较或整合；先记原因、base、范围、总数变化与回归/整合去向，讨论本身不要求新建 |
+| 默认任务粒度 | 一个明确授权、前置齐全的slice/子阶段工作包；多个工作包共用上述分支 |
+| 产出与提交 | 每个有界产出关联本地commit(s)；报告列slice/attempt、输入/输出HEAD、commit及Evidence hash/入口；不将多个未完成Goal混为一次提交 |
+
+默认闭环：
+
+1. Sol按下表顺序选择下一slice，核前置/授权/readiness，交付一个完整代码框Prompt及可选同内容文件；给出owner、真实HEAD/branch、保护路径、允许修改/本地提交范围、验收/oracle/预算、失败/关闭规则和报告格式。不惯例为每个Prompt重新要求已获批准的范围，不将流程补充扩大为功能授权。
+2. Luna作为该包唯一写入者，完成实现和相应文档/Skill同步，执行必要检查；有界stage并创建该包允许的本地提交。报告PASS/FAIL/BLOCKED/NOT_RUN、实际commit、raw Evidence、未执行项及限制，然后交回，不自行开始下一slice。
+3. Sol转为复核写入者前，先只读核对Luna实际HEAD/diff、关键代码、原始Evidence及最小缺陷敏感复核。Luna自报PASS不自动接受；范围内验收和提交可核对后，Sol在现有状态入口/manifest/history记录结论，必要的复核摘要形成有界本地提交，再发送下一slice包。
+4. 失败时Sol给一个明确返工包，复用同一分支；不放宽oracle或跳required gate。若下一行被阻塞，可继续其准备工作；要先推进独立ready行，Sol须记录原因、未变DAG和范围依据，不静默改顺序/新增依赖。
+
+AUDIT_ONLY包若仅允许ignored目录写入，原始日志/草稿仍不提交。Luna交回facts，由Sol这一指定owner将可维护摘要/索引写入既有文档并提交，建立audit→review→commit对应；不要求空提交或为了提交把raw workspace追踪进Git。Sol/Luna不同时改同一文件；各包允许的tracked写入清单及提交owner必须明确。
+
+旧已发Prompt/收据及其HEAD/hash保留签署时点。维护者调整流程/文档使在途包基线变化时，保全原输入并给出精确补充说明或重新下发的包，明确新的HEAD/允许差异和保护路径；不能默默忽略hash漂移，也不把维护者授权的Sol文档提交归因于Luna。后续包基于实际提交后的HEAD生成。
+
+该工作流允许有界本地提交；push、合并develop/main、Tag和Release仍按单独授权处理。
 
 ## 22 切片 DAG 与停止条件
 
@@ -64,7 +92,7 @@ R03 第二Provider若加入required，也须上述scope变更；若GeoPhys修复
 
 只有受影响明确问题才拓宽实验，不重跑完整 A–D/NutAssembly矩阵/485 interval R1 作为日常文档校验。禁止更换Provider求绿、提升阈值、删断言/全局skip、隐式fallback、私有状态穿透、重复Runtime、ghost transition、假物理回滚。
 
-维护者批准最终 Goal/DAG 后才启动 P00。提交此表只完成规划交付；[本轮校验](validation_receipt.json)不是新阶段验收报告。
+后续维护者明确授权P00核查/准入准备先行；最终Goal/DAG及相关合同未批准前，不进入R01–R07实施。此表仍是候选执行合同；原 [规划校验](validation_receipt.json)不是新P00实验或阶段验收报告，新审计状态由manifest的P00条目引用。
 
 ## R07条件前置与测量范围
 

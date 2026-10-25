@@ -3,7 +3,7 @@
   "date": "2026-10-23",
   "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
   "implementation_authorized": false,
-  "P00": "NOT_STARTED",
+  "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
   "goal_count": 7,
   "slice_count": 22,
   "baseline": {
@@ -349,17 +349,17 @@
     "retirement_or_new_stage_continued_deferral_approved": false
   },
   "document_sha256": {
-    "00_Phase_II_01_Blueprint.md": "302f0b1705a79b79d0f90aa0174a34a687c8584117a61d2d69e26cbf748afa7f",
+    "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
     "03_R03_Physical_Attachment.md": "b62d999a32be4dc32923f65856e1b021e6a20abd927ee24d28072e76e6adabcf",
     "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
     "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "14a2ab87458be06a5f7767560e08c7dfd1ceedec14ced8b08b81895ab12913e4",
+    "07_Execution_Order_and_Acceptance.md": "9444be9ceebe5791bfea1ad36d2bc9b0963815199fda30ffea5bff3753192a22",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "f258f9891bbc35cc8acc66429d2c935772d87f6a7c4cf2ad3df7eaa3d4f607f9"
+    "README.md": "65bf1eb3546044177d8b56f1872a2304d29d9acf52270fd81f0bbf5ff79f43a5"
   },
   "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY_RECHECK",
   "benchmark_audit": {
@@ -2051,6 +2051,149 @@
       "previous_receipt_sha256": "a7c24cde8537a6a66beff830a95f7c42b611fd9f83f593d78d1a48972efda744",
       "input_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
       "preservation": "immutable source commit plus local prior_planning_documents.tar.gz; previous signing-time no-commit/no-push fields remain historical"
+    },
+    {
+      "kind": "P00_AUDIT_ONLY_AUTHORIZATION_AND_READINESS_PREPARATION",
+      "date": "2026-10-23",
+      "input_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+      "previous_receipt_path": "docs/module/task_env/goal/Phase_II_01/validation_receipt.json",
+      "previous_receipt_sha256": "a0edfa5c5f23483dfb73b09d3ff5eefbeea5bec3f469daa1f9a84abd4540fe00",
+      "preservation": "Original planning receipt and earlier history unchanged; P00 facts recorded separately under P00_audit.local_evidence_root. No Goal/DAG/envelope/implementation approval inferred."
+    },
+    {
+      "kind": "P00_L01_SOL_AUDIT_REVIEW",
+      "date": "2026-10-25",
+      "input_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+      "previous_working_manifest_sha256": "a187cb6759adae978a9c0cc20c72e50b14abb163c3b9d4c15154803ed47ee8f2",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l01_20261025_001/review_receipt.json",
+      "preservation": "Luna report/raw outputs and previous Sol receipts unchanged; static audit accepted only, no scope/Provider/native/Qualification approval."
+    },
+    {
+      "kind": "MAINTAINER_PHASE_BRANCH_COMMIT_AND_SOL_LUNA_WORKFLOW",
+      "date": "2026-10-25",
+      "input_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+      "workflow_preference_confirmed": true,
+      "scope": "One reused phase branch, no per-prompt branches/worktrees, bounded output-to-local-commit linkage, default sequential Sol/Luna/review handoffs following 07.",
+      "implementation_scope_or_qualification_approval": false,
+      "prior_receipts_and_packages_preserved": true
     }
-  ]
+  ],
+  "P00_audit": {
+    "task_id": "PHASE-II-01-P00-SOL-001",
+    "date": "2026-10-23",
+    "mode": "AUDIT_ONLY",
+    "authorization": "Explicit maintainer instruction to read sol_startup_prompt.md and complete P00 checks/readiness preparation plus first bounded Luna work package; no R01-R07 implementation approval.",
+    "input_core_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+    "branch": "codex/phase-ii-01-p00-20261023",
+    "remote_develop_readback": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+    "local_evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/",
+    "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/sol_p00_receipt.json",
+    "receipt_availability": "LOCAL_IGNORED_NOT_DISTRIBUTED_WITH_GIT",
+    "luna_task_id": "PHASE-II-01-P00-L01",
+    "luna_mode": "AUDIT_ONLY",
+    "implementation_readiness": "AWAITING_EXPLICIT_SCOPE_APPROVAL",
+    "canonical_scope_authority": "07_Execution_Order_and_Acceptance.md and unchanged slices/required_envelope in this manifest; local reports are facts/proposals only.",
+    "S2": "NOT_RUN",
+    "S3": "NOT_RUN",
+    "S4": "NOT_RUN",
+    "formal_qualification_granted": false,
+    "technical_audit": "ROUND_1_COMPLETE",
+    "scope_decisions": "PENDING",
+    "next_action": "Prepare a precise MuJoCo-only R03a source/dynamics feasibility probe contract for maintainer decision; no new implementation/native run authorized. Optional bounded independent architecture review later.",
+    "luna_review": {
+      "task_id": "PHASE-II-01-P00-L01",
+      "review_date": "2026-10-25",
+      "reviewer": "Sol",
+      "mode": "AUDIT_ONLY",
+      "result": "Audit facts accepted by Sol; advisory successor-scope clarifications; no mandatory L01 rework.",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l01_20261025_001/review_receipt.json",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l01_20261025_001/sol_review.md",
+      "luna_report_sha256": "87f1e09529c225b868abf90047c22562ef78851782e19244da96df10339b72cd",
+      "implementation_authorized": false,
+      "new_native_tests": "NOT_RUN",
+      "next_slice": "R03a",
+      "next_slice_readiness": "NOT_READY_SCOPE_ORACLE_BUDGET_PENDING",
+      "geophys_strategy_is_prerequisite_for_mujoco_only_probe": false
+    }
+  },
+  "execution_workflow": {
+    "authority": "Explicit maintainer workflow preferences in the 2026-10-25 conversation; takes precedence over conflicting older workflow instructions.",
+    "date": "2026-10-25",
+    "canonical_workflow": "07_Execution_Order_and_Acceptance.md#sol-luna-workflow",
+    "workflow_preference_confirmed": true,
+    "implementation_scope_approval_implied": false,
+    "branch_plan": {
+      "unit": "Phase_II_01 stage integration",
+      "planned_topic_branch_count": 1,
+      "reused_topic_branch": "codex/phase-ii-01-p00-20261023",
+      "retain_existing_branch_name": true,
+      "new_worktree_count": 0,
+      "create_per_goal_or_prompt": false,
+      "additional_branch_or_worktree_cases": [
+        "recovery",
+        "separately retained alternative",
+        "isolated comparison or integration after independent/web-GPT review when necessary"
+      ],
+      "addition_requires_record": [
+        "reason",
+        "base",
+        "scope",
+        "updated planned count",
+        "reintegration or final disposition"
+      ],
+      "historical_refs_and_worktrees_preserved": true
+    },
+    "handoff": {
+      "default_execution_order": [
+        "R03a",
+        "R01a",
+        "R05a",
+        "R04a",
+        "R06a",
+        "R01b",
+        "R02a",
+        "R01c",
+        "R02b",
+        "R02c",
+        "R03b",
+        "R03c",
+        "R04b",
+        "R04c",
+        "R05b",
+        "R05c",
+        "R06b",
+        "R06c",
+        "R07a",
+        "R07b",
+        "R07c",
+        "R07d"
+      ],
+      "default_parallel_execution": false,
+      "cycle": [
+        "Sol selects one authorized ready slice and sends a self-contained prompt in a code block",
+        "Luna completes allowed work, validation and bounded local commit(s); returns report",
+        "Sol independently reviews actual diff and available Evidence, records result and summary commit where needed",
+        "Sol sends next ready slice; failed acceptance receives one rework package on the same branch"
+      ],
+      "one_writer_at_a_time": true,
+      "luna_self_reported_pass_is_automatic_acceptance": false,
+      "blocked_next_row": "Record blocker; any advance to an independent ready row must record rationale without changing the DAG or scope.",
+      "in_flight_baseline_change": "Preserve original package and provide explicit exact baseline/difference amendment; do not silently ignore hash drift."
+    },
+    "output_commit_policy": {
+      "bounded_output_linked_to_local_commits": true,
+      "report_fields": [
+        "slice",
+        "attempt",
+        "input_HEAD",
+        "output_HEAD",
+        "commit(s)",
+        "validation",
+        "Evidence paths and hashes"
+      ],
+      "audit_only_ignored_output": "Luna preserves raw workspace output; Sol as designated owner commits the maintained summary/index after review. No raw Evidence or empty commit required.",
+      "stage_other_writer_files": false,
+      "push_merge_tag_release_authorized": false
+    }
+  }
 }
