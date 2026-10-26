@@ -9,6 +9,19 @@ Read repository `AGENTS.md` and [module README](../../../docs/module/task_env/RE
 `task_env/` is the sole Core owner; use its public APIs. No historical chat context is required.
 For the source/contract/test map read [routes](references/routes.md) when implementing a workflow or diagnosing a gap.
 
+## Static Logical Assembly values
+
+R01a exposes `LogicalAssemblyV1`, `LogicalAssemblyEntityMemberV1`,
+`LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, and
+`decode_logical_assembly` from `task_env.artifacts`. Use this qualified API only
+for an immutable, versioned logical value pinned to an existing Scene identity.
+Entity members describe logical ownership; subcomponent members are typed
+reference-only views; nested members pin an exact child revision and digest.
+The codec does not check Scene/child existence, recursively resolve ownership,
+project source, attach bodies, or admit a runtime. R01b/R01c/R03 remain separate
+owners and gates. This static contract does not change the Skill's selected
+runtime routes or their supported capability envelope.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",

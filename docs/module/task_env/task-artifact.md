@@ -61,6 +61,8 @@ identity hash 保持原样；objects/sensors 仍使用通用 Entity 与 Frame，
 `TaskCompositionSpec`、assembly `TaskReferences` 和当前 Env 的单 Robot 执行边界未改变；双 Robot 目前仅有静态
 composition/reference 证据，真实施控须由后续 D01/C02 路线另行验证。
 
+Phase II-01 R01a 在同一 `task_env.artifacts` owner 增加独立 `logical-assembly-v1` strict codec：`LogicalAssemblyV1` 锁定作者给定的 assembly ID/revision、现有 Scene v1/v2/v3 的精确身份 pin 与规范排序成员。Entity member 保存现有 Entity/asset identity；reference-only subcomponent member 复用 `FrameReference`、`JointReference`、`ActuatorReference`，并用 `LogicalAssemblyControlGroupReferenceV1` 表示 typed ControlGroup 引用；nested member 只固定 child ID/revision/content SHA-256。computed logical hash 不写回自身 mapping，codec 输入被复制为 frozen 值，`to_mapping()` 返回独立 JSON snapshot。该合同不验证 Scene 成员存在性或 child digest，不做递归/投影/source closure/native materialization，也不授予物理连接或 Controller 写权；R01b/R01c/R03 仍负责其各自准入与消费。
+
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
 explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，

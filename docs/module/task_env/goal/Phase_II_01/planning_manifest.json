@@ -124,10 +124,12 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S1",
-      "stop_condition": "旧identity变动或引用契约不明→停止"
+      "status": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "execution": "PROVIDER_FREE_S1_PASS",
+      "required_evidence": "Static strict codec/non-self identity; legacy Scene v1/v2/v3 and TaskArtifact v0/v1 compatibility; pending Sol review.",
+      "stop_condition": "旧identity变动或引用契约不明→停止",
+      "result": "R01a implements logical-assembly-v1 values and explicit codec only. No recursive resolver, source projection, native assembly, or Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md"
     },
     {
       "id": "R05a",
@@ -439,16 +441,16 @@
   },
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
-    "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
+    "01_R01_Logical_Robot_Assembly.md": "1921bfa060367f782c53414fc62529e4f5bf967c93a39c380bd2bf8fec7b508b",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
     "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "6ab1f35ac57e56b20c76e90621b0d245d37ea55ddcf6a1144c52355afe82ba2d",
+    "07_Execution_Order_and_Acceptance.md": "d7c5b4d518485d5895d21ec50ba4d44a3b30759b1aaad7b10636989eed1af24a",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "081110fd7362b0a39df671a0896bedd4566e08f3028f97f204060febc2a07094"
+    "README.md": "8c2ec5effe41a40f670acce99bdc3333a5e683465ac7bed5472c2f49ae65e224"
   },
   "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY_RECHECK",
   "benchmark_audit": {
@@ -2252,6 +2254,18 @@
       "DAG_required_envelope_unchanged": true,
       "next_slice": "R01a",
       "qualification_granted": false
+    },
+    {
+      "kind": "R01A_ATTEMPT001_IMPLEMENTATION_AND_S1",
+      "date": "2026-10-26",
+      "input_commit": "2229ad857c0c711d0c3894c97b05994896c31016",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Add the versioned provider-neutral logical Assembly value contract, strict codec, non-self identity hash, targeted provider-free S1, compatibility and documentation/Skill sync. No R01b/R01c/R03b/R03c or native execution.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/evidence.json",
+      "native_execution": "NOT_RUN",
+      "sol_review": "PENDING",
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -2275,7 +2289,7 @@
     "formal_qualification_granted": false,
     "technical_audit": "ROUND_1_COMPLETE",
     "scope_decisions": "PENDING",
-    "next_action": "R03a INTERIOR_HAND_COMMANDS bounded engineering exit accepted by Sol. Issue one R01a implementation/S1/local-commit package on the same phase branch; no further preparation round and no R03b/c execution.",
+    "next_action": "R03a INTERIOR_HAND_COMMANDS bounded engineering exit accepted by Sol. R01a implementation/provider-free S1 is complete and pending Sol review; no automatic next slice or R03b/c execution.",
     "luna_review": {
       "task_id": "PHASE-II-01-P00-L01",
       "review_date": "2026-10-25",

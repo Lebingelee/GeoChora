@@ -1,12 +1,20 @@
 # R01 — Logical Robot Assembly
 
-状态：REVISED_DRAFT；R01a/b/c 均 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
+状态：REVISED_DRAFT；R01a 已实现静态值合同与 provider-free S1，等待 Sol 复核；R01b/c 仍 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
 
 ## 当前 owner 与版本边界
 
 [Asset/Entity/Frame/Joint/Robot/Scene contracts](../../../../../task_env/artifacts/contracts.py)、[source bridge](../../../../../task_env/runtime/sessions/source.py)、[assembly compiler](../../../../../task_env/assembly/compiler.py) 是复用点。现有 RobotInstance root 属单 Entity，JointDefinition 拒绝跨 Entity endpoints；assembly compiler 是特定 source 配方，不是通用递归 Assembly。
 
 EXTEND_EXISTING：优先在 artifacts owner 增独立版本化 Assembly 引用合同，由现有 compiler 消费；不为逻辑引用先行要求 Scene v4。若物理 lowering 确需新 Scene/Artifact envelope，R03b 必须提交显式版本派发方案；Scene v1/v2/v3 的 mapping、strict fields、hash 与旧 Artifact/Entity identity 保持原样。
+
+### R01a 已实现的静态合同边界
+
+`task_env.artifacts.LogicalAssemblyV1` 使用唯一 schema `logical-assembly-v1`，字段为 `assembly_id`、`revision`、`scene_pin` 和 `members`。`scene_pin` 是 `LogicalAssemblyScenePinV1`，锁定 `scene_id`、既有 Scene schema v1/v2/v3 与 `scene_identity_sha256`。`decode_logical_assembly()` 显式派发此版本；未知/缺失字段、未知 member kind、跨 kind 字段和错误 digest 均拒绝。
+
+`LogicalAssemblyEntityMemberV1` 是逻辑 owning member，显式保存 component path、Scene Entity ID 与 asset ID/version；本合同不会创建第二个物理 Entity，也不验证 Entity/asset 是否存在于已 pin 的 Scene。`LogicalAssemblySubcomponentReferenceV1` 是 reference-only，target 必须是既有 `FrameReference`、`JointReference`、`ActuatorReference` 或新值 `LogicalAssemblyControlGroupReferenceV1`；它不使用 `ControlGroup` 定义冒充引用，也不赋予 writer 权。`LogicalAssemblyNestedMemberV1` 只编码固定 child assembly ID、revision 和 `logical_content_sha256`；child 存在性、摘要匹配、递归闭包、环、跨层重复 owning、悬空引用与 32/1024 预算交由 R01b。
+
+Component path 保持 segment tuple；空路径、空 segment、`.`、`..`、分隔符和 percent 转义被拒绝。同层 path 与相同 typed target 重复也被拒绝。members 按 path/kind/typed target 排序。logical identity 是 schema、稳定 assembly ID/revision、Scene pin 和排序成员 mapping 的 canonical JSON SHA-256；计算出的摘要不写入自身 payload。`to_mapping()` 返回与内部值脱离的 JSON snapshot。这个值不解析 Scene、不生成 source/native mapping、不执行 Runtime 或连接物理 body；R01c 投影与 R03 lowering 仍未实现。
 
 ## 两类成员与拥有关系
 
@@ -34,7 +42,7 @@ R01 持有 canonical refs，不持有 native body/joint/actuator indices。R03 �
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
-| R01a | P00 | 既有 artifacts owner 中两类 member、hash DAG、版本与边界设计/codec | S1：strict discriminator/roundtrip/hash，旧 Scene/Artifact 不变；若需改旧 identity 即停止 |
+| R01a | P00 | 既有 artifacts owner 中两类 member、hash DAG、版本与边界设计/codec | provider-free S1 已通过：strict discriminator/roundtrip/non-self hash 与旧 Scene/Artifact 基线保持；报告 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md`；等待 Sol 复核 |
 | R01b | R01a | 递归 owning/reference-only 解析、typed paths 与有界负例 | S1：环/悬空/重复拥有/错误 source revision/alias/超预算拒绝；不加载 Provider |
 | R01c | R01b | source/compiler 的只读投影与可追踪 leaf refs | S1：完整 Panda 内 arm/hand subrefs、独立 Arm/Hand Entity members 两类 fixture；canonical refs 不产生物理 joint |
 

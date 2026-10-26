@@ -7,7 +7,7 @@
 | 文档 | 修订后的责任 |
 | --- | --- |
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
-| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG |
+| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a 静态合同已实现，待Sol复核 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略 |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界 |
@@ -103,7 +103,7 @@
 
 2026-10-26，维护者明确授权R03a attempt002 `INTERIOR_HAND_COMMANDS` 的有限代码修正、stdlib-only S1和一个MuJoCo 3.8.1 CPU native进程。S1与新case全部冻结数值门通过：两trial各192个outer intervals、`mj_step=1920`、`mj_forward=389`；reset完全重复，Arm/Hand motion、range、mount、finite/warning/clock与1 N同状态load balance oracle均通过。结果仅适用于close `0.002 m / ctrl 12.75`、open/reset `0.038 m / ctrl 242.25`；native joint range仍`[0,0.04] m`、ctrlrange仍`[0,255]`。attempt001端点FAIL保持，未证明0/255端点、全行程、Core Attachment admission、Core public Env/H5、R03b/c或Qualification。报告与raw Evidence保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/`，由manifest引用；Sol复核结论见下。
 
-2026-10-26，Sol复核接收R03a attempt002为`ACCEPTED_BOUNDED`：实际六文件diff、44项交付与5项native哈希、1,920行step trace、386个状态样本及冻结oracle核对通过，未运行新的native实验。attempt001端点FAIL保留；该精确内缩case满足R03a有界工程出口，下一包按表进入R01a的逻辑Assembly合同/codec实施与S1，不再追加准备轮次。R03b仍等待R01c，Core Attachment/公有Env/H5、全行程与Qualification结论不扩展。复核原件在同一ignored交接根目录的`sol_review_r03a_002/`，由manifest引用。
+2026-10-26，Sol复核接收R03a attempt002为`ACCEPTED_BOUNDED`：实际六文件diff、44项交付与5项native哈希、1,920行step trace、386个状态样本及冻结oracle核对通过，未运行新的native实验。attempt001端点FAIL保留；该精确内缩case满足R03a有界工程出口。随后R01a attempt001在输入`2229ad857c0c711d0c3894c97b05994896c31016`上实现独立`logical-assembly-v1` strict codec及非自指hash，并完成provider-free S1与旧Scene/Artifact兼容检查；结果为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，报告在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md`。R01b/c仍未执行；R03b仍等待R01c，Core Attachment/公有Env/H5、全行程与Qualification结论不扩展。
 
 ## 本轮R07修订与Scope Risks
 

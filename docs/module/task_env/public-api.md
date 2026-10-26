@@ -125,6 +125,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `ProductionCanonicalPandaController.source_artifact_hash`, `.source_xml_sha256`, `.tcp_profile_identity`, `.source_kinematics_identity`, `.expected_control_step` | `task_env.controllers.canonical.production` | Read-only actual-instance identity and evaluation-cursor view used by source-bound admission; adding these properties does not alter legacy R1 identity or compute/reset behavior |
 | `ActuatorForceMeasurementV1`, `RuntimeSnapshot.actuator_force_measurement` | `task_env.environment` | Core Provider-adapter value contract for signed raw actuator-force provenance: source generation, sample/config/state revisions, native sample index/phase, validity, and selected-session episode/reset/evaluation boundary. Used by GeoPhys legacy force-aware and MuJoCo session-cache routes; wrapped by typed state v2 only for the exact admitted Scene-v3 R1 candidate. It does not grant generic actuator units or shared Provider capability |
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
+| `LogicalAssemblyV1`, `LogicalAssemblyEntityMemberV1`, `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, `LogicalAssemblyControlGroupReferenceV1`, `decode_logical_assembly` | `task_env.artifacts` | R01a provider-neutral `logical-assembly-v1` 静态值；Scene identity pin、typed Entity/reference/nested member 与非自指 content hash。strict codec 不解析、不 lowering、不代表 Attachment admission 或 physical support |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
@@ -133,6 +134,39 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 历史收据在 GeoPhys gitlink `4436787e…` × MuJoCo native OpenGL 上对单 Panda Position/Scene-v3 scalar-joint source 验证 default/override、双相机 materialization/sync/capture/close S1/S2。当前 `a53a8cfe…` pin 已另行完成真实 NVIDIA EGL pairing S1/S2 与资源关闭复验，见 [P99 运行收据](goal/Phase_II/C_Development_Record.md#public-candidate)；旧 `4436787e` 收据独立保留。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification remain unsupported or unverified |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
+
+### Static Logical Assembly value (R01a)
+
+```python
+from task_env.artifacts import (
+    AssetDefinition,
+    EntityInstance,
+    LogicalAssemblyEntityMemberV1,
+    LogicalAssemblyScenePinV1,
+    LogicalAssemblyV1,
+    SceneDefinition,
+    decode_logical_assembly,
+)
+
+asset = AssetDefinition("asset-definition-v1", "robot/panda", "v1", "procedural://example/panda")
+entity = EntityInstance("entity-instance-v1", "arm", "robot/panda", "v1")
+scene = SceneDefinition("scene-definition-v1", "example-scene", (asset,), (entity,))
+assembly = LogicalAssemblyV1(
+    "logical-assembly-v1",
+    "robot-assembly",
+    "r1",
+    LogicalAssemblyScenePinV1(
+        "logical-assembly-scene-pin-v1",
+        scene.scene_id,
+        scene.schema_version,
+        scene.identity_hash,
+    ),
+    (LogicalAssemblyEntityMemberV1("entity_member", ("arm",), "arm", "robot/panda", "v1"),),
+)
+assert decode_logical_assembly(assembly.to_mapping()) == assembly
+```
+
+This example builds only a static value and round-trips its strict codec. It does not construct an environment, resolve a member, load a source, or create physical attachment.
 
 ## C02b Position Profile candidate status (2026-10-22)
 
