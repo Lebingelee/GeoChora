@@ -25,14 +25,14 @@
       "depends_on": [
         "P00"
       ],
-      "status": "FAIL",
-      "execution": "EXECUTED_FAIL",
-      "required_evidence": "S1/S2",
-      "stop_condition": "独立fixed dynamics未证明→阻塞b/c",
-      "result": "The independent MuJoCo 3.8.1 CPU probe compiled the attached model and failed the frozen Hand finger joint-range gate after 15 successful mj_step calls.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/report.md",
-      "native_evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/native_run_001/probe_evidence.json",
-      "candidate_basis_sha256": "7c639ca471642fd0e044c9ee7e3632aafb7fa80722a3074676bc78abebac8102",
+      "status": "BOUNDED_CASE_PASS_PENDING_SOL_REVIEW",
+      "execution": "EXECUTED_BOUNDED_CASE_PASS",
+      "required_evidence": "S1 plus one independent MuJoCo source/dynamics probe for the exact INTERIOR_HAND_COMMANDS case; not Core S2/S3.",
+      "stop_condition": "Attempt001 endpoint FAIL remains preserved; attempt002 passes only its interior command case. No endpoint/full-stroke/Core Attachment claim; Sol review pending and R03b/c retain original dependencies.",
+      "result": "Attempt001 ENDPOINT_HAND_COMMANDS remains FAIL. Attempt002 INTERIOR_HAND_COMMANDS completed the independent source/dynamics probe and passed the frozen gates for its approved operating targets only.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/report.md",
+      "native_evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/native_run_001/probe_evidence.json",
+      "candidate_basis_sha256": "a41587e297a84286a62f05c561eb484d7078b27e4cba1a5d8f47510652a97fc5",
       "sol_review": {
         "date": "2026-10-26",
         "input_commit": "697eb65485eb740ab46179f2a43870afb3e9428c",
@@ -52,6 +52,57 @@
         },
         "old_endpoint_case_remains": "FAIL; no full-stroke claim",
         "implementation_gate": "R03b/c remain blocked pending actual new evidence and Sol review"
+      },
+      "attempt001_historical": {
+        "result": "FAIL",
+        "case_id": "ENDPOINT_HAND_COMMANDS",
+        "raw_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/native_run_001/probe_evidence.json",
+        "raw_evidence_sha256": "9f44eef19810c49c678c209e3c4d0c99728b0508deb0923f1ff978b8894feb09",
+        "preservation": "Original raw and report unchanged; old 0/255 endpoint case remains failed."
+      },
+      "attempt002_execution": {
+        "case_id": "INTERIOR_HAND_COMMANDS",
+        "input_commit": "c59b98e6bde0f86afcdca8d426e67363bd809305",
+        "result": "COMPLETED_CANDIDATE_SOURCE_DYNAMICS_PROBE",
+        "case_status": "BOUNDED_CASE_PASS_PENDING_SOL_REVIEW",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/report.md",
+        "contract": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/probe_contract.json",
+        "contract_sha256": "6b429deb78fa868ba6e48595c247d059f4711495a0265d809adddc21633a3307",
+        "source_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/source_manifest.json",
+        "source_manifest_sha256": "21ecd15c5dce5218f64a5d36dcdd1d37be147a7f4f90e1420d805b7b1eca7233",
+        "probe_script_sha256": "e0646bb15f6999f0153c613b23aedee6ad0dd41f65ef88ae81559760f4c41a10",
+        "candidate_basis_sha256": "a41587e297a84286a62f05c561eb484d7078b27e4cba1a5d8f47510652a97fc5",
+        "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/native_run_001/probe_evidence.json",
+        "native_evidence_sha256": "765241807e80bbd2edc5de876a94d0093068af31f954afd11f8e929f58d46f95",
+        "native_process_invocations": 1,
+        "native_exit_code": 0,
+        "native_wall_seconds": 45.78603756602388,
+        "mj_step_calls": 1920,
+        "mj_forward_calls": 389,
+        "simulated_seconds": 3.84,
+        "hand_operation_targets": {
+          "close_each_finger_qpos_m": 0.002,
+          "close_ctrl": 12.75,
+          "open_reset_each_finger_qpos_m": 0.038,
+          "open_reset_ctrl": 242.25
+        },
+        "native_limits_unchanged": {
+          "joint_range_each_m": [
+            0.0,
+            0.04
+          ],
+          "ctrlrange": [
+            0.0,
+            255.0
+          ]
+        },
+        "native_oracles_passed": true,
+        "Core_S2_S3": "NOT_CLAIMED",
+        "core_attachment_admission": false,
+        "provider_owner_contract_approved": false,
+        "human_judge_approved": false,
+        "qualification_approved": false,
+        "sol_review": "PENDING"
       }
     },
     {
@@ -376,14 +427,14 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
-    "03_R03_Physical_Attachment.md": "73c15af2a26a087c0b44d08df8ccf0f41bdd419ff87de58681478a0e4c530696",
+    "03_R03_Physical_Attachment.md": "d44751001f4c5654379360a0e72bbf13607be9deec62d519d504fb5e250747fb",
     "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
     "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "8f45fe6106b2215ed14a852b02fef023ee96dbb10c40cc627ba539f5545fb7b8",
+    "07_Execution_Order_and_Acceptance.md": "2d5165cd51190cc0404ec888bf0fa3a8663d688c24f1f4a8a5e8bfcb30514d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "5f13fe3a1a4077c7eccd21fa3de50aef72dfb2a40da71bad823c18fd998cc1ab"
+    "README.md": "29a460c201dcbe8091f911d2e03d06746c4e5a4274c0cf760c6a7670fdd2936a"
   },
   "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY_RECHECK",
   "benchmark_audit": {
@@ -2149,6 +2200,31 @@
       "range_overrun_tolerance_unchanged": true,
       "new_native_execution": "NOT_RUN",
       "DAG_required_envelope_unchanged": true
+    },
+    {
+      "kind": "R03A_ATTEMPT002_INTERIOR_HAND_COMMANDS_EXECUTION",
+      "date": "2026-10-26",
+      "input_commit": "c59b98e6bde0f86afcdca8d426e67363bd809305",
+      "result": "COMPLETED_CANDIDATE_SOURCE_DYNAMICS_PROBE; BOUNDED_CASE_PASS_PENDING_SOL_REVIEW",
+      "case_id": "INTERIOR_HAND_COMMANDS",
+      "execution_report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/report.md",
+      "probe_contract": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/probe_contract.json",
+      "source_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/source_manifest.json",
+      "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/native_run_001/probe_evidence.json",
+      "candidate_basis_sha256": "a41587e297a84286a62f05c561eb484d7078b27e4cba1a5d8f47510652a97fc5",
+      "native_process_invocations": 1,
+      "native_exit_code": 0,
+      "mj_step_calls": 1920,
+      "mj_forward_calls": 389,
+      "simulated_seconds": 3.84,
+      "old_endpoint_attempt001_FAIL_preserved": true,
+      "no_full_stroke_or_Core_admission_claim": true,
+      "DAG_required_envelope_unchanged": true,
+      "provider_owner_contract_approved": false,
+      "human_judge_approved": false,
+      "qualification_approved": false,
+      "core_attachment_admission": false,
+      "sol_review": "PENDING"
     }
   ],
   "P00_audit": {

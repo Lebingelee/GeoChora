@@ -89,6 +89,22 @@ def snapshot_state(data: object) -> dict:
 def vectors_equal(a: list, b: list, tol: float) -> bool:
     return len(a) == len(b) and all(abs(float(x)-float(y)) <= tol for x,y in zip(a,b))
 
+def hand_ctrl_for_finger_qpos(qpos_m: float, joint_range_m: list, ctrlrange: list) -> float:
+    q_min, q_max = [float(value) for value in joint_range_m]
+    ctrl_min, ctrl_max = [float(value) for value in ctrlrange]
+    if q_max <= q_min:
+        raise CandidateBlocked("Hand source joint range is not increasing")
+    return ctrl_min + (float(qpos_m)-q_min)*(ctrl_max-ctrl_min)/(q_max-q_min)
+
+def joint_range_overrun(qpos: float, lower: float, upper: float) -> float:
+    return max(float(lower)-float(qpos), float(qpos)-float(upper), 0.0)
+
+def enforce_joint_range(name: str, qpos: float, lower: float, upper: float, tolerance: float) -> float:
+    overrun=joint_range_overrun(qpos,lower,upper)
+    if overrun>float(tolerance):
+        raise CandidateCheckFailed(f"joint range overrun for {name}: {qpos} not within [{lower},{upper}] (overrun={overrun}, tolerance={tolerance})")
+    return overrun
+
 def repo_and_artifact_preflight(repo: Path, contract_path: Path, contract: dict) -> dict:
     head = git_value(repo, "rev-parse", "HEAD")
     branch = git_value(repo, "branch", "--show-current")
@@ -143,12 +159,45 @@ def validate_supported_candidate(contract: dict) -> None:
         raise CandidateBlocked("derived call or simulated-time budget is inconsistent")
     if a["arm"]["command_curve"] != {"intervals":64,"ramp_up":16,"hold_high":16,"ramp_return":16,"hold_home":16,"joint1_target_peak_rad":0.1}:
         raise CandidateBlocked("unsupported arm command curve")
-    if a["hand"]["command_curve"] != {"intervals":64,"close_ramp":16,"hold_closed":16,"open_ramp":16,"hold_open":16}:
+    if a["hand"]["command_curve"] != {"intervals":64,"close_ramp":16,"hold_closed":16,"open_ramp":16,
+                                        "hold_open":16,"close_ctrl":12.75,"open_ctrl":242.25}:
         raise CandidateBlocked("unsupported hand command curve")
-    if contract["reset"]["arm_qpos_ctrl_rad"] != a["arm"]["home_qpos_and_ctrl_rad"] or contract["reset"]["hand_ctrl"] != a["hand"]["ctrlrange"][1]:
-        raise CandidateBlocked("explicit reset values differ from authored source/control contract")
-    if contract["reset"]["hand_finger_qpos_m"] != [0.04,0.04] or contract["reset"]["seed"] is not None:
-        raise CandidateBlocked("unsupported hand reset state or stochastic seed")
+    if contract["reset"]["arm_qpos_ctrl_rad"] != a["arm"]["home_qpos_and_ctrl_rad"]:
+        raise CandidateBlocked("explicit reset Arm values differ from authored source/control contract")
+    hand=a["hand"]; operating=hand["operating_targets"]
+    expected_targets={"close_each_finger_qpos_m":0.002,"close_ctrl":12.75,
+        "open_each_finger_qpos_m":0.038,"open_ctrl":242.25,"limit_margin_each_side_m":0.002}
+    if operating != expected_targets:
+        raise CandidateBlocked("Hand operating targets differ from the explicitly authorized interior case")
+    q_range=hand["finger_joint_range_each_m"]; ctrlrange=hand["ctrlrange"]
+    if q_range != [0.0,0.04] or ctrlrange != [0.0,255.0]:
+        raise CandidateBlocked("Hand native joint range or actuator ctrlrange changed")
+    if not (q_range[0] <= operating["close_each_finger_qpos_m"] < operating["open_each_finger_qpos_m"] <= q_range[1]):
+        raise CandidateBlocked("Hand operating qpos targets are outside or unordered within source range")
+    if not (ctrlrange[0] <= operating["close_ctrl"] < operating["open_ctrl"] <= ctrlrange[1]):
+        raise CandidateBlocked("Hand operating commands are outside or unordered within native ctrlrange")
+    for qpos_key,ctrl_key in (("close_each_finger_qpos_m","close_ctrl"),("open_each_finger_qpos_m","open_ctrl")):
+        mapped=hand_ctrl_for_finger_qpos(operating[qpos_key],q_range,ctrlrange)
+        if abs(mapped-operating[ctrl_key])>1e-12:
+            raise CandidateBlocked(f"Hand qpos/ctrl mapping mismatch for {qpos_key}: {mapped}")
+    if (contract["reset"]["hand_finger_qpos_m"] != [operating["open_each_finger_qpos_m"]]*2
+            or contract["reset"]["hand_ctrl"] != operating["open_ctrl"]
+            or hand["reset_qpos_m"] != [operating["open_each_finger_qpos_m"]]*2
+            or hand["reset_ctrl"] != operating["open_ctrl"]):
+        raise CandidateBlocked("Hand reset qpos/ctrl fields are not synchronized to the open operating target")
+    if hand["command_curve"] != {"intervals":64,"close_ramp":16,"hold_closed":16,"open_ramp":16,"hold_open":16,
+                                  "close_ctrl":operating["close_ctrl"],"open_ctrl":operating["open_ctrl"]}:
+        raise CandidateBlocked("Hand command curve and operating targets differ")
+    if contract["reset"]["seed"] is not None:
+        raise CandidateBlocked("unsupported stochastic seed")
+    initialization=contract["initialization"]
+    if (initialization["reset_count"]!=2
+            or initialization["hand_qpos_by_name_m"]!={name:operating["open_each_finger_qpos_m"] for name in hand["finger_joint_order"]}
+            or "actuator8=242.25 (open operating target)" not in initialization["ctrl"]):
+        raise CandidateBlocked("initialization hand reset fields are not synchronized to the interior open target")
+    phases={item["name"]:item["control"] for item in d["phases_per_trial"]}
+    if any("242.25" not in phases[name] for name in ("arm","load")):
+        raise CandidateBlocked("Arm/load phases do not hold the approved open operating command")
     if contract["oracles"]["reset_repeat"]["qpos_qvel_ctrl_max_abs_delta"]!=0.0 or contract["oracles"]["reset_repeat"]["time_delta_max_s"]!=0.0:
         raise CandidateBlocked("unsupported repeated-reset oracle")
     if d["nonintegrating_calls"] != {"outer_boundary_refreshes":384,"reset_forward_calls":2,"load_balance_forward_calls":3,"total_mj_forward_calls":389,"mj_fullM_calls":1,"mj_jacBodyCom_calls":1,"additional_mj_step_calls":0}:
@@ -627,7 +676,7 @@ def validate_sample(row, model, maps, contract):
     limit=contract["oracles"]["state_limits_clock"]["joint_range_overrun_max_rad_or_m"]
     for name,jid in maps["joint_ids"].items():
         q=float(row["joint_positions_by_native_name"][name]); lo,hi=[float(v) for v in model.jnt_range[jid]]
-        if max(lo-q,q-hi,0.0)>limit: raise CandidateCheckFailed(f"joint range overrun for {name}: {q} not within [{lo},{hi}]")
+        enforce_joint_range(name,q,lo,hi,limit)
 
 def vector_sub(a,b): return [float(a[i])-float(b[i]) for i in range(3)]
 def vector_norm(a): return math.sqrt(sum(float(v)*float(v) for v in a))
@@ -765,6 +814,7 @@ def execute_native_candidate(contract, repo, output, evidence, step_stream):
         for trial_index in range(budget["trials"]):
             trial_no=trial_index+1; trial={"trial":trial_no,"load_enabled":trial_index==1,"status":"INCOMPLETE",
               "samples":[],"resource_samples":[],"progress":{"stage":"trial_registered","successful_mj_step_calls":0,
+              "integrated_outer_intervals":0,"refreshed_outer_boundaries":0,"validated_outer_intervals":0,
               "completed_outer_boundaries":0,"last_public_clock_s":None,"last_public_state":None,"completed_phases":[]}}
             evidence["trials"].append(trial); record_stage(evidence,trial,"reset_started")
             reset_state=reset_trial(mujoco,model,data,maps,contract); evidence["mj_forward_calls"]+=1; warning_base=warning_counts(data)
@@ -805,18 +855,43 @@ def execute_native_candidate(contract, repo, output, evidence, step_stream):
                 integrated_end=snapshot_state(data); clock_delta=float(data.time)-start_time
                 if abs(clock_delta-outer_dt)>contract["oracles"]["state_limits_clock"]["outer_clock_abs_error_max_s"]:
                     raise CandidateCheckFailed(f"outer integration clock delta {clock_delta} differs from {outer_dt}")
+                trial["progress"]["integrated_outer_intervals"]+=1
+                trial["progress"]["last_integrated_state"]=integrated_end
+                trial["progress"]["last_integrated_clock_s"]=integrated_end["time_s"]
                 before_refresh=snapshot_state(data); record_stage(evidence,trial,f"{stage_name}_post_step_pre_refresh",data)
                 mujoco.mj_forward(model,data); evidence["mj_forward_calls"]+=1
                 after_refresh=snapshot_state(data)
+                post_refresh_stage=f"{stage_name}_post_refresh_validate"
+                record_stage(evidence,trial,post_refresh_stage,data)
+                trial["progress"]["refreshed_outer_boundaries"]+=1
                 if before_refresh!=after_refresh: raise CandidateCheckFailed("nonintegrating outer-boundary mj_forward changed qpos/qvel/ctrl/time")
                 row=state_sample(mujoco,model,data,maps,trial_no,phase,interval,site_id,hand_id,left_id,right_id,warning_base,contract)
                 row["integration"]={"pre_outer_state":integrated_start,"post_step_pre_refresh_state":integrated_end,
                     "post_refresh_state":after_refresh,"clock_delta_s":clock_delta,"mj_step_calls_this_interval":substeps,
                     "qacc_phase":"post-refresh at the integrated end state","qacc_smooth_phase":"post-refresh unconstrained acceleration at integrated end state under the current control/wrench"}
                 row["external_force_world_N"]=list(contract["oracles"]["external_load"]["force_world_N"]) if loaded_flag else [0.0,0.0,0.0]
-                trial["samples"].append(row); validate_sample(row,model,maps,contract)
-                trial["progress"]["completed_outer_boundaries"]+=1; trial["progress"]["last_public_clock_s"]=after_refresh["time_s"]
+                row["sample_validation"]={"stage":post_refresh_stage,"result":"PENDING"}
+                trial["samples"].append(row)
+                trial["progress"]["last_public_clock_s"]=after_refresh["time_s"]
                 trial["progress"]["last_public_state"]=after_refresh
+                # Persist the post-refresh sample before the acceptance oracle can raise.
+                write_evidence(output,evidence)
+                try:
+                    validate_sample(row,model,maps,contract)
+                except Exception as exc:
+                    row["sample_validation"]={"stage":post_refresh_stage,"result":"FAIL",
+                        "exception_type":type(exc).__name__,"message":str(exc)}
+                    trial["progress"]["failed_sample"]={"phase":phase,"outer_interval":interval,
+                        "validation_stage":post_refresh_stage,"exception_type":type(exc).__name__,"message":str(exc)}
+                    trial["progress"]["stage"]=post_refresh_stage
+                    evidence["current_stage"]=post_refresh_stage
+                    write_evidence(output,evidence)
+                    raise
+                row["sample_validation"]["result"]="PASS"
+                trial["progress"]["validated_outer_intervals"]+=1
+                # Compatibility alias: this counts oracle-validated boundaries only.
+                trial["progress"]["completed_outer_boundaries"]=trial["progress"]["validated_outer_intervals"]
+                record_stage(evidence,trial,f"{stage_name}_post_refresh_validated",data)
                 check_resources(contract,output,evidence,trial,stage_name); write_evidence(output,evidence)
                 return row
             arm=contract["actuation"]["arm"]; curve=arm["command_curve"]; arm_rows=[]
@@ -839,11 +914,16 @@ def execute_native_candidate(contract, repo, output, evidence, step_stream):
             # Hand displacement is referenced to the measured state at the start of this phase.
             hand_start_q={name:float(data.qpos[int(model.jnt_qposadr[joint_ids[name]])]) for name in contract["actuation"]["hand"]["finger_joint_order"]}
             hand_start_left=hand_local_position(data,hand_id,left_id); hand_start_right=hand_local_position(data,hand_id,right_id)
-            hand_rows=[]; hc=contract["actuation"]["hand"]["command_curve"]; hctrl=contract["actuation"]["hand"]["ctrlrange"][1]
-            for j in range(1,hc["close_ramp"]+1): hand_rows.append(do_outer("hand",j,list(home),hctrl*(1-j/hc["close_ramp"]),False))
-            for j in range(hc["hold_closed"]): hand_rows.append(do_outer("hand",hc["close_ramp"]+j+1,list(home),0.0,False))
-            for j in range(1,hc["open_ramp"]+1): hand_rows.append(do_outer("hand",hc["close_ramp"]+hc["hold_closed"]+j,list(home),hctrl*j/hc["open_ramp"],False))
-            for j in range(hc["hold_open"]): hand_rows.append(do_outer("hand",48+j+1,list(home),hctrl,False))
+            hand_rows=[]; hc=contract["actuation"]["hand"]["command_curve"]
+            hand_close_ctrl=hc["close_ctrl"]; hand_open_ctrl=hc["open_ctrl"]
+            for j in range(1,hc["close_ramp"]+1):
+                ctrl=hand_open_ctrl+(hand_close_ctrl-hand_open_ctrl)*j/hc["close_ramp"]
+                hand_rows.append(do_outer("hand",j,list(home),ctrl,False))
+            for j in range(hc["hold_closed"]): hand_rows.append(do_outer("hand",hc["close_ramp"]+j+1,list(home),hand_close_ctrl,False))
+            for j in range(1,hc["open_ramp"]+1):
+                ctrl=hand_close_ctrl+(hand_open_ctrl-hand_close_ctrl)*j/hc["open_ramp"]
+                hand_rows.append(do_outer("hand",hc["close_ramp"]+hc["hold_closed"]+j,list(home),ctrl,False))
+            for j in range(hc["hold_open"]): hand_rows.append(do_outer("hand",48+j+1,list(home),hand_open_ctrl,False))
             j1,j2=contract["actuation"]["hand"]["finger_joint_order"]
             openings=[float(r["joint_positions_by_native_name"][j1])+float(r["joint_positions_by_native_name"][j2]) for r in hand_rows]
             close_min=min(openings[:32]); open_max=max(openings[32:]); mismatch=max(abs(float(r["joint_positions_by_native_name"][j1])-float(r["joint_positions_by_native_name"][j2])) for r in hand_rows)
@@ -909,7 +989,8 @@ def main() -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--contract",required=True); parser.add_argument("--output-dir",required=True)
     args=parser.parse_args(); output=Path(args.output_dir).resolve(); output.mkdir(parents=True,exist_ok=False)
-    evidence={"task_id":"PHASE-II-01-R03A","attempt":"001","result":"INCOMPLETE","native_imported":False,
+    evidence={"task_id":"PHASE-II-01-R03A","slice":"R03a","attempt":"002","case_id":"INTERIOR_HAND_COMMANDS",
+      "result":"INCOMPLETE","native_imported":False,
       "started_utc":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"started_monotonic":time.monotonic(),
       "successful_mj_step_calls":0,"mj_forward_calls":0,"trials":[],"resource_samples":[]}
     contract=None; code=1; previous=signal.getsignal(signal.SIGTERM)

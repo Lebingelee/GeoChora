@@ -1,10 +1,10 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。后续维护者指令已单独授权P00基线核查与准入准备；P00首轮核查完成、实施准入仍待决。下列每一实施slice仍为PLANNED / NOT_STARTED，DAG与Required Envelope未获最终批准。
+状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。P00核查已完成；维护者已单独授权R03a attempt001及有界的attempt002 INTERIOR_HAND_COMMANDS native case，attempt002结果已记录并待Sol复核。其他实施slice仍按表中状态执行；DAG与Required Envelope未获最终批准。
 
 ## 基线、P00 与证据记账
 
-以 [00 基线](00_Phase_II_01_Blueprint.md) 的develop/gitlinks为规划输入；该次远端readback属于规划复核时点。新P00从Core `259f27f…`重新核查refs/source/build/env，保全工作区与Evidence，并在现有 [manifest](planning_manifest.json) 的P00审计条目及ignored事实收据记账。输入/预算/owner批准仍待决，核查不等于实施准入。现有编译/import事实为先前审阅探针，不计作P00/R03a实验通过。
+以 [00 基线](00_Phase_II_01_Blueprint.md) 的develop/gitlinks为规划输入；该次远端readback属于规划复核时点。新P00从Core `259f27f…`重新核查refs/source/build/env，保全工作区与Evidence，并在现有 [manifest](planning_manifest.json) 的P00审计条目及ignored事实收据记账。P00核查不等于实施准入；R03a attempt001/002只按各自维护者指令及精确source/case记账，不扩展其授权范围。
 
 R03a直接依赖 **P00**，与R01a同属早期可启动项，不等待R01 codec。R05a同样是独立Provider gate；R04/R05对R01/R02/R03 Position执行**无前置边**。下面编号是一个合法拓扑序；依维护者2026-10-25要求，默认按此顺序逐包推进，不因DAG允许独立执行就自动并行或逐Goal开新分支。
 
@@ -44,7 +44,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 
 | 序号 | Slice | 直接依赖 | 主交付 | 最低 Evidence | Stop Condition | 当前状态 |
 | ---: | --- | --- | --- | --- | --- | --- |
-| 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | S1静态准备检查通过；独立native source/dynamics probe在Hand joint range gate失败（不是Core S2/S3） | frozen dynamics未通过→阻塞b/c；保留结果并提交Sol/维护者决定后续范围 | EXECUTED / FAIL |
+| 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | attempt001 ENDPOINT_HAND_COMMANDS FAIL保留；attempt002 INTERIOR_HAND_COMMANDS的S1及独立native source/dynamics冻结oracle通过，详见ignored R03a attempt002报告；不构成Core S2/S3 | 仅当前内缩操作case通过，不证明0/255端点或全行程；Sol复核前不扩展结论；R03b/c仍须满足原DAG依赖 | EXECUTED / BOUNDED CASE PASS; SOL REVIEW PENDING |
 | 02 | R01a | P00 | 两类成员与非自指身份/codec | S1 | 旧identity变动或引用契约不明→停止 | PLANNED / NOT_STARTED |
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | PLANNED / NOT_STARTED |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | PLANNED / NOT_STARTED |

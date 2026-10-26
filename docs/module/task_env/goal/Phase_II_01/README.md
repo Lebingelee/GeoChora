@@ -101,6 +101,8 @@
 
 2026-10-26，Sol已复核R03a attempt001的实际提交与15-step raw trace，接收冻结限位门触发的FAIL。后继为一个有界实施修复包：在源行程内将Hand reset/open和close目标各内缩2 mm，保留1e-6 m越界容限与全部运动/负载门，另行授权一次attempt002；不重开准备审计，不覆盖旧FAIL，不外推原端点或全行程支持。复核入口为同一ignored交接根目录下`sol_review_r03a_001/`；原native证据及GeoPhys历史拒绝保持。
 
+2026-10-26，维护者明确授权R03a attempt002 `INTERIOR_HAND_COMMANDS` 的有限代码修正、stdlib-only S1和一个MuJoCo 3.8.1 CPU native进程。S1与新case全部冻结数值门通过：两trial各192个outer intervals、`mj_step=1920`、`mj_forward=389`；reset完全重复，Arm/Hand motion、range、mount、finite/warning/clock与1 N同状态load balance oracle均通过。结果仅适用于close `0.002 m / ctrl 12.75`、open/reset `0.038 m / ctrl 242.25`；native joint range仍`[0,0.04] m`、ctrlrange仍`[0,255]`。attempt001端点FAIL保持，未证明0/255端点、全行程、Core Attachment admission、Core public Env/H5、R03b/c或Qualification。报告与raw Evidence保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/`，由manifest引用；Sol复核待办。
+
 ## 本轮R07修订与Scope Risks
 
 - [09 R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)包含五Task逐项source/native语义/init/asset审计、ownership、真实部署门槛、Agent成本/独立review与RoboCasa feasibility；native source code读到了不等于Core已支持。

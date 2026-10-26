@@ -52,18 +52,21 @@ def main() -> int:
     parser.add_argument("--contract", required=True, type=Path)
     parser.add_argument("--probe", required=True, type=Path)
     parser.add_argument("--repo", required=True, type=Path)
+    parser.add_argument("--expected-basis", required=True)
+    parser.add_argument("--attempt001-evidence", required=True, type=Path)
     args = parser.parse_args()
 
     contract_path = args.contract.resolve()
     probe_path = args.probe.resolve()
     repo = args.repo.resolve()
+    attempt001_evidence_path = args.attempt001_evidence.resolve()
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     ast.parse(probe_path.read_text(encoding="utf-8"), filename=str(probe_path))
     module, newly_loaded = load_probe_module(probe_path)
 
     basis = module.candidate_basis_sha256(contract)
-    if basis != "7c639ca471642fd0e044c9ee7e3632aafb7fa80722a3074676bc78abebac8102":
-        raise AssertionError(f"candidate basis changed: {basis}")
+    if basis != args.expected_basis:
+        raise AssertionError(f"calculated candidate basis differs from explicit expected basis: {basis}")
     if basis != contract["artifacts"]["candidate_basis_sha256"]:
         raise AssertionError("stored candidate basis does not match calculated basis")
     if module.approval_gate(contract, basis):
@@ -92,6 +95,51 @@ def main() -> int:
         wrong_stored_basis_rejected = True
     else:
         raise AssertionError("wrong stored candidate basis was not rejected by production preflight")
+
+    wrong_operating_target = copy.deepcopy(contract)
+    wrong_operating_target["actuation"]["hand"]["operating_targets"]["close_ctrl"] = 0.0
+    expect_candidate_block(module, wrong_operating_target, "wrong interior Hand close command")
+
+    wrong_reset = copy.deepcopy(contract)
+    wrong_reset["reset"]["hand_finger_qpos_m"] = [0.04, 0.04]
+    expect_candidate_block(module, wrong_reset, "reset outside the approved interior target")
+
+    hand = contract["actuation"]["hand"]
+    targets = hand["operating_targets"]
+    close_mapped = module.hand_ctrl_for_finger_qpos(
+        targets["close_each_finger_qpos_m"], hand["finger_joint_range_each_m"], hand["ctrlrange"]
+    )
+    open_mapped = module.hand_ctrl_for_finger_qpos(
+        targets["open_each_finger_qpos_m"], hand["finger_joint_range_each_m"], hand["ctrlrange"]
+    )
+    if abs(close_mapped - targets["close_ctrl"]) > 1e-12 or abs(open_mapped - targets["open_ctrl"]) > 1e-12:
+        raise AssertionError("interior Hand qpos-to-control mapping differs")
+    if contract["reset"]["hand_finger_qpos_m"] != [targets["open_each_finger_qpos_m"]] * 2:
+        raise AssertionError("reset finger qpos differs from the approved open target")
+    if contract["reset"]["hand_ctrl"] != targets["open_ctrl"]:
+        raise AssertionError("reset control differs from the approved open target")
+
+    prior_reference = contract["prior_attempt001"]
+    prior_sha256 = module.sha256_file(attempt001_evidence_path)
+    if prior_sha256 != prior_reference["probe_evidence_sha256"]:
+        raise AssertionError("preserved attempt001 evidence hash differs from the new contract provenance")
+    prior = json.loads(attempt001_evidence_path.read_text(encoding="utf-8"))
+    if prior.get("result") != "FAIL":
+        raise AssertionError("attempt001 raw failure is not preserved as FAIL")
+    prior_rows = [row for trial in prior.get("trials", []) for row in trial.get("samples", [])]
+    old_sample = next((row for row in prior_rows
+                       if row.get("joint_positions_by_native_name", {}).get("probe_hand_finger_joint1") == 0.040001041818975604), None)
+    if old_sample is None:
+        raise AssertionError("attempt001 public range-failure sample was not found")
+    old_qpos = old_sample["joint_positions_by_native_name"]["probe_hand_finger_joint1"]
+    old_gate_rejected = False
+    try:
+        module.enforce_joint_range("probe_hand_finger_joint1", old_qpos, 0.0, 0.04,
+                                   contract["oracles"]["state_limits_clock"]["joint_range_overrun_max_rad_or_m"])
+    except module.CandidateCheckFailed:
+        old_gate_rejected = True
+    if not old_gate_rejected:
+        raise AssertionError("attempt001 0.040001041818975604 m sample no longer fails the 1e-6 m gate")
 
     over_budget = copy.deepcopy(contract)
     over_budget["budgets"]["trials"] = 3
@@ -122,6 +170,23 @@ def main() -> int:
         "missing_approval_rejected": missing_rejected,
         "wrong_basis_approval_rejected": wrong_basis_rejected,
         "wrong_stored_basis_rejected": wrong_stored_basis_rejected,
+        "wrong_operating_target_rejected": True,
+        "wrong_interior_reset_rejected": True,
+        "interior_qpos_ctrl_mapping": {
+            "close_qpos_m": targets["close_each_finger_qpos_m"],
+            "close_ctrl": close_mapped,
+            "open_qpos_m": targets["open_each_finger_qpos_m"],
+            "open_ctrl": open_mapped,
+            "native_joint_range_m": hand["finger_joint_range_each_m"],
+            "native_ctrlrange": hand["ctrlrange"],
+        },
+        "attempt001_range_regression": {
+            "evidence_sha256": prior_sha256,
+            "sample_qpos_m": old_qpos,
+            "overrun_m": module.joint_range_overrun(old_qpos, 0.0, 0.04),
+            "tolerance_m": contract["oracles"]["state_limits_clock"]["joint_range_overrun_max_rad_or_m"],
+            "rejected": old_gate_rejected,
+        },
         "over_budget_candidate_rejected": True,
         "unsupported_runtime_rejected": True,
         "static_source_preflight": static,

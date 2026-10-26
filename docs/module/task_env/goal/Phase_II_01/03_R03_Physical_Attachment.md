@@ -1,6 +1,6 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 已执行，独立 MuJoCo source/dynamics probe **FAIL**；R03b/c 仍 PLANNED / NOT_STARTED。该结果不是 Core admission、Core S2/S3 或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内完成独立 MuJoCo source/dynamics probe 并通过该 case 的冻结门，Sol 复核待办。R03b/c 仍 PLANNED / NOT_STARTED。两次结果均不构成 Core Attachment admission、Core S2/S3 或 Qualification。
 
 ## 已知事实与精确 Provider 路线
 
@@ -14,7 +14,7 @@ Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` 的 [panda_nohand.xml](../.
 
 该导出 sphere site 带三分量 size；[MJCF parser](../../../../../GeoPhys/src/geometry/mjcf_loader.py) 将它交给 [SiteConfig](../../../../../GeoPhys/src/geometry/articulation.py)，其 [site_size](../../../../../GeoPhys/src/geometry/site_volume.py) 校验精确形状宽度。原导出 XML/JSON/失败日志仅保全并记录 hash，见 [planning manifest](planning_manifest.json) 和 [README](README.md#provenance)；本轮未重跑或修复它。
 
-拟定 **MuJoCo 3.8.1 CPU** 为首个 Required Provider。当前仅 source compile 可行，R03 S2/S3 = NOT_RUN，不能称运行支持。GeoPhys a53 为第二 Provider：这份导出 source NOT_ADMITTED/BLOCKED，未获 Assembly Qualification；新独立装配 S2/S3 非首版 required，但失败与准入边界必须记录，不自动改为 DEFERRED。增加第二 Provider required 范围须维护者单独批准。
+本轮以 **MuJoCo 3.8.1 CPU** 完成了一个精确 source/mount 与 INTERIOR_HAND_COMMANDS 的独立 native source/dynamics case；这只说明该固定候选在已执行的操作范围内通过相应oracle，不是 Core 运行支持。GeoPhys a53 对这份导出 source 仍为 NOT_ADMITTED/BLOCKED，未修复、未重跑，也不是该 MuJoCo-only case 的前置。第二 Provider required 范围须另行批准。
 
 ## R03a 提前 Gate 与可审计策略
 
@@ -46,13 +46,23 @@ GeoPhys `a53a8cf` 对同一导出 source 的精确错误仍是历史 raw：`geom
 
 Sol复核接收attempt001的EXECUTED_FAIL：15行实际step trace及hash匹配；第3区间已积分但限位验证失败，不能计作3个已通过区间。该边界超出1e-6 m限值约4.18e-8 m，有限性/warning/mount在短片段内未失败，尚不能证明完整稳定性或装配动力学通过。原reset/open target位于0.04 m上限；后继提议保持原越界门及全部实测运动门，将Hand命令两端各内缩源行程的5%：close=0.002 m、open/reset=0.038 m，对应单actuator ctrl=12.75/242.25。源joint range 0..0.04 m和native ctrlrange 0..255不变。
 
-这是待维护者新执行指令授权的INTERIOR_HAND_COMMANDS attempt002；不改变旧FAIL，不授予0/255端点或全行程支持，未运行前不计PASS。具体复核与后继包入口在本地ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_001/`，由manifest引用；R03b/c继续受原依赖约束。
+维护者已另行授权INTERIOR_HAND_COMMANDS attempt002；本次输入目标为每finger close `0.002 m / ctrl 12.75`、open/reset `0.038 m / ctrl 242.25`。原生 joint range `[0,0.04] m`、ctrlrange `[0,255]`、source、mount、solver、equality/tendon、Provider pin及1e-6越界容限均未变。
+
+## R03a attempt002：INTERIOR_HAND_COMMANDS（2026-10-26）
+
+独立 MuJoCo 3.8.1 CPU进程正常结束，结果为 `COMPLETED_CANDIDATE_SOURCE_DYNAMICS_PROBE`。该结果是此attempt的单一bounded case结果；attempt001的端点FAIL、0/255端点行为和全行程均未被重新测试或改记。
+
+模型按既有 `MjSpec.attach` mount 编译，维度 `nq/nv/nu=9/9/8`、`neq=1`、`ntendon=1`，canonical/native ordered mapping通过。两trial各完成192个outer intervals；reset状态逐项完全相同。Arm peak `0.09146 rad`、return error `0.00865 rad`、Hand-root旋转 `0.09314 rad`；每trial Hand opening最小 `0.01227 m`、最大 `0.06802 m`、excursion `0.05576 m`、equality mismatch最大 `3.91e-7 m`，每finger Hand-relative位移均超过 `0.03249 m`。两trial所有386个reset/outer-boundary samples的joint range overrun均为0；mount位置误差最大0 m、旋转误差最大`3.61e-16 rad`，无非有限样本或warning增量。
+
+Trial 2同一pre-load state上的1 N world +X Hand-root-COM外载平衡oracle通过：hinge residual最大`5.56e-17 N*m`、slide residual最大`2.23e-18 N`、Arm投影`0.25465 N*m`；wrench清除后state与clock不变。两trial合计调用`mj_step=1920`、`mj_forward=389`，一组`mj_fullM`/`mj_jacBodyCom`；wall约`46.01 s`，峰值RSS约`257 MB`，证据目录约`5.81 MB`，均在预算内。该probe未产生接触，`ncon=0`；这不是contact response测试。负载轨迹差只记录为观测值，没有最小位移门。
+
+报告与raw evidence保存在本机ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/`，由manifest引用，等待Sol复核。结果不证明 Core public Env/H5、Core S2/S3、固定Attachment admission、0/255端点或全行程支持；不授予Provider owner合同、Human Judge、R03b/c或Qualification。R03b/c仍未启动且保留现有DAG依赖。
 
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
-| R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001：静态准备检查通过；独立 native probe 在 Hand joint range gate 失败（非 Core S2/S3）。当前 FAIL 阻塞 b/c；保留原限位合同并由 Sol/维护者决定后续范围 |
+| R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，待Sol复核。不是Core S2/S3或Attachment admission；不证明端点/全行程；R03b/c仍未启动 |
 | R03b | R01c,R03a | 既有 assembly/source/materialization owners 中固定树 lowering、root/collision/逆映射与新准入 | S1 错 mount/环/重复 child/root/source/顺序拒绝；S2 reset/运动 mount invariant；禁止降低旧 admission 保护 |
 | R03c | R03b,R02c | 独立 Arm+Hand 真实 Position 施控，现有 public Env→Recorder→reader | S2/S3：同一个公开实例 reset/连续 step/observation/H5 T/T+1/request/Target/Ack/state/identity/close；无真实 hand actuation 或 native coupling 即失败 |
 
