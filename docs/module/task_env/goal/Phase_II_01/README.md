@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-2026-10-23；REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b），本地259f27f完成规划复核。维护者随后通过本地启动指令单独授权P00基线核查和首份Luna工作包准备；P00首轮核查完成，实施准入仍待决，R01–R07均未启动。唯一建议执行表为 [07](07_Execution_Order_and_Acceptance.md)；总体定位见 [00](00_Phase_II_01_Blueprint.md)，原规划检查保留在 [validation receipt](validation_receipt.json)，新P00核查另记 [manifest](planning_manifest.json) 的 `P00_audit` 与 `revision_history`。
+2026-10-23规划快照：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b），本地259f27f完成规划复核。该签署时点维护者随后单独授权P00基线核查和工作包准备；当前逐slice执行状态见 [07](07_Execution_Order_and_Acceptance.md) 与 [manifest](planning_manifest.json)。总体定位见 [00](00_Phase_II_01_Blueprint.md)，原规划检查保留在 [validation receipt](validation_receipt.json)，P00核查另记manifest的 `P00_audit` 与 `revision_history`。
 
 ## 文档入口与责任
 
@@ -96,6 +96,8 @@
 2026-10-25，Sol复核P00-L02 attempt001：最新包已依据显式amendment核对Sol的`dd02da4…`七文件文档提交，旧HEAD/hash差异关闭，原历史快照保留。source闭包与raw完整性核对通过；候选草稿存在载荷前快照实际取自末态、积分末态与派生位姿缓存混采、失败时partial progress未及时保留等静态缺陷，须以attempt002返工候选合同/脚本。复核入口为同一ignored根目录的`sol_review_l02_20261025_001/`，由manifest引用。没有运行或批准native probe，R03a仍NOT_STARTED / NOT_READY_SCOPE_ORACLE_BUDGET_PENDING；按[交接规则](07_Execution_Order_and_Acceptance.md#sol-luna-workflow)在Luna执行窗口冻结HEAD和保护输入，Sol摘要提交后再发下一包。
 
 2026-10-26，Sol接收P00-L02 attempt002的F01–F08静态返工，直接修正候选实施副本中的integrator精确值/native版本字段等一致性小项，保留Luna原件。外载oracle采用同状态的公开mass/Jacobian与qacc_smooth平衡检查并记录真实轨迹；数值合并准则在首次执行前明确冻结。准备工作收口，下一步为R03a具体实施包的一次维护者授权决定，不再默认第三轮准备。复核与最终候选在同一ignored交接根目录的`sol_review_l02_20261026_002/`和`sol_r03a_001/`，由manifest引用；尚未运行native probe，也未批准Core Attachment准入。
+
+2026-10-26，维护者明确授权PHASE-II-01-R03A attempt001的一次独立MuJoCo 3.8.1 CPU probe及范围内摘要提交。静态准备检查通过；native MjSpec attach/compile与模型身份、维度和ordered mapping通过，但 trial 1 Arm interval 3 触发 Hand finger joint 原生range overrun（`0.040001041818975604 m` > `0.04 m`），15次 `mj_step` 后停止，结果为 **FAIL**。Hand开合、外载与第二trial未执行；这不是Core S2/S3、Attachment admission或Qualification。R03b/c仍受既有依赖阻塞。一次S1修正仅修复了探针静态checker取错XML equality元素的缺陷；冻结数值oracle与native结果未重试或调宽。报告及raw evidence保存在本机ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/`，由Sol复核。
 
 ## 本轮R07修订与Scope Risks
 

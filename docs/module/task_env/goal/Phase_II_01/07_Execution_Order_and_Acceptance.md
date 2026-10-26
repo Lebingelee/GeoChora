@@ -44,7 +44,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 
 | 序号 | Slice | 直接依赖 | 主交付 | 最低 Evidence | Stop Condition | 当前状态 |
 | ---: | --- | --- | --- | --- | --- | --- |
-| 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | S1/S2 | 独立fixed dynamics未证明→阻塞b/c | PLANNED / NOT_STARTED |
+| 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | S1静态准备检查通过；独立native source/dynamics probe在Hand joint range gate失败（不是Core S2/S3） | frozen dynamics未通过→阻塞b/c；保留结果并提交Sol/维护者决定后续范围 | EXECUTED / FAIL |
 | 02 | R01a | P00 | 两类成员与非自指身份/codec | S1 | 旧identity变动或引用契约不明→停止 | PLANNED / NOT_STARTED |
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | PLANNED / NOT_STARTED |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | PLANNED / NOT_STARTED |

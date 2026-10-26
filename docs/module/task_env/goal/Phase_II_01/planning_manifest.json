@@ -25,10 +25,14 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "FAIL",
+      "execution": "EXECUTED_FAIL",
       "required_evidence": "S1/S2",
-      "stop_condition": "独立fixed dynamics未证明→阻塞b/c"
+      "stop_condition": "独立fixed dynamics未证明→阻塞b/c",
+      "result": "The independent MuJoCo 3.8.1 CPU probe compiled the attached model and failed the frozen Hand finger joint-range gate after 15 successful mj_step calls.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/report.md",
+      "native_evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/native_run_001/probe_evidence.json",
+      "candidate_basis_sha256": "7c639ca471642fd0e044c9ee7e3632aafb7fa80722a3074676bc78abebac8102"
     },
     {
       "id": "R01a",
@@ -352,14 +356,14 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
-    "03_R03_Physical_Attachment.md": "b62d999a32be4dc32923f65856e1b021e6a20abd927ee24d28072e76e6adabcf",
+    "03_R03_Physical_Attachment.md": "f66dd81d3b1e08a4704c8243f544625477fd0b01ac4018ab9c03903e1f31749b",
     "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
     "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "48ceb0c81412e06a9469b81155841d284d138158be6a359f3b0d570edacc4060",
+    "07_Execution_Order_and_Acceptance.md": "8f45fe6106b2215ed14a852b02fef023ee96dbb10c40cc627ba539f5545fb7b8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "e37489a4a8adb4f53f54795c26a3836152ac0accfa31757f66f4a1fc15ae428f"
+    "README.md": "6ad8f87592e92f7fe86c2e3d8d5f96304e723b1033601395c0e952bae5a0962c"
   },
   "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY_RECHECK",
   "benchmark_audit": {
@@ -2097,6 +2101,23 @@
       "scope": "Close static preparation; Sol directly normalizes final implementation copy, freezes source/oracle/budget for one maintainer execution decision. Sync complexity-based workflow.",
       "native_execution_authorized": false,
       "DAG_required_envelope_unchanged": true
+    },
+    {
+      "kind": "R03A_ATTEMPT001_AUTHORIZED_EXECUTION",
+      "date": "2026-10-26",
+      "input_commit": "17b983b232d5f51c963cbb723af593d46962a1b5",
+      "result": "FAIL",
+      "execution_report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/report.md",
+      "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/native_run_001/probe_evidence.json",
+      "candidate_basis_before_checker_correction": "74b2f78670b5b55fc54ca68260b91339530cee9c441ac78956b556e66c55ed26",
+      "candidate_basis_executed": "7c639ca471642fd0e044c9ee7e3632aafb7fa80722a3074676bc78abebac8102",
+      "checker_correction": "One XML equality-child selection defect fixed; no source, native algorithm, numerical oracle or budget change.",
+      "native_probe_invocations": 1,
+      "DAG_required_envelope_unchanged": true,
+      "provider_owner_contract_approved": false,
+      "human_judge_approved": false,
+      "qualification_approved": false,
+      "core_attachment_admission": false
     }
   ],
   "P00_audit": {
