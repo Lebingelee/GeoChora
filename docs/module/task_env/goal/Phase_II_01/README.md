@@ -99,6 +99,8 @@
 
 2026-10-26，维护者明确授权PHASE-II-01-R03A attempt001的一次独立MuJoCo 3.8.1 CPU probe及范围内摘要提交。静态准备检查通过；native MjSpec attach/compile与模型身份、维度和ordered mapping通过，但 trial 1 Arm interval 3 触发 Hand finger joint 原生range overrun（`0.040001041818975604 m` > `0.04 m`），15次 `mj_step` 后停止，结果为 **FAIL**。Hand开合、外载与第二trial未执行；这不是Core S2/S3、Attachment admission或Qualification。R03b/c仍受既有依赖阻塞。一次S1修正仅修复了探针静态checker取错XML equality元素的缺陷；冻结数值oracle与native结果未重试或调宽。报告及raw evidence保存在本机ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/`，由Sol复核。
 
+2026-10-26，Sol已复核R03a attempt001的实际提交与15-step raw trace，接收冻结限位门触发的FAIL。后继为一个有界实施修复包：在源行程内将Hand reset/open和close目标各内缩2 mm，保留1e-6 m越界容限与全部运动/负载门，另行授权一次attempt002；不重开准备审计，不覆盖旧FAIL，不外推原端点或全行程支持。复核入口为同一ignored交接根目录下`sol_review_r03a_001/`；原native证据及GeoPhys历史拒绝保持。
+
 ## 本轮R07修订与Scope Risks
 
 - [09 R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)包含五Task逐项source/native语义/init/asset审计、ownership、真实部署门槛、Agent成本/独立review与RoboCasa feasibility；native source code读到了不等于Core已支持。

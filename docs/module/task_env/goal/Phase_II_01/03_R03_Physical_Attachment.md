@@ -42,6 +42,12 @@ reset 与前两个 Arm interval 的 mount 误差均为 `0 m`，旋转误差低�
 
 GeoPhys `a53a8cf` 对同一导出 source 的精确错误仍是历史 raw：`geometry.articulation.site_config.invalid` / `site size: exactly 1 real, non-bool values required`，原日志 hash `593befa15952ba86bd466b7c4bd2a7fd9c380cc141abd114a0bb5d9ea163c37a`；R03a 没有重跑 GeoPhys。
 
+### Sol复核与后继输入提案（2026-10-26）
+
+Sol复核接收attempt001的EXECUTED_FAIL：15行实际step trace及hash匹配；第3区间已积分但限位验证失败，不能计作3个已通过区间。该边界超出1e-6 m限值约4.18e-8 m，有限性/warning/mount在短片段内未失败，尚不能证明完整稳定性或装配动力学通过。原reset/open target位于0.04 m上限；后继提议保持原越界门及全部实测运动门，将Hand命令两端各内缩源行程的5%：close=0.002 m、open/reset=0.038 m，对应单actuator ctrl=12.75/242.25。源joint range 0..0.04 m和native ctrlrange 0..255不变。
+
+这是待维护者新执行指令授权的INTERIOR_HAND_COMMANDS attempt002；不改变旧FAIL，不授予0/255端点或全行程支持，未运行前不计PASS。具体复核与后继包入口在本地ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_001/`，由manifest引用；R03b/c继续受原依赖约束。
+
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
