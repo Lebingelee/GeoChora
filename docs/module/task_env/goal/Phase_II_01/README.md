@@ -10,7 +10,7 @@
 | [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a 静态合同已实现，待Sol复核 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略 |
-| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；R04a provider-free S1 已实现待Sol复核 |
+| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；R04a原S1通过，Sol复核要求identity绑定修正 |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
 | [07 执行表](07_Execution_Order_and_Acceptance.md) | 7/22 DAG、required envelope与停止条件 |
@@ -108,6 +108,8 @@
 2026-10-26，Sol复核接收R01a attempt001为`ACCEPTED_S1_BOUNDED`：实际11文件diff、36项输出哈希、五份旧Scene/Artifact mapping/hash核对通过；Luna完整目标S1为60 passed，Sol定向新合同S1为31 passed，另核对14项严格拒绝与四类typed subref别名隔离。未运行native；R01b/c与物理Assembly仍未实现。R05a的Provider正式native-rate合同存在preflight阻塞，维护者选择在此期间先推进无依赖边的R04a，未更改DAG/P99 required。
 
 2026-10-26，R04a在同一Position candidate/SelectedReferenceEnv/Generic H5 v3 owners中加入显式双相机三模态消费配置、typed capture metadata reader、缓存与close/fault接线及64/128 MiB容量门。provider-free S1覆盖合成数组/H5、capacity、state-only兼容、cache、partial construction cleanup、post-step capture故障latch与mask digest拒绝；真实 MuJoCo/OpenGL/EGL、public Env reset/step和camera H5 readback均NOT_RUN，结果待Sol复核。R05a仍`BLOCKED_PROVIDER_CONTRACT`；R04b/c、DAG与P99 required不变。详见 [R04](04_R04_Dynamic_Camera_Consumer.md) 与 Phase II-01 manifest。
+
+2026-10-26，Sol复核R04a attempt001为`CHANGES_REQUESTED`：原23项S1复跑通过，但独立纯S1反例发现consumer未把返回capture绑定到实际请求的mount/source合同，H5 camera reader未与真实state digest/finalized episode交叉核对。下一包只做R04a attempt002定向修复、相关S1与本地提交，不运行native、不扩展DAG或P99；原证据及未保留早期迭代日志的限制照实保留。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/`。
 
 ## 本轮R07修订与Scope Risks
 

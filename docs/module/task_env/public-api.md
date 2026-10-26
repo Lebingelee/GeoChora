@@ -251,6 +251,8 @@ the existing CHW uint8 quantization rule; depth/mask retain float32/uint32. This
 and synthetic: native MuJoCo/OpenGL/EGL pairing, real public reset/step capture, and same-file R04c
 camera readback remain NOT_RUN. It is not camera qualification or P99 gate completion.
 
+Sol review (2026-10-26): R04a is **CHANGES_REQUESTED**. The existing 23 S1 cases pass, but reviewer counterexamples show missing binding to the requested mount/source and missing camera-sidecar checks against the stored state boundary and episode outcome. These checks require targeted repair before R04a acceptance; native Camera/Env/H5 S2/S3 remain NOT_RUN.
+
 For this explicit selected candidate, `env.position_plan` after reset is the read-only typed action contract
 used by the existing dispatch owner. Do not mutate it. Gripper input is normalized in [-1,1] (+1 open / -1 close);
 arm pose uses the world hand-origin TCP, metres and wxyz quaternion. A minimal recording example:

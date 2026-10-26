@@ -1,6 +1,6 @@
 # R04 — Dynamic Camera → Public Observation / Recorder
 
-状态：REVISED_DRAFT；R04a 实现与 provider-free S1 已完成，待 Sol 复核；R04b/c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
+状态：REVISED_DRAFT；R04a 已实现且原23项provider-free S1通过；Sol复核为CHANGES_REQUESTED（capture请求绑定、H5独立state/episode锚点待修复）；R04b/c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
 
 ## Owners 与真实消费断点
 
@@ -15,6 +15,10 @@
 新增 `CameraObservationConfigV1`、capture metadata 与 boundary 值复用现有 `CameraGeometry`、`CameraCaptureIdentityV1`、Calibration、Canonical Entity LabelMap 和 `DynamicCameraRenderSourceV1`。`DynamicCameraObservationConsumerV1` 在已发布 typed state 后延迟创建两个现有 CameraSession，只读 capture；相同 boundary 复用缓存。Env 在 reset/构造失败/step fault/close 时拥有并关闭 consumer；post-step capture/observer 失败沿 C03a latch 保留实际 progress，不伪造 transition 或回滚。RGB HWC float32、Depth H×W float32 米制 optical +Z、Mask H×W uint32 进入已有 public `observation_space`/`ObservationSchema`/info contract。
 
 Generic H5 v3 保持原 ABI；opt-in 时追加 `camera_observation_contract_v1_json` 与 `camera_observations_v1_json`，`load_camera_observations_h5()` 以严格 typed semantic reader 核对 T+1、source/capture/boundary/calibration/label-map、RGB CHW uint8 既有量化布局、Depth/mask dtype 与 mask digest。provider-free S1 使用 synthetic captures/H5 验证配置、输出空间、缓存、故障关闭与 reader；真实 MuJoCo/EGL renderer、真实 Env reset/step 与同文件实际相机读回均为 NOT_RUN，分别留给 R04b/R04c。此 S1 不证明 camera native/runtime 或 P99 gate 已通过。
+
+## Sol复核与定向返工（2026-10-26）
+
+Sol核对18文件diff、16项原包输出及18项tracked摘要，重跑原定向S1仍为23 passed；但纯S1反例复现两个拒绝缺口：consumer接受同camera ID/尺寸而mount偏移0.2m的自洽capture；H5 reader接受camera sidecar与真实state boundary digest或finalized episode outcome不一致的文件。R04a出口尚未接收，下一包为同分支attempt002的有界实施修正，不新增研究轮次或native实验。复核入口为本机ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/`；原attempt001与通过项保留。修复后按原表交Sol复核，正常下一行R06a，R04b/c仍未启动。
 
 ## Observation / Capture / Storage 合同
 
