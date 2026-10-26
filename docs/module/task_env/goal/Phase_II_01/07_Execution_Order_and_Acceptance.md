@@ -47,7 +47,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | attempt001 ENDPOINT_HAND_COMMANDS FAIL保留；attempt002 INTERIOR_HAND_COMMANDS的S1及独立native source/dynamics冻结oracle通过，详见ignored R03a attempt002报告；不构成Core S2/S3 | 仅当前内缩操作case通过，不证明0/255端点或全行程；Sol已接收该有界工程出口；R03b/c仍须满足原DAG依赖 | ACCEPTED_BOUNDED / R03a EXIT MET FOR CASE |
 | 02 | R01a | P00 | `logical-assembly-v1` 两类成员、Scene pin 与非自指身份/strict codec | provider-free S1 | 旧identity变动或引用契约不明→停止 | ACCEPTED_S1_BOUNDED；见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md` |
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | BLOCKED_PROVIDER_CONTRACT（Sol preflight；无新cadence probe） |
-| 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | CHANGES_REQUESTED：R04a identity绑定返工 |
+| 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | attempt002定向修复与33项provider-free S1完成，待Sol复核 |
 | 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | PLANNED / NOT_STARTED |
 | 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | PLANNED / NOT_STARTED |
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同 | S1 | required state/TCP/资源不明→停止 | PLANNED / NOT_STARTED |
@@ -70,6 +70,8 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contract、运行与独立范围决定。R06a 记录缺口可以形成自己的 ledger，但不代表 compatibility decision gate 已接受；R06c/P99 不能把未决决定忽略。各 slice 自带受影响兼容检查，R06b/c 不取代局部回归。
 
 2026-10-26，Sol已接收R01a的静态codec/S1出口；R01b/c仍未启动。R05a受当前GeoPhys正式native-rate合同缺口阻塞：公开Reader限制逐substep host snapshot，旧C05c仅为诊断例外。此为preflight阻塞，不是R05a Audit/S1/probe完成，也不改为DEFERRED。维护者选择在R05a阻塞期间先推进独立R04a；R04a原23项S1通过但Sol复核发现identity绑定缺口，下一包为R04a attempt002定向返工，不改变DAG、R05a blocker或P99 required Camera gate。R04b/c仍按原依赖未执行。
+
+2026-10-26，R04a attempt002已完成capture对实际请求身份/typed Frame calibration的交叉核验，以及H5 camera sidecar对真实state digest、clock、typed control与EpisodeOutcome的独立核验；provider-free定向S1 33 passed，当前出口等待Sol复核。真实 renderer/Env S2与camera H5 S3未运行；R04b/c仍未启动。R05a blocker、R04原DAG依赖、P99 required Camera gate和R06a后继顺序不变。
 
 ## P99 Required Envelope（待批准）
 

@@ -1,12 +1,24 @@
 """Provider-free S1 for the opt-in Position camera observation consumer."""
 
+import json
+import os
+import shutil
 import sys
+from dataclasses import replace
+from pathlib import Path
 
 import h5py
 import numpy as np
 import pytest
 
 from task_env.artifacts.contracts import FrameReference, PoseWorld
+from task_env.controllers.canonical.contracts import (
+    CanonicalControlTarget,
+    ControlGroupActionV1,
+    GripperControlTarget,
+    PositionControlTargetV1,
+    StructuredActionRequestV1,
+)
 from task_env.artifacts.state import (
     CanonicalStateViewV1,
     StateBoundaryIdentity,
@@ -31,7 +43,9 @@ from task_env.recorders import (
     TransitionRecorder,
     load_camera_observations_h5,
     load_structured_control_records_h5,
+    load_structured_training_actions_h5,
 )
+from task_env.trajectory.canonical.episode import StructuredControlTransitionV1
 from task_env.trajectory.canonical.episode import make_episode_end_v1
 
 
@@ -105,6 +119,213 @@ def _capture(camera, execution, source, state, manifest, config):
         np.full((config.height, config.width), 0.75, dtype=np.float32),
         calibration, identity, segmentation,
     )
+
+
+def _record_state_info(state, captures, *, reset=False, clock_override=None):
+    from task_env.observations.canonical_camera.consumer import camera_observation_boundary_from_captures
+
+    info = {
+        "state_boundary_identity": state.boundary.to_mapping(),
+        "state_boundary_id": state.boundary.boundary_id,
+        "state_sample_clock": (clock_override or state.sample_clock).to_mapping(),
+        "source_closure_digest": "d" * 64,
+    }
+    if not reset:
+        info.update({
+            "control_step": state.boundary.control_step,
+            "simulation_time_s": state.sample_clock.simulation_time_s,
+        })
+    info["camera_observation_v1"] = camera_observation_boundary_from_captures(captures).to_mapping()
+    return info
+
+
+def _camera_h5_observation(state, captures, *, corrupt_state_digest=False):
+    digest = bytes.fromhex(state.boundary.boundary_id.removeprefix("state-boundary-"))
+    if corrupt_state_digest:
+        digest = bytes((digest[0] ^ 1,)) + digest[1:]
+    return {
+        "state": {
+            "value": np.asarray((state.boundary.control_step,), dtype=np.float32),
+            "boundary_identity_sha256": np.frombuffer(digest, dtype=np.uint8).copy(),
+        },
+        "privileged_state": {},
+        "rgb": {camera_id: capture.rgb for camera_id, capture in zip((FIXED_CAMERA_ID, HAND_CAMERA_ID), captures)},
+        "depth": {camera_id: capture.depth for camera_id, capture in zip((FIXED_CAMERA_ID, HAND_CAMERA_ID), captures)},
+        "entity_mask": {
+            camera_id: capture.segmentation.mask
+            for camera_id, capture in zip((FIXED_CAMERA_ID, HAND_CAMERA_ID), captures)
+        },
+    }
+
+
+def _position_control(candidate, state, values, *, writer_id, controller_identity, plan_hash, source_closure_digest):
+    components = ("x", "y", "z", "qw", "qx", "qy", "qz", "gripper")
+    action_schema_id = "r04a-position-action-v1"
+    arm_joint_order = tuple(f"joint{index}" for index in range(1, 8))
+    arm_positions = {name: float(index) * 0.01 for index, name in enumerate(arm_joint_order)}
+    target = PositionControlTargetV1(
+        "position-control-target-v1", writer_id, controller_identity, plan_hash,
+        source_closure_digest, state.boundary, state.sample_clock,
+        CanonicalControlTarget(
+            "canonical-control-v0", candidate.artifact.identity_hash, controller_identity,
+            arm_joint_order, arm_positions, dict(arm_positions),
+            GripperControlTarget("panda-main/gripper", 0.04, 10.0, 0.04),
+        ),
+    )
+    groups = (
+        ControlGroupActionV1(
+            "control-group-action-v1", "panda-main", "arm", action_schema_id,
+            tuple(float(value) for value in values[:7]),
+        ),
+        ControlGroupActionV1(
+            "control-group-action-v1", "panda-main", "gripper", action_schema_id,
+            (float(values[7]),),
+        ),
+    )
+    request = StructuredActionRequestV1(
+        "structured-action-request-v1", candidate.scene.identity_hash, plan_hash, groups,
+    )
+    target_mapping = target.to_mapping()
+    canonical_control = target.target.to_mapping()
+    return StructuredControlTransitionV1(
+        "structured-control-transition-v1", request, ({
+            "writer_id": writer_id,
+            "action_schema_id": action_schema_id,
+            "components": components,
+            "groups": (
+                {"entity_id": "panda-main", "group_id": "arm", "action_components": components[:7]},
+                {"entity_id": "panda-main", "group_id": "gripper", "action_components": (components[7],)},
+            ),
+            "requested_action": {"mode": "absolute_pose", "reference": "world",
+                                 "rotation_representation": "quaternion_wxyz", "values": tuple(values)},
+            "canonical_action": {
+                "schema_version": "canonical-action-v0",
+                "interpreted_values": tuple(values),
+                "position_target_v1": target_mapping,
+                "position_target_identity_hash": target.identity_hash,
+            },
+            "controller_target": {
+                "schema_version": canonical_control["schema_version"],
+                "payload": canonical_control,
+                "identity_hash": target.target.identity_hash,
+            },
+            "applied_control": {
+                "schema_version": "applied-canonical-control-v0",
+                "payload": {"acknowledged": True},
+                "target_hash": target.target.identity_hash,
+            },
+        },),
+    )
+
+
+def _camera_h5_recorder(
+    tmp_path, *, transition_count=0, bad_state_digest_at=None,
+    reset_clock_seconds=None, transition_clock_seconds=None,
+):
+    """Build a provider-free T/T+1 Generic H5 v3 trajectory from real typed anchors."""
+    from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1
+    from task_env.render.camera import (
+        D03_PHYSICS_PROFILE,
+        D04_ENTITY_SEGMENTATION_PROFILE,
+        DynamicCameraRenderSourceV1,
+        dynamic_entity_instance_segmentation_manifest,
+    )
+
+    config = _config(width=3, height=2)
+    candidate = _candidate(tmp_path / "candidate", horizon=2)
+    render_source = DynamicCameraRenderSourceV1.from_runtime_source(candidate.source)
+    renderer = RendererSelectionV1(
+        "renderer-selection-v1", "mujoco", "native-opengl", D04_ENTITY_SEGMENTATION_PROFILE, None,
+    )
+    execution = ExecutionSpecV1(
+        "execution-spec-v1", "geophys", "cpu", D03_PHYSICS_PROFILE,
+        31, "best_effort", renderer, physics_device="cpu:0",
+    )
+    manifest = dynamic_entity_instance_segmentation_manifest()
+    states = tuple(_state(candidate, index) for index in range(transition_count + 1))
+    captures_by_boundary = tuple(
+        tuple(_capture(camera, execution, render_source, state, manifest, config)
+              for camera in config.geometries(candidate.artifact.identity_hash))
+        for state in states
+    )
+    observations = tuple(
+        _camera_h5_observation(state, captures,
+                               corrupt_state_digest=(index == bad_state_digest_at))
+        for index, (state, captures) in enumerate(zip(states, captures_by_boundary, strict=True))
+    )
+    episode_id = states[0].boundary.episode_id
+    writer_id = "panda-main-position-writer-v1"
+    controller_identity = "c" * 64
+    plan_hash = "b" * 64
+    source_closure_digest = candidate.source.source_closure_digest
+    components = ("x", "y", "z", "qw", "qx", "qy", "qz", "gripper")
+    metadata = {
+        "env_metadata": {
+            "env_name": "SelectedReferenceEnv.PositionServoV1",
+            "task_name": "r04a-synthetic-position",
+            "task_version": "1",
+            "scene_uid": candidate.scene.scene_id,
+            "agent_uids": ("panda-main",),
+            "action_schema": {
+                "schema_id": "r04a-position-action-v1",
+                "schema_version": "structured-action-schema-v1",
+                "controller_kind": "delta_pose",
+                "reference": "world",
+                "components": components,
+            },
+            "observation_schema": {"leaf_specs": [
+                {"path": "state.boundary_identity_sha256", "semantic": "state_boundary_identity_sha256"},
+            ]},
+            "reference_profile": {
+                "writer_id": writer_id,
+                "controller_identity": controller_identity,
+                "control_binding_plan_identity_hash": plan_hash,
+                "task_artifact_identity_hash": candidate.artifact.identity_hash,
+                "scene_identity_hash": candidate.scene.identity_hash,
+                "reset_sample_id": states[0].boundary.reset_sample_id,
+                "source_closure_digest": source_closure_digest,
+            },
+        },
+        "universal_action_schema": {
+            "version": "r04a-position-universal-action-v1",
+            "dimension": len(components),
+            "components": components,
+        },
+        "camera_observation_contract_v1": config.to_mapping(),
+    }
+    reset_clock = states[0].sample_clock
+    if reset_clock_seconds is not None:
+        reset_clock = StateSampleClock(
+            "state-sample-clock-v1", "evaluation_boundary", 0, reset_clock_seconds,
+        )
+    reset_info = _record_state_info(states[0], captures_by_boundary[0], reset=True, clock_override=reset_clock)
+    recorder = TransitionRecorder(RecorderConfig(schema_version="v3", max_transitions=max(1, transition_count)))
+    recorder.begin_episode(observations[0], reset_info, metadata)
+    for index in range(transition_count):
+        state = states[index + 1]
+        clock = state.sample_clock
+        if transition_clock_seconds is not None and index == 0:
+            clock = StateSampleClock(
+                "state-sample-clock-v1", "evaluation_boundary", index + 1, transition_clock_seconds,
+            )
+        info = _record_state_info(state, captures_by_boundary[index + 1], clock_override=clock)
+        values = (0.1 + index * 0.01, 0.2, 0.3, 1.0, 0.0, 0.0, 0.0, 0.5)
+        control = _position_control(
+            candidate, states[index], values,
+            writer_id=writer_id, controller_identity=controller_identity,
+            plan_hash=plan_hash, source_closure_digest=source_closure_digest,
+        )
+        action = np.asarray(values, dtype=np.float32)
+        recorder.append_transition(
+            action, action, observations[index + 1], 0.0, False, False, False, info,
+            structured_control=control,
+        )
+    end = make_episode_end_v1(
+        episode_id=episode_id, final_boundary=transition_count, end_reason="external_stop",
+        terminated=False, truncated=True, bootstrap_allowed=True, source="r04a-s1-test",
+    )
+    recorder.end_episode("external_stop", outcome=end.outcome)
+    return recorder, candidate
 
 
 class _FakeSession:
@@ -232,6 +453,94 @@ def test_dynamic_consumer_caches_boundaries_and_closes_each_session_once(tmp_pat
         candidate.env.close()
 
 
+@pytest.mark.parametrize("drift", ("mount", "artifact", "render_source", "execution"))
+def test_dynamic_consumer_rejects_capture_that_disagrees_with_actual_request(tmp_path, drift):
+    config = _config()
+    candidate = _candidate(tmp_path)
+    sessions = []
+    forged_context = {}
+    try:
+        def factory(camera, execution, *, source, initial_state, manifest):
+            forged_camera, forged_source, forged_execution = camera, source, execution
+            if drift == "mount":
+                mount = [list(row) for row in camera.T_parent_from_mount]
+                mount[0][3] += 0.2
+                forged_camera = replace(camera, T_parent_from_mount=tuple(tuple(row) for row in mount))
+            elif drift == "artifact":
+                forged_source = replace(source, task_artifact_hash="a" * 64)
+                forged_camera = replace(camera, task_artifact_hash="a" * 64)
+            elif drift == "render_source":
+                forged_source = replace(source, source_closure_digest="c" * 64)
+            elif drift == "execution":
+                forged_execution = replace(execution, provider_seed=32)
+            else:
+                raise AssertionError(drift)
+            forged_context[drift] = (forged_camera, forged_source, forged_execution)
+            session = _FakeSession(
+                lambda state: _capture(
+                    forged_camera, forged_execution, forged_source, state, manifest, config,
+                )
+            )
+            sessions.append(session)
+            return session
+
+        consumer = DynamicCameraObservationConsumerV1(
+            config=config,
+            task_artifact_hash=candidate.artifact.identity_hash,
+            runtime_source=candidate.source,
+            horizon=2,
+            session_factory=factory,
+        )
+        with pytest.raises(ValueError, match="request"):
+            consumer.capture(_state(candidate, 0))
+        assert len(sessions) == 2
+        assert consumer._last_key is None
+        assert consumer._last_leaves is None
+        consumer.close()
+        consumer.close()
+        assert [item.close_count for item in sessions] == [1, 1]
+    finally:
+        candidate.env.close()
+
+
+def test_dynamic_consumer_rejects_calibration_from_another_parent_frame_pose(tmp_path):
+    config = _config()
+    candidate = _candidate(tmp_path)
+    sessions = []
+    state = _state(candidate, 0)
+    moved_hand = replace(
+        state.frames[0],
+        pose_world=PoseWorld((0.2, 0.0, 0.5), (1.0, 0.0, 0.0, 0.0)),
+    )
+    other_state = replace(state, frames=(moved_hand,))
+    try:
+        def factory(camera, execution, *, source, initial_state, manifest):
+            def produce(current_state):
+                capture = _capture(camera, execution, source, current_state, manifest, config)
+                if camera.camera_id == HAND_CAMERA_ID:
+                    return replace(capture, metadata=resolve_camera(camera, other_state))
+                return capture
+            session = _FakeSession(produce)
+            sessions.append(session)
+            return session
+
+        consumer = DynamicCameraObservationConsumerV1(
+            config=config,
+            task_artifact_hash=candidate.artifact.identity_hash,
+            runtime_source=candidate.source,
+            horizon=2,
+            session_factory=factory,
+        )
+        with pytest.raises(ValueError, match="calibration"):
+            consumer.capture(state)
+        assert consumer._last_key is None
+        assert consumer._last_leaves is None
+        consumer.close()
+        assert [item.close_count for item in sessions] == [1, 1]
+    finally:
+        candidate.env.close()
+
+
 def test_partial_camera_construction_closes_created_session_once(tmp_path):
     config = _config()
     candidate = _candidate(tmp_path)
@@ -328,35 +637,12 @@ def test_v3_camera_metadata_extension_roundtrip_and_mask_guard(tmp_path):
     # Avoid a height-three synthetic image: the legacy RGB quantizer accepts
     # either HWC or CHW arrays and that single-axis size is intentionally
     # ambiguous without production camera dimensions.
-    config = _config(width=3, height=2)
-    candidate = _candidate(tmp_path)
+    recorder, candidate = _camera_h5_recorder(tmp_path, transition_count=0)
     try:
-        from task_env.artifacts import ExecutionSpecV1, RendererSelectionV1
-        from task_env.render.camera import (
-            D03_PHYSICS_PROFILE,
-            D04_ENTITY_SEGMENTATION_PROFILE,
-            DynamicCameraRenderSourceV1,
-            dynamic_entity_instance_segmentation_manifest,
-        )
-
-        state = _state(candidate, 0)
-        source = DynamicCameraRenderSourceV1.from_runtime_source(candidate.source)
-        renderer = RendererSelectionV1(
-            "renderer-selection-v1", "mujoco", "native-opengl",
-            D04_ENTITY_SEGMENTATION_PROFILE, None,
-        )
-        execution = ExecutionSpecV1(
-            "execution-spec-v1", "geophys", "cpu", D03_PHYSICS_PROFILE,
-            31, "best_effort", renderer, physics_device="cpu:0",
-        )
-        manifest = dynamic_entity_instance_segmentation_manifest()
-        captures = tuple(
-            _capture(camera, execution, source, state, manifest, config)
-            for camera in config.geometries(candidate.artifact.identity_hash)
-        )
-        from task_env.observations.canonical_camera.consumer import camera_observation_boundary_from_captures
-
-        boundary = camera_observation_boundary_from_captures(captures)
+        config = _config(width=3, height=2)
+        path = recorder.save_h5(tmp_path, "synthetic-camera-v3")
+        camera = load_camera_observations_h5(path)
+        boundary = camera["boundaries"][0]
         from task_env.observations.canonical_camera.consumer import CameraObservationBoundaryV1
 
         missing_modality = boundary.to_mapping()
@@ -371,42 +657,16 @@ def test_v3_camera_metadata_extension_roundtrip_and_mask_guard(tmp_path):
         wrong_calibration["captures"][0]["calibration"]["capture_control_step"] = 1
         with pytest.raises(ValueError, match="boundary disagree"):
             CameraObservationBoundaryV1.from_mapping(wrong_calibration)
-        leaves = {
-            "state": {"value": np.asarray((0.0,), dtype=np.float32)},
-            "privileged_state": {},
-            "rgb": {camera: capture.rgb for camera, capture in zip((FIXED_CAMERA_ID, HAND_CAMERA_ID), captures)},
-            "depth": {camera: capture.depth for camera, capture in zip((FIXED_CAMERA_ID, HAND_CAMERA_ID), captures)},
-            "entity_mask": {camera: capture.segmentation.mask for camera, capture in zip((FIXED_CAMERA_ID, HAND_CAMERA_ID), captures)},
-        }
-        metadata = {
-            "env_metadata": {
-                "env_name": "r04a-synthetic-camera-v3",
-                "action_schema": {"schema_id": "synthetic-action-v1", "components": ("action",),
-                                  "controller_kind": "absolute_joint", "reference": "world"},
-                "observation_schema": {"leaf_specs": []},
-            },
-            "universal_action_schema": {"version": "synthetic-v1", "dimension": 1,
-                                        "components": ("action",)},
-            "camera_observation_contract_v1": config.to_mapping(),
-        }
-        recorder = TransitionRecorder(RecorderConfig(schema_version="v3", max_transitions=1))
-        recorder.begin_episode(
-            leaves, {"camera_observation_v1": boundary.to_mapping()}, metadata,
-        )
-        end = make_episode_end_v1(
-            episode_id=state.boundary.episode_id, final_boundary=0,
-            end_reason="external_stop", terminated=False, truncated=True,
-            bootstrap_allowed=True, source="r04a-s1-test",
-        )
-        recorder.end_episode(
-            "external_stop", outcome=end.outcome, end_event=end.boundary_event,
-        )
-        path = recorder.save_h5(tmp_path, "synthetic-camera-v3")
-        camera = load_camera_observations_h5(path)
         assert camera["schema_version"] == "camera-observation-boundary-v1"
+        assert camera["recording_binding_schema_version"] == "camera-recording-binding-v1"
         assert camera["observation_count"] == 1 and camera["transition_count"] == 0
-        assert camera["boundaries"][0].state_boundary_id == state.boundary.boundary_id
+        assert boundary.state_boundary_id == camera["recording_binding"]["boundaries"][0]["state_boundary_id"]
         assert load_structured_control_records_h5(path)["observation_count"] == 1
+        assert load_structured_training_actions_h5(path) == ()
+        evidence_dir = os.environ.get("R04A_EVIDENCE_DIR")
+        if evidence_dir:
+            Path(evidence_dir).mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, Path(evidence_dir) / "valid-zero-transition.h5")
         with h5py.File(path, "r+") as h5:
             assert h5["obs/rgb/" + FIXED_CAMERA_ID].shape == (1, 3, 2, 3)
             assert h5["obs/rgb/" + FIXED_CAMERA_ID].dtype == np.dtype(np.uint8)
@@ -415,5 +675,132 @@ def test_v3_camera_metadata_extension_roundtrip_and_mask_guard(tmp_path):
             h5["obs/entity_mask/" + HAND_CAMERA_ID][0, 0, 0] = 7
         with pytest.raises(ValueError, match="mask|LabelMap"):
             load_camera_observations_h5(path)
+    finally:
+        candidate.env.close()
+
+
+@pytest.mark.parametrize(
+    ("case", "kwargs", "message"),
+    (
+        ("wrong_state_digest", {"bad_state_digest_at": 0}, "state observation digest"),
+        ("wrong_reset_clock", {"reset_clock_seconds": 0.125}, "independent reset/transition identity and clock"),
+        ("wrong_transition_clock", {"transition_count": 1, "transition_clock_seconds": 0.125},
+         "recorded info simulation clock"),
+    ),
+)
+def test_camera_h5_writer_rejects_independent_state_clock_mismatches_and_cleans_temp(
+    tmp_path, case, kwargs, message,
+):
+    recorder, candidate = _camera_h5_recorder(tmp_path / case, **kwargs)
+    directory = tmp_path / (case + "-out")
+    try:
+        with pytest.raises(ValueError, match=message):
+            recorder.save_h5(directory, "rejected-camera-recording")
+        assert not (directory / "rejected-camera-recording.h5").exists()
+        assert not (directory / ".rejected-camera-recording.h5.tmp").exists()
+    finally:
+        candidate.env.close()
+
+
+def _replace_json_dataset(h5, dataset_path, value):
+    del h5[dataset_path]
+    h5.create_dataset(
+        dataset_path,
+        data=np.asarray(json.dumps(value, sort_keys=True), dtype=h5py.string_dtype(encoding="utf-8")),
+    )
+
+
+def test_camera_h5_reader_rejects_independent_state_episode_and_clock_mismatches(tmp_path):
+    recorder, candidate = _camera_h5_recorder(tmp_path / "base", transition_count=0)
+    try:
+        source = recorder.save_h5(tmp_path, "camera-reader-negative-base")
+        evidence_dir = os.environ.get("R04A_EVIDENCE_DIR")
+        if evidence_dir:
+            root = Path(evidence_dir)
+            root.mkdir(parents=True, exist_ok=True)
+        cases = (
+            ("wrong-state-boundary.h5", "stored state digest", "state"),
+            ("wrong-episode-outcome.h5", "finalized typed EpisodeOutcome", "episode"),
+            ("wrong-clock-anchor.h5", "stored state digest and record clock", "clock"),
+        )
+        for filename, message, kind in cases:
+            case_path = tmp_path / filename
+            shutil.copy2(source, case_path)
+            with h5py.File(case_path, "r+") as h5:
+                if kind == "state":
+                    row = np.asarray(h5["obs/state/boundary_identity_sha256"][0])
+                    row[0] ^= np.uint8(1)
+                    h5["obs/state/boundary_identity_sha256"][0] = row
+                elif kind == "episode":
+                    outcome = json.loads(h5["meta/episode_outcome_v1_json"][()].decode("utf-8"))
+                    outcome["episode_id"] = "another-finalized-episode"
+                    _replace_json_dataset(h5, "meta/episode_outcome_v1_json", outcome)
+                else:
+                    binding = json.loads(h5["meta/camera_recording_binding_v1_json"][()].decode("utf-8"))
+                    binding["boundaries"][0]["state_sample_clock"]["simulation_time_s"] = 0.125
+                    _replace_json_dataset(h5, "meta/camera_recording_binding_v1_json", binding)
+            with pytest.raises(ValueError, match=message):
+                load_camera_observations_h5(case_path)
+            if evidence_dir:
+                shutil.copy2(case_path, root / filename)
+        missing_path = tmp_path / "missing-recording-binding.h5"
+        shutil.copy2(source, missing_path)
+        with h5py.File(missing_path, "r+") as h5:
+            del h5["meta/camera_recording_binding_v1_json"]
+        with pytest.raises(ValueError, match="extension is incomplete"):
+            load_camera_observations_h5(missing_path)
+
+        geometry_path = tmp_path / "wrong-authored-geometry.h5"
+        shutil.copy2(source, geometry_path)
+        with h5py.File(geometry_path, "r+") as h5:
+            contract = json.loads(h5["meta/camera_observation_contract_v1_json"][()].decode("utf-8"))
+            contract["cameras"][0]["T_parent_from_mount"][0][3] += 0.2
+            _replace_json_dataset(h5, "meta/camera_observation_contract_v1_json", contract)
+        with pytest.raises(ValueError, match="another CameraGeometry"):
+            load_camera_observations_h5(geometry_path)
+
+        shape_path = tmp_path / "wrong-modality-shape.h5"
+        shutil.copy2(source, shape_path)
+        with h5py.File(shape_path, "r+") as h5:
+            depth_path = "obs/depth/" + HAND_CAMERA_ID
+            del h5[depth_path]
+            h5.create_dataset(depth_path, data=np.zeros((1, 1, 1), dtype=np.float32))
+        with pytest.raises(ValueError, match="schema mismatch"):
+            load_camera_observations_h5(shape_path)
+        if evidence_dir:
+            shutil.copy2(geometry_path, Path(evidence_dir) / "wrong-authored-geometry.h5")
+            shutil.copy2(shape_path, Path(evidence_dir) / "wrong-modality-shape.h5")
+    finally:
+        candidate.env.close()
+
+
+def test_camera_h5_reader_accepts_ordered_multitransition_controls_and_rejects_control_boundary_drift(tmp_path):
+    recorder, candidate = _camera_h5_recorder(tmp_path / "base", transition_count=2)
+    try:
+        source = recorder.save_h5(tmp_path, "camera-control-reader-base")
+        loaded = load_camera_observations_h5(source)
+        assert loaded["observation_count"] == 3 and loaded["transition_count"] == 2
+        assert len(load_structured_control_records_h5(source)["structured_controls"]) == 2
+        assert len(load_structured_training_actions_h5(source)) == 2
+        evidence_dir = os.environ.get("R04A_EVIDENCE_DIR")
+        if evidence_dir:
+            root = Path(evidence_dir)
+            root.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, root / "valid-two-transition.h5")
+
+        broken = tmp_path / "wrong-control-boundary.h5"
+        shutil.copy2(source, broken)
+        with h5py.File(broken, "r+") as h5:
+            controls = json.loads(h5["meta/structured_controls_v1_json"][()].decode("utf-8"))
+            action = controls[0]["writer_controls"][0]["canonical_action"]
+            target_value = action["position_target_v1"]
+            target_value["source_boundary"]["state_revision"] += 1
+            target = PositionControlTargetV1.from_mapping(target_value)
+            action["position_target_identity_hash"] = target.identity_hash
+            _replace_json_dataset(h5, "meta/structured_controls_v1_json", controls)
+        with pytest.raises(ValueError, match="structured control is not aligned"):
+            load_camera_observations_h5(broken)
+        if evidence_dir:
+            shutil.copy2(broken, Path(evidence_dir) / "wrong-control-boundary.h5")
     finally:
         candidate.env.close()

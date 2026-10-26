@@ -46,11 +46,15 @@ runtime routes or their supported capability envelope.
 - R04a adds an explicit `camera_observation` mapping to that same Position candidate. Decode it with
   `CameraObservationConfigV1` and supply both canonical camera mounts (`world` fixed mount, `hand` mounted camera)
   with authored rigid transforms and use horizon at most 16. It publishes RGB HWC float32, optical-Z depth in metres and canonical Entity mask
-  after an existing typed state boundary, and records versioned sidecars in Generic H5 v3 via the existing writer;
-  use `load_camera_observations_h5()` for semantic metadata checks. Omitting the mapping keeps the state-only default.
-  Only provider-free synthetic S1 is implemented; real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and
-  same-file camera S3 remain NOT_RUN. Do not treat the contract or S1 as R04b/c completion, camera qualification,
-  or P99 gate completion. See [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
+  after an existing typed state boundary. The consumer checks capture request identity against its actual config/source/
+  execution/manifest and calibration against that same typed parent Frame before publishing leaves. Generic H5 v3
+  keeps its root ABI and adds versioned sidecars; the recording-binding sidecar is cross-checked against stored Position
+  state-boundary digests, reset/transition clocks, reference-profile metadata and finalized typed outcome/control records.
+  Use `load_camera_observations_h5()` for strict semantic checks; missing or unknown binding versions fail closed. Omitting
+  the mapping keeps the state-only default. R04a attempt002's targeted provider-free synthetic S1 passed (33 cases),
+  pending Sol review. Real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and same-file camera S3 remain NOT_RUN.
+  Do not treat this S1 as R04b/c completion, camera qualification, or P99 gate completion. See
+  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.

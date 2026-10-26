@@ -377,13 +377,14 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
     })
     camera_extension = _camera_observation_extension(trajectory)
     if camera_extension is not None:
-        contract, boundaries = camera_extension
+        contract, boundaries, recording_binding = camera_extension
         _json_dataset(meta, "camera_observation_contract_v1_json", contract)
         _json_dataset(meta, "camera_observations_v1_json", boundaries)
+        _json_dataset(meta, "camera_recording_binding_v1_json", recording_binding)
 
 
 def _camera_observation_extension(trajectory: FrozenTrajectory):
-    """Build the opt-in v1 camera sidecar without changing Generic H5 v3."""
+    """Build camera metadata plus bindings to independent Generic H5 v3 records."""
 
     from task_env.observations.canonical_camera.consumer import (
         CAMERA_IDS,
@@ -432,7 +433,280 @@ def _camera_observation_extension(trajectory: FrozenTrajectory):
         for capture in boundary.captures:
             if capture.capture_identity.camera_geometry_identity_hash != expected_geometry[capture.camera_id]:
                 raise ValueError("stored camera metadata does not match its authored mount contract")
-    return contract.to_mapping(), [item.to_mapping() for item in boundaries]
+    boundary_values = [item.to_mapping() for item in boundaries]
+    recording_binding = _camera_recording_binding_from_trajectory(trajectory, boundaries)
+    return contract.to_mapping(), boundary_values, recording_binding
+
+
+def _camera_recording_binding_from_trajectory(trajectory: FrozenTrajectory, camera_boundaries):
+    """Bind opt-in camera metadata to real recorder observations, info, controls and outcome."""
+
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+
+    transition_count = trajectory.transition_count
+    if len(trajectory.observations) != transition_count + 1 or len(trajectory.infos) != transition_count:
+        raise ValueError("camera recording requires aligned T transitions and T+1 observations")
+    record_infos = [trajectory.reset_info, *trajectory.infos]
+    if len(camera_boundaries) != len(record_infos):
+        raise ValueError("camera recording requires one reset/transition record per observation boundary")
+
+    raw_env_metadata = trajectory.record_metadata.get("env_metadata")
+    if not isinstance(raw_env_metadata, Mapping):
+        raise ValueError("camera recording requires the independent Position record metadata")
+    profile = raw_env_metadata.get("reference_profile")
+    if not isinstance(profile, Mapping):
+        raise ValueError("camera recording requires the Position reference_profile identity anchor")
+    required_profile = (
+        "writer_id", "controller_identity", "control_binding_plan_identity_hash",
+        "task_artifact_identity_hash", "scene_identity_hash", "reset_sample_id",
+        "source_closure_digest",
+    )
+    if any(not profile.get(name) for name in required_profile):
+        raise ValueError("camera recording reference_profile is missing a required source/control identity")
+
+    records = []
+    state_digests = []
+    for index, (info, camera_boundary, observation) in enumerate(
+        zip(record_infos, camera_boundaries, trajectory.observations, strict=True)
+    ):
+        if not isinstance(info, Mapping):
+            raise ValueError("camera recording reset/transition info must be a mapping")
+        raw_boundary = info.get("state_boundary_identity")
+        raw_clock = info.get("state_sample_clock")
+        if not isinstance(raw_boundary, Mapping) or not isinstance(raw_clock, Mapping):
+            raise ValueError("camera recording reset/transition info lacks an independent state boundary or clock")
+        boundary = StateBoundaryIdentity.from_mapping(raw_boundary)
+        clock = StateSampleClock.from_mapping(raw_clock)
+        boundary_id = info.get("state_boundary_id")
+        if boundary_id != boundary.boundary_id:
+            raise ValueError("recorded state_boundary_id does not match its typed reset/transition identity")
+        if (boundary.control_step != index or clock.sample_index != index
+                or clock.clock_domain != "evaluation_boundary"):
+            raise ValueError("recorded Position boundary/clock order is not contiguous from reset")
+        if "control_step" in info and info["control_step"] != index:
+            raise ValueError("recorded info control_step does not match its T/T+1 boundary")
+        if "simulation_time_s" in info and float(info["simulation_time_s"]) != clock.simulation_time_s:
+            raise ValueError("recorded info simulation clock does not match state_sample_clock")
+        if (camera_boundary.boundary_index != index
+                or camera_boundary.state_boundary_id != boundary.boundary_id
+                or camera_boundary.simulation_time_s != clock.simulation_time_s):
+            raise ValueError("camera boundary does not match independent reset/transition identity and clock")
+        for capture in camera_boundary.captures:
+            identity = capture.capture_identity
+            if identity.state_boundary != boundary or identity.sample_clock != clock:
+                raise ValueError("camera capture does not match independent reset/transition state identity and clock")
+
+        observation_leaves = dict(_leaves(observation))
+        digest_value = observation_leaves.get("state/boundary_identity_sha256")
+        if (not isinstance(digest_value, np.ndarray)
+                or digest_value.dtype != np.dtype(np.uint8)
+                or digest_value.shape != (32,)):
+            raise ValueError("camera recording requires a 32-byte uint8 Position state boundary digest at every boundary")
+        digest_hex = bytes(digest_value).hex()
+        expected_digest = boundary.boundary_id.removeprefix("state-boundary-")
+        if digest_hex != expected_digest:
+            raise ValueError("camera boundary identity does not match the actual Position state observation digest")
+        state_digests.append(bytes(digest_value))
+        records.append({
+            "boundary_index": index,
+            "state_boundary_identity": boundary.to_mapping(),
+            "state_boundary_id": boundary.boundary_id,
+            "state_sample_clock": clock.to_mapping(),
+        })
+
+    outcome = trajectory.outcome
+    if not isinstance(outcome, EpisodeOutcomeV1):
+        raise ValueError("camera recording requires the finalized typed EpisodeOutcomeV1")
+    first_identity = StateBoundaryIdentity.from_mapping(records[0]["state_boundary_identity"])
+    if (outcome.episode_id != first_identity.episode_id
+            or outcome.final_boundary != transition_count):
+        raise ValueError("finalized EpisodeOutcome does not match the recorded camera episode and boundary")
+
+    artifact_hash = str(profile["task_artifact_identity_hash"])
+    scene_hash = str(profile["scene_identity_hash"])
+    reset_sample_id = str(profile["reset_sample_id"])
+    source_closure_digest = str(profile["source_closure_digest"])
+    plan_hash = str(profile["control_binding_plan_identity_hash"])
+    if (first_identity.scene_identity_hash != scene_hash
+            or first_identity.reset_sample_id != reset_sample_id):
+        raise ValueError("Position reference_profile does not match the actual reset boundary")
+    for camera_boundary in camera_boundaries:
+        identity = camera_boundary.captures[0].capture_identity
+        if (identity.task_artifact_hash != artifact_hash
+                or identity.state_boundary.scene_identity_hash != scene_hash
+                or identity.state_boundary.reset_sample_id != reset_sample_id
+                or identity.state_boundary.episode_id != outcome.episode_id):
+            raise ValueError("camera identity does not match independent Position source/profile and episode metadata")
+
+    controls = tuple(trajectory.structured_controls)
+    if transition_count and (len(controls) != transition_count or any(item is None for item in controls)):
+        raise ValueError("camera recording requires one structured Position control per transition")
+    typed_controls = tuple(item for item in controls if item is not None)
+    from task_env.controllers.canonical.contracts import PositionControlTargetV1
+    from task_env.trajectory.canonical.episode import single_writer_training_actions
+
+    for index, control in enumerate(typed_controls):
+        control.validate()
+        if (control.request.scene_identity_hash != scene_hash
+                or control.request.binding_identity_hash != plan_hash
+                or len(control.writer_controls) != 1):
+            raise ValueError("camera recording structured control does not match the single Position source binding")
+        writer = control.writer_controls[0]
+        if writer.get("writer_id") != profile["writer_id"]:
+            raise ValueError("camera recording structured control writer does not match reference_profile")
+        canonical_action = writer.get("canonical_action")
+        raw_target = canonical_action.get("position_target_v1") if isinstance(canonical_action, Mapping) else None
+        if not isinstance(raw_target, Mapping):
+            raise ValueError("camera recording structured control lacks its typed PositionControlTargetV1")
+        target = PositionControlTargetV1.from_mapping(dict(raw_target))
+        previous = StateBoundaryIdentity.from_mapping(records[index]["state_boundary_identity"])
+        previous_clock = StateSampleClock.from_mapping(records[index]["state_sample_clock"])
+        if (target.source_boundary != previous or target.sample_clock != previous_clock
+                or target.writer_id != profile["writer_id"]
+                or target.controller_identity != profile["controller_identity"]
+                or target.binding_identity_hash != plan_hash
+                or target.source_closure_digest != source_closure_digest
+                or target.target.task_artifact_hash != artifact_hash
+                or canonical_action.get("position_target_identity_hash") != target.identity_hash):
+            raise ValueError("camera recording structured control is not bound to the preceding real state boundary")
+
+    if typed_controls:
+        action_schema = _action_schema(trajectory.record_metadata)
+        projected = single_writer_training_actions(
+            typed_controls, action_schema_id=action_schema["schema_id"],
+            components=tuple(action_schema["components"]),
+        )
+        actual_actions = np.stack(trajectory.actions).astype(np.float32, copy=False)
+        projected_actions = np.asarray(projected, dtype=np.float32).reshape(actual_actions.shape)
+        if not np.array_equal(actual_actions, projected_actions):
+            raise ValueError("camera recording structured control order differs from stored action order")
+
+    for boundary in camera_boundaries:
+        for capture in boundary.captures:
+            if capture.capture_identity.state_boundary.boundary_id != (
+                "state-boundary-" + state_digests[boundary.boundary_index].hex()
+            ):
+                raise ValueError("camera recording boundary digest changed during validation")
+
+    return {
+        "schema_version": "camera-recording-binding-v1",
+        "observation_count": transition_count + 1,
+        "transition_count": transition_count,
+        "episode_id": outcome.episode_id,
+        "final_boundary": outcome.final_boundary,
+        "task_artifact_identity_hash": artifact_hash,
+        "scene_identity_hash": scene_hash,
+        "reset_sample_id": reset_sample_id,
+        "source_closure_digest": source_closure_digest,
+        "writer_id": str(profile["writer_id"]),
+        "controller_identity": str(profile["controller_identity"]),
+        "control_binding_plan_identity_hash": plan_hash,
+        "boundaries": records,
+    }
+
+
+def _validate_camera_recording_binding(
+    raw_binding, camera_boundaries, state_digests, env_meta, structured_records,
+    projected_actions, observation_count, transition_count,
+):
+    """Strictly cross-check camera metadata against independent stored owner data."""
+
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+    from task_env.controllers.canonical.contracts import PositionControlTargetV1
+
+    required = {
+        "schema_version", "observation_count", "transition_count", "episode_id",
+        "final_boundary", "task_artifact_identity_hash", "scene_identity_hash",
+        "reset_sample_id", "source_closure_digest", "writer_id", "controller_identity",
+        "control_binding_plan_identity_hash", "boundaries",
+    }
+    if not isinstance(raw_binding, dict) or set(raw_binding) != required:
+        raise ValueError("camera recording binding has unknown or missing fields")
+    if raw_binding["schema_version"] != "camera-recording-binding-v1":
+        raise ValueError("unsupported camera recording binding version")
+    if (raw_binding["observation_count"] != observation_count
+            or raw_binding["transition_count"] != transition_count
+            or raw_binding["final_boundary"] != transition_count
+            or len(raw_binding["boundaries"]) != observation_count):
+        raise ValueError("camera recording binding T/T+1 counts disagree with the finalized H5 episode")
+    profile = env_meta.get("reference_profile") if isinstance(env_meta, Mapping) else None
+    if not isinstance(profile, Mapping):
+        raise ValueError("camera recording H5 lacks independent Position reference_profile metadata")
+    for field in (
+        "task_artifact_identity_hash", "scene_identity_hash", "reset_sample_id",
+        "source_closure_digest", "writer_id", "controller_identity",
+        "control_binding_plan_identity_hash",
+    ):
+        if raw_binding[field] != profile.get(field):
+            raise ValueError(f"camera recording binding {field} disagrees with independent reference_profile")
+
+    decoded = []
+    expected_boundary_fields = {
+        "boundary_index", "state_boundary_identity", "state_boundary_id", "state_sample_clock",
+    }
+    for index, (entry, camera_boundary, digest_bytes) in enumerate(
+        zip(raw_binding["boundaries"], camera_boundaries, state_digests, strict=True)
+    ):
+        if not isinstance(entry, dict) or set(entry) != expected_boundary_fields:
+            raise ValueError("camera recording boundary anchor has unknown or missing fields")
+        identity = StateBoundaryIdentity.from_mapping(entry["state_boundary_identity"])
+        clock = StateSampleClock.from_mapping(entry["state_sample_clock"])
+        if (entry["boundary_index"] != index
+                or entry["state_boundary_id"] != identity.boundary_id
+                or identity.control_step != index
+                or clock.sample_index != index
+                or clock.clock_domain != "evaluation_boundary"):
+            raise ValueError("camera recording boundary anchor has invalid identity/order/clock")
+        if (bytes(digest_bytes).hex() != identity.boundary_id.removeprefix("state-boundary-")
+                or camera_boundary.boundary_index != index
+                or camera_boundary.state_boundary_id != identity.boundary_id
+                or camera_boundary.simulation_time_s != clock.simulation_time_s):
+            raise ValueError("camera sidecar does not match stored state digest and record clock")
+        if (identity.episode_id != raw_binding["episode_id"]
+                or identity.scene_identity_hash != raw_binding["scene_identity_hash"]
+                or identity.reset_sample_id != raw_binding["reset_sample_id"]):
+            raise ValueError("camera recording boundary episode/reset/source does not match its independent anchor")
+        for capture in camera_boundary.captures:
+            if (capture.capture_identity.state_boundary != identity
+                    or capture.capture_identity.sample_clock != clock
+                    or capture.capture_identity.task_artifact_hash != raw_binding["task_artifact_identity_hash"]):
+                raise ValueError("camera capture identity disagrees with independent H5 boundary/source anchors")
+        decoded.append((identity, clock))
+
+    outcome = structured_records.get("outcome")
+    if (not isinstance(outcome, EpisodeOutcomeV1)
+            or outcome.episode_id != raw_binding["episode_id"]
+            or outcome.final_boundary != transition_count):
+        raise ValueError("camera recording episode does not match finalized typed EpisodeOutcome")
+    controls = tuple(structured_records.get("structured_controls", ()))
+    if len(controls) != transition_count or len(projected_actions) != transition_count:
+        raise ValueError("camera recording control order/count does not match finalized transitions")
+    for index, control in enumerate(controls):
+        if control is None:
+            raise ValueError("camera recording requires structured control evidence for every transition")
+        control.validate()
+        if (control.request.scene_identity_hash != raw_binding["scene_identity_hash"]
+                or control.request.binding_identity_hash != raw_binding["control_binding_plan_identity_hash"]
+                or len(control.writer_controls) != 1):
+            raise ValueError("camera recording structured control disagrees with its independent Position binding")
+        writer = control.writer_controls[0]
+        if writer.get("writer_id") != raw_binding["writer_id"]:
+            raise ValueError("camera recording control order has a mismatched writer identity")
+        canonical_action = writer.get("canonical_action")
+        raw_target = canonical_action.get("position_target_v1") if isinstance(canonical_action, Mapping) else None
+        if not isinstance(raw_target, Mapping):
+            raise ValueError("camera recording structured control lacks PositionControlTargetV1")
+        target = PositionControlTargetV1.from_mapping(dict(raw_target))
+        if (target.source_boundary != decoded[index][0]
+                or target.sample_clock != decoded[index][1]
+                or target.writer_id != raw_binding["writer_id"]
+                or target.controller_identity != raw_binding["controller_identity"]
+                or target.binding_identity_hash != raw_binding["control_binding_plan_identity_hash"]
+                or target.source_closure_digest != raw_binding["source_closure_digest"]
+                or target.target.task_artifact_hash != raw_binding["task_artifact_identity_hash"]
+                or canonical_action.get("position_target_identity_hash") != target.identity_hash):
+            raise ValueError("camera recording structured control is not aligned to its source boundary/clock")
+    return raw_binding
 
 
 def _save_v1(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None:
@@ -709,12 +983,14 @@ def load_camera_observations_h5(path: Path | str) -> dict[str, Any]:
         required = {
             "meta/camera_observation_contract_v1_json",
             "meta/camera_observations_v1_json",
+            "meta/camera_recording_binding_v1_json",
             "meta/env_meta",
         }
         if any(name not in root for name in required):
             raise ValueError("task-env-h5/v3 camera observation extension is incomplete")
         contract_raw = json.loads(_read_text(root, "meta/camera_observation_contract_v1_json"))
         observations_raw = json.loads(_read_text(root, "meta/camera_observations_v1_json"))
+        raw_recording_binding = json.loads(_read_text(root, "meta/camera_recording_binding_v1_json"))
         observation_count = int(root.attrs.get("observation_count", -1))
         transition_count = int(root.attrs.get("transition_count", -1))
         env_meta = load_metadata(_read_text(root, "meta/env_meta"))
@@ -725,6 +1001,14 @@ def load_camera_observations_h5(path: Path | str) -> dict[str, Any]:
         boundaries = validate_camera_observation_boundaries(
             observations_raw, expected_count=observation_count,
         )
+        state_digest_path = "obs/state/boundary_identity_sha256"
+        if state_digest_path not in root:
+            raise ValueError("camera recording requires the actual Position state boundary digest dataset")
+        state_digest_dataset = root[state_digest_path]
+        if (state_digest_dataset.shape != (observation_count, 32)
+                or state_digest_dataset.dtype != np.dtype(np.uint8)):
+            raise ValueError("Position state boundary digest dataset must be T+1 rows of 32 uint8 bytes")
+        state_digests = tuple(bytes(np.asarray(state_digest_dataset[index])) for index in range(observation_count))
         artifact_hash = boundaries[0].captures[0].capture_identity.task_artifact_hash
         geometries = {
             item.camera_id: item for item in contract.geometries(artifact_hash)
@@ -773,12 +1057,22 @@ def load_camera_observations_h5(path: Path | str) -> dict[str, Any]:
                 mask_digest = hashlib.sha256(np.ascontiguousarray(mask).tobytes(order="C")).hexdigest()
                 if mask_digest != capture.mask_sha256:
                     raise ValueError("stored Entity mask bytes do not match the capture-bound mask digest")
+    structured_records = load_structured_control_records_h5(path)
+    if structured_records["transition_count"] != transition_count:
+        raise ValueError("camera recording transition count disagrees with typed structured records")
+    projected_actions = load_structured_training_actions_h5(path)
+    recording_binding = _validate_camera_recording_binding(
+        raw_recording_binding, boundaries, state_digests, env_meta, structured_records,
+        projected_actions, observation_count, transition_count,
+    )
     return {
         "schema_version": "camera-observation-boundary-v1",
+        "recording_binding_schema_version": recording_binding["schema_version"],
         "contract": contract,
         "observation_count": observation_count,
         "transition_count": transition_count,
         "boundaries": boundaries,
+        "recording_binding": recording_binding,
         "env_meta": env_meta,
     }
 

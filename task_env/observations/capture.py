@@ -14,6 +14,7 @@ from .canonical_camera.consumer import (
     CameraObservationConfigV1,
     camera_observation_boundary_from_captures,
 )
+from .canonical_camera.geometry import resolve_camera
 from .canonical_camera.images import CanonicalCameraObservation
 
 
@@ -50,6 +51,7 @@ class DynamicCameraObservationConsumerV1:
         self._last_boundary = None
         self._last_leaves = None
         self._last_capture_values = None
+        self._request_context = None
 
     def _ensure_sessions(self, state):
         if self._sessions:
@@ -75,6 +77,9 @@ class DynamicCameraObservationConsumerV1:
         manifest = dynamic_entity_instance_segmentation_manifest()
         geometries = self.config.geometries(self._task_artifact_hash)
         factory = self._session_factory or create_dynamic_camera_session
+        # Freeze the independent request inputs before calling a factory. A
+        # returned capture must satisfy this request, not only be self-consistent.
+        self._request_context = (render_source, execution, manifest, geometries)
         try:
             for camera in geometries:
                 session = factory(
@@ -136,7 +141,8 @@ class DynamicCameraObservationConsumerV1:
         captures = tuple(session.capture(state) for session in self._sessions)
         if len(captures) != 2 or any(not isinstance(item, CanonicalCameraObservation) for item in captures):
             raise ValueError("camera consumer requires two CanonicalCameraObservation values")
-        for camera_id, capture in zip(CAMERA_IDS, captures):
+        render_source, execution, manifest, geometries = self._request_context
+        for camera_id, camera, capture in zip(CAMERA_IDS, geometries, captures):
             if capture.capture_identity is None or capture.segmentation is None:
                 raise ValueError(f"camera {camera_id} did not publish its required capture identity and Entity mask")
             if capture.capture_identity.camera_id != camera_id:
@@ -144,6 +150,19 @@ class DynamicCameraObservationConsumerV1:
             if (capture.capture_identity.state_boundary != state.boundary
                     or capture.capture_identity.sample_clock != state.sample_clock):
                 raise ValueError("camera capture identity does not bind the supplied typed publication")
+            expected_identity = render_source.capture_identity(
+                camera, execution, manifest, state,
+                additional_modalities=("entity_instance_segmentation",),
+            )
+            if capture.capture_identity != expected_identity:
+                raise ValueError(
+                    f"camera {camera_id} capture identity does not match the consumer's authored request"
+                )
+            expected_calibration = resolve_camera(camera, state)
+            if capture.metadata != expected_calibration:
+                raise ValueError(
+                    f"camera {camera_id} calibration does not match its requested geometry and typed parent Frame"
+                )
             if capture.rgb is None or capture.rgb.dtype != np.float32 or capture.rgb.shape != (
                 self.config.height, self.config.width, 3,
             ) or not np.isfinite(capture.rgb).all() or np.any(capture.rgb < 0) or np.any(capture.rgb > 1):

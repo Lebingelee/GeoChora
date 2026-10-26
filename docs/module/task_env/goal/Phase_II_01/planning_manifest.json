@@ -160,12 +160,12 @@
       "depends_on": [
         "P00"
       ],
-      "status": "CHANGES_REQUESTED",
-      "execution": "IMPLEMENTED; BASELINE_PROVIDER_FREE_S1_PASS; REVIEW_BINDING_GAPS_REPRODUCED; NATIVE_NOT_RUN",
+      "status": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_PROVIDER_FREE_S1_PASS; ATTEMPT002_TARGETED_PROVIDER_FREE_S1_PASS; NATIVE_NOT_RUN",
       "required_evidence": "S1",
       "stop_condition": "身份/metadata reader/资源合同缺失→停止",
-      "result": "R04a extends the existing Position candidate, SelectedReferenceEnv, camera observation, and Generic H5 v3 owners with an opt-in dual-camera RGB/optical-depth/Entity-mask consumer, strict metadata reader, boundary cache/lifecycle handling, and capacity gates. Targeted provider-free S1 passed; no native camera, renderer, or real Env execution is claimed. Sol review reproduced missing requested-capture and independent recorded-state/episode bindings; R04a exit not accepted pending bounded repair.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_001/report.md",
+      "result": "Attempt001 implementation and its original 23-case provider-free S1 remain preserved. Attempt002 repairs F01 by binding capture identity/calibration to the actual consumer request and typed parent Frame, and F02 by cross-checking versioned H5 camera binding against stored state digests, independent clocks/profile, and finalized typed controls/outcome. Targeted provider-free S1: 33 passed; pending Sol review. No native renderer, public Env S2, or camera H5 S3 is claimed.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/report.md",
       "sol_review": {
         "date": "2026-10-26",
         "input_commit": "436f5c2d7114a41bf3925528d1ba8d11b6410bf9",
@@ -183,7 +183,18 @@
         "qualification_granted": false
       },
       "native_execution": "NOT_RUN",
-      "qualification_granted": false
+      "qualification_granted": false,
+      "latest_attempt": {
+        "attempt": "002",
+        "input_commit": "fc0c3bbf8dd307386dbe77bbd332fd1192f3fcbc",
+        "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/report.md",
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/evidence.json",
+        "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/commands.json",
+        "targeted_s1_passed": 33,
+        "native_execution": "NOT_RUN",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R06a",
@@ -478,13 +489,13 @@
     "01_R01_Logical_Robot_Assembly.md": "21b5b8af0325d4ab5a652248ca430de235c0de010f06b7bb584b68891e3489cf",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
-    "04_R04_Dynamic_Camera_Consumer.md": "ae134636a86b28eb31b5a0ec8ffa7175148eae4ff4551841e02cc834f8a8dc83",
+    "04_R04_Dynamic_Camera_Consumer.md": "0d41bb7514cf3d06f60d5dbe27e7c45ccd6e666432d3d36f21a9ef582738f34a",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "b21e64b51609ff743658b4994765be47a914df49e6c3eeaadbb2b904db1f637e",
+    "07_Execution_Order_and_Acceptance.md": "8b36f09b1349182c5858ff00d48140f888fe051d41af49e74aaf4581b317f5d3",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "b8e1834c0ba12a8922a2a0189124b5e0632f66a61c9b950330090a9445482222"
+    "README.md": "1b28c793a1c569c350d92720bf0bcf0c310700582bd99374156cc955a495fd31"
   },
   "revision_kind": "R04A_BOUNDED_IMPLEMENTATION_AND_S1_DOCUMENTATION_SYNC",
   "benchmark_audit": {
@@ -2344,6 +2355,23 @@
       "native_execution": "NOT_RUN",
       "next_package": "R04a attempt002 targeted repair",
       "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "R04A_ATTEMPT002_TARGETED_BINDING_REPAIR_AND_PROVIDER_FREE_S1",
+      "date": "2026-10-26",
+      "input_commit": "fc0c3bbf8dd307386dbe77bbd332fd1192f3fcbc",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Repair F01 capture request binding and calibration validation; repair F02 strict H5 camera sidecar cross-checks against actual state digests, reset/transition clocks, independent profile metadata, and typed controls/outcome. Update affected API, Task Artifact, R04, execution order, README, planning manifest, and TaskEnv Skill. No native, R04b/c, or qualification.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/evidence.json",
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/commands.json",
+      "targeted_s1_passed": 33,
+      "native_execution": "NOT_RUN",
+      "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+      "DAG_required_envelope_unchanged": true,
+      "P99_required_preserved": true,
+      "sol_review": "PENDING",
       "qualification_granted": false
     }
   ],
