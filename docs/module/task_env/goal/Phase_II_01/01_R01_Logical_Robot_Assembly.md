@@ -1,6 +1,6 @@
 # R01 — Logical Robot Assembly
 
-状态：REVISED_DRAFT；R01a 已实现静态值合同与 provider-free S1，等待 Sol 复核；R01b/c 仍 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
+状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b/c 仍 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
 
 ## 当前 owner 与版本边界
 
@@ -42,8 +42,8 @@ R01 持有 canonical refs，不持有 native body/joint/actuator indices。R03 �
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
-| R01a | P00 | 既有 artifacts owner 中两类 member、hash DAG、版本与边界设计/codec | provider-free S1 已通过：strict discriminator/roundtrip/non-self hash 与旧 Scene/Artifact 基线保持；报告 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md`；等待 Sol 复核 |
+| R01a | P00 | 既有 artifacts owner 中两类 member、hash DAG、版本与边界设计/codec | provider-free S1 已通过：strict discriminator/roundtrip/non-self hash 与旧 Scene/Artifact 基线保持；报告 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md`；Sol已接收该静态S1出口 |
 | R01b | R01a | 递归 owning/reference-only 解析、typed paths 与有界负例 | S1：环/悬空/重复拥有/错误 source revision/alias/超预算拒绝；不加载 Provider |
 | R01c | R01b | source/compiler 的只读投影与可追踪 leaf refs | S1：完整 Panda 内 arm/hand subrefs、独立 Arm/Hand Entity members 两类 fixture；canonical refs 不产生物理 joint |
 
-本 Goal 不依赖 R04/R05。S1 不能作为 R03 的动力学或 R02 的执行证明。返回 mapping 必须不可变；关闭运行时不破坏可独立持有的逻辑值。接受条件与依赖唯一入口为 [07](07_Execution_Order_and_Acceptance.md)。
+本 Goal 不依赖 R04/R05。S1 不能作为 R03 的动力学或 R02 的执行证明。逻辑投影/只读view必须不可变；codec `to_mapping()` 可返回独立JSON副本，修改副本不能回写合同。关闭运行时不破坏可独立持有的逻辑值。接受条件与依赖唯一入口为 [07](07_Execution_Order_and_Acceptance.md)。

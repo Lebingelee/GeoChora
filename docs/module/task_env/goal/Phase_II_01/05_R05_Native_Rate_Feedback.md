@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态：REVISED_DRAFT；R05a/b/c 均 PLANNED / NOT_STARTED。Provider 合同批准是本 Goal 独立前置；不把 C05c 诊断调用改名为支持。
+状态：REVISED_DRAFT；R05a 为 BLOCKED_PROVIDER_CONTRACT（Sol preflight，无新cadence probe）；R05b/c 仍 PLANNED / NOT_STARTED。Provider 合同批准是本 Goal 独立前置；不把 C05c 诊断调用改名为支持。
 
 ## 现有能力与 owner
 

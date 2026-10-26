@@ -105,6 +105,8 @@
 
 2026-10-26，Sol复核接收R03a attempt002为`ACCEPTED_BOUNDED`：实际六文件diff、44项交付与5项native哈希、1,920行step trace、386个状态样本及冻结oracle核对通过，未运行新的native实验。attempt001端点FAIL保留；该精确内缩case满足R03a有界工程出口。随后R01a attempt001在输入`2229ad857c0c711d0c3894c97b05994896c31016`上实现独立`logical-assembly-v1` strict codec及非自指hash，并完成provider-free S1与旧Scene/Artifact兼容检查；结果为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，报告在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md`。R01b/c仍未执行；R03b仍等待R01c，Core Attachment/公有Env/H5、全行程与Qualification结论不扩展。
 
+2026-10-26，Sol复核接收R01a attempt001为`ACCEPTED_S1_BOUNDED`：实际11文件diff、36项输出哈希、五份旧Scene/Artifact mapping/hash核对通过；Luna完整目标S1为60 passed，Sol定向新合同S1为31 passed，另核对14项严格拒绝与四类typed subref别名隔离。未运行native；R01b/c与物理Assembly仍未实现。下一行R05a的Provider正式native-rate合同存在preflight阻塞，维护者后继选择待定，DAG/P99 required不变。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01a_001/`。
+
 ## 本轮R07修订与Scope Risks
 
 - [09 R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)包含五Task逐项source/native语义/init/asset审计、ownership、真实部署门槛、Agent成本/独立review与RoboCasa feasibility；native source code读到了不等于Core已支持。

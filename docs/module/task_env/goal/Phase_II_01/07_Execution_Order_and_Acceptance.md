@@ -45,8 +45,8 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 序号 | Slice | 直接依赖 | 主交付 | 最低 Evidence | Stop Condition | 当前状态 |
 | ---: | --- | --- | --- | --- | --- | --- |
 | 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | attempt001 ENDPOINT_HAND_COMMANDS FAIL保留；attempt002 INTERIOR_HAND_COMMANDS的S1及独立native source/dynamics冻结oracle通过，详见ignored R03a attempt002报告；不构成Core S2/S3 | 仅当前内缩操作case通过，不证明0/255端点或全行程；Sol已接收该有界工程出口；R03b/c仍须满足原DAG依赖 | ACCEPTED_BOUNDED / R03a EXIT MET FOR CASE |
-| 02 | R01a | P00 | `logical-assembly-v1` 两类成员、Scene pin 与非自指身份/strict codec | provider-free S1 | 旧identity变动或引用契约不明→停止 | IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW；见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md` |
-| 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | PLANNED / NOT_STARTED |
+| 02 | R01a | P00 | `logical-assembly-v1` 两类成员、Scene pin 与非自指身份/strict codec | provider-free S1 | 旧identity变动或引用契约不明→停止 | ACCEPTED_S1_BOUNDED；见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md` |
+| 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | BLOCKED_PROVIDER_CONTRACT（Sol preflight；无新cadence probe） |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | PLANNED / NOT_STARTED |
 | 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | PLANNED / NOT_STARTED |
 | 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | PLANNED / NOT_STARTED |
@@ -68,6 +68,8 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 22 | R07d | R07c | session成本报告与独立human代码质量审阅 | Audit/independent review | 无来源/无独立review或虚构usage→阻塞 | PLANNED / NOT_STARTED |
 
 P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contract、运行与独立范围决定。R06a 记录缺口可以形成自己的 ledger，但不代表 compatibility decision gate 已接受；R06c/P99 不能把未决决定忽略。各 slice 自带受影响兼容检查，R06b/c 不取代局部回归。
+
+2026-10-26，Sol已接收R01a的静态codec/S1出口；R01b/c仍未启动。下一行R05a受当前GeoPhys正式native-rate合同缺口阻塞：公开Reader限制逐substep host snapshot，旧C05c仅为诊断例外。此为preflight阻塞，不是R05a Audit/S1/probe完成，也不改为DEFERRED。建议由维护者明确选择先推进独立R04a或优先决定R05a Provider合同/新pin范围；选择前不自行执行后继，原DAG与P99 required保持。
 
 ## P99 Required Envelope（待批准）
 
