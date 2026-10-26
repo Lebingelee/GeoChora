@@ -1,6 +1,7 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/b/c 均 PLANNED / NOT_STARTED。复用算法，新增 leaf binding 契约不等于已有叶级执行支持。
+状态：REVISED_DRAFT；R02a 已完成一次实现与 provider-free S1 交付，等待 Sol 复核；R02b/c 仍 PLANNED / NOT_STARTED。
+复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
 
@@ -8,15 +9,21 @@
 
 EXTEND_EXISTING / COMPOSE_EXISTING：在现有 canonical profile/target/feedback/admission owners 内形成 leaf adapter，保留现有 RuntimeSession 和 Controller 算法。两个完整 Panda Controller 的历史 S2 只做兼容基线，不能满足新 leaf 的充分证明。Asset 不嵌入 Controller 实例、任意 Python callable 或未注册可执行代码。
 
-## Leaf 版本化合同（拟议，R02a 才冻结字段名）
+## Leaf 版本化合同（R02a implementation candidate；pending Sol review）
 
 | Leaf | Action | Target / Applied Ack | Required State / Identity |
 | --- | --- | --- | --- |
-| Arm-only Position | 首版 ordered joint-position vector，rad、exact joint list、width=7、限位；Cartesian 为另行精确准入变体 | 带 version/profile/plan/source/boundary 的关节目标；Ack 引用同 target、writer、实际资源/应用边界，不混同真实到位 | Arm Entity 的 q/qvel、joint/actuator refs、reset/clock；独立 flange/TCP profile，明确 world/local frame、SE(3)/wxyz；不得硬取另一 Entity 的 hand frame |
-| Hand-only Position | 独立 schema；Panda tendon 手首版 opening_m（m）、有界 [0,0.08]，明确与旧 normalized [-1,1] adapter 的变换 | 一个真实驱动 tendon actuator 的目标与限幅；Ack 对应该驱动资源，不把两个被联动 finger 当两个 writer | Hand Entity 的 finger joints/opening 与 clock；独立 Hand/TCP 与 actuator/transmission identity；不要求 measured force，也不能填 0N 冒充 force feedback |
-| Hand-only Force-aware | 单独 schema/profile/required-state，raw signed force 与 canonical closing force 分开 | 带 force mode/threshold/hold 状态语义与具体 source phase 的 Target/Ack；不得借用 Position identity | source/transmission 审计、force unit/sign、phase/sequence/revision/freshness；未准入时 NOT_ADMITTED |
+| Arm-only Position | `ArmPositionActionV1`；有序七关节 `position_rad`，rad，Panda joint1…joint7 与绑定限位；Cartesian/IK 不包括 | `ArmPositionTargetV1` 固定 profile/action schema/writer、七个有序 Joint 与 Actuator、binding/source/Scene hash、typed boundary/clock；`LeafApplicationAckV1` 引用精确 Target 和应用 boundary，不代表到位 | `LeafRequiredStateV1` 复用 `StateRequirements`，含 Arm Entity 每关节 q/qvel 和 Entity-qualified TCP parent Frame pose；额外锁定 reset/episode/boundary/clock/source identities；不借用另一 Entity Hand frame |
+| Hand-only Position | `HandPositionActionV1` 单一 aggregate `opening_m`，m，[0,0.08]；旧 signed scalar 只能经显式 `opening_m=0.04*(u+1)` adapter 转换 | `HandPositionTargetV1` 固定两个有序 finger Joint、单一 `actuator8`、writer/identity/boundary/clock；candidate mapping `ctrl=3187.5*opening_m`，source ctrlrange `[0,255]`、gainprm `(0.01568627451,0,0)`、biasprm `(0,-100,-10)` | q1/q2、qvel、opening=`q1+q2`、Hand TCP parent Frame 和 typed clock；finger range 各 `[0,0.04] m`；`hand.xml/tendon/split` 系数 0.5/0.5 + `hand.xml/equality/finger_joint1=finger_joint2`；不要求 measured force |
+| Hand-only Force-aware | `hand-force-aware-action-v1` 仅作独立 profile/action identity；R02a 不提供可执行 Action/Target/Ack | `HandForceAwareDependencyV1` 固定依赖/拒绝描述且 `NOT_ADMITTED`；不能借用 Position identity | 独立 Force-aware Required State；要求 raw signed N 与 canonical closing N 分开、source/transmission、单位/符号、validity、phase/native index、sequence、state/config revisions、episode/reset/boundary、Provider/build/backend/cadence。符号与phase映射标为未审计 |
 
 每一 leaf 的 Action/Target/Ack/Required State 都以独立版本 discriminator/identity 绑定 ordered canonical refs、算法/配置、TCP、source closure、Provider/build/backend 和 cadence。只对实际测试的模式开放；现有 ActionModeSpec、CanonicalControlTarget 与 AppliedCanonicalControl 能复用的字段复用，若 frozen payload 不足则另版 extension，不改旧 bytes。首个 R03 required 路线只要求两种 Position leaf；Force-aware 新 leaf 仅定义依赖和拒绝边界，未纳入装配必需出口，不因此扩大 R1 支持。
+
+当前实现 owner 是 `task_env/controllers/canonical/leaf_profiles.py`，仅将高级值 re-export 于同目录 `canonical` 包，未扩充 `task_env` root facade。`LeafProfileBindingV1` 区分 `declared` 与 `synthetic_fixture`，锁定 Scene identity、Assembly ID/revision/content hash、leaf path/member selector、Entity/Asset、source closure、profile/action schema、algorithm/config、Provider/build/backend/timebase、ordered resources、ControlGroup、TCP parent Frame、`T_parent_from_tcp` transform direction 与 Required State。Arm 还逐项配对 joint1…joint7→actuator1…actuator7；Hand 只由固定 tendon 与单 actuator 表示，不给两个 finger 各自分配 writer。静态 validator 对 Scene v3 的 Joint kind/unit/axis、Actuator group 和 TCP Frame 做核验；有 `ResolvedLogicalAssemblyV1` 时核对确切 selector。Whole-Panda 的 arm/hand group 是 reference-only selector，不能据此创建 owner/writer；独立 Entity fixture 使用已有 Entity owners。
+
+Position Target/Ack 的静态交叉检查需要调用者另给 source/application boundary 和 clock context；Ack 的 source 与 application boundary 限定为同一 evaluation control step。Ack 只证明合同字段自洽，不记录真实 apply。Position state 不包含 actuator force。Force-aware 目录为有限只读值，所有三项都标为 `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`；它没有注册、Provider manifest 或执行能力。严格 decoder 拒绝未知字段/版本和跨 kind payload。旧 `RequestedAction`、`CanonicalControlTarget`、`AppliedCanonicalControl`、TaskArtifact/Scene/Reset/H5 identities 均未改。
+
+R02a provider-free S1 仅验证合同与静态selector，不算 Core admission、native S2/S3 或 Qualification。R02b 仍负责 plan/override 和执行 adapter，R02c 负责真实 leaf writer/既有 H5，R01c source projection 仍独立；本文不更改它们的 DAG 边。
 
 ## Preset 编译与执行所有权
 

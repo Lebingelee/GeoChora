@@ -127,6 +127,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `LogicalAssemblyV1`, `LogicalAssemblyScenePinV1`, `LogicalAssemblyEntityMemberV1`, `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, `LogicalAssemblyControlGroupReferenceV1`, `decode_logical_assembly` | `task_env.artifacts` | R01a provider-neutral `logical-assembly-v1` 静态值；Scene identity pin、typed Entity/reference/nested member 与非自指 content hash。strict codec 不解析、不 lowering、不代表 Attachment admission 或 physical support |
 | `resolve_logical_assembly`, `ResolvedLogicalAssemblyV1`, `ResolvedLogicalAssemblyLeafV1` | `task_env.artifacts` | R01b bounded provider-free static resolver：对一个精确 Scene 和显式 child catalog 校验可达 closure，返回不可变 typed leaves/path/provenance；最大32层/1024 leaves。不投影 source、不创建 native mapping/Entity/writer或 Runtime |
+| `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts only. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; no leaf Controller, plan compiler, apply adapter, Runtime admission, or Qualification is added |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
@@ -212,6 +213,47 @@ their source Assembly and local path as well as the canonical expanded path; ret
 are immutable. The limits are fixed at 32 Assembly levels (root depth 1) and 1024 expanded leaves. Resolution is
 stateless and provider-free: it does not request runtime Frame poses, project a Task Source, assign native indices,
 construct a RuntimeSession, or prove physical attachment. Source projection and execution remain later gates.
+
+### Position leaf contract values (R02a)
+
+R02a adds versioned, provider-free values in the existing advanced canonical Controller owner. `ArmPositionActionV1`
+is exactly seven ordered Panda Joint positions in radians, with the declared Panda joint limits held by its
+`LeafProfileBindingV1`. `HandPositionActionV1` is one aggregate `opening_m` in `[0, 0.08]`; its explicit legacy
+adapter uses `opening_m = 0.04 * (u + 1)` for `u ∈ [-1, 1]`. The Hand binding keeps the two finger Joints in
+canonical order, their `[0, 0.04] m` limits, `opening_m = finger_joint1_q_m + finger_joint2_q_m`, the fixed
+0.5/0.5 tendon, the finger equality, and one `actuator8` resource with the declared `ctrl = 3187.5 * opening_m`
+mapping and `[0, 255]` native ctrlrange. These values describe the candidate source contract; they do not add a
+runtime adapter or prove that a Core Provider consumed the mapping.
+
+Both Position targets bind exact ordered resources, profile/action schema, writer, binding/source/Scene hashes,
+typed source boundary and evaluation clock. `LeafApplicationAckV1` cross-checks the exact Target hash, source
+identity, resources and explicit application boundary/clock. It is a receipt-shaped static value, not evidence
+that native control was applied or that the state reached its target. Required State uses existing typed
+`StateRequirements` for each Joint position/velocity and an Entity-qualified TCP parent Frame; Position leaves do
+not require or synthesize force. `HandForceAwareDependencyV1` has its own action/profile identity and force-state
+requirements, but remains `NOT_ADMITTED`; source/transmission sign and phase are explicitly unaudited. Its absence
+does not block either Position contract.
+
+The strict decoders reject unknown fields/versions and cross-kind payloads. `validate_leaf_binding()` checks a
+Scene-v3 static binding and, when given a `ResolvedLogicalAssemblyV1`, verifies the exact member selector. A whole
+Panda may use two reference-only ControlGroup selectors; those views do not own Entities or create writers. A
+two-Entity static fixture uses the existing Entity owners. These checks do not project Task Source, assign native
+indices, build a plan, call `make_env()`, or admit an executable capability. The R02a catalog is deliberately
+`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; R02b/c and R01c remain separate gates.
+
+```python
+from task_env.controllers.canonical import (
+    HAND_POSITION_ACTION_SCHEMA,
+    HandPositionActionV1,
+    leaf_profile_catalog_v1,
+)
+
+action = HandPositionActionV1(HAND_POSITION_ACTION_SCHEMA, opening_m=0.038)
+assert action.opening_m == 0.038
+assert all(entry.admission_status == "NOT_ADMITTED" for entry in leaf_profile_catalog_v1())
+```
+
+This example constructs static contract values only; it does not instantiate a leaf Controller or execute a Provider.
 
 ## C02b Position Profile candidate status (2026-10-22)
 

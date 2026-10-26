@@ -34,6 +34,37 @@ example in [Public API](../../../docs/module/task_env/public-api.md#bounded-logi
 This static contract does not change selected runtime routes or their supported
 capability envelope.
 
+## Static Position leaf contracts (R02a)
+
+`task_env.controllers.canonical` exports advanced provider-free values:
+`LeafProfileBindingV1`, `ArmPositionActionV1`/`ArmPositionTargetV1`,
+`HandPositionActionV1`/`HandPositionTargetV1`, `LeafApplicationAckV1`,
+`LeafRequiredStateV1`, and `HandForceAwareDependencyV1`. Use the exact strict
+decoders and `validate_leaf_binding(s)` for typed Scene-v3 and optional resolved
+Assembly selector checks. A binding pins Scene/Assembly/member/Entity/Asset,
+source closure, profile/action schema, algorithm/config, Provider/build/backend,
+timebase, ordered resources, ControlGroup, TCP and Required State; synthetic
+fixtures must keep `provenance_kind="synthetic_fixture"`.
+
+Arm Position is seven ordered Panda joint positions in radians. Hand Position
+is one aggregate `opening_m` in `[0, 0.08]`; finger positions are measured as
+`q1+q2`, with two `[0, 0.04] m` fingers, one fixed 0.5/0.5 tendon, finger
+equality, and a single `actuator8`. The legacy normalized adapter is explicit:
+`opening_m=0.04*(u+1)` for `u∈[-1,1]`. Its bound candidate mapping is
+`ctrl=3187.5*opening_m`, with `[0,255]` ctrlrange; this is static source
+metadata, not an executed Core mapping. Position Required State does not ask
+for force. Force-aware dependencies remain `NOT_ADMITTED`; raw signed force,
+canonical closing force, transmission/sign/phase, validity, sequence/revisions,
+freshness and Provider/build/backend/cadence are separate required provenance.
+
+Targets and Acks are static contracts. Validate them against the exact binding
+and caller-supplied source/application boundary and clock; an Ack is not proof
+of native apply, target attainment, or task success. The finite catalog is
+`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`. These values do not compile a leaf
+plan, create a writer, import a Provider, call `make_env()`, project Task Source,
+or change existing full-Panda Position admission. See the executable value
+example in [Public API](../../../docs/module/task_env/public-api.md#position-leaf-contract-values-r02a).
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",

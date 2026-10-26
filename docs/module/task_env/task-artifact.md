@@ -65,6 +65,29 @@ Phase II-01 R01a 在同一 `task_env.artifacts` owner 增加独立 `logical-asse
 
 R01b 在同一 artifacts owner 增加 advanced `resolve_logical_assembly(root, scene, child_assemblies)` 静态入口。它只读取一个严格复制的 Scene v1/v2/v3 值和显式 `(assembly_id, revision)` child catalog，先对可达 containment key 图做环/深度核验，再校验所有可达 Scene pin、child content hash、Entity/Asset 与 Entity-qualified typed references。结果 `ResolvedLogicalAssemblyV1` 由 immutable leaf tuple 组成；每个 leaf 保留 member 类型、完整路径、源 Assembly 身份/hash 与 local path。跨层重复 Entity owning、重复 typed target、路径碰撞、悬空/错版本 child 与越界闭包会拒绝；reference-only view 不分配第二个 Entity owner 或 writer。上界固定为32层与1024个展开 leaf；局部 memo 只复用同一调用内的静态展开结果，错误不污染输入或后续调用。此解析不求 runtime Frame pose、不产生 source/native mapping、Provider/Runtime资源或 Attachment admission；R01c仍负责静态source投影，后续物理/执行能力须由各自Gate另行验证。
 
+Phase II-01 R02a 在既有 `task_env.controllers.canonical` owner 增加 advanced、provider-free 的 Arm-only 与
+Hand-only Position leaf 值合同，以及独立的 Hand Force-aware 依赖/拒绝描述。`LeafProfileBindingV1` 固定 Scene、
+Assembly revision/content hash、canonical member path/selector、Entity/Asset、source closure、profile/action schema、
+algorithm/config、Provider/build/backend、100 Hz cadence、ordered Joint/Actuator、ControlGroup、Entity-qualified TCP
+parent Frame、`T_parent_from_tcp` transform direction 和 Required State identity。Whole-Panda 的两个 Existing-Entity Subcomponent Reference 可分别选两个 ControlGroup；它们仍是只读引用，不
+创建 Entity owner 或 Controller writer。两个独立 Entity 的静态 fixture 则仍由现有 Scene Entity owner 表示。
+Arm binding 显式保存 ordered `joint1→actuator1` 至 `joint7→actuator7` 配对；TCP pose 按 `T_parent_from_tcp` 解释，值采用 m 与 wxyz。
+
+Arm Action 是严格有序的七关节 rad 位置向量并按绑定限位核验。Hand Action 是总开度 `opening_m ∈ [0, 0.08]`；
+指关节各为 `[0, 0.04] m`，测量开度定义为 `q1+q2`，两个手指通过 0.5/0.5 fixed tendon 和 joint equality 耦合，
+只引用一个 `actuator8`。显式的旧 normalized adapter 为 `opening_m=0.04*(u+1)`；native mapping 声明
+`ctrl=3187.5*opening_m`、`ctrlrange=[0,255]`、`gainprm=(0.01568627451,0,0)` 和 `biasprm=(0,-100,-10)`。
+这只是候选合同中的来源映射，不表示已有 Core consumer 实际读取它。
+Target/Ack 分别绑定 ordered resources、writer、source/binding/Scene、typed boundary 和 clock；Ack 是静态施用收据
+形状，不证明 native apply、到位或任务成功。Position Required State 不需要 force；Force-aware 使用独立 identity、
+显式 raw signed N / canonical closing N 分离及 phase/sequence/revision/freshness 等依赖字段，目前保持
+`NOT_ADMITTED`，sign/transmission/phase 尚未审计。Force-aware 拒绝不应使 Position 需要力反馈。
+
+R02a strict codecs 和 Scene/Assembly selector 检查只建立静态合同边界，不修改 TaskArtifact v0/v1 identity、旧
+`RequestedAction`/`CanonicalControlTarget`/Ack 或 Runtime/Provider manifests，也不创建计划、执行 adapter 或 H5
+格式。其 provider-free S1 不等于 Scene source projection、Runtime admission、native S2/S3 或 Qualification；
+R02b 负责 plan/adapter，R02c 负责真实 leaf 执行与既有 Recorder，R01c 仍独立负责静态 source 投影。
+
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
 explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，
