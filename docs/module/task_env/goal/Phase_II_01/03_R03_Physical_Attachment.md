@@ -1,6 +1,6 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内完成独立 MuJoCo source/dynamics probe 并通过该 case 的冻结门，Sol 复核待办。R03b/c 仍 PLANNED / NOT_STARTED。两次结果均不构成 Core Attachment admission、Core S2/S3 或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内完成独立 MuJoCo source/dynamics probe 并通过该 case 的冻结门，Sol 已接收该有界工程出口。R03b/c 仍 PLANNED / NOT_STARTED。两次结果均不构成 Core Attachment admission、Core S2/S3 或 Qualification。
 
 ## 已知事实与精确 Provider 路线
 
@@ -56,13 +56,15 @@ Sol复核接收attempt001的EXECUTED_FAIL：15行实际step trace及hash匹配�
 
 Trial 2同一pre-load state上的1 N world +X Hand-root-COM外载平衡oracle通过：hinge residual最大`5.56e-17 N*m`、slide residual最大`2.23e-18 N`、Arm投影`0.25465 N*m`；wrench清除后state与clock不变。两trial合计调用`mj_step=1920`、`mj_forward=389`，一组`mj_fullM`/`mj_jacBodyCom`；wall约`46.01 s`，峰值RSS约`257 MB`，证据目录约`5.81 MB`，均在预算内。该probe未产生接触，`ncon=0`；这不是contact response测试。负载轨迹差只记录为观测值，没有最小位移门。
 
-报告与raw evidence保存在本机ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/`，由manifest引用，等待Sol复核。结果不证明 Core public Env/H5、Core S2/S3、固定Attachment admission、0/255端点或全行程支持；不授予Provider owner合同、Human Judge、R03b/c或Qualification。R03b/c仍未启动且保留现有DAG依赖。
+报告与raw evidence保存在本机ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/`，由manifest引用；Sol已复核实际六文件diff、1,920行step trace与386个样本，接收该case为`ACCEPTED_BOUNDED`。结果不证明 Core public Env/H5、Core S2/S3、固定Attachment admission、0/255端点或全行程支持；不授予Provider owner合同、Human Judge、R03b/c或Qualification。R03b/c仍未启动且保留现有DAG依赖。
+
+Sol复核收据位于同一ignored交接根目录的`sol_review_r03a_002/`。复核未重跑native；原报告中“identity hand-root pose”的措辞应为保留源wxyz `(0,0,0,1)`（绕Z的π旋转），raw的RUNNING/PENDING_COMMIT残留标签不覆盖实际completed结果及提交。下一项按07进入R01a，不追加未批准的contact/端点/全行程验收。
 
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
-| R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，待Sol复核。不是Core S2/S3或Attachment admission；不证明端点/全行程；R03b/c仍未启动 |
+| R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；R03b/c仍未启动 |
 | R03b | R01c,R03a | 既有 assembly/source/materialization owners 中固定树 lowering、root/collision/逆映射与新准入 | S1 错 mount/环/重复 child/root/source/顺序拒绝；S2 reset/运动 mount invariant；禁止降低旧 admission 保护 |
 | R03c | R03b,R02c | 独立 Arm+Hand 真实 Position 施控，现有 public Env→Recorder→reader | S2/S3：同一个公开实例 reset/连续 step/observation/H5 T/T+1/request/Target/Ack/state/identity/close；无真实 hand actuation 或 native coupling 即失败 |
 

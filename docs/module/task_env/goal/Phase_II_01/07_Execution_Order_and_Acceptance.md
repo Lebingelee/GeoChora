@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。P00核查已完成；维护者已单独授权R03a attempt001及有界的attempt002 INTERIOR_HAND_COMMANDS native case，attempt002结果已记录并待Sol复核。其他实施slice仍按表中状态执行；DAG与Required Envelope未获最终批准。
+状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。P00核查已完成；维护者已单独授权R03a attempt001及有界的attempt002 INTERIOR_HAND_COMMANDS native case，attempt002经Sol复核接收为`ACCEPTED_BOUNDED`；下一实施包为R01a。其他实施slice仍按表中状态执行；DAG与Required Envelope未获最终批准。
 
 ## 基线、P00 与证据记账
 
@@ -44,7 +44,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 
 | 序号 | Slice | 直接依赖 | 主交付 | 最低 Evidence | Stop Condition | 当前状态 |
 | ---: | --- | --- | --- | --- | --- | --- |
-| 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | attempt001 ENDPOINT_HAND_COMMANDS FAIL保留；attempt002 INTERIOR_HAND_COMMANDS的S1及独立native source/dynamics冻结oracle通过，详见ignored R03a attempt002报告；不构成Core S2/S3 | 仅当前内缩操作case通过，不证明0/255端点或全行程；Sol复核前不扩展结论；R03b/c仍须满足原DAG依赖 | EXECUTED / BOUNDED CASE PASS; SOL REVIEW PENDING |
+| 01 | R03a | P00 | MuJoCo独立资产可行性；GeoPhys拒绝 | attempt001 ENDPOINT_HAND_COMMANDS FAIL保留；attempt002 INTERIOR_HAND_COMMANDS的S1及独立native source/dynamics冻结oracle通过，详见ignored R03a attempt002报告；不构成Core S2/S3 | 仅当前内缩操作case通过，不证明0/255端点或全行程；Sol已接收该有界工程出口；R03b/c仍须满足原DAG依赖 | ACCEPTED_BOUNDED / R03a EXIT MET FOR CASE |
 | 02 | R01a | P00 | 两类成员与非自指身份/codec | S1 | 旧identity变动或引用契约不明→停止 | PLANNED / NOT_STARTED |
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | PLANNED / NOT_STARTED |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | PLANNED / NOT_STARTED |
@@ -75,7 +75,7 @@ P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contrac
 | --- | --- | --- |
 | R01 logical composition | 两类typed member、稳定路径、无环/唯一owning、source/hash、旧Scene/Artifact不变 | 全部 PLANNED；不构成动力学 |
 | R02 leaf control | Arm-only + Hand-only Position，preset/override→唯一资源writer；真实分开/同时施控、target/ack/state/H5 | 双完整 Panda 历史证据仅作对照；force-aware新leaf不在装配required范围 |
-| R03 first Provider | **MuJoCo 3.8.1 CPU**、Menagerie独立Arm+Hand、新固定连接source；reset/连续运动/开合/接触或负载/constraint误差与资源关闭 | 仅先前compile成功；Native S2/S3 NOT_RUN，未获Assembly Qualification |
+| R03 first Provider | **MuJoCo 3.8.1 CPU**、Menagerie独立Arm+Hand、新固定连接source；reset/连续运动/开合/接触或负载/constraint误差与资源关闭 | 独立MuJoCo 3.8.1 CPU的INTERIOR_HAND_COMMANDS source/dynamics probe经Sol接收：重复reset、连续Arm/Hand motion、1 N外载与mount/限位门通过；端点FAIL保留，Core public Env/H5及后继lowering未实现，未获Assembly Qualification |
 | R03 public S3 | 同一公开candidate make_env（或另经明确批准的公共入口）→reset→真实steps→observation→既有Recorder→同文件T/T+1读回→close | 扩展现有factory/RuntimeSession/Recorder；不导入test helpers、不拼接diagnostics |
 | R03 second Provider disposition | GeoPhys a53同导出source拒绝、原因/策略/owner与未测项清楚列出；新S1 negative admission保护 | **NOT_ADMITTED/BLOCKED**，无新装配S2/S3/Qualification；第二Provider执行不为首版required，不自动DEFERRED |
 | R04 Camera | GeoPhys a53 CPU × MuJoCo3.8.1 Native OpenGL/EGL、原单Panda source，双fixed/mounted RGB/Depth/Entity mask→同Env→同H5 semantic reader | 旧直接capture不代消费连通；需实际context/device、identity/calibration/label-map、T/T+1/故障/close |
@@ -96,7 +96,7 @@ R03 第二Provider若加入required，也须上述scope变更；若GeoPhys修复
 
 只有受影响明确问题才拓宽实验，不重跑完整 A–D/NutAssembly矩阵/485 interval R1 作为日常文档校验。禁止更换Provider求绿、提升阈值、删断言/全局skip、隐式fallback、私有状态穿透、重复Runtime、ghost transition、假物理回滚。
 
-后续维护者明确授权P00核查/准入准备先行；最终Goal/DAG及相关合同未批准前，不进入R01–R07实施。此表仍是候选执行合同；原 [规划校验](validation_receipt.json)不是新P00实验或阶段验收报告，新审计状态由manifest的P00条目引用。
+后续维护者已按具体slice明确授权P00与R03a。总体Goal/DAG未最终批准不覆盖已有具体授权，也不替代后继slice的范围指令；可按本表逐包批准并实施已明确owner/合同/验收的有界slice，不把单包授权扩大为R01–R07整体授权。此表仍是候选执行合同；原 [规划校验](validation_receipt.json)不是新P00实验或阶段验收报告，新审计状态由manifest的P00条目引用。
 
 ## R07条件前置与测量范围
 
