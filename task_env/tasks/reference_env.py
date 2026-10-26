@@ -5,6 +5,7 @@ success predicate. Expert execution and external-action execution cannot be
 mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 """
 from dataclasses import dataclass
+from collections import OrderedDict
 from pathlib import Path
 import hashlib
 import json
@@ -110,6 +111,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     @classmethod
     def from_position_candidate(
         cls, binding: ReferenceTaskBinding, *, provider='geophys', backend='cpu', horizon=6000,
+        camera_observation_config=None,
     ):
         """Explicitly construct a bounded Position profile through the selected binding."""
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
@@ -124,7 +126,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'PositionCandidateSelectedReferenceEnv', (cls,),
                 {'uid': 'c02b-position-servo-candidate-v1'},
             )
-        env = candidate_type(provider=provider, backend=backend, horizon=horizon, _binding=binding)
+        env = candidate_type(
+            provider=provider, backend=backend, horizon=horizon, _binding=binding,
+            camera_observation_config=camera_observation_config,
+        )
         profiles = env.position_profiles
         if (not profiles or len(profiles) > 2
                 or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)
@@ -132,6 +137,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 or len({profile.entity_id for profile in profiles}) != len(profiles)):
             env.close()
             raise TypeError('candidate binding did not construct one or two Entity-bound PositionServoV1 profiles')
+        if camera_observation_config is not None and len(profiles) != 1:
+            env.close()
+            raise ValueError('R04a camera observation is bounded to the existing single Panda Position source')
         return env
 
     def _bind_selected_controller(self, value):
@@ -158,9 +166,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.controller = raw
 
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
-                 _binding=None, _diagnostic_gripper_control_hz=None):
+                 _binding=None, _diagnostic_gripper_control_hz=None,
+                 camera_observation_config=None):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
+        if camera_observation_config is not None:
+            from ..observations.canonical_camera.consumer import CameraObservationConfigV1
+
+            if not isinstance(camera_observation_config, CameraObservationConfigV1):
+                raise TypeError('camera observation opt-in requires CameraObservationConfigV1')
+            camera_observation_config.validate_production_envelope()
+            camera_observation_config.capacity(horizon)
         if _binding is not None:
             if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
                 raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
@@ -201,6 +217,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.solution = self.value['solution']
         self._bind_selected_controller(self.value)
         self.dual_entity_position = len(self.position_profiles) == 2
+        if camera_observation_config is not None and not self.position_profile:
+            raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
+        self.camera_observation_config = camera_observation_config
+        self._camera_consumer = None
+        self._camera_session_factory = None
         self.metadata = {**METADATA, 'action_schema': dict(METADATA['action_schema']), 'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
@@ -222,8 +243,71 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     })
                     for profile in self.position_profiles
                 })
-        self.observation_space = Dict({'state': Dict(state_spaces),
-            'privileged_state': Dict({k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32) for k in keys})})
+        observation_spaces = OrderedDict((
+            ('state', Dict(state_spaces)),
+            ('privileged_state', Dict({
+                k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)
+                for k in keys
+            })),
+        ))
+        if camera_observation_config is not None:
+            from ..observations.state import camera_observation_field_specs
+            from ..environment.types import ObservationFieldSpec, ObservationSchema
+
+            camera_groups = OrderedDict((name, OrderedDict()) for name in ('rgb', 'depth', 'entity_mask'))
+            for field in camera_observation_field_specs(camera_observation_config):
+                group, camera_id = field.name.split('.', 1)
+                if group == 'rgb':
+                    camera_groups[group][camera_id] = Box(0.0, 1.0, field.shape, dtype=np.float32)
+                elif group == 'depth':
+                    camera_groups[group][camera_id] = Box(0.0, np.inf, field.shape, dtype=np.float32)
+                else:
+                    camera_groups[group][camera_id] = Box(
+                        0, np.iinfo(np.uint32).max, field.shape, dtype=np.uint32,
+                    )
+            observation_spaces.update((name, Dict(values)) for name, values in camera_groups.items())
+            schema_fields = [
+                ObservationFieldSpec('state.ee_pose', (7,), 'float32', 'hand-origin TCP pose',
+                                     'm + unit quaternion', 'world'),
+                ObservationFieldSpec('state.joint_position', (9,), 'float32',
+                                     'required Panda joint positions', 'rad + m', 'canonical joint coordinates'),
+                ObservationFieldSpec('state.hand_pose', (7,), 'float32',
+                                     'provider-measured Panda hand pose', 'm + unit quaternion', 'world'),
+                ObservationFieldSpec('state.boundary_identity_sha256', (32,), 'uint8',
+                                     'state boundary identity digest', 'uint8[0,255]', 'identity'),
+            ]
+            schema_fields.extend(
+                ObservationFieldSpec(
+                    f'privileged_state.{key}_body_pose', (1, 7), 'float32',
+                    f'{key} measured world pose', 'm + unit quaternion', 'world',
+                ) for _, key in self.binding.object_poses
+            )
+            schema_fields.extend(camera_observation_field_specs(camera_observation_config))
+            self.camera_observation_schema = ObservationSchema(
+                'position-camera-observation-v1', tuple(schema_fields),
+                groups=('state', 'privileged_state', 'rgb', 'depth', 'entity_mask'),
+            )
+            self.metadata['observation_schema'] = {
+                'schema_version': 'position-camera-observation-v1',
+                'leaf_specs': tuple({
+                    'path': field.name,
+                    'shape': field.shape,
+                    'dtype': field.dtype,
+                    'semantic': field.semantic,
+                    'unit': field.unit,
+                    'frame': field.frame,
+                    'time_reference': field.time_reference,
+                } for field in self.camera_observation_schema.fields),
+            }
+            self.metadata['camera_observation_schema'] = 'camera-observation-boundary-v1'
+            self.metadata['info_schema'] = {
+                'camera_observation_v1': {
+                    'schema_version': 'camera-observation-boundary-v1',
+                    'required': True,
+                    'same_boundary_as_observation': True,
+                },
+            }
+        self.observation_space = Dict(observation_spaces)
         self.session = None
         self._external_solution_owner = None
         self._active_native_interval_receipt = None
@@ -359,9 +443,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_evaluation = None
         self._stopped = True
         previous_session, self.session = self.session, None
-        phase = 'reset_close'
+        previous_session_close_attempted = False
+        phase = 'camera_reset_close'
         try:
+            self._close_camera_consumer()
+            phase = 'reset_close'
             if previous_session is not None:
+                previous_session_close_attempted = True
                 previous_session.close()
             phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
@@ -506,6 +594,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             return self.obs, self.info
         except BaseException as error:
             self._external_solution_owner = None
+            try:
+                self._close_camera_consumer()
+            except BaseException as cleanup_error:
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'selected reset camera cleanup also failed: {cleanup_error!r}')
             failed_session, self.session = self.session, None
             if failed_session is not None:
                 try:
@@ -514,6 +608,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
                         add_note(f'selected reset cleanup also failed: {cleanup_error!r}')
+            if previous_session is not None and not previous_session_close_attempted:
+                previous_session_close_attempted = True
+                try:
+                    previous_session.close()
+                except BaseException as cleanup_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'selected prior-session reset cleanup also failed: {cleanup_error!r}')
             self._latch_fault(phase, error)
             raise
 
@@ -701,7 +803,27 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             info['state_boundary_identity'] = boundary.to_mapping()
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
+            if self.camera_observation_config is not None:
+                from ..observations.capture import DynamicCameraObservationConsumerV1
+
+                if self._camera_consumer is None:
+                    self._camera_consumer = DynamicCameraObservationConsumerV1(
+                        config=self.camera_observation_config,
+                        task_artifact_hash=self.artifact.identity_hash,
+                        runtime_source=self.value['source'],
+                        horizon=self.horizon,
+                        session_factory=self._camera_session_factory,
+                    )
+                leaves, capture_boundary = self._camera_consumer.capture(self.typed_state.view)
+                obs.update(leaves)
+                info['camera_observation_v1'] = capture_boundary.to_mapping()
+                self.camera_observation_schema.validate(obs)
         return obs, info, evaluation
+
+    def _close_camera_consumer(self):
+        consumer, self._camera_consumer = self._camera_consumer, None
+        if consumer is not None:
+            consumer.close()
 
     def step(self, action):
         if getattr(self, '_closed', False):
@@ -1054,6 +1176,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         except BaseException as error:
             after_state = None
             readback_error = None
+            try:
+                self._close_camera_consumer()
+            except BaseException as cleanup_error:
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'camera consumer cleanup after Position fault also failed: {cleanup_error!r}')
             if interval_attempted:
                 try:
                     after_state = self.session.snapshot()
@@ -1390,6 +1518,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             except BaseException as error:
                 first_error = error
         try:
+            self._close_camera_consumer()
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+        try:
             if self.session is not None:
                 self.session.close()
                 self.session = None
@@ -1555,6 +1688,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise FileExistsError(path)
             recorder = TransitionRecorder(RecorderConfig(
                 schema_version='v3', max_transitions=max(self.horizon, 1),
+                max_buffer_bytes=(
+                    self.camera_observation_config.max_recording_buffer_bytes
+                    if self.camera_observation_config is not None
+                    else RecorderConfig().max_buffer_bytes
+                ),
             ))
             recorder.begin_episode(
                 self.obs, dict(self._position_reset_info), self._position_record_metadata(),
@@ -1692,10 +1830,19 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     or loaded['observation_count'] != len(trajectory.observations)
                     or loaded['outcome'] != outcome):
                 raise ValueError('PositionServoV1 Generic H5 v3 readback mismatch')
+            camera_result = None
+            if self.camera_observation_config is not None:
+                from ..recorders import load_camera_observations_h5
+
+                camera_result = load_camera_observations_h5(output)
+                if camera_result['observation_count'] != len(trajectory.observations):
+                    raise ValueError('Position camera metadata reader T/T+1 count mismatch')
             return {
                 'schema_id': 'task-env-h5', 'schema_version': 'v3',
                 'transition_count': loaded['transition_count'],
                 'observation_count': loaded['observation_count'],
+                **({'camera_observation_schema': camera_result['schema_version']}
+                   if camera_result is not None else {}),
                 'outcome': outcome.to_mapping(), 'path': str(output),
             }
         from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
@@ -1731,6 +1878,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'state_boundary_id': boundary.boundary_id,
             'state_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
             'source_closure_digest': self.value['source'].source_closure_digest,
+            **({
+                'camera_observation_v1': self.info['camera_observation_v1'],
+            } if self.camera_observation_config is not None else {}),
         }
 
     def _position_record_metadata(self):
@@ -1769,6 +1919,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             {'path': f'privileged_state.{key}_body_pose', 'semantic': 'scene_body_pose'}
             for _, key in self.binding.object_poses
         )
+        if self.camera_observation_config is not None:
+            from ..observations.state import camera_observation_field_specs
+
+            observation_leaf_specs.extend({
+                'path': field.name,
+                'shape': field.shape,
+                'dtype': field.dtype,
+                'semantic': field.semantic,
+                'unit': field.unit,
+                'frame': field.frame,
+                'time_reference': field.time_reference,
+            } for field in camera_observation_field_specs(self.camera_observation_config))
         env_metadata = {
             'env_name': 'SelectedReferenceEnv.PositionServoV1',
             'task_name': self.artifact.task_id,
@@ -1808,12 +1970,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'resolved_config': {
                 'provider': self.provider, 'backend': 'cpu', 'horizon': self.horizon,
                 'controller_profile': profile.profile_id,
+                **({'camera_observation': self.camera_observation_config.to_mapping()}
+                   if self.camera_observation_config is not None else {}),
             },
             'candidate_identity': {
                 'task_artifact_identity_hash': self.artifact.identity_hash,
                 'source_closure_digest': self.value['source'].source_closure_digest,
                 'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
             },
+            **({
+                'camera_observation_contract_v1': self.camera_observation_config.to_mapping(),
+            } if self.camera_observation_config is not None else {}),
         }
         if self.dual_entity_position:
             env_metadata['candidate_identity']['scene_identity_hash'] = self.position_scene.identity_hash

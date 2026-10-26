@@ -17,9 +17,9 @@ class PositionCandidateEnv(SelectedReferenceEnv):
     def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
         values = {} if config is None else dict(config)
         if kwargs or render_mode is not None:
-            raise ValueError('Position candidate admits state-only execution without extra kwargs')
-        if set(values) - {'provider', 'backend', 'horizon', 'source_workspace'}:
-            raise ValueError('Position candidate config admits provider/backend/horizon/source_workspace only')
+            raise ValueError('Position candidate rejects render_mode and extra keyword arguments')
+        if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation'}:
+            raise ValueError('Position candidate config admits provider/backend/horizon/source_workspace and opt-in camera_observation only')
         provider = values.get('provider', 'geophys')
         backend = values.get('backend', 'cpu')
         horizon = values.get('horizon', 6000)
@@ -27,6 +27,16 @@ class PositionCandidateEnv(SelectedReferenceEnv):
             raise ValueError('public Position candidate admits GeoPhys scalar CPU only')
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('Position candidate horizon must be an integer in [1, 6000]')
+        camera_config = values.get('camera_observation')
+        if camera_config is not None:
+            from ...observations.canonical_camera.consumer import CameraObservationConfigV1
+
+            if isinstance(camera_config, dict):
+                camera_config = CameraObservationConfigV1.from_mapping(camera_config)
+            if not isinstance(camera_config, CameraObservationConfigV1):
+                raise TypeError('camera_observation must use camera-observation-consumer-v1')
+            camera_config.validate_production_envelope()
+            camera_config.capacity(horizon)
         workspace = values.get('source_workspace')
         if workspace is None:
             root = Path('workspace/tasks/phase-ii-c02b-position-servo/candidate-sources')
@@ -40,6 +50,7 @@ class PositionCandidateEnv(SelectedReferenceEnv):
 
         return build_position_candidate(
             workspace, provider=provider, horizon=horizon, environment_type=cls,
+            camera_observation_config=camera_config,
         ).env
 
 

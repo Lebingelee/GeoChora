@@ -14,9 +14,9 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
 | PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
 | NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution and GeoPhys `a53a8cf` CPU/CUDA cadence S2/S3 are bounded diagnostic results; the GeoPhys matrix deliberately uses host snapshot at every native step and does not expand generic support |
-| Explicit Position candidate | `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys", "backend":"cpu", "horizon":64})` | single Panda Scene-v3, fixed seed 31, 100 Hz / five 2 ms steps, state-only; candidate without freeze/Judge/Qualification; Generic H5 v3 recording and same-file readback bounded passed |
+| Explicit Position candidate | `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys", "backend":"cpu", "horizon":64})` | single Panda Scene-v3, fixed seed 31, 100 Hz / five 2 ms steps; state-only by default; opt-in R04a camera consumer has provider-free S1 only, real renderer/Env/H5 S2/S3 not run; candidate without freeze/Judge/Qualification |
 
-两条 selected route 只接受 `provider`、`backend`、`horizon`：provider 仅
+PickCube/NutAssembly 两条 selected reference 只接受 `provider`、`backend`、`horizon`：provider 仅
 `geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
 legacy overlays 会失败。不要把通用 `runtime` section 传入 selected reference。
 每个 selected task 由 task-owned `task.py`、`solution.py`、`config.yaml` 与 `__init__.py` 所有。
@@ -229,6 +229,27 @@ returned from `reset()`/`step()` with boundary/time info. `start_recording(path)
 Always close in `finally`. No Expert/task-success or freeze approval is implied. See
 [P99 readiness](goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#p99) and the
 [implementation/run receipt](goal/Phase_II/C_Development_Record.md#public-candidate).
+
+### R04a opt-in camera observation on the Position candidate (2026-10-26)
+
+The same UID now accepts an optional `camera_observation` mapping decoded as
+`CameraObservationConfigV1`. It is limited to the single Panda Position candidate, GeoPhys CPU physics,
+the existing D04 profile and two explicitly authored mounts in canonical fixed-then-hand order. Each
+mount requires its parent Frame and `T_parent_from_mount`; the public config does not guess or replace
+asset mount transforms, and the camera opt-in requires horizon at most 16. Production geometry is 321×241 with RGB HWC float32 `[0,1]`, optical-Z depth
+H×W float32 in metres (`0` invalid), and canonical Entity mask H×W uint32 (`0` background). Validation
+and capacity checks happen before source workspace creation. Omitting the mapping retains the state-only
+default and does not initialize a renderer during import/construction.
+
+After reset/step has published the typed state boundary, the existing SelectedReferenceEnv lazily owns
+the two existing CameraSessions and publishes their arrays under `rgb`, `depth`, and `entity_mask`; repeated
+reads of one boundary reuse the cache. `info["camera_observation_v1"]` carries the capture/calibration/
+label-map identity. Camera close/failure follows the existing Env lifecycle and C03a fault latch. When
+recording is enabled, Generic H5 v3 keeps its numeric tree and adds versioned camera metadata sidecars;
+read with `load_camera_observations_h5()` alongside the existing structured-control reader. RGB keeps
+the existing CHW uint8 quantization rule; depth/mask retain float32/uint32. This R04a S1 is provider-free
+and synthetic: native MuJoCo/OpenGL/EGL pairing, real public reset/step capture, and same-file R04c
+camera readback remain NOT_RUN. It is not camera qualification or P99 gate completion.
 
 For this explicit selected candidate, `env.position_plan` after reset is the read-only typed action contract
 used by the existing dispatch owner. Do not mutate it. Gripper input is normalized in [-1,1] (+1 open / -1 close);

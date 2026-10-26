@@ -30,7 +30,7 @@ runtime routes or their supported capability envelope.
   `ResolvedEnvConfig` is authoritative. `env.execution_plan` is a provider-free `execution-plan-v0`
   static projection only: it does not establish actual manifest support, runtime materialization, or reset realization.
 - Explicit single-Panda Position candidate: `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys",
-  "backend":"cpu", "horizon":64})`. Only GeoPhys scalar CPU, fixed reset seed 31, state-only, 100 Hz / five 2 ms steps.
+  "backend":"cpu", "horizon":64})`. Only GeoPhys scalar CPU, fixed reset seed 31, state-only by default, 100 Hz / five 2 ms steps.
   Optional `source_workspace` must be fresh/empty; omission allocates an ignored workspace source snapshot.
   Use exact Scene/plan-bound `StructuredActionRequestV1` with both arm/gripper groups; returned reset/step observations
   carry joint/hand/boundary leaves and info clocks. After reset use the read-only `env.position_plan` for exact Scene/plan IDs and its first binding's action schema;
@@ -43,6 +43,14 @@ runtime routes or their supported capability envelope.
   No public runtime path imports test modules. The same public environment passed 64 real intervals/65 observations
   and same-file request/target/ack/state readback; task success, freeze/Judge and Qualification are separate.
   R1 and dual-Entity candidates remain diagnostic. See [P99 run receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#public-candidate).
+- R04a adds an explicit `camera_observation` mapping to that same Position candidate. Decode it with
+  `CameraObservationConfigV1` and supply both canonical camera mounts (`world` fixed mount, `hand` mounted camera)
+  with authored rigid transforms and use horizon at most 16. It publishes RGB HWC float32, optical-Z depth in metres and canonical Entity mask
+  after an existing typed state boundary, and records versioned sidecars in Generic H5 v3 via the existing writer;
+  use `load_camera_observations_h5()` for semantic metadata checks. Omitting the mapping keeps the state-only default.
+  Only provider-free synthetic S1 is implemented; real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and
+  same-file camera S3 remain NOT_RUN. Do not treat the contract or S1 as R04b/c completion, camera qualification,
+  or P99 gate completion. See [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.

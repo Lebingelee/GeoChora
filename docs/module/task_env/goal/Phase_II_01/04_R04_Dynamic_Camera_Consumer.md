@@ -1,12 +1,20 @@
 # R04 — Dynamic Camera → Public Observation / Recorder
 
-状态：REVISED_DRAFT；R04a/b/c 均 PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
+状态：REVISED_DRAFT；R04a 实现与 provider-free S1 已完成，待 Sol 复核；R04b/c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
 
 ## Owners 与真实消费断点
 
 复用 [typed-state](../../../../../task_env/artifacts/state.py)、[CameraSession API](../../../../../task_env/render/camera/api.py)、[dynamic renderer](../../../../../task_env/render/camera/mujoco.py)、[ObservationBuilder](../../../../../task_env/observations/state.py)、[SelectedReferenceEnv](../../../../../task_env/tasks/reference_env.py)、[Recorder](../../../../../task_env/recorders/recorder.py) 与 [H5 owner](../../../../../task_env/recorders/h5.py)。
 
-当前独立 CameraSession pairing 已有有界 capture/隔离/关闭证据，[D 开发记录](../Phase_II/D_Development_Record.md)保留其原身份；Position public Env 是 state-only。generic SensorObservation/ObservationBuilder 的 depth 为 provider-defined passthrough，不等于 advanced CameraSession 的 Optical-Z/Entity-mask。R04a 必须确定在现有 Observation owner 的显式桥接与 Env 可选配置；不能用两个诊断调用拼接验收或另造 Env/Recorder。
+当前独立 CameraSession pairing 已有有界 capture/隔离/关闭证据，[D 开发记录](../Phase_II/D_Development_Record.md)保留其原身份；Position public Env 默认仍为 state-only。generic SensorObservation/ObservationBuilder 的 depth 为 provider-defined passthrough，不等于 advanced CameraSession 的 Optical-Z/Entity-mask。R04a 已在现有 Observation owner 增加显式 opt-in bridge 与 Env lifecycle 接线；R04b 的真实 renderer/同一 Env S2 尚未运行，不能用两个诊断调用拼接验收或另造 Env/Recorder。
+
+## R04a 实现边界（2026-10-26）
+
+`panda-position-servo-candidate-v1` 接受显式 `camera_observation` mapping；未选择时，state-only observation/schema、source/Controller identity 和导入无 native 初始化保持原样。opt-in 仅允许一个现有单 Panda Position Profile，production 几何固定为 321×241、D04 RGB/optical-Z/Entity-mask、固定相机与 hand-mounted 相机的 canonical 顺序；每个 `CameraMountRequestV1` 必须带明确 parent Frame 和 proper rigid mount transform，配置在 source workspace 创建前验证。它不准入新 Assembly source、其他 Provider/backend 或任意 renderer profile。
+
+新增 `CameraObservationConfigV1`、capture metadata 与 boundary 值复用现有 `CameraGeometry`、`CameraCaptureIdentityV1`、Calibration、Canonical Entity LabelMap 和 `DynamicCameraRenderSourceV1`。`DynamicCameraObservationConsumerV1` 在已发布 typed state 后延迟创建两个现有 CameraSession，只读 capture；相同 boundary 复用缓存。Env 在 reset/构造失败/step fault/close 时拥有并关闭 consumer；post-step capture/observer 失败沿 C03a latch 保留实际 progress，不伪造 transition 或回滚。RGB HWC float32、Depth H×W float32 米制 optical +Z、Mask H×W uint32 进入已有 public `observation_space`/`ObservationSchema`/info contract。
+
+Generic H5 v3 保持原 ABI；opt-in 时追加 `camera_observation_contract_v1_json` 与 `camera_observations_v1_json`，`load_camera_observations_h5()` 以严格 typed semantic reader 核对 T+1、source/capture/boundary/calibration/label-map、RGB CHW uint8 既有量化布局、Depth/mask dtype 与 mask digest。provider-free S1 使用 synthetic captures/H5 验证配置、输出空间、缓存、故障关闭与 reader；真实 MuJoCo/EGL renderer、真实 Env reset/step 与同文件实际相机读回均为 NOT_RUN，分别留给 R04b/R04c。此 S1 不证明 camera native/runtime 或 P99 gate 已通过。
 
 ## Observation / Capture / Storage 合同
 
@@ -20,7 +28,7 @@
 
 ## 资源与独立性
 
-321×241、双相机public RGB float32 + depth float32 + mask uint32每boundary为3,094,440 bytes，65 boundaries约191.82MiB；Recorder的RGB CHW uint8加原depth/mask副本每boundary为1,701,942 bytes，65 boundaries约105.50MiB。两者都未计copy/stack/H5/native GL峰值；不能用压缩磁盘大小代内存。这是算术预算，不是本轮实测。建议首个 S3 horizon=16（17 observations），R04a 必须冻结超时、Recorder buffer、峰值 RSS/GL/磁盘预算再运行；超预算为 FAIL/NOT_RUN，不删模态或降 schema 求绿。
+321×241、双相机 public RGB float32 + depth float32 + mask uint32 每 boundary 为 3,094,440 bytes；Recorder RGB CHW uint8 加原 depth/mask 副本每 boundary 为 1,701,942 bytes。R04a 固定算术 horizon≤16（最多17 boundaries）：public payload 52,605,480 bytes，recorded payload 28,933,014 bytes；实现 admission limits 分别为 64 MiB 与 128 MiB。数值不含 state、metadata、copy/stack/H5 和 native GL；不以磁盘压缩大小代内存。后继执行预算 proposal 为一个 native worker、每包最多2次显式 reset/trial、每次 horizon≤16、每未来进程 timeout 300 s、整包≤900 s、RSS≤4 GiB、增量 Evidence≤256 MiB。若 driver/GL 无公开显存计量，VRAM 记 null+reason，RSS 不代表 VRAM；这些是待维护者执行包确认的预算，不是本包实测或 R04b/c 授权。
 
 记录实际 EGL context、renderer、设备与 driver；device=None 不是 GPU ordinal pinning。缺真实 EGL 则 NOT_RUN/失败并保留日志，禁止 fake renderer/静默 skip。R04 失败不阻塞 R01/R02 Position，但当前 P99 required Camera gate 会阻塞；改范围须维护者显式接受，不自动 DEFERRED。
 

@@ -89,6 +89,9 @@ D05a 在现有 Camera Source owner 新增 `CameraCaptureIdentityV1`，其 `captu
 生成图像；旧 camera/source mapping 和 `create_camera_session()` 行为不变。实际 pairing、device/runtime identity
 解析、capture receipt、资源共享和 teardown 留给 D05b/D03。
 
+Phase II-01 R04a 在现有 Observation、SelectedReferenceEnv 与 Generic H5 v3 owners 上增加 opt-in
+`CameraObservationConfigV1`/`DynamicCameraObservationConsumerV1`，仅接入既有单 Panda Position candidate：明确 fixed/world 与 hand parent Frame/mount、双相机 canonical 顺序、RGB HWC float32、optical-Z depth 与 canonical Entity mask。未选择时保持 state-only 默认；typed boundary 后延迟 capture，相同边界复用缓存，Env lifecycle 负责 reset/fault/close 清理。H5 v3 只追加版本化 metadata sidecars 并由 `load_camera_observations_h5()` strict reader 校验 T+1、capture/calibration/label-map 与既有量化布局，旧 v3 数值与 reader 不变。当前仅 provider-free synthetic S1 已完成待 Sol 复核；真实 MuJoCo/OpenGL/EGL、真实 Env S2 与同文件图像 S3 尚未执行，不能表述为 native camera capability、R04b/c 完成或 Qualification。
+
 Phase II B04b 在同一 `task_env.artifacts` owner 增加 `TaskArtifactV1` 与 `decode_task_artifact()`。旧
 `TaskArtifact.from_mapping()` 仍是严格的 `task-artifact-v0` codec；dispatcher 只按精确 `schema_version`
 解码 v0/v1，未知或缺失版本拒绝，绝不自动迁移。`compile_task_artifact_v1()` 由现有 Task Source owner 显式组合

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import json
+import hashlib
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
@@ -374,6 +375,64 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
         "source": "structured_controls_v1_json",
         "automatic_flattening": False,
     })
+    camera_extension = _camera_observation_extension(trajectory)
+    if camera_extension is not None:
+        contract, boundaries = camera_extension
+        _json_dataset(meta, "camera_observation_contract_v1_json", contract)
+        _json_dataset(meta, "camera_observations_v1_json", boundaries)
+
+
+def _camera_observation_extension(trajectory: FrozenTrajectory):
+    """Build the opt-in v1 camera sidecar without changing Generic H5 v3."""
+
+    from task_env.observations.canonical_camera.consumer import (
+        CAMERA_IDS,
+        CameraObservationConfigV1,
+        validate_camera_observation_boundaries,
+    )
+
+    raw_contract = trajectory.record_metadata.get("camera_observation_contract_v1")
+    reset_record = trajectory.reset_info.get("camera_observation_v1")
+    transition_records = tuple(info.get("camera_observation_v1") for info in trajectory.infos)
+    if raw_contract is None:
+        if reset_record is not None or any(item is not None for item in transition_records):
+            raise ValueError("camera metadata was recorded without its versioned contract")
+        return None
+    if not isinstance(raw_contract, Mapping):
+        raise ValueError("camera observation contract must be a mapping")
+    contract = CameraObservationConfigV1.from_mapping(dict(raw_contract))
+    contract.capacity(max(1, trajectory.transition_count))
+    records = [reset_record, *transition_records]
+    boundaries = validate_camera_observation_boundaries(
+        records, expected_count=len(trajectory.observations),
+    )
+    first = boundaries[0]
+    expected_geometry = {
+        item.camera_id: item.identity_hash
+        for item in contract.geometries(first.captures[0].capture_identity.task_artifact_hash)
+    }
+    stable = None
+    for boundary in boundaries:
+        identity = boundary.captures[0].capture_identity
+        current = (
+            identity.task_artifact_hash,
+            identity.render_source_identity_hash,
+            identity.execution_spec_identity_hash,
+            identity.provider_manifest_identity_hash,
+            identity.state_boundary.scene_identity_hash,
+            identity.state_boundary.scene_instance_id,
+            identity.state_boundary.provider_materialization_id,
+            identity.state_boundary.episode_id,
+            identity.state_boundary.reset_sample_id,
+        )
+        if stable is None:
+            stable = current
+        elif current != stable:
+            raise ValueError("camera metadata identity drift within one H5 episode")
+        for capture in boundary.captures:
+            if capture.capture_identity.camera_geometry_identity_hash != expected_geometry[capture.camera_id]:
+                raise ValueError("stored camera metadata does not match its authored mount contract")
+    return contract.to_mapping(), [item.to_mapping() for item in boundaries]
 
 
 def _save_v1(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None:
@@ -628,6 +687,99 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
         "env_meta": env_meta, "structured_controls": controls,
         "boundary_events": events, "outcome": outcome,
         "training_projection": training_projection,
+    }
+
+
+def load_camera_observations_h5(path: Path | str) -> dict[str, Any]:
+    """Strictly read the opt-in camera metadata extension on Generic H5 v3."""
+
+    import h5py
+    from task_env.observations.canonical_camera.consumer import (
+        CameraObservationConfigV1,
+        validate_camera_observation_boundaries,
+    )
+
+    with h5py.File(Path(path), "r") as root:
+        if (str(root.attrs.get("schema_id", "")) != "task-env-h5"
+                or str(root.attrs.get("schema_version", "")) != "v3"):
+            raise ValueError("camera observation reader requires task-env-h5/v3")
+        episode_complete = root.attrs.get("episode_complete")
+        if not isinstance(episode_complete, (bool, np.bool_)) or not bool(episode_complete):
+            raise ValueError("camera observation reader requires a finalized episode")
+        required = {
+            "meta/camera_observation_contract_v1_json",
+            "meta/camera_observations_v1_json",
+            "meta/env_meta",
+        }
+        if any(name not in root for name in required):
+            raise ValueError("task-env-h5/v3 camera observation extension is incomplete")
+        contract_raw = json.loads(_read_text(root, "meta/camera_observation_contract_v1_json"))
+        observations_raw = json.loads(_read_text(root, "meta/camera_observations_v1_json"))
+        observation_count = int(root.attrs.get("observation_count", -1))
+        transition_count = int(root.attrs.get("transition_count", -1))
+        env_meta = load_metadata(_read_text(root, "meta/env_meta"))
+        if observation_count != transition_count + 1:
+            raise ValueError("camera observation reader requires T+1 observation boundaries")
+        contract = CameraObservationConfigV1.from_mapping(contract_raw)
+        contract.capacity(max(1, transition_count))
+        boundaries = validate_camera_observation_boundaries(
+            observations_raw, expected_count=observation_count,
+        )
+        artifact_hash = boundaries[0].captures[0].capture_identity.task_artifact_hash
+        geometries = {
+            item.camera_id: item for item in contract.geometries(artifact_hash)
+        }
+        expected_boundary_identity = None
+        for boundary in boundaries:
+            for capture in boundary.captures:
+                identity = capture.capture_identity
+                geometry = geometries[capture.camera_id]
+                if identity.camera_geometry_identity_hash != geometry.identity_hash:
+                    raise ValueError("camera capture references another CameraGeometry")
+                common_identity = (
+                    identity.task_artifact_hash,
+                    identity.render_source_identity_hash,
+                    identity.execution_spec_identity_hash,
+                    identity.provider_manifest_identity_hash,
+                    identity.state_boundary.scene_identity_hash,
+                    identity.state_boundary.scene_instance_id,
+                    identity.state_boundary.provider_materialization_id,
+                    identity.state_boundary.episode_id,
+                    identity.state_boundary.reset_sample_id,
+                )
+                if expected_boundary_identity is None:
+                    expected_boundary_identity = common_identity
+                elif common_identity != expected_boundary_identity:
+                    raise ValueError("camera observation identity changed inside one stored episode")
+                for modality, expected_shape, expected_dtype in (
+                    ("rgb", (observation_count, 3, contract.height, contract.width), np.dtype(np.uint8)),
+                    ("depth", (observation_count, contract.height, contract.width), np.dtype(np.float32)),
+                    ("entity_mask", (observation_count, contract.height, contract.width), np.dtype(np.uint32)),
+                ):
+                    dataset_path = f"obs/{modality}/{capture.camera_id}"
+                    if dataset_path not in root:
+                        raise ValueError(f"stored camera modality is missing: {dataset_path}")
+                    dataset = root[dataset_path]
+                    if dataset.shape != expected_shape or dataset.dtype != expected_dtype:
+                        raise ValueError(f"stored camera modality schema mismatch: {dataset_path}")
+                rgb = np.asarray(root[f"obs/rgb/{capture.camera_id}"][boundary.boundary_index])
+                depth = np.asarray(root[f"obs/depth/{capture.camera_id}"][boundary.boundary_index])
+                mask = np.asarray(root[f"obs/entity_mask/{capture.camera_id}"][boundary.boundary_index])
+                if not np.isfinite(depth).all() or np.any(depth < 0):
+                    raise ValueError("stored camera optical-Z depth is invalid")
+                allowed_labels = {0, *(item.label for item in capture.canonical_label_map.labels)}
+                if not set(np.unique(mask).tolist()).issubset(allowed_labels):
+                    raise ValueError("stored Entity mask contains a label absent from its capture-bound LabelMap")
+                mask_digest = hashlib.sha256(np.ascontiguousarray(mask).tobytes(order="C")).hexdigest()
+                if mask_digest != capture.mask_sha256:
+                    raise ValueError("stored Entity mask bytes do not match the capture-bound mask digest")
+    return {
+        "schema_version": "camera-observation-boundary-v1",
+        "contract": contract,
+        "observation_count": observation_count,
+        "transition_count": transition_count,
+        "boundaries": boundaries,
+        "env_meta": env_meta,
     }
 
 
