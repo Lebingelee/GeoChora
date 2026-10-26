@@ -19,6 +19,11 @@ from .logical_assembly import (
     LogicalAssemblyV1,
     decode_logical_assembly,
 )
+from .logical_assembly_resolution import (
+    ResolvedLogicalAssemblyLeafV1,
+    ResolvedLogicalAssemblyV1,
+    resolve_logical_assembly,
+)
 from .state import (
     CanonicalStatePublicationV2,
     CanonicalStatePublicationV1,
@@ -63,4 +68,6 @@ __all__ = [
     'LogicalAssemblyNestedMemberV1', 'LogicalAssemblyScenePinV1',
     'LogicalAssemblySubcomponentReferenceV1', 'LogicalAssemblyV1',
     'decode_logical_assembly',
+    'ResolvedLogicalAssemblyLeafV1', 'ResolvedLogicalAssemblyV1',
+    'resolve_logical_assembly',
 ]

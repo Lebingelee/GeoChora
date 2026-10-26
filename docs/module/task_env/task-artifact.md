@@ -63,6 +63,8 @@ composition/reference 证据，真实施控须由后续 D01/C02 路线另行验�
 
 Phase II-01 R01a 在同一 `task_env.artifacts` owner 增加独立 `logical-assembly-v1` strict codec：`LogicalAssemblyV1` 锁定作者给定的 assembly ID/revision、现有 Scene v1/v2/v3 的精确身份 pin 与规范排序成员。Entity member 保存现有 Entity/asset identity；reference-only subcomponent member 复用 `FrameReference`、`JointReference`、`ActuatorReference`，并用 `LogicalAssemblyControlGroupReferenceV1` 表示 typed ControlGroup 引用；nested member 只固定 child ID/revision/content SHA-256。computed logical hash 不写回自身 mapping，codec 输入被复制为 frozen 值，`to_mapping()` 返回独立 JSON snapshot。该合同不验证 Scene 成员存在性或 child digest，不做递归/投影/source closure/native materialization，也不授予物理连接或 Controller 写权；R01b/R01c/R03 仍负责其各自准入与消费。
 
+R01b 在同一 artifacts owner 增加 advanced `resolve_logical_assembly(root, scene, child_assemblies)` 静态入口。它只读取一个严格复制的 Scene v1/v2/v3 值和显式 `(assembly_id, revision)` child catalog，先对可达 containment key 图做环/深度核验，再校验所有可达 Scene pin、child content hash、Entity/Asset 与 Entity-qualified typed references。结果 `ResolvedLogicalAssemblyV1` 由 immutable leaf tuple 组成；每个 leaf 保留 member 类型、完整路径、源 Assembly 身份/hash 与 local path。跨层重复 Entity owning、重复 typed target、路径碰撞、悬空/错版本 child 与越界闭包会拒绝；reference-only view 不分配第二个 Entity owner 或 writer。上界固定为32层与1024个展开 leaf；局部 memo 只复用同一调用内的静态展开结果，错误不污染输入或后续调用。此解析不求 runtime Frame pose、不产生 source/native mapping、Provider/Runtime资源或 Attachment admission；R01c仍负责静态source投影，后续物理/执行能力须由各自Gate另行验证。
+
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
 explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，

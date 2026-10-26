@@ -7,7 +7,7 @@
 | 文档 | 修订后的责任 |
 | --- | --- |
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
-| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a 静态合同已获Sol接收ACCEPTED_S1_BOUNDED |
+| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a已获Sol接收，R01b bounded resolver/S1待Sol复核 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略 |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
@@ -116,6 +116,8 @@
 2026-10-26，Sol已复核接收R04a attempt002为`ACCEPTED_S1_BOUNDED`，F01/F02关闭；复用33项S1日志并独立检查13个小型H5读回正负例，通过。原attempt001与失败日志保留；无native/S2/S3/Qualification。下一行R06a按一次完整审计/ledger/静态校验/本地提交推进，原件缺失时保留独立compatibility decision gate，不自动批准退休/继续延期。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/`。
 
 2026-10-26，R06a attempt001的四类缺失原件审计、ledger与 legacy matrix S1（6 passed）已获Sol接收为`ACCEPTED_AUDIT_S1_BOUNDED`。三类B04a H5原始bytes仍缺，eb870f6f原路径现存JSON为被覆盖后的文件；本阶段恢复/reader退休/继续延期均未批准，compatibility gate保持BLOCKED。逐格式调用者、影响和待审批选项见[R06 ledger](06_R06_Compatibility_and_Regression.md#r06a-legacy-original-audit)与[manifest](planning_manifest.json)；DAG/Required Envelope/R05a与P99状态不变，R01b未启动。
+
+2026-10-27，R01b attempt001实现递归owning/reference-only静态解析与有界typed-leaf结果；最终required provider-free四文件定向集合81 passed，含新resolver、R01a strict codec/hash、Scene composition和legacy matrix。source/compiler投影、native与Core Attachment仍未实现/未运行。当前Luna出口等待Sol复核，不是R01b acceptance。R06兼容性处置继续未批准且gate仍blocked；DAG/Required Envelope/P99/R05a不变。按执行表下一个slice为R02a；R01c未启动。报告与Evidence位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/`。
 
 ## 本轮R07修订与Scope Risks
 

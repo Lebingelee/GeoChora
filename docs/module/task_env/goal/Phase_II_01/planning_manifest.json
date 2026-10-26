@@ -441,10 +441,21 @@
       "depends_on": [
         "R01a"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "execution": "PROVIDER_FREE_S1_PASS",
       "required_evidence": "S1",
-      "stop_condition": "环/重复/悬空/预算失败→停止"
+      "stop_condition": "环/重复/悬空/预算失败→停止",
+      "result": "Bounded recursive static resolution of reachable Logical Assembly ownership/reference-only closure; no source projection, native execution, Core Attachment admission, or Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md",
+      "luna_attempt": {
+        "task_id": "PHASE-II-01-R01B",
+        "attempt": "001",
+        "input_commit": "f5a65b82ed3f940a9e80989ee4ec4a744f60c148",
+        "provider_free_s1": "PASS",
+        "native": "NOT_RUN",
+        "qualification_granted": false,
+        "sol_review": "PENDING"
+      }
     },
     {
       "id": "R02a",
@@ -718,18 +729,18 @@
   },
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
-    "01_R01_Logical_Robot_Assembly.md": "21b5b8af0325d4ab5a652248ca430de235c0de010f06b7bb584b68891e3489cf",
+    "01_R01_Logical_Robot_Assembly.md": "df2ec92beae5ed55a7d489b909d2b3e1d6d69b7bb65c60dc41253f056935d309",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "c65dc658b9a066518d949ff91b4df2447625a3de37420753614158a4802122b7",
+    "07_Execution_Order_and_Acceptance.md": "285aa497cf491b25132820d38e04aca8337d154e9988e55e2b27925a91d8f9c6",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "6b8f7d46facfc55228e1f4ffc341108aa4cb2813591c39efc3ff344192a7baf2"
+    "README.md": "8d3d25c9832f9b7339043967ebbb1d06b29f7c531be71b2b03fba909720521f5"
   },
-  "revision_kind": "R04A_BOUNDED_IMPLEMENTATION_AND_S1_DOCUMENTATION_SYNC",
+  "revision_kind": "R01B_ATTEMPT001_IMPLEMENTATION_S1_DOCUMENTATION_SYNC",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -2657,6 +2668,29 @@
       "next_package": "R01b static resolver implementation/S1/local commit",
       "DAG_required_envelope_unchanged": true,
       "qualification_granted": false
+    },
+    {
+      "kind": "LUNA_R01B_ATTEMPT001_IMPLEMENTATION_S1",
+      "date": "2026-10-27",
+      "input_commit": "f5a65b82ed3f940a9e80989ee4ec4a744f60c148",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md",
+      "targeted_s1": {
+        "modules": [
+          "task_env/diagnostics/tasks/test_phase_ii_01_r01b_logical_resolution.py",
+          "task_env/diagnostics/tasks/test_phase_ii_01_r01a_logical_assembly.py",
+          "task_env/diagnostics/tasks/test_phase_ii_scene_composition.py",
+          "task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py"
+        ],
+        "result": "PASS",
+        "passed": 81
+      },
+      "native_execution": "NOT_RUN",
+      "R06_compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "R06_decision_changed": false,
+      "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_table_row": "R02a"
     }
   ],
   "P00_audit": {

@@ -13,14 +13,26 @@ For the source/contract/test map read [routes](references/routes.md) when implem
 
 R01a exposes `LogicalAssemblyV1`, `LogicalAssemblyEntityMemberV1`,
 `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, and
-`decode_logical_assembly` from `task_env.artifacts`. Use this qualified API only
-for an immutable, versioned logical value pinned to an existing Scene identity.
+`decode_logical_assembly` from `task_env.artifacts`. Use these values only for
+an immutable, versioned logical contract pinned to an existing Scene identity.
 Entity members describe logical ownership; subcomponent members are typed
 reference-only views; nested members pin an exact child revision and digest.
-The codec does not check Scene/child existence, recursively resolve ownership,
-project source, attach bodies, or admit a runtime. R01b/R01c/R03 remain separate
-owners and gates. This static contract does not change the Skill's selected
-runtime routes or their supported capability envelope.
+The codec alone does not check Scene/child existence or recursively resolve
+ownership.
+
+R01b adds advanced `resolve_logical_assembly(root, scene, child_assemblies)`
+from the same artifacts owner. It validates the exact Scene pin, reachable
+child revision/content hashes, Entity/Asset identities, and typed
+Frame/Joint/Actuator/ControlGroup targets, then returns immutable
+`ResolvedLogicalAssemblyV1` leaves with canonical segment-tuple paths and
+source Assembly provenance. Reference-only leaves do not create owners or
+writers. The fail-closed limits are root depth 1 / maximum 32 Assembly levels
+and 1024 expanded leaves. Resolution is provider-free and stateless; it does
+not project Task Source, create native names/indices, attach bodies, or admit a
+Runtime. R01c and R03 remain separate gates. See the executable minimal
+example in [Public API](../../../docs/module/task_env/public-api.md#bounded-logical-assembly-resolution-r01b).
+This static contract does not change selected runtime routes or their supported
+capability envelope.
 
 ## Choose the actual construction branch
 
