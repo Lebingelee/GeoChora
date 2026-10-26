@@ -121,6 +121,15 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   Sol reviews the actual diff and available Evidence before sending the next
   slice. Luna's reported PASS is input to that review, not automatic acceptance.
   Keep one writer at a time and use the same phase branch across handoffs.
+- Size packages to the change. A basic change with known owners normally
+  combines implementation, targeted validation, necessary in-scope fixes and
+  local commit(s) in one package. Separate preparation only for unknowns that
+  affect the implementation decision; do not impose fixed preparation rounds.
+  Reuse unchanged evidence and repeat checks only for an affected input,
+  new change, failure or unresolved concern. Sol may fix minor review issues
+  directly or include them in the implementation package; additional
+  preparation requires a concrete mandatory blocker, not report formatting
+  or an unapproved extension of the original completion criteria.
 - Freeze HEAD and protected input bytes for each Luna execution window,
   including ignored-output-only audits. Sol lands review/summary/document
   commits after Luna returns and before issuing the next package. If urgent
