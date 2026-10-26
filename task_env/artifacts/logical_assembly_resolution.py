@@ -249,6 +249,10 @@ def resolve_logical_assembly(
     heights: dict[AssemblyKey, int] = {}
 
     def check_graph(key: AssemblyKey, depth: int, path: tuple[AssemblyKey, ...]) -> int:
+        if depth > _MAX_DEPTH:
+            raise ValueError(
+                f"nested Assembly depth exceeds {_MAX_DEPTH} at {_path_text(path + (key,))}"
+            )
         state = colors.get(key, 0)
         if state == 1:
             raise ValueError(f"nested Assembly containment cycle at {_path_text(path + (key,))}")

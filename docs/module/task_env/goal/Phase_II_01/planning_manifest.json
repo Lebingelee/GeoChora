@@ -441,11 +441,11 @@
       "depends_on": [
         "R01a"
       ],
-      "status": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
-      "execution": "PROVIDER_FREE_S1_PASS",
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "PROVIDER_FREE_S1_ACCEPTED_AFTER_SOL_DEPTH_GUARD_FIX",
       "required_evidence": "S1",
       "stop_condition": "环/重复/悬空/预算失败→停止",
-      "result": "Bounded recursive static resolution of reachable Logical Assembly ownership/reference-only closure; no source projection, native execution, Core Attachment admission, or Qualification.",
+      "result": "Sol accepted bounded static resolver after directly fixing early depth rejection: original 1100-level input hit RecursionError; entry guard and regression added. Original Luna S1 81 passed retained; final same four-file S1 82 passed. No source/native/Qualification.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md",
       "luna_attempt": {
         "task_id": "PHASE-II-01-R01B",
@@ -455,6 +455,19 @@
         "native": "NOT_RUN",
         "qualification_granted": false,
         "sol_review": "PENDING"
+      },
+      "sol_review": {
+        "date": "2026-10-27",
+        "input_commit": "1ea9aee447d19640f36eb1c827c2221a23ec0e1c",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/review_receipt.json",
+        "original_s1_passed": 81,
+        "final_s1_passed": 82,
+        "finding": "R01B-F01 closed by Sol minor fix",
+        "next_slice": "R02a",
+        "native": "NOT_RUN",
+        "qualification_granted": false
       }
     },
     {
@@ -729,16 +742,16 @@
   },
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
-    "01_R01_Logical_Robot_Assembly.md": "df2ec92beae5ed55a7d489b909d2b3e1d6d69b7bb65c60dc41253f056935d309",
+    "01_R01_Logical_Robot_Assembly.md": "79a64078ae37c660ab805e6125d1ad5c0d1f17f5fb35874debce0b78b8d4ae0c",
     "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "285aa497cf491b25132820d38e04aca8337d154e9988e55e2b27925a91d8f9c6",
+    "07_Execution_Order_and_Acceptance.md": "521beb867455eebd4e703850767d2da736cb2b2bd3c4260970e5fe33a50db792",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "8d3d25c9832f9b7339043967ebbb1d06b29f7c531be71b2b03fba909720521f5"
+    "README.md": "974d1e7164ba5b1ad3d4d54620dce1207480b1863907dcc2b4fcccd22036ed33"
   },
   "revision_kind": "R01B_ATTEMPT001_IMPLEMENTATION_S1_DOCUMENTATION_SYNC",
   "benchmark_audit": {
@@ -2691,6 +2704,21 @@
       "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
       "qualification_granted": false,
       "next_table_row": "R02a"
+    },
+    {
+      "kind": "SOL_REVIEW_R01B_ATTEMPT001_WITH_MINOR_FIX",
+      "date": "2026-10-27",
+      "input_commit": "1ea9aee447d19640f36eb1c827c2221a23ec0e1c",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/review_receipt.json",
+      "original_s1_passed": 81,
+      "final_s1_passed": 82,
+      "sol_fix": "early recursion depth guard plus deep-input regression",
+      "native": "NOT_RUN",
+      "next_package": "R02a static leaf contracts/S1/local commit",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -2714,7 +2742,7 @@
     "formal_qualification_granted": false,
     "technical_audit": "ROUND_1_COMPLETE",
     "scope_decisions": "PENDING",
-    "next_action": "R01b one bounded recursive owning/reference-only static resolver implementation, targeted provider-free S1, in-scope docs/Skill sync and local commit on the same phase branch. R06a audit accepted; missing raw and unapproved Phase II-01 disposition leave the compatibility decision gate blocked without adding an R01b dependency. R01c/native not started; R05a/DAG/P99 unchanged.",
+    "next_action": "R02a one bounded implementation/S1/docs-Skill/local-commit package for Arm-only/Hand-only Position leaf contracts and Force-aware dependency/refusal catalog. R01b static resolver accepted after Sol early-depth fix. R01c/source projection, R02b adapters, native not started. R06 decision gate/R05a/DAG/P99 unchanged.",
     "luna_review": {
       "task_id": "PHASE-II-01-P00-L01",
       "review_date": "2026-10-25",

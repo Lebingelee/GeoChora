@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。P00核查已完成；R03a attempt001及有界的attempt002 INTERIOR_HAND_COMMANDS native case经Sol复核接收为`ACCEPTED_BOUNDED`。R01a attempt001的逻辑Assembly静态合同与provider-free S1已完成，等待Sol复核；本表不自动授权后继slice。其他实施slice仍按表中状态执行；DAG与Required Envelope未获最终批准。
+状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。P00核查已完成；R03a attempt001及有界的attempt002 INTERIOR_HAND_COMMANDS native case经Sol复核接收为`ACCEPTED_BOUNDED`。R01a attempt001的逻辑Assembly静态合同与provider-free S1已获Sol接收；本表不自动授权后继slice。其他实施slice仍按表中状态执行；DAG与Required Envelope未获最终批准。
 
 ## 基线、P00 与证据记账
 
@@ -49,7 +49,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | BLOCKED_PROVIDER_CONTRACT（Sol preflight；无新cadence probe） |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | ACCEPTED_S1_BOUNDED：attempt002的33项provider-free S1与Sol定向复核通过 |
 | 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | ACCEPTED_AUDIT_S1_BOUNDED；compatibility decision gate仍BLOCKED |
-| 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW；报告见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md` |
+| 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82项provider-free S1通过 |
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同 | S1 | required state/TCP/资源不明→停止 | PLANNED / NOT_STARTED |
 | 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | PLANNED / NOT_STARTED |
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | PLANNED / NOT_STARTED |
@@ -81,7 +81,7 @@ P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contrac
 
 | Gate | 必需交集/证据 | 当前已知与未获得资格 |
 | --- | --- | --- |
-| R01 logical composition | 两类typed member、稳定路径、无环/唯一owning、source/hash、旧Scene/Artifact不变 | R01a静态codec已获Sol接收；R01b bounded resolver/S1待Sol复核；source projection与动力学仍未实现 |
+| R01 logical composition | 两类typed member、稳定路径、无环/唯一owning、source/hash、旧Scene/Artifact不变 | R01a静态codec已获Sol接收；R01b bounded resolver/S1已获Sol接收（深度门修正后82 passed）；source projection与动力学仍未实现 |
 | R02 leaf control | Arm-only + Hand-only Position，preset/override→唯一资源writer；真实分开/同时施控、target/ack/state/H5 | 双完整 Panda 历史证据仅作对照；force-aware新leaf不在装配required范围 |
 | R03 first Provider | **MuJoCo 3.8.1 CPU**、Menagerie独立Arm+Hand、新固定连接source；reset/连续运动/开合/接触或负载/constraint误差与资源关闭 | 独立MuJoCo 3.8.1 CPU的INTERIOR_HAND_COMMANDS source/dynamics probe经Sol接收：重复reset、连续Arm/Hand motion、1 N外载与mount/限位门通过；端点FAIL保留，Core public Env/H5及后继lowering未实现，未获Assembly Qualification |
 | R03 public S3 | 同一公开candidate make_env（或另经明确批准的公共入口）→reset→真实steps→observation→既有Recorder→同文件T/T+1读回→close | 扩展现有factory/RuntimeSession/Recorder；不导入test helpers、不拼接diagnostics |
@@ -117,3 +117,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-26，Sol复核R04a attempt002实施提交 `72b5274e2adc438d2df165bd0190963909705630`，F01/F02关闭，接收其 `ACCEPTED_S1_BOUNDED` 出口；2个H5正例与11个拒绝反例独立读回通过，未新增native。下一工作包按表进入R06a，一次完成原件/备份审计、版本/缺口与待审批处置ledger、静态校验和本地提交。若原件仍缺失，审计交付可完成而compatibility decision gate保留BLOCKED；本条不批准reader retirement或本阶段继续延期。R04b/c、R05a blocker、DAG及P99 required保持原约束。
 
 2026-10-26，Sol接收R06a attempt001的Audit/S1与ledger出口为 `ACCEPTED_AUDIT_S1_BOUNDED`，四项原件缺失及未批准处置保留，compatibility decision gate仍为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。按表进入只依赖R01a的R01b静态解析实施包；不增加raw恢复依赖，不启动R01c/native，不关闭R06b/c/P99 required。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/`。
+
+2026-10-27，Sol复核R01b attempt001并直接修正一个递归入口深度门缺陷：原1100层输入触发RecursionError，修正后按32层合同及时拒绝。原四文件provider-free S1集合82 passed，接收为 `ACCEPTED_S1_BOUNDED`。下一包按表进入R02a的leaf静态合同/capability catalog及Force-aware依赖拒绝，不启动R01c/R02b/native；R06 gate、R05a blocker、DAG/required/P99均保持。

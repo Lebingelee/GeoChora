@@ -136,3 +136,5 @@
 | Agent usage/billing/active time缺失、self-score或native成本对照缺位 | 不能估算成测量或宣称因果成本下降 | null/reason、session/log/hash、独立human评审；controlled研究另定预算 |
 
 R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务顺序须部署前冻结；R07c指定五Task之一被阻塞或不可表示，P99保持阻塞，等待维护者精确scope decision。全部七Goal仍candidate；本轮建议审阅结果 **REVISE_PLAN**，理由是许可/依赖/Core语义与构造扩展/成本instrumentation及最终7/22范围尚需维护者批准，不构成新的acceptance decision。
+
+2026-10-27，Sol接收R01b为`ACCEPTED_S1_BOUNDED`：审阅10文件diff与原81项S1，直接补递归入口32层门及1100层反例，最终四文件S1为82 passed。无需再开返工包；R01a/Scene旧identity与R06 ledger保持，native/source projection/Qualification未建立。下一表行为R02a静态leaf合同，不自行跳到R01c。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/`。

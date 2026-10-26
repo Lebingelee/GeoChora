@@ -501,6 +501,13 @@ def test_depth_32_succeeds_and_depth_33_fails():
         resolve_logical_assembly(root33, scene, catalog33)
 
 
+def test_deep_input_stops_at_contract_limit_before_python_recursion_error():
+    scene = _scene_v1()
+    root, catalog = _empty_chain(scene, 1100)
+    with pytest.raises(ValueError, match="depth exceeds 32"):
+        resolve_logical_assembly(root, scene, catalog)
+
+
 def test_leaf_1024_succeeds_and_leaf_1025_fails():
     def build(count):
         entity_ids = tuple(f"arm-{index:04d}" for index in range(count))

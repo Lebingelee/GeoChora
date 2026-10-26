@@ -1,6 +1,6 @@
 # R01 — Logical Robot Assembly
 
-状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b bounded 静态解析与 provider-free S1 已实现，等待 Sol 复核；R01c 仍 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
+状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b bounded 静态解析已获Sol接收（ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82 passed）；R01c 仍 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
 
 ## 当前 owner 与版本边界
 
@@ -23,6 +23,10 @@ Component path 保持 segment tuple；空路径、空 segment、`.`、`..`、分
 解析先以 Assembly key 检出直接/间接 containment cycle，再校验 child logical content SHA-256；不依赖自洽循环hash。展开将 nested path 与 child member path 作为 segment tuple 连接，结果按完整路径/kind/typed target 确定排序。闭包内 Entity 只能有一个 owning member；reference-only typed target 可指向同Scene已有Entity（包括其他叶的owner），不创建第二 owner/writer。相同 typed target 多路径alias及展开路径碰撞拒绝；不同 Entity 使用同一 Asset 保持为不同实例。root 深度按1计，最大32层；Entity member 与 Subcomponent Reference 各计一个 leaf，最大1024。调用内有限memo避免共享/空child重复递归展开，超限时在构造结果期间拒绝。
 
 返回 `ResolvedLogicalAssemblyV1` 与不可变 `ResolvedLogicalAssemblyLeafV1`，记录root/Scene身份及每个leaf的full path、typed member、原 Assembly ID/revision/hash 与local path；它不增加旧codec字段或hash，不产出新的持久化 ABI。入口是advanced静态值API，不连接当前Runtime/source/compiler，不生成native mapping、物理连接或Task Source；Source投影仍属于R01c。
+
+### Sol复核（2026-10-27）
+
+Sol审阅 `1ea9aee447d19640f36eb1c827c2221a23ec0e1c` 的10文件差异与81项S1证据，发现超深输入先触发Python RecursionError；已直接在递归入口增加32层门并补1100层回归，保持原cached-height检查及1024 leaf限制。5项定向检查通过，原四文件集合82 passed，接收R01b为 **ACCEPTED_S1_BOUNDED**，无需另开返工。旧codec/hash、R06 ledger、DAG/P99保持，native与R01c未运行；下一表行为R02a。复核证据见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/`。
 
 ## 两类成员与拥有关系
 
@@ -51,7 +55,7 @@ R01 持有 canonical refs，不持有 native body/joint/actuator indices。R03 �
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
 | R01a | P00 | 既有 artifacts owner 中两类 member、hash DAG、版本与边界设计/codec | provider-free S1 已通过：strict discriminator/roundtrip/non-self hash 与旧 Scene/Artifact 基线保持；报告 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md`；Sol已接收该静态S1出口 |
-| R01b | R01a | 递归 owning/reference-only 解析、typed paths 与有界负例 | provider-free S1 已实现：环/悬空/重复拥有/错Scene/child/typed target/alias/路径碰撞/32层与1024 leaf边界；等待Sol复核，报告在 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md` |
+| R01b | R01a | 递归 owning/reference-only 解析、typed paths 与有界负例 | provider-free S1 已实现：环/悬空/重复拥有/错Scene/child/typed target/alias/路径碰撞/32层与1024 leaf边界；Sol修正递归入口深度门后已接收（82 passed），报告在 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md` |
 | R01c | R01b | source/compiler 的只读投影与可追踪 leaf refs | S1：完整 Panda 内 arm/hand subrefs、独立 Arm/Hand Entity members 两类 fixture；canonical refs 不产生物理 joint |
 
 本 Goal 不依赖 R04/R05。S1 不能作为 R03 的动力学或 R02 的执行证明。逻辑投影/只读view必须不可变；codec `to_mapping()` 可返回独立JSON副本，修改副本不能回写合同。关闭运行时不破坏可独立持有的逻辑值。接受条件与依赖唯一入口为 [07](07_Execution_Order_and_Acceptance.md)。
