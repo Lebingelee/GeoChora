@@ -1,6 +1,6 @@
 # R04 — Dynamic Camera → Public Observation / Recorder
 
-状态：REVISED_DRAFT；R04a attempt001 原23项provider-free S1通过后经Sol复核为CHANGES_REQUESTED；attempt002 已修复 capture 请求绑定与 H5 独立 state/clock/episode 锚点，定向 provider-free S1 为33 passed，等待Sol复核。R04b/c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
+状态：REVISED_DRAFT；R04a attempt001 原23项provider-free S1通过后经Sol复核为CHANGES_REQUESTED；attempt002 已修复 capture 请求绑定与 H5 独立 state/clock/episode 锚点，定向 provider-free S1 为33 passed，Sol已复核接收为ACCEPTED_S1_BOUNDED。R04b/c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
 
 ## Owners 与真实消费断点
 
@@ -14,7 +14,7 @@
 
 新增 `CameraObservationConfigV1`、capture metadata 与 boundary 值复用现有 `CameraGeometry`、`CameraCaptureIdentityV1`、Calibration、Canonical Entity LabelMap 和 `DynamicCameraRenderSourceV1`。`DynamicCameraObservationConsumerV1` 在已发布 typed state 后延迟创建两个现有 CameraSession，只读 capture；相同 boundary 复用缓存。Env 在 reset/构造失败/step fault/close 时拥有并关闭 consumer；post-step capture/observer 失败沿 C03a latch 保留实际 progress，不伪造 transition 或回滚。RGB HWC float32、Depth H×W float32 米制 optical +Z、Mask H×W uint32 进入已有 public `observation_space`/`ObservationSchema`/info contract。
 
-Generic H5 v3 保持原 ABI；opt-in 时追加 `camera_observation_contract_v1_json`、`camera_observations_v1_json` 与 `camera_recording_binding_v1_json`。binding 锚点由 writer 从实际 Position state boundary digest、reset/transition info clock、独立 reference profile、EpisodeOutcome 和 structured controls 生成；reader 从真实 state dataset、独立 profile 与现有 typed control/outcome readers重建并交叉核对。缺少必需 state digest、binding sidecar、未知 binding 版本、episode/clock/control 顺序不一致均 fail closed；写入校验失败不发布最终文件并清理临时文件。reader 继续核对 T+1、source/capture/boundary/calibration/label-map、RGB CHW uint8 既有量化布局、Depth/mask dtype 与 mask digest。provider-free synthetic S1 验证配置、请求身份/calibration、输出空间、缓存、故障关闭与 H5 正负例；attempt002 定向套件33 passed，等待Sol复核。真实 MuJoCo/EGL renderer、真实 Env reset/step 与同文件实际相机读回均为 NOT_RUN，分别留给 R04b/R04c。此 S1 不证明 camera native/runtime 或 P99 gate 已通过。
+Generic H5 v3 保持原 ABI；opt-in 时追加 `camera_observation_contract_v1_json`、`camera_observations_v1_json` 与 `camera_recording_binding_v1_json`。binding 锚点由 writer 从实际 Position state boundary digest、reset/transition info clock、独立 reference profile、EpisodeOutcome 和 structured controls 生成；reader 从真实 state dataset、独立 profile 与现有 typed control/outcome readers重建并交叉核对。缺少必需 state digest、binding sidecar、未知 binding 版本、episode/clock/control 顺序不一致均 fail closed；写入校验失败不发布最终文件并清理临时文件。reader 继续核对 T+1、source/capture/boundary/calibration/label-map、RGB CHW uint8 既有量化布局、Depth/mask dtype 与 mask digest。provider-free synthetic S1 验证配置、请求身份/calibration、输出空间、缓存、故障关闭与 H5 正负例；attempt002 定向套件33 passed，Sol已接收其S1有界出口。真实 MuJoCo/EGL renderer、真实 Env reset/step 与同文件实际相机读回均为 NOT_RUN，分别留给 R04b/R04c。此 S1 不证明 camera native/runtime 或 P99 gate 已通过。
 
 ## Sol复核与定向返工（2026-10-26）
 
@@ -26,7 +26,11 @@ Sol核对18文件diff、16项原包输出及18项tracked摘要，重跑原定向
 
 H5 camera extension 新增 strict `camera-recording-binding-v1` sidecar，不改变 Generic H5 v3 根ABI。writer在原子发布前校验每个 T+1 observation 的32-byte state boundary digest、reset/transition identity与clock、capture/episode、typed final outcome、每个 transition 的 Position control source boundary/clock和 action顺序。reader从 H5 state dataset、独立 reference-profile metadata 与现有 typed control/outcome readers读取实际锚点交叉核验；sidecar缺失、未知版本或不一致时 fail closed。零transition外部Stop和多transition记录均保留为正例；失败输出仍由现有 temporary→`os.replace`路径拒绝并清理。
 
-attempt002使用 provider-free 合成capture/H5定向S1，33 passed；报告、命令日志与原始小型H5正负例见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/`，等待Sol复核。未运行真实 renderer、MuJoCo/EGL、public Env S2或camera H5 S3；R04b/c仍PLANNED，P99 required与R05a状态不变。
+attempt002使用 provider-free 合成capture/H5定向S1，33 passed；报告、命令日志与原始小型H5正负例见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/`，Sol已接收其S1有界出口。未运行真实 renderer、MuJoCo/EGL、public Env S2或camera H5 S3；R04b/c仍PLANNED，P99 required与R05a状态不变。
+
+## Sol attempt002 复核结论（2026-10-26）
+
+审阅实施提交 `72b5274e2adc438d2df165bd0190963909705630` 的10文件差异、生产metadata路径及33项S1日志，F01/F02已关闭，接收为 **ACCEPTED_S1_BOUNDED**。Sol复用交付的小型H5独立检查2个合法正例及11个拒绝反例，全部符合预期，未重复生成资产。24项输出与10项tracked摘要、8项保护输入、11份phase文档hash核验通过。文档validator仍为相同148项既有错误，不构成全仓PASS。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/`；attempt001与失败日志保留。下一行R06a；真实native、R04b/c、S2/S3与Qualification均未授予。
 
 ## Observation / Capture / Storage 合同
 

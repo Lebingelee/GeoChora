@@ -52,7 +52,7 @@ runtime routes or their supported capability envelope.
   state-boundary digests, reset/transition clocks, reference-profile metadata and finalized typed outcome/control records.
   Use `load_camera_observations_h5()` for strict semantic checks; missing or unknown binding versions fail closed. Omitting
   the mapping keeps the state-only default. R04a attempt002's targeted provider-free synthetic S1 passed (33 cases),
-  pending Sol review. Real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and same-file camera S3 remain NOT_RUN.
+  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and same-file camera S3 remain NOT_RUN.
   Do not treat this S1 as R04b/c completion, camera qualification, or P99 gate completion. See
   [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
