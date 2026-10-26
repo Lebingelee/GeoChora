@@ -1,6 +1,6 @@
 # R06 — Compatibility / Mapping / Regression Governance
 
-状态：REVISED_DRAFT；R06a/b/c 均 PLANNED / NOT_STARTED。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
+状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED），compatibility decision gate仍BLOCKED；R06b/c PLANNED / NOT_STARTED。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
 
 ## 映射与机械语义保护
 
@@ -53,6 +53,10 @@ P99 包应有 `acceptance_report.md`、`acceptance.json`、独立 `phase_decisio
 当前没有批准归档成员或原始 hash 可供恢复；旧日志、mapping/identity hash、摘要、当前同路径 JSON 或新 a53 收据均不能代替文件 bytes。恢复选项需提供已批准来源、原件及可核验 SHA-256/来源链。若无法恢复，维护者可逐格式批准准确的 reader retirement/支持收缩（须接受上述调用者影响），或明确批准本阶段继续延期并规定该缺口对 R06c/P99 的后果；诊断 JSON 应按历史 Evidence 保留边界单独决定，不套用 reader retirement。所有选项的 `decision`、`approved_by`、`reference` 当前均为 `null`/未批准，Phase II 旧延期不自动沿用。
 
 R06a 本轮定向 `test_phase_ii_b04a_legacy_matrix.py` 为 6 passed；它覆盖当前 codec/version route 与负例，不读取缺失历史 bytes，不证明 byte compatibility。Audit/S1 可交付但 compatibility decision gate 仍为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`；R06b/c 与 P99 不得把它记作关闭。本轮没有改 reader、格式、source pin、DAG、Required Envelope 或 Skill。
+
+## Sol复核（2026-10-26）
+
+Sol审阅提交 `56f689570a0fbaf29aea4ea26a073d38b5e6afd6` 的四份文档差异、四项ledger及当前reader/caller边界，接收R06a为 **ACCEPTED_AUDIT_S1_BOUNDED**，无必需返工。20项输出、9项owner源码、13项审计输入、8项保护输入与11份phase文档摘要核验通过，复用6 passed日志；22项L2成员和7项恢复清单路径核对支持本包限定检索结论。四项原件仍未恢复，处置批准均为空，compatibility gate保持 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。下一行R01b不增加原件恢复前置；R06b/c/P99 gate不因此关闭。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/`。
 
 ## 与独立R07的分界
 

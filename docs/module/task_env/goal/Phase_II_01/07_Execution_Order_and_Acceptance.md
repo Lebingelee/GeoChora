@@ -48,7 +48,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 02 | R01a | P00 | `logical-assembly-v1` 两类成员、Scene pin 与非自指身份/strict codec | provider-free S1 | 旧identity变动或引用契约不明→停止 | ACCEPTED_S1_BOUNDED；见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md` |
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | BLOCKED_PROVIDER_CONTRACT（Sol preflight；无新cadence probe） |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | ACCEPTED_S1_BOUNDED：attempt002的33项provider-free S1与Sol定向复核通过 |
-| 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | AUDIT_S1_COMPLETE_PENDING_SOL_REVIEW；compatibility gate BLOCKED |
+| 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | ACCEPTED_AUDIT_S1_BOUNDED；compatibility decision gate仍BLOCKED |
 | 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | PLANNED / NOT_STARTED |
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同 | S1 | required state/TCP/资源不明→停止 | PLANNED / NOT_STARTED |
 | 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | PLANNED / NOT_STARTED |
@@ -113,3 +113,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-23 复核基线为已推送的 `535ce251…`；此前 `234da21b…` 是首版 R07 修订的输入，不再表述为本轮远端 HEAD。本轮保持上述 22 切片、逐 Task 条件前置与全部 Required Envelope 原值；[收据](validation_receipt.json)区分前轮 63 文件审计、本轮 16 文件重新抓取及本地静态复核。未启动任何 slice，也不以文档校验代替其 Evidence。
 
 2026-10-26，Sol复核R04a attempt002实施提交 `72b5274e2adc438d2df165bd0190963909705630`，F01/F02关闭，接收其 `ACCEPTED_S1_BOUNDED` 出口；2个H5正例与11个拒绝反例独立读回通过，未新增native。下一工作包按表进入R06a，一次完成原件/备份审计、版本/缺口与待审批处置ledger、静态校验和本地提交。若原件仍缺失，审计交付可完成而compatibility decision gate保留BLOCKED；本条不批准reader retirement或本阶段继续延期。R04b/c、R05a blocker、DAG及P99 required保持原约束。
+
+2026-10-26，Sol接收R06a attempt001的Audit/S1与ledger出口为 `ACCEPTED_AUDIT_S1_BOUNDED`，四项原件缺失及未批准处置保留，compatibility decision gate仍为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。按表进入只依赖R01a的R01b静态解析实施包；不增加raw恢复依赖，不启动R01c/native，不关闭R06b/c/P99 required。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/`。

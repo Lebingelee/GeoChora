@@ -115,7 +115,7 @@
 
 2026-10-26，Sol已复核接收R04a attempt002为`ACCEPTED_S1_BOUNDED`，F01/F02关闭；复用33项S1日志并独立检查13个小型H5读回正负例，通过。原attempt001与失败日志保留；无native/S2/S3/Qualification。下一行R06a按一次完整审计/ledger/静态校验/本地提交推进，原件缺失时保留独立compatibility decision gate，不自动批准退休/继续延期。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/`。
 
-2026-10-26，R06a attempt001已完成四类缺失原件的有界可恢复性审计与 legacy matrix S1（6 passed），等待Sol复核。三类B04a H5原始bytes仍缺，eb870f6f原路径现存JSON为被覆盖后的文件；本阶段恢复/reader退休/继续延期均未批准，compatibility gate保持BLOCKED。逐格式调用者、影响和待审批选项见[R06 ledger](06_R06_Compatibility_and_Regression.md#r06a-legacy-original-audit)与[manifest](planning_manifest.json)；DAG/Required Envelope/R05a与P99状态不变，R01b未启动。
+2026-10-26，R06a attempt001的四类缺失原件审计、ledger与 legacy matrix S1（6 passed）已获Sol接收为`ACCEPTED_AUDIT_S1_BOUNDED`。三类B04a H5原始bytes仍缺，eb870f6f原路径现存JSON为被覆盖后的文件；本阶段恢复/reader退休/继续延期均未批准，compatibility gate保持BLOCKED。逐格式调用者、影响和待审批选项见[R06 ledger](06_R06_Compatibility_and_Regression.md#r06a-legacy-original-audit)与[manifest](planning_manifest.json)；DAG/Required Envelope/R05a与P99状态不变，R01b未启动。
 
 ## 本轮R07修订与Scope Risks
 
