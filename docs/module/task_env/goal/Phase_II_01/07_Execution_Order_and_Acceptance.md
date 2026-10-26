@@ -48,7 +48,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 02 | R01a | P00 | `logical-assembly-v1` 两类成员、Scene pin 与非自指身份/strict codec | provider-free S1 | 旧identity变动或引用契约不明→停止 | ACCEPTED_S1_BOUNDED；见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md` |
 | 03 | R05a | P00 | Provider正式cadence/设备/成本合同 | Audit/S1/probe | 无owner合同→BLOCKED_PROVIDER_CONTRACT | BLOCKED_PROVIDER_CONTRACT（Sol preflight；无新cadence probe） |
 | 04 | R04a | P00 | public Camera消费/reader/预算 | S1 | 身份/metadata reader/资源合同缺失→停止 | ACCEPTED_S1_BOUNDED：attempt002的33项provider-free S1与Sol定向复核通过 |
-| 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | PLANNED / NOT_STARTED |
+| 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | AUDIT_S1_COMPLETE_PENDING_SOL_REVIEW；compatibility gate BLOCKED |
 | 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | PLANNED / NOT_STARTED |
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同 | S1 | required state/TCP/资源不明→停止 | PLANNED / NOT_STARTED |
 | 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | PLANNED / NOT_STARTED |
@@ -72,6 +72,8 @@ P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contrac
 2026-10-26，Sol已接收R01a的静态codec/S1出口；R01b/c仍未启动。R05a受当前GeoPhys正式native-rate合同缺口阻塞：公开Reader限制逐substep host snapshot，旧C05c仅为诊断例外。此为preflight阻塞，不是R05a Audit/S1/probe完成，也不改为DEFERRED。维护者选择在R05a阻塞期间先推进独立R04a；R04a原23项S1通过但Sol复核发现identity绑定缺口，下一包为R04a attempt002定向返工，不改变DAG、R05a blocker或P99 required Camera gate。R04b/c仍按原依赖未执行。
 
 2026-10-26，R04a attempt002已完成capture对实际请求身份/typed Frame calibration的交叉核验，以及H5 camera sidecar对真实state digest、clock、typed control与EpisodeOutcome的独立核验；provider-free定向S1 33 passed，当前出口等待Sol复核。真实 renderer/Env S2与camera H5 S3未运行；R04b/c仍未启动。R05a blocker、R04原DAG依赖、P99 required Camera gate和R06a后继顺序不变。
+
+2026-10-26，R06a attempt001复核四类历史缺失原件的已知索引/归档边界，并完成定向 legacy matrix S1（6 passed）。三类B04a H5无可核验原路径/hash；eb870f6f JSON原路径的现存7,664-byte文件为后续内容，不能恢复原bytes。具体codec/reader调用者、影响与恢复/退休/继续延期选项见[R06 ledger](06_R06_Compatibility_and_Regression.md#r06a-legacy-original-audit)及manifest。Audit/S1交付待Sol复核；本阶段处置未批准，compatibility decision gate保持`BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。不改变DAG、R05a blocker、R04b/c或P99 required；正常表后继R01b本包未启动。
 
 ## P99 Required Envelope（待批准）
 

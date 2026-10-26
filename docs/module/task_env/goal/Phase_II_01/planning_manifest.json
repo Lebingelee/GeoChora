@@ -232,10 +232,198 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "AUDIT_S1_COMPLETE_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_AUDIT_AND_TARGETED_S1_COMPLETE; COMPATIBILITY_DECISION_BLOCKED",
       "required_evidence": "Audit/S1",
-      "stop_condition": "缺原件且无独立处置→compatibility gate blocked"
+      "stop_condition": "缺原件且无独立处置→compatibility gate blocked",
+      "result": "Four-item bounded original-evidence audit and targeted legacy-matrix S1 (6 passed). No original restored. Phase-II-01 disposition remains pending; no reader retirement or continued deferral approved.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md",
+      "compatibility_ledger": {
+        "schema": "phase-ii-01-r06a-compatibility-ledger-v1",
+        "date": "2026-10-26",
+        "audit_scope": "Known indexed original paths, P00 missing-originals inventory, named v1.1 backup/source-recovery manifests and referenced archive entries only; no exhaustive filesystem/cloud/external search.",
+        "search_inputs": [
+          "docs/maintenance/phase_ii_scope_freeze_20261023/evidence_index.json#missing_or_unproven_originals",
+          "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/missing_originals.json",
+          "docs/releases/v1.1/backup_manifest.json",
+          "docs/releases/v1.1/source_recovery_manifest.json",
+          "docs/module/task_env/goal/Phase_II/B_Development_Record.md#b04a",
+          "docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b",
+          "docs/maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml"
+        ],
+        "archive_findings": {
+          "v1_1_backup": "REMOTE_COPY_VERIFIED for 22 scoped L2 items, not a full workspace backup; no matching B04a/C02b original entry found in the declared scope.",
+          "source_recovery_manifest": "Listed recovery manifests do not identify these four originals; absence from these lists does not establish an exhaustive storage search.",
+          "external_or_other_machine_backups": "NOT_PROVIDED_NOT_SEARCHED",
+          "v1_1_local_archive_member_count": 22,
+          "v1_1_local_archive_target_matches": [],
+          "source_recovery_manifest_entries": {
+            "listed_count": 7,
+            "present_and_checked": [
+              "docs/module/task_env/p2_0_s4_5_a_source_recovery.json",
+              "docs/module/task_env/p2_0_s4_5_b_source_recovery.json"
+            ],
+            "present_entry_target_matches": [],
+            "listed_but_absent_from_checkout": [
+              "docs/module/task_env/p2_0_s2_c1_source_identity.json",
+              "docs/module/task_env/p2_0_s2_c2_source_identity.json",
+              "docs/module/task_env/p2_0_s3_go2_retirement_manifest.json",
+              "docs/module/task_env/p2_0_s4_static_solver_retirement_manifest.json",
+              "docs/module/task_env/p2_0_s5_a_compatibility_inventory.json"
+            ],
+            "meaning": "Older P2.0 recovery-manifest references; not target-original paths. Their absence limits archive inspection and does not justify an exhaustive-search claim."
+          }
+        },
+        "historical_b04a_reconstruction_context_only": {
+          "core_commit": "f9543b8725d2990966743f49cebf9d68493b6b06",
+          "geophys_revision": "4436787e",
+          "binding": "Source-bound reconstruction context only; no per-file original H5 path or bytes hash is available."
+        },
+        "entries": [
+          {
+            "id": "b04a_geophys_transition_h5_v1",
+            "domain": "geophys-transition-h5/v1 original H5",
+            "discriminator": {
+              "schema_id": "geophys-transition-h5",
+              "schema_version": "v1"
+            },
+            "historical_disposition": "ACCEPTED-DEFERRED",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_PROVEN",
+            "original_path": null,
+            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_raw_sha256": null,
+            "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
+            "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
+            "current_route": {
+              "producer": "task_env.recorders.recorder.TransitionRecorder.save_h5 -> task_env.recorders.h5.save_trajectory_h5/_save_v1",
+              "accepted_config": "task_env.recorders.contracts.RecorderConfig accepts (geophys-transition-h5,v1).",
+              "reader": "task_env.recorders.h5.inspect_trajectory_h5 reads outer metadata and meta/layout_json; no full semantic v1 loader located. The structured-control loader is task-env-h5/v3 only.",
+              "production_caller": "No internal production replay caller found; inspect_trajectory_h5 is exported by task_env.recorders."
+            },
+            "current_candidate_path": null,
+            "current_candidate_sha256": null,
+            "retirement_impact": "Retiring the v1 config/write/inspection route changes legacy format availability and regression fixtures; no internal semantic replay caller was found.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          },
+          {
+            "id": "b04a_canonical_trajectory_outer_v0_h5",
+            "domain": "canonical trajectory outer-v0 original H5",
+            "discriminator": {
+              "outer_schema": "task-env-canonical-trajectory-v0"
+            },
+            "historical_disposition": "ACCEPTED-DEFERRED",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_PROVEN",
+            "original_path": null,
+            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_raw_sha256": null,
+            "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
+            "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
+            "current_route": {
+              "producer_reader_owner": "task_env.trajectory.canonical.h5.save/load",
+              "reader": "load dispatches v0 to CanonicalTrajectory.from_mapping and verifies logical identity and numeric projections.",
+              "current_consumer": "task_env.trajectory.reference_replay.reexecute_selected recognizes outer-v0 and calls canonical.h5.load; selected re-execution comparison utility, not a newly claimed Core production capability."
+            },
+            "current_candidate_path": null,
+            "current_candidate_sha256": null,
+            "retirement_impact": "Would remove the strict outer-v0 H5 reader and selected-reference replay route; legacy-matrix negative/version coverage is affected.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          },
+          {
+            "id": "b04a_canonical_execution_v1_h5",
+            "domain": "canonical-execution-v1 original H5",
+            "discriminator": {
+              "logical_schema": "canonical-execution-trajectory-v1",
+              "outer_schema": "task-env-canonical-execution-v1"
+            },
+            "historical_disposition": "ACCEPTED-DEFERRED",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_PROVEN",
+            "original_path": null,
+            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_raw_sha256": null,
+            "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
+            "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
+            "current_route": {
+              "reader": "task_env.trajectory.canonical.execution.load and task_env.trajectory.canonical.streaming.load_streaming validate legacy v1 schema/hash/projections.",
+              "test_owner": "task_env.diagnostics.tasks.test_phase_ii_b04a_legacy_matrix.test_trajectory_readers_keep_independent_version_routes",
+              "current_consumer": "task_env.trajectory.reference_replay.reexecute_selected routes non-outer-v0 H5 to load_streaming; selected re-execution comparison utility.",
+              "legacy_api_support": "Module-level validate/save/load accepts legacy v1 mappings; ExecutionRecorder constructor creates only v2/v3."
+            },
+            "current_candidate_path": null,
+            "current_candidate_sha256": null,
+            "retirement_impact": "Would remove legacy execution H5/streaming read and selected-reference replay support; this is narrower than removing current v2/v3 writing.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          },
+          {
+            "id": "c02b_eb870_typed_force_s2_probe_json",
+            "domain": "early GeoPhys eb870f6f typed-force s2_probe.json original bytes",
+            "discriminator": {
+              "diagnostic_schema_current_candidate": "c02b-r1-typed-force-probe-v1"
+            },
+            "historical_disposition": "MISSING_RAW_EVIDENCE",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_APPLICABLE_NO_FORMAT_READER; historical bytes unavailable",
+            "original_path": "workspace/maintenance/c02b_r1_typed_force_20261022/s2_probe.json",
+            "original_path_status": "KNOWN_BUT_OVERWRITTEN",
+            "original_raw_sha256": null,
+            "original_hash_reason": "The historical record states overwrite and supplies no raw-file hash.",
+            "source_pin_context": {
+              "geophys_revision": "eb870f6f",
+              "core_commit": null,
+              "core_reason": "Historical C02b record names the earlier GeoPhys pin but does not bind an exact Core commit to the lost JSON bytes."
+            },
+            "current_route": {
+              "producer": "task_env.diagnostics.tasks.test_phase_ii_c02b_r1_typed_force.py::_write_probe_json_exclusive (current caller at line 482); diagnostic Evidence writer only.",
+              "reader": null,
+              "production_caller": null,
+              "note": "No production codec/reader or production migration caller located; do not invent a reader-retirement item."
+            },
+            "current_candidate_path": "workspace/maintenance/c02b_r1_typed_force_20261022/s2_probe.json",
+            "current_candidate_size_bytes": 7664,
+            "current_candidate_sha256": "3c23764e877c067cd26d6af75f45127bbe5234c575dea5d69eb5118a0ac3bec7",
+            "current_candidate_identity": "Later c02b-r1-typed-force-probe-v1 content; not proof of the lost eb870 original bytes. The current candidate records GeoPhys revision a53a8cfed7c9d6464274b5c96fca601271dc4ee4 and closure aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47.",
+            "related_later_source": "GeoPhys a53 evidence is separate and does not restore the eb870 JSON.",
+            "retirement_impact": "No reader retirement applies; any decision concerns retaining/excluding this historical diagnostic Evidence requirement.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          }
+        ],
+        "recovery_option": {
+          "status": "NOT_AVAILABLE_IN_REVIEWED_INDEXES",
+          "minimum_input": "An approved archive/member that contains the exact original bytes plus the original SHA-256 or a documented source/chain-of-custody binding; retain and read a copy without replacing prior Evidence."
+        },
+        "retirement_option": {
+          "status": "UNAPPROVED",
+          "scope": "Separate exact-format decisions for each H5 reader/support route; the diagnostic JSON has no production reader and requires a different Evidence-scope decision."
+        },
+        "continued_deferral_option": {
+          "status": "UNAPPROVED",
+          "scope": "Explicitly retain MISSING_RAW_EVIDENCE and NOT_PROVEN/NOT_APPLICABLE facts and state the consequence for R06b/R06c/P99; define an approved archive/hash condition for reopening."
+        },
+        "decision_gate": {
+          "status": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+          "decision": null,
+          "approved_by": null,
+          "approval_reference": null,
+          "qualification_granted": false
+        },
+        "targeted_s1": {
+          "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.:GeoPhys/src /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py",
+          "result": "PASS",
+          "passed": 6,
+          "scope_note": "Current strict codecs/version routing and synthetic negative coverage only; no missing original H5/JSON bytes loaded."
+        },
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md"
+      }
     },
     {
       "id": "R01b",
@@ -513,7 +701,9 @@
     ],
     "B04a_disposition": "ACCEPTED-DEFERRED; raw bytes missing; byte compatibility NOT_PROVEN",
     "early_eb870_typed_force": "MISSING_RAW_EVIDENCE",
-    "retirement_or_new_stage_continued_deferral_approved": false
+    "retirement_or_new_stage_continued_deferral_approved": false,
+    "phase_ii_01_disposition": "PENDING_MAINTAINER_DECISION; see slices.R06a.compatibility_ledger",
+    "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
@@ -522,11 +712,11 @@
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
-    "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "07219ed9a89aea99768fbddd0a45fa2dea745a3e89b7899b58569029df42418b",
+    "06_R06_Compatibility_and_Regression.md": "105cd98f14e51146b15657964bb14ca1eb697c2e0d6f7660d92f3dad64030df5",
+    "07_Execution_Order_and_Acceptance.md": "f8da726d2109eee5bf3b6850b1da1de4bcd215968c5da3c105b3ecabc9fa9cbd",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "330d4838610317af7111fd9ca72f33da9cbd90596f62c11458eb9be3c0e8187f"
+    "README.md": "a256e5877e1322ea50c1b8edcbcc39234c2ffd77bd1661969db31ec138638b61"
   },
   "revision_kind": "R04A_BOUNDED_IMPLEMENTATION_AND_S1_DOCUMENTATION_SYNC",
   "benchmark_audit": {
@@ -2422,6 +2612,25 @@
       "next_package": "R06a audit/ledger/S1/local summary commit",
       "DAG_required_envelope_unchanged": true,
       "qualification_granted": false
+    },
+    {
+      "kind": "R06A_ATTEMPT001_AUDIT_S1",
+      "date": "2026-10-26",
+      "input_commit": "cf012678bdf5907b6c6883e8b8ce13f2e4351857",
+      "result": "AUDIT_S1_COMPLETE_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md",
+      "ledger": "slices.R06a.compatibility_ledger",
+      "targeted_s1": {
+        "module": "task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py",
+        "result": "PASS",
+        "passed": 6
+      },
+      "originals_restored": 0,
+      "compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "decision_approved": false,
+      "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_table_row": "R01b_NOT_STARTED"
     }
   ],
   "P00_audit": {
