@@ -341,10 +341,11 @@ class LeafMaterializationReceiptV1:
                         actuator.transmission_target_id) != (
                         "radian", "joint", native_joint_name):
                     raise ValueError("Arm Actuator transmission differs from its explicit Joint mapping")
-                if actuator.ctrlrange != binding.joint_position_limits[
-                    tuple(binding.joint_order).index(pair.joint)
-                ]:
-                    raise ValueError("Arm native ctrlrange differs from the bound Joint limits")
+                # Native actuator command ranges and canonical Joint position
+                # limits are distinct source facts.  The provider adapter
+                # verifies both against its compiled model; requiring equality
+                # here incorrectly rejects Panda's inherited <general>
+                # ctrlrange on joints whose authored Joint range is narrower.
             if binding.profile_kind == "hand_position":
                 actuator = actuator_by_ref[binding.actuator_order[0]]
                 if (actuator.command_unit, actuator.ctrlrange,

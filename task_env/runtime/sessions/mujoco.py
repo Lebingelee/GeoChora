@@ -56,7 +56,326 @@ class _MuJoCoSession(_SessionValues):
         self._frames = {semantic: self._model.site(native).id for semantic, native in source.frames.items()}
         self._target_actuators = {semantic: self._model.actuator(native).id for semantic, native in source.joint_targets.items()}
         self._open_actuators = tuple(self._model.actuator(native).id for native in source.open_actuators)
+        self._leaf_plan = None
+        self._leaf_materialization_receipt = None
+        self._leaf_configuration_revision = None
+        self._leaf_active_plan_identity = None
+        self._leaf_fault = None
+        self._leaf_interval_active = False
+        self._leaf_interval_boundary_id = None
+        self._leaf_interval_source_boundary = None
+        self._leaf_interval_writers = set()
+        self._leaf_consumed_boundaries = set()
         self._validate_canonical_scene_model()
+
+    @property
+    def leaf_materialization_receipt(self):
+        if self._leaf_materialization_receipt is None:
+            raise RuntimeError('MuJoCo RuntimeSession has no admitted leaf materialization')
+        return self._leaf_materialization_receipt
+
+    @property
+    def leaf_configuration_revision(self):
+        if self._leaf_configuration_revision is None:
+            raise RuntimeError('MuJoCo RuntimeSession has no admitted leaf configuration')
+        return self._leaf_configuration_revision
+
+    @property
+    def leaf_control_fault(self):
+        return self._leaf_fault
+
+    @property
+    def active_leaf_plan_identity(self):
+        return self._leaf_active_plan_identity
+
+    def admit_leaf_control_plan(self, plan):
+        """Bind the public R02b receipt to this compiled MuJoCo model."""
+        from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
+        from ...runtime.sessions.leaf_control import (
+            LeafMaterializationReceiptV1, LeafNativeActuatorMappingV1,
+            LeafNativeFrameMappingV1, LeafNativeJointMappingV1,
+            LeafNativeTendonMappingV1,
+        )
+        if type(plan) is not EffectiveLeafPlanV1 or not plan._compiled:
+            raise TypeError('MuJoCo leaf admission requires a compiled EffectiveLeafPlanV1')
+        if (plan.scene_identity_sha256 != self._source.scene_definition.identity_hash
+                or plan.source_closure_sha256 != self._source.source_closure_digest
+                or plan.provider_name != 'mujoco' or plan.backend != 'cpu'
+                or plan.physics_dt_s != self._artifact.timebase.physics_dt
+                or plan.control_substeps != self._artifact.timebase.control_substeps):
+            raise ValueError('MuJoCo model/source differs from the exact leaf plan')
+        model, mj = self._model, self._mj
+        dimensions = (int(model.nq), int(model.nv), int(model.nu), int(model.njnt),
+                      int(model.nbody), int(model.neq), int(model.ntendon))
+        if dimensions != (9, 9, 8, 9, dimensions[4], 1, 1):
+            raise ValueError(f'R02c full-Panda native dimensions are not the fixed 9/9/8/9/1/1 route: {dimensions}')
+        if any(int(value) == int(mj.mjtJoint.mjJNT_FREE) for value in model.jnt_type):
+            raise ValueError('R02c source unexpectedly contains an additional free root')
+        joint_maps = []
+        native_joint_id_by_name = {}
+        for entry in plan.leaves:
+            binding = entry.binding
+            for ref, limits in zip(binding.joint_order, binding.joint_position_limits, strict=True):
+                native_name = ref.joint_id
+                joint_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_JOINT, native_name))
+                if joint_id < 0:
+                    raise ValueError(f'planned native Joint {native_name!r} is absent')
+                unit = binding.joint_position_unit
+                expected_type = mj.mjtJoint.mjJNT_HINGE if unit == 'radian' else mj.mjtJoint.mjJNT_SLIDE
+                if int(model.jnt_type[joint_id]) != int(expected_type):
+                    raise ValueError(f'native Joint {native_name!r} has the wrong MuJoCo type')
+                if not bool(model.jnt_limited[joint_id]) or not np.allclose(
+                    model.jnt_range[joint_id], limits, rtol=0.0, atol=1.0e-12,
+                ):
+                    raise ValueError(f'native Joint {native_name!r} limits differ from the leaf contract')
+                qadr, dadr = int(model.jnt_qposadr[joint_id]), int(model.jnt_dofadr[joint_id])
+                native_joint_id_by_name[native_name] = joint_id
+                joint_maps.append(LeafNativeJointMappingV1(
+                    'leaf-native-joint-mapping-v1', ref, native_name, joint_id,
+                    qadr, dadr, unit,
+                ))
+        actuator_maps = []
+        native_actuator_ids = set()
+        for entry in plan.leaves:
+            binding = entry.binding
+            if binding.profile_kind == 'arm_position':
+                pairs = binding.joint_actuator_bindings
+            else:
+                pairs = ()
+            if pairs:
+                for pair in pairs:
+                    actuator_ref = pair.actuator
+                    native_name = actuator_ref.actuator_id
+                    actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native_name))
+                    if actuator_id < 0:
+                        raise ValueError(f'planned native Actuator {native_name!r} is absent')
+                    trn_type = int(model.actuator_trntype[actuator_id])
+                    trn_id = int(model.actuator_trnid[actuator_id, 0])
+                    target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, trn_id)
+                    if (trn_type != int(mj.mjtTrn.mjTRN_JOINT)
+                            or target_name != pair.joint.joint_id):
+                        raise ValueError(f'Arm actuator {native_name!r} transmission differs from its Joint binding')
+                    limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id])
+                    if not bool(model.actuator_ctrllimited[actuator_id]):
+                        raise ValueError(f'Arm actuator {native_name!r} must preserve its source ctrlrange')
+                    actuator_maps.append(LeafNativeActuatorMappingV1(
+                        'leaf-native-actuator-mapping-v1', actuator_ref, native_name,
+                        actuator_id, actuator_id, limits,
+                        'radian', 'joint', str(target_name),
+                    ))
+                    native_actuator_ids.add(actuator_id)
+            else:
+                actuator_ref = binding.actuator_order[0]
+                native_name = actuator_ref.actuator_id
+                actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native_name))
+                if actuator_id < 0:
+                    raise ValueError(f'planned native Hand actuator {native_name!r} is absent')
+                trn_type = int(model.actuator_trntype[actuator_id])
+                trn_id = int(model.actuator_trnid[actuator_id, 0])
+                target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_TENDON, trn_id)
+                if trn_type != int(mj.mjtTrn.mjTRN_TENDON) or target_name != 'split':
+                    raise ValueError('Hand actuator8 is not connected to the exact split tendon')
+                limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id])
+                if (not bool(model.actuator_ctrllimited[actuator_id])
+                        or limits != tuple(binding.native_ctrlrange)):
+                    raise ValueError('Hand actuator ctrlrange differs from the bound 0..255 range')
+                actuator_maps.append(LeafNativeActuatorMappingV1(
+                    'leaf-native-actuator-mapping-v1', actuator_ref, native_name,
+                    actuator_id, actuator_id, limits,
+                    'native_ctrl', 'tendon', str(target_name),
+                ))
+                native_actuator_ids.add(actuator_id)
+        if native_actuator_ids != set(range(int(model.nu))):
+            raise ValueError('R02c leaf writers do not own every native MuJoCo ctrl slot exactly once')
+        frame_maps = []
+        for entry in plan.leaves:
+            ref = entry.binding.tcp_frame
+            body_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_BODY, ref.frame_id))
+            if body_id <= 0:
+                raise ValueError(f'leaf TCP Body {ref.frame_id!r} is missing or is world')
+            frame_maps.append(LeafNativeFrameMappingV1(
+                'leaf-native-frame-mapping-v1', ref, ref.frame_id, body_id,
+            ))
+        tendon_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_TENDON, 'split'))
+        if tendon_id < 0 or int(model.tendon_num[tendon_id]) != 2:
+            raise ValueError('R02c native Hand split tendon must contain exactly two wraps')
+        tendon_adr = int(model.tendon_adr[tendon_id])
+        wrap_joint_ids = tuple(int(value) for value in model.wrap_objid[tendon_adr:tendon_adr + 2])
+        wrap_types = tuple(int(value) for value in model.wrap_type[tendon_adr:tendon_adr + 2])
+        wrap_coefficients = tuple(float(value) for value in model.wrap_prm[tendon_adr:tendon_adr + 2])
+        expected_fingers = tuple(native_joint_id_by_name[name] for name in ('finger_joint1', 'finger_joint2'))
+        if (wrap_joint_ids != expected_fingers
+                or any(value != int(mj.mjtWrap.mjWRAP_JOINT) for value in wrap_types)
+                or wrap_coefficients != (0.5, 0.5)):
+            raise ValueError('R02c native split tendon finger order/coefficients differ from source')
+        equality_matches = []
+        for eq_id in range(int(model.neq)):
+            if (int(model.eq_type[eq_id]) == int(mj.mjtEq.mjEQ_JOINT)
+                    and {int(model.eq_obj1id[eq_id]), int(model.eq_obj2id[eq_id])} == set(expected_fingers)):
+                equality_matches.append(eq_id)
+        if len(equality_matches) != 1:
+            raise ValueError('R02c requires the exact one native finger-joint equality')
+        receipt = LeafMaterializationReceiptV1(
+            'leaf-materialization-receipt-v1', 'provider_materialization',
+            plan.scene_identity_sha256, plan.source_closure_sha256, plan.identity_sha256,
+            'mujoco', plan.provider_version, plan.provider_build_sha256, 'cpu',
+            self._provider_materialization_id, 'leaf-' + plan.identity_sha256[:20],
+            int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.nbody),
+            int(model.neq), int(model.ntendon), tuple(joint_maps), tuple(actuator_maps),
+            tuple(frame_maps), (LeafNativeTendonMappingV1(
+                'leaf-native-tendon-mapping-v1', 'hand.xml/tendon/split', 'split',
+            ),), ('hand.xml/equality/finger_joint1=finger_joint2',),
+        )
+        receipt.validate_against_plan(plan)
+        self._leaf_plan = plan
+        self._leaf_materialization_receipt = receipt
+        self._leaf_configuration_revision = receipt.configuration_revision
+        self._leaf_fault = None
+        self._leaf_consumed_boundaries.clear()
+
+    def read_leaf_runtime_clock(self):
+        from ...artifacts.state import StateBoundaryIdentity, StateSampleClock
+        from ...runtime.sessions.leaf_control import LeafRuntimeClockV1
+        self._require_reset()
+        if self._leaf_plan is None:
+            raise RuntimeError('MuJoCo session has no admitted leaf plan')
+        state = self.snapshot()
+        boundary = StateBoundaryIdentity(
+            'state-boundary-identity-v1', self._episode_id, self._reset_sample_id,
+            self._leaf_plan.scene_identity_sha256, self._scene_instance_id,
+            self._provider_materialization_id, self._control_step, self._state_revision,
+        )
+        clock = StateSampleClock(
+            'state-sample-clock-v1', 'evaluation_boundary', self._control_step,
+            float(state.simulation_time),
+        )
+        return LeafRuntimeClockV1(
+            'leaf-runtime-clock-v1', boundary, clock, self.leaf_configuration_revision,
+        )
+
+    def validate_leaf_materialization(self, receipt, plan):
+        if (receipt != self.leaf_materialization_receipt or plan is not self._leaf_plan
+                or receipt.provenance_kind != 'provider_materialization'):
+            raise ValueError('leaf materialization receipt is not owned by this MuJoCo model')
+        receipt.validate_against_plan(plan)
+
+    def validate_leaf_writer_available(self, writer_id, actuator_refs, receipt):
+        self.validate_leaf_materialization(receipt, self._leaf_plan)
+        if self._leaf_fault is not None:
+            raise RuntimeError('MuJoCo leaf RuntimeSession is fault-latched')
+        entry = next((item for item in self._leaf_plan.leaves if item.binding.writer_id == writer_id), None)
+        if entry is None or tuple(entry.binding.actuator_order) != tuple(actuator_refs):
+            raise ValueError('requested leaf writer does not own the exact planned Actuator order')
+        if self._leaf_interval_active:
+            raise RuntimeError('MuJoCo leaf interval is already active')
+
+    def begin_leaf_control_interval(self, plan_identity, boundary_id):
+        clock = self.read_leaf_runtime_clock()
+        if (self._leaf_fault is not None or plan_identity != self._leaf_plan.identity_sha256
+                or boundary_id != clock.boundary.boundary_id
+                or boundary_id in self._leaf_consumed_boundaries):
+            raise ValueError('MuJoCo leaf interval is stale, replayed or fault-latched')
+        self._leaf_consumed_boundaries.add(boundary_id)
+        self._leaf_active_plan_identity = plan_identity
+        self._leaf_interval_active = True
+        self._leaf_interval_boundary_id = boundary_id
+        self._leaf_interval_source_boundary = clock.boundary
+        self._leaf_interval_writers.clear()
+
+    def apply_leaf_actuator_patch(self, patch):
+        from ...runtime.sessions.leaf_control import LeafApplyResultV1
+        from ...controllers.canonical.leaf_profiles import LeafApplicationAckV1
+        if not self._leaf_interval_active or self._leaf_fault is not None:
+            raise RuntimeError('MuJoCo leaf actuator patch requires an active, healthy interval')
+        if patch.writer_id in self._leaf_interval_writers:
+            raise ValueError('MuJoCo leaf writer attempted a duplicate actuator patch')
+        entry = next((item for item in self._leaf_plan.leaves
+                      if item.binding.writer_id == patch.writer_id), None)
+        if entry is None or (patch.effective_plan_identity_sha256, patch.materialization_identity_sha256) != (
+            self._leaf_plan.identity_sha256, self.leaf_materialization_receipt.identity_sha256,
+        ):
+            raise ValueError('MuJoCo patch is bound to another writer/plan/materialization')
+        target = patch.target
+        binding = entry.binding
+        if (target.writer_id != binding.writer_id
+                or target.binding_identity_hash != binding.identity_hash
+                or target.source_closure_sha256 != self._source.source_closure_digest
+                or target.scene_identity_hash != self._leaf_plan.scene_identity_sha256
+                or tuple(item.actuator for item in patch.slot_values) != tuple(binding.actuator_order)):
+            raise ValueError('MuJoCo patch Target/slot mapping differs from the selected leaf')
+        mapping = {item.canonical_actuator: item for item in self.leaf_materialization_receipt.actuators}
+        for item in patch.slot_values:
+            native = mapping.get(item.actuator)
+            if (native is None or native.ctrl_slot != item.ctrl_slot
+                    or not native.ctrlrange[0] <= item.value <= native.ctrlrange[1]):
+                raise ValueError('MuJoCo leaf patch exceeds its exact native ctrl slot/range')
+        current_clock = self.read_leaf_runtime_clock()
+        source_boundary = self._leaf_interval_source_boundary
+        current_boundary = current_clock.boundary
+        same_evaluation = (
+            source_boundary is not None
+            and (current_boundary.episode_id, current_boundary.reset_sample_id,
+                 current_boundary.scene_identity_hash, current_boundary.scene_instance_id,
+                 current_boundary.provider_materialization_id, current_boundary.control_step)
+            == (source_boundary.episode_id, source_boundary.reset_sample_id,
+                source_boundary.scene_identity_hash, source_boundary.scene_instance_id,
+                source_boundary.provider_materialization_id, source_boundary.control_step)
+            and current_boundary.state_revision
+            == source_boundary.state_revision + len(self._leaf_interval_writers)
+        )
+        if not same_evaluation:
+            raise ValueError('MuJoCo leaf patch crossed its consumed evaluation boundary')
+        for item in patch.slot_values:
+            self._data.ctrl[item.ctrl_slot] = item.value
+        self._state_revision += 1
+        self._current_ctrl = self._data.ctrl.copy()
+        self._leaf_interval_writers.add(patch.writer_id)
+        application_clock = self.read_leaf_runtime_clock()
+        ack = LeafApplicationAckV1(
+            'leaf-application-ack-v1', binding.profile_kind, binding.profile_id,
+            binding.action_schema_id, target.identity_hash, binding.writer_id,
+            binding.identity_hash, binding.source_closure_sha256, binding.scene_identity_hash,
+            binding.joint_order, binding.actuator_order, target.source_boundary,
+            target.sample_clock, application_clock.boundary, application_clock.sample_clock,
+        )
+        return LeafApplyResultV1(
+            'leaf-apply-result-v1', binding.writer_id, patch.command_identity_sha256,
+            patch.materialization_identity_sha256,
+            tuple(item.ctrl_slot for item in patch.slot_values), ack,
+        )
+
+    def step_leaf_control_interval(self, *, substeps):
+        if (not self._leaf_interval_active or self._leaf_fault is not None
+                or substeps != self._leaf_plan.control_substeps
+                or set(self._leaf_interval_writers) != {entry.binding.writer_id for entry in self._leaf_plan.leaves}):
+            raise RuntimeError('MuJoCo leaf outer step requires all planned writer patches exactly once')
+        self.step()
+        self._leaf_interval_active = False
+        self._leaf_interval_boundary_id = None
+        self._leaf_interval_source_boundary = None
+        self._leaf_interval_writers.clear()
+
+    def publish_leaf_state(self, scene, requirements):
+        if self._leaf_plan is None or scene.identity_hash != self._leaf_plan.scene_identity_sha256:
+            raise ValueError('MuJoCo leaf state publication Scene mismatch')
+        return self.snapshot_v1(
+            scene=scene,
+            joint_bindings={
+                f'{art.entity_id}/{joint.joint_id}': joint
+                for art in scene.articulations or () for joint in art.joints if joint.kind != 'fixed'
+            },
+            frame_bindings={
+                key: __import__('task_env.artifacts', fromlist=['FrameReference']).FrameReference(*key.split('/', 1))
+                for key in (*self._source.bodies, *self._source.frames)
+            }, requirements=requirements,
+        )
+
+    def latch_leaf_control_fault(self, progress, error):
+        if self._leaf_fault is not None:
+            raise RuntimeError('MuJoCo leaf fault is already latched')
+        self._leaf_fault = progress
+        self._leaf_interval_active = False
+        self._leaf_interval_source_boundary = None
 
     def _cache_completed_actuator_force(self):
         """Read force only when the admitted Controller state contract requires it."""
@@ -188,6 +507,25 @@ class _MuJoCoSession(_SessionValues):
             self._data.ctrl[actuator] = sample.joint_position[name]
         for actuator in self._open_actuators:
             self._data.ctrl[actuator] = self._model.actuator_ctrlrange[actuator, 1]
+        if getattr(self, '_leaf_plan', None) is not None:
+            from ...robots.gripper import position_gripper_ctrl_for_opening
+            hand = next(entry for entry in self._leaf_plan.leaves
+                        if entry.binding.profile_kind == 'hand_position')
+            config = hand.section.values()
+            actuator_ref = hand.binding.actuator_order[0]
+            native = next(item for item in self._leaf_materialization_receipt.actuators
+                          if item.canonical_actuator == actuator_ref)
+            self._data.ctrl[native.ctrl_slot] = position_gripper_ctrl_for_opening(
+                0.076, config['gripper_opening_range_m'],
+                config['gripper_close_ctrl'], config['gripper_open_ctrl'],
+            )
+            self._leaf_fault = None
+            self._leaf_active_plan_identity = None
+            self._leaf_interval_active = False
+            self._leaf_interval_boundary_id = None
+            self._leaf_interval_source_boundary = None
+            self._leaf_interval_writers.clear()
+            self._leaf_consumed_boundaries.clear()
         self._current_ctrl = self._data.ctrl.copy()
         self._mj.mj_forward(self._model, self._data)
         realized = self._realized(sample)

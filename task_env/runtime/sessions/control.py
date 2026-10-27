@@ -560,8 +560,46 @@ def materialize_control(
     manifest=None,
     controller_binding_plan: ControlBindingPlanV1 | None = None,
     controller_profile=None,
+    leaf_plan=None,
     diagnostic_profile=None,
 ):
+    if leaf_plan is not None:
+        from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
+        from .provenance import provider_build_identity
+        if (type(leaf_plan) is not EffectiveLeafPlanV1 or leaf_plan._compiled is not True
+                or controller_binding_plan is not None or controller_profile is not None
+                or diagnostic_profile is not None):
+            raise TypeError('R02c leaf materialization requires one compiled plan without legacy Controllers')
+        if (execution.physics_provider, execution.backend, execution.render_provider) != ('mujoco', 'cpu', 'none'):
+            raise ValueError('R02c leaf materialization is limited to MuJoCo CPU with no renderer')
+        scene = getattr(source, 'scene_definition', None)
+        if (scene is None or scene.identity_hash != leaf_plan.scene_identity_sha256
+                or source.source_closure_digest != leaf_plan.source_closure_sha256
+                or source.task_artifact_hash != artifact.identity_hash):
+            raise ValueError('R02c leaf plan does not match the exact Artifact/Scene/source closure')
+        build_info = provider_build_identity('mujoco')
+        build_sha = __import__('hashlib').sha256(
+            __import__('json').dumps(build_info, sort_keys=True, separators=(',', ':'),
+                                     allow_nan=False).encode()
+        ).hexdigest()
+        if (leaf_plan.provider_name, leaf_plan.provider_version, leaf_plan.provider_build_sha256,
+                leaf_plan.backend, leaf_plan.physics_dt_s, leaf_plan.control_substeps) != (
+                'mujoco', str(build_info['package_version']), build_sha, 'cpu',
+                artifact.timebase.physics_dt, artifact.timebase.control_substeps):
+            raise ValueError('R02c leaf plan Provider/build/backend/timebase identity mismatch')
+        expected_targets = {f'{entry.binding.entity_id}/{ref.joint_id}': f'actuator{index}'
+                            for entry in leaf_plan.leaves if entry.binding.profile_kind == 'arm_position'
+                            for index, ref in enumerate(entry.binding.joint_order, 1)}
+        expected_open = tuple(
+            ref.actuator_id for entry in leaf_plan.leaves
+            if entry.binding.profile_kind == 'hand_position' for ref in entry.binding.actuator_order
+        )
+        if dict(source.joint_targets) != expected_targets or tuple(source.open_actuators) != expected_open:
+            raise ValueError('R02c RuntimeSource actuator names differ from ordered leaf bindings')
+        if len(leaf_plan.leaves) != 2 or {entry.binding.profile_kind for entry in leaf_plan.leaves} != {
+            'arm_position', 'hand_position',
+        }:
+            raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
     if diagnostic_profile is None:
         actual_manifest = provider_manifest(execution.physics_provider)
     else:
@@ -635,7 +673,7 @@ def materialize_control(
             admission_manifest = r1_manifest
         else:
             raise TypeError('unsupported explicit Controller profile instance')
-    elif len(source.joint_targets) != 7 or len(source.open_actuators) != 1:
+    elif leaf_plan is None and (len(source.joint_targets) != 7 or len(source.open_actuators) != 1):
         raise ValueError('unsupported control source bindings')
 
     if controller_binding_plan is not None:
@@ -686,6 +724,10 @@ def materialize_control(
         )
         session._force_feedback_required = force_required
         session._control_binding_plan = controller_binding_plan
+    elif leaf_plan is not None:
+        session._force_feedback_required = False
+        session._control_binding_plan = None
+        session.admit_leaf_control_plan(leaf_plan)
     else:
         session._force_feedback_required = True
         session._control_binding_plan = None

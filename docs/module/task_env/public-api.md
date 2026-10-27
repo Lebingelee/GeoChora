@@ -130,7 +130,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `project_logical_assembly_source`, `LogicalAssemblySourceProjectionV1`, `ProjectedEntitySourceV1`, `ProjectedLeafSourceV1` | `task_env.assembly` | R01c advanced provider-free projection：每次重验当前 Assembly/Scene/child closure，关联被引用的现有 Entity、Asset声明及精确 typed Frame/Joint/Actuator/ControlGroup定义；保留来源Assembly/path与声明级证据。receipt只核对声明身份，不重新验证bytes/closure；不lower XML、不创建物理Entity/native映射或Runtime |
 | `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite Force-aware catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; R02b adds a separate compiled Position leaf plan and synthetic-IO adapter path, but does not alter the catalog or admit a Provider |
 | `LeafProfileSectionV1`, `LeafControlPresetV1`, `LeafProfileOverrideV1`, `EffectiveLeafPlanV1`, `compile_effective_leaf_plan` | `task_env.controllers.canonical` | R02b advanced provider-free owner. Re-resolves current R01b/R01c inputs, requires complete Scene ControlGroup/ActuatorResource coverage, compiles exact immutable Arm/Hand Position sections, and derives `preset` / `partially_overridden` / `custom` from effective configuration differences. This is not a public factory or runtime admission |
-| `LeafMaterializationReceiptV1`, `LeafNativeJointMappingV1`, `LeafNativeActuatorMappingV1`, `LeafNativeFrameMappingV1`, `LeafNativeTendonMappingV1`, `prepare_leaf_command`, `preflight_leaf_control_interval`, `dispatch_leaf_control_interval` | `task_env.runtime.sessions` (advanced opt-in) | R02b provider-neutral typed boundary and production preflight/dispatch owners. S1 consumes explicitly `synthetic_fixture` mappings only; no real Provider implementation, native materialization, `SelectedReferenceEnv`, or Recorder/H5 integration is added. `LeafControlRuntime` is a protocol for a future extension of the existing RuntimeSession owner, not a second runtime |
+| `LeafMaterializationReceiptV1`, `LeafNativeJointMappingV1`, `LeafNativeActuatorMappingV1`, `LeafNativeFrameMappingV1`, `LeafNativeTendonMappingV1`, `prepare_leaf_command`, `preflight_leaf_control_interval`, `dispatch_leaf_control_interval` | `task_env.runtime.sessions` (advanced opt-in) | R02b provider-neutral typed boundary and production preflight/dispatch owners. R02b S1 consumes explicitly `synthetic_fixture` mappings only; real Provider execution is attempted only by the R02c SelectedReferenceEnv integration below, whose native gate remains unverified. `LeafControlRuntime` extends the existing RuntimeSession owner, not a second runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
@@ -321,6 +321,23 @@ assert all(entry.admission_status == "NOT_ADMITTED" for entry in leaf_profile_ca
 ```
 
 This example constructs static contract values only; it does not instantiate a leaf Controller or execute a Provider.
+
+### R02c leaf Position integration status (2026-10-27)
+
+The task-owned `build_leaf_position_candidate()` and advanced
+`SelectedReferenceEnv.from_leaf_position_candidate()` path compose the existing A05 source, `ReferenceTaskBinding`,
+RuntimeSession, lifecycle and Generic H5 v3 owners. One full-Panda Entity exposes two existing ControlGroup references
+to separate Arm-only and Hand-only Position writers; this is not two complete Panda Controllers and does not represent
+the independent Arm+Hand Attachment route. `load_leaf_control_records_h5()` adds a strict leaf semantic reader over the
+existing Generic H5 v3 envelope. It does not introduce a new recorder format or public `make_env()` UID.
+
+Provider-free targeted S1 passed 53 tests. The one bounded MuJoCo 3.8.1 CPU probe process exited during static contract
+validation with `KeyError: 'provider_static_files'`, before importing MuJoCo or compiling/materializing/resetting/stepping.
+The script was corrected in a later unexecuted contract revision; the fixed process budget did not permit another start.
+Therefore no R02c S2/S3, native H5 readback, or Provider admission is established. Keep this path at
+`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`; do not describe it as an executable supported candidate or Qualification.
+The attempt report and raw logs are local ignored Evidence under
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`.
 
 ## C02b Position Profile candidate status (2026-10-22)
 

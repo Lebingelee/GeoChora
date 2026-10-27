@@ -122,6 +122,29 @@ materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
 do not report split leaves as admitted. R02c is the real execution/recording
 gate, and native S2/S3/S4 and Qualification remain separate.
 
+## SelectedReferenceEnv leaf integration (R02c attempt001)
+
+The task-owned `build_leaf_position_candidate()` composes the existing A05
+source/Artifact/reset owners with two separate Arm-only and Hand-only Position
+writers on one full-Panda Entity. `SelectedReferenceEnv.from_leaf_position_candidate()`
+reuses the existing binding, reset/step/stop/close, typed-state, fault and
+Recorder lifecycle; it is an advanced task candidate, not a registered
+`make_env()` UID or independent Arm+Hand Attachment route. The MuJoCo adapter
+builds a provider-materialization receipt from the compiled model and applies
+each writer's owned ctrl slots. `load_leaf_control_records_h5()` is an additive
+semantic reader over Generic H5 v3, not a second recording format.
+
+The provider-free targeted S1 passed 53 tests. The authorized bounded MuJoCo
+3.8.1 CPU process exited during static contract verification with
+`KeyError: 'provider_static_files'` before importing MuJoCo or running native
+compile/materialize/reset/forward/step. A script correction was preserved in
+contract revision 3 but was not rerun because the fixed process-start budget
+was exhausted. Treat R02c native S2/S3 and Provider admission as NOT_RUN; do not
+describe the implementation as a supported runtime route or Qualification.
+The initial error, corrected script and revisioned contracts are in the local
+ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`
+attempt package.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",

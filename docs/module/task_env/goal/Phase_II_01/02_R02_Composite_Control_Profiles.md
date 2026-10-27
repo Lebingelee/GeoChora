@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a 已获Sol接收（ACCEPTED_S1_BOUNDED；Required State拒绝门修正后37 passed）；R02b 已获Sol接收（ACCEPTED_S1_BOUNDED；4项局部修正后18 passed）；R02c仍 PLANNED / NOT_STARTED。
+状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt001 已实现并通过provider-free定向S1，等待Sol复核；所需S2/S3未运行，leaf Provider admission仍未建立。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -88,3 +88,11 @@ R02c 首先在既有完整 Panda 的两个 Existing-Entity Subcomponent Referenc
 Sol审阅提交 `0527b1aa9261aad199b8afe62cf66c15f2f20ccb`，通过5项定向失败复现，直接关闭4项缺口：共享gripper helper恢复旧零力Target的hold语义；canonical Controller保留原末端opening限幅与无deadband运算；native actuator/ctrl slots必须完整覆盖nu，不接受隐藏的未分配actuator；writer沿用R02a semantic name规则，允许Entity-qualified名称。leaf配置仍按原schema校验，不新增Force-aware或物理force-cap支持。
 
 最终R02b provider-free S1为18 passed（原13项加5项回归），既有owner集合101 passed/3个native selector未运行，C02b pure guard 1 passed。另从输入提交实际旧源码执行18个canonical与36个gripper数值对照，payload/Target identity或ctrl逐项完全一致。47项原始交付哈希、14项保护输入、11份Phase Markdown及R06/DAG/Required Envelope/P99语义匹配；原始Luna报告与失败日志保留。接收为 **ACCEPTED_S1_BOUNDED**；下一包按表进入R02c同完整Panda内两个真正Position leaf writer的MuJoCo CPU/既有Env与H5实现和有界验证。Sol本次未运行native/S2/S3/S4，未授予Provider admission或Qualification。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/`。
+
+## R02c attempt001 implementation 与未运行的native gate（2026-10-27）
+
+在既有Task Source、canonical leaf、RuntimeSession、SelectedReferenceEnv与Generic H5 v3 owners内完成R02c接线：`task_env/tasks/position_candidate/leaf_candidate.py`构造一个A05完整Panda Entity及arm/gripper两个ControlGroup引用、两个独立Position leaf writer和固定reset/action身份；`SelectedReferenceEnv.from_leaf_position_candidate()`复用既有reset/step/stop/close/fault生命周期。`_MuJoCoSession`生成与真实model绑定的canonical/native Joint、Actuator、Frame、Tendon/equality receipt并实施owned ctrl-slot patch。H5仍使用Generic v3；`load_leaf_control_records_h5()`为同owner增加严格语义读回，不新增存储格式。旧单/双完整Panda Controller算法与TaskArtifact/Scene/Reset/Profile/Target/Ack/H5 identity没有改写。
+
+本次R02c定向provider-free S1为53 passed，覆盖新candidate、R02b dispatch/reader、既有Position执行与R04a消费者。一次混合兼容性命令为109 passed、2 failed：旧双Entity运行测试完成4次既有materialize/reset/forward、0次`mj_step`；失败分别是旧synthetic reset sentinel访问缺失的可选`_leaf_plan`（已在本包修正）和同进程native import污染R04a provider-free import断言。随后干净provider-free集合复跑53 passed，含该R04a断言。该混合命令不是R02c S2证据。
+
+R02c固定的MuJoCo 3.8.1 CPU probe进程在合同静态字段校验时以`KeyError: 'provider_static_files'`退出；失败点早于MuJoCo import、compile、materialize、reset、forward和step，因此本包没有R02c native S2/S3或H5 readback结果。前一兼容性进程已用掉唯一允许的预步进恢复名额，未重启probe。合同修订2与失败stdout被原样保留，脚本字段修正进入修订3，但修订3未执行。R02c状态为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，required S2/S3仍`NOT_RUN`；叶级生产运行/Provider admission、task success、Qualification均未建立。报告和原始Evidence位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`。

@@ -964,6 +964,138 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
     }
 
 
+def load_leaf_control_records_h5(path: Path | str) -> dict[str, Any]:
+    """Independently validate R02c leaf Target/command/Ack against v3 metadata and observations."""
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+    from task_env.controllers.canonical.leaf_profiles import (
+        LeafPreparedCommandV1, decode_leaf_application_ack, decode_leaf_target,
+    )
+
+    generic = load_structured_control_records_h5(path)
+    profile = generic['env_meta'].get('reference_profile')
+    required_profile = {
+        'schema_version', 'profile_id', 'task_artifact_identity_hash',
+        'task_source_identity_sha256', 'scene_identity_hash', 'source_id',
+        'source_closure_digest', 'effective_leaf_plan_identity_sha256',
+        'preset_identity_sha256', 'reset_plan_identity_hash', 'reset_sample_id',
+        'provider', 'provider_version', 'provider_build_sha256', 'backend',
+        'physics_dt_s', 'control_substeps', 'control_dt_s',
+        'materialization_identity_sha256', 'configuration_revision', 'writers',
+    }
+    if (not isinstance(profile, Mapping) or set(profile) != required_profile
+            or profile.get('schema_version') != 'leaf-position-recording-profile-v1'
+            or profile.get('profile_id') != 'r02c-independent-position-leaves-v1'):
+        raise ValueError('task-env-h5/v3 does not contain the exact R02c leaf recording profile')
+    writers = profile['writers']
+    if not isinstance(writers, list) or len(writers) != 2:
+        raise ValueError('R02c H5 metadata must identify exactly two leaf writers')
+    writer_by_id = {}
+    for writer in writers:
+        if not isinstance(writer, Mapping) or set(writer) != {
+            'writer_id', 'profile_kind', 'action_schema_id', 'binding_identity_sha256',
+            'effective_configuration_identity_sha256', 'member_path', 'entity_id',
+            'control_group_id', 'joint_order', 'actuator_order',
+        }:
+            raise ValueError('R02c H5 writer binding metadata has unknown or missing fields')
+        if writer['writer_id'] in writer_by_id:
+            raise ValueError('R02c H5 writer identity is duplicated')
+        writer_by_id[writer['writer_id']] = writer
+    if {item.get('profile_kind') for item in writers} != {'arm_position', 'hand_position'}:
+        raise ValueError('R02c H5 must bind one Arm and one Position Hand leaf')
+    if (profile['provider'], profile['provider_version'], profile['backend'],
+            profile['physics_dt_s'], profile['control_substeps'], profile['control_dt_s']) != (
+            'mujoco', '3.8.1', 'cpu', 0.002, 5, 0.01):
+        raise ValueError('R02c H5 Provider/timebase metadata differs from the admitted source route')
+    transition_count = generic['transition_count']
+    observation_count = generic['observation_count']
+    if transition_count != 64 or observation_count != 65:
+        raise ValueError('R02c H5 requires exactly 64 transitions and 65 observations')
+    with __import__('h5py').File(Path(path), 'r') as root:
+        if 'obs/state/boundary_identity_sha256' not in root:
+            raise ValueError('R02c H5 lacks the independent stored state-boundary observation')
+        state_boundary_digests = np.asarray(root['obs/state/boundary_identity_sha256'][...])
+    if state_boundary_digests.shape != (65, 32) or state_boundary_digests.dtype != np.uint8:
+        raise ValueError('R02c H5 state-boundary observation has the wrong shape or dtype')
+    controls = generic['structured_controls']
+    for index, control in enumerate(controls):
+        if (control is None or control.request.scene_identity_hash != profile['scene_identity_hash']
+                or control.request.binding_identity_hash != profile['effective_leaf_plan_identity_sha256']):
+            raise ValueError(f'R02c transition {index} is not bound to the H5 Scene/plan')
+        if len(control.writer_controls) != 2:
+            raise ValueError(f'R02c transition {index} must record exactly two leaf writers')
+        records = {item['writer_id']: item for item in control.writer_controls}
+        if set(records) != set(writer_by_id):
+            raise ValueError(f'R02c transition {index} omits or duplicates a leaf writer')
+        seen_slots = set()
+        for writer_id, writer_meta in writer_by_id.items():
+            row = records[writer_id]
+            canonical = row['canonical_action']
+            if not isinstance(canonical, Mapping) or canonical.get('schema_version') != 'leaf-canonical-action-v1':
+                raise ValueError(f'R02c transition {index}/{writer_id} lacks a versioned canonical command')
+            for key, expected in (
+                ('source_closure_sha256', profile['source_closure_digest']),
+                ('effective_plan_identity_sha256', profile['effective_leaf_plan_identity_sha256']),
+                ('materialization_identity_sha256', profile['materialization_identity_sha256']),
+                ('configuration_identity_sha256', writer_meta['effective_configuration_identity_sha256']),
+            ):
+                if canonical.get(key) != expected:
+                    raise ValueError(f'R02c transition {index}/{writer_id} has mismatched {key}')
+            target = decode_leaf_target(row['controller_target']['payload'])
+            if (target.identity_hash != row['controller_target']['identity_hash']
+                    or target.writer_id != writer_id
+                    or target.binding_identity_hash != writer_meta['binding_identity_sha256']
+                    or target.scene_identity_hash != profile['scene_identity_hash']
+                    or target.source_closure_sha256 != profile['source_closure_digest']
+                    or canonical.get('target_identity_sha256') != target.identity_hash):
+                raise ValueError(f'R02c transition {index}/{writer_id} Target identity/source mismatch')
+            if row['requested_action'].get('payload') != target.action.to_mapping():
+                raise ValueError(f'R02c transition {index}/{writer_id} requested Action differs from the Target')
+            command = LeafPreparedCommandV1.from_mapping(canonical['prepared_command'])
+            if (command.command_identity_sha256 != canonical.get('command_identity_sha256')
+                    or command.target != target or command.writer_id != writer_id
+                    or command.effective_plan_identity_sha256 != profile['effective_leaf_plan_identity_sha256']
+                    or command.effective_configuration_identity_sha256
+                    != writer_meta['effective_configuration_identity_sha256']
+                    or command.materialization_identity_sha256 != profile['materialization_identity_sha256']):
+                raise ValueError(f'R02c transition {index}/{writer_id} prepared command identity mismatch')
+            ack = decode_leaf_application_ack(canonical['application_ack'])
+            applied = row['applied_control']
+            applied_payload = applied['payload']
+            applied_ack = decode_leaf_application_ack(applied_payload['ack'])
+            if (ack != applied_ack or applied['target_hash'] != target.identity_hash
+                    or applied_payload.get('writer_id') != writer_id
+                    or applied_payload.get('command_identity_sha256') != command.command_identity_sha256
+                    or applied_payload.get('materialization_identity_sha256') != profile['materialization_identity_sha256']):
+                raise ValueError(f'R02c transition {index}/{writer_id} application Ack/command mismatch')
+            slots = tuple(item.ctrl_slot for item in command.slot_values)
+            if (tuple(applied_payload.get('applied_slots', ())) != slots
+                    or seen_slots.intersection(slots)):
+                raise ValueError(f'R02c transition {index}/{writer_id} duplicate/mismatched native ctrl slots')
+            seen_slots.update(slots)
+            source = target.source_boundary
+            next_boundary = StateBoundaryIdentity.from_mapping(canonical['next_boundary'])
+            if (source.control_step != index or next_boundary.control_step != index + 1
+                    or ack.source_boundary != source
+                    or ack.application_boundary.control_step != index
+                    or (source.episode_id, source.reset_sample_id, source.scene_identity_hash,
+                        source.provider_materialization_id) != (
+                        next_boundary.episode_id, next_boundary.reset_sample_id,
+                        next_boundary.scene_identity_hash, next_boundary.provider_materialization_id)
+                    or target.sample_clock.simulation_time_s != index * profile['control_dt_s']
+                    or ack.application_sample_clock != target.sample_clock):
+                raise ValueError(f'R02c transition {index}/{writer_id} boundary/clock sequence mismatch')
+            if (canonical.get('source_boundary') != source.to_mapping()
+                    or canonical.get('application_boundary') != ack.application_boundary.to_mapping()):
+                raise ValueError(f'R02c transition {index}/{writer_id} Target/Ack boundaries disagree')
+            for boundary_index, boundary in ((index, source), (index + 1, next_boundary)):
+                digest = bytes(state_boundary_digests[boundary_index]).hex()
+                if digest != boundary.boundary_id.removeprefix('state-boundary-'):
+                    raise ValueError(f'R02c transition {index}/{writer_id} boundary differs from stored observation')
+    generic['leaf_profile'] = profile
+    generic['leaf_writer_ids'] = tuple(sorted(writer_by_id))
+    return generic
+
+
 def load_camera_observations_h5(path: Path | str) -> dict[str, Any]:
     """Strictly read the opt-in camera metadata extension on Generic H5 v3."""
 
