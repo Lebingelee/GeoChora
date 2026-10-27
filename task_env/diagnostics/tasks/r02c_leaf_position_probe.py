@@ -65,9 +65,19 @@ def _validate_mujoco_runtime_identity(observed: dict, expected: dict) -> None:
         raise RuntimeError("BLOCKED_PROVIDER: loaded MuJoCo native library path/hash differs")
 
 
+def _json_default(value):
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True, allow_nan=False, default=_json_default) + "\n"
+    )
 
 
 def _leaf_failure_progress(envs) -> list[dict]:

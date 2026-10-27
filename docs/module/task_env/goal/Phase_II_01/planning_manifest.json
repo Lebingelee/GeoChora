@@ -585,17 +585,17 @@
         "R02b",
         "R01c"
       ],
-      "status": "S1_REVIEWED_NATIVE_PENDING",
-      "execution": "ATTEMPT003_FAIL_CORE_AFTER5_MJ_STEP; TYPE_FIX_AND_OWNER_BOUNDARY_S1_REVIEWED; S2_S3_INCOMPLETE",
+      "status": "FAIL_PHYSICAL_ORACLE_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT004_E2_HAND_MOTION_ORACLE_FAIL_AFTER640_MJ_STEP; EVIDENCE_SERIALIZATION_FIX_PROVIDER_FREE_ONLY; E3_E4_NOT_RUN",
       "required_evidence": "S2/S3",
       "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
-      "native_execution": "003_PROVIDER_COMPILE_MATERIALIZATION_RESET_VERIFIED;5_MJ_STEP;PUBLICATION_FAIL;0_COMPLETE_TRANSITIONS",
+      "native_execution": "004_MUJOCO_IDENTITY_AND_STATIC_SOURCE_PASS; E1_ARM_AND_H5_PASS; E2_HAND_MOTION_FAIL; E2_OFFLINE_H5_READBACK_PASS; E3_E4_NOT_RUN",
       "core_runtime_admission": false,
-      "provider_free_s1_passed": 19,
+      "provider_free_s1_passed": 38,
       "qualification_granted": false,
-      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/report.md",
-      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/evidence.json",
-      "result": "Sol reviewed the typed publication fix, moved requirement validation before consume/physics, strengthened actual publisher/projection/H5/probe-checker S1, repaired remaining probe import and public failure receipts;38 provider-free tests passed. Original003 FAIL_CORE/H5 T0/1 retained; new004 native execution required, no slice acceptance.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/evidence.json",
+      "result": "Attempt004 verified MuJoCo 3.8.1 CPU and the frozen source. E1 passed Arm motion and H5 checks. E2 completed 64 intervals but failed the frozen Hand opening motion oracle; its closed H5 passed offline T/T+1 readback. E3/E4 were not run. The previously reviewed 38 provider-free S1 checks were reused; after the post-run serialization-only fix, the affected R02c module passed 21 tests (R02b was not rerun). Required S2/S3 remain incomplete; no Provider admission, Qualification or R03b start.",
       "sol_review": {
         "decision": "S1_REVIEWED_NATIVE_PENDING",
         "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
@@ -605,7 +605,7 @@
         "next_attempt": "004",
         "new_native_authorization_required": true
       },
-      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/commands.json",
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/commands.json",
       "attempt003": {
         "task_id": "PHASE-II-01-R02C",
         "input_commit": "cdb0c12006ca0787f9110da5df343711abc869f3",
@@ -746,7 +746,80 @@
           "attempt002_plus_continuation_max_process_starts": 2
         }
       },
-      "sol_review_required": "Repair/S1 reviewed; required actual S2/S3 remain incomplete. No slice acceptance."
+      "sol_review_required": "Attempt004 fails E2 frozen Hand-motion oracle; S2/S3 remain incomplete. Review actual diff and preserved raw/reconstructed evidence. No Provider admission/Qualification; R03b not started.",
+      "attempt004": {
+        "task_id": "PHASE-II-01-R02C",
+        "attempt": "004",
+        "input_commit": "18661b6baa291022860196b6b4683d51cfe56ba5",
+        "authorization_reference": "Current human instruction in this chat dated 2026-10-27 explicitly authorizing one fresh bounded MuJoCo 3.8.1 CPU native process, necessary in-scope repairs, S2/S3 closeout and local commit; preserve previous failures; return to Sol; no R03b.",
+        "static_preflight": {
+          "status": "PASS_STATIC_PREFLIGHT",
+          "native_imported": false,
+          "native_calls": 0,
+          "source_closure_sha256": "aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47",
+          "closure_bytes": 34307550,
+          "asset_count": 67,
+          "lowered_xml_sha256": "fc22fcdd006adb2e2d1c0aab9d19b0146f939ec66818db2bc793a2c706697bb2"
+        },
+        "native": {
+          "classification": "FAIL_PHYSICAL_ORACLE_AND_EVIDENCE_FINALIZATION",
+          "process_starts": 1,
+          "exit_code": 1,
+          "timed_out": false,
+          "wall_seconds": 9.6,
+          "provider_identity": "PASS: MuJoCo package/runtime/API 3.8.1/3.8.1/3008001 and pinned package/binding/library hashes matched",
+          "native_calls": {
+            "materialize_control": 2,
+            "mj_resetData": 2,
+            "mj_step": 640,
+            "mj_forward": null,
+            "mj_forward_reason": "Counter not serialized in failure event; no estimate used."
+          },
+          "completed_outer_intervals": 128,
+          "derived_simulation_time_s": 1.28,
+          "raw_evidence_note": "native_evidence.json says FAIL_PRE_STEP/zero calls because a secondary numpy.float32 serialization TypeError replaced the primary error. Immutable JSONL probe_failure records the E2 assertion and real counts; raw files retained.",
+          "episodes": {
+            "E1-arm-only": {
+              "status": "MOTION_AND_H5_PASS",
+              "outer_intervals": 64,
+              "mj_step_calls": 320,
+              "q1_peak_delta_rad": 0.09744434092148166,
+              "q1_final_home_error_rad": 1.0379862451645179e-05,
+              "h5_t": 64,
+              "h5_observations": 65,
+              "reader": "PASS",
+              "tamper_cases_rejected": 9
+            },
+            "E2-hand-only": {
+              "status": "FAIL_HAND_MOTION_ORACLE",
+              "outer_intervals": 64,
+              "mj_step_calls": 320,
+              "opening_min_m": 0.06878985744020077,
+              "opening_final_m": 0.07119991847030517,
+              "opening_excursion_m": 0.007210142559799224,
+              "required_opening_min_m_max": 0.02,
+              "required_excursion_m_min": 0.04,
+              "h5_t": 64,
+              "h5_observations": 65,
+              "offline_reader": "PASS"
+            },
+            "E3-simultaneous-default": "NOT_RUN",
+            "E4-simultaneous-arm-gain-3": "NOT_RUN"
+          },
+          "rss_sample": null,
+          "rss_reason": "Failure finalization error lost in-memory resource_samples."
+        },
+        "post_run_fix": {
+          "owner": "task_env/diagnostics/tasks/r02c_leaf_position_probe.py::_write_json",
+          "summary": "Serialize numpy.generic/ndarray and preserve strict allow_nan=false; no physics or oracle changes.",
+          "targeted_provider_free_tests": "21 passed",
+          "native_retry": false
+        },
+        "provider_admission": false,
+        "qualification_granted": false,
+        "R03b_started": false,
+        "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/"
+      }
     },
     {
       "id": "R03b",
@@ -979,15 +1052,15 @@
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "02_R02_Composite_Control_Profiles.md": "23f042de1121689c64ab74fd333e46c2792a36f2f4b5df7672c8915790c52e28",
+    "02_R02_Composite_Control_Profiles.md": "53b23ba16359d0b2c2f0ca12e0b730201aeb4a58ddb02e7e556c555abcb2bf6f",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "76ee06196d7cd1b3bf1005b43ff9c9e213a49ea18d52e2ff9fc33d3597556789",
+    "07_Execution_Order_and_Acceptance.md": "5b8d08fc8cbe92e6de5a0d2b84ec75e8ddd46adee746b55d55641fccd8da2e87",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "11911fa90282df5f0b70917ab6c4f9cd56b7dbf30668d29ed3c21c90cf48a70c"
+    "README.md": "c8e5cf63058d95e9577222835724497c041e45e0c0a97733bd08d4891d774c1b"
   },
   "revision_kind": "SOL_R02C_ATTEMPT003_REVIEW_AND_OWNER_BOUNDARY_REPAIR",
   "benchmark_audit": {

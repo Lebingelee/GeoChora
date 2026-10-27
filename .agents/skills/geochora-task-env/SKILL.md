@@ -122,7 +122,7 @@ materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
 do not report split leaves as admitted. R02c is the real execution/recording
 gate, and native S2/S3/S4 and Qualification remain separate.
 
-## SelectedReferenceEnv leaf integration (R02c attempts 001–003)
+## SelectedReferenceEnv leaf integration (R02c attempts 001–004)
 
 The task-owned `build_leaf_position_candidate()` composes the existing A05
 source/Artifact/reset owners with two separate Arm-only and Hand-only Position
@@ -191,11 +191,27 @@ StateRequirements repair is reviewed and now validates before consume/physics.
 The strengthened S1 uses the actual MuJoCo publisher and shared snapshot/projection
 with synthetic IO, production Recorder/H5 and the same probe ctrl checker;
 38 R02c/R02b tests passed without native load. The remaining probe readback
-import and pre-close per-writer fault receipt capture are fixed. The original
+import and pre-close per-writer fault receipt capture were fixed. The original
 T0/T+1=1 failure H5 remains rejected; its finalized attribute does not satisfy
-R02c's64/65 requirement. Current status remains S1_REVIEWED_NATIVE_PENDING;
-a separately authorized single-process attempt004 must complete real S2/S3.
-No Attachment admission, R03b start or Qualification follows from this review.
+R02c's64/65 requirement.
+
+Attempt004 (2026-10-27) used the new authorized single-process window. Static
+preflight verified the unchanged 34,307,550-byte source closure and 67 assets;
+the loaded MuJoCo identity matched 3.8.1/3.8.1/3008001 and its pinned file hashes.
+E1 arm-only completed 64 intervals, passed the joint-1 motion/home oracle, and
+passed same-file H5 T=64/T+1=65 readback plus nine tamper rejections. E2
+hand-only completed 64 intervals but failed the frozen hand-motion oracle:
+opening minimum 0.068789857 m and excursion 0.007210143 m did not meet ≤0.02 m
+and ≥0.04 m. E2's H5 was closed and passed offline typed-reader T/T+1 checks;
+E3/E4 did not run. A secondary `numpy.float32` JSON serialization error
+obscured the raw summary, but the immutable JSONL event records the actual E2
+assertion, 2 materializations, 2 resets, and 640 `mj_step` calls. Exact
+`mj_forward` and RSS counts are unavailable. A diagnostic serialization fix
+and regression passed 21 provider-free tests after the run; no native retry,
+source/algorithm/oracle/threshold/budget change, Provider admission,
+Qualification, or R03b start occurred. R02c remains
+`FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`. Evidence is in
+ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`.
 
 ## Choose the actual construction branch
 

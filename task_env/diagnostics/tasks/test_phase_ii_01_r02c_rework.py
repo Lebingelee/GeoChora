@@ -109,6 +109,21 @@ def test_static_preflight_rejects_empty_authorization_references(authorization):
         probe._verify_frozen_inputs(contract, {})
 
 
+def test_probe_json_writer_preserves_numpy_failure_progress(tmp_path):
+    from task_env.diagnostics.tasks.r02c_leaf_position_probe import _write_json
+
+    path = tmp_path / "native-evidence.json"
+    _write_json(path, {
+        "motion_metric": np.float32(0.125),
+        "native_trace": np.asarray([0.0, 0.01], dtype=np.float64),
+    })
+
+    assert json.loads(path.read_text()) == {
+        "motion_metric": pytest.approx(0.125),
+        "native_trace": [0.0, 0.01],
+    }
+
+
 def test_prepared_command_strict_codec_checks_nested_identity_and_slot_order():
     scene, _, _, _, plan = _case()
     receipt = _receipt(plan)

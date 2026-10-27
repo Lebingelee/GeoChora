@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b已接收；R02c attempt003真实构造/reset通过、5步后Core publication失败；修复/S1已复核，状态S1_REVIEWED_NATIVE_PENDING，required S2/S3仍未完成。
+状态：REVISED_DRAFT；R02a/R02b已接收；R02c attempt004已验证同source MuJoCo 3.8.1 CPU identity，E1 arm-only通过，E2 hand-only未达到冻结运动oracle；required S2/S3仍未完成，等待Sol复核。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -120,3 +120,11 @@ native原件保留后，现有`leaf_control.dispatch_leaf_control_interval()`已
 ## R02c attempt003 Sol复核（2026-10-27）
 
 接收真实MuJoCo3.8.1 CPU identity、固定source编译/receipt/reset与5个mj_step事实；首interval因tuple→StateRequirements接口不符而失败，S2/S3未完成。Luna类型修复经复核；Sol将聚合要求预先校验，并让S1实际经过MuJoCo publisher与共享snapshot/projection，同时关闭probe S3旧导入和故障逐writer receipt落盘缺口。R02c20+R02b18共38项provider-free S1通过，无新native。失败H5 T0/T+1=1只读复核拒绝；原raw不改。三条滞后文档hash由Sol直接同步，下一包004以新的明确授权单进程完成同source四episode与H5，原算法/oracle、DAG/required/R06/R05a/P99不变，R03b不启动。
+
+## R02c attempt004 native motion failure（2026-10-27）
+
+本次维护者指令授权一个新窗口内的一次MuJoCo 3.8.1 CPU native进程、范围内必要修正、S2/S3收口及本地提交；原003及更早失败原件保持只读。S0保护输入、冻结tag/gitlink及R06/R05a/DAG/Required Envelope/P99语义匹配；static preflight对原Menagerie panda.xml、34,307,550-byte source closure、lowered XML和67 assets通过，未加载native Provider。唯一进程内实际package/runtime/API为`3.8.1/3.8.1/3008001`，path/hash匹配。
+
+E1 arm-only完成64 intervals / 320 `mj_step`，joint1峰值位移`0.0974443 rad`、末态home误差`0.0000104 rad`，通过冻结Arm oracle；Generic H5 v3为T=64/T+1=65，生产独立reader通过，9类tamper均拒绝。E2 hand-only也完成64 intervals / 320 `mj_step`，其真实请求曲线达到close目标`0.004 m`，但native opening最小值仅`0.0687899 m`、excursion仅`0.00721014 m`，未达到`≤0.02 m`和`≥0.04 m`门。E2在Env清理关闭时保留的H5为T=64/T+1=65，离线独立typed reader通过；这不能抵销物理oracle失败。E3/E4未运行。唯一进程累计materialize=2、reset=2、step=640；`mj_forward`和RSS计数因失败收尾未持久化，记为未知，不从相邻日志推算。
+
+主失败是E2 hand-motion oracle assertion。随后probe在JSON终结落盘时遇到`numpy.float32`序列化错误，外层raw `native_evidence.json`因此误写`FAIL_PRE_STEP`和零计数；原JSONL `probe_failure`事件含真实原因和进度，两个H5及raw日志均保持原样。范围内对probe JSON写入器加入NumPy scalar/array规范化并增加provider-free回归，受影响模块21 passed；该修正只影响Evidence序列化，不影响物理源、命令、算法、oracle、阈值或预算。没有第二次native调用。E3/E4、完整R02c required S2/S3均未完成；出口为`FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`，不构成Provider admission或Qualification，不启动R03b。完整报告、修正后的合同revision、重建说明、offline H5读回和raw Evidence见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`；此前attempt001–003文件不变。
