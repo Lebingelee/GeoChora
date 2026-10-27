@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt001 已实现并通过provider-free定向S1，等待Sol复核；所需S2/S3未运行，leaf Provider admission仍未建立。
+状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt001 已复核为CHANGES_REQUESTED_S2_S3_NOT_RUN；须修复写入前校验与H5读回；所需S2/S3未运行，leaf Provider admission仍未建立。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -96,3 +96,7 @@ Sol审阅提交 `0527b1aa9261aad199b8afe62cf66c15f2f20ccb`，通过5项定向失
 本次R02c定向provider-free S1为53 passed，覆盖新candidate、R02b dispatch/reader、既有Position执行与R04a消费者。一次混合兼容性命令为109 passed、2 failed：旧双Entity运行测试完成4次既有materialize/reset/forward、0次`mj_step`；失败分别是旧synthetic reset sentinel访问缺失的可选`_leaf_plan`（已在本包修正）和同进程native import污染R04a provider-free import断言。随后干净provider-free集合复跑53 passed，含该R04a断言。该混合命令不是R02c S2证据。
 
 R02c固定的MuJoCo 3.8.1 CPU probe进程在合同静态字段校验时以`KeyError: 'provider_static_files'`退出；失败点早于MuJoCo import、compile、materialize、reset、forward和step，因此本包没有R02c native S2/S3或H5 readback结果。前一兼容性进程已用掉唯一允许的预步进恢复名额，未重启probe。合同修订2与失败stdout被原样保留，脚本字段修正进入修订3，但修订3未执行。R02c状态为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，required S2/S3仍`NOT_RUN`；叶级生产运行/Provider admission、task success、Qualification均未建立。报告和原始Evidence位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`。
+
+## R02c Sol复核与有界返工（2026-10-27）
+
+Sol复核保留53项S1与原始失败事实，但发现reader导入/codec缺失、Target跨episode先写后拒绝、浮点clock精确比较、admission失败资源关闭及probe旧窗口硬编码问题。前三类已用provider-free实际调用/算术复现；生命周期和预检为静态审阅。状态为 **CHANGES_REQUESTED_S2_S3_NOT_RUN**，R02c出口不接收。下一包R02c attempt002一次完成必要修复、实际static preflight、生产Recorder/reader的合成H5回归、获授权的同source有界native S2/S3和本地提交；不再单独安排准备轮。Sol未运行native；此前混合兼容运行的4次旧路materialize/reset/forward与R02c probe的0次native分开记账。复核入口在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_001/`。原source/oracle、DAG/required及R06/R05a/P99不变；不启动R03b。

@@ -100,7 +100,7 @@ Scene ControlGroup/ActuatorResource覆盖；实际 adapter 复用既有绝对关
 或Recorder/H5接线；R02b经Sol局部兼容/拒绝门修正后获接收为ACCEPTED_S1_BOUNDED。R02c attempt001已在相同既有owners中实现
 candidate、MuJoCo RuntimeSession leaf dispatch、typed state与Generic H5 v3 reader，provider-free定向S1为53 passed；其
 MuJoCo probe在import前因合同字段名错误退出，故真实materialization、motion、H5 native readback及S2/S3均未运行，Provider admission仍未建立。
-修正后的probe脚本未重跑。R01c继续独立负责静态source投影。R02c未改变R02a Force-aware `NOT_ADMITTED`、旧TaskArtifact/Scene/Reset/Profile/
+修正后的probe脚本未重跑。Sol复核进一步发现H5导入/解码、写入前Target boundary及clock校验缺口，状态为CHANGES_REQUESTED_S2_S3_NOT_RUN；合并修复与有界验证的返工包尚待执行。R01c继续独立负责静态source投影。R02c未改变R02a Force-aware `NOT_ADMITTED`、旧TaskArtifact/Scene/Reset/Profile/
 Target/Ack/H5身份、R06兼容性gate、R05a blocker、DAG、Required Envelope或Qualification。
 
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame

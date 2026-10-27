@@ -145,6 +145,17 @@ The initial error, corrected script and revisioned contracts are in the local
 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`
 attempt package.
 
+Sol review (2026-10-27) is `CHANGES_REQUESTED_S2_S3_NOT_RUN`:
+provider-free reproduction found a wrong prepared-command import, a missing
+nested decoder, and stale Targets writing ctrl slots before Ack rejection;
+the reader also uses an exact-float physical-clock comparison. Admission
+failure cleanup and executable probe preflight require repair. The next
+bounded R02c attempt002 combines those fixes, production Recorder/reader S1
+and authorized native S2/S3; no extra preparation round or R03b start.
+The earlier mixed compatibility process performed four legacy
+materialize/reset/forward operations and zero integration steps; distinguish
+that activity from the R02c probe's zero native calls. Sol ran no native.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",
