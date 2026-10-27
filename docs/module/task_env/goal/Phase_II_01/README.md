@@ -7,7 +7,7 @@
 | 文档 | 修订后的责任 |
 | --- | --- |
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
-| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b已获Sol接收，R01c静态source投影/S1等待Sol复核 |
+| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略 |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
@@ -144,3 +144,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-27，Sol接收R02a静态合同出口为`ACCEPTED_S1_BOUNDED`：原30项S1保留，Required State可降级/跨leaf字段的拒绝缺口已由Sol小范围修正，最终37 passed。catalog/Force-aware仍NOT_ADMITTED，native/plan/adapter/H5/Qualification未建立。下一表行为R01c只读source投影，R06兼容性决定与R05a/DAG/Required Envelope/P99不变；复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/`。
 
 2026-10-27，R01c attempt001在既有 `task_env.assembly` source/compiler owner完成逻辑Assembly到现有Scene源声明的只读投影，provider-free S1覆盖A05完整Panda视图与独立Menagerie Arm/Hand Entity source declarations，并核验identity/provenance、typed refs、不可变snapshot及fail-closed resolver边界。状态为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，尚未获得Sol acceptance。没有lower/attach XML、Provider/native构造、Runtime/S2/S3/S4、Core Attachment admission或Qualification；R06兼容性gate、R05a blocker、原DAG/Required Envelope/P99保持。R02b仍未开始；报告及Evidence保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/`。
+
+2026-10-27，Sol接收R01c attempt001的声明级source投影与18项provider-free S1为 `ACCEPTED_S1_BOUNDED`；无需返工。下一表行为R02b，一包完成effective plan、leaf adapter/preflight实现、定向S1及本地提交。原S2/S3/S4、Attachment/runtime/Qualification边界和R06/R05a/DAG/Required Envelope/P99保持不变。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/`。

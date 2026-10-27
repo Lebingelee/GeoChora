@@ -1,6 +1,6 @@
 # R01 — Logical Robot Assembly
 
-状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b bounded 静态解析已获Sol接收（ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82 passed）；R01c attempt001 已实现 source/compiler 声明级投影并完成 provider-free S1，当前 `IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`。本 Goal 只实现静态逻辑引用，不承诺物理连接。
+状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b bounded 静态解析已获Sol接收（ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82 passed）；R01c attempt001 source/compiler 声明级投影与18项 provider-free S1 已获Sol接收（`ACCEPTED_S1_BOUNDED`）。本 Goal 只实现静态逻辑引用，不承诺物理连接。
 
 ## 当前 owner 与版本边界
 
@@ -24,11 +24,11 @@ Component path 保持 segment tuple；空路径、空 segment、`.`、`..`、分
 
 返回 `ResolvedLogicalAssemblyV1` 与不可变 `ResolvedLogicalAssemblyLeafV1`，记录root/Scene身份及每个leaf的full path、typed member、原 Assembly ID/revision/hash 与local path；它不增加旧codec字段或hash，不产出新的持久化 ABI。入口是advanced静态值API，不连接当前Runtime/source/compiler，不生成native mapping、物理连接或Task Source；R01c现已在既有source/compiler owner增加其后续静态投影。
 
-### R01c 静态source声明投影（attempt001，等待Sol复核）
+### R01c 静态source声明投影（attempt001，Sol已接收静态出口）
 
 `task_env.assembly.project_logical_assembly_source(root, scene, child_assemblies, source_receipts=None)` 每次从当前root、精确Scene和child catalog重新调用R01b resolver；它不接受调用者提供的resolved值作为准入收据。投影以唯一Entity表关联现有 `EntityInstance`、完整 `AssetDefinition` 及其声明identity，并按leaf保留segment tuple路径、owner/reference-only kind、原Assembly身份/hash/local path与typed target definition。Frame/Joint/Actuator使用精确Scene definition；ControlGroup保留其Actuator refs并展开至对应Actuator definitions，不推导native顺序。多个leaf复用同一Entity时source Entity只出现一次；不同Entity即便共用Asset仍分别保留。
 
-投影是 `logical-assembly-source-projection-v1` immutable snapshot；自身 `identity_sha256` 是该版本canonical mapping的非自指digest，`to_mapping()`每次返回脱离内部值的JSON副本。A05完整Panda arm/gripper views共享 `panda-main`；独立Arm/Hand静态fixture保留Menagerie固定pin下的两个Entity/Asset来源声明。`source_content_sha256` null和历史receipt分别按原值保留；receipt只匹配Scene/Asset声明并标记 `MATCHED_DECLARATION_NOT_REVALIDATED`，不重读或验证bytes/closure。静态投影不lower/attach XML、不创建第二Scene/物理Entity/writer/native名字或indices、不调用旧 `compile_task_scene()`/Provider、不准入Runtime或Attachment。实现及S1状态以本地report和Evidence为准；Sol复核前不视作accepted。
+投影是 `logical-assembly-source-projection-v1` immutable snapshot；自身 `identity_sha256` 是该版本canonical mapping的非自指digest，`to_mapping()`每次返回脱离内部值的JSON副本。A05完整Panda arm/gripper views共享 `panda-main`；独立Arm/Hand静态fixture保留Menagerie固定pin下的两个Entity/Asset来源声明。`source_content_sha256` null和历史receipt分别按原值保留；receipt只匹配Scene/Asset声明并标记 `MATCHED_DECLARATION_NOT_REVALIDATED`，不重读或验证bytes/closure。静态投影不lower/attach XML、不创建第二Scene/物理Entity/writer/native名字或indices、不调用旧 `compile_task_scene()`/Provider、不准入Runtime或Attachment。Sol已复核实际差异与原始18项S1，接收此声明级静态出口；不扩大为物理或执行准入。
 
 ### Sol复核（2026-10-27）
 
@@ -65,3 +65,5 @@ R01 持有 canonical refs，不持有 native body/joint/actuator indices。R03 �
 | R01c | R01b | source/compiler 的只读投影与可追踪 leaf refs | S1：完整 Panda 内 arm/hand subrefs、独立 Arm/Hand Entity members 两类 fixture；canonical refs 不产生物理 joint |
 
 本 Goal 不依赖 R04/R05。S1 不能作为 R03 的动力学或 R02 的执行证明。逻辑投影/只读view必须不可变；codec `to_mapping()` 可返回独立JSON副本，修改副本不能回写合同。关闭运行时不破坏可独立持有的逻辑值。接受条件与依赖唯一入口为 [07](07_Execution_Order_and_Acceptance.md)。
+
+2026-10-27，Sol完成R01c attempt001复核，未发现需要返工的实现问题，接收为 **ACCEPTED_S1_BOUNDED**。复用未改动代码的18项provider-free S1与原始日志；20项交付哈希、9份保护输入、10个旧compiler函数、11份Phase Markdown哈希及R06 ledger均匹配。文档validator的152→156仅四项预期代码scope提示，无新增文档错误。下一包按执行表进入R02b effective leaf plan及真实adapter/preflight的provider-free实现/S1；native/S2/S3/S4仍未运行。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/`。
