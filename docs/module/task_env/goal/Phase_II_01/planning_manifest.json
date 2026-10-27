@@ -585,37 +585,45 @@
         "R02b",
         "R01c"
       ],
-      "status": "BLOCKED_HAND_CONFIGURATION_DECISION",
-      "execution": "004_E1_BOUNDED_PASS; E2_PHYSICAL_ORACLE_FAIL; E3_E4_NOT_RUN; HAND_CONFIGURATION_DECISION_PENDING",
+      "status": "ACCEPTED_BOUNDED_S2_S3",
+      "execution": "ATTEMPT005_HAND50_FOUR_EPISODES_NATIVE_S2_S3_PASS_SOL_ACCEPTED",
       "required_evidence": "S2/S3",
       "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
-      "native_execution": "004_MUJOCO_IDENTITY_AND_STATIC_SOURCE_PASS; E1_ARM_AND_H5_PASS; E2_HAND_MOTION_FAIL; E2_OFFLINE_H5_READBACK_PASS; E3_E4_NOT_RUN",
+      "native_execution": "MuJoCo3.8.1 CPU; source-calibrated Hand50; four64-interval episodes;1280step/260forward; four64/65 H5; one native process",
       "core_runtime_admission": false,
       "provider_free_s1_passed": 38,
       "qualification_granted": false,
-      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/report.md",
-      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/evidence.json",
-      "result": "Sol accepted exact arm-only E1 evidence and confirmed E2 physical failure via immutable JSONL/H5. Existing5/2500 position step bound explains weak servo command; source-calibrated50N/m complete Hand override is proposed, not approved or native-tested. Default/old case/oracle unchanged;42 provider-free finalization tests passed. No slice acceptance or R03b start.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/evidence.json",
+      "result": "Exact Hand50 case accepted by Sol after56 provider-free S1, actual static preflight, four native episodes and independent closed-H5 readback. Shared law/source/oracles/budget and2500 default/old FAIL unchanged. Next R03b; no Attachment/Qualification.",
       "sol_review": {
-        "decision": "BLOCKED_HAND_CONFIGURATION_DECISION",
-        "input_commit": "b94806025f0836d121bfd26df4581e80a7c6e6a2",
-        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/sol_review.md",
-        "sol_s1_passed": 42,
-        "native_run_by_sol": false,
-        "E1_acceptance": "BOUNDED_ARM_ONLY_NATIVE_MOTION_AND_H5",
-        "E2": "PHYSICAL_ORACLE_FAIL; STRUCTURAL_H5_READBACK_PASS",
-        "actual_native_calls": {
-          "materialize": 2,
-          "reset": 2,
-          "mj_step": 640,
-          "forward": null,
-          "RSS": null
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "reviewer": "Sol",
+        "date": "2026-10-28",
+        "input_head": "c066d320ec3903c0953ada74a146e5b69762cbb0",
+        "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+        "required_S1_S2_S3": "PASS_FOR_EXACT_CASE",
+        "S1_passed": 56,
+        "native_process_starts": 1,
+        "native_calls": {
+          "materialize_control": 4,
+          "mj_forward": 260,
+          "mj_resetData": 4,
+          "mj_step": 1280
         },
-        "configuration_proposal": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/proposed_hand_case.json",
-        "maintainer_case_decision": null,
-        "next_attempt_if_explicitly_approved": "005"
+        "episodes_passed": 4,
+        "total_transitions": 256,
+        "observations_per_episode": 65,
+        "tamper_rejections": 9,
+        "offline_four_H5_readback": "PASS",
+        "old_default_2500_and004_FAIL_preserved": true,
+        "physical_oracles_source_algorithm_budgets_unchanged": true,
+        "new_qualification": false,
+        "provider_owner_contract_approval": false,
+        "R03b": "NEXT_PACKAGE_ONLY_NOT_IMPLEMENTED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md"
       },
-      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/commands.json",
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/commands.json",
       "attempt003": {
         "task_id": "PHASE-II-01-R02C",
         "input_commit": "cdb0c12006ca0787f9110da5df343711abc869f3",
@@ -756,7 +764,7 @@
           "attempt002_plus_continuation_max_process_starts": 2
         }
       },
-      "sol_review_required": "004 reviewed; new Hand configuration decision required before005; no slice acceptance.",
+      "sol_review_required": "005 exact case reviewed and accepted; proceed to next R03b package.",
       "attempt004": {
         "task_id": "PHASE-II-01-R02C",
         "attempt": "004",
@@ -847,6 +855,187 @@
           "configuration_proposal": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/proposed_hand_case.json",
           "maintainer_case_decision": null,
           "next_attempt_if_explicitly_approved": "005"
+        }
+      },
+      "attempt005": {
+        "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "S1_passed": 56,
+        "native_calls": {
+          "materialize_control": 4,
+          "mj_forward": 260,
+          "mj_resetData": 4,
+          "mj_step": 1280
+        },
+        "episodes": [
+          {
+            "id": "E1-arm-only",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.01895217119805468,
+              "max_finger_difference_m": 3.645943213760605e-06,
+              "opening_excursion_m": 6.2886123847333275e-06,
+              "opening_final_m": 0.07600185645528923,
+              "opening_min_m": 0.076,
+              "q1_final_home_error_rad": 1.0379862451645179e-05,
+              "q1_peak_delta_rad": 0.09744434092148166,
+              "tcp_position_peak_excursion_m": 0.05284991752506535
+            },
+            "h5": {
+              "bytes": 1965122,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-b68a61a2b50a442fa11ecd7dbce696cf",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E1-arm-only.h5",
+              "sha256": "69402c4fe6e7aa425a3970909046f595e989f3eea38d894cfea218ca92b5ac97",
+              "transition_count": 64
+            }
+          },
+          {
+            "id": "E2-hand-only",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.002005433879145692,
+              "max_finger_difference_m": 7.54147803663785e-07,
+              "opening_excursion_m": 0.06498823257122899,
+              "opening_final_m": 0.06802404288684163,
+              "opening_min_m": 0.01101176742877101,
+              "q1_final_home_error_rad": 5.017322318379618e-18,
+              "q1_peak_delta_rad": 3.300363302850254e-06,
+              "tcp_position_peak_excursion_m": 0.0021508744231906935
+            },
+            "h5": {
+              "bytes": 1966208,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-a79f5e315e6f4453b71f89f145318ba2",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E2-hand-only.h5",
+              "sha256": "778d4ab1cb30c9ed14a96578f08f059a93e87b8443d26f5b50613e5f0ff48380",
+              "transition_count": 64
+            }
+          },
+          {
+            "id": "E3-simultaneous-default",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.01895217659405302,
+              "max_finger_difference_m": 3.6462609817322633e-06,
+              "opening_excursion_m": 0.06498710291866948,
+              "opening_final_m": 0.06802467252894896,
+              "opening_min_m": 0.01101289708133052,
+              "q1_final_home_error_rad": 1.0379743835694394e-05,
+              "q1_peak_delta_rad": 0.0974443139711741,
+              "tcp_position_peak_excursion_m": 0.052849887751732154
+            },
+            "h5": {
+              "bytes": 1967311,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-dff24485de29456f9baaf7a2880afbbc",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E3-simultaneous-default.h5",
+              "sha256": "65c8858cde1695c2687cf78080961d8e03e6ae599989c9a88aa367f5995d8357",
+              "transition_count": 64
+            }
+          },
+          {
+            "id": "E4-simultaneous-arm-gain-3",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.019307380686714663,
+              "max_finger_difference_m": 3.746805581374829e-06,
+              "opening_excursion_m": 0.06498705418863893,
+              "opening_final_m": 0.0680246595643473,
+              "opening_min_m": 0.011012945811361079,
+              "q1_final_home_error_rad": 2.8507890623825533e-06,
+              "q1_peak_delta_rad": 0.09811349509588144,
+              "tcp_position_peak_excursion_m": 0.053649806895393344
+            },
+            "h5": {
+              "bytes": 1967361,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-4efee4d1dc32426498944e6e0ed7d2e7",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E4-simultaneous-arm-gain-3.h5",
+              "sha256": "ad7b34e6160fbdd57bb1efb3f68bfd9d9565fa356e7060010ab0227085ce2246",
+              "transition_count": 64
+            }
+          }
+        ],
+        "native_wall_s": 16.77646535099484,
+        "sampled_RSS_peak_bytes": 581976064,
+        "native_processes": 1,
+        "oracles_unchanged": true,
+        "default2500_unchanged": true,
+        "old004_FAIL_unchanged": true,
+        "provider_admission": false,
+        "qualification_granted": false,
+        "R03b_started": false,
+        "sol_review": {
+          "decision": "ACCEPTED_BOUNDED_S2_S3",
+          "reviewer": "Sol",
+          "date": "2026-10-28",
+          "input_head": "c066d320ec3903c0953ada74a146e5b69762cbb0",
+          "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+          "required_S1_S2_S3": "PASS_FOR_EXACT_CASE",
+          "S1_passed": 56,
+          "native_process_starts": 1,
+          "native_calls": {
+            "materialize_control": 4,
+            "mj_forward": 260,
+            "mj_resetData": 4,
+            "mj_step": 1280
+          },
+          "episodes_passed": 4,
+          "total_transitions": 256,
+          "observations_per_episode": 65,
+          "tamper_rejections": 9,
+          "offline_four_H5_readback": "PASS",
+          "old_default_2500_and004_FAIL_preserved": true,
+          "physical_oracles_source_algorithm_budgets_unchanged": true,
+          "new_qualification": false,
+          "provider_owner_contract_approval": false,
+          "R03b": "NEXT_PACKAGE_ONLY_NOT_IMPLEMENTED",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md"
         }
       }
     },
@@ -1081,17 +1270,17 @@
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "02_R02_Composite_Control_Profiles.md": "4fedd10aea73b61873f5b26633c9009a8c2ed8dccf21532f01c4a85108b8eb87",
+    "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "460661da87e09c4c7aa17b685f7f1d79d3e04389fa780bf4039f95ef7f493d2c",
+    "07_Execution_Order_and_Acceptance.md": "ca50dd5d2d0e692a3a724696864efa4bd97c418a20e8770ce342dc767a8356b0",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "e0d1ae14264e8d98ee49ee4a255994181a83d5e0940e8e7519d67c361eb192b1"
+    "README.md": "7eca4593cfd436b30340eb5b143fb37d47199802db81b28856dffb9ef2378d94"
   },
-  "revision_kind": "SOL_R02C_ATTEMPT004_REVIEW_AND_HAND_CONFIGURATION_PROPOSAL",
+  "revision_kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3228,6 +3417,24 @@
       "proposal_approved": false,
       "DAG_required_envelope_R06_R05a_P99_unchanged": true,
       "qualification_granted": false
+    },
+    {
+      "kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
+      "date": "2026-10-28",
+      "input_commit": "c066d320ec3903c0953ada74a146e5b69762cbb0",
+      "decision": "ACCEPTED_BOUNDED_S2_S3",
+      "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+      "S1_passed": 56,
+      "native_processes": 1,
+      "native_calls": {
+        "materialize_control": 4,
+        "mj_forward": 260,
+        "mj_resetData": 4,
+        "mj_step": 1280
+      },
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_slice": "R03b package preparation only"
     }
   ],
   "P00_audit": {

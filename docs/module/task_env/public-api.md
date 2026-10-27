@@ -582,3 +582,15 @@ construction routes 和部分 camera/render CLIs 已退休，不能静默 alias�
 Sol's attempt003 review (2026-10-27) accepted the typed publication repair and 38 provider-free R02c/R02b checks, with native motion still pending. The subsequent authorized attempt004 was not a pass: E1 passed its Arm and H5 checks, E2 failed the frozen Hand motion oracle, and E3/E4 did not run. E1/E2 H5 readbacks passed, but the required combined S2/S3 exit remains incomplete. The probe's secondary NumPy JSON serialization failure obscured counters in the raw summary; the immutable event log records actual progress, and a provider-free serialization regression passed after the run. No Provider admission, Qualification or R03b start follows.
 
 R02c004 Sol review: the arm-only motion/closed-H5 intersection is accepted as bounded evidence; active-Hand motion fails the unchanged0.64s oracle. The legacy5/2500 command-step policy yields at most2mm of servo offset from measured opening, not a physical5N force cap. A proposed Task-owned complete Hand override at source-derived50N/m has new configuration/plan identities and requires an explicit maintainer case decision. Global defaults and original failure remain unchanged; no default-route support or Qualification is established. R02c remains BLOCKED_HAND_CONFIGURATION_DECISION. Future evidence finalization preserves live counters and primary failure instead of restoring stale checkpoints.
+
+R02c005 now has bounded S2/S3 evidence for the explicit advanced candidate
+`build_leaf_position_candidate(workspace, environment_type=SelectedReferenceEnv,
+hand_stiffness_N_per_m=50.0)` on the pinned full-Panda source and MuJoCo3.8.1 CPU.
+The existing full Hand section override selects SOURCE_CALIBRATED_HAND_50_V1;
+Arm gain2.5 or3.0 composes independently. Omission keeps the original2500 preset
+and effective-plan identities. Requested opening, servo opening and native ctrl
+remain distinct; this opt-in does not implement force feedback or a physical5N
+force cap. All four64-interval episodes and each same-file H5 64/65 readback
+passed; the original0042500 motion failure remains. This is task-owned advanced
+candidate evidence, not a registered make_env route, separate-Entity Attachment,
+other-Provider support or new Qualification.

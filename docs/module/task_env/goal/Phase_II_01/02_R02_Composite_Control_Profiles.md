@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b已接收；R02c004的E1 arm-only有界证据接收，E2 Hand物理门失败；待明确Hand配置决定，required S2/S3未完成。
+状态：REVISED_DRAFT；R02a/R02b已接收；R02c005的SOURCE_CALIBRATED_HAND_50_V1精确交集已由Sol接收为ACCEPTED_BOUNDED_S2_S3；旧2500 case/004物理FAIL保留，独立Attachment未准入。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -132,3 +132,11 @@ E1 arm-only完成64 intervals / 320 `mj_step`，joint1峰值位移`0.0974443 rad
 ## R02c004 Sol复核与Hand配置待决（2026-10-28）
 
 E1真实motion/H5有界通过，E2完成64步但opening/excursion失败，E3/E4未运行。原JSONL/H5支持materialize2/reset2/step640，原错误FAIL_PRE_STEP/零计数raw保持，forward/RSS未知不推断。Sol修复live-result/secondary-error收尾并通过42项provider-free S1，无新native。离线H5证明5/2500的2mm servo offset；固定source在总opening坐标的名义actuator stiffness为50N/m。提案SOURCE_CALIBRATED_HAND_50_V1用既有完整Hand section override，只改变新case的2500→50，保留全局默认/旧FAIL、source/算法/物理门和预算；新plan静态编译通过但未批准或native验证。状态BLOCKED_HAND_CONFIGURATION_DECISION；需维护者明确采用该新配置，之后一包实现+S1+单次native，不再同配置重跑。DAG/required/R06/R05a/P99不变，R03b未启动。
+
+## R02c005 Hand50有界执行与Sol接收（2026-10-28）
+
+维护者要求Sol根据调研解决Hand问题并推进后续阶段；在原005明确候选范围内实现Task-owned `hand_stiffness_N_per_m=50.0` opt-in，通过既有完整Hand section override表达，不改变共享算法、2500默认/旧plan、源资产、物理oracle或预算。旧004的Hand物理FAIL原样保留。该参数在此Position路径仍是命令偏移比例，不是物理5N force cap。现有builder不传该参数时仍使用2500；本轮通过只属于SOURCE_CALIBRATED_HAND_50_V1。
+
+56项provider-free S1与实际static preflight通过。唯一MuJoCo3.8.1 CPU进程在16.78s内完成四episode，每个64outer/320step，共1280mj_step/260mj_forward/4materialize/4reset；四次reset qpos/qvel/ctrl/time一致，clock/state/range/warning门及close通过。E2 min opening0.01101177m、final0.06802404m、excursion0.06498823m，通过原≤0.02/≥0.06/≥0.04m门；E3/E4 Hand同样通过，Arm peak/home门通过。E4只改变Arm配置，same-reset prepare的Hand配置/命令相同。每episode真实H5 T64/T+1=65，独立reader及9类tamper拒绝通过；Sol另用不导入Provider的新进程回读四个关闭H5，重算float32观察运动量与Hand requested/servo/ctrl，文件hash不变。峰值采样RSS581,976,064bytes，无cleanup错误，无native重试。
+
+Sol接收R02c为ACCEPTED_BOUNDED_S2_S3，仅覆盖该完整Panda/两个独立Position writers/Hand50配置/MuJoCo3.8.1 CPU/seed31/2ms×5的精确交集。不证明旧2500 case、端点、独立Attachment、其他Provider或Qualification。R06/R05a/DAG/Required Envelope/P99保持；按执行表下一项R03b，尚未实施。原始日志/合同/单次账本/四H5/独立复核位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/`。

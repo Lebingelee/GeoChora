@@ -229,3 +229,15 @@ R02c attempt003 review: aggregate leaf publication uses typed StateRequirements,
 R02c attempt004 update (2026-10-27): the authorized single MuJoCo 3.8.1 CPU process passed static source verification and runtime identity, then completed E1 arm-only and E2 hand-only at 64 outer intervals each. E1 passed its joint-1 motion/home oracle, closed a Generic H5 v3 file at T=64/T+1=65, passed independent leaf readback, and rejected all nine tamper cases. E2's requested Hand curve and recorded leaf controls were present, and its closed H5 passed independent T/T+1 readback, but the fixed physical oracle failed: opening minimum 0.068789857 m and excursion 0.007210143 m did not meet ≤0.02 m and ≥0.04 m. E3/E4 did not run; S2/S3 remain incomplete. The probe's `native_evidence.json` was secondarily damaged by `numpy.float32` JSON serialization during failure finalization; its immutable JSONL `probe_failure` event records the primary assertion and 2 materializations, 2 resets, and 640 `mj_step` calls. Exact `mj_forward` and RSS counters were not retained and are not inferred. A serialization-only probe fix plus regression passed 21 provider-free tests after the native run; there was no retry or change to physics, targets, oracle, or budget. Preserve attempt004 raw outputs at ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/` and all prior attempt failures. No Provider admission, Qualification, or R03b start is claimed.
 
 R02c004 evidence review distinguishes immutable misleading raw counters from JSONL/H5 reconstruction: actual640 mj_step, two materializations/resets, E1 motion pass and E2 motion fail. Both64/65 H5 files are structurally readable; that does not turn E2 into physical acceptance. Forward/RSS remain unknown. A proposed source-calibrated50N/m Hand section override is a new experiment configuration over the existing versioned plan mechanism; the original2500 configuration/failure and numeric oracles remain frozen. It is not approved by Sol or by the existence of this proposal.
+
+R02c005 selects a complete Hand section override through the existing effective
+plan mechanism. SOURCE_CALIBRATED_HAND_50_V1 retains the parent preset and frozen
+Task Artifact/source while giving the resolved experiment configuration and plan
+new identities. Native Evidence contains four independently reset64-transition
+H5 episodes, their actual requested/servo/native commands and matching typed
+Target/Ack/state/source/plan/config identities. Independent post-close readback
+also passes without loading a physics Provider. Sol accepted this exact case as
+bounded S2/S3; old2500/default and004 failure evidence remain separate. Generic
+outcome task_success=false reflects this control diagnostic, not failed motion;
+physical gate results and horizon completion are recorded separately. No Human
+Judge or Qualification decision is inferred.

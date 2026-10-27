@@ -122,7 +122,26 @@ materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
 do not report split leaves as admitted. R02c is the real execution/recording
 gate, and native S2/S3/S4 and Qualification remain separate.
 
-## SelectedReferenceEnv leaf integration (R02c attempts 001–004)
+## SelectedReferenceEnv leaf integration (R02c attempts 001–005)
+
+Current bounded route (R02c005, 2026-10-28): explicitly pass
+`hand_stiffness_N_per_m=50.0` to the task-owned builder for
+SOURCE_CALIBRATED_HAND_50_V1. It composes a complete Hand section override with
+Arm gain2.5 or3.0 using the existing effective-plan owner. Omission preserves
+legacy2500/preset/plan identities; the original0042500 motion failure remains.
+This is the same force-free Position law and source, not force feedback or a
+physical5N cap.56 provider-free S1 and actual static preflight passed; one
+MuJoCo3.8.1 CPU process completed four64-interval episodes,1280mj_step,
+260mj_forward and4reset/materializations. Arm/Hand motion, clock/range/reset,
+E3/E4 Arm-only configuration isolation, four real64/65 H5 readbacks and nine
+tamper rejections passed. A separate provider-free process reread the four
+closed H5 files and recomputed motion/command mappings without modifying bytes.
+Sol accepted only this exact full-Panda/two-writer/Hand50/seed31/2ms×5 case as
+ACCEPTED_BOUNDED_S2_S3. Independent Attachment, other Providers, force-aware,
+endpoints and new Qualification remain outside this result. Next table row is
+R03b; no R03b implementation/native has occurred. Evidence is in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/`.
+The attempt history below retains original failures and earlier review states.
 
 The task-owned `build_leaf_position_candidate()` composes the existing A05
 source/Artifact/reset owners with two separate Arm-only and Hand-only Position

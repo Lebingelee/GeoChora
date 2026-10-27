@@ -164,11 +164,19 @@ def _leaf_bindings(scene, resolved, source_digest, provider_build_sha, provider_
 
 
 def build_leaf_position_candidate(workspace: Path | str, *, environment_type, arm_gain=2.5,
-                                  provider="mujoco", horizon=64):
-    """Build one R02c candidate using the accepted source/plan/reset/Env owners."""
+                                  hand_stiffness_N_per_m=2500.0, provider="mujoco", horizon=64):
+    """Build R02c leaves, optionally selecting the source-derived Hand50 case.
+
+    The opt-in replaces a complete Hand section through the existing override
+    owner. It leaves the legacy preset/defaults and the shared Position law intact.
+    This parameter bounds command offset; it does not impose a physical force cap.
+    """
     import importlib
     if provider != "mujoco" or type(arm_gain) not in (int, float) or arm_gain not in (2.5, 3.0):
         raise ValueError("R02c candidate admits MuJoCo CPU and the two fixed Arm sections only")
+    if (type(hand_stiffness_N_per_m) not in (int, float)
+            or hand_stiffness_N_per_m not in (2500.0, 50.0)):
+        raise ValueError("R02c Hand stiffness must select legacy2500 or source-derived50 N/m")
     root_dir = Path(workspace).resolve()
     root_dir.mkdir(parents=True, exist_ok=True)
     scene = _a05_scene()
@@ -206,7 +214,7 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
     provider_version = str(build_info["package_version"])
     bindings, sections = _leaf_bindings(scene, resolved, closure_digest, build_sha, provider_version)
     preset = LeafControlPresetV1("leaf-control-preset-v1", "r02c-default", "r1", sections)
-    overrides = ()
+    overrides = []
     if arm_gain == 3.0:
         base_arm = next(item for item in sections if item.member_path == ("arm",))
         replacement = LeafProfileSectionV1(
@@ -214,13 +222,28 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
             base_arm.profile_id, base_arm.action_schema_id, base_arm.algorithm_id,
             (("joint_position_correction_gain", 3.0),),
         )
-        overrides = (LeafProfileOverrideV1("leaf-profile-override-v1", ("arm",), replacement),)
+        overrides.append(LeafProfileOverrideV1("leaf-profile-override-v1", ("arm",), replacement))
+    if hand_stiffness_N_per_m == 50.0:
+        base_hand = next(item for item in sections if item.member_path == ("hand",))
+        replacement = replace(base_hand, configuration=tuple(
+            (key, 50.0 if key == "gripper_position_stiffness_N_per_m" else value)
+            for key, value in base_hand.configuration
+        ))
+        overrides.append(LeafProfileOverrideV1("leaf-profile-override-v1", ("hand",), replacement))
+    overrides = tuple(overrides)
     plan = compile_effective_leaf_plan(
         scene, root, {}, bindings, preset, overrides,
         source_closure_sha256=closure_digest,
     )
 
+    case_id = ("SOURCE_CALIBRATED_HAND_50_V1" if hand_stiffness_N_per_m == 50.0
+               else "LEGACY_HAND_2500")
+
     def build(_provider):
+        resolved_configuration = {"provider": _provider, "backend": "cpu",
+                                  "effective_leaf_plan": plan.identity_sha256}
+        if hand_stiffness_N_per_m == 50.0:
+            resolved_configuration["hand_position_case"] = case_id
         return {
             "artifact": artifact, "task_source": task_source, "solution": None,
             "source": source, "reset_plan": reset_plan,
@@ -229,8 +252,7 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
             "provider_build_identity": build_info,
             "construction_id": digest({"artifact": artifact.identity_hash,
                                         "source": closure_digest, "plan": plan.identity_sha256}),
-            "resolved_configuration": {"provider": _provider, "backend": "cpu",
-                                       "effective_leaf_plan": plan.identity_sha256},
+            "resolved_configuration": resolved_configuration,
             "source_revision": "R02c-independent-position-leaves-v1",
             "source_sha256": {"source_closure": closure_digest, "panda_closure": panda_digest},
         }
@@ -254,6 +276,7 @@ def build_leaf_position_candidate(workspace: Path | str, *, environment_type, ar
         leaf_bindings=bindings, preset=preset, plan=plan, provider_build_identity=build_info,
         panda_closure_digest=panda_digest, panda_file_count=panda_file_count,
         provider=provider, arm_gain=float(arm_gain),
+        hand_stiffness_N_per_m=float(hand_stiffness_N_per_m), case_id=case_id,
     )
 
 

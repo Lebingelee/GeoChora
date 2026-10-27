@@ -174,3 +174,91 @@ def test_joint_limits_and_native_actuator_ranges_are_independent_contracts(candi
         by_actuator[pair.actuator].ctrlrange != arm.binding.joint_position_limits[index]
         for index, pair in enumerate(arm.binding.joint_actuator_bindings)
     )
+
+
+@pytest.mark.parametrize("value", [True, False, float("nan"), float("inf"), 0.0, 51.0, "50"])
+def test_hand_case_rejects_unknown_configuration_before_creating_source(tmp_path, value):
+    workspace = tmp_path / "invalid"
+    with pytest.raises(ValueError, match="Hand stiffness"):
+        build_leaf_position_candidate(
+            workspace, environment_type=SelectedReferenceEnv, hand_stiffness_N_per_m=value,
+        )
+    assert not workspace.exists()
+
+
+def _calibrated_contract():
+    return {
+        "configuration_case": {
+            "hand_config_identity_sha256": "5ff6243924c53fe31569a9047aa8787862c01e91d31d5b092b2c931050b313cd",
+        },
+        "plans": {
+            "default_identity_sha256": "31150ec4397ff8f94555376ca35bffb0fd0ab0e0b0415d6fe4b3ca2beb7c59ff",
+            "override_identity_sha256": "2c595164c9bded911799f5923fe51bb4f9d6e6804d156189fc81cf14ea4513cd",
+        },
+    }
+
+
+def test_hand50_complete_override_preserves_defaults_and_prepares_requested_opening(candidate, tmp_path):
+    from task_env.diagnostics.tasks.test_phase_ii_01_r02b_leaf_execution import _publication
+    from task_env.runtime.sessions.leaf_control import prepare_leaf_command
+    from task_env.diagnostics.tasks.r02c_leaf_position_probe import _validate_case_candidate
+    calibrated = build_leaf_position_candidate(
+        tmp_path / "hand50", environment_type=SelectedReferenceEnv, hand_stiffness_N_per_m=50.0,
+    )
+    variant = None
+    try:
+        assert candidate.plan.identity_sha256 == "71743daa095df274bdb59162ad29c6b6027260d62221ce755c725cee69ebf1c7"
+        assert calibrated.preset == candidate.preset
+        assert calibrated.leaf_bindings == candidate.leaf_bindings
+        assert calibrated.source.source_closure_digest == candidate.source.source_closure_digest
+        _validate_case_candidate(calibrated, _calibrated_contract(), arm_gain=2.5)
+        with pytest.raises(RuntimeError, match="complete frozen Hand50"):
+            _validate_case_candidate(candidate, _calibrated_contract(), arm_gain=2.5)
+        hand = next(entry for entry in calibrated.plan.leaves if entry.binding.profile_kind == "hand_position")
+        old_hand = next(entry for entry in candidate.plan.leaves if entry.binding.profile_kind == "hand_position")
+        assert hand.section.values() == {**old_hand.section.values(), "gripper_position_stiffness_N_per_m": 50.0}
+        assert old_hand.section.values()["gripper_position_stiffness_N_per_m"] == 2500.0
+        receipt = _receipt_with_panda_general_ranges(calibrated.plan)
+        publication = _publication(calibrated.scene, receipt, plan=calibrated.plan)
+        for interval, expected_opening, expected_ctrl in ((16, 0.004, 12.75), (64, 0.076, 242.25)):
+            action = action_for_interval(calibrated.scene, calibrated.plan, interval,
+                                         arm_active=True, hand_active=True)
+            command = prepare_leaf_command(
+                calibrated.plan, HAND_WRITER_ID, action.hand, publication, receipt,
+                receipt.configuration_revision, scene=calibrated.scene,
+            )
+            assert command.servo_opening_m == pytest.approx(expected_opening, abs=1e-15)
+            assert command.native_ctrl == pytest.approx(expected_ctrl, abs=1e-12)
+        variant = build_leaf_position_candidate(
+            tmp_path / "hand50-arm3", environment_type=SelectedReferenceEnv,
+            arm_gain=3.0, hand_stiffness_N_per_m=50.0,
+        )
+        _validate_case_candidate(variant, _calibrated_contract(), arm_gain=3.0)
+        assert next(entry.section for entry in variant.plan.leaves
+                    if entry.binding.profile_kind == "hand_position") == hand.section
+        assert "mujoco" not in sys.modules and "taichi" not in sys.modules
+    finally:
+        if variant is not None:
+            variant.env.close()
+        calibrated.env.close()
+
+
+def test_actual_static_probe_validates_both_hand50_plans_without_native(candidate, tmp_path, monkeypatch):
+    import hashlib
+    from task_env.diagnostics.tasks import r02c_leaf_position_probe as probe
+    contract = _calibrated_contract()
+    xml, assets = lower_mujoco_scene_source(
+        candidate.source.scene_source, candidate.scene, candidate.source.source_closure_digest,
+    )
+    contract["source"] = {
+        "closure_sha256": candidate.source.source_closure_digest,
+        "lowered_xml_sha256": hashlib.sha256(xml.encode()).hexdigest(),
+        "assets_sha256": {key: hashlib.sha256(value).hexdigest() for key, value in assets.items()},
+    }
+    monkeypatch.setattr(probe, "ATTEMPT_ROOT", tmp_path / "probe")
+    result = probe._static_candidate_checks(contract)
+    assert result["configuration_case"] == "SOURCE_CALIBRATED_HAND_50_V1"
+    assert result["default_plan_identity_sha256"] == contract["plans"]["default_identity_sha256"]
+    assert result["override_plan_identity_sha256"] == contract["plans"]["override_identity_sha256"]
+    assert result["hand_configuration"]["gripper_position_stiffness_N_per_m"] == 50.0
+    assert result["native_provider_imported"] is False

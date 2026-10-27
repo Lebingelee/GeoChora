@@ -18,7 +18,15 @@ import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[3]
-CURRENT_ATTEMPT = "004"
+CURRENT_ATTEMPT = "005"
+HAND_CASE_ID = "SOURCE_CALIBRATED_HAND_50_V1"
+HAND_CASE_CONFIGURATION = {
+    "gripper_close_ctrl": 0.0,
+    "gripper_default_force_N": 5.0,
+    "gripper_open_ctrl": 255.0,
+    "gripper_opening_range_m": 0.08,
+    "gripper_position_stiffness_N_per_m": 50.0,
+}
 ATTEMPT_ROOT = None
 OUTPUT = None
 CONTRACT_PATH = None
@@ -158,6 +166,10 @@ def _verify_frozen_inputs(contract: dict, snapshot: dict) -> None:
         raise RuntimeError("native authorization reference is missing")
     if contract.get("authorization", {}).get("approved_by") is not None:
         raise RuntimeError("probe contract must not invent a named approver")
+    case = contract.get("configuration_case", {})
+    if (case.get("case_id") != HAND_CASE_ID or case.get("stiffness_N_per_m") != 50.0
+            or case.get("maintainer_case_decision") != reference):
+        raise RuntimeError("R02c Hand50 case decision is missing or differs from execution scope")
     if _sha256_file(Path(__file__)) != contract["sha256"]["probe_script"]:
         raise RuntimeError("R02c probe script changed after native freeze")
     if _sha256_file(SNAPSHOT_PATH) != contract["sha256"]["input_snapshot"]:
@@ -503,6 +515,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
 
     results.update({
         "status": "RUNNING", "provider": "mujoco", "version": "3.8.1",
+        "configuration_case": contract["configuration_case"],
         "backend": "cpu", "episodes": [], "tamper_checks": [],
         "native_calls": {"mj_step": 0, "mj_forward": 0, "mj_resetData": 0,
                          "materialize_control": 0},
@@ -510,6 +523,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
         "historical_attempt001_activity": contract.get("historical_attempt001_activity"),
         "historical_attempt002_activity": contract.get("historical_attempt002_activity"),
         "historical_attempt003_activity": contract.get("historical_attempt003_activity"),
+        "historical_attempt004_activity": contract.get("historical_attempt004_activity"),
         "current_window_baseline_native_budget_consumed": contract[
             "current_window_baseline_native_budget_consumed"],
         "started_monotonic_s": started,
@@ -623,11 +637,15 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
         workspace = ATTEMPT_ROOT / "source-workspace"
         default_candidate = build_leaf_position_candidate(
             workspace, environment_type=SelectedReferenceEnv, arm_gain=2.5,
+            hand_stiffness_N_per_m=50.0,
         )
         override_candidate = build_leaf_position_candidate(
             workspace, environment_type=SelectedReferenceEnv, arm_gain=3.0,
+            hand_stiffness_N_per_m=50.0,
         )
         envs.extend((default_candidate.env, override_candidate.env))
+        _validate_case_candidate(default_candidate, contract, arm_gain=2.5)
+        _validate_case_candidate(override_candidate, contract, arm_gain=3.0)
         if default_candidate.source.source_closure_digest != contract["source"]["closure_sha256"]:
             raise RuntimeError("R02c candidate source closure changed after native freeze")
         if override_candidate.source.source_closure_digest != default_candidate.source.source_closure_digest:
@@ -665,6 +683,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
             native_step_by_episode[episode] = 0
             result_row = {
                 "episode": episode, "status": "RUNNING", "arm_active": arm_active,
+                "configuration_case": HAND_CASE_ID,
                 "hand_active": hand_active, "seed": 31, "requested_outer_intervals": 64,
                 "materialize_calls": 0, "reset_data_calls_before": results["native_calls"]["mj_resetData"],
                 "outer_intervals": 0, "mj_step_calls": 0, "mj_forward_calls": 0,
@@ -985,6 +1004,18 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
     return 0
 
 
+def _validate_case_candidate(candidate, contract: dict, *, arm_gain: float) -> None:
+    hand = next(entry for entry in candidate.plan.leaves
+                if entry.binding.profile_kind == "hand_position")
+    if (candidate.case_id != HAND_CASE_ID or hand.section.values() != HAND_CASE_CONFIGURATION
+            or hand.section.configuration_identity_sha256
+            != contract["configuration_case"]["hand_config_identity_sha256"]):
+        raise RuntimeError("R02c candidate does not select the complete frozen Hand50 section")
+    key = "default_identity_sha256" if arm_gain == 2.5 else "override_identity_sha256"
+    if candidate.plan.identity_sha256 != contract["plans"][key]:
+        raise RuntimeError("R02c Hand50 effective plan differs from the frozen contract")
+
+
 def _static_candidate_checks(contract: dict) -> dict:
     if "mujoco" in sys.modules or "taichi" in sys.modules:
         raise RuntimeError("static preflight must not import MuJoCo or Taichi")
@@ -995,8 +1026,18 @@ def _static_candidate_checks(contract: dict) -> dict:
     workspace = ATTEMPT_ROOT / "source-workspace"
     candidate = build_leaf_position_candidate(
         workspace, environment_type=SelectedReferenceEnv, arm_gain=2.5,
+        hand_stiffness_N_per_m=50.0,
     )
+    variant = None
     try:
+        _validate_case_candidate(candidate, contract, arm_gain=2.5)
+        variant = build_leaf_position_candidate(
+            workspace, environment_type=SelectedReferenceEnv, arm_gain=3.0,
+            hand_stiffness_N_per_m=50.0,
+        )
+        _validate_case_candidate(variant, contract, arm_gain=3.0)
+        if variant.source.source_closure_digest != candidate.source.source_closure_digest:
+            raise RuntimeError("static Arm override changed the frozen source closure")
         if candidate.source.source_closure_digest != contract["source"]["closure_sha256"]:
             raise RuntimeError("static candidate source closure differs from the frozen contract")
         if candidate.plan.identity_sha256 != contract["plans"]["default_identity_sha256"]:
@@ -1018,9 +1059,14 @@ def _static_candidate_checks(contract: dict) -> dict:
             "asset_count": len(assets_hashes),
             "assets_sha256": assets_hashes,
             "default_plan_identity_sha256": candidate.plan.identity_sha256,
+            "override_plan_identity_sha256": variant.plan.identity_sha256,
+            "configuration_case": HAND_CASE_ID,
+            "hand_configuration": dict(HAND_CASE_CONFIGURATION),
             "native_provider_imported": False,
         }
     finally:
+        if variant is not None:
+            variant.env.close()
         candidate.env.close()
 
 
