@@ -185,6 +185,18 @@ not start R03b. Attempt002 report/logs are in ignored
 attempt003 evidence is in ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.
 
+Sol review of attempt003 retains actual MuJoCo identity/compile/receipt/reset
+and five integration steps, followed by the typed publication failure. The
+StateRequirements repair is reviewed and now validates before consume/physics.
+The strengthened S1 uses the actual MuJoCo publisher and shared snapshot/projection
+with synthetic IO, production Recorder/H5 and the same probe ctrl checker;
+38 R02c/R02b tests passed without native load. The remaining probe readback
+import and pre-close per-writer fault receipt capture are fixed. The original
+T0/T+1=1 failure H5 remains rejected; its finalized attribute does not satisfy
+R02c's64/65 requirement. Current status remains S1_REVIEWED_NATIVE_PENDING;
+a separately authorized single-process attempt004 must complete real S2/S3.
+No Attachment admission, R03b start or Qualification follows from this review.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",

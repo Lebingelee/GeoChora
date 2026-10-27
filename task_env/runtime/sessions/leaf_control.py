@@ -687,7 +687,9 @@ class LeafControlRuntime(Protocol):
 
     def step_leaf_control_interval(self, *, substeps: int) -> None: ...
 
-    def publish_leaf_state(self, scene: SceneDefinition, requirements) -> CanonicalStatePublicationV1: ...
+    def publish_leaf_state(
+        self, scene: SceneDefinition, requirements: StateRequirements,
+    ) -> CanonicalStatePublicationV1: ...
 
     def latch_leaf_control_fault(
         self, progress: LeafDispatchProgressV1, error: BaseException,
@@ -1013,6 +1015,11 @@ def dispatch_leaf_control_interval(
         plan, writer, actions_by_writer[writer].action, request.publication,
         request.materialization, request.configuration_revision, scene=scene,
     ) for writer in sorted(entries))
+    requirements = StateRequirements(
+        "state-requirements-v1", "controller", "r02c-independent-position-leaves-v1",
+        tuple(requirement for entry in plan.leaves
+              for requirement in entry.binding.required_state.state_requirements.requirements),
+    )
     # No cursor, replay, apply or physics state has changed before this point.
     try:
         runtime.begin_leaf_control_interval(plan.identity_sha256, before.boundary.boundary_id)
@@ -1141,15 +1148,6 @@ def dispatch_leaf_control_interval(
         _latch(runtime, progress, error)
         raise
 
-    requirements = StateRequirements(
-        "state-requirements-v1",
-        "controller",
-        "r02c-independent-position-leaves-v1",
-        tuple(
-            requirement for entry in plan.leaves
-            for requirement in entry.binding.required_state.state_requirements.requirements
-        ),
-    )
     try:
         publication = runtime.publish_leaf_state(scene, requirements)
         if type(publication) is not CanonicalStatePublicationV1:

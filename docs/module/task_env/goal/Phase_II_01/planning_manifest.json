@@ -585,25 +585,25 @@
         "R02b",
         "R01c"
       ],
-      "status": "FAIL_CORE_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT003_NATIVE_FAIL_AFTER_5_MJ_STEP; POST_NATIVE_TYPED_REQUIREMENTS_FIX_S1_PASS; S2_S3_INCOMPLETE",
+      "status": "S1_REVIEWED_NATIVE_PENDING",
+      "execution": "ATTEMPT003_FAIL_CORE_AFTER5_MJ_STEP; TYPE_FIX_AND_OWNER_BOUNDARY_S1_REVIEWED; S2_S3_INCOMPLETE",
       "required_evidence": "S2/S3",
       "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
-      "native_execution": "ATTEMPT003_PROVIDER_IDENTITY_AND_COMPILE_PASS; E1_RESET_PASS; 5_MJ_STEP; CORE_TYPED_STATE_REQUIREMENTS_FAILURE; NO_COMPLETED_INTERVAL_OR_H5",
+      "native_execution": "003_PROVIDER_COMPILE_MATERIALIZATION_RESET_VERIFIED;5_MJ_STEP;PUBLICATION_FAIL;0_COMPLETE_TRANSITIONS",
       "core_runtime_admission": false,
       "provider_free_s1_passed": 19,
       "qualification_granted": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/report.md",
       "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/evidence.json",
-      "result": "Attempt003 verified MuJoCo 3.8.1 identity, compiled and materialized the fixed source, reset E1, then failed typed state publication after five mj_step calls; the post-native typed StateRequirements fix passed 19 provider-free tests and remains unverified natively. Required S2/S3 incomplete; no slice acceptance, Provider admission, Qualification or R03b start.",
+      "result": "Sol reviewed the typed publication fix, moved requirement validation before consume/physics, strengthened actual publisher/projection/H5/probe-checker S1, repaired remaining probe import and public failure receipts;38 provider-free tests passed. Original003 FAIL_CORE/H5 T0/1 retained; new004 native execution required, no slice acceptance.",
       "sol_review": {
         "decision": "S1_REVIEWED_NATIVE_PENDING",
-        "input_commit": "8a93c2ee48ac9ad1557dc3035eb94ac293136e27",
-        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_002/sol_review.md",
+        "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_003/sol_review.md",
+        "sol_s1_passed": 38,
         "native_run_by_sol": false,
-        "sol_s1_passed": 19,
-        "next_attempt": "003",
-        "attempt002_plus_continuation_max_process_starts": 2
+        "next_attempt": "004",
+        "new_native_authorization_required": true
       },
       "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/commands.json",
       "attempt003": {
@@ -671,7 +671,16 @@
         "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/commands.json",
         "qualification_granted": false,
         "provider_admission": false,
-        "R03b_started": false
+        "R03b_started": false,
+        "sol_review": {
+          "decision": "S1_REVIEWED_NATIVE_PENDING",
+          "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_003/sol_review.md",
+          "sol_s1_passed": 38,
+          "native_run_by_sol": false,
+          "next_attempt": "004",
+          "new_native_authorization_required": true
+        }
       },
       "attempt001": {
         "task_id": "PHASE-II-01-R02C",
@@ -737,7 +746,7 @@
           "attempt002_plus_continuation_max_process_starts": 2
         }
       },
-      "sol_review_required": "Attempt003 native failed after five mj_step calls at typed state publication; post-native StateRequirements fix has provider-free S1 only. Required S2/S3 incomplete; Sol review required. No slice acceptance."
+      "sol_review_required": "Repair/S1 reviewed; required actual S2/S3 remain incomplete. No slice acceptance."
     },
     {
       "id": "R03b",
@@ -970,17 +979,17 @@
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "02_R02_Composite_Control_Profiles.md": "067e6f774f34c302471ae0fa76f095769a2ede3035245f508d3b9f97dccd449d",
+    "02_R02_Composite_Control_Profiles.md": "23f042de1121689c64ab74fd333e46c2792a36f2f4b5df7672c8915790c52e28",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "cd3617cb462f8c251ec059e020f43fb3cd99f5fe8a6e4da912b6458a04b20fb3",
+    "07_Execution_Order_and_Acceptance.md": "76ee06196d7cd1b3bf1005b43ff9c9e213a49ea18d52e2ff9fc33d3597556789",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "1d7a0be6143f0f43a198dbe1dc0bcb7ece22d460970fe717a63deb9ca6b99edf"
+    "README.md": "11911fa90282df5f0b70917ab6c4f9cd56b7dbf30668d29ed3c21c90cf48a70c"
   },
-  "revision_kind": "SOL_R02C_ATTEMPT002_REVIEW_AND_HARNESS_FIX",
+  "revision_kind": "SOL_R02C_ATTEMPT003_REVIEW_AND_OWNER_BOUNDARY_REPAIR",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3090,6 +3099,19 @@
       "DAG_required_envelope_R06_R05a_P99_unchanged": true,
       "qualification_granted": false,
       "next_slice": "R02c attempt003 single-process S2/S3 continuation"
+    },
+    {
+      "kind": "SOL_R02C_ATTEMPT003_REVIEW_AND_OWNER_BOUNDARY_REPAIR",
+      "date": "2026-10-27",
+      "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
+      "decision": "S1_REVIEWED_NATIVE_PENDING",
+      "sol_s1_passed": 38,
+      "native_run_by_sol": false,
+      "003_physical_steps": 5,
+      "required_S2_S3": "INCOMPLETE",
+      "qualification_granted": false,
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "next_slice": "R02c004 new explicit single-process window"
     }
   ],
   "P00_audit": {

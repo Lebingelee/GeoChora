@@ -328,6 +328,59 @@ def _recording_profile(candidate, receipt, reset_id):
     }
 
 
+def _runtime_with_real_publication(candidate, receipt, publication):
+    """Synthetic IO; use actual MuJoCo projection and shared snapshot owners."""
+    runtime = _SyntheticRuntime(candidate.scene, receipt, publication, plan=candidate.plan)
+    session = object.__new__(_MuJoCoSession)
+    session._source, session._artifact = candidate.source, candidate.artifact
+    session._leaf_plan, session._provider = candidate.plan, "mujoco"
+    session._closed, session._reset_done = False, True
+    session._reset_plan_gate_required, session._inner_interval_active = False, False
+    session._joint_addresses = {name: (index, index)
+                                for index, name in enumerate(candidate.source.joints)}
+    session._free_addresses = {}
+    session._bodies = {name: index for index, name in enumerate(candidate.source.bodies)}
+    session._frames = {name: index for index, name in enumerate(candidate.source.frames)}
+    joints = {f"{item.entity_id}/{item.joint_id}": item for item in publication.view.joints}
+    frames = {f"{item.frame.entity_id}/{item.frame.frame_id}": item.pose_world
+              for item in publication.view.frames}
+    session._data = SimpleNamespace(
+        qpos=np.array([joints[name].position[0] for name in session._joint_addresses]),
+        qvel=np.array([joints[name].velocity[0] for name in session._joint_addresses]),
+        xpos=np.array([frames[name].position if name in frames else (0.0, 0.0, 0.0)
+                       for name in session._bodies]),
+        xquat=np.array([frames[name].quaternion_wxyz if name in frames else (1.0, 0.0, 0.0, 0.0)
+                        for name in session._bodies]),
+        site_xpos=np.zeros((len(session._frames), 3)),
+        site_xmat=np.tile(np.eye(3).reshape(9), (len(session._frames), 1)), time=0.0,
+    )
+    session._mj = SimpleNamespace(mju_mat2Quat=lambda output, _matrix: output.__setitem__(
+        slice(None), (1.0, 0.0, 0.0, 0.0),
+    ))
+    original_advance = runtime._advance
+
+    def advance(*, time_delta):
+        original_advance(time_delta=time_delta)
+        # Match the real adapter's canonical clock; no physics is simulated.
+        step = runtime.clock.boundary.control_step
+        runtime.clock = replace(runtime.clock, sample_clock=replace(
+            runtime.clock.sample_clock, simulation_time_s=step * candidate.artifact.timebase.control_dt,
+        ))
+
+    def publish(scene, requirements):
+        boundary = runtime.clock.boundary
+        for name in ("episode_id", "reset_sample_id", "scene_instance_id",
+                     "provider_materialization_id", "control_step", "state_revision"):
+            setattr(session, "_" + name, getattr(boundary, name))
+        session._native_steps = boundary.control_step * candidate.artifact.timebase.control_substeps
+        session._data.time = session._native_steps * candidate.artifact.timebase.physics_dt
+        runtime.publish_calls += 1
+        return session.publish_leaf_state(scene, requirements)
+
+    runtime._advance, runtime.publish_leaf_state = advance, publish
+    return runtime
+
+
 def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_path):
     candidate = build_leaf_position_candidate(
         tmp_path / "candidate-source", environment_type=SelectedReferenceEnv,
@@ -336,7 +389,12 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
     receipt = _receipt(plan)
     reset_id = candidate.reset_plan.reset_sample.sample_id
     publication = _publication(scene, receipt, plan=plan, reset_id=reset_id)
-    runtime = _SyntheticRuntime(scene, receipt, publication, plan=plan)
+    runtime = _runtime_with_real_publication(candidate, receipt, publication)
+    with pytest.raises(TypeError, match="requires StateRequirements"):
+        runtime.publish_leaf_state(scene, tuple(
+            requirement for entry in plan.leaves
+            for requirement in entry.binding.required_state.state_requirements.requirements
+        ))
     published_requirements = []
     original_publish_leaf_state = runtime.publish_leaf_state
 
@@ -369,6 +427,7 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
         value={"source": SimpleNamespace(source_closure_digest=plan.source_closure_sha256)},
         session=SimpleNamespace(leaf_materialization_receipt=receipt),
     )
+    observed_ctrl = {}
     try:
         for interval in range(1, 65):
             action = __import__(
@@ -380,6 +439,7 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
                     arm_action=action.arm, hand_action=action.hand, plan=plan,
                 ),
             ), scene=scene, runtime=runtime)
+            observed_ctrl[("synthetic-s1", interval)] = [runtime.ctrl[slot] for slot in range(8)]
             fake_env.obs = _boundary_observation(result.next_publication.view.boundary)
             SelectedReferenceEnv._record_leaf_position_transition(
                 fake_env, action, request, result, terminated=False, truncated=(interval == 64),
@@ -399,6 +459,12 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
         assert loaded["transition_count"] == 64
         assert loaded["observation_count"] == 65
         assert loaded["leaf_writer_ids"] == tuple(sorted(entry.binding.writer_id for entry in plan.leaves))
+        from task_env.diagnostics.tasks.r02c_leaf_position_probe import _validate_h5_commands
+        _validate_h5_commands(loaded, observed_ctrl, "synthetic-s1", arm_active=True, hand_active=True)
+        changed_ctrl = deepcopy(observed_ctrl)
+        changed_ctrl[("synthetic-s1", 1)][0] += 0.001
+        with pytest.raises(AssertionError, match="ctrl differs from stored command"):
+            _validate_h5_commands(loaded, changed_ctrl, "synthetic-s1", arm_active=True, hand_active=True)
         assert len(published_requirements) == 64
         assert all(type(value) is StateRequirements for value in published_requirements)
         assert all(value.consumer_kind == "controller"
@@ -417,3 +483,30 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
         assert "mujoco" not in __import__("sys").modules
     finally:
         candidate.env.close()
+
+
+def test_probe_captures_real_dispatch_progress_before_session_close():
+    from task_env.diagnostics.tasks.r02c_leaf_position_probe import _leaf_failure_progress
+    scene, _, _, _, plan = _case()
+    receipt = _receipt(plan)
+    publication = _publication(scene, receipt, plan=plan)
+    runtime = _SyntheticRuntime(scene, receipt, publication, plan=plan)
+
+    def rejected_publication(_scene, _requirements):
+        raise TypeError("typed state projection requires StateRequirements")
+
+    runtime.publish_leaf_state = rejected_publication
+    with pytest.raises(TypeError, match="requires StateRequirements"):
+        dispatch_leaf_control_interval(
+            plan, _request(plan, receipt, publication), scene=scene, runtime=runtime,
+        )
+    rows = _leaf_failure_progress([SimpleNamespace(session=runtime), SimpleNamespace(session=None)])
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["failure_phase"] == "leaf-state-publication"
+    assert set(row["applied_writers"]) == {entry.binding.writer_id for entry in plan.leaves}
+    assert len(row["prepared_commands"]) == len(row["returned_apply_results"]) == 2
+    assert len(row["ack_identity_hashes"]) == len(row["command_identity_hashes"]) == 2
+    assert row["fault"]["physical_progress"] == "advanced"
+    json.dumps(rows, allow_nan=False)
+    assert "mujoco" not in __import__("sys").modules

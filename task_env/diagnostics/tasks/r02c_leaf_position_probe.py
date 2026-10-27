@@ -18,7 +18,7 @@ import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[3]
-CURRENT_ATTEMPT = "003"
+CURRENT_ATTEMPT = "004"
 ATTEMPT_ROOT = None
 OUTPUT = None
 CONTRACT_PATH = None
@@ -68,6 +68,40 @@ def _validate_mujoco_runtime_identity(observed: dict, expected: dict) -> None:
 def _write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
+
+
+def _leaf_failure_progress(envs) -> list[dict]:
+    """Retain the public typed dispatch receipt before Env.close drops Session."""
+    rows = []
+    for env in envs:
+        try:
+            progress = getattr(getattr(env, "session", None), "leaf_control_fault", None)
+            if progress is None:
+                continue
+            rows.append({
+                "schema_version": progress.schema_version,
+                "effective_plan_identity_sha256": progress.effective_plan_identity_sha256,
+                "source_boundary_id": progress.source_boundary_id,
+                "attempted_writers": progress.attempted_writers,
+                "applied_writers": progress.applied_writers,
+                "unknown_writers": progress.unknown_writers,
+                "acknowledged_writers": progress.acknowledged_writers,
+                "ack_identity_hashes": progress.ack_identity_hashes,
+                "command_identity_hashes": progress.command_identity_hashes,
+                "prepared_commands": [item.to_mapping() for item in progress.prepared_commands],
+                "returned_apply_results": [{
+                    "schema_version": item.schema_version, "writer_id": item.writer_id,
+                    "command_identity_sha256": item.command_identity_sha256,
+                    "materialization_identity_sha256": item.materialization_identity_sha256,
+                    "applied_slots": item.applied_slots, "ack": item.ack.to_mapping(),
+                } for item in progress.returned_apply_results],
+                "failed_writer": progress.failed_writer,
+                "failure_phase": progress.failure_phase,
+                "fault": progress.fault.to_mapping(),
+            })
+        except BaseException as error:
+            rows.append({"capture_error": f"{type(error).__name__}: {error}"})
+    return rows
 
 
 def _rss_bytes() -> int | None:
@@ -405,6 +439,40 @@ def _tamper_checks(source_h5: Path, reader) -> list[dict]:
     return results
 
 
+def _validate_h5_commands(independently_loaded, ctrl_by_episode_interval, episode, *, arm_active, hand_active):
+    """Compare closed-H5 commands with separately observed per-interval ctrl."""
+    from task_env.tasks.position_candidate.leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+    from task_env.runtime.sessions.leaf_control import LeafPreparedCommandV1
+    for interval, control in enumerate(independently_loaded["structured_controls"], start=1):
+        rows = {item["writer_id"]: item for item in control.writer_controls}
+        if set(rows) != {ARM_WRITER_ID, HAND_WRITER_ID} or len(control.writer_controls) != 2:
+            raise AssertionError(f"{episode} H5 transition {interval} omitted/duplicated a leaf writer")
+        seen_slots = set()
+        actual_ctrl = ctrl_by_episode_interval[(episode, interval)]
+        for writer_id, row in rows.items():
+            command = LeafPreparedCommandV1.from_mapping(
+                row["canonical_action"]["prepared_command"]
+            )
+            expected_slots = tuple(item.ctrl_slot for item in command.slot_values)
+            applied_slots = tuple(row["applied_control"]["payload"]["applied_slots"])
+            if applied_slots != expected_slots or seen_slots.intersection(expected_slots):
+                raise AssertionError(f"{episode}/{writer_id} applied slots are not exact/disjoint")
+            seen_slots.update(expected_slots)
+            for slot_value in command.slot_values:
+                if actual_ctrl[slot_value.ctrl_slot] != float(slot_value.value):
+                    raise AssertionError(f"{episode}/{writer_id} native ctrl differs from stored command")
+            if writer_id == ARM_WRITER_ID and not arm_active:
+                if tuple(command.target.action.position_rad) != (
+                    0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853,
+                ):
+                    raise AssertionError(f"{episode} inactive Arm leaf did not retain its Position hold")
+            if writer_id == HAND_WRITER_ID and not hand_active:
+                if float(command.target.action.opening_m) != 0.076:
+                    raise AssertionError(f"{episode} inactive Hand leaf did not retain its Position hold")
+        if seen_slots != set(range(8)):
+            raise AssertionError(f"{episode} leaf H5 does not cover all native actuator slots")
+
+
 def _run_native(contract: dict, snapshot: dict, started: float, log_stream, results) -> int:
     if "mujoco" in sys.modules:
         raise RuntimeError("BLOCKED_PROVIDER: MuJoCo was imported before the frozen runtime identity check")
@@ -423,6 +491,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
         "resource_samples": [], "failure": None,
         "historical_attempt001_activity": contract.get("historical_attempt001_activity"),
         "historical_attempt002_activity": contract.get("historical_attempt002_activity"),
+        "historical_attempt003_activity": contract.get("historical_attempt003_activity"),
         "current_window_baseline_native_budget_consumed": contract[
             "current_window_baseline_native_budget_consumed"],
         "started_monotonic_s": started,
@@ -811,35 +880,10 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
                 raise AssertionError(f"{episode} independent H5 readback has wrong leaf writers")
             if independently_loaded["leaf_profile"]["source_closure_digest"] != candidate.source.source_closure_digest:
                 raise AssertionError(f"{episode} H5 source closure metadata mismatch")
-            from task_env.controllers.canonical.leaf_profiles import LeafPreparedCommandV1
-            for interval, control in enumerate(independently_loaded["structured_controls"], start=1):
-                rows = {item["writer_id"]: item for item in control.writer_controls}
-                if set(rows) != {ARM_WRITER_ID, HAND_WRITER_ID} or len(control.writer_controls) != 2:
-                    raise AssertionError(f"{episode} H5 transition {interval} omitted/duplicated a leaf writer")
-                seen_slots = set()
-                actual_ctrl = ctrl_by_episode_interval[(episode, interval)]
-                for writer_id, row in rows.items():
-                    command = LeafPreparedCommandV1.from_mapping(
-                        row["canonical_action"]["prepared_command"]
-                    )
-                    expected_slots = tuple(item.ctrl_slot for item in command.slot_values)
-                    applied_slots = tuple(row["applied_control"]["payload"]["applied_slots"])
-                    if applied_slots != expected_slots or seen_slots.intersection(expected_slots):
-                        raise AssertionError(f"{episode}/{writer_id} applied slots are not exact/disjoint")
-                    seen_slots.update(expected_slots)
-                    for slot_value in command.slot_values:
-                        if actual_ctrl[slot_value.ctrl_slot] != float(slot_value.value):
-                            raise AssertionError(f"{episode}/{writer_id} native ctrl differs from stored command")
-                    if writer_id == ARM_WRITER_ID and not arm_active:
-                        if tuple(command.target.action.position_rad) != (
-                            0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853,
-                        ):
-                            raise AssertionError(f"{episode} inactive Arm leaf did not retain its Position hold")
-                    if writer_id == HAND_WRITER_ID and not hand_active:
-                        if float(command.target.action.opening_m) != 0.076:
-                            raise AssertionError(f"{episode} inactive Hand leaf did not retain its Position hold")
-                if seen_slots != set(range(8)):
-                    raise AssertionError(f"{episode} leaf H5 does not cover all native actuator slots")
+            _validate_h5_commands(
+                independently_loaded, ctrl_by_episode_interval, episode,
+                arm_active=arm_active, hand_active=hand_active,
+            )
             result_row["h5"] = {
                 "path": str(h5_file.relative_to(REPO)), "sha256": _sha256_file(h5_file),
                 "bytes": h5_file.stat().st_size,
@@ -901,6 +945,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
             "mj_step_calls": results["native_calls"]["mj_step"],
             "materialize_calls": results["native_calls"]["materialize_control"],
             "reset_data_calls": results["native_calls"]["mj_resetData"],
+            "leaf_dispatch_progress": _leaf_failure_progress(envs),
         }
         note("probe_failure", failure=results["failure"])
         raise

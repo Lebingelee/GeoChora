@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt002修复/S1已复核，状态S1_REVIEWED_NATIVE_PENDING，S2/S3未运行。
+状态：REVISED_DRAFT；R02a/R02b已接收；R02c attempt003真实构造/reset通过、5步后Core publication失败；修复/S1已复核，状态S1_REVIEWED_NATIVE_PENDING，required S2/S3仍未完成。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -116,3 +116,7 @@ attempt002唯一获准MuJoCo进程在首次compile之前因运行时版本/API�
 attempt003静态预检通过，闭包、67个lowered assets与默认leaf plan哈希符合冻结合同。唯一MuJoCo 3.8.1 CPU进程实际观测到package/runtime/API `3.8.1/3.8.1/3008001`及匹配的package/binding/library路径和哈希，完成固定source编译、9/9/8 model-bound materialization receipt与E1 reset。随后E1首个outer interval执行5个`mj_step`后，Core在typed state publication报`typed state projection requires StateRequirements`：leaf dispatcher将requirements聚合成tuple，违反既有`RuntimeSession.snapshot_v1()`类型合同。H5 boundary event保留task-level `ExecutionFaultV1`：物理时钟到control step 1/0.01 s、`transition_status=incomplete`；probe raw保留5个native substep，但未序列化逐writer `LeafDispatchProgressV1`/Ack详情。没有typed interval publication或Recorder transition。Env关闭按路径尝试一次，生成了`stop_reason=execution_fault`的Generic H5 v3失败artifact（T=0/T+1=1）；R02c strict reader以`64 transitions and 65 observations`拒绝，不作为S3。此次是Core集成失败而非Provider身份阻塞；S2的构造/reset和一个物理outer step已部分发生，但 required motion/isolation oracle未完成，R02c required S2/S3均未通过。
 
 native原件保留后，现有`leaf_control.dispatch_leaf_control_interval()`已改为构造controller-owned typed `StateRequirements`，rework provider-free模块19 passed。代码修正发生在唯一native进程之后，故没有被本次native验证；禁止重跑或声称S2/S3通过。attempt003出口为 **FAIL_CORE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW**，不授予Provider admission/Qualification，不启动R03b。完整raw和资源结果位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`；原source/oracle、R06/R05a gate、DAG、Required Envelope、P99与冻结refs未改变。
+
+## R02c attempt003 Sol复核（2026-10-27）
+
+接收真实MuJoCo3.8.1 CPU identity、固定source编译/receipt/reset与5个mj_step事实；首interval因tuple→StateRequirements接口不符而失败，S2/S3未完成。Luna类型修复经复核；Sol将聚合要求预先校验，并让S1实际经过MuJoCo publisher与共享snapshot/projection，同时关闭probe S3旧导入和故障逐writer receipt落盘缺口。R02c20+R02b18共38项provider-free S1通过，无新native。失败H5 T0/T+1=1只读复核拒绝；原raw不改。三条滞后文档hash由Sol直接同步，下一包004以新的明确授权单进程完成同source四episode与H5，原算法/oracle、DAG/required/R06/R05a/P99不变，R03b不启动。

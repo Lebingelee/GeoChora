@@ -577,3 +577,5 @@ construction routes 和部分 camera/render CLIs 已退休，不能静默 alias�
 统一 Validator、通用 `Runner(env, policy).run()`、完整 Task/Policy Harness 不作为当前 API。
 现有 `task_env/alg/runner.py` 的 PPO dispatch 与各脚本 rollout loop 不能冒称统一 Runner。
 符号级细节见 [API reference](../../../task_env/doc/api/index.md)。
+
+R02c latest Sol review (2026-10-27): attempt003 verified the fixed MuJoCo identity, compile, materialization and reset, then advanced five integration steps before Core rejected an untyped publication requirement. The typed fix and the actual publisher/shared projection are now covered by bounded provider-free S1; 38 R02c/R02b tests pass. The probe readback owner import and pre-close per-writer fault capture are repaired. This does not establish native motion or complete H5 integration: the original failed H5 has zero transitions, and R02c remains S1_REVIEWED_NATIVE_PENDING. A newly authorized one-process attempt004 must complete S2/S3 before slice acceptance.
