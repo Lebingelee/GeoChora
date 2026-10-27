@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a 已完成一次实现与 provider-free S1 交付，等待 Sol 复核；R02b/c 仍 PLANNED / NOT_STARTED。
+状态：REVISED_DRAFT；R02a 已获Sol接收（ACCEPTED_S1_BOUNDED；Required State拒绝门修正后37 passed）；R02b/c 仍 PLANNED / NOT_STARTED。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -9,7 +9,7 @@
 
 EXTEND_EXISTING / COMPOSE_EXISTING：在现有 canonical profile/target/feedback/admission owners 内形成 leaf adapter，保留现有 RuntimeSession 和 Controller 算法。两个完整 Panda Controller 的历史 S2 只做兼容基线，不能满足新 leaf 的充分证明。Asset 不嵌入 Controller 实例、任意 Python callable 或未注册可执行代码。
 
-## Leaf 版本化合同（R02a implementation candidate；pending Sol review）
+## Leaf 版本化合同（R02a静态S1出口已接收；runtime仍NOT_ADMITTED）
 
 | Leaf | Action | Target / Applied Ack | Required State / Identity |
 | --- | --- | --- | --- |
@@ -24,6 +24,10 @@ EXTEND_EXISTING / COMPOSE_EXISTING：在现有 canonical profile/target/feedback
 Position Target/Ack 的静态交叉检查需要调用者另给 source/application boundary 和 clock context；Ack 的 source 与 application boundary 限定为同一 evaluation control step。Ack 只证明合同字段自洽，不记录真实 apply。Position state 不包含 actuator force。Force-aware 目录为有限只读值，所有三项都标为 `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`；它没有注册、Provider manifest 或执行能力。严格 decoder 拒绝未知字段/版本和跨 kind payload。旧 `RequestedAction`、`CanonicalControlTarget`、`AppliedCanonicalControl`、TaskArtifact/Scene/Reset/H5 identities 均未改。
 
 R02a provider-free S1 仅验证合同与静态selector，不算 Core admission、native S2/S3 或 Qualification。R02b 仍负责 plan/override 和执行 adapter，R02c 负责真实 leaf writer/既有 H5，R01c source projection 仍独立；本文不更改它们的 DAG 边。
+
+## Sol复核与Required State修正（2026-10-27）
+
+Sol审阅提交 `8d2c46524e9dc8cce282335cd5fecb04c603d622` 的10文件差异与30项S1，发现Required State可被降为optional或混入别的leaf资源。已直接要求所有v1字段保持required，并将具体binding的requirements与profile/Entity/resources/TCP模板完整匹配；不修改旧generic StateRequirements、Profile/Target/Ack或有效payload/hash。7项定向负例通过，原集合加回归37 passed，接收为 **ACCEPTED_S1_BOUNDED**。下一行R01c；source/plan/adapter/native仍由原后续Gate负责。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/`。
 
 ## Preset 编译与执行所有权
 

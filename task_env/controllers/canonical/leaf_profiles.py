@@ -162,6 +162,8 @@ class LeafRequiredStateV1(Contract):
             raise TypeError("leaf Required State requires typed StateRequirements")
         if self.state_requirements.consumer_kind != "controller":
             raise ValueError("leaf state requirements must be Controller-owned")
+        if any(item.requiredness != "required" for item in self.state_requirements.requirements):
+            raise ValueError("leaf Required State fields must remain required")
         if tuple(self.required_identity_fields) != _IDENTITY_FIELDS:
             raise ValueError("leaf state requires the complete source/boundary identity set")
         if self.required_sample_clock_domain != "evaluation_boundary":
@@ -382,6 +384,13 @@ class LeafProfileBindingV1(Contract):
                 ]
                 if len(force_fields) != 1 or force_fields[0].subject_id != actuators[0].actuator_id:
                     raise ValueError("Force-aware Required State must bind its single tendon actuator")
+        expected_requirements = _position_requirements(
+            self.profile_id, self.entity_id, tuple(ref.joint_id for ref in refs),
+            self.tcp_frame,
+            tuple(ref.actuator_id for ref in actuators) if self.profile_kind == "hand_force_aware" else (),
+        )
+        if self.required_state.state_requirements != expected_requirements:
+            raise ValueError("leaf Required State must exactly match its profile, resources and TCP")
         _name(self.member_target_kind)
 
     @property

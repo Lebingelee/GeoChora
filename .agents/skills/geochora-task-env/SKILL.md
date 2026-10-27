@@ -52,8 +52,9 @@ is one aggregate `opening_m` in `[0, 0.08]`; finger positions are measured as
 equality, and a single `actuator8`. The legacy normalized adapter is explicit:
 `opening_m=0.04*(u+1)` for `u∈[-1,1]`. Its bound candidate mapping is
 `ctrl=3187.5*opening_m`, with `[0,255]` ctrlrange; this is static source
-metadata, not an executed Core mapping. Position Required State does not ask
-for force. Force-aware dependencies remain `NOT_ADMITTED`; raw signed force,
+metadata, not an executed Core mapping. All v1 leaf state fields remain mandatory
+and exactly match the bound profile resources and TCP; optional or extra cross-leaf
+requirements are rejected. Position Required State does not ask for force. Force-aware dependencies remain `NOT_ADMITTED`; raw signed force,
 canonical closing force, transmission/sign/phase, validity, sequence/revisions,
 freshness and Provider/build/backend/cadence are separate required provenance.
 

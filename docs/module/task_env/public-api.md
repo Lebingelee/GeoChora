@@ -230,7 +230,8 @@ typed source boundary and evaluation clock. `LeafApplicationAckV1` cross-checks 
 identity, resources and explicit application boundary/clock. It is a receipt-shaped static value, not evidence
 that native control was applied or that the state reached its target. Required State uses existing typed
 `StateRequirements` for each Joint position/velocity and an Entity-qualified TCP parent Frame; Position leaves do
-not require or synthesize force. `HandForceAwareDependencyV1` has its own action/profile identity and force-state
+not require or synthesize force. All v1 leaf state fields remain mandatory and exactly match the bound profile
+resources and TCP; optional downgrades and extra cross-leaf requirements are rejected. `HandForceAwareDependencyV1` has its own action/profile identity and force-state
 requirements, but remains `NOT_ADMITTED`; source/transmission sign and phase are explicitly unaudited. Its absence
 does not block either Position contract.
 

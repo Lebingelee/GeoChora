@@ -567,6 +567,47 @@ def test_catalog_is_finite_read_only_contract_only_not_admission():
         catalog[0].profile_id = "changed"
 
 
+@pytest.mark.parametrize("profile_kind", ["arm_position", "hand_position"])
+@pytest.mark.parametrize("mutation", ["optional", "unbound_joint", "foreign_frame"])
+def test_required_state_cannot_weaken_or_expand_bound_leaf_resources(profile_kind, mutation):
+    from task_env.artifacts import StateFieldRequirement
+
+    scene = _scene()
+    _root, resolved = _assembly(scene)
+    binding = _binding(scene, resolved, profile_kind, whole_panda=True)
+    requirements = binding.required_state.state_requirements.requirements
+    if mutation == "optional":
+        requirements = tuple(replace(item, requiredness="optional") for item in requirements)
+    elif mutation == "unbound_joint":
+        requirements = (*requirements, StateFieldRequirement(
+            "state-field-requirement-v1", "joint_position", "joint", binding.entity_id,
+            "finger_joint1" if profile_kind == "arm_position" else "joint1",
+            "required", "evaluation_boundary", "joint-definition", "joint_state_query",
+        ))
+    else:
+        requirements = (*requirements, StateFieldRequirement(
+            "state-field-requirement-v1", "frame_pose_world", "frame", "another-entity", "tcp",
+            "required", "evaluation_boundary", "meter+quaternion_wxyz", "frame_pose_query",
+        ))
+    with pytest.raises(ValueError, match="Required State"):
+        state = replace(binding.required_state, state_requirements=replace(
+            binding.required_state.state_requirements, requirements=requirements,
+        ))
+        validate_leaf_binding(scene, replace(binding, required_state=state), resolved)
+    assert validate_leaf_binding(scene, binding, resolved) == binding
+
+
+def test_force_dependency_cannot_mark_required_feedback_optional():
+    force = panda_hand_force_aware_dependency("panda", FrameReference("panda", "hand"))
+    requirements = tuple(replace(item, requiredness="optional")
+                         for item in force.required_state.state_requirements.requirements)
+    with pytest.raises(ValueError, match="Required State"):
+        replace(force.required_state, state_requirements=replace(
+            force.required_state.state_requirements, requirements=requirements,
+        ))
+    assert force.admission_status == "NOT_ADMITTED"
+
+
 def test_binding_codec_hash_and_mapping_snapshots_are_strict_and_detached():
     scene = _scene()
     _root, resolved = _assembly(scene)
