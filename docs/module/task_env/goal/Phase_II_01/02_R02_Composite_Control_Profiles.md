@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b已接收；R02c attempt004已验证同source MuJoCo 3.8.1 CPU identity，E1 arm-only通过，E2 hand-only未达到冻结运动oracle；required S2/S3仍未完成，等待Sol复核。
+状态：REVISED_DRAFT；R02a/R02b已接收；R02c004的E1 arm-only有界证据接收，E2 Hand物理门失败；待明确Hand配置决定，required S2/S3未完成。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -128,3 +128,7 @@ native原件保留后，现有`leaf_control.dispatch_leaf_control_interval()`已
 E1 arm-only完成64 intervals / 320 `mj_step`，joint1峰值位移`0.0974443 rad`、末态home误差`0.0000104 rad`，通过冻结Arm oracle；Generic H5 v3为T=64/T+1=65，生产独立reader通过，9类tamper均拒绝。E2 hand-only也完成64 intervals / 320 `mj_step`，其真实请求曲线达到close目标`0.004 m`，但native opening最小值仅`0.0687899 m`、excursion仅`0.00721014 m`，未达到`≤0.02 m`和`≥0.04 m`门。E2在Env清理关闭时保留的H5为T=64/T+1=65，离线独立typed reader通过；这不能抵销物理oracle失败。E3/E4未运行。唯一进程累计materialize=2、reset=2、step=640；`mj_forward`和RSS计数因失败收尾未持久化，记为未知，不从相邻日志推算。
 
 主失败是E2 hand-motion oracle assertion。随后probe在JSON终结落盘时遇到`numpy.float32`序列化错误，外层raw `native_evidence.json`因此误写`FAIL_PRE_STEP`和零计数；原JSONL `probe_failure`事件含真实原因和进度，两个H5及raw日志均保持原样。范围内对probe JSON写入器加入NumPy scalar/array规范化并增加provider-free回归，受影响模块21 passed；该修正只影响Evidence序列化，不影响物理源、命令、算法、oracle、阈值或预算。没有第二次native调用。E3/E4、完整R02c required S2/S3均未完成；出口为`FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`，不构成Provider admission或Qualification，不启动R03b。完整报告、修正后的合同revision、重建说明、offline H5读回和raw Evidence见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`；此前attempt001–003文件不变。
+
+## R02c004 Sol复核与Hand配置待决（2026-10-28）
+
+E1真实motion/H5有界通过，E2完成64步但opening/excursion失败，E3/E4未运行。原JSONL/H5支持materialize2/reset2/step640，原错误FAIL_PRE_STEP/零计数raw保持，forward/RSS未知不推断。Sol修复live-result/secondary-error收尾并通过42项provider-free S1，无新native。离线H5证明5/2500的2mm servo offset；固定source在总opening坐标的名义actuator stiffness为50N/m。提案SOURCE_CALIBRATED_HAND_50_V1用既有完整Hand section override，只改变新case的2500→50，保留全局默认/旧FAIL、source/算法/物理门和预算；新plan静态编译通过但未批准或native验证。状态BLOCKED_HAND_CONFIGURATION_DECISION；需维护者明确采用该新配置，之后一包实现+S1+单次native，不再同配置重跑。DAG/required/R06/R05a/P99不变，R03b未启动。

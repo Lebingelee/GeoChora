@@ -74,10 +74,18 @@ def _json_default(value):
 
 
 def _write_json(path: Path, value) -> None:
+    encoded = json.dumps(value, indent=2, sort_keys=True, allow_nan=False, default=_json_default) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(value, indent=2, sort_keys=True, allow_nan=False, default=_json_default) + "\n"
-    )
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=f".{path.name}.", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(encoded)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _leaf_failure_progress(envs) -> list[dict]:
@@ -519,7 +527,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
 
     def note(message, **fields):
         record = {"time_monotonic_s": time.monotonic(), "message": message, **fields}
-        log_stream.write(json.dumps(record, sort_keys=True, allow_nan=False) + "\n")
+        log_stream.write(json.dumps(record, sort_keys=True, allow_nan=False, default=_json_default) + "\n")
         log_stream.flush()
 
     try:
@@ -1129,9 +1137,14 @@ def main(argv=None) -> int:
         _write_json(ledger_path, ledger)
         return exit_code
     except BaseException as error:
-        existing = _load_json(EVIDENCE_PATH) if EVIDENCE_PATH.exists() else result
-        if existing.get("status") == "RUNNING":
-            existing["status"] = "FAIL_PRE_STEP" if run_mode == "native" else "FAIL_STATIC_PREFLIGHT"
+        # The worker mutates this owned object in place. A disk checkpoint may
+        # predate hundreds of successful steps if final serialization failed.
+        existing = result
+        if existing.get("status") in {"RUNNING", "PASS_STATIC_PREFLIGHT"}:
+            existing["status"] = (
+                ("FAIL" if existing.get("native_calls", {}).get("mj_step", 0) else "FAIL_PRE_STEP")
+                if run_mode == "native" else "FAIL_STATIC_PREFLIGHT"
+            )
             existing["failure"] = {
                 "type": type(error).__name__, "message": str(error),
                 "traceback": traceback.format_exc(),
@@ -1143,14 +1156,24 @@ def main(argv=None) -> int:
                 "traceback": traceback.format_exc(),
                 "note": "Native evidence was already written; the wrapper failure occurred during closeout.",
             }
+        elif ((existing.get("failure") or {}).get("type"), (existing.get("failure") or {}).get("message")) != (
+            type(error).__name__, str(error),
+        ):
+            existing.setdefault("secondary_failures", []).append({
+                "type": type(error).__name__, "message": str(error),
+                "traceback": traceback.format_exc(),
+            })
         result = existing
         result["finished_monotonic_s"] = time.monotonic()
         _write_json(EVIDENCE_PATH, result)
         if not log_stream.closed:
-            log_stream.write(json.dumps({"status": result["status"], "failure": result.get("failure")}, sort_keys=True) + "\n")
+            log_stream.write(json.dumps({"status": result["status"], "failure": result.get("failure")},
+                                        sort_keys=True, allow_nan=False, default=_json_default) + "\n")
         if ledger is not None and ledger_run is not None and ledger_path is not None:
             failure_message = str(result.get("failure", {}).get("message", ""))
-            if result.get("status") == "FAIL_PRE_STEP" and failure_message.startswith("BLOCKED_PROVIDER:"):
+            if result.get("native_calls", {}).get("mj_step", 0):
+                failure_class = "POST_STEP_FAILURE"
+            elif result.get("status") == "FAIL_PRE_STEP" and failure_message.startswith("BLOCKED_PROVIDER:"):
                 failure_class = "BLOCKED_PROVIDER"
             elif result.get("status") == "FAIL_PRE_STEP" and type(error).__name__ in {
                 "TypeError", "AttributeError", "NameError", "KeyError", "IndexError",

@@ -213,6 +213,20 @@ Qualification, or R03b start occurred. R02c remains
 `FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`. Evidence is in
 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`.
 
+Sol review of R02c004 accepts only the exact E1 arm-only motion/closed-H5
+bounded evidence. E2 finished64 intervals but failed Hand motion; E3/E4 did
+not run. Actual JSONL/H5 support640 integration steps, while original raw
+summary/ledger misleadingly show zero after secondary serialization failure;
+keep the raw immutable and reconstruction separate. Forward/RSS remain unknown.
+Future probe finalization retains owned live counters, primary/secondary errors
+and atomic strict NumPy-safe JSON.42 provider-free checks passed; no Sol native.
+The existing5/2500 command-step policy sends at most2mm beyond measured opening.
+A source-derived50N/m full Hand section override is proposed as a new Task-owned
+configuration; defaults/original failure/source/algorithm/oracle remain unchanged.
+It is not a physical5N force cap or Force-aware profile. Current status is
+BLOCKED_HAND_CONFIGURATION_DECISION; only explicit maintainer adoption authorizes
+the next single-process implementation/validation package. No R03b/Qualification.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",

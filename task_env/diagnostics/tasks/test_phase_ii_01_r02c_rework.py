@@ -124,6 +124,59 @@ def test_probe_json_writer_preserves_numpy_failure_progress(tmp_path):
     }
 
 
+@pytest.mark.parametrize("invalid", [np.float32(np.nan), object()])
+def test_probe_json_writer_rejects_invalid_data_without_replacing_checkpoint(tmp_path, invalid):
+    from task_env.diagnostics.tasks.r02c_leaf_position_probe import _write_json
+    path = tmp_path / "native-evidence.json"
+    _write_json(path, {"mj_step": 640})
+    before = path.read_bytes()
+    with pytest.raises((ValueError, TypeError)):
+        _write_json(path, {"invalid": invalid})
+    assert path.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_probe_wrapper_keeps_live_step_counts_and_primary_failure_after_finalizer_error(tmp_path, monkeypatch):
+    from task_env.diagnostics.tasks import r02c_leaf_position_probe as probe
+    monkeypatch.setattr(probe, "REPO", tmp_path)
+    for name in ("ATTEMPT_ROOT", "OUTPUT", "CONTRACT_PATH", "SNAPSHOT_PATH", "EVIDENCE_PATH", "LOG_PATH"):
+        monkeypatch.setattr(probe, name, None)
+    # All provider execution is synthetic here; the actual wrapper and ledger
+    # recovery run, without importing or constructing any native Provider.
+    monkeypatch.setattr(probe, "_verify_frozen_inputs", lambda *_args: None)
+    root = tmp_path / f"workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_{probe.CURRENT_ATTEMPT}"
+    (root / "preflight_001").mkdir(parents=True)
+    (root / "preflight_001/preflight_result.json").write_text(json.dumps({
+        "status": "PASS_STATIC_PREFLIGHT", "source_static": {"source_closure_sha256": "a" * 64},
+    }))
+    contract = root / "contract.json"
+    contract.write_text(json.dumps({"source": {"closure_sha256": "a" * 64},
+                                    "budget": {"max_native_process_invocations": 1}}))
+    snapshot = root / "snapshot.json"
+    snapshot.write_text("{}")
+
+    def failed_worker(_contract, _snapshot, _started, _log, result):
+        result.update(status="FAIL", native_calls={"mj_step": 640, "mj_forward": 130,
+                      "mj_resetData": 2, "materialize_control": 2},
+                      failure={"type": "AssertionError", "message": "synthetic physical oracle failure"},
+                      resource_samples=[{"rss_bytes": np.int64(100)}])
+        raise TypeError("synthetic secondary serialization failure")
+
+    monkeypatch.setattr(probe, "_run_native", failed_worker)
+    assert probe.main(["--execute-native", "--contract", str(contract), "--snapshot", str(snapshot),
+                       "--output-dir", str(root / "native_run_001")]) == 1
+    evidence = json.loads((root / "native_run_001/native_evidence.json").read_text())
+    ledger = json.loads((root / "native_process_ledger.json").read_text())
+    assert evidence["status"] == "FAIL"
+    assert evidence["native_calls"]["mj_step"] == 640
+    assert evidence["failure"]["type"] == "AssertionError"
+    assert evidence["secondary_failures"][0]["type"] == "TypeError"
+    assert evidence["resource_samples"][0]["rss_bytes"] == 100
+    assert ledger["runs"][0]["mj_step_calls"] == 640
+    assert ledger["runs"][0]["failure_class"] == "POST_STEP_FAILURE"
+    assert "mujoco" not in __import__("sys").modules
+
+
 def test_prepared_command_strict_codec_checks_nested_identity_and_slot_order():
     scene, _, _, _, plan = _case()
     receipt = _receipt(plan)

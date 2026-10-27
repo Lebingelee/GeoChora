@@ -585,8 +585,8 @@
         "R02b",
         "R01c"
       ],
-      "status": "FAIL_PHYSICAL_ORACLE_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT004_E2_HAND_MOTION_ORACLE_FAIL_AFTER640_MJ_STEP; EVIDENCE_SERIALIZATION_FIX_PROVIDER_FREE_ONLY; E3_E4_NOT_RUN",
+      "status": "BLOCKED_HAND_CONFIGURATION_DECISION",
+      "execution": "004_E1_BOUNDED_PASS; E2_PHYSICAL_ORACLE_FAIL; E3_E4_NOT_RUN; HAND_CONFIGURATION_DECISION_PENDING",
       "required_evidence": "S2/S3",
       "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
       "native_execution": "004_MUJOCO_IDENTITY_AND_STATIC_SOURCE_PASS; E1_ARM_AND_H5_PASS; E2_HAND_MOTION_FAIL; E2_OFFLINE_H5_READBACK_PASS; E3_E4_NOT_RUN",
@@ -595,15 +595,25 @@
       "qualification_granted": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/report.md",
       "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/evidence.json",
-      "result": "Attempt004 verified MuJoCo 3.8.1 CPU and the frozen source. E1 passed Arm motion and H5 checks. E2 completed 64 intervals but failed the frozen Hand opening motion oracle; its closed H5 passed offline T/T+1 readback. E3/E4 were not run. The previously reviewed 38 provider-free S1 checks were reused; after the post-run serialization-only fix, the affected R02c module passed 21 tests (R02b was not rerun). Required S2/S3 remain incomplete; no Provider admission, Qualification or R03b start.",
+      "result": "Sol accepted exact arm-only E1 evidence and confirmed E2 physical failure via immutable JSONL/H5. Existing5/2500 position step bound explains weak servo command; source-calibrated50N/m complete Hand override is proposed, not approved or native-tested. Default/old case/oracle unchanged;42 provider-free finalization tests passed. No slice acceptance or R03b start.",
       "sol_review": {
-        "decision": "S1_REVIEWED_NATIVE_PENDING",
-        "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
-        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_003/sol_review.md",
-        "sol_s1_passed": 38,
+        "decision": "BLOCKED_HAND_CONFIGURATION_DECISION",
+        "input_commit": "b94806025f0836d121bfd26df4581e80a7c6e6a2",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/sol_review.md",
+        "sol_s1_passed": 42,
         "native_run_by_sol": false,
-        "next_attempt": "004",
-        "new_native_authorization_required": true
+        "E1_acceptance": "BOUNDED_ARM_ONLY_NATIVE_MOTION_AND_H5",
+        "E2": "PHYSICAL_ORACLE_FAIL; STRUCTURAL_H5_READBACK_PASS",
+        "actual_native_calls": {
+          "materialize": 2,
+          "reset": 2,
+          "mj_step": 640,
+          "forward": null,
+          "RSS": null
+        },
+        "configuration_proposal": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/proposed_hand_case.json",
+        "maintainer_case_decision": null,
+        "next_attempt_if_explicitly_approved": "005"
       },
       "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/commands.json",
       "attempt003": {
@@ -746,7 +756,7 @@
           "attempt002_plus_continuation_max_process_starts": 2
         }
       },
-      "sol_review_required": "Attempt004 fails E2 frozen Hand-motion oracle; S2/S3 remain incomplete. Review actual diff and preserved raw/reconstructed evidence. No Provider admission/Qualification; R03b not started.",
+      "sol_review_required": "004 reviewed; new Hand configuration decision required before005; no slice acceptance.",
       "attempt004": {
         "task_id": "PHASE-II-01-R02C",
         "attempt": "004",
@@ -818,7 +828,26 @@
         "provider_admission": false,
         "qualification_granted": false,
         "R03b_started": false,
-        "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/"
+        "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/",
+        "sol_review": {
+          "decision": "BLOCKED_HAND_CONFIGURATION_DECISION",
+          "input_commit": "b94806025f0836d121bfd26df4581e80a7c6e6a2",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/sol_review.md",
+          "sol_s1_passed": 42,
+          "native_run_by_sol": false,
+          "E1_acceptance": "BOUNDED_ARM_ONLY_NATIVE_MOTION_AND_H5",
+          "E2": "PHYSICAL_ORACLE_FAIL; STRUCTURAL_H5_READBACK_PASS",
+          "actual_native_calls": {
+            "materialize": 2,
+            "reset": 2,
+            "mj_step": 640,
+            "forward": null,
+            "RSS": null
+          },
+          "configuration_proposal": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/proposed_hand_case.json",
+          "maintainer_case_decision": null,
+          "next_attempt_if_explicitly_approved": "005"
+        }
       }
     },
     {
@@ -1052,17 +1081,17 @@
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "02_R02_Composite_Control_Profiles.md": "53b23ba16359d0b2c2f0ca12e0b730201aeb4a58ddb02e7e556c555abcb2bf6f",
+    "02_R02_Composite_Control_Profiles.md": "4fedd10aea73b61873f5b26633c9009a8c2ed8dccf21532f01c4a85108b8eb87",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "5b8d08fc8cbe92e6de5a0d2b84ec75e8ddd46adee746b55d55641fccd8da2e87",
+    "07_Execution_Order_and_Acceptance.md": "460661da87e09c4c7aa17b685f7f1d79d3e04389fa780bf4039f95ef7f493d2c",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "c8e5cf63058d95e9577222835724497c041e45e0c0a97733bd08d4891d774c1b"
+    "README.md": "e0d1ae14264e8d98ee49ee4a255994181a83d5e0940e8e7519d67c361eb192b1"
   },
-  "revision_kind": "SOL_R02C_ATTEMPT003_REVIEW_AND_OWNER_BOUNDARY_REPAIR",
+  "revision_kind": "SOL_R02C_ATTEMPT004_REVIEW_AND_HAND_CONFIGURATION_PROPOSAL",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3185,6 +3214,20 @@
       "qualification_granted": false,
       "DAG_required_envelope_R06_R05a_P99_unchanged": true,
       "next_slice": "R02c004 new explicit single-process window"
+    },
+    {
+      "kind": "SOL_R02C_ATTEMPT004_REVIEW_AND_HAND_CONFIGURATION_PROPOSAL",
+      "date": "2026-10-28",
+      "input_commit": "b94806025f0836d121bfd26df4581e80a7c6e6a2",
+      "decision": "BLOCKED_HAND_CONFIGURATION_DECISION",
+      "sol_s1_passed": 42,
+      "native_run_by_sol": false,
+      "E1": "ACCEPTED_BOUNDED",
+      "E2": "FAIL_PHYSICAL_ORACLE",
+      "proposed_hand_stiffness_N_per_m": 50.0,
+      "proposal_approved": false,
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {

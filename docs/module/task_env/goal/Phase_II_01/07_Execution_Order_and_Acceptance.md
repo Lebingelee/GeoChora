@@ -53,7 +53,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同；Force-aware依赖拒绝目录 | provider-free S1 | required state/TCP/资源不明→停止 | ACCEPTED_S1_BOUNDED；Sol修正Required State拒绝门后37项S1通过 |
 | 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | ACCEPTED_S1_BOUNDED；Sol已复核声明级投影与18项provider-free S1 |
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | ACCEPTED_S1_BOUNDED；Sol修正兼容/覆盖/name拒绝门后18项S1通过；native/provider NOT_ADMITTED |
-| 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW；004 E1 arm-only与H5通过，E2 hand-only未达到冻结motion oracle，E3/E4未运行 |
+| 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | BLOCKED_HAND_CONFIGURATION_DECISION；E1有界接收，E2物理失败；50N/m新case待明确采用，S2/S3仍未完成 |
 | 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | PLANNED / NOT_STARTED |
 | 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | PLANNED / NOT_STARTED |
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | PLANNED / NOT_STARTED |
@@ -141,3 +141,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-27，Sol复核R02c003：native5步后的Core typed publication失败保持，S2/S3未完成。类型修复已预先校验，实际publisher/projection/H5/probe checker与R02b共38项S1通过；不以合成H5或Generic episode_complete属性替代64/65实际episode。下一包004为新授权单进程执行，不续旧账本、不另交准备报告，R03b未启动。
 
 2026-10-27，R02c attempt004执行一项有界静态预检与唯一MuJoCo 3.8.1 CPU native进程。静态source closure、67 assets与runtime identity通过。E1 arm-only完成64 intervals/320 step，Arm运动/home门、真实H5 T64/T+1 65、独立reader与9类tamper拒绝通过。E2 hand-only完成64 intervals/320 step，但opening最小0.0687899 m、excursion0.00721014 m未达到固定≤0.02 m/≥0.04 m门；其closed H5离线独立reader通过。native进程累计materialize2/reset2/step640，forward计数未保存，未知；E3/E4未运行。失败后JSON证据写入遇numpy.float32 TypeError，raw `native_evidence.json`错误显示FAIL_PRE_STEP/零计数；immutable JSONL failure event保留真实E2 oracle assertion与计数。诊断写入器的序列化修正及回归后测模块21 passed，无native retry，source/physics/oracle/阈值/预算不变。状态`FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`，无Provider admission/Qualification，R03b未启动。完整attempt004报告与raw保存于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`；attempt001–003原件保留。
+
+2026-10-28，Sol复核R02c004：640实际step事实由原JSONL及两个64/65 H5交叉确认，原零计数raw误分类保留；E1有界通过、E2物理失败。默认5/2500策略限制servo距当前开度2mm，拟用source坐标推导50N/m的Task-owned完整Hand override新case；默认/旧FAIL与原物理门不改，需维护者明确选择后才实施/授权native。当前BLOCKED_HAND_CONFIGURATION_DECISION，未启动R03b。
