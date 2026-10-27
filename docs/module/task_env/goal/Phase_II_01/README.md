@@ -46,7 +46,7 @@
 | ID / 优先级 | source / owner / 范围 | 已知风险与状态 | 受影响后继 / stop或处理 |
 | --- | --- | --- | --- |
 | SRC-1 P0 | 独立Arm+Hand→MjSpec导出→GeoPhys a53 importer | site-size dialect真实拒绝，NOT_ADMITTED/BLOCKED；非所有GeoPhys Attachment结论 | GeoPhys该路线停止；Provider importer修复或versioned source normalization均须单独审查，MuJoCo候选可独立推进 |
-| CTL-1 P0 | canonical Position Profile / plan / Env | 当前整Panda writer不能直接拆成Arm-only/Hand-only | R02b/c与R03c；leaf contract/adapters与真实隔离S2/S3，不删唯一writer保护 |
+| CTL-1 P0 | canonical Position Profile / plan / Env | R02b已提供provider-free leaf adapters与整体preflight/S1；真实Runtime/Recorder admission尚未建立 | R02c与R03c验证真实隔离S2/S3；保留Force-aware拒绝与唯一writer保护 |
 | MAT-1 P0 | RuntimeSource/materialization/typed state | 当前single Robot/dual independent roots准入不等于attached pair；native tree可能跨两个canonical Entity | R03b/c；显式新identity/mapping/admission，错root/源/资源拒绝 |
 | ID-1 P1 | artifacts/Assembly refs | 同Entity子组件与Entity owning混淆、alias冲突/循环hash | R01→R02/R03；typed refs、hash有向分域、严格版本派发 |
 | MAP-1 P1 | importer→canonical→native slots→Controller/Recorder | joint/body/actuator顺序或Hand equality/tendon误解释，重复驱动 | R02/R03/R06；逆映射/置换负例/独立资源运动与H5 |
@@ -146,3 +146,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-27，R01c attempt001在既有 `task_env.assembly` source/compiler owner完成逻辑Assembly到现有Scene源声明的只读投影，provider-free S1覆盖A05完整Panda视图与独立Menagerie Arm/Hand Entity source declarations，并核验identity/provenance、typed refs、不可变snapshot及fail-closed resolver边界。状态为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，尚未获得Sol acceptance。没有lower/attach XML、Provider/native构造、Runtime/S2/S3/S4、Core Attachment admission或Qualification；R06兼容性gate、R05a blocker、原DAG/Required Envelope/P99保持。R02b仍未开始；报告及Evidence保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/`。
 
 2026-10-27，Sol接收R01c attempt001的声明级source投影与18项provider-free S1为 `ACCEPTED_S1_BOUNDED`；无需返工。下一表行为R02b，一包完成effective plan、leaf adapter/preflight实现、定向S1及本地提交。原S2/S3/S4、Attachment/runtime/Qualification边界和R06/R05a/DAG/Required Envelope/P99保持不变。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/`。
+
+2026-10-27，R02b attempt001在既有canonical与RuntimeSession control owners内实现严格parent preset、完整section override、effective Arm/Hand Position plan、共享旧算法的真实leaf adapters、明确canonical/native mapping receipt及全请求preflight/typed dispatch与partial-apply fault progress。新增provider-free S1 13 passed；受影响的R02a/R01b/R01c/C02a/C03a静态回归101 passed，C02b纯action guard 1 passed；三项真实native测试被有意排除。分离Arm/Hand Entity交集只以`synthetic_fixture`完成，Provider materialization、SelectedReferenceEnv、Recorder/H5与真实native尚未接入。交付状态`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，等待Sol复核，不构成Runtime/admission、Qualification或R02c/R03b完成。R06 compatibility gate、R05a blocker、DAG/Required Envelope/P99均保持；详见[R02](02_R02_Composite_Control_Profiles.md)和ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02b_001/report.md`。

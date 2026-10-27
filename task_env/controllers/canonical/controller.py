@@ -51,19 +51,51 @@ class CanonicalPandaController:
                 error=np.r_[position_error,cfg.ik_rotation_row_weight*cfg.ik_rotation_gain*rotation_error]
                 dq=J.T@np.linalg.solve(J@J.T+cfg.ik_damping**2*np.eye(6),error)
                 desired=np.clip(q+cfg.ik_position_gain*np.clip(dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
-        servo=np.clip(desired+cfg.joint_position_correction_gain*(desired-q),self.model.limits[:,0],self.model.limits[:,1])
+        _resolved, servo = absolute_joint_position_servo(
+            desired, q, self.model.limits, cfg.joint_position_correction_gain,
+        )
         canonical=CanonicalAction('canonical-action-v0',requested,tuple(float(v) for v in values),not np.array_equal(original,values),world_pose)
         return canonical,desired,servo
 
     def compute(self,state,requested):
         # Frozen-v0 compatibility only; production R1 owns its resolved gripper profile.
+        from ...robots.gripper import position_gripper_servo_opening
         cfg=self.config
         canonical,desired,servo=self._compute_arm(state,requested)
         values=canonical.interpreted_values
         opening=.5*(values[-1]+1)*cfg.gripper_opening_range_m
         achieved=float(sum(state.joint_position[n] for n in FINGERS))
-        correction=cfg.gripper_default_force_N/cfg.gripper_position_stiffness_N_per_m
-        servo_opening=float(np.clip(achieved+np.clip(opening-achieved,-correction,correction),0,cfg.gripper_opening_range_m))
+        servo_opening=position_gripper_servo_opening(
+            opening, achieved, cfg.gripper_default_force_N,
+            cfg.gripper_position_stiffness_N_per_m, cfg.gripper_opening_range_m,
+        )
         target=CanonicalControlTarget('canonical-control-v0',self.artifact_hash,self.identity,ARM,dict(zip(ARM,map(float,desired))),dict(zip(ARM,map(float,servo))),
             GripperControlTarget('panda-v1/gripper',float(opening),cfg.gripper_default_force_N,servo_opening))
         return canonical,target
+
+
+def absolute_joint_position_servo(requested, current, limits, correction_gain):
+    """Apply the shared absolute-joint clipping and position-error correction.
+
+    This stateless operation is also used by the versioned Arm leaf adapter,
+    which deliberately has no Panda FK/hand state.  Keeping the historical
+    controller on the same function preserves its numerical rule.
+    """
+    requested = np.asarray(requested, dtype=float)
+    current = np.asarray(current, dtype=float)
+    limits = np.asarray(limits, dtype=float)
+    if (requested.ndim != 1 or current.shape != requested.shape
+            or limits.shape != (requested.size, 2)):
+        raise ValueError('absolute-joint servo inputs have inconsistent dimensions')
+    if not np.isfinite(requested).all() or not np.isfinite(current).all() or not np.isfinite(limits).all():
+        raise ValueError('absolute-joint servo inputs must be finite')
+    if np.any(limits[:, 0] >= limits[:, 1]):
+        raise ValueError('absolute-joint servo limits must be strictly ordered')
+    if isinstance(correction_gain, bool) or not np.isfinite(correction_gain) or correction_gain <= 0:
+        raise ValueError('absolute-joint correction gain must be finite and positive')
+    desired = np.clip(requested, limits[:, 0], limits[:, 1])
+    servo = np.clip(
+        desired + float(correction_gain) * (desired - current),
+        limits[:, 0], limits[:, 1],
+    )
+    return desired, servo

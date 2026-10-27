@@ -87,8 +87,19 @@ Target/Ack 分别绑定 ordered resources、writer、source/binding/Scene、type
 
 R02a strict codecs 和 Scene/Assembly selector 检查只建立静态合同边界，不修改 TaskArtifact v0/v1 identity、旧
 `RequestedAction`/`CanonicalControlTarget`/Ack 或 Runtime/Provider manifests，也不创建计划、执行 adapter 或 H5
-格式。其 provider-free S1 不等于 Scene source projection、Runtime admission、native S2/S3 或 Qualification；
-R02b 负责 plan/adapter，R02c 负责真实 leaf 执行与既有 Recorder，R01c 仍独立负责静态 source 投影。
+格式。其 provider-free S1 不等于 Scene source projection、Runtime admission、native S2/S3 或 Qualification。
+
+R02b 在现有 canonical Controller 与 RuntimeSession control owners 内新增严格版本化的 parent preset、whole-section
+leaf override、effective plan、Arm/Hand Position adapters，以及显式 canonical/native mapping receipt 和整请求
+preflight/dispatch。plan compiler 从当前输入重跑R01b解析及R01c source declaration projection，并验证完整唯一
+Scene ControlGroup/ActuatorResource覆盖；实际 adapter 复用既有绝对关节 Position 与 Hand gripper opening 算法。
+合成 receipt 明确标为 `synthetic_fixture`，只用于provider-free S1，不代表真实materialization。整体preflight通过后
+才准备所有命令、consume边界、逐writer apply/Ack并请求单次外层step；部分apply、step或后续publication失败时，
+使用既有 `ExecutionFaultV1` 记录真实进度并闭锁；`LeafDispatchProgressV1` 保留已准备的 Target/command patch
+及失败前返回的每个 typed apply result，不回滚、不生成伪transition。当前没有真实Provider、SelectedReferenceEnv
+或Recorder/H5接线；R02b状态为实现与S1报告待Sol复核。R02c仍负责真实独立leaf执行、typed state与既有Recorder；
+R01c继续独立负责静态source投影。R02b不改变R02a Force-aware `NOT_ADMITTED`、旧TaskArtifact/Scene/Reset/Profile/
+Target/Ack/H5身份、R06兼容性gate、R05a blocker、DAG、Required Envelope或Qualification。
 
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、

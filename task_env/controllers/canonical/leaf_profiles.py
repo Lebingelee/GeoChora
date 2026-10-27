@@ -1,9 +1,10 @@
-"""Versioned, provider-free Position leaf contracts for the R02a boundary.
+"""Versioned, provider-free leaf contracts established by R02a.
 
-These immutable values describe bindings and requests.  They do not create a
-Controller, compile an effective plan, access native state, or admit a
-Provider.  The existing complete-Panda controller remains the only executable
-canonical Controller in this module family until a later slice adds adapters.
+These immutable values describe bindings, requests, Targets and Acks. R02b's
+effective-plan and adapter owners consume the bounded Arm/Hand Position
+contracts using typed synthetic IO for S1. No Provider/native admission is
+granted here; Force-aware remains refused and the complete-Panda Controller
+continues to serve its existing route.
 """
 from __future__ import annotations
 
@@ -683,13 +684,13 @@ LEAF_PROFILE_CATALOG_V1 = (
         "leaf-capability-catalog-entry-v1", "arm_position", ARM_POSITION_PROFILE_ID,
         "leaf-profile-binding-v1", ARM_POSITION_ACTION_SCHEMA, "CONTRACT_ONLY",
         "NOT_ADMITTED", "NOT_RUN", ("joint_position_actuation", "joint_state_query", "frame_pose_query"),
-        False, "Static Arm leaf contract only; R02b adapter and R02c execution are not implemented.",
+        False, "R02b adds provider-free leaf planning/dispatch logic with synthetic S1 only; R02c Provider materialization remains NOT_ADMITTED.",
     ),
     LeafCapabilityCatalogEntryV1(
         "leaf-capability-catalog-entry-v1", "hand_position", HAND_POSITION_PROFILE_ID,
         "leaf-profile-binding-v1", HAND_POSITION_ACTION_SCHEMA, "CONTRACT_ONLY",
         "NOT_ADMITTED", "NOT_RUN", ("joint_position_actuation", "joint_state_query", "frame_pose_query"),
-        False, "Static Hand leaf contract only; one tendon actuator and coupled fingers require later adapter/execution evidence.",
+        False, "R02b adds provider-free Hand preparation with synthetic S1 only; the one tendon actuator remains NOT_ADMITTED to a Provider until R02c.",
     ),
     LeafCapabilityCatalogEntryV1(
         "leaf-capability-catalog-entry-v1", "hand_force_aware", HAND_FORCE_AWARE_PROFILE_ID,

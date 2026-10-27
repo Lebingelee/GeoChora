@@ -75,10 +75,47 @@ freshness and Provider/build/backend/cadence are separate required provenance.
 Targets and Acks are static contracts. Validate them against the exact binding
 and caller-supplied source/application boundary and clock; an Ack is not proof
 of native apply, target attainment, or task success. The finite catalog is
-`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`. These values do not compile a leaf
-plan, create a writer, import a Provider, call `make_env()`, project Task Source,
-or change existing full-Panda Position admission. See the executable value
+`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`. The R02a contracts alone do not compile
+a plan or create a writer; see the R02b owner below. See the executable value
 example in [Public API](../../../docs/module/task_env/public-api.md#position-leaf-contract-values-r02a).
+
+## Effective Position leaf plan and synthetic dispatch (R02b)
+
+The existing canonical Controller owner exports `LeafProfileSectionV1`,
+`LeafControlPresetV1`, `LeafProfileOverrideV1`, `EffectiveLeafPlanV1`, and
+`compile_effective_leaf_plan()`. A preset stores complete registered Arm/Hand
+Position sections by canonical member path. An override replaces one whole
+known section; it cannot change profile/action/algorithm or add fields. The
+compiler re-resolves current root/Scene/children through R01b and reruns the
+R01c source declaration projection before checking the binding, source,
+Provider/build/backend/timebase, exact Scene Group/Actuator coverage and
+Required State. Effective status is derived from which consumed configurations
+differ from base; a no-op override does not change status or effective plan
+identity. Force-aware and unknown algorithms remain refused.
+
+The existing RuntimeSession control owner exposes advanced opt-in values and
+functions from `task_env.runtime.sessions`: `LeafMaterializationReceiptV1`,
+the explicit canonical/native Joint/Actuator/Frame mappings and logical
+Tendon-to-native-name mapping,
+`prepare_leaf_command()`, `preflight_leaf_control_interval()` and
+`dispatch_leaf_control_interval()`. The Arm adapter reuses the legacy absolute
+joint limit/correction function. The Hand adapter reuses the existing gripper
+opening servo and ctrl conversion, keeping requested metres, servo metres and
+native ctrl as separate fields. Never infer native indices from tuple order or
+write Hand fingers as two independent actuators.
+
+Preflight validates every writer, action, typed state sample, source/config
+identity, mapping and evaluation clock before preparing commands or consuming
+the source boundary. After all stateless commands are prepared, dispatch applies
+each owned patch and verifies its returned Target Ack, steps the outer boundary
+once, then validates the next typed publication. Failure after boundary consume
+uses the existing `ExecutionFaultV1` latch plus leaf attempted/applied/unknown/
+acknowledged progress, the prepared Target/command patches, and every typed apply
+result returned before failure; it does not roll back, retry, or publish a transition.
+Provider-free S1 uses `synthetic_fixture` receipts only. No real Provider
+materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
+do not report split leaves as admitted. R02c is the real execution/recording
+gate, and native S2/S3/S4 and Qualification remain separate.
 
 ## Choose the actual construction branch
 

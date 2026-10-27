@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a 已获Sol接收（ACCEPTED_S1_BOUNDED；Required State拒绝门修正后37 passed）；R02b/c 仍 PLANNED / NOT_STARTED。
+状态：REVISED_DRAFT；R02a 已获Sol接收（ACCEPTED_S1_BOUNDED；Required State拒绝门修正后37 passed）；R02b 已完成实现与provider-free S1，等待Sol复核；R02c仍 PLANNED / NOT_STARTED。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -23,7 +23,7 @@ EXTEND_EXISTING / COMPOSE_EXISTING：在现有 canonical profile/target/feedback
 
 Position Target/Ack 的静态交叉检查需要调用者另给 source/application boundary 和 clock context；Ack 的 source 与 application boundary 限定为同一 evaluation control step。Ack 只证明合同字段自洽，不记录真实 apply。Position state 不包含 actuator force。Force-aware 目录为有限只读值，所有三项都标为 `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`；它没有注册、Provider manifest 或执行能力。严格 decoder 拒绝未知字段/版本和跨 kind payload。旧 `RequestedAction`、`CanonicalControlTarget`、`AppliedCanonicalControl`、TaskArtifact/Scene/Reset/H5 identities 均未改。
 
-R02a provider-free S1 仅验证合同与静态selector，不算 Core admission、native S2/S3 或 Qualification。R02b 仍负责 plan/override 和执行 adapter，R02c 负责真实 leaf writer/既有 H5，R01c source projection 仍独立；本文不更改它们的 DAG 边。
+R02a provider-free S1 仅验证合同与静态selector，不算 Core admission、native S2/S3 或 Qualification。R02b实现状态见下文；R02c 负责真实 leaf writer/既有 H5，R01c source projection 仍独立；本文不更改它们的 DAG 边。
 
 ## Sol复核与Required State修正（2026-10-27）
 
@@ -50,5 +50,35 @@ reset 时选择 preset 与 episode 内切换分开。现有 C02c 仅单 Panda Po
 | R02a | R01a | Arm-only/Hand-only Position 和 Force-aware 依赖/拒绝合同；capability catalog | S1：版本/顺序/TCP/单位/资源/缺反馈负例；不得把 catalog 当支持 |
 | R02b | R02a,R01b | preset/override→effective leaf plan，复用现有算法与 target/ack owners | S1：整体预检、重复 native writer/alias/错 source/phase、hash 确定性、部分 apply fault；拆叶有真实 adapter，而非改名字 |
 | R02c | R02b,R01c | 独立 Arm-only 与 Hand-only writer 的真实 Position 执行及既有 Recorder；保留双完整 Panda 兼容对照 | S2/S3：arm-only/hand-only/同时运动，override 只影响所属资源，target/ack/state/identity 同 H5；无适配或错误映射即停止 |
+
+## R02b 实现与provider-free S1（2026-10-27，等待Sol复核）
+
+本包在 `task_env.controllers.canonical.leaf_plan` 与既有 `task_env.runtime.sessions` control owner 中完成 additive R02b
+合同。`LeafProfileSectionV1` 固定完整注册的 Arm/Hand Position 配置；`LeafControlPresetV1` 按规范路径保存 parent
+template；`LeafProfileOverrideV1` 替换一个已存在leaf的完整profile section。`compile_effective_leaf_plan()` 从当前
+root/Scene/child inputs 重跑R01b resolver和R01c source projection，然后重校验R02a binding、Scene Group/Actuator资源
+覆盖、source identity、Provider/build/backend/timebase、profile/action/config/TCP/Required State。`EffectiveLeafPlanV1`
+记录base preset hash、effective配置实值/hash、排序override和唯一writer资源表；状态 `preset`、
+`partially_overridden`、`custom` 从实际生效配置差异推导。无效果override不改变状态或effective identity。
+
+Arm/Hand真实stateless adapters 位于 `task_env.runtime.sessions.leaf_control`，共享已抽取的旧Arm绝对Position限幅/误差
+修正与既有Hand opening servo/ctrl换算；完整Panda旧Controller仍调用同一算法。Hand Prepared Command 分开保留请求
+开度(m)、servo开度(m)与native ctrl。显式 `LeafMaterializationReceiptV1` 固定canonical/native Joint/Actuator/Frame mapping、
+logical Tendon→native name mapping、名称/ID/地址/slot、native维度、ctrl范围、source transmission、Hand单tendon actuator/equality与plan/provider/source identity；
+乱序mapping按明确ref消费，slot/native名称/ID与地址alias拒绝。当前receipt全部标作 `synthetic_fixture`，不表示Provider产物。
+
+`dispatch_leaf_control_interval()` 对完整请求、全部leaf action、typed Required State、clock/episode/reset/materialization/
+config identity和writer可用性先做preflight；然后无副作用prepare全部command，才consume边界、apply独立patch、校验实际返回Ack、
+执行单次外层step并核验下一份typed publication。Preflight失败不compute/apply/step。边界consume或apply之后失败时，
+`ExecutionFaultV1`与 `LeafDispatchProgressV1`记录attempted/applied/unknown/acknowledged writers、已准备的Target/command patch
+及失败前返回的每个typed apply result；可能先写后抛的writer标为unknown，
+不宣称回滚、不重试、不发布transition，fault latch要求新episode/reset/materialization context后再继续。未创建native handle，
+无资源需关闭；synthetic lifecycle 的close为幂等假IO检查。真实RuntimeSession Provider接线、SelectedReferenceEnv与Recorder/H5仍
+未实现。
+
+新增R02b provider-free S1为13 passed；选定受影响既有contracts/resolver/projection/C02a/C03a owner集合101 passed、3个真实
+native selector deselected；另有C02b pure legacy-action guard 1 passed。新增测试还验证分离Arm/Hand Entity synthetic dispatch。
+R02b总体状态为 `IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`。未运行真实 Provider/native、R02c、R03b、S2/S3/S4/H5或Qualification；
+split leaf仍 `NOT_ADMITTED`。Force-aware仍拒绝，旧完整Panda及双独立Position既有路线未宣称退化。
 
 R02c 首先在既有完整 Panda 的两个 Existing-Entity Subcomponent References 上运行两个真正分离的 Arm-only / Hand-only writer，验证 leaf 算法/资源隔离与 H5；这与运行两个完整 Panda Controller 不同。若选择未装配的两个独立资产作附加样例，R02b 必须先交付其有界 source mapping/admission，不能假定已有支持。跨两个真实 Entity 的最终 split-leaf 执行、装配后载荷/耦合/状态与公开 env S3 由 R03c 必须验证；该选择不新增 R03b→R02c 的隐藏依赖。R04/R05 不是 Position-only 前置；Force-aware required-state 未准入只拒绝该 profile，不给 Position 强加力读取。

@@ -57,3 +57,22 @@ __all__ += [
     "panda_hand_force_aware_dependency", "panda_hand_required_state",
     "validate_leaf_binding", "validate_leaf_bindings", "validate_leaf_target_ack",
 ]
+from .leaf_plan import (
+    EffectiveLeafEntryV1,
+    EffectiveLeafPlanV1,
+    LeafControlPresetV1,
+    LeafProfileOverrideV1,
+    LeafProfileSectionV1,
+    compile_effective_leaf_plan,
+    decode_leaf_control_preset,
+    decode_leaf_profile_override,
+    decode_leaf_profile_section,
+    default_leaf_profile_section,
+)
+__all__ += [
+    "EffectiveLeafEntryV1", "EffectiveLeafPlanV1", "LeafControlPresetV1",
+    "LeafProfileOverrideV1", "LeafProfileSectionV1",
+    "compile_effective_leaf_plan", "decode_leaf_control_preset",
+    "decode_leaf_profile_override", "decode_leaf_profile_section",
+    "default_leaf_profile_section",
+]

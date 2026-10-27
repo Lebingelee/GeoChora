@@ -128,7 +128,9 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `LogicalAssemblyV1`, `LogicalAssemblyScenePinV1`, `LogicalAssemblyEntityMemberV1`, `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, `LogicalAssemblyControlGroupReferenceV1`, `decode_logical_assembly` | `task_env.artifacts` | R01a provider-neutral `logical-assembly-v1` 静态值；Scene identity pin、typed Entity/reference/nested member 与非自指 content hash。strict codec 不解析、不 lowering、不代表 Attachment admission 或 physical support |
 | `resolve_logical_assembly`, `ResolvedLogicalAssemblyV1`, `ResolvedLogicalAssemblyLeafV1` | `task_env.artifacts` | R01b bounded provider-free static resolver：对一个精确 Scene 和显式 child catalog 校验可达 closure，返回不可变 typed leaves/path/provenance；最大32层/1024 leaves。不投影 source、不创建 native mapping/Entity/writer或 Runtime |
 | `project_logical_assembly_source`, `LogicalAssemblySourceProjectionV1`, `ProjectedEntitySourceV1`, `ProjectedLeafSourceV1` | `task_env.assembly` | R01c advanced provider-free projection：每次重验当前 Assembly/Scene/child closure，关联被引用的现有 Entity、Asset声明及精确 typed Frame/Joint/Actuator/ControlGroup定义；保留来源Assembly/path与声明级证据。receipt只核对声明身份，不重新验证bytes/closure；不lower XML、不创建物理Entity/native映射或Runtime |
-| `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts only. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; no leaf Controller, plan compiler, apply adapter, Runtime admission, or Qualification is added |
+| `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite Force-aware catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; R02b adds a separate compiled Position leaf plan and synthetic-IO adapter path, but does not alter the catalog or admit a Provider |
+| `LeafProfileSectionV1`, `LeafControlPresetV1`, `LeafProfileOverrideV1`, `EffectiveLeafPlanV1`, `compile_effective_leaf_plan` | `task_env.controllers.canonical` | R02b advanced provider-free owner. Re-resolves current R01b/R01c inputs, requires complete Scene ControlGroup/ActuatorResource coverage, compiles exact immutable Arm/Hand Position sections, and derives `preset` / `partially_overridden` / `custom` from effective configuration differences. This is not a public factory or runtime admission |
+| `LeafMaterializationReceiptV1`, `LeafNativeJointMappingV1`, `LeafNativeActuatorMappingV1`, `LeafNativeFrameMappingV1`, `LeafNativeTendonMappingV1`, `prepare_leaf_command`, `preflight_leaf_control_interval`, `dispatch_leaf_control_interval` | `task_env.runtime.sessions` (advanced opt-in) | R02b provider-neutral typed boundary and production preflight/dispatch owners. S1 consumes explicitly `synthetic_fixture` mappings only; no real Provider implementation, native materialization, `SelectedReferenceEnv`, or Recorder/H5 integration is added. `LeafControlRuntime` is a protocol for a future extension of the existing RuntimeSession owner, not a second runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
 | `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
@@ -276,9 +278,34 @@ does not block either Position contract.
 The strict decoders reject unknown fields/versions and cross-kind payloads. `validate_leaf_binding()` checks a
 Scene-v3 static binding and, when given a `ResolvedLogicalAssemblyV1`, verifies the exact member selector. A whole
 Panda may use two reference-only ControlGroup selectors; those views do not own Entities or create writers. A
-two-Entity static fixture uses the existing Entity owners. These checks do not project Task Source, assign native
-indices, build a plan, call `make_env()`, or admit an executable capability. The R02a catalog is deliberately
-`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; R02b/c and R01c remain separate gates.
+two-Entity static fixture uses the existing Entity owners. R02a alone does not project Task Source, assign native
+indices, build a plan, call `make_env()`, or admit an executable capability. The R02a Force-aware catalog remains
+`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`.
+
+### Effective Position leaf plan and synthetic dispatch (R02b)
+
+R02b adds strict versioned `LeafProfileSectionV1`, `LeafControlPresetV1` and complete-section
+`LeafProfileOverrideV1` values. `compile_effective_leaf_plan()` re-resolves the current root/Scene/children and
+reprojects current source declarations before checking the R02a bindings, source identity, provider/build/timebase,
+unique writer/resource coverage and exact preset paths. Its immutable `EffectiveLeafPlanV1` retains the base preset,
+ordered overrides, effective config values/identities, leaf bindings and resource writers. Status is computed from
+which effective leaf sections differ from base; a no-op override does not change status or effective plan identity.
+
+`prepare_leaf_command()` is the shared stateless Arm/Hand Position adapter. Arm reuses the legacy absolute-joint
+limit/correction calculation; Hand reuses the existing gripper opening servo and affine command conversion. A Hand
+command keeps requested opening in metres, servo opening in metres and native ctrl as separate values. Explicit
+native mapping receipt values bind canonical refs to names/IDs/addresses/slots and source/Provider/config identity;
+they must validate exact resource coverage, Arm transmission to the mapped native Joint name, Hand logical-tendon to
+native-tendon name, equality and alias-free slots. R02b S1 uses only `synthetic_fixture` provenance.
+
+`dispatch_leaf_control_interval()` validates the complete action/state/request and every writer before preparing
+commands or consuming the boundary; it then applies each exact typed patch, validates the returned apply Ack,
+requests one outer interval, and validates the next typed publication. A failure after boundary consumption latches
+the existing `ExecutionFaultV1` with leaf attempted/applied/unknown/acknowledged progress, preserved prepared Targets/command patches,
+and every typed apply result returned before the failure. This provider-neutral
+path has provider-free S1 evidence only: it is not wired to any real RuntimeSession Provider, selected Env or H5
+Recorder and does not establish native leaf admission. R02c remains the required real independent leaf/runtime/
+recording gate; S2/S3/S4 and Qualification remain unrun.
 
 ```python
 from task_env.controllers.canonical import (
