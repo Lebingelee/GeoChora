@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt001复核要求的修复已在attempt002实施，定向S1与静态预检通过；唯一native进程在compile前被MuJoCo版本/API检查阻塞，S2/S3仍NOT_RUN，等待Sol复核且leaf Provider admission未建立。
+状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt002修复/S1已复核，状态S1_REVIEWED_NATIVE_PENDING，S2/S3未运行。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -106,3 +106,7 @@ Sol复核保留53项S1与原始失败事实，但发现reader导入/codec缺失�
 在既有owners内完成Sol列出的五类修复：严格leaf command codec与真实Generic H5 v3生产写入/关闭/独立读回；MuJoCo adapter在首个ctrl写入前验证Target boundary/config/clock/resource order；physical clock沿用绝对`1e-12 s`容差；leaf admission异常路径关闭session一次并保留原异常；probe使用显式合同、snapshot、output目录和静态预检，不再复用attempt001窗口计数。新增provider-free定向S1为28 passed，覆盖64/65 H5、双writer、9类篡改、adapter零副作用拒绝和admission cleanup。静态预检对固定closure/67 assets与安装文件哈希通过；缺字段、错误source hash、错误脚本hash和错误冻结HEAD均产生结构化拒绝，且native计数为0。
 
 attempt002唯一获准MuJoCo进程在首次compile之前因运行时版本/API校验失败，原始分类为`BLOCKED_PROVIDER`，native compile/materialize/reset/forward/step皆0。按停止条件未重试、未切换Provider或调整source/oracle。因未构造真实session、未发生积分也未生成episode H5，R02c所需S2/S3为`NOT_RUN`，本次出口为`BLOCKED_PROVIDER_PENDING_SOL_REVIEW`，不是接受或Provider admission。实现提交`b845bfadf518f57981b3556f65e3eb211dab1996`；attempt002完整报告、日志、合同与Evidence在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`。R03b未启动，R06、R05a、DAG/Required Envelope/P99与Qualification边界不变。
+
+## R02c attempt002 Sol复核（2026-10-27）
+
+五项原返工与28项provider-free S1经审阅；Sol直接修正probe对MuJoCo3.8.1 API版本整数的错误预期30801→3008001，并在拒绝前留存实际runtime身份。原失败没有保存实际版本值，不能据此断言Provider不兼容；也不能假称runtime已核验。Sol当前rework模块19 passed，未import/运行native；状态 **S1_REVIEWED_NATIVE_PENDING**。下一包attempt003以一个native进程补齐原四episode的S2与同Env/同H5独立S3，002+003总启动至多2；原raw不重写、不改source/算法/oracle。R02c出口仍未接收，R03b未启动，R06/R05a/DAG/required/P99保持。

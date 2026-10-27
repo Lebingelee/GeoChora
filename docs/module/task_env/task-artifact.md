@@ -213,3 +213,5 @@ Core promotion 由 Geochora maintainer 单独治理。
 不要把 metadata/hash 当作丢失 raw Evidence 的替代。操作步骤复用
 [已有 Experiment/Evidence Skill](../../../task_env/.agents/skills/task-env-experiment-evidence/SKILL.md)，
 不再创建同义 Skill 或 schema。
+
+R02c Sol review (2026-10-27): attempt002 command/H5, pre-write boundary and cleanup repairs are reviewed with bounded S1. The native stop exposed a probe API-version constant error (30801 instead of MuJoCo3.8.1 header value 3008001); Sol fixed it with strict identity regressions and pre-rejection observation capture. Original runtime values remain unavailable. S2 requires actual native motion/isolation; S3 requires those real Env transitions in the closed H5 and independent readback. Synthetic S1 is distinct; R02c remains S1_REVIEWED_NATIVE_PENDING, and R06/R05a/DAG/Required Envelope/P99 are unchanged.

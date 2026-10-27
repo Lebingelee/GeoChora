@@ -18,6 +18,7 @@ import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[3]
+CURRENT_ATTEMPT = "003"
 ATTEMPT_ROOT = None
 OUTPUT = None
 CONTRACT_PATH = None
@@ -36,6 +37,32 @@ def _sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             h.update(block)
     return h.hexdigest()
+
+
+def _validate_mujoco_runtime_identity(observed: dict, expected: dict) -> None:
+    # MuJoCo 3.8.1's public mujoco.h defines mjVERSION_HEADER as 3008001.
+    if (observed.get("version") != "3.8.1"
+            or observed.get("runtime_version") != "3.8.1"
+            or type(observed.get("mj_version")) is not int
+            or observed["mj_version"] != 3008001):
+        raise RuntimeError(
+            "BLOCKED_PROVIDER: expected MuJoCo package/runtime/API "
+            f"3.8.1/3.8.1/3008001; observed {observed.get('version')!r}/"
+            f"{observed.get('runtime_version')!r}/{observed.get('mj_version')!r}"
+        )
+    for observed_key, expected_key, hash_key in (
+        ("package_path", "package_init_path", "package_sha256"),
+        ("binding_path", "binding_path", "binding_sha256"),
+    ):
+        path = str(Path(expected[expected_key]).resolve())
+        if (observed.get(observed_key) != path
+                or observed.get(hash_key) != expected["static_files_sha256"][expected[expected_key]]):
+            raise RuntimeError(f"BLOCKED_PROVIDER: loaded {observed_key}/hash differs from frozen package")
+    library = str(Path(expected["native_library_path"]).resolve())
+    if not any(item.get("path") == library
+               and item.get("sha256") == expected["native_library_sha256"]
+               for item in observed.get("mapped_native_libraries", ())):
+        raise RuntimeError("BLOCKED_PROVIDER: loaded MuJoCo native library path/hash differs")
 
 
 def _write_json(path: Path, value) -> None:
@@ -71,9 +98,11 @@ def _raw_evidence_bytes() -> int:
 
 
 def _verify_frozen_inputs(contract: dict, snapshot: dict) -> None:
-    if contract.get("task_id") != "PHASE-II-01-R02C" or contract.get("attempt") != "002":
+    if contract.get("task_id") != "PHASE-II-01-R02C" or contract.get("attempt") != CURRENT_ATTEMPT:
         raise RuntimeError("frozen native contract task identity mismatch")
-    if contract.get("authorization", {}).get("reference") != contract.get("authorization", {}).get("user_instruction_reference"):
+    reference = contract.get("authorization", {}).get("reference")
+    if (type(reference) is not str or not reference.strip()
+            or reference != contract.get("authorization", {}).get("user_instruction_reference")):
         raise RuntimeError("native authorization reference is missing")
     if contract.get("authorization", {}).get("approved_by") is not None:
         raise RuntimeError("probe contract must not invent a named approver")
@@ -93,14 +122,16 @@ def _verify_frozen_inputs(contract: dict, snapshot: dict) -> None:
         raise RuntimeError("R02c process timeout differs from fixed contract")
     if contract["budget"]["max_materializations_total"] != 8:
         raise RuntimeError("R02c materialization budget differs from fixed contract")
+    if contract["budget"]["max_native_process_invocations"] != 1:
+        raise RuntimeError("R02c continuation allows only one native process")
     expected_counters = {
         "process_starts": 0, "materialization_attempts": 0, "reset_attempts": 0,
         "mj_step_calls": 0, "mj_forward_calls": 0, "outer_intervals": 0,
     }
     if contract.get("current_window_baseline_native_budget_consumed") != expected_counters:
-        raise RuntimeError("attempt002 native budget baseline must begin at zero")
-    if snapshot.get("task_id") != "PHASE-II-01-R02C" or snapshot.get("attempt") != "002":
-        raise RuntimeError("R02c attempt002 input snapshot identity mismatch")
+        raise RuntimeError("current continuation native budget baseline must begin at zero")
+    if snapshot.get("task_id") != "PHASE-II-01-R02C" or snapshot.get("attempt") != CURRENT_ATTEMPT:
+        raise RuntimeError("R02c continuation input snapshot identity mismatch")
     branch = __import__("subprocess").run(
         ["git", "branch", "--show-current"], cwd=REPO, check=True, capture_output=True, text=True,
     ).stdout.strip()
@@ -391,6 +422,7 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
                          "materialize_control": 0},
         "resource_samples": [], "failure": None,
         "historical_attempt001_activity": contract.get("historical_attempt001_activity"),
+        "historical_attempt002_activity": contract.get("historical_attempt002_activity"),
         "current_window_baseline_native_budget_consumed": contract[
             "current_window_baseline_native_budget_consumed"],
         "started_monotonic_s": started,
@@ -423,23 +455,20 @@ def _run_native(contract: dict, snapshot: dict, started: float, log_stream, resu
                 mapped = Path(fields[-1]).resolve()
                 if mapped not in maps:
                     maps.append(mapped)
-        if str(mujoco.__version__) != "3.8.1" or int(mujoco.mj_version()) != 30801:
-            raise RuntimeError("BLOCKED_PROVIDER: loaded MuJoCo version/API differs from 3.8.1")
-        if loaded_path != Path(contract["provider_identity"]["package_init_path"]).resolve():
-            raise RuntimeError("BLOCKED_PROVIDER: loaded MuJoCo package path differs from frozen package")
-        if native_path != Path(contract["provider_identity"]["binding_path"]).resolve():
-            raise RuntimeError("BLOCKED_PROVIDER: loaded MuJoCo binding path differs from frozen package")
-        expected_library = Path(contract["provider_identity"]["native_library_path"]).resolve()
-        if expected_library not in maps or _sha256_file(expected_library) != contract["provider_identity"]["native_library_sha256"]:
-            raise RuntimeError("BLOCKED_PROVIDER: loaded MuJoCo native library path/hash differs")
-        results["loaded_provider"] = {
-            "version": str(mujoco.__version__), "mj_version": int(mujoco.mj_version()),
+        # Save the actual values before deciding admission, including failures.
+        observed = results["loaded_provider"] = {
+            "version": str(mujoco.__version__),
             "package_path": str(loaded_path), "package_sha256": _sha256_file(loaded_path),
             "binding_path": str(native_path), "binding_sha256": _sha256_file(native_path),
             "mapped_native_libraries": [{"path": str(path), "sha256": _sha256_file(path)} for path in maps],
             "renderer_initialized": False,
         }
-        note("provider_runtime_verified", provider=results["loaded_provider"])
+        observed["mj_version"] = int(mujoco.mj_version())
+        observed["runtime_version"] = str(mujoco.mj_versionString())
+        note("provider_runtime_observed", provider=observed)
+        _write_json(EVIDENCE_PATH, results)
+        _validate_mujoco_runtime_identity(observed, contract["provider_identity"])
+        note("provider_runtime_verified", provider=observed)
 
         originals["mj_step"] = mujoco.mj_step
         originals["mj_forward"] = mujoco.mj_forward
@@ -938,16 +967,16 @@ def _load_json(path: Path):
 
 def _safe_output_path(raw_path: str, mode: str) -> Path:
     global ATTEMPT_ROOT
-    expected_root = (REPO / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002").resolve()
+    expected_root = (REPO / f"workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_{CURRENT_ATTEMPT}").resolve()
     root = Path(raw_path).expanduser().resolve(strict=False)
     if root.parent != expected_root:
-        raise ValueError("output-dir must be a direct child of the fresh r02c_002 package")
-    allowed_names = {"native_run_001", "native_run_002"}
+        raise ValueError("output-dir must be a direct child of the current R02c continuation package")
+    allowed_native = mode == "native" and root.name == "native_run_001"
     allowed_static_preflight = mode == "static" and (
         root.name.startswith("preflight_reject_")
         or (root.name.startswith("preflight_") and root.name.removeprefix("preflight_").isdigit())
     )
-    if root.name not in allowed_names and not allowed_static_preflight:
+    if not allowed_native and not allowed_static_preflight:
         raise ValueError("output-dir names an unauthorized R02c attempt directory")
     if root.exists() or root.is_symlink():
         raise FileExistsError(f"output-dir must be fresh and exclusive: {root}")
@@ -959,7 +988,7 @@ def _safe_output_path(raw_path: str, mode: str) -> Path:
 
 def main(argv=None) -> int:
     global OUTPUT, CONTRACT_PATH, SNAPSHOT_PATH, EVIDENCE_PATH, LOG_PATH
-    parser = argparse.ArgumentParser(description="Bounded R02c attempt002 MuJoCo CPU verification")
+    parser = argparse.ArgumentParser(description=f"Bounded R02c attempt{CURRENT_ATTEMPT} MuJoCo CPU verification")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--static-only", action="store_true")
     mode.add_argument("--execute-native", action="store_true")
@@ -983,7 +1012,7 @@ def main(argv=None) -> int:
     LOG_PATH = log_dir / f"{OUTPUT.name}.jsonl"
     started = time.monotonic()
     result = {
-        "task_id": "PHASE-II-01-R02C", "attempt": "002", "mode": run_mode,
+        "task_id": "PHASE-II-01-R02C", "attempt": CURRENT_ATTEMPT, "mode": run_mode,
         "status": "RUNNING", "native_calls": {"mj_step": 0, "mj_forward": 0,
                           "mj_resetData": 0, "materialize_control": 0},
         "failure": None, "started_monotonic_s": started,
@@ -1010,7 +1039,7 @@ def main(argv=None) -> int:
         valid_preflight = next((path for path in reversed(preflight_paths)
                                 if _load_json(path).get("status") == "PASS_STATIC_PREFLIGHT"), None)
         if valid_preflight is None:
-            raise RuntimeError("native mode requires a successful attempt002 static preflight")
+            raise RuntimeError("native mode requires a successful current-attempt static preflight")
         preflight_path = valid_preflight
         preflight = _load_json(preflight_path)
         result["successful_static_preflight"] = str(preflight_path)
@@ -1019,10 +1048,10 @@ def main(argv=None) -> int:
             raise RuntimeError("static preflight and native contract source closure disagree")
         ledger_path = ATTEMPT_ROOT / "native_process_ledger.json"
         ledger = _load_json(ledger_path) if ledger_path.exists() else {
-            "attempt": "002", "process_starts": 0, "runs": [],
+            "attempt": CURRENT_ATTEMPT, "process_starts": 0, "runs": [],
         }
         if ledger["process_starts"] >= contract["budget"]["max_native_process_invocations"]:
-            raise RuntimeError("attempt002 native process invocation budget exhausted")
+            raise RuntimeError("R02c continuation native process invocation budget exhausted")
         if ledger["process_starts"]:
             previous = ledger["runs"][-1]
             if (previous.get("status") != "FAIL_PRE_STEP" or previous.get("mj_step_calls") != 0

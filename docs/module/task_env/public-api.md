@@ -335,7 +335,7 @@ Provider-free targeted S1 passed 53 tests. The one bounded MuJoCo 3.8.1 CPU prob
 validation with `KeyError: 'provider_static_files'`, before importing MuJoCo or compiling/materializing/resetting/stepping.
 The script was corrected in a later unexecuted contract revision; the fixed process budget did not permit another start.
 Therefore no R02c S2/S3, native H5 readback, or Provider admission is established. Keep this path at
-`CHANGES_REQUESTED_S2_S3_NOT_RUN`; Sol reproduced reader import/decoder and pre-write Target-boundary defects, and identified an exact-float clock comparison. Repair and bounded native validation remain required; do not describe this path as supported or qualified.
+`S1_REVIEWED_NATIVE_PENDING`: attempt002 repaired the reader, pre-write Target checks, clock tolerance, admission cleanup and static preflight. Sol corrected the probe API-version expectation to 3008001 for MuJoCo3.8.1 and retained strict version/path/hash checks with observations saved before rejection. Original loaded version values were not recorded; Provider identity and real S2/S3 remain unverified. Current review regressions passed 19 tests without native import; no supported-route or Qualification claim follows.
 The attempt report and raw logs are local ignored Evidence under
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`.
 

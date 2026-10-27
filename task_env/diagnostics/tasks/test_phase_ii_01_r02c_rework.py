@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from copy import deepcopy
 import json
+from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import numpy as np
@@ -25,6 +28,85 @@ from task_env.recorders import RecorderConfig, TransitionRecorder, load_leaf_con
 from task_env.diagnostics.tasks.test_phase_ii_01_r02b_leaf_execution import (
     _actions, _case, _publication, _receipt, _request, _SyntheticRuntime,
 )
+
+
+def _runtime_identity_fixture(tmp_path):
+    package, binding, library = (str(tmp_path / name) for name in (
+        "__init__.py", "_functions.so", "libmujoco.so.3.8.1",
+    ))
+    expected = {
+        "package_init_path": package, "binding_path": binding,
+        "native_library_path": library, "native_library_sha256": "c" * 64,
+        "static_files_sha256": {package: "a" * 64, binding: "b" * 64},
+    }
+    observed = {
+        "version": "3.8.1", "runtime_version": "3.8.1", "mj_version": 3008001,
+        "package_path": package, "package_sha256": "a" * 64,
+        "binding_path": binding, "binding_sha256": "b" * 64,
+        "mapped_native_libraries": [{"path": library, "sha256": "c" * 64}],
+    }
+    return observed, expected
+
+
+def test_runtime_version_guard_accepts_the_installed_381_header_without_native_import(tmp_path):
+    from importlib.metadata import distribution
+    from task_env.diagnostics.tasks.r02c_leaf_position_probe import _validate_mujoco_runtime_identity
+    header = Path(distribution("mujoco").locate_file("mujoco/include/mujoco/mujoco.h"))
+    api_version = int(re.search(r"^#define mjVERSION_HEADER (\d+)$", header.read_text(), re.MULTILINE)[1])
+    observed, expected = _runtime_identity_fixture(tmp_path)
+    observed["mj_version"] = api_version
+    _validate_mujoco_runtime_identity(observed, expected)
+    assert "mujoco" not in __import__("sys").modules
+
+
+@pytest.mark.parametrize("field,value", [
+    ("version", "3.8.0"), ("runtime_version", "3.8.0"),
+    ("mj_version", 30801), ("mj_version", True),
+    ("package_path", "/wrong/package.py"), ("package_sha256", "d" * 64),
+    ("binding_path", "/wrong/binding.so"), ("binding_sha256", "d" * 64),
+    ("mapped_native_libraries", []),
+    ("mapped_native_libraries", [{"path": "/wrong/lib.so", "sha256": "c" * 64}]),
+])
+def test_runtime_identity_guard_retains_strict_version_path_and_hash_rejections(tmp_path, field, value):
+    from task_env.diagnostics.tasks.r02c_leaf_position_probe import _validate_mujoco_runtime_identity
+    observed, expected = _runtime_identity_fixture(tmp_path)
+    observed[field] = value
+    before = deepcopy(observed)
+    with pytest.raises(RuntimeError, match="BLOCKED_PROVIDER") as caught:
+        _validate_mujoco_runtime_identity(observed, expected)
+    assert observed == before
+    if field in {"version", "runtime_version", "mj_version"}:
+        assert "3008001" in str(caught.value) and repr(value) in str(caught.value)
+    assert "mujoco" not in __import__("sys").modules
+
+
+def test_continuation_output_gate_protects_history_and_allows_one_native_slot(tmp_path, monkeypatch):
+    from task_env.diagnostics.tasks import r02c_leaf_position_probe as probe
+    monkeypatch.setattr(probe, "REPO", tmp_path)
+    monkeypatch.setattr(probe, "ATTEMPT_ROOT", None)
+    base = tmp_path / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
+    current = base / f"r02c_{probe.CURRENT_ATTEMPT}"
+    for raw, mode in ((base / "r02c_002/native_run_002", "native"),
+                      (current / "native_run_002", "native"),
+                      (current / "native_run_001", "static"),
+                      (current / "preflight_001", "native")):
+        with pytest.raises(ValueError):
+            probe._safe_output_path(str(raw), mode)
+        assert not raw.exists()
+    for name, mode in (("preflight_001", "static"), ("native_run_001", "native")):
+        path = current / name
+        assert probe._safe_output_path(str(path), mode) == path
+        with pytest.raises(FileExistsError):
+            probe._safe_output_path(str(path), mode)
+
+
+@pytest.mark.parametrize("authorization", [{}, {"reference": "", "user_instruction_reference": ""}])
+def test_static_preflight_rejects_empty_authorization_references(authorization):
+    from task_env.diagnostics.tasks import r02c_leaf_position_probe as probe
+    contract = {"task_id": "PHASE-II-01-R02C", "attempt": probe.CURRENT_ATTEMPT,
+                "authorization": authorization}
+    with pytest.raises(RuntimeError, match="authorization reference is missing"):
+        probe._verify_frozen_inputs(contract, {})
 
 
 def test_prepared_command_strict_codec_checks_nested_identity_and_slot_order():

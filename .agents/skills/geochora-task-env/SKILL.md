@@ -162,6 +162,17 @@ legacy materialize/reset/forward operations remain historical and do not count
 toward attempt002. See ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`.
 
+Sol reviewed the attempt002 repairs and synthetic evidence. Current status is
+`S1_REVIEWED_NATIVE_PENDING`: the probe incorrectly expected API integer 30801;
+MuJoCo3.8.1's official and installed header define 3008001. Sol fixed that guard,
+kept strict package/runtime/version/path/hash checks, and records observed
+identity before rejection. Original raw logs lack the actual loaded version
+values, so neither runtime identity nor a real Provider mismatch is established.
+The current rework module passed 19 provider-free tests; Sol ran no native.
+Attempt003 is a one-process continuation for the unchanged four-episode native
+S2/S3 case. S2 measures real motion/isolation; S3 independently reads those same
+Env transitions from closed H5. Synthetic H5 remains S1. No R03b or Qualification.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",
