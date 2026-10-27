@@ -585,17 +585,17 @@
         "R02b",
         "R01c"
       ],
-      "status": "S1_REVIEWED_NATIVE_PENDING",
-      "execution": "REPAIRS_AND_S1_REVIEWED; HARNESS_VERSION_GUARD_FIXED; S2_S3_NOT_RUN",
+      "status": "FAIL_CORE_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT003_NATIVE_FAIL_AFTER_5_MJ_STEP; POST_NATIVE_TYPED_REQUIREMENTS_FIX_S1_PASS; S2_S3_INCOMPLETE",
       "required_evidence": "S2/S3",
       "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
-      "native_execution": "ATTEMPT002_PRE_COMPILE_STOP; INCORRECT_GUARD_EXPECTED_30801_INSTEAD_OF_3008001; ACTUAL_RUNTIME_VALUES_NOT_RECORDED",
+      "native_execution": "ATTEMPT003_PROVIDER_IDENTITY_AND_COMPILE_PASS; E1_RESET_PASS; 5_MJ_STEP; CORE_TYPED_STATE_REQUIREMENTS_FAILURE; NO_COMPLETED_INTERVAL_OR_H5",
       "core_runtime_admission": false,
-      "provider_free_s1_passed": 28,
+      "provider_free_s1_passed": 19,
       "qualification_granted": false,
-      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/report.md",
-      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/evidence.json",
-      "result": "Sol reviewed attempt002 repairs/S1, fixed the MuJoCo3.8.1 API integer guard and pre-rejection identity capture; 19 current provider-free rework tests passed. One-process attempt003 continuation must establish native identity/S2/S3; no slice exit acceptance or R03b start.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/evidence.json",
+      "result": "Attempt003 verified MuJoCo 3.8.1 identity, compiled and materialized the fixed source, reset E1, then failed typed state publication after five mj_step calls; the post-native typed StateRequirements fix passed 19 provider-free tests and remains unverified natively. Required S2/S3 incomplete; no slice acceptance, Provider admission, Qualification or R03b start.",
       "sol_review": {
         "decision": "S1_REVIEWED_NATIVE_PENDING",
         "input_commit": "8a93c2ee48ac9ad1557dc3035eb94ac293136e27",
@@ -605,7 +605,74 @@
         "next_attempt": "003",
         "attempt002_plus_continuation_max_process_starts": 2
       },
-      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/commands.json",
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/commands.json",
+      "attempt003": {
+        "task_id": "PHASE-II-01-R02C",
+        "input_commit": "cdb0c12006ca0787f9110da5df343711abc869f3",
+        "provider_free_s1": {
+          "status": "PASS_POST_NATIVE_FIX_UNVERIFIED_NATIVELY",
+          "passed": 19,
+          "native_import_blocked": true,
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/logs/s1_provider_free_retry.stdout.log"
+        },
+        "static_preflight": {
+          "status": "PASS_STATIC_PREFLIGHT",
+          "source_closure_sha256": "aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47",
+          "asset_count": 67,
+          "native_calls": 0,
+          "result": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/preflight_001/preflight_result.json"
+        },
+        "native": {
+          "classification": "FAIL_CORE",
+          "status": "FAIL",
+          "provider_identity": "PASS: package/runtime/API 3.8.1/3.8.1/3008001; package, binding and library path/hash matched",
+          "compile": "PASS",
+          "materialization": "PASS: nq/nv/nu=9/9/8",
+          "reset": "PASS: E1",
+          "materialization_calls": 1,
+          "reset_calls": 1,
+          "mj_forward_calls": 2,
+          "mj_step_calls": 5,
+          "returned_outer_intervals": 0,
+          "physical_clock_after_failed_publication": {
+            "control_step": 1,
+            "simulation_time_s": 0.01,
+            "transition_status": "incomplete"
+          },
+          "failure": "typed state projection requires StateRequirements; leaf dispatch supplied tuple",
+          "recorder_close": "Generic H5 v3 failure artifact written at T=0/T+1=1; R02c reader rejected because exactly 64 transitions and 65 observations are required",
+          "episodes_completed": 0,
+          "h5_readback": "OFFLINE_INCOMPLETE_READ_REJECTED; not an S3 pass",
+          "partial_h5": {
+            "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/native_run_001/E1-arm-only.h5",
+            "sha256": "52b7b27a64a0e4626115adfff719d59fed342299264c8e46ae723cc428420a87",
+            "bytes": 42824,
+            "transition_count": 0,
+            "observation_count": 1,
+            "stop_reason": "execution_fault",
+            "episode_complete_attr": true
+          },
+          "leaf_dispatch_progress_serialized": false,
+          "process_starts": 1,
+          "retry": false,
+          "S2": "INCOMPLETE_FAIL_CORE",
+          "S3": "INCOMPLETE_H5_REJECTED",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/native_run_001/native_evidence.json"
+        },
+        "post_native_fix": {
+          "owner": "task_env/runtime/sessions/leaf_control.py::dispatch_leaf_control_interval",
+          "summary": "Wrap aggregate leaf requirements in controller-owned StateRequirements before RuntimeSession typed publication",
+          "native_verification": "NOT_RUN; attempt003 native budget exhausted",
+          "qualification_granted": false,
+          "provider_admission": false
+        },
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/report.md",
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/evidence.json",
+        "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/commands.json",
+        "qualification_granted": false,
+        "provider_admission": false,
+        "R03b_started": false
+      },
       "attempt001": {
         "task_id": "PHASE-II-01-R02C",
         "input_commit": "c18325f7e332bc5d3864752fc3fe7aa94225f551",
@@ -670,7 +737,7 @@
           "attempt002_plus_continuation_max_process_starts": 2
         }
       },
-      "sol_review_required": "Required native S2/S3 still pending; attempt002 repairs/S1 reviewed. No slice acceptance."
+      "sol_review_required": "Attempt003 native failed after five mj_step calls at typed state publication; post-native StateRequirements fix has provider-free S1 only. Required S2/S3 incomplete; Sol review required. No slice acceptance."
     },
     {
       "id": "R03b",

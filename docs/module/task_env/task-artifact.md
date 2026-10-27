@@ -109,6 +109,12 @@ attempt002在既有leaf-control、MuJoCo RuntimeSession、Generic H5 v3和Select
 
 获授权的唯一attempt002 native进程成功导入阶段开始，但运行时 MuJoCo 版本/API 检查返回 `BLOCKED_PROVIDER: loaded MuJoCo version/API differs from 3.8.1`，发生在compile、materialize、reset、forward和step之前；本次各native调用计数均为0，未产生physics/H5 episode，S2/S3为NOT_RUN。失败未被当作可重试的普通预步进程序错误，未启动第二进程或更换Provider。细节与原始日志保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`；R02c仍待Sol复核，Provider admission与Qualification均未建立，R03b未启动。R06兼容性gate、R05a blocker、DAG、Required Envelope、P99及旧身份保持不变。
 
+### R02c attempt003 Core publication failure (2026-10-27)
+
+唯一获授权进程核验到MuJoCo package/runtime/API `3.8.1 / 3.8.1 / 3008001`及冻结的package/binding/library路径和哈希，编译未变的Panda closure，生成model-bound `nq/nv/nu=9/9/8` receipt并成功reset E1。首个控制interval完成五次`mj_step`后，typed state publication失败：leaf dispatcher把state fields作为tuple传给既有`RuntimeSession.snapshot_v1()`，而该owner要求typed `StateRequirements`。本轮未发布完整boundary或transition；关闭不完整Recorder时保留其`64 transitions / 65 observations`错误，未生成完整episode H5。S2/S3未通过；此为Core接线失败，不是Provider身份失败。
+
+保留原native失败后，现有leaf dispatch owner改为构造controller-owned typed aggregate requirements；定向provider-free rework模块19 passed。该修正发生在native进程后，本attempt没有也不会重跑native，故修正后的S2/S3仍未验证。报告状态为`FAIL_CORE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`；Provider admission、Qualification和R03b均未建立。原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`。
+
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
 explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，
@@ -215,3 +221,5 @@ Core promotion 由 Geochora maintainer 单独治理。
 不再创建同义 Skill 或 schema。
 
 R02c Sol review (2026-10-27): attempt002 command/H5, pre-write boundary and cleanup repairs are reviewed with bounded S1. The native stop exposed a probe API-version constant error (30801 instead of MuJoCo3.8.1 header value 3008001); Sol fixed it with strict identity regressions and pre-rejection observation capture. Original runtime values remain unavailable. S2 requires actual native motion/isolation; S3 requires those real Env transitions in the closed H5 and independent readback. Synthetic S1 is distinct; R02c remains S1_REVIEWED_NATIVE_PENDING, and R06/R05a/DAG/Required Envelope/P99 are unchanged.
+
+R02c attempt003 update (2026-10-27): the single native process verified the fixed MuJoCo identity, compiled/materialized/reset E1, then failed after five `mj_step` calls when leaf dispatch passed an untyped tuple to `snapshot_v1()` instead of `StateRequirements`. No complete boundary, transition or H5 episode resulted; incomplete Recorder close diagnostics were preserved. A post-failure Core fix constructs typed aggregate requirements and passes 19 provider-free tests; it has no native verification in this attempt. Required S2/S3 remain incomplete and pending Sol review; there is no Provider admission, Qualification or R03b start. Evidence is in ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.

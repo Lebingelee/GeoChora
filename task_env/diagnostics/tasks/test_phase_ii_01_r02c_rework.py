@@ -1,4 +1,4 @@
-"""Targeted provider-free regressions for the R02c attempt002 review."""
+"""Targeted provider-free regressions for the R02c selected leaf route."""
 from __future__ import annotations
 
 from dataclasses import replace
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+from task_env.artifacts.state import StateBoundaryIdentity, StateRequirements, StateSampleClock
 from task_env.controllers.canonical.leaf_profiles import (
     ArmPositionTargetV1, HandPositionTargetV1,
 )
@@ -337,6 +337,14 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
     reset_id = candidate.reset_plan.reset_sample.sample_id
     publication = _publication(scene, receipt, plan=plan, reset_id=reset_id)
     runtime = _SyntheticRuntime(scene, receipt, publication, plan=plan)
+    published_requirements = []
+    original_publish_leaf_state = runtime.publish_leaf_state
+
+    def capture_publish_leaf_state(published_scene, requirements):
+        published_requirements.append(requirements)
+        return original_publish_leaf_state(published_scene, requirements)
+
+    runtime.publish_leaf_state = capture_publish_leaf_state
     profile = _recording_profile(candidate, receipt, reset_id)
     metadata = {"env_metadata": {
         "env_name": "SelectedReferenceEnv.R02cSyntheticS1",
@@ -391,6 +399,18 @@ def test_production_transition_writer_generic_h5_roundtrip_and_nine_tampers(tmp_
         assert loaded["transition_count"] == 64
         assert loaded["observation_count"] == 65
         assert loaded["leaf_writer_ids"] == tuple(sorted(entry.binding.writer_id for entry in plan.leaves))
+        assert len(published_requirements) == 64
+        assert all(type(value) is StateRequirements for value in published_requirements)
+        assert all(value.consumer_kind == "controller"
+                   and value.consumer_id == "r02c-independent-position-leaves-v1"
+                   for value in published_requirements)
+        expected_requirement_keys = {
+            (requirement.field_key, requirement.sample_domain)
+            for entry in plan.leaves
+            for requirement in entry.binding.required_state.state_requirements.requirements
+        }
+        assert all({(item.field_key, item.sample_domain) for item in value.requirements}
+                   == expected_requirement_keys for value in published_requirements)
         from task_env.diagnostics.tasks.r02c_leaf_position_probe import _tamper_checks
         checks = _tamper_checks(h5_path, load_leaf_control_records_h5)
         assert len(checks) == 9 and all(item["rejected"] for item in checks)

@@ -21,6 +21,7 @@ from ...artifacts import (
     JointReference,
     SceneDefinition,
     StateBoundaryIdentity,
+    StateRequirements,
     StateSampleClock,
     TypedFrameStateValue,
     TypedJointStateValue,
@@ -1140,9 +1141,14 @@ def dispatch_leaf_control_interval(
         _latch(runtime, progress, error)
         raise
 
-    requirements = tuple(
-        requirement for entry in plan.leaves
-        for requirement in entry.binding.required_state.state_requirements.requirements
+    requirements = StateRequirements(
+        "state-requirements-v1",
+        "controller",
+        "r02c-independent-position-leaves-v1",
+        tuple(
+            requirement for entry in plan.leaves
+            for requirement in entry.binding.required_state.state_requirements.requirements
+        ),
     )
     try:
         publication = runtime.publish_leaf_state(scene, requirements)

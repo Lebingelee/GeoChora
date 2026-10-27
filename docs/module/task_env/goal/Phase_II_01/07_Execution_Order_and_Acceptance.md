@@ -53,7 +53,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同；Force-aware依赖拒绝目录 | provider-free S1 | required state/TCP/资源不明→停止 | ACCEPTED_S1_BOUNDED；Sol修正Required State拒绝门后37项S1通过 |
 | 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | ACCEPTED_S1_BOUNDED；Sol已复核声明级投影与18项provider-free S1 |
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | ACCEPTED_S1_BOUNDED；Sol修正兼容/覆盖/name拒绝门后18项S1通过；native/provider NOT_ADMITTED |
-| 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | S1_REVIEWED_NATIVE_PENDING；五项返工已复核，Sol修正版本检查器；attempt003单进程补S2/S3，不启动R03b |
+| 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | attempt003 native FAIL_CORE after first 5 `mj_step`; typed-requirement fix 19 provider-free tests passed, native fix unverified; S2/S3 incomplete, pending Sol review; R03b not started |
 | 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | PLANNED / NOT_STARTED |
 | 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | PLANNED / NOT_STARTED |
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | PLANNED / NOT_STARTED |
@@ -135,3 +135,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-27，R02c attempt002合并修复、provider-free S1与有界native执行。S1 28 passed；生产H5 T=64/T+1=65与9类tamper、adapter pre-write拒绝和cleanup通过；静态预检通过，四类合同负例均零native调用拒绝。唯一获授权进程在MuJoCo运行时版本/API检查处于compile前退出为`BLOCKED_PROVIDER`，compile/materialize/reset/forward/step均0，S2/S3未运行。未重试或换Provider，出口待Sol复核；R02c没有accepted/admission/Qualification结论，R03b未启动。实际Evidence在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`；R06/R05a/DAG/Required Envelope/P99及冻结refs保持。
 
 2026-10-27，Sol复核R02c attempt002为S1_REVIEWED_NATIVE_PENDING：原修复/S1保留，probe版本整数误写30801已按MuJoCo3.8.1官方及安装header修正为3008001，并补失败前身份记录与拒绝回归。原始loaded值未留存，Provider身份仍未核验；Sol未运行native。下一包attempt003直接单进程完成同source S2/S3与提交，不另开准备轮；S2/S3仍required，不能用synthetic H5替代。
+
+2026-10-27，R02c attempt003静态预检通过；唯一MuJoCo进程核验到3.8.1/3.8.1/3008001与固定文件身份，编译完整source、materialize 9/9/8并reset E1。首个interval五次`mj_step`后，Core typed-state publication因leaf dispatch传tuple而违反`StateRequirements`合同。H5 event保留task-level ExecutionFault（control step 1、0.01s、transition incomplete）；probe未序列化逐writer LeafDispatchProgress/Ack详情。close生成的Generic H5 v3失败artifact为T=0/T+1=1，R02c strict reader拒绝64/65，不能作为S3。S2/S3均未通过。native后在现有dispatch owner将聚合要求改为typed `StateRequirements`，定向provider-free rework S1 19 passed；修正未native复验。一次native原始失败、日志与Evidence完整保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`。当前 `FAIL_CORE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`；不构成Provider admission/Qualification，不启动R03b；R06/R05a、DAG/Required Envelope/P99及source/oracle/冻结refs保持。

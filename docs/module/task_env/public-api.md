@@ -339,6 +339,20 @@ Therefore no R02c S2/S3, native H5 readback, or Provider admission is establishe
 The attempt report and raw logs are local ignored Evidence under
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`.
 
+R02c attempt003 passed the actual MuJoCo package/runtime/API and binary identity
+checks, compiled the fixed full-Panda source, produced the 9/9/8 provider
+materialization receipt, and reset E1. Its first attempted interval executed
+five native substeps, then Core leaf dispatch passed a tuple of state fields to
+`RuntimeSession.snapshot_v1()`, which requires the typed `StateRequirements`
+contract. The interval did not publish a next boundary or a transition; the
+incomplete Recorder close rejected the episode because it lacked 64 transitions
+and 65 observations. S2/S3 therefore remain incomplete and this is not Provider
+admission. After preserving the native failure, the dispatcher was corrected to
+construct the existing typed aggregate requirements; the bounded provider-free
+rework module passed 19 tests, but the fix was not natively rerun. Sol review is
+pending. Evidence is in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.
+
 ## C02b Position Profile candidate status (2026-10-22)
 
 The C02b-E first-round candidate adds an internal, opt-in

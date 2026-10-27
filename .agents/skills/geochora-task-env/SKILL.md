@@ -122,7 +122,7 @@ materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
 do not report split leaves as admitted. R02c is the real execution/recording
 gate, and native S2/S3/S4 and Qualification remain separate.
 
-## SelectedReferenceEnv leaf integration (R02c attempts 001–002)
+## SelectedReferenceEnv leaf integration (R02c attempts 001–003)
 
 The task-owned `build_leaf_position_candidate()` composes the existing A05
 source/Artifact/reset owners with two separate Arm-only and Hand-only Position
@@ -169,9 +169,21 @@ kept strict package/runtime/version/path/hash checks, and records observed
 identity before rejection. Original raw logs lack the actual loaded version
 values, so neither runtime identity nor a real Provider mismatch is established.
 The current rework module passed 19 provider-free tests; Sol ran no native.
-Attempt003 is a one-process continuation for the unchanged four-episode native
-S2/S3 case. S2 measures real motion/isolation; S3 independently reads those same
-Env transitions from closed H5. Synthetic H5 remains S1. No R03b or Qualification.
+The single attempt003 process then verified exact MuJoCo 3.8.1 package/runtime/API,
+compiled the unchanged full-Panda closure, created its model-bound 9/9/8 receipt,
+and reset E1. The first interval failed after five native substeps: leaf dispatch
+passed an untyped tuple to the existing `snapshot_v1()` owner, which requires
+`StateRequirements`. No typed interval publication or completed transition
+resulted; Generic H5 v3 left a failure artifact with T=0/T+1=1, rejected by the
+R02c reader, and the close diagnostic is preserved. The
+attempt does not pass S2/S3 or admit the Provider. After retaining its raw
+failure, the existing dispatch owner was fixed to construct the typed aggregate
+requirements and the rework module passed 19 provider-free tests; this change
+was not natively rerun. Treat the attempt as failed and pending Sol review; do
+not start R03b. Attempt002 report/logs are in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`;
+attempt003 evidence is in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.
 
 ## Choose the actual construction branch
 

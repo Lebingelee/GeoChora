@@ -110,3 +110,9 @@ attempt002唯一获准MuJoCo进程在首次compile之前因运行时版本/API�
 ## R02c attempt002 Sol复核（2026-10-27）
 
 五项原返工与28项provider-free S1经审阅；Sol直接修正probe对MuJoCo3.8.1 API版本整数的错误预期30801→3008001，并在拒绝前留存实际runtime身份。原失败没有保存实际版本值，不能据此断言Provider不兼容；也不能假称runtime已核验。Sol当前rework模块19 passed，未import/运行native；状态 **S1_REVIEWED_NATIVE_PENDING**。下一包attempt003以一个native进程补齐原四episode的S2与同Env/同H5独立S3，002+003总启动至多2；原raw不重写、不改source/算法/oracle。R02c出口仍未接收，R03b未启动，R06/R05a/DAG/required/P99保持。
+
+## R02c attempt003 native Core publication failure（2026-10-27）
+
+attempt003静态预检通过，闭包、67个lowered assets与默认leaf plan哈希符合冻结合同。唯一MuJoCo 3.8.1 CPU进程实际观测到package/runtime/API `3.8.1/3.8.1/3008001`及匹配的package/binding/library路径和哈希，完成固定source编译、9/9/8 model-bound materialization receipt与E1 reset。随后E1首个outer interval执行5个`mj_step`后，Core在typed state publication报`typed state projection requires StateRequirements`：leaf dispatcher将requirements聚合成tuple，违反既有`RuntimeSession.snapshot_v1()`类型合同。H5 boundary event保留task-level `ExecutionFaultV1`：物理时钟到control step 1/0.01 s、`transition_status=incomplete`；probe raw保留5个native substep，但未序列化逐writer `LeafDispatchProgressV1`/Ack详情。没有typed interval publication或Recorder transition。Env关闭按路径尝试一次，生成了`stop_reason=execution_fault`的Generic H5 v3失败artifact（T=0/T+1=1）；R02c strict reader以`64 transitions and 65 observations`拒绝，不作为S3。此次是Core集成失败而非Provider身份阻塞；S2的构造/reset和一个物理outer step已部分发生，但 required motion/isolation oracle未完成，R02c required S2/S3均未通过。
+
+native原件保留后，现有`leaf_control.dispatch_leaf_control_interval()`已改为构造controller-owned typed `StateRequirements`，rework provider-free模块19 passed。代码修正发生在唯一native进程之后，故没有被本次native验证；禁止重跑或声称S2/S3通过。attempt003出口为 **FAIL_CORE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW**，不授予Provider admission/Qualification，不启动R03b。完整raw和资源结果位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`；原source/oracle、R06/R05a gate、DAG、Required Envelope、P99与冻结refs未改变。
