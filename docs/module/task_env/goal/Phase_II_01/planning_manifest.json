@@ -517,10 +517,18 @@
       "depends_on": [
         "R01b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "execution": "PROVIDER_FREE_S1_PASS; NATIVE_NOT_RUN",
       "required_evidence": "S1",
-      "stop_condition": "隐式物理构造/旧hash变动→停止"
+      "stop_condition": "隐式物理构造/旧hash变动→停止",
+      "result": "Logical Assembly source declaration projection implemented in existing assembly source/compiler owner; awaiting Sol review. No lowering, Provider/Runtime construction, Core Attachment admission, or Qualification.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/evidence.json",
+      "provider_free_s1_passed": 18,
+      "native_execution": "NOT_RUN",
+      "core_attachment_admission": false,
+      "qualification_granted": false,
+      "sol_review": "PENDING"
     },
     {
       "id": "R02b",
@@ -774,18 +782,18 @@
   },
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
-    "01_R01_Logical_Robot_Assembly.md": "79a64078ae37c660ab805e6125d1ad5c0d1f17f5fb35874debce0b78b8d4ae0c",
+    "01_R01_Logical_Robot_Assembly.md": "7157ceb18f4653aa51cbb941c8c499b2095b534f7efbfd9bf739307414bce826",
     "02_R02_Composite_Control_Profiles.md": "1a3d50bbc39f347969393570bed7f60d61aa383e7dccd01708c628266f81b9cd",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "27acab64ea4dfdab7185c7a23a04350e65e3d405be5b4bd7da978efbb5868777",
+    "07_Execution_Order_and_Acceptance.md": "7153ffc99385095423a7648355dfd9b898328b8642cc374bd83728f9f16d23a9",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "7365fde5b48701fac946db3c48f65d133e2b96d858bba7eec04b3b0aaf61c74b"
+    "README.md": "6655da3190f2c6a7f7e91e519fe6e3a7fad55ebefb68be08fadb5186dc1ae773"
   },
-  "revision_kind": "R01B_ATTEMPT001_IMPLEMENTATION_S1_DOCUMENTATION_SYNC",
+  "revision_kind": "R01C_ATTEMPT001_IMPLEMENTATION_S1_DOCUMENTATION_SYNC",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -2787,6 +2795,23 @@
       "native": "NOT_RUN",
       "next_package": "R01c static source projection/S1/local commit",
       "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "R01C_ATTEMPT001_IMPLEMENTATION_AND_PROVIDER_FREE_S1",
+      "date": "2026-10-27",
+      "input_commit": "195b9e403e5c0b1fd73968e80912603c4b63a173",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Existing TaskEnv assembly source/compiler owner; immutable declaration-level projection from freshly resolved current Logical Assembly inputs to existing Scene Entity, Asset, and typed leaf definitions.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/evidence.json",
+      "provider_free_s1_passed": 18,
+      "native_execution": "NOT_RUN",
+      "R06_compatibility_ledger_sha256": "37ee29d5d2c35094b382a96c1a68c626f8bde10c1164e0b1052f80722d64091f",
+      "R06_compatibility_gate_preserved": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+      "DAG_required_envelope_P99_unchanged": true,
+      "sol_review": "PENDING",
       "qualification_granted": false
     }
   ],

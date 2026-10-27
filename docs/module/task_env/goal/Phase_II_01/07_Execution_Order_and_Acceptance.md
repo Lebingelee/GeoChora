@@ -51,7 +51,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 05 | R06a | P00 | 历史原件与决议ledger | Audit/S1 | 缺原件且无独立处置→compatibility gate blocked | ACCEPTED_AUDIT_S1_BOUNDED；compatibility decision gate仍BLOCKED |
 | 06 | R01b | R01a | 递归owning/reference解析 | S1 | 环/重复/悬空/预算失败→停止 | ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82项provider-free S1通过 |
 | 07 | R02a | R01a | Arm-only/Hand-only版本化leaf合同；Force-aware依赖拒绝目录 | provider-free S1 | required state/TCP/资源不明→停止 | ACCEPTED_S1_BOUNDED；Sol修正Required State拒绝门后37项S1通过 |
-| 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | PLANNED / NOT_STARTED |
+| 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW |
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | PLANNED / NOT_STARTED |
 | 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | PLANNED / NOT_STARTED |
 | 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | PLANNED / NOT_STARTED |
@@ -123,3 +123,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-27，R02a attempt001在现有 `task_env.controllers.canonical` owner 增加版本化 Arm-only/Hand-only Position 静态合同、Scene/Assembly selector 校验及 Hand Force-aware 依赖/拒绝目录；Target/Ack 只通过显式上下文静态交叉校验。定向 provider-free S1、受影响旧 Controller binding 项和文档示例检查已完成；本包不编译 leaf plan、不运行 Provider/native、不接 Recorder。报告状态为 `IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，等待Sol复核，不构成 runtime/admission/Qualification。R01c、R02b/c仍未启动；R06 gate、R05a blocker、原DAG/Required Envelope/P99均不变。详见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/report.md`。
 
 2026-10-27，Sol接收R02a为 `ACCEPTED_S1_BOUNDED`：直接修正Required State的optional降级/跨leaf字段缺口，7项定向与完整37项provider-free S1通过。新catalog和Force-aware仍NOT_ADMITTED，未实现plan/adapter或native。下一包按表进入R01c静态source/compiler投影；R06 gate、R05a、DAG/required/P99及R02b/c仍按原状态。
+
+2026-10-27，R01c attempt001在既有assembly source/compiler owner中实现 `project_logical_assembly_source()`：每次从当前输入重跑R01b resolver，再投影唯一Scene Entity与Asset来源声明、精确typed leaf definitions、root/Scene/Assembly/path provenance及非自指projection identity。provider-free S1覆盖完整Panda内arm/gripper视图与独立Menagerie Arm/Hand Entity声明、四类typed target、receipt匹配/错配、同Asset不同Entity、reference-only、输入快照隔离及Provider/native未加载。结果等待Sol复核；未lower/attach XML、未创建物理/native mapping、未运行Runtime/S2/S3/S4、未授予Attachment admission或Qualification。R06 gate仍`BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，R05a仍`BLOCKED_PROVIDER_CONTRACT`，DAG/Required Envelope/P99不变。R02b是表中后续切片，但本记录不启动它；报告及Evidence在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/`。

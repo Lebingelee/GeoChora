@@ -127,6 +127,7 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
 | `LogicalAssemblyV1`, `LogicalAssemblyScenePinV1`, `LogicalAssemblyEntityMemberV1`, `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, `LogicalAssemblyControlGroupReferenceV1`, `decode_logical_assembly` | `task_env.artifacts` | R01a provider-neutral `logical-assembly-v1` 静态值；Scene identity pin、typed Entity/reference/nested member 与非自指 content hash。strict codec 不解析、不 lowering、不代表 Attachment admission 或 physical support |
 | `resolve_logical_assembly`, `ResolvedLogicalAssemblyV1`, `ResolvedLogicalAssemblyLeafV1` | `task_env.artifacts` | R01b bounded provider-free static resolver：对一个精确 Scene 和显式 child catalog 校验可达 closure，返回不可变 typed leaves/path/provenance；最大32层/1024 leaves。不投影 source、不创建 native mapping/Entity/writer或 Runtime |
+| `project_logical_assembly_source`, `LogicalAssemblySourceProjectionV1`, `ProjectedEntitySourceV1`, `ProjectedLeafSourceV1` | `task_env.assembly` | R01c advanced provider-free projection：每次重验当前 Assembly/Scene/child closure，关联被引用的现有 Entity、Asset声明及精确 typed Frame/Joint/Actuator/ControlGroup定义；保留来源Assembly/path与声明级证据。receipt只核对声明身份，不重新验证bytes/closure；不lower XML、不创建物理Entity/native映射或Runtime |
 | `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts only. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; no leaf Controller, plan compiler, apply adapter, Runtime admission, or Qualification is added |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
@@ -212,7 +213,44 @@ permits Entity-only leaves; Frame/Joint require v2/v3 and Actuator/ControlGroup 
 their source Assembly and local path as well as the canonical expanded path; returned tuples and referenced values
 are immutable. The limits are fixed at 32 Assembly levels (root depth 1) and 1024 expanded leaves. Resolution is
 stateless and provider-free: it does not request runtime Frame poses, project a Task Source, assign native indices,
-construct a RuntimeSession, or prove physical attachment. Source projection and execution remain later gates.
+construct a RuntimeSession, or prove physical attachment.
+
+### Logical Assembly source declaration projection (R01c)
+
+<!-- R01C_EXECUTABLE_EXAMPLE_BEGIN -->
+```python
+from task_env.artifacts import (
+    AssetDefinition, EntityInstance, LogicalAssemblyEntityMemberV1,
+    LogicalAssemblyScenePinV1, LogicalAssemblyV1, SceneDefinition,
+)
+from task_env.assembly import project_logical_assembly_source
+
+asset = AssetDefinition("asset-definition-v1", "robot/panda", "v1", "procedural://example/panda")
+entity = EntityInstance("entity-instance-v1", "arm", "robot/panda", "v1")
+scene = SceneDefinition("scene-definition-v1", "example-scene", (asset,), (entity,))
+pin = LogicalAssemblyScenePinV1(
+    "logical-assembly-scene-pin-v1", scene.scene_id, scene.schema_version, scene.identity_hash
+)
+assembly = LogicalAssemblyV1(
+    "logical-assembly-v1", "robot-assembly", "r1", pin,
+    (LogicalAssemblyEntityMemberV1("entity_member", ("arm",), "arm", "robot/panda", "v1"),),
+)
+projection = project_logical_assembly_source(assembly, scene, {})
+assert projection.entities[0].asset.source_content_sha256 is None
+assert projection.identity_sha256  # independent projection identity; not embedded in its payload
+```
+<!-- R01C_EXECUTABLE_EXAMPLE_END -->
+
+`project_logical_assembly_source(root, scene, child_assemblies, source_receipts=None)` first calls the R01b resolver on
+the current inputs, then joins each leaf to one existing Scene Entity and its exact Asset declaration. It preserves
+distinct Entity instances even when they share an Asset, and keeps reference-only leaves separate from owning members.
+Frame, Joint and Actuator leaves retain their exact typed definitions; a ControlGroup leaf includes that Group and the
+Actuator definitions selected by its declared references. Runtime Frames remain identity-only anchors. Result tuples
+and contract values are immutable; `to_mapping()` returns a detached JSON snapshot, and `identity_sha256` hashes the
+versioned snapshot without embedding that digest. Asset declaration identity, optional source-content hash and any
+historical receipt digest remain distinct identities. A receipt match is labelled as historical declaration
+provenance, not as a new byte/closure check. This source projection does not load source bytes, lower or attach assets,
+assign native names/indices, construct a Runtime, or admit Core materialization/physical attachment.
 
 ### Position leaf contract values (R02a)
 

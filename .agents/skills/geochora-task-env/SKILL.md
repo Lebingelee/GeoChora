@@ -34,6 +34,20 @@ example in [Public API](../../../docs/module/task_env/public-api.md#bounded-logi
 This static contract does not change selected runtime routes or their supported
 capability envelope.
 
+R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
+child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
+from current inputs, then associates each expanded leaf with one existing
+Scene Entity, its exact Asset declaration, and the corresponding typed
+Frame/Joint/Actuator/ControlGroup definition. ControlGroup actuator resources
+come from the Group's declared references. The immutable projection preserves
+the source Assembly/path and Scene/Asset declaration identities; source
+content hashes and matched historical receipts remain provenance fields, not
+fresh byte or closure verification. Use the executable example in [Public
+API](../../../docs/module/task_env/public-api.md#logical-assembly-source-declaration-projection-r01c).
+This is a static declaration join: it does not lower or attach XML, create
+physical entities/native names/indices, call the legacy Provider compiler, or
+admit Runtime/materialization/Qualification.
+
 ## Static Position leaf contracts (R02a)
 
 `task_env.controllers.canonical` exports advanced provider-free values:

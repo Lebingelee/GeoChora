@@ -7,7 +7,7 @@
 | 文档 | 修订后的责任 |
 | --- | --- |
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
-| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a已获Sol接收，R01b bounded resolver/S1待Sol复核 |
+| [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b已获Sol接收，R01c静态source投影/S1等待Sol复核 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略 |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
@@ -142,3 +142,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-27，R02a attempt001在现有 canonical Controller owner 增加版本化 Arm-only/Hand-only Position Action/Target/Ack/Required State、严格静态 binding/Scene/Assembly selector 核验，以及独立 Hand Force-aware 依赖/拒绝目录。Hand 开度是总 opening `q1+q2`，与一个 actuator8、0.5/0.5 tendon、finger equality 和候选 `ctrl=3187.5*opening_m` source mapping 分开记录；Position state 不要求力。定向 provider-free S1 与相关旧 Controller binding 检查完成，输出等待Sol复核；无R02b adapter、native/S2/S3、Recorder接入或Qualification。R01c/R02b/c仍未启动，R06 compatibility gate、R05a blocker、原DAG/Required Envelope/P99不变。详见 [R02](02_R02_Composite_Control_Profiles.md) 和 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/report.md`。
 
 2026-10-27，Sol接收R02a静态合同出口为`ACCEPTED_S1_BOUNDED`：原30项S1保留，Required State可降级/跨leaf字段的拒绝缺口已由Sol小范围修正，最终37 passed。catalog/Force-aware仍NOT_ADMITTED，native/plan/adapter/H5/Qualification未建立。下一表行为R01c只读source投影，R06兼容性决定与R05a/DAG/Required Envelope/P99不变；复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/`。
+
+2026-10-27，R01c attempt001在既有 `task_env.assembly` source/compiler owner完成逻辑Assembly到现有Scene源声明的只读投影，provider-free S1覆盖A05完整Panda视图与独立Menagerie Arm/Hand Entity source declarations，并核验identity/provenance、typed refs、不可变snapshot及fail-closed resolver边界。状态为`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，尚未获得Sol acceptance。没有lower/attach XML、Provider/native构造、Runtime/S2/S3/S4、Core Attachment admission或Qualification；R06兼容性gate、R05a blocker、原DAG/Required Envelope/P99保持。R02b仍未开始；报告及Evidence保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/`。

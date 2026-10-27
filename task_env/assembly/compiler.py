@@ -9,6 +9,7 @@ import numpy as np
 
 from ..environment import EpisodePhysicsState, TaskCompositionSpec
 from .references import TaskReferences, resolve_task_references
+from .logical_source import LogicalAssemblySourceProjectionV1, project_logical_assembly_source
 
 
 _EMPTY_TABLETOP_XML = """

@@ -1,6 +1,6 @@
 # R01 — Logical Robot Assembly
 
-状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b bounded 静态解析已获Sol接收（ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82 passed）；R01c 仍 PLANNED / NOT_STARTED。本 Goal 只实现静态逻辑引用，不承诺物理连接。
+状态：REVISED_DRAFT；R01a 静态值合同与 provider-free S1 已获 Sol 接收（ACCEPTED_S1_BOUNDED）；R01b bounded 静态解析已获Sol接收（ACCEPTED_S1_BOUNDED；Sol修正早期深度门后82 passed）；R01c attempt001 已实现 source/compiler 声明级投影并完成 provider-free S1，当前 `IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`。本 Goal 只实现静态逻辑引用，不承诺物理连接。
 
 ## 当前 owner 与版本边界
 
@@ -22,7 +22,13 @@ Component path 保持 segment tuple；空路径、空 segment、`.`、`..`、分
 
 解析先以 Assembly key 检出直接/间接 containment cycle，再校验 child logical content SHA-256；不依赖自洽循环hash。展开将 nested path 与 child member path 作为 segment tuple 连接，结果按完整路径/kind/typed target 确定排序。闭包内 Entity 只能有一个 owning member；reference-only typed target 可指向同Scene已有Entity（包括其他叶的owner），不创建第二 owner/writer。相同 typed target 多路径alias及展开路径碰撞拒绝；不同 Entity 使用同一 Asset 保持为不同实例。root 深度按1计，最大32层；Entity member 与 Subcomponent Reference 各计一个 leaf，最大1024。调用内有限memo避免共享/空child重复递归展开，超限时在构造结果期间拒绝。
 
-返回 `ResolvedLogicalAssemblyV1` 与不可变 `ResolvedLogicalAssemblyLeafV1`，记录root/Scene身份及每个leaf的full path、typed member、原 Assembly ID/revision/hash 与local path；它不增加旧codec字段或hash，不产出新的持久化 ABI。入口是advanced静态值API，不连接当前Runtime/source/compiler，不生成native mapping、物理连接或Task Source；Source投影仍属于R01c。
+返回 `ResolvedLogicalAssemblyV1` 与不可变 `ResolvedLogicalAssemblyLeafV1`，记录root/Scene身份及每个leaf的full path、typed member、原 Assembly ID/revision/hash 与local path；它不增加旧codec字段或hash，不产出新的持久化 ABI。入口是advanced静态值API，不连接当前Runtime/source/compiler，不生成native mapping、物理连接或Task Source；R01c现已在既有source/compiler owner增加其后续静态投影。
+
+### R01c 静态source声明投影（attempt001，等待Sol复核）
+
+`task_env.assembly.project_logical_assembly_source(root, scene, child_assemblies, source_receipts=None)` 每次从当前root、精确Scene和child catalog重新调用R01b resolver；它不接受调用者提供的resolved值作为准入收据。投影以唯一Entity表关联现有 `EntityInstance`、完整 `AssetDefinition` 及其声明identity，并按leaf保留segment tuple路径、owner/reference-only kind、原Assembly身份/hash/local path与typed target definition。Frame/Joint/Actuator使用精确Scene definition；ControlGroup保留其Actuator refs并展开至对应Actuator definitions，不推导native顺序。多个leaf复用同一Entity时source Entity只出现一次；不同Entity即便共用Asset仍分别保留。
+
+投影是 `logical-assembly-source-projection-v1` immutable snapshot；自身 `identity_sha256` 是该版本canonical mapping的非自指digest，`to_mapping()`每次返回脱离内部值的JSON副本。A05完整Panda arm/gripper views共享 `panda-main`；独立Arm/Hand静态fixture保留Menagerie固定pin下的两个Entity/Asset来源声明。`source_content_sha256` null和历史receipt分别按原值保留；receipt只匹配Scene/Asset声明并标记 `MATCHED_DECLARATION_NOT_REVALIDATED`，不重读或验证bytes/closure。静态投影不lower/attach XML、不创建第二Scene/物理Entity/writer/native名字或indices、不调用旧 `compile_task_scene()`/Provider、不准入Runtime或Attachment。实现及S1状态以本地report和Evidence为准；Sol复核前不视作accepted。
 
 ### Sol复核（2026-10-27）
 

@@ -13,6 +13,13 @@ from .references import (
     TaskReferences,
     resolve_task_references,
 )
+from .logical_source import (
+    LogicalAssemblySourceProjectionV1,
+    ProjectedEntitySourceV1,
+    ProjectedLeafSourceV1,
+    SourceReceiptLinkV1,
+    project_logical_assembly_source,
+)
 
 __all__ = [
     "AgentReferences",
@@ -22,4 +29,9 @@ __all__ = [
     "TaskReferences",
     "compile_task_scene",
     "resolve_task_references",
+    "LogicalAssemblySourceProjectionV1",
+    "ProjectedEntitySourceV1",
+    "ProjectedLeafSourceV1",
+    "SourceReceiptLinkV1",
+    "project_logical_assembly_source",
 ]
