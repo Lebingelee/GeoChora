@@ -122,7 +122,7 @@ materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
 do not report split leaves as admitted. R02c is the real execution/recording
 gate, and native S2/S3/S4 and Qualification remain separate.
 
-## SelectedReferenceEnv leaf integration (R02c attempt001)
+## SelectedReferenceEnv leaf integration (R02c attempts 001–002)
 
 The task-owned `build_leaf_position_candidate()` composes the existing A05
 source/Artifact/reset owners with two separate Arm-only and Hand-only Position
@@ -145,16 +145,22 @@ The initial error, corrected script and revisioned contracts are in the local
 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`
 attempt package.
 
-Sol review (2026-10-27) is `CHANGES_REQUESTED_S2_S3_NOT_RUN`:
-provider-free reproduction found a wrong prepared-command import, a missing
-nested decoder, and stale Targets writing ctrl slots before Ack rejection;
-the reader also uses an exact-float physical-clock comparison. Admission
-failure cleanup and executable probe preflight require repair. The next
-bounded R02c attempt002 combines those fixes, production Recorder/reader S1
-and authorized native S2/S3; no extra preparation round or R03b start.
-The earlier mixed compatibility process performed four legacy
-materialize/reset/forward operations and zero integration steps; distinguish
-that activity from the R02c probe's zero native calls. Sol ran no native.
+Sol review (2026-10-27) requested bounded attempt002 fixes after identifying a
+wrong prepared-command import, missing nested decoder, stale Target writes
+before Ack rejection, exact-float clock comparison, admission cleanup and
+old-window preflight gaps. Attempt002 fixed those owners and its provider-free
+targeted S1 passed 28 tests, including production Recorder/H5 T=64/T+1=65,
+nine tamper cases, adapter no-write rejection and admission cleanup. Static
+preflight passed against the frozen source/assets and MuJoCo installation
+files; four malformed-contract variants were rejected with structured
+zero-native-call evidence. The one authorized MuJoCo 3.8.1 CPU process failed
+the loaded runtime version/API check before compile, materialization, reset,
+forward or step (`BLOCKED_PROVIDER`). No retry or Provider fallback occurred;
+native S2/S3 and Provider admission remain unestablished, and the attempt is
+pending Sol review. The earlier attempt001 mixed compatibility process's four
+legacy materialize/reset/forward operations remain historical and do not count
+toward attempt002. See ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`.
 
 ## Choose the actual construction branch
 

@@ -103,6 +103,12 @@ MuJoCo probe在import前因合同字段名错误退出，故真实materializatio
 修正后的probe脚本未重跑。Sol复核进一步发现H5导入/解码、写入前Target boundary及clock校验缺口，状态为CHANGES_REQUESTED_S2_S3_NOT_RUN；合并修复与有界验证的返工包尚待执行。R01c继续独立负责静态source投影。R02c未改变R02a Force-aware `NOT_ADMITTED`、旧TaskArtifact/Scene/Reset/Profile/
 Target/Ack/H5身份、R06兼容性gate、R05a blocker、DAG、Required Envelope或Qualification。
 
+### R02c attempt002修复与Provider阻塞（2026-10-27）
+
+attempt002在既有leaf-control、MuJoCo RuntimeSession、Generic H5 v3和SelectedReferenceEnv owners内修复严格command解码、stale Target写入前拒绝、`1e-12 s`物理clock比较、admission异常时单次close，以及probe合同/窗口预检。新增生产Recorder写入后关文件、独立H5读回及9类篡改拒绝的provider-free S1；定向集合28 passed。真实静态预检核对完整source closure、67个lowered assets与MuJoCo静态安装文件，合法合同通过；缺字段、source hash、脚本hash和冻结HEAD四种合同负例均被结构化拒绝，native计数为0。
+
+获授权的唯一attempt002 native进程成功导入阶段开始，但运行时 MuJoCo 版本/API 检查返回 `BLOCKED_PROVIDER: loaded MuJoCo version/API differs from 3.8.1`，发生在compile、materialize、reset、forward和step之前；本次各native调用计数均为0，未产生physics/H5 episode，S2/S3为NOT_RUN。失败未被当作可重试的普通预步进程序错误，未启动第二进程或更换Provider。细节与原始日志保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`；R02c仍待Sol复核，Provider admission与Qualification均未建立，R03b未启动。R06兼容性gate、R05a blocker、DAG、Required Envelope、P99及旧身份保持不变。
+
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
 explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，

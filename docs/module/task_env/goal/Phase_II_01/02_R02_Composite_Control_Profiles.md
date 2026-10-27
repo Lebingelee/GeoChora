@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt001 已复核为CHANGES_REQUESTED_S2_S3_NOT_RUN；须修复写入前校验与H5读回；所需S2/S3未运行，leaf Provider admission仍未建立。
+状态：REVISED_DRAFT；R02a/R02b 已获Sol接收（ACCEPTED_S1_BOUNDED）；R02c attempt001复核要求的修复已在attempt002实施，定向S1与静态预检通过；唯一native进程在compile前被MuJoCo版本/API检查阻塞，S2/S3仍NOT_RUN，等待Sol复核且leaf Provider admission未建立。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -100,3 +100,9 @@ R02c固定的MuJoCo 3.8.1 CPU probe进程在合同静态字段校验时以`KeyEr
 ## R02c Sol复核与有界返工（2026-10-27）
 
 Sol复核保留53项S1与原始失败事实，但发现reader导入/codec缺失、Target跨episode先写后拒绝、浮点clock精确比较、admission失败资源关闭及probe旧窗口硬编码问题。前三类已用provider-free实际调用/算术复现；生命周期和预检为静态审阅。状态为 **CHANGES_REQUESTED_S2_S3_NOT_RUN**，R02c出口不接收。下一包R02c attempt002一次完成必要修复、实际static preflight、生产Recorder/reader的合成H5回归、获授权的同source有界native S2/S3和本地提交；不再单独安排准备轮。Sol未运行native；此前混合兼容运行的4次旧路materialize/reset/forward与R02c probe的0次native分开记账。复核入口在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_001/`。原source/oracle、DAG/required及R06/R05a/P99不变；不启动R03b。
+
+## R02c attempt002修复与native前Provider阻塞（2026-10-27）
+
+在既有owners内完成Sol列出的五类修复：严格leaf command codec与真实Generic H5 v3生产写入/关闭/独立读回；MuJoCo adapter在首个ctrl写入前验证Target boundary/config/clock/resource order；physical clock沿用绝对`1e-12 s`容差；leaf admission异常路径关闭session一次并保留原异常；probe使用显式合同、snapshot、output目录和静态预检，不再复用attempt001窗口计数。新增provider-free定向S1为28 passed，覆盖64/65 H5、双writer、9类篡改、adapter零副作用拒绝和admission cleanup。静态预检对固定closure/67 assets与安装文件哈希通过；缺字段、错误source hash、错误脚本hash和错误冻结HEAD均产生结构化拒绝，且native计数为0。
+
+attempt002唯一获准MuJoCo进程在首次compile之前因运行时版本/API校验失败，原始分类为`BLOCKED_PROVIDER`，native compile/materialize/reset/forward/step皆0。按停止条件未重试、未切换Provider或调整source/oracle。因未构造真实session、未发生积分也未生成episode H5，R02c所需S2/S3为`NOT_RUN`，本次出口为`BLOCKED_PROVIDER_PENDING_SOL_REVIEW`，不是接受或Provider admission。实现提交`b845bfadf518f57981b3556f65e3eb211dab1996`；attempt002完整报告、日志、合同与Evidence在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`。R03b未启动，R06、R05a、DAG/Required Envelope/P99与Qualification边界不变。

@@ -585,17 +585,17 @@
         "R02b",
         "R01c"
       ],
-      "status": "CHANGES_REQUESTED_S2_S3_NOT_RUN",
-      "execution": "S1_REPORTED_PASS_53; SOL_REVIEW_REPRODUCED_DEFECTS; R02C_S2_S3_NOT_RUN",
+      "status": "BLOCKED_PROVIDER_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT002_PROVIDER_BLOCKED_PRE_COMPILE; S1_AND_STATIC_PREFLIGHT_PASS; R02C_S2_S3_NOT_RUN",
       "required_evidence": "S2/S3",
       "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
-      "native_execution": "PROCESS_ATTEMPTED; STATIC_CONTRACT_KEY_ERROR; MUJOCO_NOT_IMPORTED; NO_NATIVE_CALLS",
+      "native_execution": "PROCESS_ATTEMPTED; MUJOCO_RUNTIME_VERSION_API_MISMATCH; BLOCKED_BEFORE_COMPILE; ZERO_COMPILE_MATERIALIZE_RESET_FORWARD_STEP",
       "core_runtime_admission": false,
-      "provider_free_s1_passed": 53,
+      "provider_free_s1_passed": 28,
       "qualification_granted": false,
-      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/report.md",
-      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/evidence.json",
-      "result": "Sol requests one bounded R02c attempt002 repair-and-execution package: fix strict command decoding/H5 readback, pre-write boundary rejection, clock tolerance, admission cleanup and executable probe preflight. No R02c exit acceptance or R03b start.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/evidence.json",
+      "result": "Attempt002 repaired the command/H5 reader, adapter pre-write boundary, physical clock tolerance, admission cleanup, and probe contract window. Provider-free S1 passed 28 tests; static preflight passed with four structured negative cases. The single authorized MuJoCo process imported the installed package but failed the runtime version/API check before compile; no compile/materialization/reset/forward/step occurred. Required S2/S3 NOT_RUN; blocked pending Sol review. No retry, fallback, Provider admission, Qualification, or R03b start.",
       "sol_review": {
         "decision": "CHANGES_REQUESTED_S2_S3_NOT_RUN",
         "input_commit": "835dcfde5a86a9a43afb9c81c176d724b80c658e",
@@ -603,7 +603,63 @@
         "reproductions": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_001/reproductions.json",
         "native_run_by_sol": false,
         "next_attempt": "002"
-      }
+      },
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/commands.json",
+      "attempt001": {
+        "task_id": "PHASE-II-01-R02C",
+        "input_commit": "c18325f7e332bc5d3864752fc3fe7aa94225f551",
+        "implementation_commit": "835dcfde5a86a9a43afb9c81c176d724b80c658e",
+        "provider_free_s1_passed": 53,
+        "native": "FAIL_PRE_IMPORT_STATIC_CONTRACT_FIELD; native compile/materialize/reset/forward/step 0",
+        "review_decision": "CHANGES_REQUESTED_S2_S3_NOT_RUN",
+        "historical": {
+          "native_execution": "PROCESS_ATTEMPTED; STATIC_CONTRACT_KEY_ERROR; MUJOCO_NOT_IMPORTED; NO_NATIVE_CALLS",
+          "provider_free_s1_passed": 53,
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/report.md",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/evidence.json",
+          "execution": "S1_REPORTED_PASS_53; SOL_REVIEW_REPRODUCED_DEFECTS; R02C_S2_S3_NOT_RUN",
+          "result": "Sol requests one bounded R02c attempt002 repair-and-execution package: fix strict command decoding/H5 readback, pre-write boundary rejection, clock tolerance, admission cleanup and executable probe preflight. No R02c exit acceptance or R03b start."
+        },
+        "qualification_granted": false
+      },
+      "attempt002": {
+        "task_id": "PHASE-II-01-R02C",
+        "input_commit": "b358252b42801215dc0a240d45bde93040b8ac16",
+        "implementation_commit": "b845bfadf518f57981b3556f65e3eb211dab1996",
+        "provider_free_s1": {
+          "status": "PASS",
+          "passed": 28,
+          "native_import_blocked": true,
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/logs/s1_final_boundaries.log"
+        },
+        "static_preflight": {
+          "status": "PASS_STATIC_PREFLIGHT",
+          "negative_cases": 4,
+          "result": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/preflight_001/preflight_result.json"
+        },
+        "native": {
+          "classification": "BLOCKED_PROVIDER",
+          "status": "FAIL_PRE_STEP",
+          "message": "BLOCKED_PROVIDER: loaded MuJoCo version/API differs from 3.8.1",
+          "runtime_package_imported": true,
+          "before_compile": true,
+          "compile_calls": 0,
+          "materialization_calls": 0,
+          "reset_calls": 0,
+          "mj_forward_calls": 0,
+          "mj_step_calls": 0,
+          "process_starts": 1,
+          "retry": false,
+          "S2": "NOT_RUN",
+          "S3": "NOT_RUN",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/native_run_001/native_evidence.json"
+        },
+        "report_pending": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/report.md",
+        "qualification_granted": false,
+        "provider_admission": false,
+        "R03b_started": false
+      },
+      "sol_review_required": "No acceptance recorded; Sol to review actual diff, S1/static Evidence, native BLOCKED_PROVIDER evidence, and bounded report."
     },
     {
       "id": "R03b",
@@ -836,17 +892,17 @@
   "document_sha256": {
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "02_R02_Composite_Control_Profiles.md": "df0a36b7634ba1fdd3c3d10759f48f67e0f2c437b82f09cc322df93e2d9b200f",
+    "02_R02_Composite_Control_Profiles.md": "a35b30e9279ee12236909e679ab2b649cfb6fd968bfb4cd1a42f25893ffa8f7b",
     "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "75ab3e6960b5c545af8664076ab39ea8b59723cdc25713035455aac08c0af216",
+    "07_Execution_Order_and_Acceptance.md": "8b9de2ce9c24eea700596c1a38df1b49eb0471c5955bb78aa22270c0e1b2e88c",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "086e43b2f663f88f1da506a7998295cba4b2e84073e5d0d63ff4df3f6c45b057"
+    "README.md": "b9256ad2ab9b7c5f02450c170cef4d9c0020f23f324d79de804ba546bdb7c46e"
   },
-  "revision_kind": "R02B_ATTEMPT001_IMPLEMENTATION_S1_DOCUMENTATION_SYNC",
+  "revision_kind": "R02C_ATTEMPT002_PROVIDER_BLOCKED_IMPLEMENTATION_AND_EVIDENCE_UPDATE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -2925,6 +2981,24 @@
       "qualification_granted": false,
       "DAG_required_envelope_unchanged": true,
       "next_slice": "R02c attempt002 bounded rework + native S2/S3"
+    },
+    {
+      "kind": "LUNA_R02C_ATTEMPT002_PROVIDER_BLOCKED_PENDING_SOL_REVIEW",
+      "date": "2026-10-27",
+      "input_commit": "b358252b42801215dc0a240d45bde93040b8ac16",
+      "implementation_commit": "b845bfadf518f57981b3556f65e3eb211dab1996",
+      "result": "BLOCKED_PROVIDER_PENDING_SOL_REVIEW",
+      "provider_free_s1_passed": 28,
+      "static_preflight": "PASS; four contract negatives rejected with zero native calls",
+      "native": "BLOCKED_PROVIDER before compile; runtime version/API mismatch; compile/materialize/reset/forward/step all 0",
+      "required_S2_S3": "NOT_RUN",
+      "retry": false,
+      "provider_admission": false,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/evidence.json",
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "R03b_started": false
     }
   ],
   "P00_audit": {
