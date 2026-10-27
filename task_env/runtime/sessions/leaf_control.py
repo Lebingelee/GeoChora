@@ -6,6 +6,7 @@ Provider-private storage is accessed here.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
@@ -429,6 +430,18 @@ class LeafActuatorSlotValueV1:
         if isinstance(self.value, bool) or not math.isfinite(self.value):
             raise ValueError("leaf ctrl command must be finite")
 
+    @classmethod
+    def from_mapping(cls, value):
+        expected = {"schema_version", "actuator", "ctrl_slot", "value"}
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise ValueError("leaf actuator slot mapping has unknown or missing fields")
+        if type(value["ctrl_slot"]) is not int or isinstance(value["value"], bool) or type(value["value"]) not in (int, float):
+            raise TypeError("leaf actuator slot mapping has invalid numeric types")
+        return cls(
+            value["schema_version"], ActuatorReference.from_mapping(value["actuator"]),
+            value["ctrl_slot"], float(value["value"]),
+        )
+
 
 @dataclass(frozen=True)
 class LeafPreparedCommandV1:
@@ -461,6 +474,13 @@ class LeafPreparedCommandV1:
             raise TypeError("prepared command requires its exact source boundary")
         if type(self.target) not in (ArmPositionTargetV1, HandPositionTargetV1):
             raise TypeError("prepared command requires an R02a Position Target")
+        expected_target = ArmPositionTargetV1 if self.profile_kind == "arm_position" else HandPositionTargetV1
+        if type(self.target) is not expected_target:
+            raise ValueError("prepared command profile kind differs from its Target schema")
+        if (self.target.writer_id != self.writer_id
+                or self.target.binding_identity_hash != self.binding_identity_sha256
+                or self.target.source_boundary != self.state_boundary):
+            raise ValueError("prepared command identity differs from its Target/source boundary")
         if type(self.slot_values) is not tuple or not self.slot_values:
             raise TypeError("prepared command must own a nonempty immutable slot patch")
         if any(type(item) is not LeafActuatorSlotValueV1 for item in self.slot_values):
@@ -468,6 +488,8 @@ class LeafPreparedCommandV1:
         slots = tuple(item.ctrl_slot for item in self.slot_values)
         if len(slots) != len(set(slots)):
             raise ValueError("prepared command cannot write a ctrl slot twice")
+        if tuple(item.actuator for item in self.slot_values) != tuple(self.target.actuator_order):
+            raise ValueError("prepared command slot order differs from its Target actuator order")
         optional = (self.requested_opening_m, self.servo_opening_m, self.native_ctrl)
         if self.profile_kind == "hand_position":
             if any(value is None or isinstance(value, bool) or not math.isfinite(value) for value in optional):
@@ -478,6 +500,38 @@ class LeafPreparedCommandV1:
                 raise ValueError("Hand native ctrl value differs from the owned slot patch")
         elif any(value is not None for value in optional):
             raise ValueError("Arm command cannot carry Hand opening metadata")
+
+    @classmethod
+    def from_mapping(cls, value):
+        expected = {
+            "schema_version", "writer_id", "profile_kind", "effective_plan_identity_sha256",
+            "binding_identity_sha256", "effective_configuration_identity_sha256",
+            "materialization_identity_sha256", "state_boundary", "state_configuration_revision",
+            "target", "slot_values", "requested_opening_m", "servo_opening_m", "native_ctrl",
+        }
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise ValueError("prepared leaf command mapping has unknown or missing fields")
+        if type(value["slot_values"]) not in (list, tuple):
+            raise TypeError("prepared leaf command slot_values must be an ordered array")
+        if type(value["profile_kind"]) is not str:
+            raise TypeError("prepared leaf command profile_kind must be a string")
+        target_mapping = value["target"]
+        if not isinstance(target_mapping, Mapping):
+            raise TypeError("prepared leaf command target must be a mapping")
+        from ...controllers.canonical.leaf_profiles import decode_leaf_target
+        return cls(
+            value["schema_version"], value["writer_id"], value["profile_kind"],
+            value["effective_plan_identity_sha256"], value["binding_identity_sha256"],
+            value["effective_configuration_identity_sha256"], value["materialization_identity_sha256"],
+            StateBoundaryIdentity.from_mapping(value["state_boundary"]),
+            value["state_configuration_revision"], decode_leaf_target(target_mapping),
+            tuple(LeafActuatorSlotValueV1.from_mapping(item) for item in value["slot_values"]),
+            value["requested_opening_m"], value["servo_opening_m"], value["native_ctrl"],
+        )
+
+    def to_mapping(self):
+        # Keep the existing asdict payload shape and identity hash semantics.
+        return asdict(self)
 
     @property
     def command_identity_sha256(self) -> str:
@@ -507,6 +561,7 @@ class LeafActuatorPatchV1:
     target: ArmPositionTargetV1 | HandPositionTargetV1
     effective_plan_identity_sha256: str
     materialization_identity_sha256: str
+    state_configuration_revision: str
     slot_values: tuple[LeafActuatorSlotValueV1, ...]
 
     def __post_init__(self):
@@ -516,6 +571,7 @@ class LeafActuatorPatchV1:
         for value in (self.command_identity_sha256, self.effective_plan_identity_sha256,
                       self.materialization_identity_sha256):
             _sha(value, "leaf patch identity")
+        _token(self.state_configuration_revision, "leaf patch configuration revision")
         if type(self.target) not in (ArmPositionTargetV1, HandPositionTargetV1):
             raise TypeError("leaf actuator patch requires the exact prepared Target")
         if type(self.slot_values) is not tuple or not self.slot_values:
@@ -984,7 +1040,7 @@ def dispatch_leaf_control_interval(
         patch = LeafActuatorPatchV1(
             "leaf-actuator-patch-v1", writer, command.command_identity_sha256,
             command.target, plan.identity_sha256, request.materialization.identity_sha256,
-            command.slot_values,
+            command.state_configuration_revision, command.slot_values,
         )
         try:
             result = runtime.apply_leaf_actuator_patch(patch)

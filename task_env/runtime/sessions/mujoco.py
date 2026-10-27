@@ -64,6 +64,8 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_interval_active = False
         self._leaf_interval_boundary_id = None
         self._leaf_interval_source_boundary = None
+        self._leaf_interval_source_sample_clock = None
+        self._leaf_interval_source_configuration_revision = None
         self._leaf_interval_writers = set()
         self._leaf_consumed_boundaries = set()
         self._validate_canonical_scene_model()
@@ -280,6 +282,8 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_interval_active = True
         self._leaf_interval_boundary_id = boundary_id
         self._leaf_interval_source_boundary = clock.boundary
+        self._leaf_interval_source_sample_clock = clock.sample_clock
+        self._leaf_interval_source_configuration_revision = clock.configuration_revision
         self._leaf_interval_writers.clear()
 
     def apply_leaf_actuator_patch(self, patch):
@@ -297,12 +301,20 @@ class _MuJoCoSession(_SessionValues):
             raise ValueError('MuJoCo patch is bound to another writer/plan/materialization')
         target = patch.target
         binding = entry.binding
+        source_boundary = self._leaf_interval_source_boundary
+        source_sample_clock = self._leaf_interval_source_sample_clock
+        source_configuration_revision = self._leaf_interval_source_configuration_revision
         if (target.writer_id != binding.writer_id
                 or target.binding_identity_hash != binding.identity_hash
                 or target.source_closure_sha256 != self._source.source_closure_digest
                 or target.scene_identity_hash != self._leaf_plan.scene_identity_sha256
+                or target.source_boundary != source_boundary
+                or target.sample_clock != source_sample_clock
+                or patch.state_configuration_revision != source_configuration_revision
+                or tuple(target.joint_order) != tuple(binding.joint_order)
+                or tuple(target.actuator_order) != tuple(binding.actuator_order)
                 or tuple(item.actuator for item in patch.slot_values) != tuple(binding.actuator_order)):
-            raise ValueError('MuJoCo patch Target/slot mapping differs from the selected leaf')
+            raise ValueError('MuJoCo patch Target/slot/source clock differs from the consumed leaf evaluation')
         mapping = {item.canonical_actuator: item for item in self.leaf_materialization_receipt.actuators}
         for item in patch.slot_values:
             native = mapping.get(item.actuator)
@@ -310,10 +322,13 @@ class _MuJoCoSession(_SessionValues):
                     or not native.ctrlrange[0] <= item.value <= native.ctrlrange[1]):
                 raise ValueError('MuJoCo leaf patch exceeds its exact native ctrl slot/range')
         current_clock = self.read_leaf_runtime_clock()
-        source_boundary = self._leaf_interval_source_boundary
         current_boundary = current_clock.boundary
         same_evaluation = (
             source_boundary is not None
+            and source_sample_clock is not None
+            and source_configuration_revision is not None
+            and current_clock.sample_clock == source_sample_clock
+            and current_clock.configuration_revision == source_configuration_revision
             and (current_boundary.episode_id, current_boundary.reset_sample_id,
                  current_boundary.scene_identity_hash, current_boundary.scene_instance_id,
                  current_boundary.provider_materialization_id, current_boundary.control_step)
@@ -353,6 +368,8 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_interval_active = False
         self._leaf_interval_boundary_id = None
         self._leaf_interval_source_boundary = None
+        self._leaf_interval_source_sample_clock = None
+        self._leaf_interval_source_configuration_revision = None
         self._leaf_interval_writers.clear()
 
     def publish_leaf_state(self, scene, requirements):
@@ -376,6 +393,8 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_fault = progress
         self._leaf_interval_active = False
         self._leaf_interval_source_boundary = None
+        self._leaf_interval_source_sample_clock = None
+        self._leaf_interval_source_configuration_revision = None
 
     def _cache_completed_actuator_force(self):
         """Read force only when the admitted Controller state contract requires it."""
@@ -524,6 +543,8 @@ class _MuJoCoSession(_SessionValues):
             self._leaf_interval_active = False
             self._leaf_interval_boundary_id = None
             self._leaf_interval_source_boundary = None
+            self._leaf_interval_source_sample_clock = None
+            self._leaf_interval_source_configuration_revision = None
             self._leaf_interval_writers.clear()
             self._leaf_consumed_boundaries.clear()
         self._current_ctrl = self._data.ctrl.copy()

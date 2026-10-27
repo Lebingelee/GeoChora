@@ -727,7 +727,17 @@ def materialize_control(
     elif leaf_plan is not None:
         session._force_feedback_required = False
         session._control_binding_plan = None
-        session.admit_leaf_control_plan(leaf_plan)
+        try:
+            session.admit_leaf_control_plan(leaf_plan)
+        except BaseException as admission_error:
+            try:
+                session.close()
+            except BaseException as cleanup_error:
+                admission_error.add_note(
+                    f"RuntimeSession cleanup after leaf admission failure also failed: "
+                    f"{type(cleanup_error).__name__}: {cleanup_error}"
+                )
+            raise
     else:
         session._force_feedback_required = True
         session._control_binding_plan = None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import json
 import hashlib
+import math
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
@@ -967,9 +968,8 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
 def load_leaf_control_records_h5(path: Path | str) -> dict[str, Any]:
     """Independently validate R02c leaf Target/command/Ack against v3 metadata and observations."""
     from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
-    from task_env.controllers.canonical.leaf_profiles import (
-        LeafPreparedCommandV1, decode_leaf_application_ack, decode_leaf_target,
-    )
+    from task_env.controllers.canonical.leaf_profiles import decode_leaf_application_ack, decode_leaf_target
+    from task_env.runtime.sessions.leaf_control import LeafPreparedCommandV1
 
     generic = load_structured_control_records_h5(path)
     profile = generic['env_meta'].get('reference_profile')
@@ -1046,26 +1046,46 @@ def load_leaf_control_records_h5(path: Path | str) -> dict[str, Any]:
                     or target.binding_identity_hash != writer_meta['binding_identity_sha256']
                     or target.scene_identity_hash != profile['scene_identity_hash']
                     or target.source_closure_sha256 != profile['source_closure_digest']
+                    or target.action_schema_id != writer_meta['action_schema_id']
+                    or tuple(ref.joint_id for ref in target.joint_order) != tuple(writer_meta['joint_order'])
+                    or tuple(ref.actuator_id for ref in target.actuator_order) != tuple(writer_meta['actuator_order'])
+                    or any(ref.entity_id != writer_meta['entity_id']
+                           for ref in (*target.joint_order, *target.actuator_order))
                     or canonical.get('target_identity_sha256') != target.identity_hash):
                 raise ValueError(f'R02c transition {index}/{writer_id} Target identity/source mismatch')
-            if row['requested_action'].get('payload') != target.action.to_mapping():
+            if json.dumps(plain_metadata(row['requested_action'].get('payload')), sort_keys=True, separators=(',', ':'),
+                          allow_nan=False) != json.dumps(target.action.to_mapping(), sort_keys=True,
+                                                       separators=(',', ':'), allow_nan=False):
                 raise ValueError(f'R02c transition {index}/{writer_id} requested Action differs from the Target')
             command = LeafPreparedCommandV1.from_mapping(canonical['prepared_command'])
             if (command.command_identity_sha256 != canonical.get('command_identity_sha256')
                     or command.target != target or command.writer_id != writer_id
                     or command.effective_plan_identity_sha256 != profile['effective_leaf_plan_identity_sha256']
+                    or command.binding_identity_sha256 != writer_meta['binding_identity_sha256']
                     or command.effective_configuration_identity_sha256
                     != writer_meta['effective_configuration_identity_sha256']
-                    or command.materialization_identity_sha256 != profile['materialization_identity_sha256']):
+                    or command.materialization_identity_sha256 != profile['materialization_identity_sha256']
+                    or command.state_boundary != target.source_boundary
+                    or command.state_configuration_revision != profile['configuration_revision']):
                 raise ValueError(f'R02c transition {index}/{writer_id} prepared command identity mismatch')
             ack = decode_leaf_application_ack(canonical['application_ack'])
             applied = row['applied_control']
             applied_payload = applied['payload']
             applied_ack = decode_leaf_application_ack(applied_payload['ack'])
             if (ack != applied_ack or applied['target_hash'] != target.identity_hash
+                    or ack.target_identity_hash != target.identity_hash
                     or applied_payload.get('writer_id') != writer_id
                     or applied_payload.get('command_identity_sha256') != command.command_identity_sha256
-                    or applied_payload.get('materialization_identity_sha256') != profile['materialization_identity_sha256']):
+                    or applied_payload.get('materialization_identity_sha256') != profile['materialization_identity_sha256']
+                    or ack.writer_id != writer_id
+                    or ack.binding_identity_hash != writer_meta['binding_identity_sha256']
+                    or ack.source_closure_sha256 != profile['source_closure_digest']
+                    or ack.scene_identity_hash != profile['scene_identity_hash']
+                    or ack.joint_order != target.joint_order
+                    or ack.actuator_order != target.actuator_order
+                    or ack.source_boundary != target.source_boundary
+                    or ack.source_sample_clock != target.sample_clock
+                    or ack.application_sample_clock != target.sample_clock):
                 raise ValueError(f'R02c transition {index}/{writer_id} application Ack/command mismatch')
             slots = tuple(item.ctrl_slot for item in command.slot_values)
             if (tuple(applied_payload.get('applied_slots', ())) != slots
@@ -1081,7 +1101,11 @@ def load_leaf_control_records_h5(path: Path | str) -> dict[str, Any]:
                         source.provider_materialization_id) != (
                         next_boundary.episode_id, next_boundary.reset_sample_id,
                         next_boundary.scene_identity_hash, next_boundary.provider_materialization_id)
-                    or target.sample_clock.simulation_time_s != index * profile['control_dt_s']
+                    or target.sample_clock.sample_index != index
+                    or not math.isclose(
+                        target.sample_clock.simulation_time_s,
+                        index * profile['control_dt_s'], rel_tol=0.0, abs_tol=1e-12,
+                    )
                     or ack.application_sample_clock != target.sample_clock):
                 raise ValueError(f'R02c transition {index}/{writer_id} boundary/clock sequence mismatch')
             if (canonical.get('source_boundary') != source.to_mapping()

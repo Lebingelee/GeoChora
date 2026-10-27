@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import argparse
 from pathlib import Path
 import shutil
 import sys
@@ -17,11 +18,12 @@ import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[3]
-OUTPUT = REPO / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001"
-CONTRACT_PATH = OUTPUT / "native_execution_contract.json"
-SNAPSHOT_PATH = REPO / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/r02c_001_input_snapshot.json"
-EVIDENCE_PATH = OUTPUT / "native_evidence.json"
-LOG_PATH = OUTPUT / "native_probe.jsonl"
+ATTEMPT_ROOT = None
+OUTPUT = None
+CONTRACT_PATH = None
+SNAPSHOT_PATH = None
+EVIDENCE_PATH = None
+LOG_PATH = None
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -53,28 +55,28 @@ def _rss_bytes() -> int | None:
 
 def _package_bytes() -> int:
     total = 0
-    for path in OUTPUT.rglob("*"):
+    for path in ATTEMPT_ROOT.rglob("*"):
         if path.is_file():
             total += path.stat().st_size
     return total
 
 
 def _raw_evidence_bytes() -> int:
-    excluded = OUTPUT / "source-workspace"
+    excluded = ATTEMPT_ROOT / "source-workspace"
     total = 0
-    for path in OUTPUT.rglob("*"):
+    for path in ATTEMPT_ROOT.rglob("*"):
         if path.is_file() and excluded not in path.parents:
             total += path.stat().st_size
     return total
 
 
 def _verify_frozen_inputs(contract: dict, snapshot: dict) -> None:
-    if contract.get("task_id") != "PHASE-II-01-R02C" or contract.get("attempt") != "001":
+    if contract.get("task_id") != "PHASE-II-01-R02C" or contract.get("attempt") != "002":
         raise RuntimeError("frozen native contract task identity mismatch")
-    if contract.get("input_head") != "c18325f7e332bc5d3864752fc3fe7aa94225f551":
-        raise RuntimeError("frozen native contract input HEAD mismatch")
-    if contract.get("authorization", {}).get("reference") != "explicit user instruction in the current R02c execution session":
+    if contract.get("authorization", {}).get("reference") != contract.get("authorization", {}).get("user_instruction_reference"):
         raise RuntimeError("native authorization reference is missing")
+    if contract.get("authorization", {}).get("approved_by") is not None:
+        raise RuntimeError("probe contract must not invent a named approver")
     if _sha256_file(Path(__file__)) != contract["sha256"]["probe_script"]:
         raise RuntimeError("R02c probe script changed after native freeze")
     if _sha256_file(SNAPSHOT_PATH) != contract["sha256"]["input_snapshot"]:
@@ -91,11 +93,22 @@ def _verify_frozen_inputs(contract: dict, snapshot: dict) -> None:
         raise RuntimeError("R02c process timeout differs from fixed contract")
     if contract["budget"]["max_materializations_total"] != 8:
         raise RuntimeError("R02c materialization budget differs from fixed contract")
-    if contract["baseline_native_budget_consumed"] != {
-        "process_starts": 1, "materialization_attempts": 4, "reset_attempts": 4,
-        "mj_step_calls": 0, "mj_forward_calls": 4, "outer_intervals": 0,
-    }:
-        raise RuntimeError("pre-freeze native activity differs from the reviewed budget carry-forward")
+    expected_counters = {
+        "process_starts": 0, "materialization_attempts": 0, "reset_attempts": 0,
+        "mj_step_calls": 0, "mj_forward_calls": 0, "outer_intervals": 0,
+    }
+    if contract.get("current_window_baseline_native_budget_consumed") != expected_counters:
+        raise RuntimeError("attempt002 native budget baseline must begin at zero")
+    if snapshot.get("task_id") != "PHASE-II-01-R02C" or snapshot.get("attempt") != "002":
+        raise RuntimeError("R02c attempt002 input snapshot identity mismatch")
+    branch = __import__("subprocess").run(
+        ["git", "branch", "--show-current"], cwd=REPO, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    head = __import__("subprocess").run(
+        ["git", "rev-parse", "HEAD"], cwd=REPO, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    if (branch, head) != (contract["git"]["branch"], contract["git"]["frozen_head"]):
+        raise RuntimeError("R02c branch/HEAD changed after native freeze")
     if _package_bytes() > contract["budget"]["max_output_bytes"]:
         raise RuntimeError("R02c output directory exceeds its byte budget before run")
     if _raw_evidence_bytes() > contract["budget"]["raw_evidence_limit_bytes"]:
@@ -361,11 +374,7 @@ def _tamper_checks(source_h5: Path, reader) -> list[dict]:
     return results
 
 
-def main() -> int:
-    started = time.monotonic()
-    contract = json.loads(CONTRACT_PATH.read_text())
-    snapshot = json.loads(SNAPSHOT_PATH.read_text())
-    _verify_frozen_inputs(contract, snapshot)
+def _run_native(contract: dict, snapshot: dict, started: float, log_stream, results) -> int:
     if "mujoco" in sys.modules:
         raise RuntimeError("BLOCKED_PROVIDER: MuJoCo was imported before the frozen runtime identity check")
 
@@ -375,17 +384,17 @@ def main() -> int:
     from task_env.tasks.reference_env import SelectedReferenceEnv
     import task_env.tasks.reference_env as reference_env_module
 
-    results = {
-        "task_id": "PHASE-II-01-R02C", "attempt": "001",
+    results.update({
         "status": "RUNNING", "provider": "mujoco", "version": "3.8.1",
         "backend": "cpu", "episodes": [], "tamper_checks": [],
         "native_calls": {"mj_step": 0, "mj_forward": 0, "mj_resetData": 0,
                          "materialize_control": 0},
         "resource_samples": [], "failure": None,
-        "prior_native_budget_consumed": contract["baseline_native_budget_consumed"],
+        "historical_attempt001_activity": contract.get("historical_attempt001_activity"),
+        "current_window_baseline_native_budget_consumed": contract[
+            "current_window_baseline_native_budget_consumed"],
         "started_monotonic_s": started,
-    }
-    log_stream = LOG_PATH.open("a", encoding="utf-8")
+    })
     active_episode = {"name": "preflight"}
     native_step_by_episode: dict[str, int] = {}
     warning_max_by_data: dict[int, tuple[int, ...]] = {}
@@ -495,7 +504,7 @@ def main() -> int:
 
         reference_env_module.materialize_control = counted_materialize
 
-        workspace = OUTPUT / "source-workspace"
+        workspace = ATTEMPT_ROOT / "source-workspace"
         default_candidate = build_leaf_position_candidate(
             workspace, environment_type=SelectedReferenceEnv, arm_gain=2.5,
         )
@@ -705,7 +714,7 @@ def main() -> int:
                     results["resource_samples"].append({"episode": episode, "phase": f"interval-{interval}",
                                                          "rss_bytes": _rss_bytes(),
                                                          "package_bytes": _package_bytes()})
-                    if results["native_calls"]["mj_step"] + contract["baseline_native_budget_consumed"]["mj_step_calls"] > 1360:
+                    if results["native_calls"]["mj_step"] > contract["budget"]["max_mj_step_calls"]:
                         raise AssertionError("R02c fixed mj_step budget exceeded")
                     if _package_bytes() > contract["budget"]["max_output_bytes"]:
                         raise AssertionError("R02c package byte budget exceeded")
@@ -829,9 +838,9 @@ def main() -> int:
             "episode_ids_are_distinct": len({row["reset_episode_id"] for row in results["episodes"]}) == 4,
         }
         if (results["native_calls"]["mj_step"] != 1280
-                or results["native_calls"]["mj_resetData"] + 4 != 8
-                or results["native_calls"]["mj_forward"] + 4 > 389
-                or results["native_calls"]["materialize_control"] + 4 != 8):
+                or results["native_calls"]["mj_resetData"] != 4
+                or results["native_calls"]["mj_forward"] > contract["budget"]["max_mj_forward_calls"]
+                or results["native_calls"]["materialize_control"] != 4):
             raise AssertionError(f"R02c aggregate native budget/accounting failed: {results['native_calls']}")
         if len(results["tamper_checks"]) != 9:
             raise AssertionError("R02c independent H5 tamper checks are incomplete")
@@ -840,16 +849,12 @@ def main() -> int:
             raise AssertionError("observed RSS exceeded 4 GiB")
         results["status"] = "PASS"
         results["budget_total"] = {
-            "process_starts": 2,
+            "process_starts": 1,
             "materialization_attempts_in_probe": results["native_calls"]["materialize_control"],
-            "materialization_attempts_including_prior": results["native_calls"]["materialize_control"] + 4,
             "reset_attempts_in_probe": results["native_calls"]["mj_resetData"],
-            "reset_attempts_including_prior": results["native_calls"]["mj_resetData"] + 4,
             "outer_intervals": sum(item["outer_intervals"] for item in results["episodes"]),
             "mj_step_calls": results["native_calls"]["mj_step"],
-            "mj_step_calls_including_prior": results["native_calls"]["mj_step"],
             "mj_forward_calls": results["native_calls"]["mj_forward"],
-            "mj_forward_calls_including_prior": results["native_calls"]["mj_forward"] + 4,
             "simulated_time_s": results["native_calls"]["mj_step"] * 0.002,
             "max_rss_sampled_bytes": max(
                 (sample["rss_bytes"] for sample in results["resource_samples"] if sample["rss_bytes"] is not None),
@@ -886,6 +891,199 @@ def main() -> int:
         if close_errors:
             raise RuntimeError(f"one or more selected environment close calls failed: {close_errors}")
     return 0
+
+
+def _static_candidate_checks(contract: dict) -> dict:
+    if "mujoco" in sys.modules or "taichi" in sys.modules:
+        raise RuntimeError("static preflight must not import MuJoCo or Taichi")
+    from task_env.tasks.position_candidate.leaf_candidate import build_leaf_position_candidate
+    from task_env.tasks.reference_env import SelectedReferenceEnv
+    from task_env.runtime.sessions.source import lower_mujoco_scene_source
+
+    workspace = ATTEMPT_ROOT / "source-workspace"
+    candidate = build_leaf_position_candidate(
+        workspace, environment_type=SelectedReferenceEnv, arm_gain=2.5,
+    )
+    try:
+        if candidate.source.source_closure_digest != contract["source"]["closure_sha256"]:
+            raise RuntimeError("static candidate source closure differs from the frozen contract")
+        if candidate.plan.identity_sha256 != contract["plans"]["default_identity_sha256"]:
+            raise RuntimeError("static default effective leaf plan differs from the frozen contract")
+        xml, assets = lower_mujoco_scene_source(
+            candidate.source.scene_source, candidate.scene, candidate.source.source_closure_digest,
+        )
+        xml_hash = _sha256_bytes(xml.encode("utf-8"))
+        assets_hashes = {name: _sha256_bytes(value) for name, value in assets.items()}
+        if xml_hash != contract["source"]["lowered_xml_sha256"]:
+            raise RuntimeError("static lowered MuJoCo source hash differs from the frozen contract")
+        if assets_hashes != contract["source"]["assets_sha256"]:
+            raise RuntimeError("static lowered asset closure differs from the frozen contract")
+        if "mujoco" in sys.modules or "taichi" in sys.modules:
+            raise RuntimeError("static source verification imported a native Provider")
+        return {
+            "source_closure_sha256": candidate.source.source_closure_digest,
+            "lowered_xml_sha256": xml_hash,
+            "asset_count": len(assets_hashes),
+            "assets_sha256": assets_hashes,
+            "default_plan_identity_sha256": candidate.plan.identity_sha256,
+            "native_provider_imported": False,
+        }
+    finally:
+        candidate.env.close()
+
+
+def _load_json(path: Path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _safe_output_path(raw_path: str, mode: str) -> Path:
+    global ATTEMPT_ROOT
+    expected_root = (REPO / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002").resolve()
+    root = Path(raw_path).expanduser().resolve(strict=False)
+    if root.parent != expected_root:
+        raise ValueError("output-dir must be a direct child of the fresh r02c_002 package")
+    allowed_names = {"native_run_001", "native_run_002"}
+    allowed_static_preflight = mode == "static" and (
+        root.name.startswith("preflight_reject_")
+        or (root.name.startswith("preflight_") and root.name.removeprefix("preflight_").isdigit())
+    )
+    if root.name not in allowed_names and not allowed_static_preflight:
+        raise ValueError("output-dir names an unauthorized R02c attempt directory")
+    if root.exists() or root.is_symlink():
+        raise FileExistsError(f"output-dir must be fresh and exclusive: {root}")
+    ATTEMPT_ROOT = expected_root
+    ATTEMPT_ROOT.mkdir(parents=True, exist_ok=True)
+    root.mkdir(exist_ok=False)
+    return root
+
+
+def main(argv=None) -> int:
+    global OUTPUT, CONTRACT_PATH, SNAPSHOT_PATH, EVIDENCE_PATH, LOG_PATH
+    parser = argparse.ArgumentParser(description="Bounded R02c attempt002 MuJoCo CPU verification")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--static-only", action="store_true")
+    mode.add_argument("--execute-native", action="store_true")
+    parser.add_argument("--contract", required=True, type=Path)
+    parser.add_argument("--snapshot", required=True, type=Path)
+    parser.add_argument("--output-dir", required=True)
+    args = parser.parse_args(argv)
+    run_mode = "static" if args.static_only else "native"
+    try:
+        OUTPUT = _safe_output_path(args.output_dir, run_mode)
+    except BaseException as error:
+        print(json.dumps({"status": "BLOCKED_PRECHECK", "error_type": type(error).__name__, "error": str(error)}), file=sys.stderr)
+        return 2
+    ATTEMPT_ROOT = OUTPUT.parent
+    globals()["ATTEMPT_ROOT"] = ATTEMPT_ROOT
+    CONTRACT_PATH = args.contract.resolve()
+    SNAPSHOT_PATH = args.snapshot.resolve()
+    EVIDENCE_PATH = OUTPUT / ("preflight_result.json" if args.static_only else "native_evidence.json")
+    log_dir = ATTEMPT_ROOT / "logs"
+    log_dir.mkdir(exist_ok=True)
+    LOG_PATH = log_dir / f"{OUTPUT.name}.jsonl"
+    started = time.monotonic()
+    result = {
+        "task_id": "PHASE-II-01-R02C", "attempt": "002", "mode": run_mode,
+        "status": "RUNNING", "native_calls": {"mj_step": 0, "mj_forward": 0,
+                          "mj_resetData": 0, "materialize_control": 0},
+        "failure": None, "started_monotonic_s": started,
+    }
+    _write_json(EVIDENCE_PATH, result)
+    log_stream = LOG_PATH.open("x", encoding="utf-8")
+    ledger = None
+    ledger_path = None
+    ledger_run = None
+    try:
+        contract = _load_json(CONTRACT_PATH)
+        snapshot = _load_json(SNAPSHOT_PATH)
+        _verify_frozen_inputs(contract, snapshot)
+        if args.static_only:
+            result["source_static"] = _static_candidate_checks(contract)
+            result["native_imported"] = False
+            result["status"] = "PASS_STATIC_PREFLIGHT"
+            result["finished_monotonic_s"] = time.monotonic()
+            _write_json(EVIDENCE_PATH, result)
+            log_stream.write(json.dumps({"status": result["status"], "source_static": result["source_static"]}, sort_keys=True) + "\n")
+            return 0
+
+        preflight_paths = sorted(ATTEMPT_ROOT.glob("preflight_[0-9][0-9][0-9]/preflight_result.json"))
+        valid_preflight = next((path for path in reversed(preflight_paths)
+                                if _load_json(path).get("status") == "PASS_STATIC_PREFLIGHT"), None)
+        if valid_preflight is None:
+            raise RuntimeError("native mode requires a successful attempt002 static preflight")
+        preflight_path = valid_preflight
+        preflight = _load_json(preflight_path)
+        result["successful_static_preflight"] = str(preflight_path)
+        if (preflight.get("source_static", {}).get("source_closure_sha256")
+                != contract["source"]["closure_sha256"]):
+            raise RuntimeError("static preflight and native contract source closure disagree")
+        ledger_path = ATTEMPT_ROOT / "native_process_ledger.json"
+        ledger = _load_json(ledger_path) if ledger_path.exists() else {
+            "attempt": "002", "process_starts": 0, "runs": [],
+        }
+        if ledger["process_starts"] >= contract["budget"]["max_native_process_invocations"]:
+            raise RuntimeError("attempt002 native process invocation budget exhausted")
+        if ledger["process_starts"]:
+            previous = ledger["runs"][-1]
+            if (previous.get("status") != "FAIL_PRE_STEP" or previous.get("mj_step_calls") != 0
+                    or previous.get("failure_class") != "PROGRAMMING_ERROR"):
+                raise RuntimeError("second native process is allowed only after an ordinary pre-step programming failure")
+        process_number = ledger["process_starts"] + 1
+        if OUTPUT.name != f"native_run_{process_number:03d}":
+            raise RuntimeError("native output directory does not match the next process ledger slot")
+        ledger["process_starts"] = process_number
+        ledger["runs"].append({"run": OUTPUT.name, "status": "RUNNING", "mj_step_calls": 0})
+        ledger_run = ledger["runs"][-1]
+        _write_json(ledger_path, ledger)
+        exit_code = _run_native(contract, snapshot, started, log_stream, result)
+        evidence = _load_json(EVIDENCE_PATH)
+        ledger_run.update({
+            "status": evidence.get("status"),
+            "mj_step_calls": evidence.get("native_calls", {}).get("mj_step", 0),
+            "failure_class": "NONE" if evidence.get("status") == "PASS" else "OTHER",
+        })
+        _write_json(ledger_path, ledger)
+        return exit_code
+    except BaseException as error:
+        existing = _load_json(EVIDENCE_PATH) if EVIDENCE_PATH.exists() else result
+        if existing.get("status") == "RUNNING":
+            existing["status"] = "FAIL_PRE_STEP" if run_mode == "native" else "FAIL_STATIC_PREFLIGHT"
+            existing["failure"] = {
+                "type": type(error).__name__, "message": str(error),
+                "traceback": traceback.format_exc(),
+            }
+        elif existing.get("status") == "PASS" and run_mode == "native":
+            existing["status"] = "FAIL_RESOURCE_CLOSE"
+            existing["failure"] = {
+                "type": type(error).__name__, "message": str(error),
+                "traceback": traceback.format_exc(),
+                "note": "Native evidence was already written; the wrapper failure occurred during closeout.",
+            }
+        result = existing
+        result["finished_monotonic_s"] = time.monotonic()
+        _write_json(EVIDENCE_PATH, result)
+        if not log_stream.closed:
+            log_stream.write(json.dumps({"status": result["status"], "failure": result.get("failure")}, sort_keys=True) + "\n")
+        if ledger is not None and ledger_run is not None and ledger_path is not None:
+            failure_message = str(result.get("failure", {}).get("message", ""))
+            if result.get("status") == "FAIL_PRE_STEP" and failure_message.startswith("BLOCKED_PROVIDER:"):
+                failure_class = "BLOCKED_PROVIDER"
+            elif result.get("status") == "FAIL_PRE_STEP" and type(error).__name__ in {
+                "TypeError", "AttributeError", "NameError", "KeyError", "IndexError",
+            }:
+                failure_class = "PROGRAMMING_ERROR"
+            else:
+                failure_class = "OTHER"
+            ledger_run.update({
+                "status": result.get("status"),
+                "mj_step_calls": result.get("native_calls", {}).get("mj_step", 0),
+                "failure_class": failure_class,
+            })
+            _write_json(ledger_path, ledger)
+        return 1
+    finally:
+        if not log_stream.closed:
+            log_stream.close()
 
 
 if __name__ == "__main__":
