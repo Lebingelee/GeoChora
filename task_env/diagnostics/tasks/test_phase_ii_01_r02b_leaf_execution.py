@@ -942,3 +942,64 @@ def test_force_aware_and_hand_config_outside_source_contract_remain_refused():
             (LeafProfileOverrideV1("leaf-profile-override-v1", hand.member_path, invalid),),
             source_closure_sha256=_SOURCE_CLOSURE,
         )
+
+
+def test_legacy_gripper_zero_force_target_retains_its_existing_hold_command():
+    import numpy as np
+    from types import SimpleNamespace
+    config = ActionConfig()
+    refs = SimpleNamespace(gripper_qpos_ids=np.asarray((0, 1)))
+    controller = PandaGripperController(references=refs, config=config)
+    snapshot = SimpleNamespace(qpos=np.asarray((0.02, 0.02)))
+    # GripperTarget has always admitted zero force: the old servo then holds
+    # the achieved opening even when the requested opening differs.
+    actual = controller.ctrl_for_target(snapshot=snapshot, target=GripperTarget(0.08, 0.0))
+    assert actual == 127.5
+
+
+@pytest.mark.parametrize("achieved_opening,command", [(-0.006, -1.0), (0.086, 1.0)])
+def test_legacy_canonical_gripper_keeps_final_opening_clamp(achieved_opening, command):
+    import numpy as np
+    from types import SimpleNamespace
+    config = ActionConfig()
+    model = SimpleNamespace(limits=np.asarray(PANDA_ARM_JOINT_LIMITS_RAD), source_sha256=_HASH)
+    state = SimpleNamespace(
+        joint_position={
+            **{f"panda-v1/{name}": value for name, value in zip(PANDA_ARM_JOINT_IDS, _ARM_CURRENT, strict=True)},
+            "panda-v1/finger_joint1": achieved_opening / 2,
+            "panda-v1/finger_joint2": achieved_opening / 2,
+        },
+        pose_world={"panda-v1/ee": _IDENTITY},
+    )
+    request = RequestedAction("absolute_joint", None, "none", (*_ARM_TARGET, command))
+    _canonical, target = CanonicalPandaController(model, artifact_hash=_HASH, config=config).compute(state, request)
+    # Independent frozen-v0 equation, including the final output clamp.
+    opening = 0.5 * (command + 1) * config.gripper_opening_range_m
+    correction = config.gripper_default_force_N / config.gripper_position_stiffness_N_per_m
+    expected = float(np.clip(achieved_opening + np.clip(opening - achieved_opening, -correction, correction),
+                             0.0, config.gripper_opening_range_m))
+    assert target.gripper.servo_opening_m == expected
+
+
+def test_native_mapping_rejects_unowned_extra_native_actuator_before_mutation():
+    scene, _root, _bindings, _preset, plan = _case()
+    receipt = replace(_receipt(plan), nu=9)
+    publication = _publication(scene, receipt)
+    runtime = _SyntheticRuntime(scene, receipt, publication, plan=plan)
+    with pytest.raises(ValueError, match="native.*actuator|Actuator.*cover"):
+        dispatch_leaf_control_interval(plan, _request(plan, receipt, publication), scene=scene, runtime=runtime)
+    assert (runtime.begin_calls, runtime.apply_calls, runtime.step_calls, len(runtime.consumed)) == (0, 0, 0, 0)
+
+
+def test_entity_qualified_r02a_writer_names_flow_through_leaf_dispatch():
+    scene, root, bindings, preset, _plan = _case()
+    bindings = tuple(replace(binding, writer_id=f"{binding.entity_id}/{binding.profile_kind}")
+                     for binding in bindings)
+    plan = compile_effective_leaf_plan(scene, root, {}, bindings, preset,
+                                       source_closure_sha256=_SOURCE_CLOSURE)
+    receipt = _receipt(plan)
+    publication = _publication(scene, receipt, plan=plan)
+    runtime = _SyntheticRuntime(scene, receipt, publication, plan=plan)
+    result = dispatch_leaf_control_interval(plan, _request(plan, receipt, publication), scene=scene, runtime=runtime)
+    assert {item.writer_id for item in result.apply_results} == {binding.writer_id for binding in bindings}
+    assert runtime.apply_calls == 2 and runtime.step_calls == 1

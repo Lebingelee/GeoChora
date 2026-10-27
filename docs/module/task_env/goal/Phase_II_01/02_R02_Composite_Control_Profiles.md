@@ -1,6 +1,6 @@
 # R02 — Composite Control Profiles
 
-状态：REVISED_DRAFT；R02a 已获Sol接收（ACCEPTED_S1_BOUNDED；Required State拒绝门修正后37 passed）；R02b 已完成实现与provider-free S1，等待Sol复核；R02c仍 PLANNED / NOT_STARTED。
+状态：REVISED_DRAFT；R02a 已获Sol接收（ACCEPTED_S1_BOUNDED；Required State拒绝门修正后37 passed）；R02b 已获Sol接收（ACCEPTED_S1_BOUNDED；4项局部修正后18 passed）；R02c仍 PLANNED / NOT_STARTED。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
 ## 真实复用边界
@@ -82,3 +82,9 @@ R02b总体状态为 `IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`。未运行真实 P
 split leaf仍 `NOT_ADMITTED`。Force-aware仍拒绝，旧完整Panda及双独立Position既有路线未宣称退化。
 
 R02c 首先在既有完整 Panda 的两个 Existing-Entity Subcomponent References 上运行两个真正分离的 Arm-only / Hand-only writer，验证 leaf 算法/资源隔离与 H5；这与运行两个完整 Panda Controller 不同。若选择未装配的两个独立资产作附加样例，R02b 必须先交付其有界 source mapping/admission，不能假定已有支持。跨两个真实 Entity 的最终 split-leaf 执行、装配后载荷/耦合/状态与公开 env S3 由 R03c 必须验证；该选择不新增 R03b→R02c 的隐藏依赖。R04/R05 不是 Position-only 前置；Force-aware required-state 未准入只拒绝该 profile，不给 Position 强加力读取。
+
+## R02b Sol复核与局部兼容修正（2026-10-27）
+
+Sol审阅提交 `0527b1aa9261aad199b8afe62cf66c15f2f20ccb`，通过5项定向失败复现，直接关闭4项缺口：共享gripper helper恢复旧零力Target的hold语义；canonical Controller保留原末端opening限幅与无deadband运算；native actuator/ctrl slots必须完整覆盖nu，不接受隐藏的未分配actuator；writer沿用R02a semantic name规则，允许Entity-qualified名称。leaf配置仍按原schema校验，不新增Force-aware或物理force-cap支持。
+
+最终R02b provider-free S1为18 passed（原13项加5项回归），既有owner集合101 passed/3个native selector未运行，C02b pure guard 1 passed。另从输入提交实际旧源码执行18个canonical与36个gripper数值对照，payload/Target identity或ctrl逐项完全一致。47项原始交付哈希、14项保护输入、11份Phase Markdown及R06/DAG/Required Envelope/P99语义匹配；原始Luna报告与失败日志保留。接收为 **ACCEPTED_S1_BOUNDED**；下一包按表进入R02c同完整Panda内两个真正Position leaf writer的MuJoCo CPU/既有Env与H5实现和有界验证。Sol本次未运行native/S2/S3/S4，未授予Provider admission或Qualification。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/`。

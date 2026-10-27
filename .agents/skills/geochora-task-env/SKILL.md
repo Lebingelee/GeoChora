@@ -103,6 +103,11 @@ joint limit/correction function. The Hand adapter reuses the existing gripper
 opening servo and ctrl conversion, keeping requested metres, servo metres and
 native ctrl as separate fields. Never infer native indices from tuple order or
 write Hand fingers as two independent actuators.
+Receipt validation must cover all `nu` native actuator IDs and ctrl slots; an
+extra unowned native actuator is rejected. Writer identities follow the same
+Entity-qualified semantic-name rule as R02a. Shared math preserves the legacy
+zero-force GripperTarget hold and the canonical controller's final opening
+clamp; these do not admit zero physical force limits or Force-aware leaves.
 
 Preflight validates every writer, action, typed state sample, source/config
 identity, mapping and evaluation clock before preparing commands or consuming

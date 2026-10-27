@@ -296,7 +296,8 @@ limit/correction calculation; Hand reuses the existing gripper opening servo and
 command keeps requested opening in metres, servo opening in metres and native ctrl as separate values. Explicit
 native mapping receipt values bind canonical refs to names/IDs/addresses/slots and source/Provider/config identity;
 they must validate exact resource coverage, Arm transmission to the mapped native Joint name, Hand logical-tendon to
-native-tendon name, equality and alias-free slots. R02b S1 uses only `synthetic_fixture` provenance.
+native-tendon name, equality and alias-free slots. The receipt must cover all `nu` native actuator IDs and ctrl slots,
+including rejection of undeclared extra actuators. Writer IDs use the same Entity-qualified semantic names as R02a. R02b S1 uses only `synthetic_fixture` provenance.
 
 `dispatch_leaf_control_interval()` validates the complete action/state/request and every writer before preparing
 commands or consuming the boundary; it then applies each exact typed patch, validates the returned apply Ack,

@@ -38,6 +38,7 @@ from ...controllers.canonical.leaf_profiles import (
     validate_leaf_target_ack,
 )
 from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1, EffectiveLeafEntryV1
+from ...artifacts.contracts import _name
 from ...controllers.canonical.controller import absolute_joint_position_servo
 from ...environment.types import ExecutionFaultV1, attach_execution_fault
 from ...robots.gripper import (
@@ -307,6 +308,8 @@ class LeafMaterializationReceiptV1:
         if any(item.native_actuator_id >= self.nu or item.ctrl_slot >= self.nu
                for item in self.actuators):
             raise ValueError("native Actuator mapping exceeds nu/ctrl dimensions")
+        if len(actuator_by_ref) != self.nu:
+            raise ValueError("native actuator mapping must cover every native actuator and ctrl slot")
         body_ids = [item.native_body_id for item in self.frames]
         frame_names = [item.native_name for item in self.frames]
         if (len(body_ids) != len(set(body_ids)) or len(frame_names) != len(set(frame_names))
@@ -378,7 +381,7 @@ class LeafActionRequestV1:
     def __post_init__(self):
         if self.schema_version != "leaf-action-request-v1":
             raise ValueError("unsupported leaf action request schema")
-        _token(self.writer_id, "leaf writer ID")
+        _name(self.writer_id)
         if type(self.action) not in (ArmPositionActionV1, HandPositionActionV1):
             raise TypeError("leaf action request requires a Position Action v1 value")
 
@@ -446,8 +449,8 @@ class LeafPreparedCommandV1:
     def __post_init__(self):
         if self.schema_version != "leaf-prepared-command-v1":
             raise ValueError("unsupported prepared leaf command schema")
-        for name in ("writer_id", "state_configuration_revision"):
-            _token(getattr(self, name), name)
+        _name(self.writer_id)
+        _token(self.state_configuration_revision, "state_configuration_revision")
         for name in ("effective_plan_identity_sha256", "binding_identity_sha256",
                      "effective_configuration_identity_sha256", "materialization_identity_sha256"):
             _sha(getattr(self, name), name)
@@ -508,7 +511,7 @@ class LeafActuatorPatchV1:
     def __post_init__(self):
         if self.schema_version != "leaf-actuator-patch-v1":
             raise ValueError("unsupported leaf actuator patch schema")
-        _token(self.writer_id, "patch writer")
+        _name(self.writer_id)
         for value in (self.command_identity_sha256, self.effective_plan_identity_sha256,
                       self.materialization_identity_sha256):
             _sha(value, "leaf patch identity")
@@ -532,7 +535,7 @@ class LeafApplyResultV1:
     def __post_init__(self):
         if self.schema_version != "leaf-apply-result-v1":
             raise ValueError("unsupported leaf apply result schema")
-        _token(self.writer_id, "apply writer")
+        _name(self.writer_id)
         _sha(self.command_identity_sha256, "applied command")
         _sha(self.materialization_identity_sha256, "apply materialization")
         if type(self.applied_slots) is not tuple or any(type(slot) is not int or slot < 0 for slot in self.applied_slots):

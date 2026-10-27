@@ -97,7 +97,7 @@ Scene ControlGroup/ActuatorResource覆盖；实际 adapter 复用既有绝对关
 才准备所有命令、consume边界、逐writer apply/Ack并请求单次外层step；部分apply、step或后续publication失败时，
 使用既有 `ExecutionFaultV1` 记录真实进度并闭锁；`LeafDispatchProgressV1` 保留已准备的 Target/command patch
 及失败前返回的每个 typed apply result，不回滚、不生成伪transition。当前没有真实Provider、SelectedReferenceEnv
-或Recorder/H5接线；R02b状态为实现与S1报告待Sol复核。R02c仍负责真实独立leaf执行、typed state与既有Recorder；
+或Recorder/H5接线；R02b经Sol局部兼容/拒绝门修正后获接收为ACCEPTED_S1_BOUNDED。R02c仍负责真实独立leaf执行、typed state与既有Recorder；
 R01c继续独立负责静态source投影。R02b不改变R02a Force-aware `NOT_ADMITTED`、旧TaskArtifact/Scene/Reset/Profile/
 Target/Ack/H5身份、R06兼容性gate、R05a blocker、DAG、Required Envelope或Qualification。
 

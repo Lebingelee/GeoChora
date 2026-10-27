@@ -16,6 +16,8 @@ def position_gripper_servo_opening(
     force_limit_N: float,
     stiffness_N_per_m: float,
     opening_range_m: float,
+    *,
+    error_deadband_m: float = 1.0e-12,
 ) -> float:
     """Pure force-free position correction shared by the legacy and leaf paths.
 
@@ -24,15 +26,15 @@ def position_gripper_servo_opening(
     force cap or force feedback.
     """
     values = (requested_opening_m, achieved_opening_m, force_limit_N,
-              stiffness_N_per_m, opening_range_m)
+              stiffness_N_per_m, opening_range_m, error_deadband_m)
     if any(isinstance(value, bool) or not np.isfinite(value) for value in values):
         raise ValueError('position gripper inputs must be finite real values')
-    if force_limit_N <= 0 or stiffness_N_per_m <= 0 or opening_range_m <= 0:
-        raise ValueError('position gripper force, stiffness and range must be positive')
+    if force_limit_N < 0 or stiffness_N_per_m <= 0 or opening_range_m <= 0 or error_deadband_m < 0:
+        raise ValueError('position gripper force/deadband must be nonnegative and stiffness/range positive')
     achieved = float(achieved_opening_m)
     requested = float(np.clip(requested_opening_m, 0.0, opening_range_m))
     error = requested - achieved
-    if abs(error) > 1.0e-12:
+    if abs(error) > error_deadband_m:
         max_motion = float(force_limit_N) / float(stiffness_N_per_m)
         requested = achieved + float(np.clip(error, -max_motion, max_motion))
     return float(requested)

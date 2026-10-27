@@ -68,7 +68,9 @@ class CanonicalPandaController:
         servo_opening=position_gripper_servo_opening(
             opening, achieved, cfg.gripper_default_force_N,
             cfg.gripper_position_stiffness_N_per_m, cfg.gripper_opening_range_m,
+            error_deadband_m=0.0,
         )
+        servo_opening=float(np.clip(servo_opening,0,cfg.gripper_opening_range_m))
         target=CanonicalControlTarget('canonical-control-v0',self.artifact_hash,self.identity,ARM,dict(zip(ARM,map(float,desired))),dict(zip(ARM,map(float,servo))),
             GripperControlTarget('panda-v1/gripper',float(opening),cfg.gripper_default_force_N,servo_opening))
         return canonical,target
