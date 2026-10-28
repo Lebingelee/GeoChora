@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -392,6 +393,7 @@ def launch_native(run_id: str, *, attempt_second_start: bool = False,
         env.update({
             "PYTHONPATH": str(REPO),
             "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONNOUSERSITE": "1",
             "PYTHONUNBUFFERED": "1",
             "OMP_NUM_THREADS": "1",
             "MKL_NUM_THREADS": "1",
@@ -400,8 +402,22 @@ def launch_native(run_id: str, *, attempt_second_start: bool = False,
             "TOKENIZERS_PARALLELISM": "false",
         })
         worker_script = REPO / "task_env/diagnostics/tasks/f01_isaac_native_baseline.py"
+        reader_script = REPO / "task_env/diagnostics/tasks/f01_isaac_native_reader.py"
+        supervisor_script = Path(__file__).resolve()
+        source_hashes = {
+            "F01_WORKER_SHA256": hashlib.sha256(worker_script.read_bytes()).hexdigest(),
+            "F01_READER_SHA256": hashlib.sha256(reader_script.read_bytes()).hexdigest(),
+            "F01_SUPERVISOR_SHA256": hashlib.sha256(supervisor_script.read_bytes()).hexdigest(),
+        }
+        env.update(source_hashes)
         command = [str(ENV_PYTHON), "-B", str(worker_script), "--native-worker", "--run-dir", str(run_dir)]
-        _json_new(run_dir / "native_command.json", {"command": command, "cwd": str(REPO), "thread_env": {k: env[k] for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")}})
+        _json_new(run_dir / "native_command.json", {
+            "command": command,
+            "cwd": str(REPO),
+            "thread_env": {k: env[k] for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")},
+            "python_no_user_site": env["PYTHONNOUSERSITE"],
+            "frozen_source_sha256": source_hashes,
+        })
         log_path = run_dir / "native_worker.log"
         with log_path.open("xb") as log_stream:
             started = time.monotonic()

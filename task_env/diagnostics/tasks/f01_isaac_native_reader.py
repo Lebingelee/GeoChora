@@ -33,6 +33,49 @@ HOME = {
     "panda_finger_joint2": 0.04,
 }
 CUBE_START = (0.8, 0.0, 0.25)
+CUBE_EDGE_M = 0.05
+CUBE_MASS_KG = 0.08
+ROBOT_ASSET = "/Isaac/Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda"
+
+
+def _expected_plan(run_id: str) -> dict[str, Any]:
+    """Independent copy of the fixed package recipe; never import the worker."""
+    return {
+        "schema": "geochora-f01-isaac-native-plan-v1",
+        "run_id": run_id,
+        "application": {
+            "headless": True, "renderer": "MinimalRendering", "fast_shutdown": False,
+            "limit_cpu_threads": 1, "disable_viewport_updates": True,
+            "enable_crashreporter": False, "multi_gpu": False, "max_gpu_count": 1,
+        },
+        "robot": {
+            "name": "franka", "prim_path": "/World/robot", "asset_path": ROBOT_ASSET,
+            "variants": {"Gripper": "alternatefinger", "Mesh": "performance"},
+            "selected_joint": ARM, "target_delta_rad": 0.1,
+        },
+        "scene": {
+            "physics_engine": "PhysX", "physics_device": "cpu", "gpu_dynamics": False,
+            "dt_seconds": DT, "stage_meters_per_unit": 1.0, "stage_up_axis": "Z",
+            "ground_path": "/World/ground_plane", "ground_visual_template": None,
+            "cube_path": "/World/f01_cube", "cube_edge_m": CUBE_EDGE_M,
+            "cube_mass_kg": CUBE_MASS_KG, "cube_position_m": list(CUBE_START),
+            "cube_orientation_wxyz": [1.0, 0.0, 0.0, 0.0],
+            "rounds": EXPECTED_ROUNDS, "steps_per_round": EXPECTED_STEPS,
+            "phase_steps": [60, 60, 60, 60],
+        },
+        "limits": {
+            "max_physics_steps": 1200, "max_simulation_seconds": 10.0,
+            "max_process_wall_seconds": 900, "max_asset_transfer_bytes": 2 * 1024**3,
+            "reset_position_tolerance": 1e-4, "reset_velocity_tolerance": 1e-4,
+            "time_tolerance": 1e-5, "min_selected_joint_motion_rad": 0.04,
+            "max_final_home_error_rad": 0.05, "min_cube_drop_m": 0.05,
+            "final_cube_center_z_m": [0.015, 0.04], "joint_limit_tolerance": 1e-4,
+        },
+    }
+
+
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
 def _reject_constant(value: str) -> None:
@@ -238,6 +281,37 @@ def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool
     checks["physics_budget"] = _finite_number(receipt.get("total_physics_steps")) and 0 <= int(receipt["total_physics_steps"]) <= 1200
     checks["simulation_time_budget"] = _finite_number(receipt.get("total_simulation_time_s")) and 0 <= float(receipt["total_simulation_time_s"]) <= 10.0 + 1e-5
 
+    run_id = receipt.get("run_id")
+    expected_plan = _expected_plan(run_id) if isinstance(run_id, str) else None
+    plan_path = result_path.parent / "run_plan.json"
+    try:
+        disk_plan = _json(plan_path)
+        disk_plan_hash = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+    except (OSError, ValueError, json.JSONDecodeError):
+        disk_plan, disk_plan_hash = None, None
+    checks["fixed_plan_matches_package"] = (
+        expected_plan is not None
+        and receipt.get("frozen_plan") == expected_plan
+        and disk_plan == expected_plan
+        and receipt.get("plan_sha256") == disk_plan_hash
+    )
+
+    source_paths = {
+        "implementation_sha256": Path(__file__).with_name("f01_isaac_native_baseline.py"),
+        "reader_source_sha256": Path(__file__).resolve(),
+        "supervisor_source_sha256": Path(__file__).with_name("f01_isaac_native_supervisor.py"),
+    }
+    source_hashes_match = True
+    for field, source_path in source_paths.items():
+        try:
+            expected_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        except OSError:
+            expected_hash = None
+        observed_hash = receipt.get(field)
+        if not isinstance(observed_hash, str) or len(observed_hash) != 64 or observed_hash != expected_hash:
+            source_hashes_match = False
+    checks["frozen_source_hashes_match"] = source_hashes_match
+
     identity = receipt.get("scene_identity") or {}
     checks["cpu_physx_and_no_gpu_dynamics"] = identity.get("physics_scene_type") == "PhysxScene" and identity.get("physics_device_configured") == "cpu" and identity.get("gpu_dynamics_enabled") is False
     checks["fixed_stage_identity"] = identity.get("stage_meters_per_unit") == 1.0 and identity.get("stage_up_axis") == "Z"
@@ -252,8 +326,32 @@ def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool
     checks["no_unexpected_rigid_bodies"] = physics.get("unexpected_rigid_body_paths") == [] and physics.get("cube_is_rigid_body") is True
     checks["one_physics_scene"] = isinstance(physics.get("physics_scene_paths"), list) and len(physics["physics_scene_paths"]) == 1
     checks["cube_mass_recipe"] = _finite_number(identity.get("cube_mass_kg")) and abs(float(identity["cube_mass_kg"]) - 0.08) <= 1e-6
+    checks["cube_geometry_recipe"] = (
+        _finite_number(identity.get("cube_edge_m"))
+        and abs(float(identity["cube_edge_m"]) - CUBE_EDGE_M) <= 1e-8
+        and _finite_vector(identity.get("cube_reset_position_m"), 3)
+        and max(abs(float(a) - b) for a, b in zip(identity["cube_reset_position_m"], CUBE_START)) <= 1e-8
+        and _quat_error(identity.get("cube_reset_orientation_wxyz"), [1.0, 0.0, 0.0, 0.0]) <= 1e-8
+    )
     assets = receipt.get("asset_inventory") or {}
     checks["asset_transfer_budget"] = _finite_number(assets.get("known_unique_bytes")) and 0 <= int(assets["known_unique_bytes"]) <= 2 * 1024**3
+    checks["official_franka_asset_and_variants"] = (
+        assets.get("robot_asset_path_from_official_config") == ROBOT_ASSET
+        and assets.get("robot_variants") == {"Gripper": "alternatefinger", "Mesh": "performance"}
+        and assets.get("usd_utils_unresolved") == []
+        and isinstance(assets.get("robot_asset_authored"), str)
+        and assets["robot_asset_authored"].endswith(ROBOT_ASSET)
+    )
+    default_rows = assets.get("scenario_default_joint_positions")
+    try:
+        default_positions = {str(name): value for name, value in default_rows}
+        defaults_match = len(default_rows) == len(HOME) and set(default_positions) == set(HOME) and all(
+            _finite_number(default_positions[name]) and abs(float(default_positions[name]) - HOME[name]) <= 1e-8
+            for name in HOME
+        )
+    except (TypeError, ValueError):
+        defaults_match = False
+    checks["official_scenario_home_positions"] = defaults_match and receipt.get("home_positions") == HOME
 
     trace_rounds: list[list[dict[str, Any]]] = [[], []]
     reset_states: dict[int, dict[str, Any]] = {}
@@ -274,6 +372,73 @@ def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool
         else:
             trace_structure_ok = False
     checks["trace_structure"] = trace_structure_ok and set(reset_states) == {1, 2}
+
+    bootstrap = receipt.get("bootstrap")
+    bootstrap_shape_ok = isinstance(bootstrap, list) and len(bootstrap) == 2 and all(isinstance(row, dict) for row in bootstrap)
+    bootstrap_steps = 0
+    bootstrap_clock_ok = bootstrap_shape_ok
+    if bootstrap_shape_ok:
+        for row in bootstrap:
+            steps = row.get("physics_steps")
+            if type(steps) is not int or steps < 0:
+                bootstrap_clock_ok = False
+                continue
+            bootstrap_steps += steps
+            if "physics_index_before" in row and "physics_index_after" in row:
+                index_delta = row.get("physics_index_after") - row.get("physics_index_before") if type(row.get("physics_index_before")) is int and type(row.get("physics_index_after")) is int else None
+                time_before = row.get("simulation_time_before_s")
+                time_after = row.get("simulation_time_after_s")
+                time_delta = row.get("simulation_time_delta_s")
+                if (index_delta != steps or not _finite_number(time_before) or not _finite_number(time_after)
+                        or not _finite_number(time_delta)
+                        or abs(float(time_after) - float(time_before) - steps * DT) > 1e-5
+                        or abs(float(time_delta) - steps * DT) > 1e-5
+                        or not _finite_number(row.get("expected_dt_s"))
+                        or abs(float(row["expected_dt_s"]) - DT) > 1e-8):
+                    bootstrap_clock_ok = False
+            elif row.get("kind") == "view_refresh":
+                if (steps != 0 or type(row.get("physics_index")) is not int
+                        or not _finite_number(row.get("simulation_time_s"))):
+                    bootstrap_clock_ok = False
+            else:
+                bootstrap_clock_ok = False
+
+    start_index = receipt.get("physics_steps_at_start")
+    end_index = receipt.get("physics_steps_at_end")
+    total_steps = receipt.get("total_physics_steps")
+    start_time = receipt.get("simulation_time_start_s")
+    end_time = receipt.get("simulation_time_end_s")
+    total_time = receipt.get("total_simulation_time_s")
+    reset1_index = reset_states.get(1, {}).get("physics_index")
+    reset2_index = reset_states.get(2, {}).get("physics_index")
+    first_round_rows = trace_rounds[0]
+    second_round_rows = trace_rounds[1]
+    round1_last_index = first_round_rows[-1].get("state", {}).get("physics_index") if first_round_rows else None
+    last_trace_index = second_round_rows[-1].get("state", {}).get("physics_index") if second_round_rows else None
+    exact_count_types = all(type(v) is int for v in (start_index, end_index, total_steps, reset1_index, reset2_index, round1_last_index, last_trace_index))
+    bootstrap_count_matches = (
+        bootstrap_shape_ok and exact_count_types
+        and reset1_index - start_index == bootstrap[0].get("physics_steps")
+        and reset2_index - round1_last_index == bootstrap[1].get("physics_steps")
+        and total_steps == end_index - start_index
+        and end_index == last_trace_index
+        and total_steps == bootstrap_steps + EXPECTED_ROUNDS * EXPECTED_STEPS
+    )
+    bootstrap_clock_matches = (
+        bootstrap_clock_ok and exact_count_types
+        and _finite_number(start_time) and _finite_number(end_time) and _finite_number(total_time)
+        and abs(float(end_time) - float(start_time) - total_steps * DT) <= 1e-5
+        and abs(float(total_time) - total_steps * DT) <= 1e-5
+        and abs(float(reset_states.get(1, {}).get("simulation_time_s", math.nan))
+                - (float(start_time) + bootstrap[0].get("physics_steps", math.inf) * DT)) <= 1e-5
+        and abs(float(reset_states.get(2, {}).get("simulation_time_s", math.nan))
+                - (float(start_time) + (bootstrap[0].get("physics_steps", math.inf)
+                                         + bootstrap[1].get("physics_steps", math.inf)
+                                         + EXPECTED_STEPS) * DT)) <= 1e-5
+    )
+    checks["bootstrap_records_consistent"] = bootstrap_clock_ok
+    checks["exact_bootstrap_refresh_and_task_step_count"] = bootstrap_count_matches
+    checks["exact_bootstrap_refresh_and_task_clock"] = bootstrap_clock_matches
     lower = receipt.get("joint_lower_limits")
     upper = receipt.get("joint_upper_limits")
     reset_checks: dict[str, Any] = {}

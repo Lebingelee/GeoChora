@@ -443,6 +443,11 @@ def run_worker(run_dir: Path, plan: dict[str, Any], *, driver_factory: Callable[
                 "trace": trace_path.exists(), "progress": progress_path.exists()}
     run_id = str(plan.get("run_id", run_dir.name))
     report = _initial_report(run_dir, evidence_kind, run_id)
+    report["frozen_plan"] = plan
+    report["plan_sha256"] = _sha256(run_dir / "run_plan.json") if (run_dir / "run_plan.json").is_file() else None
+    report["implementation_sha256"] = os.environ.get("F01_WORKER_SHA256")
+    report["reader_source_sha256"] = os.environ.get("F01_READER_SHA256")
+    report["supervisor_source_sha256"] = os.environ.get("F01_SUPERVISOR_SHA256")
     trace: JsonlTrace | None = None
     driver: Any = None
     stage_name = "trace_open"
@@ -922,6 +927,9 @@ class NativeDriver:
             "physics_inventory": physics_inventory,
             "official_scenario_added_dome_light": self.stage.GetPrimAtPath("/World/DomeLight").IsValid(),
             "cube_mass_kg": self._numpy(self.cube.get_masses())[0][0],
+            "cube_edge_m": float(self.plan["scene"]["cube_edge_m"]),
+            "cube_reset_position_m": list(self.plan["scene"]["cube_position_m"]),
+            "cube_reset_orientation_wxyz": list(self.plan["scene"]["cube_orientation_wxyz"]),
             "sample_sources": {
                 "joint_positions": "Articulation.get_dof_positions actual physics state",
                 "joint_velocities": "Articulation.get_dof_velocities actual physics state",

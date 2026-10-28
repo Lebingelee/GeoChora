@@ -72,6 +72,13 @@ class F01WorkerCliTests(unittest.TestCase):
         rejected = reader.verify(run_dir / "native_result.json", run_dir / "native_trace.jsonl")
         self.assertEqual(rejected["status"], "REJECTED_SYNTHETIC_EVIDENCE")
         self.assertFalse(rejected["native_gate"])
+        verified = reader.verify(run_dir / "native_result.json", run_dir / "native_trace.jsonl", allow_synthetic_fixture=True)
+        self.assertTrue(verified["checks"]["fixed_plan_matches_package"])
+        frozen_plan = json.loads((run_dir / "run_plan.json").read_text())
+        frozen_plan["scene"]["cube_mass_kg"] = 1.0
+        (run_dir / "run_plan.json").write_text(json.dumps(frozen_plan), encoding="utf-8")
+        tampered = reader.verify(run_dir / "native_result.json", run_dir / "native_trace.jsonl", allow_synthetic_fixture=True)
+        self.assertFalse(tampered["checks"]["fixed_plan_matches_package"])
 
     def test_primary_and_cleanup_errors_are_both_preserved(self) -> None:
         completed, run_dir = self._run_worker("dual-error", "--synthetic-fault", "primary-and-cleanup")
