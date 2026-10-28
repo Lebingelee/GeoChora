@@ -27,7 +27,9 @@
    它们不继承 R03c 的 native 授权，也不要求完整 P99 先完成；F01 安装准备等独立行可在明确选择后提前。
    原 R05a、R06 compatibility blockers 与 P99 不关闭；单 Panda USD 不追加 split Attachment/500Hz 全局依赖。
 
-2026-10-28 顺序记录：维护者明确在 R03c 后、默认 R04b 前先推进独立 F00 attempt001，理由是优先处理 Isaac、USD 与 Task Harness，并修复已有 Harness 生命周期误判。该工作包沿 `develop-full` 独立执行，不改原 7/22 DAG、P99 Required Envelope 或 R04b/c 出口，不启动其他 slice；当前实现/S1及native状态见 [10 F00记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-attempt001-实施快照-native-pending)。
+2026-10-28 顺序记录：维护者明确在 R03c 后、默认 R04b 前先推进独立 F00 attempt001，理由是优先处理 Isaac、USD 与 Task Harness，并修复已有 Harness 生命周期误判。该工作包沿 `develop-full` 独立执行，不改原 7/22 DAG、P99 Required Envelope 或 R04b/c 出口，不启动其他 slice；当前实现/S1及native结果见 [10 F00记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-attempt001-实施快照-native-result)。
+
+2026-10-28 F00 attempt001 native 结果：20 个 synthetic MuJoCo 3.8.1 CPU seed 均以 `expert_failed / gripper_readiness_timeout` 结束，Oracle/H5 与 Judge 未运行；Harness 修复及 provider-free S1 通过，但该 mock campaign 未通过，不能记为 Harness candidate acceptance。逐行原始事实见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/`；不启动 retry 或其他 slice，交 Sol 复核。
 
 
 ## 基线、P00 与证据记账

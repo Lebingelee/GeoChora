@@ -1,8 +1,8 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-28。状态：**F00 attempt001 IMPLEMENTED_S1_PASS (13 targeted tests) / SYNTHETIC_NATIVE_PENDING**。
+更新于 2026-10-28。状态：**F00 S1_PASS / SYNTHETIC_CAMPAIGN_EXPERT_FAILED (20/20) / ORACLE_NOT_RUN**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
-当前 `develop-full` 集成和 Harness 生命周期修复、定向 provider-free S1 已完成；一次有界 synthetic MuJoCo campaign、Oracle 与 pending Judge 收口仍待执行。
+`develop-full` 集成、Harness 生命周期修复和定向 provider-free S1 已完成。唯一有界 synthetic MuJoCo campaign 已执行，但 20/20 seeds 均为 `expert_failed / gripper_readiness_timeout`；candidate 未通过，因此 Oracle/H5 与 pending Judge 未运行，F00 native 兼容出口未通过。
 R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
 
 ## 1. 已确定的方向与范围
@@ -153,23 +153,26 @@ Human Judge 与 trajectory qualification 仍独立，不由 Harness 自动填写
 - 物理接触与语义 contact query 分开。当前 session manifest 将 contact_detection/contact_impulse 列 known_unsupported；
   R07 的 On/In 等若需公开接触事实，必须补 public query/state/evaluator 的对应 owner 与证据，不能用位置重叠代真实接触。
 
-<a id="f00-attempt001-实施快照-native-pending"></a>
+<a id="f00-attempt001-实施快照-native-result"></a>
 
-## F00 attempt001 实施快照（native pending）
+## F00 attempt001 实施与 native 结果
 
 Harness 与阶段基线已按本包合并到 `develop-full`：Harness parent
 `9d0b3e524d67105e67ddb98e6dec903f19eb4255`、phase parent
 `0d11d33ee6e6a9b09f2924b3450bbedff9aefd91`、merge tree
-`7684aeceb3e49013c700403e1e9f9431e2a484dd`。FIX_EXISTING 在现有 Harness
+`7684aeceb3e49013c700403e1e9f9431e2a484dd`、merge commit
+`5d890891ac6172d343d0cd904768bf415e0f9907`。F00 实现提交为
+`6e477765cf0539535e848e7717e029a44e413b29`。FIX_EXISTING 在现有 Harness
 owner 内完成：`run_seed` 保存原始 outcome/lifecycle、reset/step、fault、primary
 error 与 close facts；solved 只在无任务/专家失败、无 fault/terminal flags 且
 close 成功后产生。`construction_ledger.finish` 与 `judge_package.check_probe`
-分别检查报告身份和每条 raw row、seed 顺序与 totals。 provider-free 定向测试
+分别检查报告身份和每条 raw row、seed 顺序与 totals。provider-free 定向测试
 覆盖实际 `run_seed`、两消费者、20-row 正例、完成/终止/截断/失败/fault/cleanup
 反例、expert lifecycle 失败、部分异常和旧报告证据不足；目前 13 项通过。真实 Core caller 链由
 `compile_candidate` → `ReferenceTaskBinding` → `SelectedReferenceEnv` →
-reset/step/close 和后续 Oracle/Recorder 运行验证。synthetic campaign 与
-Oracle 尚未运行；没有 Harness acceptance 或 Qualification 结论。
+reset/step/close 的实际 MuJoCo campaign 运行；campaign 中 assets、compile、semantic 三份报告通过，feasibility 报告失败。seed 0–19 全部是 `expert_failed`，原因 `gripper_readiness_timeout`；每行 reset/close 成功，steps 为 853–864，物理 task success 0/20、expert failure 20/20，没有 termination/truncation、execution fault、step error 或 cleanup error。进程正常结束而非 timeout，退出码 1，wall 56.45 s、user 56.13 s、system 0.81 s、CPU 100%、peak RSS 568368 KiB、swap 0。账本记录一轮失败并保持 `ready`，不是 `candidate_ready`。
+
+该 campaign 使用此包新生成的 synthetic pick-lift box proxy，asset SHA-256 `317ef3820b957f17e1a9ad0e09732b5863360e74eebf22446d3e1254d1a67be5`；它不是未提供的历史 handoff bytes，也不是真实 benchmark。Oracle seed0、同-run H5 reader 和 Judge prepare/verify 按失败门未运行，无 H5 或 Judge 包；不得将 `expert_failed` 解释为 task infeasible、不能记 Harness acceptance，Qualification 保持 `NOT_ASSESSED`。没有重试 campaign、修改 candidate/reset 分布或启动其他 slice。逐 seed 原始行、四份报告、账本、stdout/stderr、进程退出与资源日志见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/`。
 
 源码审计、固定 Harness 13 文件副本、9 项 host-only 检查及失败复现在 ignored
 `workspace/maintenance/multi_provider_asset_harness_review_20261028_001/`。

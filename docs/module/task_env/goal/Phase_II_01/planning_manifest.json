@@ -1857,11 +1857,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "f353f1686e002e593e3a589286e6b1090c7389b846a2bf3a1f35e1331a64de29",
+    "07_Execution_Order_and_Acceptance.md": "99349b807dc7b3d10fa0312d3643f7b628dcb401b8d7808da6a45bd9664c2509",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "2d2c6d6631c8ce0f1c57baf132f291b7ba548bbbd958fcb1e8dcaa6bfdcf5b8f",
-    "README.md": "7b59e463653519f8d2691f6dd35de2343273b868756271bed7240df113cf29e3"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "712144bfdf02c28812b90c7b2abd56b2aa5e3c035101f8656b7e0d140e71e644",
+    "README.md": "74f455cc447fd377002463277a2fa4b15fd127e99bbfdbe0bcc73d74502c7627"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4173,6 +4173,36 @@
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/",
       "other_slice_started": false,
       "qualification": "NOT_ASSESSED"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_F00_ATTEMPT001_BOUNDED_NATIVE_CAMPAIGN_RESULT",
+      "input_head": "6e477765cf0539535e848e7717e029a44e413b29",
+      "implementation_commit": "6e477765cf0539535e848e7717e029a44e413b29",
+      "result": "S1_PASS; synthetic MuJoCo candidate feasibility failed expert_failed on seeds 0-19; Oracle/Judge not run; pending Sol review",
+      "native_process_starts": 1,
+      "native_exit_code": 1,
+      "native_timed_out": false,
+      "native_elapsed_seconds": 56.45,
+      "max_rss_kib": 568368,
+      "four_report_statuses": {
+        "assets": "pass",
+        "compile": "pass",
+        "semantic": "pass",
+        "feasibility": "fail"
+      },
+      "seed_totals": {
+        "solved": 0,
+        "invalid": 0,
+        "expert_failed": 20,
+        "unknown": 0
+      },
+      "ledger_state": "ready",
+      "same_run_h5_readback": "NOT_RUN",
+      "judge": "NOT_RUN",
+      "qualification": "NOT_ASSESSED",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/",
+      "other_slice_started": false
     }
   ],
   "P00_audit": {
@@ -4341,7 +4371,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-28",
-    "status": "F00_ATTEMPT001_IMPLEMENTED_S1_PASS_SYNTHETIC_NATIVE_PENDING; F01-F07 NOT_STARTED",
+    "status": "F00_ATTEMPT001_S1_PASS_NATIVE_CAMPAIGN_EXPERT_FAILED_ORACLE_NOT_RUN; F01-F07 NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4474,7 +4504,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 attempt001 implementation and S1 complete; bounded synthetic native campaign pending; F01-F07 remain planned/not started; no new capability or qualification claims",
+    "patch_rows_status": "F00 attempt001 Harness implementation and provider-free S1 passed; one bounded synthetic MuJoCo campaign failed with expert_failed on 20/20 seeds; Oracle/Judge not run; F01-F07 remain planned/not started; no new capability or qualification claims",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4544,7 +4574,7 @@
     ],
     "f00_attempt001": {
       "date": "2026-10-28",
-      "status": "IMPLEMENTED_S1_PASS_SYNTHETIC_NATIVE_PENDING",
+      "status": "S1_PASS_S2_EXPERT_FAILED_ALL_20_S3_ORACLE_NOT_RUN_PENDING_SOL_REVIEW",
       "sequence_override": {
         "default_next_row": "R04b",
         "selected_row": "F00 attempt001",
@@ -4557,7 +4587,7 @@
       "input_harness_head": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
       "merge_commit": "5d890891ac6172d343d0cd904768bf415e0f9907",
       "merge_tree": "7684aeceb3e49013c700403e1e9f9431e2a484dd",
-      "implementation_commit": null,
+      "implementation_commit": "6e477765cf0539535e848e7717e029a44e413b29",
       "classification": "FIX_EXISTING in task_env/script/agent Harness owner",
       "s1": {
         "status": "PASS",
@@ -4574,7 +4604,7 @@
       },
       "native": {
         "authorized_one_campaign": true,
-        "process_starts_consumed": 0,
+        "process_starts_consumed": 1,
         "provider": "MuJoCo 3.8.1 CPU",
         "horizon": 6000,
         "max_outer_steps": 120000,
@@ -4589,14 +4619,56 @@
         "cpu_blas_threads": 1,
         "oracle_timeout_seconds": 120,
         "oracle_max_outer_steps": 6000,
-        "oracle_max_substeps": 30000
+        "oracle_max_substeps": 30000,
+        "status": "COMPLETED_EXIT_1_EXPERT_FAILED_ALL_20",
+        "campaign_exit_code": 1,
+        "campaign_timed_out": false,
+        "campaign_elapsed_seconds": 56.45,
+        "campaign_resource": {
+          "user_seconds": 56.13,
+          "system_seconds": 0.81,
+          "cpu_percent": 100,
+          "max_rss_kib": 568368,
+          "swaps": 0
+        },
+        "four_report_statuses": {
+          "assets": "pass",
+          "compile": "pass",
+          "semantic": "pass",
+          "feasibility": "fail"
+        },
+        "feasibility_totals": {
+          "solved": 0,
+          "invalid": 0,
+          "expert_failed": 20,
+          "unknown": 0
+        },
+        "steps_per_seed_min": 853,
+        "steps_per_seed_max": 864,
+        "successful_resets": 20,
+        "successful_closes": 20,
+        "task_success_count": 0,
+        "execution_fault_count": 0,
+        "cleanup_error_count": 0,
+        "ledger_state": "ready",
+        "ledger_round_1": "fail",
+        "candidate_ready": false,
+        "oracle_process_starts_consumed": 0,
+        "oracle_status": "NOT_RUN_CONDITION_NOT_MET",
+        "same_run_h5_readback": "NOT_RUN",
+        "h5_files_created": 0,
+        "judge_prepare_verify": "NOT_RUN",
+        "qualification": "NOT_ASSESSED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/report.md",
+        "native_result": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/native_result.json"
       },
       "source_handoff": {
         "historical_harness_raw_seed_and_h5": "unavailable",
         "fresh_bundle_provenance": "new synthetic proxy only; not historical bytes or a real benchmark"
       },
       "other_slice_started": false,
-      "qualification": "NOT_ASSESSED"
+      "qualification": "NOT_ASSESSED",
+      "stop_condition": "Do not retry campaign or tune the candidate/reset distribution; hand off to Sol for review."
     }
   }
 }
