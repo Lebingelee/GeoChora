@@ -24,7 +24,9 @@ from task_env.artifacts.state import (
     TypedFrameStateValue, TypedJointStateValue,
 )
 from task_env.controllers.canonical.contracts import RequestedAction
-from task_env.controllers.canonical.controller import CanonicalPandaController
+from task_env.controllers.canonical.controller import (
+    CanonicalPandaController, absolute_joint_position_servo,
+)
 from task_env.controllers.canonical.leaf_profiles import (
     ARM_POSITION_ACTION_SCHEMA, ARM_POSITION_PROFILE_ID,
     HAND_POSITION_ACTION_SCHEMA, HAND_POSITION_PROFILE_ID,
@@ -752,6 +754,83 @@ def test_full_dispatch_preflights_all_writers_then_applies_acknowledges_and_step
     assert [item.writer_id for item in result.apply_results] == ["arm-writer", "hand-writer"]
     assert runtime.step_calls == runtime.publish_calls == 1
     assert result.next_publication.view.boundary.control_step == 1
+
+
+def test_reversed_receipt_order_preserves_distinguishable_joint_to_ctrl_mapping():
+    scene, _root, _bindings, _preset, plan = _case()
+    receipt = _receipt(plan)
+    publication = _publication(scene, receipt)
+    runtime = _SyntheticRuntime(scene, receipt, publication)
+    distinct_target = (0.2, -0.1, 0.5, -2.2, 0.8, 1.8, 0.1)
+    arm_action = ArmPositionActionV1(
+        ARM_POSITION_ACTION_SCHEMA,
+        tuple(JointReference("panda", name) for name in PANDA_ARM_JOINT_IDS),
+        distinct_target,
+    )
+
+    result = dispatch_leaf_control_interval(
+        plan, _request(plan, receipt, publication, actions=_actions(arm_action=arm_action)),
+        scene=scene, runtime=runtime,
+    )
+
+    arm = next(entry for entry in plan.leaves if entry.binding.profile_kind == "arm_position")
+    command = next(item for item in result.prepared_commands if item.writer_id == arm.binding.writer_id)
+    receipt_by_actuator = {item.canonical_actuator: item for item in receipt.actuators}
+    command_by_actuator = {item.actuator: item for item in command.slot_values}
+    gain = arm.section.values()["joint_position_correction_gain"]
+    _desired, expected_values = absolute_joint_position_servo(
+        distinct_target, _ARM_CURRENT, arm.binding.joint_position_limits, gain,
+    )
+
+    assert len(set(expected_values)) == len(expected_values)
+    assert set(command_by_actuator) == set(arm.binding.actuator_order)
+    for pair, expected_value in zip(arm.binding.joint_actuator_bindings, expected_values, strict=True):
+        command_value = command_by_actuator[pair.actuator]
+        native_mapping = receipt_by_actuator[pair.actuator]
+        assert command_value.ctrl_slot == native_mapping.ctrl_slot
+        assert command_value.value == pytest.approx(expected_value)
+        assert runtime.ctrl[native_mapping.ctrl_slot] == pytest.approx(expected_value)
+
+
+def test_materialization_receipt_validates_qpos_and_dof_against_separate_dimensions():
+    _scene_value, _root, _bindings, _preset, plan = _case()
+    receipt = _receipt(plan)
+    separate_layout = replace(
+        receipt,
+        nq=9,
+        nv=10,
+        joints=tuple(
+            replace(item, qpos_address=index, dof_address=index + 1)
+            for index, item in enumerate(receipt.joints)
+        ),
+    )
+
+    separate_layout.validate_against_plan(plan)
+    assert separate_layout.nq != separate_layout.nv
+    assert max(item.qpos_address for item in separate_layout.joints) < separate_layout.nq
+    assert max(item.dof_address for item in separate_layout.joints) < separate_layout.nv
+
+    qpos_out_of_bounds = replace(
+        separate_layout,
+        joints=tuple(
+            replace(item, qpos_address=separate_layout.nq)
+            if index == 0 else item
+            for index, item in enumerate(separate_layout.joints)
+        ),
+    )
+    with pytest.raises(ValueError, match="exceeds model dimensions"):
+        qpos_out_of_bounds.validate_against_plan(plan)
+
+    dof_out_of_bounds = replace(
+        separate_layout,
+        joints=tuple(
+            replace(item, dof_address=separate_layout.nv)
+            if index == 0 else item
+            for index, item in enumerate(separate_layout.joints)
+        ),
+    )
+    with pytest.raises(ValueError, match="exceeds model dimensions"):
+        dof_out_of_bounds.validate_against_plan(plan)
 
 
 def test_separate_arm_and_hand_entities_each_dispatch_through_the_same_production_owner():

@@ -628,13 +628,15 @@ def test_fresh_freeze_and_real_runner_preflight_validate_reserved_ledger_without
         return original_import(name,*args,**kwargs)
     monkeypatch.setattr(builtins,'__import__',block)
     root=r03c_freeze.ROOT
-    snapshot=json.loads(r03c_freeze.SNAPSHOT.read_text())
-    snapshot['protected_sha256']={
+    # Keep this provider-free fixture self-contained in a fresh checkout; the
+    # historical attempt's ignored workspace snapshot is not a repository input.
+    snapshot={'protected_sha256':{
         relative: hashlib.sha256((root/relative).read_bytes()).hexdigest()
-        for relative in snapshot['protected_sha256']
-    }
+        for relative in r03c_freeze.SOURCES
+    }}
     prompt=tmp_path/'prompt.md'; prompt.write_text('Synthetic S1 gate fixture; not native execution authorization.\n')
     snapshot.update(core_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
+                    branch=subprocess.check_output(['git','branch','--show-current'],cwd=root,text=True).strip(),
                     prompt=str(prompt),native_window={'max_starts':1,'consumed':False})
     snapshot_path=tmp_path/'snapshot.json'; snapshot_path.write_text(json.dumps(snapshot))
     output=tmp_path/'fresh-package'
