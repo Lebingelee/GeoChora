@@ -271,9 +271,17 @@ def _worker_default_plan() -> dict[str, Any]:
 
 
 def _ordinary_prestep_wiring_failure(start: dict[str, Any]) -> bool:
-    if start.get("failure_category") != "ordinary_bootstrap_api_asset_wiring":
-        return False
     worker = start.get("worker_receipt") or {}
+    error = worker.get("worker_error") or {}
+    eula_block = (
+        start.get("failure_category") in {None, "eula_acceptance_required_prephysics"}
+        and error.get("type") == "SystemExit"
+        and error.get("stage") == "app_start"
+        and "EULA not accepted" in str(error.get("message", ""))
+        and "OMNI_KIT_ACCEPT_EULA=YES" in str(error.get("message", ""))
+    )
+    if start.get("failure_category") != "ordinary_bootstrap_api_asset_wiring" and not eula_block:
+        return False
     if worker.get("total_physics_steps") != 0:
         return False
     if worker.get("physics_steps_at_start") not in (None, 0):
@@ -282,17 +290,16 @@ def _ordinary_prestep_wiring_failure(start: dict[str, Any]) -> bool:
         bootstrap = worker.get("bootstrap") or []
         if any(int(row.get("physics_steps", 0)) != 0 for row in bootstrap):
             return False
-    error = worker.get("worker_error") or {}
     if error.get("stage") not in {"app_start", "scene_prepare"}:
         return False
-    if error.get("type") not in {"ImportError", "ModuleNotFoundError", "AttributeError", "FileNotFoundError", "TypeError"}:
+    if not eula_block and error.get("type") not in {"ImportError", "ModuleNotFoundError", "AttributeError", "FileNotFoundError", "TypeError"}:
         return False
     if start.get("stop_reason") or start.get("resource_abort") or start.get("timed_out"):
         return False
     return True
 
 
-def launch_native(run_id: str, *, attempt_second_start: bool = False,
+def launch_native(run_id: str, *, attempt_second_start: bool = False, eula_already_accepted: bool = False,
                   lock_wait_s: float = MAX_LOCK_WAIT_S, process_timeout_s: float = MAX_PROCESS_WALL_S) -> dict[str, Any]:
     if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}", run_id):
         raise ValueError("run id contains unsupported characters")
@@ -357,6 +364,19 @@ def launch_native(run_id: str, *, attempt_second_start: bool = False,
             raise RuntimeError("second App start requires explicit attempt_second_start=true after first-start evidence review")
         if expected_index == 2 and not _ordinary_prestep_wiring_failure(starts[-1]):
             raise RuntimeError("second App start is not permitted by the recorded first-start failure evidence")
+        previous_worker = starts[-1].get("worker_receipt") or {} if starts else {}
+        previous_error = previous_worker.get("worker_error") or {}
+        eula_retry = (
+            expected_index == 2
+            and previous_error.get("type") == "SystemExit"
+            and previous_error.get("stage") == "app_start"
+            and "EULA not accepted" in str(previous_error.get("message", ""))
+            and "OMNI_KIT_ACCEPT_EULA=YES" in str(previous_error.get("message", ""))
+        )
+        if eula_retry and not eula_already_accepted:
+            raise RuntimeError("EULA-blocked retry requires explicit confirmation that the EULA was already accepted")
+        if eula_already_accepted and not eula_retry:
+            raise RuntimeError("EULA acceptance flag is only valid for the recorded EULA-blocked second start")
 
         prior_network_rx = sum(int(start.get("network_rx_delta_bytes", 0) or 0) for start in starts)
         remaining_network = max(0, MAX_NETWORK_RX_BYTES - prior_network_rx)
@@ -401,6 +421,8 @@ def launch_native(run_id: str, *, attempt_second_start: bool = False,
             "NUMEXPR_NUM_THREADS": "1",
             "TOKENIZERS_PARALLELISM": "false",
         })
+        if eula_already_accepted:
+            env["OMNI_KIT_ACCEPT_EULA"] = "YES"
         worker_script = REPO / "task_env/diagnostics/tasks/f01_isaac_native_baseline.py"
         reader_script = REPO / "task_env/diagnostics/tasks/f01_isaac_native_reader.py"
         supervisor_script = Path(__file__).resolve()
@@ -416,6 +438,8 @@ def launch_native(run_id: str, *, attempt_second_start: bool = False,
             "cwd": str(REPO),
             "thread_env": {k: env[k] for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")},
             "python_no_user_site": env["PYTHONNOUSERSITE"],
+            "eula_already_accepted_flag_applied": eula_already_accepted,
+            "omni_kit_accept_eula": env.get("OMNI_KIT_ACCEPT_EULA"),
             "frozen_source_sha256": source_hashes,
         })
         log_path = run_dir / "native_worker.log"
@@ -463,6 +487,14 @@ def launch_native(run_id: str, *, attempt_second_start: bool = False,
                 and not monitor.get("stop_reason") and native_physics_steps == 0
                 and not any(int(r.get("physics_steps", 0)) > 0 for r in worker_receipt.get("bootstrap", []) if isinstance(r, dict))):
             failure_category = "ordinary_bootstrap_api_asset_wiring"
+        if (monitor.get("exit_code") not in (0, None) and isinstance(worker_receipt, dict)
+                and worker_receipt.get("worker_error", {}).get("stage") == "app_start"
+                and worker_receipt.get("worker_error", {}).get("type") == "SystemExit"
+                and "EULA not accepted" in str(worker_receipt.get("worker_error", {}).get("message", ""))
+                and "OMNI_KIT_ACCEPT_EULA=YES" in str(worker_receipt.get("worker_error", {}).get("message", ""))
+                and not monitor.get("stop_reason") and native_physics_steps == 0
+                and not any(int(r.get("physics_steps", 0)) > 0 for r in worker_receipt.get("bootstrap", []) if isinstance(r, dict))):
+            failure_category = "eula_acceptance_required_prephysics"
         reservation.update({
             "state": "worker_process_exited",
             "exit_time": time.time(),
@@ -527,11 +559,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--attempt-second-start", action="store_true")
+    parser.add_argument("--eula-already-accepted", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--lock-wait-s", type=float, default=MAX_LOCK_WAIT_S, help=argparse.SUPPRESS)
     parser.add_argument("--process-timeout-s", type=float, default=MAX_PROCESS_WALL_S, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     try:
         result = launch_native(args.run_id, attempt_second_start=args.attempt_second_start,
+                               eula_already_accepted=args.eula_already_accepted,
                                lock_wait_s=args.lock_wait_s, process_timeout_s=args.process_timeout_s)
     except Exception as exc:
         result = {"status": "SUPERVISOR_ERROR", "error": {"type": type(exc).__name__, "message": str(exc)}}

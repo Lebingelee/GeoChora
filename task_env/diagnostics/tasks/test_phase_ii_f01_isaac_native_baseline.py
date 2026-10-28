@@ -168,6 +168,30 @@ class F01WorkerCliTests(unittest.TestCase):
 
 
 class F01SupervisorMonitorTests(unittest.TestCase):
+    def test_eula_block_is_retry_eligible_only_before_physics(self) -> None:
+        start = {
+            "failure_category": None,
+            "stop_reason": None,
+            "resource_abort": False,
+            "timed_out": False,
+            "worker_receipt": {
+                "total_physics_steps": 0,
+                "physics_steps_at_start": None,
+                "bootstrap": [],
+                "worker_error": {
+                    "type": "SystemExit",
+                    "stage": "app_start",
+                    "message": "Unable to bootstrap inner kit kernel: EULA not accepted. Set OMNI_KIT_ACCEPT_EULA=YES to accept.",
+                },
+            },
+        }
+        self.assertTrue(supervisor._ordinary_prestep_wiring_failure(start))
+        start["worker_receipt"]["total_physics_steps"] = 1
+        self.assertFalse(supervisor._ordinary_prestep_wiring_failure(start))
+        start["worker_receipt"]["total_physics_steps"] = 0
+        start["worker_receipt"]["worker_error"]["message"] = "other SystemExit"
+        self.assertFalse(supervisor._ordinary_prestep_wiring_failure(start))
+
     def test_resource_abort_requires_three_consecutive_violations(self) -> None:
         with tempfile.TemporaryDirectory(prefix="f01-resource-monitor-") as temp:
             log = Path(temp) / "child.log"
