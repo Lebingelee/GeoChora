@@ -797,6 +797,10 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
             raise ValueError('cumulative native counters differ from the exact four-episode contract')
         if len(results) != 4:
             raise ValueError('one or more of the four same-Env episode H5 files are missing')
+        # Capture the bounded output totals before embedding them in the run
+        # receipt. The receipt is written and the totals are refreshed below.
+        output_bytes = sum(path.stat().st_size for path in output_dir.rglob('*') if path.is_file())
+        native_log_bytes = sum(path.stat().st_size for path in native_dir.rglob('*') if path.is_file())
         result = {
             'status': 'NATIVE_S2_COMPLETE_AWAITING_HOST_OFFLINE_S3',
             'input_head': snapshot['core_head'], 'runtime_identity': identity,

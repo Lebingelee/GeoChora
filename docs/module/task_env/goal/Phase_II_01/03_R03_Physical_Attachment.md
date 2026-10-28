@@ -1,9 +1,8 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已经 Sol 接收为 `ACCEPTED_BOUNDED_S1_S2`。R03c attempt001 两次失败及 attempt002 唯一启动失败保留；002 为 materialization1/reset1/forward1/step0，无 episode/H5。Sol 已在 `c30d97e` 接收 runner JointDefinition 修正的静态部分，四配置真实 Core/runner snapshot 链当前模块20项 provider-free S1通过；修正仍未 native 验证，S2 **INCOMPLETE**、S3 **NOT_RUN**，状态 `S1_REVIEWED_NATIVE_PENDING`。没有新的 Provider 通用支持、任意 Attachment 支持或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已由 Sol 接收为 `ACCEPTED_BOUNDED_S1_S2`。R03c attempt001/002 的失败原件继续保留。attempt003 唯一 MuJoCo 3.8.1 CPU 启动完成 E1–E4，各自生成64 transitions/65 observations的H5，episode物理门与Env close reader均PASS；同run独立reader读回4份H5、256 transitions/260 observations并拒绝48/48 tamper。runner随后在最终资源摘要构造时因 `native_log_bytes` 未初始化退出，未生成正式 `native_result.json`，故S2 **INCOMPLETE**、S3 **INCOMPLETE**，等待Sol复核。失败后修复了runner收尾计数顺序及一个过期测试fixture，provider-free模块20项通过；这些修正未native验证。没有新的Provider通用支持、任意Attachment支持或Qualification。
 
-2026-10-28 恢复入口见 [07 检查点恢复合同](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)：
-默认下一包为新的 R03c attempt003 合同，不续用已耗尽的 002 额度，不重置历史。
+2026-10-28 当前恢复入口见 [07 检查点恢复合同](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)：attempt003额度已耗尽，当前只等待Sol复核；不得追加native启动或推进其他slice。
 GeoPhys importer/双 source lowering/leaf adapter 与新 Isaac/已验证 USD 路线的补丁 owner 见
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#3-按层级定位补丁)。
 旧完整 Panda GeoPhys 证据不代新装配；单 Panda USD 可以独立接入，不因本页 split Attachment 成为隐藏前置。
@@ -106,6 +105,9 @@ Sol核对提交`dfee52777069c1261334032e4924e8c136d08361`、attempt002的47项�
 | --- | --- | --- | --- |
 | R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；该R03a接收时R03b/c未启动，当前状态见下行 |
 | R03b | R01c,R03a | **attempt001 已接收 `ACCEPTED_BOUNDED_S1_S2`**。精确两-source Panda fixed tree、source closure、model-bound mapping/topology、ResetPlan与真实相对位姿 | Luna原19项S1及Sol补充后的99项provider-free回归通过；两trial各128区间，冻结motion/mount/range/clock/warning/close门全通过。只限本包source/provider/seed/horizon，非Qualification |
-| R03c | R03b,R02c | **S1_REVIEWED_NATIVE_PENDING；attempt002 S2不完整、S3未运行**。两个独立Entity的Position leaf接入既有 public Env→Recorder→reader owners | attempt001两个失败启动保留；attempt002唯一启动为materialization1/reset1/forward1/step0，无episode/H5，typed snapshot绑定失败。Sol补齐runner真实snapshot链后当前模块20项provider-free S1通过，修正尚未native验证；不得复用R03b S2或合成reader S1替代同Env真实运动与闭合H5 S2/S3 |
+| R03c | R03b,R02c | **attempt003 S2/S3 INCOMPLETE，待Sol复核**。两个独立Entity的Position leaf接入既有 public Env→Recorder→reader owners | attempt001/002失败历史保留；attempt003唯一启动计数1 start、4 materialization/reset、260 forward、1280 step、256 outer、2.56s。E1–E4均闭合64/65 H5且episode门PASS；reader返回INCOMPLETE（缺native_result），虽读取256 transitions/260 observations、48/48 tamper拒绝。收尾计数修正后20项provider-free测试通过但未native验证；不得把H5级reader通过替代正式S2/S3总出口。
 
 S3 必须沿现有 factory/SelectedReferenceEnv 或已明确批准的公共 candidate 入口，在原 RuntimeSession/Recorder owners 扩展；public path 不导入 test_*。失败保留原日志、partial apply/fault receipt、资源关闭检查；不伪装 rollback。R03 不依赖 Camera 或 R05 force-only 路线；不引入动态 attach/detach/闭环约束拓扑、USD ABI 或第二 Runtime。外部装配语义参考固定 [Isaac Sim 6.1.0](README.md#references)。
+
+
+2026-10-28，R03c attempt003在输入HEAD `3b71683d5890c4ca1701037d59bce7b17de50a30`通过S0快照审计和provider-free launcher `--check`后消耗唯一native start。MuJoCo身份为package/runtime 3.8.1、API 3008001。E1–E4各64 outer、320 step、65 forward，合计4 materialization、4 reset、260 forward、1280 step、256 outer、2.56s；每份episode JSON均记录64 transitions、65 observations、close reader PASS、warning为0，RSS采样峰值440,950,784 bytes。四个原始H5仍保留。runner在E4完成后打包总资源数时因`native_log_bytes`未赋值而`UnboundLocalError`退出，未写`native_result.json`。独立reader新进程未导入provider，读出4 episode/256 transitions/260 observations，48个tamper全拒绝，但因正式native result缺失输出`OFFLINE_READBACK_INCOMPLETE_OR_FAILED`。因此该attempt的S2/S3均为INCOMPLETE；不能将H5数据门通过写成总体出口通过。之后仅把resource byte计数提前初始化，并使合成fresh-window测试按当前受保护文件bytes重建fixture；R03c模块20项provider-free测试通过。该修正发生在唯一native结束后，不代表原run代码通过或已native验证。报告及完整raw/commands在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`；原attempt001/002不变，不启动其他slice，等待Sol复核。

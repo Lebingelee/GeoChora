@@ -629,6 +629,10 @@ def test_fresh_freeze_and_real_runner_preflight_validate_reserved_ledger_without
     monkeypatch.setattr(builtins,'__import__',block)
     root=r03c_freeze.ROOT
     snapshot=json.loads(r03c_freeze.SNAPSHOT.read_text())
+    snapshot['protected_sha256']={
+        relative: hashlib.sha256((root/relative).read_bytes()).hexdigest()
+        for relative in snapshot['protected_sha256']
+    }
     prompt=tmp_path/'prompt.md'; prompt.write_text('Synthetic S1 gate fixture; not native execution authorization.\n')
     snapshot.update(core_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
                     prompt=str(prompt),native_window={'max_starts':1,'consumed':False})

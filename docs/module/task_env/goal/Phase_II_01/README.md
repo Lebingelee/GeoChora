@@ -1,9 +1,6 @@
 # Phase II-01 修订规划交付包
 
-**当前恢复入口（2026-10-28）**：从 Core `c30d97e` 的 R03c attempt002 静态修正检查点继续，
-状态仍为 `S1_REVIEWED_NATIVE_PENDING`，S2 不完整、S3 未运行；旧启动额度已耗尽。
-恢复步骤、默认顺序及新窗口边界见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)，
-后续代码交接使用 [08](08_Codex_Phase_II_01_Planning_Prompt.md)。
+**当前恢复入口（2026-10-28）**：R03c attempt003 的唯一 MuJoCo 3.8.1 CPU 启动已消耗。四份 episode H5 均生成并由独立 reader 读过（256 transitions、260 observations、48/48 tamper 拒绝），但 runner 在最终资源计数字段处因 `native_log_bytes` 未初始化而退出，未写正式 `native_result.json`；S2/S3 总体仍 INCOMPLETE，等待 Sol 复核。失败后只修正收尾计数字段并完成 20 项 provider-free 回归，修正未再 native 验证。原件与本地报告位于 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)；后续交接使用 [08](08_Codex_Phase_II_01_Planning_Prompt.md)。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
@@ -18,7 +15,7 @@
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
 | [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
-| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt002唯一native在typed Joint snapshot绑定处失败，S2不完整、S3未运行 |
+| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt003四份H5/离线tamper均读取完成，但native收尾异常缺正式receipt，S2/S3 INCOMPLETE |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
@@ -56,7 +53,7 @@
 | ID / 优先级 | source / owner / 范围 | 已知风险与状态 | 受影响后继 / stop或处理 |
 | --- | --- | --- | --- |
 | SRC-1 P0 | 独立Arm+Hand→MjSpec导出→GeoPhys a53 importer | site-size dialect真实拒绝，NOT_ADMITTED/BLOCKED；非所有GeoPhys Attachment结论 | GeoPhys该路线停止；Provider importer修复或versioned source normalization均须单独审查，MuJoCo候选可独立推进 |
-| CTL-1 P0 | canonical Position Profile / plan / Env | R02c005 Hand50 case已获有界S2/S3接收；R03c002装配态public Env仍S2不完整/S3未运行；新provider native mapping尚未接通 | 07恢复R03c；10扩展native receipt/drive/reader，保留Force-aware拒绝与唯一writer保护 |
+| CTL-1 P0 | canonical Position Profile / plan / Env | R02c005 Hand50 case已获有界S2/S3接收；R03c003四episode和H5均完成，但native最终receipt缺失、离线reader总状态INCOMPLETE；新provider native mapping尚未接通 | 07记录R03c失败并等待Sol复核；10扩展native receipt/drive/reader，保留Force-aware拒绝与唯一writer保护 |
 | MAT-1 P0 | RuntimeSource/materialization/typed state | R03b已为精确Menagerie Panda Arm+Hand双source增加fixed-tree plan与Core S2；更广source/provider及public Env/H5路径仍未建立 | R03b bounded review；R03c仍需独立public Env/Recorder/reader S2/S3 |
 | ID-1 P1 | artifacts/Assembly refs | 同Entity子组件与Entity owning混淆、alias冲突/循环hash | R01→R02/R03；typed refs、hash有向分域、严格版本派发 |
 | MAP-1 P1 | importer→canonical→native slots→Controller/Recorder | joint/body/actuator顺序或Hand equality/tendon误解释，重复驱动 | R02/R03/R06；逆映射/置换负例/独立资源运动与H5 |
