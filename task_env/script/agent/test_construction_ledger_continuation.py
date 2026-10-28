@@ -290,6 +290,52 @@ class OwnerRepairContinuationTests(unittest.TestCase):
         self.assertEqual(len(begun['rounds']),3)
         self.assertEqual(begun['rounds'][2]['revision']['kind'],'spec_revision')
 
+    def finish_owner_and_fault_findings(self):
+        self.continue_owner_repair()
+        findings=[
+            CheckFinding('asset_check','asset_missing','asset','object_config.asset_sha256',
+                'missing','expected',{'case':'new asset issue'}),
+            CheckFinding('asset_check','capability_unsupported','core','scene_config.table_top_z',
+                'unsupported','supported',{'case':'new core issue'}),
+            CheckFinding('asset_check','capability_unsupported','provider','provider.mujoco',
+                'unavailable','available',{'case':'new provider issue'}),
+            CheckFinding('asset_check','capability_unsupported','harness','candidate.binding',
+                'invalid','valid',{'case':'new harness issue'}),
+            CheckFinding('asset_check','execution_fault','task_local','execution.close',
+                'fault','none',{'case':'new execution fault'}),
+        ]
+        report=CheckReport(self.new_spec.spec_sha256(),None,NEW_CORE,False,
+            'asset_check','fail',findings,{'provider':'mujoco'})
+        self.issue_report_path=self.new/'round2.issues.json'
+        report.save(self.issue_report_path)
+        ledger_api.finish(ledger=self.continued_path,reports=[self.issue_report_path])
+        return ledger_api.file_ref(self.issue_report_path)
+
+    def test_finish_appended_owner_and_fault_issues_load_in_report_order(self):
+        report_ref=self.finish_owner_and_fault_findings()
+        value=ledger_api.load(self.continued_path)
+        self.assertEqual(value['state'],'stopped')
+        historical=json.loads(self.old_ledger_path.read_text())['open_issues']
+        self.assertEqual(value['open_issues'][:len(historical)],historical)
+        self.assertEqual(value['open_issues'][len(historical):],[
+            {'report':report_ref,'finding_index':i,'status':'open','sent':False}
+            for i in range(5)])
+
+    def test_load_rejects_forged_new_issue_and_deleted_historical_issue(self):
+        self.finish_owner_and_fault_findings()
+        value=json.loads(self.continued_path.read_text())
+        value['open_issues'].append({**value['open_issues'][-1],'finding_index':999})
+        self.continued_path.write_text(json.dumps(value,indent=2)+'\n')
+        with self.assertRaisesRegex(ValueError,'new open issues do not match round findings'):
+            ledger_api.load(self.continued_path)
+
+        value=json.loads(self.continued_path.read_text())
+        value['open_issues'].pop()
+        value['open_issues'].pop(0)
+        self.continued_path.write_text(json.dumps(value,indent=2)+'\n')
+        with self.assertRaisesRegex(ValueError,'cleared or altered historical open issues'):
+            ledger_api.load(self.continued_path)
+
 
 if __name__ == '__main__':
     unittest.main()

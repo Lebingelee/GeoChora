@@ -214,7 +214,10 @@ def _load_v1(value):
         require(ref['sha256']==archived_runtime[name]['sha256']
             and ref['sha256']==legacy['runtime_refs'][name]['sha256']
             and file_ref(ref['path'])==ref,'legacy runtime snapshot changed')
-    require(value.get('open_issues',[])==legacy.get('open_issues',[]),
+    historical_issues=legacy.get('open_issues',[])
+    current_issues=value.get('open_issues',[])
+    require(isinstance(historical_issues,list) and isinstance(current_issues,list)
+        and current_issues[:len(historical_issues)]==historical_issues,
         'continuation cleared or altered historical open issues')
     require(len(value['rounds'])>=len(legacy.get('rounds',[])),
         'continuation dropped historical rounds')
@@ -232,6 +235,7 @@ def _load_v1(value):
     require(first_revision.get('kind')=='owner_repair'
         and first_revision.get('repair_receipt')==value.get('owner_repair_ref'),
         'owner-repair continuation anchor missing or mismatched')
+    expected_new_issues=[]
     for i,r in enumerate(value['rounds']):
         require(r['number']==i+1,'round numbering mismatch')
         _context(value,r)
@@ -267,6 +271,11 @@ def _load_v1(value):
                 require(report.details['provider']==context['provider'],'round report provider mismatch')
             if report.artifact_hash is not None and context.get('artifact_hash') is not None:
                 require(report.artifact_hash==context['artifact_hash'],'round artifact context mismatch')
+            if i>=legacy_round_count:
+                for finding_index,finding in enumerate(report.findings):
+                    if finding.category=='execution_fault' or finding.locality in ('asset','core','provider','harness'):
+                        expected_new_issues.append({'report':ref,'finding_index':finding_index,
+                            'status':'open','sent':False})
         if reports and r.get('status')!='running':
             parsed=[CheckReport.from_dict(read_ref(x)) for x in reports]
             require(len({report.tool for report in parsed})==len(reports),'duplicate round reports')
@@ -277,6 +286,8 @@ def _load_v1(value):
                     'passing round is missing a required report/artifact')
             else:
                 require(any(report.status!='pass' for report in parsed),'failed round has only passing reports')
+    require(current_issues[len(historical_issues):]==expected_new_issues,
+        'new open issues do not match round findings')
     require(value['state'] in ('ready','running','candidate_ready','stopped'),
         'invalid ledger state')
     if value['state']=='running':require(value['rounds'][-1]['status']=='running','running state has no reservation')

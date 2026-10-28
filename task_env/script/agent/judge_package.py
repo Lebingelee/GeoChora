@@ -318,18 +318,59 @@ def verify(directory,*,core_repo):
     history=json.loads((root/'validation/history/construction_log.json').read_text())
     require(manifest.get('open_issues',[])==history.get('open_issues',[]),
         'package altered historical open issues')
-    expected_diagnostics=sum(len((r.get('revision') or {}).get('diagnostics',[])) for r in history['rounds'])
+    require(isinstance(history.get('rounds'),list),'construction history rounds are malformed')
+    expected_bindings=[]
+    for round_ in history['rounds']:
+        require(isinstance(round_,dict),'construction history round is malformed')
+        revision=round_.get('revision') or {}
+        require(isinstance(revision,dict),'construction history revision is malformed')
+        round_context=round_.get('context') or {}
+        require(isinstance(round_context,dict),'diagnostic round context is malformed')
+        round_core=round_context.get('core_commit',history.get('core_commit'))
+        diagnostics=revision.get('diagnostics',[])
+        require(isinstance(diagnostics,list),'construction diagnostics are malformed')
+        for diagnostic in diagnostics:
+            require(isinstance(diagnostic,dict),'construction diagnostic is malformed')
+            expected_bindings.append((diagnostic,round_core))
+    expected_diagnostics=len(expected_bindings)
     diagnostic_index=root/'validation/history/diagnostics.json'
     require(diagnostic_index.is_file() or not expected_diagnostics,'portable diagnostic evidence missing')
     diagnostic_rows=json.loads(diagnostic_index.read_text()) if diagnostic_index.is_file() else []
     require(len(diagnostic_rows)==expected_diagnostics,'diagnostic count mismatch')
-    for pair in diagnostic_rows:
-        for ref in pair.values():
-            require(ref['path'] in seen and digest(root/ref['path'])==ref['sha256'],'diagnostic index mismatch')
+    for pair,(diagnostic,round_core) in zip(diagnostic_rows,expected_bindings,strict=True):
+        require(isinstance(pair,dict) and set(pair)=={'report','spec','core_commit'},
+            'portable diagnostic entry has invalid fields')
+        for kind in ('report','spec'):
+            ref=pair[kind]
+            require(isinstance(ref,dict) and set(ref)=={'path','sha256'}
+                and isinstance(ref.get('path'),str) and isinstance(ref.get('sha256'),str),
+                f'portable diagnostic {kind} ref is malformed')
+            require(ref['path'] in seen and digest(root/ref['path'])==ref['sha256'],
+                f'portable diagnostic evidence ref mismatch: {kind}')
+        report_source=diagnostic.get('report',diagnostic)
+        require(isinstance(report_source,dict) and set(report_source)=={'path','sha256'}
+            and isinstance(report_source.get('path'),str) and isinstance(report_source.get('sha256'),str)
+            and pair['report']['sha256']==report_source['sha256'],
+            'portable diagnostic report/source reference mismatch')
+        spec_source=diagnostic.get('spec')
+        if spec_source is not None:
+            require(isinstance(spec_source,dict) and set(spec_source)=={'path','sha256'}
+                and isinstance(spec_source.get('path'),str) and isinstance(spec_source.get('sha256'),str)
+                and pair['spec']['sha256']==spec_source['sha256'],
+                'portable diagnostic spec/source reference mismatch')
+        core_commit=pair['core_commit']
+        require(isinstance(core_commit,str) and len(core_commit)==40
+            and all(ch in '0123456789abcdef' for ch in core_commit),
+            'portable diagnostic Core commit is malformed')
+        require(isinstance(round_core,str) and core_commit==round_core,
+            'portable diagnostic Core identity mismatch with round context')
         ds=CandidateSpec.load(root/pair['spec']['path'])
         dr=CheckReport.from_dict(json.loads((root/pair['report']['path']).read_text()))
         require(ds.spec_sha256()==dr.spec_sha256 and ds.task_id==spec.task_id,'diagnostic spec/report identity mismatch')
-        require(dr.core_commit==pair['core_commit'] and not dr.core_dirty and dr.details.get('provider')==provider,
+        require(dr.tool=='feasibility_probe' and dr.details.get('complete') is True,
+            'portable diagnostic report is incomplete')
+        require(dr.core_commit==core_commit and dr.core_commit==round_core
+            and not dr.core_dirty and dr.details.get('provider')==provider,
             'diagnostic execution identity mismatch')
     round_rows=json.loads((root/'validation/history/rounds.json').read_text())
     require(manifest.get('construction_rounds')==round_rows,'manifest/history round summary mismatch')
