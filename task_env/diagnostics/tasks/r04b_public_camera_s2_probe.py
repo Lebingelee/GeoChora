@@ -337,6 +337,12 @@ def _verify_depth_sample(metadata, depth: np.ndarray, peg_pose) -> dict[str, obj
     }
 
 
+def _public_label_map_matches(capture_metadata, raw_label_map) -> bool:
+    """Compare the canonical JSON mapping across Contract decode boundaries."""
+
+    return capture_metadata.canonical_label_map.to_mapping() == raw_label_map
+
+
 def _validate_public_boundary(env, observation, info, round_index, rows, counters, *, repeat_probe=True):
     from task_env.observations.canonical_camera.consumer import CameraObservationBoundaryV1
 
@@ -379,7 +385,7 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
             raise ValueError("capture identity lost the typed boundary, clock, or required modalities")
         if capture_meta.mask_sha256 != row["mask_sha256"]:
             raise ValueError("public capture metadata mask digest differs from the raw Entity mask")
-        if capture_meta.label_map != row["label_map"]:
+        if not _public_label_map_matches(capture_meta, row["label_map"]):
             raise ValueError("public canonical label map differs from the raw renderer capture")
         if row["capture_identity"]["identity_hash"] != capture_identity.identity_hash:
             raise ValueError("session capture identity differs from the public metadata identity")
@@ -1054,7 +1060,14 @@ def run_s2(output: str | Path) -> dict[str, object]:
     finally:
         if env is not None and not getattr(env, "_closed", False):
             try:
-                env.close()
+                close_wrapper = locals().get("wrapped_renderer_close")
+                mujoco_module = locals().get("mujoco")
+                if close_wrapper is not None and mujoco_module is not None:
+                    patch_object = importlib.import_module("unittest.mock").patch.object
+                    with patch_object(mujoco_module.Renderer, "close", close_wrapper):
+                        env.close()
+                else:
+                    env.close()
                 env_close_calls += 1
             except BaseException as error:
                 cleanup_error = {
@@ -1064,6 +1077,24 @@ def run_s2(output: str | Path) -> dict[str, object]:
         if env is not None and getattr(env, "_closed", False) and env_close_calls == 0:
             # The successful path closed inside the try block.
             env_close_calls = 1
+        if env is not None and getattr(env, "_closed", False):
+            expected_session_closes = len(sessions)
+            expected_renderer_closes = len(renderer_ids)
+            sessions_closed = all(getattr(session, "_closed", False) for session in sessions)
+            if (not sessions_closed
+                    or counters["session_close_calls"] < expected_session_closes
+                    or counters["native_renderer_close_calls"] != expected_renderer_closes):
+                cleanup_error = cleanup_error or {
+                    "type": "AssertionError",
+                    "message": (
+                        "Environment closed without one DynamicCameraSession and native Renderer close "
+                        f"per created session (sessions={expected_session_closes}, "
+                        f"session_closes={counters['session_close_calls']}, "
+                        f"renderers={expected_renderer_closes}, "
+                        f"renderer_closes={counters['native_renderer_close_calls']})"
+                    ),
+                    "traceback": "",
+                }
 
         arrays_path = output / "raw_camera_arrays.npz"
         try:

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import MappingProxyType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -55,6 +56,26 @@ def test_worker_preflight_imports_when_loaded_from_its_direct_file_path():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().endswith("31")
+
+
+def test_contract_decoded_label_map_compares_through_canonical_json_mapping():
+    from task_env.observations.canonical_camera.images import CanonicalEntityLabelMapV1, CanonicalEntityLabelV1
+
+    canonical = CanonicalEntityLabelMapV1(
+        "canonical-entity-label-map-v1", "a" * 64, "b" * 64, "c" * 64,
+        probe.FIXED_CAMERA_ID, "scene-instance", "materialization", "episode",
+        "reset-sample", "boundary", 0, 0, 0.0, "d" * 64,
+        (CanonicalEntityLabelV1(1, "panda-main"),),
+    )
+    raw = canonical.to_mapping()
+    decoded = MappingProxyType({
+        **raw,
+        "labels": tuple(MappingProxyType(dict(item)) for item in raw["labels"]),
+    })
+    metadata = SimpleNamespace(label_map=decoded, canonical_label_map=canonical)
+
+    assert metadata.label_map != raw
+    assert probe._public_label_map_matches(metadata, raw)
 
 
 def test_public_factory_admits_r04b_config_without_eager_camera_sessions(tmp_path):
