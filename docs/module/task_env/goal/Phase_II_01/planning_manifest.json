@@ -1784,10 +1784,57 @@
         "R02c",
         "R03b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "PARTIAL_BLOCKED_PHYSICAL_ORDER_PERMUTATION_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_PROVIDER_FREE_S1_PASS; EXACT_SOURCE_S2_REUSED; PHYSICAL_ORDER_NATIVE_GATE_BLOCKED",
       "required_evidence": "S1/S2",
-      "stop_condition": "旧支持退化/新token混淆→停止"
+      "stop_condition": "真实物理顺序变体未受当前精确source合同准入；不得以synthetic拒绝门声称物理重排支持。",
+      "result": "Attempt001 added distinguishable semantic-to-ctrl-slot and independent nq/nv address-bound detectors, plus a rehashed Hand source-order mutation rejected before provider materialization. Selected provider-free S1 suites passed; accepted R02c005/R03b/R03c exact-source evidence was reused because production owners/source/profile inputs were unchanged. No native worker launched. Physical source/native order permutation remains BLOCKED; historical raw/phase disposition gate remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/report.md",
+      "attempt001": {
+        "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
+        "branch": "codex/phase-ii-01-camera",
+        "prompt_sha256": "a8777ea714ea82191956ff5c7a3f2e2411fcb85de7e36caf937a4f855ad4a87a",
+        "input_snapshot_sha256": "0584d369fa3db086e2fa2e97a5db244a46050a483dd8d5215b78534dee37f80e",
+        "input_manifest_sha256": "9212abdacd539edb3359b342b3c3b5bb3144c6ffb23027d8508905a2c0493794",
+        "implementation_commits": [
+          "0e8f09fbfffd8c2e07b71b7cc7c7dbbb83e88598"
+        ],
+        "focused_detector": "3 passed; R02b/R03b detector tests",
+        "s1": {
+          "legacy_scene_public": "41 passed, 1 warning",
+          "r02b_r02c": "44 passed",
+          "r03b_r03c": "53 passed",
+          "r03b_static_source_gate": "19 rejections; provider-free; no compile/step",
+          "max_single_process_wall_seconds": 54.1,
+          "max_single_process_rss_kib": 1760472,
+          "native_processes": 0,
+          "cumulative_wall_seconds": 152.54
+        },
+        "s2": {
+          "status": "REUSED_ACCEPTED_EXACT_SOURCE_EVIDENCE",
+          "r02c005": "ACCEPTED_BOUNDED_S2_S3; Hand50 exact Panda Position profile",
+          "r03b": "ACCEPTED_BOUNDED_S1_S2; exact Panda Arm+Hand fixed tree",
+          "r03c004": "ACCEPTED_BOUNDED_S2_S3; exact attached Arm+Hand public Env/reader",
+          "freeze_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+          "source_closure_sha256": "b97f7c4f9b585ef175e986b9fb59f3054de74184666373443d6d166a45609b63",
+          "source_closure_file_count": 70,
+          "source_closure_bytes": 34318679,
+          "current_head_rerun": false
+        },
+        "physical_order_gate": "BLOCKED_PHYSICAL_ORDER_PERMUTATION; production lowering rejects the rehashed source mutation pre-materialization; no accepted reordered source/profile/native evidence",
+        "historical_compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/report.md",
+        "documentation_validation": {
+          "phase_markdown_hashes": 12,
+          "phase_markdown_hashes_match": true,
+          "task_env_module_skill_static_check": "PASS",
+          "skill_creator_quick_validate": "PASS",
+          "local_link_check": "13 files checked; zero errors in changed files; two missing historical R03c attempt001/002 report paths in unchanged 03_R03_Physical_Attachment.md",
+          "global_document_validator": "NOT_RUN_BY_INSTRUCTION",
+          "git_diff_check": "PASS"
+        }
+      }
     },
     {
       "id": "R06c",
@@ -1943,9 +1990,9 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "75b451ab42b0686ae14372266392dffe668adb8d9659221a77eb63a0d0656e5a",
+    "README.md": "6ba57ee66988191e53e5dfa8f238f4254cee5b4d18483585813afa3d8cbcbf23",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "6e7dd980dd9415793799b8bed293c16ba220dadaa63f9cb06935d65a7c8d03c4",
+    "06_R06_Compatibility_and_Regression.md": "e0238cb37c22ab1803b6711901548ff0d7717dbb062c213e2b713bab32cd12a7",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -1954,7 +2001,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "57d5fab383c1c634fda63f3fe36fca5af47c838c8eaec427041a179197ff9476"
+    "07_Execution_Order_and_Acceptance.md": "5e6bec467f6f182fbe6539b4585a68832e1962e06ecc0bfa45749c377515fe03"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4436,6 +4483,26 @@
       "original_7_22_P99_changed": false,
       "qualification_granted": false,
       "task_success_claimed": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "LUNA_R06B_ATTEMPT001_PARTIAL_S1_AND_EXACT_SOURCE_S2_REUSE_PENDING_SOL_REVIEW",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
+      "implementation_commits": [
+        "0e8f09fbfffd8c2e07b71b7cc7c7dbbb83e88598"
+      ],
+      "prompt_sha256": "a8777ea714ea82191956ff5c7a3f2e2411fcb85de7e36caf937a4f855ad4a87a",
+      "input_snapshot_sha256": "0584d369fa3db086e2fa2e97a5db244a46050a483dd8d5215b78534dee37f80e",
+      "result": "PARTIAL_BLOCKED_PHYSICAL_ORDER_PERMUTATION_PENDING_SOL_REVIEW",
+      "provider_free_s1": "Focused detectors 3 passed; legacy/Scene/public 41 passed+1 warning; R02b/R02c 44 passed; R03b/R03c 53 passed; 19 static rejections.",
+      "s2": "No current-HEAD native rerun; reuse accepted R02c005/R03b/R03c004 evidence for unchanged exact source/profile/runtime owners.",
+      "native_processes": 0,
+      "physical_order_gate": "BLOCKED_PHYSICAL_ORDER_PERMUTATION",
+      "historical_compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/",
+      "qualification_granted": false,
+      "DAG_P99_required_envelope_changed": false
     }
   ],
   "P00_audit": {
@@ -5235,7 +5302,7 @@
     "luna2_compatibility_assignment_20261029": {
       "next_slice": "R06b",
       "attempt": "001",
-      "status": "READY_PACKAGE_PLANNED_NOT_EXECUTED",
+      "status": "ATTEMPT001_DELIVERED_PARTIAL_PENDING_SOL_REVIEW",
       "branch": "codex/phase-ii-01-camera",
       "accepted_base": "4d2765127395b99e1376ca2f0dd2934e63200a35",
       "branch_scope_extension_reason": "R04 accepted; R05 blocked; R06b independent direct dependencies accepted; reuse isolated stage worktree for parallel F-line development",
@@ -5244,7 +5311,48 @@
       "native_lock": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock",
       "historical_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION unchanged",
       "R07_pilot": "separate later package; one task first; not part of R06b",
-      "push_merge_authorized": false
+      "push_merge_authorized": false,
+      "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
+      "prompt_sha256": "a8777ea714ea82191956ff5c7a3f2e2411fcb85de7e36caf937a4f855ad4a87a",
+      "input_snapshot_sha256": "0584d369fa3db086e2fa2e97a5db244a46050a483dd8d5215b78534dee37f80e",
+      "implementation_commits": [
+        "0e8f09fbfffd8c2e07b71b7cc7c7dbbb83e88598"
+      ],
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/report.md",
+      "result": "Provider-free S1 passed; exact-source R02c005/R03b/R03c evidence reused; physical source-order success gate blocked; historical missing-raw decision gate unchanged.",
+      "native_processes": 0,
+      "qualification_granted": false
+    },
+    "r06b_attempt001": {
+      "date": "2026-10-29",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
+      "implementation_commits": [
+        "0e8f09fbfffd8c2e07b71b7cc7c7dbbb83e88598"
+      ],
+      "status": "PARTIAL_BLOCKED_PHYSICAL_ORDER_PERMUTATION_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/report.md",
+      "s1": "Legacy/Scene/public 41 passed+1 warning; R02b/R02c 44 passed; R03b/R03c 53 passed; focused detectors 3 passed; static lowering rejected 19 cases.",
+      "s2": "No new native; reuse accepted R02c005, R03b and R03c004 exact-source evidence. Relevant production owners are unchanged relative to R03c freeze.",
+      "physical_source_order": "BLOCKED; rehashed Hand order mutation rejected before provider materialization; successful physical permutation unsupported/unproven.",
+      "historical_compatibility": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "native_processes": 0,
+      "qualification_granted": false,
+      "documentation_validation": {
+        "phase_markdown_hashes": 12,
+        "phase_markdown_hashes_match": true,
+        "task_env_module_skill_static_check": "PASS",
+        "skill_creator_quick_validate": "PASS",
+        "local_link_check": "13 files checked; zero errors in changed files; two missing historical R03c attempt001/002 report paths in unchanged 03_R03_Physical_Attachment.md",
+        "global_document_validator": "NOT_RUN_BY_INSTRUCTION",
+        "git_diff_check": "PASS"
+      },
+      "s1_metrics": {
+        "max_single_process_wall_seconds": 54.1,
+        "max_single_process_rss_kib": 1760472,
+        "cumulative_wall_seconds": 152.54,
+        "timed_processes": 10
+      }
     }
   }
 }

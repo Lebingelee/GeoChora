@@ -1,6 +1,6 @@
 # R06 — Compatibility / Mapping / Regression Governance
 
-状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED），compatibility decision gate仍BLOCKED；R06b/c PLANNED / NOT_STARTED。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
+状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt001已完成provider-free S1并复用未受影响的精确source S2证据，物理source-order permutation支持门仍BLOCKED、待Sol复核；compatibility decision gate仍因历史原件/处置决定缺失而BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
 
 ## 映射与机械语义保护
 
@@ -82,4 +82,19 @@ Harness 的 canonical H5 与 leaf Generic H5 各沿现有 owner 扩展，storage
 | `sessions/mujoco.py::_make_fixed_attachment_receipt/admit_leaf_control_plan/apply_leaf_actuator_patch/publish_leaf_state` | 模型绑定显式mapping与真实响应；Hand tendon/equality/两个finger/单actuator保持原source语义，禁止用私有状态补公共能力 |
 | 现有attached candidate、`load_leaf_control_records_h5`、`r03c_offline_readback` | 复用原S2/S3，按受影响输入补最小有界native；同文件state/Action/Target/Ack/clock/H5顺序与close一致，不修改旧exact reader门 |
 
-Attempt001包括源码调查、明确覆盖矩阵、必要detector/范围内修复、S1、可复用S2关联或一个新有界S2、报告与本地提交。新增native前先通过实际worker/serializer/finalizer的provider-free成功与失败链并冻结source/case/oracle/预算；具体额度在执行包中固定。不能因同shape、构造成功或helper断言就声称真实mapping/联动通过。原缺件的compatibility decision仍BLOCKED；已完成的新旧合同回归与未完成历史bytes范围分栏。工作包完成后交Sol复核，不自动R06c、R05、R07或Isaac。
+Attempt001于2026-10-29完成源码调查、覆盖矩阵、detector/相邻fixture修复、provider-free S1、未受影响S2证据复用、报告与camera分支本地提交。新增native前置门要求完整worker链和冻结source/case/oracle/预算；本次无新增native，因为支持外的物理source顺序变体被既有精确source admission拒绝，现有accepted native source/profile未变。不能因同shape、构造成功或synthetic receipt断言声称物理重排支持。原缺件的compatibility decision仍BLOCKED；完成的新旧合同回归与未完成物理/历史范围分栏。交Sol复核后停止，不自动R06c、R05、R07或Isaac。
+
+## R06b attempt001 实施结果（2026-10-29）
+
+结果：`PARTIAL_BLOCKED_PHYSICAL_ORDER_PERMUTATION_PENDING_SOL_REVIEW`。实施提交 `0e8f09f` 只改既有诊断测试与测试夹具；没有生产API、Provider实现、source/asset、依赖或submodule pin变化。代码提交输入HEAD为 `2ed1ed5218b397d80bf062fc305fe166ebf9f410`。覆盖矩阵和逐项证据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/`。
+
+| 栏目 | 实际结果与边界 |
+| --- | --- |
+| 旧版本/UID/default/Scene 与 public Position 路径 | 选定legacy、Scene composition、Position、pairing与candidate检查：`41 passed, 1 warning`；旧严格reader/identity路径未放宽。 |
+| semantic mapping / preflight | R02b/R02c owner集合 `44 passed`；非对称Arm值在receipt tuple反序时仍按语义Joint/Actuator绑定到预期ctrl slot。另以明确synthetic `nq=9, nv=10` fixture 验证qpos/dof分别按`nq`/`nv`做边界检查，不外推到Panda。 |
+| source order / Attachment / public leaf integration | R03b/R03c provider-free集合 `53 passed`；source-order static gate报告19项拒绝。更改Hand源XML兄弟顺序并同步source/closure/asset/Scene/plan identity后，现有`lower_fixed_attachment_sources()`因source joint order不符合canonical order而拒绝；这是拒绝门证据，不是重排source的物理成功证据。 |
+| 精确source的S2/S3 | 复用Sol已接收的R02c005 Hand50、R03b exact Panda Arm+Hand固定树及R03c004 public attached-leaf证据。R03c004冻结source closure为70文件/34,318,679 bytes/SHA-256 `b97f7c4f9b585ef175e986b9fb59f3054de74184666373443d6d166a45609b63`，native freeze HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`；相关生产owner文件在该freeze至本包输入HEAD间无差异。复用不是本HEAD重跑。 |
+| 新物理顺序变体 | 未启动native worker；精确source合同没有准入改变顺序的source/asset profile。当前S1只证明此变体会在provider materialization前被拒绝。需要的物理重排成功/映射门仍 `BLOCKED_PHYSICAL_ORDER_PERMUTATION`，所以R06b不是完整compatibility regression PASS。 |
+| 历史原件 | `geophys-transition-h5/v1`、canonical trajectory outer-v0、canonical-execution-v1及早期typed-force JSON原bytes仍缺失；byte compatibility未证明，处置未批准，compatibility decision gate保持 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。 |
+
+最终定向S1进程均在包预算内，最长墙钟54.10秒，十个provider-free/static进程累计墙钟152.54秒，最大RSS 1,760,472 KiB；`r03b_fixed_attachment_probe.py --static-only`未导入Provider/编译/step。native额度未使用，共享flock未取得。保留的早期失败日志记录了初始断言和夹具不完整；修复后各最终集合通过。完整命令、RSS、输出hash、输入保护hash、原始日志及复用矩阵见ignored报告。

@@ -91,7 +91,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | `ACCEPTED_BOUNDED_S3`；GeoPhys a53 CPU × MuJoCo 3.8.1 EGL，双同Env H5各12/13、双reader与22项native派生篡改拒绝；见 [R04c attempt001](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-camera-h5-s3) |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | PLANNED / NOT_STARTED |
 | 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | PLANNED / NOT_STARTED |
-| 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | PLANNED / NOT_STARTED |
+| 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | attempt001 `PARTIAL_BLOCKED_PHYSICAL_ORDER_PERMUTATION_PENDING_SOL_REVIEW`：定向provider-free S1通过，精确source S2/S3复用；物理重排变体只证明pre-native拒绝，没有成功执行证据；历史missing raw处置gate仍BLOCKED。 |
 | 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | PLANNED / NOT_STARTED |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PLANNED / NOT_STARTED |
 | 20 | R07b | R07a | asset/benchmarks与bench_deploy责任/verified manifests/最小配方 | S1 | 许可/闭包/一般Core能力缺失→BLOCKED | PLANNED / NOT_STARTED |
@@ -213,3 +213,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-29 R04c attempt001 Sol最终接收：162项清单及68项恢复source匹配，复用原两份H5的独立semantic/raw读回和8+10项S1/22项拒绝，状态为ACCEPTED_BOUNDED_S3。仅camera分支收口，无新native/测试重跑、未merge。下一原表行R05b仍受R05a正式Provider合同阻塞；R06b直接前置已有有界接收，可作为独立后继准备，但历史missing raw/本阶段处置决定保持BLOCKED，R06c/P99不得提前关闭。主develop-full正冻结于604da2c供Luna1执行R07a004，本次不写主checkout、不追加在途prompt、不派发R06b或其他实现包。
 
 2026-10-29维护者在两位Luna完整返回后重新分工：Luna1仅做F00–F07，Isaac已安装但F01 native待验；Luna2复用camera工作树开展R06b attempt001。选择R06b的理由、owner/方法/探测矩阵见[06实施定位](06_R06_Compatibility_and_Regression.md#r06b-attempt001-实施定位2026-10-29)。沿用两个阶段checkout，native共享排他锁；原R05和历史compatibility blocker不变。LIBERO仅先选无TurboSquid依赖的一项pilot，后续沿R07独立实施；本R06b包不展开benchmark适配，不改变旧五任务P99记录。主checkout后续摘要由其owner维护，本camera分支不覆盖F线安装/运行证据。
+
+2026-10-29 R06b attempt001在camera输入HEAD `2ed1ed5218b397d80bf062fc305fe166ebf9f410` 完成owner定位、兼容性矩阵、映射/source-order detector与定向S1。Focused新detector 3 passed；legacy/Scene/public候选集合41 passed、1 warning；R02b/R02c集合44 passed；R03b/R03c集合53 passed；静态source gate拒绝19项。修复限诊断测试/夹具，无生产owner/API/source/pin变化。复用已接收R02c005 Hand50、R03b固定Panda Arm+Hand和R03c004 public attached-leaf精确source证据；相关生产owner相对R03c native freeze HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`无差异，没有当前HEAD重跑。新的Hand source-order变体在lowering admission前按精确canonical order拒绝，没有有效物理变体获准执行；因此R06b物理重排门 `BLOCKED_PHYSICAL_ORDER_PERMUTATION`、总体交付为partial待Sol复核。没有启动native、没有取得共享锁。四类历史原件/Phase II-01处置仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`；R05a blocker、DAG、P99与Required Envelope不变。报告和原始日志在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/`。

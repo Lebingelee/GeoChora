@@ -945,3 +945,20 @@ public Env/Recorder/reader intersection is `ACCEPTED_BOUNDED_S2_S3`. The
 four H5 hashes/readback were reviewed; 33 provider-free S1 checks were reused.
 This does not grant general provider/Attachment admission or Qualification.
 Evidence and the Sol review remain in ignored workspace maintenance records.
+
+## R06b compatibility boundary (2026-10-29)
+
+`LeafMaterializationReceiptV1` maps by semantic Joint/Actuator references; do
+not infer qpos addresses, dof addresses or ctrl slots from tuple order. qpos
+and dof use their separate native dimensions (`nq` and `nv`); an `nq != nv`
+fixture is synthetic evidence only. The fixed Panda Arm+Hand attachment path
+also pins exact source bytes and canonical joint declaration order. A
+rehashed/rebound source that reverses Hand sibling declarations is refused by
+`lower_fixed_attachment_sources()` before provider materialization. That
+rejection does not demonstrate successful physical execution of a reordered
+source; general source/native permutation support remains unproven and blocked.
+R06b attempt001 reused accepted R02c005/R03b/R03c exact-source S2 evidence
+because those production owners and source/profile inputs were unchanged; it
+did not rerun native at the current HEAD. Read the current result, evidence
+limits and historical missing-byte blocker in the [R06 compatibility
+record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt001-实施结果2026-10-29).
