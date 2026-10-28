@@ -1945,7 +1945,7 @@
   "document_sha256": {
     "README.md": "75b451ab42b0686ae14372266392dffe668adb8d9659221a77eb63a0d0656e5a",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
+    "06_R06_Compatibility_and_Regression.md": "6e7dd980dd9415793799b8bed293c16ba220dadaa63f9cb06935d65a7c8d03c4",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -1954,7 +1954,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "ca26371c2553f4bdffb7aa360c93c3bb60ddc2597b0dfd8e3c0233038524723d"
+    "07_Execution_Order_and_Acceptance.md": "57d5fab383c1c634fda63f3fe36fca5af47c838c8eaec427041a179197ff9476"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -5231,6 +5231,20 @@
       "qualification_granted": false,
       "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/",
       "integration": "camera branch only; not merged into develop-full"
+    },
+    "luna2_compatibility_assignment_20261029": {
+      "next_slice": "R06b",
+      "attempt": "001",
+      "status": "READY_PACKAGE_PLANNED_NOT_EXECUTED",
+      "branch": "codex/phase-ii-01-camera",
+      "accepted_base": "4d2765127395b99e1376ca2f0dd2934e63200a35",
+      "branch_scope_extension_reason": "R04 accepted; R05 blocked; R06b independent direct dependencies accepted; reuse isolated stage worktree for parallel F-line development",
+      "new_worktrees": 0,
+      "luna1_scope": "F00-F07 on primary develop-full; no R07 source audit continuation",
+      "native_lock": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock",
+      "historical_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION unchanged",
+      "R07_pilot": "separate later package; one task first; not part of R06b",
+      "push_merge_authorized": false
     }
   }
 }

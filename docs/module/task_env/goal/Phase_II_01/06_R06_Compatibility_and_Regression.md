@@ -69,3 +69,17 @@ R06b新增R03b前置，以便对真实lowering/root与native顺序映射做回�
 Harness 的 canonical H5 与 leaf Generic H5 各沿现有 owner 扩展，storage roundtrip 不代正式 replay。
 新三 provider 运行保留精确 execution/source/build 身份，不回写旧 pin 的证据。
 本页四项 missing raw/处置决定与 R06c/P99 阻塞保持，不以新资产验证报告或新 H5 自动填补历史 bytes。
+
+## R06b attempt001 实施定位（2026-10-29）
+
+维护者明确要求Luna2继续R04c之后工作。R04c已在camera提交`4d27651`有界接收；原表下一行R05b仍被R05a正式Provider合同阻塞，因此明确选择直接前置R06a/R01c/R02c/R03b已接收的独立R06b。复用`codex/phase-ii-01-camera`及既有工作树，范围从camera收口扩展到兼容性回归，不新增checkout；Luna1同时在develop-full仅做F00–F07，两边native共用同一排他锁，不并发运行。此顺序选择不关闭R05或历史证据处置gate。
+
+| 既有owner/方法 | 本包实施与缺陷探测 |
+| --- | --- |
+| artifacts strict codecs、registry、既有legacy matrix/Scene composition | 固定旧mapping/hash、UID/default/action-observation顺序；未知版本/字段拒绝，不把缺失历史文件替换为新synthetic |
+| `assembly/fixed_attachment.py::lower_fixed_attachment_sources`；source declaration gate | canonical/native名称和逆映射、声明顺序变化、alias/遗漏/重复、错误root/mount；不支持的物理变换在apply前拒绝 |
+| `sessions/leaf_control.py::LeafMaterializationReceiptV1/preflight_leaf_control_interval/dispatch_leaf_control_interval` | 原子preflight、qpos/dof/ctrl独立映射、Writer ownership与不可区分目标的反例；有效重排不依赖tuple索引，错映射在写入前拒绝 |
+| `sessions/mujoco.py::_make_fixed_attachment_receipt/admit_leaf_control_plan/apply_leaf_actuator_patch/publish_leaf_state` | 模型绑定显式mapping与真实响应；Hand tendon/equality/两个finger/单actuator保持原source语义，禁止用私有状态补公共能力 |
+| 现有attached candidate、`load_leaf_control_records_h5`、`r03c_offline_readback` | 复用原S2/S3，按受影响输入补最小有界native；同文件state/Action/Target/Ack/clock/H5顺序与close一致，不修改旧exact reader门 |
+
+Attempt001包括源码调查、明确覆盖矩阵、必要detector/范围内修复、S1、可复用S2关联或一个新有界S2、报告与本地提交。新增native前先通过实际worker/serializer/finalizer的provider-free成功与失败链并冻结source/case/oracle/预算；具体额度在执行包中固定。不能因同shape、构造成功或helper断言就声称真实mapping/联动通过。原缺件的compatibility decision仍BLOCKED；已完成的新旧合同回归与未完成历史bytes范围分栏。工作包完成后交Sol复核，不自动R06c、R05、R07或Isaac。
