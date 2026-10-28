@@ -99,6 +99,7 @@ def diagnostic_bindings(log,spec_paths=()):
     result=[]
     for round_ in log['rounds']:
         revision=round_.get('revision') or {}
+        round_core=(round_.get('context') or {}).get('core_commit',log['core_commit'])
         for item in revision.get('diagnostics',[]):
             report_ref=item.get('report',item)
             report=CheckReport.from_dict(read_ref(report_ref))
@@ -108,10 +109,44 @@ def diagnostic_bindings(log,spec_paths=()):
             require(spec.spec_sha256()==report.spec_sha256,'diagnostic spec/report mismatch')
             require(spec.task_id==log['task_id'],'cross-task diagnostic')
             require(report.tool=='feasibility_probe' and report.details.get('complete') is True,'incomplete diagnostic')
-            require(report.core_commit==log['core_commit'] and report.core_dirty is False,'diagnostic Core mismatch')
+            require(report.core_commit==round_core and report.core_dirty is False,'diagnostic Core mismatch')
             require(report.details.get('provider')==log['provider'],'diagnostic provider mismatch')
-            result.append({'report':report_ref,'spec':spec_ref})
+            result.append({'report':report_ref,'spec':spec_ref,'core_commit':round_core})
     return result
+
+
+def owner_repair_bundle(log, output, copy_file):
+    """Copy owner-level diagnosis and repair provenance into the pending package."""
+    from construction_ledger import read_ref
+    ref=log.get('owner_repair_ref')
+    if not ref:
+        for round_ in log.get('rounds',[]):
+            revision=round_.get('revision') or {}
+            if revision.get('kind')=='owner_repair':ref=revision.get('repair_receipt')
+    if not ref:return None
+    receipt=read_ref(ref)
+    receipt_dest='validation/history/owner_repair/receipt.json'
+    copy_file(ref['path'],receipt_dest)
+    diagnostics=[]
+    for index,item in enumerate(receipt.get('diagnostic_refs',[])):
+        dest=f'validation/history/owner_repair/diagnostics/{index:02d}_{item["label"]}{Path(item["ref"]["path"]).suffix}'
+        copy_file(item['ref']['path'],dest)
+        diagnostics.append({'label':item['label'],'path':dest,'sha256':item['ref']['sha256']})
+    source_diff=receipt.get('source_diff_ref')
+    diff_dest=None
+    if source_diff:
+        diff_dest='validation/history/owner_repair/source.diff'
+        copy_file(source_diff['path'],diff_dest)
+    index={'receipt_path':receipt_dest,'receipt_sha256':ref['sha256'],
+        'diagnostics':diagnostics,'source_diff_path':diff_dest}
+    return index
+
+
+def round_history(log):
+    return [{'number':r['number'],'status':r['status'],'spec_sha256':r['spec_sha256'],
+        'core_commit':(r.get('context') or {}).get('core_commit',log['core_commit']),
+        'artifact_hash':r.get('artifact_hash'),
+        'finding_keys':r.get('finding_keys',[])} for r in log.get('rounds',[])]
 
 
 def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir,output,historical_archive=None,diagnostic_specs=()):
@@ -135,14 +170,18 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
         if name=='semantic':check_semantic(r,u/'semantic_examples.json',artifact)
     oracle_reports=[check_oracle(d,sh,ah,ctx['core_commit'],provider) for d in oracle_dirs]
     require(bool(oracle_reports),'at least one passing Oracle recording required')
-    log=json.loads(logpath.read_text());last=log['rounds'][-1]
+    from construction_ledger import load as load_ledger
+    log=load_ledger(logpath);last=log['rounds'][-1]
     require(last['spec_sha256']==sh and last['artifact_hash']==ah,'construction log final candidate mismatch')
-    if log.get('schema_version')=='harness-attempt-ledger-v0':
-        require(log['state']=='candidate_ready' and last['status']=='pass','construction is not candidate_ready')
+    final_context=last.get('context') or {'core_commit':log['core_commit']}
+    require(ctx['core_commit']==final_context['core_commit'],
+        'current Core differs from final construction round context')
+    require(log['state']=='candidate_ready' and last['status']=='pass','construction is not candidate_ready')
     diagnostics=diagnostic_bindings(log,diagnostic_specs)
     require(log.get('judge_decision') is None,'refuse to repackage a decided artifact')
-    upstream_hash=log.get('upstream_sha256') or log.get('refs',{}).get('task',{}).get('sha256')
-    bundle_hash=log.get('asset_bundle_sha256') or log.get('refs',{}).get('asset_bundle',{}).get('sha256')
+    current_inputs=final_context.get('input_refs',log.get('refs',{}))
+    upstream_hash=current_inputs.get('task',{}).get('sha256')
+    bundle_hash=current_inputs.get('asset_bundle',{}).get('sha256')
     require(upstream_hash==digest(u/'task.json'),'upstream task changed since construction')
     require(bundle_hash==digest(u/'asset_bundle.json'),'asset bundle changed since construction')
     bundle=json.loads((u/'asset_bundle.json').read_text())
@@ -164,9 +203,7 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     copy_tree(u,'local_assets')
     copy_file(logpath,'validation/history/construction_log.json')
     if 'evidence_directory' in log:copy_tree(Path(log['evidence_directory']),'validation/history/rounds')
-    elif log.get('schema_version')=='harness-attempt-ledger-v0':
-        from construction_ledger import load
-        load(logpath)
+    else:
         def collect(value):
             if isinstance(value,dict):
                 if set(value)=={'path','sha256'}:
@@ -176,6 +213,9 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
             elif isinstance(value,list):
                 for child in value:collect(child)
         collect(log)
+    repair_index=owner_repair_bundle(log,output,copy_file)
+    history=round_history(log)
+    save_json(history,output/'validation/history/rounds.json')
     portable_diagnostics=[]
     for i,pair in enumerate(diagnostics):
         entry={}
@@ -183,6 +223,7 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
             dest=f'validation/history/diagnostics/{i}/{kind}.json'
             copy_file(ref['path'],dest)
             entry[kind]={'path':dest,'sha256':ref['sha256']}
+        entry['core_commit']=pair['core_commit']
         portable_diagnostics.append(entry)
     save_json(portable_diagnostics,output/'validation/history/diagnostics.json')
     for i,d in enumerate(oracle_dirs):copy_tree(Path(d),f'validation/oracle-{i}')
@@ -198,6 +239,7 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
         'video':{'status':'NOT_RECORDED','reason':'selected route has no supported render configuration'},
         'qualification':'NOT_ASSESSED','D0':'NOT_ASSESSED','D1':'NOT_ASSESSED','D2':'NOT_ASSESSED',
         'open_issues':log.get('open_issues',[]),
+        'construction_rounds':history,'owner_repair_evidence':repair_index,
         'scope':'synthetic lift candidate; no LIBERO equivalence, freeze, training readiness or replay qualification'}
     (output/'manifest.yaml').write_text(yaml.safe_dump(manifest,allow_unicode=True,sort_keys=False))
     rows='\n'.join(f"| {r.details['seed']} | {r.details['episode']['transitions']} | {r.details['recording']['boundaries']} | PASS |" for r in oracle_reports)
@@ -220,6 +262,7 @@ Expert completion, physical task success and termination flags are retained inde
 ## Review gaps and limits
 
 - Review open_issues in manifest.yaml and the full construction history; a later passing candidate does not resolve earlier execution faults.
+- Construction round history preserves each round's Core context, including prior failures; owner-repair diagnosis and source diff are indexed under `validation/history/owner_repair/`.
 - Lift surrogate and box-collision proxy do not establish LIBERO In/On equivalence.
 - No supported selected-route camera video; no video is claimed. H5 and checks are available for review.
 - ReferenceTaskBinding is still an internal extension pending maintainer confirmation.
@@ -257,7 +300,8 @@ def verify(directory,*,core_repo):
         require(path.stat().st_size==item['bytes'] and digest(path)==item['sha256'],f'evidence changed: {item["path"]}')
     required={'candidate.spec.json','artifact.json','manifest.yaml','validation/current/compile.json',
         'validation/current/assets.json','validation/current/semantic.json','validation/current/feasibility.json',
-        'validation/history/construction_log.json','local_assets/task.json','local_assets/asset_bundle.json',
+        'validation/history/construction_log.json','validation/history/rounds.json',
+        'local_assets/task.json','local_assets/asset_bundle.json',
         'local_assets/semantic_examples.json','validation/report.md'}
     require(required<=seen,'required candidate evidence missing from index')
     actual_files={str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}
@@ -272,6 +316,8 @@ def verify(directory,*,core_repo):
         and manifest['core_commit']==data['core_commit'] and manifest['task_id']==spec.task_id,'manifest identity mismatch')
     provider=manifest['provider']
     history=json.loads((root/'validation/history/construction_log.json').read_text())
+    require(manifest.get('open_issues',[])==history.get('open_issues',[]),
+        'package altered historical open issues')
     expected_diagnostics=sum(len((r.get('revision') or {}).get('diagnostics',[])) for r in history['rounds'])
     diagnostic_index=root/'validation/history/diagnostics.json'
     require(diagnostic_index.is_file() or not expected_diagnostics,'portable diagnostic evidence missing')
@@ -283,8 +329,38 @@ def verify(directory,*,core_repo):
         ds=CandidateSpec.load(root/pair['spec']['path'])
         dr=CheckReport.from_dict(json.loads((root/pair['report']['path']).read_text()))
         require(ds.spec_sha256()==dr.spec_sha256 and ds.task_id==spec.task_id,'diagnostic spec/report identity mismatch')
-        require(dr.core_commit==data['core_commit'] and not dr.core_dirty and dr.details.get('provider')==provider,
+        require(dr.core_commit==pair['core_commit'] and not dr.core_dirty and dr.details.get('provider')==provider,
             'diagnostic execution identity mismatch')
+    round_rows=json.loads((root/'validation/history/rounds.json').read_text())
+    require(manifest.get('construction_rounds')==round_rows,'manifest/history round summary mismatch')
+    require(round_rows and round_rows[-1]['status']=='pass','final construction round is not passing')
+    if len(round_rows)>1:
+        require(any(row['status']=='fail' for row in round_rows[:-1]),
+            'continuation package dropped its historical failed round')
+    repair=manifest.get('owner_repair_evidence')
+    if repair:
+        receipt_path=root/repair['receipt_path']
+        require(repair['receipt_path'] in seen and digest(receipt_path)==repair['receipt_sha256'],
+            'owner-repair receipt missing from index')
+        receipt=json.loads(receipt_path.read_text())
+        require(receipt.get('repair_commit')==data['core_commit'],'owner-repair receipt/Core mismatch')
+        require(history.get('schema_version')=='harness-attempt-ledger-v1'
+            and history.get('legacy_ledger_ref',{}).get('sha256')==receipt.get('legacy_ledger_sha256'),
+            'owner-repair receipt does not match preserved ledger history')
+        require(len(round_rows)>=2 and round_rows[0]['status']=='fail'
+            and round_rows[-1]['status']=='pass'
+            and round_rows[-1]['core_commit']==data['core_commit'],
+            'v1 package dropped its failed predecessor or final round context')
+        for item in repair['diagnostics']:
+            path=root/item['path']
+            require(item['path'] in seen and digest(path)==item['sha256'],'owner-repair diagnostic changed')
+        if repair.get('source_diff_path'):
+            path=root/repair['source_diff_path']
+            require(repair['source_diff_path'] in seen and digest(path)==receipt['source_diff_ref']['sha256'],
+                'owner-repair source diff changed')
+    require(manifest.get('qualification')=='NOT_ASSESSED' and manifest.get('D0')=='NOT_ASSESSED'
+        and manifest.get('D1')=='NOT_ASSESSED' and manifest.get('D2')=='NOT_ASSESSED',
+        'pending package overstates qualification status')
     for name,tool in {'compile':'harness_compiler','assets':'asset_check','semantic':'semantic_check','feasibility':'feasibility_probe'}.items():
         r=load_report(root/f'validation/current/{name}.json',data['spec_sha256'],data['artifact_hash'],data['core_commit'],provider=provider,expected_tool=tool)
         if name=='feasibility':

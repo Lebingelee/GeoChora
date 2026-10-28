@@ -56,6 +56,32 @@ Each diagnostic must bind to its actual saved spec. Its report hash and spec has
 
 Run `begin --revision <file> --spec <new spec>`, then the same checks and `finish`. The runtime refuses stale report bytes, unrelated report citations, empty diffs, a sixth round and adjacent repeated findings. `status --ledger ...` revalidates file hashes. Runtime files must remain unchanged during the attempt; code fixes belong in a separately identified harness version, not hidden inside an existing run.
 
+### Owner repair continuation
+
+Do not turn an `asset`, `harness`, `core` or `provider` failure into a task-local
+spec edit. Finish the diagnosis and owner repair first, commit the implementation,
+regenerate the catalog on that clean commit, and create an owner-repair receipt
+that binds the legacy ledger/archive, public diagnostics, source diff/commit,
+and input before/after hashes. Then reserve the next existing round:
+
+```sh
+"$PY" "$RT/construction_ledger.py" continue-owner-repair \
+  --legacy-ledger "$OUT/history/attempt001/construction.json" \
+  --history-archive "$OUT/history/attempt001/archive_manifest.json" \
+  --repair-receipt "$OUT/owner_repair.json" \
+  --task "$UP/task.json" --catalog "$OUT/catalog.json" \
+  --spec "$OUT/round2.spec.json" --provider mujoco \
+  --ledger "$OUT/construction-v1.json"
+```
+
+The v1 ledger validates each report against that round's Core, catalog,
+runtime, provider and spec context. The old ledger and failed reports stay
+linked to their original context. A later pass preserves earlier findings and
+open issues; issue resolution needs its own cited evidence. Ordinary v0
+`begin --revision` remains supported. In v1, ordinary spec revisions may reuse
+the current context only when the external asset identity is unchanged;
+changing Core/catalog/input identity requires an explicit `--context` JSON.
+
 ## D. Oracle Candidate
 
 ```sh

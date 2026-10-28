@@ -53,7 +53,7 @@ runtime.
 | `feasibility_probe.py` | Separate solved/invalid/expert_failed/unknown outcomes |
 | `completion_facts.py` | Versioned raw completion facts and independent row/report validation |
 | `check_candidate.py` | One candidate's four checks, with real reports |
-| `construction_ledger.py` | Hash-bound revisions, five-round budget and escalation |
+| `construction_ledger.py` | Hash-bound per-round contexts, v0 compatibility, owner-repair continuation, five-round budget and escalation |
 | `oracle_candidate.py` | Existing recorder, completion check and independent H5 inspection |
 | `judge_package.py` | Portable evidence index and pending-only verification |
 
@@ -77,6 +77,16 @@ endpoints test the checker, not equivalence to a source benchmark demonstration.
 The ledger's task input includes `task_id` (matching the candidate), and relative
 `asset_bundle` / `semantic_examples` filenames. The host agent also reads the
 upstream's requested object, scene, initialization and goal to construct a spec.
+
+The ledger keeps `harness-attempt-ledger-v0` readable for existing workflows.
+Owner-level repair continuation writes `harness-attempt-ledger-v1`: every round
+has its own clean Core/catalog/runtime/provider/spec/input context. The
+`continue-owner-repair` operation requires a hash-bound receipt for the legacy
+ledger, archived runtime refs, diagnosis, owner commit/diff, and input changes;
+it reserves the next available round without replacing earlier failures or
+open issues. A passing round does not automatically resolve a prior issue.
+Ordinary task-local revisions remain supported; v1 revisions that change the
+Core/catalog/input context supply that context explicitly.
 
 Current **package preparation** supports the explicit synthetic handoff only:
 `task.json`, `semantic_examples.json`, `asset_bundle.json` and referenced XML

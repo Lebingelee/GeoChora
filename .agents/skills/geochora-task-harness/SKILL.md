@@ -7,7 +7,7 @@ description: Construct and revise GeoChora task candidates from an upstream task
 
 Deliver a checked Candidate Spec + Artifact, hash-bound construction history, Oracle H5 and a pending Stage-1 review package. The host agent makes decisions; these Python CLIs contain no LLM client or autonomous loop.
 
-Read [the CLI workflow](references/workflow.md). Resolve the supplied Core checkout, Python environment, runtime directory and task workspace. The runtime directory is `<Core>/task_env/script/agent/`; see its README for setup and input contracts. Core must be a clean known snapshot; regenerate the catalog when moving machines. Keep generated work in ignored `workspace/` or outside the checkout. Do not edit Core, register new tasks, install engines, or approve/freeze artifacts as part of this workflow.
+Read [the CLI workflow](references/workflow.md). Resolve the supplied Core checkout, Python environment, runtime directory and task workspace. The runtime directory is `<Core>/task_env/script/agent/`; see its README for setup and input contracts. Core must be a clean known snapshot; regenerate the catalog when moving machines. Keep generated work in ignored `workspace/` or outside the checkout. Ordinary candidate construction does not authorize Core edits, task registration, engine installation, or artifact approval/freeze. A separate explicit maintainer maintenance package may authorize a bounded repair in an existing owner.
 
 ## Construction decisions
 
@@ -17,6 +17,17 @@ Read [the CLI workflow](references/workflow.md). Resolve the supplied Core check
 4. Revise only on evidence. A `task_local` finding permits a corresponding spec edit. `harness`, `asset`, `core` or `provider` needs its owner. `unknown` expert failure requires additional diagnostic probe evidence before a bounded task-local revision; it is not proof of infeasibility. An execution fault remains an open escalation even if an independently justified candidate revision passes. Never cite an execution fault as permission to shrink the reset distribution. No inference from model self-assessment can replace a tool receipt.
 5. Each revision supplies the immediately previous report's SHA-256, the exact finding index, reason and diagnostic refs when needed. The ledger computes the spec diff. Maximum 5 candidate rounds; the same finding in adjacent rounds stops the task. Do not reset/recreate the ledger to bypass a stop. If a report has no actionable finding (including unknown/truncated outcomes), report the gap rather than inventing a repair citation.
 6. A passing candidate needs assets, compile, semantic and complete feasibility reports, with at least 20 distinct declared seeds solved. Keep task success, expert completion, invalid execution, unknown outcomes and termination distinct. Record limitations of a changed sampling distribution.
+
+Owner-level repairs use a separate continuation receipt, not a fabricated task
+spec revision. `harness-attempt-ledger-v1` binds each round to its own clean
+Core commit, catalog, runtime files, provider, spec and inputs while retaining
+the earlier ledger history and findings. Use `continue-owner-repair` only after
+the owner has supplied hashed diagnosis, source diff/commit and input
+before/after identities. The continuation reserves the next existing round;
+it does not reset the five-round budget, erase an earlier failure, or clear an
+open issue merely because a later round passes. Ordinary task-local revisions
+remain available through `begin`; a v1 revision whose Core/catalog/input
+identity changes must provide its own context.
 
 ## Completion evidence and compatibility
 
@@ -32,7 +43,7 @@ actually truncate the episode. Close failure is invalid and remains secondary
 to any earlier execution error.
 
 `construction_ledger.finish` and `judge_package.check_probe` independently bind
-the report to the expected spec, artifact, Core commit, provider and horizon;
+the report to the expected spec, artifact, round-specific Core commit, provider and horizon;
 they recompute each row's class, seed order/uniqueness and totals from its raw
 facts. A historical feasibility report that lacks enough facts to establish
 completion or cleanup is unverifiable. Preserve it byte-for-byte; do not fill
