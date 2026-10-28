@@ -633,3 +633,18 @@ force cap. All four64-interval episodes and each same-file H5 64/65 readback
 passed; the original0042500 motion failure remains. This is task-owned advanced
 candidate evidence, not a registered make_env route, separate-Entity Attachment,
 other-Provider support or new Qualification.
+
+
+R03c Sol static review (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
+The original attempt001 two-start budget remains spent, with no completed real
+episode/H5. Sol added actual attached-leaf admission and public Env reset/step
+tests with only native IO stand-ins, coherent Ack-target and remapped-slot
+rejection, strict frozen motion gates and a shared pre-import runner preflight.
+The selected current provider-free set passes 90 tests; no native was rerun,
+and this does not establish R03c S2/S3. A fresh one-start package is prepared
+separately for human forwarding, preserving all attempt001 evidence.
+GeoPhys still has the earlier full-Panda Position/R1 evidence; the new leaf and
+fixed-Attachment Core entries currently admit only MuJoCo. This is a scoped
+source/adapter integration gap, not evidence that GeoPhys physics cannot run
+the new mechanical assembly. See the [R03 source and review
+record](goal/Phase_II_01/03_R03_Physical_Attachment.md).

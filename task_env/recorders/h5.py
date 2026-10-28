@@ -1234,7 +1234,12 @@ def _load_attached_leaf_control_records_h5(path: Path, generic: dict[str, Any], 
             or leaf_receipt.get('materialization_id') != profile['provider_materialization_id']
             or leaf_receipt.get('effective_plan_identity_sha256') != profile['effective_leaf_plan_identity_sha256']
             or leaf_receipt.get('scene_identity_sha256') != profile['scene_identity_hash']
-            or leaf_receipt.get('source_closure_sha256') != profile['source_closure_digest']):
+            or leaf_receipt.get('source_closure_sha256') != profile['source_closure_digest']
+            or leaf_receipt.get('provider_name') != profile['provider']
+            or leaf_receipt.get('provider_version') != profile['provider_version']
+            or leaf_receipt.get('provider_build_sha256') != profile['provider_build_sha256']
+            or leaf_receipt.get('backend') != profile['backend']
+            or leaf_receipt.get('configuration_revision') != profile['configuration_revision']):
         raise ValueError('R03c leaf receipt is not bound to the same Attachment Runtime/plan')
 
     writers = profile['writers']
@@ -1278,6 +1283,10 @@ def _load_attached_leaf_control_records_h5(path: Path, generic: dict[str, Any], 
             mapped = leaf_actuators.get(key)
             if mapped is None or mapped['native_name'] != canonical_native['actuators'][key]:
                 raise ValueError(f'R03c leaf Actuator native receipt mismatch: {key}')
+            attachment_actuator = attachment['native_actuator_mappings'][key]
+            if (mapped['ctrl_slot'] != attachment_actuator['ctrl_slot']
+                    or mapped['native_actuator_id'] != attachment_actuator['actuator_id']):
+                raise ValueError(f'R03c leaf Actuator slot differs from Attachment receipt: {key}')
         entity, frame = writer['tcp_frame']
         key = f'{entity}/{frame}'
         mapped = leaf_frames.get(key)
@@ -1306,20 +1315,23 @@ def _load_attached_leaf_control_records_h5(path: Path, generic: dict[str, Any], 
         home = np.asarray((0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853), dtype=np.float64)
         if np.max(np.abs(arm[-1].astype(np.float64) - home)) > 0.02:
             raise ValueError('R03c stored Arm final state is outside the home-return gate')
-        if profile['arm_active'] and np.max(np.abs(arm[:, 0].astype(np.float64) - home[0])) < 0.08 - 1e-6:
+        if profile['arm_active'] and np.max(np.abs(arm[:, 0].astype(np.float64) - home[0])) < 0.08:
             raise ValueError('R03c stored Arm motion does not reach the required joint1 excursion')
         if float(opening[-1]) < 0.06:
             raise ValueError('R03c stored Hand opening does not return to the final open gate')
         if profile['hand_active'] and (
-                float(np.min(opening[16:33])) > 0.020001
-                or float(np.max(opening) - np.min(opening)) < 0.04 - 1e-6
+                float(np.min(opening[16:33])) > 0.02
+                or float(np.max(opening) - np.min(opening)) < 0.04
                 or np.max(np.abs(fingers[:, 0] - fingers[:, 1])) > 1e-4):
             raise ValueError('R03c stored Hand motion/equality differs from its closed-phase gate')
         hand_pose = arrays['obs/state/entities/panda-hand/hand_pose'][:, 3:7].astype(np.float64)
-        quats = hand_pose / np.linalg.norm(hand_pose, axis=1, keepdims=True)
+        norms = np.linalg.norm(hand_pose, axis=1, keepdims=True)
+        if np.any(norms <= 1e-12):
+            raise ValueError('R03c stored Hand rotation contains a zero quaternion')
+        quats = hand_pose / norms
         dots = np.clip(np.abs(quats @ quats[0]), 0.0, 1.0)
         rotation_excursion = float(np.max(2.0 * np.arccos(dots)))
-        if profile['arm_active'] and rotation_excursion < 0.05 - 1e-6:
+        if profile['arm_active'] and rotation_excursion < 0.05:
             raise ValueError('R03c stored attached Hand root did not follow active Arm rotation')
         state_boundary_digests = arrays['obs/state/boundary_identity_sha256']
 
@@ -1377,7 +1389,8 @@ def _load_attached_leaf_control_records_h5(path: Path, generic: dict[str, Any], 
             payload = applied['payload']
             applied_ack = decode_leaf_application_ack(payload['ack'])
             slots = tuple(item.ctrl_slot for item in command.slot_values)
-            if (ack != applied_ack or ack.writer_id != writer_id
+            if (ack != applied_ack or ack.target_identity_hash != target.identity_hash
+                    or ack.writer_id != writer_id
                     or ack.binding_identity_hash != writer_meta['binding_identity_sha256']
                     or ack.source_closure_sha256 != profile['source_closure_digest']
                     or ack.scene_identity_hash != profile['scene_identity_hash']
@@ -1394,14 +1407,25 @@ def _load_attached_leaf_control_records_h5(path: Path, generic: dict[str, Any], 
             seen_slots.update(slots)
             if any(not 0 <= item.ctrl_slot < dimensions['nu'] for item in command.slot_values):
                 raise ValueError(f'R03c transition {index}/{writer_id} slot exceeds fixed model dimensions')
+            for item in command.slot_values:
+                key = f'{item.actuator.entity_id}/{item.actuator.actuator_id}'
+                mapped = leaf_actuators.get(key)
+                if mapped is None or item.ctrl_slot != mapped['ctrl_slot']:
+                    raise ValueError(f'R03c transition {index}/{writer_id} command slot differs from its Actuator receipt')
             source = target.source_boundary
             next_boundary = StateBoundaryIdentity.from_mapping(canonical['next_boundary'])
             if (source.control_step != index or next_boundary.control_step != index + 1
                     or source.reset_sample_id != profile['reset_sample_id']
                     or source.provider_materialization_id != profile['provider_materialization_id']
-                    or (source.episode_id, source.scene_identity_hash, source.provider_materialization_id)
-                    != (next_boundary.episode_id, next_boundary.scene_identity_hash,
-                        next_boundary.provider_materialization_id)
+                    or (source.episode_id, source.reset_sample_id, source.scene_identity_hash,
+                        source.scene_instance_id, source.provider_materialization_id)
+                    != (next_boundary.episode_id, next_boundary.reset_sample_id, next_boundary.scene_identity_hash,
+                        next_boundary.scene_instance_id, next_boundary.provider_materialization_id)
+                    or (ack.application_boundary.episode_id, ack.application_boundary.reset_sample_id,
+                        ack.application_boundary.scene_identity_hash, ack.application_boundary.scene_instance_id,
+                        ack.application_boundary.provider_materialization_id, ack.application_boundary.control_step)
+                    != (source.episode_id, source.reset_sample_id, source.scene_identity_hash,
+                        source.scene_instance_id, source.provider_materialization_id, source.control_step)
                     or target.sample_clock.sample_index != index
                     or not math.isclose(target.sample_clock.simulation_time_s,
                                         index * profile['control_dt_s'], rel_tol=0.0, abs_tol=1e-12)

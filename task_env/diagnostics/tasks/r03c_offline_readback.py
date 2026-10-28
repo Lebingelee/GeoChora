@@ -108,16 +108,16 @@ def run(output_dir: Path):
         hand_rotation = float(max(
             _rotation_error(hand_pose[0, 3:7], row[3:7]) for row in hand_pose
         ))
-        if episode_contract['arm_active'] and (arm_peak < 0.08 - 1e-6 or hand_rotation < 0.05 - 1e-6):
+        if episode_contract['arm_active'] and (arm_peak < 0.08 or hand_rotation < 0.05):
             raise ValueError(f'{episode_id} stored active Arm motion/root-rotation gate failed')
         closed_min = float(np.min(opening[16:33]))
         hand_final = float(opening[-1])
         hand_excursion = float(np.max(opening) - np.min(opening))
         finger_mismatch = float(np.max(np.abs(fingers64[:, 0] - fingers64[:, 1])))
-        if hand_final < 0.06 - 1e-6:
+        if hand_final < 0.06:
             raise ValueError(f'{episode_id} stored Hand final opening gate failed')
         if episode_contract['hand_active'] and (
-                closed_min > 0.02 + 1e-6 or hand_excursion < 0.04 - 1e-6
+                closed_min > 0.02 or hand_excursion < 0.04
                 or finger_mismatch > 1e-4 + 1e-7):
             raise ValueError(f'{episode_id} stored Hand motion/equality gate failed')
         tamper = _tamper_checks(path, native_dir)

@@ -8,6 +8,7 @@ import math
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import time
 import traceback
@@ -394,8 +395,26 @@ def _retry_counters(prior_native_dir: Path, output_dir: Path):
     }
 
 
+def _validate_fresh_start_record(native_dir, contract_sha256, *, allow_unreserved=False):
+    """Validate the prelaunch reservation without assuming an empty ledger."""
+    ledger_path = native_dir / 'native_process_ledger.jsonl'
+    invocation_path = native_dir / 'native_invocation.json'
+    if allow_unreserved and not ledger_path.exists() and not invocation_path.exists():
+        return 0
+    rows = [json.loads(line) for line in ledger_path.read_text().splitlines() if line.strip()]
+    invocation = json.loads(invocation_path.read_text())
+    if (len(rows) != 1 or rows[0] != invocation or invocation.get('attempt') != 1
+            or invocation.get('event') != 'START_RECORDED_BEFORE_NATIVE_PROCESS_LAUNCH'
+            or invocation.get('budget_before_start', {}).get('native_starts') != 0
+            or invocation.get('budget_after_reserving_start', {}).get('native_starts') != 1
+            or invocation.get('executed_contract_sha256') != contract_sha256):
+        raise ValueError('fresh R03c execution requires exactly its one bound prelaunch start record')
+    return 1
+
+
 def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
-               native_attempt_dir: str = 'native', prior_native_dir: str | None = None):
+               native_attempt_dir: str = 'native', prior_native_dir: str | None = None,
+               *, preflight_only=False):
     output_dir.mkdir(parents=True, exist_ok=True)
     native_dir = output_dir / native_attempt_dir
     if native_dir.resolve().parent != output_dir.resolve():
@@ -403,19 +422,38 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
     if prior_native_dir is not None and (native_attempt_dir != 'native_attempt_002'
                                          or prior_native_dir != 'native'):
         raise ValueError('the authorized retry must be native_attempt_002 against preserved attempt native/')
-    native_dir.mkdir(exist_ok=True)
     for name in ('native_progress.json', 'native_failure.json', 'native_result.json'):
         if (native_dir / name).exists():
             raise FileExistsError(native_dir / name)
     snapshot = json.loads(snapshot_path.read_text())
     frozen = json.loads((output_dir / 'freeze' / 'execution_freeze.json').read_text())
+    if (_sha(snapshot_path) != frozen['snapshot_sha256']
+            or _sha(Path(snapshot['prompt'])) != frozen['prompt_sha256']):
+        raise ValueError('R03c snapshot or prompt changed after the execution freeze')
+    if (snapshot['core_head'] != subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+            or snapshot['branch'] != subprocess.check_output(['git','branch','--show-current'],cwd=ROOT,text=True).strip()):
+        raise ValueError('live branch/HEAD differs from the R03c execution window')
+    for relative, expected in snapshot['protected_sha256'].items():
+        if _sha(ROOT / relative) != expected:
+            raise ValueError(f'R03c protected input changed: {relative}')
     for relative, expected in frozen['code_sha256'].items():
         actual = _sha(ROOT / relative)
         if actual != expected:
             raise ValueError(f'R03c source changed after the execution freeze: {relative}')
     contract = json.loads((output_dir / 'freeze' / 'executed_contract.json').read_text())
+    if (_sha(output_dir / 'freeze' / 'executed_contract.json') != frozen['executed_contract_sha256']
+            or _sha(output_dir / 'freeze' / 'source_inventory.json') != frozen['source_inventory_sha256']):
+        raise ValueError('R03c frozen contract/source inventory bytes do not match their recorded hashes')
     if contract['input_head'] != snapshot['core_head']:
         raise ValueError('frozen execution contract is not bound to the protected input HEAD')
+    if contract.get('fresh_native_window'):
+        if (prior_native_dir is not None or native_attempt_dir != 'native'
+                or snapshot.get('native_window', {}).get('max_starts') != 1
+                or snapshot.get('native_window', {}).get('consumed') is not False
+                or contract.get('required_native_totals', {}).get('native_starts') != 1):
+            raise ValueError('fresh R03c native execution is limited to its separate one-start window')
+        _validate_fresh_start_record(native_dir, frozen['executed_contract_sha256'],
+                                     allow_unreserved=preflight_only)
     counters = (_retry_counters(output_dir / prior_native_dir, output_dir)
                 if prior_native_dir is not None else {
                     'native_starts': 1, 'materialization_attempts': 0, 'resets': 0,
@@ -430,6 +468,11 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
                 or frozen_retry.get('prior_native_progress_sha256') != reconstructed['native_progress_sha256']
                 or frozen_retry.get('prior_native_process_ledger_sha256') != reconstructed['native_process_ledger_sha256']):
             raise ValueError('retry execution contract does not bind the preserved first-process evidence')
+    if preflight_only:
+        return {'status':'PROVIDER_FREE_NATIVE_PREFLIGHT_READY','native_starts':0,
+                'provider_imports':0,'mj_step_calls':0,
+                'expected_episodes':len(contract['episodes'])}
+    native_dir.mkdir(exist_ok=True)
     active = {'episode_id': None, 'outer': 0, 'phase': 'native_import'}
     native_started_at = time.monotonic()
     _write_json(native_dir / 'native_progress.json', {
@@ -495,8 +538,8 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
 
         def counted_materialize_control(*args, **kwargs):
             counters['materialization_attempts'] += 1
-            if counters['materialization_attempts'] > 5:
-                raise RuntimeError('RuntimeSession materialization attempt budget of 5 exceeded')
+            if counters['materialization_attempts'] > contract['required_native_totals']['materialization_attempts']:
+                raise RuntimeError('RuntimeSession materialization attempt budget exceeded')
             active['phase'] = 'runtime_materialization'
             _write_progress(native_dir, snapshot, counters, active)
             return original_materialize_control(*args, **kwargs)
@@ -559,8 +602,8 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
             active['phase'] = 'public_env_reset'
             _write_progress(native_dir, snapshot, counters, active)
             counters['resets'] += 1
-            if counters['resets'] > 5:
-                raise RuntimeError('ResetPlan realization budget of 5 exceeded')
+            if counters['resets'] > contract['required_native_totals']['resets']:
+                raise RuntimeError('ResetPlan realization budget exceeded')
             reset_result = env.reset(seed=31)
             reset_info = reset_result[1]
             if (reset_result[1].get('state_boundary_id') != env.typed_state.view.boundary.boundary_id
@@ -735,7 +778,8 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
             env.close()
             _write_progress(native_dir, snapshot, counters,
                             {'episode_id': episode_spec['episode_id'], 'outer': 64, 'phase': 'episode_closed'})
-        if counters['materialization_attempts'] > 5 or counters['resets'] > 5:
+        if (counters['materialization_attempts'] > contract['required_native_totals']['materialization_attempts']
+                or counters['resets'] > contract['required_native_totals']['resets']):
             raise RuntimeError('materialization or reset budget exceeded')
         if (counters['outer_intervals'] != 256 or counters['mj_step_calls'] != 1280
                 or counters['simulated_seconds'] != 2.56 or counters['mj_forward_calls'] > 300):
@@ -803,9 +847,13 @@ def main(argv=None):
     parser.add_argument('--snapshot', type=Path, default=SNAPSHOT)
     parser.add_argument('--native-attempt-dir', default='native')
     parser.add_argument('--prior-native-dir')
+    parser.add_argument('--preflight-only', action='store_true')
     args = parser.parse_args(argv)
     result = run_native(args.output_dir, args.snapshot, args.native_attempt_dir,
-                        args.prior_native_dir)
+                        args.prior_native_dir, preflight_only=args.preflight_only)
+    if args.preflight_only:
+        print(json.dumps(result, sort_keys=True))
+        return
     print(json.dumps({
         'status': result['status'], 'counters': result['counters'],
         'episodes': len(result['episodes']),

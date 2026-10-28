@@ -172,3 +172,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-28，R02c005 SOURCE_CALIBRATED_HAND_50_V1已接收ACCEPTED_BOUNDED_S2_S3：现有candidate builder通过完整Hand override显式选50，默认2500/旧plan和004 FAIL保留；56项provider-free S1，单次MuJoCo3.8.1 CPU的四episode motion/隔离及四份真实H5独立回读通过。没有改source/算法/物理门/预算。当前按07转入R03b工作包准备，尚无独立Attachment admission或Qualification。报告在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md`。
 
 2026-10-28，Sol已接收R03b attempt001为`ACCEPTED_BOUNDED_S1_S2`：实际双Entity固定装配、两个RuntimeSession trial及256个运动边界/两份reset经离线复核通过。接收时直接补齐source与canonical Joint/Asset声明的一致性拒绝门，99项provider-free回归及原19负例静态检查通过；正确case身份及原S2证据不变，没有新增native。原Luna报告保持签署时状态，当前决定见ignored `sol_review_r03b_001/sol_review.md`。R03c public Env/Recorder/H5及S3/S4仍NOT_RUN、未启动；R06/R05a、DAG/Required Envelope/P99与冻结refs不变。
+
+2026-10-28，R03c001经Sol静态复核后为`S1_REVIEWED_NATIVE_PENDING`：真实Core准入至public reset/step的native-IO替身检查、reader一致篡改拒绝与冻结门、共享执行preflight补齐，当前90项S1通过；没有追加native，原S2/S3仍不完整。GeoPhys继续保留Phase II已验证完整Panda路线；新leaf/Attachment尚有source与Core adapter适配缺口，不能概括成GeoPhys不支持Phase II-01。详细复核在ignored `sol_review_r03c_001/`，原失败raw不改。

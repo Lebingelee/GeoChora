@@ -14,7 +14,7 @@ Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` 的 [panda_nohand.xml](../.
 
 该导出 sphere site 带三分量 size；[MJCF parser](../../../../../GeoPhys/src/geometry/mjcf_loader.py) 将它交给 [SiteConfig](../../../../../GeoPhys/src/geometry/articulation.py)，其 [site_size](../../../../../GeoPhys/src/geometry/site_volume.py) 校验精确形状宽度。原导出 XML/JSON/失败日志仅保全并记录 hash，见 [planning manifest](planning_manifest.json) 和 [README](README.md#provenance)；本轮未重跑或修复它。
 
-本轮以 **MuJoCo 3.8.1 CPU** 完成了一个精确 source/mount 与 INTERIOR_HAND_COMMANDS 的独立 native source/dynamics case；这只说明该固定候选在已执行的操作范围内通过相应oracle，不是 Core 运行支持。GeoPhys a53 对这份导出 source 仍为 NOT_ADMITTED/BLOCKED，未修复、未重跑，也不是该 MuJoCo-only case 的前置。第二 Provider required 范围须另行批准。
+本轮以 **MuJoCo 3.8.1 CPU** 完成了一个精确 source/mount 与 INTERIOR_HAND_COMMANDS 的独立 native source/dynamics case；这只说明该固定候选在已执行的操作范围内通过相应oracle，不是 Core 运行支持。GeoPhys a53 对这份导出 source 仍为 NOT_ADMITTED/BLOCKED，未修复、未重跑，也不是该 MuJoCo-only case 的前置。第二 Provider required 范围须另行批准。GeoPhys没有整体退出Phase II-01：同pin的Phase II完整Panda旧Position/R1路线仍有真实运行证据；当前新leaf与fixed Attachment入口在Core中明确仅准入MuJoCo，GeoPhys adapter尚未接通对应新合同。历史site错误只证明精确导出source的import兼容缺口，不证明GeoPhys动力学无法执行Arm+Hand。source兼容修正、既有GeoPhys adapter扩展与新路线S2/S3是独立待规划工作，本次不更改现有DAG或新开Provider运行。
 
 ## R03a 提前 Gate 与可审计策略
 
@@ -80,12 +80,16 @@ Sol已复核实现提交 `ee5ed6c298bbdab206968873c61944ac35c66dbf`、两个mode
 
 第二个、也是最后一个授权native start在MuJoCo导入前失败：runner仍按“账本只含首轮一行”校验，但其启动账本已按要求先追加了第二行。原stdout/stderr及prelaunch invocation均保留。随后的provider-free修正使retry counter从append-only账本首行重建，并以最终83项S1和无Provider import的定向counter reconstruction验证；**未再次启动native进程**。累计为native starts 2/2、materialization attempts 1、reset attempts 1、`mj_forward` 0、`mj_step` 0、outer intervals 0、模拟时长0。没有完整episode或真实H5，所以真实S2、关闭文件S3、tamper回读均未运行；不得把候选实现或S1通过写成S2/S3通过。原始输入、冻结合同、两次启动记录与失败日志见ignored [R03c attempt001报告](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md)。
 
+### Sol复核：静态修补与待执行窗口
+
+Sol复核结果为`S1_REVIEWED_NATIVE_PENDING`，尚不接收R03c S2/S3。原两次启动及83项S1是attempt001的历史事实；Sol补查发现原S1跳过真实attached-leaf admission，直接补上现有Core admission→public Env reset/step链，只有native model/data/I/O替身，不作为动力学证据。另修正reader对一致伪造Ack target、重哈希槽位互换的拒绝，并移除物理门中的1e-6额外放宽；零四元数也拒绝。90项provider-free S1通过。freezer支持显式新输出/snapshot/prompt的一次新窗口，runner提供与实际导入前同路径的`--preflight-only`，同时验证预追加启动记录，避免再次因账本形状消耗native。原native窗口2/2耗尽，Sol没有追加Provider导入或native；下一份attempt002仅是待维护者转交授权的一个新启动窗口，不是attempt001的第三次启动。
+
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
 | R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；该R03a接收时R03b/c未启动，当前状态见下行 |
 | R03b | R01c,R03a | **attempt001 已接收 `ACCEPTED_BOUNDED_S1_S2`**。精确两-source Panda fixed tree、source closure、model-bound mapping/topology、ResetPlan与真实相对位姿 | Luna原19项S1及Sol补充后的99项provider-free回归通过；两trial各128区间，冻结motion/mount/range/clock/warning/close门全通过。只限本包source/provider/seed/horizon，非Qualification |
-| R03c | R03b,R02c | **attempt001 已实现；provider-free S1 83 passed；S2/S3不完整，等待Sol复核**。两个独立Entity的Position leaf接入既有 public Env→Recorder→reader owners | 两次授权native starts均已消耗且都在任何`mj_step`前失败；累计materialization1/reset1/forward0/step0，无episode/H5。不得复用R03b S2或合成reader S1替代同Env真实运动与闭合H5 S2/S3 |
+| R03c | R03b,R02c | **S1_REVIEWED_NATIVE_PENDING；Sol当前90项S1通过，真实S2/S3不完整**。两个独立Entity的Position leaf接入既有 public Env→Recorder→reader owners | 两次授权native starts均已消耗且都在任何`mj_step`前失败；累计materialization1/reset1/forward0/step0，无episode/H5。不得复用R03b S2或合成reader S1替代同Env真实运动与闭合H5 S2/S3 |
 
 S3 必须沿现有 factory/SelectedReferenceEnv 或已明确批准的公共 candidate 入口，在原 RuntimeSession/Recorder owners 扩展；public path 不导入 test_*。失败保留原日志、partial apply/fault receipt、资源关闭检查；不伪装 rollback。R03 不依赖 Camera 或 R05 force-only 路线；不引入动态 attach/detach/闭环约束拓扑、USD ABI 或第二 Runtime。外部装配语义参考固定 [Isaac Sim 6.1.0](README.md#references)。

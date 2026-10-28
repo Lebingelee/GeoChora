@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import builtins
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -50,17 +51,8 @@ def canonical_sha(value) -> str:
     ).encode()).hexdigest()
 
 
-def main():
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    freeze_dir = OUTPUT / 'freeze'
-    if freeze_dir.exists():
-        raise FileExistsError(freeze_dir)
-    freeze_dir.mkdir()
-    snapshot = json.loads(SNAPSHOT.read_text())
-    if snapshot['core_head'] != subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip():
-        raise ValueError('input HEAD changed before the R03c execution freeze')
-    prior_native_dir = OUTPUT / 'native'
+def _preserved_retry_provenance(output_dir):
+    prior_native_dir = output_dir / 'native'
     prior_failure_path = prior_native_dir / 'native_failure.json'
     prior_progress_path = prior_native_dir / 'native_progress.json'
     prior_ledger_path = prior_native_dir / 'native_process_ledger.jsonl'
@@ -77,7 +69,7 @@ def main():
             or prior_failure.get('counters', {}).get('resets') != 1
             or prior_progress.get('counters', {}).get('native_starts') != 1):
         raise ValueError('preserved first native attempt does not match the authorized pre-step retry conditions')
-    retry_provenance = {
+    return {
         'retry_attempt': 2, 'prior_native_starts': 1,
         'prior_materialization_attempts_reconstructed': 1, 'prior_resets': 1,
         'prior_mj_forward_calls': 0, 'prior_mj_step_calls': 0,
@@ -87,10 +79,36 @@ def main():
         'reconstruction_basis': 'preserved traceback enters ReferenceEnv.materialize_control and RuntimeSession.admit_leaf_control_plan; failed before mj_forward/mj_step',
     }
 
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output-dir', type=Path, default=OUTPUT)
+    parser.add_argument('--snapshot', type=Path, default=SNAPSHOT)
+    parser.add_argument('--prompt', type=Path, default=PROMPT)
+    parser.add_argument('--fresh-window', action='store_true')
+    args = parser.parse_args(argv)
+    output_dir = args.output_dir
+    freeze_dir = output_dir / 'freeze'
+    if freeze_dir.exists():
+        raise FileExistsError(freeze_dir)
+    snapshot = json.loads(args.snapshot.read_text())
+    if snapshot['core_head'] != subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip():
+        raise ValueError('input HEAD changed before the R03c execution freeze')
+    if args.fresh_window:
+        if (snapshot.get('native_window', {}).get('max_starts') != 1
+                or snapshot.get('native_window', {}).get('consumed') is not False):
+            raise ValueError('fresh R03c window requires an explicit unconsumed one-start snapshot')
+        if (output_dir / 'native').exists():
+            raise FileExistsError('fresh R03c window already contains a native directory')
+        retry_provenance = {}
+    else:
+        retry_provenance = _preserved_retry_provenance(output_dir)
     original_import = builtins.__import__
 
     def block_provider(name, *args, **kwargs):
-        if name.split('.', 1)[0] in {'mujoco', 'taichi'}:
+        level = args[3] if len(args) > 3 else kwargs.get('level', 0)
+        if level == 0 and name.split('.', 1)[0] in {'mujoco', 'taichi'}:
             raise AssertionError(f'provider-free freeze imported {name}')
         return original_import(name, *args, **kwargs)
 
@@ -169,12 +187,15 @@ def main():
     contract = {
         'schema_version': 'r03c-attached-leaf-execution-contract-v1',
         'input_head': snapshot['core_head'], 'backend': 'cpu',
+        'fresh_native_window': args.fresh_window,
         'retry_provenance': retry_provenance,
         'provider': {'package_version': '3.8.1', 'runtime_version': '3.8.1', 'api_version': 3008001},
         'seed': 31, 'horizon': 64, 'outer_dt_s': 0.01, 'physics_dt_s': 0.002,
         'substeps': 5, 'episodes': rows,
         'required_native_totals': {
-            'native_starts': 2, 'materialization_attempts': 5, 'resets': 5,
+            'native_starts': 1 if args.fresh_window else 2,
+            'materialization_attempts': 4 if args.fresh_window else 5,
+            'resets': 4 if args.fresh_window else 5,
             'mj_forward_max': 300,
             'outer_intervals': 256, 'mj_step_calls': 1280, 'simulated_seconds': 2.56,
         },
@@ -191,6 +212,9 @@ def main():
         },
     }
     code_hashes = {relative: sha(ROOT / relative) for relative in SOURCES}
+    # Do not leave a partial freeze directory when candidate/static validation
+    # fails. Raw evidence from earlier windows is never reused as this output.
+    freeze_dir.mkdir(parents=True, exist_ok=False)
     contract_path = freeze_dir / 'executed_contract.json'
     contract_path.write_text(json.dumps(contract, sort_keys=True, indent=2, allow_nan=False) + '\n')
     (freeze_dir / 'source_inventory.json').write_text(
@@ -199,7 +223,7 @@ def main():
     (freeze_dir / 'execution_freeze.json').write_text(json.dumps({
         'schema_version': 'r03c-execution-freeze-v1',
         'input_head': snapshot['core_head'], 'branch': snapshot['branch'],
-        'prompt_sha256': sha(PROMPT), 'snapshot_sha256': sha(SNAPSHOT),
+        'prompt_sha256': sha(args.prompt), 'snapshot_sha256': sha(args.snapshot),
         'code_sha256': code_hashes,
         'executed_contract_sha256': sha(contract_path),
         'executed_contract_identity_sha256': canonical_sha(contract),

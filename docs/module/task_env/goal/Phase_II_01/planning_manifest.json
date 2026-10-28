@@ -1138,11 +1138,11 @@
         "R03b",
         "R02c"
       ],
-      "status": "IMPLEMENTED_S1_PASS_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
-      "execution": "R03C_ATTEMPT001_IMPLEMENTED_S1_PASS_NATIVE_START_BUDGET_EXHAUSTED",
+      "status": "S1_REVIEWED_NATIVE_PENDING",
+      "execution": "ATTEMPT001_NATIVE_BUDGET_SPENT_SOL_STATIC_FIXES_PASS_NO_NEW_NATIVE",
       "required_evidence": "Selected provider-free S1 plus four same-public-Env MuJoCo 3.8.1 CPU episodes and independent readback of four closed Generic H5 files; S2/S3 were not completed in this attempt.",
       "stop_condition": "The two authorized native process starts are consumed. Both stopped before mj_step; no third start. Preserve both failure records and do not claim S2/S3 without four real same-Env H5 episodes and independent readback.",
-      "result": "Task-owned two-Entity Position-leaf candidate/Env/Recorder/reader implementation and selected S1 passed (83 tests). Native start 1 verified pinned MuJoCo CPU identity, then failed public reset admission because the Attachment receipt Entity-scoped Hand tendon key did not map to the Hand leaf logical identity. After that one Core mapping repair and a new freeze, native start 2 exited before provider import because retry accounting rejected the append-only second ledger row. A provider-free retry-counter repair and S1 rerun passed; the native-start budget is exhausted. No complete episode/H5 was produced; S2 is incomplete and real S3 is NOT_RUN. Sol review pending; no Provider admission, general Attachment support or Qualification.",
+      "result": "Sol reviewed b42287c and preserved two pre-step failures; added actual attached admission/public Env reset-step S1 with native IO stand-ins, coherent H5 Ack/slot rejection and strict frozen motion gates, plus shared fresh-window preflight. 90 current provider-free tests pass. No real episode/H5 or R03c S2/S3 acceptance; attempt001 starts2/2 remain spent. Prepare only a separately authorized one-start attempt002; no other slice.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md",
       "attempt001_execution": {
         "input_head": "703e8a1b184b18e7efbc0b5532b96fb3a462b4d2",
@@ -1218,6 +1218,18 @@
         "R06_R05a_DAG_Required_Envelope_P99_unchanged": true,
         "other_slice_started": false,
         "sol_review": "PENDING"
+      },
+      "sol_review": {
+        "decision": "S1_REVIEWED_NATIVE_PENDING",
+        "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
+        "current_provider_free_tests": 90,
+        "actual_native_imports": 0,
+        "actual_native_starts": 0,
+        "S2": "INCOMPLETE",
+        "S3": "NOT_RUN",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_001/sol_review.md",
+        "next_package": "R03c attempt002, one separate human-authorized native start only; not attempt001 start3",
+        "geophys_scope": "Earlier Phase II full-Panda routes retain bounded evidence; new leaf/Attachment source and Core adapter gap, not a blanket provider or phase exclusion."
       }
     },
     {
@@ -1430,14 +1442,14 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
-    "03_R03_Physical_Attachment.md": "7e0d5f90c49a7280c571c99f365e0b7a1bd8980be5fadd65229355ab3dc84807",
+    "03_R03_Physical_Attachment.md": "c8708520df92e4a2cd6e1e046cc606881fa22dd04b9a1550c57acbd8f5c1774d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "c45754dddfa9452618c3cd0c549f8ad3ba114a2e526189606717bd0556e637a8",
+    "07_Execution_Order_and_Acceptance.md": "01284cf7b4408b668ac1b3f5a93d9779162e486ec5e014ff3a1423dfc634123a",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "510dd1e1638a5e84905095cab8a1c7693f04757400fc3fcd3115bdfc4911d277"
+    "README.md": "737806c8d979b665132b42a8a6c9548da7af614917b739ccdd68273b216a5867"
   },
   "revision_kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
   "benchmark_audit": {
@@ -3619,6 +3631,13 @@
       "qualification_granted": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md",
       "sol_review": "PENDING"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R03C_STATIC_REVIEW_AND_PREFLIGHT_REPAIR",
+      "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
+      "result": "S1_REVIEWED_NATIVE_PENDING",
+      "scope": "90 provider-free checks; actual Core owner chain, coherent reader rejection, strict oracles, fresh-window preflight. No additional native, S2/S3 acceptance or next-slice start."
     }
   ],
   "P00_audit": {

@@ -44,7 +44,8 @@ def _candidate(monkeypatch, **kwargs):
     original = builtins.__import__
 
     def guarded(name, *args, **options):
-        if name == 'mujoco' or name.startswith('mujoco.'):
+        level = args[3] if len(args) > 3 else options.get('level', 0)
+        if level == 0 and (name == 'mujoco' or name.startswith('mujoco.')):
             raise AssertionError('provider-free R03c S1 imported MuJoCo')
         return original(name, *args, **options)
 
@@ -54,26 +55,46 @@ def _candidate(monkeypatch, **kwargs):
 
 def _fixed_receipt(candidate, materialization_id='synthetic-materialization-r03c'):
     plan = candidate.attachment_plan
+    bindings = {ref.joint_id: (entry.binding, limits)
+                for entry in candidate.plan.leaves
+                for ref, limits in zip(entry.binding.joint_order, entry.binding.joint_position_limits, strict=True)}
+    body_names = ['world', *plan.native_body_names.values()]
+    body_ids = {name: index for index, name in enumerate(body_names)}
+    parent_names = {'link0': 'world', **{f'link{i}': f'link{i-1}' for i in range(1, 8)},
+                    'attachment': 'link7', 'probe_hand_hand': 'attachment',
+                    'probe_hand_left_finger': 'probe_hand_hand',
+                    'probe_hand_right_finger': 'probe_hand_hand'}
     joints = {}
     for index, (canonical, native) in enumerate(plan.native_joint_names.items()):
+        entity, local = canonical.split('/')
+        binding, limits = bindings[local]
+        joint = next(joint for articulation in candidate.scene.articulations
+                     if articulation.entity_id == entity
+                     for joint in articulation.joints if joint.joint_id == local)
         joints[canonical] = {
             'native_name': native, 'joint_id': index, 'qpos_address': index,
-            'dof_address': index, 'type': 3, 'axis': [0.0, 0.0, 1.0],
-            'limited': True, 'range': [0.0, 0.04], 'body_id': index + 1,
+            'dof_address': index, 'type': 3 if binding.profile_kind == 'arm_position' else 2,
+            'axis': list(joint.axis), 'limited': True, 'range': list(limits),
+            'body_id': body_ids[plan.native_body_names[f'{entity}/{joint.child_frame.frame_id}']],
         }
     actuators = {}
     for index, (canonical, native) in enumerate(plan.native_actuator_names.items()):
+        hand = canonical.startswith('panda-hand/')
+        target = 'probe_hand_split' if hand else native.replace('actuator', 'joint')
         actuators[canonical] = {
             'native_name': native, 'actuator_id': index, 'ctrl_slot': index,
-            'transmission_type': 0, 'target_native_name': 'joint1',
-            'ctrl_limited': True, 'ctrl_range': [-10.0, 10.0],
+            'transmission_type': 3 if hand else 0, 'target_native_name': target,
+            'ctrl_limited': True, 'ctrl_range': [0.0, 255.0] if hand else list(bindings[target][1]),
             'force_limited': False, 'force_range': [0.0, 0.0],
         }
     bodies = {canonical: {
         'native_name': native, 'body_id': index + 1,
-        'parent_body_id': 0, 'parent_native_name': 'world',
+        'parent_body_id': body_ids[parent_names[native]], 'parent_native_name': parent_names[native],
     } for index, (canonical, native) in enumerate(plan.native_body_names.items())}
-    tendons = {canonical: {'native_name': native, 'tendon_id': 0, 'wraps': []}
+    tendons = {canonical: {'native_name': native, 'tendon_id': 0, 'wraps': [
+        {'wrap_type': 1, 'joint_native_name': 'probe_hand_finger_joint1', 'coefficient': 0.5},
+        {'wrap_type': 1, 'joint_native_name': 'probe_hand_finger_joint2', 'coefficient': 0.5},
+    ]}
                for canonical, native in plan.native_tendon_names.items()}
     payload = {
         'schema_version': 'fixed-attachment-model-receipt-v1',
@@ -94,10 +115,10 @@ def _fixed_receipt(candidate, materialization_id='synthetic-materialization-r03c
             'parent_site_from_child_root': plan.parent_site_from_child_root.to_mapping(),
             'root_policy': plan.root_policy,
         },
-        'dimensions': {'nq': 9, 'nv': 9, 'nu': 8, 'njnt': 9, 'nbody': 20,
-                       'nsite': 2, 'nmesh': 0, 'ngeom': 1, 'neq': 1,
+        'dimensions': {'nq': 9, 'nv': 9, 'nu': 8, 'njnt': 9, 'nbody': 13,
+                       'nsite': 1, 'nmesh': 67, 'ngeom': 81, 'neq': 1,
                        'ntendon': 1, 'nexclude': 3},
-        'native_body_order': list(plan.native_body_names.values()),
+        'native_body_order': body_names,
         'native_joint_order': list(plan.native_joint_names.values()),
         'native_actuator_order': list(plan.native_actuator_names.values()),
         'native_body_mappings': bodies, 'native_site_mappings': {},
@@ -136,7 +157,9 @@ def _synthetic_io(candidate):
             slot = len(actuator_rows)
             actuator_rows.append(LeafNativeActuatorMappingV1(
                 'leaf-native-actuator-mapping-v1', pair.actuator, pair.actuator.actuator_id,
-                slot, slot, (-10.0, 10.0), 'radian', 'joint', native_joint_by_ref[pair.joint],
+                slot, slot, tuple(attachment['native_actuator_mappings'][
+                    f'{pair.actuator.entity_id}/{pair.actuator.actuator_id}'
+                ]['ctrl_range']), 'radian', 'joint', native_joint_by_ref[pair.joint],
             ))
         if entry.binding.profile_kind == 'hand_position':
             ref = entry.binding.actuator_order[0]
@@ -148,14 +171,14 @@ def _synthetic_io(candidate):
         frame_rows.append(LeafNativeFrameMappingV1(
             'leaf-native-frame-mapping-v1', entry.binding.tcp_frame,
             ('link7' if entry.binding.entity_id == 'panda-arm' else 'probe_hand_hand'),
-            10 if entry.binding.entity_id == 'panda-arm' else 11,
+            attachment['native_body_mappings'][f'{entry.binding.entity_id}/{entry.binding.tcp_frame.frame_id}']['body_id'],
         ))
     receipt = LeafMaterializationReceiptV1(
         'leaf-materialization-receipt-v1', 'synthetic_fixture', plan.scene_identity_sha256,
         plan.source_closure_sha256, plan.identity_sha256, plan.provider_name,
         plan.provider_version, plan.provider_build_sha256, plan.backend,
         'synthetic-materialization-r03c', 'leaf-' + plan.identity_sha256[:20],
-        9, 9, 8, 9, 20, 1, 1, tuple(joint_rows), tuple(actuator_rows),
+        9, 9, 8, 9, 13, 1, 1, tuple(joint_rows), tuple(actuator_rows),
         tuple(frame_rows), (LeafNativeTendonMappingV1(
             'leaf-native-tendon-mapping-v1', 'hand.xml/tendon/split', 'probe_hand_split',
         ),), ('hand.xml/equality/finger_joint1=finger_joint2',),
@@ -409,6 +432,155 @@ def test_attached_public_materialization_reaches_existing_runtime_owner_without_
     assert len(calls) == 1
 
 
+def _session_with_synthetic_native_io(candidate):
+    """Keep all Core owners real; replace only the native model/data operations.
+
+    This models names, slots and dimensions, never physical motion. In
+    particular the source tendon key differs from the leaf logical identity.
+    """
+    from task_env.runtime.sessions.mujoco import _MuJoCoSession
+    session = object.__new__(_MuJoCoSession)
+    session._initialize_values(candidate.artifact, candidate.source, 'mujoco')
+    receipt = _fixed_receipt(candidate, session.provider_materialization_id)
+    joint_rows = sorted(receipt['native_joint_mappings'].values(), key=lambda row: row['joint_id'])
+    actuator_rows = sorted(receipt['native_actuator_mappings'].values(), key=lambda row: row['actuator_id'])
+    names = {
+        'joint': [row['native_name'] for row in joint_rows],
+        'actuator': [row['native_name'] for row in actuator_rows],
+        'body': receipt['native_body_order'], 'tendon': ['probe_hand_split'],
+    }
+    model = SimpleNamespace(
+        nq=9, nv=9, nu=8, njnt=9, nbody=13, neq=1, ntendon=1,
+        jnt_type=np.asarray([row['type'] for row in joint_rows]),
+        jnt_limited=np.ones(9, dtype=bool),
+        jnt_range=np.asarray([row['range'] for row in joint_rows]),
+        jnt_qposadr=np.arange(9), jnt_dofadr=np.arange(9),
+        actuator_ctrlrange=np.asarray([row['ctrl_range'] for row in actuator_rows]),
+        actuator_ctrllimited=np.ones(8, dtype=bool),
+        actuator_trnid=np.asarray([[i, -1] for i in range(7)] + [[0, -1]]),
+        actuator_trntype=np.asarray([0]*7 + [3]),
+        tendon_num=np.asarray([2]), tendon_adr=np.asarray([0]),
+        wrap_type=np.asarray([1, 1]), wrap_objid=np.asarray([7, 8]), wrap_prm=np.asarray([0.5, 0.5]),
+        eq_type=np.asarray([2]), eq_obj1id=np.asarray([7]), eq_obj2id=np.asarray([8]),
+        opt=SimpleNamespace(timestep=0.002),
+    )
+    data = SimpleNamespace(qpos=np.zeros(9), qvel=np.zeros(9), act=np.zeros(0),
+        ctrl=np.zeros(8), time=0.0, xpos=np.zeros((13,3)),
+        xquat=np.tile((1.,0.,0.,0.), (13,1)),
+        site_xpos=np.zeros((1,3)), site_xmat=np.eye(3).reshape(1,9))
+
+    def name2id(_model, kind, name):
+        return names[kind].index(name) if name in names[kind] else -1
+
+    def reset(_model, values):
+        values.qpos[:]=0; values.qvel[:]=0; values.ctrl[:]=0; values.time=0.0
+
+    def step(_model, values):
+        values.time += 0.002  # IO stand-in advances clock only, no physics.
+
+    def quaternion(output, matrix):
+        output[:] = (1.,0.,0.,0.)
+
+    session._model, session._data = model, data
+    session._mj = SimpleNamespace(
+        mjtJoint=SimpleNamespace(mjJNT_FREE=0, mjJNT_HINGE=3, mjJNT_SLIDE=2),
+        mjtObj=SimpleNamespace(mjOBJ_JOINT='joint', mjOBJ_ACTUATOR='actuator', mjOBJ_BODY='body', mjOBJ_TENDON='tendon'),
+        mjtTrn=SimpleNamespace(mjTRN_JOINT=0, mjTRN_TENDON=3),
+        mjtEq=SimpleNamespace(mjEQ_JOINT=2),
+        mj_name2id=name2id, mj_id2name=lambda _m, kind, index: names[kind][index],
+        mj_resetData=reset, mj_forward=lambda *_: None, mj_step=step, mju_mat2Quat=quaternion,
+    )
+    session._fixed_attachment_receipt=receipt
+    session._fixed_attachment_close_receipt=None
+    session._joint_addresses={key:(row['qpos_address'],row['dof_address']) for key,row in receipt['native_joint_mappings'].items()}
+    session._bodies={key:row['body_id'] for key,row in receipt['native_body_mappings'].items()}
+    session._frames={key:0 for key in candidate.source.frames}
+    session._free_addresses={}
+    session._target_actuators={key:names['actuator'].index(native) for key,native in candidate.source.joint_targets.items()}
+    session._open_actuators=(7,)
+    session._native_steps=0; session._fixed_forward_calls=0
+    session._leaf_plan=None; session._leaf_materialization_receipt=None
+    session._leaf_fault=None; session._leaf_consumed_boundaries=set()
+    session._leaf_interval_active=False; session._leaf_interval_writers=set()
+    session._leaf_active_plan_identity=None
+    return session
+
+
+def test_public_env_reset_and_step_reach_real_attached_admission_and_publication(monkeypatch):
+    from task_env.runtime.sessions import api
+    candidate=_candidate(monkeypatch)
+    session=_session_with_synthetic_native_io(candidate)
+    monkeypatch.setattr(api, '_materialize_admitted', lambda *_:session)
+    try:
+        obs, info=candidate.env.reset(seed=31)
+        receipt=session.leaf_materialization_receipt
+        assert receipt.tendons[0].tendon_identity == 'hand.xml/tendon/split'
+        assert receipt.tendons[0].native_name == 'probe_hand_split'
+        assert candidate.attachment_plan.native_tendon_names == {'panda-hand/split':'probe_hand_split'}
+        assert obs['state']['entities']['panda-arm']['joint_position'].shape==(7,)
+        assert obs['state']['entities']['panda-hand']['joint_position'].shape==(2,)
+        assert session._data.ctrl[7] == 242.25
+        candidate.env.step(action_for_interval(candidate,1,arm_active=True,hand_active=True))
+        assert session._native_steps==5 and session._fixed_forward_calls==2
+        assert candidate.env.typed_state.view.boundary.control_step==1
+        assert len(session._leaf_consumed_boundaries)==1
+        assert candidate.env.state.simulation_time==0.01
+    finally:
+        candidate.env.close()
+    assert session._closed and session._model is None and session._data is None
+
+
+def test_real_attached_admission_rejects_logical_tendon_key_in_source_namespace(monkeypatch):
+    candidate=_candidate(monkeypatch)
+    session=_session_with_synthetic_native_io(candidate)
+    receipt=session._fixed_attachment_receipt
+    receipt['native_tendon_mappings']['hand.xml/tendon/split']=receipt['native_tendon_mappings'].pop('panda-hand/split')
+    with pytest.raises(ValueError,match='actuator/tendon mapping'):
+        session.admit_leaf_control_plan(candidate.plan)
+    assert session._native_steps==0
+    session.close()
+
+
+def test_fresh_freeze_and_real_runner_preflight_validate_reserved_ledger_without_provider(monkeypatch, tmp_path):
+    import subprocess
+    from task_env.diagnostics.tasks import r03c_freeze
+    from task_env.diagnostics.tasks.r03c_attached_leaf_probe import run_native
+
+    original_import=builtins.__import__
+    def block(name,*args,**kwargs):
+        level=args[3] if len(args)>3 else kwargs.get('level',0)
+        if level==0 and name.split('.')[0] in {'mujoco','taichi'}:
+            raise AssertionError('static execution preflight reached native import')
+        return original_import(name,*args,**kwargs)
+    monkeypatch.setattr(builtins,'__import__',block)
+    root=r03c_freeze.ROOT
+    snapshot=json.loads(r03c_freeze.SNAPSHOT.read_text())
+    prompt=tmp_path/'prompt.md'; prompt.write_text('Synthetic S1 gate fixture; not native execution authorization.\n')
+    snapshot.update(core_head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
+                    prompt=str(prompt),native_window={'max_starts':1,'consumed':False})
+    snapshot_path=tmp_path/'snapshot.json'; snapshot_path.write_text(json.dumps(snapshot))
+    output=tmp_path/'fresh-package'
+    r03c_freeze.main(['--fresh-window','--output-dir',str(output),'--snapshot',str(snapshot_path),'--prompt',str(prompt)])
+    result=run_native(output,snapshot_path,preflight_only=True)
+    assert result['status']=='PROVIDER_FREE_NATIVE_PREFLIGHT_READY'
+    assert result['provider_imports']==result['native_starts']==result['mj_step_calls']==0
+    assert not (output/'native').exists()
+    with pytest.raises(FileNotFoundError):
+        run_native(output,snapshot_path)  # Actual import remains behind mandatory reservation.
+    native=output/'native'; native.mkdir()
+    record={'attempt':1,'event':'START_RECORDED_BEFORE_NATIVE_PROCESS_LAUNCH',
+            'budget_before_start':{'native_starts':0},'budget_after_reserving_start':{'native_starts':1},
+            'executed_contract_sha256':hashlib.sha256((output/'freeze/executed_contract.json').read_bytes()).hexdigest()}
+    (native/'native_invocation.json').write_text(json.dumps(record))
+    ledger=native/'native_process_ledger.jsonl'; ledger.write_text(json.dumps(record)+'\n')
+    assert run_native(output,snapshot_path,preflight_only=True)['expected_episodes']==4
+    assert not (native/'native_progress.json').exists()
+    ledger.write_text(ledger.read_text()+json.dumps(record)+'\n')
+    with pytest.raises(ValueError,match='one bound prelaunch'):
+        run_native(output,snapshot_path,preflight_only=True)
+    assert 'mujoco' not in __import__('sys').modules and 'taichi' not in __import__('sys').modules
+
+
 def _observation(candidate, index, boundary_id):
     arm_values = np.asarray(ARM_HOME, dtype=np.float32).copy()
     if candidate.arm_active:
@@ -448,7 +620,7 @@ def _observation(candidate, index, boundary_id):
     }
 
 
-def test_attached_generic_h5_closes_and_independently_reads_back_without_native(monkeypatch, tmp_path):
+def _write_attached_recording(monkeypatch, tmp_path):
     candidate = _candidate(monkeypatch, episode_id='E3')
     receipt, publication, attachment = _synthetic_io(candidate)
     runtime = _SyntheticRuntime(candidate, receipt, publication, attachment)
@@ -495,6 +667,11 @@ def test_attached_generic_h5_closes_and_independently_reads_back_without_native(
     result = env.finish_recording('horizon')
     assert result['schema_version'] == 'v3'
     assert result['transition_count'] == 64 and result['observation_count'] == 65
+    return candidate, env
+
+
+def test_attached_generic_h5_closes_and_independently_reads_back_without_native(monkeypatch, tmp_path):
+    candidate, env = _write_attached_recording(monkeypatch, tmp_path)
     cases = {
         'target_identity': lambda rows: rows[0]['writer_controls'][0]['controller_target'].__setitem__('identity_hash', '0' * 64),
         'ack_writer': lambda rows: rows[0]['writer_controls'][0]['canonical_action']['application_ack'].__setitem__('writer_id', 'tampered-writer'),
@@ -595,3 +772,36 @@ def test_attached_generic_h5_closes_and_independently_reads_back_without_native(
         'tamper_rejections': 12,
     }
     assert 'mujoco' not in __import__('sys').modules and 'taichi' not in __import__('sys').modules
+
+
+@pytest.mark.parametrize('case', ('ack_target', 'ctrl_slot_permutation', 'near_failed_hand_close', 'zero_rotation'))
+def test_attached_reader_rejects_coherent_corruption_and_failed_motion(monkeypatch, tmp_path, case):
+    import h5py
+    from task_env.recorders.h5 import _read_text
+    from task_env.runtime.sessions.leaf_control import LeafPreparedCommandV1
+
+    _, env = _write_attached_recording(monkeypatch, tmp_path)
+    destination=tmp_path/f'coherent-{case}.h5'
+    shutil.copy2(env.recording_path, destination)
+    with h5py.File(destination, 'r+') as root:
+        rows=json.loads(_read_text(root, 'meta/structured_controls_v1_json'))
+        row=rows[0]['writer_controls'][0]
+        if case=='ack_target':
+            row['canonical_action']['application_ack']['target_identity_hash']='0'*64
+            row['applied_control']['payload']['ack']['target_identity_hash']='0'*64
+        elif case=='ctrl_slot_permutation':
+            payload=row['canonical_action']['prepared_command']
+            slots=payload['slot_values']
+            slots[0]['ctrl_slot'],slots[1]['ctrl_slot']=slots[1]['ctrl_slot'],slots[0]['ctrl_slot']
+            row['canonical_action']['command_identity_sha256']=LeafPreparedCommandV1.from_mapping(payload).command_identity_sha256
+            row['applied_control']['payload']['applied_slots']=[item['ctrl_slot'] for item in slots]
+        elif case=='near_failed_hand_close':
+            root['obs/state/entities/panda-hand/joint_position'][16:33]=[[0.01000025]*2]*17
+        else:
+            root['obs/state/entities/panda-hand/hand_pose'][0,3:7]=[0.0]*4
+        if case in ('ack_target', 'ctrl_slot_permutation'):
+            del root['meta/structured_controls_v1_json']
+            root.create_dataset('meta/structured_controls_v1_json',data=json.dumps(rows),
+                                dtype=h5py.string_dtype(encoding='utf-8'))
+    with pytest.raises(ValueError):
+        load_leaf_control_records_h5(destination)

@@ -859,6 +859,13 @@ leaf logical tendon identity, before any forward or step. The second and final
 authorized start stopped before provider import because the retry runner did
 not accept its already-appended ledger row. A provider-free retry-counter fix
 and S1 rerun passed; the native budget is exhausted, with no real episode/H5
-or S2/S3 result. Sol review is pending. Read the current scope and limits in the
+or S2/S3 result. Sol reviewed the static implementation and added real Core
+admission→public Env reset/step S1 with native IO stand-ins, coherent Ack/slot
+tamper checks, strict physical thresholds and a shared pre-import execution
+preflight. The current 90 provider-free tests pass; the state is
+`S1_REVIEWED_NATIVE_PENDING`, not S2/S3 acceptance. Use the existing
+`r03c_freeze` explicit output/snapshot/prompt and `r03c_attached_leaf_probe
+--preflight-only` before any separately authorized new native window; never
+reuse attempt001's spent two-start budget. Read the current scope and limits in the
 [R03 contract](../../../docs/module/task_env/goal/Phase_II_01/03_R03_Physical_Attachment.md)
 and the current materialization boundary in [Public API](../../../docs/module/task_env/public-api.md).
