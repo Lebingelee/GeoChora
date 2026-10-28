@@ -1,8 +1,8 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-28。状态：**F00 PARTIAL → attempt002 收口；F01 HOLD_UNTIL_F00_ACCEPTED**。
+更新于 2026-10-28。状态：**F00 attempt002 完整出口满足、待Sol复核；F01 HOLD_UNTIL_F00_ACCEPTED**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
-`develop-full` 集成、Harness 生命周期修复和定向 provider-free S1 已完成。唯一有界 synthetic MuJoCo campaign 已执行，但 20/20 seeds 均为 `expert_failed / gripper_readiness_timeout`；candidate 未通过，因此 Oracle/H5 与 pending Judge 未运行，F00 native 兼容出口未通过。
+F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其20/20 synthetic seeds均为`expert_failed / gripper_readiness_timeout`；该失败原件保持不变。attempt002随后完成受控物理归因、输入修复、20-seed native验收、Oracle/H5独立读回和pending Judge prepare/verify。完整出口仅待Sol复核；F01仍未派发或启动。
 R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
 
 2026-10-28 Sol复核F00 attempt001：接收 `develop-full` 两线整合与完成事实修复/S1；33项manifest（25文件、8个Git blob）匹配，13项provider-free tests复核通过，20条原始campaign行经report validator再核一致。candidate仍为20/20 `expert_failed / gripper_readiness_timeout`，ledger round1 fail/state ready、Oracle/H5/Judge未运行；F00整体保持PARTIAL。该专家可行性缺口不作为独立F01安装/官方原生Panda+刚体对照的前置。维护者要求下一子阶段工作包，当前明确选择F01，之后按F02/F03/F04逐包推进；R04b/c可独立安排，原DAG/P99门保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md`。
@@ -177,6 +177,16 @@ close 成功后产生。`construction_ledger.finish` 与 `judge_package.check_pr
 reset/step/close 的实际 MuJoCo campaign 运行；campaign 中 assets、compile、semantic 三份报告通过，feasibility 报告失败。seed 0–19 全部是 `expert_failed`，原因 `gripper_readiness_timeout`；每行 reset/close 成功，steps 为 853–864，物理 task success 0/20、expert failure 20/20，没有 termination/truncation、execution fault、step error 或 cleanup error。进程正常结束而非 timeout，退出码 1，wall 56.45 s、user 56.13 s、system 0.81 s、CPU 100%、peak RSS 568368 KiB、swap 0。账本记录一轮失败并保持 `ready`，不是 `candidate_ready`。
 
 该 campaign 使用此包新生成的 synthetic pick-lift box proxy，asset SHA-256 `317ef3820b957f17e1a9ad0e09732b5863360e74eebf22446d3e1254d1a67be5`；它不是未提供的历史 handoff bytes，也不是真实 benchmark。Oracle seed0、同-run H5 reader 和 Judge prepare/verify 按失败门未运行，无 H5 或 Judge 包；不得将 `expert_failed` 解释为 task infeasible、不能记 Harness acceptance，Qualification 保持 `NOT_ASSESSED`。没有重试 campaign、修改 candidate/reset 分布或启动其他 slice。逐 seed 原始行、四份报告、账本、stdout/stderr、进程退出与资源日志见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/`。
+
+## F00 attempt002 完整出口（待Sol复核）
+
+2026-10-28，Luna在输入HEAD `3bfd07a323fbcfdc3ee6f7ba9bfddbe54165a6cd`及clean tracked tree上开始，复用`develop-full`。实现提交为`0d75d7646d45f96cc22c567aa61e070dbab5dd94`；没有新建branch/worktree、push/merge或改动tag/submodule。F00 attempt001原件不变。完整命令、raw traces、run ledger、H5和pending Judge包见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/`。
+
+归因先执行同seed0、同reset/timebase/horizon/控制路线的builtin与旧mock真实Core A/B。builtin在427 outer steps有效完成；旧mock在854 steps的`close_gripper`阶段以`gripper_readiness_timeout`失败。两边controller/expert/readiness身份相同，public target/Ack哈希持续匹配，execution fault均未出现；完整编译source body不同。builtin包含freejoint damping `0.8`、armature `0.01`、collision margin `0.001`、condim `4`、friction `1.8 0.10 0.002`、contype/conaffinity、独立visual与center site；旧mock缺少这些配置，diaginertia也不同（`3.5e-05` vs `0.000033333333`）。该A/B支持source/composition差异是解释路径，但不能隔离唯一物理因果属性。v002保留现有builtin body物性与reset/goal/timebase，改用新synthetic UID/version及XML hash；未降低30N readiness、未改R1、0.06m reset、0.10m goal、6000 horizon、solver或provider路线。
+
+修复后seed0/19 sentinel均以MuJoCo 3.8.1 CPU运行并valid solved（427/433 steps）。该sentinel runner在两episode完成后因汇总变量`STARTED`未初始化退出1；raw stdout/traces保留，provider-free整理验证两episode facts，没有重启。正式campaign单进程exit 0：seeds0–19全部`solved`，无invalid、expert_failed、unknown、execution fault、termination/truncation或cleanup error，共8612 outer steps、29.66秒wall、peak RSS 626312 KiB。ledger为v1 `candidate_ready`：round1仍为旧Core `6e47776`上的fail，round2在实现Core`0d75d76`上pass，artifact `6320dd63cf056f229fec9ad5156722e2d233f7f3c65f7f51bf8026983eac83bb`。20-seed结果是此synthetic lift候选证据，不表示LIBERO In/On等价。
+
+同一commit/spec/catalog执行Oracle seed0一次，exit 0；task success与expert完成、无fault/terminal/cleanup error，427 transitions、428 boundaries。真实canonical H5关闭，T+1、逻辑映射精确回读与独立Core inspector均通过。实际Judge `prepare`和独立`verify`都通过，86项文件已核验，decision仍`pending`，Qualification/D0/D1/D2均`NOT_ASSESSED`。此状态报告为`F00_FULL_PASS_PENDING_SOL_REVIEW`，不是Sol接收、Human批准、正式Qualification或training-ready。F01继续`HELD`，本包没有安装/启动Isaac，也没有启动其他slice或运行全局文档validator。
 
 源码审计、固定 Harness 13 文件副本、9 项 host-only 检查及失败复现在 ignored
 `workspace/maintenance/multi_provider_asset_harness_review_20261028_001/`。

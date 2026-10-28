@@ -1850,18 +1850,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "c94752d534e69918f5de9b208fce59e129c519989e4c6fcd70883926f54bb854",
+    "README.md": "359b261b640f66a2ded92db9c9e9fd6a4863952ebc48e1eac08a5ee2045fba87",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "83eb321d0f5c3ff8745f41436524b0b75eeee35149d601390393b0967888f50b",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "c8e83d864012947cee788a8cbbfa9fb1bc7c52e3de78f386dbaf2ef1f15229cc",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "71fdf4f9a2b25b8f02485ba5e984a05abed5cee8e39d8eef9bf43868815e0dee"
+    "07_Execution_Order_and_Acceptance.md": "a33826bb700846419007c1808465d38225ed448dcb4117bf32cd929e1a01edd0"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4203,6 +4203,28 @@
       "qualification": "NOT_ASSESSED",
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/",
       "other_slice_started": false
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_F00_ATTEMPT002_FULL_CLOSURE_PENDING_SOL_REVIEW",
+      "input_head": "3bfd07a323fbcfdc3ee6f7ba9bfddbe54165a6cd",
+      "implementation_commit": "0d75d7646d45f96cc22c567aa61e070dbab5dd94",
+      "result": "F00_FULL_PASS_PENDING_SOL_REVIEW",
+      "scope": "Public builtin-versus-old-mock attribution, evidence-bound v1 ledger/Judge continuation, versioned synthetic proxy, targeted S1, one bounded 20-seed MuJoCo 3.8.1 CPU campaign, one Oracle/H5/independent inspector, pending Judge prepare/verify, current F00 docs and local commits.",
+      "native_processes": 4,
+      "diagnostic_episodes": 4,
+      "campaign_seed_count": 20,
+      "campaign_totals": {
+        "solved": 20,
+        "invalid": 0,
+        "expert_failed": 0,
+        "unknown": 0
+      },
+      "oracle": "PASS; 427 transitions/428 boundaries; H5 and independent inspector passed",
+      "judge": "prepare/verify PASS; pending; 86 files verified",
+      "qualification_granted": false,
+      "F01_started": false,
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/"
     }
   ],
   "P00_audit": {
@@ -4504,7 +4526,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 integration/fix/S1 accepted, mock feasibility failed; attempt002 full closure selected; F01 draft held until F00 accepted",
+    "patch_rows_status": "F00 attempt002 full-exit gates passed pending Sol review; F01 remains HELD until F00 is accepted",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4681,7 +4703,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F00 attempt002",
+      "selected_next": "Sol review of F00 attempt002",
       "after_that_priority": [
         "F01 only after full F00 accepted",
         "F02",
@@ -4691,10 +4713,11 @@
         "F06 ready cells"
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
-      "F00_status": "PARTIAL; integration/fix/S1 accepted, mock feasibility failed",
-      "reason": "Maintainer clarified F00 must fully pass before preparing/executing F01; supersedes earlier independent-F01 choice",
+      "F00_status": "F00_FULL_PASS_PENDING_SOL_REVIEW",
+      "reason": "All package F00 exit gates passed in attempt002; Sol must review before F01 preparation or execution.",
       "F07": "later extension; not required before camera",
-      "native_authorization": "each concrete package pins its own build/cases/budget"
+      "native_authorization": "each concrete package pins its own build/cases/budget",
+      "F01": "HELD; not dispatched, installed or started"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -4711,10 +4734,145 @@
       "prerequisite_by_maintainer": "full F00 acceptance before proceeding"
     },
     "f00_attempt002_preparation": {
-      "status": "PREPARING",
+      "status": "PREPARATION_COMPLETE; execution result recorded below",
       "maintainer_goal": "Complete F00 in one bounded rework package, including valid 20seed feasibility, Oracle, H5/readback and pending Judge verification",
       "source_static_finding": "New mock XML omitted built-in cube friction/contact margin/condim and free-joint damping/armature; causal role requires controlled evidence, no automatic blame on solver/controller",
       "new_native_starts_by_sol": 0
+    },
+    "f00_attempt002_execution": {
+      "date": "2026-10-28",
+      "status": "F00_FULL_PASS_PENDING_SOL_REVIEW",
+      "input_head": "3bfd07a323fbcfdc3ee6f7ba9bfddbe54165a6cd",
+      "implementation_commit": "0d75d7646d45f96cc22c567aa61e070dbab5dd94",
+      "branch": "develop-full",
+      "tracked_tree_clean_at_native_freeze": true,
+      "classification": "FIX_EXISTING; existing Task Harness ledger/Judge owners plus versioned synthetic asset input",
+      "source_diagnosis": {
+        "builtin_seed0": {
+          "classification": "solved",
+          "steps": 427,
+          "first_gripper_ready_step": 380
+        },
+        "old_mock_seed0": {
+          "classification": "expert_failed",
+          "reason": "gripper_readiness_timeout",
+          "steps": 854
+        },
+        "same_controller_expert_readiness_identities": true,
+        "public_target_ack_hashes_match": true,
+        "execution_faults": 0,
+        "inference": "Compiled source/composition differences support the asset route as a failure explanation; no unique causal attribute is asserted.",
+        "repair": "New synthetic UID/version/hash reproduces the existing builtin PickCube body properties; R1/readiness, reset extent, goal, horizon and solver remain unchanged."
+      },
+      "targeted_s1": {
+        "existing_completion_facts_tests": 13,
+        "owner_repair_continuation_tests": 9,
+        "oracle_wiring_import_test": 1,
+        "skill_frontmatter_and_relative_links": "PASS",
+        "provider_io_substituted_record_candidate_preflight": "PASS; canonical writer/load and independent Core inspector; zero native provider steps",
+        "judge_prepare_verify_preflight": "PASS; isolated synthetic feasibility fixture; 82 files verified; not native evidence",
+        "global_document_validator": "NOT_RUN_BY_INSTRUCTION"
+      },
+      "sentinels": {
+        "native_processes": 1,
+        "episodes": 2,
+        "results": [
+          {
+            "seed": 0,
+            "status": "solved",
+            "steps": 427
+          },
+          {
+            "seed": 19,
+            "status": "solved",
+            "steps": 433
+          }
+        ],
+        "runner_exit_code": 1,
+        "runner_error": "STARTED NameError after both episodes completed; raw output/traces preserved and read back without restarting.",
+        "episodes_are_diagnostic_not_campaign_reports": true
+      },
+      "campaign": {
+        "native_processes": 1,
+        "provider": "MuJoCo 3.8.1 CPU",
+        "api_version": 3008001,
+        "exit_code": 0,
+        "timed_out": false,
+        "elapsed_seconds": 29.66,
+        "max_rss_kib": 626312,
+        "seed_start": 0,
+        "seed_end": 19,
+        "seed_count": 20,
+        "outer_steps": 8612,
+        "reports": {
+          "assets": "pass",
+          "compile": "pass",
+          "semantic": "pass",
+          "feasibility": "pass"
+        },
+        "totals": {
+          "solved": 20,
+          "invalid": 0,
+          "expert_failed": 0,
+          "unknown": 0
+        }
+      },
+      "ledger": {
+        "schema": "harness-attempt-ledger-v1",
+        "state": "candidate_ready",
+        "round_count": 2,
+        "round1": {
+          "status": "fail",
+          "core_commit": "6e477765cf0539535e848e7717e029a44e413b29"
+        },
+        "round2": {
+          "status": "pass",
+          "core_commit": "0d75d7646d45f96cc22c567aa61e070dbab5dd94",
+          "artifact_hash": "6320dd63cf056f229fec9ad5156722e2d233f7f3c65f7f51bf8026983eac83bb"
+        },
+        "historical_open_issues_preserved": true,
+        "open_issues": 0,
+        "max_rounds": 5
+      },
+      "oracle": {
+        "native_processes": 1,
+        "exit_code": 0,
+        "seed": 0,
+        "status": "PASS",
+        "transitions": 427,
+        "boundaries": 428,
+        "h5_closed": true,
+        "t_plus_one_valid": true,
+        "logical_mapping_exact": true,
+        "independent_core_inspector": "PASS",
+        "cleanup_errors": 0,
+        "same_implementation_commit_catalog_and_spec_as_campaign": true
+      },
+      "judge": {
+        "prepare": "PASS",
+        "verify": "PASS",
+        "files_verified": 86,
+        "decision": "pending",
+        "qualification": "NOT_ASSESSED",
+        "D0": "NOT_ASSESSED",
+        "D1": "NOT_ASSESSED",
+        "D2": "NOT_ASSESSED"
+      },
+      "native_budget": {
+        "diagnostic_processes_used": 2,
+        "diagnostic_episode_limit": 6,
+        "diagnostic_episodes_used": 4,
+        "campaign_processes_used": 1,
+        "oracle_processes_used": 1,
+        "total_native_processes_used": 4,
+        "total_native_outer_steps": 11180,
+        "total_native_simulated_seconds": 111.8
+      },
+      "F01": "HELD; no install or native start",
+      "qualification_granted": false,
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/report.md",
+      "sol_review": "PENDING"
     }
   }
 }

@@ -1,7 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c已接收；F00整体PARTIAL，下一包F00 attempt002；完整F00验收后再进入F01**。
-当前复用集成分支 `develop-full`。F00剩余目标为同一候选20seed全部有效solved、Oracle真实H5与独立读回、pending Judge prepare/verify；原attempt001的20条专家失败保持。F01安装/native草稿暂存，尚未派发。此后顺序为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c仍可明确安排，F07不成为相机前置。
+当前入口（2026-10-28）：**R03c已接收；F00 attempt002完整出口已满足、待Sol复核；F01保持HELD直至F00被接收**。
+当前复用集成分支 `develop-full`。attempt002保留attempt001的20条专家失败，在新版本合成box proxy上完成20/20有效solved、Oracle真实H5与独立读回、pending Judge prepare/verify。candidate包仍待Sol审阅，Human decision pending；Qualification/D0/D1/D2均未评估。F01安装/native草稿未派发、未启动。此后顺序为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c仍可明确安排，F07不成为相机前置。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
@@ -197,3 +197,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28 Sol复核F00 attempt001：接收 `develop-full` 两线整合与完成事实修复/S1；33项manifest（25文件、8个Git blob）匹配，13项provider-free tests复核通过，20条原始campaign行经report validator再核一致。candidate仍为20/20 `expert_failed / gripper_readiness_timeout`，ledger round1 fail/state ready、Oracle/H5/Judge未运行；F00整体保持PARTIAL。该专家可行性缺口不作为独立F01安装/官方原生Panda+刚体对照的前置。维护者要求下一子阶段工作包，当前明确选择F01，之后按F02/F03/F04逐包推进；R04b/c可独立安排，原DAG/P99门保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md`。
 
 2026-10-28 维护者最新纠正顺序：先成功验收F00完整闭环，再准备/执行F01。F00 attempt001仅整合/修复/S1接收，20seed候选失败，下一包为F00 attempt002集中诊断、必要owner修复、20seed/Oracle/H5/pending Judge收口；F01草稿保留待用、未派发、未安装或启动。该选择覆盖此前独立提前F01的计划，R04b/c及原7/22/P99门仍保留。
+
+2026-10-28 Luna执行F00 attempt002：在同一 `develop-full` 上保留round1失败并新增round2 owner-repair复验；公开A/B显示builtin seed0在427 steps完成，旧mock在854 steps以`gripper_readiness_timeout`失败，controller/expert/readiness身份相同且target/Ack哈希一致，实际编译source body不同。v002仅将已有builtin PickCube物理属性复制到新UID/version/hash的synthetic box输入，没有更改R1、reset、goal、horizon或solver。MuJoCo 3.8.1 CPU campaign seeds0–19全部valid solved（8612 outer steps）；ledger `candidate_ready`，round1 fail仍保留。Oracle seed0完成427 transitions/428 boundaries，H5 T+1、逻辑映射与独立Core inspector通过；Judge pending包prepare/verify均通过、86 files verified。实现提交`0d75d7646d45f96cc22c567aa61e070dbab5dd94`；完整receipt见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/`。状态为`F00_FULL_PASS_PENDING_SOL_REVIEW`，不表示已被Sol/Human接收或获得Qualification；F01未启动。

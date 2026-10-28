@@ -1,8 +1,8 @@
 # Phase II-01 修订规划交付包
 
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
-维护者于2026-10-28明确在默认后继R04b之前推进独立 F00 attempt001，以优先处理 Isaac、USD 与 Task Harness；当前在 `develop-full` 完成 Harness 生命周期修复及13项provider-free S1。唯一 synthetic MuJoCo campaign 已执行，20/20 seeds 为 `expert_failed / gripper_readiness_timeout`，故 Oracle/H5、Judge 未运行，native 验证出口未通过。R04b/c、原DAG、P99与R05a/R06门保持不变；顺序选择及范围见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-attempt001-实施快照-native-result)。
-当前下一包为 **F00 attempt002：完整Harness闭环收口**。F00整合和完成事实修复/S1经Sol接收，但mock候选尚未通过；维护者要求先成功验收F00，再进入F01安装/原生对照。具体顺序以 [07 当前入口](07_Execution_Order_and_Acceptance.md) 为准，R04b/c无需等待全部F行完成。
+维护者于2026-10-28纠正顺序：F00 attempt001仅完成整合/完成事实修复与S1，20/20 seeds 因 `gripper_readiness_timeout` 失败；随后要求完整验收F00后才准备/执行F01。attempt002已在 `develop-full` 完成公开 A/B 归因、合成输入修复、20-seed campaign、Oracle/H5独立回读及pending Judge包，完整出口当前 **待Sol复核**。历史attempt001失败原件保留；详见 [10 F00 attempt002 结果](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-attempt002-完整出口待sol复核)。
+当前后继是 **Sol复核 F00 attempt002**；F01仍 `HELD`，未派发、未安装或启动。只有Sol接收F00完整出口后才能准备/执行F01。具体顺序以 [07 当前入口](07_Execution_Order_and_Acceptance.md) 为准，R04b/c无需等待全部F行完成。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
