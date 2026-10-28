@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态：**R07a PARTIAL_AUDIT / FIXTURE_FACTS_ACCEPTED / R07B_BLOCKED**（2026-10-28 Sol复核attempt001）。五任务部署与native语义对照仍未启动；成本协议仍是待冻结候选。下文原规划审计的来源与历史边界保留，本轮复核见[第8节](#8-r07a-attempt001-sol复核)。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，不由本次审计改变。
+状态：**R07a PARTIAL_AUDIT / PROTOCOL_REWORK / RIGHTS_MAPPING_BLOCKED**（2026-10-28 Sol复核attempt002）。五任务部署与native语义对照仍未启动；成本协议仍是待冻结候选。下文原规划审计的来源与历史边界保留，attempt001复核见[第8节](#8-r07a-attempt001-sol复核)，最新attempt002见[第9节](#9-r07a-attempt002-sol复核)。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，不由本次审计改变。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -164,3 +164,19 @@ R07a交付source/asset/license/embodiment/fixture/资源/缺口与go/no-go recom
 成本脚本是一次性审计夹具，不是完整验收器：`validate_record`只检查部分身份/非空字段，尚未验证真实log/hash、依赖/recipe/tool绑定和时间区间；LOC行指纹用文本空白归一，不能据此普遍判定复制/移动。正式测量前需复用既有Evidence所有者补齐这些具体检查及独立预期值正负例，再冻结baseline、cache policy和独立Human reviewer。该限制不否定原小型夹具的记录结果。
 
 后续分开处理：R07a先收敛来源/许可与必需语义的处置方案、成本协议冻结；R07b负责实际verified manifests/install与批准后的Core extension；R07c负责真实reset/物理控制/native语义/H5验证。当前缺口的发现不要求在只读审计包中提前实现R07b/c，也不允许跳过R07a部署门。Sol本轮没有新增测试、native或安装；全局文档validator按维护者要求未运行。原Required Envelope、P99和其他slice状态保持。
+
+## 9. R07a attempt002 Sol复核
+
+2026-10-28，Sol独立核1,795项输出hash、120条固定资产路径的size/Git blob/SHA-256及26项冻结输入，全部匹配；120条由原108条及动态scene/style新增12条组成，共116个不同blob。原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_002/`。静态字节闭包与现有owner下的source/reset/state/contact/site/fixture/control/evaluator/record扩展方向接收；这不表示已经实现或native验证。
+
+成本v2候选SHA-256 `f1e4e13c6d773ff9279cbf2576f8599824d112fdf3f384f30267f4d84c6943c2`保持原样，技术复核为CHANGES_REQUESTED，未冻结：
+
+- 已确认的`measurement_baseline_commit=0309d73…`是比较与setup起点；未来实际运行/开发final commit必须单独绑定。现工具要求`identity.core_commit`恒等于baseline，无法记录R07新增实现之后的真实执行身份。
+- R07b准入与R07d质量审阅必须按阶段检查；R07d Human review不能成为R07b部署前置。synthetic S1、测量记录完整性、部署准入和最终quality acceptance不能混成一个PASS。
+- 当input不包含cached时，应分别校验非负计数并合计；`cached<=input`约束只适用于input已经包含cached的口径。现工具与协议对此有不一致。
+
+原19项拒绝/9项LOC与正例仍是已记录的有界事实；Sol未重跑，不因此宣称完整测量器已通过。维护者确认的warm-cache盘点、baseline和R07d本人独立评审安排继续有效，无须重问这些参数。
+
+许可调查需纠正粒度：TurboSquid的14条文件路径对应moka_pot/wine_bottle/wine_rack三组；HOPE的4条对应cookies/cream_cheese两组；GSO的8条对应四组。下一步先查固定仓库的NOTICE/文件注释/导入历史和这些具体模型族的官方来源，再把证据不足压缩为精确待决项，不要求用户提供14个虚构模型的记录。来源可核、本地用途、商业用途、资产再分发与数据输出应分别记录，未知权利不自动批准；原五Task不换题。
+
+维护者选择先完成R07a再安排Isaac安装检验；Luna1仅继续成本工具修正及来源证据收口。R07b/c仍未启动，Isaac安装/下载由维护者持有。复核原件为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_002/`；全局文档validator按指示未运行。
