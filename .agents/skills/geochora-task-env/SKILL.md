@@ -844,7 +844,12 @@ receipt.
 The current task-owned `build_fixed_attachment_candidate()` path has provider-
 free S1 and bounded MuJoCo 3.8.1 CPU S2 evidence for exactly this source pair,
 seed 31, ResetPlan and 2 ms × five-step timebase. Its current result is
-`BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`. This is not a
+`ACCEPTED_BOUNDED_S1_S2` after Sol review. Static admission also rejects
+coherently rebound Scene Joint topology/type/axis/pose or Asset provenance
+that disagrees with the pinned source; 99 provider-free checks and the actual
+19-case static gate passed. Sol reused the two original native trials,
+independently checked 256 motion boundaries plus both resets, and added no
+native execution. This is not a
 registered `make_env()` route, a general multi-Entity/Attachment capability,
 an Env/Recorder/H5 integration, or Qualification. R03c public S2/S3 is
 `NOT_RUN` and has not started. Read the current scope and limits in the

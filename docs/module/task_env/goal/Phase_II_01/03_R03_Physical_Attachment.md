@@ -1,6 +1,6 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已完成实现、定向 S1 与 Core RuntimeSession S2，全部冻结门通过，出口为 `BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`；R03c **NOT_RUN**。本次没有 public Env/Recorder/H5 S3、任意 Attachment 支持或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已完成实现、定向 S1 与 Core RuntimeSession S2，全部冻结门通过，经Sol复核接收为 `ACCEPTED_BOUNDED_S1_S2`；R03c **NOT_RUN**。本次没有 public Env/Recorder/H5 S3、任意 Attachment 支持或 Qualification。
 
 ## 已知事实与精确 Provider 路线
 
@@ -70,14 +70,14 @@ Provider-free S1 的19个source、Scene/Assembly pin、mount方向、root、映�
 
 MuJoCo package、binding、实际mapped CPU library与公开header的路径、版本/API和SHA-256均匹配冻结输入。跨两个进程累计计数为materialization3（含保留的首次pre-step失败尝试）、reset2、forward258、outer256、step1280、模拟2.56 s；峰值观测RSS为336,027,648 bytes，闭包34,318,679 bytes，均在包内上限内。review产物与逐次账本保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/`，以 `report.md` 与 `native_run_002/s2_evidence.json` 为证据入口。
 
-当前交付为 `BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`；这不是Sol acceptance、Provider通用合同或Qualification。S2只覆盖该源、seed31、2 ms×5、reset与冻结Arm/Hand motion片段；R03b未运行外载或接触测试。R03c 的 public candidate→Env→Recorder→reader S2/S3、H5与所有未列出的source/provider/backend均 **NOT_RUN**，R03c 保持未启动。R06 gate、R05a blocker、DAG、Required Envelope、P99与冻结refs不变。
+Sol已复核实现提交 `ee5ed6c298bbdab206968873c61944ac35c66dbf`、两个model-bound receipt、256个运动样本和两份reset，并接收本精确case为 `ACCEPTED_BOUNDED_S1_S2`。复核中发现，错误的Scene Joint轴/拓扑/局部pose或Asset provenance在同步重绑hash后可能通过原静态门；Sol在既有Assembly/source与admission owners中补上source语义核对。19项新定向回归加80项旧owner检查为99 passed，原19负例静态包仍通过。修补只增加native前拒绝检查，正确candidate的Scene/Assembly/Attachment/Artifact/source身份不变；S2依据仍是Luna提交上的原始运行，Sol没有再次native执行。首次fixture/测试选择问题与修正日志均保留在ignored `sol_review_r03b_001/`。该接收不授予Provider通用合同或Qualification。S2只覆盖该源、seed31、2 ms×5、reset与冻结Arm/Hand motion片段；R03b未运行外载或接触测试。R03c 的 public candidate→Env→Recorder→reader S2/S3、H5与所有未列出的source/provider/backend均 **NOT_RUN**，R03c 保持未启动。R06 gate、R05a blocker、DAG、Required Envelope、P99与冻结refs不变。
 
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
-| R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；R03b/c仍未启动 |
-| R03b | R01c,R03a | **attempt001 已实现；S1/S2 PASS，待Sol复核**。精确两-source Panda fixed tree、source closure、model-bound mapping/topology、ResetPlan与真实相对位姿 | 19项定向S1与80项旧owner回归通过；两trial各128区间，冻结motion/mount/range/clock/warning/close门全通过。只限本包source/provider/seed/horizon，非Qualification |
+| R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；该R03a接收时R03b/c未启动，当前状态见下行 |
+| R03b | R01c,R03a | **attempt001 已接收 `ACCEPTED_BOUNDED_S1_S2`**。精确两-source Panda fixed tree、source closure、model-bound mapping/topology、ResetPlan与真实相对位姿 | Luna原19项S1及Sol补充后的99项provider-free回归通过；两trial各128区间，冻结motion/mount/range/clock/warning/close门全通过。只限本包source/provider/seed/horizon，非Qualification |
 | R03c | R03b,R02c | **NOT_RUN / 未启动**。独立 Arm+Hand 真实 Position 施控，现有 public Env→Recorder→reader | S2/S3仍要求同一公开实例 reset/step/observation/H5 T/T+1/request/Target/Ack/state/identity/close；R03b S2不能替代R03c |
 
 S3 必须沿现有 factory/SelectedReferenceEnv 或已明确批准的公共 candidate 入口，在原 RuntimeSession/Recorder owners 扩展；public path 不导入 test_*。失败保留原日志、partial apply/fault receipt、资源关闭检查；不伪装 rollback。R03 不依赖 Camera 或 R05 force-only 路线；不引入动态 attach/detach/闭环约束拓扑、USD ABI 或第二 Runtime。外部装配语义参考固定 [Isaac Sim 6.1.0](README.md#references)。

@@ -279,6 +279,16 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
         raise ValueError('fixed Attachment mount direction or child-frame compensation differs from the source oracle')
     if plan.collision_policy != 'source_preserved' or plan.extra_cross_entity_overrides:
         raise ValueError('fixed Attachment collision admission must preserve source filters and exclusions')
+    assets = {(asset.asset_id, asset.asset_version): asset for asset in scene.assets}
+    for asset_id, asset_version, source_reference in (
+        (plan.parent_asset_id, plan.parent_asset_version, 'menagerie:franka_emika_panda/panda_nohand.xml'),
+        (plan.child_asset_id, plan.child_asset_version, 'menagerie:franka_emika_panda/hand.xml'),
+    ):
+        asset = assets[(asset_id, asset_version)]
+        if (asset.source_reference, asset.source_revision, asset.license_id) != (
+            source_reference, 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7', 'Apache-2.0',
+        ):
+            raise ValueError('fixed Attachment Asset provenance differs from the pinned source recipe')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('fixed Attachment RuntimeSource does not bind the exact TaskArtifact')
     if source.scene_source.source_id != f'scene-definition-v3:{scene.identity_hash}':

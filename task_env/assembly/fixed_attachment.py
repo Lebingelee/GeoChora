@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import math
 import xml.etree.ElementTree as ET
 
 from ..artifacts import (
@@ -28,6 +29,83 @@ class LoweredFixedAttachmentSourceV1:
 
 def _native_names(root: ET.Element, tags: set[str]) -> set[str]:
     return {node.get("name") for tag in tags for node in root.iter(tag) if node.get("name")}
+
+
+def _validate_source_declarations(root: ET.Element, entity_id: str, scene: SceneDefinition,
+                                  source_sha256: str) -> None:
+    """Check canonical kinematics against the pinned Panda source, without native IO.
+
+    Hashing two internally consistent declarations does not establish that they
+    describe the same source. This bounded reader covers the scalar, zero-anchor
+    joints in the admitted Panda pair; it is not a general MJCF compiler.
+    """
+    entity = next(item for item in scene.entities if item.entity_id == entity_id)
+    asset = next(item for item in scene.assets
+                 if (item.asset_id, item.asset_version) == (entity.asset_id, entity.asset_version))
+    if asset.source_content_sha256 != source_sha256:
+        raise ValueError(f"fixed Attachment Asset content hash differs from source for {entity_id!r}")
+    defaults = {}
+
+    def collect_defaults(node, inherited):
+        values = dict(inherited)
+        joint = node.find("joint")
+        if joint is not None:
+            values.update(joint.attrib)
+        if node.get("class"):
+            defaults[node.get("class")] = values
+        for child in node.findall("default"):
+            collect_defaults(child, values)
+
+    for node in root.findall("default"):
+        collect_defaults(node, {})
+    articulation = next(item for item in scene.articulations if item.entity_id == entity_id)
+    expected = []
+
+    def vector(text, fallback):
+        return tuple(float(value) for value in text.split()) if text is not None else fallback
+
+    def near(left, right):
+        return len(left) == len(right) and all(abs(a - b) <= 1e-12 for a, b in zip(left, right))
+
+    def walk(body, parent_name, inherited_class):
+        childclass = body.get("childclass", inherited_class)
+        position = vector(body.get("pos"), (0.0, 0.0, 0.0))
+        quaternion = vector(body.get("quat"), (1.0, 0.0, 0.0, 0.0))
+        norm = math.sqrt(sum(value * value for value in quaternion))
+        quaternion = tuple(value / norm for value in quaternion)
+        for node in body.findall("joint"):
+            values = {**defaults.get(node.get("class", childclass), {}), **node.attrib}
+            name = node.get("name")
+            expected.append(name)
+            declared = next((joint for joint in articulation.joints if joint.joint_id == name), None)
+            axis = vector(values.get("axis"), (0.0, 0.0, 1.0))
+            axis_norm = math.sqrt(sum(value * value for value in axis))
+            axis = tuple(value / axis_norm for value in axis)
+            kind = {"hinge": "revolute", "slide": "prismatic"}.get(values.get("type", "hinge"))
+            if not near(vector(values.get("pos"), (0.0, 0.0, 0.0)), (0.0, 0.0, 0.0)):
+                raise ValueError("fixed Attachment source requires the pinned zero-anchor joint recipe")
+            if (declared is None or kind is None or declared.kind != kind
+                    or declared.parent_frame.entity_id != entity_id
+                    or declared.child_frame.entity_id != entity_id
+                    or declared.parent_frame.frame_id != parent_name
+                    or declared.child_frame.frame_id != body.get("name")
+                    or declared.axis is None or not near(declared.axis, axis)):
+                raise ValueError(f"fixed Attachment canonical Joint topology/type/axis differs from source: {entity_id}/{name}")
+            parent_pose, child_pose = declared.pose_parent_from_joint, declared.pose_child_from_joint
+            if (not near(parent_pose.position, position)
+                    or not (near(parent_pose.quaternion_wxyz, quaternion)
+                            or near(parent_pose.quaternion_wxyz, tuple(-v for v in quaternion)))
+                    or not near(child_pose.position, (0.0, 0.0, 0.0))
+                    or not (near(child_pose.quaternion_wxyz, (1.0, 0.0, 0.0, 0.0))
+                            or near(child_pose.quaternion_wxyz, (-1.0, 0.0, 0.0, 0.0)))):
+                raise ValueError(f"fixed Attachment canonical Joint pose differs from source: {entity_id}/{name}")
+        for child in body.findall("body"):
+            walk(child, body.get("name"), childclass)
+
+    for body in root.findall("./worldbody/body"):
+        walk(body, None, None)
+    if tuple(expected) != tuple(joint.joint_id for joint in articulation.joints):
+        raise ValueError("fixed Attachment canonical Joint order/coverage differs from source")
 
 
 def validate_fixed_attachment_scene(
@@ -166,6 +244,8 @@ def lower_fixed_attachment_sources(
         raise ValueError("fixed Attachment derived source closure digest mismatch")
 
     parent_root, child_root = ET.fromstring(parent.xml), ET.fromstring(child.xml)
+    _validate_source_declarations(parent_root, plan.parent_entity_id, scene, plan.parent_source_sha256)
+    _validate_source_declarations(child_root, plan.child_entity_id, scene, plan.child_source_sha256)
     for root, label, native_maps in (
         (parent_root, "parent", (
             ("body", plan.native_body_names, {k: v for k, v in plan.native_body_names.items()

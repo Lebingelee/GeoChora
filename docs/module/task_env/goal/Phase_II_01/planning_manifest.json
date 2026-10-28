@@ -1045,11 +1045,11 @@
         "R03a",
         "R01c"
       ],
-      "status": "BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW",
-      "execution": "EXECUTED_S1_AND_TWO_TRIAL_MUJOCO_CPU_S2_PASS",
+      "status": "ACCEPTED_BOUNDED_S1_S2",
+      "execution": "SOL_REVIEWED_S1_AND_ORIGINAL_BOUNDED_S2",
       "required_evidence": "Provider-free S1; one bounded Core RuntimeSession MuJoCo 3.8.1 CPU S2 execution with two independent materialize/ResetPlan/128-interval trials; source/model receipt and closed-session evidence.",
       "stop_condition": "Wrong mount/root/source/order/constraint or budget breach stops; no oracle/limit widening. S3/R03c and general Attachment remain separate.",
-      "result": "Both S2 trials passed the frozen source/mount/motion/range/clock/warning/close gates. Initial native process failed before native import/reset/forward/step on the source-omitted timestep attribute; the ordinary Core wiring correction was bounded, S1/regressions rerun, and only the final authorized process passed. Pending Sol actual-diff/source/Evidence review.",
+      "result": "Exact Panda fixed Arm+Hand candidate accepted after actual diff/source/receipt review and independent 256-boundary/two-reset readback. Sol added only pre-native source/Scene Joint and Asset provenance rejection guards; positive identities/native algorithm/physics/source/oracles unchanged. 99 provider-free checks and original 19-case static gate passed. No new native or R03c execution.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/report.md",
       "attempt001_execution": {
         "input_commit": "48bc7e023929df7aa843a2097014481cd6c3c806",
@@ -1108,6 +1108,28 @@
         "public_env_recorder_h5_s3": "NOT_RUN",
         "R03c": "NOT_RUN_NOT_STARTED",
         "provider_admission_or_qualification": false
+      },
+      "sol_review": {
+        "decision": "ACCEPTED_BOUNDED_S1_S2",
+        "date": "2026-10-28",
+        "implementation_commit": "ee5ed6c298bbdab206968873c61944ac35c66dbf",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03b_001/sol_review.md",
+        "provider_free_s1": {
+          "pytest_passed": 99,
+          "original_static_negative_cases": 19,
+          "native_imports": 0,
+          "native_starts": 0
+        },
+        "offline_review": {
+          "receipts": 2,
+          "motion_boundaries": 256,
+          "reset_samples": 2,
+          "status": "PASS"
+        },
+        "post_native_change": "Static rejection-only checks. Correct Scene/Assembly/Artifact/Attachment/source identity unchanged; original S2 ran on ee5ed6c, not on the later review commit.",
+        "new_native_starts": 0,
+        "R03c_started": false,
+        "qualification_granted": false
       }
     },
     {
@@ -1117,10 +1139,10 @@
         "R02c"
       ],
       "status": "PLANNED",
-      "execution": "NOT_RUN_PENDING_R03B_SOL_REVIEW_AND_SEPARATE_AUTHORIZATION",
+      "execution": "NOT_RUN_PENDING_SEPARATE_R03C_AUTHORIZATION",
       "required_evidence": "S2/S3",
       "stop_condition": "不同diagnostic路径拼接或不完整H5→失败",
-      "result": "Not started in R03b attempt001. Public Env/Recorder/H5 S2/S3 remain unrun."
+      "result": "R03b/R02c bounded engineering exits accepted. R03c public Env/Recorder/H5 S2/S3 not started or run; separate self-contained implementation package required."
     },
     {
       "id": "R04b",
@@ -1332,14 +1354,14 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
-    "03_R03_Physical_Attachment.md": "e4a0b31c4271d3cfc9e6b84ff7da1d73385e20443cedf3cd312c43eb3215a53e",
+    "03_R03_Physical_Attachment.md": "ab40a4647bd2808a29d6102bcd99b4df55d8830f9a7df1c193697fd75af0102b",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "36b0e73fe60e0961d1cb89978d2063958f85571b019b95e95432eaf3f918ccd6",
+    "07_Execution_Order_and_Acceptance.md": "b121767ba28c2250dfe0de0f4234c4211fdb8b301a2966e10d3f95d588aa914a",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "394707a5f47612b9b8f82d7bd92d6ce55277ca5e550d156f9dbc7903bde08f4a"
+    "README.md": "c5f032f3e35c303c60e8f682e19ceba4f59f5b9c1e2b745047c89f17ed3e3d73"
   },
   "revision_kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
   "benchmark_audit": {
@@ -3496,6 +3518,13 @@
       "DAG_required_envelope_R06_R05a_P99_unchanged": true,
       "qualification_granted": false,
       "next_slice": "R03b package preparation only"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R03B_REVIEW_AND_STATIC_ADMISSION_FIX",
+      "input_commit": "ee5ed6c298bbdab206968873c61944ac35c66dbf",
+      "result": "ACCEPTED_BOUNDED_S1_S2",
+      "scope": "R03b review, pre-native source/Scene semantic guard, 99 provider-free tests plus original 19-case static gate; offline two-trial raw verification. No new native, no R03c implementation/execution, no Qualification."
     }
   ],
   "P00_audit": {

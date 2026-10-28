@@ -214,8 +214,13 @@ still required to report `opt.timestep=0.002`. The affected S1 and old-owner
 regressions were rerun. The final authorized MuJoCo 3.8.1 CPU process passed
 two independent Core materialize→ResetPlan→128-interval trials, including the
 measured mount, Arm/Hand motion, source joint/ctrl range, clock, finite-state,
-warning and close gates. This is a bounded S1/S2 candidate pending Sol review;
-the Artifact is not frozen by this result. R03c public Env/Recorder/H5 S2/S3,
+warning and close gates. Sol accepted this exact case as `ACCEPTED_BOUNDED_S1_S2`, independently
+checked both receipts/resets and 256 stored motion boundaries, and fixed the
+pre-native declaration/source consistency gate. Wrong canonical Joint
+topology/type/axis/poses or Asset provenance are rejected even after coherent
+identity rebinding. The positive case identity is unchanged; 99 provider-free
+checks and the original 19-case static gate passed, with no additional native
+execution. The Artifact is not frozen by this result. R03c public Env/Recorder/H5 S2/S3,
 other providers/sources, generalized Attachment, Judge approval and
 Qualification remain `NOT_RUN` or unestablished. See the [Phase II-01 R03
 record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
