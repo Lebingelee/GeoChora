@@ -1851,18 +1851,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "529b3ccd8659df03baa9ef5d3d887353aa762dfcc43d401d5a7f5d1ba1084547",
+    "README.md": "48eb781403848cbf8d7375ca73e55102723edd126af4d668af60d26d5ae2ecff",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "93e126a490ca46e41f2ea8829f92fb68505fa82feedddad432833bcc957ae7b4",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "fe170d36513c21d97b762b5254c7a99720ffc5d700a47d1d4aff85b7f6758025",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "fdfcdf7d60e107dda5ff95e20436299c30cbb89c4293039970a69b3b31711294"
+    "07_Execution_Order_and_Acceptance.md": "87ffa98721ac8fe594240690d3dd94028bd03414d9045e27a183a48ebba3cb05"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4521,8 +4521,8 @@
     }
   },
   "checkpoint_recovery_plan": {
-    "updated": "2026-10-28",
-    "status": "F00_ACCEPTED_BOUNDED; F01_AUTHORIZED_PACKAGE_READY",
+    "updated": "2026-10-29",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ATTEMPT002_NATIVE_BOOTSTRAP_EULA_BLOCKED_BEFORE_PHYSICS; RETRY_CONFIRMATION_PENDING",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4847,7 +4847,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Parallel: R07a Audit/S1 by Luna1; R04b attempt002 by Luna2; F01 download owned by maintainer",
+      "selected_next": "F01 attempt002 completion and Sol review; do not start F02 before Sol review",
       "after_that_priority": [
         "F01 isolated install/native baseline under a new frozen package",
         "F02",
@@ -4858,10 +4858,10 @@
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
-      "reason": "Maintainer requested useful Isaac-independent work while manually downloading Isaac dependencies; R07a depends only on accepted P00 and R04b only on accepted R04a.",
+      "reason": "Maintainer limited Luna1 to F00–F07 and explicitly dispatched F01 attempt002 after F00 acceptance; native execution uses the shared exclusive lock and stops on package budgets/conditions.",
       "F07": "later extension; not required before camera",
       "native_authorization": "each concrete package pins its own build/cases/budget",
-      "F01": "INSTALL_PARTIAL; NATIVE_NOT_RUN; dependency download/installation environment owned by maintainer until fresh F01 continuation"
+      "F01": "INSTALL_COMPLETE; API_SOURCE_AND_S1_PASS; APP_START_001_EULA_BLOCKED_BEFORE_PHYSICS; SECOND_START_HELD_FOR_MAINTAINER_CONFIRMATION"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -4872,9 +4872,9 @@
       "host": "Ubuntu24.04/glibc2.39/RTX5060 8151MiB/driver595.84",
       "memory_constraint": "Maintainer freed memory; fresh readback exceeds the package 6GiB RAM / 5GiB VRAM prelaunch gate; remeasure immediately before launch.",
       "native_starts_by_sol": 0,
-      "implementation_started": false,
+      "implementation_started": true,
       "core_adapter": "F04 later; no current Isaac Core capability claim",
-      "status": "INSTALL_PARTIAL_MANUAL_DOWNLOAD_BY_MAINTAINER",
+      "status": "INSTALL_COMPLETE; API_SOURCE_AND_TARGETED_S1_PASS; NATIVE_START_001_EULA_BLOCKED_BEFORE_PHYSICS",
       "prerequisite_by_maintainer": "full F00 acceptance satisfied 2026-10-28; refresh package on actual new HEAD before dispatch",
       "host_resource_readback": {
         "mem_available_kib": 9772532,
@@ -4885,13 +4885,22 @@
         "glibc": "2.39",
         "CXXABI_1_3_15_present": true
       },
-      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f01_001_dispatch_001/luna1_prompt.md",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f01_002/luna1_prompt.md",
       "parallel_review_package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f01_001_dispatch_001/luna2_review_prompt.md",
       "writer_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
       "review_thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
       "installation_environment": "workspace/environments/isaacsim-6.2.0",
       "old_draft": "sol_f01_001 remains superseded and must not be executed",
-      "agent_environment_writes_authorized_now": false
+      "agent_environment_writes_authorized_now": false,
+      "native_app_starts_attempt002": 1,
+      "native_physics_steps_attempt002": 0,
+      "retry_confirmation": "pending maintainer confirmation that the EULA was already accepted; no second App start yet",
+      "attempt002_output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/",
+      "latest_start_resource_readback": {
+        "mem_available_bytes": 8762064896,
+        "gpu0_free_mib": 6824,
+        "passed": true
+      }
     },
     "f00_attempt002_preparation": {
       "status": "PREPARATION_COMPLETE; execution result recorded below",
@@ -5099,7 +5108,7 @@
       "luna1": {
         "thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
         "scope": "F00-F07 only",
-        "next_package": "F00 accepted-evidence readback + F01 attempt002; then stop for Sol review",
+        "next_package": "F01 attempt002; first native start EULA-blocked before physics, awaiting maintainer confirmation; then report and stop for Sol review",
         "checkout": "develop-full primary",
         "installed_metadata_verified": {
           "isaacsim": "6.2.0.0",
@@ -5109,7 +5118,10 @@
           "pip_check": "PASS",
           "native_app_starts_by_sol": 0
         },
-        "context_compaction": "concise F-line handoff; use native compaction if exposed, no false compaction claim"
+        "context_compaction": "concise F-line handoff; use native compaction if exposed, no false compaction claim",
+        "current_native_app_starts": 1,
+        "current_native_physics_steps": 0,
+        "current_status": "F01_INSTALL_API_S1_PASS; NATIVE_RETRY_HELD_PENDING_EULA_CONFIRMATION"
       },
       "luna2": {
         "thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
@@ -5124,6 +5136,46 @@
       "parallel_native_allowed": false,
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
+    },
+    "latest_authorization": "Maintainer authorized F01 attempt002 on input HEAD 552c43aab8641608c64781fe5f6e6bfca38481a6: isolated installed-environment/API check, targeted S1, and one bounded native window with a conditional second start only for a located pre-physics bootstrap/API/asset wiring error. The first Kit process exited before any physics step because the Omniverse EULA was not accepted non-interactively. No second start until maintainer confirms the EULA was already accepted.",
+    "f01_attempt002_execution": {
+      "date": "2026-10-29",
+      "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
+      "implementation_commits": [
+        "015e62085d5d8b7468f4f712d0f5f34ff84a4b13",
+        "5deeadb54be99457ccbd41d1c8b69cccb164dda3",
+        "5904f8e52fad5388bbe0b841079eb725ee2016de"
+      ],
+      "status": "NATIVE_BOOTSTRAP_EULA_BLOCKED_BEFORE_PHYSICS_PENDING_MAINTAINER_CONFIRMATION",
+      "metadata": "PASS: Isaac Sim/core/extscache-kit 6.2.0.0, Python 3.12.14, Torch 2.11.0+cu128, NumPy 2.3.1",
+      "pip_check": "PASS",
+      "installed_api_source_and_asset_recipe": "RECORDED_BEFORE_KIT_START",
+      "targeted_provider_free_s1": "11 passed",
+      "first_native_start": 1,
+      "first_native_failure": {
+        "stage": "app_start",
+        "type": "SystemExit",
+        "reason": "Omniverse EULA not accepted in non-interactive Kit bootstrap",
+        "physics_steps": 0,
+        "resource_abort": false,
+        "timeout": false
+      },
+      "native_retry_eligibility": "Package-eligible only as an exact pre-physics EULA bootstrap stop; second start requires maintainer confirmation of prior EULA acceptance and explicit flag.",
+      "second_native_start": "HELD_PENDING_MAINTAINER_CONFIRMATION",
+      "sol_review": "PENDING",
+      "f02": "HELD",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/report.md",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/"
+    },
+    "f01_attempt002_documentation_validation": {
+      "mode": "TARGETED_STATIC_ONLY",
+      "markdown_hashes_verified": 12,
+      "local_relative_links_exist": 139,
+      "missing_local_paths": 0,
+      "skill_navigation_link": "PASS",
+      "global_docs_validator": "NOT_RUN_PER_PACKAGE",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/evidence/docs/static_link_check.json",
+      "receipt_sha256": "6f3534f32ab25bcbe2315388981b91b470ad45321e2e5b93e4f43d60ea44d7d4"
     }
   }
 }

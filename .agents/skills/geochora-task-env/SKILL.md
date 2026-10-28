@@ -935,3 +935,14 @@ public Env/Recorder/reader intersection is `ACCEPTED_BOUNDED_S2_S3`. The
 four H5 hashes/readback were reviewed; 33 provider-free S1 checks were reused.
 This does not grant general provider/Attachment admission or Qualification.
 Evidence and the Sol review remain in ignored workspace maintenance records.
+
+F01 attempt002 execution (2026-10-29): the isolated Isaac Sim 6.2.0.0
+environment metadata, installed public-source/API inventory and 11-case
+provider-free diagnostic S1 passed. The first bounded Kit process stopped at
+`app_start` because the non-interactive NVIDIA Omniverse EULA acceptance flag
+was absent; the worker receipt reports zero physics steps and no resource
+abort or timeout. A second start remains conditional on the maintainer
+confirming prior EULA acceptance; until then F01 has no native result and F02
+is held. This diagnostic is not a Core Isaac provider, current Panda import,
+task-harness asset success or Qualification. See the
+[Phase II-01 execution record](../../../docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md).

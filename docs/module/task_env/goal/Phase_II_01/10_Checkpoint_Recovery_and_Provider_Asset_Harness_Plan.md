@@ -1,11 +1,11 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；维护者完成Isaac安装，Sol metadata/pip check通过；F01原生对照尚未通过，下一包为F01 attempt002**。
+更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；Isaac 6.2.0.0隔离环境、metadata/pip检查、真实API/资产静态核对及F01 attempt002定向S1通过；首次Kit启动在EULA提示处、physics step之前退出，条件性重试待维护者确认**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。Luna1先以精简交接摘要恢复F线，核对F00已有接收收据及未变输入，不重跑20-seed/Oracle，再实施F01 attempt002。Sol只读核实隔离环境的isaacsim/core/extscache-kit为6.2.0.0、Torch2.11.0+cu128、numpy2.3.1，`pip check`通过；未导入Isaac或启动App。安装完成不等于F01 native或F04 Core adapter通过。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。Luna1从F00接收点恢复，未重跑20-seed/Oracle；Isaac 6.2.0.0隔离环境的isaacsim/core/extscache-kit、Torch2.11.0+cu128、numpy2.3.1及`pip check`通过。F01 attempt002已完成实际安装源码/API/资产静态核对与定向S1；一次Kit启动因非交互EULA尚未接受而在物理步前退出。第二次启动只在维护者明确确认已接受EULA后，按包内零步重试门执行。F01 native与F04 Core adapter仍未通过。
 
 下一包沿现有diagnostics owner补齐公开API/资产配方、真实launcher/reader/S1和官方Panda+刚体两轮native reset/step/close；既有6.2源码同时包含experimental新API和extsDeprecated旧类，启动前必须按实际包源码核签名及extension启用，不能照搬旧版本Franka/World示例。预算和原运动/落体门在新工作包重冻；共享native锁与Luna2串行，禁止并发重型仿真。F01之后逐包复核推进F02–F06；F07须先固定一个具体扩展交集，不授权无限场景/全部Newton宿主路线。
 
@@ -226,3 +226,9 @@ Sol独立核对338项输出清单、旧attempt001保护字节、全部20条原�
 Human decision仍pending，Qualification/D0/D1/D2均NOT_ASSESSED，无benchmark等价、freeze或training-ready声明。既有Judge YAML部分身份校验缺口单列后续；不追加为本次出口。Luna2所述S1无预检H5/回执的判断未采纳：实际`diagnostics/s1/oracle_preflight/oracle/`已保留并索引H5、Oracle报告和Inspector；顶层命令摘要缺该调用仅记可追溯性限制，不影响真实Oracle证据。
 
 F00前置已满足，允许准备F01新工作包；旧草稿未派发，需重新固定HEAD/官方稳定版本/安装环境/启动预算和资源，不能直接恢复旧授权快照。原7/22、Required Envelope、P99、R04b/c与其他slice不变。复核和独立审阅见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_002/`及`sol_luna2_f00_review_001/`。
+
+## F01 attempt002 execution（2026-10-29）
+
+输入HEAD为`552c43aab8641608c64781fe5f6e6bfca38481a6`；实现提交为`015e620`、`5deeadb`、`5904f8e`。隔离Isaac Python 3.12.14、Isaac Sim/core/extscache-kit 6.2.0.0、Torch 2.11.0+cu128、NumPy 2.3.1的metadata核对及`pip check`通过；installed-source API/官方Panda资产配方已记录；11项provider-free S1通过，独立reader绑定固定plan/source hashes并重算trace中的bootstrap、refresh、steps与clock。
+
+唯一首次native App进程在Kit kernel bootstrap时要求EULA接受，非交互进程按未接受退出：`SystemExit`，stage `app_start`，0 physics steps，未完成SimulationApp构造/scene/资产/物理步；resource preflight通过，worker RSS样本约8.4 MiB，RX差值432 bytes，无超时或resource abort，共享flock在worker退出及缓存测量后释放。该启动原件保存在attempt输出中。当前独立资格记录仅判定：若维护者确认其已接受NVIDIA Omniverse EULA，则这次零步、无资源/超时的bootstrap阻断满足包内唯一一次条件性重试；当前尚未获该确认，second start未启动，F01不通过/未完成，F02保持HELD。此诊断不表示Core Isaac adapter、当前Panda导入或Qualification。
