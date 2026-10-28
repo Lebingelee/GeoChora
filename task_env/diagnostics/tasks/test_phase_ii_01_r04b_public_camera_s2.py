@@ -157,7 +157,14 @@ class _ProviderFreeRuntimeSession(_SessionValues):
         self._require_reset()
         self._boundary.step(substeps=int(self._artifact.timebase.control_substeps))
         if self._pending_joints is not None:
-            self._joint_positions.update(self._pending_joints)
+            # Represent a bounded 10 ms synthetic actuator interval instead of
+            # teleporting every measured joint to its servo target. The worker
+            # still exercises the real controller/target/Env path; only the
+            # physical joint IO is synthetic in this provider-free fixture.
+            for key, target in self._pending_joints.items():
+                current = float(self._joint_positions[key])
+                delta = float(target) - current
+                self._joint_positions[key] = current + float(np.clip(delta, -0.02, 0.02))
             self._pending_joints = None
         self._control_step += 1
         self._state_revision += 1
