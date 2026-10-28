@@ -69,6 +69,51 @@ GeoPhys             -X-> Geochora/task_env
 
 Follow the maintainer's [phase branch and Sol/Luna policy](../../../AGENTS.md#phase-branch-workflow): plan branches/worktrees per phase or stage, reuse the current phase branch across Goal prompts, and associate each bounded output with its relevant local commit(s). For Phase II-01, the [execution table](../../../docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md#sol-luna-workflow) owns its concrete branch plan, sequential Sol → Luna → Sol review loop and audit-summary commit route. Preserve old receipts and check the actual committed HEAD before the next handoff; this workflow does not grant implementation, publishing or Qualification approval.
 
+### One complete prompt per Luna execution window
+
+- Before dispatch, freeze one self-contained package: slice/attempt ID, target
+  thread, checkout/branch/input HEAD, prompt path and SHA-256, protected inputs,
+  allowed changes, acceptance gates, execution budgets, output directory and
+  required final report. Keep this index with the package so review can match
+  the response to the exact prompt. Include implementation, in-scope repairs,
+  validation and evidence/report/commit cleanup in the original package.
+- Assign an expected duration based on scope and known dependencies. Useful
+  planning ranges are 15–30 minutes for a bounded audit/document edit,
+  30–90 minutes for a known-owner implementation with targeted checks, and
+  90–180 minutes for integration with native execution and independent readers.
+  Adjust for actual difficulty and prior attempts; do not split work merely to
+  fit these examples. Estimate downloads separately from active development.
+  Expected duration is not a timeout, success criterion, retry allowance or
+  permission to extend the package's hard native/resource limits.
+- Keep at most one unfinished package per Luna thread. While Luna executes,
+  collect new findings and proposed next steps in Sol's own review notes;
+  do not send supplemental prompts, review requests, reminders or new tasks
+  into that thread. Inspect progress through read-only status tools. Passing
+  the expected duration alone does not justify interruption or another prompt.
+- Wait for a complete final response to the original package, including actual
+  outcome (PASS/FAIL/BLOCKED), input/output HEAD, permitted local commits,
+  validation and evidence paths, remaining blockers and explicit release of
+  the writing/native window. A progress update, tool result, interrupted turn,
+  capacity error or idle UI alone is not a completed handoff. A failed gate
+  can still have a complete handoff; implementation success is not required
+  before Sol may review it.
+- After the final response, review the actual diff and evidence against that
+  frozen package. Then send one consolidated rework/continuation or the next
+  authorized package. If the report is incomplete, address its missing items
+  in that one continuation rather than layering more messages onto execution.
+  After interruption, first confirm the worker has stopped and ownership is
+  clear, then issue one recovery package with the preserved progress.
+- An explicit maintainer redirection or an immediate safety/resource issue
+  may require stopping early. Record the reason, stop and confirm the current
+  execution/window has ended, preserve its prompt/snapshot/progress, then
+  dispatch one replacement package with an explicit supersedes reference and
+  changed scope/HEAD/hashes. Do not silently append requirements. If Luna
+  explicitly pauses for a required clarification, answer only that question;
+  a scope change follows the same replacement procedure.
+- Parallel Luna threads may each hold one package only under the existing
+  independent-checkout/scope and shared native-lock rules. One thread's early
+  return does not authorize injecting work into another active thread.
+
 ## Non-negotiable boundaries
 
 - Core must not repair a provider through private solver or renderer state.
