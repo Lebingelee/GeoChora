@@ -54,8 +54,8 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 08 | R01c | R01b | 静态source投影与leaf refs | S1 | 隐式物理构造/旧hash变动→停止 | ACCEPTED_S1_BOUNDED；Sol已复核声明级投影与18项provider-free S1 |
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | ACCEPTED_S1_BOUNDED；Sol修正兼容/覆盖/name拒绝门后18项S1通过；native/provider NOT_ADMITTED |
 | 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | ACCEPTED_BOUNDED_S2_S3；005 Hand50 case四episode/四H5通过；2500默认/旧FAIL保留，下一项R03b |
-| 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | PLANNED / NOT_STARTED |
-| 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | PLANNED / NOT_STARTED |
+| 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | attempt001 S1/S2 PASS；等待Sol复核，范围仅限该Panda source/seed31/2ms×5候选 |
+| 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | NOT_RUN / 未启动；等待R03b Sol复核 |
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | PLANNED / NOT_STARTED |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | PLANNED / NOT_STARTED |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | PLANNED / NOT_STARTED |
@@ -145,3 +145,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28，Sol复核R02c004：640实际step事实由原JSONL及两个64/65 H5交叉确认，原零计数raw误分类保留；E1有界通过、E2物理失败。默认5/2500策略限制servo距当前开度2mm，拟用source坐标推导50N/m的Task-owned完整Hand override新case；默认/旧FAIL与原物理门不改，需维护者明确选择后才实施/授权native。当前BLOCKED_HAND_CONFIGURATION_DECISION，未启动R03b。
 
 2026-10-28，Sol完成R02c005 Task-owned Hand50配置修复：56项S1、实际static、唯一MuJoCo3.8.1 CPU进程四episode S2/S3通过，1280step/260forward/4reset/4materialize；E2 min11.01mm、final68.02mm、excursion64.99mm，四H5各64/65且新进程独立回读通过。原算法/source/oracle/预算、2500默认和旧FAIL保持。出口ACCEPTED_BOUNDED_S2_S3，限定新case，未授Qualification或独立Attachment支持；下一项R03b准备工作包，未实现。
+
+2026-10-28，R03b attempt001在固定输入HEAD `48bc7e023929df7aa843a2097014481cd6c3c806` 实现精确双source Panda Arm+Hand fixed-tree计划、closure/lowering、现有Core `materialize()` opt-in和compiled-model receipt。Provider-free S1 19项拒绝门及受影响旧owner 80项回归通过。首个MuJoCo进程在任何native import/reset/forward/step前因源XML省略显式2ms timestep而失败；保留raw后，授权的一次pre-step普通接线修正只对显式Attachment plan允许该省略属性，compiled model仍核对`opt.timestep=0.002`，修复后S1与80项回归重过。第二且最后一次3.8.1 CPU native进程的两个独立trial各完成128 intervals/640 step/129 forward；reset、9/9/8维度、单一`link0`物理root、source映射/碰撞、Arm/Hand motion、mount≤1e-8m/2e-7rad、range、clock、warning与resource-close门全部通过。跨进程预算计数为materialize3（含失败前置尝试）/reset2/forward258/outer256/step1280/2.56s，峰值RSS 336,027,648 bytes。当前仅为`BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`，没有public Env/Recorder/H5 S3或Qualification；R03c NOT_RUN、未启动，R06/R05a/DAG/Required Envelope/P99与冻结refs不变。报告、S1/S2原件、合同与ledger位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/`。

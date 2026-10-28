@@ -829,3 +829,24 @@ Historical refresh receipts saying review was pending retain their signing-time 
 Release promotion/main/tag/GitHub Release and new Formal Qualification are not authorized by this freeze.
 Six next-stage themes are candidates only in the existing [Roadmap](../../../docs/roadmap/README.md#phase-ii-01-candidate-handoff);
 do not create or implement Phase II-01 Goals without separate authorization. This refresh changes status navigation only, no API/example behavior.
+
+## Phase II-01 fixed Attachment candidate (R03b, 2026-10-28)
+
+`FixedAttachmentPlanV1` is an advanced immutable intent exported by
+`task_env.artifacts`; `validate_fixed_attachment_scene()` and
+`lower_fixed_attachment_sources()` extend the existing Assembly/source owners.
+The bounded candidate binds two separate canonical Scene-v3 Entities to the
+unchanged Menagerie Panda Arm and Hand sources, explicit mount transforms,
+license/source-closure hashes and complete native-name maps. One existing
+MuJoCo RuntimeSession owns the attached native model and its model-bound
+receipt.
+
+The current task-owned `build_fixed_attachment_candidate()` path has provider-
+free S1 and bounded MuJoCo 3.8.1 CPU S2 evidence for exactly this source pair,
+seed 31, ResetPlan and 2 ms × five-step timebase. Its current result is
+`BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`. This is not a
+registered `make_env()` route, a general multi-Entity/Attachment capability,
+an Env/Recorder/H5 integration, or Qualification. R03c public S2/S3 is
+`NOT_RUN` and has not started. Read the current scope and limits in the
+[R03 contract](../../../docs/module/task_env/goal/Phase_II_01/03_R03_Physical_Attachment.md)
+and the current materialization boundary in [Public API](../../../docs/module/task_env/public-api.md).

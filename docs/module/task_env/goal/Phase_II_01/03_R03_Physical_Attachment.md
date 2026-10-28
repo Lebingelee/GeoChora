@@ -1,6 +1,6 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内完成独立 MuJoCo source/dynamics probe 并通过该 case 的冻结门，Sol 已接收该有界工程出口。R03b/c 仍 PLANNED / NOT_STARTED。两次结果均不构成 Core Attachment admission、Core S2/S3 或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已完成实现、定向 S1 与 Core RuntimeSession S2，全部冻结门通过，出口为 `BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`；R03c **NOT_RUN**。本次没有 public Env/Recorder/H5 S3、任意 Attachment 支持或 Qualification。
 
 ## 已知事实与精确 Provider 路线
 
@@ -60,12 +60,24 @@ Trial 2同一pre-load state上的1 N world +X Hand-root-COM外载平衡oracle通
 
 Sol复核收据位于同一ignored交接根目录的`sol_review_r03a_002/`。复核未重跑native；原报告中“identity hand-root pose”的措辞应为保留源wxyz `(0,0,0,1)`（绕Z的π旋转），raw的RUNNING/PENDING_COMMIT残留标签不覆盖实际completed结果及提交。下一项按07进入R01a，不追加未批准的contact/端点/全行程验收。
 
+## R03b attempt001：Core 固定 Arm+Hand Attachment（2026-10-28）
+
+在冻结输入 HEAD `48bc7e023929df7aa843a2097014481cd6c3c806` 上，本包在现有 `task_env.artifacts`、`task_env.assembly`、`RuntimeSession` 与 task-owned candidate owners 中增加版本化 `FixedAttachmentPlanV1`、双 source closure/lowering、严格 `materialize()` opt-in 与 model-bound receipt。两个 canonical Entity、Scene-v3、既有 LogicalAssembly 和 TaskArtifact schema/fixture 保持独立与不变；native 只由一个 MuJoCo RuntimeSession 持有。该实现仅绑定本节列出的 Panda Arm/Hand source 与 fixed-tree route。
+
+Provider-free S1 的19个source、Scene/Assembly pin、mount方向、root、映射、资源、碰撞和时间步负例均在 native 前拒绝；生产 `materialize()` admission 的正例通过。受影响旧 owner 回归集合为80 passed。首个native进程因源 MJCF 省略显式 `timestep` 而在native import/reset/forward/step前被 Core 的旧时间步门拒绝；保留该原始失败。包内仅用一次允许的pre-step普通接线修正，将2 ms默认只允许于显式 fixed-Attachment plan，并保留真实compiled model timestep核对；修复后的S1仍19项通过，旧回归仍80 passed。第二次且最后一次授权 MuJoCo 3.8.1 CPU 进程通过两个独立 materialization/reset trials。
+
+两trial各完成128 outer intervals、640 `mj_step`、129 `mj_forward` 和1.28 s仿真。compiled model为 `nq/nv/nu=9/9/8`、9 joints、13 bodies（含world）、1 site、67 meshes、81 geoms、1 equality、1 tendon、3 excludes；物理树只有 `link0` 一个world child root。两次reset的Joint、Velocity、ctrl和time逐项相同。每trial Arm joint1 peak `0.09146 rad`、return error `0.008651 rad`、Hand-root rotation `0.09314 rad`；Hand opening最小 `0.012269 m`、最大 `0.068024 m`、excursion `0.055755 m`，finger-equality mismatch最大 `2.536e-6 m`，两finger相对Hand位移各 `0.032494 m`。实际compiled-state mount最大位置误差 `0 m`、旋转误差 `2.9803e-8 rad`；时钟误差为0，无限值或warning增量。两次close都确认model/data释放。
+
+MuJoCo package、binding、实际mapped CPU library与公开header的路径、版本/API和SHA-256均匹配冻结输入。跨两个进程累计计数为materialization3（含保留的首次pre-step失败尝试）、reset2、forward258、outer256、step1280、模拟2.56 s；峰值观测RSS为336,027,648 bytes，闭包34,318,679 bytes，均在包内上限内。review产物与逐次账本保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/`，以 `report.md` 与 `native_run_002/s2_evidence.json` 为证据入口。
+
+当前交付为 `BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW`；这不是Sol acceptance、Provider通用合同或Qualification。S2只覆盖该源、seed31、2 ms×5、reset与冻结Arm/Hand motion片段；R03b未运行外载或接触测试。R03c 的 public candidate→Env→Recorder→reader S2/S3、H5与所有未列出的source/provider/backend均 **NOT_RUN**，R03c 保持未启动。R06 gate、R05a blocker、DAG、Required Envelope、P99与冻结refs不变。
+
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
 | R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；R03b/c仍未启动 |
-| R03b | R01c,R03a | 既有 assembly/source/materialization owners 中固定树 lowering、root/collision/逆映射与新准入 | S1 错 mount/环/重复 child/root/source/顺序拒绝；S2 reset/运动 mount invariant；禁止降低旧 admission 保护 |
-| R03c | R03b,R02c | 独立 Arm+Hand 真实 Position 施控，现有 public Env→Recorder→reader | S2/S3：同一个公开实例 reset/连续 step/observation/H5 T/T+1/request/Target/Ack/state/identity/close；无真实 hand actuation 或 native coupling 即失败 |
+| R03b | R01c,R03a | **attempt001 已实现；S1/S2 PASS，待Sol复核**。精确两-source Panda fixed tree、source closure、model-bound mapping/topology、ResetPlan与真实相对位姿 | 19项定向S1与80项旧owner回归通过；两trial各128区间，冻结motion/mount/range/clock/warning/close门全通过。只限本包source/provider/seed/horizon，非Qualification |
+| R03c | R03b,R02c | **NOT_RUN / 未启动**。独立 Arm+Hand 真实 Position 施控，现有 public Env→Recorder→reader | S2/S3仍要求同一公开实例 reset/step/observation/H5 T/T+1/request/Target/Ack/state/identity/close；R03b S2不能替代R03c |
 
 S3 必须沿现有 factory/SelectedReferenceEnv 或已明确批准的公共 candidate 入口，在原 RuntimeSession/Recorder owners 扩展；public path 不导入 test_*。失败保留原日志、partial apply/fault receipt、资源关闭检查；不伪装 rollback。R03 不依赖 Camera 或 R05 force-only 路线；不引入动态 attach/detach/闭环约束拓扑、USD ABI 或第二 Runtime。外部装配语义参考固定 [Isaac Sim 6.1.0](README.md#references)。

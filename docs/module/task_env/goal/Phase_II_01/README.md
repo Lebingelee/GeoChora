@@ -47,7 +47,7 @@
 | --- | --- | --- | --- |
 | SRC-1 P0 | 独立Arm+Hand→MjSpec导出→GeoPhys a53 importer | site-size dialect真实拒绝，NOT_ADMITTED/BLOCKED；非所有GeoPhys Attachment结论 | GeoPhys该路线停止；Provider importer修复或versioned source normalization均须单独审查，MuJoCo候选可独立推进 |
 | CTL-1 P0 | canonical Position Profile / plan / Env | R02b已提供provider-free leaf adapters与整体preflight/S1；真实Runtime/Recorder admission尚未建立 | R02c与R03c验证真实隔离S2/S3；保留Force-aware拒绝与唯一writer保护 |
-| MAT-1 P0 | RuntimeSource/materialization/typed state | 当前single Robot/dual independent roots准入不等于attached pair；native tree可能跨两个canonical Entity | R03b/c；显式新identity/mapping/admission，错root/源/资源拒绝 |
+| MAT-1 P0 | RuntimeSource/materialization/typed state | R03b已为精确Menagerie Panda Arm+Hand双source增加fixed-tree plan与Core S2；更广source/provider及public Env/H5路径仍未建立 | R03b bounded review；R03c仍需独立public Env/Recorder/reader S2/S3 |
 | ID-1 P1 | artifacts/Assembly refs | 同Entity子组件与Entity owning混淆、alias冲突/循环hash | R01→R02/R03；typed refs、hash有向分域、严格版本派发 |
 | MAP-1 P1 | importer→canonical→native slots→Controller/Recorder | joint/body/actuator顺序或Hand equality/tendon误解释，重复驱动 | R02/R03/R06；逆映射/置换负例/独立资源运动与H5 |
 | CAM-1 P1 | CameraSession→Observation→H5 | state-only与generic passthrough断点；identity/calibration/labels/缓存与峰值内存 | R04b/c/P99；strict reader/同边界/预算/fault/teardown |
@@ -152,6 +152,8 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-27，Sol接收R02b attempt001为 `ACCEPTED_S1_BOUNDED`：4项局部兼容与拒绝门缺口已直接修正，R02b最终18项S1通过；101项既有owner与1项C02b pure guard通过，54个旧源码数值/身份对照一致。下一行R02c，由现有完整Panda两个ControlGroup引用运行真正独立的Arm/Hand Position writer并接入既有Env/H5；不以两个完整Panda替代leaf证据，不增加R03b隐藏前置。Sol本轮未运行native、R02c/R03b或S2/S3/S4，原gate与Qualification边界保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/`。
 
 2026-10-27，R02c attempt001在既有Task Source、RuntimeSession、SelectedReferenceEnv与Generic H5 v3 owners内完成独立Arm/Hand Position leaf candidate、MuJoCo adapter和严格leaf H5 reader；provider-free定向S1为53 passed。唯一获准probe进程在MuJoCo import前因合同静态校验字段名错误退出，native compile/reset/forward/step与S2/S3均未发生。脚本已静态修正但未重启；Provider admission、Qualification和R03b均未启动。报告及失败原始日志位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`；当前状态等待Sol复核，原DAG、R06/R05a blocker、Required Envelope和P99不变。
+
+2026-10-28，R03b attempt001完成精确Arm/Hand双source fixed Attachment candidate、Core RuntimeSession S2与定向S1。19项S1负例与80项旧owner回归通过；两个独立3.8.1 CPU trial各128 intervals/640 step，mount、Arm/Hand运动、limits、时钟、warnings及close均通过。首次pre-step source-timestep拒绝和唯一允许修正均单独保留；修正后第二且最后native进程通过，合计预算仍在冻结上限。出口等待Sol复核，仅覆盖该source/seed31/2ms×5；未建立通用Attachment、public Env/Recorder/H5 S3或Qualification。R03c **NOT_RUN / 未启动**，等待R03b复核。完整事实与Evidence入口见 [R03](03_R03_Physical_Attachment.md) 和 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/report.md`。
 
 2026-10-27，Sol复核R02c attempt001为 **CHANGES_REQUESTED_S2_S3_NOT_RUN**：保留53项S1，但reader导入/codec、Target写入前boundary校验及clock比较存在可复现缺陷，另须关闭admission失败清理与probe旧窗口接线。原失败和两进程额度耗尽事实保留；Sol未运行native。下一包attempt002合并修复、provider-free回归、实际静态预检及获授权的有界S2/S3；R02c出口尚未接收，R03b未启动。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_001/`；原DAG、R06/R05a、Required Envelope/P99及Qualification边界不变。
 

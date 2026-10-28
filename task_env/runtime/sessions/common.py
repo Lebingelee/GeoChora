@@ -163,7 +163,16 @@ class _SessionValues:
         self._inner_interval_active = False
         root = ET.fromstring(source.scene_source.xml)
         option = root.find('option')
-        if option is None or float(option.get('timestep', 'nan')) != artifact.timebase.physics_dt:
+        explicit_timestep = None if option is None else option.get('timestep')
+        if getattr(source, 'fixed_attachment_plan', None) is not None:
+            # The frozen Panda Arm/Hand source pair omits timestep attributes;
+            # MuJoCo's 3.8.1 default is 2 ms and the adapter checks the compiled
+            # model before admitting the session. Preserve the source bytes.
+            if artifact.timebase.physics_dt != 0.002 or (
+                explicit_timestep is not None and float(explicit_timestep) != artifact.timebase.physics_dt
+            ):
+                raise ValueError('fixed Attachment source/native physics timestep mismatch')
+        elif option is None or explicit_timestep is None or float(explicit_timestep) != artifact.timebase.physics_dt:
             raise ValueError('source/native physics timestep mismatch')
 
     @property

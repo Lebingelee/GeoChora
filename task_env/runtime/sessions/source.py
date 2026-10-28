@@ -131,6 +131,9 @@ class RuntimeSource:
     objects: tuple
     scene_definition: SceneDefinition | None = None
     source_closure_digest: str | None = None
+    fixed_attachment_plan: object | None = None
+    fixed_attachment_assembly: object | None = None
+    fixed_attachment_sources: Mapping[str, TaskSceneSource] | None = None
 
     def __post_init__(self):
         for field in ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets'):
@@ -152,3 +155,26 @@ class RuntimeSource:
         expected_source_id = f'scene-definition-v3:{self.scene_definition.identity_hash}'
         if self.scene_source.source_id != expected_source_id:
             raise ValueError('runtime source ID must bind the exact canonical Scene identity')
+        attached_values = (
+            self.fixed_attachment_plan, self.fixed_attachment_assembly,
+            self.fixed_attachment_sources,
+        )
+        if any(value is not None for value in attached_values):
+            if any(value is None for value in attached_values):
+                raise ValueError('fixed Attachment RuntimeSource requires its full immutable plan, Assembly and sources')
+            from ...artifacts import FixedAttachmentPlanV1, LogicalAssemblyV1
+            if type(self.fixed_attachment_plan) is not FixedAttachmentPlanV1:
+                raise TypeError('fixed_attachment_plan must be FixedAttachmentPlanV1')
+            if type(self.fixed_attachment_assembly) is not LogicalAssemblyV1:
+                raise TypeError('fixed_attachment_assembly must be LogicalAssemblyV1')
+            if not isinstance(self.fixed_attachment_sources, Mapping):
+                raise TypeError('fixed_attachment_sources must map Entity IDs to TaskSceneSource values')
+            sources = dict(self.fixed_attachment_sources)
+            if set(sources) != {
+                self.fixed_attachment_plan.parent_entity_id,
+                self.fixed_attachment_plan.child_entity_id,
+            } or any(not isinstance(value, TaskSceneSource) for value in sources.values()):
+                raise ValueError('fixed Attachment RuntimeSource must contain exactly its two Entity sources')
+            if sources[self.fixed_attachment_plan.parent_entity_id].xml != self.scene_source.xml:
+                raise ValueError('fixed Attachment primary SceneSource must be its parent Entity source')
+            object.__setattr__(self, 'fixed_attachment_sources', MappingProxyType(sources))

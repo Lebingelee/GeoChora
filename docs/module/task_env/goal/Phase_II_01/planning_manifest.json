@@ -1045,10 +1045,70 @@
         "R03a",
         "R01c"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S1/S2",
-      "stop_condition": "wrong mount/root/顺序/约束失败→停止"
+      "status": "BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW",
+      "execution": "EXECUTED_S1_AND_TWO_TRIAL_MUJOCO_CPU_S2_PASS",
+      "required_evidence": "Provider-free S1; one bounded Core RuntimeSession MuJoCo 3.8.1 CPU S2 execution with two independent materialize/ResetPlan/128-interval trials; source/model receipt and closed-session evidence.",
+      "stop_condition": "Wrong mount/root/source/order/constraint or budget breach stops; no oracle/limit widening. S3/R03c and general Attachment remain separate.",
+      "result": "Both S2 trials passed the frozen source/mount/motion/range/clock/warning/close gates. Initial native process failed before native import/reset/forward/step on the source-omitted timestep attribute; the ordinary Core wiring correction was bounded, S1/regressions rerun, and only the final authorized process passed. Pending Sol actual-diff/source/Evidence review.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/report.md",
+      "attempt001_execution": {
+        "input_commit": "48bc7e023929df7aa843a2097014481cd6c3c806",
+        "status": "BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW",
+        "s1": {
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/s1_run_005/s1_evidence.json",
+          "sha256": "253a6035a3d3681ac36f0f87b235a41f44fab7394f5f1c8e4691ba082eef7bc8",
+          "negative_cases_rejected": 19,
+          "native_import_or_step": false
+        },
+        "targeted_regressions": {
+          "count": 80,
+          "status": "PASS",
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/targeted_regressions_003.log",
+          "sha256": "9483e8019636b13a22cf09bb3c59a6ab49e7933f61c58bfa5d80cd037dfbc24d"
+        },
+        "source_inventory": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/source_inventory.json",
+        "source_inventory_sha256": "43a4ba107101062a3a9816dd54be98eea644de8fcfa33c18f6fe591afb4a70b3",
+        "native_contract": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/native_execution_contract_rev002.json",
+        "native_contract_sha256": "6c70902af8f5587e25da76c47250286fe15b5df02cc5cc8edd405c215758e2a5",
+        "native_ledger": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/native_run_001/ledger.json",
+        "native_ledger_sha256": "9cbc2b8ea5d48d2a99da1c1d16533deffe3fca4bbc683dd592e2ea32000fa7cf",
+        "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/native_run_002/s2_evidence.json",
+        "native_evidence_sha256": "dedf0c10d8335bfac7be59493250a29f4f5dc9eb23f05065ac7f095686c5c0db",
+        "native_process_invocations": 2,
+        "native_process_001": {
+          "exit_code": 1,
+          "status": "PRESERVED_PRE_NATIVE_IMPORT_PRE_MJ_STEP_WIRING_FAILURE",
+          "materialize_attempts": 1,
+          "reset": 0,
+          "mj_forward": 0,
+          "mj_step": 0,
+          "retry_allowed": true
+        },
+        "native_process_002": {
+          "exit_code": 0,
+          "status": "PASS",
+          "materializations": 2,
+          "resets": 2,
+          "mj_forward": 258,
+          "outer_intervals": 256,
+          "mj_step": 1280,
+          "simulated_seconds": 2.56
+        },
+        "aggregate_native_counts": {
+          "materializations": 3,
+          "resets": 2,
+          "mj_forward": 258,
+          "outer_intervals": 256,
+          "mj_step": 1280,
+          "simulated_seconds": 2.56
+        },
+        "peak_rss_bytes": 336027648,
+        "runtime_identity_verified": true,
+        "native_oracles_passed": true,
+        "public_env_recorder_h5_s3": "NOT_RUN",
+        "R03c": "NOT_RUN_NOT_STARTED",
+        "provider_admission_or_qualification": false
+      }
     },
     {
       "id": "R03c",
@@ -1057,9 +1117,10 @@
         "R02c"
       ],
       "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "execution": "NOT_RUN_PENDING_R03B_SOL_REVIEW_AND_SEPARATE_AUTHORIZATION",
       "required_evidence": "S2/S3",
-      "stop_condition": "不同diagnostic路径拼接或不完整H5→失败"
+      "stop_condition": "不同diagnostic路径拼接或不完整H5→失败",
+      "result": "Not started in R03b attempt001. Public Env/Recorder/H5 S2/S3 remain unrun."
     },
     {
       "id": "R04b",
@@ -1271,14 +1332,14 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
-    "03_R03_Physical_Attachment.md": "403b5be2eda7f1db54d8b3d6318d758f591bbd415d086138541eaecf0a85533d",
+    "03_R03_Physical_Attachment.md": "e4a0b31c4271d3cfc9e6b84ff7da1d73385e20443cedf3cd312c43eb3215a53e",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "ca50dd5d2d0e692a3a724696864efa4bd97c418a20e8770ce342dc767a8356b0",
+    "07_Execution_Order_and_Acceptance.md": "36b0e73fe60e0961d1cb89978d2063958f85571b019b95e95432eaf3f918ccd6",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "7eca4593cfd436b30340eb5b143fb37d47199802db81b28856dffb9ef2378d94"
+    "README.md": "394707a5f47612b9b8f82d7bd92d6ce55277ca5e550d156f9dbc7903bde08f4a"
   },
   "revision_kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
   "benchmark_audit": {

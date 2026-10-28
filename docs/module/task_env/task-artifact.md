@@ -185,6 +185,41 @@ Task Success、Expert Completion、episode terminated/truncated 分别属于语�
 存在成功后动作时必须声明不可变 completion policy、terminal stage、readiness/timeouts/budget 和
 record/replay 状态，见[runtime contract](runtime-and-providers.md#expert-lifecycle)。
 
+## Phase II-01 R03b fixed Attachment candidate (2026-10-28)
+
+`FixedAttachmentPlanV1` is an additive immutable intent bound to an existing
+LogicalAssembly content hash and Scene-v3 pin. It names two canonical Entity
+owners, separate source/asset/license/closure digests, typed root/mount Frames,
+the directed parent-mount-from-child-root transform, root/collision policy and
+complete native-name maps. It does not write its own digest back into the
+LogicalAssembly and does not alter the Scene-v3, LogicalAssembly-v1 or
+TaskArtifact-v1 schema/identity.
+
+The task-owned R03b candidate composes the existing Scene, R01c source
+projection, TaskArtifact compiler, ResetPlan, RuntimeSource and MuJoCo
+RuntimeSession owners. Its only exercised pair is the frozen Menagerie Panda
+`panda_nohand.xml` + `hand.xml` with their license and 70-file derived closure
+(`b97f7c4f9b585ef175e986b9fb59f3054de74184666373443d6d166a45609b63`). A
+model-bound receipt records the compiled fixed root/topology, dimensions,
+canonical/native forward and inverse maps, source tendon/equality/collision
+checks, exact Provider files and native-resource close. Source bytes are
+retained; the adapter removes source keyframes from compile copies because
+ResetPlan owns the realized initial state.
+
+R03b attempt001 provider-free S1 rejected 19 negative contracts; the selected
+legacy-owner regressions passed 80 tests. After preserving the initial
+pre-import/pre-step omitted-timestep wiring failure and its raw log, a narrow
+fixed-plan-only 2 ms default gate was added, with the compiled MuJoCo model
+still required to report `opt.timestep=0.002`. The affected S1 and old-owner
+regressions were rerun. The final authorized MuJoCo 3.8.1 CPU process passed
+two independent Core materialize→ResetPlan→128-interval trials, including the
+measured mount, Arm/Hand motion, source joint/ctrl range, clock, finite-state,
+warning and close gates. This is a bounded S1/S2 candidate pending Sol review;
+the Artifact is not frozen by this result. R03c public Env/Recorder/H5 S2/S3,
+other providers/sources, generalized Attachment, Judge approval and
+Qualification remain `NOT_RUN` or unestablished. See the [Phase II-01 R03
+record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+
 ## Randomization 所有权
 
 Stage 1 定义随机化 quantity/schema、hard bounds/allowed envelope、nominal train range、

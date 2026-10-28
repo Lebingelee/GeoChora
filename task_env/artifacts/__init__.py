@@ -24,6 +24,7 @@ from .logical_assembly_resolution import (
     ResolvedLogicalAssemblyV1,
     resolve_logical_assembly,
 )
+from .fixed_attachment import FixedAttachmentPlanV1
 from .state import (
     CanonicalStatePublicationV2,
     CanonicalStatePublicationV1,
@@ -70,4 +71,5 @@ __all__ = [
     'decode_logical_assembly',
     'ResolvedLogicalAssemblyLeafV1', 'ResolvedLogicalAssemblyV1',
     'resolve_logical_assembly',
+    'FixedAttachmentPlanV1',
 ]

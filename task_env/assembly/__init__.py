@@ -20,6 +20,11 @@ from .logical_source import (
     SourceReceiptLinkV1,
     project_logical_assembly_source,
 )
+from .fixed_attachment import (
+    LoweredFixedAttachmentSourceV1,
+    lower_fixed_attachment_sources,
+    validate_fixed_attachment_scene,
+)
 
 __all__ = [
     "AgentReferences",
@@ -34,4 +39,7 @@ __all__ = [
     "ProjectedLeafSourceV1",
     "SourceReceiptLinkV1",
     "project_logical_assembly_source",
+    "LoweredFixedAttachmentSourceV1",
+    "lower_fixed_attachment_sources",
+    "validate_fixed_attachment_scene",
 ]
