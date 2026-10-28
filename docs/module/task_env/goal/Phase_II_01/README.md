@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-**当前恢复入口（2026-10-28）**：Sol已复核R03c attempt003，接收四份H5及48/48 tamper拒绝的执行事实；因native exit 1且缺正式receipt，S2/S3仍INCOMPLETE。收尾计数修正保留，现有runner成功receipt改为预算/进度检查后发布，模块33项provider-free S1通过；修正未native复验。下一工作包为attempt004同source/oracle的一次启动收口。003及更早原件保留，复核见ignored `sol_review_r03c_003/`。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)；后续方向仍按 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
+**当前恢复入口（2026-10-28）**：R03c attempt004唯一MuJoCo 3.8.1 CPU启动及同run独立H5 readback均通过，当前状态`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`。正式receipt/progress完整，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。S1复用Sol已复核的33项provider-free结果。attempt001–003原件继续保留；启动额度已用完，当前交Sol复核，不启动其他slice。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向仍按 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
@@ -15,7 +15,7 @@
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
 | [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
-| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt003四份H5/离线tamper均读取完成，但native收尾异常缺正式receipt，S2/S3 INCOMPLETE |
+| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt004精确Panda/MuJoCo CPU public Env S2/S3通过、待Sol复核；不扩展通用Attachment/Provider或Qualification |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
@@ -53,7 +53,7 @@
 | ID / 优先级 | source / owner / 范围 | 已知风险与状态 | 受影响后继 / stop或处理 |
 | --- | --- | --- | --- |
 | SRC-1 P0 | 独立Arm+Hand→MjSpec导出→GeoPhys a53 importer | site-size dialect真实拒绝，NOT_ADMITTED/BLOCKED；非所有GeoPhys Attachment结论 | GeoPhys该路线停止；Provider importer修复或versioned source normalization均须单独审查，MuJoCo候选可独立推进 |
-| CTL-1 P0 | canonical Position Profile / plan / Env | R02c005 Hand50 case已获有界S2/S3接收；R03c003四episode和H5均完成，但native最终receipt缺失、离线reader总状态INCOMPLETE；新provider native mapping尚未接通 | 07记录R03c失败并等待Sol复核；10扩展native receipt/drive/reader，保留Force-aware拒绝与唯一writer保护 |
+| CTL-1 P0 | canonical Position Profile / plan / Env | R02c005 Hand50 case已获有界S2/S3接收；R03c004固定Panda/MuJoCo 3.8.1 CPU public Env/Recorder/reader bounded S2/S3通过待Sol复核；更广provider/native mapping尚未接通 | 07记录精确边界和pending Sol review；10后续方向保持独立，保留Force-aware拒绝与唯一writer保护 |
 | MAT-1 P0 | RuntimeSource/materialization/typed state | R03b已为精确Menagerie Panda Arm+Hand双source增加fixed-tree plan与Core S2；更广source/provider及public Env/H5路径仍未建立 | R03b bounded review；R03c仍需独立public Env/Recorder/reader S2/S3 |
 | ID-1 P1 | artifacts/Assembly refs | 同Entity子组件与Entity owning混淆、alias冲突/循环hash | R01→R02/R03；typed refs、hash有向分域、严格版本派发 |
 | MAP-1 P1 | importer→canonical→native slots→Controller/Recorder | joint/body/actuator顺序或Hand equality/tendon误解释，重复驱动 | R02/R03/R06；逆映射/置换负例/独立资源运动与H5 |
@@ -183,3 +183,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-28，R03c001经Sol静态复核后为`S1_REVIEWED_NATIVE_PENDING`：真实Core准入至public reset/step的native-IO替身检查、reader一致篡改拒绝与冻结门、共享执行preflight补齐，当前90项S1通过；没有追加native，原S2/S3仍不完整。GeoPhys继续保留Phase II已验证完整Panda路线；新leaf/Attachment尚有source与Core adapter适配缺口，不能概括成GeoPhys不支持Phase II-01。详细复核在ignored `sol_review_r03c_001/`，原失败raw不改。
 
 2026-10-28，R03c attempt002使用单次授权MuJoCo 3.8.1 CPU native窗口后，在E1 public reset后的 `snapshot_v1()` typed Joint绑定处失败：runner传入 `JointReference` 而Core要求canonical Scene中的 `JointDefinition`。计数为1 start/materialization/reset/forward、0 step/outer，未完成episode/H5，独立H5 reader未运行，RSS无样本。失败后runner从固定Scene选择typed Joint definitions并通过新增1项provider-free S1；无native重试，修正仍待native验证。仅记录此attempt的S2/S3不完整与失败，不改变通用Provider/Attachment能力。原始attempt001与attempt002 bytes、freeze和账本由Phase II-01 manifest分别指向`r03c_001/`与`r03c_002/`；Sol复核前不推进其他slice。
+
+2026-10-28，R03c attempt004在冻结输入HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`完成一次MuJoCo 3.8.1 CPU启动，实际package/runtime/API为3.8.1/3.8.1/3008001，runner exit 0并发布正式receipt/progress。E1–E4各64 transitions/65 observations，合计4 materialization/reset、260 forward、1280 step、256 outer、2.56 simulated seconds；S2活动控制/复位/装配门及E3/E4配置隔离通过。另一provider-free进程对同run四份H5回读256 transitions/260 observations，provider imports为0，48/48 tamper拒绝通过，S3通过。状态为`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`；范围仅本包精确source、双Position writer、seed31、2ms×5和MuJoCo CPU，不是Qualification或通用Attachment/Provider准入。S1复用33项已复核结果；attempt001–003原件保留，当前仅待Sol复核，不启动其他slice。raw evidence在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/`。

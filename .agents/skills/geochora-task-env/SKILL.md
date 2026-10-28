@@ -913,3 +913,17 @@ these synthetic closeout facts do not prove dynamics. The next package is
 attempt004, same source/oracles and one separate native start. No new native
 execution, Qualification or other slice follows from this review. See ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/sol_review.md`.
+
+R03c attempt004 execution (2026-10-28): one bounded MuJoCo 3.8.1 CPU start
+on frozen input HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d` completed
+four same-public-Env Arm/Hand Position episodes and published the formal
+native receipt. A separate provider-free process read the four closed H5s,
+verified 256 transitions/260 observations and rejected 48/48 copy-only tamper
+cases. Current exact-scope status is
+`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`; the focused
+33-case S1 was reused, not rerun. This result is limited to the frozen Panda
+Arm+Hand source, MuJoCo 3.8.1 CPU, seed 31, 2 ms × 5 and four configurations.
+It does not establish general Attachment/Provider support, task success or
+Qualification. Preserve attempt001–003 originals; attempt004's one-start
+budget is consumed and no other slice starts before Sol review. Evidence is in
+ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/`.

@@ -1,21 +1,19 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c attempt003 唯一启动已执行，结果待Sol复核**，输入HEAD `3b71683`。
-四份H5与独立数据回读完整，但runner最终receipt缺失，故S2/S3总体INCOMPLETE；启动额度已耗尽，不重启。
+当前入口（2026-10-28）：**R03c attempt004 唯一启动已完成，bounded S2/S3通过，待Sol复核**，native输入HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`。
+正式native receipt与complete progress存在；四份同run H5经独立reader验证，S2/S3状态为`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`。attempt004启动额度已耗尽；保留attempt001–003失败原件，不重启或推进其他slice。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
 新增后继方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)，本文件更新不自动授权实现/native。
 
 <a id="r03c-checkpoint-recovery"></a>
 
-## R03c attempt003 结果与检查点恢复合同
+## R03c attempt004 结果与检查点恢复合同
 
-1. **恢复位置**：保留 `codex/phase-ii-01-p00-20261023` 与已有本地提交，不 reset 回旧 HEAD。
-   c30 是功能/source 审阅基线；后续恢复包冻结实际 `git rev-parse HEAD`（包含本次文档提交）及保护 bytes，
-   检查 c30 以来差异。文档提交不冒充新的功能验证，原 attempt002 freeze/账本保持原样。
-2. **attempt003结果与未完成项**：attempt003唯一native窗口在HEAD `3b71683`启动一次，MuJoCo package/runtime/API为3.8.1/3.8.1/3008001。E1–E4分别完成64 outer/320 step/65 forward，四份H5闭合并通过episode motion/reset/mount/warning门；总计4 materialization、4 reset、260 forward、1280 step、256 outer、2.56s。runner在E4 close后构造最终resource summary时引用未赋值的`native_log_bytes`而抛 `UnboundLocalError`，exit 1且未写`native_result.json`。同run provider-free reader解析全部H5并有48/48 tamper拒绝，但汇总为`OFFLINE_READBACK_INCOMPLETE_OR_FAILED`；因此S2/S3均INCOMPLETE，不作为新的Hand动力学失败，也不授通用Attachment/Provider能力。
-   失败后修正runner收尾计数初始化顺序和测试fixture的过期protected hash基线；模块20项provider-free测试通过。post-run代码修正没有再次native验证，原执行freeze/hash与失败原件保持。
-3. **当前下一步**：仅交Sol复核attempt003的实际diff、native raw和H5/readback Evidence；不重试、不开其他slice。Sol如另需新运行，必须有新的明确工作包与启动额度，当前文档不发放。
+1. **恢复位置**：复用 `codex/phase-ii-01-p00-20261023` 和现有阶段提交，不 reset 回旧 HEAD。
+   attempt004 native与freeze绑定输入HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`；本次结果文档提交只记录证据，实际后续包仍须从届时真实HEAD和保护bytes建立快照。历史attempt002/003 freeze、账本与raw保持不变。
+2. **attempt003失败历史保留**：attempt003在HEAD `3b71683`的唯一native窗口完成四份H5和同run文件读取，但runner以`UnboundLocalError`退出1、缺正式`native_result.json`，S2/S3为INCOMPLETE。post-run收尾修正及33项provider-free S1经Sol复核；该修正不追溯改变attempt003状态。原freeze/hash和失败raw保持。
+3. **attempt004 bounded结果**：S0与launcher `--check`通过且均provider-free、native starts为0；随后消耗一个native start，实际MuJoCo package/runtime/API为3.8.1/3.8.1/3008001，CPU且renderer未初始化，runner exit 0，发布正式receipt并将progress置为complete，无failure/cleanup error。总计4 materialization、4 reset、260 forward、1280 step、256 outer、2.56 simulated seconds。E1–E4各自64 transitions/65 observations；活动Arm/Hand门、reset/mount/warning门、E3/E4 Arm增益隔离均通过。独立provider-free reader对同run四个闭合H5读回256 transitions/260 observations，并拒绝48/48 tamper。总体状态`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`，只覆盖本包冻结的Panda Arm+Hand source、seed31、2ms×5、四配置和两个Position writer；不是task success、通用Attachment/Provider admission或Qualification。完整Evidence在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/`。当前仅交Sol复核实际差异、正式receipt、H5和独立reader Evidence；额度已用完，不重试、不启动其他slice。
 4. **S1 入口**：现有 candidate/已选 public 构造入口→真实 Core admission→public reset→runner bindings/requirements→真实 snapshot_v1/check-reset→
    首个 public step→snapshot/check-outer→Recorder/reader→close；仅替换 native IO，
    不以 helper 类型断言或 hash/账本 preflight 代替出错链覆盖。完整通用门见 [10 第6节](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#6-防止字段与接线错误进入-native)。
@@ -83,7 +81,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | ACCEPTED_S1_BOUNDED；Sol修正兼容/覆盖/name拒绝门后18项S1通过；native/provider NOT_ADMITTED |
 | 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | ACCEPTED_BOUNDED_S2_S3；005 Hand50 case四episode/四H5通过；2500默认/旧FAIL保留，下一项R03b |
 | 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | ACCEPTED_BOUNDED_S1_S2；Sol补齐source声明拒绝门并通过99项S1，原两trial S2离线复核通过；仅限该Panda source/seed31/2ms×5候选 |
-| 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | attempt003 S2/S3 INCOMPLETE pending Sol review：四份H5、256 transitions/260 observations及48/48 tamper读回；native收尾UnboundLocalError导致正式receipt缺失。post-run修正后20项provider-free测试通过，未native验证；不追加启动 |
+| 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | attempt004 bounded S2/S3通过待Sol复核：正式receipt/progress complete；四份同run 64/65 H5由独立reader读取，256 transitions/260 observations、48/48 tamper拒绝。只限冻结Panda Arm+Hand/MuJoCo 3.8.1 CPU/seed31/timebase/config；其他provider、Attachment和Qualification未准入 |
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | PLANNED / NOT_STARTED |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | PLANNED / NOT_STARTED |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | PLANNED / NOT_STARTED |
@@ -186,3 +184,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28，R03c attempt003基于HEAD `3b71683d5890c4ca1701037d59bce7b17de50a30`通过S0及launcher check后启动唯一MuJoCo 3.8.1 CPU进程。E1–E4各64 outer/320 step/65 forward且各自H5闭合；合计4 materialization、4 reset、260 forward、1280 step、256 outer、2.56 simulated seconds。E4 close后runner在resource summary引用未赋值的`native_log_bytes`并退出1，缺正式`native_result.json`。同run独立reader完成四文件语义回读、48/48 tamper拒绝（256 transitions/260 observations），但整体状态`OFFLINE_READBACK_INCOMPLETE_OR_FAILED`。峰值RSS采样440,950,784 bytes。post-run仅修复runner资源计数顺序和合成fresh-window测试fixture，20项provider-free回归通过，未重启native且不代表修正获native验证。该attempt S2/S3均INCOMPLETE、待Sol复核；原attempt001/002、R06/R05a/DAG/Required Envelope/P99与frozen refs保留，未启动其他slice。详情见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`。
 
 2026-10-28，Sol已复核R03c attempt003的两笔提交和53项签署hash：四份真实H5各64/65、1280次step trace、260 forward、四reset与四materialization、48/48离线tamper拒绝事实接收；native最终receipt缺失且exit 1，S2/S3仍INCOMPLETE。post-run计数修正保留。Sol在现有runner提取可独立检查的收尾方法，并在预算/进度写入完成后才发布正式receipt；新增13项成功出口、计数/缺episode、预算与写入/非有限值失败检查，模块33项provider-free S1通过。没有新native，下一包为同source/oracle/预算的attempt004一次启动收口；其结果仍待实际执行和Sol复核，不推进其他slice。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/sol_review.md`。
+
+2026-10-28，R03c attempt004以输入HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`完成一次新的MuJoCo 3.8.1 CPU启动。S0和launcher `--check`通过；actual package/runtime/API为3.8.1/3.8.1/3008001，正式native receipt存在、progress complete、无failure/cleanup error，native exit 0。四episode共4 materialization/reset、260 forward、1280 step、256 outer；H5各64/65，活动Arm/Hand与reset/mount/warning/config-isolation门通过。新provider-free进程同run读取四份H5，provider imports 0，累计256 transitions/260 observations和48/48 tamper拒绝；reader状态`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`。RSS最大采样459,276,288 bytes（outer boundary sampling，不代表interval内硬峰值）；完整package最终大小见ignored attempt004 `sha256.manifest`/report。S1复用33项Sol复核结果，没有重跑；attempt001–003失败原件不变。当前只待Sol复核，不启动其他slice，且不授予通用Provider/Attachment支持或Qualification。
