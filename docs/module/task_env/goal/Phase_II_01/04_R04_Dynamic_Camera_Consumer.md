@@ -57,3 +57,9 @@ attempt002使用 provider-free 合成capture/H5定向S1，33 passed；报告、�
 | R04c | R04b | 同文件 H5 图像/深度/mask/metadata/数值控制与状态 semantic readback | S3：T/T+1、每帧identity/calibration/labels/数值与经过既有量化/布局变换的RGB像素比对、故障不成完整轨迹；不能以 inspector 代 reader |
 
 不引入 visuomotor policy Qualification、async、semantic/link mask、free-joint/Assembly rendering 全矩阵；不把 Isaac Lab 的 Warp-native buffer 作为本项目 ABI。参考 producer/native refresh/consumer lifetime 分离原则见 [README](README.md#references)。
+
+## R04b attempt001 Sol复核（2026-10-28）
+
+独立camera分支`codex/phase-ii-01-camera`的实现提交`f7bc956`、`37ca3ee`、`27fad20`共4个诊断/测试文件，未改生产camera合同。Sol核149项evidence hash并重跑24项provider-free tests通过，仅接收S1和partial reset/capture事实，**S2_NOT_ACCEPTED**。两个启动额度已用：首进程CLI相对导入预检失败；次进程完成一次GeoPhys materialize/reset和两相机RGB/depth/Entity-mask捕获后，因Contract tuple与JSON list直比失败，0outer/0physics substeps。比较及异常Renderer.close计数修正未native复验；原离线reader缺boundary行而失败。
+
+另有明确未走到的worker接线错误：`CanonicalStateViewV1`没有直属`scene_identity_hash`，应通过`view.boundary.scene_identity_hash`。下一包R04b attempt002在同分支修正并先让实际worker成功分支、序列化及独立reader的provider-free全链通过，再使用新有界native窗口。旧失败原件保持；不以新比较helper测试替代全链、不自动进入R04c/H5、不改oracle/provider/预算。主develop-full的F01下载由维护者接管，Luna1独立R07a审计，camera分支不混入主分支安装提交。复核入口为ignored`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_001/sol_review.md`。

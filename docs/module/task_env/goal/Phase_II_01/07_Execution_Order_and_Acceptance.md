@@ -203,3 +203,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28 Sol接收F00 attempt002及有限复核修正为`ACCEPTED_BOUNDED_F00`：338项原件及历史保护hash、20seed原始完成事实、真实Oracle427/428和86项pending包独立复核通过；Luna2独立审阅同意本次native结果未被其条件性缺陷推翻。新增非空portable diagnostics字符串误作文件ref、新owner/fault issue追加后账本无法load两项缺陷已在`1045fd9c65daaa56fdb7eab06779d946bf4b8cd6`修正，Sol复核actual diff并独立重跑29项provider-free tests通过。原生证据继续仅绑定`0d75d76`，复核修正零native；原338项保持不变。Judge metadata既有校验缺口另记后续，不扩大本次标准；原7/22、P99及其他slice不变。下一步F01工作包准备，尚未安装/启动。复核详见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_002/sol_review.md`。
 
 2026-10-28 维护者在F00接收后要求准备F01并安装Isaac。Sol重新核实官方stable6.2.0.0、Python3.12/torch2.11.0 cu128配方及主机资源，准备新HEAD工作包：Luna1持有代码/安装单写入并执行隔离安装及官方Panda+刚体有界native；Luna2独立只读复核配方/API/资源与收尾门禁，不并行安装或启动App。原F01草稿保持历史不执行。本次Sol零安装、零native；Core Isaac adapter仍为F04，安装不等于provider接通。
+
+2026-10-28 camera分支R04b attempt001经Sol复核仅S1/partial capture接收，完整S2未通过；下一包同分支attempt002修复诊断字段接线并完成完整worker→独立reader预检及新有界native。详见[04 R04b复核](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt001-sol复核2026-10-28)。本camera分支未包含主分支F01当前安装结果，不能用其旧F01摘要覆盖主checkout事实；两个分支分别固定HEAD，等待Sol协调集成。

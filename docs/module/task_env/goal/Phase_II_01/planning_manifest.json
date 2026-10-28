@@ -1856,12 +1856,12 @@
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
-    "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
+    "04_R04_Dynamic_Camera_Consumer.md": "6a292d8805545e6f814d4c8204ba29ad26e6f438094ba07d8b8379853d09cb99",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "f7cbc1bb54901f136bc19f39779015b7f4a47faf91ba4dea0c17dcd00cc97134"
+    "07_Execution_Order_and_Acceptance.md": "b5672331e49ae34af5863417ec9966a9623c1dee950b91dc43be2e7da0780f37"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4249,6 +4249,27 @@
       "two_luna_roles": "Luna1 implementation/install/native; Luna2 isolated review outputs only",
       "original_7_22_P99_changed": false,
       "qualification_granted": false
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R04B_ATTEMPT001_REVIEW_AND_REWORK",
+      "branch": "codex/phase-ii-01-camera",
+      "review_input_head": "27fad201facebc1903bb61082490e1c74c7e625c",
+      "result": "S1_AND_PARTIAL_CAPTURE_FACTS_ACCEPTED; S2_NOT_ACCEPTED",
+      "provider_free_tests": 24,
+      "manifest_entries_verified": 149,
+      "native_starts_by_sol": 0,
+      "observed_usage": {
+        "worker_processes": 2,
+        "materializations": 1,
+        "reset_attempts": 1,
+        "outer_steps": 0,
+        "physics_substeps": 0,
+        "captures": 2
+      },
+      "next": "R04b attempt002 bounded rework on same camera branch; R04c not started",
+      "original_7_22_P99_changed": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_001/sol_review.md"
     }
   ],
   "P00_audit": {
@@ -4961,6 +4982,15 @@
         "F00-R2 append-only owner/fault issue readback"
       ],
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002_review_fix_001/report.md"
+    },
+    "r04b_current": {
+      "status": "S1_REVIEWED_S2_INCOMPLETE; ATTEMPT002_READY_FOR_REWORK",
+      "implementation_head": "27fad201facebc1903bb61082490e1c74c7e625c",
+      "S2": "NOT_ACCEPTED",
+      "R04c": "NOT_STARTED",
+      "input_provider_route": "GeoPhys a53 CPU × MuJoCo3.8.1 NVIDIA EGL × existing single Panda Position source",
+      "new_sol_finding": "CanonicalStateViewV1 scene identity is view.boundary.scene_identity_hash; fix worker and full positive wiring test before native",
+      "main_checkout": "separate develop-full; maintainer owns Isaac dependency installation; no edits permitted from this camera package"
     }
   }
 }
