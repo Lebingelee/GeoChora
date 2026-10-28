@@ -231,19 +231,37 @@ class _ProviderFreeCameraSession:
         )
         transform = np.asarray(metadata.T_camera_from_world, dtype=np.float64)
         camera_point = transform[:3, :3] @ np.asarray(peg_pose.position) + transform[:3, 3]
-        pixel = np.asarray(metadata.K, dtype=np.float64) @ camera_point
-        col = int(round(float(pixel[0] / pixel[2]) - 0.5))
-        row = int(round(float(pixel[1] / pixel[2]) - 0.5))
-        try:
-            expected_depth, _ = probe._ray_box_hit(metadata, peg_pose, row, col)
-        except ValueError as exc:
+        # The worker requires a geometry sample at reset and at the target
+        # boundary. During intermediate controller states, the hand camera can
+        # legitimately point away from the static peg; do not synthesize an
+        # impossible in-view landmark sample for those boundaries.
+        if camera_point[2] > 0:
+            pixel = np.asarray(metadata.K, dtype=np.float64) @ camera_point
+            col = int(round(float(pixel[0] / pixel[2]) - 0.5))
+            row = int(round(float(pixel[1] / pixel[2]) - 0.5))
+            if 0 <= row < HEIGHT and 0 <= col < WIDTH:
+                try:
+                    expected_depth, _ = probe._ray_box_hit(metadata, peg_pose, row, col)
+                except ValueError as exc:
+                    if camera_id == probe.FIXED_CAMERA_ID or step in (0, 12):
+                        raise ValueError(
+                            f"{exc}; synthetic capture camera={camera_id} "
+                            f"control_step={step} peg_position={tuple(peg_pose.position)} "
+                            f"camera_point={camera_point.tolist()} pixel={pixel.tolist()} row={row} col={col} "
+                            f"T_world_from_camera={np.asarray(metadata.T_world_from_camera).tolist()}"
+                        ) from exc
+                else:
+                    depth[row, col] = np.float32(expected_depth)
+            elif camera_id == probe.FIXED_CAMERA_ID or step in (0, 12):
+                raise ValueError(
+                    f"synthetic calibration landmark is outside view: camera={camera_id} "
+                    f"control_step={step} camera_point={camera_point.tolist()} pixel={pixel.tolist()}"
+                )
+        elif camera_id == probe.FIXED_CAMERA_ID or step in (0, 12):
             raise ValueError(
-                f"{exc}; synthetic capture camera={camera_id} "
-                f"control_step={step} peg_position={tuple(peg_pose.position)} "
-                f"camera_point={camera_point.tolist()} pixel={pixel.tolist()} row={row} col={col} "
-                f"T_world_from_camera={np.asarray(metadata.T_world_from_camera).tolist()}"
-            ) from exc
-        depth[row, col] = np.float32(expected_depth)
+                f"synthetic calibration landmark is behind camera: camera={camera_id} "
+                f"control_step={step} camera_point={camera_point.tolist()}"
+            )
 
         self.last_sync = SimpleNamespace(to_mapping=lambda: {
             "schema_version": "render-state-sync-receipt-v1",
