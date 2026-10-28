@@ -488,6 +488,10 @@ def test_provider_free_complete_worker_success_and_independent_reader_negative_m
 
     def fake_materialize(artifact, execution, *, source, binding,
                          controller_binding_plan, controller_profile, **_kwargs):
+        if isinstance(controller_profile, (tuple, list)):
+            if len(controller_profile) != 1:
+                raise AssertionError("provider-free fixture only admits the single existing Panda profile")
+            controller_profile = controller_profile[0]
         session = _ProviderFreeRuntimeSession(
             artifact, source, binding, controller_binding_plan, controller_profile,
         )
