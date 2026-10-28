@@ -15,6 +15,7 @@ import pytest
 from task_env.diagnostics.tasks import (
     r04b_public_camera_s2_probe as camera_probe,
     r04c_camera_h5_s3_probe as r04c_worker,
+    r04c_finalize_readback as finalizer,
     r04c_public_h5_semantic_reader as semantic_reader,
     r04c_raw_h5_comparator as raw_comparator,
 )
@@ -333,9 +334,31 @@ def test_r04c_complete_provider_free_s3_worker_and_two_independent_readers(tmp_p
     assert native_matrix["status"] == "R04C_NATIVE_H5_TAMPER_MATRIX_PASS"
     assert native_matrix["case_count"] >= 21
 
+    fake_supervisor = worker_output / "synthetic_supervisor_receipt.json"
+    fake_supervisor.write_text(json.dumps({
+        "schema_version": "r04b-native-supervisor-v1",
+        "status": "NATIVE_WORKER_FAILED_OR_ABORTED",
+        "lock_acquired": False,
+        "native_processes_launched": 0,
+    }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    final_receipt = worker_output / "synthetic_final_gate.json"
+    assert finalizer.main([
+        "--output-root", str(worker_output),
+        "--worker-receipt", str(worker_output / "r04c_worker_receipt.json"),
+        "--supervisor-receipt", str(fake_supervisor),
+        "--semantic-receipt", str(semantic_receipt),
+        "--raw-receipt", str(raw_receipt),
+        "--negative-matrix", str(native_matrix_receipt),
+        "--lock", str(MAINTENANCE / "shared_native_execution.lock"),
+        "--receipt-out", str(final_receipt),
+    ]) == 1
+    synthetic_final = json.loads(final_receipt.read_text())
+    assert synthetic_final["status"] == "R04C_FINAL_GATE_FAIL"
+    assert synthetic_final["qualification_granted"] is False
+
 
 def test_r04c_reader_cli_argument_contracts_are_available():
-    for module in (r04c_worker, semantic_reader, raw_comparator,
+    for module in (r04c_worker, finalizer, semantic_reader, raw_comparator,
                    importlib.import_module("task_env.diagnostics.tasks.r04c_h5_negative_matrix")):
         worktree = Path(module.__file__).resolve().parents[3]
         help_result = subprocess.run(
