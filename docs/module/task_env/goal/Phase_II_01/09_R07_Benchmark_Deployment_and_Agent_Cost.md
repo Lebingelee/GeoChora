@@ -180,3 +180,19 @@ R07a交付source/asset/license/embodiment/fixture/资源/缺口与go/no-go recom
 许可调查需纠正粒度：TurboSquid的14条文件路径对应moka_pot/wine_bottle/wine_rack三组；HOPE的4条对应cookies/cream_cheese两组；GSO的8条对应四组。下一步先查固定仓库的NOTICE/文件注释/导入历史和这些具体模型族的官方来源，再把证据不足压缩为精确待决项，不要求用户提供14个虚构模型的记录。来源可核、本地用途、商业用途、资产再分发与数据输出应分别记录，未知权利不自动批准；原五Task不换题。
 
 维护者选择先完成R07a再安排Isaac安装检验；Luna1仅继续成本工具修正及来源证据收口。R07b/c仍未启动，Isaac安装/下载由维护者持有。复核原件为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_002/`；全局文档validator按指示未运行。
+
+## 10. R07a attempt003 Sol复核与最后一次收口
+
+Sol接收attempt003的**有界成本协议技术修正/S1**，按原始bytes冻结v2.1候选：protocol SHA-256 `a6f5836b65498d23e0dfb53568bdd8dee69f60f020c579957990b6a6bc59987e`；tool `6d6bdf991910320ed6713bdb20c35a1c9344d720f800def4c27e6f19b96e67ba`；独立reader `2f31a9aa8007f7a8efa8a0e8c11f478d4e3d447c42211b9b50a677cc6d1c6778`。baseline与execution/final身份、R07b/R07d阶段门及cached-input三项返工关闭；冻结通过外部Sol收据记录，不重写候选中原有pending文字。该工具仍是有界审计候选，不是完整通用成本平台或真实Agent成本测量。
+
+2,181项输出hash、11项冻结源码Git bytes、10项保护证据和2项工作包hash匹配；120条资产size/SHA-256/Git blob与120条模型族/任务关联匹配。Sol在新隔离进程读回保留的最终成本结果，40项预期全部符合（38项分类核对、缺证据和非严格JSON两项reader拒绝）；原33 CLI拒绝/2 reader拒绝/9 LOC测试结果复用，没有重跑完整S1或native。复核入口：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_003/`。
+
+**R07a整体仍为FIRST_USE_SOURCE_RECORDS_PENDING，R07b未启动。** TurboSquid的moka_pot、wine_bottle、wine_rack三组共14条路径仍缺精确来源/适用条款绑定；另有LIBERO场景纹理覆盖/署名、Google plate精确ID、历史Panda派生来源/notice问题，须分别判断实际缺项，不能把未知来源等同侵权，也不能把下游镜像声明当成原始授权。维护者已确认仅本地、非商业研究仿真，不分发资产或数据；不再重问已确认用途。
+
+维护者明确考虑到前三次派发早于新的attempt约束，允许**最多一个额外attempt004**。本次仅对剩余具体来源问题做最后一次有界调查和处置；成本已通过项不重新搭建，五任务/source/predicate不替换，原门不放宽。若仍需外部资料，交付最终精确待答表并停止，不能自动派发第五次或转入R07b。预计时长、网络预算、冻结输入和完整输出在独立工作包中固定，执行中不追加prompt。
+
+### 审计缓存与R07b部署位置
+
+当前资产bytes在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_002/assets/bytes/`：五任务所选LIBERO闭包为52文件/68,172,587 bytes，robosuite机器人/依赖闭包为68文件/42,820,217 bytes。LIBERO缓存另保留两份旧失败`.part`，不属于验证闭包。源码、BDDL/XML和init审计记录分布在早期source cache/audit中；这不是完整LIBERO运行环境或完整benchmark数据集安装。
+
+`asset/benchmarks/`与`bench_deploy/`目前均未创建。按本页第3节和第7节，**R07b**负责正式来源manifest、允许保留的源码/版本化引用、可复现install/verify，以及benchmark-specific task/robot/controller/planner/observation/assembly/evaluation配方、映射与最小adapter。通用Core能力继续归既有owner；报告/H5/log留在workspace Evidence。本次R07a收口不提前创建这些部署目录、不移动或覆盖审计原件。

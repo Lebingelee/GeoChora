@@ -1714,11 +1714,11 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PARTIAL_AUDIT_PROTOCOL_REWORK_RIGHTS_MAPPING_BLOCKED",
-      "execution": "AUDIT_BYTES_VERIFIED; COST_V2_CHANGES_REQUESTED; NO_NATIVE",
+      "status": "PARTIAL_TECHNICAL_PROTOCOL_ACCEPTED_FIRST_USE_SOURCE_RECORDS_PENDING",
+      "execution": "AUDIT_BYTES_VERIFIED; COST_V2_1_TECHNICALLY_FROZEN_BOUNDED; NO_NATIVE",
       "required_evidence": "source audit / measurement protocol / feasibility",
       "stop_condition": "unresolved required semantic/source/protocol gate blocks deployment",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_002/report.md"
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_003/report.md"
     },
     {
       "id": "R07b",
@@ -1859,10 +1859,10 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "85a80fd3f28ed68b4c66daf179eb5e460bd42f966428da61e10bb4f0c38e7719",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "048d587fa7293dbcad6638797c2b098c90615b9123749c53d6f11e48be34cf6d",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "e19e9b151639f34042f5f90478de89861f13fe24bcf5767b8d98fde810e9b965"
+    "07_Execution_Order_and_Acceptance.md": "db4f9e0ee095e1e808168529bfecdaba9962536f1c9935afb2fb249666a14046"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -3501,11 +3501,43 @@
       "r07b_started": false,
       "isaac_work_by_luna1": "HELD_PENDING_R07A_AND_NEW_EXPLICIT_PACKAGE",
       "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_002/sol_review.md"
+    },
+    "r07a_attempt003_sol_review": {
+      "status": "ACCEPTED_BOUNDED_TECHNICAL_PROTOCOL_S1; R07A_NOT_ACCEPTED_FIRST_USE_SOURCE_RECORDS_PENDING",
+      "luna_input_head": "d03292bf6c6381cdf9f1d9174de6399ca52d7d5d",
+      "sol_input_head": "8cd9ef422377f3e4e82f2f8033785238113c4082",
+      "output_manifest_hashes_matched": 2181,
+      "frozen_source_git_hashes_matched": 11,
+      "protected_evidence_hashes_matched": 10,
+      "package_hashes_matched": 2,
+      "asset_paths_verified": 120,
+      "distinct_git_blobs": 116,
+      "family_path_task_links_verified": 120,
+      "independent_existing_output_readback_expectations": 40,
+      "full_s1_rerun": false,
+      "native_started": 0,
+      "cost_protocol_frozen_bounded": true,
+      "protocol_sha256": "a6f5836b65498d23e0dfb53568bdd8dee69f60f020c579957990b6a6bc59987e",
+      "tool_sha256": "6d6bdf991910320ed6713bdb20c35a1c9344d720f800def4c27e6f19b96e67ba",
+      "reader_sha256": "2f31a9aa8007f7a8efa8a0e8c11f478d4e3d447c42211b9b50a677cc6d1c6778",
+      "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_003/",
+      "final_extra_attempt_authorized": "attempt004 only; explicit maintainer exception for history predating attempt limit; no automatic attempt005",
+      "pending_source_questions": [
+        "TurboSquid moka_pot/wine_bottle/wine_rack exact source/terms",
+        "LIBERO scene notice/attribution coverage",
+        "Google plate source identity",
+        "historical Panda derivative source/notices"
+      ],
+      "r07b_started": false,
+      "deployment_roots_created": false,
+      "asset_cache_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_002/assets/bytes/",
+      "selected_libero_files": 52,
+      "selected_robosuite_files": 68
     }
   },
   "cost_measurement_protocol": {
-    "status": "PROPOSED_NOT_YET_FROZEN_FOR_DEPLOYMENT",
-    "freeze_gate": "R07a before R07b",
+    "status": "TECHNICALLY_FROZEN_V2_1_BOUNDED; R07B_ADMISSION_STILL_BLOCKED_BY_FIRST_USE_SOURCE_RECORDS",
+    "freeze_gate": "v2.1 exact protocol/tool/reader accepted by Sol in sol_review_r07a_003; independent Human quality review remains R07d",
     "actual_deployment_measurements_this_revision": null,
     "tokens": {
       "input": null,
@@ -3557,10 +3589,10 @@
       "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
     ],
     "measurement_baseline_accounting": {
-      "status": "PROPOSED_TO_FREEZE_IN_R07a",
-      "measurement_baseline_commit": null,
+      "status": "MAINTAINER_PARAMETERS_CONFIRMED_SOL_TECHNICAL_REWORK_ACCEPTED",
+      "measurement_baseline_commit": "0309d73bb5b60f9989907c3eede8c0cd2893f29f",
       "reused_module_revisions": null,
-      "reason": "No deployment authorized or started; planning commit is not a measured deployment baseline",
+      "reason": "Fixed measurement/setup baseline is distinct from actual execution/final commits; warm cache retained and R07d Human reviewer confirmed. This is not a measured deployment result.",
       "R07_triggered_Core_extensions": "count as setup/shared or per-task incremental with owner/source/session bindings",
       "preexisting_R01_R06_foundation": "separate provenance and excluded-cost boundary; no free-implementation or causal cost-reduction inference"
     }
