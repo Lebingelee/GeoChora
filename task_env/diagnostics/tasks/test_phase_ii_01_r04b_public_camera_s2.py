@@ -239,7 +239,7 @@ class _ProviderFreeCameraSession:
             pixel = np.asarray(metadata.K, dtype=np.float64) @ camera_point
             col = int(round(float(pixel[0] / pixel[2]) - 0.5))
             row = int(round(float(pixel[1] / pixel[2]) - 0.5))
-            if 0 <= row < HEIGHT and 0 <= col < WIDTH:
+            if 0 <= row < probe.HEIGHT and 0 <= col < probe.WIDTH:
                 try:
                     expected_depth, _ = probe._ray_box_hit(metadata, peg_pose, row, col)
                 except ValueError as exc:
