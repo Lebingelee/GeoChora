@@ -1,7 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c已接收；F00整合与完成事实修复/S1已接收，mock候选可行性仍失败；下一包选择独立F01**。
-当前复用集成分支 `develop-full`。F01负责隔离安装Isaac及官方Panda+刚体的原生对照；F00专家准备超时不阻塞这条独立路线。实际优先安排为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c保留独立可执行性，F07不成为相机的前置。每包仍核真实readiness与授权。
+当前入口（2026-10-28）：**R03c已接收；F00整体PARTIAL，下一包F00 attempt002；完整F00验收后再进入F01**。
+当前复用集成分支 `develop-full`。F00剩余目标为同一候选20seed全部有效solved、Oracle真实H5与独立读回、pending Judge prepare/verify；原attempt001的20条专家失败保持。F01安装/native草稿暂存，尚未派发。此后顺序为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c仍可明确安排，F07不成为相机前置。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
@@ -195,3 +195,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28，Sol复核R03c attempt004，接收 `ACCEPTED_BOUNDED_S2_S3`。实际启动exit 0、正式receipt及complete progress存在；50项原始文件hash、16项冻结源码hash、1280 step trace、四份H5与独立readback的hash及冻结门一致，48/48 tamper拒绝。接收仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置；RSS为边界采样，非interval内硬峰值。复用33项provider-free S1，没有新增native或软件测试。复核报告：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md`。
 
 2026-10-28 Sol复核F00 attempt001：接收 `develop-full` 两线整合与完成事实修复/S1；33项manifest（25文件、8个Git blob）匹配，13项provider-free tests复核通过，20条原始campaign行经report validator再核一致。candidate仍为20/20 `expert_failed / gripper_readiness_timeout`，ledger round1 fail/state ready、Oracle/H5/Judge未运行；F00整体保持PARTIAL。该专家可行性缺口不作为独立F01安装/官方原生Panda+刚体对照的前置。维护者要求下一子阶段工作包，当前明确选择F01，之后按F02/F03/F04逐包推进；R04b/c可独立安排，原DAG/P99门保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md`。
+
+2026-10-28 维护者最新纠正顺序：先成功验收F00完整闭环，再准备/执行F01。F00 attempt001仅整合/修复/S1接收，20seed候选失败，下一包为F00 attempt002集中诊断、必要owner修复、20seed/Oracle/H5/pending Judge收口；F01草稿保留待用、未派发、未安装或启动。该选择覆盖此前独立提前F01的计划，R04b/c及原7/22/P99门仍保留。
