@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import ExitStack
+from collections.abc import Mapping
 from dataclasses import replace
 import hashlib
 import importlib
@@ -554,11 +555,102 @@ def _camera_render_json(camera_capture, camera_id, index, round_index, capture_k
     }
 
 
-def run_s2(output: str | Path) -> dict[str, object]:
+def _record_r04c_public_witness(
+    observation, info, boundary_row, capture_rows, arrays, witness_rows, *,
+    episode_index, request=None, control_row=None, action_components=(),
+):
+    """Capture pre-H5 public observation/state/control values for R04c readback."""
+    boundary_index = int(boundary_row["boundary_index"])
+    prefix = f"ep{episode_index + 1:02d}_b{boundary_index:02d}"
+    camera_array_keys = {"rgb": {}, "depth": {}, "entity_mask": {}}
+    capture_by_id = {
+        capture_rows[index]["camera_id"]: capture_rows[index]
+        for index in boundary_row["capture_rows"]
+    }
+    for modality, capture_field in (("rgb", "rgb"), ("depth", "depth"), ("entity_mask", "mask")):
+        for camera_id in CAMERA_IDS:
+            public_value = np.asarray(observation[modality][camera_id])
+            capture = capture_by_id[camera_id]
+            capture_value = np.asarray(capture[capture_field])
+            if (public_value.dtype != capture_value.dtype or public_value.shape != capture_value.shape
+                    or not np.array_equal(public_value, capture_value)):
+                raise AssertionError(
+                    f"R04c public {modality} differs from the same-boundary renderer capture: {camera_id}"
+                )
+            key = capture["array_keys"][capture_field]
+            # Replace the renderer-side copy with the equal value taken from the public Env result.
+            arrays[key] = np.ascontiguousarray(public_value).copy()
+            camera_array_keys[modality][camera_id] = key
+
+    observation_array_keys = {}
+    observation_scalars = {}
+
+    def collect(value, group, path=()):
+        if isinstance(value, Mapping):
+            for child_key, child_value in value.items():
+                collect(child_value, group, (*path, str(child_key)))
+            return
+        if isinstance(value, np.ndarray):
+            if value.dtype.hasobject:
+                raise TypeError(f"R04c public observation contains an object array at {group}.{'.'.join(path)}")
+            key = f"{prefix}_{group}_{'_'.join(path)}"
+            arrays[key] = np.ascontiguousarray(value).copy()
+            observation_array_keys[f"{group}.{'.'.join(path)}"] = key
+            return
+        if isinstance(value, np.generic):
+            value = value.item()
+        observation_scalars[f"{group}.{'.'.join(path)}"] = _json_safe(value)
+
+    for group in ("state", "privileged_state"):
+        for key, value in observation[group].items():
+            collect(value, group, (str(key),))
+
+    row = {
+        "episode_index": episode_index + 1,
+        "boundary_index": boundary_index,
+        "state_boundary_identity": info["state_boundary_identity"],
+        "state_boundary_id": info["state_boundary_id"],
+        "state_sample_clock": info["state_sample_clock"],
+        "camera_observation_v1": info["camera_observation_v1"],
+        "camera_array_keys": camera_array_keys,
+        "observation_array_keys": observation_array_keys,
+        "observation_scalars": observation_scalars,
+        "capture_rows": list(boundary_row["capture_rows"]),
+        "source_closure_digest": boundary_row["source_closure_digest"],
+        "task_artifact_hash": boundary_row["task_artifact_hash"],
+        "scene_identity_hash": boundary_row["scene_identity_hash"],
+        "control_transition": control_row,
+        "request": None if request is None else request.to_mapping(),
+        "action_components": list(action_components),
+    }
+    if request is not None:
+        groups = {(group.entity_id, group.group_id): group for group in request.groups}
+        arm = groups[("panda-main", "arm")]
+        gripper = groups[("panda-main", "gripper")]
+        action_key = f"{prefix}_action"
+        arrays[action_key] = np.asarray((*arm.values, *gripper.values), dtype=np.float32)
+        row["action_array_key"] = action_key
+    else:
+        row["action_array_key"] = None
+    witness_rows.append(row)
+
+
+def run_s2(
+    output: str | Path,
+    *,
+    recording_root: str | Path | None = None,
+    input_head: str = "90f89cd67414c148bf547952612cf301cd4ec99d",
+    frozen_head_env: str = "R04B_FROZEN_HEAD",
+) -> dict[str, object]:
     output = Path(output).resolve()
     if output.exists() and any(output.iterdir()):
         raise ValueError("R04b native output must be fresh; existing evidence is preserved")
     output.mkdir(parents=True, exist_ok=True)
+    recording_root = None if recording_root is None else Path(recording_root).resolve()
+    if recording_root is not None:
+        if recording_root.exists() and any(recording_root.iterdir()):
+            raise ValueError("R04c H5 recording root must be fresh; existing evidence is preserved")
+        recording_root.mkdir(parents=True, exist_ok=True)
     counters = {
         "reset_attempts": 0,
         "materialization_ids": [],
@@ -596,6 +688,8 @@ def run_s2(output: str | Path) -> dict[str, object]:
     cache_rows = []
     control_rows = []
     action_trajectories = []
+    recording_rows = []
+    public_witness_rows = []
     sessions = []
     # Keep each Renderer strongly referenced for the whole diagnostic so a
     # later Python object cannot inherit a recycled id() and be miscounted.
@@ -683,15 +777,16 @@ def run_s2(output: str | Path) -> dict[str, object]:
             "reset_sample_id": env.value["reset_plan"].reset_sample.sample_id,
             "reset_seed": env.value["reset_plan"].reset_sample.task_seed,
         }
-        frozen_head = os.environ.get("R04B_FROZEN_HEAD")
+        frozen_head = os.environ.get(frozen_head_env)
         runtime["frozen_head"] = frozen_head
+        runtime["input_head"] = input_head
         tracked_status = subprocess.check_output(
             ["git", "status", "--porcelain", "--untracked-files=all"], cwd=worktree, text=True,
         )
         if not frozen_head or runtime["core_revision"] != frozen_head or tracked_status.strip():
             raise RuntimeError("camera worker HEAD or clean tree differs from its native freeze")
         if subprocess.run(
-            ["git", "merge-base", "--is-ancestor", "90f89cd67414c148bf547952612cf301cd4ec99d", "HEAD"],
+            ["git", "merge-base", "--is-ancestor", input_head, "HEAD"],
             cwd=worktree, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         ).returncode != 0:
             raise RuntimeError("camera worker HEAD is not a descendant of the frozen input")
@@ -911,6 +1006,28 @@ def run_s2(output: str | Path) -> dict[str, object]:
                         "capture_indices": list(boundary_rows[-1]["capture_rows"]),
                     }
 
+                    if recording_root is not None:
+                        recording_path = recording_root / f"episode_{round_index + 1:02d}.h5"
+                        recording_entry = {
+                            "episode_index": round_index + 1,
+                            "status": "STARTING",
+                            "path": str(recording_path),
+                            "start_boundary": boundary_rows[-1]["state_boundary"],
+                            "finalizer_result": None,
+                        }
+                        recording_rows.append(recording_entry)
+                        phase = f"start_recording_round_{round_index + 1}"
+                        env.start_recording(recording_path)
+                        recording_entry["status"] = "RECORDING"
+                        action_components = tuple(
+                            env.controller.controller_binding().action_schema.components
+                        )
+                        _record_r04c_public_witness(
+                            observation, info, boundary_rows[-1], capture_rows, arrays,
+                            public_witness_rows, episode_index=round_index,
+                            action_components=action_components,
+                        )
+
                     from task_env.diagnostics.tasks.c02b_position_s2_probe import _request
                     frozen_target = config_evidence["requested_hand_target_pose_world"]
                     hand_target = type(initial_hand)(
@@ -994,6 +1111,16 @@ def run_s2(output: str | Path) -> dict[str, object]:
                             **boundary_rows[-1]["cache_probe"],
                         })
                         counters["public_boundary_captures"] += len(CAMERA_IDS)
+                        if recording_root is not None:
+                            action_components = tuple(
+                                env.controller.controller_binding().action_schema.components
+                            )
+                            _record_r04c_public_witness(
+                                observation, info, boundary_rows[-1], capture_rows, arrays,
+                                public_witness_rows, episode_index=round_index,
+                                request=request, control_row=control_row,
+                                action_components=action_components,
+                            )
 
                     moved = env.typed_state.view
                     moved_hand = _frame_pose(moved, "panda-main", "hand")
@@ -1047,6 +1174,29 @@ def run_s2(output: str | Path) -> dict[str, object]:
                                 "mask_changed_pixels": mask_changed,
                                 "extrinsic_change_metric": extrinsic_motion,
                             })
+
+                    if recording_root is not None:
+                        phase = f"finalize_recording_round_{round_index + 1}"
+                        episode_end = env.stop("external_stop")
+                        outcome = episode_end.outcome
+                        if (outcome.end_reason != "external_stop" or outcome.final_boundary != 12
+                                or outcome.terminated or not outcome.truncated
+                                or outcome.task_success is True):
+                            raise AssertionError("R04c episode must finalize as an external stop at boundary 12")
+                        finalizer_result = env.finish_recording("external_stop")
+                        if (finalizer_result.get("transition_count") != 12
+                                or finalizer_result.get("observation_count") != 13
+                                or finalizer_result.get("schema_id") != "task-env-h5"
+                                or finalizer_result.get("schema_version") != "v3"
+                                or not Path(finalizer_result.get("path", "")).is_file()):
+                            raise AssertionError("existing Position recorder did not finalize one 12/13 H5 episode")
+                        recording_entry.update({
+                            "status": "FINALIZED",
+                            "finalizer_result": finalizer_result,
+                            "episode_end": episode_end.to_mapping(),
+                            "file_bytes": Path(finalizer_result["path"]).stat().st_size,
+                            "file_sha256": _sha256(Path(finalizer_result["path"])),
+                        })
 
                 if counters["reset_attempts"] != 2 or counters["outer_steps"] != 24:
                     raise AssertionError("R04b successful native route must use two resets and 24 outer steps")
@@ -1120,6 +1270,13 @@ def run_s2(output: str | Path) -> dict[str, object]:
                 context["capture_kind"] = "public"
                 if counters["renderer_capture_calls"] != 53 or counters["isolation_capture_calls"] != 1:
                     raise AssertionError("isolation capture was not separately counted exactly once")
+                if recording_root is not None and (
+                    len(recording_rows) != 2
+                    or any(row["status"] != "FINALIZED" for row in recording_rows)
+                    or len(public_witness_rows) != 26
+                    or any(row["boundary_index"] not in range(13) for row in public_witness_rows)
+                ):
+                    raise AssertionError("R04c requires two finalized 12/13 episodes and 26 pre-H5 witnesses")
                 if counters["mj_step_during_capture"] or counters["mj_forward_during_capture"]:
                     raise AssertionError("dynamic camera capture advanced MuJoCo physics or called mj_forward")
 
@@ -1196,7 +1353,10 @@ def run_s2(output: str | Path) -> dict[str, object]:
         try:
             temporary = arrays_path.with_name(arrays_path.name + ".tmp")
             with temporary.open("wb") as stream:
-                np.savez(stream, **arrays)
+                if recording_root is None:
+                    np.savez(stream, **arrays)
+                else:
+                    np.savez_compressed(stream, **arrays)
             os.replace(temporary, arrays_path)
         except BaseException as error:
             cleanup_errors.append({"type": type(error).__name__, "message": f"array finalization: {error}",
@@ -1216,6 +1376,17 @@ def run_s2(output: str | Path) -> dict[str, object]:
                     "type": type(error).__name__, "message": f"{key} finalization: {error}",
                     "traceback": traceback.format_exc(),
                 })
+        if recording_root is not None:
+            witness_path = output / "public_h5_witness_rows.jsonl"
+            try:
+                witness_path.touch(exist_ok=True)
+                for row in public_witness_rows:
+                    _append_jsonl(witness_path, row)
+            except BaseException as error:
+                cleanup_errors.append({
+                    "type": type(error).__name__, "message": f"public H5 witness finalization: {error}",
+                    "traceback": traceback.format_exc(),
+                })
         cleanup_error = cleanup_errors[0] if cleanup_errors else None
 
     passed = (primary_error is None and cleanup_error is None and env is not None
@@ -1225,7 +1396,7 @@ def run_s2(output: str | Path) -> dict[str, object]:
         "schema_version": "r04b-public-camera-s2-worker-v1",
         "status": "R04B_PUBLIC_ENV_TWO_CAMERA_S2_PASS" if passed else "R04B_PUBLIC_ENV_TWO_CAMERA_S2_FAIL",
         "scope": "one make_env panda-position-servo-candidate-v1 Env; two reset(seed=31) rounds; 12 public Position steps each; fixed and hand D04 RGB/depth/Entity mask",
-        "input_head": "90f89cd67414c148bf547952612cf301cd4ec99d",
+        "input_head": input_head,
         "runtime": runtime,
         "camera_config_preflight": config_evidence,
         "counters": counters,
@@ -1236,6 +1407,9 @@ def run_s2(output: str | Path) -> dict[str, object]:
         "isolation_capture_calls": counters["isolation_capture_calls"],
         "geometry_oracles": geometry_results,
         "action_trajectories": action_trajectories,
+        **({"r04c_recordings": recording_rows} if recording_root is not None else {}),
+        **({"public_h5_witness_rows": str(output / "public_h5_witness_rows.jsonl")}
+           if recording_root is not None else {}),
         "graphics_contexts": graphics,
         "native_worker_elapsed_s": __import__("time").monotonic() - start_time,
         "primary_error": primary_error,
@@ -1251,6 +1425,10 @@ def run_s2(output: str | Path) -> dict[str, object]:
     }
     if (output / "raw_camera_arrays.npz").exists():
         receipt["evidence"]["raw_camera_arrays_sha256"] = _sha256(output / "raw_camera_arrays.npz")
+    if recording_root is not None:
+        witness_path = output / "public_h5_witness_rows.jsonl"
+        if witness_path.exists():
+            receipt["evidence"]["public_h5_witness_rows_sha256"] = _sha256(witness_path)
     for key in ("capture_rows", "boundary_rows", "cache_probes", "control_rows"):
         path = Path(receipt["evidence"][key])
         if path.exists():

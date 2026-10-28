@@ -1,4 +1,4 @@
-"""Lock-owning resource supervisor for one bounded R04b native worker.
+"""Lock-owning resource supervisor for one bounded R04b/R04c native worker.
 
 This script uses only the Python standard library and launches exactly one
 worker process group. The exclusive advisory lock is held through the complete
@@ -253,6 +253,7 @@ def supervise(*, lock_path: Path, output: Path, worker_output: Path, worktree: P
             "VECLIB_MAXIMUM_THREADS": "1",
             "TAICHI_NUM_THREADS": "1",
             "R04B_FROZEN_HEAD": frozen_head,
+            "R04C_FROZEN_HEAD": frozen_head,
         })
         command = [str(python), str(worker_script), "--output", str(worker_output)]
         launch_start = time.monotonic()
@@ -318,6 +319,7 @@ def supervise(*, lock_path: Path, output: Path, worker_output: Path, worktree: P
                 "NUMEXPR_NUM_THREADS", "NUMBA_NUM_THREADS", "VECLIB_MAXIMUM_THREADS",
             "TAICHI_NUM_THREADS",
             "R04B_FROZEN_HEAD",
+            "R04C_FROZEN_HEAD",
             )},
             "frozen_head": frozen_head,
             "frozen_branch": frozen_branch,
