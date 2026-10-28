@@ -94,6 +94,54 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
 
 ## Repository hygiene and publishing
 
+<a id="phase-branch-workflow"></a>
+
+### Phase branches, commits and Sol/Luna handoff
+
+- Follow the maintainer's explicit workflow preferences over conflicting older
+  plans or prompts. Plan the total development branches and worktrees at the
+  phase/stage level before execution; normally reuse one topic branch per
+  planned stage for multiple sub-stages, Goals and slices. A new Goal prompt
+  is not a reason to create another branch or worktree.
+- Reuse a suitable existing phase branch. Consider an additional branch or
+  worktree for recovery, a separately retained alternative, or an isolated
+  comparison/integration after independent or web-GPT review; first record its
+  reason, scope, base, expected branch count and reintegration/disposition.
+  Discussion alone does not require a new checkout. Preserve historical refs
+  and worktrees; do not rename or remove them just to match a naming preference.
+- Pair each bounded output with its relevant local commit(s) on that phase
+  branch. Reports identify the input/output HEAD, slice/attempt, commits,
+  validation and Evidence references. Raw generated workspace data stays
+  ignored; an audit-only output can be paired with a tracked summary/index
+  commit by its designated owner instead of committing raw logs or creating an
+  empty commit. Do not stage another writer's pending files.
+- For Sol/Luna work, follow the phase execution table by default: Sol prepares
+  one self-contained, authorized, ready work package; Luna executes that slice,
+  validates and makes its permitted local commit(s), then returns its report;
+  Sol reviews the actual diff and available Evidence before sending the next
+  slice. Luna's reported PASS is input to that review, not automatic acceptance.
+  Keep one writer at a time and use the same phase branch across handoffs.
+- Size packages to the change. A basic change with known owners normally
+  combines implementation, targeted validation, necessary in-scope fixes and
+  local commit(s) in one package. Separate preparation only for unknowns that
+  affect the implementation decision; do not impose fixed preparation rounds.
+  Reuse unchanged evidence and repeat checks only for an affected input,
+  new change, failure or unresolved concern. Sol may fix minor review issues
+  directly or include them in the implementation package; additional
+  preparation requires a concrete mandatory blocker, not report formatting
+  or an unapproved extension of the original completion criteria.
+- Freeze HEAD and protected input bytes for each Luna execution window,
+  including ignored-output-only audits. Sol lands review/summary/document
+  commits after Luna returns and before issuing the next package. If urgent
+  maintainer steering changes an in-flight baseline, explicitly interrupt or
+  amend that package with the exact commit/diff/hashes; preserve the old
+  snapshot and require readback before resuming.
+- If a gate fails, Sol issues one bounded rework package. If the next table row
+  is blocked, record the blocker and any explicit decision to advance an
+  independent ready row; do not silently reorder work or add dependencies.
+  Scope approval remains separate from this development workflow, and
+  push/merge/tag/Release still require their existing authorization.
+
 - Keep generated `workspace/` data untracked. Historical P1.6 closure metadata
   remains in immutable v1.0.0. Preserve local bytes, decisions, hashes and
   relocation mappings before cleanup. Protect current L2 originals and frozen decisions;
@@ -102,7 +150,9 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   `setup.cfg`; document dependency installation and `PYTHONPATH`, not editable
   installation, unless packaging metadata is added deliberately.
 - Keep annotated v1.0.0/v1.1.0 tags and the v1.1.0 release branch immutable.
-  Prepare post-release work on a topic branch from fetched current develop.
+  At a new phase/stage boundary, prepare its planned topic branch from fetched
+  current develop, preserving intentional local commits. Reuse that phase
+  branch for subsequent Goal prompts; do not reset or recreate it per slice.
   Do not push or merge before maintainer review authorization. After approval,
   fetch/check and integrate normally into develop, then main; never rewrite frozen refs.
 - Run checks appropriate to the changed files and report what ran, what did

@@ -5,6 +5,7 @@ success predicate. Expert execution and external-action execution cannot be
 mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 """
 from dataclasses import dataclass
+from collections import OrderedDict
 from pathlib import Path
 import hashlib
 import json
@@ -110,6 +111,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     @classmethod
     def from_position_candidate(
         cls, binding: ReferenceTaskBinding, *, provider='geophys', backend='cpu', horizon=6000,
+        camera_observation_config=None,
     ):
         """Explicitly construct a bounded Position profile through the selected binding."""
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
@@ -124,7 +126,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'PositionCandidateSelectedReferenceEnv', (cls,),
                 {'uid': 'c02b-position-servo-candidate-v1'},
             )
-        env = candidate_type(provider=provider, backend=backend, horizon=horizon, _binding=binding)
+        env = candidate_type(
+            provider=provider, backend=backend, horizon=horizon, _binding=binding,
+            camera_observation_config=camera_observation_config,
+        )
         profiles = env.position_profiles
         if (not profiles or len(profiles) > 2
                 or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)
@@ -132,10 +137,56 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 or len({profile.entity_id for profile in profiles}) != len(profiles)):
             env.close()
             raise TypeError('candidate binding did not construct one or two Entity-bound PositionServoV1 profiles')
+        if camera_observation_config is not None and len(profiles) != 1:
+            env.close()
+            raise ValueError('R04a camera observation is bounded to the existing single Panda Position source')
+        return env
+
+    @classmethod
+    def from_leaf_position_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=64,
+                                     fixed_attachment=False):
+        """Construct the explicitly opted-in R02c Arm/Hand leaf candidate."""
+        if not isinstance(binding, ReferenceTaskBinding):
+            raise TypeError('leaf Position candidate requires the existing ReferenceTaskBinding')
+        if provider != 'mujoco' or backend != 'cpu':
+            raise ValueError('R02c leaf Position candidate is limited to MuJoCo CPU')
+        if fixed_attachment:
+            candidate_type = type('AttachedLeafSelectedReferenceEnv', (cls,),
+                                  {'uid': 'r03c-attached-entity-leaf-candidate-v1'})
+        else:
+            candidate_type = cls
+        if not fixed_attachment and not hasattr(cls, 'uid'):
+            candidate_type = type('LeafPositionSelectedReferenceEnv', (cls,),
+                                  {'uid': 'r02c-independent-position-leaf-candidate-v1'})
+        env = candidate_type(provider=provider, backend=backend, horizon=horizon,
+                             _binding=binding, _leaf_position_candidate=True,
+                             _fixed_attachment_leaf_position_candidate=fixed_attachment)
+        if not getattr(env, 'leaf_position_profile', False):
+            env.close()
+            raise TypeError('leaf candidate binding did not provide an effective compiled leaf plan')
+        if bool(getattr(env, 'fixed_attachment_leaf_position_profile', False)) != bool(fixed_attachment):
+            env.close()
+            raise TypeError('leaf candidate attachment opt-in was not preserved by the selected environment')
         return env
 
     def _bind_selected_controller(self, value):
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
+
+        leaf_plan = value.get('leaf_plan')
+        if leaf_plan is not None:
+            from ..controllers.canonical.leaf_plan import EffectiveLeafPlanV1
+            if type(leaf_plan) is not EffectiveLeafPlanV1 or not leaf_plan._compiled:
+                raise TypeError('leaf Position route requires a compiled EffectiveLeafPlanV1')
+            if (leaf_plan.provider_name, leaf_plan.backend) != (self.provider, self.backend):
+                raise ValueError('leaf plan provider/backend differs from the selected environment')
+            self.leaf_position_profile = True
+            self.leaf_plan = leaf_plan
+            self.position_profiles = ()
+            self.position_profile = True
+            self.controller = None
+            return
+        self.leaf_position_profile = False
+        self.leaf_plan = None
 
         raw = value['controller']
         profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
@@ -158,13 +209,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.controller = raw
 
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
-                 _binding=None, _diagnostic_gripper_control_hz=None):
+                 _binding=None, _diagnostic_gripper_control_hz=None,
+                 camera_observation_config=None, _leaf_position_candidate=False,
+                 _fixed_attachment_leaf_position_candidate=False):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
+        if camera_observation_config is not None:
+            from ..observations.canonical_camera.consumer import CameraObservationConfigV1
+
+            if not isinstance(camera_observation_config, CameraObservationConfigV1):
+                raise TypeError('camera observation opt-in requires CameraObservationConfigV1')
+            camera_observation_config.validate_production_envelope()
+            camera_observation_config.capacity(horizon)
         if _binding is not None:
             if not isinstance(self, SelectedReferenceEnv) or not isinstance(_binding, ReferenceTaskBinding):
                 raise TypeError('explicit Position binding is only admitted by SelectedReferenceEnv')
             self.binding = _binding
+        self.leaf_position_profile = False
+        self.fixed_attachment_leaf_position_profile = bool(_fixed_attachment_leaf_position_candidate)
+        if _leaf_position_candidate and (provider, backend) != ('mujoco', 'cpu'):
+            raise ValueError('leaf Position candidate admits MuJoCo CPU only')
+        if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
+            raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
         if _diagnostic_gripper_control_hz is None:
@@ -201,6 +267,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.solution = self.value['solution']
         self._bind_selected_controller(self.value)
         self.dual_entity_position = len(self.position_profiles) == 2
+        if camera_observation_config is not None and not self.position_profile:
+            raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
+        self.camera_observation_config = camera_observation_config
+        self._camera_consumer = None
+        self._camera_session_factory = None
         self.metadata = {**METADATA, 'action_schema': dict(METADATA['action_schema']), 'env_id': self.uid,
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
@@ -222,8 +293,82 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     })
                     for profile in self.position_profiles
                 })
-        self.observation_space = Dict({'state': Dict(state_spaces),
-            'privileged_state': Dict({k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32) for k in keys})})
+            elif self.fixed_attachment_leaf_position_profile and self.leaf_plan is not None:
+                state_spaces['entities'] = Dict({
+                    'panda-arm': Dict({
+                        'joint_position': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                        'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                    }),
+                    'panda-hand': Dict({
+                        'joint_position': Box(-np.inf, np.inf, (2,), dtype=np.float32),
+                        'hand_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                    }),
+                })
+        observation_spaces = OrderedDict((
+            ('state', Dict(state_spaces)),
+            ('privileged_state', Dict({
+                k + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)
+                for k in keys
+            })),
+        ))
+        if camera_observation_config is not None:
+            from ..observations.state import camera_observation_field_specs
+            from ..environment.types import ObservationFieldSpec, ObservationSchema
+
+            camera_groups = OrderedDict((name, OrderedDict()) for name in ('rgb', 'depth', 'entity_mask'))
+            for field in camera_observation_field_specs(camera_observation_config):
+                group, camera_id = field.name.split('.', 1)
+                if group == 'rgb':
+                    camera_groups[group][camera_id] = Box(0.0, 1.0, field.shape, dtype=np.float32)
+                elif group == 'depth':
+                    camera_groups[group][camera_id] = Box(0.0, np.inf, field.shape, dtype=np.float32)
+                else:
+                    camera_groups[group][camera_id] = Box(
+                        0, np.iinfo(np.uint32).max, field.shape, dtype=np.uint32,
+                    )
+            observation_spaces.update((name, Dict(values)) for name, values in camera_groups.items())
+            schema_fields = [
+                ObservationFieldSpec('state.ee_pose', (7,), 'float32', 'hand-origin TCP pose',
+                                     'm + unit quaternion', 'world'),
+                ObservationFieldSpec('state.joint_position', (9,), 'float32',
+                                     'required Panda joint positions', 'rad + m', 'canonical joint coordinates'),
+                ObservationFieldSpec('state.hand_pose', (7,), 'float32',
+                                     'provider-measured Panda hand pose', 'm + unit quaternion', 'world'),
+                ObservationFieldSpec('state.boundary_identity_sha256', (32,), 'uint8',
+                                     'state boundary identity digest', 'uint8[0,255]', 'identity'),
+            ]
+            schema_fields.extend(
+                ObservationFieldSpec(
+                    f'privileged_state.{key}_body_pose', (1, 7), 'float32',
+                    f'{key} measured world pose', 'm + unit quaternion', 'world',
+                ) for _, key in self.binding.object_poses
+            )
+            schema_fields.extend(camera_observation_field_specs(camera_observation_config))
+            self.camera_observation_schema = ObservationSchema(
+                'position-camera-observation-v1', tuple(schema_fields),
+                groups=('state', 'privileged_state', 'rgb', 'depth', 'entity_mask'),
+            )
+            self.metadata['observation_schema'] = {
+                'schema_version': 'position-camera-observation-v1',
+                'leaf_specs': tuple({
+                    'path': field.name,
+                    'shape': field.shape,
+                    'dtype': field.dtype,
+                    'semantic': field.semantic,
+                    'unit': field.unit,
+                    'frame': field.frame,
+                    'time_reference': field.time_reference,
+                } for field in self.camera_observation_schema.fields),
+            }
+            self.metadata['camera_observation_schema'] = 'camera-observation-boundary-v1'
+            self.metadata['info_schema'] = {
+                'camera_observation_v1': {
+                    'schema_version': 'camera-observation-boundary-v1',
+                    'required': True,
+                    'same_boundary_as_observation': True,
+                },
+            }
+        self.observation_space = Dict(observation_spaces)
         self.session = None
         self._external_solution_owner = None
         self._active_native_interval_receipt = None
@@ -298,6 +443,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _position_requirements(self):
         from ..artifacts import StateRequirements
 
+        if getattr(self, 'leaf_position_profile', False):
+            requirements = tuple(
+                requirement
+                for entry in self.leaf_plan.leaves
+                for requirement in entry.binding.required_state.state_requirements.requirements
+            )
+            return StateRequirements(
+                'state-requirements-v1', 'controller',
+                ('r03c-attached-entity-position-leaves-v1'
+                 if self.fixed_attachment_leaf_position_profile
+                 else 'r02c-independent-position-leaves-v1'),
+                requirements,
+            )
+
         if len(self.position_profiles) == 1:
             return self.position_profiles[0].requirements
         return StateRequirements(
@@ -359,9 +518,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_evaluation = None
         self._stopped = True
         previous_session, self.session = self.session, None
-        phase = 'reset_close'
+        previous_session_close_attempted = False
+        phase = 'camera_reset_close'
         try:
+            self._close_camera_consumer()
+            phase = 'reset_close'
             if previous_session is not None:
+                previous_session_close_attempted = True
                 previous_session.close()
             phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
@@ -402,13 +565,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 )
                 self.position_scene = self.value['source'].scene_definition
                 self.position_plan = self.value.get('controller_binding_plan')
-                if self.position_plan is None:
-                    self.position_plan = compile_control_binding_plan(
-                        self.position_scene,
-                        tuple(profile.controller_binding() for profile in self.position_profiles),
-                    )
-                if not isinstance(self.position_plan, ControlBindingPlanV1):
-                    raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
+                if self.leaf_position_profile:
+                    if self.position_plan is not None:
+                        raise ValueError('leaf route cannot carry a legacy ControllerBindingPlan')
+                else:
+                    if self.position_plan is None:
+                        self.position_plan = compile_control_binding_plan(
+                            self.position_scene,
+                            tuple(profile.controller_binding() for profile in self.position_profiles),
+                        )
+                    if not isinstance(self.position_plan, ControlBindingPlanV1):
+                        raise TypeError('PositionServoV1 selected route requires ControlBindingPlanV1')
                 self.position_joint_bindings = {
                     f'{articulation.entity_id}/{joint.joint_id}': joint
                     for articulation in self.position_scene.articulations or ()
@@ -423,12 +590,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         for name in (*self.value['source'].bodies, *self.value['source'].frames)
                     }.items()
                 }
-                self.session = materialize_control(
-                    self.artifact, self.execution, source=self.value['source'],
-                    binding=ControlBinding('panda-main/gripper', .08),
-                    controller_binding_plan=self.position_plan,
-                    controller_profile=self.position_profiles,
-                )
+                if self.leaf_position_profile:
+                    control_binding = ('panda-hand/hand-position'
+                                       if self.fixed_attachment_leaf_position_profile
+                                       else 'panda-main/gripper')
+                    self.session = materialize_control(
+                        self.artifact, self.execution, source=self.value['source'],
+                        binding=ControlBinding(control_binding, .08),
+                        leaf_plan=self.leaf_plan,
+                    )
+                else:
+                    self.session = materialize_control(
+                        self.artifact, self.execution, source=self.value['source'],
+                        binding=ControlBinding('panda-main/gripper', .08),
+                        controller_binding_plan=self.position_plan,
+                        controller_profile=self.position_profiles,
+                    )
             else:
                 self.position_profile = False
                 self.session = materialize_control(self.artifact, self.execution,
@@ -454,8 +631,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     frame_bindings=self.position_frame_bindings,
                     requirements=self._position_requirements(),
                 )
-                for profile in self.position_profiles:
-                    profile.reset(self.typed_state, self.position_plan)
+                if self.leaf_position_profile:
+                    self.leaf_materialization = self.session.leaf_materialization_receipt
+                else:
+                    for profile in self.position_profiles:
+                        profile.reset(self.typed_state, self.position_plan)
                 self.feedback = None
             else:
                 phase = 'controller_feedback'
@@ -506,6 +686,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             return self.obs, self.info
         except BaseException as error:
             self._external_solution_owner = None
+            try:
+                self._close_camera_consumer()
+            except BaseException as cleanup_error:
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'selected reset camera cleanup also failed: {cleanup_error!r}')
             failed_session, self.session = self.session, None
             if failed_session is not None:
                 try:
@@ -514,6 +700,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     add_note = getattr(error, 'add_note', None)
                     if callable(add_note):
                         add_note(f'selected reset cleanup also failed: {cleanup_error!r}')
+            if previous_session is not None and not previous_session_close_attempted:
+                previous_session_close_attempted = True
+                try:
+                    previous_session.close()
+                except BaseException as cleanup_error:
+                    add_note = getattr(error, 'add_note', None)
+                    if callable(add_note):
+                        add_note(f'selected prior-session reset cleanup also failed: {cleanup_error!r}')
             self._latch_fault(phase, error)
             raise
 
@@ -641,16 +835,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def observation(self, state):
         if getattr(self, 'position_profile', False):
-            adapted = self.controller._adapt_publication(self.typed_state)
-            evaluation_state = SimpleNamespace(
-                control_step=state.control_step,
-                simulation_time=state.simulation_time,
-                joint_position={**state.joint_position, **adapted.joint_position},
-                joint_velocity=state.joint_velocity,
-                pose_world={**state.pose_world, **adapted.pose_world},
-            )
-            evaluation = self.binding.evaluate(evaluation_state, self.artifact.semantics)
-            ee = adapted.pose_world['panda-v1/ee']
+            if getattr(self, 'leaf_position_profile', False):
+                evaluation = self.binding.evaluate(state, self.artifact.semantics)
+                frame_values = {
+                    (item.frame.entity_id, item.frame.frame_id): item
+                    for item in self.typed_state.view.frames
+                }
+                ee_key = (('panda-arm', 'link7')
+                          if self.fixed_attachment_leaf_position_profile
+                          else ('panda-main', 'link7'))
+                ee_value = frame_values[ee_key].pose_world
+                ee = ee_value
+            else:
+                adapted = self.controller._adapt_publication(self.typed_state)
+                evaluation_state = SimpleNamespace(
+                    control_step=state.control_step,
+                    simulation_time=state.simulation_time,
+                    joint_position={**state.joint_position, **adapted.joint_position},
+                    joint_velocity=state.joint_velocity,
+                    pose_world={**state.pose_world, **adapted.pose_world},
+                )
+                evaluation = self.binding.evaluate(evaluation_state, self.artifact.semantics)
+                ee = adapted.pose_world['panda-v1/ee']
         else:
             evaluation = self.binding.evaluate(state, self.artifact.semantics)
             ee = state.pose_world['panda-v1/ee']
@@ -660,34 +866,84 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             view = self.typed_state.view
             boundary = view.boundary
             entity_states = {}
-            for profile in self.position_profiles:
-                joints = {
-                    value.joint_id: value for value in view.joints
-                    if value.entity_id == profile.entity_id
-                }
-                hand = next(
-                    value for value in view.frames
-                    if value.frame.entity_id == profile.entity_id
-                    and value.frame.frame_id == profile.hand_frame_id
-                )
-                entity_states[profile.entity_id] = {
-                    'joint_position': np.asarray([
-                        joints[name].position[0]
-                        for name in (*profile.joint_ids, *profile.finger_joint_ids)
-                    ], dtype=np.float32),
-                    'hand_pose': np.asarray(
-                        (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz),
-                        dtype=np.float32,
-                    ),
-                }
-            primary = self.position_profiles[0]
+            if getattr(self, 'leaf_position_profile', False):
+                if self.fixed_attachment_leaf_position_profile:
+                    arm_joints = {value.joint_id: value for value in view.joints
+                                  if value.entity_id == 'panda-arm'}
+                    hand_joints = {value.joint_id: value for value in view.joints
+                                   if value.entity_id == 'panda-hand'}
+                    arm_pose = frame_values[('panda-arm', 'link7')].pose_world
+                    hand_pose = frame_values[('panda-hand', 'hand')].pose_world
+                    entity_states['panda-arm'] = {
+                        'joint_position': np.asarray([
+                            arm_joints[name].position[0] for name in (
+                                'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7',
+                            )
+                        ], dtype=np.float32),
+                        'hand_pose': np.asarray((*arm_pose.position, *arm_pose.quaternion_wxyz), dtype=np.float32),
+                    }
+                    entity_states['panda-hand'] = {
+                        'joint_position': np.asarray([
+                            hand_joints[name].position[0] for name in ('finger_joint1', 'finger_joint2')
+                        ], dtype=np.float32),
+                        'hand_pose': np.asarray((*hand_pose.position, *hand_pose.quaternion_wxyz), dtype=np.float32),
+                    }
+                else:
+                    entity_id = 'panda-main'
+                    joints = {value.joint_id: value for value in view.joints if value.entity_id == entity_id}
+                    hand = frame_values[(entity_id, 'hand')]
+                    entity_states[entity_id] = {
+                        'joint_position': np.asarray([
+                            *(joints[name].position[0] for name in (
+                                'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7',
+                            )),
+                            joints['finger_joint1'].position[0], joints['finger_joint2'].position[0],
+                        ], dtype=np.float32),
+                        'hand_pose': np.asarray(
+                            (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz), dtype=np.float32,
+                        ),
+                    }
+            else:
+                for profile in self.position_profiles:
+                    joints = {
+                        value.joint_id: value for value in view.joints
+                        if value.entity_id == profile.entity_id
+                    }
+                    hand = next(
+                        value for value in view.frames
+                        if value.frame.entity_id == profile.entity_id
+                        and value.frame.frame_id == profile.hand_frame_id
+                    )
+                    entity_states[profile.entity_id] = {
+                        'joint_position': np.asarray([
+                            joints[name].position[0]
+                            for name in (*profile.joint_ids, *profile.finger_joint_ids)
+                        ], dtype=np.float32),
+                        'hand_pose': np.asarray(
+                            (*hand.pose_world.position, *hand.pose_world.quaternion_wxyz),
+                            dtype=np.float32,
+                        ),
+                    }
+            primary_entity = (
+                'panda-arm' if self.fixed_attachment_leaf_position_profile else 'panda-main'
+            ) if self.leaf_position_profile else self.position_profiles[0].entity_id
             identity_hex = boundary.boundary_id.removeprefix('state-boundary-')
-            state_obs.update({
-                'joint_position': entity_states[primary.entity_id]['joint_position'],
-                'hand_pose': entity_states[primary.entity_id]['hand_pose'],
-                'boundary_identity_sha256': np.frombuffer(bytes.fromhex(identity_hex), dtype=np.uint8).copy(),
-            })
-            if self.dual_entity_position:
+            if self.fixed_attachment_leaf_position_profile:
+                state_obs['joint_position'] = np.concatenate((
+                    entity_states['panda-arm']['joint_position'],
+                    entity_states['panda-hand']['joint_position'],
+                )).astype(np.float32, copy=False)
+                state_obs['hand_pose'] = entity_states['panda-hand']['hand_pose']
+                state_obs['entities'] = entity_states
+            else:
+                state_obs.update({
+                    'joint_position': entity_states[primary_entity]['joint_position'],
+                    'hand_pose': entity_states[primary_entity]['hand_pose'],
+                })
+            state_obs['boundary_identity_sha256'] = np.frombuffer(
+                bytes.fromhex(identity_hex), dtype=np.uint8,
+            ).copy()
+            if self.dual_entity_position and not self.fixed_attachment_leaf_position_profile:
                 state_obs['entities'] = entity_states
         for semantic, key in self.binding.object_poses:
             pose = state.pose_world[semantic]
@@ -701,7 +957,27 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             info['state_boundary_identity'] = boundary.to_mapping()
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
+            if self.camera_observation_config is not None:
+                from ..observations.capture import DynamicCameraObservationConsumerV1
+
+                if self._camera_consumer is None:
+                    self._camera_consumer = DynamicCameraObservationConsumerV1(
+                        config=self.camera_observation_config,
+                        task_artifact_hash=self.artifact.identity_hash,
+                        runtime_source=self.value['source'],
+                        horizon=self.horizon,
+                        session_factory=self._camera_session_factory,
+                    )
+                leaves, capture_boundary = self._camera_consumer.capture(self.typed_state.view)
+                obs.update(leaves)
+                info['camera_observation_v1'] = capture_boundary.to_mapping()
+                self.camera_observation_schema.validate(obs)
         return obs, info, evaluation
+
+    def _close_camera_consumer(self):
+        consumer, self._camera_consumer = self._camera_consumer, None
+        if consumer is not None:
+            consumer.close()
 
     def step(self, action):
         if getattr(self, '_closed', False):
@@ -723,6 +999,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.state.control_step >= self.horizon:
                 self._stopped = True
                 raise RuntimeError('selected PositionServoV1 horizon is exhausted')
+            if getattr(self, 'leaf_position_profile', False):
+                if self.fixed_attachment_leaf_position_profile:
+                    from .position_candidate.attached_leaf_candidate import AttachedLeafActionSetV1
+                    action_set_type = AttachedLeafActionSetV1
+                else:
+                    from .position_candidate.leaf_candidate import LeafPositionActionSetV1
+                    action_set_type = LeafPositionActionSetV1
+                if type(action) is not action_set_type:
+                    raise TypeError('leaf Position route requires its typed Arm and Hand action-set')
+                action.structured_request(self.position_scene, self.leaf_plan)
+                return self._step_leaf_position(action)
             if not isinstance(action, StructuredActionRequestV1):
                 raise TypeError('PositionServoV1 requires a StructuredActionRequestV1')
             from ..runtime.sessions.control import prepare_structured_action
@@ -962,6 +1249,184 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise
         return event
 
+    def _step_leaf_position(self, action):
+        """Dispatch one real R02b two-leaf interval through the selected lifecycle."""
+        if not getattr(self, 'leaf_position_profile', False) or self.session is None:
+            raise RuntimeError('R02c leaf plan and RuntimeSession are required')
+        if self._closed or self._stopped or self.state.control_step >= self.horizon:
+            raise RuntimeError('reset required or R02c leaf episode is stopped')
+        from ..runtime.sessions.leaf_control import (
+            LeafActionRequestV1, LeafControlIntervalRequestV1,
+            dispatch_leaf_control_interval,
+        )
+        if getattr(self, 'fixed_attachment_leaf_position_profile', False):
+            from .position_candidate.attached_leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+        else:
+            from .position_candidate.leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+
+        request = action.structured_request(self.position_scene, self.leaf_plan)
+        leaf_request = LeafControlIntervalRequestV1(
+            'leaf-control-interval-request-v1', self.leaf_plan.identity_sha256,
+            self.session.leaf_materialization_receipt, self.typed_state,
+            self.session.leaf_configuration_revision,
+            (
+                LeafActionRequestV1('leaf-action-request-v1', ARM_WRITER_ID, action.arm),
+                LeafActionRequestV1('leaf-action-request-v1', HAND_WRITER_ID, action.hand),
+            ),
+        )
+        before_state = self.state
+        transition_counts_before = self._recording_counts(self.recorder)
+        append_attempted = False
+        phase = 'leaf_control_preflight'
+        completed = False
+        try:
+            result = dispatch_leaf_control_interval(
+                self.leaf_plan, leaf_request, scene=self.position_scene, runtime=self.session,
+            )
+            self.state = self.session.snapshot()
+            self.typed_state = result.next_publication
+            completed = True
+            self.feedback = None
+            self.last_leaf_transition = (action, result)
+            phase = 'leaf_observation'
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info.update({
+                'provider': self.provider,
+                'leaf_effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+            })
+            terminated = bool(self.evaluation.failure)
+            truncated = self.state.control_step >= self.horizon
+            self._stopped = bool(terminated or truncated)
+            self._episode_mode = 'external'
+            self._last_position_terminated = terminated
+            self._last_position_truncated = truncated
+            self._last_position_request = request
+            if self.recorder is not None:
+                phase = 'record_leaf_transition'
+                append_attempted = True
+                self._record_leaf_position_transition(action, request, result,
+                                                      terminated=terminated, truncated=truncated)
+            self._published_position_state = self.state
+            self._published_position_typed_state = self.typed_state
+            self._published_position_obs = self.obs
+            self._published_position_info = dict(self.info)
+            self._published_position_evaluation = self.evaluation
+            if terminated or truncated:
+                self._position_episode_end = self._make_position_episode_end(
+                    'task_terminal' if terminated else 'horizon_reached',
+                    terminated=terminated, truncated=not terminated,
+                    bootstrap_allowed=not terminated,
+                )
+                self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+        except BaseException as error:
+            after_state = None
+            readback_error = None
+            try:
+                after_state = self.session.snapshot()
+                self.state = after_state
+            except BaseException as snapshot_error:
+                readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            completed = completed or (
+                after_state is not None and after_state.control_step == before_state.control_step + 1
+            )
+            self._latch_fault(
+                phase, error, before_state=before_state, after_state=after_state,
+                interval_attempted=True, interval_completed=completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                transition_status=self._fault_transition_status(
+                    self.recorder, transition_counts_before, append_attempted=append_attempted,
+                ), readback_error=readback_error,
+            )
+            self._stopped = True
+            raise
+
+    def _record_leaf_position_transition(self, action, request, result, *, terminated, truncated):
+        from dataclasses import asdict
+        from ..trajectory.canonical.episode import StructuredControlTransitionV1
+        if getattr(self, 'fixed_attachment_leaf_position_profile', False):
+            from .position_candidate.attached_leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+        else:
+            from .position_candidate.leaf_candidate import ARM_WRITER_ID, HAND_WRITER_ID
+
+        groups = {(item.entity_id, item.group_id): item for item in request.groups}
+        commands = {item.writer_id: item for item in result.prepared_commands}
+        applied = {item.writer_id: item for item in result.apply_results}
+        entries = {entry.binding.writer_id: entry for entry in self.leaf_plan.leaves}
+        writer_controls = []
+        request_groups = {(item.entity_id, item.group_id): item for item in request.groups}
+        for writer_id, typed_action in ((ARM_WRITER_ID, action.arm), (HAND_WRITER_ID, action.hand)):
+            entry = entries[writer_id]
+            entity_id, group_id = entry.binding.entity_id, entry.binding.control_group_id
+            if (entity_id, group_id) not in request_groups:
+                raise ValueError('typed leaf request omits its exact Entity/ControlGroup')
+            command = commands[writer_id]
+            applied_result = applied[writer_id]
+            is_arm = entry.binding.profile_kind == 'arm_position'
+            components = (tuple(item.joint_id for item in entry.binding.joint_order)
+                          if is_arm else ('opening_m',))
+            values = tuple(typed_action.position_rad) if is_arm else (float(typed_action.opening_m),)
+            requested_group = request_groups[(entity_id, group_id)]
+            if (requested_group.action_schema_id != entry.binding.action_schema_id
+                    or tuple(requested_group.values) != values):
+                raise ValueError('typed leaf request Group schema/values differ from its writer Action')
+            ack = applied_result.ack
+            target = command.target
+            writer_controls.append({
+                'writer_id': writer_id,
+                'action_schema_id': entry.binding.action_schema_id,
+                'components': components,
+                'groups': ({
+                    'entity_id': entry.binding.entity_id,
+                    'group_id': group_id,
+                    'action_components': components,
+                },),
+                'requested_action': {
+                    'schema_version': typed_action.schema_version,
+                    'values': values,
+                    'payload': typed_action.to_mapping(),
+                    'unit': 'radian' if is_arm else 'meter_total_opening',
+                },
+                'canonical_action': {
+                    'schema_version': 'leaf-canonical-action-v1',
+                    'interpreted_values': values,
+                    'target_identity_sha256': target.identity_hash,
+                    'command_identity_sha256': command.command_identity_sha256,
+                    'prepared_command': asdict(command),
+                    'application_ack': ack.to_mapping(),
+                    'source_boundary': target.source_boundary.to_mapping(),
+                    'application_boundary': ack.application_boundary.to_mapping(),
+                    'next_boundary': result.next_publication.view.boundary.to_mapping(),
+                    'source_closure_sha256': self.value['source'].source_closure_digest,
+                    'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+                    'effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                    'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+                },
+                'controller_target': {
+                    'schema_version': target.schema_version,
+                    'payload': target.to_mapping(),
+                    'identity_hash': target.identity_hash,
+                },
+                'applied_control': {
+                    'schema_version': applied_result.schema_version,
+                    'payload': asdict(applied_result),
+                    'target_hash': target.identity_hash,
+                },
+            })
+        control = StructuredControlTransitionV1(
+            'structured-control-transition-v1', request, tuple(writer_controls),
+        )
+        control.validate()
+        action_values = np.asarray(tuple(
+            value for key in sorted(groups) for value in groups[key].values
+        ), dtype=np.float32)
+        self.recorder.append_transition(
+            action_values, action_values, self.obs, float(self.evaluation.reward),
+            bool(self.evaluation.success), bool(terminated), bool(truncated), self.info,
+            structured_control=control,
+        )
+
     def _step_position_profile(self, request):
         """Run one source-bound Position interval through the selected lifecycle latch."""
         if self._execution_fault is not None:
@@ -1054,6 +1519,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         except BaseException as error:
             after_state = None
             readback_error = None
+            try:
+                self._close_camera_consumer()
+            except BaseException as cleanup_error:
+                add_note = getattr(error, 'add_note', None)
+                if callable(add_note):
+                    add_note(f'camera consumer cleanup after Position fault also failed: {cleanup_error!r}')
             if interval_attempted:
                 try:
                     after_state = self.session.snapshot()
@@ -1390,6 +1861,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             except BaseException as error:
                 first_error = error
         try:
+            self._close_camera_consumer()
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+        try:
             if self.session is not None:
                 self.session.close()
                 self.session = None
@@ -1417,9 +1893,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'simulation_time_s': float(state.simulation_time),
             'state_boundary_id': boundary.boundary_id,
             'source_closure_digest': self.value['source'].source_closure_digest,
-            'controller_identity': self.controller.identity,
-            'profile_id': self.controller.profile_id,
         }
+        if getattr(self, 'leaf_position_profile', False):
+            details.update({
+                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+                'leaf_writers': tuple({
+                    'writer_id': entry.binding.writer_id,
+                    'binding_identity_sha256': entry.binding.identity_hash,
+                    'configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+                } for entry in self.leaf_plan.leaves),
+            })
+        else:
+            details.update({
+                'controller_identity': self.controller.identity,
+                'profile_id': self.controller.profile_id,
+            })
         if self.dual_entity_position:
             details['position_writers'] = tuple({
                 'entity_id': profile.entity_id,
@@ -1555,6 +2044,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise FileExistsError(path)
             recorder = TransitionRecorder(RecorderConfig(
                 schema_version='v3', max_transitions=max(self.horizon, 1),
+                max_buffer_bytes=(
+                    self.camera_observation_config.max_recording_buffer_bytes
+                    if self.camera_observation_config is not None
+                    else RecorderConfig().max_buffer_bytes
+                ),
             ))
             recorder.begin_episode(
                 self.obs, dict(self._position_reset_info), self._position_record_metadata(),
@@ -1659,7 +2153,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def finish_recording(self, reason):
         if getattr(self, 'position_profile', False):
-            from ..recorders import load_structured_control_records_h5
+            from ..recorders import (
+                load_leaf_control_records_h5, load_structured_control_records_h5,
+            )
             if self.recorder is None or not getattr(self.recorder, 'active', False):
                 raise RuntimeError('no active recording')
             if self._position_episode_end is None:
@@ -1687,15 +2183,25 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 end_event=episode_end.boundary_event,
             )
             output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
-            loaded = load_structured_control_records_h5(output)
+            loaded = (load_leaf_control_records_h5(output) if self.leaf_position_profile
+                      else load_structured_control_records_h5(output))
             if (loaded['transition_count'] != trajectory.transition_count
                     or loaded['observation_count'] != len(trajectory.observations)
                     or loaded['outcome'] != outcome):
                 raise ValueError('PositionServoV1 Generic H5 v3 readback mismatch')
+            camera_result = None
+            if self.camera_observation_config is not None:
+                from ..recorders import load_camera_observations_h5
+
+                camera_result = load_camera_observations_h5(output)
+                if camera_result['observation_count'] != len(trajectory.observations):
+                    raise ValueError('Position camera metadata reader T/T+1 count mismatch')
             return {
                 'schema_id': 'task-env-h5', 'schema_version': 'v3',
                 'transition_count': loaded['transition_count'],
                 'observation_count': loaded['observation_count'],
+                **({'camera_observation_schema': camera_result['schema_version']}
+                   if camera_result is not None else {}),
                 'outcome': outcome.to_mapping(), 'path': str(output),
             }
         from ..trajectory.canonical.streaming import save_streaming, verify_roundtrip
@@ -1721,7 +2227,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _position_record_reset_info(self):
         plan = self.value['reset_plan']
         boundary = self.typed_state.view.boundary
-        return {
+        info = {
             'seed': int(plan.reset_sample.task_seed),
             'options': {},
             'reset_sample_id': plan.reset_sample.sample_id,
@@ -1731,10 +2237,238 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'state_boundary_id': boundary.boundary_id,
             'state_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
             'source_closure_digest': self.value['source'].source_closure_digest,
+            **({
+                'camera_observation_v1': self.info['camera_observation_v1'],
+            } if self.camera_observation_config is not None else {}),
+        }
+        if getattr(self, 'leaf_position_profile', False):
+            info.update({
+                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                'leaf_materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+                'leaf_configuration_revision': self.session.leaf_configuration_revision,
+            })
+            if self.fixed_attachment_leaf_position_profile:
+                info.update({
+                    'fixed_attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
+                    'fixed_attachment_receipt_identity_sha256': self.session.fixed_attachment_receipt[
+                        'receipt_identity_sha256'
+                    ],
+                })
+        return info
+
+    def _attached_leaf_record_metadata(self, asdict):
+        attachment = self.session.fixed_attachment_receipt
+        leaf_receipt = self.session.leaf_materialization_receipt
+        writers = tuple({
+            'writer_id': entry.binding.writer_id,
+            'profile_kind': entry.binding.profile_kind,
+            'action_schema_id': entry.binding.action_schema_id,
+            'binding_identity_sha256': entry.binding.identity_hash,
+            'effective_configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+            'member_path': entry.binding.member_path,
+            'entity_id': entry.binding.entity_id,
+            'control_group_id': entry.binding.control_group_id,
+            'joint_order': tuple((ref.entity_id, ref.joint_id) for ref in entry.binding.joint_order),
+            'actuator_order': tuple((ref.entity_id, ref.actuator_id) for ref in entry.binding.actuator_order),
+            'tcp_frame': (entry.binding.tcp_frame.entity_id, entry.binding.tcp_frame.frame_id),
+        } for entry in self.leaf_plan.leaves)
+        profile = {
+            'schema_version': 'leaf-position-recording-profile-v1',
+            'profile_id': 'r03c-attached-entity-position-leaves-v1',
+            'task_artifact_identity_hash': self.artifact.identity_hash,
+            'task_source_identity_sha256': self.artifact.task_source_identity_hash,
+            'scene_identity_hash': self.position_scene.identity_hash,
+            'source_id': self.value['source'].scene_source.source_id,
+            'source_closure_digest': self.value['source'].source_closure_digest,
+            'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+            'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
+            'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+            'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
+            'provider': self.provider,
+            'provider_version': self.leaf_plan.provider_version,
+            'provider_build_sha256': self.leaf_plan.provider_build_sha256,
+            'backend': self.backend,
+            'physics_dt_s': self.leaf_plan.physics_dt_s,
+            'control_substeps': self.leaf_plan.control_substeps,
+            'control_dt_s': self.artifact.timebase.control_dt,
+            'materialization_identity_sha256': leaf_receipt.identity_sha256,
+            'configuration_revision': self.session.leaf_configuration_revision,
+            'attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
+            'assembly_identity_sha256': self.value['fixed_attachment_plan'].logical_content_sha256,
+            'attachment_receipt': attachment,
+            'attachment_receipt_identity_sha256': attachment['receipt_identity_sha256'],
+            'leaf_materialization_receipt': asdict(leaf_receipt),
+            'leaf_materialization_receipt_identity_sha256': leaf_receipt.identity_sha256,
+            'provider_materialization_id': leaf_receipt.materialization_id,
+            'episode_id': self.value['resolved_configuration'].get('episode_id'),
+            'arm_active': self.value['resolved_configuration'].get('arm_active'),
+            'hand_active': self.value['resolved_configuration'].get('hand_active'),
+            'writers': writers,
+        }
+        env_metadata = {
+            'env_name': 'SelectedReferenceEnv.R03cAttachedLeafPositionV1',
+            'task_name': self.artifact.task_id,
+            'task_version': self.artifact.artifact_version,
+            'scene_uid': self.position_scene.scene_id,
+            'agent_uids': ('panda-arm', 'panda-hand'),
+            'physics_dt': self.artifact.timebase.physics_dt,
+            'control_substeps': self.artifact.timebase.control_substeps,
+            'control_frequency': 1.0 / self.artifact.timebase.control_dt,
+            'action_schema': {
+                'schema_id': 'r03c-attached-leaf-action-set-v1',
+                'components': tuple(ref.joint_id for ref in next(
+                    item for item in self.leaf_plan.leaves
+                    if item.binding.profile_kind == 'arm_position'
+                ).binding.joint_order) + ('opening_m',),
+                'units': ('radian',) * 7 + ('meter_total_opening',),
+            },
+            'observation_schema': {'leaf_specs': (
+                {'path': 'state.ee_pose', 'semantic': 'panda_arm_link7_pose_world'},
+                {'path': 'state.entities.panda-arm.joint_position', 'semantic': 'panda_arm_joint_positions'},
+                {'path': 'state.entities.panda-hand.joint_position', 'semantic': 'panda_hand_finger_positions'},
+                {'path': 'state.entities.panda-hand.hand_pose', 'semantic': 'panda_hand_pose_world'},
+                {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
+            )},
+            'leaf_position_v1': profile,
+            'reference_profile': profile,
+        }
+        return {
+            'env_metadata': env_metadata,
+            'universal_action_schema': {
+                'version': 'r03c-attached-leaf-action-set-v1',
+                'dimension': 8,
+                'components': env_metadata['action_schema']['components'],
+            },
+            'resolved_config': {
+                'provider': self.provider, 'backend': self.backend, 'horizon': self.horizon,
+                'effective_leaf_plan': self.leaf_plan.identity_sha256,
+                'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
+                'override_paths': tuple(item.member_path for item in self.value['leaf_overrides']),
+            },
+            'candidate_identity': {
+                'task_artifact_identity_hash': self.artifact.identity_hash,
+                'scene_identity_hash': self.position_scene.identity_hash,
+                'source_closure_digest': self.value['source'].source_closure_digest,
+                'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+                'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                'attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
+                'attachment_receipt_identity_sha256': attachment['receipt_identity_sha256'],
+            },
         }
 
     def _position_record_metadata(self):
         from dataclasses import asdict
+
+        if getattr(self, 'leaf_position_profile', False):
+            if self.fixed_attachment_leaf_position_profile:
+                return self._attached_leaf_record_metadata(asdict)
+            arm_entry = next(item for item in self.leaf_plan.leaves if item.binding.profile_kind == 'arm_position')
+            hand_entry = next(item for item in self.leaf_plan.leaves if item.binding.profile_kind == 'hand_position')
+            action_components = tuple(item.joint_id for item in arm_entry.binding.joint_order) + ('opening_m',)
+            observation_leaf_specs = (
+                {'path': 'state.ee_pose', 'semantic': 'panda_main_link7_pose_world'},
+                {'path': 'state.joint_position', 'semantic': 'panda_main_arm_then_two_finger_positions'},
+                {'path': 'state.hand_pose', 'semantic': 'panda_main_hand_pose_world'},
+                {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
+            )
+            env_metadata = {
+                'env_name': 'SelectedReferenceEnv.R02cLeafPositionV1',
+                'task_name': self.artifact.task_id,
+                'task_version': self.artifact.artifact_version,
+                'scene_uid': self.position_scene.scene_id,
+                'agent_uids': ('panda-main',),
+                'physics_dt': self.artifact.timebase.physics_dt,
+                'control_substeps': self.artifact.timebase.control_substeps,
+                'control_frequency': 1.0 / self.artifact.timebase.control_dt,
+                'action_schema': {
+                    'schema_id': 'leaf-position-action-set-v1',
+                    'components': action_components,
+                    'units': ('radian',) * 7 + ('meter_total_opening',),
+                },
+                'observation_schema': {'leaf_specs': observation_leaf_specs},
+                'leaf_position_v1': {
+                    'scene_identity_sha256': self.position_scene.identity_hash,
+                    'task_artifact_identity_sha256': self.artifact.identity_hash,
+                    'task_source_identity_sha256': self.artifact.task_source_identity_hash,
+                    'source_id': self.value['source'].scene_source.source_id,
+                    'source_xml_sha256': hashlib.sha256(self.value['source'].scene_source.xml.encode()).hexdigest(),
+                    'source_closure_sha256': self.value['source'].source_closure_digest,
+                    'effective_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                    'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
+                    'provider': self.provider, 'provider_version': self.leaf_plan.provider_version,
+                    'provider_build_sha256': self.leaf_plan.provider_build_sha256,
+                    'backend': self.backend, 'physics_dt_s': self.leaf_plan.physics_dt_s,
+                    'control_substeps': self.leaf_plan.control_substeps,
+                    'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+                    'configuration_revision': self.session.leaf_configuration_revision,
+                    'writers': tuple({
+                        'writer_id': entry.binding.writer_id,
+                        'profile_kind': entry.binding.profile_kind,
+                        'action_schema_id': entry.binding.action_schema_id,
+                        'binding_identity_sha256': entry.binding.identity_hash,
+                        'effective_configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+                        'member_path': entry.binding.member_path,
+                        'entity_id': entry.binding.entity_id,
+                        'control_group_id': entry.binding.control_group_id,
+                        'joint_order': tuple(ref.joint_id for ref in entry.binding.joint_order),
+                        'actuator_order': tuple(ref.actuator_id for ref in entry.binding.actuator_order),
+                    } for entry in self.leaf_plan.leaves),
+                },
+                'reference_profile': {
+                    'schema_version': 'leaf-position-recording-profile-v1',
+                    'profile_id': 'r02c-independent-position-leaves-v1',
+                    'task_artifact_identity_hash': self.artifact.identity_hash,
+                    'task_source_identity_sha256': self.artifact.task_source_identity_hash,
+                    'scene_identity_hash': self.position_scene.identity_hash,
+                    'source_id': self.value['source'].scene_source.source_id,
+                    'source_closure_digest': self.value['source'].source_closure_digest,
+                    'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                    'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
+                    'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+                    'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
+                    'provider': self.provider,
+                    'provider_version': self.leaf_plan.provider_version,
+                    'provider_build_sha256': self.leaf_plan.provider_build_sha256,
+                    'backend': self.backend,
+                    'physics_dt_s': self.leaf_plan.physics_dt_s,
+                    'control_substeps': self.leaf_plan.control_substeps,
+                    'control_dt_s': self.artifact.timebase.control_dt,
+                    'materialization_identity_sha256': self.session.leaf_materialization_receipt.identity_sha256,
+                    'configuration_revision': self.session.leaf_configuration_revision,
+                    'writers': tuple({
+                        'writer_id': entry.binding.writer_id,
+                        'profile_kind': entry.binding.profile_kind,
+                        'action_schema_id': entry.binding.action_schema_id,
+                        'binding_identity_sha256': entry.binding.identity_hash,
+                        'effective_configuration_identity_sha256': entry.effective_configuration_identity_sha256,
+                        'member_path': entry.binding.member_path,
+                        'entity_id': entry.binding.entity_id,
+                        'control_group_id': entry.binding.control_group_id,
+                        'joint_order': tuple(ref.joint_id for ref in entry.binding.joint_order),
+                        'actuator_order': tuple(ref.actuator_id for ref in entry.binding.actuator_order),
+                    } for entry in self.leaf_plan.leaves),
+                },
+            }
+            return {
+                'env_metadata': env_metadata,
+                'universal_action_schema': {
+                    'version': 'r02c-leaf-position-action-set-v1',
+                    'dimension': 8, 'components': action_components,
+                },
+                'resolved_config': {
+                    'provider': self.provider, 'backend': self.backend,
+                    'horizon': self.horizon, 'effective_leaf_plan': self.leaf_plan.identity_sha256,
+                    'preset_identity_sha256': self.value['leaf_preset'].identity_sha256,
+                    'override_paths': tuple(item.member_path for item in self.value['leaf_overrides']),
+                },
+                'candidate_identity': {
+                    'task_artifact_identity_hash': self.artifact.identity_hash,
+                    'scene_identity_hash': self.position_scene.identity_hash,
+                    'source_closure_digest': self.value['source'].source_closure_digest,
+                    'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+                    'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
+                },
+            }
 
         profile = self.controller
         action_schema = profile.controller_binding().action_schema
@@ -1769,6 +2503,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             {'path': f'privileged_state.{key}_body_pose', 'semantic': 'scene_body_pose'}
             for _, key in self.binding.object_poses
         )
+        if self.camera_observation_config is not None:
+            from ..observations.state import camera_observation_field_specs
+
+            observation_leaf_specs.extend({
+                'path': field.name,
+                'shape': field.shape,
+                'dtype': field.dtype,
+                'semantic': field.semantic,
+                'unit': field.unit,
+                'frame': field.frame,
+                'time_reference': field.time_reference,
+            } for field in camera_observation_field_specs(self.camera_observation_config))
         env_metadata = {
             'env_name': 'SelectedReferenceEnv.PositionServoV1',
             'task_name': self.artifact.task_id,
@@ -1808,12 +2554,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'resolved_config': {
                 'provider': self.provider, 'backend': 'cpu', 'horizon': self.horizon,
                 'controller_profile': profile.profile_id,
+                **({'camera_observation': self.camera_observation_config.to_mapping()}
+                   if self.camera_observation_config is not None else {}),
             },
             'candidate_identity': {
                 'task_artifact_identity_hash': self.artifact.identity_hash,
                 'source_closure_digest': self.value['source'].source_closure_digest,
                 'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
             },
+            **({
+                'camera_observation_contract_v1': self.camera_observation_config.to_mapping(),
+            } if self.camera_observation_config is not None else {}),
         }
         if self.dual_entity_position:
             env_metadata['candidate_identity']['scene_identity_hash'] = self.position_scene.identity_hash

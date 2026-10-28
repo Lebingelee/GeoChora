@@ -3,20 +3,21 @@
   "date": "2026-10-23",
   "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
   "implementation_authorized": false,
-  "P00": "NOT_STARTED",
+  "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
   "goal_count": 7,
   "slice_count": 22,
   "baseline": {
-    "core_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "core_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
     "geophys_gitlink": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
     "menagerie_gitlink": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
     "main": "f292df149f41520b484ff27cf2ff78a584903013",
-    "remote_develop_readback": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+    "remote_develop_readback": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
     "v2_tag_local_only": false,
     "v2_tag_object": "4ebd8d536c0c054641c6edc1a31fcd317fa237cc",
-    "previous_planning_core_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "previous_planning_core_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
     "v2_branch_tag_remote_readback": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
-    "engineering_freeze_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec"
+    "engineering_freeze_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+    "main_reference_check": "local main/public/main only this revision; remote main not freshly fetched"
   },
   "slices": [
     {
@@ -24,80 +25,522 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S1/S2",
-      "stop_condition": "独立fixed dynamics未证明→阻塞b/c"
+      "status": "ACCEPTED_BOUNDED",
+      "execution": "EXECUTED_BOUNDED_CASE_PASS",
+      "required_evidence": "S1 plus one independent MuJoCo source/dynamics probe for the exact INTERIOR_HAND_COMMANDS case; not Core S2/S3.",
+      "stop_condition": "Exact INTERIOR_HAND_COMMANDS case accepted by Sol; original endpoint FAIL retained. No endpoint/full-stroke/Core Attachment claim. R03b/c retain original dependencies.",
+      "result": "Attempt001 ENDPOINT_HAND_COMMANDS remains FAIL. Attempt002 INTERIOR_HAND_COMMANDS completed the independent source/dynamics probe and passed the frozen gates for its approved operating targets only.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/report.md",
+      "native_evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/native_run_001/probe_evidence.json",
+      "candidate_basis_sha256": "a41587e297a84286a62f05c561eb484d7078b27e4cba1a5d8f47510652a97fc5",
+      "sol_review": {
+        "date": "2026-10-26",
+        "input_commit": "03e26f7c6b899e994002bd79524e680ed1699855",
+        "result": "ACCEPTED_BOUNDED; R03a engineering exit met for the exact approved case",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_002/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_002/review_receipt.json",
+        "offline_verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_002/offline_verification.json",
+        "new_native_run": "NOT_RUN",
+        "next_slice": "R01a",
+        "R03b_dependency": "R01c remains required",
+        "Core_S2_S3": "NOT_CLAIMED",
+        "qualification_granted": false
+      },
+      "attempt001_historical": {
+        "result": "FAIL",
+        "case_id": "ENDPOINT_HAND_COMMANDS",
+        "raw_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/native_run_001/probe_evidence.json",
+        "raw_evidence_sha256": "9f44eef19810c49c678c209e3c4d0c99728b0508deb0923f1ff978b8894feb09",
+        "preservation": "Original raw and report unchanged; old 0/255 endpoint case remains failed."
+      },
+      "attempt002_execution": {
+        "case_id": "INTERIOR_HAND_COMMANDS",
+        "input_commit": "c59b98e6bde0f86afcdca8d426e67363bd809305",
+        "result": "COMPLETED_CANDIDATE_SOURCE_DYNAMICS_PROBE",
+        "case_status": "ACCEPTED_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/report.md",
+        "contract": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/probe_contract.json",
+        "contract_sha256": "6b429deb78fa868ba6e48595c247d059f4711495a0265d809adddc21633a3307",
+        "source_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/source_manifest.json",
+        "source_manifest_sha256": "21ecd15c5dce5218f64a5d36dcdd1d37be147a7f4f90e1420d805b7b1eca7233",
+        "probe_script_sha256": "e0646bb15f6999f0153c613b23aedee6ad0dd41f65ef88ae81559760f4c41a10",
+        "candidate_basis_sha256": "a41587e297a84286a62f05c561eb484d7078b27e4cba1a5d8f47510652a97fc5",
+        "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/native_run_001/probe_evidence.json",
+        "native_evidence_sha256": "765241807e80bbd2edc5de876a94d0093068af31f954afd11f8e929f58d46f95",
+        "native_process_invocations": 1,
+        "native_exit_code": 0,
+        "native_wall_seconds": 45.78603756602388,
+        "mj_step_calls": 1920,
+        "mj_forward_calls": 389,
+        "simulated_seconds": 3.84,
+        "hand_operation_targets": {
+          "close_each_finger_qpos_m": 0.002,
+          "close_ctrl": 12.75,
+          "open_reset_each_finger_qpos_m": 0.038,
+          "open_reset_ctrl": 242.25
+        },
+        "native_limits_unchanged": {
+          "joint_range_each_m": [
+            0.0,
+            0.04
+          ],
+          "ctrlrange": [
+            0.0,
+            255.0
+          ]
+        },
+        "native_oracles_passed": true,
+        "Core_S2_S3": "NOT_CLAIMED",
+        "core_attachment_admission": false,
+        "provider_owner_contract_approved": false,
+        "human_judge_approved": false,
+        "qualification_approved": false,
+        "sol_review": "ACCEPTED_BOUNDED; see slices[R03a].sol_review",
+        "output_commit": "03e26f7c6b899e994002bd79524e680ed1699855"
+      },
+      "attempt001_sol_review": {
+        "date": "2026-10-26",
+        "input_commit": "697eb65485eb740ab46179f2a43870afb3e9428c",
+        "result": "ACCEPT_EXECUTED_FAIL_FACTS; TARGETED_IMPLEMENTATION_REWORK",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_001/review_receipt.json",
+        "new_native_run": "NOT_RUN",
+        "next_attempt": "002 INTERIOR_HAND_COMMANDS proposal; requires new maintainer execution instruction",
+        "unchanged_range_overrun_tolerance_m": 1e-06,
+        "proposed_finger_operating_targets_m": {
+          "close": 0.002,
+          "open_and_reset": 0.038
+        },
+        "proposed_hand_controls": {
+          "close": 12.75,
+          "open_and_reset": 242.25
+        },
+        "old_endpoint_case_remains": "FAIL; no full-stroke claim",
+        "implementation_gate": "R03b/c remain blocked pending actual new evidence and Sol review"
+      }
     },
     {
       "id": "R01a",
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S1",
-      "stop_condition": "旧identity变动或引用契约不明→停止"
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "PROVIDER_FREE_S1_PASS",
+      "required_evidence": "Static strict codec/non-self identity; legacy Scene v1/v2/v3 and TaskArtifact v0/v1 compatibility; accepted by Sol for R01a only.",
+      "stop_condition": "旧identity变动或引用契约不明→停止",
+      "result": "R01a implements logical-assembly-v1 values and explicit codec only. No recursive resolver, source projection, native assembly, or Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md",
+      "sol_review": {
+        "date": "2026-10-26",
+        "input_commit": "431810681b73a84503d66ff9ad637d1058f25cdd",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01a_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01a_001/review_receipt.json",
+        "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01a_001/verification.json",
+        "luna_targeted_S1_passed": 60,
+        "sol_new_contract_S1_passed": 31,
+        "native_execution": "NOT_RUN",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R05a",
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "BLOCKED_PROVIDER_CONTRACT",
+      "execution": "SOL_PREFLIGHT_ONLY; CADENCE_PROBE_NOT_RUN",
       "required_evidence": "Audit/S1/probe",
-      "stop_condition": "无owner合同→BLOCKED_PROVIDER_CONTRACT"
+      "stop_condition": "无owner合同→BLOCKED_PROVIDER_CONTRACT",
+      "blocker": "Current pinned GeoPhys Reader forbids routine per-substep host snapshot; formal Provider API/phase/device/cadence/cost decision not established. Historical C05c is diagnostic-only.",
+      "scope_decision": "Maintainer selected independent R04a while R05a remains BLOCKED_PROVIDER_CONTRACT; no DAG/P99 waiver and no R05a execution."
     },
     {
       "id": "R04a",
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "ATTEMPT002_PROVIDER_FREE_S1_ACCEPTED_BY_SOL; NATIVE_NOT_RUN",
       "required_evidence": "S1",
-      "stop_condition": "身份/metadata reader/资源合同缺失→停止"
+      "stop_condition": "身份/metadata reader/资源合同缺失→停止",
+      "result": "Attempt002 F01/F02 closed by Sol actual-diff/caller review, reuse of 33-case provider-free S1 and 13 independent small-H5 readback checks. ACCEPTED_S1_BOUNDED only. Attempt001 CHANGES_REQUESTED preserved. No native/public Env S2/camera H5 S3/Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/report.md",
+      "sol_review": {
+        "date": "2026-10-26",
+        "input_commit": "72b5274e2adc438d2df165bd0190963909705630",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/review_receipt.json",
+        "targeted_s1_passed": 33,
+        "sol_independent_readback_cases": 13,
+        "findings": {
+          "F01": "CLOSED",
+          "F02": "CLOSED"
+        },
+        "next_slice": "R06a",
+        "qualification_granted": false
+      },
+      "native_execution": "NOT_RUN",
+      "qualification_granted": false,
+      "latest_attempt": {
+        "attempt": "002",
+        "input_commit": "fc0c3bbf8dd307386dbe77bbd332fd1192f3fcbc",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/report.md",
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/evidence.json",
+        "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/commands.json",
+        "targeted_s1_passed": 33,
+        "native_execution": "NOT_RUN",
+        "qualification_granted": false,
+        "implementation_commit": "72b5274e2adc438d2df165bd0190963909705630",
+        "sol_review": {
+          "date": "2026-10-26",
+          "input_commit": "72b5274e2adc438d2df165bd0190963909705630",
+          "result": "ACCEPTED_S1_BOUNDED",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/sol_review.md",
+          "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/review_receipt.json",
+          "targeted_s1_passed": 33,
+          "sol_independent_readback_cases": 13,
+          "findings": {
+            "F01": "CLOSED",
+            "F02": "CLOSED"
+          },
+          "next_slice": "R06a",
+          "qualification_granted": false
+        }
+      },
+      "attempt001_sol_review": {
+        "date": "2026-10-26",
+        "input_commit": "436f5c2d7114a41bf3925528d1ba8d11b6410bf9",
+        "result": "CHANGES_REQUESTED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/review_receipt.json",
+        "counterexamples": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/binding_gap_evidence.json",
+        "baseline_s1_passed": 23,
+        "findings": [
+          "F01: consumer accepts capture from an altered authored mount instead of binding expected config/source identity",
+          "F02: camera H5 reader accepts state boundary digest or finalized episode mismatch; writer also needs independent record anchors"
+        ],
+        "next_package": "R04a attempt002 bounded implementation repair; no new preparation or native",
+        "normal_next_table_row_after_acceptance": "R06a",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R06a",
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_AUDIT_S1_BOUNDED",
+      "execution": "ATTEMPT001_AUDIT_AND_TARGETED_S1_ACCEPTED_BY_SOL; COMPATIBILITY_DECISION_BLOCKED",
       "required_evidence": "Audit/S1",
-      "stop_condition": "缺原件且无独立处置→compatibility gate blocked"
+      "stop_condition": "缺原件且无独立处置→compatibility gate blocked",
+      "result": "Sol accepted the bounded four-item original-evidence/reader/backup audit, ledger and 6-case provider-free S1 deliverable. No original restored, no retirement or Phase II-01 continued deferral approved; compatibility decision gate remains blocked.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md",
+      "compatibility_ledger": {
+        "schema": "phase-ii-01-r06a-compatibility-ledger-v1",
+        "date": "2026-10-26",
+        "audit_scope": "Known indexed original paths, P00 missing-originals inventory, named v1.1 backup/source-recovery manifests and referenced archive entries only; no exhaustive filesystem/cloud/external search.",
+        "search_inputs": [
+          "docs/maintenance/phase_ii_scope_freeze_20261023/evidence_index.json#missing_or_unproven_originals",
+          "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/missing_originals.json",
+          "docs/releases/v1.1/backup_manifest.json",
+          "docs/releases/v1.1/source_recovery_manifest.json",
+          "docs/module/task_env/goal/Phase_II/B_Development_Record.md#b04a",
+          "docs/module/task_env/goal/Phase_II/C_Development_Record.md#c02b",
+          "docs/maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml"
+        ],
+        "archive_findings": {
+          "v1_1_backup": "REMOTE_COPY_VERIFIED for 22 scoped L2 items, not a full workspace backup; no matching B04a/C02b original entry found in the declared scope.",
+          "source_recovery_manifest": "Listed recovery manifests do not identify these four originals; absence from these lists does not establish an exhaustive storage search.",
+          "external_or_other_machine_backups": "NOT_PROVIDED_NOT_SEARCHED",
+          "v1_1_local_archive_member_count": 22,
+          "v1_1_local_archive_target_matches": [],
+          "source_recovery_manifest_entries": {
+            "listed_count": 7,
+            "present_and_checked": [
+              "docs/module/task_env/p2_0_s4_5_a_source_recovery.json",
+              "docs/module/task_env/p2_0_s4_5_b_source_recovery.json"
+            ],
+            "present_entry_target_matches": [],
+            "listed_but_absent_from_checkout": [
+              "docs/module/task_env/p2_0_s2_c1_source_identity.json",
+              "docs/module/task_env/p2_0_s2_c2_source_identity.json",
+              "docs/module/task_env/p2_0_s3_go2_retirement_manifest.json",
+              "docs/module/task_env/p2_0_s4_static_solver_retirement_manifest.json",
+              "docs/module/task_env/p2_0_s5_a_compatibility_inventory.json"
+            ],
+            "meaning": "Older P2.0 recovery-manifest references; not target-original paths. Their absence limits archive inspection and does not justify an exhaustive-search claim."
+          }
+        },
+        "historical_b04a_reconstruction_context_only": {
+          "core_commit": "f9543b8725d2990966743f49cebf9d68493b6b06",
+          "geophys_revision": "4436787e",
+          "binding": "Source-bound reconstruction context only; no per-file original H5 path or bytes hash is available."
+        },
+        "entries": [
+          {
+            "id": "b04a_geophys_transition_h5_v1",
+            "domain": "geophys-transition-h5/v1 original H5",
+            "discriminator": {
+              "schema_id": "geophys-transition-h5",
+              "schema_version": "v1"
+            },
+            "historical_disposition": "ACCEPTED-DEFERRED",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_PROVEN",
+            "original_path": null,
+            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_raw_sha256": null,
+            "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
+            "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
+            "current_route": {
+              "producer": "task_env.recorders.recorder.TransitionRecorder.save_h5 -> task_env.recorders.h5.save_trajectory_h5/_save_v1",
+              "accepted_config": "task_env.recorders.contracts.RecorderConfig accepts (geophys-transition-h5,v1).",
+              "reader": "task_env.recorders.h5.inspect_trajectory_h5 reads outer metadata and meta/layout_json; no full semantic v1 loader located. The structured-control loader is task-env-h5/v3 only.",
+              "production_caller": "No internal production replay caller found; inspect_trajectory_h5 is exported by task_env.recorders."
+            },
+            "current_candidate_path": null,
+            "current_candidate_sha256": null,
+            "retirement_impact": "Retiring the v1 config/write/inspection route changes legacy format availability and regression fixtures; no internal semantic replay caller was found.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          },
+          {
+            "id": "b04a_canonical_trajectory_outer_v0_h5",
+            "domain": "canonical trajectory outer-v0 original H5",
+            "discriminator": {
+              "outer_schema": "task-env-canonical-trajectory-v0"
+            },
+            "historical_disposition": "ACCEPTED-DEFERRED",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_PROVEN",
+            "original_path": null,
+            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_raw_sha256": null,
+            "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
+            "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
+            "current_route": {
+              "producer_reader_owner": "task_env.trajectory.canonical.h5.save/load",
+              "reader": "load dispatches v0 to CanonicalTrajectory.from_mapping and verifies logical identity and numeric projections.",
+              "current_consumer": "task_env.trajectory.reference_replay.reexecute_selected recognizes outer-v0 and calls canonical.h5.load; selected re-execution comparison utility, not a newly claimed Core production capability."
+            },
+            "current_candidate_path": null,
+            "current_candidate_sha256": null,
+            "retirement_impact": "Would remove the strict outer-v0 H5 reader and selected-reference replay route; legacy-matrix negative/version coverage is affected.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          },
+          {
+            "id": "b04a_canonical_execution_v1_h5",
+            "domain": "canonical-execution-v1 original H5",
+            "discriminator": {
+              "logical_schema": "canonical-execution-trajectory-v1",
+              "outer_schema": "task-env-canonical-execution-v1"
+            },
+            "historical_disposition": "ACCEPTED-DEFERRED",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_PROVEN",
+            "original_path": null,
+            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_raw_sha256": null,
+            "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
+            "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
+            "current_route": {
+              "reader": "task_env.trajectory.canonical.execution.load and task_env.trajectory.canonical.streaming.load_streaming validate legacy v1 schema/hash/projections.",
+              "test_owner": "task_env.diagnostics.tasks.test_phase_ii_b04a_legacy_matrix.test_trajectory_readers_keep_independent_version_routes",
+              "current_consumer": "task_env.trajectory.reference_replay.reexecute_selected routes non-outer-v0 H5 to load_streaming; selected re-execution comparison utility.",
+              "legacy_api_support": "Module-level validate/save/load accepts legacy v1 mappings; ExecutionRecorder constructor creates only v2/v3."
+            },
+            "current_candidate_path": null,
+            "current_candidate_sha256": null,
+            "retirement_impact": "Would remove legacy execution H5/streaming read and selected-reference replay support; this is narrower than removing current v2/v3 writing.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          },
+          {
+            "id": "c02b_eb870_typed_force_s2_probe_json",
+            "domain": "early GeoPhys eb870f6f typed-force s2_probe.json original bytes",
+            "discriminator": {
+              "diagnostic_schema_current_candidate": "c02b-r1-typed-force-probe-v1"
+            },
+            "historical_disposition": "MISSING_RAW_EVIDENCE",
+            "raw_evidence": "MISSING_RAW_EVIDENCE",
+            "byte_compatibility": "NOT_APPLICABLE_NO_FORMAT_READER; historical bytes unavailable",
+            "original_path": "workspace/maintenance/c02b_r1_typed_force_20261022/s2_probe.json",
+            "original_path_status": "KNOWN_BUT_OVERWRITTEN",
+            "original_raw_sha256": null,
+            "original_hash_reason": "The historical record states overwrite and supplies no raw-file hash.",
+            "source_pin_context": {
+              "geophys_revision": "eb870f6f",
+              "core_commit": null,
+              "core_reason": "Historical C02b record names the earlier GeoPhys pin but does not bind an exact Core commit to the lost JSON bytes."
+            },
+            "current_route": {
+              "producer": "task_env.diagnostics.tasks.test_phase_ii_c02b_r1_typed_force.py::_write_probe_json_exclusive (current caller at line 482); diagnostic Evidence writer only.",
+              "reader": null,
+              "production_caller": null,
+              "note": "No production codec/reader or production migration caller located; do not invent a reader-retirement item."
+            },
+            "current_candidate_path": "workspace/maintenance/c02b_r1_typed_force_20261022/s2_probe.json",
+            "current_candidate_size_bytes": 7664,
+            "current_candidate_sha256": "3c23764e877c067cd26d6af75f45127bbe5234c575dea5d69eb5118a0ac3bec7",
+            "current_candidate_identity": "Later c02b-r1-typed-force-probe-v1 content; not proof of the lost eb870 original bytes. The current candidate records GeoPhys revision a53a8cfed7c9d6464274b5c96fca601271dc4ee4 and closure aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47.",
+            "related_later_source": "GeoPhys a53 evidence is separate and does not restore the eb870 JSON.",
+            "retirement_impact": "No reader retirement applies; any decision concerns retaining/excluding this historical diagnostic Evidence requirement.",
+            "phase_ii_01_decision": null,
+            "approved_by": null,
+            "approval_reference": null
+          }
+        ],
+        "recovery_option": {
+          "status": "NOT_AVAILABLE_IN_REVIEWED_INDEXES",
+          "minimum_input": "An approved archive/member that contains the exact original bytes plus the original SHA-256 or a documented source/chain-of-custody binding; retain and read a copy without replacing prior Evidence."
+        },
+        "retirement_option": {
+          "status": "UNAPPROVED",
+          "scope": "Separate exact-format decisions for each H5 reader/support route; the diagnostic JSON has no production reader and requires a different Evidence-scope decision."
+        },
+        "continued_deferral_option": {
+          "status": "UNAPPROVED",
+          "scope": "Explicitly retain MISSING_RAW_EVIDENCE and NOT_PROVEN/NOT_APPLICABLE facts and state the consequence for R06b/R06c/P99; define an approved archive/hash condition for reopening."
+        },
+        "decision_gate": {
+          "status": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+          "decision": null,
+          "approved_by": null,
+          "approval_reference": null,
+          "qualification_granted": false
+        },
+        "targeted_s1": {
+          "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.:GeoPhys/src /home/lly/miniconda3/envs/geochora/bin/python -m pytest -q task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py",
+          "result": "PASS",
+          "passed": 6,
+          "scope_note": "Current strict codecs/version routing and synthetic negative coverage only; no missing original H5/JSON bytes loaded."
+        },
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md"
+      },
+      "sol_review": {
+        "date": "2026-10-26",
+        "input_commit": "56f689570a0fbaf29aea4ea26a073d38b5e6afd6",
+        "result": "ACCEPTED_AUDIT_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/review_receipt.json",
+        "compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "targeted_s1_passed": 6,
+        "next_slice": "R01b",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R01b",
       "depends_on": [
         "R01a"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "PROVIDER_FREE_S1_ACCEPTED_AFTER_SOL_DEPTH_GUARD_FIX",
       "required_evidence": "S1",
-      "stop_condition": "环/重复/悬空/预算失败→停止"
+      "stop_condition": "环/重复/悬空/预算失败→停止",
+      "result": "Sol accepted bounded static resolver after directly fixing early depth rejection: original 1100-level input hit RecursionError; entry guard and regression added. Original Luna S1 81 passed retained; final same four-file S1 82 passed. No source/native/Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md",
+      "luna_attempt": {
+        "task_id": "PHASE-II-01-R01B",
+        "attempt": "001",
+        "input_commit": "f5a65b82ed3f940a9e80989ee4ec4a744f60c148",
+        "provider_free_s1": "PASS",
+        "native": "NOT_RUN",
+        "qualification_granted": false,
+        "sol_review": "PENDING"
+      },
+      "sol_review": {
+        "date": "2026-10-27",
+        "input_commit": "1ea9aee447d19640f36eb1c827c2221a23ec0e1c",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/review_receipt.json",
+        "original_s1_passed": 81,
+        "final_s1_passed": 82,
+        "finding": "R01B-F01 closed by Sol minor fix",
+        "next_slice": "R02a",
+        "native": "NOT_RUN",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R02a",
       "depends_on": [
         "R01a"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "PROVIDER_FREE_S1_ACCEPTED_AFTER_SOL_REQUIRED_STATE_FIX",
       "required_evidence": "S1",
-      "stop_condition": "required state/TCP/资源不明→停止"
+      "stop_condition": "required state/TCP/资源不明→停止",
+      "result": "Sol accepted static leaf contracts after closing Required State optional-downgrade/cross-leaf expansion gap. Original Luna S1 30 passed retained; final targeted collection 37 passed. Catalog and Force-aware NOT_ADMITTED; no plan/adapter/native/Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/report.md",
+      "attempt001": {
+        "task_id": "PHASE-II-01-R02A",
+        "input_commit": "e3c1af978a2c0ea189ab09efb8c013faaa70784d",
+        "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+        "targeted_s1": {
+          "command_log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/s1_final_03.json",
+          "result": "PASS",
+          "passed": 30
+        },
+        "native_execution": "NOT_RUN",
+        "R06_compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "R06_decision_changed": false,
+        "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
+        "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+        "R01c_R02b_R02c": "NOT_STARTED",
+        "qualification_granted": false
+      },
+      "sol_review": {
+        "date": "2026-10-27",
+        "input_commit": "8d2c46524e9dc8cce282335cd5fecb04c603d622",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/review_receipt.json",
+        "original_s1_passed": 30,
+        "final_s1_passed": 37,
+        "finding": "R02A-F01 closed by Sol minor fix",
+        "next_slice": "R01c",
+        "native": "NOT_RUN",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R01c",
       "depends_on": [
         "R01b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "PROVIDER_FREE_S1_PASS_ACCEPTED_BY_SOL; NATIVE_NOT_RUN",
       "required_evidence": "S1",
-      "stop_condition": "隐式物理构造/旧hash变动→停止"
+      "stop_condition": "隐式物理构造/旧hash变动→停止",
+      "result": "Sol accepted the bounded static declaration projection after actual source/diff/evidence review; original 18-case S1 reused. No implementation rework, lowering, runtime, native, Attachment admission or Qualification.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/evidence.json",
+      "provider_free_s1_passed": 18,
+      "native_execution": "NOT_RUN",
+      "core_attachment_admission": false,
+      "qualification_granted": false,
+      "sol_review": {
+        "date": "2026-10-27",
+        "input_commit": "a270cd16b8e6651184ab5797612a9a48ea4024c8",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/review_receipt.json",
+        "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/verification.json",
+        "luna_targeted_s1_passed": 18,
+        "sol_new_s1_run": "NOT_RUN; unchanged source and raw evidence reused",
+        "native": "NOT_RUN",
+        "next_slice": "R02b",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R02b",
@@ -105,10 +548,36 @@
         "R02a",
         "R01b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_S1_BOUNDED",
+      "execution": "PROVIDER_FREE_S1_PASS_ACCEPTED_BY_SOL; NATIVE_NOT_RUN",
       "required_evidence": "S1",
-      "stop_condition": "重叠native writer/部分apply假回滚→停止"
+      "stop_condition": "重叠native writer/部分apply假回滚→停止",
+      "result": "Sol accepted R02b after four local compatibility/rejection repairs and five defect-sensitive regressions: legacy zero-force Target and canonical opening behavior, full native actuator coverage, R02a Entity-qualified writer names. Final R02b S1 18 passed; retained owners 101 passed/3 native selectors deselected plus one C02b pure guard. 54 comparisons to actual pre-R02b source preserve numerical outputs and canonical identities. No Provider/native admission.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02b_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02b_001/evidence.json",
+      "provider_free_s1_passed": 18,
+      "retained_provider_free_s1_passed": 102,
+      "native_execution": "NOT_RUN",
+      "core_runtime_admission": false,
+      "qualification_granted": false,
+      "luna_original_provider_free_s1_passed": 13,
+      "sol_review": {
+        "date": "2026-10-27",
+        "input_commit": "0527b1aa9261aad199b8afe62cf66c15f2f20ccb",
+        "result": "ACCEPTED_S1_BOUNDED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/sol_review.md",
+        "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/review_receipt.json",
+        "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/verification.json",
+        "original_s1_passed": 13,
+        "final_s1_passed": 18,
+        "new_regressions": 5,
+        "retained_provider_free_s1_passed": 102,
+        "native_selectors_deselected": 3,
+        "legacy_source_parity_cases": 54,
+        "native": "NOT_RUN",
+        "next_slice": "R02c",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R02c",
@@ -116,10 +585,459 @@
         "R02b",
         "R01c"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "ACCEPTED_BOUNDED_S2_S3",
+      "execution": "ATTEMPT005_HAND50_FOUR_EPISODES_NATIVE_S2_S3_PASS_SOL_ACCEPTED",
       "required_evidence": "S2/S3",
-      "stop_condition": "只测两个完整Panda或无真实hand驱动→失败"
+      "stop_condition": "只测两个完整Panda或无真实hand驱动→失败",
+      "native_execution": "MuJoCo3.8.1 CPU; source-calibrated Hand50; four64-interval episodes;1280step/260forward; four64/65 H5; one native process",
+      "core_runtime_admission": false,
+      "provider_free_s1_passed": 38,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/evidence.json",
+      "result": "Exact Hand50 case accepted by Sol after56 provider-free S1, actual static preflight, four native episodes and independent closed-H5 readback. Shared law/source/oracles/budget and2500 default/old FAIL unchanged. Next R03b; no Attachment/Qualification.",
+      "sol_review": {
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "reviewer": "Sol",
+        "date": "2026-10-28",
+        "input_head": "c066d320ec3903c0953ada74a146e5b69762cbb0",
+        "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+        "required_S1_S2_S3": "PASS_FOR_EXACT_CASE",
+        "S1_passed": 56,
+        "native_process_starts": 1,
+        "native_calls": {
+          "materialize_control": 4,
+          "mj_forward": 260,
+          "mj_resetData": 4,
+          "mj_step": 1280
+        },
+        "episodes_passed": 4,
+        "total_transitions": 256,
+        "observations_per_episode": 65,
+        "tamper_rejections": 9,
+        "offline_four_H5_readback": "PASS",
+        "old_default_2500_and004_FAIL_preserved": true,
+        "physical_oracles_source_algorithm_budgets_unchanged": true,
+        "new_qualification": false,
+        "provider_owner_contract_approval": false,
+        "R03b": "NEXT_PACKAGE_ONLY_NOT_IMPLEMENTED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md"
+      },
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/commands.json",
+      "attempt003": {
+        "task_id": "PHASE-II-01-R02C",
+        "input_commit": "cdb0c12006ca0787f9110da5df343711abc869f3",
+        "provider_free_s1": {
+          "status": "PASS_POST_NATIVE_FIX_UNVERIFIED_NATIVELY",
+          "passed": 19,
+          "native_import_blocked": true,
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/logs/s1_provider_free_retry.stdout.log"
+        },
+        "static_preflight": {
+          "status": "PASS_STATIC_PREFLIGHT",
+          "source_closure_sha256": "aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47",
+          "asset_count": 67,
+          "native_calls": 0,
+          "result": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/preflight_001/preflight_result.json"
+        },
+        "native": {
+          "classification": "FAIL_CORE",
+          "status": "FAIL",
+          "provider_identity": "PASS: package/runtime/API 3.8.1/3.8.1/3008001; package, binding and library path/hash matched",
+          "compile": "PASS",
+          "materialization": "PASS: nq/nv/nu=9/9/8",
+          "reset": "PASS: E1",
+          "materialization_calls": 1,
+          "reset_calls": 1,
+          "mj_forward_calls": 2,
+          "mj_step_calls": 5,
+          "returned_outer_intervals": 0,
+          "physical_clock_after_failed_publication": {
+            "control_step": 1,
+            "simulation_time_s": 0.01,
+            "transition_status": "incomplete"
+          },
+          "failure": "typed state projection requires StateRequirements; leaf dispatch supplied tuple",
+          "recorder_close": "Generic H5 v3 failure artifact written at T=0/T+1=1; R02c reader rejected because exactly 64 transitions and 65 observations are required",
+          "episodes_completed": 0,
+          "h5_readback": "OFFLINE_INCOMPLETE_READ_REJECTED; not an S3 pass",
+          "partial_h5": {
+            "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/native_run_001/E1-arm-only.h5",
+            "sha256": "52b7b27a64a0e4626115adfff719d59fed342299264c8e46ae723cc428420a87",
+            "bytes": 42824,
+            "transition_count": 0,
+            "observation_count": 1,
+            "stop_reason": "execution_fault",
+            "episode_complete_attr": true
+          },
+          "leaf_dispatch_progress_serialized": false,
+          "process_starts": 1,
+          "retry": false,
+          "S2": "INCOMPLETE_FAIL_CORE",
+          "S3": "INCOMPLETE_H5_REJECTED",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/native_run_001/native_evidence.json"
+        },
+        "post_native_fix": {
+          "owner": "task_env/runtime/sessions/leaf_control.py::dispatch_leaf_control_interval",
+          "summary": "Wrap aggregate leaf requirements in controller-owned StateRequirements before RuntimeSession typed publication",
+          "native_verification": "NOT_RUN; attempt003 native budget exhausted",
+          "qualification_granted": false,
+          "provider_admission": false
+        },
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/report.md",
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/evidence.json",
+        "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/commands.json",
+        "qualification_granted": false,
+        "provider_admission": false,
+        "R03b_started": false,
+        "sol_review": {
+          "decision": "S1_REVIEWED_NATIVE_PENDING",
+          "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_003/sol_review.md",
+          "sol_s1_passed": 38,
+          "native_run_by_sol": false,
+          "next_attempt": "004",
+          "new_native_authorization_required": true
+        }
+      },
+      "attempt001": {
+        "task_id": "PHASE-II-01-R02C",
+        "input_commit": "c18325f7e332bc5d3864752fc3fe7aa94225f551",
+        "implementation_commit": "835dcfde5a86a9a43afb9c81c176d724b80c658e",
+        "provider_free_s1_passed": 53,
+        "native": "FAIL_PRE_IMPORT_STATIC_CONTRACT_FIELD; native compile/materialize/reset/forward/step 0",
+        "review_decision": "CHANGES_REQUESTED_S2_S3_NOT_RUN",
+        "historical": {
+          "native_execution": "PROCESS_ATTEMPTED; STATIC_CONTRACT_KEY_ERROR; MUJOCO_NOT_IMPORTED; NO_NATIVE_CALLS",
+          "provider_free_s1_passed": 53,
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/report.md",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/evidence.json",
+          "execution": "S1_REPORTED_PASS_53; SOL_REVIEW_REPRODUCED_DEFECTS; R02C_S2_S3_NOT_RUN",
+          "result": "Sol requests one bounded R02c attempt002 repair-and-execution package: fix strict command decoding/H5 readback, pre-write boundary rejection, clock tolerance, admission cleanup and executable probe preflight. No R02c exit acceptance or R03b start."
+        },
+        "qualification_granted": false
+      },
+      "attempt002": {
+        "task_id": "PHASE-II-01-R02C",
+        "input_commit": "b358252b42801215dc0a240d45bde93040b8ac16",
+        "implementation_commit": "b845bfadf518f57981b3556f65e3eb211dab1996",
+        "provider_free_s1": {
+          "status": "PASS",
+          "passed": 28,
+          "native_import_blocked": true,
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/logs/s1_final_boundaries.log"
+        },
+        "static_preflight": {
+          "status": "PASS_STATIC_PREFLIGHT",
+          "negative_cases": 4,
+          "result": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/preflight_001/preflight_result.json"
+        },
+        "native": {
+          "classification": "BLOCKED_PROVIDER",
+          "status": "FAIL_PRE_STEP",
+          "message": "BLOCKED_PROVIDER: loaded MuJoCo version/API differs from 3.8.1",
+          "runtime_package_imported": true,
+          "before_compile": true,
+          "compile_calls": 0,
+          "materialization_calls": 0,
+          "reset_calls": 0,
+          "mj_forward_calls": 0,
+          "mj_step_calls": 0,
+          "process_starts": 1,
+          "retry": false,
+          "S2": "NOT_RUN",
+          "S3": "NOT_RUN",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/native_run_001/native_evidence.json",
+          "sol_diagnosis": "HARNESS_VERSION_GUARD_DEFECT; loaded values absent, actual Provider mismatch unproven"
+        },
+        "report_pending": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/report.md",
+        "qualification_granted": false,
+        "provider_admission": false,
+        "R03b_started": false,
+        "sol_review": {
+          "decision": "S1_REVIEWED_NATIVE_PENDING",
+          "input_commit": "8a93c2ee48ac9ad1557dc3035eb94ac293136e27",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_002/sol_review.md",
+          "native_run_by_sol": false,
+          "sol_s1_passed": 19,
+          "next_attempt": "003",
+          "attempt002_plus_continuation_max_process_starts": 2
+        }
+      },
+      "sol_review_required": "005 exact case reviewed and accepted; proceed to next R03b package.",
+      "attempt004": {
+        "task_id": "PHASE-II-01-R02C",
+        "attempt": "004",
+        "input_commit": "18661b6baa291022860196b6b4683d51cfe56ba5",
+        "authorization_reference": "Current human instruction in this chat dated 2026-10-27 explicitly authorizing one fresh bounded MuJoCo 3.8.1 CPU native process, necessary in-scope repairs, S2/S3 closeout and local commit; preserve previous failures; return to Sol; no R03b.",
+        "static_preflight": {
+          "status": "PASS_STATIC_PREFLIGHT",
+          "native_imported": false,
+          "native_calls": 0,
+          "source_closure_sha256": "aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47",
+          "closure_bytes": 34307550,
+          "asset_count": 67,
+          "lowered_xml_sha256": "fc22fcdd006adb2e2d1c0aab9d19b0146f939ec66818db2bc793a2c706697bb2"
+        },
+        "native": {
+          "classification": "FAIL_PHYSICAL_ORACLE_AND_EVIDENCE_FINALIZATION",
+          "process_starts": 1,
+          "exit_code": 1,
+          "timed_out": false,
+          "wall_seconds": 9.6,
+          "provider_identity": "PASS: MuJoCo package/runtime/API 3.8.1/3.8.1/3008001 and pinned package/binding/library hashes matched",
+          "native_calls": {
+            "materialize_control": 2,
+            "mj_resetData": 2,
+            "mj_step": 640,
+            "mj_forward": null,
+            "mj_forward_reason": "Counter not serialized in failure event; no estimate used."
+          },
+          "completed_outer_intervals": 128,
+          "derived_simulation_time_s": 1.28,
+          "raw_evidence_note": "native_evidence.json says FAIL_PRE_STEP/zero calls because a secondary numpy.float32 serialization TypeError replaced the primary error. Immutable JSONL probe_failure records the E2 assertion and real counts; raw files retained.",
+          "episodes": {
+            "E1-arm-only": {
+              "status": "MOTION_AND_H5_PASS",
+              "outer_intervals": 64,
+              "mj_step_calls": 320,
+              "q1_peak_delta_rad": 0.09744434092148166,
+              "q1_final_home_error_rad": 1.0379862451645179e-05,
+              "h5_t": 64,
+              "h5_observations": 65,
+              "reader": "PASS",
+              "tamper_cases_rejected": 9
+            },
+            "E2-hand-only": {
+              "status": "FAIL_HAND_MOTION_ORACLE",
+              "outer_intervals": 64,
+              "mj_step_calls": 320,
+              "opening_min_m": 0.06878985744020077,
+              "opening_final_m": 0.07119991847030517,
+              "opening_excursion_m": 0.007210142559799224,
+              "required_opening_min_m_max": 0.02,
+              "required_excursion_m_min": 0.04,
+              "h5_t": 64,
+              "h5_observations": 65,
+              "offline_reader": "PASS"
+            },
+            "E3-simultaneous-default": "NOT_RUN",
+            "E4-simultaneous-arm-gain-3": "NOT_RUN"
+          },
+          "rss_sample": null,
+          "rss_reason": "Failure finalization error lost in-memory resource_samples."
+        },
+        "post_run_fix": {
+          "owner": "task_env/diagnostics/tasks/r02c_leaf_position_probe.py::_write_json",
+          "summary": "Serialize numpy.generic/ndarray and preserve strict allow_nan=false; no physics or oracle changes.",
+          "targeted_provider_free_tests": "21 passed",
+          "native_retry": false
+        },
+        "provider_admission": false,
+        "qualification_granted": false,
+        "R03b_started": false,
+        "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/",
+        "sol_review": {
+          "decision": "BLOCKED_HAND_CONFIGURATION_DECISION",
+          "input_commit": "b94806025f0836d121bfd26df4581e80a7c6e6a2",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/sol_review.md",
+          "sol_s1_passed": 42,
+          "native_run_by_sol": false,
+          "E1_acceptance": "BOUNDED_ARM_ONLY_NATIVE_MOTION_AND_H5",
+          "E2": "PHYSICAL_ORACLE_FAIL; STRUCTURAL_H5_READBACK_PASS",
+          "actual_native_calls": {
+            "materialize": 2,
+            "reset": 2,
+            "mj_step": 640,
+            "forward": null,
+            "RSS": null
+          },
+          "configuration_proposal": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02c_004/proposed_hand_case.json",
+          "maintainer_case_decision": null,
+          "next_attempt_if_explicitly_approved": "005"
+        }
+      },
+      "attempt005": {
+        "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "S1_passed": 56,
+        "native_calls": {
+          "materialize_control": 4,
+          "mj_forward": 260,
+          "mj_resetData": 4,
+          "mj_step": 1280
+        },
+        "episodes": [
+          {
+            "id": "E1-arm-only",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.01895217119805468,
+              "max_finger_difference_m": 3.645943213760605e-06,
+              "opening_excursion_m": 6.2886123847333275e-06,
+              "opening_final_m": 0.07600185645528923,
+              "opening_min_m": 0.076,
+              "q1_final_home_error_rad": 1.0379862451645179e-05,
+              "q1_peak_delta_rad": 0.09744434092148166,
+              "tcp_position_peak_excursion_m": 0.05284991752506535
+            },
+            "h5": {
+              "bytes": 1965122,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-b68a61a2b50a442fa11ecd7dbce696cf",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E1-arm-only.h5",
+              "sha256": "69402c4fe6e7aa425a3970909046f595e989f3eea38d894cfea218ca92b5ac97",
+              "transition_count": 64
+            }
+          },
+          {
+            "id": "E2-hand-only",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.002005433879145692,
+              "max_finger_difference_m": 7.54147803663785e-07,
+              "opening_excursion_m": 0.06498823257122899,
+              "opening_final_m": 0.06802404288684163,
+              "opening_min_m": 0.01101176742877101,
+              "q1_final_home_error_rad": 5.017322318379618e-18,
+              "q1_peak_delta_rad": 3.300363302850254e-06,
+              "tcp_position_peak_excursion_m": 0.0021508744231906935
+            },
+            "h5": {
+              "bytes": 1966208,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-a79f5e315e6f4453b71f89f145318ba2",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E2-hand-only.h5",
+              "sha256": "778d4ab1cb30c9ed14a96578f08f059a93e87b8443d26f5b50613e5f0ff48380",
+              "transition_count": 64
+            }
+          },
+          {
+            "id": "E3-simultaneous-default",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.01895217659405302,
+              "max_finger_difference_m": 3.6462609817322633e-06,
+              "opening_excursion_m": 0.06498710291866948,
+              "opening_final_m": 0.06802467252894896,
+              "opening_min_m": 0.01101289708133052,
+              "q1_final_home_error_rad": 1.0379743835694394e-05,
+              "q1_peak_delta_rad": 0.0974443139711741,
+              "tcp_position_peak_excursion_m": 0.052849887751732154
+            },
+            "h5": {
+              "bytes": 1967311,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-dff24485de29456f9baaf7a2880afbbc",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E3-simultaneous-default.h5",
+              "sha256": "65c8858cde1695c2687cf78080961d8e03e6ae599989c9a88aa367f5995d8357",
+              "transition_count": 64
+            }
+          },
+          {
+            "id": "E4-simultaneous-arm-gain-3",
+            "status": "PASS",
+            "motion": {
+              "hand_position_peak_excursion_m": 0.019307380686714663,
+              "max_finger_difference_m": 3.746805581374829e-06,
+              "opening_excursion_m": 0.06498705418863893,
+              "opening_final_m": 0.0680246595643473,
+              "opening_min_m": 0.011012945811361079,
+              "q1_final_home_error_rad": 2.8507890623825533e-06,
+              "q1_peak_delta_rad": 0.09811349509588144,
+              "tcp_position_peak_excursion_m": 0.053649806895393344
+            },
+            "h5": {
+              "bytes": 1967361,
+              "independent_reader": "PASS",
+              "observation_count": 65,
+              "outcome": {
+                "bootstrap_allowed": true,
+                "end_reason": "horizon_reached",
+                "episode_id": "episode-4efee4d1dc32426498944e6e0ed7d2e7",
+                "final_boundary": 64,
+                "schema_version": "episode-outcome-v1",
+                "solution_completed": null,
+                "task_success": false,
+                "terminated": false,
+                "truncated": true
+              },
+              "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/native_run_001/E4-simultaneous-arm-gain-3.h5",
+              "sha256": "ad7b34e6160fbdd57bb1efb3f68bfd9d9565fa356e7060010ab0227085ce2246",
+              "transition_count": 64
+            }
+          }
+        ],
+        "native_wall_s": 16.77646535099484,
+        "sampled_RSS_peak_bytes": 581976064,
+        "native_processes": 1,
+        "oracles_unchanged": true,
+        "default2500_unchanged": true,
+        "old004_FAIL_unchanged": true,
+        "provider_admission": false,
+        "qualification_granted": false,
+        "R03b_started": false,
+        "sol_review": {
+          "decision": "ACCEPTED_BOUNDED_S2_S3",
+          "reviewer": "Sol",
+          "date": "2026-10-28",
+          "input_head": "c066d320ec3903c0953ada74a146e5b69762cbb0",
+          "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+          "required_S1_S2_S3": "PASS_FOR_EXACT_CASE",
+          "S1_passed": 56,
+          "native_process_starts": 1,
+          "native_calls": {
+            "materialize_control": 4,
+            "mj_forward": 260,
+            "mj_resetData": 4,
+            "mj_step": 1280
+          },
+          "episodes_passed": 4,
+          "total_transitions": 256,
+          "observations_per_episode": 65,
+          "tamper_rejections": 9,
+          "offline_four_H5_readback": "PASS",
+          "old_default_2500_and004_FAIL_preserved": true,
+          "physical_oracles_source_algorithm_budgets_unchanged": true,
+          "new_qualification": false,
+          "provider_owner_contract_approval": false,
+          "R03b": "NEXT_PACKAGE_ONLY_NOT_IMPLEMENTED",
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/report.md"
+        }
+      }
     },
     {
       "id": "R03b",
@@ -127,10 +1045,92 @@
         "R03a",
         "R01c"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S1/S2",
-      "stop_condition": "wrong mount/root/顺序/约束失败→停止"
+      "status": "ACCEPTED_BOUNDED_S1_S2",
+      "execution": "SOL_REVIEWED_S1_AND_ORIGINAL_BOUNDED_S2",
+      "required_evidence": "Provider-free S1; one bounded Core RuntimeSession MuJoCo 3.8.1 CPU S2 execution with two independent materialize/ResetPlan/128-interval trials; source/model receipt and closed-session evidence.",
+      "stop_condition": "Wrong mount/root/source/order/constraint or budget breach stops; no oracle/limit widening. S3/R03c and general Attachment remain separate.",
+      "result": "Exact Panda fixed Arm+Hand candidate accepted after actual diff/source/receipt review and independent 256-boundary/two-reset readback. Sol added only pre-native source/Scene Joint and Asset provenance rejection guards; positive identities/native algorithm/physics/source/oracles unchanged. 99 provider-free checks and original 19-case static gate passed. No new native or R03c execution.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/report.md",
+      "attempt001_execution": {
+        "input_commit": "48bc7e023929df7aa843a2097014481cd6c3c806",
+        "status": "BOUNDED_FIXED_ATTACHMENT_S1_S2_PASS_PENDING_SOL_REVIEW",
+        "s1": {
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/s1_run_005/s1_evidence.json",
+          "sha256": "253a6035a3d3681ac36f0f87b235a41f44fab7394f5f1c8e4691ba082eef7bc8",
+          "negative_cases_rejected": 19,
+          "native_import_or_step": false
+        },
+        "targeted_regressions": {
+          "count": 80,
+          "status": "PASS",
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/targeted_regressions_003.log",
+          "sha256": "9483e8019636b13a22cf09bb3c59a6ab49e7933f61c58bfa5d80cd037dfbc24d"
+        },
+        "source_inventory": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/source_inventory.json",
+        "source_inventory_sha256": "43a4ba107101062a3a9816dd54be98eea644de8fcfa33c18f6fe591afb4a70b3",
+        "native_contract": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/native_execution_contract_rev002.json",
+        "native_contract_sha256": "6c70902af8f5587e25da76c47250286fe15b5df02cc5cc8edd405c215758e2a5",
+        "native_ledger": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/native_run_001/ledger.json",
+        "native_ledger_sha256": "9cbc2b8ea5d48d2a99da1c1d16533deffe3fca4bbc683dd592e2ea32000fa7cf",
+        "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03b_001/native_run_002/s2_evidence.json",
+        "native_evidence_sha256": "dedf0c10d8335bfac7be59493250a29f4f5dc9eb23f05065ac7f095686c5c0db",
+        "native_process_invocations": 2,
+        "native_process_001": {
+          "exit_code": 1,
+          "status": "PRESERVED_PRE_NATIVE_IMPORT_PRE_MJ_STEP_WIRING_FAILURE",
+          "materialize_attempts": 1,
+          "reset": 0,
+          "mj_forward": 0,
+          "mj_step": 0,
+          "retry_allowed": true
+        },
+        "native_process_002": {
+          "exit_code": 0,
+          "status": "PASS",
+          "materializations": 2,
+          "resets": 2,
+          "mj_forward": 258,
+          "outer_intervals": 256,
+          "mj_step": 1280,
+          "simulated_seconds": 2.56
+        },
+        "aggregate_native_counts": {
+          "materializations": 3,
+          "resets": 2,
+          "mj_forward": 258,
+          "outer_intervals": 256,
+          "mj_step": 1280,
+          "simulated_seconds": 2.56
+        },
+        "peak_rss_bytes": 336027648,
+        "runtime_identity_verified": true,
+        "native_oracles_passed": true,
+        "public_env_recorder_h5_s3": "NOT_RUN",
+        "R03c": "NOT_RUN_NOT_STARTED",
+        "provider_admission_or_qualification": false
+      },
+      "sol_review": {
+        "decision": "ACCEPTED_BOUNDED_S1_S2",
+        "date": "2026-10-28",
+        "implementation_commit": "ee5ed6c298bbdab206968873c61944ac35c66dbf",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03b_001/sol_review.md",
+        "provider_free_s1": {
+          "pytest_passed": 99,
+          "original_static_negative_cases": 19,
+          "native_imports": 0,
+          "native_starts": 0
+        },
+        "offline_review": {
+          "receipts": 2,
+          "motion_boundaries": 256,
+          "reset_samples": 2,
+          "status": "PASS"
+        },
+        "post_native_change": "Static rejection-only checks. Correct Scene/Assembly/Artifact/Attachment/source identity unchanged; original S2 ran on ee5ed6c, not on the later review commit.",
+        "new_native_starts": 0,
+        "R03c_started": false,
+        "qualification_granted": false
+      }
     },
     {
       "id": "R03c",
@@ -138,10 +1138,510 @@
         "R03b",
         "R02c"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S2/S3",
-      "stop_condition": "不同diagnostic路径拼接或不完整H5→失败"
+      "status": "ACCEPTED_BOUNDED_S2_S3",
+      "execution": "ATTEMPT004_S2_S3_ACCEPTED_BOUNDED_AFTER_SOL_REVIEW",
+      "required_evidence": "Reused Sol-reviewed provider-free 33-case S1; one MuJoCo 3.8.1 CPU native run bound to input HEAD 4ac7284 completed four same-public-Env episodes and published the formal receipt; a fresh provider-free process independently read the four closed same-run H5 files and passed the 48-case copy-only tamper matrix.",
+      "stop_condition": "Preserve attempt001–003 failures and attempt004 raw. The attempt004 one-start budget is consumed; future work follows the phase plan and its own execution scope. No general Provider/Attachment admission or Qualification follows from this result.",
+      "result": "Sol reviewed attempt004 execution and accepted bounded S2/S3: one MuJoCo 3.8.1 CPU run, four 64/65 H5 episodes, 1280 steps, 260 forwards, four materializations/resets, same-run provider-free readback and 48/48 tamper rejections. Scope: Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置. Original earlier attempts and signed pending-review execution records are preserved.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/report.md",
+      "attempt001_execution": {
+        "input_head": "703e8a1b184b18e7efbc0b5532b96fb3a462b4d2",
+        "status": "IMPLEMENTED_S1_PASS_NATIVE_BUDGET_EXHAUSTED_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
+        "s1": {
+          "selected_files": 5,
+          "pytest_passed": 83,
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/s1_final_after_native_limit.log",
+          "provider_imports": 0,
+          "native_starts": 0
+        },
+        "provider_free_retry_counter_check": {
+          "status": "PASS_RETRY_COUNTER_RECONSTRUCTION_PROVIDER_FREE",
+          "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/retry_counter_reconstruction.log",
+          "provider_imports": 0
+        },
+        "execution_freeze": {
+          "directory": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/freeze",
+          "sha256": "f2ca95cb8753bb991771c91356d4c495ac62768e873eb0db593172c700e02805",
+          "contract_sha256": "77926fa3afa3649b6015398d45dd6d1c6ce569c516e759b921051d2ad1bc7cfe",
+          "note": "Freeze bound the source/code before native start 2. A provider-free retry-counter correction followed attempt 2; no native rerun followed that correction."
+        },
+        "native_processes": [
+          {
+            "attempt": 1,
+            "exit_code": 1,
+            "classification": "CORE_ATTACHED_LEAF_ADMISSION_WIRING_FAILURE_BEFORE_STEP",
+            "provider_imported": true,
+            "runtime_identity_verified": true,
+            "error": "Attachment receipt omits the canonical Hand actuator/tendon mapping",
+            "materialization_attempts_in_raw_counters": 0,
+            "materialization_attempts_reconstructed": 1,
+            "resets": 1,
+            "mj_forward_calls": 0,
+            "mj_step_calls": 0,
+            "failure": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/native/native_failure.json",
+            "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/native/native.stdout_stderr.log"
+          },
+          {
+            "attempt": 2,
+            "exit_code": 1,
+            "classification": "RETRY_RUNNER_LEDGER_VALIDATION_BEFORE_PROVIDER_IMPORT",
+            "provider_imported": false,
+            "mj_forward_calls": 0,
+            "mj_step_calls": 0,
+            "failure": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/native_attempt_002/launcher_failure.json",
+            "log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/native_attempt_002/native.stdout_stderr.log"
+          }
+        ],
+        "aggregate_native_counts": {
+          "native_process_starts": 2,
+          "native_process_start_limit": 2,
+          "materialization_attempts": 1,
+          "materialization_attempts_limit": 5,
+          "reset_attempts": 1,
+          "reset_attempts_limit": 5,
+          "mj_forward_calls": 0,
+          "mj_forward_calls_limit": 300,
+          "outer_intervals": 0,
+          "outer_intervals_limit": 256,
+          "mj_step_calls": 0,
+          "mj_step_calls_limit": 1280,
+          "simulated_seconds": 0.0,
+          "simulated_seconds_limit": 2.56
+        },
+        "episodes_completed": 0,
+        "real_h5_files_closed": 0,
+        "S2": "INCOMPLETE",
+        "S3": "NOT_RUN",
+        "offline_reader": "Synthetic provider-free reader test passed in S1; real H5 readback/tamper matrix NOT_RUN.",
+        "qualification_granted": false,
+        "general_provider_admission": false,
+        "R06_R05a_DAG_Required_Envelope_P99_unchanged": true,
+        "other_slice_started": false,
+        "sol_review": "PENDING"
+      },
+      "sol_review": {
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "reviewed_attempt": "004",
+        "review_input_head": "0c45a5db442d3a758790dca4fede2856ac15f15b",
+        "native_input_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+        "S2": "PASS",
+        "S3": "PASS",
+        "manifest_files_verified": 50,
+        "frozen_code_files_verified": 16,
+        "provider_free_s1_reused": 33,
+        "native_starts_by_sol": 0,
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md",
+        "raw_verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/raw_verification.json",
+        "scope": "Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置"
+      },
+      "attempt002_execution": {
+        "input_head": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
+        "status": "NATIVE_FAILURE_S2_INCOMPLETE_S3_NOT_RUN_POSTRUN_FIX_NOT_NATIVE_VERIFIED",
+        "preflight": {
+          "status": "PASS",
+          "provider_imports": 0,
+          "native_starts": 0,
+          "output_absent_before_start": true
+        },
+        "native_processes": [
+          {
+            "attempt": 1,
+            "exit_code": 1,
+            "classification": "RUNNER_TYPED_STATE_BINDING_TYPE_ERROR_AFTER_PUBLIC_RESET_BEFORE_STEP",
+            "provider_imported": true,
+            "runtime_identity_verified": true,
+            "error": "TypeError: typed Joint binding 'panda-arm/joint1' must be a JointDefinition",
+            "materialization_attempts": 1,
+            "resets": 1,
+            "mj_forward_calls": 1,
+            "mj_step_calls": 0,
+            "outer_intervals": 0,
+            "simulated_seconds": 0.0,
+            "native_wall_seconds": 2.6684191308449954,
+            "launcher_wall_seconds": 3.54570907400921,
+            "rss_bytes": null,
+            "failure": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/native/native_failure.json",
+            "trace": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/native/stderr.log",
+            "runtime_identity": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/native/runtime_identity.json"
+          }
+        ],
+        "episodes_completed": 0,
+        "closed_real_h5_files": 0,
+        "same_run_offline_reader": "NOT_RUN_NO_H5",
+        "postrun_fix": {
+          "owner": "task_env/diagnostics/tasks/r03c_attached_leaf_probe.py::_candidate_bindings",
+          "classification": "FIX_EXISTING",
+          "change": "Select canonical JointDefinition objects from the candidate Scene using leaf JointReference identities.",
+          "provider_free_s1": "1 passed",
+          "native_verified": false
+        },
+        "qualification_granted": false,
+        "general_provider_admission": false,
+        "R06_R05a_DAG_Required_Envelope_P99_frozen_refs_unchanged": true,
+        "other_slice_started": false,
+        "sol_review": "S1_REVIEWED_NATIVE_PENDING; see attempt002_sol_review; original native result unchanged"
+      },
+      "attempt002_sol_review": {
+        "decision": "S1_REVIEWED_NATIVE_PENDING",
+        "implementation_commit": "dfee52777069c1261334032e4924e8c136d08361",
+        "provider_free_tests_current_module": 20,
+        "runner_snapshot_configurations": 4,
+        "old_reference_input_rejected_by_real_snapshot": true,
+        "original_native_starts": 1,
+        "new_native_starts": 0,
+        "postrun_fix_native_verified": false,
+        "S2": "INCOMPLETE",
+        "S3": "NOT_RUN",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_002/sol_review.md"
+      },
+      "attempt003_execution": {
+        "input_head": "3b71683d5890c4ca1701037d59bce7b17de50a30",
+        "status": "NATIVE_FAILURE_AFTER_FOUR_H5; OFFLINE_READBACK_INCOMPLETE; S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
+        "preflight": {
+          "S0": "S0_SNAPSHOT_PASS",
+          "launcher_check": "PREPARED_ONE_START_LAUNCHER_CHECK_PASS",
+          "provider_imports": 0,
+          "native_starts": 0
+        },
+        "native_process": {
+          "attempt": 1,
+          "exit_code": 1,
+          "launcher_wall_seconds": 17.691430281847715,
+          "native_wall_seconds": 17.313346301903948,
+          "classification": "FINAL_RESOURCE_SUMMARY_UNBOUNDLOCALERROR_AFTER_E4_CLOSE",
+          "error_type": "UnboundLocalError",
+          "error": "cannot access local variable native_log_bytes where it is not associated with a value",
+          "provider_imported": true,
+          "mujoco_package": "3.8.1",
+          "mujoco_runtime": "3.8.1",
+          "mujoco_api_version": 3008001,
+          "native_result_written": false,
+          "native_window_relaunch_permitted": false,
+          "runtime_identity": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/native/runtime_identity.json",
+          "failure": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/native/native_failure.json",
+          "ledger": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/native/native_process_ledger.jsonl"
+        },
+        "native_counters": {
+          "native_starts": 1,
+          "materializations": 4,
+          "resets": 4,
+          "mj_forward_calls": 260,
+          "mj_step_calls": 1280,
+          "outer_intervals": 256,
+          "simulated_seconds": 2.56,
+          "sampled_max_rss_bytes": 440950784,
+          "rss_samples": 256
+        },
+        "episodes_completed": 4,
+        "closed_real_h5_files": 4,
+        "episode_results": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/native/E{1..4}_result.json",
+        "h5_sha256": {
+          "E1": "9381060a0461c88bb499d95d6e8aaad05b1cd8f674f4cfb818bedfb071a1c5a1",
+          "E2": "f48c74bac0179267c2242d96121d447d139d6a040bd00735f0b39d7c15ff445d",
+          "E3": "c5c82c9f29752ba90d6e2c02f36f27806a88aa8e147d9aa98003627b998c675f",
+          "E4": "d0521fa55d54e5a1a69a9433001a687cc1b885f9847bbe43eeb397f8438cdff2"
+        },
+        "same_run_offline_readback": {
+          "status": "OFFLINE_READBACK_INCOMPLETE_OR_FAILED",
+          "exit_code": 0,
+          "provider_imports": 0,
+          "episodes": 4,
+          "transitions": 256,
+          "observations": 260,
+          "tamper_rejections": 48,
+          "native_result_present": false,
+          "reason": "Aggregate reader requires the native runner receipt; all four H5 readbacks and tamper checks completed."
+        },
+        "postrun_fix": {
+          "classification": "FIX_EXISTING_DIAGNOSTIC_FINALIZATION",
+          "change": "Initialize output_bytes and native_log_bytes before building the final native result; refresh the synthetic freeze test fixture protected hashes against the current working tree.",
+          "provider_free_module_tests": "20 passed",
+          "native_verified": false
+        },
+        "qualification_granted": false,
+        "general_provider_admission": false,
+        "R06_R05a_DAG_Required_Envelope_P99_frozen_refs_unchanged": true,
+        "other_slice_started": false,
+        "sol_review": "PENDING"
+      },
+      "attempt003_sol_review": {
+        "date": "2026-10-28",
+        "input_commits": [
+          "f4233126509ddadb25165d77517de4d2a25736dc",
+          "3aafcf30a3458599933d8812a1b1f824f7558919"
+        ],
+        "decision": "ACCEPT_EXECUTION_FACTS_AND_STATIC_CORRECTION; S2_S3_REMAIN_INCOMPLETE",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/sol_review.md",
+        "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/offline_verification.json",
+        "manifest_entries_verified_at_review_input": 53,
+        "current_provider_free_tests": 33,
+        "new_closeout_cases": 13,
+        "actual_native_starts_by_Sol": 0,
+        "S2": "INCOMPLETE",
+        "S3": "INCOMPLETE",
+        "qualification_granted": false,
+        "next_package": "attempt004 same source, four cases, oracles and one-start budget; no other slice",
+        "implementation": "FIX_EXISTING runner closeout; final receipt published only after byte-budget/progress writes; actual shared closeout and CLI success/error paths covered",
+        "native_verification_of_postrun_changes": false
+      },
+      "attempt004_execution": {
+        "input_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+        "branch": "codex/phase-ii-01-p00-20261023",
+        "status": "BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW",
+        "S0": {
+          "status": "PASS",
+          "audit": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/commands/s0/s0_audit.json",
+          "launcher_check": "PREPARED_ONE_START_LAUNCHER_CHECK_PASS",
+          "launcher_check_exit_code": 0,
+          "provider_imports": 0,
+          "native_starts": 0
+        },
+        "reused_S1": {
+          "passed": 33,
+          "rerun": false,
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/s1_result.json",
+          "sha256": "65e693da52a553fcfb21ee9a5aa1983969c114f3565ed9a3304ed5dbe6861345"
+        },
+        "native_process": {
+          "starts": 1,
+          "exit_code": 0,
+          "launcher_wall_seconds": 16.89038668386638,
+          "timeout_seconds": 300,
+          "native_window_relaunch_permitted": false,
+          "package_version": "3.8.1",
+          "runtime_version": "3.8.1",
+          "api_version": 3008001,
+          "renderer_initialized": false,
+          "runtime_identity_sha256": "85b0eb779ba82f45b93e18e0f4517aa37ad22ec38a0d482d972e44656cfb7fd2",
+          "native_result_sha256": "4348c0f3afac40ec0166df981d32b0e0edbd82caebff39e241b91df0f1e6f630",
+          "native_progress_phase": "complete",
+          "native_failure_present": false,
+          "cleanup_error_present": false
+        },
+        "native_counts": {
+          "materialization_attempts": 4,
+          "max_rss_bytes": 459276288,
+          "mj_forward_calls": 260,
+          "mj_step_calls": 1280,
+          "native_starts": 1,
+          "outer_intervals": 256,
+          "resets": 4,
+          "simulated_seconds": 2.56
+        },
+        "rss_sampling": "sampled at each returned outer boundary; interval-internal peak may be missed",
+        "S2": {
+          "status": "PASS",
+          "gate_file": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/commands/s2_native_gate.json",
+          "all_checks_pass": true,
+          "episodes": [
+            {
+              "episode_id": "E1",
+              "arm_active": true,
+              "hand_active": false,
+              "native_h5_sha256": "ee3d88cae205958b1fed6644579bb7e4df380481d24bddad984f31b09b5a3863",
+              "transitions": 64,
+              "observations": 65,
+              "arm_peak_abs_joint1_rad": 0.09998995621098894,
+              "arm_home_error_rad": 0.0018715961116149502,
+              "hand_closed_min_m": 0.07600199705406374,
+              "hand_final_open_m": 0.076002066045047,
+              "hand_excursion_m": 6.5321407259205655e-06,
+              "finger_mismatch_m": 6.391116977526312e-06,
+              "hand_root_rotation_rad": 0.10033990484582953
+            },
+            {
+              "episode_id": "E2",
+              "arm_active": false,
+              "hand_active": true,
+              "native_h5_sha256": "0ef5bce861adfc533ea1e2c8133e4ae966fe0ab4b86c554220e9836fae65efd3",
+              "transitions": 64,
+              "observations": 65,
+              "arm_peak_abs_joint1_rad": 3.5566583077462642e-06,
+              "arm_home_error_rad": 0.0018718399197492392,
+              "hand_closed_min_m": 0.012268907107855068,
+              "hand_final_open_m": 0.06802404280536098,
+              "hand_excursion_m": 0.06489143727980196,
+              "finger_mismatch_m": 4.782396588812188e-07,
+              "hand_root_rotation_rad": 0.004080655204687584
+            },
+            {
+              "episode_id": "E3",
+              "arm_active": true,
+              "hand_active": true,
+              "native_h5_sha256": "6aefd11b074481f78c613a5fc275b4a7c8931c7ff0b02accd5545bccbaf5cd72",
+              "transitions": 64,
+              "observations": 65,
+              "arm_peak_abs_joint1_rad": 0.09998995647052653,
+              "arm_home_error_rad": 0.0018715961207216836,
+              "hand_closed_min_m": 0.012270391263042886,
+              "hand_final_open_m": 0.06802477984965263,
+              "hand_excursion_m": 0.0648903338081038,
+              "finger_mismatch_m": 6.391005942761596e-06,
+              "hand_root_rotation_rad": 0.10033984325379523
+            },
+            {
+              "episode_id": "E4",
+              "arm_active": true,
+              "hand_active": true,
+              "native_h5_sha256": "b6134ddd99e3e03dd503034048cf24e4d5ca8f903e86dbc64209519517d5f569",
+              "transitions": 64,
+              "observations": 65,
+              "arm_peak_abs_joint1_rad": 0.09999697094336257,
+              "arm_home_error_rad": 0.0016372844039416064,
+              "hand_closed_min_m": 0.012270388818658919,
+              "hand_final_open_m": 0.06802474796337449,
+              "hand_excursion_m": 0.06489032808430927,
+              "finger_mismatch_m": 5.73566819443011e-06,
+              "hand_root_rotation_rad": 0.10058733335794526
+            }
+          ],
+          "gain_isolation": {
+            "E3": {
+              "arm_config": "983d26f9c62c21c0c5ace0c70361694fe1eb642365ac17c7e31e5c12a5400f00",
+              "arm_slot_values": [
+                0.021875,
+                0.0,
+                0.0,
+                -1.57079,
+                0.0,
+                1.57079,
+                -0.7853
+              ],
+              "hand_config": "5ff6243924c53fe31569a9047aa8787862c01e91d31d5b092b2c931050b313cd",
+              "hand_ctrl": 227.90624999999997,
+              "hand_request_m": 0.0715,
+              "hand_servo_m": 0.0715
+            },
+            "E4": {
+              "arm_config": "5d49ad30e1eb158db49c3516fe78a264ddb5dad1e326ee1e71a9b77215b8e1f7",
+              "arm_slot_values": [
+                0.025,
+                0.0,
+                0.0,
+                -1.57079,
+                0.0,
+                1.57079,
+                -0.7853
+              ],
+              "hand_config": "5ff6243924c53fe31569a9047aa8787862c01e91d31d5b092b2c931050b313cd",
+              "hand_ctrl": 227.90624999999997,
+              "hand_request_m": 0.0715,
+              "hand_servo_m": 0.0715
+            }
+          },
+          "write_time_resource_limits": {
+            "native_log_bytes": 8377716,
+            "output_bytes": 8403108,
+            "rss_sampled_max_bytes": 459276288,
+            "rss_sampling": "sampled at each returned outer boundary; intra-interval peak may be missed"
+          }
+        },
+        "S3": {
+          "status": "PASS",
+          "gate_file": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/commands/s3_offline_gate.json",
+          "all_checks_pass": true,
+          "readback_sha256": "ece531e06c89736f6d90b8947e571987ce6ac4c4469743cae96a6a5d72770b6c",
+          "summary": {
+            "episode_count": 4,
+            "observation_count": 260,
+            "tamper_rejections": 48,
+            "transition_count": 256
+          },
+          "provider_imports": 0,
+          "episodes_read": [
+            {
+              "episode_id": "E1",
+              "sha256": "ee3d88cae205958b1fed6644579bb7e4df380481d24bddad984f31b09b5a3863",
+              "bytes": 2031829,
+              "transition_count": 64,
+              "observation_count": 65,
+              "tamper_rejections": 12
+            },
+            {
+              "episode_id": "E2",
+              "sha256": "0ef5bce861adfc533ea1e2c8133e4ae966fe0ab4b86c554220e9836fae65efd3",
+              "bytes": 2032696,
+              "transition_count": 64,
+              "observation_count": 65,
+              "tamper_rejections": 12
+            },
+            {
+              "episode_id": "E3",
+              "sha256": "6aefd11b074481f78c613a5fc275b4a7c8931c7ff0b02accd5545bccbaf5cd72",
+              "bytes": 2034080,
+              "transition_count": 64,
+              "observation_count": 65,
+              "tamper_rejections": 12
+            },
+            {
+              "episode_id": "E4",
+              "sha256": "b6134ddd99e3e03dd503034048cf24e4d5ca8f903e86dbc64209519517d5f569",
+              "bytes": 2034064,
+              "transition_count": 64,
+              "observation_count": 65,
+              "tamper_rejections": 12
+            }
+          ]
+        },
+        "source_closure": {
+          "file_count": 70,
+          "bytes": 34318679,
+          "sha256": "b97f7c4f9b585ef175e986b9fb59f3054de74184666373443d6d166a45609b63"
+        },
+        "contract_sha256": "2a99155e0dab2db05219c747e7fbb87595ea2501313d061e3a4f6cc4c6c12a6c",
+        "freeze_sha256": "c6d3e23933c84098f0ebc2c34283513c0f25d456b6eae244ebd78613626dc6d8",
+        "other_slice_started": false,
+        "qualification_granted": false,
+        "general_provider_admission": false,
+        "sol_review": "PENDING",
+        "documentation_validation": {
+          "phase_markdown_hashes": 12,
+          "task_env_skill_static_check": "PASS",
+          "global_docs_validator_exit_code": 1,
+          "baseline_errors": 176,
+          "current_errors": 176,
+          "added_errors": [],
+          "removed_errors": [],
+          "counts": {
+            "docs": 84,
+            "task_env": 37,
+            "markdown": 42,
+            "task_env_markdown": 28,
+            "machine_or_other": 42
+          },
+          "baseline_source": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/docs_validator.json",
+          "note": "The repository validator retains its baseline count/scope failures; the exact error multiset is unchanged."
+        }
+      },
+      "attempt004_sol_review": {
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "reviewed_attempt": "004",
+        "review_input_head": "0c45a5db442d3a758790dca4fede2856ac15f15b",
+        "native_input_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+        "S2": "PASS",
+        "S3": "PASS",
+        "manifest_files_verified": 50,
+        "frozen_code_files_verified": 16,
+        "provider_free_s1_reused": 33,
+        "native_starts_by_sol": 0,
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md",
+        "raw_verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/raw_verification.json",
+        "scope": "Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置"
+      },
+      "attempt001_sol_review": {
+        "decision": "S1_REVIEWED_NATIVE_PENDING",
+        "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
+        "current_provider_free_tests": 90,
+        "actual_native_imports": 0,
+        "actual_native_starts": 0,
+        "S2": "INCOMPLETE",
+        "S3": "NOT_RUN",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_001/sol_review.md",
+        "next_package": "R03c attempt002, one separate human-authorized native start only; not attempt001 start3",
+        "geophys_scope": "Earlier Phase II full-Panda routes retain bounded evidence; new leaf/Attachment source and Core adapter gap, not a blanket provider or phase exclusion."
+      }
     },
     {
       "id": "R04b",
@@ -345,22 +1845,25 @@
     ],
     "B04a_disposition": "ACCEPTED-DEFERRED; raw bytes missing; byte compatibility NOT_PROVEN",
     "early_eb870_typed_force": "MISSING_RAW_EVIDENCE",
-    "retirement_or_new_stage_continued_deferral_approved": false
+    "retirement_or_new_stage_continued_deferral_approved": false,
+    "phase_ii_01_disposition": "PENDING_MAINTAINER_DECISION; see slices.R06a.compatibility_ledger",
+    "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "00_Phase_II_01_Blueprint.md": "67bfc64859c68908af002c40de32dbe1f06f88ec2ebd83f6fb132a551ce99b01",
-    "01_R01_Logical_Robot_Assembly.md": "da549fff044c7e99ddee58cc24ddac3cb43d6786ca6adf1ebc5edaa2a0eb0936",
-    "02_R02_Composite_Control_Profiles.md": "c2ab64b6059b6fdd24f8e6a9b120b92d566e68b345c3499a31e03eaf8448e4bb",
-    "03_R03_Physical_Attachment.md": "b62d999a32be4dc32923f65856e1b021e6a20abd927ee24d28072e76e6adabcf",
-    "04_R04_Dynamic_Camera_Consumer.md": "195b80098c41c78353e7e90385b9577b6224488599c9d33785096f49c10881b5",
-    "05_R05_Native_Rate_Feedback.md": "099ba8070a0fe6a06d20ff1e9d916703d410f9bb06e08f0cdffd2a5b371edc35",
-    "06_R06_Compatibility_and_Regression.md": "b9ab451acf192f2005349289bf02a8e2987d04363b74d52ac096ee6df1e231b4",
-    "07_Execution_Order_and_Acceptance.md": "c608590d3e0429690438759382f888f0e767a056a6d563342c34d38805a6eee9",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "0071c7444e9bbd09036ed33b18407b5ab282af225e69ce6dcec6240d6f853328",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "585f3f7adcef7c03d3fa52c804818026eee47326886caa363b2103671c4490a7",
-    "README.md": "e59c49a476e1911b2405e2a7fcbf1f65f2ca7ccc3d76fe33c219d538327dc141"
+    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
+    "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
+    "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
+    "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
+    "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
+    "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
+    "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
+    "07_Execution_Order_and_Acceptance.md": "cd7e6c1d76ac7af24a991e42ca112bcd7a5da66b3ed17088eee7ffc24b5051dc",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "69b53cde406e75b0f8daed1cf6b6b516cb3d68ea90eaf6a7636a3fb19afde048",
+    "README.md": "352c6d167035ef26adce0b5dc6d1e2f1cf5ee317ab255f1e536ba751682f9377"
   },
-  "revision_kind": "R07_REVISE_PLAN_DOCUMENTATION_ONLY",
+  "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -1834,6 +3337,148 @@
         "default_mount": "RethinkMount",
         "Core_admission": "BLOCKED_CORE drive-mode/resource mapping; no actual controller deployment tested"
       }
+    },
+    "revalidation": {
+      "source_audit_receipt_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+      "all_previously_downloaded_source_files_locally_hash_rechecked": 63,
+      "fresh_upstream_text_files_refetched_and_blob_hash_checked": 16,
+      "refetched_files": [
+        {
+          "repo": "libero",
+          "path": "README.md",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "e87d5b284da3d7c127e1bc8282ea80b5da02aad3e9272c13adc96c4eca0eaa41",
+          "git_blob_sha": "96cf5b87eb7bb42be1269581256cc85bd7e21b6f",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "requirements.txt",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "b7d3093bb5e2f424c54396a2731bf26ea185bd3fbff79b561571a92400958130",
+          "git_blob_sha": "2f287f782ea6a1b9582cbb2e83ffe027834692b1",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "setup.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "848de286575e813c0c77cba86aad48de85945d7fce1b163cc13eaa45737c476e",
+          "git_blob_sha": "59d490046d366cbb54f821e9d9165c294c7ce9b2",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/benchmark/__init__.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "4ce6edbb00b3280692f2e2b2e8a14bf6e2d5878965b0484a386c0355a867ecc5",
+          "git_blob_sha": "2b833d0935163fb75a26ca77bf1e38eca6ccc31b",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "381cf12788739624b2037b3cabca34b8efdd7c6397bf38c1af7056caf49d38b7",
+          "git_blob_sha": "0ba2f4cba13a793f303e3261de4ec921c70305ca",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "491835cc2eb6956f7ce3d1ee4e266377116168fe453e6529fe105e3b0333635d",
+          "git_blob_sha": "6530a7778f9413f4b22b291a5a6606c04809d7c0",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_goal/push_the_plate_to_the_front_of_the_stove.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "26f22f8ad39a4b2b344b049115c45661a877fa0b4821fb78246725e7e87d8c0b",
+          "git_blob_sha": "b31490451ee3c938ba45321e4f900a699a20230b",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_goal/open_the_middle_drawer_of_the_cabinet.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "832ab48ec476807c767e8985666e295700f92d1f8daeae1c34eee1e75293769b",
+          "git_blob_sha": "582fa1b35b9d32cf3c11cfb3fe3bdaba4b410bb3",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/bddl_files/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.bddl",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660c959b",
+          "git_blob_sha": "6438652602192995ca5b3f4343ab475494c7b334",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/envs/object_states/base_object_states.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "ca6f53123336b6487bdb4feb02534ddb3a0627a4b847fe89da4460520ef01366",
+          "git_blob_sha": "300f1daa99487328755820e46260bbe728894e40",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/envs/predicates/base_predicates.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "319137e95330dbb22a266a8dceb8110f18413c2bf17461550222228c4bc310a1",
+          "git_blob_sha": "b8cc0299ba4a53a37ab809db5bcf32eda249865e",
+          "match": true
+        },
+        {
+          "repo": "libero",
+          "path": "libero/libero/envs/objects/site_object.py",
+          "pin": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+          "sha256": "4907bf2550945c395b85fd92725763ada4da533ad50966eb179e637dabeeebf6",
+          "git_blob_sha": "88eceb274d13b4774307d9d7f69f1674d52adda4",
+          "match": true
+        },
+        {
+          "repo": "robocasa",
+          "path": "README.md",
+          "pin": "2ce1aecdd76e29b52d32fdb160436c5a3e230b07",
+          "sha256": "9958a9def6290c33dcbcb59a8593e566fbe3bf0860a58a575aff4faf53561f8d",
+          "git_blob_sha": "ab7cf853658bb5625f176bebb8ce338ce1b3b212",
+          "match": true
+        },
+        {
+          "repo": "robocasa",
+          "path": "setup.py",
+          "pin": "2ce1aecdd76e29b52d32fdb160436c5a3e230b07",
+          "sha256": "9bb7055c345a50c69417c9978277f82a0d782ae17cb369939a35e5faaa6a83e5",
+          "git_blob_sha": "51ac4a0b9c2a2d1c7888323c75bbf31558b63972",
+          "match": true
+        },
+        {
+          "repo": "robosuite",
+          "path": "robosuite/models/assets/grippers/panda_gripper.xml",
+          "pin": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+          "sha256": "066fd7ae45afb11e1844869360e587646e9768210ba5389aa3cd35292cde29c1",
+          "git_blob_sha": "fb9463484727e1df64cc3db2be2ddb4a8341a22a",
+          "match": true
+        },
+        {
+          "repo": "robosuite",
+          "path": "robosuite/models/assets/robots/panda/robot.xml",
+          "pin": "fbee5844ff5632f5b5698e204ec5357ca50be0df",
+          "sha256": "1b83897bbdd11045846aeccd704ad748e1b8c975d782e8ec5cdcf378f4e371d1",
+          "git_blob_sha": "6a8d84fdcb197d2bd894beae516c0b22a570e9c5",
+          "match": true
+        }
+      ],
+      "initialization_binary_files_refetched_this_revision": 0,
+      "upstream_import_or_execution": false,
+      "LIBERO_commit_readback": {
+        "url": "https://api.github.com/repos/Lifelong-Robot-Learning/LIBERO/git/commits/8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "sha": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+        "tree": "99f4ada3f1d62e026fc9ff2390eb4ff8a1760e60"
+      }
     }
   },
   "cost_measurement_protocol": {
@@ -1888,9 +3533,989 @@
       "libero_goal/push_the_plate_to_the_front_of_the_stove",
       "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
       "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
-    ]
+    ],
+    "measurement_baseline_accounting": {
+      "status": "PROPOSED_TO_FREEZE_IN_R07a",
+      "measurement_baseline_commit": null,
+      "reused_module_revisions": null,
+      "reason": "No deployment authorized or started; planning commit is not a measured deployment baseline",
+      "R07_triggered_Core_extensions": "count as setup/shared or per-task incremental with owner/source/session bindings",
+      "preexisting_R01_R06_foundation": "separate provenance and excluded-cost boundary; no free-implementation or causal cost-reduction inference"
+    }
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "NO_COMMIT_OR_PUSH_PERFORMED"
+  "planning_submission_this_revision": "DOCUMENTATION_ONLY; checkpoint c30d97e retained; recovery and F00-F07 patch direction recorded. No implementation, install, branch integration or native execution.",
+  "revision_history": [
+    {
+      "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+      "previous_receipt_path": "docs/module/task_env/goal/Phase_II_01/validation_receipt.json",
+      "previous_receipt_sha256": "a7c24cde8537a6a66beff830a95f7c42b611fd9f83f593d78d1a48972efda744",
+      "input_commit": "234da21b0bd9e9ab5a9df3f516840a6422ce936a",
+      "preservation": "immutable source commit plus local prior_planning_documents.tar.gz; previous signing-time no-commit/no-push fields remain historical"
+    },
+    {
+      "kind": "P00_AUDIT_ONLY_AUTHORIZATION_AND_READINESS_PREPARATION",
+      "date": "2026-10-23",
+      "input_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+      "previous_receipt_path": "docs/module/task_env/goal/Phase_II_01/validation_receipt.json",
+      "previous_receipt_sha256": "a0edfa5c5f23483dfb73b09d3ff5eefbeea5bec3f469daa1f9a84abd4540fe00",
+      "preservation": "Original planning receipt and earlier history unchanged; P00 facts recorded separately under P00_audit.local_evidence_root. No Goal/DAG/envelope/implementation approval inferred."
+    },
+    {
+      "kind": "P00_L01_SOL_AUDIT_REVIEW",
+      "date": "2026-10-25",
+      "input_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+      "previous_working_manifest_sha256": "a187cb6759adae978a9c0cc20c72e50b14abb163c3b9d4c15154803ed47ee8f2",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l01_20261025_001/review_receipt.json",
+      "preservation": "Luna report/raw outputs and previous Sol receipts unchanged; static audit accepted only, no scope/Provider/native/Qualification approval."
+    },
+    {
+      "kind": "MAINTAINER_PHASE_BRANCH_COMMIT_AND_SOL_LUNA_WORKFLOW",
+      "date": "2026-10-25",
+      "input_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+      "workflow_preference_confirmed": true,
+      "scope": "One reused phase branch, no per-prompt branches/worktrees, bounded output-to-local-commit linkage, default sequential Sol/Luna/review handoffs following 07.",
+      "implementation_scope_or_qualification_approval": false,
+      "prior_receipts_and_packages_preserved": true
+    },
+    {
+      "kind": "P00_L02_SOL_REVIEW_AND_PREPARATION_REWORK",
+      "date": "2026-10-25",
+      "input_commit": "dd02da44c8b069a17b377bf891bde3a28be0b3a0",
+      "result": "REWORK_REQUIRED",
+      "baseline": "Exact authorized seven-file docs commit reconciled; prior snapshots preserved.",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261025_001/review_receipt.json",
+      "scope": "Static review of unexecuted candidate contract/script; freeze handoff baseline during Luna execution.",
+      "DAG_required_envelope_unchanged": true,
+      "native_implementation_qualification_approval": false
+    },
+    {
+      "kind": "P00_L02_ATTEMPT002_CLOSEOUT_AND_R03A_EXECUTION_DECISION",
+      "date": "2026-10-26",
+      "input_commit": "6805a7717adf9ee7e45f972531ebee1b61a401d7",
+      "review_result": "PREPARATION_CLOSED_READY_FOR_R03A_AUTHORIZATION",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261026_002/review_receipt.json",
+      "scope": "Close static preparation; Sol directly normalizes final implementation copy, freezes source/oracle/budget for one maintainer execution decision. Sync complexity-based workflow.",
+      "native_execution_authorized": false,
+      "DAG_required_envelope_unchanged": true
+    },
+    {
+      "kind": "R03A_ATTEMPT001_AUTHORIZED_EXECUTION",
+      "date": "2026-10-26",
+      "input_commit": "17b983b232d5f51c963cbb723af593d46962a1b5",
+      "result": "FAIL",
+      "execution_report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/report.md",
+      "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_001/native_run_001/probe_evidence.json",
+      "candidate_basis_before_checker_correction": "74b2f78670b5b55fc54ca68260b91339530cee9c441ac78956b556e66c55ed26",
+      "candidate_basis_executed": "7c639ca471642fd0e044c9ee7e3632aafb7fa80722a3074676bc78abebac8102",
+      "checker_correction": "One XML equality-child selection defect fixed; no source, native algorithm, numerical oracle or budget change.",
+      "native_probe_invocations": 1,
+      "DAG_required_envelope_unchanged": true,
+      "provider_owner_contract_approved": false,
+      "human_judge_approved": false,
+      "qualification_approved": false,
+      "core_attachment_admission": false
+    },
+    {
+      "kind": "R03A_ATTEMPT001_SOL_REVIEW",
+      "date": "2026-10-26",
+      "input_commit": "697eb65485eb740ab46179f2a43870afb3e9428c",
+      "result": "ACCEPT_EXECUTED_FAIL; INTERIOR_HAND_COMMANDS_REWORK_PROPOSED",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_001/review_receipt.json",
+      "original_failure_and_raw_preserved": true,
+      "range_overrun_tolerance_unchanged": true,
+      "new_native_execution": "NOT_RUN",
+      "DAG_required_envelope_unchanged": true
+    },
+    {
+      "kind": "R03A_ATTEMPT002_INTERIOR_HAND_COMMANDS_EXECUTION",
+      "date": "2026-10-26",
+      "input_commit": "c59b98e6bde0f86afcdca8d426e67363bd809305",
+      "result": "COMPLETED_CANDIDATE_SOURCE_DYNAMICS_PROBE; BOUNDED_CASE_PASS_PENDING_SOL_REVIEW",
+      "case_id": "INTERIOR_HAND_COMMANDS",
+      "execution_report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/report.md",
+      "probe_contract": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/probe_contract.json",
+      "source_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/source_manifest.json",
+      "native_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03a_002/native_run_001/probe_evidence.json",
+      "candidate_basis_sha256": "a41587e297a84286a62f05c561eb484d7078b27e4cba1a5d8f47510652a97fc5",
+      "native_process_invocations": 1,
+      "native_exit_code": 0,
+      "mj_step_calls": 1920,
+      "mj_forward_calls": 389,
+      "simulated_seconds": 3.84,
+      "old_endpoint_attempt001_FAIL_preserved": true,
+      "no_full_stroke_or_Core_admission_claim": true,
+      "DAG_required_envelope_unchanged": true,
+      "provider_owner_contract_approved": false,
+      "human_judge_approved": false,
+      "qualification_approved": false,
+      "core_attachment_admission": false,
+      "sol_review": "PENDING"
+    },
+    {
+      "kind": "SOL_REVIEW_R03A_ATTEMPT002",
+      "date": "2026-10-26",
+      "input_commit": "03e26f7c6b899e994002bd79524e680ed1699855",
+      "result": "ACCEPTED_BOUNDED; R03a engineering exit met for INTERIOR_HAND_COMMANDS",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_002/review_receipt.json",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03a_002/sol_review.md",
+      "native_run_by_sol": false,
+      "old_endpoint_FAIL_preserved": true,
+      "DAG_required_envelope_unchanged": true,
+      "next_slice": "R01a",
+      "qualification_granted": false
+    },
+    {
+      "kind": "R01A_ATTEMPT001_IMPLEMENTATION_AND_S1",
+      "date": "2026-10-26",
+      "input_commit": "2229ad857c0c711d0c3894c97b05994896c31016",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Add the versioned provider-neutral logical Assembly value contract, strict codec, non-self identity hash, targeted provider-free S1, compatibility and documentation/Skill sync. No R01b/R01c/R03b/R03c or native execution.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01a_001/evidence.json",
+      "native_execution": "NOT_RUN",
+      "sol_review": "PENDING",
+      "qualification_granted": false
+    },
+    {
+      "kind": "SOL_REVIEW_R01A_ATTEMPT001",
+      "date": "2026-10-26",
+      "input_commit": "431810681b73a84503d66ff9ad637d1058f25cdd",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01a_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01a_001/review_receipt.json",
+      "luna_S1_passed": 60,
+      "sol_S1_passed": 31,
+      "native_execution": "NOT_RUN",
+      "R05a_preflight": "BLOCKED_PROVIDER_CONTRACT",
+      "next_slice_decision": "PENDING_MAINTAINER_PREFERENCE",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "R04A_ATTEMPT001_IMPLEMENTATION_AND_PROVIDER_FREE_S1",
+      "date": "2026-10-26",
+      "input_commit": "b976770dba2b4880d328f689d6c7d21529438264",
+      "authorization_source": "Current maintainer instruction selecting independent R04a while R05a is blocked; authorizes R04a implementation, targeted S1, necessary docs/Skill sync, and local commit.",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Existing camera observation, SelectedReferenceEnv, Position candidate, and Generic H5 v3 owners; no new Provider, camera native run, or R04b/c execution.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_001/evidence.json",
+      "native_execution": "NOT_RUN",
+      "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+      "DAG_required_envelope_unchanged": true,
+      "P99_required_preserved": true,
+      "sol_review": "PENDING",
+      "qualification_granted": false
+    },
+    {
+      "kind": "SOL_REVIEW_R04A_ATTEMPT001",
+      "date": "2026-10-26",
+      "input_commit": "436f5c2d7114a41bf3925528d1ba8d11b6410bf9",
+      "result": "CHANGES_REQUESTED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/review_receipt.json",
+      "counterexamples": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_001/binding_gap_evidence.json",
+      "baseline_s1_passed": 23,
+      "native_execution": "NOT_RUN",
+      "next_package": "R04a attempt002 targeted repair",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "R04A_ATTEMPT002_TARGETED_BINDING_REPAIR_AND_PROVIDER_FREE_S1",
+      "date": "2026-10-26",
+      "input_commit": "fc0c3bbf8dd307386dbe77bbd332fd1192f3fcbc",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Repair F01 capture request binding and calibration validation; repair F02 strict H5 camera sidecar cross-checks against actual state digests, reset/transition clocks, independent profile metadata, and typed controls/outcome. Update affected API, Task Artifact, R04, execution order, README, planning manifest, and TaskEnv Skill. No native, R04b/c, or qualification.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/evidence.json",
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04a_002/commands.json",
+      "targeted_s1_passed": 33,
+      "native_execution": "NOT_RUN",
+      "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+      "DAG_required_envelope_unchanged": true,
+      "P99_required_preserved": true,
+      "sol_review": "PENDING",
+      "qualification_granted": false
+    },
+    {
+      "kind": "SOL_REVIEW_R04A_ATTEMPT002",
+      "date": "2026-10-26",
+      "input_commit": "72b5274e2adc438d2df165bd0190963909705630",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04a_002/review_receipt.json",
+      "targeted_s1_passed": 33,
+      "sol_independent_readback_cases": 13,
+      "findings_closed": [
+        "F01",
+        "F02"
+      ],
+      "native_execution": "NOT_RUN",
+      "next_package": "R06a audit/ledger/S1/local summary commit",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "R06A_ATTEMPT001_AUDIT_S1",
+      "date": "2026-10-26",
+      "input_commit": "cf012678bdf5907b6c6883e8b8ce13f2e4351857",
+      "result": "AUDIT_S1_COMPLETE_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md",
+      "ledger": "slices.R06a.compatibility_ledger",
+      "targeted_s1": {
+        "module": "task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py",
+        "result": "PASS",
+        "passed": 6
+      },
+      "originals_restored": 0,
+      "compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "decision_approved": false,
+      "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_table_row": "R01b_NOT_STARTED"
+    },
+    {
+      "kind": "SOL_REVIEW_R06A_ATTEMPT001",
+      "date": "2026-10-26",
+      "input_commit": "56f689570a0fbaf29aea4ea26a073d38b5e6afd6",
+      "result": "ACCEPTED_AUDIT_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/review_receipt.json",
+      "targeted_s1_passed": 6,
+      "originals_restored": 0,
+      "phase_decisions_approved": 0,
+      "compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "next_package": "R01b static resolver implementation/S1/local commit",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "LUNA_R01B_ATTEMPT001_IMPLEMENTATION_S1",
+      "date": "2026-10-27",
+      "input_commit": "f5a65b82ed3f940a9e80989ee4ec4a744f60c148",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01b_001/report.md",
+      "targeted_s1": {
+        "modules": [
+          "task_env/diagnostics/tasks/test_phase_ii_01_r01b_logical_resolution.py",
+          "task_env/diagnostics/tasks/test_phase_ii_01_r01a_logical_assembly.py",
+          "task_env/diagnostics/tasks/test_phase_ii_scene_composition.py",
+          "task_env/diagnostics/tasks/test_phase_ii_b04a_legacy_matrix.py"
+        ],
+        "result": "PASS",
+        "passed": 81
+      },
+      "native_execution": "NOT_RUN",
+      "R06_compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "R06_decision_changed": false,
+      "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_table_row": "R02a"
+    },
+    {
+      "kind": "SOL_REVIEW_R01B_ATTEMPT001_WITH_MINOR_FIX",
+      "date": "2026-10-27",
+      "input_commit": "1ea9aee447d19640f36eb1c827c2221a23ec0e1c",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01b_001/review_receipt.json",
+      "original_s1_passed": 81,
+      "final_s1_passed": 82,
+      "sol_fix": "early recursion depth guard plus deep-input regression",
+      "native": "NOT_RUN",
+      "next_package": "R02a static leaf contracts/S1/local commit",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "LUNA_R02A_ATTEMPT001_IMPLEMENTATION_S1",
+      "date": "2026-10-27",
+      "input_commit": "e3c1af978a2c0ea189ab09efb8c013faaa70784d",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/evidence.json",
+      "commands": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/commands.json",
+      "source_inventory": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/source_inventory.json",
+      "targeted_s1": {
+        "command_log": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02a_001/s1_final_03.json",
+        "result": "PASS",
+        "passed": 30
+      },
+      "native_execution": "NOT_RUN",
+      "R06_compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "R06_decision_changed": false,
+      "DAG_required_envelope_R05a_R04bc_P99_unchanged": true,
+      "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+      "R01c_R02b_R02c": "NOT_STARTED",
+      "qualification_granted": false
+    },
+    {
+      "kind": "SOL_REVIEW_R02A_ATTEMPT001_WITH_MINOR_FIX",
+      "date": "2026-10-27",
+      "input_commit": "8d2c46524e9dc8cce282335cd5fecb04c603d622",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02a_001/review_receipt.json",
+      "original_s1_passed": 30,
+      "final_s1_passed": 37,
+      "sol_fix": "required state stays mandatory and exactly scoped to bound profile/resources/TCP",
+      "native": "NOT_RUN",
+      "next_package": "R01c static source projection/S1/local commit",
+      "DAG_required_envelope_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "R01C_ATTEMPT001_IMPLEMENTATION_AND_PROVIDER_FREE_S1",
+      "date": "2026-10-27",
+      "input_commit": "195b9e403e5c0b1fd73968e80912603c4b63a173",
+      "result": "IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW",
+      "scope": "Existing TaskEnv assembly source/compiler owner; immutable declaration-level projection from freshly resolved current Logical Assembly inputs to existing Scene Entity, Asset, and typed leaf definitions.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r01c_001/evidence.json",
+      "provider_free_s1_passed": 18,
+      "native_execution": "NOT_RUN",
+      "R06_compatibility_ledger_sha256": "37ee29d5d2c35094b382a96c1a68c626f8bde10c1164e0b1052f80722d64091f",
+      "R06_compatibility_gate_preserved": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "R05a_status_preserved": "BLOCKED_PROVIDER_CONTRACT",
+      "DAG_required_envelope_P99_unchanged": true,
+      "sol_review": "PENDING",
+      "qualification_granted": false
+    },
+    {
+      "kind": "SOL_REVIEW_R01C_ATTEMPT001",
+      "date": "2026-10-27",
+      "input_commit": "a270cd16b8e6651184ab5797612a9a48ea4024c8",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/review_receipt.json",
+      "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r01c_001/verification.json",
+      "luna_targeted_s1_passed": 18,
+      "sol_new_s1_run": "NOT_RUN; unchanged source and raw evidence reused",
+      "native": "NOT_RUN",
+      "next_slice": "R02b",
+      "qualification_granted": false,
+      "DAG_required_envelope_unchanged": true
+    },
+    {
+      "kind": "SOL_REVIEW_R02B_ATTEMPT001_WITH_LOCAL_FIXES",
+      "date": "2026-10-27",
+      "input_commit": "0527b1aa9261aad199b8afe62cf66c15f2f20ccb",
+      "result": "ACCEPTED_S1_BOUNDED",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/review_receipt.json",
+      "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r02b_001/verification.json",
+      "original_s1_passed": 13,
+      "final_s1_passed": 18,
+      "new_regressions": 5,
+      "retained_provider_free_s1_passed": 102,
+      "native_selectors_deselected": 3,
+      "legacy_source_parity_cases": 54,
+      "native": "NOT_RUN",
+      "next_slice": "R02c",
+      "qualification_granted": false,
+      "DAG_required_envelope_unchanged": true
+    },
+    {
+      "kind": "LUNA_R02C_ATTEMPT001",
+      "date": "2026-10-27",
+      "input_commit": "c18325f7e332bc5d3864752fc3fe7aa94225f551",
+      "provider_free_s1_passed": 53,
+      "native": "PROCESS_ATTEMPTED_BUT_EXITED_BEFORE_PROVIDER_IMPORT; S2/S3 NOT_RUN",
+      "native_compile_materialize_reset_forward_step_calls": 0,
+      "provider_admission": false,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/evidence.json",
+      "DAG_required_envelope_unchanged": true,
+      "next_slice": "PENDING_SOL_REVIEW"
+    },
+    {
+      "kind": "SOL_R02C_ATTEMPT001_REVIEW",
+      "date": "2026-10-27",
+      "input_commit": "835dcfde5a86a9a43afb9c81c176d724b80c658e",
+      "decision": "CHANGES_REQUESTED_S2_S3_NOT_RUN",
+      "provider_free_reproductions": "reader ImportError, absent decoder, stale Target writes before Ack rejects, float-clock predicate",
+      "native_run_by_sol": false,
+      "qualification_granted": false,
+      "DAG_required_envelope_unchanged": true,
+      "next_slice": "R02c attempt002 bounded rework + native S2/S3"
+    },
+    {
+      "kind": "LUNA_R02C_ATTEMPT002_PROVIDER_BLOCKED_PENDING_SOL_REVIEW",
+      "date": "2026-10-27",
+      "input_commit": "b358252b42801215dc0a240d45bde93040b8ac16",
+      "implementation_commit": "b845bfadf518f57981b3556f65e3eb211dab1996",
+      "result": "BLOCKED_PROVIDER_PENDING_SOL_REVIEW",
+      "provider_free_s1_passed": 28,
+      "static_preflight": "PASS; four contract negatives rejected with zero native calls",
+      "native": "BLOCKED_PROVIDER before compile; runtime version/API mismatch; compile/materialize/reset/forward/step all 0",
+      "required_S2_S3": "NOT_RUN",
+      "retry": false,
+      "provider_admission": false,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/evidence.json",
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "R03b_started": false
+    },
+    {
+      "kind": "SOL_R02C_ATTEMPT002_REVIEW_AND_HARNESS_FIX",
+      "date": "2026-10-27",
+      "input_commit": "8a93c2ee48ac9ad1557dc3035eb94ac293136e27",
+      "decision": "S1_REVIEWED_NATIVE_PENDING",
+      "sol_s1_passed": 19,
+      "native_run_by_sol": false,
+      "wrong_api_constant": 30801,
+      "correct_api_constant": 3008001,
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_slice": "R02c attempt003 single-process S2/S3 continuation"
+    },
+    {
+      "kind": "SOL_R02C_ATTEMPT003_REVIEW_AND_OWNER_BOUNDARY_REPAIR",
+      "date": "2026-10-27",
+      "input_commit": "26b2359c984322359f752c3d1cb723fa7f23a850",
+      "decision": "S1_REVIEWED_NATIVE_PENDING",
+      "sol_s1_passed": 38,
+      "native_run_by_sol": false,
+      "003_physical_steps": 5,
+      "required_S2_S3": "INCOMPLETE",
+      "qualification_granted": false,
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "next_slice": "R02c004 new explicit single-process window"
+    },
+    {
+      "kind": "SOL_R02C_ATTEMPT004_REVIEW_AND_HAND_CONFIGURATION_PROPOSAL",
+      "date": "2026-10-28",
+      "input_commit": "b94806025f0836d121bfd26df4581e80a7c6e6a2",
+      "decision": "BLOCKED_HAND_CONFIGURATION_DECISION",
+      "sol_s1_passed": 42,
+      "native_run_by_sol": false,
+      "E1": "ACCEPTED_BOUNDED",
+      "E2": "FAIL_PHYSICAL_ORACLE",
+      "proposed_hand_stiffness_N_per_m": 50.0,
+      "proposal_approved": false,
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "qualification_granted": false
+    },
+    {
+      "kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
+      "date": "2026-10-28",
+      "input_commit": "c066d320ec3903c0953ada74a146e5b69762cbb0",
+      "decision": "ACCEPTED_BOUNDED_S2_S3",
+      "case_id": "SOURCE_CALIBRATED_HAND_50_V1",
+      "S1_passed": 56,
+      "native_processes": 1,
+      "native_calls": {
+        "materialize_control": 4,
+        "mj_forward": 260,
+        "mj_resetData": 4,
+        "mj_step": 1280
+      },
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "qualification_granted": false,
+      "next_slice": "R03b package preparation only"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R03B_REVIEW_AND_STATIC_ADMISSION_FIX",
+      "input_commit": "ee5ed6c298bbdab206968873c61944ac35c66dbf",
+      "result": "ACCEPTED_BOUNDED_S1_S2",
+      "scope": "R03b review, pre-native source/Scene semantic guard, 99 provider-free tests plus original 19-case static gate; offline two-trial raw verification. No new native, no R03c implementation/execution, no Qualification."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_R03C_ATTEMPT001_IMPLEMENTATION_S1_AND_BOUNDED_NATIVE_STOP",
+      "input_commit": "703e8a1b184b18e7efbc0b5532b96fb3a462b4d2",
+      "result": "IMPLEMENTED_S1_PASS_NATIVE_BUDGET_EXHAUSTED_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
+      "scope": "Task-owned attached two-Entity leaf candidate, targeted S1, at most two authorized native starts, offline H5 reader, necessary docs/Skill and local commit. No other slice.",
+      "selected_s1_passed": 83,
+      "native_process_starts": 2,
+      "native_mj_step_calls": 0,
+      "episodes_completed": 0,
+      "real_h5_files_closed": 0,
+      "S2": "INCOMPLETE",
+      "S3": "NOT_RUN",
+      "DAG_required_envelope_R06_R05a_P99_unchanged": true,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md",
+      "sol_review": "PENDING"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R03C_STATIC_REVIEW_AND_PREFLIGHT_REPAIR",
+      "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
+      "result": "S1_REVIEWED_NATIVE_PENDING",
+      "scope": "90 provider-free checks; actual Core owner chain, coherent reader rejection, strict oracles, fresh-window preflight. No additional native, S2/S3 acceptance or next-slice start."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "R03C_ATTEMPT002_NATIVE_FAILURE_AND_POSTRUN_S1_FIX",
+      "input_commit": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
+      "result": "S2_FAILED_S3_NOT_RUN_PENDING_SOL_REVIEW",
+      "scope": "One authorized MuJoCo 3.8.1 CPU start; one reset/forward and zero steps; no H5. Runner mapping fix passed one provider-free S1 after the native start and remains natively unverified. No retry or other slice."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R03C002_REAL_RUNNER_SNAPSHOT_REVIEW",
+      "input_commit": "dfee52777069c1261334032e4924e8c136d08361",
+      "result": "S1_REVIEWED_NATIVE_PENDING",
+      "scope": "Reviewed raw47 and old77 hashes; current module20 provider-free checks include four real runner snapshot configurations with native IO stand-ins. No added native or S2/S3 acceptance."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_DOCUMENTATION",
+      "input_commit": "c30d97efa6ad169c205ea25d7917bc7b9a06e93c",
+      "result": "PLAN_UPDATED; original 7/22/P99/slice records preserved; F00-F07 planned, not started",
+      "scope": "Recovery entry, source/asset/reset/state/control/session/H5/Harness patch owners and call-chain gates; validated USD and internal binding directions confirmed. No implementation/install/native/integration.",
+      "document": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+      "audit_summary": "10 section8; local ignored source/host audit indexed, not physics acceptance",
+      "receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
+      "validation": "14 focused document checks; 12 hashes/132 links/24 anchors; global validator 176 unchanged errors, counts +1 Markdown; module Skill static PASS; no software tests/native."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_R03C_ATTEMPT003_SINGLE_NATIVE_AND_READBACK_INCOMPLETE",
+      "input_commit": "3b71683d5890c4ca1701037d59bce7b17de50a30",
+      "result": "S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
+      "scope": "One explicitly authorized MuJoCo 3.8.1 CPU start, same-run independent H5 reader, in-scope post-run fix, result docs and local commit; no other slice.",
+      "native_process_starts": 1,
+      "native_exit_code": 1,
+      "native_exception": "UnboundLocalError: native_log_bytes unassigned after E4 close; native_result.json absent.",
+      "completed_episodes": 4,
+      "real_h5_files_closed": 4,
+      "native_counts": {
+        "materializations": 4,
+        "resets": 4,
+        "mj_forward": 260,
+        "mj_step": 1280,
+        "outer_intervals": 256,
+        "simulated_seconds": 2.56,
+        "sampled_peak_rss_bytes": 440950784
+      },
+      "offline_readback": {
+        "episodes": 4,
+        "transitions": 256,
+        "observations": 260,
+        "tamper_rejections": 48,
+        "provider_imports": 0,
+        "status": "OFFLINE_READBACK_INCOMPLETE_OR_FAILED"
+      },
+      "postrun_fix": "Initialized final resource byte totals before result construction; refreshed synthetic freeze test fixture protected hashes. 20 provider-free module tests passed; no native rerun.",
+      "qualification_granted": false,
+      "general_provider_admission": false,
+      "R06_R05a_DAG_Required_Envelope_P99_unchanged": true,
+      "other_slice_started": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/report.md",
+      "sol_review": "PENDING"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_R03C_ATTEMPT004_SINGLE_NATIVE_AND_READBACK_BOUNDED_S2_S3_PASS",
+      "input_commit": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+      "result": "BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW",
+      "scope": "One authorized MuJoCo 3.8.1 CPU native start, same-run provider-free H5 readback, bounded result documentation and local commit; no other slice.",
+      "native_process_starts": 1,
+      "native_exit_code": 0,
+      "native_identity": {
+        "package": "3.8.1",
+        "runtime": "3.8.1",
+        "api_version": 3008001,
+        "renderer_initialized": false
+      },
+      "native_counts": {
+        "materialization_attempts": 4,
+        "max_rss_bytes": 459276288,
+        "mj_forward_calls": 260,
+        "mj_step_calls": 1280,
+        "native_starts": 1,
+        "outer_intervals": 256,
+        "resets": 4,
+        "simulated_seconds": 2.56
+      },
+      "completed_episodes": 4,
+      "real_h5_files_closed": 4,
+      "formal_native_result_present": true,
+      "offline_readback": {
+        "episodes": 4,
+        "transitions": 256,
+        "observations": 260,
+        "tamper_rejections": 48,
+        "provider_imports": 0,
+        "status": "BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW"
+      },
+      "resource_limits": {
+        "sampled_peak_rss_bytes": 459276288,
+        "sampling": "each returned outer boundary; not a hard/intra-interval peak",
+        "native_log_bytes_at_receipt": 8377716,
+        "output_bytes_at_receipt": 8403108
+      },
+      "qualification_granted": false,
+      "general_provider_admission": false,
+      "R06_R05a_DAG_Required_Envelope_P99_unchanged": true,
+      "other_slice_started": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/report.md",
+      "sol_review": "PENDING"
+    }
+  ],
+  "P00_audit": {
+    "task_id": "PHASE-II-01-P00-SOL-001",
+    "date": "2026-10-23",
+    "mode": "AUDIT_ONLY",
+    "authorization": "Explicit maintainer instruction to read sol_startup_prompt.md and complete P00 checks/readiness preparation plus first bounded Luna work package; no R01-R07 implementation approval.",
+    "input_core_commit": "259f27f13e0b96067c5f58406271a3339edc0023",
+    "branch": "codex/phase-ii-01-p00-20261023",
+    "remote_develop_readback": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+    "local_evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/",
+    "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_p00_001/sol_p00_receipt.json",
+    "receipt_availability": "LOCAL_IGNORED_NOT_DISTRIBUTED_WITH_GIT",
+    "luna_task_id": "PHASE-II-01-P00-L01",
+    "luna_mode": "AUDIT_ONLY",
+    "implementation_readiness": "AWAITING_EXPLICIT_SCOPE_APPROVAL",
+    "canonical_scope_authority": "07_Execution_Order_and_Acceptance.md and unchanged slices/required_envelope in this manifest; local reports are facts/proposals only.",
+    "S2": "NOT_RUN",
+    "S3": "NOT_RUN",
+    "S4": "NOT_RUN",
+    "formal_qualification_granted": false,
+    "technical_audit": "ROUND_1_COMPLETE",
+    "scope_decisions": "PENDING",
+    "next_action": "R01c one bounded stateless source/compiler projection and traceable leaf-reference implementation, provider-free S1, docs/Skill and local commit. R01b/R02a static exits accepted; R02a Required State gate fixed by Sol. No physical joint/native mapping/Runtime; R02b/c/R03 not started by this package. R06/R05a/DAG/P99 unchanged.",
+    "luna_review": {
+      "task_id": "PHASE-II-01-P00-L01",
+      "review_date": "2026-10-25",
+      "reviewer": "Sol",
+      "mode": "AUDIT_ONLY",
+      "result": "Audit facts accepted by Sol; advisory successor-scope clarifications; no mandatory L01 rework.",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l01_20261025_001/review_receipt.json",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l01_20261025_001/sol_review.md",
+      "luna_report_sha256": "87f1e09529c225b868abf90047c22562ef78851782e19244da96df10339b72cd",
+      "implementation_authorized": false,
+      "new_native_tests": "NOT_RUN",
+      "next_slice": "R03a",
+      "next_slice_readiness": "NOT_READY_SCOPE_ORACLE_BUDGET_PENDING",
+      "geophys_strategy_is_prerequisite_for_mujoco_only_probe": false
+    },
+    "luna_l02_review": {
+      "task_id": "PHASE-II-01-P00-L02",
+      "attempt": "001",
+      "review_date": "2026-10-25",
+      "reviewer": "Sol",
+      "mode": "AUDIT_ONLY",
+      "result": "REWORK_REQUIRED",
+      "baseline_result": "PASS_RECONCILED_EXACT_SEVEN_DOC_COMMIT",
+      "input_commit": "dd02da44c8b069a17b377bf891bde3a28be0b3a0",
+      "luna_report_sha256": "ecb1f8a6f624b8a542227ce581351c16550420ad5605b9db6f6a827c1e83a5e1",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261025_001/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261025_001/review_receipt.json",
+      "raw_availability": "LOCAL_IGNORED_NOT_DISTRIBUTED_WITH_GIT",
+      "static_findings": [
+        "post-load state mislabeled as pre-load",
+        "mixed integration/derived-cache boundary",
+        "partial progress not registered before failure",
+        "native library identity incomplete",
+        "units and finger-motion frame",
+        "contract/script/baseline consistency",
+        "resource enforcement language"
+      ],
+      "next_action": "P00-L02 attempt002 AUDIT_ONLY preparation rework before any native execution proposal; new baseline from Sol summary commit.",
+      "native_execution_authorized": false,
+      "implementation_authorized": false,
+      "native_tests": "NOT_RUN",
+      "qualification_granted": false
+    },
+    "luna_l02_review_attempt002": {
+      "date": "2026-10-26",
+      "attempt": "002",
+      "reviewer": "Sol",
+      "mode": "AUDIT_ONLY",
+      "input_commit": "6805a7717adf9ee7e45f972531ebee1b61a401d7",
+      "result": "PREPARATION_CLOSED_READY_FOR_R03A_AUTHORIZATION",
+      "luna_report_sha256": "8b200478cbc6062797be299c114e51970554d224891ebec4695da9279006925c",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261026_002/sol_review.md",
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_l02_20261026_002/review_receipt.json",
+      "candidate_execution_package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_r03a_001/",
+      "native_execution_authorized": false,
+      "native_tests": "NOT_RUN",
+      "core_admission_or_qualification_granted": false,
+      "next_action": "Issue concrete R03a implementation/execution prompt for one maintainer decision; no default third preparation round."
+    }
+  },
+  "execution_workflow": {
+    "authority": "Explicit maintainer workflow preferences in the 2026-10-25 conversation; takes precedence over conflicting older workflow instructions.",
+    "date": "2026-10-25",
+    "canonical_workflow": "07_Execution_Order_and_Acceptance.md#sol-luna-workflow",
+    "workflow_preference_confirmed": true,
+    "implementation_scope_approval_implied": false,
+    "branch_plan": {
+      "unit": "Phase_II_01 stage integration",
+      "planned_topic_branch_count": 1,
+      "reused_topic_branch": "codex/phase-ii-01-p00-20261023",
+      "retain_existing_branch_name": true,
+      "new_worktree_count": 0,
+      "create_per_goal_or_prompt": false,
+      "additional_branch_or_worktree_cases": [
+        "recovery",
+        "separately retained alternative",
+        "isolated comparison or integration after independent/web-GPT review when necessary"
+      ],
+      "addition_requires_record": [
+        "reason",
+        "base",
+        "scope",
+        "updated planned count",
+        "reintegration or final disposition"
+      ],
+      "historical_refs_and_worktrees_preserved": true
+    },
+    "handoff": {
+      "default_execution_order": [
+        "R03a",
+        "R01a",
+        "R05a",
+        "R04a",
+        "R06a",
+        "R01b",
+        "R02a",
+        "R01c",
+        "R02b",
+        "R02c",
+        "R03b",
+        "R03c",
+        "R04b",
+        "R04c",
+        "R05b",
+        "R05c",
+        "R06b",
+        "R06c",
+        "R07a",
+        "R07b",
+        "R07c",
+        "R07d"
+      ],
+      "default_parallel_execution": false,
+      "cycle": [
+        "Sol selects one authorized ready slice and sends a self-contained prompt in a code block",
+        "Luna completes allowed work, validation and bounded local commit(s); returns report",
+        "Sol independently reviews actual diff and available Evidence, records result and summary commit where needed",
+        "Sol sends next ready slice; failed acceptance receives one rework package on the same branch"
+      ],
+      "one_writer_at_a_time": true,
+      "luna_self_reported_pass_is_automatic_acceptance": false,
+      "blocked_next_row": "Record blocker; any advance to an independent ready row must record rationale without changing the DAG or scope.",
+      "in_flight_baseline_change": "Preserve original package and provide explicit exact baseline/difference amendment; do not silently ignore hash drift.",
+      "execution_window_freeze": "Freeze HEAD and protected input bytes while Luna executes, including ignored-only audits. Sol review/summary commits land after report and before next prompt; urgent baseline changes require explicit interrupt/amendment with exact readback.",
+      "package_sizing": "Per maintainer 2026-10-26: basic known-owner changes combine implementation, targeted validation, in-scope fixes and commits; separate preparation only for decision-critical unknowns. Reuse unchanged evidence. Sol fixes minor review issues directly or includes them in implementation; no fixed preparation rounds."
+    },
+    "output_commit_policy": {
+      "bounded_output_linked_to_local_commits": true,
+      "report_fields": [
+        "slice",
+        "attempt",
+        "input_HEAD",
+        "output_HEAD",
+        "commit(s)",
+        "validation",
+        "Evidence paths and hashes"
+      ],
+      "audit_only_ignored_output": "Luna preserves raw workspace output; Sol as designated owner commits the maintained summary/index after review. No raw Evidence or empty commit required.",
+      "stage_other_writer_files": false,
+      "push_merge_tag_release_authorized": false
+    }
+  },
+  "checkpoint_recovery_plan": {
+    "updated": "2026-10-28",
+    "status": "PLAN_UPDATED_IMPLEMENTATION_NOT_STARTED",
+    "authorization": "R03c attempt003 was explicitly authorized for one bounded MuJoCo 3.8.1 CPU start, same-run independent H5 readback, necessary in-scope repair, result documentation, and local commit. That start is consumed; no subsequent native start or other slice is authorized here.",
+    "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
+    "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+    "implementation_checkpoint": "c30d97efa6ad169c205ea25d7917bc7b9a06e93c",
+    "resume_git_input": "Actual HEAD after this documentation commit; inspect changes since c30 and freeze new HEAD/bytes, never reset or mutate old freeze/ledger.",
+    "R03c": {
+      "status": "ATTEMPT003_INCOMPLETE_PENDING_SOL_REVIEW",
+      "S2": "INCOMPLETE",
+      "S3": "INCOMPLETE",
+      "provider_free_tests_reused_before_native": 20,
+      "provider_free_module_tests_after_postrun_fix": "20 passed",
+      "four_configuration_runner_chain_reviewed": true,
+      "attempt003_native_start_consumed": true,
+      "native_result_present": false,
+      "same_run_h5_count": 4,
+      "offline_transition_count": 256,
+      "offline_observation_count": 260,
+      "offline_tamper_rejections": 48,
+      "offline_reader_status": "OFFLINE_READBACK_INCOMPLETE_OR_FAILED",
+      "postrun_fix_native_verified": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/report.md",
+      "previous_native_windows": "attempt001 and attempt002 raw retained unchanged; attempt003 one-start budget spent",
+      "default_next_action": "Sol review attempt003 report, diff and available raw Evidence; no retry or other slice",
+      "new_native_authorized_this_revision": false
+    },
+    "confirmed_direction": {
+      "core_runtime_owners": 1,
+      "provider_adapters": "reuse current RuntimeSession; add Isaac native adapter only",
+      "asset_input": "USD, upstream validated; team selected, no branch yet; consume input/report identity, do not rebuild upstream validation",
+      "public_construction": "extend existing Core entry; ReferenceTaskBinding remains internal; no known external dependency",
+      "isaac_first_acceptance": "official Panda + one movable rigid body; then actual current Panda import",
+      "isaac_installation": "pip; stable rechecked at install; audited candidate 6.2.0.0/Python3.12 on 2026-10-28; isolated environment; bounded small-scene 8GB exploration",
+      "native_asset_route": "prefer native USD, explicit verified derived representation only when needed; no silent proxy"
+    },
+    "original_contract_preservation": {
+      "goal_count": 7,
+      "slice_count": 22,
+      "all_original_slice_records_unchanged": true,
+      "P99_dependencies_unchanged": true,
+      "required_envelope_unchanged": true,
+      "R05a": "BLOCKED_PROVIDER_CONTRACT",
+      "R06_compatibility": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "original_R07_five_tasks_retained": true,
+      "F_rows_are_original_slices": false,
+      "F_rows_automatically_required_for_original_P99": false,
+      "F06_expert_multiseed_required_for_original_R07": false
+    },
+    "branch_plan": {
+      "current_topic": "codex/phase-ii-01-p00-20261023",
+      "new_worktrees_this_revision": 0,
+      "additional_core_integration_topics_planned": 1,
+      "proposed_name": "develop-full",
+      "created_this_revision": false,
+      "integration": "future package fetches/readbacks base, preserves both Harness and phase ancestry and pins; no per-row branch",
+      "geophys_submodule_topic_if_needed": 1,
+      "push_merge_tag_release_authorized": false,
+      "total_core_topics_including_retained_phase_and_future_integration": 2
+    },
+    "harness_input": {
+      "merge_head": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
+      "pr_source": "710b42253dae2ce0175c3c51eee97d0ce83fabeb",
+      "shared_base": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+      "feishu": "original webpage inaccessible; maintainer supplied handoff text",
+      "reported_real_execution": "mock upstream with real MuJoCo CPU physics; execution claim from handoff, raw seed/H5 not independently reviewed",
+      "host_reproduced_finding": "run_seed checks solved before terminated/truncated; Judge check_probe accepts terminal solved rows; ledger finish source reviewed only",
+      "audit_root": "workspace/maintenance/multi_provider_asset_harness_review_20261028_001/",
+      "raw_availability": "local ignored; clones without bytes mark indexed but raw unavailable"
+    },
+    "patch_rows": [
+      {
+        "id": "F00",
+        "depends_on": [],
+        "external_gate": "actual checkpoint/harness inputs and single-writer selection",
+        "work": "integration and Harness lifecycle correctness"
+      },
+      {
+        "id": "F01",
+        "depends_on": [],
+        "external_gate": "pinned install/runtime recipe; native separately budgeted/authorized",
+        "work": "Isaac isolated install and native baseline; independent installation preparation may advance"
+      },
+      {
+        "id": "F02",
+        "depends_on": [
+          "F00"
+        ],
+        "work": "consume validated USD delivery/source/closure/report; resolve MuJoCo USD execution route",
+        "external_gate": "fixed official asset/API recipe; F01 samples reusable, F01 native PASS not a prerequisite"
+      },
+      {
+        "id": "F03",
+        "depends_on": [
+          "F02"
+        ],
+        "work": "Core reset/state/control/admission/factory/reader real-caller S1"
+      },
+      {
+        "id": "F04",
+        "depends_on": [
+          "F01",
+          "F03"
+        ],
+        "work": "Isaac public Env/record/readback official Panda then current Panda"
+      },
+      {
+        "id": "F05",
+        "depends_on": [
+          "F02",
+          "F03"
+        ],
+        "work": "GeoPhys and MuJoCo same-declared-USD cells, retained MJCF regressions; split Attachment separate"
+      },
+      {
+        "id": "F06",
+        "depends_on": [
+          "F00",
+          "F04",
+          "F05"
+        ],
+        "work": "aggregate real Harness four reports/multiseed/Oracle/pending Judge across declared providers",
+        "per_provider_runs_may_advance_when_its_own_cell_ready": true
+      },
+      {
+        "id": "F07",
+        "depends_on": [
+          "F04",
+          "F05"
+        ],
+        "external_gate": "specific expansion scope",
+        "work": "broader scenes/render and selected Newton route"
+      }
+    ],
+    "patch_rows_status": "PLANNED_NOT_STARTED; not new capability claims or execution authorization",
+    "open_technical_questions": [
+      "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
+      "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
+      "actual MuJoCo 3.8.1 build USD decoder versus separate build/derived route",
+      "provider consumption of validated USD authored extensions",
+      "public contact query/state/evaluator required by task semantics; physical contact observation alone does not satisfy On/In contact predicates"
+    ],
+    "new_native_runs": 0,
+    "software_tests_run_this_documentation_revision": [],
+    "local_update_receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
+    "documentation_validation": {
+      "mode": "STATIC_DOCUMENTATION_ONLY",
+      "focused_checks_passed": 14,
+      "markdown_hashes": 12,
+      "local_links": 132,
+      "anchors": 24,
+      "reused_source_hashes": 28,
+      "original_slice_records_DAG_P99_required_envelope_unchanged": true,
+      "historical_validation_receipt_unchanged": true,
+      "git_diff_check": "PASS",
+      "module_skill_static_check": "PASS with existing geochora interpreter; default python3 lacks PyYAML, no dependency installed",
+      "global_validator": {
+        "exit_code": 1,
+        "errors_before": 176,
+        "errors_after": 176,
+        "new_errors": [],
+        "counts_before": {
+          "docs": 83,
+          "task_env": 36,
+          "markdown": 41,
+          "task_env_markdown": 27,
+          "machine_or_other": 42
+        },
+        "counts_after": {
+          "docs": 84,
+          "task_env": 37,
+          "markdown": 42,
+          "task_env_markdown": 28,
+          "machine_or_other": 42
+        },
+        "limitation": "existing consolidation count/history-scope failures remain; one new planning Markdown increases counts; no thresholds relaxed"
+      },
+      "software_tests": [],
+      "provider_imports": 0,
+      "native_starts": 0,
+      "receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json"
+    },
+    "latest_r03c_execution": {
+      "attempt": "004",
+      "status": "BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW",
+      "input_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/report.md",
+      "native_start_consumed": true,
+      "other_slice_started": false,
+      "next_action": "Sol review attempt004; no retry or other slice."
+    }
+  }
 }

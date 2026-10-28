@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import json
+import hashlib
+import math
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
@@ -374,6 +376,338 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
         "source": "structured_controls_v1_json",
         "automatic_flattening": False,
     })
+    camera_extension = _camera_observation_extension(trajectory)
+    if camera_extension is not None:
+        contract, boundaries, recording_binding = camera_extension
+        _json_dataset(meta, "camera_observation_contract_v1_json", contract)
+        _json_dataset(meta, "camera_observations_v1_json", boundaries)
+        _json_dataset(meta, "camera_recording_binding_v1_json", recording_binding)
+
+
+def _camera_observation_extension(trajectory: FrozenTrajectory):
+    """Build camera metadata plus bindings to independent Generic H5 v3 records."""
+
+    from task_env.observations.canonical_camera.consumer import (
+        CAMERA_IDS,
+        CameraObservationConfigV1,
+        validate_camera_observation_boundaries,
+    )
+
+    raw_contract = trajectory.record_metadata.get("camera_observation_contract_v1")
+    reset_record = trajectory.reset_info.get("camera_observation_v1")
+    transition_records = tuple(info.get("camera_observation_v1") for info in trajectory.infos)
+    if raw_contract is None:
+        if reset_record is not None or any(item is not None for item in transition_records):
+            raise ValueError("camera metadata was recorded without its versioned contract")
+        return None
+    if not isinstance(raw_contract, Mapping):
+        raise ValueError("camera observation contract must be a mapping")
+    contract = CameraObservationConfigV1.from_mapping(dict(raw_contract))
+    contract.capacity(max(1, trajectory.transition_count))
+    records = [reset_record, *transition_records]
+    boundaries = validate_camera_observation_boundaries(
+        records, expected_count=len(trajectory.observations),
+    )
+    first = boundaries[0]
+    expected_geometry = {
+        item.camera_id: item.identity_hash
+        for item in contract.geometries(first.captures[0].capture_identity.task_artifact_hash)
+    }
+    stable = None
+    for boundary in boundaries:
+        identity = boundary.captures[0].capture_identity
+        current = (
+            identity.task_artifact_hash,
+            identity.render_source_identity_hash,
+            identity.execution_spec_identity_hash,
+            identity.provider_manifest_identity_hash,
+            identity.state_boundary.scene_identity_hash,
+            identity.state_boundary.scene_instance_id,
+            identity.state_boundary.provider_materialization_id,
+            identity.state_boundary.episode_id,
+            identity.state_boundary.reset_sample_id,
+        )
+        if stable is None:
+            stable = current
+        elif current != stable:
+            raise ValueError("camera metadata identity drift within one H5 episode")
+        for capture in boundary.captures:
+            if capture.capture_identity.camera_geometry_identity_hash != expected_geometry[capture.camera_id]:
+                raise ValueError("stored camera metadata does not match its authored mount contract")
+    boundary_values = [item.to_mapping() for item in boundaries]
+    recording_binding = _camera_recording_binding_from_trajectory(trajectory, boundaries)
+    return contract.to_mapping(), boundary_values, recording_binding
+
+
+def _camera_recording_binding_from_trajectory(trajectory: FrozenTrajectory, camera_boundaries):
+    """Bind opt-in camera metadata to real recorder observations, info, controls and outcome."""
+
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+
+    transition_count = trajectory.transition_count
+    if len(trajectory.observations) != transition_count + 1 or len(trajectory.infos) != transition_count:
+        raise ValueError("camera recording requires aligned T transitions and T+1 observations")
+    record_infos = [trajectory.reset_info, *trajectory.infos]
+    if len(camera_boundaries) != len(record_infos):
+        raise ValueError("camera recording requires one reset/transition record per observation boundary")
+
+    raw_env_metadata = trajectory.record_metadata.get("env_metadata")
+    if not isinstance(raw_env_metadata, Mapping):
+        raise ValueError("camera recording requires the independent Position record metadata")
+    profile = raw_env_metadata.get("reference_profile")
+    if not isinstance(profile, Mapping):
+        raise ValueError("camera recording requires the Position reference_profile identity anchor")
+    required_profile = (
+        "writer_id", "controller_identity", "control_binding_plan_identity_hash",
+        "task_artifact_identity_hash", "scene_identity_hash", "reset_sample_id",
+        "source_closure_digest",
+    )
+    if any(not profile.get(name) for name in required_profile):
+        raise ValueError("camera recording reference_profile is missing a required source/control identity")
+
+    records = []
+    state_digests = []
+    for index, (info, camera_boundary, observation) in enumerate(
+        zip(record_infos, camera_boundaries, trajectory.observations, strict=True)
+    ):
+        if not isinstance(info, Mapping):
+            raise ValueError("camera recording reset/transition info must be a mapping")
+        raw_boundary = info.get("state_boundary_identity")
+        raw_clock = info.get("state_sample_clock")
+        if not isinstance(raw_boundary, Mapping) or not isinstance(raw_clock, Mapping):
+            raise ValueError("camera recording reset/transition info lacks an independent state boundary or clock")
+        boundary = StateBoundaryIdentity.from_mapping(raw_boundary)
+        clock = StateSampleClock.from_mapping(raw_clock)
+        boundary_id = info.get("state_boundary_id")
+        if boundary_id != boundary.boundary_id:
+            raise ValueError("recorded state_boundary_id does not match its typed reset/transition identity")
+        if (boundary.control_step != index or clock.sample_index != index
+                or clock.clock_domain != "evaluation_boundary"):
+            raise ValueError("recorded Position boundary/clock order is not contiguous from reset")
+        if "control_step" in info and info["control_step"] != index:
+            raise ValueError("recorded info control_step does not match its T/T+1 boundary")
+        if "simulation_time_s" in info and float(info["simulation_time_s"]) != clock.simulation_time_s:
+            raise ValueError("recorded info simulation clock does not match state_sample_clock")
+        if (camera_boundary.boundary_index != index
+                or camera_boundary.state_boundary_id != boundary.boundary_id
+                or camera_boundary.simulation_time_s != clock.simulation_time_s):
+            raise ValueError("camera boundary does not match independent reset/transition identity and clock")
+        for capture in camera_boundary.captures:
+            identity = capture.capture_identity
+            if identity.state_boundary != boundary or identity.sample_clock != clock:
+                raise ValueError("camera capture does not match independent reset/transition state identity and clock")
+
+        observation_leaves = dict(_leaves(observation))
+        digest_value = observation_leaves.get("state/boundary_identity_sha256")
+        if (not isinstance(digest_value, np.ndarray)
+                or digest_value.dtype != np.dtype(np.uint8)
+                or digest_value.shape != (32,)):
+            raise ValueError("camera recording requires a 32-byte uint8 Position state boundary digest at every boundary")
+        digest_hex = bytes(digest_value).hex()
+        expected_digest = boundary.boundary_id.removeprefix("state-boundary-")
+        if digest_hex != expected_digest:
+            raise ValueError("camera boundary identity does not match the actual Position state observation digest")
+        state_digests.append(bytes(digest_value))
+        records.append({
+            "boundary_index": index,
+            "state_boundary_identity": boundary.to_mapping(),
+            "state_boundary_id": boundary.boundary_id,
+            "state_sample_clock": clock.to_mapping(),
+        })
+
+    outcome = trajectory.outcome
+    if not isinstance(outcome, EpisodeOutcomeV1):
+        raise ValueError("camera recording requires the finalized typed EpisodeOutcomeV1")
+    first_identity = StateBoundaryIdentity.from_mapping(records[0]["state_boundary_identity"])
+    if (outcome.episode_id != first_identity.episode_id
+            or outcome.final_boundary != transition_count):
+        raise ValueError("finalized EpisodeOutcome does not match the recorded camera episode and boundary")
+
+    artifact_hash = str(profile["task_artifact_identity_hash"])
+    scene_hash = str(profile["scene_identity_hash"])
+    reset_sample_id = str(profile["reset_sample_id"])
+    source_closure_digest = str(profile["source_closure_digest"])
+    plan_hash = str(profile["control_binding_plan_identity_hash"])
+    if (first_identity.scene_identity_hash != scene_hash
+            or first_identity.reset_sample_id != reset_sample_id):
+        raise ValueError("Position reference_profile does not match the actual reset boundary")
+    for camera_boundary in camera_boundaries:
+        identity = camera_boundary.captures[0].capture_identity
+        if (identity.task_artifact_hash != artifact_hash
+                or identity.state_boundary.scene_identity_hash != scene_hash
+                or identity.state_boundary.reset_sample_id != reset_sample_id
+                or identity.state_boundary.episode_id != outcome.episode_id):
+            raise ValueError("camera identity does not match independent Position source/profile and episode metadata")
+
+    controls = tuple(trajectory.structured_controls)
+    if transition_count and (len(controls) != transition_count or any(item is None for item in controls)):
+        raise ValueError("camera recording requires one structured Position control per transition")
+    typed_controls = tuple(item for item in controls if item is not None)
+    from task_env.controllers.canonical.contracts import PositionControlTargetV1
+    from task_env.trajectory.canonical.episode import single_writer_training_actions
+
+    for index, control in enumerate(typed_controls):
+        control.validate()
+        if (control.request.scene_identity_hash != scene_hash
+                or control.request.binding_identity_hash != plan_hash
+                or len(control.writer_controls) != 1):
+            raise ValueError("camera recording structured control does not match the single Position source binding")
+        writer = control.writer_controls[0]
+        if writer.get("writer_id") != profile["writer_id"]:
+            raise ValueError("camera recording structured control writer does not match reference_profile")
+        canonical_action = writer.get("canonical_action")
+        raw_target = canonical_action.get("position_target_v1") if isinstance(canonical_action, Mapping) else None
+        if not isinstance(raw_target, Mapping):
+            raise ValueError("camera recording structured control lacks its typed PositionControlTargetV1")
+        target = PositionControlTargetV1.from_mapping(dict(raw_target))
+        previous = StateBoundaryIdentity.from_mapping(records[index]["state_boundary_identity"])
+        previous_clock = StateSampleClock.from_mapping(records[index]["state_sample_clock"])
+        if (target.source_boundary != previous or target.sample_clock != previous_clock
+                or target.writer_id != profile["writer_id"]
+                or target.controller_identity != profile["controller_identity"]
+                or target.binding_identity_hash != plan_hash
+                or target.source_closure_digest != source_closure_digest
+                or target.target.task_artifact_hash != artifact_hash
+                or canonical_action.get("position_target_identity_hash") != target.identity_hash):
+            raise ValueError("camera recording structured control is not bound to the preceding real state boundary")
+
+    if typed_controls:
+        action_schema = _action_schema(trajectory.record_metadata)
+        projected = single_writer_training_actions(
+            typed_controls, action_schema_id=action_schema["schema_id"],
+            components=tuple(action_schema["components"]),
+        )
+        actual_actions = np.stack(trajectory.actions).astype(np.float32, copy=False)
+        projected_actions = np.asarray(projected, dtype=np.float32).reshape(actual_actions.shape)
+        if not np.array_equal(actual_actions, projected_actions):
+            raise ValueError("camera recording structured control order differs from stored action order")
+
+    for boundary in camera_boundaries:
+        for capture in boundary.captures:
+            if capture.capture_identity.state_boundary.boundary_id != (
+                "state-boundary-" + state_digests[boundary.boundary_index].hex()
+            ):
+                raise ValueError("camera recording boundary digest changed during validation")
+
+    return {
+        "schema_version": "camera-recording-binding-v1",
+        "observation_count": transition_count + 1,
+        "transition_count": transition_count,
+        "episode_id": outcome.episode_id,
+        "final_boundary": outcome.final_boundary,
+        "task_artifact_identity_hash": artifact_hash,
+        "scene_identity_hash": scene_hash,
+        "reset_sample_id": reset_sample_id,
+        "source_closure_digest": source_closure_digest,
+        "writer_id": str(profile["writer_id"]),
+        "controller_identity": str(profile["controller_identity"]),
+        "control_binding_plan_identity_hash": plan_hash,
+        "boundaries": records,
+    }
+
+
+def _validate_camera_recording_binding(
+    raw_binding, camera_boundaries, state_digests, env_meta, structured_records,
+    projected_actions, observation_count, transition_count,
+):
+    """Strictly cross-check camera metadata against independent stored owner data."""
+
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+    from task_env.controllers.canonical.contracts import PositionControlTargetV1
+
+    required = {
+        "schema_version", "observation_count", "transition_count", "episode_id",
+        "final_boundary", "task_artifact_identity_hash", "scene_identity_hash",
+        "reset_sample_id", "source_closure_digest", "writer_id", "controller_identity",
+        "control_binding_plan_identity_hash", "boundaries",
+    }
+    if not isinstance(raw_binding, dict) or set(raw_binding) != required:
+        raise ValueError("camera recording binding has unknown or missing fields")
+    if raw_binding["schema_version"] != "camera-recording-binding-v1":
+        raise ValueError("unsupported camera recording binding version")
+    if (raw_binding["observation_count"] != observation_count
+            or raw_binding["transition_count"] != transition_count
+            or raw_binding["final_boundary"] != transition_count
+            or len(raw_binding["boundaries"]) != observation_count):
+        raise ValueError("camera recording binding T/T+1 counts disagree with the finalized H5 episode")
+    profile = env_meta.get("reference_profile") if isinstance(env_meta, Mapping) else None
+    if not isinstance(profile, Mapping):
+        raise ValueError("camera recording H5 lacks independent Position reference_profile metadata")
+    for field in (
+        "task_artifact_identity_hash", "scene_identity_hash", "reset_sample_id",
+        "source_closure_digest", "writer_id", "controller_identity",
+        "control_binding_plan_identity_hash",
+    ):
+        if raw_binding[field] != profile.get(field):
+            raise ValueError(f"camera recording binding {field} disagrees with independent reference_profile")
+
+    decoded = []
+    expected_boundary_fields = {
+        "boundary_index", "state_boundary_identity", "state_boundary_id", "state_sample_clock",
+    }
+    for index, (entry, camera_boundary, digest_bytes) in enumerate(
+        zip(raw_binding["boundaries"], camera_boundaries, state_digests, strict=True)
+    ):
+        if not isinstance(entry, dict) or set(entry) != expected_boundary_fields:
+            raise ValueError("camera recording boundary anchor has unknown or missing fields")
+        identity = StateBoundaryIdentity.from_mapping(entry["state_boundary_identity"])
+        clock = StateSampleClock.from_mapping(entry["state_sample_clock"])
+        if (entry["boundary_index"] != index
+                or entry["state_boundary_id"] != identity.boundary_id
+                or identity.control_step != index
+                or clock.sample_index != index
+                or clock.clock_domain != "evaluation_boundary"):
+            raise ValueError("camera recording boundary anchor has invalid identity/order/clock")
+        if (bytes(digest_bytes).hex() != identity.boundary_id.removeprefix("state-boundary-")
+                or camera_boundary.boundary_index != index
+                or camera_boundary.state_boundary_id != identity.boundary_id
+                or camera_boundary.simulation_time_s != clock.simulation_time_s):
+            raise ValueError("camera sidecar does not match stored state digest and record clock")
+        if (identity.episode_id != raw_binding["episode_id"]
+                or identity.scene_identity_hash != raw_binding["scene_identity_hash"]
+                or identity.reset_sample_id != raw_binding["reset_sample_id"]):
+            raise ValueError("camera recording boundary episode/reset/source does not match its independent anchor")
+        for capture in camera_boundary.captures:
+            if (capture.capture_identity.state_boundary != identity
+                    or capture.capture_identity.sample_clock != clock
+                    or capture.capture_identity.task_artifact_hash != raw_binding["task_artifact_identity_hash"]):
+                raise ValueError("camera capture identity disagrees with independent H5 boundary/source anchors")
+        decoded.append((identity, clock))
+
+    outcome = structured_records.get("outcome")
+    if (not isinstance(outcome, EpisodeOutcomeV1)
+            or outcome.episode_id != raw_binding["episode_id"]
+            or outcome.final_boundary != transition_count):
+        raise ValueError("camera recording episode does not match finalized typed EpisodeOutcome")
+    controls = tuple(structured_records.get("structured_controls", ()))
+    if len(controls) != transition_count or len(projected_actions) != transition_count:
+        raise ValueError("camera recording control order/count does not match finalized transitions")
+    for index, control in enumerate(controls):
+        if control is None:
+            raise ValueError("camera recording requires structured control evidence for every transition")
+        control.validate()
+        if (control.request.scene_identity_hash != raw_binding["scene_identity_hash"]
+                or control.request.binding_identity_hash != raw_binding["control_binding_plan_identity_hash"]
+                or len(control.writer_controls) != 1):
+            raise ValueError("camera recording structured control disagrees with its independent Position binding")
+        writer = control.writer_controls[0]
+        if writer.get("writer_id") != raw_binding["writer_id"]:
+            raise ValueError("camera recording control order has a mismatched writer identity")
+        canonical_action = writer.get("canonical_action")
+        raw_target = canonical_action.get("position_target_v1") if isinstance(canonical_action, Mapping) else None
+        if not isinstance(raw_target, Mapping):
+            raise ValueError("camera recording structured control lacks PositionControlTargetV1")
+        target = PositionControlTargetV1.from_mapping(dict(raw_target))
+        if (target.source_boundary != decoded[index][0]
+                or target.sample_clock != decoded[index][1]
+                or target.writer_id != raw_binding["writer_id"]
+                or target.controller_identity != raw_binding["controller_identity"]
+                or target.binding_identity_hash != raw_binding["control_binding_plan_identity_hash"]
+                or target.source_closure_digest != raw_binding["source_closure_digest"]
+                or target.target.task_artifact_hash != raw_binding["task_artifact_identity_hash"]
+                or canonical_action.get("position_target_identity_hash") != target.identity_hash):
+            raise ValueError("camera recording structured control is not aligned to its source boundary/clock")
+    return raw_binding
 
 
 def _save_v1(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None:
@@ -628,6 +962,602 @@ def load_structured_control_records_h5(path: Path | str) -> dict[str, Any]:
         "env_meta": env_meta, "structured_controls": controls,
         "boundary_events": events, "outcome": outcome,
         "training_projection": training_projection,
+    }
+
+
+def load_leaf_control_records_h5(path: Path | str) -> dict[str, Any]:
+    """Independently validate R02c leaf Target/command/Ack against v3 metadata and observations."""
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+    from task_env.controllers.canonical.leaf_profiles import decode_leaf_application_ack, decode_leaf_target
+    from task_env.runtime.sessions.leaf_control import LeafPreparedCommandV1
+
+    generic = load_structured_control_records_h5(path)
+    profile = generic['env_meta'].get('reference_profile')
+    if isinstance(profile, Mapping) and profile.get('profile_id') == 'r03c-attached-entity-position-leaves-v1':
+        return _load_attached_leaf_control_records_h5(Path(path), generic, profile)
+    required_profile = {
+        'schema_version', 'profile_id', 'task_artifact_identity_hash',
+        'task_source_identity_sha256', 'scene_identity_hash', 'source_id',
+        'source_closure_digest', 'effective_leaf_plan_identity_sha256',
+        'preset_identity_sha256', 'reset_plan_identity_hash', 'reset_sample_id',
+        'provider', 'provider_version', 'provider_build_sha256', 'backend',
+        'physics_dt_s', 'control_substeps', 'control_dt_s',
+        'materialization_identity_sha256', 'configuration_revision', 'writers',
+    }
+    if (not isinstance(profile, Mapping) or set(profile) != required_profile
+            or profile.get('schema_version') != 'leaf-position-recording-profile-v1'
+            or profile.get('profile_id') != 'r02c-independent-position-leaves-v1'):
+        raise ValueError('task-env-h5/v3 does not contain the exact R02c leaf recording profile')
+    writers = profile['writers']
+    if not isinstance(writers, list) or len(writers) != 2:
+        raise ValueError('R02c H5 metadata must identify exactly two leaf writers')
+    writer_by_id = {}
+    for writer in writers:
+        if not isinstance(writer, Mapping) or set(writer) != {
+            'writer_id', 'profile_kind', 'action_schema_id', 'binding_identity_sha256',
+            'effective_configuration_identity_sha256', 'member_path', 'entity_id',
+            'control_group_id', 'joint_order', 'actuator_order',
+        }:
+            raise ValueError('R02c H5 writer binding metadata has unknown or missing fields')
+        if writer['writer_id'] in writer_by_id:
+            raise ValueError('R02c H5 writer identity is duplicated')
+        writer_by_id[writer['writer_id']] = writer
+    if {item.get('profile_kind') for item in writers} != {'arm_position', 'hand_position'}:
+        raise ValueError('R02c H5 must bind one Arm and one Position Hand leaf')
+    if (profile['provider'], profile['provider_version'], profile['backend'],
+            profile['physics_dt_s'], profile['control_substeps'], profile['control_dt_s']) != (
+            'mujoco', '3.8.1', 'cpu', 0.002, 5, 0.01):
+        raise ValueError('R02c H5 Provider/timebase metadata differs from the admitted source route')
+    transition_count = generic['transition_count']
+    observation_count = generic['observation_count']
+    if transition_count != 64 or observation_count != 65:
+        raise ValueError('R02c H5 requires exactly 64 transitions and 65 observations')
+    with __import__('h5py').File(Path(path), 'r') as root:
+        if 'obs/state/boundary_identity_sha256' not in root:
+            raise ValueError('R02c H5 lacks the independent stored state-boundary observation')
+        state_boundary_digests = np.asarray(root['obs/state/boundary_identity_sha256'][...])
+    if state_boundary_digests.shape != (65, 32) or state_boundary_digests.dtype != np.uint8:
+        raise ValueError('R02c H5 state-boundary observation has the wrong shape or dtype')
+    controls = generic['structured_controls']
+    for index, control in enumerate(controls):
+        if (control is None or control.request.scene_identity_hash != profile['scene_identity_hash']
+                or control.request.binding_identity_hash != profile['effective_leaf_plan_identity_sha256']):
+            raise ValueError(f'R02c transition {index} is not bound to the H5 Scene/plan')
+        if len(control.writer_controls) != 2:
+            raise ValueError(f'R02c transition {index} must record exactly two leaf writers')
+        records = {item['writer_id']: item for item in control.writer_controls}
+        if set(records) != set(writer_by_id):
+            raise ValueError(f'R02c transition {index} omits or duplicates a leaf writer')
+        seen_slots = set()
+        for writer_id, writer_meta in writer_by_id.items():
+            row = records[writer_id]
+            canonical = row['canonical_action']
+            if not isinstance(canonical, Mapping) or canonical.get('schema_version') != 'leaf-canonical-action-v1':
+                raise ValueError(f'R02c transition {index}/{writer_id} lacks a versioned canonical command')
+            for key, expected in (
+                ('source_closure_sha256', profile['source_closure_digest']),
+                ('effective_plan_identity_sha256', profile['effective_leaf_plan_identity_sha256']),
+                ('materialization_identity_sha256', profile['materialization_identity_sha256']),
+                ('configuration_identity_sha256', writer_meta['effective_configuration_identity_sha256']),
+            ):
+                if canonical.get(key) != expected:
+                    raise ValueError(f'R02c transition {index}/{writer_id} has mismatched {key}')
+            target = decode_leaf_target(row['controller_target']['payload'])
+            if (target.identity_hash != row['controller_target']['identity_hash']
+                    or target.writer_id != writer_id
+                    or target.binding_identity_hash != writer_meta['binding_identity_sha256']
+                    or target.scene_identity_hash != profile['scene_identity_hash']
+                    or target.source_closure_sha256 != profile['source_closure_digest']
+                    or target.action_schema_id != writer_meta['action_schema_id']
+                    or tuple(ref.joint_id for ref in target.joint_order) != tuple(writer_meta['joint_order'])
+                    or tuple(ref.actuator_id for ref in target.actuator_order) != tuple(writer_meta['actuator_order'])
+                    or any(ref.entity_id != writer_meta['entity_id']
+                           for ref in (*target.joint_order, *target.actuator_order))
+                    or canonical.get('target_identity_sha256') != target.identity_hash):
+                raise ValueError(f'R02c transition {index}/{writer_id} Target identity/source mismatch')
+            if json.dumps(plain_metadata(row['requested_action'].get('payload')), sort_keys=True, separators=(',', ':'),
+                          allow_nan=False) != json.dumps(target.action.to_mapping(), sort_keys=True,
+                                                       separators=(',', ':'), allow_nan=False):
+                raise ValueError(f'R02c transition {index}/{writer_id} requested Action differs from the Target')
+            command = LeafPreparedCommandV1.from_mapping(canonical['prepared_command'])
+            if (command.command_identity_sha256 != canonical.get('command_identity_sha256')
+                    or command.target != target or command.writer_id != writer_id
+                    or command.effective_plan_identity_sha256 != profile['effective_leaf_plan_identity_sha256']
+                    or command.binding_identity_sha256 != writer_meta['binding_identity_sha256']
+                    or command.effective_configuration_identity_sha256
+                    != writer_meta['effective_configuration_identity_sha256']
+                    or command.materialization_identity_sha256 != profile['materialization_identity_sha256']
+                    or command.state_boundary != target.source_boundary
+                    or command.state_configuration_revision != profile['configuration_revision']):
+                raise ValueError(f'R02c transition {index}/{writer_id} prepared command identity mismatch')
+            ack = decode_leaf_application_ack(canonical['application_ack'])
+            applied = row['applied_control']
+            applied_payload = applied['payload']
+            applied_ack = decode_leaf_application_ack(applied_payload['ack'])
+            if (ack != applied_ack or applied['target_hash'] != target.identity_hash
+                    or ack.target_identity_hash != target.identity_hash
+                    or applied_payload.get('writer_id') != writer_id
+                    or applied_payload.get('command_identity_sha256') != command.command_identity_sha256
+                    or applied_payload.get('materialization_identity_sha256') != profile['materialization_identity_sha256']
+                    or ack.writer_id != writer_id
+                    or ack.binding_identity_hash != writer_meta['binding_identity_sha256']
+                    or ack.source_closure_sha256 != profile['source_closure_digest']
+                    or ack.scene_identity_hash != profile['scene_identity_hash']
+                    or ack.joint_order != target.joint_order
+                    or ack.actuator_order != target.actuator_order
+                    or ack.source_boundary != target.source_boundary
+                    or ack.source_sample_clock != target.sample_clock
+                    or ack.application_sample_clock != target.sample_clock):
+                raise ValueError(f'R02c transition {index}/{writer_id} application Ack/command mismatch')
+            slots = tuple(item.ctrl_slot for item in command.slot_values)
+            if (tuple(applied_payload.get('applied_slots', ())) != slots
+                    or seen_slots.intersection(slots)):
+                raise ValueError(f'R02c transition {index}/{writer_id} duplicate/mismatched native ctrl slots')
+            seen_slots.update(slots)
+            source = target.source_boundary
+            next_boundary = StateBoundaryIdentity.from_mapping(canonical['next_boundary'])
+            if (source.control_step != index or next_boundary.control_step != index + 1
+                    or ack.source_boundary != source
+                    or ack.application_boundary.control_step != index
+                    or (source.episode_id, source.reset_sample_id, source.scene_identity_hash,
+                        source.provider_materialization_id) != (
+                        next_boundary.episode_id, next_boundary.reset_sample_id,
+                        next_boundary.scene_identity_hash, next_boundary.provider_materialization_id)
+                    or target.sample_clock.sample_index != index
+                    or not math.isclose(
+                        target.sample_clock.simulation_time_s,
+                        index * profile['control_dt_s'], rel_tol=0.0, abs_tol=1e-12,
+                    )
+                    or ack.application_sample_clock != target.sample_clock):
+                raise ValueError(f'R02c transition {index}/{writer_id} boundary/clock sequence mismatch')
+            if (canonical.get('source_boundary') != source.to_mapping()
+                    or canonical.get('application_boundary') != ack.application_boundary.to_mapping()):
+                raise ValueError(f'R02c transition {index}/{writer_id} Target/Ack boundaries disagree')
+            for boundary_index, boundary in ((index, source), (index + 1, next_boundary)):
+                digest = bytes(state_boundary_digests[boundary_index]).hex()
+                if digest != boundary.boundary_id.removeprefix('state-boundary-'):
+                    raise ValueError(f'R02c transition {index}/{writer_id} boundary differs from stored observation')
+    generic['leaf_profile'] = profile
+    generic['leaf_writer_ids'] = tuple(sorted(writer_by_id))
+    return generic
+
+
+def _load_attached_leaf_control_records_h5(path: Path, generic: dict[str, Any], profile: Mapping) -> dict[str, Any]:
+    """Strict offline reader for the R03c fixed Attachment + two Entity leaf receipt chain."""
+    from task_env.artifacts.state import StateBoundaryIdentity
+    from task_env.controllers.canonical.leaf_profiles import decode_leaf_application_ack, decode_leaf_target
+    from task_env.runtime.sessions.leaf_control import LeafPreparedCommandV1
+
+    required = {
+        'schema_version', 'profile_id', 'task_artifact_identity_hash', 'task_source_identity_sha256',
+        'scene_identity_hash', 'source_id', 'source_closure_digest',
+        'effective_leaf_plan_identity_sha256', 'preset_identity_sha256', 'reset_plan_identity_hash',
+        'reset_sample_id', 'provider', 'provider_version', 'provider_build_sha256', 'backend',
+        'physics_dt_s', 'control_substeps', 'control_dt_s', 'materialization_identity_sha256',
+        'configuration_revision', 'attachment_plan_identity_sha256', 'assembly_identity_sha256',
+        'attachment_receipt', 'attachment_receipt_identity_sha256', 'leaf_materialization_receipt',
+        'leaf_materialization_receipt_identity_sha256', 'provider_materialization_id', 'episode_id',
+        'arm_active', 'hand_active', 'writers',
+    }
+    if set(profile) != required or profile.get('schema_version') != 'leaf-position-recording-profile-v1':
+        raise ValueError('R03c H5 metadata does not match the exact attached-leaf profile schema')
+    if (profile['provider'], profile['provider_version'], profile['backend'],
+            profile['physics_dt_s'], profile['control_substeps'], profile['control_dt_s']) != (
+            'mujoco', '3.8.1', 'cpu', 0.002, 5, 0.01):
+        raise ValueError('R03c H5 Provider/timebase differs from the bounded native contract')
+    if (type(profile['arm_active']) is not bool or type(profile['hand_active']) is not bool
+            or profile['episode_id'] not in {'E1', 'E2', 'E3', 'E4'}):
+        raise ValueError('R03c H5 episode identity/activity metadata is invalid')
+    if (generic['transition_count'], generic['observation_count']) != (64, 65):
+        raise ValueError('R03c H5 requires exactly 64 transitions and 65 observations')
+
+    attachment = profile['attachment_receipt']
+    if not isinstance(attachment, Mapping):
+        raise ValueError('R03c H5 lacks its same-Env fixed Attachment model receipt')
+    receipt_payload = dict(attachment)
+    receipt_hash = receipt_payload.pop('receipt_identity_sha256', None)
+    calculated_receipt_hash = hashlib.sha256(json.dumps(
+        receipt_payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False,
+    ).encode()).hexdigest()
+    if (receipt_hash != calculated_receipt_hash
+            or receipt_hash != profile['attachment_receipt_identity_sha256']
+            or attachment.get('schema_version') != 'fixed-attachment-model-receipt-v1'
+            or attachment.get('provider') != 'mujoco' or attachment.get('backend') != 'cpu'
+            or attachment.get('provider_materialization_id') != profile['provider_materialization_id']
+            or attachment.get('task_artifact_sha256') != profile['task_artifact_identity_hash']
+            or attachment.get('scene_identity_sha256') != profile['scene_identity_hash']
+            or attachment.get('assembly_identity_sha256') != profile['assembly_identity_sha256']
+            or attachment.get('attachment_plan_sha256') != profile['attachment_plan_identity_sha256']
+            or attachment.get('source_closure_sha256') != profile['source_closure_digest']):
+        raise ValueError('R03c Attachment receipt identity/source/Runtime binding mismatch')
+    dimensions = attachment.get('dimensions', {})
+    if tuple(dimensions.get(key) for key in ('nq', 'nv', 'nu', 'njnt', 'neq', 'ntendon')) != (9, 9, 8, 9, 1, 1):
+        raise ValueError('R03c Attachment receipt dimensions differ from the exact fixed tree')
+    fixed_root = attachment.get('fixed_root', {})
+    if (fixed_root.get('parent_entity_id'), fixed_root.get('child_entity_id'),
+            fixed_root.get('parent_mount'), fixed_root.get('child_mount'), fixed_root.get('root_policy')) != (
+            'panda-arm', 'panda-hand', 'panda-arm/attachment_site', 'panda-hand/hand',
+            'fixed_child_root_under_parent_mount_no_free_joint'):
+        raise ValueError('R03c fixed Attachment root receipt is not the selected two-Entity mount')
+
+    canonical_native = {
+        'joints': {
+            **{f'panda-arm/joint{i}': f'joint{i}' for i in range(1, 8)},
+            'panda-hand/finger_joint1': 'probe_hand_finger_joint1',
+            'panda-hand/finger_joint2': 'probe_hand_finger_joint2',
+        },
+        'actuators': {**{f'panda-arm/actuator{i}': f'actuator{i}' for i in range(1, 8)},
+                      'panda-hand/actuator8': 'probe_hand_actuator8'},
+        'bodies': {'panda-arm/link7': 'link7', 'panda-hand/hand': 'probe_hand_hand'},
+        'tendons': {'panda-hand/split': 'probe_hand_split'},
+    }
+    for receipt_key, section_key in (('native_joint_mappings', 'joints'),
+                                     ('native_actuator_mappings', 'actuators'),
+                                     ('native_body_mappings', 'bodies'),
+                                     ('native_tendon_mappings', 'tendons')):
+        mappings = attachment.get(receipt_key)
+        if not isinstance(mappings, Mapping):
+            raise ValueError(f'R03c Attachment receipt omits {receipt_key}')
+        for canonical, native_name in canonical_native[section_key].items():
+            if mappings.get(canonical, {}).get('native_name') != native_name:
+                raise ValueError(f'R03c Attachment native map mismatch for {canonical}')
+
+    leaf_receipt = profile['leaf_materialization_receipt']
+    if not isinstance(leaf_receipt, Mapping):
+        raise ValueError('R03c H5 lacks its leaf materialization receipt')
+    leaf_identity_payload = {
+        'schema_version': leaf_receipt['schema_version'],
+        'provenance_kind': leaf_receipt['provenance_kind'],
+        'scene_identity_sha256': leaf_receipt['scene_identity_sha256'],
+        'source_closure_sha256': leaf_receipt['source_closure_sha256'],
+        'effective_plan_identity_sha256': leaf_receipt['effective_plan_identity_sha256'],
+        'provider_name': leaf_receipt['provider_name'], 'provider_version': leaf_receipt['provider_version'],
+        'provider_build_sha256': leaf_receipt['provider_build_sha256'], 'backend': leaf_receipt['backend'],
+        'materialization_id': leaf_receipt['materialization_id'],
+        'configuration_revision': leaf_receipt['configuration_revision'],
+        'dimensions': tuple(leaf_receipt[name] for name in ('nq', 'nv', 'nu', 'njnt', 'nbody', 'neq', 'ntendon')),
+        'joints': leaf_receipt['joints'], 'actuators': leaf_receipt['actuators'],
+        'frames': leaf_receipt['frames'], 'tendons': leaf_receipt['tendons'],
+        'equality_identities': leaf_receipt['equality_identities'],
+    }
+    if leaf_receipt.get('fixed_attachment_receipt_identity_sha256') is not None:
+        leaf_identity_payload['fixed_attachment_receipt_identity_sha256'] = (
+            leaf_receipt['fixed_attachment_receipt_identity_sha256']
+        )
+    leaf_hash = hashlib.sha256(json.dumps(
+        leaf_identity_payload, sort_keys=True, separators=(',', ':'),
+        ensure_ascii=False, allow_nan=False,
+    ).encode()).hexdigest()
+    if (leaf_hash != profile['leaf_materialization_receipt_identity_sha256']
+            or leaf_hash != profile['materialization_identity_sha256']
+            or leaf_receipt.get('fixed_attachment_receipt_identity_sha256') != receipt_hash
+            or leaf_receipt.get('materialization_id') != profile['provider_materialization_id']
+            or leaf_receipt.get('effective_plan_identity_sha256') != profile['effective_leaf_plan_identity_sha256']
+            or leaf_receipt.get('scene_identity_sha256') != profile['scene_identity_hash']
+            or leaf_receipt.get('source_closure_sha256') != profile['source_closure_digest']
+            or leaf_receipt.get('provider_name') != profile['provider']
+            or leaf_receipt.get('provider_version') != profile['provider_version']
+            or leaf_receipt.get('provider_build_sha256') != profile['provider_build_sha256']
+            or leaf_receipt.get('backend') != profile['backend']
+            or leaf_receipt.get('configuration_revision') != profile['configuration_revision']):
+        raise ValueError('R03c leaf receipt is not bound to the same Attachment Runtime/plan')
+
+    writers = profile['writers']
+    if not isinstance(writers, list) or len(writers) != 2:
+        raise ValueError('R03c H5 must bind exactly two Entity leaf writers')
+    expected_writer_fields = {
+        'writer_id', 'profile_kind', 'action_schema_id', 'binding_identity_sha256',
+        'effective_configuration_identity_sha256', 'member_path', 'entity_id',
+        'control_group_id', 'joint_order', 'actuator_order', 'tcp_frame',
+    }
+    writer_by_id = {}
+    for writer in writers:
+        if not isinstance(writer, Mapping) or set(writer) != expected_writer_fields:
+            raise ValueError('R03c writer metadata has an unknown or missing bound field')
+        if writer['writer_id'] in writer_by_id:
+            raise ValueError('R03c writer identity is duplicated')
+        writer_by_id[writer['writer_id']] = writer
+    expected_owner = {
+        'panda-arm/arm-position-leaf': ('arm_position', 'panda-arm', 'arm-position', ['arm']),
+        'panda-hand/hand-position-leaf': ('hand_position', 'panda-hand', 'hand-position', ['hand']),
+    }
+    for writer_id, (kind, entity, group, path_members) in expected_owner.items():
+        writer = writer_by_id.get(writer_id)
+        if (writer is None or writer['profile_kind'] != kind or writer['entity_id'] != entity
+                or writer['control_group_id'] != group or writer['member_path'] != path_members):
+            raise ValueError(f'R03c writer {writer_id} is not bound to its exact Assembly Entity/Group')
+    leaf_joints = {item['canonical_joint']['entity_id'] + '/' + item['canonical_joint']['joint_id']: item
+                   for item in leaf_receipt['joints']}
+    leaf_actuators = {item['canonical_actuator']['entity_id'] + '/' + item['canonical_actuator']['actuator_id']: item
+                      for item in leaf_receipt['actuators']}
+    leaf_frames = {item['canonical_frame']['entity_id'] + '/' + item['canonical_frame']['frame_id']: item
+                   for item in leaf_receipt['frames']}
+    for writer_id, writer in writer_by_id.items():
+        for entity, joint in writer['joint_order']:
+            key = f'{entity}/{joint}'
+            mapped = leaf_joints.get(key)
+            if mapped is None or mapped['native_name'] != canonical_native['joints'][key]:
+                raise ValueError(f'R03c leaf Joint native receipt mismatch: {key}')
+        for entity, actuator in writer['actuator_order']:
+            key = f'{entity}/{actuator}'
+            mapped = leaf_actuators.get(key)
+            if mapped is None or mapped['native_name'] != canonical_native['actuators'][key]:
+                raise ValueError(f'R03c leaf Actuator native receipt mismatch: {key}')
+            attachment_actuator = attachment['native_actuator_mappings'][key]
+            if (mapped['ctrl_slot'] != attachment_actuator['ctrl_slot']
+                    or mapped['native_actuator_id'] != attachment_actuator['actuator_id']):
+                raise ValueError(f'R03c leaf Actuator slot differs from Attachment receipt: {key}')
+        entity, frame = writer['tcp_frame']
+        key = f'{entity}/{frame}'
+        mapped = leaf_frames.get(key)
+        if mapped is None or mapped['native_name'] != canonical_native['bodies'][key]:
+            raise ValueError(f'R03c leaf TCP native receipt mismatch: {key}')
+
+    with __import__('h5py').File(path, 'r') as root:
+        required_arrays = {
+            'obs/state/boundary_identity_sha256': ((65, 32), np.dtype(np.uint8)),
+            'obs/state/entities/panda-arm/joint_position': ((65, 7), np.dtype(np.float32)),
+            'obs/state/entities/panda-hand/joint_position': ((65, 2), np.dtype(np.float32)),
+            'obs/state/entities/panda-arm/hand_pose': ((65, 7), np.dtype(np.float32)),
+            'obs/state/entities/panda-hand/hand_pose': ((65, 7), np.dtype(np.float32)),
+        }
+        arrays = {}
+        for dataset_path, (shape, dtype) in required_arrays.items():
+            if dataset_path not in root:
+                raise ValueError(f'R03c H5 lacks stored typed observation {dataset_path}')
+            array = np.asarray(root[dataset_path][...])
+            if array.shape != shape or array.dtype != dtype or not np.isfinite(array).all():
+                raise ValueError(f'R03c H5 stored observation shape/dtype/finite mismatch: {dataset_path}')
+            arrays[dataset_path] = array
+        arm = arrays['obs/state/entities/panda-arm/joint_position']
+        fingers = arrays['obs/state/entities/panda-hand/joint_position']
+        opening = fingers.sum(axis=1)
+        home = np.asarray((0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, -0.7853), dtype=np.float64)
+        if np.max(np.abs(arm[-1].astype(np.float64) - home)) > 0.02:
+            raise ValueError('R03c stored Arm final state is outside the home-return gate')
+        if profile['arm_active'] and np.max(np.abs(arm[:, 0].astype(np.float64) - home[0])) < 0.08:
+            raise ValueError('R03c stored Arm motion does not reach the required joint1 excursion')
+        if float(opening[-1]) < 0.06:
+            raise ValueError('R03c stored Hand opening does not return to the final open gate')
+        if profile['hand_active'] and (
+                float(np.min(opening[16:33])) > 0.02
+                or float(np.max(opening) - np.min(opening)) < 0.04
+                or np.max(np.abs(fingers[:, 0] - fingers[:, 1])) > 1e-4):
+            raise ValueError('R03c stored Hand motion/equality differs from its closed-phase gate')
+        hand_pose = arrays['obs/state/entities/panda-hand/hand_pose'][:, 3:7].astype(np.float64)
+        norms = np.linalg.norm(hand_pose, axis=1, keepdims=True)
+        if np.any(norms <= 1e-12):
+            raise ValueError('R03c stored Hand rotation contains a zero quaternion')
+        quats = hand_pose / norms
+        dots = np.clip(np.abs(quats @ quats[0]), 0.0, 1.0)
+        rotation_excursion = float(np.max(2.0 * np.arccos(dots)))
+        if profile['arm_active'] and rotation_excursion < 0.05:
+            raise ValueError('R03c stored attached Hand root did not follow active Arm rotation')
+        state_boundary_digests = arrays['obs/state/boundary_identity_sha256']
+
+    controls = generic['structured_controls']
+    for index, control in enumerate(controls):
+        if (control is None or control.request.scene_identity_hash != profile['scene_identity_hash']
+                or control.request.binding_identity_hash != profile['effective_leaf_plan_identity_sha256']):
+            raise ValueError(f'R03c transition {index} is not bound to the H5 Scene/plan')
+        if len(control.writer_controls) != 2:
+            raise ValueError(f'R03c transition {index} must record exactly two writers')
+        records = {item['writer_id']: item for item in control.writer_controls}
+        if set(records) != set(writer_by_id):
+            raise ValueError(f'R03c transition {index} omits or duplicates an Entity writer')
+        seen_slots = set()
+        for writer_id, writer_meta in writer_by_id.items():
+            row = records[writer_id]
+            canonical = row['canonical_action']
+            for key, expected_value in (
+                ('source_closure_sha256', profile['source_closure_digest']),
+                ('effective_plan_identity_sha256', profile['effective_leaf_plan_identity_sha256']),
+                ('materialization_identity_sha256', profile['materialization_identity_sha256']),
+                ('configuration_identity_sha256', writer_meta['effective_configuration_identity_sha256']),
+            ):
+                if canonical.get(key) != expected_value:
+                    raise ValueError(f'R03c transition {index}/{writer_id} mismatched {key}')
+            target = decode_leaf_target(row['controller_target']['payload'])
+            expected_joints = tuple((entity, joint) for entity, joint in writer_meta['joint_order'])
+            expected_actuators = tuple((entity, actuator) for entity, actuator in writer_meta['actuator_order'])
+            if (target.identity_hash != row['controller_target']['identity_hash']
+                    or target.writer_id != writer_id
+                    or target.binding_identity_hash != writer_meta['binding_identity_sha256']
+                    or target.scene_identity_hash != profile['scene_identity_hash']
+                    or target.source_closure_sha256 != profile['source_closure_digest']
+                    or target.action_schema_id != writer_meta['action_schema_id']
+                    or tuple((ref.entity_id, ref.joint_id) for ref in target.joint_order) != expected_joints
+                    or tuple((ref.entity_id, ref.actuator_id) for ref in target.actuator_order) != expected_actuators):
+                raise ValueError(f'R03c transition {index}/{writer_id} Target binding mismatch')
+            if json.dumps(plain_metadata(row['requested_action'].get('payload')), sort_keys=True,
+                          separators=(',', ':'), allow_nan=False) != json.dumps(
+                    target.action.to_mapping(), sort_keys=True, separators=(',', ':'), allow_nan=False):
+                raise ValueError(f'R03c transition {index}/{writer_id} Action differs from typed Target')
+            command = LeafPreparedCommandV1.from_mapping(canonical['prepared_command'])
+            if (command.command_identity_sha256 != canonical.get('command_identity_sha256')
+                    or command.target != target or command.writer_id != writer_id
+                    or command.effective_plan_identity_sha256 != profile['effective_leaf_plan_identity_sha256']
+                    or command.binding_identity_sha256 != writer_meta['binding_identity_sha256']
+                    or command.effective_configuration_identity_sha256
+                    != writer_meta['effective_configuration_identity_sha256']
+                    or command.materialization_identity_sha256 != profile['materialization_identity_sha256']
+                    or command.state_boundary != target.source_boundary
+                    or command.state_configuration_revision != profile['configuration_revision']):
+                raise ValueError(f'R03c transition {index}/{writer_id} prepared command mismatch')
+            ack = decode_leaf_application_ack(canonical['application_ack'])
+            applied = row['applied_control']
+            payload = applied['payload']
+            applied_ack = decode_leaf_application_ack(payload['ack'])
+            slots = tuple(item.ctrl_slot for item in command.slot_values)
+            if (ack != applied_ack or ack.target_identity_hash != target.identity_hash
+                    or ack.writer_id != writer_id
+                    or ack.binding_identity_hash != writer_meta['binding_identity_sha256']
+                    or ack.source_closure_sha256 != profile['source_closure_digest']
+                    or ack.scene_identity_hash != profile['scene_identity_hash']
+                    or ack.joint_order != target.joint_order or ack.actuator_order != target.actuator_order
+                    or ack.source_boundary != target.source_boundary
+                    or ack.source_sample_clock != target.sample_clock
+                    or ack.application_sample_clock != target.sample_clock
+                    or payload.get('writer_id') != writer_id
+                    or payload.get('materialization_identity_sha256') != profile['materialization_identity_sha256']
+                    or tuple(payload.get('applied_slots', ())) != slots
+                    or applied.get('target_hash') != target.identity_hash
+                    or seen_slots.intersection(slots)):
+                raise ValueError(f'R03c transition {index}/{writer_id} Ack/slot evidence mismatch')
+            seen_slots.update(slots)
+            if any(not 0 <= item.ctrl_slot < dimensions['nu'] for item in command.slot_values):
+                raise ValueError(f'R03c transition {index}/{writer_id} slot exceeds fixed model dimensions')
+            for item in command.slot_values:
+                key = f'{item.actuator.entity_id}/{item.actuator.actuator_id}'
+                mapped = leaf_actuators.get(key)
+                if mapped is None or item.ctrl_slot != mapped['ctrl_slot']:
+                    raise ValueError(f'R03c transition {index}/{writer_id} command slot differs from its Actuator receipt')
+            source = target.source_boundary
+            next_boundary = StateBoundaryIdentity.from_mapping(canonical['next_boundary'])
+            if (source.control_step != index or next_boundary.control_step != index + 1
+                    or source.reset_sample_id != profile['reset_sample_id']
+                    or source.provider_materialization_id != profile['provider_materialization_id']
+                    or (source.episode_id, source.reset_sample_id, source.scene_identity_hash,
+                        source.scene_instance_id, source.provider_materialization_id)
+                    != (next_boundary.episode_id, next_boundary.reset_sample_id, next_boundary.scene_identity_hash,
+                        next_boundary.scene_instance_id, next_boundary.provider_materialization_id)
+                    or (ack.application_boundary.episode_id, ack.application_boundary.reset_sample_id,
+                        ack.application_boundary.scene_identity_hash, ack.application_boundary.scene_instance_id,
+                        ack.application_boundary.provider_materialization_id, ack.application_boundary.control_step)
+                    != (source.episode_id, source.reset_sample_id, source.scene_identity_hash,
+                        source.scene_instance_id, source.provider_materialization_id, source.control_step)
+                    or target.sample_clock.sample_index != index
+                    or not math.isclose(target.sample_clock.simulation_time_s,
+                                        index * profile['control_dt_s'], rel_tol=0.0, abs_tol=1e-12)
+                    or canonical.get('source_boundary') != source.to_mapping()
+                    or canonical.get('application_boundary') != ack.application_boundary.to_mapping()):
+                raise ValueError(f'R03c transition {index}/{writer_id} boundary/clock sequence mismatch')
+            for boundary_index, boundary in ((index, source), (index + 1, next_boundary)):
+                if bytes(state_boundary_digests[boundary_index]).hex() != boundary.boundary_id.removeprefix('state-boundary-'):
+                    raise ValueError(f'R03c transition {index}/{writer_id} boundary differs from stored observation')
+        if seen_slots != set(range(dimensions['nu'])):
+            raise ValueError(f'R03c transition {index} does not bind the exact disjoint 7+1 slots')
+    generic['leaf_profile'] = profile
+    generic['leaf_writer_ids'] = tuple(sorted(writer_by_id))
+    generic['attachment_receipt_identity_sha256'] = receipt_hash
+    generic['stored_motion_oracle'] = {
+        'arm_peak_joint1_rad': float(np.max(np.abs(arm[:, 0].astype(np.float64)))),
+        'hand_final_opening_m': float(opening[-1]),
+        'hand_rotation_excursion_rad': rotation_excursion,
+    }
+    return generic
+
+
+def load_camera_observations_h5(path: Path | str) -> dict[str, Any]:
+    """Strictly read the opt-in camera metadata extension on Generic H5 v3."""
+
+    import h5py
+    from task_env.observations.canonical_camera.consumer import (
+        CameraObservationConfigV1,
+        validate_camera_observation_boundaries,
+    )
+
+    with h5py.File(Path(path), "r") as root:
+        if (str(root.attrs.get("schema_id", "")) != "task-env-h5"
+                or str(root.attrs.get("schema_version", "")) != "v3"):
+            raise ValueError("camera observation reader requires task-env-h5/v3")
+        episode_complete = root.attrs.get("episode_complete")
+        if not isinstance(episode_complete, (bool, np.bool_)) or not bool(episode_complete):
+            raise ValueError("camera observation reader requires a finalized episode")
+        required = {
+            "meta/camera_observation_contract_v1_json",
+            "meta/camera_observations_v1_json",
+            "meta/camera_recording_binding_v1_json",
+            "meta/env_meta",
+        }
+        if any(name not in root for name in required):
+            raise ValueError("task-env-h5/v3 camera observation extension is incomplete")
+        contract_raw = json.loads(_read_text(root, "meta/camera_observation_contract_v1_json"))
+        observations_raw = json.loads(_read_text(root, "meta/camera_observations_v1_json"))
+        raw_recording_binding = json.loads(_read_text(root, "meta/camera_recording_binding_v1_json"))
+        observation_count = int(root.attrs.get("observation_count", -1))
+        transition_count = int(root.attrs.get("transition_count", -1))
+        env_meta = load_metadata(_read_text(root, "meta/env_meta"))
+        if observation_count != transition_count + 1:
+            raise ValueError("camera observation reader requires T+1 observation boundaries")
+        contract = CameraObservationConfigV1.from_mapping(contract_raw)
+        contract.capacity(max(1, transition_count))
+        boundaries = validate_camera_observation_boundaries(
+            observations_raw, expected_count=observation_count,
+        )
+        state_digest_path = "obs/state/boundary_identity_sha256"
+        if state_digest_path not in root:
+            raise ValueError("camera recording requires the actual Position state boundary digest dataset")
+        state_digest_dataset = root[state_digest_path]
+        if (state_digest_dataset.shape != (observation_count, 32)
+                or state_digest_dataset.dtype != np.dtype(np.uint8)):
+            raise ValueError("Position state boundary digest dataset must be T+1 rows of 32 uint8 bytes")
+        state_digests = tuple(bytes(np.asarray(state_digest_dataset[index])) for index in range(observation_count))
+        artifact_hash = boundaries[0].captures[0].capture_identity.task_artifact_hash
+        geometries = {
+            item.camera_id: item for item in contract.geometries(artifact_hash)
+        }
+        expected_boundary_identity = None
+        for boundary in boundaries:
+            for capture in boundary.captures:
+                identity = capture.capture_identity
+                geometry = geometries[capture.camera_id]
+                if identity.camera_geometry_identity_hash != geometry.identity_hash:
+                    raise ValueError("camera capture references another CameraGeometry")
+                common_identity = (
+                    identity.task_artifact_hash,
+                    identity.render_source_identity_hash,
+                    identity.execution_spec_identity_hash,
+                    identity.provider_manifest_identity_hash,
+                    identity.state_boundary.scene_identity_hash,
+                    identity.state_boundary.scene_instance_id,
+                    identity.state_boundary.provider_materialization_id,
+                    identity.state_boundary.episode_id,
+                    identity.state_boundary.reset_sample_id,
+                )
+                if expected_boundary_identity is None:
+                    expected_boundary_identity = common_identity
+                elif common_identity != expected_boundary_identity:
+                    raise ValueError("camera observation identity changed inside one stored episode")
+                for modality, expected_shape, expected_dtype in (
+                    ("rgb", (observation_count, 3, contract.height, contract.width), np.dtype(np.uint8)),
+                    ("depth", (observation_count, contract.height, contract.width), np.dtype(np.float32)),
+                    ("entity_mask", (observation_count, contract.height, contract.width), np.dtype(np.uint32)),
+                ):
+                    dataset_path = f"obs/{modality}/{capture.camera_id}"
+                    if dataset_path not in root:
+                        raise ValueError(f"stored camera modality is missing: {dataset_path}")
+                    dataset = root[dataset_path]
+                    if dataset.shape != expected_shape or dataset.dtype != expected_dtype:
+                        raise ValueError(f"stored camera modality schema mismatch: {dataset_path}")
+                rgb = np.asarray(root[f"obs/rgb/{capture.camera_id}"][boundary.boundary_index])
+                depth = np.asarray(root[f"obs/depth/{capture.camera_id}"][boundary.boundary_index])
+                mask = np.asarray(root[f"obs/entity_mask/{capture.camera_id}"][boundary.boundary_index])
+                if not np.isfinite(depth).all() or np.any(depth < 0):
+                    raise ValueError("stored camera optical-Z depth is invalid")
+                allowed_labels = {0, *(item.label for item in capture.canonical_label_map.labels)}
+                if not set(np.unique(mask).tolist()).issubset(allowed_labels):
+                    raise ValueError("stored Entity mask contains a label absent from its capture-bound LabelMap")
+                mask_digest = hashlib.sha256(np.ascontiguousarray(mask).tobytes(order="C")).hexdigest()
+                if mask_digest != capture.mask_sha256:
+                    raise ValueError("stored Entity mask bytes do not match the capture-bound mask digest")
+    structured_records = load_structured_control_records_h5(path)
+    if structured_records["transition_count"] != transition_count:
+        raise ValueError("camera recording transition count disagrees with typed structured records")
+    projected_actions = load_structured_training_actions_h5(path)
+    recording_binding = _validate_camera_recording_binding(
+        raw_recording_binding, boundaries, state_digests, env_meta, structured_records,
+        projected_actions, observation_count, transition_count,
+    )
+    return {
+        "schema_version": "camera-observation-boundary-v1",
+        "recording_binding_schema_version": recording_binding["schema_version"],
+        "contract": contract,
+        "observation_count": observation_count,
+        "transition_count": transition_count,
+        "boundaries": boundaries,
+        "recording_binding": recording_binding,
+        "env_meta": env_meta,
     }
 
 

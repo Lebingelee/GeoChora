@@ -1,16 +1,23 @@
 # Phase II-01 — Composite Robot & Core Integration
 
-状态：**REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL**，2026-10-23。目标版本 v2.0.1；本次只提交规划，P00 与 R01–R07 均未启动。7 个候选父 Goal、22 个切片不是已批准实施范围。
+当前规划状态：**CHECKPOINT_RECOVERY_PLAN_UPDATED**，2026-10-28。R03c attempt002 静态修正已接收，
+检查点 `c30d97e`，S2 不完整、S3 未运行。恢复入口为 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)，
+新增 USD/Isaac/GeoPhys/Harness 补丁为 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
+本轮仅修订文档，没有实施或 native 授权；原 7 父 Goal/22 切片及 P99 保留，逐 slice 的已授权/已接收事实见 manifest。
+
+原 2026-10-23 规划状态为 REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL，目标版本 v2.0.1；
+后续已有独立 P00 与逐 slice 指令。原基线、签署时点与历史批准边界保留，不能再把“R01–R07均未启动”作为当前状态。
+新 P00 从 Core `259f27f…` 起，见 [README](README.md) 与 [manifest](planning_manifest.json)。
 
 ## 基线与治理
 
-本轮规划基线为已fetch并独立核验的 develop `234da21b0bd9e9ab5a9df3f516840a6422ce936a`（前轮规划提交；原工程冻结仍为 `3759f917…`），远端 public/develop 本轮 readback 相同；main/public/main 为 `f292df149f41520b484ff27cf2ff78a584903013`。GeoPhys gitlink `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。规划文档的新提交不冒充被接受功能源码 `90071ace…` 的新行为证据。
+本轮规划基线为已fetch并独立核验的 develop `535ce2516e61ecd538d5ff6dccf7493a1cfe2cac`（已提交的首版 R07 规划；其输入为 `234da21b…`，原工程冻结仍为 `3759f917…`），远端 public/develop 本轮 readback 相同；本地 main/public/main 记录为 `f292df149f41520b484ff27cf2ff78a584903013`，本轮未重新抓取 main。GeoPhys gitlink `a53a8cfed7c9d6464274b5c96fca601271dc4ee4`；Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。规划文档的新提交不冒充被接受功能源码 `90071ace…` 的新行为证据。
 
 本地 v2.0.0 分支和 annotated Tag 均指向 `3759f917…`；Tag 对象 `4ebd8d536c0c054641c6edc1a31fcd317fa237cc`。这两个引用已另经维护者授权推送并回读远端，指向相同冻结提交；本轮不执行 main promotion 或 GitHub Release。本轮不移动它们。[Phase II 范围决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml) 及[九文件状态入口](../Phase_II/05_Architecture_Review_and_Execution_Order.md) 原样保留；历史“未授权 Tag”描述保留其签署时点含义，后续建立本地引用的授权来自维护者对话。
 
 Scoped Engineering Acceptance、Task Freeze、Release Promotion、Formal Qualification 分别决议。此草案及文档提交不产生后三者；也不重新打开 Phase II 20/33/P00/P99 的已接受范围。
 
-## 端到端目标与独立分支
+## 端到端目标与独立能力链
 
 首条新执行交集拟定为 **MuJoCo 3.8.1 CPU × Menagerie 独立 panda_nohand.xml + hand.xml × 静态 Fixed Attachment × Arm-only/Hand-only Position Profiles**。未来须由同一公开 Environment 完成 reset→连续真实 step→typed/public observation→既有 Recorder→同 H5 readback→close。预组装完整 Panda 与两个自由 Panda 都不能作为独立 Attachment 成功证据。
 
@@ -27,6 +34,8 @@ Scoped Engineering Acceptance、Task Freeze、Release Promotion、Formal Qualifi
 R07新增4切片；P99建议直接依赖R06c与R07d。R07c每Task的R02/R03/R04条件前置须在配方中明确选择；首版authentic预集成MountedPanda/state-only方案为none，缺Core通用构造/谓词/公开状态能力仍BLOCKED_CORE。
 
 R04、R05 各自独立施工，但按当前建议均为整阶段 P99 的 required gates。某项失败不阻止不依赖它的 Position 子链继续，却阻止最终 P99 通过，除非维护者先批准精确范围变更。R03 第二 Provider 的执行不是默认 required；其拒绝原因和未获 Qualification 的状态必须可追溯。详见[执行表](07_Execution_Order_and_Acceptance.md)。
+
+2026-10-25维护者工作流补充：上述独立能力链不对应逐Goal新建Git分支。Phase II-01复用既有`codex/phase-ii-01-p00-20261023`作为本阶段集成分支，计划内开发分支总数为1、新增worktree为0；原名称保留，其职责覆盖本阶段多个子阶段和Goal。按[07的Sol/Luna顺序与提交闭环](07_Execution_Order_and_Acceptance.md#sol-luna-workflow)逐包推进。该流程偏好已明确，不代替尚待决定的具体实施范围和运行合同。
 
 ## Owner 与组合路线
 
@@ -45,12 +54,16 @@ Logical contracts 属 `task_env/artifacts/`；编译/source mapping 属 `task_en
 
 优先 COMPOSE_EXISTING / EXTEND_EXISTING。新不可变引用值并不授权新 Runtime abstraction；NEW_IMPLEMENTATION 必须另证既有 owner 不足。完整 source→consumer→failure→close 路线和[风险/修订对照](README.md)须在 P00 批准后细化。
 
-## 外部原则与非目标
+## 原 7/22 外部原则与非目标
 
-固定引用为 Isaac Lab v3.0.0（官方 Release 2026-10-20）与 Isaac Sim 6.1.0；[参考锁定表](README.md#references)列出实际读取的官方页。只借鉴显式选择/准入、producer-owned state、显式顺序映射、物理资产验证、policy interface 兼容原则；不引入 Isaac Lab/USD/Warp、第二 Runtime 或统一 Provider storage ABI。
+原规划固定引用为 Isaac Lab v3.0.0（官方 Release 2026-10-20）与 Isaac Sim 6.1.0；[参考锁定表](README.md#references)保留原用途。
+2026-10-28 新增计划按 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 接收已验证 USD，并规划 Isaac 6.2 pip 环境与 provider adapter；
+这不是把原 6.1 引用当作安装版本，也不引入第二 Runtime 或统一 Provider storage ABI。旧 reference 的 source/身份不因新计划升级。
 
 R07只规划 `asset/benchmarks/`（资产来源/许可/安装验证）与 `bench_deploy/`（benchmark配方/最小adapters）；不创建新TaskEnv/registry/Agent runtime。PhysPi仍外部消费方。
 
-不做动态 attach/detach、闭环拓扑热切换、通用 Assembly/仲裁、双臂 IK、所有 Provider/CUDA 矩阵、Camera async/semantic masks、训练/跨引擎 policy transfer、Task Harness、自动 Qualification。保持 Scene v1/v2/v3、旧 Artifact/Entity/Recorder identities 与历史 Evidence；新增合同独立版本化，不向旧 codec 静默增字段。
+原 7/22 不做动态 attach/detach、闭环拓扑热切换、通用 Assembly/仲裁、双臂 IK、所有 Provider/CUDA 矩阵、Camera async/semantic masks、训练/跨引擎 policy transfer 或自动 Qualification。
+Task Harness 从原非目标调整为 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 的独立接入计划，
+消费既有 Core；不改变 R07 原五任务的 Expert/训练非必需边界。保持 Scene v1/v2/v3、旧 Artifact/Entity/Recorder identities 与历史 Evidence；新增合同独立版本化，不向旧 codec 静默增字段。
 
-批准顺序：维护者审阅本规划→批准最终 Goal/DAG/Required Envelope→单独启动 P00→逐 slice 执行与 evidence→独立 P99 scope decision→另行 Release Gate。本轮停在第一步的文档交付。
+原规划批准顺序为：维护者审阅→批准最终Goal/DAG/Required Envelope→单独启动P00→逐slice执行与Evidence→独立P99 scope decision→另行Release Gate。后续明确授权允许P00基线核查和准入准备先行；这不批准最终范围，也不越过逐slice实施gate。相关范围未获明确批准前，工作包只能为AUDIT_ONLY，不能标READY_TO_IMPLEMENT。

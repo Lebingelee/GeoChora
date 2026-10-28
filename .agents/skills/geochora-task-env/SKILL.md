@@ -9,6 +9,243 @@ Read repository `AGENTS.md` and [module README](../../../docs/module/task_env/RE
 `task_env/` is the sole Core owner; use its public APIs. No historical chat context is required.
 For the source/contract/test map read [routes](references/routes.md) when implementing a workflow or diagnosing a gap.
 
+## Static Logical Assembly values
+
+R01a exposes `LogicalAssemblyV1`, `LogicalAssemblyEntityMemberV1`,
+`LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, and
+`decode_logical_assembly` from `task_env.artifacts`. Use these values only for
+an immutable, versioned logical contract pinned to an existing Scene identity.
+Entity members describe logical ownership; subcomponent members are typed
+reference-only views; nested members pin an exact child revision and digest.
+The codec alone does not check Scene/child existence or recursively resolve
+ownership.
+
+R01b adds advanced `resolve_logical_assembly(root, scene, child_assemblies)`
+from the same artifacts owner. It validates the exact Scene pin, reachable
+child revision/content hashes, Entity/Asset identities, and typed
+Frame/Joint/Actuator/ControlGroup targets, then returns immutable
+`ResolvedLogicalAssemblyV1` leaves with canonical segment-tuple paths and
+source Assembly provenance. Reference-only leaves do not create owners or
+writers. The fail-closed limits are root depth 1 / maximum 32 Assembly levels
+and 1024 expanded leaves. Resolution is provider-free and stateless; it does
+not project Task Source, create native names/indices, attach bodies, or admit a
+Runtime. R01c and R03 remain separate gates. See the executable minimal
+example in [Public API](../../../docs/module/task_env/public-api.md#bounded-logical-assembly-resolution-r01b).
+This static contract does not change selected runtime routes or their supported
+capability envelope.
+
+R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
+child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
+from current inputs, then associates each expanded leaf with one existing
+Scene Entity, its exact Asset declaration, and the corresponding typed
+Frame/Joint/Actuator/ControlGroup definition. ControlGroup actuator resources
+come from the Group's declared references. The immutable projection preserves
+the source Assembly/path and Scene/Asset declaration identities; source
+content hashes and matched historical receipts remain provenance fields, not
+fresh byte or closure verification. Use the executable example in [Public
+API](../../../docs/module/task_env/public-api.md#logical-assembly-source-declaration-projection-r01c).
+This is a static declaration join: it does not lower or attach XML, create
+physical entities/native names/indices, call the legacy Provider compiler, or
+admit Runtime/materialization/Qualification.
+
+## Static Position leaf contracts (R02a)
+
+`task_env.controllers.canonical` exports advanced provider-free values:
+`LeafProfileBindingV1`, `ArmPositionActionV1`/`ArmPositionTargetV1`,
+`HandPositionActionV1`/`HandPositionTargetV1`, `LeafApplicationAckV1`,
+`LeafRequiredStateV1`, and `HandForceAwareDependencyV1`. Use the exact strict
+decoders and `validate_leaf_binding(s)` for typed Scene-v3 and optional resolved
+Assembly selector checks. A binding pins Scene/Assembly/member/Entity/Asset,
+source closure, profile/action schema, algorithm/config, Provider/build/backend,
+timebase, ordered resources, ControlGroup, TCP and Required State; synthetic
+fixtures must keep `provenance_kind="synthetic_fixture"`.
+
+Arm Position is seven ordered Panda joint positions in radians. Hand Position
+is one aggregate `opening_m` in `[0, 0.08]`; finger positions are measured as
+`q1+q2`, with two `[0, 0.04] m` fingers, one fixed 0.5/0.5 tendon, finger
+equality, and a single `actuator8`. The legacy normalized adapter is explicit:
+`opening_m=0.04*(u+1)` for `u∈[-1,1]`. Its bound candidate mapping is
+`ctrl=3187.5*opening_m`, with `[0,255]` ctrlrange; this is static source
+metadata, not an executed Core mapping. All v1 leaf state fields remain mandatory
+and exactly match the bound profile resources and TCP; optional or extra cross-leaf
+requirements are rejected. Position Required State does not ask for force. Force-aware dependencies remain `NOT_ADMITTED`; raw signed force,
+canonical closing force, transmission/sign/phase, validity, sequence/revisions,
+freshness and Provider/build/backend/cadence are separate required provenance.
+
+Targets and Acks are static contracts. Validate them against the exact binding
+and caller-supplied source/application boundary and clock; an Ack is not proof
+of native apply, target attainment, or task success. The finite catalog is
+`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`. The R02a contracts alone do not compile
+a plan or create a writer; see the R02b owner below. See the executable value
+example in [Public API](../../../docs/module/task_env/public-api.md#position-leaf-contract-values-r02a).
+
+## Effective Position leaf plan and synthetic dispatch (R02b)
+
+The existing canonical Controller owner exports `LeafProfileSectionV1`,
+`LeafControlPresetV1`, `LeafProfileOverrideV1`, `EffectiveLeafPlanV1`, and
+`compile_effective_leaf_plan()`. A preset stores complete registered Arm/Hand
+Position sections by canonical member path. An override replaces one whole
+known section; it cannot change profile/action/algorithm or add fields. The
+compiler re-resolves current root/Scene/children through R01b and reruns the
+R01c source declaration projection before checking the binding, source,
+Provider/build/backend/timebase, exact Scene Group/Actuator coverage and
+Required State. Effective status is derived from which consumed configurations
+differ from base; a no-op override does not change status or effective plan
+identity. Force-aware and unknown algorithms remain refused.
+
+The existing RuntimeSession control owner exposes advanced opt-in values and
+functions from `task_env.runtime.sessions`: `LeafMaterializationReceiptV1`,
+the explicit canonical/native Joint/Actuator/Frame mappings and logical
+Tendon-to-native-name mapping,
+`prepare_leaf_command()`, `preflight_leaf_control_interval()` and
+`dispatch_leaf_control_interval()`. The Arm adapter reuses the legacy absolute
+joint limit/correction function. The Hand adapter reuses the existing gripper
+opening servo and ctrl conversion, keeping requested metres, servo metres and
+native ctrl as separate fields. Never infer native indices from tuple order or
+write Hand fingers as two independent actuators.
+Receipt validation must cover all `nu` native actuator IDs and ctrl slots; an
+extra unowned native actuator is rejected. Writer identities follow the same
+Entity-qualified semantic-name rule as R02a. Shared math preserves the legacy
+zero-force GripperTarget hold and the canonical controller's final opening
+clamp; these do not admit zero physical force limits or Force-aware leaves.
+
+Preflight validates every writer, action, typed state sample, source/config
+identity, mapping and evaluation clock before preparing commands or consuming
+the source boundary. After all stateless commands are prepared, dispatch applies
+each owned patch and verifies its returned Target Ack, steps the outer boundary
+once, then validates the next typed publication. Failure after boundary consume
+uses the existing `ExecutionFaultV1` latch plus leaf attempted/applied/unknown/
+acknowledged progress, the prepared Target/command patches, and every typed apply
+result returned before failure; it does not roll back, retry, or publish a transition.
+Provider-free S1 uses `synthetic_fixture` receipts only. No real Provider
+materialization, SelectedReferenceEnv or Recorder/H5 integration exists in R02b;
+do not report split leaves as admitted. R02c is the real execution/recording
+gate, and native S2/S3/S4 and Qualification remain separate.
+
+## SelectedReferenceEnv leaf integration (R02c attempts 001–005)
+
+Current bounded route (R02c005, 2026-10-28): explicitly pass
+`hand_stiffness_N_per_m=50.0` to the task-owned builder for
+SOURCE_CALIBRATED_HAND_50_V1. It composes a complete Hand section override with
+Arm gain2.5 or3.0 using the existing effective-plan owner. Omission preserves
+legacy2500/preset/plan identities; the original0042500 motion failure remains.
+This is the same force-free Position law and source, not force feedback or a
+physical5N cap.56 provider-free S1 and actual static preflight passed; one
+MuJoCo3.8.1 CPU process completed four64-interval episodes,1280mj_step,
+260mj_forward and4reset/materializations. Arm/Hand motion, clock/range/reset,
+E3/E4 Arm-only configuration isolation, four real64/65 H5 readbacks and nine
+tamper rejections passed. A separate provider-free process reread the four
+closed H5 files and recomputed motion/command mappings without modifying bytes.
+Sol accepted only this exact full-Panda/two-writer/Hand50/seed31/2ms×5 case as
+ACCEPTED_BOUNDED_S2_S3. Independent Attachment, other Providers, force-aware,
+endpoints and new Qualification remain outside this result. Next table row is
+R03b; no R03b implementation/native has occurred. Evidence is in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_005/`.
+The attempt history below retains original failures and earlier review states.
+
+The task-owned `build_leaf_position_candidate()` composes the existing A05
+source/Artifact/reset owners with two separate Arm-only and Hand-only Position
+writers on one full-Panda Entity. `SelectedReferenceEnv.from_leaf_position_candidate()`
+reuses the existing binding, reset/step/stop/close, typed-state, fault and
+Recorder lifecycle; it is an advanced task candidate, not a registered
+`make_env()` UID or independent Arm+Hand Attachment route. The MuJoCo adapter
+builds a provider-materialization receipt from the compiled model and applies
+each writer's owned ctrl slots. `load_leaf_control_records_h5()` is an additive
+semantic reader over Generic H5 v3, not a second recording format.
+
+The provider-free targeted S1 passed 53 tests. The authorized bounded MuJoCo
+3.8.1 CPU process exited during static contract verification with
+`KeyError: 'provider_static_files'` before importing MuJoCo or running native
+compile/materialize/reset/forward/step. A script correction was preserved in
+contract revision 3 but was not rerun because the fixed process-start budget
+was exhausted. Treat R02c native S2/S3 and Provider admission as NOT_RUN; do not
+describe the implementation as a supported runtime route or Qualification.
+The initial error, corrected script and revisioned contracts are in the local
+ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`
+attempt package.
+
+Sol review (2026-10-27) requested bounded attempt002 fixes after identifying a
+wrong prepared-command import, missing nested decoder, stale Target writes
+before Ack rejection, exact-float clock comparison, admission cleanup and
+old-window preflight gaps. Attempt002 fixed those owners and its provider-free
+targeted S1 passed 28 tests, including production Recorder/H5 T=64/T+1=65,
+nine tamper cases, adapter no-write rejection and admission cleanup. Static
+preflight passed against the frozen source/assets and MuJoCo installation
+files; four malformed-contract variants were rejected with structured
+zero-native-call evidence. The one authorized MuJoCo 3.8.1 CPU process failed
+the loaded runtime version/API check before compile, materialization, reset,
+forward or step (`BLOCKED_PROVIDER`). No retry or Provider fallback occurred;
+native S2/S3 and Provider admission remain unestablished, and the attempt is
+pending Sol review. The earlier attempt001 mixed compatibility process's four
+legacy materialize/reset/forward operations remain historical and do not count
+toward attempt002. See ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`.
+
+Sol reviewed the attempt002 repairs and synthetic evidence. Current status is
+`S1_REVIEWED_NATIVE_PENDING`: the probe incorrectly expected API integer 30801;
+MuJoCo3.8.1's official and installed header define 3008001. Sol fixed that guard,
+kept strict package/runtime/version/path/hash checks, and records observed
+identity before rejection. Original raw logs lack the actual loaded version
+values, so neither runtime identity nor a real Provider mismatch is established.
+The current rework module passed 19 provider-free tests; Sol ran no native.
+The single attempt003 process then verified exact MuJoCo 3.8.1 package/runtime/API,
+compiled the unchanged full-Panda closure, created its model-bound 9/9/8 receipt,
+and reset E1. The first interval failed after five native substeps: leaf dispatch
+passed an untyped tuple to the existing `snapshot_v1()` owner, which requires
+`StateRequirements`. No typed interval publication or completed transition
+resulted; Generic H5 v3 left a failure artifact with T=0/T+1=1, rejected by the
+R02c reader, and the close diagnostic is preserved. The
+attempt does not pass S2/S3 or admit the Provider. After retaining its raw
+failure, the existing dispatch owner was fixed to construct the typed aggregate
+requirements and the rework module passed 19 provider-free tests; this change
+was not natively rerun. Treat the attempt as failed and pending Sol review; do
+not start R03b. Attempt002 report/logs are in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`;
+attempt003 evidence is in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.
+
+Sol review of attempt003 retains actual MuJoCo identity/compile/receipt/reset
+and five integration steps, followed by the typed publication failure. The
+StateRequirements repair is reviewed and now validates before consume/physics.
+The strengthened S1 uses the actual MuJoCo publisher and shared snapshot/projection
+with synthetic IO, production Recorder/H5 and the same probe ctrl checker;
+38 R02c/R02b tests passed without native load. The remaining probe readback
+import and pre-close per-writer fault receipt capture were fixed. The original
+T0/T+1=1 failure H5 remains rejected; its finalized attribute does not satisfy
+R02c's64/65 requirement.
+
+Attempt004 (2026-10-27) used the new authorized single-process window. Static
+preflight verified the unchanged 34,307,550-byte source closure and 67 assets;
+the loaded MuJoCo identity matched 3.8.1/3.8.1/3008001 and its pinned file hashes.
+E1 arm-only completed 64 intervals, passed the joint-1 motion/home oracle, and
+passed same-file H5 T=64/T+1=65 readback plus nine tamper rejections. E2
+hand-only completed 64 intervals but failed the frozen hand-motion oracle:
+opening minimum 0.068789857 m and excursion 0.007210143 m did not meet ≤0.02 m
+and ≥0.04 m. E2's H5 was closed and passed offline typed-reader T/T+1 checks;
+E3/E4 did not run. A secondary `numpy.float32` JSON serialization error
+obscured the raw summary, but the immutable JSONL event records the actual E2
+assertion, 2 materializations, 2 resets, and 640 `mj_step` calls. Exact
+`mj_forward` and RSS counts are unavailable. A diagnostic serialization fix
+and regression passed 21 provider-free tests after the run; no native retry,
+source/algorithm/oracle/threshold/budget change, Provider admission,
+Qualification, or R03b start occurred. R02c remains
+`FAIL_PHYSICAL_ORACLE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`. Evidence is in
+ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`.
+
+Sol review of R02c004 accepts only the exact E1 arm-only motion/closed-H5
+bounded evidence. E2 finished64 intervals but failed Hand motion; E3/E4 did
+not run. Actual JSONL/H5 support640 integration steps, while original raw
+summary/ledger misleadingly show zero after secondary serialization failure;
+keep the raw immutable and reconstruction separate. Forward/RSS remain unknown.
+Future probe finalization retains owned live counters, primary/secondary errors
+and atomic strict NumPy-safe JSON.42 provider-free checks passed; no Sol native.
+The existing5/2500 command-step policy sends at most2mm beyond measured opening.
+A source-derived50N/m full Hand section override is proposed as a new Task-owned
+configuration; defaults/original failure/source/algorithm/oracle remain unchanged.
+It is not a physical5N force cap or Force-aware profile. Current status is
+BLOCKED_HAND_CONFIGURATION_DECISION; only explicit maintainer adoption authorizes
+the next single-process implementation/validation package. No R03b/Qualification.
+
 ## Choose the actual construction branch
 
 - Generic scalar: `from task_env import make_env`; e.g. `make_env("pendulum-v1",
@@ -17,7 +254,7 @@ For the source/contract/test map read [routes](references/routes.md) when implem
   `ResolvedEnvConfig` is authoritative. `env.execution_plan` is a provider-free `execution-plan-v0`
   static projection only: it does not establish actual manifest support, runtime materialization, or reset realization.
 - Explicit single-Panda Position candidate: `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys",
-  "backend":"cpu", "horizon":64})`. Only GeoPhys scalar CPU, fixed reset seed 31, state-only, 100 Hz / five 2 ms steps.
+  "backend":"cpu", "horizon":64})`. Only GeoPhys scalar CPU, fixed reset seed 31, state-only by default, 100 Hz / five 2 ms steps.
   Optional `source_workspace` must be fresh/empty; omission allocates an ignored workspace source snapshot.
   Use exact Scene/plan-bound `StructuredActionRequestV1` with both arm/gripper groups; returned reset/step observations
   carry joint/hand/boundary leaves and info clocks. After reset use the read-only `env.position_plan` for exact Scene/plan IDs and its first binding's action schema;
@@ -30,6 +267,18 @@ For the source/contract/test map read [routes](references/routes.md) when implem
   No public runtime path imports test modules. The same public environment passed 64 real intervals/65 observations
   and same-file request/target/ack/state readback; task success, freeze/Judge and Qualification are separate.
   R1 and dual-Entity candidates remain diagnostic. See [P99 run receipt](../../../docs/module/task_env/goal/Phase_II/C_Development_Record.md#public-candidate).
+- R04a adds an explicit `camera_observation` mapping to that same Position candidate. Decode it with
+  `CameraObservationConfigV1` and supply both canonical camera mounts (`world` fixed mount, `hand` mounted camera)
+  with authored rigid transforms and use horizon at most 16. It publishes RGB HWC float32, optical-Z depth in metres and canonical Entity mask
+  after an existing typed state boundary. The consumer checks capture request identity against its actual config/source/
+  execution/manifest and calibration against that same typed parent Frame before publishing leaves. Generic H5 v3
+  keeps its root ABI and adds versioned sidecars; the recording-binding sidecar is cross-checked against stored Position
+  state-boundary digests, reset/transition clocks, reference-profile metadata and finalized typed outcome/control records.
+  Use `load_camera_observations_h5()` for strict semantic checks; missing or unknown binding versions fail closed. Omitting
+  the mapping keeps the state-only default. R04a attempt002's targeted provider-free synthetic S1 passed (33 cases),
+  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and same-file camera S3 remain NOT_RUN.
+  Do not treat this S1 as R04b/c completion, camera qualification, or P99 gate completion. See
+  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
@@ -580,3 +829,109 @@ Historical refresh receipts saying review was pending retain their signing-time 
 Release promotion/main/tag/GitHub Release and new Formal Qualification are not authorized by this freeze.
 Six next-stage themes are candidates only in the existing [Roadmap](../../../docs/roadmap/README.md#phase-ii-01-candidate-handoff);
 do not create or implement Phase II-01 Goals without separate authorization. This refresh changes status navigation only, no API/example behavior.
+
+## Phase II-01 fixed Attachment candidate (R03b/R03c, 2026-10-28)
+
+`FixedAttachmentPlanV1` is an advanced immutable intent exported by
+`task_env.artifacts`; `validate_fixed_attachment_scene()` and
+`lower_fixed_attachment_sources()` extend the existing Assembly/source owners.
+The bounded candidate binds two separate canonical Scene-v3 Entities to the
+unchanged Menagerie Panda Arm and Hand sources, explicit mount transforms,
+license/source-closure hashes and complete native-name maps. One existing
+MuJoCo RuntimeSession owns the attached native model and its model-bound
+receipt.
+
+The current task-owned `build_fixed_attachment_candidate()` path has provider-
+free S1 and bounded MuJoCo 3.8.1 CPU S2 evidence for exactly this source pair,
+seed 31, ResetPlan and 2 ms × five-step timebase. Its current result is
+`ACCEPTED_BOUNDED_S1_S2` after Sol review. Static admission also rejects
+coherently rebound Scene Joint topology/type/axis/pose or Asset provenance
+that disagrees with the pinned source; 99 provider-free checks and the actual
+19-case static gate passed. Sol reused the two original native trials,
+independently checked 256 motion boundaries plus both resets, and added no
+native execution. This is not a
+registered `make_env()` route, a general multi-Entity/Attachment capability,
+or Qualification. R03c attempt001 adds an opt-in two-Entity Position-leaf
+candidate and passed 83 selected provider-free S1 tests. The first authorized
+native start verified the pinned MuJoCo CPU identity but stopped during public
+reset admission on the Entity-scoped Attachment tendon key versus the Hand
+leaf logical tendon identity, before any forward or step. The second and final
+authorized start stopped before provider import because the retry runner did
+not accept its already-appended ledger row. A provider-free retry-counter fix
+and S1 rerun passed; the native budget is exhausted, with no real episode/H5
+or S2/S3 result. Sol reviewed the static implementation and added real Core
+admission→public Env reset/step S1 with native IO stand-ins, coherent Ack/slot
+tamper checks, strict physical thresholds and a shared pre-import execution
+preflight. The current 90 provider-free tests pass; the state is
+`S1_REVIEWED_NATIVE_PENDING`, not S2/S3 acceptance. Use the existing
+`r03c_freeze` explicit output/snapshot/prompt and `r03c_attached_leaf_probe
+--preflight-only` before any separately authorized new native window; never
+reuse attempt001's spent two-start budget. Read the current scope and limits in the
+[R03 contract](../../../docs/module/task_env/goal/Phase_II_01/03_R03_Physical_Attachment.md)
+and the current materialization boundary in [Public API](../../../docs/module/task_env/public-api.md).
+
+R03c attempt002 update (2026-10-28): its one authorized MuJoCo 3.8.1 CPU
+native start verified runtime/API identity, reset E1 and called one `mj_forward`,
+then failed when the runner passed `JointReference` values to
+`RuntimeSession.snapshot_v1()`, which requires `JointDefinition` values from
+the canonical Scene. It recorded one materialization/reset, zero `mj_step` or
+outer intervals, no episode/H5, and no RSS sample; independent H5 readback did
+not run. The task-owned runner mapping was repaired after preserving the raw
+failure, and one provider-free S1 regression passed. This repair is not
+native-verified and no retry is permitted in that window. Sol reviewed the
+source repair and added four actual runner snapshot configurations through real
+Core reset/step with synthetic native IO/geometry; the current R03c module has
+20 provider-free passing checks. The prior shared preflight checked frozen
+identity/ledger, not this runner publication path. Status remains
+`S1_REVIEWED_NATIVE_PENDING`, with S2 incomplete/S3 not run; this does not add
+Provider admission, general Attachment support or Qualification. Keep
+attempt001 bytes and attempt002 failure/freeze/ledger separate at their ignored
+workspace Evidence paths.
+
+R03c attempt003 update (2026-10-28): the separately authorized one-start
+MuJoCo 3.8.1 CPU window completed four 64-transition/65-observation episodes
+and closed four H5 files. The independent provider-free reader read all four,
+reported 256 transitions/260 observations, and rejected all 48 copy-only
+tamper cases. After E4 close, the runner raised `UnboundLocalError` because
+`native_log_bytes` had not been initialized while assembling the final receipt;
+no `native_result.json` was written. The aggregate reader therefore returned
+`OFFLINE_READBACK_INCOMPLETE_OR_FAILED`, and R03c S2/S3 remain incomplete.
+After this consumed native window, the runner's output-byte initialization order
+and the synthetic fresh-window test's stale protected-hash fixture were fixed;
+the focused provider-free module suite passed 20 cases. Neither correction was
+native-verified. Keep the original failure and H5s; do not retry this window,
+claim general Attachment/Provider support or Qualification, or start another
+slice. Sol review is pending in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`.
+
+R03c attempt003 Sol review (2026-10-28): accepts the four-episode execution
+facts and post-run correction, while S2/S3 remain incomplete (exit 1, no final
+native receipt). The existing probe now delegates its post-episode closeout to
+a provider-free helper and publishes the final receipt after budget/progress
+writes. The focused suite has 33 passing cases, including 13 closeout checks;
+these synthetic closeout facts do not prove dynamics. The next package is
+attempt004, same source/oracles and one separate native start. No new native
+execution, Qualification or other slice follows from this review. See ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/sol_review.md`.
+
+R03c attempt004 execution (2026-10-28): one bounded MuJoCo 3.8.1 CPU start
+on frozen input HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d` completed
+four same-public-Env Arm/Hand Position episodes and published the formal
+native receipt. A separate provider-free process read the four closed H5s,
+verified 256 transitions/260 observations and rejected 48/48 copy-only tamper
+cases. Current exact-scope status is
+`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`; the focused
+33-case S1 was reused, not rerun. This result is limited to the frozen Panda
+Arm+Hand source, MuJoCo 3.8.1 CPU, seed 31, 2 ms × 5 and four configurations.
+It does not establish general Attachment/Provider support, task success or
+Qualification. Preserve attempt001–003 originals; attempt004's one-start
+budget is consumed and no other slice starts before Sol review. Evidence is in
+ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/`.
+
+R03c attempt004 Sol review (2026-10-28): the exact Panda Arm+Hand, two
+Position-writer, MuJoCo 3.8.1 CPU, seed 31 and 2 ms × 5 four-configuration
+public Env/Recorder/reader intersection is `ACCEPTED_BOUNDED_S2_S3`. The
+50-file attempt manifest, 16 frozen source files, receipt, native trace and
+four H5 hashes/readback were reviewed; 33 provider-free S1 checks were reused.
+This does not grant general provider/Attachment admission or Qualification.
+Evidence and the Sol review remain in ignored workspace maintenance records.

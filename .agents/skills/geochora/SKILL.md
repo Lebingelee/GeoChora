@@ -65,6 +65,10 @@ GeoPhys             -X-> Geochora/task_env
 5. Update the canonical document when the supported contract changed, and
    report changed files, checks, unsupported intersections, and remaining risk.
 
+## Phase branches and handoffs
+
+Follow the maintainer's [phase branch and Sol/Luna policy](../../../AGENTS.md#phase-branch-workflow): plan branches/worktrees per phase or stage, reuse the current phase branch across Goal prompts, and associate each bounded output with its relevant local commit(s). For Phase II-01, the [execution table](../../../docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md#sol-luna-workflow) owns its concrete branch plan, sequential Sol → Luna → Sol review loop and audit-summary commit route. Preserve old receipts and check the actual committed HEAD before the next handoff; this workflow does not grant implementation, publishing or Qualification approval.
+
 ## Non-negotiable boundaries
 
 - Core must not repair a provider through private solver or renderer state.

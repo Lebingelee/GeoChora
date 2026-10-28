@@ -2,13 +2,22 @@
 
 状态：**REVISED_DRAFT / PLANNED / NOT_STARTED**。本轮仅源码审计与规划修订，不启动 P00/R07a，不把审阅检查计为部署验收。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，尚待维护者批准。
 
+2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
+[10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
+上游按已验证 USD 处理，Core 负责接收与 provider 执行绑定；其来源/验证成功不自动证明 benchmark 语义对应。
+Harness 当前 mock `pick-lift-v0` 不能替代本页 On/In/region/Open/TurnOn/native-init 的任务映射。
+F06 的 Expert/≥20-seed/Oracle 是新增 Harness 出口，不回写为本页五任务部署的新必需项；
+本页任务完成/Expert/训练非必需的边界保持，R07 当前仍未执行。
+
 ## 1. 范围、来源和实际审计边界
 
 首个 required Benchmark 候选为 LIBERO 下列五任务；RoboCasa 仅第二阶段 feasibility/scope recommendation。R07 不要求 Expert Solution、任务成功率、策略训练或机器人完整完成任务；但必须真实构造、重复 reset、语义对照和有意义的公开 Controller/Planner 物理交互，不能以静态编译、fake/random actions 或视觉相似充证。
 
 LIBERO 固定 inspected candidate：`8f1084e3132a39270c3a13ebe37270a43ece2a01`，仓库 [Lifelong-Robot-Learning/LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO/tree/8f1084e3132a39270c3a13ebe37270a43ece2a01)。提交存在、未截断树与下载文件 Git blob bytes 已核对；这不是 dependency/runtime compatibility 已通过。共读取/核 hash 46 个 LIBERO 文件，包括 5 BDDL、8 init/pruned_init 文件、native evaluator/object/site/robot/source XML；raw files 留 ignored workspace，摘要在 [manifest](planning_manifest.json)。
 
-[benchmark loader](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/benchmark/__init__.py) 实际为每个 Task 选择 `.pruned_init` 并调用 torch.load。五份对应文件都存在；libero_goal 两任务在此树中没有同名 `.init`，其他三任务另有 `.init`，不能互换。初始化本轮只检查 ZIP/pickle opcode 元数据与 bytes/hash，未调用 torch.load/unpickle、上游 import 或 native env。元数据中的二维尺寸如下；其坐标含义、MuJoCo flat-state 顺序与实际 reset realization 尚未验证。
+审计时点：上述 46 个 LIBERO + 9 个 RoboCasa + 8 个 robosuite 文件的获取/审计来自 `535ce251…` 保存的前轮收据。本轮在该提交基线上重新确认 LIBERO commit，并重新抓取 16 个固定版本文本文件（含五 BDDL、loader、object/site/predicate、依赖和 robot/gripper XML），逐字节摘要与原 Git blob 一致；本地另复核全部 63 个既存源文件摘要。8 份 init 二进制本轮未重新下载或反序列化；完整 mesh/逐资产许可/依赖运行兼容核验及所有 native 语义/部署实验仍未执行。详见 [validation receipt](validation_receipt.json)，不能把重新读取源码写成 R07a 已验收。
+
+[benchmark loader](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/benchmark/__init__.py) 实际为每个 Task 选择 `.pruned_init` 并调用 torch.load。五份对应文件都存在；libero_goal 两任务在此树中没有同名 `.init`，其他三任务另有 `.init`，不能互换。前轮初始化审计只检查 ZIP/pickle opcode 元数据与 bytes/hash，未调用 torch.load/unpickle、上游 import 或 native env；本轮复核保全文件摘要。元数据中的二维尺寸如下；其坐标含义、MuJoCo flat-state 顺序与实际 reset realization 尚未验证。
 
 | # | Suite | Native filename（无扩展名） | 原 BDDL goal（原表达，不推断行为顺序） | pruned_init 编码 shape |
 | --- | --- | --- | --- | --- |
@@ -20,7 +29,7 @@ LIBERO 固定 inspected candidate：`8f1084e3132a39270c3a13ebe37270a43ece2a01`�
 
 每任务精确 [BDDL / init SHA-256、init 条件、fixtures/objects 与条件前置](planning_manifest.json) 是机器审阅入口；任务名来自维护者指定集合，不允许替换难任务。language、BDDL `:init`、serialized native init、BDDL `:goal`、原生 Python predicate 是五种输入：language 不是动作约束，`:init` 不是对 serialized state 已实现的证明。
 
-本轮读取 11 个真实资产 XML，42 个 file references 均能按路径在同提交树定位；检查了 mesh scales、joint/range、site、inertial 声明。外部 mesh/texture 原 bytes、完整 robot/scene transitive closure、逐资产许可和 runtime importer 消费尚未验证，不能称 verified asset manifest。LIBERO [root LICENSE](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/LICENSE) 为 MIT，不能据此自动批准 Google Scanned / HOPE / Turbosquid 等来源网格的再分发。
+前轮审计读取 11 个真实资产 XML，42 个 file references 均能按路径在同提交树定位；检查了 mesh scales、joint/range、site、inertial 声明，本轮保留这些 source-bound 结果并复核文件摘要。外部 mesh/texture 原 bytes、完整 robot/scene transitive closure、逐资产许可和 runtime importer 消费尚未验证，不能称 verified asset manifest。LIBERO [root LICENSE](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/LICENSE) 为 MIT，不能据此自动批准 Google Scanned / HOPE / Turbosquid 等来源网格的再分发。
 
 ## 2. Native predicate 审计与不能简化的语义
 
@@ -103,6 +112,8 @@ R07b 的 verified asset source manifest 必须包含 URI/upstream repo+revision�
 | maintainability | 固定静态检查配置/版本（LOC、复杂度/重复、public/private usage、测试/owner边界）+独立human readability review；保存reviewer身份/资格冲突、rubric、原始意见。部署Agent自评仅附录，不足以独立结论 |
 
 静态比较需同一工具/过滤集合，新增classes数量/LOC本身不是越少越好；binary/data与installation量分别统计。记录缺失instrumentation、工具失败、未计入的外部服务和人工支持；不将“未读取到”当零。R07d必须给出可审计session-bound报告，即使部分tokens/billing确实不可得也写null/reason；若连主要session/time/source/log来源不可追溯，成本gate不能PASS。本轮真实部署成本均未测，未读取私人账单或以对话长度估算tokens。
+
+R07a 还须固定真实部署的 `measurement_baseline_commit`、可复用模块版本与 setup 起点；本轮规划审阅提交不是未来成本实验的默认源码起点。R07 引发的通用 Core Extension 成本必须进入 setup/shared 或对应任务增量，并与已有 R01–R06 基础分栏；后者列来源与未纳入成本的边界，不能当作本次新开发、免费实现或降低成本的因果证据。所有口径与原始计数一起冻结，失败和人工帮助不能在汇总时被排除。
 
 ### Native-reference 成本对照与因果边界
 

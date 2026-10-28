@@ -14,9 +14,9 @@ Root facade 的声明见 [`task_env/__init__.py`](../../../task_env/__init__.py)
 | 通用 scalar | `make_env("pendulum-v1", config={"runtime": {"backend": "cpu"}})` | `BaseTaskEnv` 的 Gymnasium 生命周期；另有 `two-wheel-balance-v1` |
 | PickCube selected reference | `make_env("pick-cube-p16-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | lift-only task predicate，保留 selected P1.6 Artifact |
 | NutAssembly selected reference | `make_env("nut-assembly-outcome-reference-v1", config={"provider": "mujoco", "backend": "cpu", "horizon": 6000})` | legacy `step_expert()` retained; exact MuJoCo 3.8.1 CPU external Solution and GeoPhys `a53a8cf` CPU/CUDA cadence S2/S3 are bounded diagnostic results; the GeoPhys matrix deliberately uses host snapshot at every native step and does not expand generic support |
-| Explicit Position candidate | `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys", "backend":"cpu", "horizon":64})` | single Panda Scene-v3, fixed seed 31, 100 Hz / five 2 ms steps, state-only; candidate without freeze/Judge/Qualification; Generic H5 v3 recording and same-file readback bounded passed |
+| Explicit Position candidate | `make_env("panda-position-servo-candidate-v1", config={"provider":"geophys", "backend":"cpu", "horizon":64})` | single Panda Scene-v3, fixed seed 31, 100 Hz / five 2 ms steps; state-only by default; opt-in R04a camera consumer checks capture identity against the actual request and typed Frame, while the H5 reader binds sidecars to stored state digests, clocks, typed controls and episode outcome; targeted provider-free S1 accepted by Sol as ACCEPTED_S1_BOUNDED, real renderer/Env/H5 S2/S3 not run; candidate without freeze/Judge/Qualification |
 
-两条 selected route 只接受 `provider`、`backend`、`horizon`：provider 仅
+PickCube/NutAssembly 两条 selected reference 只接受 `provider`、`backend`、`horizon`：provider 仅
 `geophys`/`mujoco`，backend 仅 `cpu`，horizon 为 `[1,6000]` 内整数；render_mode、extra kwargs、
 legacy overlays 会失败。不要把通用 `runtime` section 传入 selected reference。
 每个 selected task 由 task-owned `task.py`、`solution.py`、`config.yaml` 与 `__init__.py` 所有。
@@ -125,14 +125,273 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `ProductionCanonicalPandaController.source_artifact_hash`, `.source_xml_sha256`, `.tcp_profile_identity`, `.source_kinematics_identity`, `.expected_control_step` | `task_env.controllers.canonical.production` | Read-only actual-instance identity and evaluation-cursor view used by source-bound admission; adding these properties does not alter legacy R1 identity or compute/reset behavior |
 | `ActuatorForceMeasurementV1`, `RuntimeSnapshot.actuator_force_measurement` | `task_env.environment` | Core Provider-adapter value contract for signed raw actuator-force provenance: source generation, sample/config/state revisions, native sample index/phase, validity, and selected-session episode/reset/evaluation boundary. Used by GeoPhys legacy force-aware and MuJoCo session-cache routes; wrapped by typed state v2 only for the exact admitted Scene-v3 R1 candidate. It does not grant generic actuator units or shared Provider capability |
 | `AssetDefinition`, `EntityInstance`, `SceneDefinition` | `task_env.artifacts` | Phase II A01 identity/provenance、A02 frames/articulations、A03 `scene-definition-v3` static composition；strict codec only，不构造 Provider/runtime |
+| `LogicalAssemblyV1`, `LogicalAssemblyScenePinV1`, `LogicalAssemblyEntityMemberV1`, `LogicalAssemblySubcomponentReferenceV1`, `LogicalAssemblyNestedMemberV1`, `LogicalAssemblyControlGroupReferenceV1`, `decode_logical_assembly` | `task_env.artifacts` | R01a provider-neutral `logical-assembly-v1` 静态值；Scene identity pin、typed Entity/reference/nested member 与非自指 content hash。strict codec 不解析、不 lowering、不代表 Attachment admission 或 physical support |
+| `resolve_logical_assembly`, `ResolvedLogicalAssemblyV1`, `ResolvedLogicalAssemblyLeafV1` | `task_env.artifacts` | R01b bounded provider-free static resolver：对一个精确 Scene 和显式 child catalog 校验可达 closure，返回不可变 typed leaves/path/provenance；最大32层/1024 leaves。不投影 source、不创建 native mapping/Entity/writer或 Runtime |
+| `project_logical_assembly_source`, `LogicalAssemblySourceProjectionV1`, `ProjectedEntitySourceV1`, `ProjectedLeafSourceV1` | `task_env.assembly` | R01c advanced provider-free projection：每次重验当前 Assembly/Scene/child closure，关联被引用的现有 Entity、Asset声明及精确 typed Frame/Joint/Actuator/ControlGroup定义；保留来源Assembly/path与声明级证据。receipt只核对声明身份，不重新验证bytes/closure；不lower XML、不创建物理Entity/native映射或Runtime |
+| `FixedAttachmentPlanV1` | `task_env.artifacts` (advanced) | R03b 新增的 immutable、版本化 fixed-tree intent：单向绑定现有 LogicalAssembly content hash、Scene pin、两个 Entity/Asset/source与license/closure hash、typed root/mount refs、变换、collision/root policy及显式native-name maps。该值不改旧 Scene/LogicalAssembly identity，也不单独证明 source bytes 或native支持 |
+| `validate_fixed_attachment_scene`, `lower_fixed_attachment_sources` | `task_env.assembly` (advanced) | R03b 既有Assembly/source owner的附加准入与双source闭包：每次重跑当前 resolver/projector，绑定实际source bytes并检查本case映射/equality/tendon。S1/S2仅覆盖固定的Menagerie Panda Arm+Hand候选；不代表任意树已支持 |
+| `LeafProfileBindingV1`, `LeafJointActuatorBindingV1`, `ArmPositionActionV1`, `ArmPositionTargetV1`, `HandPositionActionV1`, `HandPositionTargetV1`, `LeafApplicationAckV1`, `LeafRequiredStateV1`, `HandForceAwareDependencyV1`, `leaf_profile_catalog_v1` | `task_env.controllers.canonical` | R02a advanced provider-free leaf contracts. Strict values pin Scene/Assembly/member/Entity/Asset/source/profile/config/Provider/backend/timebase identities, explicit TCP transform direction, and ordered Joint/Actuator refs. The finite Force-aware catalog remains `CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`; R02b adds a separate compiled Position leaf plan and synthetic-IO adapter path, but does not alter the catalog or admit a Provider |
+| `LeafProfileSectionV1`, `LeafControlPresetV1`, `LeafProfileOverrideV1`, `EffectiveLeafPlanV1`, `compile_effective_leaf_plan` | `task_env.controllers.canonical` | R02b advanced provider-free owner. Re-resolves current R01b/R01c inputs, requires complete Scene ControlGroup/ActuatorResource coverage, compiles exact immutable Arm/Hand Position sections, and derives `preset` / `partially_overridden` / `custom` from effective configuration differences. This is not a public factory or runtime admission |
+| `LeafMaterializationReceiptV1`, `LeafNativeJointMappingV1`, `LeafNativeActuatorMappingV1`, `LeafNativeFrameMappingV1`, `LeafNativeTendonMappingV1`, `prepare_leaf_command`, `preflight_leaf_control_interval`, `dispatch_leaf_control_interval` | `task_env.runtime.sessions` (advanced opt-in) | R02b provider-neutral typed boundary and production preflight/dispatch owners. R02b S1 consumes explicitly `synthetic_fixture` mappings only. R02c attempt004 verified MuJoCo 3.8.1 CPU identity and frozen source; E1 arm motion plus H5/tamper checks passed, while E2 hand motion failed its fixed oracle after 64 intervals. E1/E2 H5 files independently read as T=64/T+1=65; E3/E4 were not run. Slice S2/S3 remains incomplete and Provider admission is unverified. `LeafControlRuntime` extends the existing RuntimeSession owner, not a second runtime |
 | `FrameReference`, `FrameDefinition`, `ArticulationDefinition`, `JointDefinition` | `task_env.artifacts` | entity-qualified frame、固定变换、runtime anchors 与多 articulation topology；不执行 FK 或 provider lowering |
 | `RobotInstance`, `ActuatorResourceDefinition`, `ActuatorReference`, `ControlGroup` | `task_env.artifacts` | Entity-qualified 的静态 Robot/actuator/group identity；`SceneDefinition.resolve_*` 仅解析静态声明，不定义 Controller、动作维数、native binding 或多 Robot 执行 |
-| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的 v1 route 仍只支持精确 Scene-v3、一个 RobotInstance、scalar reset/state、bounded source root 的 GeoPhys/MuJoCo CPU 路线；现有 `materialize_control()` owner 另有精确 Position candidate 和双 Position Entity admission，以及单个 source/Controller/plan-bound R1 typed-force admission：GeoPhys clean revision `a53a8cfe...` CPU 或实测 MuJoCo 3.8.1 CPU Python/native binary digest。两者都严格绑定新 Artifact、Scene/source closure、实际 Controller/TCP、`actuator8` 和精确 plan；不扩展 generic provider manifests 或其他 backend/transmission。`reset_plan()` 校验 Artifact/TaskSource/Scene identity，原样执行 ResetSample v0，并在 measured-state tolerance gate 通过前阻断 snapshot/step。`snapshot_v1()` 保持不发布 actuator force；`snapshot_v2()` 只在上述精确 routes 发布 required typed force，其他 RuntimeSession 对 required force 明确不可用。contact/native-interval 不由此支持 |
+| `RuntimeSession`, `RuntimeSession.snapshot_v1`, `RuntimeSession.snapshot_v2`, `RuntimeSession.reset_plan`, `materialize`, `provider_manifest` | `task_env.runtime.sessions` | advanced bounded session route；需合法 artifact/source/profile。直接 `materialize()` 的既有路线仍按单Robot/已列精确准入处理；R03b另加显式 fixed-attachment-plan opt-in，只在准确Menagerie Panda Arm+Hand双source、Scene-v3/LogicalAssembly/closure identity、MuJoCo 3.8.1 CPU、2 ms × 5、ResetPlan及模型映射/拓扑门内执行，经Sol复核为ACCEPTED_BOUNDED_S1_S2。该attempt不是公共`make_env()`、Controller、Recorder/H5 S3或任意Attachment route。现有`materialize_control()`仍单独拥有Position与plan-bound R1 typed-force准入：GeoPhys clean revision `a53a8cfe...` CPU或实测MuJoCo 3.8.1 CPU build/source。`reset_plan()`校验Artifact/TaskSource/Scene identity并在measured-state tolerance gate前阻断snapshot/step；`snapshot_v1()`不发布actuator force，`snapshot_v2()`只在精确R1 routes发布required typed force。contact/native-interval不由此通用支持 |
 | `CameraCaptureIdentityV1`, `CameraRenderSource.capture_identity` | `task_env.render.camera` | 绑定 camera/source、ExecutionSpec v1、准确 manifest mapping、state boundary/clock 与 modalities 的静态 capture-request identity；不代表实际 capture 或 renderer pairing 已运行 |
 | `CanonicalCameraObservation.capture_identity` | `task_env.observations.canonical_camera` | Dynamic camera 成功返回图像时附带现有 `CameraCaptureIdentityV1`；buffer、metadata step/time 与 identity boundary/clock/modalities 必须相符。该组合标识已返回的 capture 数据；identity value 单独仍不是运行证据 |
 | `DynamicCameraRenderSourceV1`, `project_render_state_v1`, `create_dynamic_camera_session`, D03/D04 manifests and profiles | `task_env.render.camera` | D03 RGB、D04 RGB/Depth、受限 D04 Entity-instance-mask 是独立 versioned profiles；D05b 历史收据在 GeoPhys gitlink `4436787e…` × MuJoCo native OpenGL 上对单 Panda Position/Scene-v3 scalar-joint source 验证 default/override、双相机 materialization/sync/capture/close S1/S2。当前 `a53a8cfe…` pin 已另行完成真实 NVIDIA EGL pairing S1/S2 与资源关闭复验，见 [P99 运行收据](goal/Phase_II/C_Development_Record.md#public-candidate)；旧 `4436787e` 收据独立保留。segmentation requires RGB+Depth in the same capture and maps native geoms through canonical Frame→Entity bindings. `CanonicalEntityInstanceSegmentationV1` is H×W uint32 (0 background); `CanonicalEntityLabelMapV1` maps positive dense labels to canonical Entity IDs and binds source, SceneInstance, episode/reset, boundary, camera and capture identity. Native geometry IDs stay private. Other provider/backend pairs, free-joints, semantic classes, Environment policy observation/TransitionRecorder integration and general D05b qualification remain unsupported or unverified |
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
+
+### Static Logical Assembly value (R01a)
+
+```python
+from task_env.artifacts import (
+    AssetDefinition,
+    EntityInstance,
+    LogicalAssemblyEntityMemberV1,
+    LogicalAssemblyScenePinV1,
+    LogicalAssemblyV1,
+    SceneDefinition,
+    decode_logical_assembly,
+)
+
+asset = AssetDefinition("asset-definition-v1", "robot/panda", "v1", "procedural://example/panda")
+entity = EntityInstance("entity-instance-v1", "arm", "robot/panda", "v1")
+scene = SceneDefinition("scene-definition-v1", "example-scene", (asset,), (entity,))
+assembly = LogicalAssemblyV1(
+    "logical-assembly-v1",
+    "robot-assembly",
+    "r1",
+    LogicalAssemblyScenePinV1(
+        "logical-assembly-scene-pin-v1",
+        scene.scene_id,
+        scene.schema_version,
+        scene.identity_hash,
+    ),
+    (LogicalAssemblyEntityMemberV1("entity_member", ("arm",), "arm", "robot/panda", "v1"),),
+)
+assert decode_logical_assembly(assembly.to_mapping()) == assembly
+```
+
+This example builds only a static value and round-trips its strict codec. It does not construct an environment, resolve a member, load a source, or create physical attachment.
+
+### Bounded Logical Assembly resolution (R01b)
+
+```python
+from task_env.artifacts import (
+    AssetDefinition,
+    EntityInstance,
+    LogicalAssemblyEntityMemberV1,
+    LogicalAssemblyNestedMemberV1,
+    LogicalAssemblyScenePinV1,
+    LogicalAssemblyV1,
+    SceneDefinition,
+    resolve_logical_assembly,
+)
+
+asset = AssetDefinition("asset-definition-v1", "robot/panda", "v1", "procedural://example/panda")
+entity = EntityInstance("entity-instance-v1", "arm", "robot/panda", "v1")
+scene = SceneDefinition("scene-definition-v1", "example-scene", (asset,), (entity,))
+pin = LogicalAssemblyScenePinV1(
+    "logical-assembly-scene-pin-v1", scene.scene_id, scene.schema_version, scene.identity_hash
+)
+child = LogicalAssemblyV1(
+    "logical-assembly-v1", "arm-leaf", "r1", pin,
+    (LogicalAssemblyEntityMemberV1("entity_member", ("arm",), "arm", "robot/panda", "v1"),),
+)
+root = LogicalAssemblyV1(
+    "logical-assembly-v1", "robot-root", "r1", pin,
+    (LogicalAssemblyNestedMemberV1(
+        "nested_assembly", ("robot",), child.assembly_id, child.revision,
+        child.logical_content_sha256,
+    ),),
+)
+resolved = resolve_logical_assembly(root, scene, {(child.assembly_id, child.revision): child})
+assert resolved.leaves[0].full_path == ("robot", "arm")
+```
+
+The resolver checks exact Scene pins, child IDs/revisions/content hashes, Entity/assets and entity-qualified typed
+Frame/Joint/Actuator/ControlGroup references. It rejects containment cycles, repeated owning Entities, repeated typed
+targets and expanded path collisions. Reference-only leaves do not create another Entity owner or writer. Scene v1
+permits Entity-only leaves; Frame/Joint require v2/v3 and Actuator/ControlGroup require v3. Result leaves preserve
+their source Assembly and local path as well as the canonical expanded path; returned tuples and referenced values
+are immutable. The limits are fixed at 32 Assembly levels (root depth 1) and 1024 expanded leaves. Resolution is
+stateless and provider-free: it does not request runtime Frame poses, project a Task Source, assign native indices,
+construct a RuntimeSession, or prove physical attachment.
+
+### Logical Assembly source declaration projection (R01c)
+
+<!-- R01C_EXECUTABLE_EXAMPLE_BEGIN -->
+```python
+from task_env.artifacts import (
+    AssetDefinition, EntityInstance, LogicalAssemblyEntityMemberV1,
+    LogicalAssemblyScenePinV1, LogicalAssemblyV1, SceneDefinition,
+)
+from task_env.assembly import project_logical_assembly_source
+
+asset = AssetDefinition("asset-definition-v1", "robot/panda", "v1", "procedural://example/panda")
+entity = EntityInstance("entity-instance-v1", "arm", "robot/panda", "v1")
+scene = SceneDefinition("scene-definition-v1", "example-scene", (asset,), (entity,))
+pin = LogicalAssemblyScenePinV1(
+    "logical-assembly-scene-pin-v1", scene.scene_id, scene.schema_version, scene.identity_hash
+)
+assembly = LogicalAssemblyV1(
+    "logical-assembly-v1", "robot-assembly", "r1", pin,
+    (LogicalAssemblyEntityMemberV1("entity_member", ("arm",), "arm", "robot/panda", "v1"),),
+)
+projection = project_logical_assembly_source(assembly, scene, {})
+assert projection.entities[0].asset.source_content_sha256 is None
+assert projection.identity_sha256  # independent projection identity; not embedded in its payload
+```
+<!-- R01C_EXECUTABLE_EXAMPLE_END -->
+
+`project_logical_assembly_source(root, scene, child_assemblies, source_receipts=None)` first calls the R01b resolver on
+the current inputs, then joins each leaf to one existing Scene Entity and its exact Asset declaration. It preserves
+distinct Entity instances even when they share an Asset, and keeps reference-only leaves separate from owning members.
+Frame, Joint and Actuator leaves retain their exact typed definitions; a ControlGroup leaf includes that Group and the
+Actuator definitions selected by its declared references. Runtime Frames remain identity-only anchors. Result tuples
+and contract values are immutable; `to_mapping()` returns a detached JSON snapshot, and `identity_sha256` hashes the
+versioned snapshot without embedding that digest. Asset declaration identity, optional source-content hash and any
+historical receipt digest remain distinct identities. A receipt match is labelled as historical declaration
+provenance, not as a new byte/closure check. This source projection does not load source bytes, lower or attach assets,
+assign native names/indices, construct a Runtime, or admit Core materialization/physical attachment.
+
+### Position leaf contract values (R02a)
+
+R02a adds versioned, provider-free values in the existing advanced canonical Controller owner. `ArmPositionActionV1`
+is exactly seven ordered Panda Joint positions in radians, with the declared Panda joint limits held by its
+`LeafProfileBindingV1`. `HandPositionActionV1` is one aggregate `opening_m` in `[0, 0.08]`; its explicit legacy
+adapter uses `opening_m = 0.04 * (u + 1)` for `u ∈ [-1, 1]`. The Hand binding keeps the two finger Joints in
+canonical order, their `[0, 0.04] m` limits, `opening_m = finger_joint1_q_m + finger_joint2_q_m`, the fixed
+0.5/0.5 tendon, the finger equality, and one `actuator8` resource with the declared `ctrl = 3187.5 * opening_m`
+mapping and `[0, 255]` native ctrlrange. These values describe the candidate source contract; they do not add a
+runtime adapter or prove that a Core Provider consumed the mapping.
+
+Both Position targets bind exact ordered resources, profile/action schema, writer, binding/source/Scene hashes,
+typed source boundary and evaluation clock. `LeafApplicationAckV1` cross-checks the exact Target hash, source
+identity, resources and explicit application boundary/clock. It is a receipt-shaped static value, not evidence
+that native control was applied or that the state reached its target. Required State uses existing typed
+`StateRequirements` for each Joint position/velocity and an Entity-qualified TCP parent Frame; Position leaves do
+not require or synthesize force. All v1 leaf state fields remain mandatory and exactly match the bound profile
+resources and TCP; optional downgrades and extra cross-leaf requirements are rejected. `HandForceAwareDependencyV1` has its own action/profile identity and force-state
+requirements, but remains `NOT_ADMITTED`; source/transmission sign and phase are explicitly unaudited. Its absence
+does not block either Position contract.
+
+The strict decoders reject unknown fields/versions and cross-kind payloads. `validate_leaf_binding()` checks a
+Scene-v3 static binding and, when given a `ResolvedLogicalAssemblyV1`, verifies the exact member selector. A whole
+Panda may use two reference-only ControlGroup selectors; those views do not own Entities or create writers. A
+two-Entity static fixture uses the existing Entity owners. R02a alone does not project Task Source, assign native
+indices, build a plan, call `make_env()`, or admit an executable capability. The R02a Force-aware catalog remains
+`CONTRACT_ONLY / NOT_ADMITTED / NOT_RUN`.
+
+### Effective Position leaf plan and synthetic dispatch (R02b)
+
+R02b adds strict versioned `LeafProfileSectionV1`, `LeafControlPresetV1` and complete-section
+`LeafProfileOverrideV1` values. `compile_effective_leaf_plan()` re-resolves the current root/Scene/children and
+reprojects current source declarations before checking the R02a bindings, source identity, provider/build/timebase,
+unique writer/resource coverage and exact preset paths. Its immutable `EffectiveLeafPlanV1` retains the base preset,
+ordered overrides, effective config values/identities, leaf bindings and resource writers. Status is computed from
+which effective leaf sections differ from base; a no-op override does not change status or effective plan identity.
+
+`prepare_leaf_command()` is the shared stateless Arm/Hand Position adapter. Arm reuses the legacy absolute-joint
+limit/correction calculation; Hand reuses the existing gripper opening servo and affine command conversion. A Hand
+command keeps requested opening in metres, servo opening in metres and native ctrl as separate values. Explicit
+native mapping receipt values bind canonical refs to names/IDs/addresses/slots and source/Provider/config identity;
+they must validate exact resource coverage, Arm transmission to the mapped native Joint name, Hand logical-tendon to
+native-tendon name, equality and alias-free slots. The receipt must cover all `nu` native actuator IDs and ctrl slots,
+including rejection of undeclared extra actuators. Writer IDs use the same Entity-qualified semantic names as R02a. R02b S1 uses only `synthetic_fixture` provenance.
+
+`dispatch_leaf_control_interval()` validates the complete action/state/request and every writer before preparing
+commands or consuming the boundary; it then applies each exact typed patch, validates the returned apply Ack,
+requests one outer interval, and validates the next typed publication. A failure after boundary consumption latches
+the existing `ExecutionFaultV1` with leaf attempted/applied/unknown/acknowledged progress, preserved prepared Targets/command patches,
+and every typed apply result returned before the failure. This provider-neutral
+path has provider-free S1 evidence only: it is not wired to any real RuntimeSession Provider, selected Env or H5
+Recorder and does not establish native leaf admission. R02c remains the required real independent leaf/runtime/
+recording gate; S2/S3/S4 and Qualification remain unrun.
+
+```python
+from task_env.controllers.canonical import (
+    HAND_POSITION_ACTION_SCHEMA,
+    HandPositionActionV1,
+    leaf_profile_catalog_v1,
+)
+
+action = HandPositionActionV1(HAND_POSITION_ACTION_SCHEMA, opening_m=0.038)
+assert action.opening_m == 0.038
+assert all(entry.admission_status == "NOT_ADMITTED" for entry in leaf_profile_catalog_v1())
+```
+
+This example constructs static contract values only; it does not instantiate a leaf Controller or execute a Provider.
+
+### R02c leaf Position integration status (2026-10-27)
+
+The task-owned `build_leaf_position_candidate()` and advanced
+`SelectedReferenceEnv.from_leaf_position_candidate()` path compose the existing A05 source, `ReferenceTaskBinding`,
+RuntimeSession, lifecycle and Generic H5 v3 owners. One full-Panda Entity exposes two existing ControlGroup references
+to separate Arm-only and Hand-only Position writers; this is not two complete Panda Controllers and does not represent
+the independent Arm+Hand Attachment route. `load_leaf_control_records_h5()` adds a strict leaf semantic reader over the
+existing Generic H5 v3 envelope. It does not introduce a new recorder format or public `make_env()` UID.
+
+Provider-free targeted S1 passed 53 tests. The one bounded MuJoCo 3.8.1 CPU probe process exited during static contract
+validation with `KeyError: 'provider_static_files'`, before importing MuJoCo or compiling/materializing/resetting/stepping.
+The script was corrected in a later unexecuted contract revision; the fixed process budget did not permit another start.
+The earlier attempt001/002 blockers are historical. Attempt003 established MuJoCo identity, compile/materialization/reset, then failed its first interval on typed state publication; Sol reviewed the repair and the 38-case provider-free S1. Attempt004 then verified the same MuJoCo 3.8.1 CPU identity, static source closure, 67 assets and default/override plans. E1 completed 64 intervals, passed the Arm motion oracle, wrote a Generic H5 v3 file with T=64/T+1=65, passed independent readback, and rejected all nine tamper copies. E2 completed 64 intervals, but the fixed Hand motion oracle failed: opening minimum was 0.0687899 m and excursion 0.00721014 m, against ≤0.02 m and ≥0.04 m requirements. Its closed H5 also passed offline T/T+1 readback. E3/E4 were not run; the required R02c S2/S3 exit remains incomplete, with no Provider admission or Qualification claim.
+
+The attempt004 primary physical failure and a secondary evidence-finalization TypeError are both retained. The raw `native_evidence.json` was misclassified as `FAIL_PRE_STEP` because JSON serialization of `numpy.float32` failed after the real E2 oracle assertion; the immutable JSONL failure event records 2 materializations, 2 resets, and 640 `mj_step` calls. The exact `mj_forward` count and RSS sample were not persisted and remain unknown. A diagnostic-only NumPy JSON encoding fix passed the affected provider-free rework module (21 tests); no native retry followed. Report and raw Evidence are in ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/`.
+
+### R03b exact fixed Attachment candidate (2026-10-28)
+
+The additive `FixedAttachmentPlanV1` and Assembly source owner admit one bounded
+fixed-tree candidate made from the unchanged Menagerie `panda_nohand.xml` and
+`hand.xml`, as two separate canonical Scene-v3 Entities. `materialize()` uses
+the existing RuntimeSession adapter to attach the child source under the
+parent's measured `attachment_site`, with a model-bound receipt for native
+body/site/joint/actuator/tendon mappings, root topology, collision exclusions,
+provider identity and close state. It retains the source closure and license;
+ResetPlan, not source keyframes, initializes runtime state.
+
+Provider-free S1 rejected 19 negative contracts, and the selected legacy-owner
+regression set passed 80 tests. Two independent MuJoCo 3.8.1 CPU trials each
+passed 128 intervals/640 native steps, reset equality, source limits, Arm and
+Hand motion, the measured fixed-mount oracle, finite state/clock, zero warning
+increments and native-resource close. The first native start is preserved as a
+pre-import/pre-step source-timestep wiring failure; one bounded correction and
+S1 rerun preceded the final allowed native start. This is
+`ACCEPTED_BOUNDED_S1_S2` after Sol review. The source owner additionally
+rejects coherently rebound canonical Joint topology/type/axis/pose and Asset
+provenance inconsistent with the pinned source. The positive candidate identity
+is unchanged; 99 provider-free checks plus the original 19-case static gate
+passed. Sol independently checked the two original native receipts, resets and
+256 motion boundaries without another native run. This is not a general
+Provider admission or Qualification. R03c attempt001 has an opt-in task-owned
+two-Entity Position-leaf candidate and provider-free Env/reader regressions
+(83 selected tests passed). Both authorized native process starts stopped
+before `mj_step`: the first verified MuJoCo 3.8.1 CPU identity and found an
+Attachment-receipt/Hand-leaf tendon-key mismatch during public reset; the
+second runner exited before provider import because its retry ledger check did
+not account for the already-appended start row. The retry-counter fix passed
+provider-free S1 but was not run natively. No complete episode or real closed
+H5 was produced; R03c S2/S3 remain incomplete pending Sol review. This
+candidate is not registered as general `make_env()` support. See [the R03
+contract and attempt status](goal/Phase_II_01/03_R03_Physical_Attachment.md)
+and ignored [R03c report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md).
+The attempt report and raw logs are local ignored Evidence under
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`.
+
+R02c attempt003 passed the actual MuJoCo package/runtime/API and binary identity
+checks, compiled the fixed full-Panda source, produced the 9/9/8 provider
+materialization receipt, and reset E1. Its first attempted interval executed
+five native substeps, then Core leaf dispatch passed a tuple of state fields to
+`RuntimeSession.snapshot_v1()`, which requires the typed `StateRequirements`
+contract. The interval did not publish a next boundary or a transition; the
+incomplete Recorder close rejected the episode because it lacked 64 transitions
+and 65 observations. S2/S3 therefore remain incomplete and this is not Provider
+admission. After preserving the native failure, the dispatcher was corrected to
+construct the existing typed aggregate requirements; the bounded provider-free
+rework module passed 19 tests, but the fix was not natively rerun. Sol review is
+pending. Evidence is in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.
 
 ## C02b Position Profile candidate status (2026-10-22)
 
@@ -195,6 +454,29 @@ returned from `reset()`/`step()` with boundary/time info. `start_recording(path)
 Always close in `finally`. No Expert/task-success or freeze approval is implied. See
 [P99 readiness](goal/Phase_II/05_Architecture_Review_and_Execution_Order.md#p99) and the
 [implementation/run receipt](goal/Phase_II/C_Development_Record.md#public-candidate).
+
+### R04a opt-in camera observation on the Position candidate (2026-10-26)
+
+The same UID now accepts an optional `camera_observation` mapping decoded as
+`CameraObservationConfigV1`. It is limited to the single Panda Position candidate, GeoPhys CPU physics,
+the existing D04 profile and two explicitly authored mounts in canonical fixed-then-hand order. Each
+mount requires its parent Frame and `T_parent_from_mount`; the public config does not guess or replace
+asset mount transforms, and the camera opt-in requires horizon at most 16. Production geometry is 321×241 with RGB HWC float32 `[0,1]`, optical-Z depth
+H×W float32 in metres (`0` invalid), and canonical Entity mask H×W uint32 (`0` background). Validation
+and capacity checks happen before source workspace creation. Omitting the mapping retains the state-only
+default and does not initialize a renderer during import/construction.
+
+After reset/step has published the typed state boundary, the existing SelectedReferenceEnv lazily owns
+the two existing CameraSessions and publishes their arrays under `rgb`, `depth`, and `entity_mask`; repeated
+reads of one boundary reuse the cache. `info["camera_observation_v1"]` carries the capture/calibration/
+label-map identity. Camera close/failure follows the existing Env lifecycle and C03a fault latch. When
+recording is enabled, Generic H5 v3 keeps its numeric tree and adds versioned camera metadata sidecars;
+read with `load_camera_observations_h5()` alongside the existing structured-control reader. RGB keeps
+the existing CHW uint8 quantization rule; depth/mask retain float32/uint32. This R04a S1 is provider-free
+and synthetic: native MuJoCo/OpenGL/EGL pairing, real public reset/step capture, and same-file R04c
+camera readback remain NOT_RUN. It is not camera qualification or P99 gate completion.
+
+Sol review (2026-10-26): R04a is **CHANGES_REQUESTED**. The existing 23 S1 cases pass, but reviewer counterexamples show missing binding to the requested mount/source and missing camera-sidecar checks against the stored state boundary and episode outcome. These checks require targeted repair before R04a acceptance; native Camera/Env/H5 S2/S3 remain NOT_RUN.
 
 For this explicit selected candidate, `env.position_plan` after reset is the read-only typed action contract
 used by the existing dispatch owner. Do not mutate it. Gripper input is normalized in [-1,1] (+1 open / -1 close);
@@ -335,3 +617,46 @@ construction routes 和部分 camera/render CLIs 已退休，不能静默 alias�
 统一 Validator、通用 `Runner(env, policy).run()`、完整 Task/Policy Harness 不作为当前 API。
 现有 `task_env/alg/runner.py` 的 PPO dispatch 与各脚本 rollout loop 不能冒称统一 Runner。
 符号级细节见 [API reference](../../../task_env/doc/api/index.md)。
+
+Sol's attempt003 review (2026-10-27) accepted the typed publication repair and 38 provider-free R02c/R02b checks, with native motion still pending. The subsequent authorized attempt004 was not a pass: E1 passed its Arm and H5 checks, E2 failed the frozen Hand motion oracle, and E3/E4 did not run. E1/E2 H5 readbacks passed, but the required combined S2/S3 exit remains incomplete. The probe's secondary NumPy JSON serialization failure obscured counters in the raw summary; the immutable event log records actual progress, and a provider-free serialization regression passed after the run. No Provider admission, Qualification or R03b start follows.
+
+R02c004 Sol review: the arm-only motion/closed-H5 intersection is accepted as bounded evidence; active-Hand motion fails the unchanged0.64s oracle. The legacy5/2500 command-step policy yields at most2mm of servo offset from measured opening, not a physical5N force cap. A proposed Task-owned complete Hand override at source-derived50N/m has new configuration/plan identities and requires an explicit maintainer case decision. Global defaults and original failure remain unchanged; no default-route support or Qualification is established. R02c remains BLOCKED_HAND_CONFIGURATION_DECISION. Future evidence finalization preserves live counters and primary failure instead of restoring stale checkpoints.
+
+R02c005 now has bounded S2/S3 evidence for the explicit advanced candidate
+`build_leaf_position_candidate(workspace, environment_type=SelectedReferenceEnv,
+hand_stiffness_N_per_m=50.0)` on the pinned full-Panda source and MuJoCo3.8.1 CPU.
+The existing full Hand section override selects SOURCE_CALIBRATED_HAND_50_V1;
+Arm gain2.5 or3.0 composes independently. Omission keeps the original2500 preset
+and effective-plan identities. Requested opening, servo opening and native ctrl
+remain distinct; this opt-in does not implement force feedback or a physical5N
+force cap. All four64-interval episodes and each same-file H5 64/65 readback
+passed; the original0042500 motion failure remains. This is task-owned advanced
+candidate evidence, not a registered make_env route, separate-Entity Attachment,
+other-Provider support or new Qualification.
+
+
+R03c Sol static review before attempt002 (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
+The original attempt001 two-start budget remains spent, with no completed real
+episode/H5. Sol added actual attached-leaf admission and public Env reset/step
+tests with only native IO stand-ins, coherent Ack-target and remapped-slot
+rejection, strict frozen motion gates and a shared pre-import runner preflight.
+The selected current provider-free set passes 90 tests; no native was rerun,
+and this does not establish R03c S2/S3. A fresh one-start package is prepared
+separately for human forwarding, preserving all attempt001 evidence.
+GeoPhys still has the earlier full-Panda Position/R1 evidence; the new leaf and
+fixed-Attachment Core entries currently admit only MuJoCo. This is a scoped
+source/adapter integration gap, not evidence that GeoPhys physics cannot run
+the new mechanical assembly. See the [R03 source and review
+record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+
+R03c attempt002 update (2026-10-28): the sole authorized MuJoCo 3.8.1 CPU
+native process verified package/runtime/API identity and reset E1, then failed
+at `RuntimeSession.snapshot_v1()` because the runner supplied leaf
+`JointReference` values where the public typed-state projection requires
+canonical Scene `JointDefinition` values. Counts were one materialization,
+reset and `mj_forward`, with zero `mj_step` or outer intervals; no episode or
+H5 was produced and independent readback was not run. After preserving that
+failure, the task-owned runner now selects definitions from its fixed Scene; a
+new provider-free regression passed. No native retry verified the correction,
+so this result remains S2 incomplete/S3 not run pending Sol review. It adds no
+new provider admission, general Attachment support or Qualification.

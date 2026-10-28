@@ -10,6 +10,21 @@ from .contracts import (
     UniformDimension, WorldDefinition,
     admit_capabilities, decode_execution_spec, decode_task_artifact,
 )
+from .logical_assembly import (
+    LogicalAssemblyControlGroupReferenceV1,
+    LogicalAssemblyEntityMemberV1,
+    LogicalAssemblyNestedMemberV1,
+    LogicalAssemblyScenePinV1,
+    LogicalAssemblySubcomponentReferenceV1,
+    LogicalAssemblyV1,
+    decode_logical_assembly,
+)
+from .logical_assembly_resolution import (
+    ResolvedLogicalAssemblyLeafV1,
+    ResolvedLogicalAssemblyV1,
+    resolve_logical_assembly,
+)
+from .fixed_attachment import FixedAttachmentPlanV1
 from .state import (
     CanonicalStatePublicationV2,
     CanonicalStatePublicationV1,
@@ -50,4 +65,11 @@ __all__ = [
     'admit_capabilities', 'decode_execution_spec', 'decode_task_artifact',
     'decode_canonical_state_publication', 'decode_canonical_state_view',
     'project_canonical_state_v0',
+    'LogicalAssemblyControlGroupReferenceV1', 'LogicalAssemblyEntityMemberV1',
+    'LogicalAssemblyNestedMemberV1', 'LogicalAssemblyScenePinV1',
+    'LogicalAssemblySubcomponentReferenceV1', 'LogicalAssemblyV1',
+    'decode_logical_assembly',
+    'ResolvedLogicalAssemblyLeafV1', 'ResolvedLogicalAssemblyV1',
+    'resolve_logical_assembly',
+    'FixedAttachmentPlanV1',
 ]

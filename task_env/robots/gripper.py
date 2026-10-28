@@ -10,6 +10,52 @@ from ..environment import ActionConfig, RuntimeSnapshot
 from ..assembly import AgentReferences
 
 
+def position_gripper_servo_opening(
+    requested_opening_m: float,
+    achieved_opening_m: float,
+    force_limit_N: float,
+    stiffness_N_per_m: float,
+    opening_range_m: float,
+    *,
+    error_deadband_m: float = 1.0e-12,
+) -> float:
+    """Pure force-free position correction shared by the legacy and leaf paths.
+
+    ``force_limit_N`` is the legacy Position algorithm's command-step bound
+    parameter.  This function does not read force and does not claim a physical
+    force cap or force feedback.
+    """
+    values = (requested_opening_m, achieved_opening_m, force_limit_N,
+              stiffness_N_per_m, opening_range_m, error_deadband_m)
+    if any(isinstance(value, bool) or not np.isfinite(value) for value in values):
+        raise ValueError('position gripper inputs must be finite real values')
+    if force_limit_N < 0 or stiffness_N_per_m <= 0 or opening_range_m <= 0 or error_deadband_m < 0:
+        raise ValueError('position gripper force/deadband must be nonnegative and stiffness/range positive')
+    achieved = float(achieved_opening_m)
+    requested = float(np.clip(requested_opening_m, 0.0, opening_range_m))
+    error = requested - achieved
+    if abs(error) > error_deadband_m:
+        max_motion = float(force_limit_N) / float(stiffness_N_per_m)
+        requested = achieved + float(np.clip(error, -max_motion, max_motion))
+    return float(requested)
+
+
+def position_gripper_ctrl_for_opening(
+    opening_m: float,
+    opening_range_m: float,
+    close_ctrl: float,
+    open_ctrl: float,
+) -> float:
+    """Map a resolved physical opening to the existing affine actuator command."""
+    values = (opening_m, opening_range_m, close_ctrl, open_ctrl)
+    if any(isinstance(value, bool) or not np.isfinite(value) for value in values):
+        raise ValueError('position gripper command inputs must be finite real values')
+    if opening_range_m <= 0 or close_ctrl == open_ctrl:
+        raise ValueError('position gripper command range must be nonzero')
+    alpha = float(opening_m) / float(opening_range_m)
+    return float((1.0 - alpha) * close_ctrl + alpha * open_ctrl)
+
+
 @dataclass(frozen=True)
 class GripperTarget:
     """One-tick Panda gripper request: opening in metres and force in N."""
@@ -139,18 +185,16 @@ class PandaGripperController:
         requested_opening = float(
             np.clip(target.opening_m, 0.0, self.config.gripper_opening_range_m)
         )
-        opening_error = requested_opening - current_opening
-        if abs(opening_error) > 1.0e-12:
-            max_motion = float(target.force_N) / self.config.gripper_position_stiffness_N_per_m
-            requested_opening = current_opening + np.clip(
-                opening_error,
-                -max_motion,
-                max_motion,
-            )
-        alpha = requested_opening / self.config.gripper_opening_range_m
-        return float(
-            (1.0 - alpha) * self.config.gripper_close_ctrl
-            + alpha * self.config.gripper_open_ctrl
+        servo_opening = position_gripper_servo_opening(
+            requested_opening, current_opening, target.force_N,
+            self.config.gripper_position_stiffness_N_per_m,
+            self.config.gripper_opening_range_m,
+        )
+        return position_gripper_ctrl_for_opening(
+            servo_opening,
+            self.config.gripper_opening_range_m,
+            self.config.gripper_close_ctrl,
+            self.config.gripper_open_ctrl,
         )
 
 

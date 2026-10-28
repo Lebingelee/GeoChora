@@ -26,7 +26,8 @@ POSITION_CANDIDATE_SEED = 31
 
 
 def build_position_candidate(workspace: Path | str, *, provider: str, horizon: int = 6000,
-                             environment_type=SelectedReferenceEnv):
+                             environment_type=SelectedReferenceEnv,
+                             camera_observation_config=None):
     """Build one source-identified candidate through SelectedReferenceEnv's existing binding."""
     import importlib
 
@@ -118,6 +119,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
     )
     env = environment_type.from_position_candidate(
         binding, provider=provider, backend='cpu', horizon=horizon,
+        camera_observation_config=camera_observation_config,
     )
     return SimpleNamespace(
         env=env, scene=scene, task_source=task_source, artifact=artifact,

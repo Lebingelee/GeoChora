@@ -43,6 +43,8 @@ API、schema、失败路径和相应 Evidence，必要时更新 canonical 文档
 [AGENTS.md](../../AGENTS.md)记录自然语言 activation convention；API/qualification 敏感更新
 保留 Human review。PhysPi 经验提炼和自主 Skill evolution 不在 Core 内实现。
 
+2026-10-25维护者明确的[阶段分支与Sol/Luna工作流](../../AGENTS.md#phase-branch-workflow)优先于旧规划/Prompt中的冲突流程：先按phase/stage规划少量分支，多个sub-stage/Goal复用同一分支；每个有界产出关联本地提交。Sol按阶段执行表发单slice包，Luna执行/验证/提交并交回报告，Sol复核后再发下一包。恢复或独立方案比较/整合需要时再评估额外branch/worktree，讨论本身不触发新建。单writer、ignored原始Evidence、独立范围/Qualification及发布授权边界保持不变。
+
 ## 能力与发布治理
 
 精确状态定义复用[唯一 v1.1 矩阵](../module/task_env/capability_matrix_v1_1_0_candidate.json)。

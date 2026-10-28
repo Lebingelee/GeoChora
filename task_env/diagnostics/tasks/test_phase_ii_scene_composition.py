@@ -223,6 +223,7 @@ def test_v3_scene_roundtrip_and_identity_are_stable_under_declaration_order():
         control_groups=reversed(groups),
     )
     assert first.identity_hash == reordered.identity_hash
+    assert first.identity_hash == "fee77d95cb729b4008d90618618dfee00c0941b195e16641044c27336db60a99"
     assert SceneDefinition.from_mapping(first.to_mapping()) == first
     assert SceneDefinition.from_mapping(first.to_mapping()).identity_hash == first.identity_hash
 

@@ -61,6 +61,60 @@ identity hash 保持原样；objects/sensors 仍使用通用 Entity 与 Frame，
 `TaskCompositionSpec`、assembly `TaskReferences` 和当前 Env 的单 Robot 执行边界未改变；双 Robot 目前仅有静态
 composition/reference 证据，真实施控须由后续 D01/C02 路线另行验证。
 
+Phase II-01 R01a 在同一 `task_env.artifacts` owner 增加独立 `logical-assembly-v1` strict codec：`LogicalAssemblyV1` 锁定作者给定的 assembly ID/revision、现有 Scene v1/v2/v3 的精确身份 pin 与规范排序成员。Entity member 保存现有 Entity/asset identity；reference-only subcomponent member 复用 `FrameReference`、`JointReference`、`ActuatorReference`，并用 `LogicalAssemblyControlGroupReferenceV1` 表示 typed ControlGroup 引用；nested member 只固定 child ID/revision/content SHA-256。computed logical hash 不写回自身 mapping，codec 输入被复制为 frozen 值，`to_mapping()` 返回独立 JSON snapshot。该合同不验证 Scene 成员存在性或 child digest，不做递归/投影/source closure/native materialization，也不授予物理连接或 Controller 写权；R01b/R01c/R03 仍负责其各自准入与消费。
+
+R01b 在同一 artifacts owner 增加 advanced `resolve_logical_assembly(root, scene, child_assemblies)` 静态入口。它只读取一个严格复制的 Scene v1/v2/v3 值和显式 `(assembly_id, revision)` child catalog，先对可达 containment key 图做环/深度核验，再校验所有可达 Scene pin、child content hash、Entity/Asset 与 Entity-qualified typed references。结果 `ResolvedLogicalAssemblyV1` 由 immutable leaf tuple 组成；每个 leaf 保留 member 类型、完整路径、源 Assembly 身份/hash 与 local path。跨层重复 Entity owning、重复 typed target、路径碰撞、悬空/错版本 child 与越界闭包会拒绝；reference-only view 不分配第二个 Entity owner 或 writer。上界固定为32层与1024个展开 leaf；局部 memo 只复用同一调用内的静态展开结果，错误不污染输入或后续调用。此解析不求 runtime Frame pose、不产生 source/native mapping、Provider/Runtime资源或 Attachment admission；R01c增加后续静态source声明投影，物理lowering/执行能力须由各自Gate另行验证。
+
+R01c 在既有 `task_env.assembly` source/compiler owner 增加 `project_logical_assembly_source(root, scene, child_assemblies, source_receipts=None)`。入口从当前输入重跑 R01b resolver，再将每个解析 leaf 关联到唯一的现有 Scene Entity、对应 Asset 声明及准确 typed Frame/Joint/Actuator/ControlGroup 定义；ControlGroup 输出沿用声明的 Actuator references。结果是独立版本化、不可变且可脱离调用者持有的 source projection，保留 root/Scene身份、完整segment路径、源Assembly身份/path及Asset声明身份。receipt 仅在 Scene/Asset/source字段相符时记录为 `MATCHED_DECLARATION_NOT_REVALIDATED`；无receipt或声明中的 `source_content_sha256` 均不代表本轮读取了bytes，默认状态是 `DECLARED_ONLY_NOT_BYTE_VERIFIED`。原Asset的可选null保持不变。该入口不调用旧 `compile_task_scene()`、Provider、XML lowering或Runtime，不创建物理Entity、writer、native名称/indices，不构成materialization或Attachment admission。完整Panda的arm/gripper视图共享 `panda-main`；独立Arm/Hand fixture保留两个Scene Entity及两个Menagerie来源声明，两者都只覆盖静态source关联。
+
+Phase II-01 R02a 在既有 `task_env.controllers.canonical` owner 增加 advanced、provider-free 的 Arm-only 与
+Hand-only Position leaf 值合同，以及独立的 Hand Force-aware 依赖/拒绝描述。`LeafProfileBindingV1` 固定 Scene、
+Assembly revision/content hash、canonical member path/selector、Entity/Asset、source closure、profile/action schema、
+algorithm/config、Provider/build/backend、100 Hz cadence、ordered Joint/Actuator、ControlGroup、Entity-qualified TCP
+parent Frame、`T_parent_from_tcp` transform direction 和 Required State identity。Whole-Panda 的两个 Existing-Entity Subcomponent Reference 可分别选两个 ControlGroup；它们仍是只读引用，不
+创建 Entity owner 或 Controller writer。两个独立 Entity 的静态 fixture 则仍由现有 Scene Entity owner 表示。
+Arm binding 显式保存 ordered `joint1→actuator1` 至 `joint7→actuator7` 配对；TCP pose 按 `T_parent_from_tcp` 解释，值采用 m 与 wxyz。
+
+Arm Action 是严格有序的七关节 rad 位置向量并按绑定限位核验。Hand Action 是总开度 `opening_m ∈ [0, 0.08]`；
+指关节各为 `[0, 0.04] m`，测量开度定义为 `q1+q2`，两个手指通过 0.5/0.5 fixed tendon 和 joint equality 耦合，
+只引用一个 `actuator8`。显式的旧 normalized adapter 为 `opening_m=0.04*(u+1)`；native mapping 声明
+`ctrl=3187.5*opening_m`、`ctrlrange=[0,255]`、`gainprm=(0.01568627451,0,0)` 和 `biasprm=(0,-100,-10)`。
+这只是候选合同中的来源映射，不表示已有 Core consumer 实际读取它。
+Target/Ack 分别绑定 ordered resources、writer、source/binding/Scene、typed boundary 和 clock；Ack 是静态施用收据
+形状，不证明 native apply、到位或任务成功。Position Required State 不需要 force；Force-aware 使用独立 identity、
+显式 raw signed N / canonical closing N 分离及 phase/sequence/revision/freshness 等依赖字段，目前保持
+`NOT_ADMITTED`，sign/transmission/phase 尚未审计。Force-aware 拒绝不应使 Position 需要力反馈。
+
+R02a strict codecs 和 Scene/Assembly selector 检查只建立静态合同边界，不修改 TaskArtifact v0/v1 identity、旧
+`RequestedAction`/`CanonicalControlTarget`/Ack 或 Runtime/Provider manifests，也不创建计划、执行 adapter 或 H5
+格式。其 provider-free S1 不等于 Scene source projection、Runtime admission、native S2/S3 或 Qualification。
+
+R02b 在现有 canonical Controller 与 RuntimeSession control owners 内新增严格版本化的 parent preset、whole-section
+leaf override、effective plan、Arm/Hand Position adapters，以及显式 canonical/native mapping receipt 和整请求
+preflight/dispatch。plan compiler 从当前输入重跑R01b解析及R01c source declaration projection，并验证完整唯一
+Scene ControlGroup/ActuatorResource覆盖；实际 adapter 复用既有绝对关节 Position 与 Hand gripper opening 算法。
+合成 receipt 明确标为 `synthetic_fixture`，只用于provider-free S1，不代表真实materialization。整体preflight通过后
+才准备所有命令、consume边界、逐writer apply/Ack并请求单次外层step；部分apply、step或后续publication失败时，
+使用既有 `ExecutionFaultV1` 记录真实进度并闭锁；`LeafDispatchProgressV1` 保留已准备的 Target/command patch
+及失败前返回的每个 typed apply result，不回滚、不生成伪transition。当前没有真实Provider、SelectedReferenceEnv
+或Recorder/H5接线；R02b经Sol局部兼容/拒绝门修正后获接收为ACCEPTED_S1_BOUNDED。R02c attempt001已在相同既有owners中实现
+candidate、MuJoCo RuntimeSession leaf dispatch、typed state与Generic H5 v3 reader，provider-free定向S1为53 passed；其
+MuJoCo probe在import前因合同字段名错误退出，故真实materialization、motion、H5 native readback及S2/S3均未运行，Provider admission仍未建立。
+修正后的probe脚本未重跑。Sol复核进一步发现H5导入/解码、写入前Target boundary及clock校验缺口，状态为CHANGES_REQUESTED_S2_S3_NOT_RUN；合并修复与有界验证的返工包尚待执行。R01c继续独立负责静态source投影。R02c未改变R02a Force-aware `NOT_ADMITTED`、旧TaskArtifact/Scene/Reset/Profile/
+Target/Ack/H5身份、R06兼容性gate、R05a blocker、DAG、Required Envelope或Qualification。
+
+### R02c attempt002修复与Provider阻塞（2026-10-27）
+
+attempt002在既有leaf-control、MuJoCo RuntimeSession、Generic H5 v3和SelectedReferenceEnv owners内修复严格command解码、stale Target写入前拒绝、`1e-12 s`物理clock比较、admission异常时单次close，以及probe合同/窗口预检。新增生产Recorder写入后关文件、独立H5读回及9类篡改拒绝的provider-free S1；定向集合28 passed。真实静态预检核对完整source closure、67个lowered assets与MuJoCo静态安装文件，合法合同通过；缺字段、source hash、脚本hash和冻结HEAD四种合同负例均被结构化拒绝，native计数为0。
+
+获授权的唯一attempt002 native进程成功导入阶段开始，但运行时 MuJoCo 版本/API 检查返回 `BLOCKED_PROVIDER: loaded MuJoCo version/API differs from 3.8.1`，发生在compile、materialize、reset、forward和step之前；本次各native调用计数均为0，未产生physics/H5 episode，S2/S3为NOT_RUN。失败未被当作可重试的普通预步进程序错误，未启动第二进程或更换Provider。细节与原始日志保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_002/`；R02c仍待Sol复核，Provider admission与Qualification均未建立，R03b未启动。R06兼容性gate、R05a blocker、DAG、Required Envelope、P99及旧身份保持不变。
+
+### R02c attempt003 Core publication failure (2026-10-27)
+
+唯一获授权进程核验到MuJoCo package/runtime/API `3.8.1 / 3.8.1 / 3008001`及冻结的package/binding/library路径和哈希，编译未变的Panda closure，生成model-bound `nq/nv/nu=9/9/8` receipt并成功reset E1。首个控制interval完成五次`mj_step`后，typed state publication失败：leaf dispatcher把state fields作为tuple传给既有`RuntimeSession.snapshot_v1()`，而该owner要求typed `StateRequirements`。本轮未发布完整boundary或transition；关闭不完整Recorder时保留其`64 transitions / 65 observations`错误，未生成完整episode H5。S2/S3未通过；此为Core接线失败，不是Provider身份失败。
+
+保留原native失败后，现有leaf dispatch owner改为构造controller-owned typed aggregate requirements；定向provider-free rework模块19 passed。该修正发生在native进程后，本attempt没有也不会重跑native，故修正后的S2/S3仍未验证。报告状态为`FAIL_CORE / S2_S3_INCOMPLETE_PENDING_SOL_REVIEW`；Provider admission、Qualification和R03b均未建立。原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`。
+
 Phase II D02a 在既有 `task_env.artifacts` owner 增加 `canonical-state-v1`、Entity-qualified joint/frame
 values、consumer-owned `StateRequirements`、evaluation/native interval clocks、boundary revision identity、
 explicit unavailable values 与 provider-view lifetime contract。`canonical-state-v0` class/codec/mapping 不变，
@@ -86,6 +140,9 @@ D05a 在现有 Camera Source owner 新增 `CameraCaptureIdentityV1`，其 `captu
 和输出 modality 绑定为一个稳定 identity。它表示 planned capture request，不证明已构造 renderer、执行 capture 或
 生成图像；旧 camera/source mapping 和 `create_camera_session()` 行为不变。实际 pairing、device/runtime identity
 解析、capture receipt、资源共享和 teardown 留给 D05b/D03。
+
+Phase II-01 R04a 在现有 Observation、SelectedReferenceEnv 与 Generic H5 v3 owners 上增加 opt-in
+`CameraObservationConfigV1`/`DynamicCameraObservationConsumerV1`，仅接入既有单 Panda Position candidate：明确 fixed/world 与 hand parent Frame/mount、双相机 canonical 顺序、RGB HWC float32、optical-Z depth 与 canonical Entity mask。未选择时保持 state-only 默认；typed boundary 后延迟 capture，相同边界复用缓存，Env lifecycle 负责 reset/fault/close 清理。Consumer 将返回 capture 的请求身份和 calibration 与实例实际 config/source/execution/manifest 及同一 typed parent Frame 交叉核对。H5 v3 保持根 ABI 并追加版本化 metadata sidecars；camera recording binding 锚点来自实际 state boundary digest、reset/transition clock、reference profile 与 finalized typed outcome/control，`load_camera_observations_h5()` 对这些独立记录 fail closed，同时校验 T+1、capture/calibration/label-map 与既有量化布局。attempt001原23项provider-free synthetic S1通过；Sol复核发现请求mount/capture绑定与H5独立state/episode锚点缺口。attempt002已完成定向修复，目标 provider-free S1 为33 passed，Sol复核已接收为ACCEPTED_S1_BOUNDED，原请求绑定及独立记录锚点缺口关闭。真实 MuJoCo/OpenGL/EGL、真实 Env S2 与同文件图像 S3 尚未执行，不能表述为 native camera capability、R04b/c 完成或 Qualification。
 
 Phase II B04b 在同一 `task_env.artifacts` owner 增加 `TaskArtifactV1` 与 `decode_task_artifact()`。旧
 `TaskArtifact.from_mapping()` 仍是严格的 `task-artifact-v0` codec；dispatcher 只按精确 `schema_version`
@@ -128,6 +185,54 @@ Task Success、Expert Completion、episode terminated/truncated 分别属于语�
 存在成功后动作时必须声明不可变 completion policy、terminal stage、readiness/timeouts/budget 和
 record/replay 状态，见[runtime contract](runtime-and-providers.md#expert-lifecycle)。
 
+## Phase II-01 R03b fixed Attachment candidate (2026-10-28)
+
+`FixedAttachmentPlanV1` is an additive immutable intent bound to an existing
+LogicalAssembly content hash and Scene-v3 pin. It names two canonical Entity
+owners, separate source/asset/license/closure digests, typed root/mount Frames,
+the directed parent-mount-from-child-root transform, root/collision policy and
+complete native-name maps. It does not write its own digest back into the
+LogicalAssembly and does not alter the Scene-v3, LogicalAssembly-v1 or
+TaskArtifact-v1 schema/identity.
+
+The task-owned R03b candidate composes the existing Scene, R01c source
+projection, TaskArtifact compiler, ResetPlan, RuntimeSource and MuJoCo
+RuntimeSession owners. Its only exercised pair is the frozen Menagerie Panda
+`panda_nohand.xml` + `hand.xml` with their license and 70-file derived closure
+(`b97f7c4f9b585ef175e986b9fb59f3054de74184666373443d6d166a45609b63`). A
+model-bound receipt records the compiled fixed root/topology, dimensions,
+canonical/native forward and inverse maps, source tendon/equality/collision
+checks, exact Provider files and native-resource close. Source bytes are
+retained; the adapter removes source keyframes from compile copies because
+ResetPlan owns the realized initial state.
+
+R03b attempt001 provider-free S1 rejected 19 negative contracts; the selected
+legacy-owner regressions passed 80 tests. After preserving the initial
+pre-import/pre-step omitted-timestep wiring failure and its raw log, a narrow
+fixed-plan-only 2 ms default gate was added, with the compiled MuJoCo model
+still required to report `opt.timestep=0.002`. The affected S1 and old-owner
+regressions were rerun. The final authorized MuJoCo 3.8.1 CPU process passed
+two independent Core materialize→ResetPlan→128-interval trials, including the
+measured mount, Arm/Hand motion, source joint/ctrl range, clock, finite-state,
+warning and close gates. Sol accepted this exact case as `ACCEPTED_BOUNDED_S1_S2`, independently
+checked both receipts/resets and 256 stored motion boundaries, and fixed the
+pre-native declaration/source consistency gate. Wrong canonical Joint
+topology/type/axis/poses or Asset provenance are rejected even after coherent
+identity rebinding. The positive case identity is unchanged; 99 provider-free
+checks and the original 19-case static gate passed, with no additional native
+execution. R03c attempt001 now has an opt-in task-owned two-Entity Position-leaf
+candidate and an 83-passed selected provider-free S1 set, including a synthetic
+provider-free closed-H5 reader check. Its two authorized native starts both
+stopped before `mj_step`: the first failed public reset admission on the
+Attachment receipt versus Hand leaf tendon key; the second stopped in retry
+ledger validation before importing MuJoCo. A provider-free retry-counter repair
+passed S1, but no further native start was allowed. No real episode or H5 was
+produced, so R03c S2/S3 remain incomplete pending Sol review. The Artifact is
+not frozen by this result; other providers/sources, generalized Attachment,
+Judge approval and Qualification remain unestablished. See the [Phase II-01
+R03 record](goal/Phase_II_01/03_R03_Physical_Attachment.md) and ignored
+[R03c report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md).
+
 ## Randomization 所有权
 
 Stage 1 定义随机化 quantity/schema、hard bounds/allowed envelope、nominal train range、
@@ -162,3 +267,50 @@ Core promotion 由 Geochora maintainer 单独治理。
 不要把 metadata/hash 当作丢失 raw Evidence 的替代。操作步骤复用
 [已有 Experiment/Evidence Skill](../../../task_env/.agents/skills/task-env-experiment-evidence/SKILL.md)，
 不再创建同义 Skill 或 schema。
+
+R02c Sol review (2026-10-27): attempt002 command/H5, pre-write boundary and cleanup repairs are reviewed with bounded S1. The native stop exposed a probe API-version constant error (30801 instead of MuJoCo3.8.1 header value 3008001); Sol fixed it with strict identity regressions and pre-rejection observation capture. Original runtime values remain unavailable. S2 requires actual native motion/isolation; S3 requires those real Env transitions in the closed H5 and independent readback. Synthetic S1 is distinct; R02c remains S1_REVIEWED_NATIVE_PENDING, and R06/R05a/DAG/Required Envelope/P99 are unchanged.
+
+R02c attempt003 update (2026-10-27): the single native process verified the fixed MuJoCo identity, compiled/materialized/reset E1, then failed after five `mj_step` calls when leaf dispatch passed an untyped tuple to `snapshot_v1()` instead of `StateRequirements`. No complete boundary, transition or H5 episode resulted; incomplete Recorder close diagnostics were preserved. A post-failure Core fix constructs typed aggregate requirements and passes 19 provider-free tests; it has no native verification in this attempt. Required S2/S3 remain incomplete and pending Sol review; there is no Provider admission, Qualification or R03b start. Evidence is in ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_003/`.
+
+R02c attempt003 review: aggregate leaf publication uses typed StateRequirements, now validated before boundary consume and physics. Provider-free regression exercises the actual MuJoCo publisher, shared typed projection, production transition writer and independent H5/control comparison over synthetic IO. Native003 advanced5 steps before the old tuple error and stored only T0/T+1=1; a finalized failure artifact is not a complete64-step R02c episode. Original raw is immutable; future probe failures preserve public per-writer command/Ack/fault progress before Session teardown. S2/S3 remain incomplete pending a separately authorized004 execution.
+
+R02c attempt004 update (2026-10-27): the authorized single MuJoCo 3.8.1 CPU process passed static source verification and runtime identity, then completed E1 arm-only and E2 hand-only at 64 outer intervals each. E1 passed its joint-1 motion/home oracle, closed a Generic H5 v3 file at T=64/T+1=65, passed independent leaf readback, and rejected all nine tamper cases. E2's requested Hand curve and recorded leaf controls were present, and its closed H5 passed independent T/T+1 readback, but the fixed physical oracle failed: opening minimum 0.068789857 m and excursion 0.007210143 m did not meet ≤0.02 m and ≥0.04 m. E3/E4 did not run; S2/S3 remain incomplete. The probe's `native_evidence.json` was secondarily damaged by `numpy.float32` JSON serialization during failure finalization; its immutable JSONL `probe_failure` event records the primary assertion and 2 materializations, 2 resets, and 640 `mj_step` calls. Exact `mj_forward` and RSS counters were not retained and are not inferred. A serialization-only probe fix plus regression passed 21 provider-free tests after the native run; there was no retry or change to physics, targets, oracle, or budget. Preserve attempt004 raw outputs at ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_004/` and all prior attempt failures. No Provider admission, Qualification, or R03b start is claimed.
+
+R02c004 evidence review distinguishes immutable misleading raw counters from JSONL/H5 reconstruction: actual640 mj_step, two materializations/resets, E1 motion pass and E2 motion fail. Both64/65 H5 files are structurally readable; that does not turn E2 into physical acceptance. Forward/RSS remain unknown. A proposed source-calibrated50N/m Hand section override is a new experiment configuration over the existing versioned plan mechanism; the original2500 configuration/failure and numeric oracles remain frozen. It is not approved by Sol or by the existence of this proposal.
+
+R02c005 selects a complete Hand section override through the existing effective
+plan mechanism. SOURCE_CALIBRATED_HAND_50_V1 retains the parent preset and frozen
+Task Artifact/source while giving the resolved experiment configuration and plan
+new identities. Native Evidence contains four independently reset64-transition
+H5 episodes, their actual requested/servo/native commands and matching typed
+Target/Ack/state/source/plan/config identities. Independent post-close readback
+also passes without loading a physics Provider. Sol accepted this exact case as
+bounded S2/S3; old2500/default and004 failure evidence remain separate. Generic
+outcome task_success=false reflects this control diagnostic, not failed motion;
+physical gate results and horizon completion are recorded separately. No Human
+Judge or Qualification decision is inferred.
+
+
+R03c Sol static review before attempt002 (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
+The original attempt001 two-start budget remains spent, with no completed real
+episode/H5. Sol added actual attached-leaf admission and public Env reset/step
+tests with only native IO stand-ins, coherent Ack-target and remapped-slot
+rejection, strict frozen motion gates and a shared pre-import runner preflight.
+The selected current provider-free set passes 90 tests; no native was rerun,
+and this does not establish R03c S2/S3. A fresh one-start package is prepared
+separately for human forwarding, preserving all attempt001 evidence.
+GeoPhys still has the earlier full-Panda Position/R1 evidence; the new leaf and
+fixed-Attachment Core entries currently admit only MuJoCo. This is a scoped
+source/adapter integration gap, not evidence that GeoPhys physics cannot run
+the new mechanical assembly. See the [R03 source and review
+record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+
+R03c attempt002 (2026-10-28) then used its one authorized MuJoCo 3.8.1 CPU
+start. Runtime identity and E1 reset were observed, but `snapshot_v1()` rejected
+the runner's `JointReference` values where it requires typed Scene
+`JointDefinition` values. The process recorded one materialization, reset and
+`mj_forward`, zero `mj_step`, no completed episode/H5, and no RSS sample.
+Independent H5 readback was not run. A post-failure task-owned runner repair
+selects definitions from the canonical Scene and passed one targeted
+provider-free S1 check; that repair remains natively unverified because no
+retry is permitted. S2/S3 therefore remain incomplete pending Sol review.

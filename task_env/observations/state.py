@@ -44,6 +44,39 @@ def _object_key(uid: str, suffix: str) -> str:
     return f"{uid.replace('-', '_')}_{suffix}"
 
 
+def camera_observation_field_specs(config) -> tuple[ObservationFieldSpec, ...]:
+    """Describe the bounded D04 leaves using the existing schema owner."""
+
+    from .canonical_camera.consumer import CAMERA_IDS, CameraObservationConfigV1
+
+    if not isinstance(config, CameraObservationConfigV1):
+        raise TypeError("camera observation field projection requires CameraObservationConfigV1")
+    config.validate()
+    fields = []
+    for camera_id in CAMERA_IDS:
+        fields.extend((
+            ObservationFieldSpec(
+                name=f"rgb.{camera_id}", shape=(config.height, config.width, 3),
+                dtype="float32", semantic=f"{camera_id} linear normalized RGB",
+                unit="float[0,1]", frame=f"camera:{camera_id}/pixel_grid",
+                time_reference="same capture boundary",
+            ),
+            ObservationFieldSpec(
+                name=f"depth.{camera_id}", shape=(config.height, config.width),
+                dtype="float32", semantic=f"{camera_id} optical +Z depth",
+                unit="m; invalid=0", frame=f"camera:{camera_id}/optical_frame",
+                time_reference="same capture boundary",
+            ),
+            ObservationFieldSpec(
+                name=f"entity_mask.{camera_id}", shape=(config.height, config.width),
+                dtype="uint32", semantic=f"{camera_id} canonical Entity instance labels",
+                unit="uint32; background=0", frame=f"camera:{camera_id}/pixel_grid",
+                time_reference="same capture boundary",
+            ),
+        ))
+    return tuple(fields)
+
+
 class StateObservationBuilder:
     """从同一个 RuntimeSnapshot 构造 state / privileged_state observation。"""
 
