@@ -1,13 +1,13 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态：**REVISED_DRAFT / PLANNED / NOT_STARTED**。本轮仅源码审计与规划修订，不启动 P00/R07a，不把审阅检查计为部署验收。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，尚待维护者批准。
+状态：**R07a PARTIAL_AUDIT / FIXTURE_FACTS_ACCEPTED / R07B_BLOCKED**（2026-10-28 Sol复核attempt001）。五任务部署与native语义对照仍未启动；成本协议仍是待冻结候选。下文原规划审计的来源与历史边界保留，本轮复核见[第8节](#8-r07a-attempt001-sol复核)。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，不由本次审计改变。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
 上游按已验证 USD 处理，Core 负责接收与 provider 执行绑定；其来源/验证成功不自动证明 benchmark 语义对应。
 Harness 当前 mock `pick-lift-v0` 不能替代本页 On/In/region/Open/TurnOn/native-init 的任务映射。
 F06 的 Expert/≥20-seed/Oracle 是新增 Harness 出口，不回写为本页五任务部署的新必需项；
-本页任务完成/Expert/训练非必需的边界保持，R07 当前仍未执行。
+本页任务完成/Expert/训练非必需的边界保持，R07 native部署当前仍未执行。
 
 ## 1. 范围、来源和实际审计边界
 
@@ -33,7 +33,7 @@ LIBERO 固定 inspected candidate：`8f1084e3132a39270c3a13ebe37270a43ece2a01`�
 
 ## 2. Native predicate 审计与不能简化的语义
 
-固定来源：[dispatch](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/predicates/__init__.py)、[predicate functions](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/predicates/base_predicates.py)、[ObjectState/SiteObjectState](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/object_states/base_object_states.py)、[SiteObject](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/objects/site_object.py)、[Tabletop evaluator](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/problems/libero_tabletop_manipulation.py)、[Kitchen evaluator](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/problems/libero_kitchen_tabletop_manipulation.py)、[articulated objects](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/objects/articulated_objects.py)。以下是源码解释，未执行 semantic fixtures。
+固定来源：[dispatch](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/predicates/__init__.py)、[predicate functions](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/predicates/base_predicates.py)、[ObjectState/SiteObjectState](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/object_states/base_object_states.py)、[SiteObject](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/objects/site_object.py)、[Tabletop evaluator](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/problems/libero_tabletop_manipulation.py)、[Kitchen evaluator](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/problems/libero_kitchen_tabletop_manipulation.py)、[articulated objects](https://github.com/Lifelong-Robot-Learning/LIBERO/blob/8f1084e3132a39270c3a13ebe37270a43ece2a01/libero/libero/envs/objects/articulated_objects.py)。以下是原规划的源码解释；attempt001后来补充了隔离源码夹具，结果与限制见[第8节](#8-r07a-attempt001-sol复核)，仍未执行native semantic comparison。
 
 | Native 调用链 | 确认的语义 | GeoChora 映射风险 / 必需负例 |
 | --- | --- | --- |
@@ -147,3 +147,20 @@ R07a交付source/asset/license/embodiment/fixture/资源/缺口与go/no-go recom
 建议阶段依赖 **P99 ← R06c, R07d**，保留R01–R06原required gates；R06b修正为依赖R06a/R01c/R02c/R03b。[07](07_Execution_Order_and_Acceptance.md)为统一执行表。七Goal/22切片仍是candidate，所有implementation NOT_STARTED。
 
 维护者待决：7/22/DAG最终范围、5Task的初版state-only/robot/controller/frequency/安全trajectory与tolerance/预算、generic source/reset/contact/evaluator缺口的原owner扩展范围、逐资产许可与依赖兼容、RoboCasa仅feasibility边界、成本instrumentation与独立human reviewer/可选reference实验设计。任一Required Task无法表示或准入须显式scope decision，不能换题/放宽predicate/自动延期。Release、Scoped Engineering Acceptance、测试、Formal Qualification独立；本轮不签maintainer决定。
+
+## 8. R07a attempt001 Sol复核
+
+2026-10-28，Luna1在`develop-full`输入/输出HEAD `8578b080c37c946d8f52fd4aaaa2843ca7ae179f`完成有界审计，tracked改动为0，已释放输出窗口。Sol接收**部分审计和已记录的夹具事实**，R07a整体未完成，R07b仍阻塞。原报告、脚本及54项manifest保持只读，位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_001/`；Sol复核位于相邻`sol_review_r07a_001/`。
+
+| 已接收范围 | 证据与限制 |
+| --- | --- |
+| 五任务source/init/XML静态身份 | Sol独立核54项输出、63份既存源码SHA-256/Git blob、15个唯一XML及10项受保护输入全部匹配；46次XML任务引用不等于46个唯一XML。 |
+| On/Open/TurnOn/And源码夹具 | 记录26项通过，基于固定函数体AST与注入依赖；Sol阅读脚本和结果，未重跑。不是实际Core evaluator接入或native语义等价。 |
+| 资产闭包与许可缺口 | 446次任务级文件引用归并108个唯一binary；只有tree/blob/大小元数据，未核真实binary bytes或完整运行时闭包，未完成逐资产来源/许可核实。 |
+| Core与provider缺口 | 公开pairwise contact、site几何/parent/fixture-joint关联、native init映射及MountedPanda 7 torque + 2 finger position准入均未补齐；沿现有owner扩展，不以私有state补洞。 |
+| RoboCasa | 受限单场景feasibility建议接收；具体task/layout/robot配置、资产与实测成本仍未知，不授权安装或部署。 |
+| 成本协议 | 候选SHA-256 `4484785a6d175cf59850fee816789b63e94a89b0754adcf72a4c18f666f65075`；小型diff记录+10/−7、net+3、effective3、moved2/copied1及缺来源/身份拒绝例，未测真实Agent成本、未获最终冻结。 |
+
+成本脚本是一次性审计夹具，不是完整验收器：`validate_record`只检查部分身份/非空字段，尚未验证真实log/hash、依赖/recipe/tool绑定和时间区间；LOC行指纹用文本空白归一，不能据此普遍判定复制/移动。正式测量前需复用既有Evidence所有者补齐这些具体检查及独立预期值正负例，再冻结baseline、cache policy和独立Human reviewer。该限制不否定原小型夹具的记录结果。
+
+后续分开处理：R07a先收敛来源/许可与必需语义的处置方案、成本协议冻结；R07b负责实际verified manifests/install与批准后的Core extension；R07c负责真实reset/物理控制/native语义/H5验证。当前缺口的发现不要求在只读审计包中提前实现R07b/c，也不允许跳过R07a部署门。Sol本轮没有新增测试、native或安装；全局文档validator按维护者要求未运行。原Required Envelope、P99和其他slice状态保持。
