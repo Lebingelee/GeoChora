@@ -1857,11 +1857,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "99349b807dc7b3d10fa0312d3643f7b628dcb401b8d7808da6a45bd9664c2509",
+    "07_Execution_Order_and_Acceptance.md": "7e3ba246c46e13092efebb8275137b435d17f25986b2359862bcf84a35c90960",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "712144bfdf02c28812b90c7b2abd56b2aa5e3c035101f8656b7e0d140e71e644",
-    "README.md": "74f455cc447fd377002463277a2fa4b15fd127e99bbfdbe0bcc73d74502c7627"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "5e988bfa5689402bb7732a6aa4b75a7028700e19cf32797a8ea97b22e56a9cfe",
+    "README.md": "f88dcc93d50efc9795f15221eff67152bd88318c75b5da5f620b367db250de44"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4371,7 +4371,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-28",
-    "status": "F00_ATTEMPT001_S1_PASS_NATIVE_CAMPAIGN_EXPERT_FAILED_ORACLE_NOT_RUN; F01-F07 NOT_STARTED",
+    "status": "F00_PARTIAL_REVIEWED; F01_NEXT_PACKAGE_PREPARATION",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4420,12 +4420,12 @@
       "F06_expert_multiseed_required_for_original_R07": false
     },
     "branch_plan": {
-      "current_topic": "codex/phase-ii-01-p00-20261023",
+      "current_topic": "develop-full",
       "new_worktrees_this_revision": 0,
       "additional_core_integration_topics_planned": 1,
       "proposed_name": "develop-full",
-      "created_this_revision": false,
-      "integration": "future package fetches/readbacks base, preserves both Harness and phase ancestry and pins; no per-row branch",
+      "created_this_revision": true,
+      "integration": "5d89089 preserves Harness 9d0b3e5 and phase 0d11d33 ancestry; reuse develop-full for subsequent packages",
       "geophys_submodule_topic_if_needed": 1,
       "push_merge_tag_release_authorized": false,
       "total_core_topics_including_retained_phase_and_future_integration": 2
@@ -4504,7 +4504,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 attempt001 Harness implementation and provider-free S1 passed; one bounded synthetic MuJoCo campaign failed with expert_failed on 20/20 seeds; Oracle/Judge not run; F01-F07 remain planned/not started; no new capability or qualification claims",
+    "patch_rows_status": "F00 integration/fix/S1 accepted; mock native feasibility failed and unresolved; independent F01 package preparation selected, F02-F07 planned",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4668,7 +4668,44 @@
       },
       "other_slice_started": false,
       "qualification": "NOT_ASSESSED",
-      "stop_condition": "Do not retry campaign or tune the candidate/reset distribution; hand off to Sol for review."
+      "stop_condition": "Do not retry campaign or tune the candidate/reset distribution; hand off to Sol for review.",
+      "sol_review": {
+        "decision": "ACCEPT_INTEGRATION_AND_COMPLETION_FIX_S1; NATIVE_CANDIDATE_NOT_ACCEPTED",
+        "review_input_head": "6da0d4a5c001efd373fe42c23c18a084ea3b8208",
+        "manifest_entries_verified": 33,
+        "provider_free_tests": 13,
+        "native_starts_by_sol": 0,
+        "candidate_ready": false,
+        "F01_independent": true,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md"
+      }
+    },
+    "current_execution_order": {
+      "selected_next": "F01",
+      "after_that_priority": [
+        "F02",
+        "F03",
+        "F04",
+        "F05 ready cells",
+        "F06 per-provider ready cells"
+      ],
+      "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
+      "F00_status": "PARTIAL; integration/fix/S1 accepted, mock feasibility failed",
+      "reason": "Maintainer prioritizes Isaac/USD/multi-provider task execution and requests next substage after F00",
+      "F07": "later extension; not required before camera",
+      "native_authorization": "each concrete package pins its own build/cases/budget"
+    },
+    "f01_preparation": {
+      "version_candidate": "6.2.0.0",
+      "official_stable_verified_on": "2026-10-28",
+      "python": "3.12 isolated environment",
+      "backend": "Isaac app host, PhysX CPU solver; GPU remains app/renderer resource",
+      "first_case": "official Panda USD plus one falling rigid cube and ground",
+      "host": "Ubuntu24.04/glibc2.39/RTX5060 8151MiB/driver595.84",
+      "memory_constraint": "15GiB RAM, current MemAvailable about1.5GiB; maintainer will release memory before native launch",
+      "native_starts_by_sol": 0,
+      "implementation_started": false,
+      "core_adapter": "F04 later; no current Isaac Core capability claim"
     }
   }
 }

@@ -1,7 +1,8 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c attempt004 bounded S2/S3已获Sol复核接收**，native输入HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`。
-正式native receipt与complete progress存在；四份同run H5经独立reader验证，S2/S3当前状态为`ACCEPTED_BOUNDED_S2_S3`。attempt004启动额度已耗尽；attempt001–003失败原件继续保留。
+当前入口（2026-10-28）：**R03c已接收；F00整合与完成事实修复/S1已接收，mock候选可行性仍失败；下一包选择独立F01**。
+当前复用集成分支 `develop-full`。F01负责隔离安装Isaac及官方Panda+刚体的原生对照；F00专家准备超时不阻塞这条独立路线。实际优先安排为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c保留独立可执行性，F07不成为相机的前置。每包仍核真实readiness与授权。
+R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
 新增后继方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)，本文件更新不自动授权实现/native。
@@ -21,7 +22,7 @@
    保留 source/plan/Attachment/materialization/config/command/Target/Ack/state/clock 身份。
    不降低原 motion/mount/range/clock/oracle、不以 R03b S2、synthetic H5 或诊断拼接替代。
 6. **失败与后继**：保留原失败与新 partial progress；同包普通接线修正只用该包允许的运行额度。
-   Sol 接收 R03c 出口后，默认按原表进入 R04b。若 R03c 或后继行受阻，选择独立 ready 行须在工作包中记明原因，
+   原表在 R03c 后默认进入 R04b；维护者后续选择的F00/F01优先顺序见本页当前入口。选择独立 ready 行须在工作包中记明原因，
    不自动换 provider、放宽 required 或延长预算。
 7. **新增补丁线**：F00–F07 由 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#5-分阶段顺序与出口) 维护。
    它们不继承 R03c 的 native 授权，也不要求完整 P99 先完成；F01 安装准备等独立行可在明确选择后提前。
@@ -192,3 +193,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28，R03c attempt004以输入HEAD `4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d`完成一次新的MuJoCo 3.8.1 CPU启动。S0和launcher `--check`通过；actual package/runtime/API为3.8.1/3.8.1/3008001，正式native receipt存在、progress complete、无failure/cleanup error，native exit 0。四episode共4 materialization/reset、260 forward、1280 step、256 outer；H5各64/65，活动Arm/Hand与reset/mount/warning/config-isolation门通过。新provider-free进程同run读取四份H5，provider imports 0，累计256 transitions/260 observations和48/48 tamper拒绝；reader状态`BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW`。RSS最大采样459,276,288 bytes（outer boundary sampling，不代表interval内硬峰值）；完整package最终大小见ignored attempt004 `sha256.manifest`/report。S1复用33项Sol复核结果，没有重跑；attempt001–003失败原件不变。当前只待Sol复核，不启动其他slice，且不授予通用Provider/Attachment支持或Qualification。
 
 2026-10-28，Sol复核R03c attempt004，接收 `ACCEPTED_BOUNDED_S2_S3`。实际启动exit 0、正式receipt及complete progress存在；50项原始文件hash、16项冻结源码hash、1280 step trace、四份H5与独立readback的hash及冻结门一致，48/48 tamper拒绝。接收仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置；RSS为边界采样，非interval内硬峰值。复用33项provider-free S1，没有新增native或软件测试。复核报告：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md`。
+
+2026-10-28 Sol复核F00 attempt001：接收 `develop-full` 两线整合与完成事实修复/S1；33项manifest（25文件、8个Git blob）匹配，13项provider-free tests复核通过，20条原始campaign行经report validator再核一致。candidate仍为20/20 `expert_failed / gripper_readiness_timeout`，ledger round1 fail/state ready、Oracle/H5/Judge未运行；F00整体保持PARTIAL。该专家可行性缺口不作为独立F01安装/官方原生Panda+刚体对照的前置。维护者要求下一子阶段工作包，当前明确选择F01，之后按F02/F03/F04逐包推进；R04b/c可独立安排，原DAG/P99门保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md`。

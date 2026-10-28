@@ -1,9 +1,11 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-28。状态：**F00 S1_PASS / SYNTHETIC_CAMPAIGN_EXPERT_FAILED (20/20) / ORACLE_NOT_RUN**。
+更新于 2026-10-28。状态：**F00 PARTIAL（整合/修复/S1已接收，候选失败）；F01 NEXT_PACKAGE_PREPARATION**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
 `develop-full` 集成、Harness 生命周期修复和定向 provider-free S1 已完成。唯一有界 synthetic MuJoCo campaign 已执行，但 20/20 seeds 均为 `expert_failed / gripper_readiness_timeout`；candidate 未通过，因此 Oracle/H5 与 pending Judge 未运行，F00 native 兼容出口未通过。
 R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
+
+2026-10-28 Sol复核F00 attempt001：接收 `develop-full` 两线整合与完成事实修复/S1；33项manifest（25文件、8个Git blob）匹配，13项provider-free tests复核通过，20条原始campaign行经report validator再核一致。candidate仍为20/20 `expert_failed / gripper_readiness_timeout`，ledger round1 fail/state ready、Oracle/H5/Judge未运行；F00整体保持PARTIAL。该专家可行性缺口不作为独立F01安装/官方原生Panda+刚体对照的前置。维护者要求下一子阶段工作包，当前明确选择F01，之后按F02/F03/F04逐包推进；R04b/c可独立安排，原DAG/P99门保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md`。
 
 ## 1. 已确定的方向与范围
 
