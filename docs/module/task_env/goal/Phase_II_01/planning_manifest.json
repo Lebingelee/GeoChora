@@ -1138,11 +1138,11 @@
         "R03b",
         "R02c"
       ],
-      "status": "BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT004_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW; one native start consumed; no other slice started",
+      "status": "ACCEPTED_BOUNDED_S2_S3",
+      "execution": "ATTEMPT004_S2_S3_ACCEPTED_BOUNDED_AFTER_SOL_REVIEW",
       "required_evidence": "Reused Sol-reviewed provider-free 33-case S1; one MuJoCo 3.8.1 CPU native run bound to input HEAD 4ac7284 completed four same-public-Env episodes and published the formal receipt; a fresh provider-free process independently read the four closed same-run H5 files and passed the 48-case copy-only tamper matrix.",
-      "stop_condition": "Preserve attempt001–003 failures and raw bytes. Attempt004 one-start budget is consumed. Sol must review the actual docs/code diff and available Evidence before another package; do not retry, start another native process, or advance any other slice. No general Provider/Attachment admission or Qualification.",
-      "result": "Attempt004 passed S2/S3 for the exact frozen Panda Arm+Hand dual-source candidate, two Position writers, MuJoCo 3.8.1 CPU, seed31, 2 ms physics step ×5 substeps, 0.01 s outer step and E1–E4. Native exit 0; formal native_result receipt and complete progress exist; no native failure/cleanup error. Counts: 4 materializations, 4 resets, 260 mj_forward, 1280 mj_step, 256 outer intervals, 2.56 simulated seconds; max sampled RSS 459276288 bytes sampled at each returned outer boundary. Four H5 files have 64 transitions/65 observations and match the independent readback SHA-256 values. Offline readback status BOUNDED_ATTACHED_LEAF_PUBLIC_ENV_S2_S3_PASS_PENDING_SOL_REVIEW, 4 episodes/256 transitions/260 observations, provider imports 0, 48/48 tamper rejections. Sol review pending; no Qualification, task-success claim or general Provider/Attachment admission.",
+      "stop_condition": "Preserve attempt001–003 failures and attempt004 raw. The attempt004 one-start budget is consumed; future work follows the phase plan and its own execution scope. No general Provider/Attachment admission or Qualification follows from this result.",
+      "result": "Sol reviewed attempt004 execution and accepted bounded S2/S3: one MuJoCo 3.8.1 CPU run, four 64/65 H5 episodes, 1280 steps, 260 forwards, four materializations/resets, same-run provider-free readback and 48/48 tamper rejections. Scope: Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置. Original earlier attempts and signed pending-review execution records are preserved.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/report.md",
       "attempt001_execution": {
         "input_head": "703e8a1b184b18e7efbc0b5532b96fb3a462b4d2",
@@ -1220,16 +1220,20 @@
         "sol_review": "PENDING"
       },
       "sol_review": {
-        "decision": "S1_REVIEWED_NATIVE_PENDING",
-        "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
-        "current_provider_free_tests": 90,
-        "actual_native_imports": 0,
-        "actual_native_starts": 0,
-        "S2": "INCOMPLETE",
-        "S3": "NOT_RUN",
-        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_001/sol_review.md",
-        "next_package": "R03c attempt002, one separate human-authorized native start only; not attempt001 start3",
-        "geophys_scope": "Earlier Phase II full-Panda routes retain bounded evidence; new leaf/Attachment source and Core adapter gap, not a blanket provider or phase exclusion."
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "reviewed_attempt": "004",
+        "review_input_head": "0c45a5db442d3a758790dca4fede2856ac15f15b",
+        "native_input_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+        "S2": "PASS",
+        "S3": "PASS",
+        "manifest_files_verified": 50,
+        "frozen_code_files_verified": 16,
+        "provider_free_s1_reused": 33,
+        "native_starts_by_sol": 0,
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md",
+        "raw_verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/raw_verification.json",
+        "scope": "Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置"
       },
       "attempt002_execution": {
         "input_head": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
@@ -1611,8 +1615,32 @@
         }
       },
       "attempt004_sol_review": {
-        "decision": "PENDING",
-        "review_required": "Actual docs/code diff, native receipt, H5s, same-run offline readback and resource/failure records. No subsequent slice or native run until Sol review."
+        "decision": "ACCEPTED_BOUNDED_S2_S3",
+        "reviewed_attempt": "004",
+        "review_input_head": "0c45a5db442d3a758790dca4fede2856ac15f15b",
+        "native_input_head": "4ac7284a4cf770f28a1c5d1f9c81337a6b39c66d",
+        "S2": "PASS",
+        "S3": "PASS",
+        "manifest_files_verified": 50,
+        "frozen_code_files_verified": 16,
+        "provider_free_s1_reused": 33,
+        "native_starts_by_sol": 0,
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md",
+        "raw_verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/raw_verification.json",
+        "scope": "Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置"
+      },
+      "attempt001_sol_review": {
+        "decision": "S1_REVIEWED_NATIVE_PENDING",
+        "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
+        "current_provider_free_tests": 90,
+        "actual_native_imports": 0,
+        "actual_native_starts": 0,
+        "S2": "INCOMPLETE",
+        "S3": "NOT_RUN",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_001/sol_review.md",
+        "next_package": "R03c attempt002, one separate human-authorized native start only; not attempt001 start3",
+        "geophys_scope": "Earlier Phase II full-Panda routes retain bounded evidence; new leaf/Attachment source and Core adapter gap, not a blanket provider or phase exclusion."
       }
     },
     {
@@ -1825,15 +1853,15 @@
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
-    "03_R03_Physical_Attachment.md": "e0a6cdc2030815e67dc6b2cd0ff40f779f96b18025d9f78a74be062ffc270c67",
+    "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "23dc07020d9f666c16647e675b13e1c21871cdd73b8166980dbf742146bfb5bd",
+    "07_Execution_Order_and_Acceptance.md": "cd7e6c1d76ac7af24a991e42ca112bcd7a5da66b3ed17088eee7ffc24b5051dc",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "69b53cde406e75b0f8daed1cf6b6b516cb3d68ea90eaf6a7636a3fb19afde048",
-    "README.md": "71bd57de91edd2b93b7d958f3865ff17473589f76361c4e5959c59df283dbfb4"
+    "README.md": "352c6d167035ef26adce0b5dc6d1e2f1cf5ee317ab255f1e536ba751682f9377"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {

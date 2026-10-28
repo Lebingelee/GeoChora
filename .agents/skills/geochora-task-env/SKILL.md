@@ -927,3 +927,11 @@ It does not establish general Attachment/Provider support, task success or
 Qualification. Preserve attempt001–003 originals; attempt004's one-start
 budget is consumed and no other slice starts before Sol review. Evidence is in
 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/`.
+
+R03c attempt004 Sol review (2026-10-28): the exact Panda Arm+Hand, two
+Position-writer, MuJoCo 3.8.1 CPU, seed 31 and 2 ms × 5 four-configuration
+public Env/Recorder/reader intersection is `ACCEPTED_BOUNDED_S2_S3`. The
+50-file attempt manifest, 16 frozen source files, receipt, native trace and
+four H5 hashes/readback were reviewed; 33 provider-free S1 checks were reused.
+This does not grant general provider/Attachment admission or Qualification.
+Evidence and the Sol review remain in ignored workspace maintenance records.
