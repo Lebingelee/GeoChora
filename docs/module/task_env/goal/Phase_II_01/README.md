@@ -9,7 +9,7 @@
 | [00 总蓝图](00_Phase_II_01_Blueprint.md) | 基线/范围/owner/相互独立与批准顺序 |
 | [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
-| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt001实现/S1完成，native两次启动预算耗尽，S2/S3不完整 |
+| [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt002唯一native在typed Joint snapshot绑定处失败，S2不完整、S3未运行 |
 | [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
@@ -174,3 +174,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-28，Sol已接收R03b attempt001为`ACCEPTED_BOUNDED_S1_S2`：实际双Entity固定装配、两个RuntimeSession trial及256个运动边界/两份reset经离线复核通过。接收时直接补齐source与canonical Joint/Asset声明的一致性拒绝门，99项provider-free回归及原19负例静态检查通过；正确case身份及原S2证据不变，没有新增native。原Luna报告保持签署时状态，当前决定见ignored `sol_review_r03b_001/sol_review.md`。R03c public Env/Recorder/H5及S3/S4仍NOT_RUN、未启动；R06/R05a、DAG/Required Envelope/P99与冻结refs不变。
 
 2026-10-28，R03c001经Sol静态复核后为`S1_REVIEWED_NATIVE_PENDING`：真实Core准入至public reset/step的native-IO替身检查、reader一致篡改拒绝与冻结门、共享执行preflight补齐，当前90项S1通过；没有追加native，原S2/S3仍不完整。GeoPhys继续保留Phase II已验证完整Panda路线；新leaf/Attachment尚有source与Core adapter适配缺口，不能概括成GeoPhys不支持Phase II-01。详细复核在ignored `sol_review_r03c_001/`，原失败raw不改。
+
+2026-10-28，R03c attempt002使用单次授权MuJoCo 3.8.1 CPU native窗口后，在E1 public reset后的 `snapshot_v1()` typed Joint绑定处失败：runner传入 `JointReference` 而Core要求canonical Scene中的 `JointDefinition`。计数为1 start/materialization/reset/forward、0 step/outer，未完成episode/H5，独立H5 reader未运行，RSS无样本。失败后runner从固定Scene选择typed Joint definitions并通过新增1项provider-free S1；无native重试，修正仍待native验证。仅记录此attempt的S2/S3不完整与失败，不改变通用Provider/Attachment能力。原始attempt001与attempt002 bytes、freeze和账本由Phase II-01 manifest分别指向`r03c_001/`与`r03c_002/`；Sol复核前不推进其他slice。

@@ -1138,12 +1138,12 @@
         "R03b",
         "R02c"
       ],
-      "status": "S1_REVIEWED_NATIVE_PENDING",
-      "execution": "ATTEMPT001_NATIVE_BUDGET_SPENT_SOL_STATIC_FIXES_PASS_NO_NEW_NATIVE",
-      "required_evidence": "Selected provider-free S1 plus four same-public-Env MuJoCo 3.8.1 CPU episodes and independent readback of four closed Generic H5 files; S2/S3 were not completed in this attempt.",
-      "stop_condition": "The two authorized native process starts are consumed. Both stopped before mj_step; no third start. Preserve both failure records and do not claim S2/S3 without four real same-Env H5 episodes and independent readback.",
-      "result": "Sol reviewed b42287c and preserved two pre-step failures; added actual attached admission/public Env reset-step S1 with native IO stand-ins, coherent H5 Ack/slot rejection and strict frozen motion gates, plus shared fresh-window preflight. 90 current provider-free tests pass. No real episode/H5 or R03c S2/S3 acceptance; attempt001 starts2/2 remain spent. Prepare only a separately authorized one-start attempt002; no other slice.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md",
+      "status": "S2_FAILED_S3_NOT_RUN_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT002_ONE_NATIVE_START_FAILED_TYPED_JOINT_SNAPSHOT; POSTRUN_PROVIDER_FREE_FIX_NOT_NATIVE_VERIFIED",
+      "required_evidence": "Selected provider-free S1 plus four same-public-Env MuJoCo 3.8.1 CPU episodes and independent readback of four closed Generic H5 files; attempt002 did not complete this evidence.",
+      "stop_condition": "Attempt001 history and attempt002 one-start failure are preserved. Attempt002 budget is spent; do not retry. No S2/S3 pass without four real same-Env H5 episodes and independent readback in a separately authorized window.",
+      "result": "Attempt002 passed S0 and the provider-free launcher check. Its one MuJoCo 3.8.1 CPU process verified runtime/API identity, reset E1, then failed in snapshot_v1 because the runner passed JointReference instead of Scene JointDefinition. Counts: starts1/materialization1/reset1/forward1/step0/outer0; no episode/H5, reader NOT_RUN, RSS unsampled. After preserving raw failure, runner binding was repaired and one provider-free S1 check passed; fix is not native-verified and no retry occurred. S2 incomplete, S3 not run; pending Sol review; no other slice.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/report.md",
       "attempt001_execution": {
         "input_head": "703e8a1b184b18e7efbc0b5532b96fb3a462b4d2",
         "status": "IMPLEMENTED_S1_PASS_NATIVE_BUDGET_EXHAUSTED_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
@@ -1230,6 +1230,59 @@
         "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_001/sol_review.md",
         "next_package": "R03c attempt002, one separate human-authorized native start only; not attempt001 start3",
         "geophys_scope": "Earlier Phase II full-Panda routes retain bounded evidence; new leaf/Attachment source and Core adapter gap, not a blanket provider or phase exclusion."
+      },
+      "attempt002_execution": {
+        "input_head": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
+        "status": "NATIVE_FAILURE_S2_INCOMPLETE_S3_NOT_RUN_POSTRUN_FIX_NOT_NATIVE_VERIFIED",
+        "preflight": {
+          "status": "PASS",
+          "provider_imports": 0,
+          "native_starts": 0,
+          "output_absent_before_start": true
+        },
+        "native_processes": [
+          {
+            "attempt": 1,
+            "exit_code": 1,
+            "classification": "RUNNER_TYPED_STATE_BINDING_TYPE_ERROR_AFTER_PUBLIC_RESET_BEFORE_STEP",
+            "provider_imported": true,
+            "runtime_identity_verified": true,
+            "error": "TypeError: typed Joint binding 'panda-arm/joint1' must be a JointDefinition",
+            "materialization_attempts": 1,
+            "resets": 1,
+            "mj_forward_calls": 1,
+            "mj_step_calls": 0,
+            "outer_intervals": 0,
+            "simulated_seconds": 0.0,
+            "native_wall_seconds": 2.6684191308449954,
+            "launcher_wall_seconds": 3.54570907400921,
+            "rss_bytes": null,
+            "failure": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/native/native_failure.json",
+            "trace": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/native/stderr.log",
+            "runtime_identity": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/native/runtime_identity.json"
+          }
+        ],
+        "episodes_completed": 0,
+        "closed_real_h5_files": 0,
+        "same_run_offline_reader": "NOT_RUN_NO_H5",
+        "postrun_fix": {
+          "owner": "task_env/diagnostics/tasks/r03c_attached_leaf_probe.py::_candidate_bindings",
+          "classification": "FIX_EXISTING",
+          "change": "Select canonical JointDefinition objects from the candidate Scene using leaf JointReference identities.",
+          "provider_free_s1": "1 passed",
+          "native_verified": false
+        },
+        "qualification_granted": false,
+        "general_provider_admission": false,
+        "R06_R05a_DAG_Required_Envelope_P99_frozen_refs_unchanged": true,
+        "other_slice_started": false,
+        "sol_review": "PENDING"
+      },
+      "attempt002_sol_review": {
+        "decision": "PENDING",
+        "input_head": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
+        "native_starts": 1,
+        "postrun_fix_native_verified": false
       }
     },
     {
@@ -1442,14 +1495,14 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
-    "03_R03_Physical_Attachment.md": "c8708520df92e4a2cd6e1e046cc606881fa22dd04b9a1550c57acbd8f5c1774d",
+    "03_R03_Physical_Attachment.md": "2001297a415ea6d2bd807bd81511aafa137a937127063f65316e7ccc09c6fdf8",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "01284cf7b4408b668ac1b3f5a93d9779162e486ec5e014ff3a1423dfc634123a",
+    "07_Execution_Order_and_Acceptance.md": "08013367eb0bacfc78e3e5aa4ebd3a83d46d2975f61e75f1fdf5d3a3d6e9e5ef",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "737806c8d979b665132b42a8a6c9548da7af614917b739ccdd68273b216a5867"
+    "README.md": "7fb5c61ba566c3e478df55f72cd8b0975d3bf3b38bfe017453e8f5259b4c84e6"
   },
   "revision_kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
   "benchmark_audit": {
@@ -3638,6 +3691,13 @@
       "input_commit": "b42287c558afdcc4026ddb8294f30c0f83c865ad",
       "result": "S1_REVIEWED_NATIVE_PENDING",
       "scope": "90 provider-free checks; actual Core owner chain, coherent reader rejection, strict oracles, fresh-window preflight. No additional native, S2/S3 acceptance or next-slice start."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "R03C_ATTEMPT002_NATIVE_FAILURE_AND_POSTRUN_S1_FIX",
+      "input_commit": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
+      "result": "S2_FAILED_S3_NOT_RUN_PENDING_SOL_REVIEW",
+      "scope": "One authorized MuJoCo 3.8.1 CPU start; one reset/forward and zero steps; no H5. Runner mapping fix passed one provider-free S1 after the native start and remains natively unverified. No retry or other slice."
     }
   ],
   "P00_audit": {

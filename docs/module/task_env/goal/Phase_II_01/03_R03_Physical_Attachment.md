@@ -1,6 +1,6 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已完成实现、定向 S1 与 Core RuntimeSession S2，全部冻结门通过，经Sol复核接收为 `ACCEPTED_BOUNDED_S1_S2`。R03c attempt001 已实现并通过所选 provider-free S1（83 passed），但两个有界 native starts 均以接线/runner失败结束且没有 `mj_step`；R03c S2/S3 **INCOMPLETE**，等待Sol复核。没有由此授予Provider通用支持、任意 Attachment 支持或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已完成实现、定向 S1 与 Core RuntimeSession S2，全部冻结门通过，经Sol复核接收为 `ACCEPTED_BOUNDED_S1_S2`。R03c attempt001 两次启动失败原件继续保留；attempt002 唯一启动核实 MuJoCo 3.8.1 CPU 身份并完成 reset/一次 `mj_forward`，但在 typed-state Joint binding 失败，`mj_step=0`、无 episode/H5；S2 **FAIL/INCOMPLETE**、S3 **NOT_RUN**，待Sol复核。失败后 runner 映射修正通过1项 provider-free 定向S1，尚未native验证。没有由此授予Provider通用支持、任意 Attachment 支持或 Qualification。
 
 ## 已知事实与精确 Provider 路线
 
@@ -84,12 +84,18 @@ Sol已复核实现提交 `ee5ed6c298bbdab206968873c61944ac35c66dbf`、两个mode
 
 Sol复核结果为`S1_REVIEWED_NATIVE_PENDING`，尚不接收R03c S2/S3。原两次启动及83项S1是attempt001的历史事实；Sol补查发现原S1跳过真实attached-leaf admission，直接补上现有Core admission→public Env reset/step链，只有native model/data/I/O替身，不作为动力学证据。另修正reader对一致伪造Ack target、重哈希槽位互换的拒绝，并移除物理门中的1e-6额外放宽；零四元数也拒绝。90项provider-free S1通过。freezer支持显式新输出/snapshot/prompt的一次新窗口，runner提供与实际导入前同路径的`--preflight-only`，同时验证预追加启动记录，避免再次因账本形状消耗native。原native窗口2/2耗尽，Sol没有追加Provider导入或native；下一份attempt002仅是待维护者转交授权的一个新启动窗口，不是attempt001的第三次启动。
 
+## R03c attempt002 — 一次native失败，S3未运行
+
+2026-10-28，维护者授权在固定输入HEAD `b39bba45c1d39685bc1bd4869a61a2ca3c360208` 的现有阶段分支运行一次MuJoCo 3.8.1 CPU public Env窗口。S0快照、submodule/gitlink、v2.0.0 tag与保护输入哈希通过，attempt001完整SHA manifest仍有效；90项已复核S1按包复用，启动器provider-free `--check`通过。新窗口唯一子进程实际加载package/runtime 3.8.1、API 3008001及冻结CPU library/header身份，执行1次materialization、1次reset和1次`mj_forward`；在首次typed state snapshot处，`snapshot_v1()`拒绝`JointReference`而要求Scene `JointDefinition`。原始错误为`TypeError: typed Joint binding 'panda-arm/joint1' must be a JointDefinition`。native `mj_step=0`、outer=0、模拟时间0、无完成episode及H5；RSS没有样本，记null。`native_progress.json`的活动phase字段保留为`runtime_materialization`，而traceback显示失败发生在public reset之后的`env.session.snapshot_v1()`；保留二者原样并以traceback定位故障。
+
+失败后按既有owner修正runner的`_candidate_bindings()`：从candidate固定Scene的Articulation中取`JointDefinition`，将leaf `JointReference`仅用于选择，不再把Reference冒充Definition。新增provider-free回归定向检查，关闭pytest插件自动加载后`1 passed`；首次pytest自动加载在受限sandbox中因插件开socket而`PermissionError`退出，该原件也保留。该修正确认不改source、物理门、配置或预算，且没有第二次native启动；因此修正尚未native验证。没有H5可供独立reader读取，S3为`NOT_RUN`，本attempt的S2/S3均不接收。报告、freeze、startup ledger、runtime identity、失败raw与命令记录见ignored [R03c attempt002 report](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/report.md)。R06、R05a、DAG、Required Envelope、P99及冻结refs不变，未启动其他slice。
+
 ## 切片
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
 | R03a | P00 | MuJoCo CPU source/closure/机械语义的早期真实可行性与 GeoPhys 精确拒绝审计 | attempt001端点case FAIL保留；attempt002 INTERIOR_HAND_COMMANDS bounded case通过冻结source/dynamics oracle，Sol已接收该有界工程出口。不是Core S2/S3或Attachment admission；不证明端点/全行程；该R03a接收时R03b/c未启动，当前状态见下行 |
 | R03b | R01c,R03a | **attempt001 已接收 `ACCEPTED_BOUNDED_S1_S2`**。精确两-source Panda fixed tree、source closure、model-bound mapping/topology、ResetPlan与真实相对位姿 | Luna原19项S1及Sol补充后的99项provider-free回归通过；两trial各128区间，冻结motion/mount/range/clock/warning/close门全通过。只限本包source/provider/seed/horizon，非Qualification |
-| R03c | R03b,R02c | **S1_REVIEWED_NATIVE_PENDING；Sol当前90项S1通过，真实S2/S3不完整**。两个独立Entity的Position leaf接入既有 public Env→Recorder→reader owners | 两次授权native starts均已消耗且都在任何`mj_step`前失败；累计materialization1/reset1/forward0/step0，无episode/H5。不得复用R03b S2或合成reader S1替代同Env真实运动与闭合H5 S2/S3 |
+| R03c | R03b,R02c | **attempt002 NATIVE_FAILURE；S2不完整、S3未运行，待Sol复核**。两个独立Entity的Position leaf接入既有 public Env→Recorder→reader owners | attempt001两个失败启动保留；attempt002唯一启动为materialization1/reset1/forward1/step0，无episode/H5，typed snapshot绑定失败。失败后runner修正仅经1项provider-free定向S1，尚未native验证；不得复用R03b S2或合成reader S1替代同Env真实运动与闭合H5 S2/S3 |
 
 S3 必须沿现有 factory/SelectedReferenceEnv 或已明确批准的公共 candidate 入口，在原 RuntimeSession/Recorder owners 扩展；public path 不导入 test_*。失败保留原日志、partial apply/fault receipt、资源关闭检查；不伪装 rollback。R03 不依赖 Camera 或 R05 force-only 路线；不引入动态 attach/detach/闭环约束拓扑、USD ABI 或第二 Runtime。外部装配语义参考固定 [Isaac Sim 6.1.0](README.md#references)。

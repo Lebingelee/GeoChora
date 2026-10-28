@@ -869,3 +869,17 @@ preflight. The current 90 provider-free tests pass; the state is
 reuse attempt001's spent two-start budget. Read the current scope and limits in the
 [R03 contract](../../../docs/module/task_env/goal/Phase_II_01/03_R03_Physical_Attachment.md)
 and the current materialization boundary in [Public API](../../../docs/module/task_env/public-api.md).
+
+R03c attempt002 update (2026-10-28): its one authorized MuJoCo 3.8.1 CPU
+native start verified runtime/API identity, reset E1 and called one `mj_forward`,
+then failed when the runner passed `JointReference` values to
+`RuntimeSession.snapshot_v1()`, which requires `JointDefinition` values from
+the canonical Scene. It recorded one materialization/reset, zero `mj_step` or
+outer intervals, no episode/H5, and no RSS sample; independent H5 readback did
+not run. The task-owned runner mapping was repaired after preserving the raw
+failure, and one provider-free S1 regression passed. This repair is not
+native-verified and no retry is permitted in that window. Current attempt002
+status is S2 incomplete/S3 not run pending Sol review; this does not add
+Provider admission, general Attachment support or Qualification. Keep
+attempt001 bytes and attempt002 failure/freeze/ledger separate at their ignored
+workspace Evidence paths.

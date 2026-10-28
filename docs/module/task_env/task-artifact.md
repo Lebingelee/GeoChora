@@ -291,7 +291,7 @@ physical gate results and horizon completion are recorded separately. No Human
 Judge or Qualification decision is inferred.
 
 
-R03c Sol static review (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
+R03c Sol static review before attempt002 (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
 The original attempt001 two-start budget remains spent, with no completed real
 episode/H5. Sol added actual attached-leaf admission and public Env reset/step
 tests with only native IO stand-ins, coherent Ack-target and remapped-slot
@@ -304,3 +304,13 @@ fixed-Attachment Core entries currently admit only MuJoCo. This is a scoped
 source/adapter integration gap, not evidence that GeoPhys physics cannot run
 the new mechanical assembly. See the [R03 source and review
 record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+
+R03c attempt002 (2026-10-28) then used its one authorized MuJoCo 3.8.1 CPU
+start. Runtime identity and E1 reset were observed, but `snapshot_v1()` rejected
+the runner's `JointReference` values where it requires typed Scene
+`JointDefinition` values. The process recorded one materialization, reset and
+`mj_forward`, zero `mj_step`, no completed episode/H5, and no RSS sample.
+Independent H5 readback was not run. A post-failure task-owned runner repair
+selects definitions from the canonical Scene and passed one targeted
+provider-free S1 check; that repair remains natively unverified because no
+retry is permitted. S2/S3 therefore remain incomplete pending Sol review.

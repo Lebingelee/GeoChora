@@ -165,11 +165,22 @@ def _mount_requirements(candidate):
 
 
 def _candidate_bindings(candidate):
-    joint_bindings = {
-        f'{ref.entity_id}/{ref.joint_id}': ref
+    scene_joints = {
+        f'{articulation.entity_id}/{joint.joint_id}': joint
+        for articulation in candidate.scene.articulations or ()
+        for joint in articulation.joints
+    }
+    requested_joints = [
+        f'{ref.entity_id}/{ref.joint_id}'
         for entry in candidate.plan.leaves
         for ref in entry.binding.joint_order
-    }
+    ]
+    if len(requested_joints) != len(set(requested_joints)):
+        raise ValueError('R03c leaf state projection contains duplicate Scene Joint references')
+    missing_joints = sorted(set(requested_joints) - set(scene_joints))
+    if missing_joints:
+        raise ValueError(f'R03c leaf state projection references Joints absent from the Scene: {missing_joints}')
+    joint_bindings = {name: scene_joints[name] for name in sorted(requested_joints)}
     frame_bindings = {
         name: __import__('task_env.artifacts', fromlist=['FrameReference']).FrameReference(
             *name.split('/', 1)

@@ -635,7 +635,7 @@ candidate evidence, not a registered make_env route, separate-Entity Attachment,
 other-Provider support or new Qualification.
 
 
-R03c Sol static review (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
+R03c Sol static review before attempt002 (2026-10-28): `S1_REVIEWED_NATIVE_PENDING`.
 The original attempt001 two-start budget remains spent, with no completed real
 episode/H5. Sol added actual attached-leaf admission and public Env reset/step
 tests with only native IO stand-ins, coherent Ack-target and remapped-slot
@@ -648,3 +648,15 @@ fixed-Attachment Core entries currently admit only MuJoCo. This is a scoped
 source/adapter integration gap, not evidence that GeoPhys physics cannot run
 the new mechanical assembly. See the [R03 source and review
 record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+
+R03c attempt002 update (2026-10-28): the sole authorized MuJoCo 3.8.1 CPU
+native process verified package/runtime/API identity and reset E1, then failed
+at `RuntimeSession.snapshot_v1()` because the runner supplied leaf
+`JointReference` values where the public typed-state projection requires
+canonical Scene `JointDefinition` values. Counts were one materialization,
+reset and `mj_forward`, with zero `mj_step` or outer intervals; no episode or
+H5 was produced and independent readback was not run. After preserving that
+failure, the task-owned runner now selects definitions from its fixed Scene; a
+new provider-free regression passed. No native retry verified the correction,
+so this result remains S2 incomplete/S3 not run pending Sol review. It adds no
+new provider admission, general Attachment support or Qualification.

@@ -530,6 +530,30 @@ def test_public_env_reset_and_step_reach_real_attached_admission_and_publication
     assert session._closed and session._model is None and session._data is None
 
 
+def test_native_snapshot_bindings_use_scene_joint_definitions(monkeypatch):
+    from task_env.artifacts.contracts import JointDefinition
+    from task_env.diagnostics.tasks.r03c_attached_leaf_probe import _candidate_bindings
+    import sys
+
+    candidate=_candidate(monkeypatch)
+    joint_bindings, frame_bindings=_candidate_bindings(candidate)
+    expected={
+        f'{articulation.entity_id}/{joint.joint_id}': joint
+        for articulation in candidate.scene.articulations
+        for joint in articulation.joints
+    }
+    selected={
+        f'{ref.entity_id}/{ref.joint_id}'
+        for entry in candidate.plan.leaves
+        for ref in entry.binding.joint_order
+    }
+    assert set(joint_bindings)==selected
+    assert all(type(value) is JointDefinition for value in joint_bindings.values())
+    assert joint_bindings=={name:expected[name] for name in sorted(selected)}
+    assert set(frame_bindings)==set(candidate.source.bodies)|set(candidate.source.frames)
+    assert not any(name.split('.',1)[0] in {'mujoco','taichi'} for name in sys.modules)
+
+
 def test_real_attached_admission_rejects_logical_tendon_key_in_source_namespace(monkeypatch):
     candidate=_candidate(monkeypatch)
     session=_session_with_synthetic_native_io(candidate)
