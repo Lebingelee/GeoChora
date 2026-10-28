@@ -81,7 +81,7 @@ def _sha256(path: Path) -> str:
 
 
 def _pose_matrix(pose) -> np.ndarray:
-    from ...utils.rotation import quat_wxyz_to_matrix
+    from task_env.utils.rotation import quat_wxyz_to_matrix
 
     result = np.eye(4, dtype=np.float64)
     result[:3, :3] = quat_wxyz_to_matrix(np.asarray(pose.quaternion_wxyz, dtype=np.float64))
@@ -110,7 +110,7 @@ def _look_at_world_from_optical(position, target) -> np.ndarray:
 
 
 def _pose_from_mjcf_body(body) -> np.ndarray:
-    from ...utils.rotation import quat_wxyz_to_matrix
+    from task_env.utils.rotation import quat_wxyz_to_matrix
 
     position = np.fromstring(body.get("pos", "0 0 0"), sep=" ", dtype=np.float64)
     quaternion = np.fromstring(body.get("quat", "1 0 0 0"), sep=" ", dtype=np.float64)

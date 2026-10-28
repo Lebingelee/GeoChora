@@ -35,6 +35,28 @@ def test_r04b_mounts_come_from_fixed_reset_plan_fk_and_are_proper():
     assert config.capacity(16)["boundary_count"] == 17
 
 
+def test_worker_preflight_imports_when_loaded_from_its_direct_file_path():
+    worktree = Path(__file__).resolve().parents[3]
+    worker_path = Path(probe.__file__).resolve()
+    environment = dict(os.environ)
+    environment.update({
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": os.pathsep.join((str(worktree), str(worktree / "GeoPhys" / "src"))),
+    })
+    code = (
+        "import runpy; "
+        "m=runpy.run_path(__import__('sys').argv[1], run_name='r04b_worker_preflight_test'); "
+        "config,evidence=m['derive_camera_config'](); "
+        "print(config.cameras[0].camera_id, evidence['task_seed'])"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(worker_path)], env=environment,
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().endswith("31")
+
+
 def test_public_factory_admits_r04b_config_without_eager_camera_sessions(tmp_path):
     from task_env import make_env
 
