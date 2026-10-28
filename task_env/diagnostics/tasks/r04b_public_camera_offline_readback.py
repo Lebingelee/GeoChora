@@ -203,7 +203,8 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
     worker = _read_json(worker_path)
     if worker.get("status") != "R04B_PUBLIC_ENV_TWO_CAMERA_S2_PASS":
         raise ValueError("worker did not publish a closed successful public Env run")
-    if not worker.get("closed_before_receipt") or worker.get("env_close_calls") != 1:
+    if (not worker.get("closed_before_receipt") or worker.get("env_close_calls") != 1
+            or worker.get("env_close_successes") != 1):
         raise ValueError("worker receipt was not written after the sole Environment close")
     if worker.get("primary_error") is not None or worker.get("cleanup_error") is not None:
         raise ValueError("worker receipt contains an execution or cleanup error")
@@ -244,22 +245,40 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
     expected_counts = {
         "reset_attempts": 2,
         "outer_steps": 24,
-        "physics_substeps": 120,
+        "clock_inferred_substeps": 120,
+        "accepted_physics_substeps": 120,
         "renderer_capture_calls": 53,
         "renderer_capture_successes": 53,
         "public_boundary_captures": 52,
         "isolation_capture_calls": 1,
         "renderer_render_calls": 159,
+        "renderer_render_successes": 159,
         "provider_interval_step_calls": 24,
+        "provider_interval_step_successes": 24,
+        "runtime_boundary_step_calls": 24,
+        "runtime_boundary_step_successes": 24,
+        "runtime_boundary_step_calls_during_capture": 0,
         "mj_step_during_capture": 0,
         "mj_forward_during_capture": 0,
         "native_renderer_close_calls": 4,
+        "native_renderer_close_successes": 4,
+        "session_close_calls": 5,
+        "session_close_successes": 5,
+        "session_close_failures": 0,
     }
     for key, value in expected_counts.items():
         if counters.get(key) != value:
             raise ValueError(f"worker counted {key}={counters.get(key)!r}; expected {value}")
     if len(set(counters.get("materialization_ids", ()))) != 2:
         raise ValueError("worker did not observe two fresh provider materializations")
+    if (len(counters.get("native_renderer_close_counts", {})) != 4
+            or set(counters["native_renderer_close_counts"].values()) != {1}
+            or len(counters.get("native_renderer_tokens_closed", ())) != 4):
+        raise ValueError("worker did not close each stable renderer lifecycle token exactly once")
+    session_closes = counters.get("camera_session_close_counts", {})
+    if (len(session_closes) != 4 or sorted(session_closes.values()) != [1, 1, 1, 2]
+            or session_closes != counters.get("camera_session_close_successes", {})):
+        raise ValueError("worker did not record the explicit duplicate camera-session close while closing each renderer once")
     if abs(float(counters.get("simulation_seconds", -1.0)) - 0.24) > 2e-9:
         raise ValueError("worker integrated simulation time other than 0.24 seconds")
 
@@ -306,6 +325,9 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
                 raise ValueError("boundary includes a non-public isolation capture")
             if capture["round_index"] != round_index or capture["camera_id"] not in CAMERA_IDS:
                 raise ValueError("capture row round/camera differs from its boundary")
+            if (capture["capture_identity"]["state_boundary"] != state
+                    or capture["capture_identity"]["sample_clock"] != clock):
+                raise ValueError("capture identity boundary/clock differs from its typed public boundary")
             capture_by_boundary_camera[capture_key] = capture
 
     if set(boundaries_by_key) != {(episode, step) for episode in (0, 1) for step in range(13)}:
@@ -322,6 +344,14 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
             raise ValueError("boundary control transition differs from the independent control JSONL")
         if row["target_identity_hash"] != row["applied_target_hash"]:
             raise ValueError("Position applied acknowledgement targets a different Controller output")
+        if (row["target"].get("schema_version") != "position-control-target-v1"
+                or row["target"]["target"].get("schema_version") != "canonical-control-v0"
+                or row["applied"].get("schema_version") != "applied-canonical-control-v0"
+                or row["applied"].get("target_hash") != row["target_identity_hash"]
+                or row["applied"].get("provider_name") != "geophys"):
+            raise ValueError("Position Target/Ack public schema or provider binding is invalid")
+        if _capture_identity_digest(row["target"]) != row["target_identity_hash"]:
+            raise ValueError("Position Target identity digest is invalid")
         if row["target"]["target"]["task_artifact_hash"] != expected_artifact:
             raise ValueError("Position target is not bound to the admitted TaskArtifact")
         if row["controller_identity"] != boundaries_by_key[key]["controller_identity"]:

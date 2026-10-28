@@ -448,9 +448,12 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
             "simulation_time_s": float(env.state.simulation_time),
             "boundary_id": boundary.boundary_id,
             "sample_clock": clock.to_mapping(),
-            "physics_substeps": counters["physics_substeps"],
+            "clock_inferred_substeps": counters["clock_inferred_substeps"],
+            "accepted_physics_substeps": counters["accepted_physics_substeps"],
             "controller_compute_calls": counters["controller_compute_calls"],
             "provider_interval_step_calls": counters["provider_interval_step_calls"],
+            "runtime_boundary_step_calls": counters["runtime_boundary_step_calls"],
+            "runtime_boundary_step_calls_during_capture": counters["runtime_boundary_step_calls_during_capture"],
             "renderer_capture_calls": counters["renderer_capture_calls"],
             "renderer_render_calls": counters["renderer_render_calls"],
             "mj_step_during_capture": counters["mj_step_during_capture"],
@@ -463,9 +466,12 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
             "simulation_time_s": float(env.state.simulation_time),
             "boundary_id": after_view.boundary.boundary_id,
             "sample_clock": after_view.sample_clock.to_mapping(),
-            "physics_substeps": counters["physics_substeps"],
+            "clock_inferred_substeps": counters["clock_inferred_substeps"],
+            "accepted_physics_substeps": counters["accepted_physics_substeps"],
             "controller_compute_calls": counters["controller_compute_calls"],
             "provider_interval_step_calls": counters["provider_interval_step_calls"],
+            "runtime_boundary_step_calls": counters["runtime_boundary_step_calls"],
+            "runtime_boundary_step_calls_during_capture": counters["runtime_boundary_step_calls_during_capture"],
             "renderer_capture_calls": counters["renderer_capture_calls"],
             "renderer_render_calls": counters["renderer_render_calls"],
             "mj_step_during_capture": counters["mj_step_during_capture"],
@@ -497,7 +503,7 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
         "controller_identity": env.controller.identity,
         "controller_plan_identity_hash": env.position_plan.identity_hash,
         "task_artifact_hash": env.artifact.identity_hash,
-        "scene_identity_hash": view.scene_identity_hash,
+        "scene_identity_hash": view.boundary.scene_identity_hash,
     }
 
 
@@ -548,18 +554,30 @@ def run_s2(output: str | Path) -> dict[str, object]:
         "reset_attempts": 0,
         "materialization_ids": [],
         "outer_steps": 0,
-        "physics_substeps": 0,
+        "clock_inferred_substeps": 0,
+        "accepted_physics_substeps": 0,
         "simulation_seconds": 0.0,
         "provider_interval_step_calls": 0,
+        "provider_interval_step_successes": 0,
+        "runtime_boundary_step_calls": 0,
+        "runtime_boundary_step_successes": 0,
+        "runtime_boundary_step_calls_during_capture": 0,
         "controller_compute_calls": 0,
         "renderer_capture_calls": 0,
         "renderer_capture_successes": 0,
         "renderer_render_calls": 0,
+        "renderer_render_successes": 0,
         "mj_step_during_capture": 0,
         "mj_forward_during_capture": 0,
         "session_close_calls": 0,
+        "session_close_successes": 0,
+        "session_close_failures": 0,
+        "camera_session_close_counts": {},
+        "camera_session_close_successes": {},
         "native_renderer_close_calls": 0,
-        "native_renderer_ids_closed": [],
+        "native_renderer_close_successes": 0,
+        "native_renderer_tokens_closed": [],
+        "native_renderer_close_counts": {},
         "public_boundary_captures": 0,
         "isolation_capture_calls": 0,
     }
@@ -570,8 +588,9 @@ def run_s2(output: str | Path) -> dict[str, object]:
     control_rows = []
     action_trajectories = []
     sessions = []
-    renderer_ids = set()
-    renderer_camera_by_id = {}
+    # Keep each Renderer strongly referenced for the whole diagnostic so a
+    # later Python object cannot inherit a recycled id() and be miscounted.
+    renderer_registry = {}
     active_capture = {"value": False, "session": None}
     context = {"round_index": -1, "capture_kind": "public"}
     env = None
@@ -587,6 +606,8 @@ def run_s2(output: str | Path) -> dict[str, object]:
     graphics = []
     graphics_seen = set()
     env_close_calls = 0
+    env_close_successes = 0
+    cleanup_errors = []
 
     try:
         if os.environ.get("PYTHONDONTWRITEBYTECODE") != "1":
@@ -661,7 +682,7 @@ def run_s2(output: str | Path) -> dict[str, object]:
         if not frozen_head or runtime["core_revision"] != frozen_head or tracked_status.strip():
             raise RuntimeError("camera worker HEAD or clean tree differs from its native freeze")
         if subprocess.run(
-            ["git", "merge-base", "--is-ancestor", "b0b26e95ddfd7b5128401261f05541bb19586372", "HEAD"],
+            ["git", "merge-base", "--is-ancestor", "90f89cd67414c148bf547952612cf301cd4ec99d", "HEAD"],
             cwd=worktree, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         ).returncode != 0:
             raise RuntimeError("camera worker HEAD is not a descendant of the frozen input")
@@ -678,6 +699,8 @@ def run_s2(output: str | Path) -> dict[str, object]:
         original_renderer_close = mujoco.Renderer.close
         original_mj_step = mujoco.mj_step
         original_mj_forward = mujoco.mj_forward
+        runtime_boundary_module = importlib.import_module("task_env.runtime.boundary")
+        original_boundary_step = runtime_boundary_module.GeoPhysRuntimeBoundary.step
         runtime_session_type = None
 
         def wrapped_factory(camera, execution, **kwargs):
@@ -686,8 +709,19 @@ def run_s2(output: str | Path) -> dict[str, object]:
             renderer = getattr(session, "_renderer", None)
             if renderer is not None:
                 renderer_id = id(renderer)
-                renderer_ids.add(renderer_id)
-                renderer_camera_by_id[renderer_id] = camera.camera_id
+                if renderer_id in renderer_registry and renderer_registry[renderer_id]["object"] is not renderer:
+                    raise AssertionError("Renderer identity collided while an earlier renderer remained alive")
+                renderer_registry[renderer_id] = {
+                    "object": renderer,
+                    "token": f"renderer-{len(renderer_registry) + 1:02d}",
+                    "camera_id": camera.camera_id,
+                }
+                counters["native_renderer_close_counts"][renderer_registry[renderer_id]["token"]] = 0
+                session_renderer_token = renderer_registry[renderer_id]["token"]
+                counters["camera_session_close_counts"][session_renderer_token] = 0
+                counters["camera_session_close_successes"][session_renderer_token] = 0
+            else:
+                session_renderer_token = None
             old_capture = session.capture
             old_close = session.close
 
@@ -717,7 +751,17 @@ def run_s2(output: str | Path) -> dict[str, object]:
 
             def wrapped_close():
                 counters["session_close_calls"] += 1
-                return old_close()
+                if session_renderer_token is not None:
+                    counters["camera_session_close_counts"][session_renderer_token] += 1
+                try:
+                    result = old_close()
+                except BaseException:
+                    counters["session_close_failures"] += 1
+                    raise
+                counters["session_close_successes"] += 1
+                if session_renderer_token is not None:
+                    counters["camera_session_close_successes"][session_renderer_token] += 1
+                return result
 
             session.capture = wrapped_capture
             session.close = wrapped_close
@@ -728,15 +772,37 @@ def run_s2(output: str | Path) -> dict[str, object]:
             return original_compute(controller, *args, **kwargs)
 
         def wrapped_render(renderer, *args, **kwargs):
-            if id(renderer) in renderer_ids:
+            record = renderer_registry.get(id(renderer))
+            tracked = record is not None and record["object"] is renderer
+            if tracked:
                 counters["renderer_render_calls"] += 1
-            return original_render(renderer, *args, **kwargs)
+            result = original_render(renderer, *args, **kwargs)
+            if tracked:
+                counters["renderer_render_successes"] += 1
+            return result
 
         def wrapped_renderer_close(renderer, *args, **kwargs):
-            if id(renderer) in renderer_ids:
+            record = renderer_registry.get(id(renderer))
+            tracked = record is not None and record["object"] is renderer
+            if tracked:
                 counters["native_renderer_close_calls"] += 1
-                counters["native_renderer_ids_closed"].append(renderer_camera_by_id[id(renderer)])
-            return original_renderer_close(renderer, *args, **kwargs)
+                counters["native_renderer_tokens_closed"].append(record["token"])
+                counters["native_renderer_close_counts"][record["token"]] += 1
+            result = original_renderer_close(renderer, *args, **kwargs)
+            if tracked:
+                counters["native_renderer_close_successes"] += 1
+            return result
+
+        def wrapped_runtime_boundary_step(boundary, *, substeps, track_actuator_force=False):
+            counters["runtime_boundary_step_calls"] += 1
+            if active_capture["value"]:
+                counters["runtime_boundary_step_calls_during_capture"] += 1
+            result = original_boundary_step(
+                boundary, substeps=substeps, track_actuator_force=track_actuator_force,
+            )
+            counters["runtime_boundary_step_successes"] += 1
+            counters["accepted_physics_substeps"] += int(substeps)
+            return result
 
         def wrapped_mj_step(*args, **kwargs):
             if active_capture["value"]:
@@ -768,6 +834,9 @@ def run_s2(output: str | Path) -> dict[str, object]:
             stack.enter_context(importlib.import_module("unittest.mock").patch.object(
                 mujoco, "mj_forward", wrapped_mj_forward,
             ))
+            stack.enter_context(importlib.import_module("unittest.mock").patch.object(
+                runtime_boundary_module.GeoPhysRuntimeBoundary, "step", wrapped_runtime_boundary_step,
+            ))
             try:
                 for round_index in (0, 1):
                     context["round_index"] = round_index
@@ -783,7 +852,9 @@ def run_s2(output: str | Path) -> dict[str, object]:
 
                         def wrapped_runtime_step(session, *args, **kwargs):
                             counters["provider_interval_step_calls"] += 1
-                            return original_runtime_step(session, *args, **kwargs)
+                            result = original_runtime_step(session, *args, **kwargs)
+                            counters["provider_interval_step_successes"] += 1
+                            return result
 
                         stack.enter_context(importlib.import_module("unittest.mock").patch.object(
                             runtime_session_type, "step", wrapped_runtime_step,
@@ -879,9 +950,10 @@ def run_s2(output: str | Path) -> dict[str, object]:
                                 or terminated or truncated):
                             raise AssertionError("public Position step did not complete one 5×2 ms interval")
                         counters["outer_steps"] += 1
-                        counters["physics_substeps"] += substeps
+                        counters["clock_inferred_substeps"] += substeps
                         counters["simulation_seconds"] += elapsed
-                        if counters["physics_substeps"] > MAX_SUBSTEPS:
+                        if (counters["clock_inferred_substeps"] > MAX_SUBSTEPS
+                                or counters["accepted_physics_substeps"] > MAX_SUBSTEPS):
                             raise RuntimeError("native physical-substep budget exceeded")
                         boundary_rows.append(_validate_public_boundary(
                             env, observation, info, round_index, capture_rows, counters,
@@ -968,7 +1040,11 @@ def run_s2(output: str | Path) -> dict[str, object]:
 
                 if counters["reset_attempts"] != 2 or counters["outer_steps"] != 24:
                     raise AssertionError("R04b successful native route must use two resets and 24 outer steps")
-                if counters["physics_substeps"] != 120 or abs(counters["simulation_seconds"] - 0.24) > 2e-9:
+                if (counters["clock_inferred_substeps"] != 120
+                        or counters["accepted_physics_substeps"] != 120
+                        or counters["runtime_boundary_step_calls"] != 24
+                        or counters["runtime_boundary_step_successes"] != 24
+                        or abs(counters["simulation_seconds"] - 0.24) > 2e-9):
                     raise AssertionError("R04b successful native route must integrate exactly 120×2 ms")
                 if len(set(counters["materialization_ids"])) != 2:
                     raise AssertionError("the two reset rounds did not create distinct provider materializations")
@@ -1034,8 +1110,9 @@ def run_s2(output: str | Path) -> dict[str, object]:
                 if counters["mj_step_during_capture"] or counters["mj_forward_during_capture"]:
                     raise AssertionError("dynamic camera capture advanced MuJoCo physics or called mj_forward")
 
-                env.close()
                 env_close_calls += 1
+                env.close()
+                env_close_successes += 1
                 if not env._closed:
                     raise AssertionError("Environment did not report closed after its sole close call")
                 if counters["native_renderer_close_calls"] != 4:
@@ -1044,8 +1121,15 @@ def run_s2(output: str | Path) -> dict[str, object]:
                     )
                 if counters["renderer_render_calls"] != 159:
                     raise AssertionError(f"expected 159 real RGB/depth/mask renderer calls, got {counters['renderer_render_calls']}")
-                if counters["provider_interval_step_calls"] != 24:
+                if (counters["renderer_render_successes"] != 159
+                        or counters["native_renderer_close_successes"] != 4
+                        or set(counters["native_renderer_close_counts"].values()) != {1}):
+                    raise AssertionError("each captured Renderer must render and close once per counted native call")
+                if (counters["provider_interval_step_calls"] != 24
+                        or counters["provider_interval_step_successes"] != 24):
                     raise AssertionError("RuntimeSession.step was not called exactly once per public interval")
+                if counters["runtime_boundary_step_calls_during_capture"] != 0:
+                    raise AssertionError("camera capture invoked the physics runtime step boundary")
                 phase = "closed_success"
             except BaseException:
                 raise
@@ -1058,43 +1142,42 @@ def run_s2(output: str | Path) -> dict[str, object]:
             "traceback": traceback.format_exc(),
         }
     finally:
-        if env is not None and not getattr(env, "_closed", False):
+        if env is not None and env_close_calls == 0:
             try:
                 close_wrapper = locals().get("wrapped_renderer_close")
                 mujoco_module = locals().get("mujoco")
+                env_close_calls += 1
                 if close_wrapper is not None and mujoco_module is not None:
                     patch_object = importlib.import_module("unittest.mock").patch.object
                     with patch_object(mujoco_module.Renderer, "close", close_wrapper):
                         env.close()
                 else:
                     env.close()
-                env_close_calls += 1
+                env_close_successes += 1
             except BaseException as error:
-                cleanup_error = {
+                cleanup_errors.append({
                     "type": type(error).__name__, "message": str(error),
                     "traceback": traceback.format_exc(),
-                }
-        if env is not None and getattr(env, "_closed", False) and env_close_calls == 0:
-            # The successful path closed inside the try block.
-            env_close_calls = 1
-        if env is not None and getattr(env, "_closed", False):
-            expected_session_closes = len(sessions)
-            expected_renderer_closes = len(renderer_ids)
-            sessions_closed = all(getattr(session, "_closed", False) for session in sessions)
-            if (not sessions_closed
-                    or counters["session_close_calls"] < expected_session_closes
-                    or counters["native_renderer_close_calls"] != expected_renderer_closes):
-                cleanup_error = cleanup_error or {
+                })
+        if env is not None and env_close_successes == 1:
+            expected_renderer_closes = len(renderer_registry)
+            if (counters["session_close_successes"] < expected_renderer_closes
+                    or counters["native_renderer_close_calls"] != expected_renderer_closes
+                    or counters["native_renderer_close_successes"] != expected_renderer_closes
+                    or set(counters["native_renderer_close_counts"].values()) not in ({1}, set())):
+                cleanup_errors.append({
                     "type": "AssertionError",
                     "message": (
-                        "Environment closed without one DynamicCameraSession and native Renderer close "
-                        f"per created session (sessions={expected_session_closes}, "
-                        f"session_closes={counters['session_close_calls']}, "
-                        f"renderers={expected_renderer_closes}, "
-                        f"renderer_closes={counters['native_renderer_close_calls']})"
+                        "successful Environment close lacks one observed DynamicCameraSession/native Renderer close "
+                        f"per created session (sessions={expected_renderer_closes}, "
+                        f"session_close_successes={counters['session_close_successes']}, "
+                        f"renderer_close_calls={counters['native_renderer_close_calls']}, "
+                        f"renderer_close_successes={counters['native_renderer_close_successes']}, "
+                        f"renderer_close_counts={counters['native_renderer_close_counts']})"
                     ),
                     "traceback": "",
-                }
+                })
+        cleanup_error = cleanup_errors[0] if cleanup_errors else None
 
         arrays_path = output / "raw_camera_arrays.npz"
         try:
@@ -1103,35 +1186,38 @@ def run_s2(output: str | Path) -> dict[str, object]:
                 np.savez(stream, **arrays)
             os.replace(temporary, arrays_path)
         except BaseException as error:
-            if cleanup_error is None:
-                cleanup_error = {"type": type(error).__name__, "message": f"array finalization: {error}",
-                                 "traceback": traceback.format_exc()}
-        try:
-            for row in capture_rows:
-                _append_jsonl(output / "capture_rows.jsonl", {
-                    key: value for key, value in row.items() if key not in {"rgb", "depth", "mask"}
+            cleanup_errors.append({"type": type(error).__name__, "message": f"array finalization: {error}",
+                                   "traceback": traceback.format_exc()})
+        for key, rows in (("capture_rows", capture_rows), ("boundary_rows", boundary_rows),
+                          ("cache_probes", cache_rows), ("control_rows", control_rows)):
+            path = output / f"{key}.jsonl"
+            try:
+                path.touch(exist_ok=True)
+                for row in rows:
+                    if key == "capture_rows":
+                        row = {field: value for field, value in row.items()
+                               if field not in {"rgb", "depth", "mask"}}
+                    _append_jsonl(path, row)
+            except BaseException as error:
+                cleanup_errors.append({
+                    "type": type(error).__name__, "message": f"{key} finalization: {error}",
+                    "traceback": traceback.format_exc(),
                 })
-            for row in boundary_rows:
-                _append_jsonl(output / "boundary_rows.jsonl", row)
-            for row in cache_rows:
-                _append_jsonl(output / "cache_probes.jsonl", row)
-            for row in control_rows:
-                _append_jsonl(output / "control_rows.jsonl", row)
-        except BaseException as error:
-            if cleanup_error is None:
-                cleanup_error = {"type": type(error).__name__, "message": f"JSONL finalization: {error}",
-                                 "traceback": traceback.format_exc()}
+        cleanup_error = cleanup_errors[0] if cleanup_errors else None
 
-    passed = primary_error is None and cleanup_error is None and env is not None and getattr(env, "_closed", False)
+    passed = (primary_error is None and cleanup_error is None and env is not None
+              and env_close_calls == 1 and env_close_successes == 1
+              and bool(getattr(env, "_closed", False)))
     receipt = {
         "schema_version": "r04b-public-camera-s2-worker-v1",
         "status": "R04B_PUBLIC_ENV_TWO_CAMERA_S2_PASS" if passed else "R04B_PUBLIC_ENV_TWO_CAMERA_S2_FAIL",
         "scope": "one make_env panda-position-servo-candidate-v1 Env; two reset(seed=31) rounds; 12 public Position steps each; fixed and hand D04 RGB/depth/Entity mask",
-        "input_head": "b0b26e95ddfd7b5128401261f05541bb19586372",
+        "input_head": "90f89cd67414c148bf547952612cf301cd4ec99d",
         "runtime": runtime,
         "camera_config_preflight": config_evidence,
         "counters": counters,
         "env_close_calls": env_close_calls,
+        "env_close_successes": env_close_successes,
         "closed_before_receipt": bool(env is not None and getattr(env, "_closed", False)),
         "normal_capture_calls_expected": 52,
         "isolation_capture_calls": counters["isolation_capture_calls"],
@@ -1141,6 +1227,7 @@ def run_s2(output: str | Path) -> dict[str, object]:
         "native_worker_elapsed_s": __import__("time").monotonic() - start_time,
         "primary_error": primary_error,
         "cleanup_error": cleanup_error,
+        "cleanup_errors": cleanup_errors,
         "evidence": {
             "arrays": str(output / "raw_camera_arrays.npz"),
             "capture_rows": str(output / "capture_rows.jsonl"),
