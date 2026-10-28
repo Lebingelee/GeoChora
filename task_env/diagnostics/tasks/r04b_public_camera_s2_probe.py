@@ -971,11 +971,12 @@ def run_s2(output: str | Path) -> dict[str, object]:
                             "canonical_action": canonical_action.to_mapping(),
                             "target": target.to_mapping(),
                             "target_identity_hash": target.identity_hash,
+                            "canonical_target_identity_hash": target.target.identity_hash,
                             "applied": applied.to_mapping(),
                             "applied_target_hash": applied.target_hash,
                         }
-                        if control_row["target_identity_hash"] != control_row["applied_target_hash"]:
-                            raise AssertionError("Position Controller acknowledgement does not bind its actual target")
+                        if control_row["canonical_target_identity_hash"] != control_row["applied_target_hash"]:
+                            raise AssertionError("Position Controller acknowledgement does not bind its canonical target")
                         control_rows.append(control_row)
                         boundary_rows[-1]["control_transition"] = control_row
                         cache_rows.append({

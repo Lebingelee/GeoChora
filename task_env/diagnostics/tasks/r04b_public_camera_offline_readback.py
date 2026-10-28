@@ -347,16 +347,19 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
         boundary_control = boundaries_by_key[key].get("control_transition")
         if boundary_control != row:
             raise ValueError("boundary control transition differs from the independent control JSONL")
-        if row["target_identity_hash"] != row["applied_target_hash"]:
-            raise ValueError("Position applied acknowledgement targets a different Controller output")
+        if row["canonical_target_identity_hash"] != row["applied_target_hash"]:
+            raise ValueError("Position applied acknowledgement targets a different canonical Controller target")
         if (row["target"].get("schema_version") != "position-control-target-v1"
                 or row["target"]["target"].get("schema_version") != "canonical-control-v0"
                 or row["applied"].get("schema_version") != "applied-canonical-control-v0"
-                or row["applied"].get("target_hash") != row["target_identity_hash"]
+                or row["applied"].get("target_hash") != row["canonical_target_identity_hash"]
                 or row["applied"].get("provider_name") != "geophys"):
             raise ValueError("Position Target/Ack public schema or provider binding is invalid")
         if _capture_identity_digest(row["target"]) != row["target_identity_hash"]:
             raise ValueError("Position Target identity digest is invalid")
+        if (_capture_identity_digest(row["target"]["target"])
+                != row["canonical_target_identity_hash"]):
+            raise ValueError("Position canonical Target identity digest is invalid")
         if row["target"]["target"]["task_artifact_hash"] != expected_artifact:
             raise ValueError("Position target is not bound to the admitted TaskArtifact")
         if row["controller_identity"] != boundaries_by_key[key]["controller_identity"]:

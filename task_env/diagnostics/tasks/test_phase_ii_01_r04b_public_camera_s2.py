@@ -673,7 +673,7 @@ def test_provider_free_complete_worker_success_and_independent_reader_negative_m
         ("bad-label-map", mutate_label_map, "label map includes a non-canonical Entity ID"),
         ("missing-boundary", remove_boundary, "expected two 13-boundary episodes and one cache probe per public boundary"),
         ("duplicate-boundary", duplicate_boundary, "expected two 13-boundary episodes and one cache probe per public boundary"),
-        ("bad-target-ack", mutate_target_ack, "Position applied acknowledgement targets a different Controller output"),
+        ("bad-target-ack", mutate_target_ack, "Position applied acknowledgement targets a different canonical Controller target"),
         ("bad-close-count", mutate_close_count, "stable renderer lifecycle token exactly once"),
         ("failure-receipt-claims-pass", failure_receipt_claims_pass, "execution or cleanup error"),
     )
