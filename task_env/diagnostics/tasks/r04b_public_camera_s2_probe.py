@@ -387,7 +387,7 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
             raise ValueError("public capture metadata mask digest differs from the raw Entity mask")
         if not _public_label_map_matches(capture_meta, row["label_map"]):
             raise ValueError("public canonical label map differs from the raw renderer capture")
-        if row["capture_identity"]["identity_hash"] != capture_identity.identity_hash:
+        if row["capture_identity_identity_hash"] != capture_identity.identity_hash:
             raise ValueError("session capture identity differs from the public metadata identity")
 
         rgb, depth, mask = row["rgb"], row["depth"], row["mask"]
