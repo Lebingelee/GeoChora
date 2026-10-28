@@ -554,6 +554,56 @@ def test_native_snapshot_bindings_use_scene_joint_definitions(monkeypatch):
     assert not any(name.split('.',1)[0] in {'mujoco','taichi'} for name in sys.modules)
 
 
+@pytest.mark.parametrize('episode,arm_active,hand_active,arm_gain', [
+    ('E1', True, False, 2.5), ('E2', False, True, 2.5),
+    ('E3', True, True, 2.5), ('E4', True, True, 3.0),
+])
+def test_runner_mount_snapshot_reaches_real_core_after_reset_and_step(
+        monkeypatch, episode, arm_active, hand_active, arm_gain):
+    from task_env.runtime.sessions import api
+    from task_env.diagnostics.tasks.r03c_attached_leaf_probe import (
+        _candidate_bindings, _mount_requirements, _check_reset, _check_outer,
+    )
+
+    candidate = _candidate(monkeypatch, episode_id=episode, arm_gain=arm_gain,
+                           arm_active=arm_active, hand_active=hand_active)
+    session = _session_with_synthetic_native_io(candidate)
+    # Explicit synthetic native readback geometry, not a dynamics result.
+    child = session._bodies['panda-hand/hand']
+    session._data.xquat[child] = candidate.attachment_plan.parent_site_from_child_root.quaternion_wxyz
+    session._data.warning = []
+    monkeypatch.setattr(api, '_materialize_admitted', lambda *_: session)
+    try:
+        candidate.env.reset(seed=31)
+        joints, frames = _candidate_bindings(candidate)
+        requirements = _mount_requirements(candidate)
+
+        def snapshot():
+            return session.snapshot_v1(scene=candidate.scene, joint_bindings=joints,
+                                       frame_bindings=frames, requirements=requirements)
+
+        initial = snapshot()
+        reset = _check_reset(candidate, candidate.env, initial, ())
+        assert reset['joint_position_max_abs_error_rad_or_m'] == 0
+        assert len(initial.view.joints) == 9
+        # Same path and API that failed in attempt002, not just a type assertion.
+        wrong_joints = {f'{ref.entity_id}/{ref.joint_id}': ref
+                        for entry in candidate.plan.leaves for ref in entry.binding.joint_order}
+        with pytest.raises(TypeError, match='must be a JointDefinition'):
+            session.snapshot_v1(scene=candidate.scene, joint_bindings=wrong_joints,
+                                frame_bindings=frames, requirements=requirements)
+        candidate.env.step(action_for_interval(candidate, 1, arm_active=arm_active,
+                                               hand_active=hand_active))
+        after = snapshot()
+        _check_outer(candidate, candidate.env, after, 1, ())
+        assert after.view.boundary.control_step == 1
+        assert after.view.sample_clock.simulation_time_s == 0.01
+        assert session._native_steps == 5  # Synthetic IO calls, no native import.
+    finally:
+        candidate.env.close()
+    assert session._closed and session._model is None and session._data is None
+
+
 def test_real_attached_admission_rejects_logical_tendon_key_in_source_namespace(monkeypatch):
     candidate=_candidate(monkeypatch)
     session=_session_with_synthetic_native_io(candidate)

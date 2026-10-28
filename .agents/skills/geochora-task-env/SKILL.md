@@ -878,8 +878,12 @@ the canonical Scene. It recorded one materialization/reset, zero `mj_step` or
 outer intervals, no episode/H5, and no RSS sample; independent H5 readback did
 not run. The task-owned runner mapping was repaired after preserving the raw
 failure, and one provider-free S1 regression passed. This repair is not
-native-verified and no retry is permitted in that window. Current attempt002
-status is S2 incomplete/S3 not run pending Sol review; this does not add
+native-verified and no retry is permitted in that window. Sol reviewed the
+source repair and added four actual runner snapshot configurations through real
+Core reset/step with synthetic native IO/geometry; the current R03c module has
+20 provider-free passing checks. The prior shared preflight checked frozen
+identity/ledger, not this runner publication path. Status remains
+`S1_REVIEWED_NATIVE_PENDING`, with S2 incomplete/S3 not run; this does not add
 Provider admission, general Attachment support or Qualification. Keep
 attempt001 bytes and attempt002 failure/freeze/ledger separate at their ignored
 workspace Evidence paths.

@@ -1138,11 +1138,11 @@
         "R03b",
         "R02c"
       ],
-      "status": "S2_FAILED_S3_NOT_RUN_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT002_ONE_NATIVE_START_FAILED_TYPED_JOINT_SNAPSHOT; POSTRUN_PROVIDER_FREE_FIX_NOT_NATIVE_VERIFIED",
+      "status": "S1_REVIEWED_NATIVE_PENDING",
+      "execution": "ATTEMPT002_NATIVE_WINDOW_SPENT; SOL_STATIC_REVIEW_AND_REAL_RUNNER_SNAPSHOT_S1_PASS",
       "required_evidence": "Selected provider-free S1 plus four same-public-Env MuJoCo 3.8.1 CPU episodes and independent readback of four closed Generic H5 files; attempt002 did not complete this evidence.",
       "stop_condition": "Attempt001 history and attempt002 one-start failure are preserved. Attempt002 budget is spent; do not retry. No S2/S3 pass without four real same-Env H5 episodes and independent readback in a separately authorized window.",
-      "result": "Attempt002 passed S0 and the provider-free launcher check. Its one MuJoCo 3.8.1 CPU process verified runtime/API identity, reset E1, then failed in snapshot_v1 because the runner passed JointReference instead of Scene JointDefinition. Counts: starts1/materialization1/reset1/forward1/step0/outer0; no episode/H5, reader NOT_RUN, RSS unsampled. After preserving raw failure, runner binding was repaired and one provider-free S1 check passed; fix is not native-verified and no retry occurred. S2 incomplete, S3 not run; pending Sol review; no other slice.",
+      "result": "Sol reviewed dfee527 and preserved attempt002 one-start failure: reset/materialization/forward1, step0, no episode/H5. Scene JointDefinition repair is statically reviewed; four episode configurations now exercise actual Core reset, runner bindings/requirements, typed snapshot/check-reset, public step and typed snapshot/check-outer with synthetic native IO/geometry. Current R03c module20 provider-free checks pass; unchanged adjacent checks reused. No new native, S2 incomplete and S3 NOT_RUN; not a Hand dynamics failure, no other slice.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_002/report.md",
       "attempt001_execution": {
         "input_head": "703e8a1b184b18e7efbc0b5532b96fb3a462b4d2",
@@ -1276,13 +1276,20 @@
         "general_provider_admission": false,
         "R06_R05a_DAG_Required_Envelope_P99_frozen_refs_unchanged": true,
         "other_slice_started": false,
-        "sol_review": "PENDING"
+        "sol_review": "S1_REVIEWED_NATIVE_PENDING; see attempt002_sol_review; original native result unchanged"
       },
       "attempt002_sol_review": {
-        "decision": "PENDING",
-        "input_head": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
-        "native_starts": 1,
-        "postrun_fix_native_verified": false
+        "decision": "S1_REVIEWED_NATIVE_PENDING",
+        "implementation_commit": "dfee52777069c1261334032e4924e8c136d08361",
+        "provider_free_tests_current_module": 20,
+        "runner_snapshot_configurations": 4,
+        "old_reference_input_rejected_by_real_snapshot": true,
+        "original_native_starts": 1,
+        "new_native_starts": 0,
+        "postrun_fix_native_verified": false,
+        "S2": "INCOMPLETE",
+        "S3": "NOT_RUN",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_002/sol_review.md"
       }
     },
     {
@@ -1495,11 +1502,11 @@
     "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
-    "03_R03_Physical_Attachment.md": "2001297a415ea6d2bd807bd81511aafa137a937127063f65316e7ccc09c6fdf8",
+    "03_R03_Physical_Attachment.md": "60a9af592c86c90b74c4a19e830af34bdbdcc9d8f483bd1f7a5a88b9e0ab2644",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
     "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "08013367eb0bacfc78e3e5aa4ebd3a83d46d2975f61e75f1fdf5d3a3d6e9e5ef",
+    "07_Execution_Order_and_Acceptance.md": "d436806a58c0860bedfc9b12b8d0fd8b002224c44cb98cf1c966dd2b2d692803",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
     "README.md": "7fb5c61ba566c3e478df55f72cd8b0975d3bf3b38bfe017453e8f5259b4c84e6"
@@ -3698,6 +3705,13 @@
       "input_commit": "b39bba45c1d39685bc1bd4869a61a2ca3c360208",
       "result": "S2_FAILED_S3_NOT_RUN_PENDING_SOL_REVIEW",
       "scope": "One authorized MuJoCo 3.8.1 CPU start; one reset/forward and zero steps; no H5. Runner mapping fix passed one provider-free S1 after the native start and remains natively unverified. No retry or other slice."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_R03C002_REAL_RUNNER_SNAPSHOT_REVIEW",
+      "input_commit": "dfee52777069c1261334032e4924e8c136d08361",
+      "result": "S1_REVIEWED_NATIVE_PENDING",
+      "scope": "Reviewed raw47 and old77 hashes; current module20 provider-free checks include four real runner snapshot configurations with native IO stand-ins. No added native or S2/S3 acceptance."
     }
   ],
   "P00_audit": {

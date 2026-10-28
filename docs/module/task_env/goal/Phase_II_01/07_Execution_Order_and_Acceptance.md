@@ -55,7 +55,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 09 | R02b | R02a,R01b | effective plan与leaf adapter/preflight | S1 | 重叠native writer/部分apply假回滚→停止 | ACCEPTED_S1_BOUNDED；Sol修正兼容/覆盖/name拒绝门后18项S1通过；native/provider NOT_ADMITTED |
 | 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | ACCEPTED_BOUNDED_S2_S3；005 Hand50 case四episode/四H5通过；2500默认/旧FAIL保留，下一项R03b |
 | 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | ACCEPTED_BOUNDED_S1_S2；Sol补齐source声明拒绝门并通过99项S1，原两trial S2离线复核通过；仅限该Panda source/seed31/2ms×5候选 |
-| 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | attempt002唯一native在snapshot_v1 typed Joint绑定处失败；S2不完整、S3未运行待Sol复核。失败后runner修正的1项provider-free S1通过，尚未native验证；不再启动本窗口 |
+| 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | S1_REVIEWED_NATIVE_PENDING：Sol复核attempt002失败及Scene Joint修正，补齐runner真实snapshot链后当前模块20项provider-free S1通过。S2不完整、S3未运行；修正尚未native验证，不追加本窗口启动 |
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | PLANNED / NOT_STARTED |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | PLANNED / NOT_STARTED |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | PLANNED / NOT_STARTED |
