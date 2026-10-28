@@ -65,12 +65,17 @@ class _ProviderFreeRuntimeSession(_SessionValues):
         self._pending_joints = None
         self._joint_positions = {}
         self._joint_velocities = {}
-        self._peg_pose = probe._pose_from_mjcf_body(
+        peg_matrix = probe._pose_from_mjcf_body(
             __import__("xml.etree.ElementTree", fromlist=["fromstring"])
             .fromstring(source.scene_source.xml)
             .find("worldbody/body[@name='peg1']")
         )
         self._PoseWorld = PoseWorld
+        from task_env.utils.rotation import matrix_to_quat_wxyz
+        self._peg_pose = PoseWorld(
+            tuple(float(value) for value in peg_matrix[:3, 3]),
+            tuple(float(value) for value in matrix_to_quat_wxyz(peg_matrix[:3, :3])),
+        )
         self._kinematics = PandaKinematics(
             source.scene_source.xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1,
         )
