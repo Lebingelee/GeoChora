@@ -1661,10 +1661,67 @@
       "depends_on": [
         "R04b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "BOUNDED_S3_PASS_PENDING_SOL_REVIEW",
+      "execution": "ONE_NATIVE_WORKER_EXIT_ZERO; TWO_SAME_ENV_H5_EPISODES; PUBLIC_SEMANTIC_AND_RAW_WITNESS_READERS_PASS; 22_NATIVE_DERIVED_TAMPER_CASES_REJECTED",
       "required_evidence": "S3",
-      "stop_condition": "错T/T+1或无semantic reader→失败"
+      "stop_condition": "错T/T+1或无semantic reader→失败",
+      "result": "R04c attempt001 on frozen camera branch HEAD 72f136c6c089eb0bfc6c4389b3d81441b605c28f: provider-free S1 8 passed, R04b regression 10 passed, one bounded native worker exit 0, two Generic H5 v3 episodes each T=12/T+1=13, both independent readbacks passed, 22 native-derived tamper cases rejected. Both episodes ended via external_stop with terminated=false, truncated=true, task_success=false. Source workspace was removed after native hash inventory and later restored from hash-identical retained R04b attempt002 files; separate recovery receipt preserves provenance. Pending Sol review; no Qualification/task success/general provider-camera support.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/report.md",
+      "latest_attempt": {
+        "attempt": "001",
+        "input_head": "cb6313f117f70678ee7c821e8344d8c595dea5ad",
+        "implementation_commits": [
+          "0aa8bd08ba93741f6faa7b15d782c745a05455c7",
+          "72f136c6c089eb0bfc6c4389b3d81441b605c28f"
+        ],
+        "native_freeze_head": "72f136c6c089eb0bfc6c4389b3d81441b605c28f",
+        "result": "R04C_BOUNDED_CAMERA_H5_S3_PASS_PENDING_SOL_REVIEW",
+        "provider_free_s1": "8 passed in 37.91s; R04b regression 10 passed in 9.51s",
+        "native_processes_launched": 1,
+        "native_exit_code": 0,
+        "native_elapsed_seconds": 73.3286026311107,
+        "resets": 2,
+        "outer_steps": 24,
+        "accepted_physics_substeps": 120,
+        "simulation_seconds": 0.24,
+        "episodes": 2,
+        "transitions_per_episode": 12,
+        "observations_per_episode": 13,
+        "episode_outcome": "external_stop; terminated=false; truncated=true; task_success=false",
+        "public_semantic_reader": "R04C_PUBLIC_H5_SEMANTIC_READBACK_PASS",
+        "raw_witness_reader": "R04C_RAW_H5_PREWRITE_WITNESS_PASS",
+        "native_tamper_cases": {
+          "rejected": 22,
+          "total": 22
+        },
+        "maximum_sampled_process_group_rss_bytes": 2121879552,
+        "source_workspace_recovery": {
+          "files": 68,
+          "bytes": 34307151,
+          "mismatches": 0,
+          "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/native/worker_001/source_workspace_recovery_receipt.json"
+        },
+        "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/",
+        "sol_review": "PENDING",
+        "qualification_granted": false,
+        "task_success_claimed": false,
+        "sol_parallel_read_only_review": {
+          "input_source_hashes_matched": 24,
+          "native_freeze_source_hashes_matched": 19,
+          "protected_evidence_hashes_matched": 8,
+          "semantic_reader": "R04C_PUBLIC_H5_SEMANTIC_READBACK_PASS",
+          "raw_reader": "R04C_RAW_H5_PREWRITE_WITNESS_PASS",
+          "raw_forbidden_imports": 0,
+          "semantic_engine_imports": 0,
+          "invalid_python_path_attempts": {
+            "count": 2,
+            "exit_code": 127,
+            "native_started": false
+          },
+          "review_outputs": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/",
+          "formal_acceptance": "PENDING"
+        }
+      }
     },
     {
       "id": "R05b",
@@ -1853,18 +1910,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "673ae49c648802e2dbd55585f990e198d83ab13ceccb4a40b553715592538750",
+    "README.md": "9938d7bcbc612afcdcd5ffef56c4eddb8209552c8668bd0f2f9510a74e20fd54",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
-    "04_R04_Dynamic_Camera_Consumer.md": "7e20588b34f59cb4789289a0463edbbe5397902fef13bb87b2a9ba45ff9fb0d4",
+    "04_R04_Dynamic_Camera_Consumer.md": "d615d9408339bb44025266c5c53d8bb46c6ab2fdfe2a3446ad06717c91123753",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "9408ee5f94e0772670623cac7aa2f6c067ff90a7041a540ecf2ae6f9df24aff6"
+    "07_Execution_Order_and_Acceptance.md": "f060a246791af2d6d26e28c56f3c7f1a6dde763273cfa6cf13f52337179f447d"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4311,6 +4368,41 @@
       "main_checkout_head_at_dispatch": "8578b080c37c946d8f52fd4aaaa2843ca7ae179f",
       "main_checkout_F01_status": "Not reported from this camera branch; main/maintainer record remains authoritative",
       "original_7_22_P99_changed": false
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_R04C_ATTEMPT001_BOUNDED_S3_RESULT_PENDING_SOL_REVIEW",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "cb6313f117f70678ee7c821e8344d8c595dea5ad",
+      "native_freeze_head": "72f136c6c089eb0bfc6c4389b3d81441b605c28f",
+      "implementation_commits": [
+        "0aa8bd08ba93741f6faa7b15d782c745a05455c7",
+        "72f136c6c089eb0bfc6c4389b3d81441b605c28f"
+      ],
+      "result": "R04C_BOUNDED_CAMERA_H5_S3_PASS_PENDING_SOL_REVIEW",
+      "provider_free_s1": "8 passed in 37.91s; R04b regression 10 passed in 9.51s",
+      "native_processes_launched": 1,
+      "native_exit_code": 0,
+      "native_elapsed_seconds": 73.3286026311107,
+      "episodes": 2,
+      "transitions_per_episode": 12,
+      "observations_per_episode": 13,
+      "episode_outcome": "external_stop; terminated=false; truncated=true; task_success=false",
+      "semantic_reader": "R04C_PUBLIC_H5_SEMANTIC_READBACK_PASS",
+      "raw_witness_reader": "R04C_RAW_H5_PREWRITE_WITNESS_PASS",
+      "native_tamper_matrix": "22/22 rejected",
+      "maximum_sampled_process_group_rss_bytes": 2121879552,
+      "source_workspace_recovery": {
+        "files": 68,
+        "bytes": 34307151,
+        "source": "r04b_002/native/worker_001/source_workspace_public",
+        "verified_against": "unchanged r04c source_workspace_manifest.json"
+      },
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/",
+      "sol_review": "PENDING",
+      "original_7_22_P99_changed": false,
+      "qualification_granted": false,
+      "task_success_claimed": false
     }
   ],
   "P00_audit": {

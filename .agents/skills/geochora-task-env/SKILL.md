@@ -279,8 +279,16 @@ the next single-process implementation/validation package. No R03b/Qualification
   accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Sol accepted R04b attempt002 as
   `ACCEPTED_BOUNDED_S2` on 2026-10-28 for GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × this single Panda Position candidate:
   two resets, 24 public steps, dual D04 cameras and an independent offline reader. This does not establish a broader
-  provider/camera intersection or Qualification. R04c same-file camera S3 remains NOT_RUN and is not authorized. See
-  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md) for exact scope and Evidence.
+  provider/camera intersection or Qualification. R04c attempt001 then exercised same-Env camera recording on this
+  candidate: start the existing recording at reset, take 12 public steps, call `stop("external_stop")` and
+  `finish_recording("external_stop")`, then repeat on the same Env after the prior file is finalized. Its two
+  Generic H5 v3 episodes each contain 12 transitions/13 observations and passed separate public semantic and raw
+  prewrite-witness readers, plus 22 native-derived H5 tamper rejections. The observed end outcome is
+  `terminated=false`, `truncated=true`, `task_success=false` for the bounded external stop; it is not horizon
+  completion or task success. R04c is `R04C_BOUNDED_CAMERA_H5_S3_PASS_PENDING_SOL_REVIEW`, limited to the frozen
+  GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × single Panda Position × seed31 × 2 ms × 5 × dual-D04-camera intersection.
+  It does not add generic provider/camera support or Qualification. See
+  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md) for the evidence and limits.
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
