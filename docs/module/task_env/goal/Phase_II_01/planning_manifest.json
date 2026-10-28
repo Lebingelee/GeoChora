@@ -1850,7 +1850,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "12183bed9302bd7f0477b0df4b5b2aa512c3fe55cdb29dfe3c60417ab534ec2f",
+    "README.md": "9629eba303c4ba8f918a3a3babe1b44407de839d4f2e4214b5f319de11a11a33",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -1861,7 +1861,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "a6d7c5b1277c5fa7941b0d9cf714b8e6bb728d1d2a14e5bdee72a7c08595c793"
+    "07_Execution_Order_and_Acceptance.md": "f7cbc1bb54901f136bc19f39779015b7f4a47faf91ba4dea0c17dcd00cc97134"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4238,6 +4238,17 @@
       "next": "F01 package preparation; no install or launch in this revision",
       "original_7_22_P99_changed": false,
       "qualification_granted": false
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_F01_INSTALL_AND_NATIVE_PACKAGE_PREPARATION",
+      "result": "READY_FOR_DISPATCH; F00 prerequisite accepted",
+      "implementation_baseline_before_this_docs_commit": "996875f7a018d3fd6739a3c5df2e76306561e95c",
+      "stable": "Isaac Sim6.2.0.0/Python3.12/torch2.11.0+cu128",
+      "native_started_by_sol": 0,
+      "two_luna_roles": "Luna1 implementation/install/native; Luna2 isolated review outputs only",
+      "original_7_22_P99_changed": false,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -4406,7 +4417,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-28",
-    "status": "F00_ACCEPTED_BOUNDED; F01_READY_FOR_PACKAGE_PREPARATION",
+    "status": "F00_ACCEPTED_BOUNDED; F01_AUTHORIZED_PACKAGE_READY",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4605,6 +4616,21 @@
         "sequence_override": "advance independent F00 after accepted R03c and before default R04b, per maintainer priority for Isaac, USD, and Task Harness",
         "other_slices_started": false,
         "push_merge_main_tag_release": false
+      },
+      {
+        "date": "2026-10-28",
+        "slice": "F01 attempt001",
+        "authorized": true,
+        "maintainer_request": "请准备F01，并准备安装isaac",
+        "scope": "isolated pip install of stable6.2.0.0; official Panda+rigid body bounded native baseline under concrete package; Luna1 sole writer/installer; Luna2 independent recipe/API review; no Core Isaac adapter/F02-F07 execution",
+        "install_budget_bytes": 85899345920,
+        "native_max_app_processes": 2,
+        "native_max_physics_steps_total": 1200,
+        "native_dt_s": 0.008333333333333333,
+        "native_max_simulated_seconds_total": 10,
+        "native_max_wall_s_per_process": 900,
+        "no_automatic_native_retry_after_physics_failure_or_resource_abort": true,
+        "push_merge_main_tag_release": false
       }
     ],
     "f00_attempt001": {
@@ -4716,7 +4742,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F01 package preparation",
+      "selected_next": "F01 attempt001 isolated install and bounded native baseline",
       "after_that_priority": [
         "F01 isolated install/native baseline under a new frozen package",
         "F02",
@@ -4727,10 +4753,10 @@
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
-      "reason": "Sol verified full bounded F00 evidence and review fix 1045fd9; maintainer F00-before-F01 prerequisite satisfied.",
+      "reason": "Maintainer explicitly requested preparation of F01 and installation of Isaac on 2026-10-28 after F00 acceptance.",
       "F07": "later extension; not required before camera",
       "native_authorization": "each concrete package pins its own build/cases/budget",
-      "F01": "READY_FOR_PACKAGE_REFRESH; not dispatched, installed or started"
+      "F01": "AUTHORIZED; package dispatch follows frozen HEAD; not installed/native-started by Sol"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -4739,12 +4765,27 @@
       "backend": "Isaac app host, PhysX CPU solver; GPU remains app/renderer resource",
       "first_case": "official Panda USD plus one falling rigid cube and ground",
       "host": "Ubuntu24.04/glibc2.39/RTX5060 8151MiB/driver595.84",
-      "memory_constraint": "15GiB RAM, current MemAvailable about1.5GiB; maintainer will release memory before native launch",
+      "memory_constraint": "Maintainer freed memory; fresh readback exceeds the package 6GiB RAM / 5GiB VRAM prelaunch gate; remeasure immediately before launch.",
       "native_starts_by_sol": 0,
       "implementation_started": false,
       "core_adapter": "F04 later; no current Isaac Core capability claim",
-      "status": "READY_FOR_REFRESH_NOT_DISPATCHED",
-      "prerequisite_by_maintainer": "full F00 acceptance satisfied 2026-10-28; refresh package on actual new HEAD before dispatch"
+      "status": "READY_FOR_DISPATCH",
+      "prerequisite_by_maintainer": "full F00 acceptance satisfied 2026-10-28; refresh package on actual new HEAD before dispatch",
+      "host_resource_readback": {
+        "mem_available_kib": 9772532,
+        "gpu_free_mib": 7215,
+        "gpu_total_mib": 8151,
+        "home_disk_free_bytes": 584832221184,
+        "python": "3.12.14",
+        "glibc": "2.39",
+        "CXXABI_1_3_15_present": true
+      },
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f01_001_dispatch_001/luna1_prompt.md",
+      "parallel_review_package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f01_001_dispatch_001/luna2_review_prompt.md",
+      "writer_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
+      "review_thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
+      "installation_environment": "workspace/environments/isaacsim-6.2.0",
+      "old_draft": "sol_f01_001 remains superseded and must not be executed"
     },
     "f00_attempt002_preparation": {
       "status": "PREPARATION_COMPLETE; execution result recorded below",

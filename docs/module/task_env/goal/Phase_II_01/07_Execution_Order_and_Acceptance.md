@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c已接收；F00 attempt002及有限复核修正已获Sol有界接收；下一步准备F01**。
+当前入口（2026-10-28）：**R03c已接收；F00 attempt002及有限复核修正已获Sol有界接收；F01 attempt001安装/原生对照包已获维护者授权**。
 当前复用集成分支 `develop-full`。attempt002保留attempt001的20条专家失败，在新版本合成box proxy上完成20/20有效solved、Oracle真实H5与独立读回、pending Judge prepare/verify。Sol已核实完整出口并接收两处消费者复核修正，状态`ACCEPTED_BOUNDED_F00`；Human decision仍pending，Qualification/D0/D1/D2均未评估。F01可准备新包，但安装/native草稿仍须按新HEAD、官方版本和资源重新冻结，尚未派发、安装或启动。此后顺序为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c仍可明确安排，F07不成为相机前置。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
@@ -201,3 +201,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28 Luna执行F00 attempt002：在同一 `develop-full` 上保留round1失败并新增round2 owner-repair复验；公开A/B显示builtin seed0在427 steps完成，旧mock在854 steps以`gripper_readiness_timeout`失败，controller/expert/readiness身份相同且target/Ack哈希一致，实际编译source body不同。v002仅将已有builtin PickCube物理属性复制到新UID/version/hash的synthetic box输入，没有更改R1、reset、goal、horizon或solver。MuJoCo 3.8.1 CPU campaign seeds0–19全部valid solved（8612 outer steps）；ledger `candidate_ready`，round1 fail仍保留。Oracle seed0完成427 transitions/428 boundaries，H5 T+1、逻辑映射与独立Core inspector通过；Judge pending包prepare/verify均通过、86 files verified。实现提交`0d75d7646d45f96cc22c567aa61e070dbab5dd94`；完整receipt见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/`。状态为`F00_FULL_PASS_PENDING_SOL_REVIEW`，不表示已被Sol/Human接收或获得Qualification；F01未启动。
 
 2026-10-28 Sol接收F00 attempt002及有限复核修正为`ACCEPTED_BOUNDED_F00`：338项原件及历史保护hash、20seed原始完成事实、真实Oracle427/428和86项pending包独立复核通过；Luna2独立审阅同意本次native结果未被其条件性缺陷推翻。新增非空portable diagnostics字符串误作文件ref、新owner/fault issue追加后账本无法load两项缺陷已在`1045fd9c65daaa56fdb7eab06779d946bf4b8cd6`修正，Sol复核actual diff并独立重跑29项provider-free tests通过。原生证据继续仅绑定`0d75d76`，复核修正零native；原338项保持不变。Judge metadata既有校验缺口另记后续，不扩大本次标准；原7/22、P99及其他slice不变。下一步F01工作包准备，尚未安装/启动。复核详见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_002/sol_review.md`。
+
+2026-10-28 维护者在F00接收后要求准备F01并安装Isaac。Sol重新核实官方stable6.2.0.0、Python3.12/torch2.11.0 cu128配方及主机资源，准备新HEAD工作包：Luna1持有代码/安装单写入并执行隔离安装及官方Panda+刚体有界native；Luna2独立只读复核配方/API/资源与收尾门禁，不并行安装或启动App。原F01草稿保持历史不执行。本次Sol零安装、零native；Core Isaac adapter仍为F04，安装不等于provider接通。
