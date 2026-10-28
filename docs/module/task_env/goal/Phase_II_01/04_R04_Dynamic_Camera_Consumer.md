@@ -95,3 +95,11 @@ Native结束后发现worker按既定收尾记录68项source workspace哈希后�
 Sol并行只读复核报告24项输入源码与`cb6313f` bytes、19项native冻结源码与`72f136c`/当前文件、8项保护证据均匹配；用实际环境Python新进程重新读取两份原始H5，semantic与raw reader均PASS，raw无TaskEnv/provider/engine导入，semantic无engine导入。复核中的两次错误`.venv`路径命令exit127，未启动Python/native；随后改用receipt指定Python完成成功读回。该只读核对不改R04c pending review状态，Sol最终接收仍待其完成收尾审阅。
 
 完整报告、Evidence索引、命令和输出哈希清单位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/`。此结果只覆盖上述固定task/provider/backend/seed/horizon交集；不改变R04b接收事实、原7/22 DAG或P99 required，也不涵盖R04其他source或Qualification。
+
+## R04c attempt001 Sol接收（2026-10-29）
+
+Sol完成对camera输入HEAD `150dae45dcdd00d08cd1b7c37aebc50266a9656b`的最终复核，接收 **`ACCEPTED_BOUNDED_S3`**。162项输出清单全部匹配，目录含manifest共61,227,398 bytes，低于256MiB；24项输入源码Git bytes、19项native冻结源码与当前bytes、8项保护证据、12份phase Markdown hash一致。68项恢复source共34,307,151 bytes与原native manifest及R04b保留件逐字节相符；恢复receipt保留来源/时间，原删除记录和native/H5/reader原件不改。
+
+复用Sol此前新隔离进程对两份原H5的独立semantic/raw读回：当前H5 hash仍匹配，semantic未导入engine，raw未导入TaskEnv/provider/engine。复用Luna已记录的8项R04c S1、10项共享R04b回归及22/22 native派生拒绝；本次没有重跑native或测试套件。接收只限上述GeoPhys a53 CPU × MuJoCo3.8.1 EGL、单Panda Position、seed31、2ms×5、双D04、两轮12/13交集；external_stop的truncated=true/task_success=false及RSS采样限制不变，不构成Qualification。
+
+复核收据和报告位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/`。camera分支未合入develop-full。R04有界出口可收口；R05b仍被R05a Provider正式合同阻塞。R06b为可独立准备的后继，历史missing raw/phase decision gate仍未关闭；尚未派发新的实现/native包。

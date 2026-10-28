@@ -285,7 +285,7 @@ the next single-process implementation/validation package. No R03b/Qualification
   Generic H5 v3 episodes each contain 12 transitions/13 observations and passed separate public semantic and raw
   prewrite-witness readers, plus 22 native-derived H5 tamper rejections. The observed end outcome is
   `terminated=false`, `truncated=true`, `task_success=false` for the bounded external stop; it is not horizon
-  completion or task success. R04c is `R04C_BOUNDED_CAMERA_H5_S3_PASS_PENDING_SOL_REVIEW`, limited to the frozen
+  completion or task success. Sol accepted R04c on 2026-10-29 as `ACCEPTED_BOUNDED_S3`, limited to the frozen
   GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × single Panda Position × seed31 × 2 ms × 5 × dual-D04-camera intersection.
   It does not add generic provider/camera support or Qualification. See
   [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md) for the evidence and limits.

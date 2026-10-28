@@ -1661,11 +1661,11 @@
       "depends_on": [
         "R04b"
       ],
-      "status": "BOUNDED_S3_PASS_PENDING_SOL_REVIEW",
+      "status": "ACCEPTED_BOUNDED_S3",
       "execution": "ONE_NATIVE_WORKER_EXIT_ZERO; TWO_SAME_ENV_H5_EPISODES; PUBLIC_SEMANTIC_AND_RAW_WITNESS_READERS_PASS; 22_NATIVE_DERIVED_TAMPER_CASES_REJECTED",
       "required_evidence": "S3",
       "stop_condition": "错T/T+1或无semantic reader→失败",
-      "result": "R04c attempt001 on frozen camera branch HEAD 72f136c6c089eb0bfc6c4389b3d81441b605c28f: provider-free S1 8 passed, R04b regression 10 passed, one bounded native worker exit 0, two Generic H5 v3 episodes each T=12/T+1=13, both independent readbacks passed, 22 native-derived tamper cases rejected. Both episodes ended via external_stop with terminated=false, truncated=true, task_success=false. Source workspace was removed after native hash inventory and later restored from hash-identical retained R04b attempt002 files; separate recovery receipt preserves provenance. Pending Sol review; no Qualification/task success/general provider-camera support.",
+      "result": "R04c attempt001 on frozen camera branch HEAD 72f136c6c089eb0bfc6c4389b3d81441b605c28f: provider-free S1 8 passed, R04b regression 10 passed, one bounded native worker exit 0, two Generic H5 v3 episodes each T=12/T+1=13, both independent readbacks passed, 22 native-derived tamper cases rejected. Both episodes ended via external_stop with terminated=false, truncated=true, task_success=false. Source workspace was removed after native hash inventory and later restored from hash-identical retained R04b attempt002 files; separate recovery receipt preserves provenance. Pending Sol review; no Qualification/task success/general provider-camera support. Subsequent Sol final review on 2026-10-29: ACCEPTED_BOUNDED_S3; original pending status retained as historical Luna result.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/report.md",
       "latest_attempt": {
         "attempt": "001",
@@ -1702,7 +1702,23 @@
           "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/native/worker_001/source_workspace_recovery_receipt.json"
         },
         "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04c_001/",
-        "sol_review": "PENDING",
+        "sol_review": {
+          "date": "2026-10-29",
+          "input_head": "150dae45dcdd00d08cd1b7c37aebc50266a9656b",
+          "decision": "ACCEPTED_BOUNDED_S3",
+          "manifest_entries_matched": 162,
+          "evidence_bytes": 61227398,
+          "source_recovery_files_matched": 68,
+          "input_git_source_hashes_matched": 24,
+          "native_git_and_current_source_hashes_matched": 19,
+          "protected_evidence_hashes_matched": 8,
+          "independent_readback": "prior Sol isolated semantic/raw readback reused; both current original H5 hashes unchanged",
+          "native_starts_by_sol": 0,
+          "full_s1_rerun_by_sol": false,
+          "qualification_granted": false,
+          "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/",
+          "integration": "camera branch only; not merged into develop-full"
+        },
         "qualification_granted": false,
         "task_success_claimed": false,
         "sol_parallel_read_only_review": {
@@ -1721,6 +1737,23 @@
           "review_outputs": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/",
           "formal_acceptance": "PENDING"
         }
+      },
+      "sol_review": {
+        "date": "2026-10-29",
+        "input_head": "150dae45dcdd00d08cd1b7c37aebc50266a9656b",
+        "decision": "ACCEPTED_BOUNDED_S3",
+        "manifest_entries_matched": 162,
+        "evidence_bytes": 61227398,
+        "source_recovery_files_matched": 68,
+        "input_git_source_hashes_matched": 24,
+        "native_git_and_current_source_hashes_matched": 19,
+        "protected_evidence_hashes_matched": 8,
+        "independent_readback": "prior Sol isolated semantic/raw readback reused; both current original H5 hashes unchanged",
+        "native_starts_by_sol": 0,
+        "full_s1_rerun_by_sol": false,
+        "qualification_granted": false,
+        "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/",
+        "integration": "camera branch only; not merged into develop-full"
       }
     },
     {
@@ -1910,18 +1943,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "9938d7bcbc612afcdcd5ffef56c4eddb8209552c8668bd0f2f9510a74e20fd54",
+    "README.md": "75b451ab42b0686ae14372266392dffe668adb8d9659221a77eb63a0d0656e5a",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
-    "04_R04_Dynamic_Camera_Consumer.md": "d615d9408339bb44025266c5c53d8bb46c6ab2fdfe2a3446ad06717c91123753",
+    "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "f060a246791af2d6d26e28c56f3c7f1a6dde763273cfa6cf13f52337179f447d"
+    "07_Execution_Order_and_Acceptance.md": "ca26371c2553f4bdffb7aa360c93c3bb60ddc2597b0dfd8e3c0233038524723d"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -5181,6 +5214,23 @@
         "integration": "camera branch only; not merged",
         "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_002/"
       }
+    },
+    "r04c_attempt001_sol_review": {
+      "date": "2026-10-29",
+      "input_head": "150dae45dcdd00d08cd1b7c37aebc50266a9656b",
+      "decision": "ACCEPTED_BOUNDED_S3",
+      "manifest_entries_matched": 162,
+      "evidence_bytes": 61227398,
+      "source_recovery_files_matched": 68,
+      "input_git_source_hashes_matched": 24,
+      "native_git_and_current_source_hashes_matched": 19,
+      "protected_evidence_hashes_matched": 8,
+      "independent_readback": "prior Sol isolated semantic/raw readback reused; both current original H5 hashes unchanged",
+      "native_starts_by_sol": 0,
+      "full_s1_rerun_by_sol": false,
+      "qualification_granted": false,
+      "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04c_001/",
+      "integration": "camera branch only; not merged into develop-full"
     }
   }
 }
