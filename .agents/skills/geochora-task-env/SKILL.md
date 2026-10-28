@@ -276,8 +276,8 @@ the next single-process implementation/validation package. No R03b/Qualification
   state-boundary digests, reset/transition clocks, reference-profile metadata and finalized typed outcome/control records.
   Use `load_camera_observations_h5()` for strict semantic checks; missing or unknown binding versions fail closed. Omitting
   the mapping keeps the state-only default. R04a attempt002's targeted provider-free synthetic S1 passed (33 cases),
-  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. R04b attempt002 has a Luna-reported
-  bounded S2 pass pending Sol review for GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × this single Panda Position candidate:
+  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Sol accepted R04b attempt002 as
+  `ACCEPTED_BOUNDED_S2` on 2026-10-28 for GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × this single Panda Position candidate:
   two resets, 24 public steps, dual D04 cameras and an independent offline reader. This does not establish a broader
   provider/camera intersection or Qualification. R04c same-file camera S3 remains NOT_RUN and is not authorized. See
   [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md) for exact scope and Evidence.

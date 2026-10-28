@@ -1648,12 +1648,13 @@
       "depends_on": [
         "R04a"
       ],
-      "status": "LUNA_REPORTED_BOUNDED_S2_PASS_PENDING_SOL_REVIEW",
-      "execution": "ONE_BOUNDED_NATIVE_WORKER_EXIT_ZERO; INDEPENDENT_OFFLINE_READER_PASS; PENDING_SOL_REVIEW",
+      "status": "ACCEPTED_BOUNDED_S2",
+      "execution": "ONE_BOUNDED_NATIVE_WORKER_EXIT_ZERO; SOL_INDEPENDENT_PROVIDER_FREE_READBACK_PASS",
       "required_evidence": "S2",
       "stop_condition": "stale/ghost step/teardown失败→停止",
-      "result": "R04b attempt002 provider-free S1 and the frozen GeoPhys/MuJoCo3.8.1 EGL public Position camera S2 passed on the camera branch. This is Luna-reported bounded evidence pending Sol review; R04c/H5 and Qualification remain unrun/not authorized.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/report.md"
+      "result": "Sol accepted only R04b attempt002 GeoPhys a53 CPU x MuJoCo3.8.1 EGL x existing Panda Position candidate, seed31, 2ms x5, 2 reset/24 steps/53 captures. No production API changed; R04c/H5 and Qualification not run/not authorized.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/report.md",
+      "sol_review_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_002/sol_review.md"
     },
     {
       "id": "R04c",
@@ -1852,18 +1853,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "2dab1fe7f40cdd77d95b20303d5cba6dc8be53a0cdf9acd3d23dc3208491a005",
+    "README.md": "673ae49c648802e2dbd55585f990e198d83ab13ceccb4a40b553715592538750",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
-    "04_R04_Dynamic_Camera_Consumer.md": "42dcb263a243fd663a3de9ba3ac98d89ea08e616fbd705413918a231270689bb",
+    "04_R04_Dynamic_Camera_Consumer.md": "7e20588b34f59cb4789289a0463edbbe5397902fef13bb87b2a9ba45ff9fb0d4",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "0c51bdd053309868c4c946aaad40091de229b32aea9c956b57dc74ce7735d06b"
+    "07_Execution_Order_and_Acceptance.md": "9408ee5f94e0772670623cac7aa2f6c067ff90a7041a540ecf2ae6f9df24aff6"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -5024,7 +5025,7 @@
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002_review_fix_001/report.md"
     },
     "r04b_current": {
-      "status": "R04B_BOUNDED_PUBLIC_CAMERA_S2_PASS_PENDING_SOL_REVIEW",
+      "status": "ACCEPTED_BOUNDED_S2",
       "input_head": "90f89cd67414c148bf547952612cf301cd4ec99d",
       "native_freeze_head": "8ff099640c9b0282ce224282a957e23e0a47656c",
       "branch": "codex/phase-ii-01-camera",
@@ -5042,7 +5043,7 @@
         "a73bca68989e1b3d3b772e6a908fb7d2b41d5fab"
       ],
       "provider_free_s1": {
-        "status": "PASS_PENDING_SOL_REVIEW",
+        "status": "REPORTED_PASS_REVIEWED_NOT_RERUN_BY_SOL",
         "test_file": "task_env/diagnostics/tasks/test_phase_ii_01_r04b_public_camera_s2.py",
         "full_file_passed": 10,
         "negative_reader_cases_rejected": 11,
@@ -5071,7 +5072,23 @@
         "offline_reader": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/native/worker_001/offline_readback_receipt.json",
         "supervisor": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/native/supervisor_001/launch_receipt.json"
       },
-      "main_checkout": "Camera worktree excludes and does not refresh current main-checkout F01/Isaac installation facts; maintainer-owned main records remain authoritative."
+      "main_checkout": "Camera worktree excludes and does not refresh current main-checkout F01/Isaac installation facts; maintainer-owned main records remain authoritative.",
+      "luna_reported_status": "R04B_BOUNDED_PUBLIC_CAMERA_S2_PASS_PENDING_SOL_REVIEW",
+      "sol_review": {
+        "date": "2026-10-28",
+        "input_head": "55e713fd9fdc0b6309facf912976fcb822068432",
+        "decision": "ACCEPTED_BOUNDED_S2",
+        "output_hashes_matched": 105,
+        "input_source_hashes_matched": 9,
+        "native_source_hashes_matched": 3,
+        "protected_hashes_matched": 5,
+        "independent_same_run_readback": "PASS; 26 boundaries/53 captures/24 control rows; observed no TaskEnv/provider imports",
+        "native_started": 0,
+        "tests_rerun": false,
+        "kernel_trace_claim": false,
+        "integration": "camera branch only; not merged",
+        "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_002/"
+      }
     }
   }
 }

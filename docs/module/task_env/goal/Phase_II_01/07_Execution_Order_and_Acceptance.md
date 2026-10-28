@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c已接收；F00 attempt002及有限复核修正已获Sol有界接收；F01 attempt001安装/原生对照包已获维护者授权；camera分支R04b attempt002的bounded S2结果等待Sol复核**。
+当前入口（2026-10-28）：**R03c已接收；F00 attempt002及有限复核修正已获Sol有界接收；F01 attempt001安装/原生对照包已获维护者授权；camera分支R04b attempt002已获Sol接收ACCEPTED_BOUNDED_S2**。
 当前复用集成分支 `develop-full`。attempt002保留attempt001的20条专家失败，在新版本合成box proxy上完成20/20有效solved、Oracle真实H5与独立读回、pending Judge prepare/verify。Sol已核实完整出口并接收两处消费者复核修正，状态`ACCEPTED_BOUNDED_F00`；Human decision仍pending，Qualification/D0/D1/D2均未评估。F01的安装/原生执行状态由主checkout与维护者安装记录管理；本camera分支不包含或覆盖该事实。此后顺序为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c仍可明确安排，F07不成为相机前置。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
@@ -87,7 +87,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 10 | R02c | R02b,R01c | 真实独立leaf Position隔离与H5 | S2/S3 | 只测两个完整Panda或无真实hand驱动→失败 | ACCEPTED_BOUNDED_S2_S3；005 Hand50 case四episode/四H5通过；2500默认/旧FAIL保留，下一项R03b |
 | 11 | R03b | R03a,R01c | 固定树lowering/root/collision/mapping | S1/S2 | wrong mount/root/顺序/约束失败→停止 | ACCEPTED_BOUNDED_S1_S2；Sol补齐source声明拒绝门并通过99项S1，原两trial S2离线复核通过；仅限该Panda source/seed31/2ms×5候选 |
 | 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | attempt004 ACCEPTED_BOUNDED_S2_S3：正式receipt/progress complete；四份同run 64/65 H5由独立reader读取，256 transitions/260 observations、48/48 tamper拒绝。只限冻结Panda Arm+Hand/MuJoCo 3.8.1 CPU/seed31/timebase/config；其他provider、Attachment和Qualification未准入 |
-| 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | Luna报告 bounded S2 PASS，PENDING_SOL_REVIEW；见 [R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28) |
+| 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | ACCEPTED_BOUNDED_S2；GeoPhys a53 CPU × MuJoCo3.8.1 EGL、两轮24step/53capture；见 [R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28) |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | PLANNED / NOT_STARTED |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | PLANNED / NOT_STARTED |
 | 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | PLANNED / NOT_STARTED |
@@ -205,3 +205,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28 维护者在F00接收后要求准备F01并安装Isaac。Sol重新核实官方stable6.2.0.0、Python3.12/torch2.11.0 cu128配方及主机资源，准备新HEAD工作包：Luna1持有代码/安装单写入并执行隔离安装及官方Panda+刚体有界native；Luna2独立只读复核配方/API/资源与收尾门禁，不并行安装或启动App。原F01草稿保持历史不执行。本次Sol零安装、零native；Core Isaac adapter仍为F04，安装不等于provider接通。
 
 2026-10-28 camera分支R04b attempt001经Sol复核仅S1/partial capture接收，完整S2未通过；attempt002已在同分支修复worker/reader字段接线，完整provider-free S1文件10 passed，之后一个native worker exit 0且独立offline reader通过。S2结果仅绑定attempt002冻结的GeoPhys/MuJoCo3.8.1 EGL、单Panda Position source、seed31、双相机、24 steps和120个接受substeps；当前为`R04B_BOUNDED_PUBLIC_CAMERA_S2_PASS_PENDING_SOL_REVIEW`，不表示Sol接收或Qualification。R04c/H5未运行且未授权。详见[04 R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28)及ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/`。本camera分支不包含或更新main checkout的F01/Isaac安装进展；不改变原7/22 DAG、P99或其他slice状态，等待Sol复核并协调后续集成。
+
+2026-10-28 Sol接收camera分支R04b attempt002为`ACCEPTED_BOUNDED_S2`：105项原始输出、9项输入源码、3项native源码和5项保护hash匹配；隔离provider-free进程独立重读同run 26 boundary/53 capture/24 control，通过原reset/几何/变化/cache/close门。一次native exit0、2reset、24public step、120 accepted substeps和独立clock推导120/.24s事实接收；不称逐kernel trace。10项S1/11项拒绝例复用，Sol零新native/测试。仅限GeoPhys a53 CPU × MuJoCo3.8.1 EGL × 单Panda Position/seed31/2ms×5/D04双相机。原件与既有失败保留；未合入develop-full，主分支R07a/维护者Isaac窗口不变。R04c仍未运行/未授权；P99及Qualification不由此关闭。复核入口ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_002/sol_review.md`。

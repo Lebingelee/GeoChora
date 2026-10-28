@@ -1,6 +1,6 @@
 # R04 — Dynamic Camera → Public Observation / Recorder
 
-状态：REVISED_DRAFT；R04a attempt001 原23项provider-free S1通过后经Sol复核为CHANGES_REQUESTED；attempt002 已修复 capture 请求绑定与 H5 独立 state/clock/episode 锚点，定向 provider-free S1 为33 passed，Sol已复核接收为ACCEPTED_S1_BOUNDED。R04b attempt002 的 bounded S2 结果由Luna报告通过、等待Sol复核；R04c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
+状态：REVISED_DRAFT；R04a attempt001 原23项provider-free S1通过后经Sol复核为CHANGES_REQUESTED；attempt002 已修复 capture 请求绑定与 H5 独立 state/clock/episode 锚点，定向 provider-free S1 为33 passed，Sol已复核接收为ACCEPTED_S1_BOUNDED。R04b attempt002 已获Sol有界接收 `ACCEPTED_BOUNDED_S2`；R04c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
 
 ## Owners 与真实消费断点
 
@@ -71,3 +71,11 @@ attempt002使用 provider-free 合成capture/H5定向S1，33 passed；报告、�
 有界 native worker 1次启动并 exit 0；独立 offline reader 通过。该次冻结交集为 GeoPhys a53 CPU × MuJoCo 3.8.1 Native OpenGL/EGL × `panda-position-servo-candidate-v1`、seed31、2 ms × 5、固定 D04 双相机与0.08 m Position target。结果为2次 reset、24次 public step、120个在成功返回的 runtime-boundary 调用中接受的 substep、26个 boundary、53个 capture（52个 normal、1个 isolation）；clock 独立推导同为120 substeps/0.24 s。双相机 RGB变化、6个光学深度/回投样本、cache零推进、复位身份/图像重复、consumer隔离与 renderer/Env close 门通过。Luna报告状态为 **`R04B_BOUNDED_PUBLIC_CAMERA_S2_PASS_PENDING_SOL_REVIEW`**，尚待Sol复核，不是S2接收、Qualification或task success。R04c/H5未运行、未授权。
 
 完整命令、receipt、raw Evidence 与哈希见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/`。本camera分支不包含或更新main checkout的F01/Isaac安装进展；该状态仍由维护者在主checkout管理。
+
+## R04b attempt002 Sol接收（2026-10-28）
+
+Sol已复核camera分支输入`55e713fd9fdc0b6309facf912976fcb822068432`的实际diff及原始证据，接收**`ACCEPTED_BOUNDED_S2`**。105项输出hash、9项冻结输入源码、3项native冻结源码和5项受保护证据全部匹配；`derive_camera_config`、光学depth oracle与10个冻结常量的AST比较未变。Sol在新隔离进程调用现有独立reader重新读取原NPZ/JSONL，通过26 boundary、53 capture、24 control的同run证据与原几何/变化/reset/cache/close门，进程未导入TaskEnv/GeoPhys/MuJoCo/Taichi/OpenGL。原件未重写；10项S1与11项拒绝例沿用Luna结果，Sol未重跑测试或启动native。
+
+接收仅限上一节冻结的GeoPhys a53 CPU × MuJoCo3.8.1 EGL、既有单Panda Position source、seed31、2ms×5、两轮12-step、双D04相机交集。120 substeps为24次成功返回的公开runtime step调用所接受的substep数，clock独立推导同为120；不是逐kernel trace。RSS 2,171,637,760 bytes为监督采样最大值，不是interval内硬峰值。四个renderer生命周期各观察到一次close，五次session close含一次预期的重复close。
+
+复核原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_002/`。接收记录仅提交camera分支，未合入develop-full；主checkout与R07a冻结窗口保持。R04c同H5相机S3仍未运行、未授权，Qualification/task success未由本结果建立。
