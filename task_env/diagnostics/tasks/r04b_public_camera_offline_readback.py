@@ -188,6 +188,11 @@ def _capture_identity_digest(identity) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _state_boundary_id(boundary) -> str:
+    payload = json.dumps(boundary, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return "state-boundary-" + hashlib.sha256(payload).hexdigest()
+
+
 def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[str, object]:
     started = time.monotonic()
     output = Path(output).resolve()
@@ -358,7 +363,7 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
             raise ValueError("Position target was computed by another Controller identity")
         source_boundary = row["target"]["source_boundary"]
         previous_boundary = boundaries_by_key[(key[0], key[1] - 1)]["state_boundary"]
-        if (source_boundary["boundary_id"] != previous_boundary["boundary_id"]
+        if (source_boundary != previous_boundary
                 or source_boundary["control_step"] != key[1] - 1
                 or row["target"]["sample_clock"] != boundaries_by_key[(key[0], key[1] - 1)]["sample_clock"]):
             raise ValueError("Position target is not bound to the exact preceding typed boundary")
@@ -472,7 +477,7 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
         label_map = capture["label_map"]
         if (label_map["capture_identity_hash"] != actual_identity_hash
                 or label_map["camera_id"] != camera_id
-                or label_map["state_boundary_id"] != state["boundary_id"]
+                or label_map["state_boundary_id"] != _state_boundary_id(state)
                 or label_map["episode_id"] != state["episode_id"]
                 or label_map["reset_sample_id"] != state["reset_sample_id"]
                 or label_map["provider_materialization_id"] != state["provider_materialization_id"]
@@ -493,7 +498,7 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
 
         sync = capture["sync"]
         if (sync["consumer_id"] != capture["consumer_id"]
-                or sync["state_boundary"]["boundary_id"] != state["boundary_id"]
+                or sync["state_boundary"] != state
                 or sync["sample_clock"] != clock
                 or float(sync["max_frame_position_error_m"]) > FRAME_POSITION_ATOL_M
                 or float(sync["max_frame_quaternion_sign_invariant_l2_error"]) > FRAME_QUATERNION_ATOL):
@@ -616,10 +621,10 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
             raise ValueError("cache JSONL entry differs from the public boundary receipt")
         if not probe or probe["before"] != probe["after"]:
             raise ValueError("same-boundary public observation read advanced a tracked counter")
-        if (probe["before"]["boundary_id"] != boundary["state_boundary"]["boundary_id"]
+        if (probe["before"]["boundary_id"] != _state_boundary_id(boundary["state_boundary"])
                 or probe["before"]["sample_clock"] != boundary["sample_clock"]):
             raise ValueError("cache read receipt is not bound to its typed boundary")
-    if len({row["before"]["boundary_id"] for row in cache_rows}) != 26:
+    if len({_state_boundary_id(row["state_boundary"]) for row in boundary_rows}) != 26:
         raise ValueError("cache readback did not cover all 26 distinct public boundaries")
 
     preflight = worker["camera_config_preflight"]

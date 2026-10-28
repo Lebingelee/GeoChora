@@ -425,7 +425,7 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
         if camera_error > 1.0e-9:
             raise AssertionError(f"{camera_id} camera calibration disagrees with the typed parent frame")
         sync = row["sync"]
-        if (sync["state_boundary"]["boundary_id"] != boundary.boundary_id
+        if (sync["state_boundary"] != boundary.to_mapping()
                 or sync["sample_clock"] != clock.to_mapping()
                 or sync["consumer_id"] != row["consumer_id"]):
             raise ValueError("renderer sync receipt is not bound to the public capture boundary")
