@@ -220,10 +220,18 @@ pre-native declaration/source consistency gate. Wrong canonical Joint
 topology/type/axis/poses or Asset provenance are rejected even after coherent
 identity rebinding. The positive case identity is unchanged; 99 provider-free
 checks and the original 19-case static gate passed, with no additional native
-execution. The Artifact is not frozen by this result. R03c public Env/Recorder/H5 S2/S3,
-other providers/sources, generalized Attachment, Judge approval and
-Qualification remain `NOT_RUN` or unestablished. See the [Phase II-01 R03
-record](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+execution. R03c attempt001 now has an opt-in task-owned two-Entity Position-leaf
+candidate and an 83-passed selected provider-free S1 set, including a synthetic
+provider-free closed-H5 reader check. Its two authorized native starts both
+stopped before `mj_step`: the first failed public reset admission on the
+Attachment receipt versus Hand leaf tendon key; the second stopped in retry
+ledger validation before importing MuJoCo. A provider-free retry-counter repair
+passed S1, but no further native start was allowed. No real episode or H5 was
+produced, so R03c S2/S3 remain incomplete pending Sol review. The Artifact is
+not frozen by this result; other providers/sources, generalized Attachment,
+Judge approval and Qualification remain unestablished. See the [Phase II-01
+R03 record](goal/Phase_II_01/03_R03_Physical_Attachment.md) and ignored
+[R03c report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md).
 
 ## Randomization 所有权
 

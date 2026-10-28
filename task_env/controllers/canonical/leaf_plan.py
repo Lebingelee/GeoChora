@@ -259,6 +259,7 @@ class EffectiveLeafPlanV1:
     overrides: tuple[LeafProfileOverrideV1, ...]
     leaves: tuple[EffectiveLeafEntryV1, ...]
     resource_writers: tuple[tuple[str, str, str], ...]
+    fixed_attachment_plan_identity_sha256: str | None = None
     _compiled: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self):
@@ -270,6 +271,8 @@ class EffectiveLeafPlanV1:
                              (self.provider_build_sha256, "Provider build"),
                              (self.base_preset_identity_sha256, "base preset")):
             _sha(field, label)
+        if self.fixed_attachment_plan_identity_sha256 is not None:
+            _sha(self.fixed_attachment_plan_identity_sha256, "fixed Attachment plan")
         if (type(self.overrides) is not tuple or type(self.leaves) is not tuple
                 or type(self.resource_writers) is not tuple):
             raise TypeError("effective plan collections must be immutable tuples")
@@ -305,7 +308,7 @@ class EffectiveLeafPlanV1:
 
     @property
     def identity_sha256(self) -> str:
-        return _digest({
+        payload = {
             "schema_version": self.schema_version,
             "scene_identity_sha256": self.scene_identity_sha256,
             "root_assembly_id": self.root_assembly_id,
@@ -328,7 +331,10 @@ class EffectiveLeafPlanV1:
                 for entry in self.leaves
             ],
             "resource_writers": self.resource_writers,
-        })
+        }
+        if self.fixed_attachment_plan_identity_sha256 is not None:
+            payload["fixed_attachment_plan_identity_sha256"] = self.fixed_attachment_plan_identity_sha256
+        return _digest(payload)
 
     @property
     def profile_status(self) -> str:
@@ -344,7 +350,7 @@ class EffectiveLeafPlanV1:
         return "partially_overridden"
 
     def to_mapping(self) -> dict[str, object]:
-        return {
+        payload = {
             "schema_version": self.schema_version,
             "scene_identity_sha256": self.scene_identity_sha256,
             "root_assembly_id": self.root_assembly_id,
@@ -376,6 +382,9 @@ class EffectiveLeafPlanV1:
             ],
             "resource_writers": [list(item) for item in self.resource_writers],
         }
+        if self.fixed_attachment_plan_identity_sha256 is not None:
+            payload["fixed_attachment_plan_identity_sha256"] = self.fixed_attachment_plan_identity_sha256
+        return payload
 
 
 def default_leaf_profile_section(binding: LeafProfileBindingV1) -> LeafProfileSectionV1:
@@ -408,6 +417,7 @@ def compile_effective_leaf_plan(
     overrides: tuple[LeafProfileOverrideV1, ...] = (),
     *,
     source_closure_sha256: str,
+    fixed_attachment_plan_identity_sha256: str | None = None,
 ) -> EffectiveLeafPlanV1:
     """Re-resolve current authoring inputs and compile one complete leaf plan."""
     if type(scene) is not SceneDefinition or scene.schema_version != "scene-definition-v3":
@@ -417,6 +427,8 @@ def compile_effective_leaf_plan(
     if type(overrides) is not tuple or any(type(item) is not LeafProfileOverrideV1 for item in overrides):
         raise TypeError("leaf overrides must be an immutable tuple of complete replacements")
     _sha(source_closure_sha256, "source closure")
+    if fixed_attachment_plan_identity_sha256 is not None:
+        _sha(fixed_attachment_plan_identity_sha256, "fixed Attachment plan")
 
     # Never accept caller-created Resolved/Projection objects as proof.  Both
     # existing owners re-check the supplied root, child closure and Scene.
@@ -521,6 +533,7 @@ def compile_effective_leaf_plan(
         tuple(sorted(overrides, key=lambda item: item.member_path)),
         tuple(sorted(entries, key=lambda item: item.section.member_path)),
         tuple(sorted(resource_writers)),
+        fixed_attachment_plan_identity_sha256,
     )
     object.__setattr__(result, "_compiled", True)
     return result

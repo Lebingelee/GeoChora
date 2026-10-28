@@ -77,6 +77,8 @@ P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contrac
 
 2026-10-27，R01b attempt001在同一artifacts owner实现bounded `resolve_logical_assembly()` 与 immutable resolved-leaf values；最终required provider-free四文件定向集合81 passed，包含新resolver、R01a strict codec/固定identity hash、Scene composition与legacy matrix。覆盖精确Scene与child closure、typed refs、owning/reference-only分离、cycle/path/alias拒绝、32层/1024 leaf边界和调用内memo；未连接R01c/source/compiler，未运行native/S2/S3/S4。当前状态是Luna报告`IMPLEMENTED_S1_PASS_PENDING_SOL_REVIEW`，Sol尚未接受R01b。R06 compatibility gate仍`BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，四项处置未批准，R05a blocker、DAG、Required Envelope与P99保持；原表下一行为R02a，R01c未启动。
 
+2026-10-28，授权R03c attempt001完成既有Owner上的双Entity Position-leaf candidate/Env/Recorder/reader实现，所选provider-free S1为83 passed。第一次MuJoCo 3.8.1 CPU启动核实runtime identity后，在public reset admission因Attachment receipt的`panda-hand/split`与Hand leaf逻辑tendon identity不匹配而失败，0次forward/step；一次Core映射修正后，第二次（最后授权）native进程在MuJoCo import前因retry runner错误要求append-only ledger仍只有首行而退出。保留两次启动原件；累计materialization1、reset1、forward0、step0、outer0、模拟0，未产生完整episode/H5。之后retry counter修复通过最终provider-free S1，未再启动native。R03c真实S2/S3未完成，等待Sol核对diff与证据；不授予Provider admission、Attachment通用支持或Qualification。R06 gate、R05a blocker、DAG、Required Envelope、P99与冻结refs不变。未启动其他slice；报告/ledger见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/`。
+
 ## P99 Required Envelope（待批准）
 
 | Gate | 必需交集/证据 | 当前已知与未获得资格 |

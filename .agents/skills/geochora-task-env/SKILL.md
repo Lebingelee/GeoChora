@@ -830,7 +830,7 @@ Release promotion/main/tag/GitHub Release and new Formal Qualification are not a
 Six next-stage themes are candidates only in the existing [Roadmap](../../../docs/roadmap/README.md#phase-ii-01-candidate-handoff);
 do not create or implement Phase II-01 Goals without separate authorization. This refresh changes status navigation only, no API/example behavior.
 
-## Phase II-01 fixed Attachment candidate (R03b, 2026-10-28)
+## Phase II-01 fixed Attachment candidate (R03b/R03c, 2026-10-28)
 
 `FixedAttachmentPlanV1` is an advanced immutable intent exported by
 `task_env.artifacts`; `validate_fixed_attachment_scene()` and
@@ -851,7 +851,14 @@ that disagrees with the pinned source; 99 provider-free checks and the actual
 independently checked 256 motion boundaries plus both resets, and added no
 native execution. This is not a
 registered `make_env()` route, a general multi-Entity/Attachment capability,
-an Env/Recorder/H5 integration, or Qualification. R03c public S2/S3 is
-`NOT_RUN` and has not started. Read the current scope and limits in the
+or Qualification. R03c attempt001 adds an opt-in two-Entity Position-leaf
+candidate and passed 83 selected provider-free S1 tests. The first authorized
+native start verified the pinned MuJoCo CPU identity but stopped during public
+reset admission on the Entity-scoped Attachment tendon key versus the Hand
+leaf logical tendon identity, before any forward or step. The second and final
+authorized start stopped before provider import because the retry runner did
+not accept its already-appended ledger row. A provider-free retry-counter fix
+and S1 rerun passed; the native budget is exhausted, with no real episode/H5
+or S2/S3 result. Sol review is pending. Read the current scope and limits in the
 [R03 contract](../../../docs/module/task_env/goal/Phase_II_01/03_R03_Physical_Attachment.md)
 and the current materialization boundary in [Public API](../../../docs/module/task_env/public-api.md).

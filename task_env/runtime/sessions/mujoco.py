@@ -465,6 +465,8 @@ class _MuJoCoSession(_SessionValues):
                 or plan.physics_dt_s != self._artifact.timebase.physics_dt
                 or plan.control_substeps != self._artifact.timebase.control_substeps):
             raise ValueError('MuJoCo model/source differs from the exact leaf plan')
+        if plan.fixed_attachment_plan_identity_sha256 is not None:
+            return self._admit_attached_leaf_control_plan(plan)
         model, mj = self._model, self._mj
         dimensions = (int(model.nq), int(model.nv), int(model.nu), int(model.njnt),
                       int(model.nbody), int(model.neq), int(model.ntendon))
@@ -586,6 +588,174 @@ class _MuJoCoSession(_SessionValues):
             tuple(frame_maps), (LeafNativeTendonMappingV1(
                 'leaf-native-tendon-mapping-v1', 'hand.xml/tendon/split', 'split',
             ),), ('hand.xml/equality/finger_joint1=finger_joint2',),
+        )
+        receipt.validate_against_plan(plan)
+        self._leaf_plan = plan
+        self._leaf_materialization_receipt = receipt
+        self._leaf_configuration_revision = receipt.configuration_revision
+        self._leaf_fault = None
+        self._leaf_consumed_boundaries.clear()
+
+    def _admit_attached_leaf_control_plan(self, plan):
+        """Resolve canonical leaf resources only through the compiled Attachment receipt."""
+        from ...controllers.canonical.leaf_profiles import (
+            PANDA_HAND_EQUALITY_IDENTITY, PANDA_HAND_TENDON_IDENTITY,
+        )
+        from ...runtime.sessions.leaf_control import (
+            LeafMaterializationReceiptV1, LeafNativeActuatorMappingV1,
+            LeafNativeFrameMappingV1, LeafNativeJointMappingV1,
+            LeafNativeTendonMappingV1,
+        )
+        source_plan = self._source.fixed_attachment_plan
+        attached = self.fixed_attachment_receipt
+        if (source_plan is None
+                or source_plan.identity_hash != plan.fixed_attachment_plan_identity_sha256
+                or attached.get('attachment_plan_sha256') != source_plan.identity_hash
+                or attached.get('scene_identity_sha256') != plan.scene_identity_sha256
+                or attached.get('source_closure_sha256') != plan.source_closure_sha256
+                or attached.get('assembly_identity_sha256') != plan.root_logical_content_sha256
+                or attached.get('provider_materialization_id') != self._provider_materialization_id):
+            raise ValueError('fixed Attachment model receipt does not attest the selected leaf plan/source/runtime')
+        if attached.get('provider') != 'mujoco' or attached.get('backend') != 'cpu':
+            raise ValueError('attached leaf plan requires the same MuJoCo CPU Attachment model receipt')
+        model, mj = self._model, self._mj
+        dimensions = attached.get('dimensions', {})
+        if ((int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.neq), int(model.ntendon))
+                != tuple(dimensions.get(key) for key in ('nq', 'nv', 'nu', 'njnt', 'neq', 'ntendon'))
+                or (int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.neq), int(model.ntendon))
+                != (9, 9, 8, 9, 1, 1)):
+            raise ValueError('attached leaf native dimensions differ from the fixed model receipt')
+        if any(int(value) == int(mj.mjtJoint.mjJNT_FREE) for value in model.jnt_type):
+            raise ValueError('fixed Attachment model unexpectedly contains a free root joint')
+
+        receipt_joint_maps = attached.get('native_joint_mappings', {})
+        receipt_actuator_maps = attached.get('native_actuator_mappings', {})
+        receipt_body_maps = attached.get('native_body_mappings', {})
+        receipt_tendon_maps = attached.get('native_tendon_mappings', {})
+        # The fixed Attachment receipt is keyed by its Entity-scoped source
+        # plan (panda-hand/split); the leaf profile has its own logical
+        # identity (hand.xml/tendon/split). Resolve through the former and
+        # publish the latter only after the native mapping is verified.
+        hand_tendon_source_key = f'{source_plan.child_entity_id}/split'
+        joint_maps, actuator_maps, frame_maps = [], [], []
+        native_joint_ids = {}
+        native_actuator_ids = set()
+        for entry in plan.leaves:
+            binding = entry.binding
+            for ref, limits in zip(binding.joint_order, binding.joint_position_limits, strict=True):
+                canonical = f'{ref.entity_id}/{ref.joint_id}'
+                native = receipt_joint_maps.get(canonical)
+                if native is None or source_plan.native_joint_names.get(canonical) != native.get('native_name'):
+                    raise ValueError(f'Attachment receipt omits the exact canonical Joint mapping {canonical}')
+                name = native['native_name']
+                joint_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_JOINT, name))
+                expected_type = mj.mjtJoint.mjJNT_HINGE if binding.joint_position_unit == 'radian' else mj.mjtJoint.mjJNT_SLIDE
+                if (joint_id < 0 or joint_id != native['joint_id']
+                        or int(model.jnt_type[joint_id]) != int(expected_type)
+                        or not bool(model.jnt_limited[joint_id])
+                        or not np.allclose(model.jnt_range[joint_id], limits, rtol=0.0, atol=1e-12)
+                        or int(model.jnt_qposadr[joint_id]) != native['qpos_address']
+                        or int(model.jnt_dofadr[joint_id]) != native['dof_address']):
+                    raise ValueError(f'Attachment native Joint mapping differs from the leaf contract: {canonical}')
+                native_joint_ids[name] = joint_id
+                joint_maps.append(LeafNativeJointMappingV1(
+                    'leaf-native-joint-mapping-v1', ref, name, joint_id,
+                    int(model.jnt_qposadr[joint_id]), int(model.jnt_dofadr[joint_id]),
+                    binding.joint_position_unit,
+                ))
+            if binding.profile_kind == 'arm_position':
+                pairs = binding.joint_actuator_bindings
+            else:
+                pairs = ()
+            if pairs:
+                for pair in pairs:
+                    actuator_ref = pair.actuator
+                    canonical = f'{actuator_ref.entity_id}/{actuator_ref.actuator_id}'
+                    native = receipt_actuator_maps.get(canonical)
+                    if native is None or source_plan.native_actuator_names.get(canonical) != native.get('native_name'):
+                        raise ValueError(f'Attachment receipt omits the exact canonical Actuator mapping {canonical}')
+                    actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native['native_name']))
+                    target_id = int(model.actuator_trnid[actuator_id, 0]) if actuator_id >= 0 else -1
+                    target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, target_id) if target_id >= 0 else None
+                    if (actuator_id != native['actuator_id'] or actuator_id != native['ctrl_slot']
+                            or int(model.actuator_trntype[actuator_id]) != int(mj.mjtTrn.mjTRN_JOINT)
+                            or target_name != source_plan.native_joint_names[f'{pair.joint.entity_id}/{pair.joint.joint_id}']):
+                        raise ValueError(f'Attachment native Arm transmission differs from its leaf mapping: {canonical}')
+                    limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id])
+                    actuator_maps.append(LeafNativeActuatorMappingV1(
+                        'leaf-native-actuator-mapping-v1', actuator_ref, native['native_name'],
+                        actuator_id, int(native['ctrl_slot']), limits, 'radian', 'joint', str(target_name),
+                    ))
+                    native_actuator_ids.add(actuator_id)
+            else:
+                actuator_ref = binding.actuator_order[0]
+                canonical = f'{actuator_ref.entity_id}/{actuator_ref.actuator_id}'
+                native = receipt_actuator_maps.get(canonical)
+                tendon = receipt_tendon_maps.get(hand_tendon_source_key)
+                if (native is None or tendon is None
+                        or source_plan.native_actuator_names.get(canonical) != native.get('native_name')
+                        or source_plan.native_tendon_names.get(hand_tendon_source_key) != tendon.get('native_name')):
+                    raise ValueError('Attachment receipt omits the canonical Hand actuator/tendon mapping')
+                actuator_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_ACTUATOR, native['native_name']))
+                target_id = int(model.actuator_trnid[actuator_id, 0]) if actuator_id >= 0 else -1
+                target_name = mj.mj_id2name(model, mj.mjtObj.mjOBJ_TENDON, target_id) if target_id >= 0 else None
+                limits = tuple(float(item) for item in model.actuator_ctrlrange[actuator_id]) if actuator_id >= 0 else ()
+                if (actuator_id != native['actuator_id'] or actuator_id != native['ctrl_slot']
+                        or int(model.actuator_trntype[actuator_id]) != int(mj.mjtTrn.mjTRN_TENDON)
+                        or target_name != tendon['native_name'] or limits != tuple(binding.native_ctrlrange)
+                        or not bool(model.actuator_ctrllimited[actuator_id])):
+                    raise ValueError('Attachment Hand actuator differs from its receipt tendon/ctrl contract')
+                actuator_maps.append(LeafNativeActuatorMappingV1(
+                    'leaf-native-actuator-mapping-v1', actuator_ref, native['native_name'],
+                    actuator_id, int(native['ctrl_slot']), limits, 'native_ctrl', 'tendon', str(target_name),
+                ))
+                native_actuator_ids.add(actuator_id)
+                tendon_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_TENDON, tendon['native_name']))
+                if tendon_id < 0 or int(model.tendon_num[tendon_id]) != 2:
+                    raise ValueError('Attachment Hand tendon must contain exactly two source finger wraps')
+                adr = int(model.tendon_adr[tendon_id])
+                wraps = tuple({
+                    'wrap_type': int(model.wrap_type[index]),
+                    'joint_native_name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT,
+                                                       int(model.wrap_objid[index])),
+                    'coefficient': float(model.wrap_prm[index]),
+                } for index in range(adr, adr + 2))
+                expected_names = tuple(source_plan.native_joint_names[f'panda-hand/{name}']
+                                       for name in ('finger_joint1', 'finger_joint2'))
+                if tuple(item['joint_native_name'] for item in wraps) != expected_names or tuple(
+                        item['coefficient'] for item in wraps) != (0.5, 0.5):
+                    raise ValueError('Attachment Hand tendon wraps differ from receipt child-prefix mappings')
+                matching = [eq for eq in range(int(model.neq)) if
+                            int(model.eq_type[eq]) == int(mj.mjtEq.mjEQ_JOINT)
+                            and {int(model.eq_obj1id[eq]), int(model.eq_obj2id[eq])}
+                            == {native_joint_ids[name] for name in expected_names}]
+                if len(matching) != 1:
+                    raise ValueError('Attachment Hand requires exactly the receipt-bound finger equality')
+            ref = binding.tcp_frame
+            canonical = f'{ref.entity_id}/{ref.frame_id}'
+            native = receipt_body_maps.get(canonical)
+            if native is None or source_plan.native_body_names.get(canonical) != native.get('native_name'):
+                raise ValueError(f'Attachment receipt omits the canonical leaf TCP Body mapping {canonical}')
+            body_id = int(mj.mj_name2id(model, mj.mjtObj.mjOBJ_BODY, native['native_name']))
+            if body_id <= 0 or body_id != native['body_id']:
+                raise ValueError(f'Attachment native TCP Body differs from its receipt: {canonical}')
+            frame_maps.append(LeafNativeFrameMappingV1(
+                'leaf-native-frame-mapping-v1', ref, native['native_name'], body_id,
+            ))
+        if native_actuator_ids != set(range(int(model.nu))):
+            raise ValueError('attached leaf writers must own every native ctrl slot exactly once')
+        fixed_receipt_hash = attached.get('receipt_identity_sha256')
+        receipt = LeafMaterializationReceiptV1(
+            'leaf-materialization-receipt-v1', 'provider_materialization',
+            plan.scene_identity_sha256, plan.source_closure_sha256, plan.identity_sha256,
+            'mujoco', plan.provider_version, plan.provider_build_sha256, 'cpu',
+            self._provider_materialization_id, 'leaf-' + plan.identity_sha256[:20],
+            int(model.nq), int(model.nv), int(model.nu), int(model.njnt), int(model.nbody),
+            int(model.neq), int(model.ntendon), tuple(joint_maps), tuple(actuator_maps),
+            tuple(frame_maps), (LeafNativeTendonMappingV1(
+                'leaf-native-tendon-mapping-v1', PANDA_HAND_TENDON_IDENTITY,
+                receipt_tendon_maps[hand_tendon_source_key]['native_name'],
+            ),), (PANDA_HAND_EQUALITY_IDENTITY,), fixed_receipt_hash,
         )
         receipt.validate_against_plan(plan)
         self._leaf_plan = plan

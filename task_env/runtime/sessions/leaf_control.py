@@ -189,6 +189,7 @@ class LeafMaterializationReceiptV1:
     frames: tuple[LeafNativeFrameMappingV1, ...]
     tendons: tuple[LeafNativeTendonMappingV1, ...]
     equality_identities: tuple[str, ...]
+    fixed_attachment_receipt_identity_sha256: str | None = None
 
     def __post_init__(self):
         if self.schema_version != "leaf-materialization-receipt-v1":
@@ -200,6 +201,8 @@ class LeafMaterializationReceiptV1:
                              (self.effective_plan_identity_sha256, "effective plan"),
                              (self.provider_build_sha256, "Provider build")):
             _sha(value, label)
+        if self.fixed_attachment_receipt_identity_sha256 is not None:
+            _sha(self.fixed_attachment_receipt_identity_sha256, "fixed Attachment model receipt")
         for value, label in ((self.provider_name, "Provider"),
                              (self.provider_version, "Provider version"),
                              (self.backend, "backend"),
@@ -226,7 +229,7 @@ class LeafMaterializationReceiptV1:
 
     @property
     def identity_sha256(self) -> str:
-        return _digest({
+        payload = {
             "schema_version": self.schema_version,
             "provenance_kind": self.provenance_kind,
             "scene_identity_sha256": self.scene_identity_sha256,
@@ -244,7 +247,10 @@ class LeafMaterializationReceiptV1:
             "frames": [asdict(item) for item in self.frames],
             "tendons": [asdict(item) for item in self.tendons],
             "equality_identities": self.equality_identities,
-        })
+        }
+        if self.fixed_attachment_receipt_identity_sha256 is not None:
+            payload["fixed_attachment_receipt_identity_sha256"] = self.fixed_attachment_receipt_identity_sha256
+        return _digest(payload)
 
     def validate_against_plan(self, plan: EffectiveLeafPlanV1) -> None:
         if type(plan) is not EffectiveLeafPlanV1:
@@ -256,6 +262,12 @@ class LeafMaterializationReceiptV1:
                 plan.identity_sha256, plan.provider_name, plan.provider_version,
                 plan.provider_build_sha256, plan.backend):
             raise ValueError("materialization receipt is bound to another plan/source/provider")
+        if (plan.fixed_attachment_plan_identity_sha256 is not None
+                and self.fixed_attachment_receipt_identity_sha256 is None):
+            raise ValueError("attached leaf receipt omits its model-bound Attachment receipt")
+        if (plan.fixed_attachment_plan_identity_sha256 is None
+                and self.fixed_attachment_receipt_identity_sha256 is not None):
+            raise ValueError("non-attached leaf receipt cannot carry a fixed Attachment receipt")
         expected_joints = {ref for entry in plan.leaves for ref in entry.binding.joint_order}
         expected_actuators = {ref for entry in plan.leaves for ref in entry.binding.actuator_order}
         expected_frames = {entry.binding.tcp_frame for entry in plan.leaves}

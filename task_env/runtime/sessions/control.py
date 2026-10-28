@@ -587,13 +587,33 @@ def materialize_control(
                 'mujoco', str(build_info['package_version']), build_sha, 'cpu',
                 artifact.timebase.physics_dt, artifact.timebase.control_substeps):
             raise ValueError('R02c leaf plan Provider/build/backend/timebase identity mismatch')
-        expected_targets = {f'{entry.binding.entity_id}/{ref.joint_id}': f'actuator{index}'
-                            for entry in leaf_plan.leaves if entry.binding.profile_kind == 'arm_position'
-                            for index, ref in enumerate(entry.binding.joint_order, 1)}
-        expected_open = tuple(
-            ref.actuator_id for entry in leaf_plan.leaves
-            if entry.binding.profile_kind == 'hand_position' for ref in entry.binding.actuator_order
-        )
+        attachment_plan = getattr(source, 'fixed_attachment_plan', None)
+        if leaf_plan.fixed_attachment_plan_identity_sha256 is not None:
+            if (attachment_plan is None
+                    or attachment_plan.identity_hash != leaf_plan.fixed_attachment_plan_identity_sha256):
+                raise ValueError('attached leaf plan differs from the exact RuntimeSource Attachment plan')
+            expected_targets = {
+                f'{entry.binding.entity_id}/{ref.joint_id}': attachment_plan.native_actuator_names[
+                    f'{entry.binding.entity_id}/{actuator.actuator_id}'
+                ]
+                for entry in leaf_plan.leaves if entry.binding.profile_kind == 'arm_position'
+                for ref, actuator in zip(entry.binding.joint_order,
+                                         tuple(pair.actuator for pair in entry.binding.joint_actuator_bindings),
+                                         strict=True)
+            }
+            expected_open = tuple(
+                attachment_plan.native_actuator_names[f'{entry.binding.entity_id}/{ref.actuator_id}']
+                for entry in leaf_plan.leaves if entry.binding.profile_kind == 'hand_position'
+                for ref in entry.binding.actuator_order
+            )
+        else:
+            expected_targets = {f'{entry.binding.entity_id}/{ref.joint_id}': f'actuator{index}'
+                                for entry in leaf_plan.leaves if entry.binding.profile_kind == 'arm_position'
+                                for index, ref in enumerate(entry.binding.joint_order, 1)}
+            expected_open = tuple(
+                ref.actuator_id for entry in leaf_plan.leaves
+                if entry.binding.profile_kind == 'hand_position' for ref in entry.binding.actuator_order
+            )
         if dict(source.joint_targets) != expected_targets or tuple(source.open_actuators) != expected_open:
             raise ValueError('R02c RuntimeSource actuator names differ from ordered leaf bindings')
         if len(leaf_plan.leaves) != 2 or {entry.binding.profile_kind for entry in leaf_plan.leaves} != {

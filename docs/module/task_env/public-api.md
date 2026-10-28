@@ -364,9 +364,18 @@ provenance inconsistent with the pinned source. The positive candidate identity
 is unchanged; 99 provider-free checks plus the original 19-case static gate
 passed. Sol independently checked the two original native receipts, resets and
 256 motion boundaries without another native run. This is not a general
-Provider admission or Qualification. Public Env/Recorder/H5 integration and
-R03c S2/S3 are `NOT_RUN`; R03c has not started. See [the R03 contract and
-attempt status](goal/Phase_II_01/03_R03_Physical_Attachment.md).
+Provider admission or Qualification. R03c attempt001 has an opt-in task-owned
+two-Entity Position-leaf candidate and provider-free Env/reader regressions
+(83 selected tests passed). Both authorized native process starts stopped
+before `mj_step`: the first verified MuJoCo 3.8.1 CPU identity and found an
+Attachment-receipt/Hand-leaf tendon-key mismatch during public reset; the
+second runner exited before provider import because its retry ledger check did
+not account for the already-appended start row. The retry-counter fix passed
+provider-free S1 but was not run natively. No complete episode or real closed
+H5 was produced; R03c S2/S3 remain incomplete pending Sol review. This
+candidate is not registered as general `make_env()` support. See [the R03
+contract and attempt status](goal/Phase_II_01/03_R03_Physical_Attachment.md)
+and ignored [R03c report](../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_001/report.md).
 The attempt report and raw logs are local ignored Evidence under
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r02c_001/`.
 

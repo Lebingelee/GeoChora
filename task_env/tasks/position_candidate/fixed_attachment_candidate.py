@@ -59,6 +59,7 @@ class FixedAttachmentCandidate:
     runtime_source: RuntimeSource
     reset_plan: EpisodeResetPlanV1
     source_inventory: dict[str, object]
+    source_artifact: object
 
 
 def _sha(path: Path) -> str:
@@ -400,7 +401,7 @@ def build_fixed_attachment_candidate() -> FixedAttachmentCandidate:
     }
     return FixedAttachmentCandidate(
         scene, assembly, projection, plan, artifact, task_source,
-        runtime_source, reset_plan, inventory,
+        runtime_source, reset_plan, inventory, legacy,
     )
 
 
