@@ -607,9 +607,11 @@ def verify(output: str | Path, evidence_root: str | Path | None = None) -> dict[
 
     first_boundary = boundaries_by_key[(0, 0)]["state_boundary"]
     second_boundary = boundaries_by_key[(1, 0)]["state_boundary"]
-    for key in ("episode_id", "scene_instance_id", "provider_materialization_id", "boundary_id"):
+    for key in ("episode_id", "scene_instance_id", "provider_materialization_id"):
         if first_boundary[key] == second_boundary[key]:
             raise ValueError(f"second reset did not refresh {key}")
+    if _state_boundary_id(first_boundary) == _state_boundary_id(second_boundary):
+        raise ValueError("second reset did not refresh the derived StateBoundaryIdentity boundary_id")
     if first_boundary["reset_sample_id"] != second_boundary["reset_sample_id"]:
         raise ValueError("second reset did not reuse the fixed ResetPlan sample")
     if abs(float(counters["simulation_seconds"]) - 24 * 0.01) > 2e-9:

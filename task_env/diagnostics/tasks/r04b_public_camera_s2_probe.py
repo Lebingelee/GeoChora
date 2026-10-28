@@ -80,6 +80,13 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _state_boundary_id_from_mapping(boundary: dict[str, object]) -> str:
+    """Recompute the derived StateBoundaryIdentity ID from its public mapping."""
+
+    payload = json.dumps(boundary, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return "state-boundary-" + hashlib.sha256(payload).hexdigest()
+
+
 def _pose_matrix(pose) -> np.ndarray:
     from task_env.utils.rotation import quat_wxyz_to_matrix
 
@@ -353,6 +360,8 @@ def _validate_public_boundary(env, observation, info, round_index, rows, counter
     view = env.typed_state.view
     boundary = view.boundary
     clock = view.sample_clock
+    if _state_boundary_id_from_mapping(boundary.to_mapping()) != boundary.boundary_id:
+        raise ValueError("typed StateBoundaryIdentity ID differs from its canonical public mapping")
     if (boundary_value.boundary_index != boundary.control_step
             or boundary_value.state_boundary_id != boundary.boundary_id
             or boundary_value.simulation_time_s != clock.simulation_time_s
@@ -1079,9 +1088,12 @@ def run_s2(output: str | Path) -> dict[str, object]:
                 second_reset = round_initial[1]
                 first_boundary = first_reset["boundary"]["state_boundary"]
                 second_boundary = second_reset["boundary"]["state_boundary"]
-                for key in ("episode_id", "scene_instance_id", "provider_materialization_id", "boundary_id"):
+                for key in ("episode_id", "scene_instance_id", "provider_materialization_id"):
                     if first_boundary[key] == second_boundary[key]:
                         raise AssertionError(f"reset did not refresh state identity field {key}")
+                if (_state_boundary_id_from_mapping(first_boundary)
+                        == _state_boundary_id_from_mapping(second_boundary)):
+                    raise AssertionError("reset did not refresh derived StateBoundaryIdentity boundary_id")
                 if first_boundary["reset_sample_id"] != second_boundary["reset_sample_id"]:
                     raise AssertionError("second reset did not reuse the same fixed ResetPlan sample")
                 for camera_id in CAMERA_IDS:
