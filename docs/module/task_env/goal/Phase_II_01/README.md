@@ -1,5 +1,14 @@
 # Phase II-01 修订规划交付包
 
+**当前恢复入口（2026-10-28）**：从 Core `c30d97e` 的 R03c attempt002 静态修正检查点继续，
+状态仍为 `S1_REVIEWED_NATIVE_PENDING`，S2 不完整、S3 未运行；旧启动额度已耗尽。
+恢复步骤、默认顺序及新窗口边界见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)，
+后续代码交接使用 [08](08_Codex_Phase_II_01_Planning_Prompt.md)。
+已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
+集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
+原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
+以下 2026-10-23 记录及历史外部参考保留签署时点含义，不代表所有切片至今未启动。
+
 2026-10-23规划快照：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。独立R07与候选7父Goal/22切片已在develop@535ce251加入（前轮输入234da21b），本地259f27f完成规划复核。该签署时点维护者随后单独授权P00基线核查和工作包准备；当前逐slice执行状态见 [07](07_Execution_Order_and_Acceptance.md) 与 [manifest](planning_manifest.json)。总体定位见 [00](00_Phase_II_01_Blueprint.md)，原规划检查保留在 [validation receipt](validation_receipt.json)，P00核查另记manifest的 `P00_audit` 与 `revision_history`。
 
 ## 文档入口与责任
@@ -16,6 +25,7 @@
 | [07 执行表](07_Execution_Order_and_Acceptance.md) | 7/22 DAG、required envelope与停止条件 |
 | [08 审阅交接](08_Codex_Phase_II_01_Planning_Prompt.md) | 下一轮独立审阅/维护者审批指令 |
 | [R07部署/Agent成本](09_R07_Benchmark_Deployment_and_Agent_Cost.md) | 固定五LIBERO审计/部署与成本协议、RoboCasa feasibility；不隶属R06 |
+| [10 检查点后补丁](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) | USD/source、free-body/state/control、Isaac/GeoPhys、真实 Harness 的 owner/方法、F00–F07 与调用链门禁；原目标保留 |
 | [planning manifest](planning_manifest.json) | 机器可读DAG、source/probe出处与文档hash；非实施receipt |
 
 ## 当前开发流程（维护者2026-10-25补充）
@@ -46,7 +56,7 @@
 | ID / 优先级 | source / owner / 范围 | 已知风险与状态 | 受影响后继 / stop或处理 |
 | --- | --- | --- | --- |
 | SRC-1 P0 | 独立Arm+Hand→MjSpec导出→GeoPhys a53 importer | site-size dialect真实拒绝，NOT_ADMITTED/BLOCKED；非所有GeoPhys Attachment结论 | GeoPhys该路线停止；Provider importer修复或versioned source normalization均须单独审查，MuJoCo候选可独立推进 |
-| CTL-1 P0 | canonical Position Profile / plan / Env | R02b已提供provider-free leaf adapters与整体preflight/S1；真实Runtime/Recorder admission尚未建立 | R02c与R03c验证真实隔离S2/S3；保留Force-aware拒绝与唯一writer保护 |
+| CTL-1 P0 | canonical Position Profile / plan / Env | R02c005 Hand50 case已获有界S2/S3接收；R03c002装配态public Env仍S2不完整/S3未运行；新provider native mapping尚未接通 | 07恢复R03c；10扩展native receipt/drive/reader，保留Force-aware拒绝与唯一writer保护 |
 | MAT-1 P0 | RuntimeSource/materialization/typed state | R03b已为精确Menagerie Panda Arm+Hand双source增加fixed-tree plan与Core S2；更广source/provider及public Env/H5路径仍未建立 | R03b bounded review；R03c仍需独立public Env/Recorder/reader S2/S3 |
 | ID-1 P1 | artifacts/Assembly refs | 同Entity子组件与Entity owning混淆、alias冲突/循环hash | R01→R02/R03；typed refs、hash有向分域、严格版本派发 |
 | MAP-1 P1 | importer→canonical→native slots→Controller/Recorder | joint/body/actuator顺序或Hand equality/tendon误解释，重复驱动 | R02/R03/R06；逆映射/置换负例/独立资源运动与H5 |

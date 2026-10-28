@@ -1,6 +1,12 @@
 # R03 — Physical Attachment
 
-状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已完成实现、定向 S1 与 Core RuntimeSession S2，全部冻结门通过，经Sol复核接收为 `ACCEPTED_BOUNDED_S1_S2`。R03c attempt001 两次启动失败原件继续保留；attempt002 唯一启动核实 MuJoCo 3.8.1 CPU 身份并完成 reset/一次 `mj_forward`，但在 typed-state Joint binding 失败，`mj_step=0`、无 episode/H5；S2 **FAIL/INCOMPLETE**、S3 **NOT_RUN**，待Sol复核。失败后 runner 映射修正通过1项 provider-free 定向S1，尚未native验证。没有由此授予Provider通用支持、任意 Attachment 支持或 Qualification。
+状态：REVISED_DRAFT；R03a attempt001 的 ENDPOINT_HAND_COMMANDS **FAIL** 原样保留；attempt002 的 INTERIOR_HAND_COMMANDS 在获批范围内通过独立 MuJoCo source/dynamics probe，Sol 已接收该有界工程出口。R03b attempt001 已经 Sol 接收为 `ACCEPTED_BOUNDED_S1_S2`。R03c attempt001 两次失败及 attempt002 唯一启动失败保留；002 为 materialization1/reset1/forward1/step0，无 episode/H5。Sol 已在 `c30d97e` 接收 runner JointDefinition 修正的静态部分，四配置真实 Core/runner snapshot 链当前模块20项 provider-free S1通过；修正仍未 native 验证，S2 **INCOMPLETE**、S3 **NOT_RUN**，状态 `S1_REVIEWED_NATIVE_PENDING`。没有新的 Provider 通用支持、任意 Attachment 支持或 Qualification。
+
+2026-10-28 恢复入口见 [07 检查点恢复合同](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)：
+默认下一包为新的 R03c attempt003 合同，不续用已耗尽的 002 额度，不重置历史。
+GeoPhys importer/双 source lowering/leaf adapter 与新 Isaac/已验证 USD 路线的补丁 owner 见
+[10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#3-按层级定位补丁)。
+旧完整 Panda GeoPhys 证据不代新装配；单 Panda USD 可以独立接入，不因本页 split Attachment 成为隐藏前置。
 
 ## 已知事实与精确 Provider 路线
 

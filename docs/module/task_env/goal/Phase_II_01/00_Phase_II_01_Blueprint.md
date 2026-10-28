@@ -1,6 +1,13 @@
 # Phase II-01 — Composite Robot & Core Integration
 
-状态：**REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL**，2026-10-23。目标版本 v2.0.1；后续维护者指令单独授权P00核查/实施准入准备和首份Luna工作包，首轮核查完成、实施准入仍待决，R01–R07均未启动。7个候选父Goal、22个切片不是已批准实施范围。原规划基线和下列规划事实保留其签署时点；新P00核查从Core `259f27f…` 起，见 [README](README.md) 与 [manifest](planning_manifest.json)。
+当前规划状态：**CHECKPOINT_RECOVERY_PLAN_UPDATED**，2026-10-28。R03c attempt002 静态修正已接收，
+检查点 `c30d97e`，S2 不完整、S3 未运行。恢复入口为 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)，
+新增 USD/Isaac/GeoPhys/Harness 补丁为 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
+本轮仅修订文档，没有实施或 native 授权；原 7 父 Goal/22 切片及 P99 保留，逐 slice 的已授权/已接收事实见 manifest。
+
+原 2026-10-23 规划状态为 REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL，目标版本 v2.0.1；
+后续已有独立 P00 与逐 slice 指令。原基线、签署时点与历史批准边界保留，不能再把“R01–R07均未启动”作为当前状态。
+新 P00 从 Core `259f27f…` 起，见 [README](README.md) 与 [manifest](planning_manifest.json)。
 
 ## 基线与治理
 
@@ -47,12 +54,16 @@ Logical contracts 属 `task_env/artifacts/`；编译/source mapping 属 `task_en
 
 优先 COMPOSE_EXISTING / EXTEND_EXISTING。新不可变引用值并不授权新 Runtime abstraction；NEW_IMPLEMENTATION 必须另证既有 owner 不足。完整 source→consumer→failure→close 路线和[风险/修订对照](README.md)须在 P00 批准后细化。
 
-## 外部原则与非目标
+## 原 7/22 外部原则与非目标
 
-固定引用为 Isaac Lab v3.0.0（官方 Release 2026-10-20）与 Isaac Sim 6.1.0；[参考锁定表](README.md#references)列出实际读取的官方页。只借鉴显式选择/准入、producer-owned state、显式顺序映射、物理资产验证、policy interface 兼容原则；不引入 Isaac Lab/USD/Warp、第二 Runtime 或统一 Provider storage ABI。
+原规划固定引用为 Isaac Lab v3.0.0（官方 Release 2026-10-20）与 Isaac Sim 6.1.0；[参考锁定表](README.md#references)保留原用途。
+2026-10-28 新增计划按 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 接收已验证 USD，并规划 Isaac 6.2 pip 环境与 provider adapter；
+这不是把原 6.1 引用当作安装版本，也不引入第二 Runtime 或统一 Provider storage ABI。旧 reference 的 source/身份不因新计划升级。
 
 R07只规划 `asset/benchmarks/`（资产来源/许可/安装验证）与 `bench_deploy/`（benchmark配方/最小adapters）；不创建新TaskEnv/registry/Agent runtime。PhysPi仍外部消费方。
 
-不做动态 attach/detach、闭环拓扑热切换、通用 Assembly/仲裁、双臂 IK、所有 Provider/CUDA 矩阵、Camera async/semantic masks、训练/跨引擎 policy transfer、Task Harness、自动 Qualification。保持 Scene v1/v2/v3、旧 Artifact/Entity/Recorder identities 与历史 Evidence；新增合同独立版本化，不向旧 codec 静默增字段。
+原 7/22 不做动态 attach/detach、闭环拓扑热切换、通用 Assembly/仲裁、双臂 IK、所有 Provider/CUDA 矩阵、Camera async/semantic masks、训练/跨引擎 policy transfer 或自动 Qualification。
+Task Harness 从原非目标调整为 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 的独立接入计划，
+消费既有 Core；不改变 R07 原五任务的 Expert/训练非必需边界。保持 Scene v1/v2/v3、旧 Artifact/Entity/Recorder identities 与历史 Evidence；新增合同独立版本化，不向旧 codec 静默增字段。
 
 原规划批准顺序为：维护者审阅→批准最终Goal/DAG/Required Envelope→单独启动P00→逐slice执行与Evidence→独立P99 scope decision→另行Release Gate。后续明确授权允许P00基线核查和准入准备先行；这不批准最终范围，也不越过逐slice实施gate。相关范围未获明确批准前，工作包只能为AUDIT_ONLY，不能标READY_TO_IMPLEMENT。

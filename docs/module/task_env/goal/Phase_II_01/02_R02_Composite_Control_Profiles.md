@@ -3,6 +3,12 @@
 状态：REVISED_DRAFT；R02a/R02b已接收；R02c005的SOURCE_CALIBRATED_HAND_50_V1精确交集已由Sol接收为ACCEPTED_BOUNDED_S2_S3；旧2500 case/004物理FAIL保留，独立Attachment未准入。
 复用算法，新增 leaf binding 契约不等于已有叶级执行支持，也不修改最终 Goal/DAG/Required Envelope。
 
+2026-10-28 后续补丁边界：现有 Position 算法与 canonical Action/Target/Ack 继续复用，
+MuJoCo-specific native receipt 不直接冒充 Isaac drive 通道。source-derived kinematics、joint/TCP/opening、
+native resource mapping/fan-out/唯一 writer 与新 reader 的逐方法改动见
+[10 补丁表](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#3-按层级定位补丁)。
+该计划不改本页已冻结的 actuator8/tendon/Hand50 case，也不把新的 Force-aware 依赖加入 Position 必需出口。
+
 ## 真实复用边界
 
 [Position Profile](../../../../../task_env/controllers/canonical/position_profile.py) 当前要求同 Entity 内 7 arm + 2 finger joints，并以单 writer 绑定 arm/gripper 两组。[ControlBindingPlan](../../../../../task_env/runtime/sessions/control.py) 检查全部资源唯一覆盖，并拒绝一个 writer 跨 Entity。[JointPositionServoBackend](../../../../../task_env/controllers/joint_position.py) 提供既有 position 算法复用点；它不是现成的 advanced Arm-only/Hand-only profile。

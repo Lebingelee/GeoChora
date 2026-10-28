@@ -1499,19 +1499,20 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "00_Phase_II_01_Blueprint.md": "12a241fe288374d3817dc33688751541378f345ad71bbb8a2b42262fadf5c340",
+    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "02_R02_Composite_Control_Profiles.md": "01fdc9f3bc509ad107ac6a99653295bfcff63e76d0f031c9a69accdc5694811e",
-    "03_R03_Physical_Attachment.md": "60a9af592c86c90b74c4a19e830af34bdbdcc9d8f483bd1f7a5a88b9e0ab2644",
+    "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
+    "03_R03_Physical_Attachment.md": "421ca90196ca5bf7e2204c41b5090bfb3ff0323a9e588aac0b898f02175a427d",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
-    "05_R05_Native_Rate_Feedback.md": "9fff9fd4932ae7ac57f822132fbdcc330a0e27595f80a730bd3e11abb1a9295f",
-    "06_R06_Compatibility_and_Regression.md": "84f766f15fbf92a691d7821246b2a6aba841309286319b11a890619d68e0a8f2",
-    "07_Execution_Order_and_Acceptance.md": "d436806a58c0860bedfc9b12b8d0fd8b002224c44cb98cf1c966dd2b2d692803",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "ed33d92d55c06e0569ec0ef01f18d0fb6addd7814b6fd292b7d9ea45513c439d",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "91767dc05df0b11dc7e6cb77e19f82cb754dfb352bfb942e5a070338837c63b8",
-    "README.md": "7fb5c61ba566c3e478df55f72cd8b0975d3bf3b38bfe017453e8f5259b4c84e6"
+    "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
+    "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
+    "07_Execution_Order_and_Acceptance.md": "dfae2fc5c11894527e39d02196295c69316f1cdcf2690f394a6d3f7e289f6808",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "69b53cde406e75b0f8daed1cf6b6b516cb3d68ea90eaf6a7636a3fb19afde048",
+    "README.md": "5d70d9c0991312c2394c2c57bc2b7f8282fddc41f107c244657ff66e0b410fef"
   },
-  "revision_kind": "SOL_R02C005_HAND50_BOUNDED_S2_S3_ACCEPTANCE",
+  "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3193,7 +3194,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "R04A_IMPLEMENTATION_S1; one bounded local commit on the existing phase branch; no Goal/DAG/Provider/Qualification approval.",
+  "planning_submission_this_revision": "DOCUMENTATION_ONLY; checkpoint c30d97e retained; recovery and F00-F07 patch direction recorded. No implementation, install, branch integration or native execution.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -3712,6 +3713,17 @@
       "input_commit": "dfee52777069c1261334032e4924e8c136d08361",
       "result": "S1_REVIEWED_NATIVE_PENDING",
       "scope": "Reviewed raw47 and old77 hashes; current module20 provider-free checks include four real runner snapshot configurations with native IO stand-ins. No added native or S2/S3 acceptance."
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_DOCUMENTATION",
+      "input_commit": "c30d97efa6ad169c205ea25d7917bc7b9a06e93c",
+      "result": "PLAN_UPDATED; original 7/22/P99/slice records preserved; F00-F07 planned, not started",
+      "scope": "Recovery entry, source/asset/reset/state/control/session/H5/Harness patch owners and call-chain gates; validated USD and internal binding directions confirmed. No implementation/install/native/integration.",
+      "document": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+      "audit_summary": "10 section8; local ignored source/host audit indexed, not physics acceptance",
+      "receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
+      "validation": "14 focused document checks; 12 hashes/132 links/24 anchors; global validator 176 unchanged errors, counts +1 Markdown; module Skill static PASS; no software tests/native."
     }
   ],
   "P00_audit": {
@@ -3876,6 +3888,181 @@
       "audit_only_ignored_output": "Luna preserves raw workspace output; Sol as designated owner commits the maintained summary/index after review. No raw Evidence or empty commit required.",
       "stage_other_writer_files": false,
       "push_merge_tag_release_authorized": false
+    }
+  },
+  "checkpoint_recovery_plan": {
+    "updated": "2026-10-28",
+    "status": "PLAN_UPDATED_IMPLEMENTATION_NOT_STARTED",
+    "authorization": "Maintainer explicitly requested Phase_II_01 document updates for a later resumption from R03c attempt002; this revision authorizes documents/local documentation commit only.",
+    "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
+    "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+    "implementation_checkpoint": "c30d97efa6ad169c205ea25d7917bc7b9a06e93c",
+    "resume_git_input": "Actual HEAD after this documentation commit; inspect changes since c30 and freeze new HEAD/bytes, never reset or mutate old freeze/ledger.",
+    "R03c": {
+      "status": "S1_REVIEWED_NATIVE_PENDING",
+      "S2": "INCOMPLETE",
+      "S3": "NOT_RUN",
+      "provider_free_tests_reused": 20,
+      "four_configuration_runner_chain_reviewed": true,
+      "postrun_fix_native_verified": false,
+      "previous_native_window": "attempt002 one-start budget spent; retained unchanged",
+      "default_next_package": "R03c attempt003 same-source four-episode/four-H5 S2/S3; new exact execution contract and authorization required",
+      "new_native_authorized_this_revision": false
+    },
+    "confirmed_direction": {
+      "core_runtime_owners": 1,
+      "provider_adapters": "reuse current RuntimeSession; add Isaac native adapter only",
+      "asset_input": "USD, upstream validated; team selected, no branch yet; consume input/report identity, do not rebuild upstream validation",
+      "public_construction": "extend existing Core entry; ReferenceTaskBinding remains internal; no known external dependency",
+      "isaac_first_acceptance": "official Panda + one movable rigid body; then actual current Panda import",
+      "isaac_installation": "pip; stable rechecked at install; audited candidate 6.2.0.0/Python3.12 on 2026-10-28; isolated environment; bounded small-scene 8GB exploration",
+      "native_asset_route": "prefer native USD, explicit verified derived representation only when needed; no silent proxy"
+    },
+    "original_contract_preservation": {
+      "goal_count": 7,
+      "slice_count": 22,
+      "all_original_slice_records_unchanged": true,
+      "P99_dependencies_unchanged": true,
+      "required_envelope_unchanged": true,
+      "R05a": "BLOCKED_PROVIDER_CONTRACT",
+      "R06_compatibility": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "original_R07_five_tasks_retained": true,
+      "F_rows_are_original_slices": false,
+      "F_rows_automatically_required_for_original_P99": false,
+      "F06_expert_multiseed_required_for_original_R07": false
+    },
+    "branch_plan": {
+      "current_topic": "codex/phase-ii-01-p00-20261023",
+      "new_worktrees_this_revision": 0,
+      "additional_core_integration_topics_planned": 1,
+      "proposed_name": "develop-full",
+      "created_this_revision": false,
+      "integration": "future package fetches/readbacks base, preserves both Harness and phase ancestry and pins; no per-row branch",
+      "geophys_submodule_topic_if_needed": 1,
+      "push_merge_tag_release_authorized": false,
+      "total_core_topics_including_retained_phase_and_future_integration": 2
+    },
+    "harness_input": {
+      "merge_head": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
+      "pr_source": "710b42253dae2ce0175c3c51eee97d0ce83fabeb",
+      "shared_base": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
+      "feishu": "original webpage inaccessible; maintainer supplied handoff text",
+      "reported_real_execution": "mock upstream with real MuJoCo CPU physics; execution claim from handoff, raw seed/H5 not independently reviewed",
+      "host_reproduced_finding": "run_seed checks solved before terminated/truncated; Judge check_probe accepts terminal solved rows; ledger finish source reviewed only",
+      "audit_root": "workspace/maintenance/multi_provider_asset_harness_review_20261028_001/",
+      "raw_availability": "local ignored; clones without bytes mark indexed but raw unavailable"
+    },
+    "patch_rows": [
+      {
+        "id": "F00",
+        "depends_on": [],
+        "external_gate": "actual checkpoint/harness inputs and single-writer selection",
+        "work": "integration and Harness lifecycle correctness"
+      },
+      {
+        "id": "F01",
+        "depends_on": [],
+        "external_gate": "pinned install/runtime recipe; native separately budgeted/authorized",
+        "work": "Isaac isolated install and native baseline; independent installation preparation may advance"
+      },
+      {
+        "id": "F02",
+        "depends_on": [
+          "F00"
+        ],
+        "work": "consume validated USD delivery/source/closure/report; resolve MuJoCo USD execution route",
+        "external_gate": "fixed official asset/API recipe; F01 samples reusable, F01 native PASS not a prerequisite"
+      },
+      {
+        "id": "F03",
+        "depends_on": [
+          "F02"
+        ],
+        "work": "Core reset/state/control/admission/factory/reader real-caller S1"
+      },
+      {
+        "id": "F04",
+        "depends_on": [
+          "F01",
+          "F03"
+        ],
+        "work": "Isaac public Env/record/readback official Panda then current Panda"
+      },
+      {
+        "id": "F05",
+        "depends_on": [
+          "F02",
+          "F03"
+        ],
+        "work": "GeoPhys and MuJoCo same-declared-USD cells, retained MJCF regressions; split Attachment separate"
+      },
+      {
+        "id": "F06",
+        "depends_on": [
+          "F00",
+          "F04",
+          "F05"
+        ],
+        "work": "aggregate real Harness four reports/multiseed/Oracle/pending Judge across declared providers",
+        "per_provider_runs_may_advance_when_its_own_cell_ready": true
+      },
+      {
+        "id": "F07",
+        "depends_on": [
+          "F04",
+          "F05"
+        ],
+        "external_gate": "specific expansion scope",
+        "work": "broader scenes/render and selected Newton route"
+      }
+    ],
+    "patch_rows_status": "PLANNED_NOT_STARTED; not new capability claims or execution authorization",
+    "open_technical_questions": [
+      "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
+      "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
+      "actual MuJoCo 3.8.1 build USD decoder versus separate build/derived route",
+      "provider consumption of validated USD authored extensions",
+      "public contact query/state/evaluator required by task semantics; physical contact observation alone does not satisfy On/In contact predicates"
+    ],
+    "new_native_runs": 0,
+    "software_tests_run_this_documentation_revision": [],
+    "local_update_receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
+    "documentation_validation": {
+      "mode": "STATIC_DOCUMENTATION_ONLY",
+      "focused_checks_passed": 14,
+      "markdown_hashes": 12,
+      "local_links": 132,
+      "anchors": 24,
+      "reused_source_hashes": 28,
+      "original_slice_records_DAG_P99_required_envelope_unchanged": true,
+      "historical_validation_receipt_unchanged": true,
+      "git_diff_check": "PASS",
+      "module_skill_static_check": "PASS with existing geochora interpreter; default python3 lacks PyYAML, no dependency installed",
+      "global_validator": {
+        "exit_code": 1,
+        "errors_before": 176,
+        "errors_after": 176,
+        "new_errors": [],
+        "counts_before": {
+          "docs": 83,
+          "task_env": 36,
+          "markdown": 41,
+          "task_env_markdown": 27,
+          "machine_or_other": 42
+        },
+        "counts_after": {
+          "docs": 84,
+          "task_env": 37,
+          "markdown": 42,
+          "task_env_markdown": 28,
+          "machine_or_other": 42
+        },
+        "limitation": "existing consolidation count/history-scope failures remain; one new planning Markdown increases counts; no thresholds relaxed"
+      },
+      "software_tests": [],
+      "provider_imports": 0,
+      "native_starts": 0,
+      "receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json"
     }
   }
 }

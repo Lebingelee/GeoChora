@@ -2,6 +2,13 @@
 
 状态：**REVISED_DRAFT / PLANNED / NOT_STARTED**。本轮仅源码审计与规划修订，不启动 P00/R07a，不把审阅检查计为部署验收。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，尚待维护者批准。
 
+2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
+[10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
+上游按已验证 USD 处理，Core 负责接收与 provider 执行绑定；其来源/验证成功不自动证明 benchmark 语义对应。
+Harness 当前 mock `pick-lift-v0` 不能替代本页 On/In/region/Open/TurnOn/native-init 的任务映射。
+F06 的 Expert/≥20-seed/Oracle 是新增 Harness 出口，不回写为本页五任务部署的新必需项；
+本页任务完成/Expert/训练非必需的边界保持，R07 当前仍未执行。
+
 ## 1. 范围、来源和实际审计边界
 
 首个 required Benchmark 候选为 LIBERO 下列五任务；RoboCasa 仅第二阶段 feasibility/scope recommendation。R07 不要求 Expert Solution、任务成功率、策略训练或机器人完整完成任务；但必须真实构造、重复 reset、语义对照和有意义的公开 Controller/Planner 物理交互，不能以静态编译、fake/random actions 或视觉相似充证。

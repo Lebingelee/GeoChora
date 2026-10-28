@@ -38,3 +38,11 @@ R05 不作为 R01/R02/R03 Position-only 前置；R04 也不依赖 R05。仅整�
 | R05c | R05b | CPU/CUDA 各 100/500Hz、same source/reset 的 Native Sequence/Guard/hold-ramp/H5 对照 | S2/S3：raw/closing force 分列、sample/ack/time/identity 和磁盘原值、费用/故障；任何 required cell 不通过阻塞 P99 |
 
 预算必须在 R05a 冻结并保留实际成本；旧约 0.3ms host Reader 和低于实时速度只是历史测量，不是未来门槛或本轮复测。没有正式调用合同即使画面/Guard 运行正常也不构成 capability。
+
+## 与检查点后 Provider 补丁的分界（2026-10-28）
+
+[10 的 F03/F05](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#5-分阶段顺序与出口)
+计划先接已验证 USD、single-Panda/刚体 Position 与 GeoPhys public source/session。
+这些基础 reset/step 检查可以独立推进，不要求本页 500Hz/双 backend 合同先通过；
+它们的成功也不能关闭 `R05a=BLOCKED_PROVIDER_CONTRACT` 或替代 R05b/c 的正式 sample/freshness/cadence 证据。
+Isaac R1 force-aware 若需要读取力，同样先核 source/transmission、单位/phase/freshness 和公开能力，不能借 Position 准入。

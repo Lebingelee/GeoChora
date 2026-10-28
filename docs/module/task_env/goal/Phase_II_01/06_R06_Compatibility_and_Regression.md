@@ -61,3 +61,11 @@ Sol审阅提交 `56f689570a0fbaf29aea4ea26a073d38b5e6afd6` 的四份文档差异
 ## 与独立R07的分界
 
 R06b新增R03b前置，以便对真实lowering/root与native顺序映射做回归；原R01–R06目的/required gates保持。Benchmark部署/Agent成本由独立[R07](09_R07_Benchmark_Deployment_and_Agent_Cost.md)所有，不并入R06c。R06仍保护旧Scene/Artifact/Recorder/Provider合同；P99同时依赖R06c和R07d，R07不是回写PhaseII兼容结论的理由。
+
+## 与 USD / Harness 后继计划的分界（2026-10-28）
+
+[10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 规定新增 source/receipt/recording profile
+版本化并保留现有 R02c/R03c exact reader；不能为接 Isaac 删除 MuJoCo3.8.1/64/65 的旧交集校验。
+Harness 的 canonical H5 与 leaf Generic H5 各沿现有 owner 扩展，storage roundtrip 不代正式 replay。
+新三 provider 运行保留精确 execution/source/build 身份，不回写旧 pin 的证据。
+本页四项 missing raw/处置决定与 R06c/P99 阻塞保持，不以新资产验证报告或新 H5 自动填补历史 bytes。

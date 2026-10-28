@@ -1,6 +1,37 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-状态：REVISED_DRAFT / AWAITING_MAINTAINER_GOAL_DAG_APPROVAL。以下是7父Goal/22切片**建议表**，不继承Phase II的PASS。P00核查已完成；R03a两个有界native case经Sol复核接收为`ACCEPTED_BOUNDED`，R01a静态合同/S1与R01b resolver/S1已获接收。R02a attempt001已交付实现与 provider-free S1，等待Sol复核；本表不自动授权后继slice。DAG与Required Envelope未获最终批准。
+当前入口（2026-10-28）：**R03c attempt002 检查点恢复规划已更新**，Core `c30d97e`。
+R03c 静态修正接收，S2 INCOMPLETE、S3 NOT_RUN；原窗口已耗尽，未授权重启。
+各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
+原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
+新增后继方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)，本文件更新不自动授权实现/native。
+
+<a id="r03c-checkpoint-recovery"></a>
+
+## R03c attempt002 检查点恢复合同
+
+1. **恢复位置**：保留 `codex/phase-ii-01-p00-20261023` 与已有本地提交，不 reset 回旧 HEAD。
+   c30 是功能/source 审阅基线；后续恢复包冻结实际 `git rev-parse HEAD`（包含本次文档提交）及保护 bytes，
+   检查 c30 以来差异。文档提交不冒充新的功能验证，原 attempt002 freeze/账本保持原样。
+2. **已接受与未完成**：dfee527 的 Scene JointDefinition 修正、c30 的四配置真实 runner snapshot S1 已接收，
+   当前模块 20 passed；未变时复用。attempt002 只有 materialization1/reset1/forward1、step0，
+   无完整 episode/H5；S2/S3 尚未通过，修正尚未 native 验证。不是新的 Hand 动力学失败。
+3. **默认下一包**：准备 R03c attempt003 的同 source、同 mount、同 public Env 四配置与四 H5 S2/S3，
+   先核实际 runner 调用覆盖及未变输入，不固定安排新的准备轮。实现/执行在维护者后续工作包范围内进行；
+   新启动额度/timeout/资源/source/build/oracle 需在新合同明确，不能借用 002 已耗尽额度，本文不发放启动额度。
+4. **S1 入口**：现有 candidate/已选 public 构造入口→真实 Core admission→public reset→runner bindings/requirements→真实 snapshot_v1/check-reset→
+   首个 public step→snapshot/check-outer→Recorder/reader→close；仅替换 native IO，
+   不以 helper 类型断言或 hash/账本 preflight 代替出错链覆盖。完整通用门见 [10 第6节](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#6-防止字段与接线错误进入-native)。
+5. **出口不变**：同一 public 路线完成原四 episode，各 T=64/T+1=65；四个真实 closed H5 独立读回及原 tamper 门；
+   保留 source/plan/Attachment/materialization/config/command/Target/Ack/state/clock 身份。
+   不降低原 motion/mount/range/clock/oracle、不以 R03b S2、synthetic H5 或诊断拼接替代。
+6. **失败与后继**：保留原失败与新 partial progress；同包普通接线修正只用该包允许的运行额度。
+   Sol 接收 R03c 出口后，默认按原表进入 R04b。若 R03c 或后继行受阻，选择独立 ready 行须在工作包中记明原因，
+   不自动换 provider、放宽 required 或延长预算。
+7. **新增补丁线**：F00–F07 由 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#5-分阶段顺序与出口) 维护。
+   它们不继承 R03c 的 native 授权，也不要求完整 P99 先完成；F01 安装准备等独立行可在明确选择后提前。
+   原 R05a、R06 compatibility blockers 与 P99 不关闭；单 Panda USD 不追加 split Attachment/500Hz 全局依赖。
+
 
 ## 基线、P00 与证据记账
 
