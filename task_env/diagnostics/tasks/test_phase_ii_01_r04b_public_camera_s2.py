@@ -234,7 +234,15 @@ class _ProviderFreeCameraSession:
         pixel = np.asarray(metadata.K, dtype=np.float64) @ camera_point
         col = int(round(float(pixel[0] / pixel[2]) - 0.5))
         row = int(round(float(pixel[1] / pixel[2]) - 0.5))
-        expected_depth, _ = probe._ray_box_hit(metadata, peg_pose, row, col)
+        try:
+            expected_depth, _ = probe._ray_box_hit(metadata, peg_pose, row, col)
+        except ValueError as exc:
+            raise ValueError(
+                f"{exc}; synthetic capture camera={camera_id} "
+                f"control_step={step} peg_position={tuple(peg_pose.position)} "
+                f"camera_point={camera_point.tolist()} pixel={pixel.tolist()} row={row} col={col} "
+                f"T_world_from_camera={np.asarray(metadata.T_world_from_camera).tolist()}"
+            ) from exc
         depth[row, col] = np.float32(expected_depth)
 
         self.last_sync = SimpleNamespace(to_mapping=lambda: {
