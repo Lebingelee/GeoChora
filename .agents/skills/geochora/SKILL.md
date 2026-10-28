@@ -114,6 +114,19 @@ Follow the maintainer's [phase branch and Sol/Luna policy](../../../AGENTS.md#ph
   independent-checkout/scope and shared native-lock rules. One thread's early
   return does not authorize injecting work into another active thread.
 
+### Goals spanning multiple substages
+
+For a maintainer-authorized goal covering multiple substages, follow the
+[goal orchestration procedure](references/goal-orchestration.md): locate each
+substage's implementation details in its planning document, aim for research
+and implementation in attempt 1 and review/acceptance in attempt 2, and cap
+each substage at three attempts. Before attempt 3, reassess the actual blockers,
+research relevant open-source implementations and decide whether the original
+acceptance remains achievable. Track Luna through periodic read-only checks;
+prepare future work privately during report cleanup, then independently verify
+the completed handoff before dispatch. This procedure does not itself create a
+goal or start/message additional agents.
+
 ## Non-negotiable boundaries
 
 - Core must not repair a provider through private solver or renderer state.

@@ -128,6 +128,15 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   window before sending one reviewed continuation or next package. Do not
   append findings or tasks during execution; elapsed estimates and idle or
   interrupted status alone do not establish a complete handoff.
+- For goals spanning substages, follow the project Skill's
+  [goal orchestration procedure](.agents/skills/geochora/references/goal-orchestration.md).
+  Locate implementation details in the planning record before dispatch;
+  target research/implementation in attempt 1 and review/acceptance in attempt
+  2, with at most three attempts per substage. Before attempt 3, reassess the
+  actual blockers, research relevant open-source implementations and record
+  feasibility against the original gates. Observe Luna periodically read-only,
+  prepare next steps privately during report cleanup, and verify the final
+  report against actual changes, commands and evidence before dispatching.
 - Size packages to the change. A basic change with known owners normally
   combines implementation, targeted validation, necessary in-scope fixes and
   local commit(s) in one package. Separate preparation only for unknowns that
