@@ -14,6 +14,9 @@ import json
 from pathlib import Path
 import subprocess
 import time
+import traceback
+
+from completion_facts import COMPLETION_CONTRACT, capture_episode_facts
 
 CLASSES = ('solved', 'invalid', 'expert_failed', 'unknown')
 
@@ -23,65 +26,133 @@ def run_seed(env_class, provider, seed, horizon):
     env = None
     info = {}
     phase = 'construction'
-    row = dict(seed=seed, start_pose=None, artifact_hash=None, steps=0,
-               step_attempts=0, phase=phase, reason=None, stage=None,
-               terminated=False, truncated=False, solution_done=False,
-               solution_failed=False, task_success=False, execution_fault=None)
+    row = dict(seed=seed, horizon=horizon, start_pose=None, sample_seed=None,
+        artifact_hash=None, classification='unknown', steps=0, step_attempts=0,
+        phase=phase, reason='probe did not reach an outcome', stage=None,
+        construction_succeeded=False, reset_attempted=False, reset_succeeded=False,
+        terminated=False, truncated=False, task_success=False, task_failure=False,
+        solution_done=False, solution_failed=False, expert_complete=False,
+        planned_trajectory_completed=None, outcome_complete=None,
+        unapproved_override_used=None, original_expert_lifecycle_status=None,
+        readiness_warnings=[], execution_lifecycle_status=None,
+        completion_basis=None, completion_eligible=False, execution_fault=None,
+        close_attempted=False, close_succeeded=False, cleanup_error=None,
+        cleanup_traceback=None, error_phase=None, error_type=None,
+        error_message=None, error_traceback=None, failure_reason=None,
+        wall_time_s=0.0)
+
+    def remember_error(error, error_phase):
+        if row['error_type'] is not None:
+            return
+        row.update(phase=error_phase, error_phase=error_phase,
+            error_type=type(error).__name__, error_message=str(error),
+            error_traceback=''.join(traceback.format_exception(type(error), error, error.__traceback__)),
+            reason=f'{type(error).__name__}: {error}')
+
+    def record_fault(fault):
+        if fault is None:
+            return
+        mapping = fault.to_mapping()
+        row['execution_fault'] = mapping
+        if row['error_type'] is None:
+            row['reason'] = fault.message
+
     try:
         env = env_class(provider=provider, backend='cpu', horizon=horizon)
+        row['construction_succeeded'] = True
         row['artifact_hash'] = env.artifact.identity_hash
         phase = 'reset'
+        row['phase'] = phase
+        row['reset_attempted'] = True
         _, info = env.reset(seed=seed)
+        row['reset_succeeded'] = True
         phase = 'execution'
+        row['phase'] = phase
         while True:
-            solution = env.solution
-            row.update(solution_done=bool(solution.done), solution_failed=bool(solution.failed),
-                       task_success=bool(info.get('is_success', info.get('task_metrics', {}).get('task_success', False))),
-                       stage=solution.stage)
             fault = env.execution_fault
+            solution = env.solution
+            row.update(capture_episode_facts(env, info, terminated=row['terminated'],
+                                             truncated=row['truncated'], transitions=row['steps']))
+            row.update(stage=solution.stage, failure_reason=solution.failure_reason)
             if fault is not None:
-                row.update(classification='invalid', reason=fault.message,
-                           phase=fault.phase, execution_fault=fault.to_mapping())
+                record_fault(fault)
                 break
-            if row['solution_done'] and row['task_success']:
-                row.update(classification='solved', reason='expert_done_and_task_success')
+            if row['terminated'] and row['truncated']:
+                row.update(reason='terminated_and_truncated', classification='invalid')
+                break
+            if row['completion_eligible']:
+                row.update(reason='task_and_expert_completion_confirmed')
                 break
             if row['solution_failed']:
-                row.update(classification='expert_failed', reason=solution.failure_reason)
+                row.update(reason=solution.failure_reason or 'expert_failed')
                 break
-            if row['terminated'] or row['truncated'] or row['steps'] >= horizon or row['solution_done']:
+            if row['terminated'] or row['truncated'] or row['task_failure']:
                 reason = ('terminated' if row['terminated'] else 'truncated' if row['truncated']
-                          else 'expert_done_without_task_success' if row['solution_done'] else 'horizon_exhausted')
-                row.update(classification='unknown', reason=reason)
+                          else 'task_failure')
+                row.update(reason=reason)
+                break
+            if row['steps'] >= horizon or row['solution_done']:
+                reason = 'expert_done_without_confirmed_completion' if row['solution_done'] else 'horizon_exhausted'
+                row.update(reason=reason)
                 break
             row['step_attempts'] += 1
-            _, _, row['terminated'], row['truncated'], info = env.step_expert()
+            _, _, terminated, truncated, info = env.step_expert()
+            row.update(terminated=terminated, truncated=truncated)
             row['steps'] += 1
-        if row['execution_fault'] is None:
-            row['phase'] = phase
     except Exception as error:
+        remember_error(error, phase)
         fault = getattr(error, 'execution_fault', None)
         if fault is None and env is not None:
-            fault = env.execution_fault
-        row.update(classification='invalid', phase=fault.phase if fault else phase,
-                   reason=f'{type(error).__name__}: {error}',
-                   error_type=type(error).__name__,
-                   execution_fault=fault.to_mapping() if fault else None)
+            try:
+                fault = env.execution_fault
+            except Exception:
+                pass
+        if fault is not None:
+            try:
+                record_fault(fault)
+            except Exception as fault_error:
+                row['fault_mapping_error'] = f'{type(fault_error).__name__}: {fault_error}'
     finally:
         if env is not None:
-            sample = getattr(env, 'sample', None)
-            if sample is not None:
-                row['start_pose'] = {key: {'position': list(pose.position),
-                    'quaternion_wxyz': list(pose.quaternion_wxyz)} for key, pose in sample.poses_world.items()}
-                row['sample_seed'] = sample.task_seed
-            row['stage'] = env.solution.stage
-            row['solution_done'] = bool(env.solution.done)
-            row['solution_failed'] = bool(env.solution.failed)
-            row['failure_reason'] = env.solution.failure_reason
+            try:
+                sample = getattr(env, 'sample', None)
+                if sample is not None:
+                    row['start_pose'] = {key: {'position': list(pose.position),
+                        'quaternion_wxyz': list(pose.quaternion_wxyz)} for key, pose in sample.poses_world.items()}
+                    row['sample_seed'] = sample.task_seed
+            except Exception as error:
+                row['evidence_capture_error'] = f'{type(error).__name__}: {error}'
+            row['close_attempted'] = True
             try:
                 env.close()
+                row['close_succeeded'] = True
             except Exception as error:
                 row['cleanup_error'] = f'{type(error).__name__}: {error}'
+                row['cleanup_traceback'] = ''.join(
+                    traceback.format_exception(type(error), error, error.__traceback__)
+                )
+                if row['error_type'] is None:
+                    remember_error(error, 'close')
+        if row['execution_fault'] is not None or row['error_type'] is not None \
+                or row['cleanup_error'] is not None or not row['construction_succeeded'] \
+                or not row['reset_succeeded'] or (row['terminated'] and row['truncated']):
+            row['classification'] = 'invalid'
+        elif row['solution_failed'] \
+                or (isinstance(row['original_expert_lifecycle_status'], dict)
+                    and row['original_expert_lifecycle_status'].get('expert_failed') is True) \
+                or row['execution_lifecycle_status'] == 'failed':
+            row['classification'] = 'expert_failed'
+        elif row['completion_eligible'] and not row['terminated'] and not row['truncated'] \
+                and row['close_succeeded']:
+            row['classification'] = 'solved'
+        else:
+            row['classification'] = 'unknown'
+        if row['classification'] == 'invalid' and row['reason'] == 'probe did not reach an outcome':
+            row['reason'] = 'execution or cleanup invalidated completion'
+        elif row['classification'] == 'expert_failed' and row['reason'] == 'probe did not reach an outcome':
+            row['reason'] = row['failure_reason'] or 'expert_failed'
+        elif row['classification'] == 'unknown' and row['reason'] == 'probe did not reach an outcome':
+            row['reason'] = 'completion was not confirmed'
         row['wall_time_s'] = time.perf_counter() - started
     return row
 
@@ -124,7 +195,8 @@ def run_candidate_probe(spec, catalog, provider, seeds, *, output=None):
             catalog['core_commit'], catalog['core_dirty'], 'feasibility_probe', status, list(findings),
             details={'complete': complete, 'provider': provider, 'horizon': spec.horizon,
                 'seeds': list(seeds), 'rows': list(rows), 'totals': totals,
-                'classification_policy': 'invalid first; solved requires expert done AND current success; then expert_failed; otherwise unknown',
+                'completion_contract': COMPLETION_CONTRACT,
+                'classification_policy': 'invalid first; solved requires task success, confirmed expert completion, no failure/flags, and successful close; then expert_failed; otherwise unknown',
                 'scope': 'Candidate reset/expert evidence only; not task infeasibility, full validation, or qualification.'})
     def checkpoint(report):
         if stream is not None:
@@ -227,7 +299,8 @@ def main(argv=None):
                   provider=args.provider, core_commit=commit, core_dirty=bool(dirty),
                   core_repo=str(repo), horizon=args.horizon, seeds=seeds,
                   created_at=datetime.now(timezone.utc).isoformat(),
-                  classification_policy='HANDOFF section 6: invalid first; solved requires expert done AND current task success; then expert_failed; otherwise unknown.',
+                  completion_contract=COMPLETION_CONTRACT,
+                  classification_policy='invalid first; solved requires task success, confirmed expert completion, no failure/flags, and successful close; then expert_failed; otherwise unknown.',
                   scope='Randomized reset/expert probe; expert failure is not task infeasibility; no qualification.',
                   status='running', artifact_hash=None, rows=[], totals={key: 0 for key in CLASSES})
     args.output.parent.mkdir(parents=True, exist_ok=True)

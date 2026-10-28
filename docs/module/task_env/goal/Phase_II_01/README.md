@@ -1,6 +1,7 @@
 # Phase II-01 修订规划交付包
 
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
+维护者于2026-10-28明确在默认后继R04b之前推进独立 F00 attempt001，以优先处理 Isaac、USD 与 Task Harness；当前在 `develop-full` 完成 Harness 生命周期修复及13项provider-free S1，synthetic MuJoCo/Oracle/Judge仍待运行。R04b/c、原DAG、P99与R05a/R06门保持不变；顺序选择及范围见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-attempt001-实施快照-native-pending)。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。

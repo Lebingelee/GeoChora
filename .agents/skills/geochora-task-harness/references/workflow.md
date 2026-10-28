@@ -30,6 +30,12 @@ For upstream schema `harness-upstream-task-v0`, map `task_id`, `scene`, `initial
 
 Check exits: 0=pass, 1=expected failure, 2=input/tool error. Ledger exits: 0=registered/ready/candidate_ready, 1=stopped/escalate, 2=invalid evidence or operation. Read JSON, not only exit codes. Every output directory must be new; reports are not overwritten.
 
+The current feasibility report records raw completion and cleanup facts for
+every attempted seed. `finish` independently revalidates those rows, their
+declared order and totals; a passing 20-seed report without the current
+completion contract is rejected. Historical reports missing these facts are
+preserved as-is and cannot establish a passing candidate.
+
 Unified findings have `check, category, locality, spec_path, observed, expected, evidence, revision_hint`. Categories: spec_invalid, asset_missing, capability_unsupported, semantic_mismatch, init_infeasible, expert_failed, execution_fault, template_missing. `unknown` locality means unestablished ownership. Semantic endpoint examples must include positive and negative cases; synthetic cases only test the checker, not real source-demo equivalence.
 
 If a diagnostic is needed, make an explicit separate spec and run `feasibility_probe.py --core-repo ... --spec ... --catalog ... --provider ... --seeds ... --output ...`. Diagnostic probes are evidence, not new accepted candidates. Isolate relevant variables using the failure's actual reset poses and stage; keep failed diagnostics. Do not count a one-seed diagnostic as the final 20-seed check.

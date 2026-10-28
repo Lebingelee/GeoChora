@@ -1857,11 +1857,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "cd7e6c1d76ac7af24a991e42ca112bcd7a5da66b3ed17088eee7ffc24b5051dc",
+    "07_Execution_Order_and_Acceptance.md": "f353f1686e002e593e3a589286e6b1090c7389b846a2bf3a1f35e1331a64de29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "69b53cde406e75b0f8daed1cf6b6b516cb3d68ea90eaf6a7636a3fb19afde048",
-    "README.md": "352c6d167035ef26adce0b5dc6d1e2f1cf5ee317ab255f1e536ba751682f9377"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "2d2c6d6631c8ce0f1c57baf132f291b7ba548bbbd958fcb1e8dcaa6bfdcf5b8f",
+    "README.md": "7b59e463653519f8d2691f6dd35de2343273b868756271bed7240df113cf29e3"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4159,6 +4159,20 @@
       "other_slice_started": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_004/report.md",
       "sol_review": "PENDING"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "LUNA_F00_ATTEMPT001_IMPLEMENTATION_S1_PRE_NATIVE",
+      "input_phase_head": "0d11d33ee6e6a9b09f2924b3450bbedff9aefd91",
+      "input_harness_head": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
+      "merge_commit": "5d890891ac6172d343d0cd904768bf415e0f9907",
+      "result": "IMPLEMENTED_S1_PASS_SYNTHETIC_NATIVE_PENDING",
+      "sequence_override": "F00 attempt001 advanced before default R04b at maintainer direction; original DAG/P99 and other slice states unchanged",
+      "native_starts_consumed": 0,
+      "provider_free_tests": 13,
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_001/",
+      "other_slice_started": false,
+      "qualification": "NOT_ASSESSED"
     }
   ],
   "P00_audit": {
@@ -4327,8 +4341,8 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-28",
-    "status": "PLAN_UPDATED_IMPLEMENTATION_NOT_STARTED",
-    "authorization": "R03c attempt003 was explicitly authorized for one bounded MuJoCo 3.8.1 CPU start, same-run independent H5 readback, necessary in-scope repair, result documentation, and local commit. That start is consumed; no subsequent native start or other slice is authorized here.",
+    "status": "F00_ATTEMPT001_IMPLEMENTED_S1_PASS_SYNTHETIC_NATIVE_PENDING; F01-F07 NOT_STARTED",
+    "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
     "implementation_checkpoint": "c30d97efa6ad169c205ea25d7917bc7b9a06e93c",
@@ -4460,7 +4474,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "PLANNED_NOT_STARTED; not new capability claims or execution authorization",
+    "patch_rows_status": "F00 attempt001 implementation and S1 complete; bounded synthetic native campaign pending; F01-F07 remain planned/not started; no new capability or qualification claims",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4516,6 +4530,73 @@
       "native_start_consumed": true,
       "other_slice_started": false,
       "next_action": "Sol review attempt004; no retry or other slice."
+    },
+    "authorization_history": [
+      {
+        "date": "2026-10-28",
+        "slice": "F00 attempt001",
+        "authorized": true,
+        "scope": "develop-full integration; existing Harness lifecycle repair; directed S1/S2; one bounded MuJoCo 3.8.1 CPU synthetic campaign; same-run H5 readback, result documents, and local commits",
+        "sequence_override": "advance independent F00 after accepted R03c and before default R04b, per maintainer priority for Isaac, USD, and Task Harness",
+        "other_slices_started": false,
+        "push_merge_main_tag_release": false
+      }
+    ],
+    "f00_attempt001": {
+      "date": "2026-10-28",
+      "status": "IMPLEMENTED_S1_PASS_SYNTHETIC_NATIVE_PENDING",
+      "sequence_override": {
+        "default_next_row": "R04b",
+        "selected_row": "F00 attempt001",
+        "reason": "Maintainer prioritized Isaac, USD, and Task Harness; F00 is independently ready for Harness lifecycle repair.",
+        "original_dag_and_required_envelope_changed": false,
+        "R04b_R04c_R05a_R06_status_changed": false
+      },
+      "branch": "develop-full",
+      "input_phase_head": "0d11d33ee6e6a9b09f2924b3450bbedff9aefd91",
+      "input_harness_head": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
+      "merge_commit": "5d890891ac6172d343d0cd904768bf415e0f9907",
+      "merge_tree": "7684aeceb3e49013c700403e1e9f9431e2a484dd",
+      "implementation_commit": null,
+      "classification": "FIX_EXISTING in task_env/script/agent Harness owner",
+      "s1": {
+        "status": "PASS",
+        "provider_free_tests": 13,
+        "test_module": "task_env/script/agent/test_completion_facts.py",
+        "coverage": [
+          "actual run_seed",
+          "actual construction_ledger.finish and judge_package.check_probe",
+          "positive 20-row report",
+          "terminal/failure/fault/cleanup/legacy-forgery rejection",
+          "outcome and lifecycle failure",
+          "constructor/reset/step exceptions and primary-error preservation"
+        ]
+      },
+      "native": {
+        "authorized_one_campaign": true,
+        "process_starts_consumed": 0,
+        "provider": "MuJoCo 3.8.1 CPU",
+        "horizon": 6000,
+        "max_outer_steps": 120000,
+        "max_substeps": 600000,
+        "max_simulated_seconds": 1200,
+        "wall_timeout_seconds": 900,
+        "term_then_kill_seconds": 5,
+        "oracle_allowed_only_after_all_campaign_gates_pass": true,
+        "seed_start": 0,
+        "seed_end": 19,
+        "seed_count": 20,
+        "cpu_blas_threads": 1,
+        "oracle_timeout_seconds": 120,
+        "oracle_max_outer_steps": 6000,
+        "oracle_max_substeps": 30000
+      },
+      "source_handoff": {
+        "historical_harness_raw_seed_and_h5": "unavailable",
+        "fresh_bundle_provenance": "new synthetic proxy only; not historical bytes or a real benchmark"
+      },
+      "other_slice_started": false,
+      "qualification": "NOT_ASSESSED"
     }
   }
 }

@@ -6,6 +6,7 @@ import hashlib
 import json
 
 from harness_spec_schema import CandidateSpec,CheckReport,canonical_json,save_json
+from completion_facts import validate_probe_report
 
 MAX_ROUNDS=5
 REQUIRED_TOOLS={'asset_check','harness_compiler','semantic_check','feasibility_probe'}
@@ -135,6 +136,7 @@ def stable_findings(report):
 def finish(*,ledger,reports):
     value=load(ledger);require(value['state']=='running','no active round')
     current=value['rounds'][-1];parsed=[];refs=[];artifacts=set();tools=set()
+    current_spec=CandidateSpec.from_dict(read_ref(current['spec']))
     for path in reports:
         ref=file_ref(path);report=CheckReport.from_dict(read_ref(ref))
         require(report.spec_sha256==current['spec_sha256'],'report belongs to a different spec')
@@ -146,12 +148,13 @@ def finish(*,ledger,reports):
             require(report.details.get('provider')==value['provider'],'passing check must declare provider')
         if 'provider' in report.details:require(report.details['provider']==value['provider'],'report provider mismatch')
         if report.artifact_hash:artifacts.add(report.artifact_hash)
-        if report.tool=='feasibility_probe' and report.status=='pass':
-            d=report.details
-            require(d.get('complete') is True and len(d.get('seeds',[]))>=20,'complete 20-seed final probe required')
-            require(len(d['seeds'])==len(set(d['seeds'])) and [r['seed'] for r in d['rows']]==d['seeds'],'probe seed mismatch')
-            totals={k:sum(r['classification']==k for r in d['rows']) for k in ('solved','invalid','expert_failed','unknown')}
-            require(totals==d['totals'] and totals['solved']==len(d['seeds']),'invalid probe totals')
+        if report.tool=='feasibility_probe':
+            validate_probe_report(report,
+                expected_spec_sha256=current['spec_sha256'],
+                expected_core_commit=value['core_commit'],
+                expected_provider=value['provider'],
+                expected_horizon=current_spec.horizon,
+                require_passing=report.status=='pass')
         parsed.append(report);refs.append(ref)
     require(parsed and len(artifacts)<=1,'missing reports or inconsistent artifact identities')
     passed=all(r.status=='pass' for r in parsed)

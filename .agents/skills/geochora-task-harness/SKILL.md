@@ -18,6 +18,26 @@ Read [the CLI workflow](references/workflow.md). Resolve the supplied Core check
 5. Each revision supplies the immediately previous report's SHA-256, the exact finding index, reason and diagnostic refs when needed. The ledger computes the spec diff. Maximum 5 candidate rounds; the same finding in adjacent rounds stops the task. Do not reset/recreate the ledger to bypass a stop. If a report has no actionable finding (including unknown/truncated outcomes), report the gap rather than inventing a repair citation.
 6. A passing candidate needs assets, compile, semantic and complete feasibility reports, with at least 20 distinct declared seeds solved. Keep task success, expert completion, invalid execution, unknown outcomes and termination distinct. Record limitations of a changed sampling distribution.
 
+## Completion evidence and compatibility
+
+The current feasibility row contract is `harness-feasibility-completion-v1`.
+`run_seed` records physical task success/failure, expert done/failed/completion,
+the selected outcome-policy/lifecycle fields, terminal flags, reset and step
+attempts/results, execution faults, the primary error/phase, and close result.
+These facts are snapshotted before cleanup. A row is `solved` only when task
+success and expert completion are both confirmed, task/expert failure and
+execution fault are absent, neither terminal flag is set, and `close()` returns
+successfully. A legal final step at the horizon can pass when Core did not
+actually truncate the episode. Close failure is invalid and remains secondary
+to any earlier execution error.
+
+`construction_ledger.finish` and `judge_package.check_probe` independently bind
+the report to the expected spec, artifact, Core commit, provider and horizon;
+they recompute each row's class, seed order/uniqueness and totals from its raw
+facts. A historical feasibility report that lacks enough facts to establish
+completion or cleanup is unverifiable. Preserve it byte-for-byte; do not fill
+missing fields with success defaults or package it as a passing candidate.
+
 ## Oracle and Human review
 
 After candidate checks pass, use `oracle_candidate.py` with the same final spec/catalog/provider. It composes Core's selected recorder and completion helper, performs exact logical H5 save/load comparison and separately invokes the Core inspector. A successful recording requires the full expert route and task success, not merely an H5 file or its T+1 count.

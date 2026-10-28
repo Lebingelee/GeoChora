@@ -1,9 +1,9 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-28。状态：**PLAN_UPDATED / IMPLEMENTATION_NOT_STARTED**。
-维护者要求把已讨论的补丁方向写入本目录，供后续从 R03c attempt002 检查点恢复。
-本次授权为文档修订；没有安装、功能实现、native 启动、分支整合或新的能力批准。
-R03c 恢复合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
+更新于 2026-10-28。状态：**F00 attempt001 IMPLEMENTED_S1_PASS (13 targeted tests) / SYNTHETIC_NATIVE_PENDING**。
+本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
+当前 `develop-full` 集成和 Harness 生命周期修复、定向 provider-free S1 已完成；一次有界 synthetic MuJoCo campaign、Oracle 与 pending Judge 收口仍待执行。
+R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
 
 ## 1. 已确定的方向与范围
 
@@ -25,6 +25,8 @@ R03c 恢复合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-r
 原 R04 Camera、R05 正式反馈、R06 历史原件处置和 R07 五 LIBERO 部署均继续保留。
 新增单 Panda USD/Position 不以 split Attachment、R05 500Hz 或全阶段 P99 通过为全局前置。
 若在原默认执行表之外提前推进独立行，工作包应明确记录顺序选择、理由与未变的原 gates。
+
+2026-10-28 顺序选择：07 原表在 R03c 后默认进入 R04b；维护者本轮明确优先推进 Isaac、USD 与 Task Harness，且 F00 是可独立启动的 Harness 生命周期缺陷修复行，因此要求先执行 F00 attempt001。该选择只调整本次工作包先后顺序，不更改 R04b/R04c 的出口、原 7/22 DAG、P99 Required Envelope、R05a/R06 blocker，也不把 F00 增加为 F01–F05 或 R04 的全局前置。本工作包不启动其他 slice。
 
 ## 2. 实际输入与当前实现边界
 
@@ -129,14 +131,10 @@ GeoPhys 优先复用公开 USD 路线；MuJoCo 先查实际 USD-enabled build，
 
 ## 7. 分支、接收人与待核实项
 
-本次文档继续在 `codex/phase-ii-01-p00-20261023`，新增 worktree 为 0。
-若后续落实 handoff 的 `develop-full` 集成建议，计划仅新增 **1 个 Core 集成 topic**，
-从 fetched/readback 的 harness/develop 基线保留两条 ancestry，并正常纳入 phase 检查点。
-名称/base/merge 顺序在该集成包核实后固定；本轮不创建、不切换、不合并。
-当前 phase topic 保留；F00 后续各行复用集成 topic，不逐行建分支。
-因此保留的 phase topic 加拟新增 integration topic 共 2 个 Core topic；只有后续集成包实际需要时才创建新增的 1 个。
+F00 attempt001 按授权在 `develop-full` 执行，未创建 worktree；基线 merge 与当前提交记录见下方 F00 快照。
+原 `codex/phase-ii-01-p00-20261023` 阶段 topic 保留；后续 F 行若获单独授权，复用 `develop-full`，不逐行建分支。
+不移动 frozen refs；push/merge `develop`/`main`、Tag 和 Release 仍遵循单独授权。
 GeoPhys importer 如需提交，子模块可用 1 个专用 topic（基于实际审核 pin），主仓单独审查 gitlink 更新。
-不移动 frozen refs；push/merge develop/main/tag/Release 仍遵循原授权。
 
 资产团队保留源 bytes/revision/验证报告真源，Core 接收及绑定，Harness 消费；
 Human Judge 与 trajectory qualification 仍独立，不由 Harness 自动填写 approve。
@@ -155,7 +153,23 @@ Human Judge 与 trajectory qualification 仍独立，不由 Harness 自动填写
 - 物理接触与语义 contact query 分开。当前 session manifest 将 contact_detection/contact_impulse 列 known_unsupported；
   R07 的 On/In 等若需公开接触事实，必须补 public query/state/evaluator 的对应 owner 与证据，不能用位置重叠代真实接触。
 
-## 8. 来源与证据可用性
+<a id="f00-attempt001-实施快照-native-pending"></a>
+
+## F00 attempt001 实施快照（native pending）
+
+Harness 与阶段基线已按本包合并到 `develop-full`：Harness parent
+`9d0b3e524d67105e67ddb98e6dec903f19eb4255`、phase parent
+`0d11d33ee6e6a9b09f2924b3450bbedff9aefd91`、merge tree
+`7684aeceb3e49013c700403e1e9f9431e2a484dd`。FIX_EXISTING 在现有 Harness
+owner 内完成：`run_seed` 保存原始 outcome/lifecycle、reset/step、fault、primary
+error 与 close facts；solved 只在无任务/专家失败、无 fault/terminal flags 且
+close 成功后产生。`construction_ledger.finish` 与 `judge_package.check_probe`
+分别检查报告身份和每条 raw row、seed 顺序与 totals。 provider-free 定向测试
+覆盖实际 `run_seed`、两消费者、20-row 正例、完成/终止/截断/失败/fault/cleanup
+反例、expert lifecycle 失败、部分异常和旧报告证据不足；目前 13 项通过。真实 Core caller 链由
+`compile_candidate` → `ReferenceTaskBinding` → `SelectedReferenceEnv` →
+reset/step/close 和后续 Oracle/Recorder 运行验证。synthetic campaign 与
+Oracle 尚未运行；没有 Harness acceptance 或 Qualification 结论。
 
 源码审计、固定 Harness 13 文件副本、9 项 host-only 检查及失败复现在 ignored
 `workspace/maintenance/multi_provider_asset_harness_review_20261028_001/`。
@@ -163,6 +177,8 @@ Human Judge 与 trajectory qualification 仍独立，不由 Harness 自动填写
 缺该目录的 clone 标记 **indexed but raw unavailable**，不能把本页摘要当作新物理证据。
 R03c 原始收据见 [R03](03_R03_Physical_Attachment.md)，原 `validation_receipt.json` 保留签署时点，不覆盖历史。
 本次文档修订/检查在 manifest 的独立 revision 条目记账，不回写旧运行结论。
+
+## 8. 来源与证据可用性
 
 固定官方参考（2026-10-28 审阅；采用方向不表示本仓已实现）：
 

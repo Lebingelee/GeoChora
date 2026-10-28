@@ -10,6 +10,7 @@ import yaml
 
 from harness_spec_schema import CandidateSpec, CheckReport, save_json
 from catalog_query import core_context
+from completion_facts import validate_probe_report
 
 
 def digest(path):
@@ -33,14 +34,17 @@ def load_report(path,spec_hash,artifact_hash,core_commit,*,provider=None,expecte
     return report
 
 
-def check_probe(report):
-    d=report.details
-    require(d.get('complete') is True,'incomplete feasibility probe')
-    require(len(d['seeds'])==len(set(d['seeds'])) and len(d['seeds'])>=20,'at least 20 distinct seeds required')
-    require([r['seed'] for r in d['rows']]==d['seeds'],'probe seed/row mismatch')
-    totals={c:sum(r['classification']==c for r in d['rows']) for c in ('solved','invalid','expert_failed','unknown')}
-    require(totals==d['totals'],'probe totals do not match rows')
-    require(totals['solved']==len(d['seeds']),'probe has non-solved seeds')
+def check_probe(report, *, expected_spec_sha256=None, expected_artifact_hash=None,
+                expected_core_commit=None, expected_provider=None,
+                expected_horizon=None):
+    """Independently verify report context and every raw completion fact."""
+    return validate_probe_report(report,
+        expected_spec_sha256=expected_spec_sha256,
+        expected_artifact_hash=expected_artifact_hash,
+        expected_core_commit=expected_core_commit,
+        expected_provider=expected_provider,
+        expected_horizon=expected_horizon,
+        require_passing=True)
 
 
 def check_semantic(report,examples_path,artifact):
@@ -124,7 +128,10 @@ def prepare(*,core_repo,validation_dir,construction_log,oracle_dirs,upstream_dir
     for name in ('assets','semantic','feasibility'):
         r=load_report(v/f'{name}.json',sh,ah,ctx['core_commit'],provider=provider,
             expected_tool={'assets':'asset_check','semantic':'semantic_check','feasibility':'feasibility_probe'}[name])
-        if name=='feasibility':check_probe(r)
+        if name=='feasibility':
+            check_probe(r, expected_spec_sha256=sh, expected_artifact_hash=ah,
+                expected_core_commit=ctx['core_commit'], expected_provider=provider,
+                expected_horizon=spec.horizon)
         if name=='semantic':check_semantic(r,u/'semantic_examples.json',artifact)
     oracle_reports=[check_oracle(d,sh,ah,ctx['core_commit'],provider) for d in oracle_dirs]
     require(bool(oracle_reports),'at least one passing Oracle recording required')
@@ -236,9 +243,11 @@ This package follows Core's existing task-env-experiment-evidence procedure. It 
 
 
 def verify(directory,*,core_repo):
-    core_context(core_repo)
+    ctx=core_context(core_repo)
     root=Path(directory).resolve();index=root/'validation/evidence.json'
     data=json.loads(index.read_text());seen=set()
+    require(data.get('core_commit')==ctx['core_commit'] and ctx['core_dirty'] is False,
+            'pending package requires the same clean Core commit')
     require(data.get('schema_version')=='harness-stage1-evidence-index-v0','unknown evidence index')
     for item in data['files']:
         path=(root/item['path']).resolve()
@@ -278,7 +287,11 @@ def verify(directory,*,core_repo):
             'diagnostic execution identity mismatch')
     for name,tool in {'compile':'harness_compiler','assets':'asset_check','semantic':'semantic_check','feasibility':'feasibility_probe'}.items():
         r=load_report(root/f'validation/current/{name}.json',data['spec_sha256'],data['artifact_hash'],data['core_commit'],provider=provider,expected_tool=tool)
-        if name=='feasibility':check_probe(r)
+        if name=='feasibility':
+            check_probe(r, expected_spec_sha256=data['spec_sha256'],
+                expected_artifact_hash=data['artifact_hash'],
+                expected_core_commit=data['core_commit'], expected_provider=provider,
+                expected_horizon=spec.horizon)
         if name=='semantic':check_semantic(r,root/'local_assets/semantic_examples.json',artifact)
     oracle_dirs=sorted((root/'validation').glob('oracle-*'))
     require(bool(oracle_dirs),'Oracle evidence missing')

@@ -51,10 +51,18 @@ runtime.
 | `harness_compiler.py` | Deterministic `pick-lift-v0` Artifact/binding |
 | `semantic_check.py` | Declared lift goal and positive/negative endpoint examples |
 | `feasibility_probe.py` | Separate solved/invalid/expert_failed/unknown outcomes |
+| `completion_facts.py` | Versioned raw completion facts and independent row/report validation |
 | `check_candidate.py` | One candidate's four checks, with real reports |
 | `construction_ledger.py` | Hash-bound revisions, five-round budget and escalation |
 | `oracle_candidate.py` | Existing recorder, completion check and independent H5 inspection |
 | `judge_package.py` | Portable evidence index and pending-only verification |
+
+Passing feasibility rows use `harness-feasibility-completion-v1`. The probe,
+construction ledger and pending Judge verifier require raw task/expert outcome,
+termination, fault, reset/step and cleanup evidence; they do not accept a
+`classification` label or declared totals by themselves. Older rows without
+those facts remain historical and unverifiable; regenerate evidence under the
+current clean Harness commit instead of rewriting an old report.
 
 ## Supplied input contracts
 
