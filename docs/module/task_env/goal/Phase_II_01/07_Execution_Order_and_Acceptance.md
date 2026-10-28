@@ -1,7 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-28）：**R03c已接收；F00 attempt002及有限复核修正已获Sol有界接收；F01 attempt001安装/原生对照包已获维护者授权**。
-当前复用集成分支 `develop-full`。attempt002保留attempt001的20条专家失败，在新版本合成box proxy上完成20/20有效solved、Oracle真实H5与独立读回、pending Judge prepare/verify。Sol已核实完整出口并接收两处消费者复核修正，状态`ACCEPTED_BOUNDED_F00`；Human decision仍pending，Qualification/D0/D1/D2均未评估。F01可准备新包，但安装/native草稿仍须按新HEAD、官方版本和资源重新冻结，尚未派发、安装或启动。此后顺序为F01→F02→F03→F04，再按ready cell推进F05/F06；R04b/R04c仍可明确安排，F07不成为相机前置。
+当前入口（2026-10-29）：**F00已获Sol有界接收；Isaac安装metadata/pip check已通过，F01 native待验；camera分支R04c已接收；Luna1专注F00–F07，Luna2下一包推进独立R06b**。
+当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。Luna1以F00接收证据恢复上下文，不重跑未变campaign/Oracle；新F01 attempt002验证官方Panda+刚体native，后继F02–F07逐包复核。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。LIBERO首轮收敛为一项独立pilot，完整五任务要求另列，不阻塞F线。详见09第11节与10当前分工。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
@@ -213,3 +213,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-28 Sol复核R07a attempt002：1,795项输出manifest、120条资产路径的size/Git blob/SHA-256（116个不同blob）与26项冻结输入均匹配；接收固定五任务的静态字节闭包及沿现有Core owner的扩展方向，未授予实现/运行准入。复用19项成本拒绝例、9项LOC例和旧26项语义夹具，不重跑native或安装。v2成本协议暂不冻结：工具把measurement baseline与未来执行Core commit等同，协议把R07d Human review反向列为deployment-ready前置，cached-input的排他/包含口径需一致；这些是下一有界返工的明确位置。许可应按模型族取证：14条TurboSquid路径属于moka_pot/wine_bottle/wine_rack三组，并非14个模型；HOPE为2组、GSO为4组。维护者要求先收口R07a再回到Isaac安装检验；Luna1继续此范围，安装仍由维护者持有，R07b不启动。R07a整体保持PARTIAL_BLOCKED；具体Sol复核与下一工作包见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_002/`。当前处置不改原五任务、Required Envelope、P99或其他slice。
 
 R07a attempt003 Sol复核：有界v2.1成本协议技术修正/S1接收并冻结精确hash；2,181项输出及120条资产/模型族关联匹配，Sol独立读回40项预期全部符合，无新native或完整S1重跑。整体仍为FIRST_USE_SOURCE_RECORDS_PENDING；剩余三组TurboSquid来源/条款及具体署名映射按[09第10节](09_R07_Benchmark_Deployment_and_Agent_Cost.md#10-r07a-attempt003-sol复核与最后一次收口)收口。维护者为新attempt约束之前的历史工作明确允许最多一次额外attempt004；若外部记录仍缺，列最终阻碍停止，不自动第五次。R07b仍未启动，asset/benchmarks与bench_deploy的正式manifest/install/配方/adapter归R07b，当前workspace资产仅为审计缓存。
+
+2026-10-29维护者重新分工：两位Luna均已完整返回，Sol先复核R07a004的71项输出，完整五任务仍缺三组TurboSquid来源记录；按维护者明确选择，单任务LIBERO pilot先行，原五任务/P99不自动缩减。Luna1仅执行F00–F07，下一包F00接收回读+F01 attempt002；Luna2复用camera分支扩展到独立R06b，下一包R06b attempt001。总共两个活动阶段checkout，不新建分支；代码/文档各自单写入，native使用同一排他锁，完成一包交Sol复核后才推进后继。R04c接收commit为camera的4d27651，未合入develop-full；原接收可引用，但不冒称主分支已有该差异。

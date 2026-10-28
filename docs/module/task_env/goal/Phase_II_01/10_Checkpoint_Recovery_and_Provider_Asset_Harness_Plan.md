@@ -1,7 +1,15 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-28。状态：**F00 attempt002及有限复核修正获Sol `ACCEPTED_BOUNDED_F00`；下一步准备F01，尚未安装/启动**。
+更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；维护者完成Isaac安装，Sol metadata/pip check通过；F01原生对照尚未通过，下一包为F01 attempt002**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
+
+### 当前双Luna分工（2026-10-29）
+
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。Luna1先以精简交接摘要恢复F线，核对F00已有接收收据及未变输入，不重跑20-seed/Oracle，再实施F01 attempt002。Sol只读核实隔离环境的isaacsim/core/extscache-kit为6.2.0.0、Torch2.11.0+cu128、numpy2.3.1，`pip check`通过；未导入Isaac或启动App。安装完成不等于F01 native或F04 Core adapter通过。
+
+下一包沿现有diagnostics owner补齐公开API/资产配方、真实launcher/reader/S1和官方Panda+刚体两轮native reset/step/close；既有6.2源码同时包含experimental新API和extsDeprecated旧类，启动前必须按实际包源码核签名及extension启用，不能照搬旧版本Franka/World示例。预算和原运动/落体门在新工作包重冻；共享native锁与Luna2串行，禁止并发重型仿真。F01之后逐包复核推进F02–F06；F07须先固定一个具体扩展交集，不授权无限场景/全部Newton宿主路线。
+
+F06需要真实来源与对应provider基础出口，但不要求完整五任务LIBERO或TurboSquid资产先通过。维护者另选择“少量可接收资产任务先闭环”的LIBERO pilot，按R07单独记账；它不阻塞F01官方Panda+方块，也不把benchmark的On语义改成现有lift模板来求绿。每位Luna一次只执行一个冻结包，完整返回后再派发后继。
 F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其20/20 synthetic seeds均为`expert_failed / gripper_readiness_timeout`；该失败原件保持不变。attempt002随后完成受控物理归因、输入修复、20-seed native验收、Oracle/H5独立读回和pending Judge prepare/verify。完整出口仅待Sol复核；F01仍未派发或启动。
 R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
 

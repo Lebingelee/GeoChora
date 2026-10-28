@@ -196,3 +196,13 @@ Sol接收attempt003的**有界成本协议技术修正/S1**，按原始bytes冻�
 当前资产bytes在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_002/assets/bytes/`：五任务所选LIBERO闭包为52文件/68,172,587 bytes，robosuite机器人/依赖闭包为68文件/42,820,217 bytes。LIBERO缓存另保留两份旧失败`.part`，不属于验证闭包。源码、BDDL/XML和init审计记录分布在早期source cache/audit中；这不是完整LIBERO运行环境或完整benchmark数据集安装。
 
 `asset/benchmarks/`与`bench_deploy/`目前均未创建。按本页第3节和第7节，**R07b**负责正式来源manifest、允许保留的源码/版本化引用、可复现install/verify，以及benchmark-specific task/robot/controller/planner/observation/assembly/evaluation配方、映射与最小adapter。通用Core能力继续归既有owner；报告/H5/log留在workspace Evidence。本次R07a收口不提前创建这些部署目录、不移动或覆盖审计原件。
+
+## 11. R07a attempt004与单任务pilot决定（2026-10-29）
+
+Sol核71项最终输出hash匹配，接收新增模型族/source-history处置事实；完整五任务R07a仍被moka_pot、wine_bottle、wine_rack三族的精确来源/条款记录阻塞，不再自主追加attempt005。成本v2.1技术冻结及已接收S1沿用。LIBERO场景notice、Google plate精确ID、Panda转换细节与署名等非阻断记录缺口继续列出，不抹成“全部来源无缺项”。复核入口为ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_004/`。
+
+维护者明确改为先用资产条件可接收的少量LIBERO任务跑通闭环。**首个active pilot仅一项**：`libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate`。第二候选为`libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle`，尚非本轮必执行项。两者各93条被选资产路径，均无上述TurboSquid族；逐任务完整闭包包括robot、fixture和distractors，不能仅检查目标碗。用途仍仅本地非商业研究、不分发资产或数据；这是来源审计的有界准入，不证明reset/控制/语义/H5已通过。
+
+pilot后续由Luna2沿R07b/c既有owner实现manifest/install、benchmark配方和公开执行/语义对照，并按原On/contact/region语义验收；不套pick-lift-v0冒充原任务。Luna1仅负责F00–F07，不再追查此R07阻碍。当前两个新执行包分别是Luna1 F01 attempt002、Luna2 R06b attempt001，尚不启动R07b pilot实施。
+
+原五任务计划、旧attempt、成本protocol五任务顺序和P99 required envelope保持历史身份；pilot结果以1项为分母单列，不能写5/5或全R07/P99通过。原三项受阻任务保留BLOCKED；第二候选只在首项有完整证据并经后续包明确选择后扩展。该优先级与受限pilot授权不自动授予商业/再分发或Release批准。
