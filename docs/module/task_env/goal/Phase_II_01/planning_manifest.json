@@ -1850,7 +1850,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "5cd7bdcb72e0bbadd4129c4f6ea7e625dec3d249b5a59373b36b3e9630068490",
+    "README.md": "529b3ccd8659df03baa9ef5d3d887353aa762dfcc43d401d5a7f5d1ba1084547",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -1861,7 +1861,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "71104962804156e3c315f6c7670c436dff3e0565bccd2eb40415ed046f2eada1"
+    "07_Execution_Order_and_Acceptance.md": "32866d16bd4ea328f95e698770614bbcc7cdce458bce28e5d033084c8ace04fe"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4249,6 +4249,18 @@
       "two_luna_roles": "Luna1 implementation/install/native; Luna2 isolated review outputs only",
       "original_7_22_P99_changed": false,
       "qualification_granted": false
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_SELECT_R07A_AND_R04B_REWORK_WHILE_MANUAL_ISAAC_DOWNLOAD",
+      "main_input_head": "f72669367ee856431df7e6e12b3ac42b5e0ac62c",
+      "r04b_review": "S1/partial two-camera reset facts accepted only; complete S2 not accepted",
+      "Luna1": "R07a Audit/S1",
+      "Luna2": "R04b attempt002 existing camera branch",
+      "native_starts_by_sol": 0,
+      "Isaac_env_writes_by_agents": "paused under maintainer ownership",
+      "original_7_22_P99_changed": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_001/sol_review.md"
     }
   ],
   "P00_audit": {
@@ -4742,7 +4754,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F01 attempt001 isolated install and bounded native baseline",
+      "selected_next": "Parallel: R07a Audit/S1 by Luna1; R04b attempt002 by Luna2; F01 download owned by maintainer",
       "after_that_priority": [
         "F01 isolated install/native baseline under a new frozen package",
         "F02",
@@ -4753,10 +4765,10 @@
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
-      "reason": "Maintainer explicitly requested preparation of F01 and installation of Isaac on 2026-10-28 after F00 acceptance.",
+      "reason": "Maintainer requested useful Isaac-independent work while manually downloading Isaac dependencies; R07a depends only on accepted P00 and R04b only on accepted R04a.",
       "F07": "later extension; not required before camera",
       "native_authorization": "each concrete package pins its own build/cases/budget",
-      "F01": "AUTHORIZED; package dispatch follows frozen HEAD; not installed/native-started by Sol"
+      "F01": "INSTALL_PARTIAL; NATIVE_NOT_RUN; dependency download/installation environment owned by maintainer until fresh F01 continuation"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -4769,7 +4781,7 @@
       "native_starts_by_sol": 0,
       "implementation_started": false,
       "core_adapter": "F04 later; no current Isaac Core capability claim",
-      "status": "READY_FOR_DISPATCH",
+      "status": "INSTALL_PARTIAL_MANUAL_DOWNLOAD_BY_MAINTAINER",
       "prerequisite_by_maintainer": "full F00 acceptance satisfied 2026-10-28; refresh package on actual new HEAD before dispatch",
       "host_resource_readback": {
         "mem_available_kib": 9772532,
@@ -4785,7 +4797,8 @@
       "writer_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
       "review_thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
       "installation_environment": "workspace/environments/isaacsim-6.2.0",
-      "old_draft": "sol_f01_001 remains superseded and must not be executed"
+      "old_draft": "sol_f01_001 remains superseded and must not be executed",
+      "agent_environment_writes_authorized_now": false
     },
     "f00_attempt002_preparation": {
       "status": "PREPARATION_COMPLETE; execution result recorded below",
@@ -4961,6 +4974,32 @@
         "F00-R2 append-only owner/fault issue readback"
       ],
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002_review_fix_001/report.md"
+    },
+    "parallel_non_isaac_20261028": {
+      "Luna1": "R07a Audit/S1; main tracked files read-only during execution; fresh ignored output; Sol owns tracked summary commit",
+      "Luna2": "R04b attempt002 on existing codex/phase-ii-01-camera worktree; necessary diagnostics and production wiring repair, full preflight then bounded native; no automatic merge",
+      "F01": "maintainer downloading dependencies; no agent pip/cache/env writes/App launch",
+      "new_worktrees_this_revision": 0,
+      "existing_additional_camera_worktree": "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
+      "new_stage_dependencies": false
+    },
+    "r04b_attempt001_review": {
+      "decision": "ACCEPT_PARTIAL_CAPTURE_FACTS_AND_S1; S2_NOT_ACCEPTED",
+      "camera_head": "27fad201facebc1903bb61082490e1c74c7e625c",
+      "provider_free_tests": 24,
+      "manifest_entries_verified": 149,
+      "native_processes_consumed": 2,
+      "materializations": 1,
+      "resets": 1,
+      "outer_steps": 0,
+      "physics_substeps": 0,
+      "actual_reset_camera_captures": 2,
+      "reported_reset_close_observed_native_calls": 0,
+      "postrun_comparator_and_close_fix_native_verified": false,
+      "offline_reader": "FAILED_MISSING_BOUNDARY_ROWS",
+      "new_sol_finding": "worker reads CanonicalStateViewV1.scene_identity_hash; actual owner is view.boundary.scene_identity_hash",
+      "next": "R04b attempt002 bounded rework; complete worker/reader positive preflight required",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_001/sol_review.md"
     }
   }
 }
