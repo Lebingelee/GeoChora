@@ -1850,18 +1850,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "359b261b640f66a2ded92db9c9e9fd6a4863952ebc48e1eac08a5ee2045fba87",
+    "README.md": "12183bed9302bd7f0477b0df4b5b2aa512c3fe55cdb29dfe3c60417ab534ec2f",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "c8e83d864012947cee788a8cbbfa9fb1bc7c52e3de78f386dbaf2ef1f15229cc",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "a33826bb700846419007c1808465d38225ed448dcb4117bf32cd929e1a01edd0"
+    "07_Execution_Order_and_Acceptance.md": "a6d7c5b1277c5fa7941b0d9cf714b8e6bb728d1d2a14e5bdee72a7c08595c793"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4225,6 +4225,19 @@
       "qualification_granted": false,
       "F01_started": false,
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/"
+    },
+    {
+      "date": "2026-10-28",
+      "kind": "SOL_F00_ATTEMPT002_BOUNDED_ACCEPTANCE_AND_REVIEW_FIX",
+      "result": "ACCEPTED_BOUNDED_F00",
+      "native_execution_commit": "0d75d7646d45f96cc22c567aa61e070dbab5dd94",
+      "review_fix_commit": "1045fd9c65daaa56fdb7eab06779d946bf4b8cd6",
+      "native_starts_by_sol": 0,
+      "provider_free_tests": 29,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_002/sol_review.md",
+      "next": "F01 package preparation; no install or launch in this revision",
+      "original_7_22_P99_changed": false,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -4393,7 +4406,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-28",
-    "status": "F00_PARTIAL_REWORK_ATTEMPT002_PREPARATION; F01_HOLD",
+    "status": "F00_ACCEPTED_BOUNDED; F01_READY_FOR_PACKAGE_PREPARATION",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4472,8 +4485,8 @@
       {
         "id": "F01",
         "depends_on": [],
-        "external_gate": "pinned install/runtime recipe; native separately budgeted/authorized",
-        "work": "Isaac isolated install and native baseline; independent installation preparation may advance"
+        "external_gate": "F00 bounded acceptance satisfied; new pinned install/runtime recipe and explicit bounded launch package required",
+        "work": "Isaac isolated install and native baseline after F00 acceptance"
       },
       {
         "id": "F02",
@@ -4526,7 +4539,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 attempt002 full-exit gates passed pending Sol review; F01 remains HELD until F00 is accepted",
+    "patch_rows_status": "F00 accepted bounded after native evidence and provider-free review fixes; F01 package preparation next, no install/native yet",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4703,9 +4716,9 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F00 attempt002",
+      "selected_next": "F01 package preparation",
       "after_that_priority": [
-        "F01 only after full F00 accepted",
+        "F01 isolated install/native baseline under a new frozen package",
         "F02",
         "F03",
         "F04",
@@ -4713,11 +4726,11 @@
         "F06 ready cells"
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
-      "F00_status": "F00_FULL_PASS_PENDING_SOL_REVIEW",
-      "reason": "All package F00 exit gates passed in attempt002; Sol must review before F01 preparation or execution.",
+      "F00_status": "ACCEPTED_BOUNDED_F00",
+      "reason": "Sol verified full bounded F00 evidence and review fix 1045fd9; maintainer F00-before-F01 prerequisite satisfied.",
       "F07": "later extension; not required before camera",
       "native_authorization": "each concrete package pins its own build/cases/budget",
-      "F01": "HELD; not dispatched, installed or started"
+      "F01": "READY_FOR_PACKAGE_REFRESH; not dispatched, installed or started"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -4730,8 +4743,8 @@
       "native_starts_by_sol": 0,
       "implementation_started": false,
       "core_adapter": "F04 later; no current Isaac Core capability claim",
-      "status": "DRAFT_HELD_NOT_DISPATCHED",
-      "prerequisite_by_maintainer": "full F00 acceptance before proceeding"
+      "status": "READY_FOR_REFRESH_NOT_DISPATCHED",
+      "prerequisite_by_maintainer": "full F00 acceptance satisfied 2026-10-28; refresh package on actual new HEAD before dispatch"
     },
     "f00_attempt002_preparation": {
       "status": "PREPARATION_COMPLETE; execution result recorded below",
@@ -4868,11 +4881,45 @@
         "total_native_outer_steps": 11180,
         "total_native_simulated_seconds": 111.8
       },
-      "F01": "HELD; no install or native start",
+      "F01": "PREREQUISITE_SATISFIED; package not dispatched, no install/native",
       "qualification_granted": false,
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/",
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002/report.md",
-      "sol_review": "PENDING"
+      "sol_review": {
+        "decision": "ACCEPTED_BOUNDED_F00",
+        "date": "2026-10-28",
+        "review_input_head": "1045fd9c65daaa56fdb7eab06779d946bf4b8cd6",
+        "native_execution_commit": "0d75d7646d45f96cc22c567aa61e070dbab5dd94",
+        "consumer_review_fix_commit": "1045fd9c65daaa56fdb7eab06779d946bf4b8cd6",
+        "manifest_entries_verified": 338,
+        "independent_pending_package_index_files": 86,
+        "provider_free_tests": 29,
+        "native_starts_by_sol": 0,
+        "original_native_evidence_unchanged": true,
+        "native_evidence_reused_for_unchanged_inputs_only": true,
+        "judge_decision": "pending",
+        "qualification": "NOT_ASSESSED",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_002/sol_review.md",
+        "independent_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_luna2_f00_review_001/report.md",
+        "limitations": [
+          "synthetic pick-lift-v0 / Panda R1 / MuJoCo 3.8.1 CPU only",
+          "review fix has provider-free verification only",
+          "portable diagnostic regression requires retained ignored workspace fixture",
+          "pre-existing pending Judge YAML identity-check gap remains follow-up"
+        ]
+      },
+      "current_status": "ACCEPTED_BOUNDED_F00"
+    },
+    "f00_attempt002_review_fix": {
+      "status": "ACCEPTED_PROVIDER_FREE_FIX",
+      "commit": "1045fd9c65daaa56fdb7eab06779d946bf4b8cd6",
+      "native_starts": 0,
+      "provider_free_tests": 29,
+      "fixed_findings": [
+        "F00-R1 portable diagnostic scalar/ref type handling",
+        "F00-R2 append-only owner/fault issue readback"
+      ],
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f00_002_review_fix_001/report.md"
     }
   }
 }

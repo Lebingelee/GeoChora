@@ -1,6 +1,6 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-28。状态：**F00 attempt002 完整出口满足、待Sol复核；F01 HOLD_UNTIL_F00_ACCEPTED**。
+更新于 2026-10-28。状态：**F00 attempt002及有限复核修正获Sol `ACCEPTED_BOUNDED_F00`；下一步准备F01，尚未安装/启动**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
 F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其20/20 synthetic seeds均为`expert_failed / gripper_readiness_timeout`；该失败原件保持不变。attempt002随后完成受控物理归因、输入修复、20-seed native验收、Oracle/H5独立读回和pending Judge prepare/verify。完整出口仅待Sol复核；F01仍未派发或启动。
 R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
@@ -206,3 +206,15 @@ R03c 原始收据见 [R03](03_R03_Physical_Attachment.md)，原 `validation_rece
 - [MuJoCo 3.8.1 USD importing 源文](https://github.com/google-deepmind/mujoco/blob/3.8.1/doc/OpenUSD/importing.rst)、
   [3.8.1 CMake USD 选项](https://github.com/google-deepmind/mujoco/blob/3.8.1/CMakeLists.txt)。
 - [固定 Harness merge 源码](https://github.com/Lebingelee/GeoChora/tree/9d0b3e524d67105e67ddb98e6dec903f19eb4255/task_env/script/agent)。
+
+<a id="f00-sol-acceptance"></a>
+
+## F00 Sol接收（2026-10-28）
+
+Sol独立核对338项输出清单、旧attempt001保护字节、全部20条原生completion facts、round1 fail/round2 pass上下文、Oracle真实H5及源码快照、pending Judge包86项索引，确认本包完整出口满足；Luna2独立审阅未推翻本次原生结果。复核发现两项新增路径缺陷：非空portable diagnostic中的Core标量被误当文件ref；新round产生owner/fault issue后账本load拒绝合法追加。两者已在本地提交`1045fd9c65daaa56fdb7eab06779d946bf4b8cd6`修正，Sol复核actual diff并重跑29项provider-free tests全部通过。
+
+结论为`ACCEPTED_BOUNDED_F00`，仅覆盖本次synthetic pick-lift-v0、Panda R1、MuJoCo3.8.1 CPU的20seed/Oracle/H5/pending Judge闭环及所述消费者修复。真实物理/H5结果仍绑定`0d75d7646d45f96cc22c567aa61e070dbab5dd94`；复核修正只做provider-free验证，零新增native，不声称新HEAD跑过原生。新portable诊断测试依赖保留的workspace fixture，缺该原件会skip，不能据此声称全新checkout的CI覆盖。
+
+Human decision仍pending，Qualification/D0/D1/D2均NOT_ASSESSED，无benchmark等价、freeze或training-ready声明。既有Judge YAML部分身份校验缺口单列后续；不追加为本次出口。Luna2所述S1无预检H5/回执的判断未采纳：实际`diagnostics/s1/oracle_preflight/oracle/`已保留并索引H5、Oracle报告和Inspector；顶层命令摘要缺该调用仅记可追溯性限制，不影响真实Oracle证据。
+
+F00前置已满足，允许准备F01新工作包；旧草稿未派发，需重新固定HEAD/官方稳定版本/安装环境/启动预算和资源，不能直接恢复旧授权快照。原7/22、Required Envelope、P99、R04b/c与其他slice不变。复核和独立审阅见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_002/`及`sol_luna2_f00_review_001/`。
