@@ -659,6 +659,115 @@ def test_fresh_freeze_and_real_runner_preflight_validate_reserved_ledger_without
     assert 'mujoco' not in __import__('sys').modules and 'taichi' not in __import__('sys').modules
 
 
+@pytest.fixture
+def runner_closeout(monkeypatch, tmp_path):
+    """Synthetic completed-episode facts; exercises real receipt IO, no physics claim."""
+    from task_env.diagnostics.tasks import r03c_attached_leaf_probe as probe
+    import time
+
+    original_import = builtins.__import__
+
+    def block(name, *args, **kwargs):
+        level = args[3] if len(args) > 3 else kwargs.get('level', 0)
+        if level == 0 and name.split('.')[0] in {'mujoco', 'taichi'}:
+            raise AssertionError('runner closeout imported a native provider')
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', block)
+    native = tmp_path / 'native'
+    native.mkdir()
+    freeze = tmp_path / 'freeze'
+    freeze.mkdir()
+    (native / 'executed_contract.json').write_text('{}\n')
+    (freeze / 'execution_freeze.json').write_text('{}\n')
+    return probe, {
+        'output_dir': tmp_path, 'native_dir': native,
+        'snapshot': {'core_head': 'synthetic-closeout'},
+        'contract': {'required_native_totals': {'materialization_attempts': 4, 'resets': 4}},
+        'counters': {'materialization_attempts': 4, 'resets': 4, 'outer_intervals': 256,
+                     'mj_step_calls': 1280, 'simulated_seconds': 2.56,
+                     'mj_forward_calls': 260, 'max_rss_bytes': 1024},
+        'identity': {'synthetic': True},
+        'results': [{'episode_id': f'E{i}', 'transition_count': 64, 'observation_count': 65}
+                    for i in range(1, 5)],
+        'gain_comparison': {}, 'inventory': {'synthetic': True},
+        'native_started_at': time.monotonic(),
+    }
+
+
+def test_runner_closeout_publishes_receipt_and_cli_summary(runner_closeout, monkeypatch, capsys):
+    probe, facts = runner_closeout
+    # CLI invokes the actual closeout used by run_native, including all file writes.
+    monkeypatch.setattr(probe, 'run_native', lambda *args, **kwargs: probe._finish_native_run(**facts))
+    probe.main(['--output-dir', str(facts['output_dir'])])
+    summary = json.loads(capsys.readouterr().out)
+    result = json.loads((facts['native_dir'] / 'native_result.json').read_text())
+    progress = json.loads((facts['native_dir'] / 'native_progress.json').read_text())
+    assert summary['status'] == result['status'] == 'NATIVE_S2_COMPLETE_AWAITING_HOST_OFFLINE_S3'
+    assert summary['episodes'] == 4
+    assert result['counters'] == facts['counters']
+    assert result['resource_limits']['native_log_bytes'] > 0
+    assert result['resource_limits']['output_bytes'] >= result['resource_limits']['native_log_bytes']
+    assert result['executed_contract_sha256'] == probe._sha(facts['native_dir'] / 'executed_contract.json')
+    assert result['execution_freeze_sha256'] == probe._sha(facts['output_dir'] / 'freeze/execution_freeze.json')
+    assert progress['active']['phase'] == 'complete'
+    assert not (facts['native_dir'] / 'native_result.pending.json').exists()
+
+
+@pytest.mark.parametrize('change,error,match', [
+    ({'materialization_attempts': 5}, RuntimeError, 'budget exceeded'),
+    ({'resets': 5}, RuntimeError, 'budget exceeded'),
+    ({'outer_intervals': 255}, ValueError, 'cumulative native counters'),
+    ({'mj_step_calls': 1279}, ValueError, 'cumulative native counters'),
+    ({'mj_forward_calls': 301}, ValueError, 'cumulative native counters'),
+    ({'simulated_seconds': 2.55}, ValueError, 'cumulative native counters'),
+])
+def test_runner_closeout_rejects_invalid_counts(runner_closeout, change, error, match):
+    probe, facts = runner_closeout
+    facts['counters'].update(change)
+    with pytest.raises(error, match=match):
+        probe._finish_native_run(**facts)
+    assert not (facts['native_dir'] / 'native_result.json').exists()
+
+
+def test_runner_closeout_rejects_missing_episode(runner_closeout):
+    probe, facts = runner_closeout
+    facts['results'].pop()
+    with pytest.raises(ValueError, match='H5 files are missing'):
+        probe._finish_native_run(**facts)
+    assert not (facts['native_dir'] / 'native_result.json').exists()
+
+
+@pytest.mark.parametrize('location,size', [('native', 129 * 1024**2), ('output', 257 * 1024**2)])
+def test_runner_closeout_budget_failure_never_publishes_success(runner_closeout, location, size):
+    probe, facts = runner_closeout
+    # Sparse file: exercises real stat accounting without writing hundreds of MiB.
+    directory = facts['native_dir'] if location == 'native' else facts['output_dir']
+    with (directory / 'synthetic-sparse-output').open('wb') as stream:
+        stream.truncate(size)
+    with pytest.raises(MemoryError, match='byte budget exceeded'):
+        probe._finish_native_run(**facts)
+    assert not (facts['native_dir'] / 'native_result.json').exists()
+
+
+@pytest.mark.parametrize('failure', ['nonfinite', 'progress_write', 'receipt_write'])
+def test_runner_closeout_failure_never_publishes_success(runner_closeout, monkeypatch, failure):
+    probe, facts = runner_closeout
+    if failure == 'nonfinite':
+        facts['identity']['invalid'] = float('nan')
+        error = ValueError
+    else:
+        error = OSError
+
+        def fail(*args, **kwargs):
+            raise OSError('synthetic closeout write failure')
+
+        monkeypatch.setattr(probe, '_write_progress' if failure == 'progress_write' else '_write_json', fail)
+    with pytest.raises(error):
+        probe._finish_native_run(**facts)
+    assert not (facts['native_dir'] / 'native_result.json').exists()
+
+
 def _observation(candidate, index, boundary_id):
     arm_values = np.asarray(ARM_HOME, dtype=np.float32).copy()
     if candidate.arm_active:

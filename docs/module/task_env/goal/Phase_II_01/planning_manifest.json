@@ -1138,8 +1138,8 @@
         "R03b",
         "R02c"
       ],
-      "status": "ATTEMPT003_S2_S3_INCOMPLETE_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT003_SINGLE_NATIVE_START_CONSUMED; FOUR_H5_READ; FINAL_NATIVE_RECEIPT_MISSING",
+      "status": "S1_REVIEWED_NATIVE_PENDING",
+      "execution": "ATTEMPT003_REVIEWED_S2_S3_INCOMPLETE; ATTEMPT004_ONE_START_CLOSURE_PACKAGE_READY_PENDING_FREEZE",
       "required_evidence": "Selected provider-free S1 plus four same-public-Env MuJoCo 3.8.1 CPU episodes and an independent readback of four closed Generic H5 files. Attempt003 produced all four H5 files and 48/48 tamper rejections, but its runner failed before writing native_result.json; aggregate S2/S3 remain incomplete.",
       "stop_condition": "Attempt001 and attempt002 history plus attempt003 raw are preserved. Attempt003 one-start budget is spent; do not retry. S2/S3 remain incomplete until a separately authorized package resolves missing formal evidence; no slice may be advanced by this record.",
       "result": "Attempt003 completed E1-E4 H5 episodes with 64 transitions/65 observations each; native counters were 4 materializations, 4 resets, 260 forwards, 1280 steps, 256 outer intervals, 2.56 simulated seconds, and sampled peak RSS 440950784 bytes. Independent provider-free readback read 4 H5, 256 transitions, 260 observations and rejected 48/48 tamper copies. Runner then raised UnboundLocalError for native_log_bytes during final resource summary, exit 1, without native_result.json. Reader aggregate status is OFFLINE_READBACK_INCOMPLETE_OR_FAILED; S2/S3 INCOMPLETE. Post-run serialization/test-fixture corrections pass the current 20 provider-free module tests, but were not native-verified. No Qualification, general Attachment/provider admission, or other slice.",
@@ -1360,6 +1360,26 @@
         "R06_R05a_DAG_Required_Envelope_P99_frozen_refs_unchanged": true,
         "other_slice_started": false,
         "sol_review": "PENDING"
+      },
+      "attempt003_sol_review": {
+        "date": "2026-10-28",
+        "input_commits": [
+          "f4233126509ddadb25165d77517de4d2a25736dc",
+          "3aafcf30a3458599933d8812a1b1f824f7558919"
+        ],
+        "decision": "ACCEPT_EXECUTION_FACTS_AND_STATIC_CORRECTION; S2_S3_REMAIN_INCOMPLETE",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/sol_review.md",
+        "verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/offline_verification.json",
+        "manifest_entries_verified_at_review_input": 53,
+        "current_provider_free_tests": 33,
+        "new_closeout_cases": 13,
+        "actual_native_starts_by_Sol": 0,
+        "S2": "INCOMPLETE",
+        "S3": "INCOMPLETE",
+        "qualification_granted": false,
+        "next_package": "attempt004 same source, four cases, oracles and one-start budget; no other slice",
+        "implementation": "FIX_EXISTING runner closeout; final receipt published only after byte-budget/progress writes; actual shared closeout and CLI success/error paths covered",
+        "native_verification_of_postrun_changes": false
       }
     },
     {
@@ -1572,15 +1592,15 @@
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
-    "03_R03_Physical_Attachment.md": "efde2e1ad57bd4f11c8f0158a8039c6941dd97fa0f1abdb61e5281864b542b19",
+    "03_R03_Physical_Attachment.md": "29de409c8e5ece0c3aed722be3ae88ff9f1600cd0ffeb5fb674d503e644e784a",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "2c5114fb329f293e8a03450e31325dba059bec5398b230cdd16800fb304c65e2",
+    "07_Execution_Order_and_Acceptance.md": "7ffb3097b04324b7c5b62349ac140167bff4d22f3810e298d8137636680cf108",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "69b53cde406e75b0f8daed1cf6b6b516cb3d68ea90eaf6a7636a3fb19afde048",
-    "README.md": "0441110cc0ba1ccaa387bda5183c3c70da109ff2bde35741bcef2d9eb5d011de"
+    "README.md": "74d0f979e2e00b5b777f0d48ba2a810e636c53fc8976e42f2e84bed4980d8211"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {

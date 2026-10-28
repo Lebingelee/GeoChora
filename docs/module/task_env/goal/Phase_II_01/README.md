@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-**当前恢复入口（2026-10-28）**：R03c attempt003 的唯一 MuJoCo 3.8.1 CPU 启动已消耗。四份 episode H5 均生成并由独立 reader 读过（256 transitions、260 observations、48/48 tamper 拒绝），但 runner 在最终资源计数字段处因 `native_log_bytes` 未初始化而退出，未写正式 `native_result.json`；S2/S3 总体仍 INCOMPLETE，等待 Sol 复核。失败后只修正收尾计数字段并完成 20 项 provider-free 回归，修正未再 native 验证。原件与本地报告位于 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)；后续交接使用 [08](08_Codex_Phase_II_01_Planning_Prompt.md)。
+**当前恢复入口（2026-10-28）**：Sol已复核R03c attempt003，接收四份H5及48/48 tamper拒绝的执行事实；因native exit 1且缺正式receipt，S2/S3仍INCOMPLETE。收尾计数修正保留，现有runner成功receipt改为预算/进度检查后发布，模块33项provider-free S1通过；修正未native复验。下一工作包为attempt004同source/oracle的一次启动收口。003及更早原件保留，复核见ignored `sol_review_r03c_003/`。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)；后续方向仍按 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。

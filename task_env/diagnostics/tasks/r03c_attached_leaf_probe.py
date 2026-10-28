@@ -423,6 +423,56 @@ def _validate_fresh_start_record(native_dir, contract_sha256, *, allow_unreserve
     return 1
 
 
+def _finish_native_run(*, output_dir, native_dir, snapshot, contract, counters,
+                       identity, results, gain_comparison, inventory, native_started_at):
+    """Finalize closed episodes without importing a provider; publish success last."""
+    if (counters['materialization_attempts'] > contract['required_native_totals']['materialization_attempts']
+            or counters['resets'] > contract['required_native_totals']['resets']):
+        raise RuntimeError('materialization or reset budget exceeded')
+    if (counters['outer_intervals'] != 256 or counters['mj_step_calls'] != 1280
+            or counters['simulated_seconds'] != 2.56 or counters['mj_forward_calls'] > 300):
+        raise ValueError('cumulative native counters differ from the exact four-episode contract')
+    if len(results) != 4:
+        raise ValueError('one or more of the four same-Env episode H5 files are missing')
+    # Capture the bounded output totals before embedding them in the run
+    # receipt. The receipt is written and the totals are refreshed below.
+    output_bytes = sum(path.stat().st_size for path in output_dir.rglob('*') if path.is_file())
+    native_log_bytes = sum(path.stat().st_size for path in native_dir.rglob('*') if path.is_file())
+    result = {
+        'status': 'NATIVE_S2_COMPLETE_AWAITING_HOST_OFFLINE_S3',
+        'input_head': snapshot['core_head'], 'runtime_identity': identity,
+        'counters': counters, 'episodes': results,
+        'gain_isolation': gain_comparison,
+        'source_inventory': inventory,
+        'resource_limits': {
+            'rss_sampled_max_bytes': counters['max_rss_bytes'],
+            'rss_sampling': 'sampled at each returned outer boundary; intra-interval peak may be missed',
+            'native_log_bytes': native_log_bytes, 'output_bytes': output_bytes,
+        },
+        'native_wall_seconds': time.monotonic() - native_started_at,
+        'executed_contract_sha256': _sha(native_dir / 'executed_contract.json'),
+        'execution_freeze_sha256': _sha(output_dir / 'freeze' / 'execution_freeze.json'),
+    }
+    pending_result = native_dir / 'native_result.pending.json'
+    _write_json(pending_result, result)
+    output_bytes = sum(path.stat().st_size for path in output_dir.rglob('*') if path.is_file())
+    native_log_bytes = sum(path.stat().st_size for path in native_dir.rglob('*') if path.is_file())
+    if native_log_bytes > 128 * 1024 * 1024 or output_bytes > 256 * 1024 * 1024:
+        raise MemoryError('native/log or total output byte budget exceeded')
+    result['resource_limits']['native_log_bytes'] = native_log_bytes
+    result['resource_limits']['output_bytes'] = output_bytes
+    _write_json(pending_result, result)
+    _write_progress(native_dir, snapshot, counters,
+                    {'episode_id': None, 'outer': None, 'phase': 'complete'})
+    # Recheck the final pending receipt and progress before publishing success.
+    output_bytes = sum(path.stat().st_size for path in output_dir.rglob('*') if path.is_file())
+    native_log_bytes = sum(path.stat().st_size for path in native_dir.rglob('*') if path.is_file())
+    if native_log_bytes > 128 * 1024 * 1024 or output_bytes > 256 * 1024 * 1024:
+        raise MemoryError('native/log or total output byte budget exceeded')
+    pending_result.replace(native_dir / 'native_result.json')
+    return result
+
+
 def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
                native_attempt_dir: str = 'native', prior_native_dir: str | None = None,
                *, preflight_only=False):
@@ -789,44 +839,13 @@ def run_native(output_dir: Path, snapshot_path: Path = SNAPSHOT,
             env.close()
             _write_progress(native_dir, snapshot, counters,
                             {'episode_id': episode_spec['episode_id'], 'outer': 64, 'phase': 'episode_closed'})
-        if (counters['materialization_attempts'] > contract['required_native_totals']['materialization_attempts']
-                or counters['resets'] > contract['required_native_totals']['resets']):
-            raise RuntimeError('materialization or reset budget exceeded')
-        if (counters['outer_intervals'] != 256 or counters['mj_step_calls'] != 1280
-                or counters['simulated_seconds'] != 2.56 or counters['mj_forward_calls'] > 300):
-            raise ValueError('cumulative native counters differ from the exact four-episode contract')
-        if len(results) != 4:
-            raise ValueError('one or more of the four same-Env episode H5 files are missing')
-        # Capture the bounded output totals before embedding them in the run
-        # receipt. The receipt is written and the totals are refreshed below.
-        output_bytes = sum(path.stat().st_size for path in output_dir.rglob('*') if path.is_file())
-        native_log_bytes = sum(path.stat().st_size for path in native_dir.rglob('*') if path.is_file())
-        result = {
-            'status': 'NATIVE_S2_COMPLETE_AWAITING_HOST_OFFLINE_S3',
-            'input_head': snapshot['core_head'], 'runtime_identity': identity,
-            'counters': counters, 'episodes': results,
-            'gain_isolation': gain_comparison,
-            'source_inventory': inventory,
-            'resource_limits': {
-                'rss_sampled_max_bytes': counters['max_rss_bytes'],
-                'rss_sampling': 'sampled at each returned outer boundary; intra-interval peak may be missed',
-                'native_log_bytes': native_log_bytes, 'output_bytes': output_bytes,
-            },
-            'native_wall_seconds': time.monotonic() - native_started_at,
-            'executed_contract_sha256': _sha(native_dir / 'executed_contract.json'),
-            'execution_freeze_sha256': _sha(output_dir / 'freeze' / 'execution_freeze.json'),
-        }
-        _write_json(native_dir / 'native_result.json', result)
-        output_bytes = sum(path.stat().st_size for path in output_dir.rglob('*') if path.is_file())
-        native_log_bytes = sum(path.stat().st_size for path in native_dir.rglob('*') if path.is_file())
-        if native_log_bytes > 128 * 1024 * 1024 or output_bytes > 256 * 1024 * 1024:
-            raise MemoryError('native/log or total output byte budget exceeded')
-        result['resource_limits']['native_log_bytes'] = native_log_bytes
-        result['resource_limits']['output_bytes'] = output_bytes
-        _write_json(native_dir / 'native_result.json', result)
-        _write_progress(native_dir, snapshot, counters,
-                        {'episode_id': None, 'outer': None, 'phase': 'complete'})
-        return result
+        active['phase'] = 'finalize_native_receipt'
+        return _finish_native_run(
+            output_dir=output_dir, native_dir=native_dir, snapshot=snapshot,
+            contract=contract, counters=counters, identity=identity, results=results,
+            gain_comparison=gain_comparison, inventory=inventory,
+            native_started_at=native_started_at,
+        )
     except BaseException as error:
         active['exception_type'] = type(error).__name__
         active['message'] = str(error)

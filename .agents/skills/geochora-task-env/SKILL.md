@@ -903,3 +903,13 @@ native-verified. Keep the original failure and H5s; do not retry this window,
 claim general Attachment/Provider support or Qualification, or start another
 slice. Sol review is pending in ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`.
+
+R03c attempt003 Sol review (2026-10-28): accepts the four-episode execution
+facts and post-run correction, while S2/S3 remain incomplete (exit 1, no final
+native receipt). The existing probe now delegates its post-episode closeout to
+a provider-free helper and publishes the final receipt after budget/progress
+writes. The focused suite has 33 passing cases, including 13 closeout checks;
+these synthetic closeout facts do not prove dynamics. The next package is
+attempt004, same source/oracles and one separate native start. No new native
+execution, Qualification or other slice follows from this review. See ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_003/sol_review.md`.
