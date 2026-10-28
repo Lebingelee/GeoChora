@@ -887,3 +887,19 @@ identity/ledger, not this runner publication path. Status remains
 Provider admission, general Attachment support or Qualification. Keep
 attempt001 bytes and attempt002 failure/freeze/ledger separate at their ignored
 workspace Evidence paths.
+
+R03c attempt003 update (2026-10-28): the separately authorized one-start
+MuJoCo 3.8.1 CPU window completed four 64-transition/65-observation episodes
+and closed four H5 files. The independent provider-free reader read all four,
+reported 256 transitions/260 observations, and rejected all 48 copy-only
+tamper cases. After E4 close, the runner raised `UnboundLocalError` because
+`native_log_bytes` had not been initialized while assembling the final receipt;
+no `native_result.json` was written. The aggregate reader therefore returned
+`OFFLINE_READBACK_INCOMPLETE_OR_FAILED`, and R03c S2/S3 remain incomplete.
+After this consumed native window, the runner's output-byte initialization order
+and the synthetic fresh-window test's stale protected-hash fixture were fixed;
+the focused provider-free module suite passed 20 cases. Neither correction was
+native-verified. Keep the original failure and H5s; do not retry this window,
+claim general Attachment/Provider support or Qualification, or start another
+slice. Sol review is pending in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r03c_003/`.
