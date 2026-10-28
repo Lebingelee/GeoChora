@@ -2,7 +2,7 @@
 
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 维护者于2026-10-28纠正顺序：F00 attempt001仅完成整合/完成事实修复与S1，20/20 seeds 因 `gripper_readiness_timeout` 失败；随后要求完整验收F00后才准备/执行F01。attempt002已在 `develop-full` 完成公开 A/B 归因、合成输入修复、20-seed campaign、Oracle/H5独立回读及pending Judge包，完整出口及有限复核修正已获Sol **`ACCEPTED_BOUNDED_F00`**。历史attempt001失败原件保留；详见 [10 F00 Sol接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-sol-acceptance)。
-当前后继是 **F01 attempt001隔离安装与官方原生对照**；维护者已要求安装Isaac，Sol已重新固定配方与资源并准备新包。Luna1实施，Luna2独立复核；当前Sol尚未安装或启动，原草稿不执行。Human Judge仍pending、Qualification未评估。具体顺序以 [07 当前入口](07_Execution_Order_and_Acceptance.md) 为准，R04b/c无需等待全部F行完成。
+F01 attempt001安装与原生对照的最新状态由维护者管理的主checkout记录决定；本camera分支不包含或刷新Isaac安装进展。独立camera分支R04b attempt002的bounded S2结果为Luna报告通过、等待Sol复核；具体范围与限制见 [04 R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28)。Human Judge仍pending、Qualification未评估。具体顺序以 [07 当前入口](07_Execution_Order_and_Acceptance.md) 为准，R04b/c无需等待全部F行完成。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
@@ -18,7 +18,7 @@
 | [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt004精确Panda/MuJoCo CPU public Env S2/S3已获Sol有界接收；不扩展通用Attachment/Provider或Qualification |
-| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
+| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；R04a attempt002已获Sol接收ACCEPTED_S1_BOUNDED；R04b attempt002 bounded S2报告待Sol复核，R04c未运行 |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
 | [07 执行表](07_Execution_Order_and_Acceptance.md) | 7/22 DAG、required envelope与停止条件 |

@@ -1,6 +1,6 @@
 # R04 — Dynamic Camera → Public Observation / Recorder
 
-状态：REVISED_DRAFT；R04a attempt001 原23项provider-free S1通过后经Sol复核为CHANGES_REQUESTED；attempt002 已修复 capture 请求绑定与 H5 独立 state/clock/episode 锚点，定向 provider-free S1 为33 passed，Sol已复核接收为ACCEPTED_S1_BOUNDED。R04b/c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
+状态：REVISED_DRAFT；R04a attempt001 原23项provider-free S1通过后经Sol复核为CHANGES_REQUESTED；attempt002 已修复 capture 请求绑定与 H5 独立 state/clock/episode 锚点，定向 provider-free S1 为33 passed，Sol已复核接收为ACCEPTED_S1_BOUNDED。R04b attempt002 的 bounded S2 结果由Luna报告通过、等待Sol复核；R04c PLANNED / NOT_STARTED。required 候选交集为 GeoPhys a53 CPU physics × MuJoCo 3.8.1 Native OpenGL/EGL × 既有单 Panda Position source，双 fixed/hand-mounted RGB/Depth/Entity mask。不把新 Assembly source 默认纳入 Camera 支持。
 
 ## Owners 与真实消费断点
 
@@ -63,3 +63,11 @@ attempt002使用 provider-free 合成capture/H5定向S1，33 passed；报告、�
 独立camera分支`codex/phase-ii-01-camera`的实现提交`f7bc956`、`37ca3ee`、`27fad20`共4个诊断/测试文件，未改生产camera合同。Sol核149项evidence hash并重跑24项provider-free tests通过，仅接收S1和partial reset/capture事实，**S2_NOT_ACCEPTED**。两个启动额度已用：首进程CLI相对导入预检失败；次进程完成一次GeoPhys materialize/reset和两相机RGB/depth/Entity-mask捕获后，因Contract tuple与JSON list直比失败，0outer/0physics substeps。比较及异常Renderer.close计数修正未native复验；原离线reader缺boundary行而失败。
 
 另有明确未走到的worker接线错误：`CanonicalStateViewV1`没有直属`scene_identity_hash`，应通过`view.boundary.scene_identity_hash`。下一包R04b attempt002在同分支修正并先让实际worker成功分支、序列化及独立reader的provider-free全链通过，再使用新有界native窗口。旧失败原件保持；不以新比较helper测试替代全链、不自动进入R04c/H5、不改oracle/provider/预算。主develop-full的F01下载由维护者接管，Luna1独立R07a审计，camera分支不混入主分支安装提交。复核入口为ignored`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_001/sol_review.md`。
+
+## R04b attempt002 bounded S2 execution (2026-10-28)
+
+在同一 camera 分支，输入 HEAD `90f89cd67414c148bf547952612cf301cd4ec99d` 上完成诊断 runner/reader 修正；native freeze 为 `8ff099640c9b0282ce224282a957e23e0a47656c`。production Camera/Env API 与 TaskArtifact 未改。完整 provider-free S1 文件 10 passed，覆盖真实公开 Candidate Env/Controller/consumer 的成功收尾路径、独立 reader 正例与11类语义拒绝、部分构造和关闭计数；此 S1 仅替换物理/GL IO，不作为物理结果。
+
+有界 native worker 1次启动并 exit 0；独立 offline reader 通过。该次冻结交集为 GeoPhys a53 CPU × MuJoCo 3.8.1 Native OpenGL/EGL × `panda-position-servo-candidate-v1`、seed31、2 ms × 5、固定 D04 双相机与0.08 m Position target。结果为2次 reset、24次 public step、120个在成功返回的 runtime-boundary 调用中接受的 substep、26个 boundary、53个 capture（52个 normal、1个 isolation）；clock 独立推导同为120 substeps/0.24 s。双相机 RGB变化、6个光学深度/回投样本、cache零推进、复位身份/图像重复、consumer隔离与 renderer/Env close 门通过。Luna报告状态为 **`R04B_BOUNDED_PUBLIC_CAMERA_S2_PASS_PENDING_SOL_REVIEW`**，尚待Sol复核，不是S2接收、Qualification或task success。R04c/H5未运行、未授权。
+
+完整命令、receipt、raw Evidence 与哈希见 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r04b_002/`。本camera分支不包含或更新main checkout的F01/Isaac安装进展；该状态仍由维护者在主checkout管理。
