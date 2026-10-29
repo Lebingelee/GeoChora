@@ -1,5 +1,7 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
+当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包为 [D01 attempt001 统一路线计划](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)：复用 camera 分支，替换 candidate 的 BaseTaskEnv 活跃路线，在既有 SelectedReferenceEnv/RuntimeSession/MuJoCo owner 内修复 mixed control、reset/contact 和同路线记录。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧 G1/G2 partial/失败不追溯升级。包准备不表示实现/native 已启动，五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
+
 状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/BLOCKED待Sol复核。新source composer恢复了上游 movable-object free-joint与命名规则；原`.pruned_init`安全解码成功，但其不含每行fixture pose或采样seed，不能完成原始reset映射。真正MuJoCo RuntimeSession mixed-control/contact consumer与同路线S1未完成，因此G1/G2未过、zero native。公开LIBERO `make_env` admission关闭；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；历史记录保持其签署时点含义，原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由

@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+2026-10-30诊断接续：[R07c D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)由维护者转交 Luna2，复用 camera checkout，先修现有 SelectedReferenceEnv → RuntimeSession → MuJoCo 统一路线及 pilot S1/native/H5。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。正常评估不要求恢复某次历史 fixture sample；其余原 source/reset/control/contact/语义和记录门保持。当前仍为未执行的工作包，18/22 与原五任务出口不变；下文旧状态保留历史含义。
+
 当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收。R07b pilot attempt001的source/recipe S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/G1-G2 BLOCKED实现包待Sol复核，Core native admission仍关闭，原五任务整体未完成，接收数不增加。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
 - **Luna2**：`codex/phase-ii-01-camera`上的[R07c pilot attempt003](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-execution-result)已交回PARTIAL/G1-G2 BLOCKED待Sol复核。source composer恢复movable-object free joint；安全解码原始init rows，但fixture placement缺失；同路线MuJoCo RuntimeSession consumer、contact freshness与G2 S1仍未实现，native为0。
