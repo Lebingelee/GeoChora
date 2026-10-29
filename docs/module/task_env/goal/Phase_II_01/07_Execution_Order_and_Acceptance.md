@@ -1,8 +1,8 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收，剩余R07a/b/c/d四行。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
+当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收。R07b pilot attempt001的source/recipe S1已交付、待Sol复核，尚未计入接收数；R07a五任务整体及R07c/d仍未完成。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
-- **Luna2**：继续在`codex/phase-ii-01-camera`开发原07表；下一包为[R07b单任务pilot实施](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-pilot-attempt001-plan)，先用已接收来源的spatial bowl→plate建立source manifest/install+verify及部署配方，不重开R07a第五attempt，不启动R07c/native。
+- **Luna2**：在`codex/phase-ii-01-camera`完成[R07b单任务pilot attempt001](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-attempt001-execution-result-2026-10-29)：source install与provider-free recipe S1交付，等待Sol复核；native为0，不启动R07c。
 - **R07当前边界**：R07a004来源/协议部分接收及单pilot来源准入已有Sol记录。pilot不代表原五任务R07a或R07b整体通过；TurboSquid三族仍阻塞其关联任务，不影响本包未消费这些资产的工作。保留原五任务最终P99目标、原生语义和成本/独立Human评审。
 - **Luna1**：独立负责`develop-full`的F00–F07，状态以其分支10文档及实际报告为准；本次不写主checkout/F文档、Isaac或依赖。
 - **R05完成**：精确normal-route CPU/CUDA×100/500Hz完整回合及H5双reader已获Sol接收，不承诺通用Provider/实时2ms/Qualification。
@@ -258,3 +258,6 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 
 
 2026-10-29 Sol已接收R06c attempt002技术包：`ACCEPTED_R06C_TECHNICAL_BUNDLE_HISTORICAL_DECISION_PENDING`。三项返工关闭，独立核对115项清单、152项保护输入与16份H5，正例和原三种漏检变体均符合预期；8/250项S1与27项负例按原日志复用。整体R06c仍`BLOCKED_MISSING_RAW_OR_PHASE_DECISION`、17/22不变，四项历史处置仍全null；R07/P99/Qualification未关闭。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06c_002/`。
+
+
+2026-10-29 R07b pilot attempt001：camera输入HEAD `21ea2965a1660a60d9f236793eb01f02e05ee7b6`；实现提交 `b1d5c8719f2289b6ee9fb20a5d0a22a8486d6c93`。来源manifest `4ad168e4…d30a75` 含103项载荷、89文件/76,512,539-byte实际首pilot闭包；两个fresh install/verify与recipe CLI完成，provider-free S1 50 passed，真实engine/provider tripwire 0。`source_install_ready=true`，`recipe_s1_ready=true`，`core_native_admission_ready=false`；无native/共享锁。R07a003 v2.1成本记录按原协议核验，但其固定0309d73测量baseline不在本输入HEAD祖先链，结果INVALID；token/费用未知、活动时间无连续计量。状态`R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW`，尚不计接收，18/22与五任务/P99/R07c/R07d保持。报告及原件见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07b_pilot_001/`。

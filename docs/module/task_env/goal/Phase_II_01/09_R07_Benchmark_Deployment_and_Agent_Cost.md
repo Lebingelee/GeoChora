@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；原五任务整体仍未完成。维护者选择先用来源可准入的少量LIBERO任务跑通闭环，首pilot固定spatial bowl→plate；下一包为R07b pilot attempt001。下文“本轮仅规划/未执行”保留原审计时点，不覆盖当前状态；原五任务最终目标不缩减。
+状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已完成，等待Sol复核。原五任务整体仍未完成，维护者选择先用来源可准入的少量LIBERO任务跑通闭环，首pilot固定spatial bowl→plate。下文“本轮仅规划/未执行”保留原审计时点，不覆盖当前状态；原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -170,3 +170,18 @@ R07a交付source/asset/license/embodiment/fixture/资源/缺口与go/no-go recom
 预计主动90–150分钟，上限180分钟。provider-free S1/本地install+verify可多次修正重跑；每进程180秒/采样RSS2GiB，输出128MiB，独立安装目标256MiB；额外缺失固定文本来源最多32MiB，不下载未审计模型/不装上游运行环境。零native/零共享锁，原因是R07b的源/配方S1交付；不把attempt视为一次测试额度。
 
 目标交付为`R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW`或准确PARTIAL/BLOCKED，必须区分source_install_ready与core_native_admission_ready。所有本包源/配方S1通过也不等于R07b原五任务整体完成，不增加18/22、不表示R07c/P99/Qualification通过。下一包由Sol审阅完整报告后准备、维护者发送。
+
+
+<a id="r07b-attempt001-execution-result-2026-10-29"></a>
+
+## R07b pilot attempt001 执行结果（2026-10-29）
+
+在 camera 输入 `21ea2965a1660a60d9f236793eb01f02e05ee7b6` 上完成有界来源包与单pilot声明式配方；实现提交为 `b1d5c8719f2289b6ee9fb20a5d0a22a8486d6c93`。最终来源manifest固定 LIBERO `8f1084e3132a39270c3a13ebe37270a43ece2a01` 与 robosuite `fbee5844ff5632f5b5698e204ec5357ca50be0df`，manifest SHA-256 为 `4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75`。manifest 含 103 个文本/来源载荷条目；选定场景闭包为89个文件、76,512,539 bytes（10个XML、92条XML文件边），不把未选中的robosuite默认arena纹理并入场景。安装到两个全新目录并分别独立verify；第二目录完成验证与篡改负例后清理。二进制资产只在ignored安装目录，不进Git。
+
+provider-free CLI 成功串联 install→verify→recipe。最终 focused S1 为50 passed，tripwire未观察到MuJoCo、GeoPhys、Taichi、Isaac、Genesis、Warp、Torch、LIBERO或robosuite导入。`source_install_ready=true`、`recipe_s1_ready=true`；`core_native_admission_ready=false`。未启动native worker、未取共享锁。
+
+recipe保留原任务 `On(akita_black_bowl_1, plate_1)` 及严格XY `<0.03 m`、contact和竖直次序需求；公开contact、free-body init realization、Core frame映射、MountedPanda 7 torque motor+双finger position对接、OSC_POSE 20 Hz至Core 100 Hz时钟/drive与planner映射仍未建立。native物理dt未由编译模型确认，init仅按原bytes/hash核验，没有反序列化或reset。`owner_gap_matrix.json` 和 `r07c_minimal_patch_checklist.json` 指向原owner的最小后续工作；本结果不代表任务执行或语义等价。
+
+输出和逐命令原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07b_pilot_001/`，安装树位于对应 `_install/`。成本事实按R07a003 v2.1原口径记录；该协议固定测量基线 `0309d73bb5b60f9989907c3eede8c0cd2893f29f` 不在本camera输入 `21ea2965a1660a60d9f236793eb01f02e05ee7b6` 的祖先链中，因此协议校验结果如实保留为 INVALID，不更改基线或声称有效LOC/Agent成本测量。token usage与货币费用不可用；活动时间未连续计量，保留null及原因。
+
+状态为 `R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW`。这只是单pilot来源/配方S1出口，原五任务总目标、18/22接收数、R07c、P99与Qualification均保持未关闭。详见本包 `report.md`、`evidence.json` 与 `commands.json`。

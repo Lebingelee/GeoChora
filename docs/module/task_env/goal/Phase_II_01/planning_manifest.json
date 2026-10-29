@@ -2569,17 +2569,34 @@
       "depends_on": [
         "R07a"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S1 source/license/manifest/admission",
+      "status": "R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_COMPLETE_PENDING_SOL_REVIEW",
+      "required_evidence": "single-pilot source/license/manifest/install/verify/recipe provider-free S1 and scoped owner gaps",
       "stop_condition": "unverified assets, Core/Provider gaps remain BLOCKED",
       "pilot_execution": {
-        "status": "PACKAGE_PREPARED_NOT_SENT",
+        "status": "R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW",
         "task": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
         "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-pilot-attempt001-plan",
         "upstream_pilot_source_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_004/sol_review.md",
         "new_native_authorized": false,
-        "full_five_task_exit": false
+        "full_five_task_exit": false,
+        "attempt": "001",
+        "input_head": "21ea2965a1660a60d9f236793eb01f02e05ee7b6",
+        "implementation_commit": "b1d5c8719f2289b6ee9fb20a5d0a22a8486d6c93",
+        "source_manifest_sha256": "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75",
+        "source_payload_files": 103,
+        "active_scene_closure_files": 89,
+        "active_scene_closure_bytes": 76512539,
+        "fresh_install_targets": 2,
+        "provider_free_s1_passed": 50,
+        "provider_free_s1_failed": 0,
+        "forbidden_engine_provider_imports": 0,
+        "source_install_ready": true,
+        "recipe_s1_ready": true,
+        "core_native_admission_ready": false,
+        "native_worker_starts": 0,
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07b_pilot_001/",
+        "native_run_authorized": false
       }
     },
     {
@@ -2714,7 +2731,7 @@
     }
   },
   "document_sha256": {
-    "README.md": "66a1277041bd4498afd39f7c35b36382ade6cecb23cb0ad39d227eaf9bc58026",
+    "README.md": "731fafa4a54ebeb6d5b6269b3e46b18475de2afe0711f6bcadbe6c2721c5b1dd",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2722,10 +2739,10 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "1d84182debb390417263b48c90eaa91b2bd2baff6832e39595782dcf8d46264a",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "72b7beb677ab58a954932bc8a9464ce565e8b42fa228fcc4a3e6e7dd66726ce5",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "f65bec14353d3e64c1a581831fd60daa02b39e4741468730d5feb9812447af11"
+    "07_Execution_Order_and_Acceptance.md": "f2e5c6cbc49a100e48269a5c9c9f8c2a6f55e8a6ccea8791c91eaea832740532"
   },
   "revision_kind": "R06C_SCOPE_RECONCILIATION_AND_R07B_PILOT_PLAN",
   "benchmark_audit": {
@@ -5423,6 +5440,21 @@
       "R06c": "ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION",
       "R07b": "single pilot source/recipe S1 package only",
       "R07_P99_qualification_closed": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "R07B_PILOT_ATTEMPT001_SOURCE_RECIPE_S1",
+      "authority": "Maintainer-frozen sol_r07b_pilot_001 work package; pending Sol review",
+      "input_HEAD": "21ea2965a1660a60d9f236793eb01f02e05ee7b6",
+      "implementation_commit": "b1d5c8719f2289b6ee9fb20a5d0a22a8486d6c93",
+      "status": "R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW",
+      "source_install_ready": true,
+      "recipe_s1_ready": true,
+      "core_native_admission_ready": false,
+      "native_worker_starts": 0,
+      "provider_free_s1": "50 passed",
+      "accepted_count_unchanged": "18/22",
+      "full_five_task_exit": false
     }
   ],
   "P00_audit": {
