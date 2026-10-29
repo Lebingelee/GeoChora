@@ -13,6 +13,14 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
 | 首个失败边界、重试/恢复与升级 | [troubleshooting](troubleshooting.md) |
 
+The fixed LIBERO spatial bowl-to-plate diagnostic now reuses
+`SelectedReferenceEnv` and `RuntimeSession`; its internal constructor, exact
+route limits and current bounded evidence are documented in the
+[public API](public-api.md#r07c-d01-libero-diagnostic-entry-2026-10-30),
+[runtime/provider contracts](runtime-and-providers.md#r07c-d01-selected-mixed-control-diagnostic-2026-10-30),
+and [recording evidence](recording-and-learning.md#r07c-d01-same-route-h5-evidence-2026-10-30).
+It is not a registered `make_env()` task or a general LIBERO capability.
+
 ## 快速开始
 
 从仓库根目录执行。已发布环境记录为 Ubuntu 24.04.4/x86_64/Python 3.12.14；

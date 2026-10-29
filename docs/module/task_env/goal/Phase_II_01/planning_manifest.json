@@ -6560,7 +6560,7 @@
   },
   "r07c_diagnostic_d01_attempt001_plan": {
     "date": "2026-10-30",
-    "status": "PACKAGE_PREPARATION_NOT_EXECUTED",
+    "status": "IMPLEMENTATION_PROVIDER_FREE_S1_PASS_NATIVE_PENDING",
     "diagnostic_attempt": 1,
     "ordinary_attempts_preserved": [
       1,
@@ -6582,7 +6582,10 @@
     "normal_reset_contract": "upstream reset realization plus specified init row; no required historical fixture-to-row sample recovery",
     "f05_main_checkout_writes": false,
     "integration_authorized": false,
+    "implementation_commit": "11f652705259b2a29901ed11491dfe226c54ffce",
+    "final_s1_run": "run081; 125 passed; max sampled RSS 374738944 bytes",
     "new_native_started": false,
+    "native_plan": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/native/native_plan.json",
     "package_dir": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_r07c_diag_d01_001/",
     "output_dir": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/",
     "timebox_minutes": 420,

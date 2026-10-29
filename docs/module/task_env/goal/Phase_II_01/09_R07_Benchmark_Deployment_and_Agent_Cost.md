@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包为 [D01 attempt001 统一路线计划](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)：复用 camera 分支，替换 candidate 的 BaseTaskEnv 活跃路线，在既有 SelectedReferenceEnv/RuntimeSession/MuJoCo owner 内修复 mixed control、reset/contact 和同路线记录。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧 G1/G2 partial/失败不追溯升级。包准备不表示实现/native 已启动，五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
+当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包 [D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md) 已在 camera 分支实现 SelectedReferenceEnv → RuntimeSession → MuJoCo 路线，并通过最终 provider-free S1（125 passed）；本包另有条件授权的 MuJoCo 3.8.1 CPU native/H5 正在按冻结计划执行，门状态见[D01 execution result](#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30)。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧普通 attempt003 的 partial/失败不追溯升级。五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
 
 状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/BLOCKED待Sol复核。新source composer恢复了上游 movable-object free-joint与命名规则；原`.pruned_init`安全解码成功，但其不含每行fixture pose或采样seed，不能完成原始reset映射。真正MuJoCo RuntimeSession mixed-control/contact consumer与同路线S1未完成，因此G1/G2未过、zero native。公开LIBERO `make_env` admission关闭；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；历史记录保持其签署时点含义，原五任务最终目标不缩减。
 
@@ -288,3 +288,33 @@ provider-free修复S1：安全decoder/source-control 32 passed；旧BaseTaskEnv 
 
 
 2026-10-29 Sol复核R07c pilot attempt003：`PARTIAL_G1_G2_BLOCKED_CONFIRMED`，三次常规窗口已用完。82项包哈希/14项保护输入/136项Git blob匹配，5个free roots及原row hashes独立静态通过。G1缺历史fixture精确sample；G2 MuJoCo mixed/reset/contact/Env仍未实施。32+2项S1沿原记录保留；早期三次失败缺原始stdout。planning manifest中07/09旧hash再次过期，Sol当前修复，原证据不改。18/22不变，无native/第四轮授权。维护者可提供精确历史fixture记录，或明确批准按原BDDL语义新生成并冻结fixture realization的合同修正续接；后者不宣称历史等价、不重置attempt。复核入口：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_003/sol_review.md`。
+
+<a id="r07c-diagnostic-d01-attempt001-execution-result-2026-10-30"></a>
+
+## R07c diagnostic D01 attempt001 execution result (2026-10-30)
+
+Status before the authorized native window: implementation complete; G0–G2
+provider-free gates pass, native G3–G5 are pending. Input was camera
+`06e289aaedc5d9e540beb56807e8cb898bf57c99`; implementation commit is
+`11f652705259b2a29901ed11491dfe226c54ffce`. Final provider-free S1 run081
+passed 125 focused cases in 27.61 s with maximum sampled process-group RSS
+374,738,944 bytes. Correct camera Core/GeoPhys `PYTHONPATH` and the required
+geochora Python 3.12 executable were recorded. The S1 integration executes the
+same `SelectedReferenceEnv → RuntimeSession → MuJoCo adapter → existing H5 v3`
+route with only bottom MuJoCo public model/data IO replaced; it does not count
+as native evidence.
+
+The fixed controller/source/reset plan is frozen for one conditional CPU run:
+LIBERO `8f1084e3132a39270c3a13ebe37270a43ece2a01`, robosuite
+`fbee5844ff5632f5b5698e204ec5357ca50be0df`, seed 19, rows 0/1/2, 64 public
+outer intervals each, 20 Hz, 2 ms × 25, 4,800 expected `mj_step` calls, and two
+separately counted public contact endpoints. Gains are explicit unqualified
+joint-space PD `Kp=20`, `Kd=4`; this is not upstream OSC_POSE equivalence or a
+controller qualification. The deterministic current fixture realization is
+source-derived and recorded; historical per-row fixture parity is not claimed.
+
+The next gate is the locked MuJoCo 3.8.1/API3008001 CPU worker and same-run
+independent H5/parent receipt. No broader task/P99/qualification claims follow
+from this pilot. Final run receipts, exact gate status, resource use and local
+documentation commit are in the ignored output
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/`.

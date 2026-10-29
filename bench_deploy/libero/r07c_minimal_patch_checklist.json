@@ -1,11 +1,14 @@
 {
   "schema_version": "libero-r07c-minimal-patch-checklist-v1",
   "pilot_task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+  "d01_status": "R07C_DIAG_D01_PROVIDER_FREE_S1_PASS_NATIVE_PENDING_SOL_REVIEW",
+  "d01_s1_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/runs/run081/",
+  "d01_native_started": false,
   "implementation_order": [
     {
       "step": 1,
       "owner": "task_env public control/resource contract",
-      "minimum_change": "Assess reuse of AbsoluteJointPositionActionAdapter, JointPositionServoBackend and existing runtime control owners first; extend only missing source-bound mixed torque/finger mapping and acknowledgements. Preserve authentic actuators and explicitly select the admitted action/hold/clock route; identical OSC algorithms are not required.",
+      "minimum_change": "Implemented in the existing SelectedReferenceEnv, canonical mixed target/Ack and RuntimeSession adapter owners. S1 proves named torque/finger writes, slot/range identity and partial-write faulting. The D01 native run must verify compiled transmissions and the same target/Ack path before the status is reviewed.",
       "required_s1": [
         "slot/type/unit/range contract",
         "invalid and reordered maps",
@@ -16,7 +19,7 @@
     {
       "step": 2,
       "owner": "task_env task source/reset/reference owners",
-      "minimum_change": "Define the reviewed .pruned_init decode or an explicit unsupported-format boundary, then adapt the selected reset identity into existing typed task state and resolve object/site/joint/frame references through existing owners.",
+      "minimum_change": "Implemented as a safe versioned decoder, source-derived deterministic normal-reset sampler, typed reset realization and complete row restore through existing RuntimeSession reset/state owners. S1 covers identity, sampler, non-zero time/velocity and mapping negatives; native source row and fixture readback remain pending.",
       "required_s1": [
         "byte and identity tamper",
         "missing/duplicate reference",
@@ -28,7 +31,7 @@
     {
       "step": 3,
       "owner": "task_env observation/evaluator/planner owners",
-      "minimum_change": "Provide required poses/contact through existing public state owners with unavailable distinct; reuse an existing public waypoint planner for bounded meaningful motion where possible. Generic IK/collision planning is not an added universal gate; justify an extension only if the chosen route actually requires it.",
+      "minimum_change": "Implemented through the existing public state/contact and evaluator owners, existing joint planner, and fixed unqualified diagnostic PD controller. S1 exercises positive/negative ResetPlan endpoints and freshness; native contact, On oracle and motion checks remain pending.",
       "required_s1": [
         "contact true/false/unavailable",
         "On threshold boundary",
@@ -40,7 +43,7 @@
     {
       "step": 4,
       "owner": "existing task factory, recorder, and semantic reader",
-      "minimum_change": "Compose only after the three prior owner contracts pass. Keep source receipt, same-Env identity, T/T+1 clocks, action/ack/state identity, and existing recorder/reader connected.",
+      "minimum_change": "Implemented through the same SelectedReferenceEnv/RuntimeSession and existing Generic H5 v3 recorder/reader. Provider-free worker/close/serialization/fault/tamper/partial-bundle paths pass; the one native worker and its parent run receipt are pending.",
       "required_s1": [
         "public factory/admission",
         "continuous identity and clock",

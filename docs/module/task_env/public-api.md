@@ -702,3 +702,32 @@ failure, the task-owned runner now selects definitions from its fixed Scene; a
 new provider-free regression passed. No native retry verified the correction,
 so this result remains S2 incomplete/S3 not run pending Sol review. It adds no
 new provider admission, general Attachment support or Qualification.
+
+## R07c D01 LIBERO diagnostic entry (2026-10-30)
+
+The fixed spatial bowl-to-plate candidate is constructed by
+`bench_deploy.libero.selected_candidate.build_libero_selected_candidate()` and
+then executes through `SelectedReferenceEnv.from_libero_diagnostic_candidate()`
+and the existing `RuntimeSession` route. Example:
+
+```python
+from bench_deploy.libero.selected_candidate import build_libero_selected_candidate
+
+env = build_libero_selected_candidate(horizon=64)
+try:
+    observation, info = env.reset(seed=19, options={"init_row_index": 0})
+    action = [float(value) for value in observation["state"]["joint_position"][:7]] + [0.04]
+    observation, reward, terminated, truncated, info = env.step(action)
+finally:
+    env.close()
+```
+
+This is an internal, source-fixed diagnostic constructor; it is not registered
+in `make_env()`, does not widen general MuJoCo admission, and accepts only the
+pinned LIBERO task on MuJoCo CPU. It reuses the selected lifecycle, typed
+mixed-control route, observation/evaluator, and existing H5 v3 Recorder. The
+source-derived deterministic fixture realization is recorded with the complete
+named `.pruned_init` row restore; it does not claim historical fixture-to-row
+parity. D01 provider-free S1 passed 125 focused cases. The separately frozen
+native/H5 result and its limits are recorded in the
+[R07c D01 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).

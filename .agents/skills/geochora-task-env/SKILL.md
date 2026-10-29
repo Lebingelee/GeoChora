@@ -1069,3 +1069,52 @@ existing v3 recorder, finalizer and report consumer with synthetic IO; this
 does not establish a physical trajectory, native stability, task-semantic
 equivalence, P99 or Qualification. See the [R07c attempt002 execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-execution-result-2026-10-29)
 for remaining owner gates and evidence limits.
+
+## R07c D01 diagnostic route (2026-10-30)
+
+The D01 diagnostic replaces the prior candidate's BaseTaskEnv/GeoPhys active
+route with the existing
+`bench_deploy.libero.selected_candidate.build_libero_selected_candidate()` →
+`SelectedReferenceEnv.from_libero_diagnostic_candidate()` →
+`RuntimeSession.materialize()` → MuJoCo session path. The candidate is fixed to
+the spatial bowl-to-plate source, MuJoCo CPU and the pinned LIBERO/robosuite
+inputs. It is an internal diagnostic entry, not a `make_env()` UID and not a
+general Provider capability.
+
+Core owns the selected lifecycle, mixed target/Ack contract, source-bound
+materialization, reset/readback, contact freshness, typed observations and
+existing Generic H5 v3 recording. `bench_deploy/libero/` owns the task-specific
+sampler, planner, On oracle and explicit unqualified joint-space PD gains. The
+route maps seven named torque actuators and two signed finger position
+actuators at 20 Hz, holding torques over 25 × 2 ms steps. The reset is derived
+from pinned BDDL/sampler source using a recorded deterministic fixture
+realization, then restores the complete named `.pruned_init` row; historical
+per-row fixture parity is not claimed. Missing or stale contact remains
+unavailable. The controller is not equivalent to upstream OSC_POSE.
+
+Validated provider-free entry example:
+
+```python
+from bench_deploy.libero.selected_candidate import build_libero_selected_candidate
+
+env = build_libero_selected_candidate(horizon=64)
+try:
+    observation, info = env.reset(seed=19, options={"init_row_index": 0})
+    action = [float(x) for x in observation["state"]["joint_position"][:7]] + [0.04]
+    observation, reward, terminated, truncated, info = env.step(action)
+finally:
+    env.close()
+```
+
+The current focused provider-free set is 125 passed in
+`task_env/diagnostics/tasks/test_r07c_libero_core_env_s1.py`,
+`test_r07c_libero_source_control_s1.py`, `test_r07c_libero_init_state_s1.py`,
+`test_selected_consumers.py`, the R02b leaf, C05a recording, D02a state and
+R04a camera consumer tests. The run used the geochora Python 3.12 interpreter,
+`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, and explicit camera Core/GeoPhys `PYTHONPATH`.
+It exercised the same Selected Env/RuntimeSession/worker/Generic H5 v3 reader
+with only bottom MuJoCo model/data IO replaced. S1 does not establish native
+semantics. The D01 native/H5 status is maintained in the
+[execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
+Do not promote the route to general task registration, five-task R07c, P99,
+Human Judge, or Qualification from this diagnostic result.

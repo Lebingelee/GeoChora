@@ -309,3 +309,31 @@ friction、damping、gain/compliance 可能需近似映射；iteration/stabiliza
 C1 open-loop 固定 Artifact/ResetSample/control stream/timebase；C2 closed-loop expert 固定
 Artifact/sample/algorithm/config 但读取 live state；两者独立 gate，contact-rich 长时轨迹不要求逐点相等。
 不同 replay 语义及未测试交集见[qualification](qualification.md)和[recording](recording-and-learning.md)。
+
+## R07c D01 selected mixed-control diagnostic (2026-10-30)
+
+The fixed LIBERO spatial pilot now enters through
+`SelectedReferenceEnv.from_libero_diagnostic_candidate()` and the existing
+`RuntimeSession.materialize()` / MuJoCo session owners. Its source-bound profile
+maps seven named torque motors and two signed finger position actuators. The
+task-owned controller uses absolute seven-joint targets, explicit unqualified
+`Kp=20 Nm/rad`, `Kd=4 Nm·s/rad`, 20 Hz outer control and a zero-order hold over
+25 × 2 ms native steps. Source actuator limits are checked against the
+compiled model. This is not the upstream OSC_POSE controller and provides no
+normal `make_env()` or generic Provider admission.
+
+Reset uses a pinned-source-derived deterministic tabletop/fixture realization,
+then restores one complete named `.pruned_init` row including source time and
+nonzero joint velocity through the existing session owner. The current fixture
+sample is recorded; exact historical per-row fixture parity is not claimed.
+Versioned public readback binds named robot/object/fixture state, compiled
+layout and entity-pair contact coverage/freshness. The task-owned On predicate
+requires current positive bowl/plate contact, bowl height at least the plate,
+and XY distance below 0.03 m; missing or stale contact remains unavailable.
+
+The final provider-free same-route S1 passed 125 focused cases. D01's bounded
+MuJoCo 3.8.1 CPU native result is reported in the
+[execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
+Even a successful pilot is limited to its frozen source/task/reset/controller
+intersection and does not establish the original five-task R07 goal, P99,
+Formal Qualification, or a general LIBERO Provider route.
