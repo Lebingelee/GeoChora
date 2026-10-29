@@ -240,3 +240,15 @@ R06c attempt001在输入HEAD `5764ebea777271a724bac34218fe5bbd830853bc`、GeoPhy
 四个原始artifact仍缺；三项旧H5 byte compatibility `NOT_PROVEN`，早期`eb870f6f` JSON原hash未知且当前同路径文件为后续版本。`phase_decision.yaml`四项的 `decision`、`approved_by`、`approval_reference` 全为null。`decision_options.md`提供RESTORE、RETAIN_AND_DEFER_THIS_STAGE与精确退休/范围变更的逐项后果及可复制回复；推荐只是提案，不构成延期、reader退休或P99豁免。
 
 完整交付包位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/`：`acceptance.json`、`acceptance_report.md`、`version_difference_index.md`、`versions/source_diff_index.json`、待决模板、validator/fixtures、commands与原始检查日志。无native、未取得共享锁、不触碰Provider pin。Sol复核前不改变历史compatibility gate，也不启动R07。
+
+<a id="r06c-attempt002-技术修复与接收引用校正-2026-10-29"></a>
+
+## R06c attempt002 技术修复与接收引用校正（2026-10-29）
+
+attempt002在输入HEAD `04c35d137c4fb93644bce730fd47fa552a38a823` 上完成attempt001复核要求的三项有界修正。attempt001的242/7日志与原始包不变；本次将7个worker正向/故障路径的合成合同改为读取当前真实gitlink，旧R06b snapshot继续只提供受保护历史证据哈希。生产 `_check_frozen_contract` 的HEAD、clean、pin、code、protected hash与digest检查保持原状，并新增digest有效但pin错误的负例，确认guard在worker/model IO前拒绝。8项focused worker节点通过；所选11文件相邻集合250 passed。原249项集合新增一个wrong-pin测试；两次运行tripwire均无真实engine/provider导入。
+
+17条Sol接收引用现逐条绑定明确review文件、SHA-256、decision token与source report/hash；存在Sol receipt时同时绑定receipt路径/hash。R06b改指 `sol_review_r06b_003/sol_review.md`：`ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`，Sol输出提交`7ebd49c73bf97c38caec1f839d103641d0d3a589`，接受实现HEAD `03fba40873e651b0831ed040fec93ea12655642c` 的run002；run001失败继续保留。所有16份既有H5按原slice/run/cell/path/source evidence重新核对size/hash，semantic/raw reader结果按同一原始bytes的Sol接收记录复用；未复制H5、未重跑reader或native。
+
+独立validator使用冻结的planning manifest、受保护review列表及实际review/source/H5 bytes建立可信表。它拒绝不完整/重复slice与H5、错误decision/review/hash、跨slice review、H5 hash/size/file/run/cell/source/pin不符、未知schema及历史处置仍pending却声明PASS/18条接收/Qualification的变体；正例与27项指定负例均通过。R04c仍是GeoPhys a53 CPU physics × MuJoCo EGL renderer；R06b是MuJoCo CPU physics且GeoPhys a53 gitlink未作物理provider；R05c保持17d6388/c6df840精确profile，均未被当前输入HEAD/c6df840改写。
+
+四项历史raw仍缺失，`phase_decision.yaml`全部decision/approved_by/approval_reference为null。技术包状态为 `R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW`；R06c overall仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，17/22计数不变，R07/P99/Qualification未关闭。两项历史`source.config`摘要断言仍按独立限制记录；本包不表示全仓测试通过。完整文件与运行receipt位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/`；无native、未取共享锁。待Sol复核，不自动进入R07。

@@ -2,7 +2,7 @@
 
 当前复核结论（2026-10-29）：R05c attempt001四格已获Sol接收 `ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3`；R05a/b/c精确required出口完成。Sol独立读回四H5与完整Guard/Outcome/strict Expert，复跑当前focused集合26 passed；详情见[R05c接收](05_R05_Native_Rate_Feedback.md#r05c-attempt001-sol-acceptance)。后续prompt由维护者发送；下一项R06c仍须历史missing-raw的独立阶段处置，P99未关闭。
 
-当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c attempt001四格已获有界接收。Luna1 独立负责 F00–F07。**
+当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c attempt001四格已获有界接收。R06c attempt002技术包完成，等待Sol复核；四项历史缺件仍待维护者决定。Luna1 独立负责 F00–F07。**
 
 跨分支汇总已有 **17/22 slices 获 Sol 有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a–c、R06a/b。接收等级各异：静态 S1、Audit、真实 S2/S3 不能互换，R06a 审计接收也不关闭历史 compatibility decision gate。
 尚有五个未完成的行：R06c、R07a/b/c/d。R07a 已有部分协议/来源审计接收及一项 pilot 的来源处置，但原五任务完整出口未达到，不计入 17 项。
@@ -103,7 +103,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2；attempt002 F1–F4关闭，19项S1复跑及CPU/CUDA短S2接收；不含完整任务 |
 | 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3；17d6388四格完整任务/H5/双reader接收，精确交集见R05 |
 | 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；历史missing raw处置仍BLOCKED，R06c/P99不关闭。 |
-| 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | PLANNED / NOT_STARTED |
+| 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | attempt002技术包已完成，等待Sol复核；17条接收/16份H5已校验，四项历史决定pending；R06c overall仍BLOCKED |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PARTIAL_AUDIT_ACCEPTED；一项 pilot 来源审计有界接收，原五任务出口未完成；详见09及主分支 Sol R07a004记录 |
 | 20 | R07b | R07a | asset/benchmarks与bench_deploy责任/verified manifests/最小配方 | S1 | 许可/闭包/一般Core能力缺失→BLOCKED | PLANNED / NOT_STARTED |
 | 21 | R07c | R07b | 五Task真实构造/reset/motion/Controller/Planner/语义/H5 | S1/S2/S3 | 任一required Task阻塞/不可表示/失败/未测→P99 blocked | PLANNED / NOT_STARTED |
@@ -260,3 +260,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 
 
 2026-10-29 R06c attempt001在camera输入HEAD `5764ebea777271a724bac34218fe5bbd830853bc`完成R01–R06 17条accepted source-bound evidence汇总和四项历史raw待决包。16份required H5原件原位SHA-256复核匹配；没有复制raw。选定provider-free S1为242 passed、7 failed，均为旧R06b worker合同a53 pin对当前c6df840的fail-closed guard拒绝，实际worker/native/model IO未启动；tripwire forbidden engine/provider imports为0。标记 `R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW`，但technical recheck保留上述部分限制，R06c整体仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，接收计数维持17/22。`phase_decision.yaml`全部批准字段为null，R07/P99/Qualification未关闭；本次无native且未取共享锁。交付与原始日志位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/`，详见[R06c结果](06_R06_Compatibility_and_Regression.md#r06c-attempt001-技术验收与历史待决包-2026-10-29)。
+
+2026-10-29 R06c attempt002在输入HEAD `04c35d137c4fb93644bce730fd47fa552a38a823`完成同一技术窗口的有界返工。`_prepare_worker`现在将合成current-source合同绑定当前真实GeoPhys/Menagerie gitlink；生产freeze guard未改，并新增digest有效wrong-pin早拒绝负例。Focused worker 8 passed；原11文件集合250 passed（新增1例），RSS均为采样峰值、tripwire各阶段无真实engine/provider导入。17条Sol接收文件/hash/decision/source报告逐行校正，R06b改用Sol已接收的`sol_review_r06b_003`、提交`7ebd49c`、实现HEAD`03fba40`与run002；16份H5仅复核原位hash/size并复用既有同bytes reader接收。正例和27类validator变异负例通过。无新native/共享锁；四项历史decision/approver/reference仍全null，R06c overall依然`BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，17/22、R07、P99与Qualification不变。完整包见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/`，详见[06 R06c attempt002](06_R06_Compatibility_and_Regression.md#r06c-attempt002-技术修复与接收引用校正-2026-10-29)。

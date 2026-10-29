@@ -2430,15 +2430,15 @@
         "R05c"
       ],
       "status": "R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT001_TECHNICAL_EVIDENCE_BUNDLE_READY; FOUR_HISTORICAL_DECISIONS_PENDING; R06C_OVERALL_BLOCKED",
+      "execution": "ATTEMPT002_TECHNICAL_BUNDLE_READY; 17_ACCEPTED_REFS_CORRECTED; S1_250_PASS; 27_VALIDATOR_NEGATIVES_PASS; HISTORICAL_DECISIONS_PENDING; R06C_OVERALL_BLOCKED",
       "required_evidence": "S1/S2/S3",
       "stop_condition": "缺required出口/历史处置→P99 blocked",
       "implementation_plan": "06_R06_Compatibility_and_Regression.md#r06c-attempt001-implementation-plan",
       "historical_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
       "prompt_sender": "MAINTAINER_ONLY",
       "scope": "Technical acceptance bundle/source-evidence applicability/targeted S1 and offline checks; pending independent phase decision; no new native",
-      "result": "17 accepted source-bound R01-R06 rows and 16 required H5 hashes were consolidated; selected provider-free recheck 242 passed/7 old R06b worker frozen-pin guards failed; no new native. Four original artifacts remain missing and no Phase II-01 disposition is approved. R06c overall remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION; P99 and Qualification remain open.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/acceptance_report.md",
+      "result": "Attempt002 fixes the seven R06b worker fixture failures and adds digest-valid wrong-pin rejection. The focused worker set passed 8 nodes; the original 11-file adjacent set passed 250 tests. All 17 accepted rows now bind explicit Sol review/source files and hashes, including the accepted R06b003 review/commit/implementation/run002. Sixteen original H5 files were rehashed against exact source/run/cell records. The positive bundle validator and 27 specified mutation rejections passed. No new native or engine/provider imports. Four historical raw artifacts remain missing and decisions remain null; overall R06c stays BLOCKED_MISSING_RAW_OR_PHASE_DECISION, 17/22 and P99/Qualification unchanged.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/acceptance_report.md",
       "attempt001_execution": {
         "input_head": "5764ebea777271a724bac34218fe5bbd830853bc",
         "branch": "codex/phase-ii-01-camera",
@@ -2457,6 +2457,71 @@
         "P99": "BLOCKED_DEPENDS_ON_R06C_AND_R07D",
         "qualification_granted": false,
         "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/"
+      },
+      "attempt002_execution": {
+        "input_head": "04c35d137c4fb93644bce730fd47fa552a38a823",
+        "branch": "codex/phase-ii-01-camera",
+        "prompt_sha256": "7ed761a2516b6105962812a0ce25217f06cf416bea68fe7da27a2baa609e7687",
+        "input_snapshot_sha256": "e80938983d87c74ed9fd3ad83d8f13b155ae3e99c14128fbbd0e8657bb6f1f53",
+        "implementation_commit": "02fe0d8a9381ede272e28582fccb51324b99c6b2",
+        "worker_fixture": {
+          "classification": "FIX_EXISTING",
+          "production_guard_modified": false,
+          "current_pins_read_from_live_gitlinks": true,
+          "historical_protected_evidence_snapshot_modified": false,
+          "wrong_pin_negative": "digest-valid wrong GeoPhys pin rejected before worker/model IO"
+        },
+        "s1": {
+          "focused_worker_nodes": {
+            "status": "PASS",
+            "passed": 8,
+            "wall_seconds": 60.72336016804911,
+            "sampled_process_group_rss_max_bytes": 178552832,
+            "run": "checks/s1_worker_nodes"
+          },
+          "adjacent_files": 11,
+          "adjacent_tests_passed": 250,
+          "adjacent_wall_seconds": 120.81805350002833,
+          "adjacent_sampled_process_group_rss_max_bytes": 208920576,
+          "import_tripwire_forbidden_modules": [],
+          "old_attempt001_242_pass_7_fail_log_preserved": true
+        },
+        "acceptance_refs": {
+          "accepted_slice_count": 17,
+          "sol_review_path_hash_decisions_bound": true,
+          "r06b_review": "sol_review_r06b_003/sol_review.md",
+          "r06b_review_sha256": "2cc0118a695ba748fc077ec29baf40217fb710798c693df46100c13093e46bb0",
+          "r06b_decision": "ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION",
+          "r06b_sol_output_commit": "7ebd49c73bf97c38caec1f839d103641d0d3a589",
+          "r06b_implementation_head": "03fba40873e651b0831ed040fec93ea12655642c",
+          "r06b_accepted_run": "run_002",
+          "old_run001_failure_preserved": true
+        },
+        "required_h5": {
+          "count": 16,
+          "rehash": "PASS",
+          "semantic_or_raw_reader_rerun": false
+        },
+        "validator": {
+          "positive": "PASS",
+          "specified_negative_cases": 27,
+          "status": "PASS",
+          "mutation_run": "checks/validator_final_mutations_27",
+          "mutation_wall_seconds": 2.5590147878974676,
+          "sampled_process_group_rss_max_bytes": 25550848,
+          "positive_run": "checks/validator_final_positive2"
+        },
+        "new_native_starts": 0,
+        "shared_native_lock_acquired": false,
+        "historical_decisions": {
+          "status": "PENDING_MAINTAINER_DECISION",
+          "decision_approved_by_reference_all_null": true
+        },
+        "R06c_overall": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "accepted_count": "17/22",
+        "P99": "BLOCKED_DEPENDS_ON_R06C_AND_R07D",
+        "qualification_granted": false,
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/"
       }
     },
     {
@@ -2606,9 +2671,9 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "616f81d5afbae93ddc458e9a76cac6253898b6d99a6c3598e2ff449c5fd57371",
+    "README.md": "09498ade8d6483c2db4bde85e5e377a6b52442981324ec2396e7d789530e7a93",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "d2f2347c6b31dd590095a9fd99286618db7e523d432107899cbd838a24843b93",
+    "06_R06_Compatibility_and_Regression.md": "d698d62ef83e0f26760c3737794034d6ded5a90c8df5530be6fc4d2cc8f6721d",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2617,7 +2682,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "e7c88dfa0490d6a972641a2de13872fd10807be352e6292f4f21d02da258d20f"
+    "07_Execution_Order_and_Acceptance.md": "cabcf56663705506856cca2e2f707449b8631b5d76063f735217a2bf3df4a493"
   },
   "revision_kind": "R05C_ATTEMPT001_BOUNDED_FOUR_CELL_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
