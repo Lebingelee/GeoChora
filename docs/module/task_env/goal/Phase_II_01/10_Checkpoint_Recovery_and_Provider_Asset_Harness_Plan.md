@@ -1,11 +1,11 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt001为部分实现候选，等待Sol复核**。
-F04 attempt001已开始并完成有界S1与Menagerie Panda静态转换准备；真实Core/native闭环仍因两种源均缺少合格的F02 upstream validation report而未执行。
+更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt002已完成两来源有界真实Core/Isaac运行但物理门失败，等待Sol复核**。
+F04 attempt001仍保留为静态候选的历史状态。attempt002增加仅针对两个冻结Panda派生样本的`local-validated`来源合同，接通既有Core/Isaac路径并生成四份H5；抓手开合、来源标定FK及原reader时钟比较尚未收口，故F04总体仍为PARTIAL。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt003已获Sol接收`ACCEPTED_BOUNDED_F03_S1`，范围仅限synthetic I/O下的真实Core链与末行reader，attempt002 CPU Pendulum三步范围偏差继续保留。F04 attempt001现有Isaac Core adapter候选，但A/B均未达到生产source admission；候选等待Sol复核。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt003已获Sol接收`ACCEPTED_BOUNDED_F03_S1`，范围仅限synthetic I/O下的真实Core链与末行reader，attempt002 CPU Pendulum三步范围偏差继续保留。F04 attempt001为原始静态候选记录；attempt002已针对两个固定本地验证的Panda派生样本运行真实Core/Isaac路线，结构读回完成但冻结物理阈值失败，当前为PARTIAL并等待Sol复核。
 
 未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。F01已接收的GPU基线不代表Core Isaac provider已接通。
 
@@ -450,3 +450,58 @@ provider-free冻结列表v3为13个精确nodeid；collection 13/13，仅运行al
 当前Menagerie Gitlink固定为`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。本次将当前工作树中的`panda.xml`及其68个固定闭包文件逐项与既有source inventory比较，68/68 bytes和SHA匹配，合计34,307,151 bytes，保留原文件不变。受共享native worker启动资源门限制，转换器没有运行：最近一次锁内预检MemAvailable为6,081,589,248 bytes，低于要求的6 GiB；GPU空闲6,637 MiB，高于5 GiB。预检未启动converter worker，锁已释放。故B目前没有USD输出/转换报告，也没有Core/native/H5验收。
 
 本次没有启动Kit/App、Isaac GPU PhysX或物理步进；没有F04 H5、独立native reader、真实Target/Ack运动或碰撞响应证据。共享锁只在Menagerie转换期间持有，converter退出后已释放。当前官方样本仍缺可由F02接受、绑定完整依赖闭包的上游验证报告；Menagerie虽已生成7文件USD候选并完成静态组合/DOF范围检查，也仍缺F02 upstream validation report，不能设置`source_verified=true`。Candidate总体为`F04_PARTIAL_SOURCE_VERIFICATION`，不满足A/B闭环或F04全包token，不表示Sol接收、Provider admission、S2/S3或Qualification。完整调用链/接口表、源文件/hash、run原件、资源及保护输入检查见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_001/`。
+
+<a id="f04-attempt002-isaac-core-adapter-two-source-native"></a>
+
+## F04 attempt002：本地验证来源、Core adapter与两来源真实闭环（2026-10-29，Luna候选，待Sol复核）
+
+本attempt从`develop-full@d67b718dbb0ef258d0e9d1e7450d81d4b917af93`开始。F04 attempt001 的207项保护清单以及本包469项冻结输入均按包清单逐项复核匹配；旧attempt001、F00–F03受保护原件未覆盖。此处是新候选结果，不追溯改变attempt001状态，也不表示Sol接收。
+
+### Owner与调用路径修订
+
+| Owner | 输入/输出与职责 | 本次结果与证据边界 |
+| --- | --- | --- |
+| `task_env/artifacts/contracts.py` / `artifacts.__init__` | 新增`UsdLocalValidationReportV1`、`UsdAssetDeliveryLocalV1`，绑定原来源清单/变体、派生闭包、recipe/options/checker、报告文件和`local-validated`来源身份 | 旧`UsdValidationReportV1` / `UsdAssetDeliveryV1`语义不变；local报告不设置F02 upstream `source_verified` |
+| `task_env/assembly/usd_delivery.py`、`assembly/source.py`、`runtime/sessions/source.py` | 由既有loader、closure校验及source lease验证本地派生字节，并传递准确的来源与报告身份 | 正例只限固定官方Panda及当前Menagerie Panda两组recipe；清单、报告、entry、派生文件篡改拒绝 |
+| `runtime/sessions/api.py`、`control.py`、`native_io.py`、`isaac_native_io.py` | 通过既有materialize、Core session和native I/O边界完成来源准入、public bootstrap、DOF映射、state/control/step/cleanup | 两个样本在实际metadata出现后建立native receipt；只允许冻结build/backend/device/profile及来源交集，不创建第二套Session |
+| `leaf_control.py`、`controllers/canonical/position_profile.py`、`tasks/position_candidate/builder.py` | 复用既有Position目标与控制路线，处理官方来源DOF名字、hand开度、延迟receipt及来源标定运动学 | Native轨迹揭示gripper opening与FK oracle不合格；目标阈值没有放宽 |
+| `tasks/reference_env.py`、既有Recorder/H5 | 既有public reset/step、记录、finalize与close owner | 四个新H5各100 transitions、101 observations；使用F04 native profile，未借用F03 synthetic provenance |
+
+Source provenance的边界是：本地派生recipe与checker验证了列明的样本字节和装配内容，不等于上游签发的通用USD验证报告，也不证明其他revision、资产、Isaac build或任务兼容。当前准入仍精确约束两个source family、6.2.0.0、CUDA `cuda:0`、GPU PhysX、`best_effort`、state-only和100Hz×5×2ms。
+
+### 来源准备与S1
+
+A使用F01实际官方Panda来源；B使用冻结Menagerie gitlink所指Panda闭包并通过Isaac转换器建立本地派生USD。对两者分别生成task scene delivery、PhysX drive/资源配方、本地验证报告及manifest；原始输入与attempt001文件保持只读。详细entry、source/derived closure、工具recipe、报告和SHA在本包`assets/`、`sources/`和`evidence/`原件中。
+
+冻结的provider-free选择含20个精确nodeid，collection与执行均为20/20通过；该run Kit/native/physics启动均为0。它覆盖local loader正例及篡改、Core Env/Recorder synthetic fixture seam、本地来源准入、source family拒绝、App owner lease与关闭、DOF name mapping、COM/frame与unit/profile拒绝等。它没有替代真实native路径的S1，更不能消除后续native观察到的物理失败。
+
+### 真实CUDA/GPU PhysX运行
+
+Native计划冻结在实现源码哈希与阈值之后。实际唯一完成A+B的worker为run `110_both_sources_one_app_cli_fixed`；同一Isaac App进程按官方Panda、Menagerie Panda顺序运行。每来源两次同Env episode reset，每episode 100 public intervals；每个interval恰五个accepted的2ms physics step。每个family有36次reset/bootstrap step，native总量为2,000个public physics step+72个bootstrap step，即2,072 steps/4.144模拟秒。每个episode含100 transitions、101 observations。四个H5的SHA-256为：
+
+| 来源 / episode | SHA-256 | 记录结果 |
+| --- | --- | --- |
+| official Panda / 00 | `85658db6c2b919d98ab50943423c997fca58253a3332469b25ed00983e9e1fba` | 100 transitions / 101 observations |
+| official Panda / 01 | `6b84e55a635449f35f5ee7d3196e85dca501ce76c5674a99f9cc0cd5454f3102` | 100 transitions / 101 observations |
+| Menagerie Panda / 00 | `fb17323662fe1e41e657620daafd9b9c6f59b0158a62bccff548e9092bec58a0` | 100 transitions / 101 observations |
+| Menagerie Panda / 01 | `fd37392a12c02a8e6e88e445cf98676cb1179297574aa331683cffd3ffb97da0` | 100 transitions / 101 observations |
+
+worker exit 0，native进程组完全退出后释放共享锁。记录的采样值：worker组RSS最大约5.11GB，最低MemAvailable约4.10GB，GPU最低空闲4,553MiB，进程显存最大采样1,845MiB；网络接收增量约37.3MB，Omniverse缓存增长0，native日志23,382 bytes，输出目录约267.0MB，预算记录无超项。以上RSS/GPU/RAM为采样值，不称硬峰值。
+
+前序失败run全部保留。run080/087因Core runtime缺少Python依赖而在App前失败；run098因PXR在SimulationApp之前导入而启动失败；run108因worker CLI未接受`both`参数而退出，未消耗App start。修正后run110完成两个来源。App start总额为2/2，故本attempt没有后续Kit重跑。原失败日志、native plan副本和每次source binding均保存在`runs/`与`evidence/`。
+
+### Reader与物理Gate
+
+原冻结independent reader对有效H5内的浮点clock使用精确相等，run中以`0.010000000000000002`对`0.01`误拒第一边界。原reader、原H5和witness均未改写。离线reader副本只将时间比较改为`1e-12`秒误差，独立加载四个真实H5后核验404/404边界及观测行，两个family各拒绝20/20篡改；还核验了source/episode cross-witness graft拒绝。该副本把物理结果准确记为失败；它不把文件宣布为物理合格。reader与bundle原件、诊断副本及stdout/stderr均在`evidence/`和run110 postrun目录。
+
+四个episode均有三项物理门失败：gripper opening change约0.00974m，低于冻结阈值0.015m；来源标定FK最大位置误差约0.568–0.611m，超过0.01m；FK orientation误差约0.878–0.959rad，超过0.08rad。自由刚体reset/零速度、自由下落及承载面settle门通过。没有改阈值、缩短轨迹或把失败状态并为PASS。
+
+worker family receipts与H5已写入，但Isaac `SimulationApp.close()`使用快速shutdown提前终止Python进程，导致worker根aggregate `native_result.json`未写出。父进程按原始family receipts、resource/lock/exit记录离线生成了显式`PARENT_RECONCILED`视图；没有覆盖或伪称producer原始receipt。独立reader所用的reconciled receipt与原始文件、派生方式、hash分别留证。当前正式worker exit为0，App close/aggregate receipt的最终写回顺序仍需修复并经新run验证。
+
+### 结论与最小后续工作
+
+当前结果为`F04_PARTIAL_PENDING_SOL_REVIEW`。A/B真实Core与CUDA/GPU PhysX路线均被实际调用，四份H5结构读回及tamper检查有效；但抓手控制幅度、两套source-calibrated FK与原reader clock实现未达到验收要求，且producer聚合receipt受App fast shutdown影响缺失。不能据此报告`F04_ISAAC_CORE_TWO_SOURCE_S1_S2_S3_PASS_PENDING_SOL_REVIEW`，不能自授Sol接收、一般Isaac/provider admission、S2/S3或Qualification。
+
+若后续获得新attempt授权，最小修复点为：从公开运动学/关节顺序复核两来源kinematics binding与FK对齐；针对真实PhysX drive检查手指effective stiffness/damping/limits/targets，不能只改变阈值；在保留更精确的binary-clock语义下修正reader比较；将aggregate receipt写入安排在可能`os._exit`的App close之前，或让独立parent receipt成为正式producer-owned协议后更新reader/合同。对这些变更需先在provider-free受影响S1验证，再按新source hashes和冻结oracles执行新native run。本attempt预算已耗尽，不在本包内重启Kit。
+
+完整report、evidence、commands、run ledger、资源/锁记录、local delivery报告、四份H5/witness及原失败日志位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/`。此前F00–F03、F04 attempt001原件保持保留；不启动F05或其他slice。

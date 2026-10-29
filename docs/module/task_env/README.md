@@ -10,15 +10,15 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | 冻结任务、Experiment、randomization、Evidence/Judge | [task-artifact](task-artifact.md) |
 | USD delivery、依赖闭包与 Provider 表示选择（F02 advanced） | [public-api: USD delivery](public-api.md#usd-delivery-and-provider-representation-selection-f02) |
 | F03 版本化 USD Position candidate 与合成 I/O Core S1 边界 | [public-api: F03](public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission) |
-| F04 Isaac Core adapter 候选与真实 source 准入限制 | [public-api: F04](public-api.md#f04-isaac-core-adapter-attempt001) |
+| F04 Isaac Core adapter 与两类 Panda 来源的有界结果 | [public-api: F04](public-api.md#f04-isaac-core-adapter-attempt002) |
 | runtime/state/timebase、controller、Expert lifecycle、providers | [runtime-and-providers](runtime-and-providers.md) |
 | recorder/H5/replay、learning、rendering | [recording-and-learning](recording-and-learning.md) |
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
 | 首个失败边界、重试/恢复与升级 | [troubleshooting](troubleshooting.md) |
 
-F04 attempt001已形成Isaac Core adapter实现候选，13项provider-free S1通过。官方Panda和转换后的Menagerie源仍缺生产准入所需的F02上游验证报告；本attempt未启动Kit/GPU/physics，也未生成F04 H5。详见[有界F04记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt001-isaac-core-adapter)。
+F04 attempt002已将两个固定 Panda 样本接入精确的本地验证来源路线，并在 Isaac Sim 6.2.0.0 CUDA/GPU PhysX 下生成四份 H5；但抓手开合幅度与来源标定 FK 的物理验收门未通过，独立读回也发现原 reader 的精确浮点时钟比较问题。因此总体仍为 `F04_PARTIAL_PENDING_SOL_REVIEW`，不代表通用 provider admission 或 Qualification。详见[有界F04 attempt002记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native)。
 
-F03 attempt003 已由 Sol 接收为 `ACCEPTED_BOUNDED_F03_S1`，范围限于 synthetic I/O 下的 Core 调用链与最终 T+1 reader；attempt002 的真实 CPU Pendulum 三步范围偏差仍作为历史原件保留且不计入接收证据。F04 attempt001 的 Isaac adapter 目前只是待复核实现候选：官方 USD 依赖闭包/上游 F02 报告门未满足，Menagerie 转换也因启动前 RAM 低于6 GiB而未运行，因此没有真实 Core/native/H5结果。查看[F03收口](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure)和[F04 attempt001](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt001-isaac-core-adapter)。
+F03 attempt003 已由 Sol 接收为 `ACCEPTED_BOUNDED_F03_S1`，范围限于 synthetic I/O 下的 Core 调用链与最终 T+1 reader；attempt002 的真实 CPU Pendulum 三步范围偏差仍作为历史原件保留且不计入接收证据。F04 attempt001 的静态来源与无 native 状态仅为历史记录；attempt002 的两来源实测及未过物理门结果见[F04 attempt002](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native)。
 
 ## 快速开始
 

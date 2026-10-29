@@ -62,10 +62,10 @@ bytes. `UsdRuntimeSourceV1` binds the delivery, `TaskArtifactV1`, canonical
 Scene/TaskSource identities, reset pose/free Joint maps, body/Frame bindings
 and named scalar drive targets. This is a construction declaration, not by
 itself Provider admission. Production `RuntimeSession.materialize()` rejects
-synthetic or unverified USD. F04 attempt001 adds a narrow Isaac adapter
-candidate to the existing Core route, but it cannot run until a source passes
-the exact F02 upstream-validated gate. Do not pass synthetic source onward as
-runtime evidence.
+synthetic or unverified USD. F04 attempt001 initially had only an adapter/source
+candidate; attempt002 adds a separate, exact-sample `local-validated` route
+described below. A local report does not establish F02 `upstream-validated`
+provenance. Do not pass synthetic source onward as runtime evidence.
 
 `legacy_execution_projection()` preserves the exact old `ExecutionSpec`
 mapping. It projects `ExecutionSpecV1` only when all choices are representable
@@ -118,27 +118,38 @@ attempt003 closure](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint
 the [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission),
 and the [historical attempt001 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
-## F04 Isaac adapter candidate (2026-10-29; pending Sol review)
+## F04 Isaac Core adapter and bounded two-source evidence (2026-10-29; partial, pending Sol review)
 
-The candidate wires the existing versioned Position input, production source
-admission, shared Core `RuntimeSession` lifecycle, native I/O boundary, named
-DOF receipt and public Env/Recorder owners. The target is Isaac Sim 6.2.0.0,
-CUDA `cuda:0`, GPU PhysX, `best_effort`, state-only and 100 Hz with five 2 ms
-steps. Its frozen provider-free selection passed 13/13; that includes the F03
-synthetic call chain and F04 rejection/cleanup boundaries, not successful F04
-materialization or physics.
+F04 attempt001 is a historical source/adapter candidate only; see its dated plan
+record. Attempt002 added `UsdLocalValidationReportV1` and
+`UsdAssetDeliveryLocalV1` as separate versioned owners for the two fixed derived
+Panda samples. These values bind the original source inventory and variants,
+derived output closure, recipe/options, checker and report bytes. Their
+`local-validated` provenance is distinct from F02 `upstream-validated` and
+`synthetic_fixture`; it never sets the upstream `source_verified` bit. Runtime
+admission is limited to the exact frozen official-Panda and Menagerie-Panda
+sample recipes and execution profile.
 
-The official Panda bytes were inventoried and its selected variant schema shows
-7+2 joints. Production admission remains closed: the all-authored USD dependency
-closure has unresolved Robotiq and `OmniPBR.mdl` references, and the upstream
-Transformer `report.json` does not bind the F02 source-closure fields required
-by `UsdValidationReportV1`. Do not locally relabel or wrap that report to set
-`source_verified=true`. The current Menagerie source closure matches its 68-file
-inventory. The installed Isaac 6.2 converter produced a seven-file local USD
-candidate; static composition and all nine DOF limit ranges were checked,
-including radians-to-degrees for revolute USD limits. This is not an upstream
-F02 validation report and leaves `source_verified=false`. No F04 native Core/H5
-result, S2/S3 or Qualification exists. See [F04 attempt001](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt001-isaac-core-adapter).
+The existing Core RuntimeSession, native-I/O seam, Position control, public Env,
+Recorder and reader were exercised. Provider-free S1 passed 20/20 exact node IDs
+with zero Kit/native starts. The CUDA/GPU PhysX worker ran both sources at Isaac
+Sim 6.2.0.0, CUDA `cuda:0`, state-only, `best_effort`, 100 Hz and five 2 ms
+substeps. Each source produced two 100-transition/101-observation closed H5s;
+each interval advanced five physics steps. The independent diagnostic readback
+verified 404/404 boundary/observation rows and rejected 40/40 tamper cases.
+
+This attempt remains `F04_PARTIAL_PENDING_SOL_REVIEW`: all four episodes missed
+the frozen gripper opening-change gate (about 0.00974 m observed vs 0.015 m
+required) and source-calibrated FK position/orientation gates (about
+0.568–0.611 m and 0.878–0.959 rad error). The free-body drop/settle checks
+passed. The original reader also has an exact-float clock comparison that
+rejects valid recorded time values; a separate diagnostic reader copy used a
+1e-12-second tolerance without editing the original. Do not loosen physical
+thresholds or infer a completed qualification from the structural readback.
+The worker exited 0, but fast `SimulationApp.close()` shutdown skipped writing
+the producer's root aggregate receipt; parent-side reconciliation is separately
+labeled and raw receipts remain preserved. No broader Isaac/provider,
+Qualification or F05 claim follows. See [F04 attempt002](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native).
 
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver

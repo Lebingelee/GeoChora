@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "b2f6494e8c0f5b7d477882c458a60649ffe4dd4984a51615d776bc6372306dfc",
+    "07_Execution_Order_and_Acceptance.md": "ed5b239576737914a0304c7f742958bcf994dff2b3bb81609f2ff2a3c98cf4a2",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "46bc87f1def13f513acdf31f8a4903d95e2a04ed58f39fb5f25c1880d2578d02",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "70dc81126f20db1a6048a26e81557399e700d20624af8375b7ebcbb11a551992",
     "README.md": "8936f9cfa37a6a056978995b698df6361b3ad60c3e8f1f03ac50f84e067675d0"
   },
-  "revision_kind": "F04_ATTEMPT001_ISAAC_CORE_ADAPTER_PARTIAL_CANDIDATE_UPDATE",
+  "revision_kind": "F04_ATTEMPT002_LOCAL_DERIVED_DELIVERY_AND_TWO_SOURCE_ISAAC_PARTIAL",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3638,7 +3638,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "F04 attempt001 implementation/S1/source investigation and bounded Menagerie USD conversion candidate; no provider admission, native Core route, or qualification claim.",
+  "planning_submission_this_revision": "F04 attempt002 adds exact-sample local-derived USD delivery/report contracts and an existing-Core Isaac adapter route, records 20/20 provider-free S1 plus two-source CUDA/GPU PhysX runs and four H5 readbacks; frozen gripper/FK thresholds fail and reader clock comparison requires repair. No F04 acceptance or F05 claim.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4379,6 +4379,19 @@
       "f05_started": false,
       "qualification_granted": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_001/report.md"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "F04_ATTEMPT002_TWO_SOURCE_ISAAC_CORE_PARTIAL",
+      "input_head": "d67b718dbb0ef258d0e9d1e7450d81d4b917af93",
+      "result": "F04_PARTIAL_PENDING_SOL_REVIEW",
+      "provider_free_s1": "20/20 exact nodes; no Kit/native/physics",
+      "native": "2 App starts; official Panda and Menagerie Panda; 2072 steps; four closed H5 files",
+      "reader": "404/404 rows and 40/40 tamper rejection through diagnostic reader copy; original exact float clock check fails",
+      "physical": "all four episodes failed frozen gripper opening and source-calibrated FK thresholds; no threshold changes",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/report.md",
+      "f05_started": false,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -4547,7 +4560,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_ACCEPTED_BOUNDED_F03_S1; F04_PARTIAL_SOURCE_VERIFICATION_PENDING_SOL_REVIEW",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_ACCEPTED_BOUNDED_F03_S1; F04_PARTIAL_PENDING_SOL_REVIEW",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4755,24 +4768,23 @@
     ],
     "new_native_runs": 0,
     "software_tests_run_this_documentation_revision": [
-      "F03 call-chain/fault tests: 5 passed; run036_final_f03_core_chain_faults_r3.",
-      "F03 independent reader: two H5, eight tamper classes; run033_final_independent_h5_reader_r1.",
-      "F03 frame/state/execution contract: 20 passed; run023_f03_contract_frame_state_regression_r1.",
-      "C02b Position/H5: 15 passed; run026; P99 candidate: 15 passed; run027; old R02c reader: 2 passed; run029.",
-      "F02 attempt002 plus affected legacy asset identity/closure tests on clean implementation commit: 45 passed; run037. Dirty-tree precursor run024 had 25/26 and is retained.",
-      "Protected F00/F01/F02/Sol F02/F03 attempt001 hash manifests: 676/676 files pass; run038.",
-      "Touched Markdown relative links + 12 document hashes + manifest + git diff --check: pass; run041 (157 links).",
-      "TaskEnv Skill static metadata/local-link/source-path checker: pass; run040."
+      "F04 attempt002 frozen provider-free S1: 20 exact node IDs passed; run105.",
+      "F04 attempt002 native worker: both source families executed; worker exit 0, 2072 steps including bootstrap; all four episodes failed gripper/FK physical gates.",
+      "Independent diagnostic H5 readback: 404/404 T+1 rows, 40/40 tamper cases rejected; physical status remains failed; original reader exact-float clock defect retained.",
+      "Protected prior hash set 228/228, F04 attempt001 207/207 manifest, and frozen native implementation source hashes 26/26 verified.",
+      "TaskEnv Module Skill checker: PASS in Core Python; system Python first lacked PyYAML and is recorded in commands.json.",
+      "Touched TaskEnv/Phase II Markdown local links/anchors: 121 checked, 0 issues; planning manifest and all 12 Phase II Markdown hashes pass.",
+      "git diff --check: PASS; global docs validator: NOT RUN."
     ],
-    "local_update_receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
+    "local_update_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/skill_refresh_receipt.md",
     "documentation_validation": {
-      "status": "PASS",
-      "bounded_local_links_checked": 157,
+      "status": "PASS_BOUNDED_LOCAL_CHECKS",
+      "bounded_local_links_checked": 121,
       "phase_markdown_hashes_checked": 12,
       "planning_manifest_json": "PASS",
-      "module_skill_checker": "PASS; run040_taskenv_skill_static_check_r1",
-      "protected_input_manifests": "676/676 PASS; run038_protected_inputs_hash_recheck_r1",
-      "touched_doc_hash_link_checker": "PASS; run041_final_docs_hash_links_manifest_r2",
+      "module_skill_checker": "PASS; Core Python 3.12, geochora-task-env metadata/local-links/source-paths",
+      "protected_input_manifests": "228/228 prior hashes; 207/207 F04 attempt001 manifest; 26/26 frozen native implementation hashes",
+      "touched_doc_hash_link_checker": "PASS; 121 relative links and anchors checked",
       "global_docs_validator": "NOT_RUN"
     },
     "latest_r03c_execution": {
@@ -4871,6 +4883,22 @@
         ],
         "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
         "result": "SYNTHETIC_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION"
+      },
+      {
+        "date": "2026-10-29",
+        "slice": "F04 attempt002",
+        "authorized": true,
+        "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f04_002/luna1_prompt.md",
+        "prompt_sha256": "880f7c246d74bf72030bf68e44fe1bd717ac4f38572f6f8a797c4fae5847704f",
+        "input_head": "d67b718dbb0ef258d0e9d1e7450d81d4b917af93",
+        "scope": "Exact-sample local USD report/delivery contract, existing-owner adapter repair, frozen provider-free S1, A/B CUDA GPU PhysX run within 2 App starts, independent H5 readback, docs/Skill and local commit.",
+        "prohibitions": [
+          "No F05 or other slice.",
+          "No provider pin/dependency mutation.",
+          "No push, merge, rebase, cherry-pick, tag."
+        ],
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/report.md",
+        "result": "F04_PARTIAL_PENDING_SOL_REVIEW"
       }
     ],
     "f00_attempt001": {
@@ -4982,7 +5010,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F04 attempt001 partial candidate, actual diff, evidence and retained failures; do not start F05 before review and a new package.",
+      "selected_next": "Sol review of F04 attempt002 actual diff, partial native/reader evidence and retained failures; no F05 until review and a new package.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -4994,11 +5022,11 @@
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
       "F02": "ACCEPTED_BOUNDED_F02; delivery/report/closure and representation selection only; no runtime admission or real upstream delivery received.",
-      "reason": "Sol accepted F03 attempt003 as ACCEPTED_BOUNDED_F03_S1. F04 attempt001 started under its own frozen authorization. Its source/admission gate remains closed for both sources, so no real Core/native execution was attempted; Sol review is the next action.",
+      "reason": "F04 attempt002 exercised the exact local-validation and Core/Isaac route for both frozen Panda samples, but all episodes failed frozen gripper/FK thresholds and the original reader rejects valid float clocks. Sol review is next; native App budget is consumed.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
-      "F04": "PARTIAL_SOURCE_VERIFICATION_PENDING_SOL_REVIEW; provider-free S1 13/13 and Menagerie static conversion candidate completed; A and B still lack F02 upstream-validated reports; no Kit/App/GPU PhysX/physics or F04 H5."
+      "F04": "F04_PARTIAL_PENDING_SOL_REVIEW; attempt002 provider-free S1 20/20, two source families run through CUDA/GPU PhysX, four H5 structural readbacks; gripper and FK physical gates fail, original reader clock and producer aggregate receipt ordering need repair."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5274,7 +5302,7 @@
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
     },
-    "latest_authorization": "Maintainer directly authorized F04 attempt001 in the 2026-10-29 conversation: implement the bounded Isaac Core adapter, run frozen provider-free S1, investigate and prepare the two exact Panda sources, convert current pinned Menagerie Panda, and perform CUDA/GPU PhysX native validation only when the frozen source/admission and resource gates pass. No F05 or other slice.",
+    "latest_authorization": "Maintainer-provided self-contained F04 attempt002 package; input d67b718dbb0ef258d0e9d1e7450d81d4b917af93. Authorized local derived-delivery contracts, existing-Core adapter repair, exact provider-free S1, two-source CUDA/GPU PhysX bounded run, H5 readback, docs/Skill and local commits. No F05 or other slice.",
     "f01_attempt002_execution": {
       "date": "2026-10-29",
       "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
@@ -5646,6 +5674,34 @@
       ],
       "qualification_granted": false,
       "next": "Sol review; do not start F05"
+    },
+    "f04_attempt002_execution": {
+      "input_head": "d67b718dbb0ef258d0e9d1e7450d81d4b917af93",
+      "branch": "develop-full",
+      "result": "F04_PARTIAL_PENDING_SOL_REVIEW",
+      "prompt_sha256": "880f7c246d74bf72030bf68e44fe1bd717ac4f38572f6f8a797c4fae5847704f",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/report.md",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/",
+      "local_source_contracts": [
+        "UsdLocalValidationReportV1",
+        "UsdAssetDeliveryLocalV1"
+      ],
+      "source_A": "Official F01 Panda selected sample through exact local-validated derived delivery; upstream source_verified remains false.",
+      "source_B": "Pinned current Menagerie Panda selected sample through exact local-validated converted delivery; upstream source_verified remains false.",
+      "provider_free_s1": "20/20 exact node IDs passed, Kit/native/physics starts 0.",
+      "native_execution": "Isaac Sim 6.2.0.0; CUDA cuda:0; GPU PhysX; best_effort; state-only; 100 Hz x 5 x 2 ms.",
+      "app_starts": "2/2 consumed (098 pre-physics failure, 110 combined worker).",
+      "native_run": "110_both_sources_one_app_cli_fixed; worker exit 0; 2072 steps including bootstrap; 4.144 simulated seconds.",
+      "h5_files": 4,
+      "transitions_total": 400,
+      "observations_total": 404,
+      "independent_reader_rows_verified": "404/404 boundaries and 404/404 observations via diagnostic copy; original reader rejects exact binary clock; 40/40 tamper cases rejected.",
+      "physical_gates": "All four episodes fail gripper opening change (~0.00974m vs 0.015m) and source-calibrated FK position (~0.568-0.611m vs 0.01m) and orientation (~0.878-0.959rad vs 0.08rad). Free-body drop/settle passed; thresholds unchanged.",
+      "resource": "No recorded budget overrun; sample maxima/minima and lock/exit receipts in run ledger.",
+      "producer_root_receipt": "Missing because fast SimulationApp.close terminates before aggregate receipt write; parent reconciliation separately labeled.",
+      "sol_review": "PENDING",
+      "f05_started": false,
+      "qualification_granted": false
     }
   }
 }

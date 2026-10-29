@@ -14,7 +14,7 @@ from typing import Any
 from ...artifacts import ExecutionSpecV1, PoseWorld, TaskArtifactV1
 from ...artifacts.execution import ResetSample
 from ...assembly.source import UsdSnapshotLeaseV1
-from .free_joint_state import PublicRigidBodyReadbackV1, _quaternion_wxyz
+from .free_joint_state import PublicRigidBodyReadbackV1
 from .native_io import (
     NativeAdvanceReceiptV1, NativePositionWriteAckV1,
     NativeResetWriteReceiptV1, NativeRuntimeIOMetadataV1,
@@ -39,6 +39,8 @@ class IsaacSimAppOwnerV1:
     def __init__(self) -> None:
         self._app = None
         self._closed = False
+        self._process_lifetime_holds = 0
+        self._close_requested = False
         self.start_attempts = 0
         self.close_attempts = 0
 
@@ -71,17 +73,37 @@ class IsaacSimAppOwnerV1:
             try:
                 _validate_isaac_task_thread_count(actual)
             except RuntimeError:
-                app, self._app = self._app, None
-                self._closed = True
-                app.close()
+                self._close_now()
                 raise
         return self._app
 
     def close(self) -> None:
         if self._closed:
             return
+        if self._process_lifetime_holds:
+            self._close_requested = True
+            return
+        self._close_now()
+
+    def retain_process_lifetime(self) -> None:
+        """Keep the process App alive while sequential Core Env leases are exchanged."""
+        if self._closed:
+            raise RuntimeError("cannot retain a closed process Isaac App")
+        self._process_lifetime_holds += 1
+
+    def release_process_lifetime(self) -> None:
+        if self._process_lifetime_holds <= 0:
+            raise RuntimeError("process Isaac App lifetime hold is not retained")
+        self._process_lifetime_holds -= 1
+        if self._process_lifetime_holds == 0 and self._close_requested:
+            self._close_now()
+
+    def _close_now(self) -> None:
+        if self._closed:
+            return
         self.close_attempts += 1
         self._closed = True
+        self._close_requested = False
         app, self._app = self._app, None
         if app is not None:
             app.close()
@@ -120,6 +142,17 @@ def _pose_from_view(view) -> tuple[tuple[float, float, float], tuple[float, floa
     return p, q
 
 
+def _body_local_com_offset_from_public_tensor_pose(com_position_body_local_m) -> tuple[float, float, float]:
+    """Validate the Tensor RigidPrim COM translation, which is body-local in Isaac 6.2."""
+    if len(com_position_body_local_m) != 3:
+        raise ValueError("public rigid-body COM translation must have three components")
+    result = tuple(float(value) for value in com_position_body_local_m)
+    import math
+    if any(not math.isfinite(value) for value in result):
+        raise ValueError("public rigid-body COM translation must be finite")
+    return result
+
+
 def _native_prim_path(native_name: str, entry_prim: str) -> str:
     """Resolve an explicit stage prim path or entry-root-relative path."""
     if type(native_name) is not str or not native_name or "\\" in native_name:
@@ -135,6 +168,8 @@ def _native_prim_path(native_name: str, entry_prim: str) -> str:
 
 class IsaacSimNativeRuntimeIOV1:
     """Implement the six Core native-I/O operations over public Isaac APIs."""
+
+    execution_provenance_kind = "native_runtime"
 
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
@@ -166,8 +201,8 @@ class IsaacSimNativeRuntimeIOV1:
         self._open_public_runtime()
 
     def _open_public_runtime(self) -> None:
-        self._app_owner.open()
         try:
+            self._app_owner.open()
             import omni.usd
             import torch
             from pxr import UsdGeom, UsdPhysics
@@ -240,22 +275,6 @@ class IsaacSimNativeRuntimeIOV1:
                 raise RuntimeError("public SimulationManager did not retain the requested cuda:0 device")
             self._articulation = Articulation(str(articulation_roots[0].GetPath()))
             self._articulation_path = str(articulation_roots[0].GetPath())
-            self._dof_names = tuple(str(name) for name in self._articulation.dof_names)
-            expected_dofs = {
-                *(f"panda_joint{index}" for index in range(1, 8)),
-                "panda_finger_joint1", "panda_finger_joint2",
-            }
-            if len(self._dof_names) != 9 or set(self._dof_names) != expected_dofs:
-                raise ValueError("F04 requires the exact seven named Panda Arm and two finger DOFs")
-            self._dof_index = {name: index for index, name in enumerate(self._dof_names)}
-            low_array, high_array = self._articulation.get_dof_limits()
-            lows = _tensor_rows(low_array, width=len(self._dof_names), label="joint lower limits")[0]
-            highs = _tensor_rows(high_array, width=len(self._dof_names), label="joint upper limits")[0]
-            self._position_limits = {
-                name: (float(lows[index]), float(highs[index]))
-                for index, name in enumerate(self._dof_names)
-            }
-
             entry_prim = delivery.entry_prim
             for semantic, native in self._source.bodies.items():
                 path = _native_prim_path(native, entry_prim)
@@ -273,16 +292,14 @@ class IsaacSimNativeRuntimeIOV1:
                     prim = self._stage.GetPrimAtPath(path)
                     if not prim or not prim.IsValid():
                         raise ValueError(f"USD RuntimeSource Frame binding is not a composed prim: {path}")
-                    self._frame_views[semantic] = XformPrim(path)
+                    self._frame_views[semantic] = (
+                        RigidPrim(path) if prim.HasAPI(UsdPhysics.RigidBodyAPI) else XformPrim(path)
+                    )
             for semantic in self._source.free_joints:
                 body_path = _native_prim_path(self._source.bodies[semantic], entry_prim)
                 self._free_views[semantic] = self._body_views[body_path]
             if len(self._free_views) != 1:
                 raise ValueError("F04 requires exactly one mapped floating rigid body")
-            for view in self._body_views.values():
-                if hasattr(view, "is_physics_tensor_entity_valid") and not view.is_physics_tensor_entity_valid():
-                    raise RuntimeError("public RigidPrim view is not bound to a valid physics entity")
-
             # Isaac's tensor views become live only after the public timeline
             # starts and Kit processes its stage callbacks. Count this bootstrap
             # separately from Core reset and public interval advances.
@@ -296,9 +313,25 @@ class IsaacSimNativeRuntimeIOV1:
                 int(SimulationManager.get_num_physics_steps()),
                 float(SimulationManager.get_simulation_time()),
             )
-            for view in (self._articulation, *self._body_views.values()):
-                if not view.is_physics_tensor_entity_valid():
+            for view in (self._articulation, *self._body_views.values(),
+                         *(v for v in self._frame_views.values() if isinstance(v, RigidPrim))):
+                if hasattr(view, "is_physics_tensor_entity_valid") and not view.is_physics_tensor_entity_valid():
                     raise RuntimeError("public physics tensor view did not initialize after Kit bootstrap")
+            self._dof_names = tuple(str(name) for name in self._articulation.dof_names)
+            expected_dofs = set(self._source.joint_targets.values())
+            if len(self._dof_names) != 9 or len(set(self._dof_names)) != 9 or set(self._dof_names) != expected_dofs:
+                raise ValueError(
+                    "public articulation DOF names differ from the exact source-bound nine-joint mapping: "
+                    f"actual={self._dof_names!r}, expected={sorted(expected_dofs)!r}"
+                )
+            self._dof_index = {name: index for index, name in enumerate(self._dof_names)}
+            low_array, high_array = self._articulation.get_dof_limits()
+            lows = _tensor_rows(low_array, width=len(self._dof_names), label="joint lower limits")[0]
+            highs = _tensor_rows(high_array, width=len(self._dof_names), label="joint upper limits")[0]
+            self._position_limits = {
+                name: (float(lows[index]), float(highs[index]))
+                for index, name in enumerate(self._dof_names)
+            }
             for semantic, view in self._free_views.items():
                 masses = _tensor_rows(view.get_masses(), width=1, label=f"{semantic} mass")
                 if masses[0][0] <= 0.0:
@@ -359,13 +392,17 @@ class IsaacSimNativeRuntimeIOV1:
                 self._position_limits,
             )
             self._manager = SimulationManager
-        except BaseException:
-            try:
-                if self._context is not None:
-                    self._context.close_stage()
-            finally:
-                self._lease.close()
-                self._app_owner.close()
+        except BaseException as primary:
+            for label, cleanup in (
+                ("USD stage close", lambda: self._context.close_stage() if self._context is not None else None),
+                ("USD snapshot lease close", self._lease.close),
+                ("Isaac App owner close", self._app_owner.close),
+            ):
+                try:
+                    cleanup()
+                except BaseException as cleanup_error:
+                    primary.add_note(f"{label} after adapter startup failure also failed: "
+                                     f"{type(cleanup_error).__name__}: {cleanup_error}")
             raise
 
     def metadata(self) -> NativeRuntimeIOMetadataV1:
@@ -455,11 +492,13 @@ class IsaacSimNativeRuntimeIOV1:
             linear, angular = view.get_velocities()
             v = _tensor_rows(linear, width=3, label="COM linear velocity")[0]
             w = _tensor_rows(angular, width=3, label="angular velocity")[0]
-            com_positions, _com_orientations = view.get_coms()
-            p_com = _tensor_rows(com_positions, width=3, label="world COM position")[0]
-            rotation = _quaternion_wxyz(q_wxyz)
-            com_world = tuple(p_com[index] - p[index] for index in range(3))
-            com = tuple(float(value) for value in rotation.T @ com_world)
+            com_positions_body, _com_orientations_body = view.get_coms()
+            p_com_body = _tensor_rows(
+                com_positions_body, width=3, label="body-local COM position",
+            )[0]
+            # Isaac 6.2's public Tensor RigidPrim.get_coms() returns the COM
+            # pose relative to the rigid-body-prim frame, already in body axes.
+            com = _body_local_com_offset_from_public_tensor_pose(p_com_body)
             frame = self._artifact.legacy_frame_bindings[semantic]
             free_readbacks[semantic] = PublicRigidBodyReadbackV1(
                 "public-rigid-body-readback-v1", frame,
@@ -582,20 +621,28 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
                                   source: UsdRuntimeSourceV1):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
-    if not source.scene_source.source_verified:
-        raise ValueError("Isaac Core adapter requires the exact upstream-validated USD delivery")
+    if not (source.scene_source.source_verified or source.scene_source.locally_validated):
+        raise ValueError("Isaac Core adapter requires an upstream-validated or exact local F04 USD delivery")
     if source.scene_source.representation.provider != "isaacsim":
         raise ValueError("Isaac Core adapter requires an Isaac Sim representation selection")
     owner = _process_app_owner()
     lease = source.scene_source.acquire_snapshot()
     try:
         return IsaacSimNativeRuntimeIOV1(artifact, execution, source, lease, owner)
-    except BaseException:
+    except BaseException as primary:
         # Constructor cleanup owns the lease/App when startup begins; this is
         # idempotent and protects failures before its first import as well.
         if not lease.closed:
-            lease.close()
-        owner.close()
+            try:
+                lease.close()
+            except BaseException as cleanup_error:
+                primary.add_note(f"snapshot lease cleanup after adapter construction failure also failed: "
+                                 f"{type(cleanup_error).__name__}: {cleanup_error}")
+        try:
+            owner.close()
+        except BaseException as cleanup_error:
+            primary.add_note(f"App owner cleanup after adapter construction failure also failed: "
+                             f"{type(cleanup_error).__name__}: {cleanup_error}")
         raise
 
 

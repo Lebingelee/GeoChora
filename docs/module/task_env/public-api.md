@@ -244,9 +244,9 @@ This is synthetic Core S1 evidence only. Production `materialize()` continues to
 synthetic/unverified input. Sol accepted F03 attempt003 as `ACCEPTED_BOUNDED_F03_S1`, limited to
 the synthetic-I/O Core route and its final-boundary reader. Attempt002's accidental three public
 steps in a real CPU Pendulum environment remain a retained execution-scope deviation; they are
-not F03 acceptance evidence. F04 attempt001 now has a narrow Isaac adapter implementation
-candidate, but no upstream-validated Panda delivery has passed the existing source gate, so
-production provider admission and native execution remain unestablished. See the [F03 attempt003 closure](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
+not F03 acceptance evidence. At the time of F04 attempt001, the Isaac adapter and source inputs
+were only an implementation candidate and no native route had been exercised. The later
+attempt002 result is recorded below. See the [F03 attempt003 closure](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
 [attempt002 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)
 and historical [attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
@@ -279,6 +279,42 @@ upstream F02 validation report and leaves `source_verified=false`. Thus the F04 
 remains partial: neither A nor B has production Core/native/H5 evidence, and provider admission,
 S2/S3 and Qualification are not established.
 See the [F04 attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt001-isaac-core-adapter).
+
+<a id="f04-isaac-core-adapter-attempt002"></a>
+
+### F04 attempt002: two-source Isaac Core route (2026-10-29; partial, pending Sol review)
+
+The existing Core owners now include separate `UsdLocalValidationReportV1` and
+`UsdAssetDeliveryLocalV1` contracts for fixed derived samples. They bind original source
+inventory, selected variants, derived closure, recipe/options, checker and local report bytes.
+This provenance remains `local-validated`; it does not set the F02 upstream
+`source_verified` bit or change the older upstream/synthetic v1 contracts. The current local
+admission is an exact allowlist for the official F01 Panda and pinned Menagerie Panda recipes,
+execution identity and profile, not general Isaac asset support.
+
+The adapter uses the shared Core session, public Env, Position controller, Recorder and H5
+reader path. Provider-free S1 collected and passed 20 exact node IDs with zero Kit/native
+starts. One frozen worker then ran both source families on Isaac Sim 6.2.0.0, CUDA `cuda:0`,
+GPU PhysX, `best_effort`, state-only at 100 Hz with five 2 ms substeps. Each source completed
+two same-Env episodes, 100 public intervals per episode and 500 accepted physics steps per
+episode, producing four closed H5 files (100 transitions and 101 observations each). The
+floating body drop/settle checks passed. This confirms that the narrow implementation path
+was exercised; it does not pass the frozen physical acceptance thresholds.
+
+Post-worker diagnostic readback verified all 404/404 T+1 boundary/observation rows and
+rejected 40/40 tamper cases across the four files. The original F04 reader still uses exact
+binary floating-point clock equality and rejects an unmodified valid file; a separate,
+unmodified-evidence copy with a 1e-12-second clock comparison was used to continue the
+structural and tamper checks. All four episodes failed the gripper-opening-change threshold
+(observed about 0.00974 m against 0.015 m) and the source-calibrated FK position/orientation
+thresholds (position error about 0.568–0.611 m; orientation error about 0.878–0.959 rad).
+Thresholds were not changed. The worker exited zero and met recorded resource budgets, but
+Isaac `SimulationApp.close()` fast shutdown exited before its root aggregate receipt was
+written; parent reconciliation is retained separately from raw worker receipts.
+
+Current result: `F04_PARTIAL_PENDING_SOL_REVIEW`. Do not infer physical acceptance, provider
+admission for other sources/builds, S2/S3, Human Judge approval, or Qualification. The
+attempt002 ledger and raw/derived evidence are in the [F04 attempt002 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native).
 
 ### Static Logical Assembly value (R01a)
 

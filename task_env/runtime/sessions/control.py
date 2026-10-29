@@ -758,8 +758,7 @@ def materialize_control(
                 if (len(profiles) != 1 or profiles[0].open_actuator is not None
                         or profiles[0].native_drive_receipt is not None
                         or set(source.joint_targets) != set(source.joints)
-                        or len(set(source.joint_targets.values())) != 9
-                        or tuple(source.open_actuators)):
+                        or len(set(source.joint_targets.values())) != 9):
                     raise ValueError('F04 Position requires one deferred native receipt and exact nine-name source bindings')
             elif dict(source.joint_targets) != expected_targets or set(source.open_actuators) != set(expected_open):
                 raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
@@ -825,8 +824,15 @@ def materialize_control(
         try:
             receipt = getattr(session, '_drive_receipt', None)
             from .leaf_control import IsaacNamedPositionDriveReceiptV1
+            io_provenance = getattr(
+                getattr(session, '_native_io', None),
+                'execution_provenance_kind', 'native_runtime',
+            )
+            expected_receipt_provenance = (
+                'synthetic_fixture' if io_provenance == 'synthetic_fixture' else 'native_runtime'
+            )
             if (type(receipt) is not IsaacNamedPositionDriveReceiptV1
-                    or receipt.provenance_kind != 'native_runtime'
+                    or receipt.provenance_kind != expected_receipt_provenance
                     or dict(source.joint_targets) != {
                         f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
                         for item in receipt.drives

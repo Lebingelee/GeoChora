@@ -1015,6 +1015,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             info['state_boundary_identity'] = boundary.to_mapping()
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
+            if self.value.get('f04_position_input') is not None:
+                # F04's state-only public route needs the actual typed
+                # free-body twist and Frame poses in the reset/step result so
+                # native H5 witnesses can be built without provider-private
+                # reads. The publication is the same Core-owned value used by
+                # observation projection and Position control.
+                info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
             if self.camera_observation_config is not None:
                 from ..observations.capture import DynamicCameraObservationConsumerV1
 
@@ -2460,37 +2467,46 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         f03_input = self.value.get('f03_position_input')
         f04_input = self.value.get('f04_position_input')
         if f03_input is not None or f04_input is not None:
-            f04_native = f04_input is not None
-            versioned_input = f04_input if f04_native else f03_input
+            f04_route = f04_input is not None
+            versioned_input = f04_input if f04_route else f03_input
             source = self.value['source']
             source_scene = source.scene_source
             loaded = source_scene.loaded_delivery
             delivery = loaded.delivery
             representation = source_scene.representation
             drive_receipt = (getattr(self.session, '_drive_receipt', None)
-                             if f04_native else self.value['native_drive_receipt'])
+                             if f04_route else self.value['native_drive_receipt'])
             native_metadata = self.session._native_io_metadata
             reset_receipt = self.session._reset_write_receipt
             if reset_receipt is None:
                 raise RuntimeError('versioned USD recording requires the successful Core reset write receipt')
+            f04_native = bool(f04_route and drive_receipt is not None
+                              and drive_receipt.provenance_kind == 'native_runtime')
             expected_provenance = 'native_runtime' if f04_native else 'synthetic_fixture'
             if (drive_receipt is None or drive_receipt.provenance_kind != expected_provenance):
                 raise RuntimeError('versioned USD recording receipt provenance differs from its execution route')
             if f04_native:
-                if not source.scene_source.source_verified:
-                    raise RuntimeError('F04 recording requires the source-verified production delivery')
+                if not (source.scene_source.source_verified or source.scene_source.locally_validated):
+                    raise RuntimeError('F04 recording requires a loader-verified upstream or fixed local production delivery')
                 bootstrap = self.session._native_io.bootstrap_receipt()
             else:
                 bootstrap = None
             action_schema = self.controller.controller_binding().action_schema
             profile = {
-                'schema_version': ('f04-isaac-core-position-recording-profile-v1'
-                                   if f04_native else 'f03-core-call-chain-recording-profile-v1'),
-                'profile_id': ('f04-isaac-panda-position-native-v1'
-                               if f04_native else 'f03-versioned-usd-position-synthetic-s1-v1'),
+                'schema_version': (
+                    'f04-isaac-core-position-recording-profile-v1' if f04_native else
+                    'f04-core-position-synthetic-io-s1-profile-v1' if f04_route else
+                    'f03-core-call-chain-recording-profile-v1'
+                ),
+                'profile_id': (
+                    'f04-isaac-panda-position-native-v1' if f04_native else
+                    'f04-local-source-synthetic-io-s1-v1' if f04_route else
+                    'f03-versioned-usd-position-synthetic-s1-v1'
+                ),
                 'provenance_kind': 'native_runtime' if f04_native else 'synthetic_fixture',
                 'runtime_admitted': bool(f04_native),
-                'source_verified': bool(f04_native),
+                'source_verified': bool(source_scene.source_verified),
+                'source_validation_provenance_kind': delivery.provenance_kind,
                 'task_source_identity_sha256': versioned_input.task_source.identity_hash,
                 'task_artifact_identity_sha256': self.artifact.identity_hash,
                 'scene_identity_sha256': self.position_scene.identity_hash,
@@ -2511,6 +2527,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'validation_report_id': loaded.report.report_id,
                     'validation_report_passed': loaded.report.passed,
                     'validation_report_provenance_kind': loaded.report.provenance_kind,
+                    'locally_validated': bool(getattr(loaded, 'locally_validated', False)),
+                    **({
+                        'source_closure_sha256': delivery.source_closure_sha256,
+                        'source_manifest_sha256': delivery.source_manifest_sha256,
+                        'source_variant_selections': dict(delivery.source_variant_selections),
+                        'source_variant_selection_sha256': delivery.source_variant_selection_sha256,
+                        'recipe_sha256': delivery.recipe_sha256,
+                        'checker_sha256': delivery.checker_sha256,
+                    } if getattr(loaded, 'locally_validated', False) else {}),
                 },
                 'representation': {
                     'identity_sha256': representation.identity_hash,
@@ -2545,7 +2570,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'frames': dict(source.frames), 'free_joints': dict(source.free_joints),
                     'joint_targets': dict(source.joint_targets),
                 },
-                ('source_calibrated_kinematics_source_sha256' if f04_native
+                ('source_calibrated_kinematics_source_sha256' if f04_route
                  else 'static_kinematics_source_sha256'): versioned_input.kinematics_source_sha256,
                 'reset_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
                 'recording_scope': (
@@ -2556,8 +2581,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             action_components = tuple(action_schema.components)
             return {
                 'env_metadata': {
-                    'env_name': ('SelectedReferenceEnv.F04IsaacPandaPosition'
-                                 if f04_native else 'SelectedReferenceEnv.F03VersionedPositionS1'),
+                    'env_name': (
+                        'SelectedReferenceEnv.F04IsaacPandaPosition' if f04_native else
+                        'SelectedReferenceEnv.F04LocalSourceSyntheticIOS1' if f04_route else
+                        'SelectedReferenceEnv.F03VersionedPositionS1'
+                    ),
                     'task_name': self.artifact.task_id,
                     'task_version': self.artifact.artifact_version,
                     'scene_uid': self.position_scene.scene_id,
@@ -2577,7 +2605,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 },
                 'universal_action_schema': {
                     'version': ('f04-isaac-core-position-action-v1'
-                                if f04_native else 'f03-core-call-chain-position-action-v1'),
+                                if f04_route else 'f03-core-call-chain-position-action-v1'),
                     'dimension': len(action_components), 'components': action_components,
                 },
                 'resolved_config': {
@@ -2841,10 +2869,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
             applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
             applied_payload['native_interval_advance_attempts'] = advance_attempts
-            applied_payload['native_io_execution_class'] = (
-                'native_runtime_accepted_physics' if f04_input is not None
-                else 'synthetic_fixture_no_physics'
-            )
+            if f04_input is not None:
+                native_io = getattr(self.session, '_native_io', None)
+                provenance = getattr(native_io, 'execution_provenance_kind', None)
+                if provenance == 'native_runtime':
+                    execution_class = 'native_runtime_accepted_physics'
+                elif provenance == 'synthetic_fixture':
+                    execution_class = 'synthetic_fixture_no_physics'
+                else:
+                    raise ValueError(
+                        'F04 Position recording requires an explicit native-I/O execution provenance'
+                    )
+            else:
+                execution_class = 'synthetic_fixture_no_physics'
+            applied_payload['native_io_execution_class'] = execution_class
         canonical_action = {
             **canonical.to_mapping(),
             'position_target_v1': target.to_mapping(),

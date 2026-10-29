@@ -370,6 +370,184 @@ class UsdAssetDeliveryV1(Contract):
 
 
 @dataclass(frozen=True)
+class UsdLocalValidationReportV1(Contract):
+    """Local, reproducible validation of one bounded derived USD sample.
+
+    This report is deliberately distinct from the F02 upstream-validated v1
+    report. Its source inventory and derived output hashes may differ, and it
+    never changes the meaning of ``UsdValidationReportV1``.
+    """
+
+    schema_version: str
+    report_id: str
+    provenance_kind: str
+    source_asset_identity_hash: str
+    source_revision: str
+    source_closure_sha256: str
+    source_manifest_sha256: str
+    source_entry_sha256: str
+    source_variant_selection_sha256: str
+    entry_file_sha256: str
+    output_closure_sha256: str
+    entry_prim: str
+    representation_format: str
+    representation_id: str
+    recipe_id: str
+    recipe_version: str
+    recipe_sha256: str
+    options_sha256: str
+    checker_id: str
+    checker_sha256: str
+    author: str
+    checks: tuple[str, ...]
+    losses: tuple[str, ...]
+    unconsumed: tuple[str, ...]
+    passed: bool
+
+    def validate(self):
+        _choice(self.schema_version, {"usd-local-validation-report-v1"}, "local USD report schema")
+        _choice(self.provenance_kind, {"local-validated"}, "local USD report provenance")
+        _name(self.report_id)
+        for label in (
+            "source_asset_identity_hash", "source_closure_sha256", "source_manifest_sha256",
+            "source_entry_sha256", "source_variant_selection_sha256", "entry_file_sha256",
+            "output_closure_sha256", "recipe_sha256", "options_sha256", "checker_sha256",
+        ):
+            value = getattr(self, label)
+            if type(value) is not str or not _SHA256.fullmatch(value):
+                raise ValueError(f"{label} must be lowercase SHA-256 hex")
+        for label, value in (("source_revision", self.source_revision),
+                             ("recipe_version", self.recipe_version),
+                             ("author", self.author)):
+            if type(value) is not str or not value or value != value.strip():
+                raise ValueError(f"{label} must be a stable nonempty string")
+        _name(self.entry_prim.lstrip("/"))
+        for value, label in ((self.representation_format, "representation format"),
+                             (self.representation_id, "representation ID"),
+                             (self.recipe_id, "recipe ID"), (self.checker_id, "checker ID")):
+            _name(value)
+        for label, values in (("checks", self.checks), ("losses", self.losses),
+                              ("unconsumed", self.unconsumed)):
+            if type(values) is not tuple or len(values) != len(set(values)):
+                raise ValueError(f"{label} must be an immutable tuple of unique entries")
+            if label == "checks" and not values:
+                raise ValueError("local validation report requires executed checks")
+            if any(type(item) is not str or not item.strip() for item in values):
+                raise ValueError(f"{label} entries must be nonempty strings")
+        if type(self.passed) is not bool:
+            raise TypeError("passed must be bool")
+
+
+@dataclass(frozen=True)
+class UsdAssetDeliveryLocalV1(Contract):
+    """Versioned delivery for a fixed-scope, locally checked derived sample."""
+
+    schema_version: str
+    asset_definition: AssetDefinition
+    source_revision: str
+    provenance_kind: str
+    source_closure_sha256: str
+    source_manifest_path: str
+    source_manifest_sha256: str
+    source_files: tuple[UsdDeliveryFileV1, ...]
+    source_entry_file: str
+    source_entry_sha256: str
+    source_variant_selections: Mapping[str, str]
+    source_variant_selection_sha256: str
+    entry_file: str
+    entry_prim: str
+    variant_selections: Mapping[str, str]
+    representation_format: str
+    representation_id: str
+    closure_policy: str
+    files: tuple[UsdDeliveryFileV1, ...]
+    closure_sha256: str
+    recipe_path: str
+    recipe_sha256: str
+    checker_path: str
+    checker_sha256: str
+    support_files: tuple[UsdDeliveryFileV1, ...]
+    validation_report_path: str
+    validation_report_sha256: str
+    options_sha256: str
+
+    def validate(self):
+        _choice(self.schema_version, {"usd-local-derived-delivery-v1"}, "local USD delivery schema")
+        if type(self.asset_definition) is not AssetDefinition:
+            raise TypeError("asset_definition must be the exact AssetDefinition contract")
+        self.asset_definition.validate()
+        if type(self.source_revision) is not str or not self.source_revision.strip():
+            raise ValueError("source_revision must be stable and nonempty")
+        if self.asset_definition.source_revision != self.source_revision:
+            raise ValueError("local USD delivery revision differs from its source AssetDefinition")
+        _choice(self.provenance_kind, {"local-validated"}, "local USD delivery provenance")
+        for label in ("source_closure_sha256", "source_manifest_sha256", "source_entry_sha256",
+                      "source_variant_selection_sha256", "closure_sha256", "recipe_sha256", "checker_sha256",
+                      "validation_report_sha256", "options_sha256"):
+            value = getattr(self, label)
+            if type(value) is not str or not _SHA256.fullmatch(value):
+                raise ValueError(f"{label} must be lowercase SHA-256 hex")
+        for label, value in (("source_manifest_path", self.source_manifest_path),
+                             ("entry_file", self.entry_file), ("recipe_path", self.recipe_path),
+                             ("source_entry_file", self.source_entry_file), ("checker_path", self.checker_path),
+                             ("validation_report_path", self.validation_report_path)):
+            if type(value) is not str or not value or value.startswith("/") or "\\" in value:
+                raise ValueError(f"{label} must be a root-relative POSIX path")
+            parts = value.split("/")
+            if any(part in {"", ".", ".."} for part in parts):
+                raise ValueError(f"{label} is noncanonical or escapes its root")
+        if not self.entry_prim.startswith("/") or self.entry_prim == "/" or ".." in self.entry_prim.split("/"):
+            raise ValueError("entry_prim must be an absolute USD prim path")
+        _name(self.representation_format)
+        _name(self.representation_id)
+        _choice(self.closure_policy, {"f04-selected-derived-scene-v1"}, "local USD closure policy")
+        for label, values in (("source_files", self.source_files), ("files", self.files)):
+            if type(values) is not tuple or not values or any(type(item) is not UsdDeliveryFileV1 for item in values):
+                raise TypeError(f"{label} must be a nonempty tuple of exact USD file bindings")
+            paths = [item.path for item in values]
+            if paths != sorted(paths) or len(paths) != len(set(paths)):
+                raise ValueError(f"{label} must have unique, canonically sorted paths")
+            for item in values:
+                item.validate()
+        if {item.path for item in self.source_files} & {item.path for item in self.files}:
+            raise ValueError("local source input and derived output paths must be disjoint")
+        if self.source_entry_file not in {item.path for item in self.source_files}:
+            raise ValueError("local original source entry is not in its bound input inventory")
+        if self.entry_file not in {item.path for item in self.files}:
+            raise ValueError("local USD entry file is not in its derived closure")
+        if not isinstance(self.source_variant_selections, Mapping) or not isinstance(self.variant_selections, Mapping):
+            raise TypeError("variant selections must be mappings")
+        for values in (self.source_variant_selections, self.variant_selections):
+            if any(type(k) is not str or not k.strip() or type(v) is not str or not v.strip()
+                   for k, v in values.items()):
+                raise ValueError("variant selections require nonempty string keys and values")
+        if self.validation_report_path in {item.path for item in self.files}:
+            raise ValueError("validation report is metadata, not a source closure file")
+        if self.recipe_path in {item.path for item in self.files}:
+            raise ValueError("derivation recipe is metadata, not a USD dependency")
+        if type(self.support_files) is not tuple or any(type(item) is not UsdDeliveryFileV1 for item in self.support_files):
+            raise TypeError("support_files must be an immutable tuple of USD-style hash bindings")
+        support_paths = [item.path for item in self.support_files]
+        if support_paths != sorted(support_paths) or len(support_paths) != len(set(support_paths)):
+            raise ValueError("support_files must have unique, canonically sorted paths")
+        if (set(support_paths) & ({item.path for item in self.files} | {item.path for item in self.source_files})
+                or self.source_manifest_path in support_paths or self.recipe_path in support_paths
+                or self.checker_path in support_paths or self.validation_report_path in support_paths):
+            raise ValueError("local metadata/support paths must be disjoint from source and output closures")
+        for item in self.support_files:
+            item.validate()
+
+    @property
+    def asset_identity_hash(self) -> str:
+        return self.asset_definition.identity_hash
+
+    @property
+    def delivery_sha256(self) -> str:
+        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
 class ProviderRepresentationSelectionV1(Contract):
     """F02 representation decision; never implies provider runtime admission."""
 

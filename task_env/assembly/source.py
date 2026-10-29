@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import re
 from pathlib import Path
 import tempfile
@@ -108,6 +109,17 @@ class UsdTaskSceneSourceV1:
     def source_verified(self) -> bool:
         self.validate()
         return bool(self.loaded_delivery.source_verified)
+
+    @property
+    def locally_validated(self) -> bool:
+        """Return the distinct local-sample validation state without upgrading upstream provenance."""
+        self.validate()
+        return bool(getattr(self.loaded_delivery, 'locally_validated', False))
+
+    @property
+    def validation_report_identity_sha256(self) -> str:
+        self.validate()
+        return hashlib.sha256(self.loaded_delivery.report_bytes).hexdigest()
 
     def assert_fresh(self) -> None:
         self.validate()

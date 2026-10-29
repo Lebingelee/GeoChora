@@ -291,6 +291,20 @@ class UsdCoreRuntimeSession(_SessionValues):
         if type(self._native_io_metadata) is not NativeRuntimeIOMetadataV1:
             raise TypeError('native Runtime I/O metadata() must return NativeRuntimeIOMetadataV1')
         self._native_io_metadata.validate_binding(artifact, execution, source)
+        # The low-level I/O owner, rather than source validation, determines
+        # whether this execution crossed a real provider boundary. This lets
+        # provider-free S1 replace only native I/O and keep its Recorder
+        # evidence explicitly synthetic. Older F03 ports do not declare the
+        # marker and retain their source-derived behavior.
+        execution_provenance = getattr(native_io, 'execution_provenance_kind', None)
+        if execution_provenance is None:
+            execution_provenance = (
+                'native_runtime'
+                if source.scene_source.source_verified or source.scene_source.locally_validated
+                else 'synthetic_fixture'
+            )
+        if execution_provenance not in {'native_runtime', 'synthetic_fixture'}:
+            raise ValueError('native I/O owner reported an unsupported execution provenance')
         if drive_receipt is None:
             drive_receipt = compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
                 execution=execution, source=source,
@@ -298,10 +312,12 @@ class UsdCoreRuntimeSession(_SessionValues):
                 native_metadata=self._native_io_metadata,
                 writer_id='panda-main/position-servo-v1',
             )
+            if execution_provenance == 'synthetic_fixture':
+                from dataclasses import replace
+                drive_receipt = replace(drive_receipt, provenance_kind='synthetic_fixture')
         if type(drive_receipt) is not IsaacNamedPositionDriveReceiptV1:
             raise TypeError('Core RuntimeSession requires the existing named-drive receipt owner')
-        expected_provenance = 'native_runtime' if source.scene_source.source_verified else 'synthetic_fixture'
-        if drive_receipt.provenance_kind != expected_provenance:
+        if drive_receipt.provenance_kind != execution_provenance:
             raise ValueError('named-drive receipt provenance does not match the loaded USD source')
         if (self._native_io_metadata.provider_build_identity != drive_receipt.provider_build_identity
                 or self._native_io_metadata.native_dof_names != tuple(

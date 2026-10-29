@@ -13,6 +13,8 @@ from ...artifacts import (
     FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
     StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
+from ...artifacts.contracts import UsdAssetDeliveryLocalV1
+from ...assembly.usd_delivery import variant_selection_hash
 from ...artifacts.execution import (
     EpisodeResetPlanV1, RealizedInitialState, ResetSample, legacy_execution_projection,
 )
@@ -33,6 +35,12 @@ _F04_MENAGERIE_PANDA_SOURCE_REFERENCE = (
     'mujoco-menagerie://franka_emika_panda/panda.xml'
 )
 _F04_MENAGERIE_PANDA_REVISION = 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7'
+_F04_OFFICIAL_PANDA_LOCAL_REVISION = 's3-prefix-last-modified-2026-10-07T01:07:07Z-through-2026-10-07T01:07:09Z'
+_F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256 = '7ba946a0b02623525dc6b92db9f1000f85fb2e9ea140a0ec6fabb6f818f6c072'
+_F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256 = 'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a'
+_F04_LOCAL_CHECKER_SHA256 = '9863ee00a3fa76f5fbe943f74fb1866e12acd5e6cd72a991c93472f016a11dbb'
+_F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '071fcd34bcf5abcf30f91b34c6d23f2958e1000a8bbca77edc1cb9084d7cc98f'
+_F04_MENAGERIE_LOCAL_RECIPE_SHA256 = 'dc5f1c896a98767dc1cf25e226a4cb086c99042dc4024ea2bdcf6a758c24b3f3'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
@@ -161,7 +169,45 @@ def _validate_f04_source_family(delivery) -> None:
             and (definition.source_revision != _F04_MENAGERIE_PANDA_REVISION
                  or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION)):
         raise ValueError('F04 Menagerie Panda source must bind the current frozen provider Gitlink')
-    if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
+    if type(delivery) is UsdAssetDeliveryLocalV1:
+        if delivery.provenance_kind != 'local-validated':
+            raise ValueError('F04 local Panda route requires explicit local-validated provenance')
+        selected_source_variants = dict(delivery.source_variant_selections)
+        if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
+            expected_variants = {
+                '/panda#Gripper': 'alternatefinger',
+                '/panda#Mesh': 'performance',
+                '/panda#Physics': 'physx',
+            }
+            if selected_source_variants != expected_variants:
+                raise ValueError('F04 local official Panda report must bind the exact F01 source variants')
+            if delivery.source_entry_sha256 != 'cbdbfc4481e0420aa30c2e57c39cce91006cb29b93bc2e06becaf4304c20ea30':
+                raise ValueError('F04 local official Panda report binds an unexpected source entry byte')
+            if (delivery.source_revision != _F04_OFFICIAL_PANDA_LOCAL_REVISION
+                    or delivery.source_closure_sha256 != _F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256):
+                raise ValueError('F04 local official Panda report differs from the frozen S3 prefix inventory')
+        else:
+            if selected_source_variants:
+                raise ValueError('F04 local Menagerie report does not admit unreviewed source variants')
+            if (delivery.source_entry_sha256 != '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'
+                    or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION
+                    or delivery.source_closure_sha256 != _F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256):
+                raise ValueError('F04 local Menagerie report differs from the frozen Panda XML/gitlink')
+        if delivery.source_variant_selection_sha256 != variant_selection_hash(selected_source_variants):
+            raise ValueError('F04 local report source variant identity is inconsistent')
+        if delivery.recipe_path != 'metadata/physx_task_scene_recipe.json':
+            raise ValueError('F04 local delivery must use the frozen task-scene/PhysX recipe path')
+        expected_recipe_sha = (
+            _F04_OFFICIAL_LOCAL_RECIPE_SHA256
+            if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE
+            else _F04_MENAGERIE_LOCAL_RECIPE_SHA256
+        )
+        if (delivery.recipe_sha256 != expected_recipe_sha
+                or delivery.checker_sha256 != _F04_LOCAL_CHECKER_SHA256):
+            raise ValueError('F04 local delivery differs from the exact reviewed source recipe/checker bytes')
+        if delivery.entry_prim != '/panda' or delivery.variant_selections:
+            raise ValueError('F04 local derived stage must be a flattened selected scene rooted at /panda')
+    elif definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
         expected_variants = {
             '/panda#Gripper': 'alternatefinger',
             '/panda#Mesh': 'performance',
@@ -179,9 +225,17 @@ def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
     source.validate()
     delivery = source.scene_source.loaded_delivery
     definition = delivery.delivery.asset_definition
-    if not delivery.source_verified:
+    if not (delivery.source_verified or source.scene_source.locally_validated):
         raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
-    _validate_f04_source_family(delivery)
+    if source.scene_source.locally_validated:
+        if (not delivery.locally_validated or delivery.report.provenance_kind != 'local-validated'
+                or delivery.report.recipe_id != 'f04-physx-task-scene-overlay-v1'
+                or delivery.report.checker_id != 'geochora-f04-local-usd-checker-v1'
+                or delivery.report.checker_sha256 != _F04_LOCAL_CHECKER_SHA256
+                or delivery.report.recipe_sha256 != delivery.delivery.recipe_sha256
+                or not delivery.report.passed):
+            raise ValueError('F04 local source lacks the loader-verified local validation report')
+    _validate_f04_source_family(delivery.delivery)
     if source.scene_source.representation.provider != 'isaacsim':
         raise ValueError('F04 adapter requires the exact Isaac Sim representation')
     if (source.scene_source.representation.provider_build_identity,
@@ -307,7 +361,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             session._declared_execution_spec_v1 = declared_execution
             session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
             return session
-        if not source.scene_source.source_verified:
+        if not (source.scene_source.source_verified or source.scene_source.locally_validated):
             raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
         if not declared_execution.physics_provider == 'isaacsim':
             raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')

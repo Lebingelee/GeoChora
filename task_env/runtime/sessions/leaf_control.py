@@ -269,8 +269,22 @@ class IsaacNamedPositionDriveReceiptV1:
             by_joint[drive.canonical_joint] = drive
         if set(by_joint) != set(expected):
             raise ValueError('Isaac drive receipt must exactly cover seven Arm and two finger Joints')
-        if any((drive.native_dof_name, drive.position_unit) != expected[joint]
-               for joint, drive in by_joint.items()):
+        observed_mapping = {joint: (drive.native_dof_name, drive.position_unit)
+                            for joint, drive in by_joint.items()}
+        allowed_mappings = [expected]
+        # Both fixed F04 source families retain their own authored DOF names.
+        # S1 may exercise either mapping through a synthetic low-level I/O
+        # fixture; provenance classifies execution, not the source namespace.
+        menagerie = {
+            JointReference('panda-main', f'joint{index}'): (f'joint{index}', 'radian')
+            for index in range(1, 8)
+        }
+        menagerie.update({
+            JointReference('panda-main', 'finger_joint1'): ('finger_joint1', 'meter'),
+            JointReference('panda-main', 'finger_joint2'): ('finger_joint2', 'meter'),
+        })
+        allowed_mappings.append(menagerie)
+        if observed_mapping not in allowed_mappings:
             raise ValueError('Isaac native DOF name or unit differs from the Panda mapping')
         indices = [drive.native_dof_index for drive in self.drives]
         names = [drive.native_dof_name for drive in self.drives]
@@ -318,7 +332,22 @@ class IsaacNamedPositionDriveReceiptV1:
             raise ValueError('Hand opening target must be within [0, 0.08] metres')
         targets = {JointReference('panda-main', name.split('/', 1)[1]): float(value)
                    for name, value in values.items()}
-        half_opening = float(hand_opening_m) / 2.0
+        finger_upper = {
+            drive.canonical_joint.joint_id: float(drive.upper_limit)
+            for drive in self.drives
+            if drive.canonical_joint.joint_id in {'finger_joint1', 'finger_joint2'}
+        }
+        if set(finger_upper) != {'finger_joint1', 'finger_joint2'}:
+            raise ValueError('named-drive receipt is missing one of the two canonical finger limits')
+        max_common_opening = 2.0 * min(finger_upper.values())
+        requested_opening = float(hand_opening_m)
+        # The fixed USD source encodes 0.04 m as a float32 limit, which reads
+        # back as 0.03999999910593033. Accept only that sub-2 nm encoding
+        # difference at the canonical 0.08 m endpoint, then issue the exact
+        # metadata-bounded target. Larger requests remain fail-closed.
+        if requested_opening > max_common_opening + 2e-9:
+            raise ValueError('Hand opening target exceeds the two native finger limits')
+        half_opening = min(requested_opening / 2.0, min(finger_upper.values()))
         targets.update({
             JointReference('panda-main', 'finger_joint1'): half_opening,
             JointReference('panda-main', 'finger_joint2'): half_opening,
@@ -337,6 +366,7 @@ def compile_isaac_named_position_drive_receipt_v1(
     source_closure_sha256: str, provider_build_identity: str,
     writer_id: str, native_dof_names: tuple[str, ...],
     native_position_limits: Mapping[str, tuple[float, float]],
+    canonical_native_names: Mapping[str, str] | None = None,
 ) -> IsaacNamedPositionDriveReceiptV1:
     """Compile an explicitly synthetic receipt from public-style DOF metadata."""
     if type(execution) is not ExecutionSpecV1:
@@ -359,13 +389,30 @@ def compile_isaac_named_position_drive_receipt_v1(
     limits = dict(native_position_limits)
     if set(limits) != set(native_dof_names):
         raise ValueError('public DOF limits must exactly cover the named DOF metadata')
-    expected = [
-        *((JointReference('panda-main', f'joint{index}'), f'panda_joint{index}', 'radian')
-          for index in range(1, 8)),
-        (JointReference('panda-main', 'finger_joint1'), 'panda_finger_joint1', 'meter'),
-        (JointReference('panda-main', 'finger_joint2'), 'panda_finger_joint2', 'meter'),
-    ]
-    by_name = {name: (joint, unit) for joint, name, unit in expected}
+    canonical_joint_ids = tuple(f'panda-main/joint{index}' for index in range(1, 8)) + (
+        'panda-main/finger_joint1', 'panda-main/finger_joint2',
+    )
+    default_names = {key: key.replace('panda-main/', 'panda_') for key in canonical_joint_ids}
+    native_names = default_names if canonical_native_names is None else dict(canonical_native_names)
+    if set(native_names) != set(canonical_joint_ids) or len(set(native_names.values())) != 9:
+        raise ValueError('canonical-to-native mapping must cover the nine Panda joints bijectively')
+    allowed_name_sets = (
+        {key: key.replace('panda-main/', 'panda_') for key in canonical_joint_ids},
+        {key: key.split('/', 1)[1] for key in canonical_joint_ids},
+    )
+    if native_names not in allowed_name_sets:
+        raise ValueError('canonical-to-native mapping is outside the two frozen Panda name profiles')
+    by_name = {
+        native_names[f'panda-main/{joint_id}']: (
+            JointReference('panda-main', joint_id),
+            'meter' if joint_id.startswith('finger_joint') else 'radian',
+        )
+        for joint_id in (f'joint{index}' for index in range(1, 8))
+    }
+    by_name.update({
+        native_names[f'panda-main/{joint_id}']: (JointReference('panda-main', joint_id), 'meter')
+        for joint_id in ('finger_joint1', 'finger_joint2')
+    })
     if set(native_dof_names) != set(by_name):
         raise ValueError('public DOF names differ from the exact Panda Arm+Hand name set')
     drives = []
@@ -401,8 +448,8 @@ def compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
         raise TypeError('native drive receipt requires actual NativeRuntimeIOMetadataV1')
     source.validate()
     execution.validate()
-    if not source.scene_source.source_verified:
-        raise ValueError('native drive receipt requires an upstream-validated USD source')
+    if not (source.scene_source.source_verified or source.scene_source.locally_validated):
+        raise ValueError('native drive receipt requires an upstream-validated or fixed locally validated F04 USD source')
     native_metadata.validate_binding(source.task_artifact, execution, source)
     if (native_metadata.provider_build_identity, native_metadata.physics_provider,
             native_metadata.backend, native_metadata.device, native_metadata.determinism_mode) != (
@@ -414,6 +461,7 @@ def compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
         provider_build_identity=native_metadata.provider_build_identity,
         writer_id=writer_id, native_dof_names=native_metadata.native_dof_names,
         native_position_limits=native_metadata.native_position_limits,
+        canonical_native_names=dict(source.joint_targets),
     )
     expected_targets = {
         f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name

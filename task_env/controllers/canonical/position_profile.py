@@ -262,10 +262,11 @@ class PandaPositionServoProfileV1:
     @classmethod
     def from_usd_source(cls, artifact, source, *, execution, kinematics_source_xml: str,
                         native_drive_receipt=None, config: ActionConfig | None = None):
-        """Bind the existing Position math to a versioned USD source and named DOF receipt.
+        """Bind the existing Position math to one versioned USD source.
 
-        ``kinematics_source_xml`` is a static FK description for this synthetic
-        S1. It is never treated as a materialization source or runtime admission.
+        ``kinematics_source_xml`` must be locally calibrated to the selected
+        source family. Its byte identity contributes to the controller binding;
+        it is not a replacement for USD delivery validation or native admission.
         """
         from ...runtime.sessions.source import UsdRuntimeSourceV1
         from ...runtime.sessions.leaf_control import IsaacNamedPositionDriveReceiptV1
@@ -288,8 +289,8 @@ class PandaPositionServoProfileV1:
                 artifact.timebase.control_dt) != (0.002, 5, 0.01):
             raise ValueError('PositionServoV1 requires 100 Hz outer / five 2 ms native steps')
         if native_drive_receipt is None:
-            if not source.scene_source.source_verified:
-                raise ValueError('deferred native receipt is allowed only for an upstream-validated USD source')
+            if not (source.scene_source.source_verified or source.scene_source.locally_validated):
+                raise ValueError('deferred native receipt requires a loader-verified upstream or fixed local F04 USD source')
             if execution.physics_profile != 'isaac-gpu-physx-f04-position-v1':
                 raise ValueError('deferred native receipt requires the exact F04 Isaac profile')
         elif (native_drive_receipt.scene_identity_sha256,

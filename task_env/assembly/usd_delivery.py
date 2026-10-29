@@ -18,8 +18,10 @@ from types import MappingProxyType
 
 from ..artifacts.contracts import (
     ProviderRepresentationSelectionV1,
+    UsdAssetDeliveryLocalV1,
     UsdAssetDeliveryV1,
     UsdDeliveryFileV1,
+    UsdLocalValidationReportV1,
     UsdValidationReportV1,
 )
 from .assets import _source_closure_digest, _source_closure_manifest
@@ -31,6 +33,11 @@ _REQUIRED_REPORT_CHECKS = frozenset(
 _SUPPORTED_USD_EXTENSIONS = {".usd", ".usda", ".usdc"}
 _MAX_CLOSURE_BYTES = 512 * 1024 * 1024
 _LOADER_TOKEN = object()
+_LOCAL_REPORT_CHECKS = frozenset({
+    "source-bytes", "derived-output-bytes", "usd-composition", "dependency-closure",
+    "selected-scene-structure", "panda-dof-units-limits", "physx-drive-profile",
+    "free-body-and-support", "source-losses-recorded",
+})
 
 
 def _strict_object(pairs):
@@ -198,14 +205,16 @@ def _inspect_snapshot(
 
 @dataclass(frozen=True)
 class LoadedUsdDeliveryV1:
-    delivery: UsdAssetDeliveryV1
-    report: UsdValidationReportV1
+    delivery: UsdAssetDeliveryV1 | UsdAssetDeliveryLocalV1
+    report: UsdValidationReportV1 | UsdLocalValidationReportV1
     manifest_path: Path
     manifest_bytes_sha256: str
     file_bytes: Mapping[str, bytes]
     report_bytes: bytes
     inspection: Mapping[str, object]
     source_verified: bool
+    source_input_bytes: Mapping[str, bytes] = field(default_factory=lambda: MappingProxyType({}))
+    local_support_bytes: Mapping[str, bytes] = field(default_factory=lambda: MappingProxyType({}))
     _verification_token: object = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
@@ -220,6 +229,10 @@ class LoadedUsdDeliveryV1:
     def closure_sha256(self) -> str:
         return self.delivery.closure_sha256
 
+    @property
+    def locally_validated(self) -> bool:
+        return type(self.delivery) is UsdAssetDeliveryLocalV1 and type(self.report) is UsdLocalValidationReportV1
+
     def assert_fresh(self) -> None:
         """Refuse a resolver decision if any original delivery byte changed."""
         manifest_raw = _safe_read(self.manifest_path.parent, self.manifest_path.name, label="delivery manifest")
@@ -229,6 +242,14 @@ class LoadedUsdDeliveryV1:
             current = _safe_read(self.manifest_path.parent, relative, label="USD source file")
             if current != original:
                 raise ValueError(f"stale USD source dependency: {relative}")
+        for relative, original in self.source_input_bytes.items():
+            current = _safe_read(self.manifest_path.parent, relative, label="local USD original source")
+            if current != original:
+                raise ValueError(f"stale local USD original source input: {relative}")
+        for relative, original in self.local_support_bytes.items():
+            current = _safe_read(self.manifest_path.parent, relative, label="local USD validation support")
+            if current != original:
+                raise ValueError(f"stale local USD validation support: {relative}")
         report_raw = _safe_read(self.manifest_path.parent, self.delivery.validation_report_path, label="USD validation report")
         if report_raw != self.report_bytes:
             raise ValueError("stale USD validation report")
@@ -245,7 +266,14 @@ def load_usd_asset_delivery(
     if root.is_symlink():
         raise ValueError("USD delivery root cannot be a symlink")
     manifest_raw = _safe_read(root, manifest_path.name, label="delivery manifest", max_bytes=16 * 1024 * 1024)
-    delivery = UsdAssetDeliveryV1.from_mapping(_strict_json_bytes(manifest_raw, label="USD delivery manifest"))
+    manifest_mapping = _strict_json_bytes(manifest_raw, label="USD delivery manifest")
+    schema = manifest_mapping.get("schema_version") if isinstance(manifest_mapping, Mapping) else None
+    if schema == "usd-asset-delivery-v1":
+        delivery = UsdAssetDeliveryV1.from_mapping(manifest_mapping)
+    elif schema == "usd-local-derived-delivery-v1":
+        delivery = UsdAssetDeliveryLocalV1.from_mapping(manifest_mapping)
+    else:
+        raise ValueError(f"unsupported USD delivery schema: {schema!r}")
     if delivery.representation_format != "usd":
         raise ValueError("F02 loader only accepts USD source representations")
     if Path(delivery.entry_file).suffix.lower() not in _SUPPORTED_USD_EXTENSIONS:
@@ -274,22 +302,94 @@ def load_usd_asset_delivery(
     report_raw = _safe_read(root, delivery.validation_report_path, label="USD validation report", max_bytes=16 * 1024 * 1024)
     if hashlib.sha256(report_raw).hexdigest() != delivery.validation_report_sha256:
         raise ValueError("USD validation report SHA-256 mismatch")
-    report = UsdValidationReportV1.from_mapping(_strict_json_bytes(report_raw, label="USD validation report"))
+    report_mapping = _strict_json_bytes(report_raw, label="USD validation report")
+    report_schema = report_mapping.get("schema_version") if isinstance(report_mapping, Mapping) else None
+    if report_schema == "usd-validation-report-v1":
+        report = UsdValidationReportV1.from_mapping(report_mapping)
+    elif report_schema == "usd-local-validation-report-v1":
+        report = UsdLocalValidationReportV1.from_mapping(report_mapping)
+    else:
+        raise ValueError(f"unsupported USD validation report schema: {report_schema!r}")
     entry_sha = hashlib.sha256(file_bytes[delivery.entry_file]).hexdigest()
-    expected_report_binding = (
-        report.provenance_kind == delivery.provenance_kind
-        and report.source_asset_identity_hash == delivery.asset_identity_hash
-        and report.source_revision == delivery.source_revision
-        and report.entry_file_sha256 == entry_sha
-        and report.closure_sha256 == delivery.closure_sha256
-        and report.input_closure_sha256 == delivery.closure_sha256
-        and report.output_closure_sha256 == delivery.closure_sha256
-        and report.entry_prim == delivery.entry_prim
-        and report.variant_selection_sha256 == variant_selection_hash(delivery.variant_selections)
-        and report.representation_format == delivery.representation_format
-        and report.representation_id == delivery.representation_id
-        and _REQUIRED_REPORT_CHECKS.issubset(report.checks)
-    )
+    if type(delivery) is UsdAssetDeliveryLocalV1:
+        if type(report) is not UsdLocalValidationReportV1:
+            raise ValueError("locally derived USD delivery requires the distinct local validation report schema")
+        source_manifest_raw = _safe_read(root, delivery.source_manifest_path, label="local USD source inventory", max_bytes=16 * 1024 * 1024)
+        recipe_raw = _safe_read(root, delivery.recipe_path, label="local USD derivation recipe", max_bytes=16 * 1024 * 1024)
+        checker_raw = _safe_read(root, delivery.checker_path, label="local USD checker source", max_bytes=16 * 1024 * 1024)
+        if hashlib.sha256(source_manifest_raw).hexdigest() != delivery.source_manifest_sha256:
+            raise ValueError("local USD source inventory manifest SHA-256 mismatch")
+        if hashlib.sha256(recipe_raw).hexdigest() != delivery.recipe_sha256:
+            raise ValueError("local USD derivation recipe SHA-256 mismatch")
+        if hashlib.sha256(checker_raw).hexdigest() != delivery.checker_sha256:
+            raise ValueError("local USD validation checker SHA-256 mismatch")
+        support_file_bytes: dict[str, bytes] = {}
+        for binding in delivery.support_files:
+            raw = _safe_read(root, binding.path, label="local USD validation support file", max_bytes=16 * 1024 * 1024)
+            if len(raw) != binding.size_bytes or hashlib.sha256(raw).hexdigest() != binding.sha256:
+                raise ValueError(f"local USD validation support byte mismatch: {binding.path}")
+            support_file_bytes[binding.path] = raw
+        source_file_bytes: dict[str, bytes] = {}
+        source_total_bytes = 0
+        for binding in delivery.source_files:
+            remaining = _MAX_CLOSURE_BYTES - source_total_bytes
+            raw = _safe_read(root, binding.path, label="local USD original source byte", max_bytes=remaining)
+            source_total_bytes += len(raw)
+            if len(raw) != binding.size_bytes or hashlib.sha256(raw).hexdigest() != binding.sha256:
+                raise ValueError(f"local USD original source byte mismatch: {binding.path}")
+            source_file_bytes[binding.path] = raw
+        if _source_closure_digest(source_file_bytes) != delivery.source_closure_sha256:
+            raise ValueError("local USD original source closure does not match exact source bytes")
+        source_inventory = _strict_json_bytes(source_manifest_raw, label="local USD source inventory")
+        expected_inventory = {
+            "schema_version": "f04-local-source-inventory-v1",
+            "files": [item.to_mapping() for item in delivery.source_files],
+            "source_closure_sha256": delivery.source_closure_sha256,
+        }
+        if source_inventory != expected_inventory:
+            raise ValueError("local USD source inventory content differs from the bound byte manifest")
+        if delivery.source_entry_file not in source_file_bytes or hashlib.sha256(
+                source_file_bytes[delivery.source_entry_file]).hexdigest() != delivery.source_entry_sha256:
+            raise ValueError("local USD original source entry hash is not bound by its inventory")
+        source_variant_sha = variant_selection_hash(delivery.source_variant_selections)
+        expected_report_binding = (
+            report.provenance_kind == delivery.provenance_kind == "local-validated"
+            and report.source_asset_identity_hash == delivery.asset_identity_hash
+            and report.source_revision == delivery.source_revision
+            and report.source_closure_sha256 == delivery.source_closure_sha256
+            and report.source_manifest_sha256 == delivery.source_manifest_sha256
+            and report.source_entry_sha256 == delivery.source_entry_sha256
+            and report.source_variant_selection_sha256 == source_variant_sha == delivery.source_variant_selection_sha256
+            and report.entry_file_sha256 == entry_sha
+            and report.output_closure_sha256 == delivery.closure_sha256
+            and report.entry_prim == delivery.entry_prim
+            and report.representation_format == delivery.representation_format
+            and report.representation_id == delivery.representation_id
+            and report.recipe_sha256 == delivery.recipe_sha256
+            and report.options_sha256 == delivery.options_sha256
+            and report.checker_sha256 == delivery.checker_sha256
+            and _LOCAL_REPORT_CHECKS.issubset(report.checks)
+        )
+    else:
+        source_file_bytes = {}
+        support_file_bytes = {}
+        local_support_bytes = {}
+        if type(report) is not UsdValidationReportV1:
+            raise ValueError("F02 v1 USD delivery requires its unchanged upstream/synthetic report schema")
+        expected_report_binding = (
+            report.provenance_kind == delivery.provenance_kind
+            and report.source_asset_identity_hash == delivery.asset_identity_hash
+            and report.source_revision == delivery.source_revision
+            and report.entry_file_sha256 == entry_sha
+            and report.closure_sha256 == delivery.closure_sha256
+            and report.input_closure_sha256 == delivery.closure_sha256
+            and report.output_closure_sha256 == delivery.closure_sha256
+            and report.entry_prim == delivery.entry_prim
+            and report.variant_selection_sha256 == variant_selection_hash(delivery.variant_selections)
+            and report.representation_format == delivery.representation_format
+            and report.representation_id == delivery.representation_id
+            and _REQUIRED_REPORT_CHECKS.issubset(report.checks)
+        )
     if not expected_report_binding:
         raise ValueError("USD validation report does not bind this source, closure, entry or representation")
     if not report.passed:
@@ -301,11 +401,12 @@ def load_usd_asset_delivery(
             target = snapshot.joinpath(*PurePosixPath(relative).parts)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(raw)
+        inspection_variants = {} if type(delivery) is UsdAssetDeliveryLocalV1 else delivery.variant_selections
         required, inspection = _inspect_snapshot(
             snapshot,
             snapshot.joinpath(*PurePosixPath(delivery.entry_file).parts),
             delivery.entry_prim,
-            delivery.variant_selections,
+            inspection_variants,
         )
         if required != set(file_bytes):
             missing = sorted(required.difference(file_bytes))
@@ -320,7 +421,14 @@ def load_usd_asset_delivery(
         file_bytes=MappingProxyType(dict(file_bytes)),
         report_bytes=report_raw,
         inspection=MappingProxyType(inspection),
-        source_verified=delivery.provenance_kind == "upstream-validated",
+        source_verified=type(delivery) is UsdAssetDeliveryV1 and delivery.provenance_kind == "upstream-validated",
+        source_input_bytes=MappingProxyType(dict(source_file_bytes)),
+        local_support_bytes=MappingProxyType({
+            delivery.source_manifest_path: source_manifest_raw,
+            delivery.recipe_path: recipe_raw,
+            delivery.checker_path: checker_raw,
+            **support_file_bytes,
+        }) if type(delivery) is UsdAssetDeliveryLocalV1 else MappingProxyType({}),
         _verification_token=_LOADER_TOKEN,
     )
 
