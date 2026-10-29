@@ -361,11 +361,12 @@ def test_controller_snapshot_and_required_feedback_survive_diagnostics_toggle():
             evaluation=evaluation,
             command=command,
             applied=applied,
-            observation={"state": {}},
-            terminated=False,
-            truncated=False,
-            elapsed_steps=2,
-        )
+                observation={"state": {}},
+                terminated=False,
+                truncated=False,
+                episode_end=None,
+                elapsed_steps=2,
+            )
         lifecycle = SimpleNamespace(episode_finished=False)
         return BaseTaskEnv._format_step_result(env, lifecycle, result)[4]
 

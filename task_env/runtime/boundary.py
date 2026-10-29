@@ -318,7 +318,11 @@ class GeoPhysRuntimeBoundary:
             ),
             site_jacp=site_jacp,
             site_jacr=site_jacr,
-            contact_summary=ContactSummary() if request.contact_summary else None,
+            contact_summary=(
+                ContactSummary.unavailable("provider_contact_pair_query_not_implemented")
+                if request.contact_summary
+                else None
+            ),
             simulation_time=(
                 self._simulation_time if request.simulation_time else None
             ),

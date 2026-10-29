@@ -817,18 +817,53 @@ class ActuatorForceMeasurementV1:
 
 @dataclass(frozen=True)
 class ContactSummary:
-    """任务层可消费的稳定接触摘要占位契约。"""
+    """Versioned entity-pair contact evidence for task semantics.
+
+    An empty available mapping means the queried pairs had no contacts. A
+    missing peer query is represented by ``unavailable`` and must not be
+    interpreted as an empty mapping.
+    """
 
     pair_counts: Mapping[str, int] = field(default_factory=dict)
+    status: str = "available"
+    reason: str | None = None
+    schema_version: str = "task-contact-summary-v1"
 
     def __post_init__(self) -> None:
+        if self.schema_version != "task-contact-summary-v1":
+            raise ValueError("unsupported ContactSummary schema")
+        if self.status not in {"available", "unavailable"}:
+            raise ValueError("ContactSummary status must be available or unavailable")
+        if self.status == "available" and self.reason is not None:
+            raise ValueError("available ContactSummary cannot carry a reason")
+        if self.status == "unavailable" and (
+            not isinstance(self.reason, str) or not self.reason.strip()
+        ):
+            raise ValueError("unavailable ContactSummary requires a reason")
+        frozen_counts = {}
+        for name, count in self.pair_counts.items():
+            if type(name) is not str or not name.strip() or name != name.strip():
+                raise ValueError("ContactSummary pair names must be stable nonempty tokens")
+            if isinstance(count, bool) or not isinstance(count, (int, np.integer)) or count < 0:
+                raise ValueError("ContactSummary counts must be nonnegative integers")
+            if name in frozen_counts:
+                raise ValueError("ContactSummary pair names must be unique")
+            frozen_counts[name] = int(count)
+        if self.status == "unavailable" and frozen_counts:
+            raise ValueError("unavailable ContactSummary cannot carry contact counts")
         object.__setattr__(
             self,
             "pair_counts",
-            MappingProxyType(
-                {str(name): int(count) for name, count in self.pair_counts.items()}
-            ),
+            MappingProxyType(frozen_counts),
         )
+
+    @classmethod
+    def available(cls, pair_counts: Mapping[str, int]) -> "ContactSummary":
+        return cls(pair_counts=pair_counts)
+
+    @classmethod
+    def unavailable(cls, reason: str) -> "ContactSummary":
+        return cls(status="unavailable", reason=reason)
 
 
 @dataclass(frozen=True)

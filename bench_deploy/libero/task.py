@@ -1,5 +1,85 @@
 """Pinned task identity and source-level task semantics."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from task_env.environment.task_definition import (
+    TaskDefinitionBase,
+    TaskEvaluationContextV1,
+    TaskPredicateEvaluationV1,
+    TaskPredicateResultV1,
+)
+from task_env.controllers.mounted_panda_mixed import (
+    MountedPandaControlMapV1,
+    MountedPandaMixedActuatorAdapter,
+    MountedPandaServoConfigV1,
+)
+
+
+PILOT_SOURCE_ID = (
+    "libero-pilot-candidate:"
+    "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75"
+)
+PILOT_ACTIVE_SCENE_XML_SHA256 = (
+    "bb118118e3e02a0f23295c072d77c5a7c6b44cc773032dc79c17070b4e133f86"
+)
+
+
+@dataclass(frozen=True)
+class LiberoPilotControlHookV1(TaskDefinitionBase):
+    """TaskDefinition extension candidate for one explicitly bound source.
+
+    This is not a registered Env or a public admission route. A future
+    LIBERO TaskDefinition can delegate its existing ``create_action_adapter``
+    hook here after a real Core source construction path is established.
+    Every physical identity and gain is supplied by the caller; there are no
+    production defaults.
+    """
+
+    source_id: str
+    source_xml_sha256: str
+    agent_uid: str
+    servo_config: MountedPandaServoConfigV1
+    requires_contact_summary = True
+
+    def __post_init__(self) -> None:
+        if self.source_id != PILOT_SOURCE_ID:
+            raise ValueError("LIBERO candidate source id differs from the frozen pilot manifest")
+        if self.source_xml_sha256 != PILOT_ACTIVE_SCENE_XML_SHA256:
+            raise ValueError("LIBERO candidate active-scene XML hash differs from the frozen pilot")
+        if self.agent_uid != "libero-mounted-panda-v1":
+            raise ValueError("LIBERO candidate requires the fixed MountedPanda Agent identity")
+
+    def create_action_adapter(self, compiled_scene: Any):
+        references = getattr(compiled_scene, "references", None)
+        if references is None:
+            raise TypeError("LIBERO candidate action hook requires compiled TaskReferences")
+        mapping = MountedPandaControlMapV1.from_task_references(
+            references,
+            agent_uid=self.agent_uid,
+            source_id=self.source_id,
+            source_xml_sha256=self.source_xml_sha256,
+        )
+        return MountedPandaMixedActuatorAdapter(
+            mapping=mapping,
+            config=self.servo_config,
+        )
+
+    def evaluate_predicates(self, context: TaskEvaluationContextV1):
+        if not isinstance(context, TaskEvaluationContextV1):
+            raise TypeError("LIBERO pilot predicate evaluation requires TaskEvaluationContextV1")
+        contact = context.state.contact_summary
+        reason = (
+            contact.reason
+            if contact is not None and contact.status == "unavailable"
+            else "public_object_pose_mapping_unavailable"
+        )
+        return TaskPredicateEvaluationV1.available({
+            "on_bowl_plate": TaskPredicateResultV1.unavailable(reason)
+        })
+
 
 def build_task(manifest: dict) -> dict:
     task = manifest["task"]
