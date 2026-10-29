@@ -1858,10 +1858,10 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "564a997af1f391e79a296acfd4eac4cdb71c39e17b4ecb22bbd214fc494f5f14",
+    "07_Execution_Order_and_Acceptance.md": "41c3e5219f77e8a6824553f6f34d6886040b15f094b4f1fb72d148ea50d02c0e",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "3f0b4137b5d030519b0c14c68a5dc71b8da9d20d966515608ab4d6b25b51bd30",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "78f27ec08c0092b4ebe24b22fb412c2a6de5c47455068356b962af8b0418dfdc",
     "README.md": "0d70d28a4f4966f6fb8d9e5f30ada98f58483b44b315858a0bf96f03606b5911"
   },
   "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
@@ -5028,7 +5028,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Prepare a separately frozen F05 ready-cell package after F04 final closeout; F05 execution has not started.",
+      "selected_next": "F05 attempt001 source/control foundation and actual Core S1; package prepared for maintainer forwarding, not executed.",
       "after_that_priority": [
         "F05 ready cells",
         "F06 ready cells",
@@ -5916,6 +5916,41 @@
       "F05_started": false,
       "fifth_native_required": false,
       "qualification_granted": false
+    },
+    "f05_attempt001_package_plan": {
+      "date": "2026-10-30",
+      "status": "PREPARED_NOT_EXECUTED",
+      "attempt": 1,
+      "target_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
+      "branch": "develop-full",
+      "canonical_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-source-control-foundation",
+      "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_001/luna1_prompt.md",
+      "input_snapshot": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_001/input_snapshot.json",
+      "input_head": "actual post-planning commit pinned in package snapshot",
+      "scope": "GeoPhys USD source/control lowering in existing owners, actual source/host-model reports, MJCF site importer fix, exact same-route Core synthetic S1/H5/reader/fault; retain production fail-closed, no native",
+      "known_mandatory_unknown": "source USD drive is lowered to generalized-force affine channel, current Core assumes position targets; model-bound public mapping/mimic/units not yet validated",
+      "expected_active_minutes": [
+        180,
+        270
+      ],
+      "timebox_minutes": 360,
+      "native_solver_initializations": 0,
+      "physics_steps": 0,
+      "Kit_starts": 0,
+      "provider_worktree_plan": {
+        "reason": "isolate local GeoPhys importer repair while preserving accepted Core/provider pin and existing provider worktrees",
+        "base": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+        "branch": "codex/phase-ii-01-f05-geophys",
+        "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_geophys_provider/GeoPhys",
+        "new_provider_branches_max": 1,
+        "new_provider_worktrees_max": 1,
+        "new_core_worktrees": 0,
+        "gitlink_update_in_this_window": false,
+        "disposition": "retain candidate local commit/worktree for Sol review; integration/gitlink update separately authorized after review"
+      },
+      "mujoCo_usd_cell": "existing exact decoder rejection reused, other builds unverified; no install/build/native probe",
+      "F06_authorized": false,
+      "full_F05_acceptance_claimed": false
     }
   }
 }

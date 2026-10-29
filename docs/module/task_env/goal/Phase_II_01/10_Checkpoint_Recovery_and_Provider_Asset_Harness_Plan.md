@@ -1,7 +1,7 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt004的技术门通过，等待处理G8 tracked-clean交接并等待Sol复核**。
-F04 attempt001–003的历史状态和失败原件继续保留。attempt004在既有Core owners上修复worker退出边界，完成两个冻结Panda source的同run CUDA/GPU PhysX闭环、S1、原物理门、独立reader和bundle检查；本次未扩展来源/build/device准入，不表示Sol接收或Qualification。F04包要求的最终tracked-clean尚未满足：恢复执行时已有两份无关tracked文档dirty，为保护其写入权属没有暂存。F05尚未启动。
+更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt001工作包准备中，未执行**。
+F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05首包的具体source/control缺口、owner、隔离provider工作树计划和零native预算见[首包计划](#f05-attempt001-source-control-foundation)。
 
 ### 当前双Luna分工（2026-10-29）
 
@@ -644,3 +644,37 @@ provider-free读取/collection、reader和bundle各自run ledger及失败修复�
 该接收不声称自然Python/Kit析构已经修复，不升级为上游`source_verified`，不扩大到其他资产/source/build/device/profile、通用Isaac provider、Human Judge、D0/D1/D2、P99、Qualification或training-ready。attempt001–003及attempt003五次`-11`原件保持不变。F04的普通attempt与维护者授权诊断attempt004分别保留，不通过重命名抹去历史。
 
 **无需第五轮native。F05尚未启动，后续必须单独冻结范围、真实HEAD和执行预算后再派包。** 原7/22、R05a/compatibility blockers及其他分支状态不因本次收口改变。
+
+<a id="f05-attempt001-source-control-foundation"></a>
+
+## F05 attempt001工作包计划：GeoPhys USD来源、控制lowering与同路线S1（2026-10-30）
+
+F04已获`ACCEPTED_BOUNDED_F04`，F05总目标保持本节第5表的三provider USD闭环。首包只覆盖明确可实施的source/control基础与同路线S1；**零Kit/solver初始化、零物理步进、零native运行**。这不是新增固定准备轮：实现、定向检查、必要修复和本地提交均在一个窗口完成。下一窗口是否进入native由本包的实际公开能力和Sol复核决定。
+
+### 实际调用链缺口
+
+| Owner / 方法 | 已确认当前行为 | 本包实施与检查 |
+| --- | --- | --- |
+| `assembly/source.py::UsdTaskSceneSourceV1`、`runtime/sessions/geophys_source.py::native_scene_source/GeoPhysSourceComposer`、`assembly/compiler.py::compile_task_scene` | Core GeoPhys composer只接MJCF；已有F02 USD闭包/snapshot和GeoPhys `SceneSource.usd_path` 未贯通 | 在现有source/composer owner按类型分派，消费owned USD snapshot及entry/variants/dependencies，保证失败释放lease；保留原MJCF输出与hash，不写USD进xml字段 |
+| GeoPhys `SceneSource.usd_path → import_scene_source → ImportedScene.build_solver_scene_desc/build_rigid_scene_model` | Provider已有真实USD import、capability报告、scalar drive lowering；Core不能只因format matched准入 | 真正调用public importer和host model lowering，绑定source/build/options、IR/target hash、依赖和canonical资源映射；逐属性记录consumed/retained/approximated/rejected，source-only成功不称runtime支持 |
+| `GeoPhys/src/scene/_rigid_usd_joint.py::usd_joint_actuators` | `gain=1`、`bias=(k*target+d*velocity,-k,-d)`，角度/质量/长度转换；不是native位置setter | 在既有Core control/native-IO边界定义并验证position target到公开ctrl通道的静态映射；核q零位、单位、drive类型、limit/maxForce和初始bias。不能直接把弧度/米写作力，也不能让Core重算provider私有力状态 |
+| `runtime/sessions/native_io.py::UsdCoreRuntimeSession`、`leaf_control.py` | session无receipt时固定编译`IsaacNamedPositionDriveReceiptV1`，未有GeoPhys USD receipt路径 | 在既有owner中最小加法扩展GeoPhys-specific mapping/receipt；保留Isaac旧type/schema/hash与F04路径。新receipt不伪装Isaac，不复制session。公开能力不足时保存精确blocker并保持production拒绝 |
+| `tasks/position_candidate/builder.py`、`registry.make_env`、`SelectedReferenceEnv`、`sessions/api.materialize`、Recorder/H5 | F04 input/admission只准Isaac；新provider不能只换字符串套旧metadata | 使用版本化显式候选输入和lexical S1 opt-in，调用真实factory/reset/typed snapshot/target/Ack/step/Recorder/read/close，仅替换bottom native IO；production GeoPhys USD保持fail closed直到native另验 |
+| GeoPhys `geometry/mjcf_loader.py::_parse_site → SiteConfig → site_size` | MjSpec导出的sphere三槽尺寸被exact width校验拒绝；通用padded helper还要求未用槽为0 | importer按primitive有效维规范化MJCF尺寸，先对所有输入作finite/合法检查，再交给严格SiteConfig；不放宽`site_size(padded=True)`，不改源bytes。覆盖raw短维、三槽导出、fromto/defaults及非法维度/NaN/Inf/负有效尺寸 |
+| `assembly/usd_delivery.py::resolve_provider_representation`、MuJoCo source owner | 精确MuJoCo3.8.1 build decoder已拒绝；其他build未核实 | 复用原拒绝证据与定向正负例，报告独立MuJoCo USD cell未就绪；不升级/安装build、反向转换或以MJCF执行替代USD cell |
+
+### 首包来源、未知与停止条件
+
+只读复用F04 attempt003 `assets/local_official_panda_r009`、`assets/local_menagerie_panda_r009` 的完整delivery；实际路径/closure/recipe/checker/report SHA从F04 attempt004 frozen source bindings读取，不猜目录或拼字段。保留原始输入与Isaac验收。先分析Menagerie两drive sample，再分析官方含PhysX mimic sample。官方mimic不能因导入无报错视作消费成功；未被public target保真支持时明确拒绝该cell，不删除mimic或用另一个Panda替代。
+
+本包尚待执行者通过公开API/源码核实：USD actor/link与COM reference、implicit free root/固定根、原始joint-frame rest偏置、mimic和PhysX专属属性的消费范围、USD actuator通道是否可通过现有公开ctrl表达完整位置驱动。检查 `_rigid_usd_joint.py` 的affine law及现有scalar reset/ctrl/snapshot公开路径；若不能支持，给出具体source prim/IR字段/target decision/API缺口及最小修复owner。不能把这些未知转为无依据provider-private访问或静默近似。
+
+可复用官方资料（2026-10-30访问）：[OpenUSD DriveAPI](https://openusd.org/release/api/class_usd_physics_drive_a_p_i.html)定义drive law及角度单位；[MuJoCo官方XML参考](https://mujoco.readthedocs.io/en/3.13.0/XMLreference.html)说明primitive size有效维。后者版本不同，只作格式参考；具体3.8.1导出形态以已保存的R03c/MjSpec原bytes和当前源码为oracle。3.8.1网页本轮无法抓取，不称已读取。无需新依赖或第三方Runtime。
+
+### 分支、窗口和验收
+
+主仓复用`develop-full`，零新增Core分支/worktree。GeoPhys当前子模块保持`a53a8cfed7c9d6464274b5c96fca601271dc4ee4`、Menagerie保持`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。仅为已知provider importer修复计划一个隔离GeoPhys topic/worktree：分支`codex/phase-ii-01-f05-geophys`，基于上述GeoPhys pin；工作树位于本包冻结索引指定ignored目录。理由是修provider同时保护Core已验收pin和其他工作树。优先复用该分支/目录若已适合；存在异质历史或其他writer则报告，不重置。此窗口不更新主仓gitlink、不push/merge；provider本地提交由Sol审查后另定集成，所有S1/probe明确区分pinned与candidate import origin/commit。不得悄悄用candidate证明旧pin。
+
+G1：输入/保护hash及所有权完整；G2：真实USD import/host lowering与属性处置报告（每个来源独立结果，失败也保留）；G3：已知MJCF site importer复现、修复及primitive/strict-helper回归；G4：控制单位/零位/drive law和model-bound映射正负例；G5：真实Core工厂到两个same-Env synthetic episode、完整T+1/H5独立读回及fault/cleanup检查；G6：F02/F03/F04受影响S1回归，旧Isaac receipt/hash/reader保持；G7：docs/Skill/源码/来源/预算/run ledger和本地提交完整，tracked变更只含本包范围。只有相应门通过才可报告`F05_SOURCE_CONTROL_S1_PASS_PENDING_SOL_REVIEW`，仍不等于F05总接收或S2/S3。未完成的public capability必须报PARTIAL/BLOCKED并指出下一包的具体修复，不用仅有报告取代本包已知可做实现。
+
+预计活跃180–270分钟，timebox360分钟（最后30分钟收口）。每source-only import/model或S1子进程wall≤300秒、RSS≤3GiB，单进程/最多4CPU threads；同时只运行一个资源密集检查。启动MemAvailable≥4GiB，低于1GiB中止；新evidence≤512MiB、日志≤64MiB、cache增长≤1GiB。无安装/升级/新资产下载，网络仅官方资料≤50MiB。严禁`ti.init/init_test_backend`、solver/simulator构造、MuJoCo native compile/step、Isaac/Kit、renderer。source-only import/host model必须有tripwire和实际零初始化计数；触发即停留证。每5–10分钟只读可观察进展；一个完整prompt，维护者转述，Sol不直接消息派发。原三轮attempt与本F05 attempt001分别计数，失败run在窗口内修复，不随意提前结束。

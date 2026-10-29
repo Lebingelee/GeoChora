@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+2026-10-30后继包：F04已完成最终接收；当前准备F05 attempt001，在现有Core source/control owners实施GeoPhys USD基础与同路线S1，并在隔离GeoPhys topic/worktree修复已知MJCF site尺寸导出兼容缺陷。当前公开USD drive到Core可变position target的单位、偏置、通道/mimic映射未验证，故首包明确零solver初始化/零native/零物理步进；不是F05三provider总出口。具体owner、门禁、预算和provider branch disposition见[10 F05首包计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-source-control-foundation)。F05尚未执行，F06/F07不自动授权。
+
 当前入口（2026-10-30）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02 attempt002获`ACCEPTED_BOUNDED_F02`；F03 attempt003获Sol接收`ACCEPTED_BOUNDED_F03_S1`；attempt002真实CPU Pendulum三步范围偏差继续保留；F04 attempt004技术复核及G8收口完成，已获`ACCEPTED_BOUNDED_F04`；F05未启动；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
 
 2026-10-30最终收口：维护者已转述临时窗口独立技术复核的有界接收决定；主窗口复核原冻结包9/9、输出364/364、保护输入2,134/2,134及native源码27/27全部匹配。通用Skill修改由主窗口独立审阅后提交`875954f101033568a3e1f5e439ed86be3cf29cc2`，该HEAD的tracked tree clean；F04实现及冻结证据不变。执行目录缺失的转述副本已从原包逐字节补齐，输出清单更新为365项并保留更新前清单。G8关闭，登记`ACCEPTED_BOUNDED_F04`；仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及受控worker退出合同，无第五轮native、无软件测试重跑。详见[10最终接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-sol-acceptance)。F05未启动，须另行冻结工作包。
