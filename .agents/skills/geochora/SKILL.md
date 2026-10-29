@@ -127,13 +127,38 @@ For a maintainer-authorized goal covering multiple substages, follow the
 [goal orchestration procedure](references/goal-orchestration.md): locate each
 substage's implementation details in its planning document, aim for research
 and implementation in attempt 1 and review/acceptance in attempt 2, and cap
-each substage at three execution windows. Each window may contain multiple
+ordinary substage work at three execution windows. Each window may contain multiple
 repair and validation runs; count those runs separately from attempts. Before attempt 3, reassess the actual blockers,
 research relevant open-source implementations and decide whether the original
 acceptance remains achievable. Track Luna through periodic read-only checks;
 prepare future work privately during report cleanup, then independently verify
 the completed handoff before dispatch. This procedure does not itself create a
 goal or start/message additional agents.
+
+If three ordinary attempts still do not meet acceptance, report the blocker.
+Avoid routinely opening diagnostic conversations: they consume maintainer
+attention and usage. The maintainer may explicitly designate a temporary
+diagnostic conversation; its diagnostic attempts have no fixed count limit,
+but each still needs a concrete repair objective, timebox and evidence. Use the
+[post-limit diagnostic handoff](references/goal-orchestration.md#post-limit-diagnostic-conversation)
+to isolate the root cause before further execution. Preserve ordinary and
+diagnostic attempt histories separately. A new conversation alone does not
+authorize implementation, native execution or additional resources.
+
+## Runtime route consolidation direction
+
+The maintainer's migration target is one task execution route through
+`SelectedReferenceEnv -> RuntimeSession -> provider adapter`. New benchmark
+integration must use that route. Benchmark-specific controllers may live in
+`bench_deploy/` and consume Core control/state contracts; runtime lifecycle and
+native application remain Core/adapter responsibilities.
+
+Migrate existing `BaseTaskEnv` callers before making its retained import names
+direct aliases of `SelectedReferenceEnv`, with the same interface and no second
+reset/step implementation. Keep those import names through 2.x; deprecation or
+removal is deferred to 3.0.0 planning. This is a migration requirement, not a
+claim that current callers have already migrated. Preserve provider-internal
+helpers that the unified route still uses and retain historical evidence.
 
 ## Non-negotiable boundaries
 

@@ -61,7 +61,7 @@ to the intended successful run; never combine partial runs into a fake pass.
    reassessment below is complete. Include the chosen repair, its validation
    and final substage disposition in one package.
 
-Each substage has at most **three attempts**. Count completed execution
+Ordinary substage work has at most **three attempts**. Count completed execution
 windows in the index, with their success, timebox or external-guidance handoff
 reason; record repeat tests/native runs under that window. Do not reset the
 count through renamed packages, new threads/branches or preparation rounds.
@@ -72,6 +72,45 @@ not itself spend an attempt. Preserve pre-existing historical attempts without
 relabeling them. If the limit is already reached, do not issue another attempt
 under this procedure; report the unresolved result and obtain a maintainer decision on
 the plan. An exhausted limit does not make the substage accepted.
+
+<a id="post-limit-diagnostic-conversation"></a>
+
+### Post-limit diagnostic conversation
+
+After three unsuccessful ordinary attempts, report the unresolved result.
+Opening diagnostic conversations is discouraged because it consumes maintainer
+attention and usage; resolve routine defects inside existing execution windows.
+The maintainer may explicitly open a temporary conversation dedicated to
+locating and resolving a persistent blocker. Do not create or message another
+conversation automatically.
+Hand over the original objective and acceptance gates, current branch/HEAD and
+writer ownership, three frozen packages and results, established facts versus
+hypotheses, and exact unresolved owner/method boundaries.
+
+Use that conversation to check upstream construction and reset semantics,
+existing production callers, and whether a claimed missing input is absent
+from the available delivery or absent upstream altogether. Separate an
+implementation gap from an external-data gap and from an unnecessarily strict
+or changed acceptance gate. Verify these distinctions before asking for more
+assets, changing task semantics, or extending execution.
+
+Once explicitly designated by the maintainer, diagnostic work has **no fixed
+attempt-count limit**. Preserve the original three-attempt result and record
+diagnostic attempts and individual runs separately. This exception must not be
+self-declared by renaming ordinary work. Each diagnostic attempt should resolve
+an identified cause or deliver an implementation/validation increment; do not
+repeat the same audit or ask the user to reopen conversations for routine fixes.
+Maintain bounded time and resource budgets and one complete prompt per window.
+Reassess the approach when repeated work makes no progress.
+
+Opening the conversation alone authorizes no implementation, native execution,
+branch changes or concurrent writes. Its default is read-only diagnosis; edits
+and execution need maintainer scope and coordination with the current writer.
+Return the root cause, reusable owners, smallest repair and validation plan,
+and any concrete maintainer decision to the phase record. Resume implementation
+under the agreed scope, acceptance contract and execution budget. An explicit
+diagnostic mandate does not erase failed evidence or automatically grant
+substage acceptance.
 
 ## Mandatory reassessment before attempt 3
 
