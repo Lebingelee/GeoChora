@@ -282,3 +282,27 @@ Sol对`develop-full@21fd6ee22e08690383bc6fbc1497430d6b20cfdc`的实际diff与原
 接收为`ACCEPTED_BOUNDED_F02`，覆盖版本化USD交付/报告绑定、bytes闭包、选定本地USD依赖策略和provider表示选择，以及实际Core/catalog消费路径。实际实现与更深布局回归分别绑定`0acadcd158850f49f92c3172af24548629ae9dc5`、`f5e35e3b43ec90cf02e6665dd2d57463dcff2bb7`；本次Sol没有修改实现或测试、没有新增native/decoder/physics/H5/Expert运行。attempt001的GeoPhys source-only与精确MuJoCo build拒绝证据复用原件，不迁移为新运行或其他build能力。
 
 真实官方Panda bytes及上游validated report仍未取得；synthetic fixture不能替代真实交付或几何/物性等价验证，所有runtime admission保持false，Qualification为NOT_ASSESSED。F03的F02合同前置已满足，但F03尚未启动，仍需单独冻结实施包。无须第三次F02 attempt。独立复核与收据见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f02_002/`；历史候选与失败原件保持签署时点。
+
+<a id="f03-core-contract-call-chain-package-plan"></a>
+
+## F03 Core合同与调用链实施定位（2026-10-29，包准备）
+
+维护者指定Luna1继续在`develop-full`实施F00–F07；`develop@41cbf53`仅为两线集成参考，本包不merge/rebase/cherry-pick该分支，不改`main`或camera工作树。F02已经`ACCEPTED_BOUNDED_F02`；F03 attempt001将单独冻结包，当前段为实施定位，尚不代表代码或native完成。
+
+首轮目标为完整Panda（7 arm+2 finger joints）与一个floating刚体的state-only Position合同；canonical hand opening用米，原生双finger position drive与旧MuJoCo单tendon/actuator表示分开。目标Isaac执行身份明确provider/build/backend/device/PhysX，默认`cuda:0`和GPU dynamics；F03仅合成native-I/O一致性验证，不启动Isaac。Core采用既有Position路线100Hz、5×2ms；F01的120Hz native原件保持自身配方，不称本包已验证该新时间基准的真实PhysX运行。真实官方USD交付与上游报告尚未取得；只用准确标记的synthetic input测试，生产默认不因synthetic通过而准入。
+
+| Owner/实际方法 | 需构建或扩展 | 定向出口 |
+| --- | --- | --- |
+| `assembly/usd_delivery.py`、`assembly/source.py::TaskSceneSource`、`sessions/source.py::RuntimeSource` | 将F02的immutable bytes/entry/prim/variants/报告绑定接到显式版本化source输入；保留MJCF旧布局与identity | 不将USD路径塞xml；使用同一核验快照，拒绝stale依赖、错Scene/Asset、嵌套路径及错误表示 |
+| `environment/task_source.py::sample_episode_reset_plan`、`sessions/api.py::_validate_v1_materialization_source`、`sessions/common.py::reset_plan`及provider reset owner | 有界free-body reset/resource projection与测量realization gate；不能仅删除poses_world guard | 正确Entity/root/frame/floating binding；零速度/targets重置；错误或未实现source lowering在native前拒绝 |
+| `sessions/common.py::snapshot_v1`、MuJoCo/GeoPhys已有free readback及Isaac公开API边界 | 静态可判定的JointDefinition/Frame/StateRequirements前移；provider特定速度解释留adapter边界 | 非identity姿态、非零速度及COM偏移的frame/reference-point oracle，旧MuJoCo输出保持；无provider-private state |
+| `artifacts/contracts.py::ExecutionSpecV1`、`sessions/api.py::materialize/_materialize_admitted`、`sessions/provenance.py` | 显式消费现有v1选择而非丢失device/render/determinism；保留legacy ExecutionSpec | 精确provider/build/source/profile/device与contract-only/未验证状态；未知能力不被caller manifest扩大 |
+| `controllers/canonical`、`sessions/control.py::materialize_control`、`sessions/leaf_control.py` | 复用Position数学和Target/Ack/preflight；版本化canonical资源与native drive绑定；必要source-derived运动学输入位于既有owner | 7 arm+2 finger映射、米/弧度、单writer完整覆盖、重复native channel与partial apply故障闭锁；不伪造nq/nv/ctrl slots |
+| `registry.py::make_env`、`tasks/position_candidate`、`SelectedReferenceEnv`构造/reset/step/record/close | 现有Core入口接版本化任务/场景输入；ReferenceTaskBinding继续内部seam | 从真实工厂到真实reset/state/control/首步/publication/stop/Recorder/close，测试只替原生I/O，不mock掉Core owners |
+| `recorders/h5.py`、既有Generic H5 v3/TransitionRecorder | 新profile分派/receipt读取，保留旧R02c/R03c exact reader | 两episode短轨迹T+1、controls/state/clock/source/execution身份、独立离线读回和tamper拒绝；合成H5不冒充native S3 |
+
+F03不得建立第二Runtime/Recorder/controller或将ReferenceTaskBinding提升为公共任务协议；新native I/O seam只位于现有RuntimeSession/provider边界，并记录为什么现有接口不足。生产缺少真实adapter或validated source时仍fail closed；S1有明确synthetic上下文，不得改写provider registry/能力表为已运行支持。F04再提供Isaac真实I/O及native闭环，F05处理其他USD provider cells。
+
+F03 attempt001包须包含：先调研并确定实际patch/caller/type表，完成所需实现、定向正反例、两次同Env reset与短轨迹真实H5写读、finalizer/close失败路径、必要文档/Skill和本地提交；不分成固定准备轮。预计150–240分钟，活跃timebox240分钟；允许包内多次修复和复跑，不以单次测试失败结束attempt。F00/F01/F02 raw、旧reader/profile、R05反馈/原R表和pins保持；R05b的camera工作树由Luna2独立持有。
+
+速度适配的已核实参考：Isaac 6.2 installed `experimental.prims`公开RigidPrim wrapper返回wxyz姿态，底层public tensor velocity为world frame且线速度在COM；参见[Omni Physics Tensor API](https://docs.omniverse.nvidia.com/kit/docs/omni_physics/107.3/extensions/runtime/source/omni.physics.tensors/docs/api/python.html)。后续需核实际安装版本与公开COM读法，并用非零COM oracle转换到canonical声明的frame/reference point，不能把两种native速度拼成同一qvel合同。

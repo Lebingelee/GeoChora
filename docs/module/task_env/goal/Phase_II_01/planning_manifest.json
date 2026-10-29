@@ -1856,13 +1856,13 @@
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "d2eb14212c2e772070808cf327be2d403314893b59129566d50f0aef9145f277",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9f643e8159b05a5e2935c1b57cfe6a72d503aace5d557c83f92bb6f122a3f5b",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "cf0f376f9523d2728c7089e0b3dec6f7aa108b91e25ffb91e2481fedf58a65ef"
+    "07_Execution_Order_and_Acceptance.md": "92d0ccf4492287820f905dc86655a700ef2bb0133bce6938ad6415a9587abbc9"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4897,7 +4897,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F03 may be prepared from the F02 accepted contract; separately frozen package required, not started.",
+      "selected_next": "F03 attempt001 package preparation on develop-full; execute only after separate frozen dispatch.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -5431,6 +5431,36 @@
       "F03": "READY_FOR_SEPARATELY_FROZEN_PACKAGE_NOT_STARTED",
       "review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f02_002/sol_review.md",
       "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f02_002/review_receipt.json"
+    },
+    "f03_attempt001_package_plan": {
+      "status": "PACKAGE_PREPARED_NOT_EXECUTED",
+      "branch": "develop-full",
+      "accepted_baseline": "ad8ee10a7fe7013a94d0b9d7d5ef3269307fd15b",
+      "thread_id": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
+      "planning_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-core-contract-call-chain-package-plan",
+      "work": "Extend existing Core source/reset/typed-state/execution/control/factory/recorder owners; actual caller conformance with synthetic native IO only.",
+      "target_resources": "complete Panda 7 arm + 2 finger joints and one floating rigid object; position only",
+      "target_timebase": {
+        "physics_dt_s": 0.002,
+        "control_substeps": 5,
+        "control_dt_s": 0.01
+      },
+      "target_isaac": {
+        "version": "6.2.0.0",
+        "device": "cuda:0",
+        "gpu_dynamics": true,
+        "native_validated_in_F03": false
+      },
+      "expected_active_minutes": [
+        150,
+        240
+      ],
+      "timebox_minutes": 240,
+      "native_app_starts_authorized": 0,
+      "physics_steps_authorized": 0,
+      "real_validated_asset_delivery_received": false,
+      "next_substage_auto_authorized": false,
+      "other_branch_policy": "No merge/rebase/cherry-pick of develop or camera; no main changes; R05b independent."
     }
   }
 }
