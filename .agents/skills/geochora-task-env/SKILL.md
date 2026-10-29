@@ -163,12 +163,13 @@ status is `F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW`; preserve every
 failed run, keep the original thresholds, and do not start F05. Details are in
 the [attempt003 closeout](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate).
 
-F04 attempt004 is a Luna candidate pending Sol review: the exact provider-free list passed 30/30,
-and one same-run Isaac Sim 6.2.0.0 CUDA `cuda:0`/GPU PhysX worker exercised the frozen official
-and current Menagerie Panda sources through the existing Core route. Four closed H5 files passed
+F04 attempt004's technical gates passed: the exact provider-free list passed 30/30, and one
+same-run Isaac Sim 6.2.0.0 CUDA `cuda:0`/GPU PhysX worker exercised the frozen official and
+current Menagerie Panda sources through the existing Core route. Four closed H5 files passed
 independent T+1 and original physical-gate checks; the same-run parent observed worker exit 0,
-process-group completion and lock release. The candidate label is
-`F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW`, not a general Isaac capability or
+process-group completion and lock release. The package-wide candidate PASS remains unclaimed
+because G8 requires a tracked-clean handoff and two unrelated tracked documentation changes were
+preserved without staging. The technical result is not a general Isaac capability or
 Qualification.
 
 The process-scoped App owner calls public `SimulationApp.close()` and records its outcome. Env,

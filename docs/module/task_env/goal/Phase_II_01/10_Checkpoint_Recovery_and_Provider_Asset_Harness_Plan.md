@@ -1,7 +1,7 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt004为 `F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW` Luna候选，等待Sol复核**。
-F04 attempt001–003的历史状态和失败原件继续保留。attempt004在既有Core owners上修复worker退出边界，完成两个冻结Panda source的同run CUDA/GPU PhysX闭环、S1、原物理门、独立reader和bundle检查；本次候选未扩展来源/build/device准入，不表示Sol接收或Qualification。F05尚未启动。
+更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt004的技术门通过，等待处理G8 tracked-clean交接并等待Sol复核**。
+F04 attempt001–003的历史状态和失败原件继续保留。attempt004在既有Core owners上修复worker退出边界，完成两个冻结Panda source的同run CUDA/GPU PhysX闭环、S1、原物理门、独立reader和bundle检查；本次未扩展来源/build/device准入，不表示Sol接收或Qualification。F04包要求的最终tracked-clean尚未满足：恢复执行时已有两份无关tracked文档dirty，为保护其写入权属没有暂存。F05尚未启动。
 
 ### 当前双Luna分工（2026-10-29）
 
@@ -617,6 +617,6 @@ provider-free读取/collection、reader和bundle各自run ledger及失败修复�
 
 ### 当前出口与限制
 
-本attempt候选状态为`F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW`，不是Sol接收。该证据限于冻结的两个Panda delivery/source、Isaac 6.2.0.0/CUDA `cuda:0`/GPU PhysX execution/profile和本次public Position/Core/H5路线；不授予更广Isaac provider admission、其他source/build/device支持、Human Judge、D0/D1/D2、P99、Qualification或training-ready。F05未启动。
+本attempt的S1/native/物理/独立reader/bundle技术门全部通过，但没有声明包内全门候选PASS：G8要求的最终tracked-clean因两份无关文件仍dirty而未满足。当前限于冻结的两个Panda delivery/source、Isaac 6.2.0.0/CUDA `cuda:0`/GPU PhysX execution/profile和本次public Position/Core/H5路线；不授予更广Isaac provider admission、其他source/build/device支持、Human Judge、D0/D1/D2、P99、Qualification或training-ready。等待写入者处理无关dirty文件后由Sol决定接收与否；F05未启动。
 
 完整prompt、snapshot/readback、输入保护检查、S1/native/reader/bundle artifacts、逐run账本、资源/锁回执、Skill review和manifest见`f04_004/`。Sol复核前，当前仅声明Luna候选；代码写入和native锁窗口已释放。

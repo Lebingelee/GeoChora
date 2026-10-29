@@ -361,12 +361,13 @@ The same-run bundle rejected cross-family and cross-episode witness grafts. The 
 worker exit 0 and a fully exited process group; the shared lock was released after exit and
 resource measurement.
 
-Current candidate status is
-`F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW`. This is limited to the two
-frozen Panda deliveries and exact build/backend/device/profile. It does not establish general
-Isaac admission, other source/build/device combinations, Human Judge approval, P99, Qualification
-or training-ready status. F04 attempt001–003 evidence is unchanged, including all five attempt003
-`-11` exits; F05 has not started. See the [attempt004 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
+The F04 attempt004 S1/native/reader/bundle technical gates passed. The package-wide candidate
+PASS is not declared because its G8 tracked-clean handoff requirement is still unmet: two
+unrelated tracked documentation changes were already present and were left untouched. The result
+is limited to the two frozen Panda deliveries and exact build/backend/device/profile. It does not
+establish general Isaac admission, other source/build/device combinations, Human Judge approval,
+P99, Qualification or training-ready status. F04 attempt001–003 evidence is unchanged, including
+all five attempt003 `-11` exits; F05 has not started. See the [attempt004 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
 
 ### Static Logical Assembly value (R01a)
 
