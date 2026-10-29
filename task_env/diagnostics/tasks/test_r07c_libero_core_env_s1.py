@@ -5,7 +5,9 @@ from dataclasses import dataclass
 import hashlib
 import importlib.abc
 import json
+import os
 from pathlib import Path
+import shutil
 import sys
 import types
 import xml.etree.ElementTree as ET
@@ -28,6 +30,16 @@ from task_env.recorders import (
     inspect_trajectory_h5,
     load_structured_control_records_h5,
 )
+
+
+def _preserve_h5(path: Path) -> Path:
+    artifact_root = os.environ.get("R07C_S1_ARTIFACT_DIR")
+    if not artifact_root:
+        return path
+    destination = Path(artifact_root) / path.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, destination)
+    return destination
 
 
 @dataclass(frozen=True)
@@ -382,6 +394,7 @@ def test_real_core_env_compile_lifecycle_fault_recorder_h5_and_independent_read(
         assert structured.writer_controls[0]["canonical_action"]["gain_status"] == "synthetic_s1_fixture"
         assert scheduler.calls == [25]
         h5_path = recording.save_h5(tmp_path, "libero_core_candidate_success")
+        _preserve_h5(h5_path)
         production = inspect_trajectory_h5(h5_path)
         assert production["schema_version"] == "v3"
         assert production["transition_count"] == 1
@@ -433,6 +446,7 @@ def test_real_core_env_compile_lifecycle_fault_recorder_h5_and_independent_read(
         assert step_failed_end.outcome.end_reason == "execution_fault"
         assert step_failed_end.outcome.final_boundary == 0
         failed_path = recording.save_h5(tmp_path, "libero_core_candidate_step_failure")
+        _preserve_h5(failed_path)
         failed_records = load_structured_control_records_h5(failed_path)
         assert failed_records["transition_count"] == 0
         assert failed_records["observation_count"] == 1
@@ -456,6 +470,7 @@ def test_real_core_env_compile_lifecycle_fault_recorder_h5_and_independent_read(
         assert recording.recorder.transition_count == 0
         readback_failed_end = recording.stop("failed_readback_boundary")
         readback_failed_path = recording.save_h5(tmp_path, "libero_core_candidate_readback_failure")
+        _preserve_h5(readback_failed_path)
         readback_failed_records = load_structured_control_records_h5(readback_failed_path)
         assert readback_failed_records["transition_count"] == 0
         assert readback_failed_records["observation_count"] == 1
@@ -472,6 +487,7 @@ def test_real_core_env_compile_lifecycle_fault_recorder_h5_and_independent_read(
         _, _, _, recovered_truncated, _ = recording.step(action)
         assert recovered_truncated is True
         recovery_path = recording.save_h5(tmp_path, "libero_core_candidate_reset_recovery")
+        _preserve_h5(recovery_path)
         recovery_records = load_structured_control_records_h5(recovery_path)
         assert recovery_records["outcome"].episode_id == recovered_info["episode_id"]
         assert recovery_records["transition_count"] == 1
@@ -485,6 +501,7 @@ def test_real_core_env_compile_lifecycle_fault_recorder_h5_and_independent_read(
         assert env._last_episode_end.outcome.end_reason == "external_stop"
         assert env._last_episode_end.boundary_event.payload["requested_reason"] == "environment_close"
         close_path = recording.save_h5(tmp_path, "libero_core_candidate_close_finalizer")
+        _preserve_h5(close_path)
         close_records = load_structured_control_records_h5(close_path)
         assert close_records["transition_count"] == 0
         assert close_records["observation_count"] == 1
@@ -534,15 +551,18 @@ def test_candidate_worker_finalizer_and_independent_report_consumer_success_and_
         success_env = build_libero_pilot_env(
             xml=xml, composed_mjcf_sha256=xml_sha, install_root=tmp_path / "success"
         )
+        artifact_root = Path(os.environ.get("R07C_S1_ARTIFACT_DIR", tmp_path / "worker_reports"))
+        success_dir = artifact_root / "worker_success"
+        failure_dir = artifact_root / "worker_failure"
         success_report = run_candidate_episode(
             success_env,
             action=action,
-            output_dir=tmp_path / "worker_success",
+            output_dir=success_dir,
             run_id="success",
             seed=31,
         )
         success_consumed = consume_candidate_episode_report(
-            tmp_path / "worker_success" / "success.result.json"
+            success_dir / "success.result.json"
         )
         assert success_report["execution_status"] == "passed"
         assert success_report["task_success"] is False
@@ -558,12 +578,12 @@ def test_candidate_worker_finalizer_and_independent_report_consumer_success_and_
         failure_report = run_candidate_episode(
             failure_env,
             action=action,
-            output_dir=tmp_path / "worker_failure",
+            output_dir=failure_dir,
             run_id="failure",
             seed=32,
         )
         failure_consumed = consume_candidate_episode_report(
-            tmp_path / "worker_failure" / "failure.result.json"
+            failure_dir / "failure.result.json"
         )
         assert failure_report["execution_status"] == "failed"
         assert failure_report["worker_error"]["type"] == "RuntimeError"
@@ -578,7 +598,7 @@ def test_candidate_worker_finalizer_and_independent_report_consumer_success_and_
         forged_pass["result_sha256"] = hashlib.sha256(
             json.dumps(unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
         ).hexdigest()
-        forged_path = tmp_path / "worker_failure" / "forged_pass.result.json"
+        forged_path = failure_dir / "forged_pass.result.json"
         forged_path.write_text(json.dumps(forged_pass), encoding="utf-8")
         with pytest.raises(ValueError, match="success status lacks"):
             consume_candidate_episode_report(forged_path)
