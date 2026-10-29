@@ -1,6 +1,6 @@
 # R06 — Compatibility / Mapping / Regression Governance
 
-状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt003已完成有界双case S1/S2交付，待Sol复核；历史原件/处置决定缺失使compatibility decision gate仍BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
+状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt003 run002已获Sol有界接收（ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION）；历史原件/处置决定缺失使compatibility decision gate仍BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
 
 ## 映射与机械语义保护
 
@@ -192,3 +192,16 @@ R04b误导入MuJoCo与argv未保留的偏离保持记录。历史missing raw/Pha
 | 局限 | E1/E2结束均为 `horizon_reached` 且 `task_success=false`。证据只覆盖冻结Panda Arm+Hand source、r06b-order-v1 recipe、MuJoCo 3.8.1 CPU及该有界配置；不代表任意source/provider兼容。四类历史原件及Phase II-01处置仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`；R05 Provider合同阻塞、R06c/P99未关闭、无Qualification。 |
 
 完整报告、command/resource收据及sha256清单位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/`；其中 `resume001/runs/run_001/`保留reader失败现场，`resume001/runs/run_002/`是独立完整成功run。该结果待Sol检查actual diff、manifest和available Evidence后决定是否接收。
+
+
+<a id="r06b-attempt003-sol-acceptance"></a>
+
+## R06b attempt003 Sol有界接收（2026-10-29）
+
+决定：**`ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`**。复核输入camera `a0a5662`，native实现 `03fba40`；仅接收同attempt003的fresh run002。386项输出hash、两run各12代码hash与66/69保护hash匹配；完整输出146,920,144 bytes（含49,963-byte清单）。Sol复用两次249项S1/资源/tripwire，未重跑pytest/native。
+
+Sol只读核对run002两份H5共128 transitions/130 observations、source闭包与同run文件/receipt/materialization joins；640条实际step trace逐outer五步、1.28s、两个case的names/inverse/ctrl slots均对应。原Articulation v1规范化文件与c05beb3完全一致；特定source traversal与canonical order已独立。独立进程无TaskEnv/engine导入，原件未改。详情见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06b_003/`。
+
+接收范围：固定Panda Arm+Hand原source加唯一`r06b-order-v1`派生，MuJoCo3.8.1 CPU、Arm gain2.5/Hand50、seed31、2ms×5、每case64步。一worker完成两次materialization/reset、128outer、640 mj_step、130forward、1.28sim秒，两H5各64/65、production reader及24项native派生拒绝通过；同锁raw正例通过，raw错run等negative复用249项S1 detector。E2真实joint/body/actuator顺序变化且actuator1 slot从0变6。worker/reader均exit0，close与锁收尾通过，最大RSS413,986,816 bytes为采样值。
+
+run001 reader失败原件保留；同attempt修复/重验未另计004，两run成本1280step/260forward/2.56sim秒完整计入。两episode outcome均horizon_reached、task_success=false。R06b有界实现出口完成，**不关闭**历史missing-raw/Phase处置、R05正式合同、R06c/P99或Qualification，不代表任意source/provider/资产支持。未merge/push；Sol提交本接收记录后释放camera窗口，不自动开始下一slice。

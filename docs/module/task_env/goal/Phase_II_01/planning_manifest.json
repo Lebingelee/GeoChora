@@ -1784,11 +1784,11 @@
         "R02c",
         "R03b"
       ],
-      "status": "BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT003_S1_PASS; RUN001_DUAL_CASE_NATIVE_COMPLETED_RAW_READBACK_FAILED_DIAGNOSED; RUN002_SAME_WORKER_E1_E2_NATIVE_AND_INDEPENDENT_RAW_READBACK_PASS_PENDING_SOL_REVIEW",
+      "status": "ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION",
+      "execution": "ATTEMPT003_RUN002_ACCEPTED_BOUNDED_S1_S2_AND_H5_READBACK; RUN001_FAILED_READER_PRESERVED",
       "required_evidence": "S1/S2",
-      "stop_condition": "Sol reviews the implementation diff and exact run evidence before acceptance. Historical raw/phase disposition remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION; do not advance R06c/P99 or infer general Provider/source compatibility.",
-      "result": "Attempt003 resumed under the maintainer-corrected execution window. Provider-free S1 passed 249 checks. Run001 physically completed E1/E2 but its independent reader rejected missing per-case episode_id; the defect was fixed, complete S1 rerun, and fresh run002 passed both E1/E2 in one MuJoCo 3.8.1 CPU worker with production H5 and independent same-run raw readback. The bounded order-regression result is pending Sol review. Historical raw/phase disposition remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION; R05 remains blocked, R06c/P99 and Qualification are not closed.",
+      "stop_condition": "Bounded R06b implementation exit accepted; no general compatibility/Qualification. R06c still requires R05c and explicit historical raw/phase disposition.",
+      "result": "Sol accepted exact bounded R06b order regression at 03fba40/run002 after independent retained-byte/trace/closure/raw-H5 verification. Original canonical normalization restored. One same-worker baseline+derived run passed with two64/65 H5s and640steps. Historical missing raw/phase decision and R05 remain blocked; R06c/P99 and Qualification unchanged.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/report.md",
       "attempt001": {
         "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
@@ -1952,7 +1952,7 @@
         "reader_repair": "Rehash contract; exact native result case set/file SHA/receipt/materialization/counter joins; cross-run negatives",
         "resumed_from_input_head": "a6831128e9494cca682943cad410ecacd58d74d7",
         "s1_invocations_before_pause": 7,
-        "status": "COMPLETED_PENDING_SOL_REVIEW",
+        "status": "COMPLETE_ACCEPTED_BOUNDED",
         "thread_id": "01a18225-9aff-7f63-b2a8-589c63e7fec8"
       },
       "attempt003_execution": {
@@ -2083,6 +2083,23 @@
           "tests_passed": 249
         },
         "status": "R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW"
+      },
+      "sol_review_attempt003": {
+        "date": "2026-10-29",
+        "decision": "ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION",
+        "review_input_head": "a0a566256276f5023e28cf6ac7cb7f7523d4c42f",
+        "implementation_head": "03fba40873e651b0831ed040fec93ea12655642c",
+        "run": "run_002",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06b_003/sol_review.md",
+        "offline_verification": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06b_003/offline_verification.json",
+        "manifest_entries": 386,
+        "total_output_bytes": 146920144,
+        "transitions": 128,
+        "observations": 130,
+        "new_native_starts": 0,
+        "pytest_rerun": false,
+        "missing_raw_disposition": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "qualification_granted": false
       }
     },
     {
@@ -2239,9 +2256,9 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "cae2031ac99865e67d371984d93ee8526b5b8386c5b99f640d945c7a63b9b9a8",
+    "README.md": "cb2e5eff1b2eeee1a295eb8dd60e8b3660bbbdd21ccc440c24d7d55a8491da7c",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "45e72fec075852e6c00429e3bc11444d73a879331c291f58aa282bde7a7b0143",
+    "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2250,7 +2267,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "240a0a6dbef4e02f91aa0fd9b4537e717d125c87493a04b1ca812ecc8dd16be3"
+    "07_Execution_Order_and_Acceptance.md": "dbbd178a307183effb996b6ed4952f9a772903e371a8d4dfe92bb04f35f0e5e7"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {

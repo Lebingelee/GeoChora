@@ -968,10 +968,10 @@ supervisor, finalizer, raw-reader and strict H5 regressions; it is not physical
 evidence. The native run produced 64/65 H5s for each case and the independent
 reader joined the recomputed contract digest, exact case IDs, worker file
 hash/size, receipt, materialization ID, per-case counters and native named
-order/slots. Current state is
-`R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`. It covers only the
+order/slots. Sol accepted run002 on 2026-10-29 as
+`ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`; run001 remains a retained reader failure. It covers only the
 frozen Panda Arm+Hand and one `r06b-order-v1` recipe; it does not grant general
 source/provider compatibility, task success or Qualification. Historical
 raw/phase disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`, R05
 remains blocked on its formal Provider contract, and R06c/P99 is not closed.
-See the [attempt003 execution result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-execution-result-2026-10-29).
+See the [Sol bounded acceptance](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-sol-acceptance) and [attempt003 execution result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-execution-result-2026-10-29).
