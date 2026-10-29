@@ -1,13 +1,13 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；Isaac 6.2.0.0隔离环境、metadata/pip检查、真实API/资产静态核对及F01 attempt002定向S1通过；首次Kit启动在EULA提示处、physics step之前退出，条件性重试待维护者确认**。
+更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX有界native已获 `ACCEPTED_BOUNDED_F01`；F02保持HELD且未启动**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。Luna1从F00接收点恢复，未重跑20-seed/Oracle；Isaac 6.2.0.0隔离环境的isaacsim/core/extscache-kit、Torch2.11.0+cu128、numpy2.3.1及`pip check`通过。F01 attempt002已完成实际安装源码/API/资产静态核对与定向S1；一次Kit启动因非交互EULA尚未接受而在物理步前退出。第二次启动只在维护者明确确认已接受EULA后，按包内零步重试门执行。F01 native与F04 Core adapter仍未通过。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00完整闭环已接收。Isaac 6.2.0.0隔离环境及依赖检查、实际API/资产核对均已完成；F01 attempt002的两次零物理步失败仍保留。F01 attempt003已由维护者授权进行GPU PhysX复验，并由Sol按原始运行源码副本、worker/parent receipts、资源账本、独立reader和定向S1完成复核，获`ACCEPTED_BOUNDED_F01`。F02不在本次收尾范围，仍未启动；需要单独冻结包后再执行。
 
-下一包沿现有diagnostics owner补齐公开API/资产配方、真实launcher/reader/S1和官方Panda+刚体两轮native reset/step/close；既有6.2源码同时包含experimental新API和extsDeprecated旧类，启动前必须按实际包源码核签名及extension启用，不能照搬旧版本Franka/World示例。预算和原运动/落体门在新工作包重冻；共享native锁与Luna2串行，禁止并发重型仿真。F01之后逐包复核推进F02–F06；F07须先固定一个具体扩展交集，不授权无限场景/全部Newton宿主路线。
+未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。此偏好不代表Core Isaac provider已接通。
 
 F06需要真实来源与对应provider基础出口，但不要求完整五任务LIBERO或TurboSquid资产先通过。维护者另选择“少量可接收资产任务先闭环”的LIBERO pilot，按R07单独记账；它不阻塞F01官方Panda+方块，也不把benchmark的On语义改成现有lift模板来求绿。每位Luna一次只执行一个冻结包，完整返回后再派发后继。
 F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其20/20 synthetic seeds均为`expert_failed / gripper_readiness_timeout`；该失败原件保持不变。attempt002随后完成受控物理归因、输入修复、20-seed native验收、Oracle/H5独立读回和pending Judge prepare/verify。完整出口仅待Sol复核；F01仍未派发或启动。
@@ -236,3 +236,13 @@ F00前置已满足，允许准备F01新工作包；旧草稿未派发，需重�
 第二次worker进入SimulationApp路径后，在`driver.open()`导入`isaacsim.robot_motion.examples.manipulation.ManipulationScenario`时报`ModuleNotFoundError: No module named 'isaacsim.robot_motion.examples'`，发生于scene/asset/physics前。worker receipt记录`app_start_attempts=1`、`app_close_attempts=1`、`app_closed=true`、无cleanup errors、0 physics steps/0 trace rows；worker错误出口为1。父supervisor观察到进程组最终以`-11`退出，`worker_wall_seconds=821.487`，未超900秒，无resource abort/timeout；flock持有829.926秒后释放。resource preflight为MemAvailable 8,280,596,480 bytes / GPU0 6,643 MiB；运行期最小MemAvailable 3,082,502,144 bytes、最小GPU空闲6,138 MiB、worker组RSS峰值6,594,056,192 bytes；RX增量47,273,450 bytes、Omniverse cache增长52 bytes，均未超包内预算。
 
 两次独立reader均输出`REJECTED_NATIVE_GATES`、0 trace rows；第二次reader确认plan/source hashes匹配，但app-stage错误、无asset inventory和无物理证据使native gate失败。首次reader也拒绝，且记录首次receipt使用的旧supervisor source hash与当前不一致。总计native启动2/2、physics steps 0/1200、simulation time 0/10秒；不启动第三次，不把本次诊断描述为F01 baseline PASS。F01的实际扩展导入问题交Sol复核；F02保持HELD，需后续单独冻结/授权。此诊断不表示Core Isaac adapter、当前Panda导入或Qualification。
+
+<a id="f01-attempt003-sol-acceptance"></a>
+
+## F01 attempt003 GPU PhysX native与Sol接收（2026-10-29）
+
+attempt003以`ed4e5468daf19ad5f132242c44b4822b60992ad4`为输入，在Isaac Sim 6.2.0.0隔离环境运行官方Panda与0.08 kg刚体。首次Kit启动被非交互EULA提示挡在物理步前；维护者已明确接受EULA，第二次启动完成两轮`cuda:0`/GPU dynamics实验。总计486 physics steps（含6步bootstrap）、4.05 simulated seconds、worker wall 86.4秒、exit 0；每轮选中关节运动约0.09706 rad、cube下落约0.225 m、final home误差约0.002915 rad。32项独立reader gate及20项定向S1通过。启动资源预检MemAvailable 11,332,579,328 bytes、GPU空闲6,887 MiB；运行期worker PID VRAM峰值935 MiB、组RSS峰值6,114,865,152 bytes、GPU空闲最低5,921 MiB、MemAvailable最低6,380,040,192 bytes；RX增量3,022,266 bytes、Omniverse cache增长0，超预算项为空，锁在worker退出后释放。
+
+Sol复核重新校验attempt003 42项SHA清单和attempt002 53项原件清单；用冻结运行源码副本重跑离线reader得到32/32通过，并重跑定向S1得到20/20通过。直接从develop-full目录重放reader时，仅运行副本supervisor的三个路径常量与tracked文件不同，导致源码哈希gate拒绝；attempt003所附native harness副本仅将`ATTEMPT_DIR`、`LOCK_PATH`、`ENV_PYTHON`指向隔离输出/环境，使用该精确运行副本后哈希gate通过。实现本地提交为`c88da2f`；复核receipt位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f01_003/`。
+
+接收为`ACCEPTED_BOUNDED_F01`，仅对应本次Isaac Sim 6.2.0.0官方Panda+刚体、CUDA GPU PhysX与上述资源/步数边界。attempt002失败原件与attempt003首次EULA启动记录不变；F02未启动。该结果不表示Core Isaac provider、真实当前Panda资产导入、其他任务/场景或Qualification通过。

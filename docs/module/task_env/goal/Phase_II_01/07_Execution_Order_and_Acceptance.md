@@ -1,11 +1,13 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-29）：**F00已获Sol有界接收；Isaac 6.2.0.0安装及11项定向S1通过；F01 attempt002两次Kit启动均未到达physics step，第二次worker因 `isaacsim.robot_motion.examples` 模块不可用而失败，2/2启动额度已用；F02保持HELD，等待Sol复核；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
-当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。F01 attempt002的第二次worker记录 `ModuleNotFoundError`、0 physics trace，关闭调用返回后父进程以 `-11` 退出；同run reader为 `REJECTED_NATIVE_GATES`。资源预算内、共享锁已释放；本次不满足F01 bounded native baseline。F02未启动，待Sol复核后再推进。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。详见10当前分工。
+当前入口（2026-10-29）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02仍HELD且未启动，等待单独冻结工作包；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
+当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。F01 attempt002两次启动的0-step失败保持原样；attempt003在Isaac Sim 6.2.0.0、官方Panda+0.08 kg刚体、`cuda:0`/GPU dynamics下完成两轮，486 physics steps/4.05 simulated seconds，worker exit 0，32项独立reader和20项定向S1全部通过，资源/锁预算未超。该接收只覆盖记录的有界配方，不表示Core Isaac provider、当前Panda导入或Qualification。F02未启动。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。详见10当前分工。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
 新增后继方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)，本文件更新不自动授权实现/native。
+
+2026-10-29 Sol代维护者复核F01 attempt003：输入HEAD `ed4e5468daf19ad5f132242c44b4822b60992ad4`；保留attempt002两次0-step失败原件及attempt003第一次EULA阻断记录。第二次attempt003 Kit进程在`cuda:0`和GPU dynamics下完成官方Panda+刚体两轮，486 total steps（含6 bootstrap）、4.05秒、worker exit 0；独立reader按保存的运行源码副本重读为32/32通过，定向S1重放20/20通过。42项attempt003输出清单与53项attempt002原始清单均通过SHA-256校验；进程级VRAM峰值935 MiB、worker组RSS峰值6,114,865,152 bytes、最低GPU空闲5,921 MiB，启动前RAM/GPU预检通过，运行无超预算项，排他锁于worker退出后释放。本地实现提交为`c88da2f`；复核replay见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f01_003/`。结论`ACCEPTED_BOUNDED_F01`仅适用于冻结的Isaac 6.2.0.0 GPU PhysX配方，不授予Qualification、Core provider或当前Panda导入能力；后续Isaac Sim native验证默认使用CUDA，F02仍未启动并须另行冻结授权。
 
 <a id="r03c-checkpoint-recovery"></a>
 

@@ -948,3 +948,23 @@ rejected the native gates; the two-start budget is consumed, so F01 has no
 native baseline and F02 remains held. This is not a Core Isaac provider,
 current Panda import, task-harness asset success or Qualification. See the
 [Phase II-01 execution record](../../../docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md).
+
+F01 attempt003 Sol acceptance (2026-10-29): the preserved attempt002 failures
+remain failed history. The bounded Isaac Sim 6.2.0.0 official Panda + rigid
+body run completed two GPU PhysX rounds on `cuda:0`; the worker exited 0,
+486 physics steps/4.05 simulated seconds stayed within budget, the independent
+reader passed 32/32 gates, and targeted provider-free S1 passed 20/20.
+Attempt003's 42-file manifest and attempt002's 53-file original manifest both
+verified. Sol replayed the reader against the exact path-bound runtime source
+copies and reproduced 32/32; its initial replay from the current checkout
+rejected the harness-specific supervisor hash, which differs only in the
+attempt, lock, and interpreter paths. The bounded result is
+`ACCEPTED_BOUNDED_F01`; it does not establish a Core Isaac provider, current
+Panda import, general Isaac capability, or Qualification. F02 remains held and
+was not started.
+
+Maintainer preference from 2026-10-29: future Isaac Sim native verification
+defaults to CUDA GPU PhysX (`cuda:0`, `gpu_dynamics=true`). Freeze and verify
+the device and GPU process evidence in each run package; use a CPU recipe only
+when the maintainer explicitly specifies it for that package. See the
+[Phase II-01 F01 closeout](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f01-attempt003-sol-acceptance).

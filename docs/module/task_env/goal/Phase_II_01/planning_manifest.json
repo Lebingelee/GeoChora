@@ -1851,18 +1851,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "48eb781403848cbf8d7375ca73e55102723edd126af4d668af60d26d5ae2ecff",
+    "README.md": "2b9e8c6d09896dc3760ab0179815f3771eb0ef8abb54c541bb112dd07590db78",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "fe170d36513c21d97b762b5254c7a99720ffc5d700a47d1d4aff85b7f6758025",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "1d795f387c0e8a6bcfad2accbf1e5052069201e34910bb8cd014f7a7953d12ba",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "87ffa98721ac8fe594240690d3dd94028bd03414d9045e27a183a48ebba3cb05"
+    "07_Execution_Order_and_Acceptance.md": "078ae90490a19c1bdb68af82684563928a0002aecb2460b7f04dab2f08f2df3b"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4522,12 +4522,12 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ATTEMPT002_NATIVE_API_IMPORT_BLOCKED_BEFORE_PHYSICS; BOTH_APP_STARTS_CONSUMED; SOL_REVIEW_PENDING",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_HELD_NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
-    "implementation_checkpoint": "c30d97efa6ad169c205ea25d7917bc7b9a06e93c",
-    "resume_git_input": "Actual HEAD after this documentation commit; inspect changes since c30 and freeze new HEAD/bytes, never reset or mutate old freeze/ledger.",
+    "implementation_checkpoint": "c88da2f625f28a4d0b923c5ce2cf64544527631b",
+    "resume_git_input": "HEAD after the F01 closeout documentation commit; inspect changes since the F01 implementation commit recorded in f01_attempt003_sol_review; do not reset or mutate frozen attempt inputs.",
     "R03c": {
       "status": "ATTEMPT003_INCOMPLETE_PENDING_SOL_REVIEW",
       "S2": "INCOMPLETE",
@@ -4655,7 +4655,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 accepted bounded after native evidence and provider-free review fixes; F01 package preparation next, no install/native yet",
+    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for the exact attempt003 CUDA GPU PhysX recipe; F02 held and not started pending a separately frozen package.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4735,6 +4735,15 @@
         "native_max_simulated_seconds_total": 10,
         "native_max_wall_s_per_process": 900,
         "no_automatic_native_retry_after_physics_failure_or_resource_abort": true,
+        "push_merge_main_tag_release": false
+      },
+      {
+        "date": "2026-10-29",
+        "slice": "F01 attempt003 Sol review and bounded closeout",
+        "authorized": true,
+        "maintainer_request": "Continue F01 acceptance; future Isaac Sim defaults to CUDA; prepare F01 closeout.",
+        "scope": "Review frozen attempt003 evidence, replay the exact offline reader and targeted S1, update F01 execution records, and make local commits; no new Isaac App or native run; do not start F02.",
+        "native_starts_this_review": 0,
         "push_merge_main_tag_release": false
       }
     ],
@@ -4847,9 +4856,8 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F01 attempt002 completion and Sol review; do not start F02 before Sol review",
+      "selected_next": "F02 may proceed only in a separately frozen package; it was not started by this F01 closeout.",
       "after_that_priority": [
-        "F01 isolated install/native baseline under a new frozen package",
         "F02",
         "F03",
         "F04",
@@ -4858,10 +4866,11 @@
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
-      "reason": "Maintainer limited Luna1 to F00–F07 and explicitly dispatched F01 attempt002 after F00 acceptance; native execution uses the shared exclusive lock and stops on package budgets/conditions.",
-      "F07": "later extension; not required before camera",
+      "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
+      "F02": "HELD_NOT_STARTED; separate frozen package required",
+      "reason": "Maintainer authorized F01 attempt003 acceptance and local closeout. No subsequent slice was included in this authorization.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
-      "F01": "INSTALL_COMPLETE; API_SOURCE_AND_S1_PASS; APP_START_001_EULA_BLOCKED_BEFORE_PHYSICS; SECOND_START_HELD_FOR_MAINTAINER_CONFIRMATION"
+      "F07": "later extension; not required before camera"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5137,7 +5146,7 @@
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
     },
-    "latest_authorization": "Maintainer authorized F01 attempt002 on input HEAD 552c43aab8641608c64781fe5f6e6bfca38481a6: isolated installed-environment/API check, targeted S1, and one bounded native window with a conditional second start only for a located pre-physics bootstrap/API/asset wiring error. The first Kit process exited before any physics step because the Omniverse EULA was not accepted non-interactively. No second start until maintainer confirms the EULA was already accepted.",
+    "latest_authorization": "Maintainer authorized continued F01 attempt003 review/closeout on 2026-10-29, set future Isaac Sim native validation to default to CUDA, and did not authorize starting F02 in this closeout.",
     "f01_attempt002_execution": {
       "date": "2026-10-29",
       "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
@@ -5216,6 +5225,87 @@
       "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/evidence/docs/static_link_check_final.json",
       "receipt_sha256": "8c7092a48e051b0fa3edc2670eada892c9833eb5b586f624d24513797361abbb",
       "markdown_hashes_artifact": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/evidence/docs/markdown_hashes_final.json"
+    },
+    "f01_attempt003_sol_review": {
+      "date": "2026-10-29",
+      "status": "ACCEPTED_BOUNDED_F01",
+      "input_head": "ed4e5468daf19ad5f132242c44b4822b60992ad4",
+      "implementation_commit": "c88da2f625f28a4d0b923c5ce2cf64544527631b",
+      "attempt003_report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_003/report.md",
+      "review_report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f01_003/sol_review.md",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f01_003/review_receipt.json",
+      "native_run": {
+        "run_id": "f01_gpu_physx_full_native_016_eula_retry",
+        "provider_version": "Isaac Sim 6.2.0.0",
+        "robot": "official Panda asset with recorded variants",
+        "rigid_body_mass_kg": 0.08,
+        "physics_device": "cuda:0",
+        "gpu_dynamics": true,
+        "task_rounds": 2,
+        "physics_steps_including_bootstrap": 486,
+        "simulated_seconds_including_bootstrap": 4.05,
+        "worker_exit_code": 0,
+        "app_starts_attempt003": 2,
+        "first_start": "EULA-blocked before physics; preserved",
+        "second_start": "two GPU PhysX rounds completed; independent reader passed"
+      },
+      "independent_reader": {
+        "status": "PASS_NATIVE_PENDING_SOL_REVIEW",
+        "checks_passed": 32,
+        "checks_total": 32,
+        "sol_replay_status": "PASS_NATIVE_PENDING_SOL_REVIEW",
+        "sol_replay_checks_passed": 32,
+        "sol_replay_checks_total": 32,
+        "sol_replay_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f01_003/independent_reader_replay_frozen_runtime.json",
+        "path_bound_supervisor_hash_difference": "runtime copy differs from tracked source only in ATTEMPT_DIR, LOCK_PATH, and ENV_PYTHON constants"
+      },
+      "targeted_s1": {
+        "status": "PASS",
+        "passed": 20,
+        "total": 20,
+        "replay_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f01_003/targeted_s1_replay_isaac_python.log"
+      },
+      "source_identity": {
+        "worker_and_reader_match_current_tracked_sources": true,
+        "runtime_supervisor_source_copy_preserved": true,
+        "direct_checkout_replay_failure": "frozen supervisor source hash only; resolved by replaying the preserved exact runtime source copies"
+      },
+      "resource_consumption": {
+        "startup_mem_available_bytes": 11332579328,
+        "startup_gpu0_free_mib": 6887,
+        "peak_worker_process_vram_mib": 935,
+        "peak_worker_group_rss_bytes": 6114865152,
+        "minimum_mem_available_bytes": 6380040192,
+        "minimum_gpu0_free_mib": 5921,
+        "network_rx_delta_bytes": 3022266,
+        "omniverse_cache_growth_bytes": 0,
+        "over_budget_items": [],
+        "lock_released_after_worker_exit": true
+      },
+      "runtime_thread_scope": "Frozen attempt003 plan used limit_cpu_threads=16 and observed Carbonite/runtime OMP=16; BLAS-related supervisor environment variables started at 1. Acceptance is limited to this plan.",
+      "environment": "Metadata revalidation passed; reuse unchanged attempt002 pip-check pass; no install mutation.",
+      "attempt003_manifest_verified_files": 42,
+      "attempt002_original_manifest_verified_files": 53,
+      "attempt002_failures_preserved": true,
+      "future_isaac_sim_default": "CUDA GPU PhysX, device cuda:0, gpu_dynamics=true",
+      "F02_started": false,
+      "qualification_granted": false,
+      "Core_Isaac_provider_claimed": false
+    },
+    "f01_closeout_documentation_validation": {
+      "mode": "FOCUSED_STATIC_ONLY",
+      "updated_markdown_files": [
+        ".agents/skills/geochora-task-env/SKILL.md",
+        "docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md",
+        "docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
+        "docs/module/task_env/goal/Phase_II_01/README.md"
+      ],
+      "local_link_targets_checked": true,
+      "missing_local_paths": 0,
+      "explicit_new_anchor_checked": "f01-attempt003-sol-acceptance",
+      "global_docs_validator": "NOT_RUN",
+      "native_starts": 0,
+      "F01_targeted_S1_replay": "20/20 PASS under installed Isaac Python"
     }
   }
 }
