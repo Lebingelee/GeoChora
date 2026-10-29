@@ -1,9 +1,13 @@
 # Phase II-01 修订规划交付包
 
+当前统筹（2026-10-29）：Luna2负责原07执行表；R05a合同设计已获有界接收，R05b attempt001正在执行；Luna1独立负责F00–F07。跨分支15/22 slices已有有界接收，余R05b/c、R06c、R07a–d；R07a部分协议/一项pilot来源审计不等于原五任务出口。旧C05c CPU/CUDA×100/500Hz四格已通过，R05没有已知频率物理失败；见[07当前入口](07_Execution_Order_and_Acceptance.md)与[R05接收与实施合同](05_R05_Native_Rate_Feedback.md#r05a-sol-acceptance-20261029)。当前develop集成两线交付checkpoint、main保持v2.0.0，详见[分支记录](../../../../maintenance/phase_ii_01_branch_integration_20261029/README.md)。下文早期入口及历史记录按各自时点保留。
+
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 **当前F线恢复入口（2026-10-29）**：F00已获 `ACCEPTED_BOUNDED_F00`；F01 attempt003的Isaac Sim 6.2.0.0官方Panda+刚体GPU PhysX有界验证经Sol复核获 `ACCEPTED_BOUNDED_F01`。`cuda:0`/GPU dynamics两轮native、独立reader 32/32、定向S1 20/20通过；attempt002两次0-step失败原件保持不变，attempt003首次EULA阻断记录也保留。F02 attempt002经Sol独立复核获 `ACCEPTED_BOUNDED_F02`：45项定向/legacy检查和原缺陷复现回放通过，163项输出及652项保护输入匹配；F03前置满足，待单独冻结实施包且未启动。该出口不表示Core Isaac provider、当前Panda导入或Qualification。后续Isaac Sim native验证默认CUDA。详见 [07 当前状态](07_Execution_Order_and_Acceptance.md) 和 [10 F01 attempt003](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 维护者于2026-10-28纠正顺序：F00 attempt001仅完成整合/完成事实修复与S1，20/20 seeds 因 `gripper_readiness_timeout` 失败；随后要求完整验收F00后才准备/执行F01。attempt002已在 `develop-full` 完成公开 A/B 归因、合成输入修复、20-seed campaign、Oracle/H5独立回读及pending Judge包，完整出口及有限复核修正已获Sol **`ACCEPTED_BOUNDED_F00`**。历史attempt001失败原件保留；详见 [10 F00 Sol接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-sol-acceptance)。
 当前F01 attempt001在 `develop-full` 冻结输入 `b0b26e95ddfd7b5128401261f05541bb19586372` 上完成隔离 Python 3.12 环境及 Torch 2.11.0+cu128 安装；国内镜像对可镜像依赖达到 21–55 MiB/s 且哈希与上游一致。官方 6.2 扩展缓存 wheel（5.498 GB）在 NVIDIA 源与官方 Akamai 边缘实测约 0.22 MB/s，USTC/阿里/清华/上交均无该专有 wheel；故本次为 `INSTALL_PARTIAL / NATIVE_NOT_RUN_INSTALL_BLOCKED`，IsaacSim 未安装、App 启动数为0。所有部分下载与失败日志保留在 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_001/`，详见 [07 当前入口](07_Execution_Order_and_Acceptance.md) 及该目录 `report.md`。F01尚未完成，F02及后继不启动；Human Judge仍pending、Qualification未评估。
+
+F01 attempt001安装与原生对照的最新状态由维护者管理的主checkout记录决定；本camera分支不包含或刷新Isaac安装进展。独立camera分支R04b attempt002已获Sol接收`ACCEPTED_BOUNDED_S2`，R04c attempt001已获Sol接收`ACCEPTED_BOUNDED_S3`；范围仍限其冻结交集，未合入develop-full。R06b attempt003 run002已获Sol接收`ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`：249项S1、同worker原始/派生Panda Arm+Hand两case共640step、两份64/65 H5与独立raw读回通过；旧canonical规范化恢复。前两attempt与run001失败原件保留。仅限MuJoCo3.8.1 CPU和唯一r06b-order-v1配方；历史compatibility处置/R05仍BLOCKED，R06c/P99未关闭。见 [R04](04_R04_Dynamic_Camera_Consumer.md)、[R06](06_R06_Compatibility_and_Regression.md) 与 [07 当前入口](07_Execution_Order_and_Acceptance.md)。Human Judge仍pending、Qualification未评估。
 已确认的一个 Core Runtime、多 provider adapter、已验证 USD 输入、Isaac/GeoPhys 与真实 Harness 补丁
 集中在 [10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 原 7/22 与 P99 保留；新增 F00–F07 是独立补丁计划行，不自动改变原 DAG 或授权实现/native。
@@ -19,7 +23,7 @@
 | [R01](01_R01_Logical_Robot_Assembly.md) | typed logical membership与hash DAG；R01a/R01b/R01c均已获Sol接收静态出口；R01c为声明级source投影/S1 |
 | [R02](02_R02_Composite_Control_Profiles.md) | 独立leaf控制与binding/admission/fault |
 | [R03](03_R03_Physical_Attachment.md) | 真实source、MuJoCo首条装配候选、GeoPhys拒绝与策略；R03c attempt004精确Panda/MuJoCo CPU public Env S2/S3已获Sol有界接收；不扩展通用Attachment/Provider或Qualification |
-| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；attempt002绑定修复已获Sol接收ACCEPTED_S1_BOUNDED |
+| [R04](04_R04_Dynamic_Camera_Consumer.md) | public observation/capture/storage消费边界；R04a attempt002已获Sol接收ACCEPTED_S1_BOUNDED；R04b attempt002已获Sol接收ACCEPTED_BOUNDED_S2；R04c attempt001 `R04C_BOUNDED_CAMERA_H5_S3_PASS_PENDING_SOL_REVIEW` |
 | [R05](05_R05_Native_Rate_Feedback.md) | 正式Provider sample/cadence合同 |
 | [R06](06_R06_Compatibility_and_Regression.md) | 顺序/机械/历史/兼容与证据治理 |
 | [07 执行表](07_Execution_Order_and_Acceptance.md) | 7/22 DAG、required envelope与停止条件 |
@@ -192,3 +196,9 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-28，Sol复核R03c attempt004，接收 `ACCEPTED_BOUNDED_S2_S3`。实际启动exit 0、正式receipt及complete progress存在；50项原始文件hash、16项冻结源码hash、1280 step trace、四份H5与独立readback的hash及冻结门一致，48/48 tamper拒绝。接收仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置；RSS为边界采样，非interval内硬峰值。复用33项provider-free S1，没有新增native或软件测试。复核报告：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md`。
 
 2026-10-28 当前并行安排：维护者手动下载Isaac依赖，F01仍安装未完成、无native；Luna1推进R07a的非native审计/S1，Luna2在独立camera工作树完成R04b attempt002返工。R04b attempt001的24项S1可复核，完整S2未通过，旧失败与新修正分开记账。新包冻结具体HEAD/保护输入，原7/22/P99门及F02–F07后继不改。
+
+2026-10-29，Sol完成R04c attempt001最终复核，接收ACCEPTED_BOUNDED_S3：162项输出hash和68项恢复source一致；复用两份12/13 H5的独立semantic/raw读回，原8+10项S1及22项native派生拒绝结果保留，无新native或测试套件重跑。仅限GeoPhys a53 CPU × MuJoCo3.8.1 EGL × seed31单Panda Position双D04交集，不是task success/Qualification；camera分支未merge。R05b/c仍受R05a正式合同阻塞，R06b可独立准备但历史compatibility处置gate不关闭。详见[R04接收记录](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-sol接收2026-10-29)。
+
+R06b attempt002经Sol复核仅接收部分S1/E1事实；派生E2未materialize。第三次前重评已完成，恢复canonical旧规范化并修复worker/supervisor，详细边界见[R06重评](06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment)。未接收通用Articulation v1顺序变更，R06b/R06c/P99未完成。
+
+2026-10-29 R05a attempt001 已完成合同候选、条款矩阵、旧证据复用/成本预算及精确R05b/c计划，状态 `R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW`。既有 provider-free cadence S1 4/4 passed；没有新 native、GeoPhys/Core生产代码或 pin 改动。具体发现、原始状态分别见 [R05候选](05_R05_Native_Rate_Feedback.md#r05a-attempt001-contract-candidate-20261029) 与 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/`；R05b仍待Sol复核和后继包。

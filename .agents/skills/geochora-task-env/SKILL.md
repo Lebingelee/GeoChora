@@ -296,9 +296,19 @@ the next single-process implementation/validation package. No R03b/Qualification
   state-boundary digests, reset/transition clocks, reference-profile metadata and finalized typed outcome/control records.
   Use `load_camera_observations_h5()` for strict semantic checks; missing or unknown binding versions fail closed. Omitting
   the mapping keeps the state-only default. R04a attempt002's targeted provider-free synthetic S1 passed (33 cases),
-  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Real MuJoCo/OpenGL/EGL pairing, public Env camera capture, and same-file camera S3 remain NOT_RUN.
-  Do not treat this S1 as R04b/c completion, camera qualification, or P99 gate completion. See
-  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md).
+  accepted by Sol as `ACCEPTED_S1_BOUNDED` after bounded identity/readback review. Sol accepted R04b attempt002 as
+  `ACCEPTED_BOUNDED_S2` on 2026-10-28 for GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × this single Panda Position candidate:
+  two resets, 24 public steps, dual D04 cameras and an independent offline reader. This does not establish a broader
+  provider/camera intersection or Qualification. R04c attempt001 then exercised same-Env camera recording on this
+  candidate: start the existing recording at reset, take 12 public steps, call `stop("external_stop")` and
+  `finish_recording("external_stop")`, then repeat on the same Env after the prior file is finalized. Its two
+  Generic H5 v3 episodes each contain 12 transitions/13 observations and passed separate public semantic and raw
+  prewrite-witness readers, plus 22 native-derived H5 tamper rejections. The observed end outcome is
+  `terminated=false`, `truncated=true`, `task_success=false` for the bounded external stop; it is not horizon
+  completion or task success. Sol accepted R04c on 2026-10-29 as `ACCEPTED_BOUNDED_S3`, limited to the frozen
+  GeoPhys a53 CPU × MuJoCo 3.8.1 EGL × single Panda Position × seed31 × 2 ms × 5 × dual-D04-camera intersection.
+  It does not add generic provider/camera support or Qualification. See
+  [R04](../../../docs/module/task_env/goal/Phase_II_01/04_R04_Dynamic_Camera_Consumer.md) for the evidence and limits.
 - Selected PickCube: UID `pick-cube-p16-reference-v1`, config `{"provider":"mujoco",
   "backend":"cpu","horizon":6000}`; published bounded scope CPU/100 Hz/seed 31, lift-only predicate.
 - Selected NutAssembly: UID `nut-assembly-outcome-reference-v1`, same flat config, seed 19/NA-S0.
@@ -988,3 +998,43 @@ defaults to CUDA GPU PhysX (`cuda:0`, `gpu_dynamics=true`). Freeze and verify
 the device and GPU process evidence in each run package; use a CPU recipe only
 when the maintainer explicitly specifies it for that package. See the
 [Phase II-01 F01 closeout](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f01-attempt003-sol-acceptance).
+
+## R06b compatibility boundary (2026-10-29)
+
+`LeafMaterializationReceiptV1` maps by semantic Joint/Actuator references; do
+not infer qpos addresses, dof addresses or ctrl slots from tuple order. qpos
+and dof use their separate native dimensions (`nq` and `nv`); an `nq != nv`
+fixture is synthetic evidence only. The fixed Panda Arm+Hand path pins exact
+source bytes. `ArticulationDefinition.joints` v1 is canonicalized by
+`joint_id`; source traversal and provider-native body/joint/actuator order are
+separate values validated by the exact source recipe and named receipt.
+
+R06b attempt001 documented a source/Scene mismatch rejection, not a successful
+reorder. Attempt002 then implemented the derived recipe but stopped after E1
+when a nested materialization counter prevented E2 from reaching the owner;
+these are preserved historical results in the [R06 record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md).
+
+R06b attempt003 restored canonical joint normalization, exercised the existing
+worker and independent reader with a provider-free S1, and completed one
+bounded same-worker E1/E2 MuJoCo 3.8.1 CPU run. The 249-case S1 includes worker,
+supervisor, finalizer, raw-reader and strict H5 regressions; it is not physical
+evidence. The native run produced 64/65 H5s for each case and the independent
+reader joined the recomputed contract digest, exact case IDs, worker file
+hash/size, receipt, materialization ID, per-case counters and native named
+order/slots. Sol accepted run002 on 2026-10-29 as
+`ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`; run001 remains a retained reader failure. It covers only the
+frozen Panda Arm+Hand and one `r06b-order-v1` recipe; it does not grant general
+source/provider compatibility, task success or Qualification. Historical
+raw/phase disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`, R05
+remains blocked on its formal Provider contract, and R06c/P99 is not closed.
+See the [Sol bounded acceptance](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-sol-acceptance) and [attempt003 execution result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-execution-result-2026-10-29).
+
+## Current dual-line integration (2026-10-29)
+
+F00–F07 use `develop-full`; original R01–R07/P99 use
+`codex/phase-ii-01-camera`. `develop` integrates completed handoffs; `main`
+tracks stable v2.0.0. Preserve an active Luna window's frozen HEAD and checkout.
+R05a contract design is accepted; R05b is in progress and is excluded from this
+merge. F02 USD delivery has bounded source-contract/fixture acceptance,
+with `runtime_admitted=false`. These statuses do not qualify their combined
+runtime or v2.1.0. See the [branch integration record](../../../docs/maintenance/phase_ii_01_branch_integration_20261029/README.md).

@@ -1,0 +1,14 @@
+{
+  "F_branch": "develop-full",
+  "F_head": "ad8ee10a7fe7013a94d0b9d7d5ef3269307fd15b",
+  "R_branch": "codex/phase-ii-01-camera",
+  "R_accepted_head": "b5b75dda74adcab6706cb09b875dc64b92485d33",
+  "develop_before": "3b71683d5890c4ca1701037d59bce7b17de50a30",
+  "main_before": "f292df149f41520b484ff27cf2ff78a584903013",
+  "stable_v2_commit": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec",
+  "remote_harness": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
+  "retire_topics": {
+    "codex/phase-ii-01-p00-20261023": "0d11d33ee6e6a9b09f2924b3450bbedff9aefd91",
+    "codex/phase-ii-scope-freeze-20261023": "3759f917b80adb0b7df361c0928d6aff2e4cf1ec"
+  }
+}
