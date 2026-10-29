@@ -63,7 +63,18 @@ def test_cadence_experiment_is_explicit_and_does_not_widen_selected_manifest():
     assert cpu_100['controller_identity'] != cpu_500['controller_identity']
 
 
-def test_cuda_diagnostic_manifest_is_source_pinned_and_not_global_capability():
+def test_cuda_diagnostic_manifest_is_source_pinned_and_not_global_capability(monkeypatch):
+    # The positive check is the frozen historical C05c contract. Its build is
+    # represented by an exact a53 receipt; the live R05b build is rejected below.
+    from task_env.runtime.sessions import api
+    historical = {
+        'provider': 'geophys', 'package_version': None,
+        'repository_revision': 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4',
+        'dirty_build_sha256': None, 'import_origin': '/frozen/C05c/a53/geophys/__init__.py',
+        'origin_sha256': 'a' * 64,
+        'manifest_version': 'git:a53a8cfed7c9d6464274b5c96fca601271dc4ee4',
+    }
+    monkeypatch.setattr(api, 'provider_build_identity', lambda _provider: dict(historical))
     reference = build_gripper_cadence_diagnostic_reference(backend='cuda', gripper_control_hz=500)
     execution = ExecutionSpec('geophys', 'p1_2_scalar_cpu_v0', 'none', 'cuda', 0, 'strict')
     manifest = _diagnostic_manifest(

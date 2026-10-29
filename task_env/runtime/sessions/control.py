@@ -562,6 +562,7 @@ def materialize_control(
     controller_profile=None,
     leaf_plan=None,
     diagnostic_profile=None,
+    native_feedback_profile=None,
 ):
     if leaf_plan is not None:
         from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
@@ -620,13 +621,22 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if diagnostic_profile is None:
+    if diagnostic_profile is not None and native_feedback_profile is not None:
+        raise ValueError('diagnostic and normal native-feedback admissions are mutually exclusive')
+    if diagnostic_profile is None and native_feedback_profile is None:
         actual_manifest = provider_manifest(execution.physics_provider)
-    else:
+    elif diagnostic_profile is not None:
         from .api import _diagnostic_manifest
         if manifest is not None:
             raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
         actual_manifest = _diagnostic_manifest(artifact, execution, source, diagnostic_profile)
+    else:
+        from .api import _r05b_native_feedback_manifest
+        if manifest is not None:
+            raise CapabilityAdmissionError('R05b native feedback admission does not accept a custom manifest')
+        actual_manifest = _r05b_native_feedback_manifest(
+            artifact, execution, source, native_feedback_profile,
+        )
     if manifest is not None:
         admit_capabilities(CONTROL_REQUIRED, manifest, execution)
     admit_capabilities(CONTROL_REQUIRED, actual_manifest, execution)
@@ -734,6 +744,7 @@ def materialize_control(
         manifest=admission_manifest,
         _materialization_authority=materialization_authority,
         _diagnostic_profile=diagnostic_profile,
+        _native_feedback_profile=native_feedback_profile,
     )
     session._control_binding = binding
     if controller_binding_plan is not None:

@@ -22,6 +22,8 @@ PROFILE = 'p1_2_scalar_cpu_v0'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
+_GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION = 'c6df840bef8d36b1150150167df08e29dc3f664c'
+_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
 
 
 class RuntimeSession(Protocol):
@@ -116,21 +118,102 @@ def _diagnostic_manifest(artifact, execution, source, profile_id):
     )
 
 
+def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
+    """Admit one exact normal NutAssembly GeoPhys force-feedback profile."""
+    from dataclasses import replace
+    import hashlib
+    from pathlib import Path
+    from ...assembly.assets import _source_closure_digest
+
+    if profile_id != _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE:
+        raise ValueError('unknown normal native-feedback admission profile')
+    if not isinstance(artifact, TaskArtifact):
+        raise ValueError('R05b native feedback requires the frozen NutAssembly TaskArtifact v0')
+    if (artifact.artifact_id != 'nut-assembly-square-v1/p1_8_e/nominal-v1'
+            or artifact.task_id != 'nut-assembly-square-v1'
+            or artifact.identity_hash != '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
+            or artifact.timebase.physics_dt != 0.002
+            or artifact.timebase.control_dt != 0.01
+            or artifact.timebase.control_substeps != 5
+            or set(artifact.required_capabilities.names) != set(CAPABILITIES)):
+        raise ValueError('R05b admission is limited to the frozen NutAssembly 100 Hz / 2 ms Artifact')
+    if (execution.physics_provider != 'geophys' or execution.backend not in {'cpu', 'cuda'}
+            or execution.physics_profile != PROFILE or execution.render_provider != 'none'
+            or execution.determinism_mode != 'strict'):
+        raise ValueError('R05b admission requires strict GeoPhys CPU/CUDA scalar execution without rendering')
+    receipt = getattr(source, 'execution_source_receipt', None)
+    if receipt is None:
+        raise ValueError('R05b admission requires the versioned immutable execution source receipt')
+    receipt.validate_snapshot()
+    if (source.task_artifact_hash != artifact.identity_hash
+            or source.scene_source.source_id !=
+            'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
+            or receipt.canonical_xml_sha256 !=
+            '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
+            or receipt.source_closure_digest != _source_closure_digest(receipt.closure_files)
+            or source.config.runtime.backend != execution.backend
+            or source.config.runtime.physics_dt != 0.002
+            or source.config.runtime.control_substeps != 5
+            or source.config.runtime.integrator != 'implicitfast'
+            or source.config.render.camera_obs
+            or len(source.joint_targets) != 7
+            or dict(source.joint_targets) != {
+                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
+            }
+            or tuple(source.open_actuators) != ('actuator8',)):
+        raise ValueError('R05b source/receipt/controller actuator mapping differs from the exact allowlist')
+    build = provider_build_identity('geophys')
+    expected_origin = (Path(__file__).resolve().parents[3] / 'GeoPhys/src/geophys/__init__.py').resolve()
+    if (build['repository_revision'] != _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION
+            or build['dirty_build_sha256'] is not None
+            or Path(build['import_origin']).resolve() != expected_origin):
+        raise ValueError('R05b admission requires the clean committed GeoPhys build from this worktree')
+    cpu_manifest = provider_manifest('geophys')
+    evidence = (
+        f'{_GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE}/artifact={artifact.identity_hash}/'
+        f'canonical_xml={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}/'
+        f'provider={build["repository_revision"]}/origin={hashlib.sha256(expected_origin.read_bytes()).hexdigest()}/'
+        f'backend={execution.backend}'
+    )
+    return replace(
+        cpu_manifest,
+        adapter_version='task-env-r05b-geophys-native-feedback-v1',
+        backend=execution.backend,
+        capabilities=tuple(cpu_manifest.capabilities) + (
+            CapabilityClaim('actuator_force_query', 'tested', evidence),
+        ),
+        evidence_reference=evidence,
+    )
+
+
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec, *, source: RuntimeSource,
                 manifest: ProviderCapabilityManifest | None = None,
-                _materialization_authority=None, _diagnostic_profile=None) -> RuntimeSession:
+                _materialization_authority=None, _diagnostic_profile=None,
+                _native_feedback_profile=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
-    actual = (provider_manifest(execution.physics_provider) if _diagnostic_profile is None
-              else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile))
+    if _diagnostic_profile is not None and _native_feedback_profile is not None:
+        raise ValueError('diagnostic and normal native-feedback admissions are mutually exclusive')
+    actual = (
+        provider_manifest(execution.physics_provider)
+        if _diagnostic_profile is None and _native_feedback_profile is None
+        else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile)
+        if _diagnostic_profile is not None
+        else _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
+    )
     # A caller may restrict a manifest for negative admission, never expand support.
     if manifest is not None:
         if _diagnostic_profile is not None:
             raise ValueError('diagnostic admission cannot be combined with a caller-supplied manifest')
+        if _native_feedback_profile is not None:
+            raise ValueError('R05b normal admission does not accept caller-supplied manifests')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)
+    if _native_feedback_profile is not None:
+        from ...artifacts import RequiredCapabilitySet
+        admit_capabilities(RequiredCapabilitySet(('actuator_force_query',)), actual, execution)
     if execution.render_provider != 'none':
         raise ValueError('P1.2 rendering is unsupported')
     if (source.config.runtime.physics_dt != artifact.timebase.physics_dt

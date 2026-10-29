@@ -177,10 +177,12 @@ def validate_canonical_scene_import(scene_definition, imported_scene) -> dict[st
 class GeoPhysSourceComposer:
     adapter_name = 'task_env_neutral_mjcf_bridge_v0'
 
-    def __init__(self, source, *, scene_definition=None, source_closure_digest=None):
+    def __init__(self, source, *, scene_definition=None, source_closure_digest=None,
+                 execution_source_receipt=None):
         self._source = source
         self._scene_definition = scene_definition
         self._source_closure_digest = source_closure_digest
+        self._execution_source_receipt = execution_source_receipt
         self._projected_xml = None
         if (scene_definition is None) != (source_closure_digest is None):
             raise ValueError('canonical Scene and source closure digest must be provided together')
@@ -188,6 +190,18 @@ class GeoPhysSourceComposer:
             raise ValueError('source ID does not bind the canonical Scene identity')
 
     def build_scene_source(self, composition, agents):
+        receipt = self._execution_source_receipt
+        if receipt is not None:
+            receipt.validate_snapshot()
+            from scene import SceneSource
+            return (
+                SceneSource.mjcf_string(
+                    receipt.importer_xml.decode('utf-8'),
+                    base_dir=receipt.snapshot_root,
+                    label=receipt.source_id,
+                ),
+                'task_env_execution_source_receipt_v1',
+            )
         if self._scene_definition is None:
             return native_scene_source(self._source), self.adapter_name
         self._projected_xml = project_scene_definition_v3_to_mjcf(
@@ -204,6 +218,9 @@ class GeoPhysSourceComposer:
         )
 
     def build_scene_model(self, imported_scene, composition):
+        receipt = self._execution_source_receipt
+        if receipt is not None:
+            receipt.validate_imported_scene(imported_scene)
         if self._scene_definition is not None:
             if self._projected_xml is None:
                 raise RuntimeError('canonical Scene source must be built before model lowering')

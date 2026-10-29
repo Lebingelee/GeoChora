@@ -79,6 +79,7 @@ class ReferenceTaskBinding:
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
     build_gripper_cadence_diagnostic: Callable | None = None
+    build_native_feedback_profile: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -210,6 +211,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
                  _binding=None, _diagnostic_gripper_control_hz=None,
+                 _native_feedback_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
                  _fixed_attachment_leaf_position_candidate=False):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
@@ -233,12 +235,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
-        if _diagnostic_gripper_control_hz is None:
+        if _diagnostic_gripper_control_hz is not None and _native_feedback_gripper_control_hz is not None:
+            raise ValueError('diagnostic and normal native-feedback profiles are mutually exclusive')
+        if _diagnostic_gripper_control_hz is None and _native_feedback_gripper_control_hz is None:
             if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             self._diagnostic_profile = None
             build_value = lambda: self.binding.build(provider)
-        else:
+        elif _diagnostic_gripper_control_hz is not None:
             if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
                     or type(_diagnostic_gripper_control_hz) is not int
                     or _diagnostic_gripper_control_hz not in {100, 500}
@@ -251,6 +255,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._diagnostic_gripper_control_hz = _diagnostic_gripper_control_hz
             build_value = lambda: self.binding.build_gripper_cadence_diagnostic(
                 provider, backend, _diagnostic_gripper_control_hz, True,
+            )
+            self._native_feedback_profile = None
+        else:
+            if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
+                    or type(_native_feedback_gripper_control_hz) is not int
+                    or _native_feedback_gripper_control_hz not in {100, 500}
+                    or self.binding.build_native_feedback_profile is None):
+                raise ValueError(
+                    'normal native-feedback profile requires the opted-in GeoPhys NutAssembly binding, '
+                    'CPU/CUDA, and 100/500 Hz'
+                )
+            self._native_feedback_profile = 'nutassembly-native-feedback-v1'
+            self._native_feedback_gripper_control_hz = _native_feedback_gripper_control_hz
+            self._diagnostic_profile = None
+            build_value = lambda: self.binding.build_native_feedback_profile(
+                provider, backend, _native_feedback_gripper_control_hz, True,
             )
         self.provider, self.backend, self.horizon = provider, backend, horizon
         self._execution_fault = None
@@ -533,6 +553,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     self.provider, self.backend, self._diagnostic_gripper_control_hz,
                     external_solution is None,
                 )
+            elif self._native_feedback_profile is not None:
+                self.value = self.binding.build_native_feedback_profile(
+                    self.provider, self.backend, self._native_feedback_gripper_control_hz,
+                    external_solution is None,
+                )
             else:
                 self.value = (self.binding.build_external(self.provider)
                               if external_solution is not None else self.binding.build(self.provider))
@@ -611,7 +636,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.session = materialize_control(self.artifact, self.execution,
                     source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08),
                     diagnostic_profile=(self._diagnostic_profile
-                                        if self.backend == 'cuda' else None))
+                                        if self.backend == 'cuda' else None),
+                    native_feedback_profile=self._native_feedback_profile)
             phase = 'runtime_reset'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
@@ -1846,10 +1872,27 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self._closed:
             return
         if not getattr(self, 'position_profile', False):
+            first_error = None
             if self.session is not None:
-                self.session.close()
+                try:
+                    self.session.close()
+                except BaseException as error:
+                    first_error = error
                 self.session = None
+            receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
+            try:
+                if receipt is not None:
+                    receipt.close()
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(
+                        f'execution source receipt cleanup also failed: {type(error).__name__}: {error}'
+                    )
             self._closed, self._stopped = True, True
+            if first_error is not None:
+                raise first_error
             return
         first_error = None
         if self._published_position_state is not None:
@@ -2066,7 +2109,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'interval_source': hashlib.sha256(Path(session_common.__file__).read_bytes()).hexdigest(),
             'resolved_configuration_json': json.dumps(config, sort_keys=True),
             'execution_configuration_json': json.dumps({'env_id': self.uid, 'provider': self.provider,
-                'backend': 'cpu', 'horizon': self.horizon}, sort_keys=True),
+                'backend': self.backend, 'horizon': self.horizon}, sort_keys=True),
         }
         if 'source_revision' in self.value:
             runtime_source = self.value['source']
@@ -2082,7 +2125,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if runtime_source.source_closure_digest is not None:
                 source_provenance['runtime_source_closure_digest'] = runtime_source.source_closure_digest
             source_provenance.update({f"source_sha256:{name}": value
-                for name, value in self.value.get('source_sha256', {}).items()})
+                                      for name, value in self.value.get('source_sha256', {}).items()})
+            source_receipt = getattr(runtime_source, 'execution_source_receipt', None)
+            if source_receipt is not None:
+                source_provenance['runtime_execution_source_receipt_json'] = json.dumps(
+                    source_receipt.to_mapping(), sort_keys=True,
+                )
         solution_identity = self._active_solution_identity()
         metadata = EpisodeMetadata('canonical-trajectory-metadata-v0', self.artifact.identity_hash,
             self.sample, self.realized, self.execution,

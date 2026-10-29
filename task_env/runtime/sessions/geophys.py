@@ -17,6 +17,7 @@ class _GeoPhysSession(_SessionValues):
                 source.scene_source,
                 scene_definition=source.scene_definition,
                 source_closure_digest=source.source_closure_digest,
+                execution_source_receipt=source.execution_source_receipt,
             ),
             create_render_source=False,
         )
@@ -427,6 +428,23 @@ class _GeoPhysSession(_SessionValues):
 
     def close(self):
         if not self._closed:
-            self._boundary.close()
+            failure = None
+            try:
+                self._boundary.close()
+            except BaseException as error:
+                failure = error
+            receipt = getattr(self._source, 'execution_source_receipt', None)
+            try:
+                if receipt is not None:
+                    receipt.close()
+            except BaseException as error:
+                if failure is None:
+                    failure = error
+                else:
+                    failure.add_note(
+                        f'execution source snapshot cleanup also failed: {type(error).__name__}: {error}'
+                    )
             self._boundary = None
             self._closed = True
+            if failure is not None:
+                raise failure
