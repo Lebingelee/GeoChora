@@ -249,3 +249,6 @@ Sol复核attempt001为PARTIAL_WORK_RETAINED_REWORK_REQUIRED，保留controller/c
 init decoder/原行flat-state mapping、public对象pose/contact、ControlMap实际source绑定及typed故障记录能在纯S1内完成的本轮落地；源名字/声明布局与compiled native IDs分别记录，不能伪造编译。缺必需源事实时列具体输入和阻塞，不换随机reset、不把缺contact填False。零native/零compile/不import上游env；允许基于已锁source编写有界确定性XML组合及无pickle hooks的纯数据解码，未支持opcode明确拒绝。
 
 预计主动180–240分钟、timebox300分钟；窗口内多轮修复测试。目标R07C_PILOT_CORE_WIRING_S1_READY_PENDING_SOL_REVIEW（不是R07c物理通过）；源组合/真实Env成功与故障/同H5读回没有完成则准确PARTIAL。现源码变化后重新跑受影响S1和原拒绝门，避免降低旧gate。上次native draft保持历史，生成新draft及明确ready blockers。若本次仍核心未解，第三attempt前必须重新梳理实际阻碍、官方/开源可复用方案和原门可行性；本包不自动第三轮或新native。
+
+
+2026-10-29 Sol复核R07c pilot attempt002：`PARTIAL_WORK_RETAINED_REWORK_REQUIRED`。139项包哈希、32项保护输入、122项输入Git blob通过；15/29/43项S1与3个native deselect按原日志保留。实际组合XML的free joint为0，可动物体被固定，缺上游object实例化/free joint语义；同Env S1仍走GeoPhys consumer，未证明约定MuJoCo路线。init/placement、生产contact与freshness、native验证仍缺。planning manifest中07/09的旧hash不匹配，Sol当前修复，原报告不改。接收数18/22不变；第三attempt前须完成这些具体owner/方法方案及上游复用可行性判断，未授权native或下一attempt。复核原件：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_002/`。
