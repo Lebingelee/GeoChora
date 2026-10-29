@@ -2759,6 +2759,16 @@
         "original_five_task_exit": false,
         "fourth_attempt_authorized": false,
         "sol_review": "PENDING"
+      },
+      "pilot_attempt003_sol_review": {
+        "decision": "PARTIAL_G1_G2_BLOCKED_CONFIRMED",
+        "reviewed_head": "9185941034bf58f6f63be87129a6198891018fac",
+        "ordinary_attempts_exhausted": true,
+        "G1": "historical fixture realization missing",
+        "G2": "MuJoCo mixed/reset/contact/Env code not implemented",
+        "maintainer_decision_required": true,
+        "continuation_authorized": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_003/sol_review.md"
       }
     },
     {
@@ -2891,10 +2901,10 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "e6e317c6a29eee151d485969c7d52beb91c83ec3b1500a1a54b5fbf549f62ba1",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "ad3487abebef00e585dc07830fe622d87055e5abeafffa5fdd4f14cfe8b1de74",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "edbc477765175724277e277a11edf06ce886ae7354ea05c6afa46a82b2581c9e"
+    "07_Execution_Order_and_Acceptance.md": "0d8ba281647de5dc5d2c8111e4285c5868bf2c789bb15d0a6c75f5564c9f7fc6"
   },
   "revision_kind": "PREPARE_R07C_PILOT_ATTEMPT002_REWORK",
   "benchmark_audit": {
