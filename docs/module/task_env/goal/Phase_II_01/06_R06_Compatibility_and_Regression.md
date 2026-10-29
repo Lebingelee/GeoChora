@@ -205,3 +205,25 @@ Sol只读核对run002两份H5共128 transitions/130 observations、source闭包�
 接收范围：固定Panda Arm+Hand原source加唯一`r06b-order-v1`派生，MuJoCo3.8.1 CPU、Arm gain2.5/Hand50、seed31、2ms×5、每case64步。一worker完成两次materialization/reset、128outer、640 mj_step、130forward、1.28sim秒，两H5各64/65、production reader及24项native派生拒绝通过；同锁raw正例通过，raw错run等negative复用249项S1 detector。E2真实joint/body/actuator顺序变化且actuator1 slot从0变6。worker/reader均exit0，close与锁收尾通过，最大RSS413,986,816 bytes为采样值。
 
 run001 reader失败原件保留；同attempt修复/重验未另计004，两run成本1280step/260forward/2.56sim秒完整计入。两episode outcome均horizon_reached、task_success=false。R06b有界实现出口完成，**不关闭**历史missing-raw/Phase处置、R05正式合同、R06c/P99或Qualification，不代表任意source/provider/资产支持。未merge/push；Sol提交本接收记录后释放camera窗口，不自动开始下一slice。
+
+<a id="r06c-attempt001-implementation-plan"></a>
+
+## R06c attempt001 实施定位（2026-10-29，维护者发送工作包）
+
+R06b/R03c/R04c/R05c的各自有界出口均已获Sol接收，原表17/22接收。下一包完成R01–R06 required交集的技术汇总、版本与证据适用性检查及待维护者独立处置的验收包，不把“历史缺件决定未批准”变成无法准备实际交付的理由。
+
+| 位置/既有owner | 本包实施与验证 |
+| --- | --- |
+| 本目录manifest的slices及R06a.compatibility_ledger、R01–R06规划与Sol复核原件 | 建立每required条款→生产owner/公开调用者→实现/原运行HEAD/Providerpin/backend/source/seed/预算→原件/H5/reader→Sol接收/局限/当前适用性的索引；只对确受影响owner做差异和字节审计，不重新全仓扫描历史。 |
+| `runtime/sessions/{api,source,control,geophys,mujoco}`、Scene/Attachment/Position与camera/typed-state/Recorder实际owner | 对R03c/R04c/R06b旧a53来源与当前c6df840分别给差异归因。旧Evidence保留原identity；相同/无关改动可精确reuse，不宣称旧a53真实运行已迁成c6df840。当前实际未验证组合单列，不能虚构全部backend叉乘。 |
+| R06b顺序/worker reader、R03c/R04c旧reader与R05c full reader | 优先复用Sol已读回且bytes未变的H5/receipt；验证索引与关键hash/closure/source identity，发现受影响/缺证据才做限定offline reader。不得启动provider/renderer/native、导入engine或重跑完整任务。 |
+| legacy matrix/Scene/Artifact/codecs及受影响窄S1 | 明确provider-free selector与oracle，使用import tripwire；已接受且未变owner证据复用。两个旧source.config摘要失败独立保留，不更新常量或塞进通过计数。 |
+| ignored `r06c_001/acceptance_report.md`、`acceptance.json`、`phase_decision.yaml` | 审核包分开记录technical checks、historical evidence decision、R06c overall与P99/R07 gate。decision文件为PENDING_MAINTAINER_DECISION模板，approved_by/reference为null；不填写Human approve或Judge结论。 |
+
+分类COMPOSE_EXISTING，针对已证实小缺陷才FIX_EXISTING；本包不是增加Core能力/新验证框架。可在ignored工具下建立有界索引/checksum/decision一致性校验器及成功/错hash/错pin/缺文件/跨run/未批准却PASS反例；不得复制Runtime/Recorder/Artifact/统一Evidence协议。仅同步本R06/07/README/manifest和确有漂移的Skill，原Phase II接受决定和保护原件不动。实际旧route缺陷如超出索引/纯codec小修范围，列出真实owner/复现/必要scope交Sol，不擅自改Provider pin或扩大native合同。
+
+预计60–90分钟、主动timebox120分钟；每S1进程180秒/采样RSS2GiB，每offline reader180秒/采样RSS4GiB；输出总量128MiB，不复制大H5。无新native与锁占用，因为本包交付是复用已获接收的required S2/S3原件及聚合审阅，并非默认把一次attempt限制成一次运行；窗口内允许多轮索引/测试/reader修正。
+
+四项缺件逐项形成restore/retain-deferred/precise-retirement的影响及待决选项：三类H5没有已知原bytes/hash，eb870 JSON是单独历史Evidence项，不套reader retirement。恢复必须真实已批准来源与身份链；本包不全盘/云端扫描、不合成替代、不删reader。推荐保留当前reader、明确暂未证明历史bytes兼容并由维护者单独决定是否接受本阶段有限延期及其R06c/P99后果；推荐不是授权，传递本prompt也不是scope waiver。
+
+技术汇总可完成，但在本阶段决定仍pending时，只能返回 `R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW`，R06c overall仍BLOCKED_MISSING_RAW_OR_PHASE_DECISION，不能将17变18或把P99/R07判通过。报告应列精确待决问题/可选处置文本，Sol复核后由维护者决定；不要仅返回“缺件blocked”而不给完整技术包。后续prompt由维护者发送。

@@ -2429,10 +2429,14 @@
         "R04c",
         "R05c"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "READY_FOR_TECHNICAL_CONSOLIDATION_HISTORICAL_DECISION_PENDING",
+      "execution": "ATTEMPT001_PACKAGE_PREPARED_NOT_STARTED",
       "required_evidence": "S1/S2/S3",
-      "stop_condition": "缺required出口/历史处置→P99 blocked"
+      "stop_condition": "缺required出口/历史处置→P99 blocked",
+      "implementation_plan": "06_R06_Compatibility_and_Regression.md#r06c-attempt001-implementation-plan",
+      "historical_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "prompt_sender": "MAINTAINER_ONLY",
+      "scope": "Technical acceptance bundle/source-evidence applicability/targeted S1 and offline checks; pending independent phase decision; no new native"
     },
     {
       "id": "R07a",
@@ -2583,7 +2587,7 @@
   "document_sha256": {
     "README.md": "e5be4095295d925feedab1bf0264b6b10767209adcd4f6de4affd3fca71af6fb",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
+    "06_R06_Compatibility_and_Regression.md": "517148ca1553f0c1d6abd641d3ba18cf5e8d8eb7ccd6e6b1123e9a33baf732b4",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2592,7 +2596,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "2263acdc0b21989662b8095a17d1a9e54b76e083d3d8f64e386f2abab237f4d0"
+    "07_Execution_Order_and_Acceptance.md": "f3d9d05bec18cc7a9d86e0b225ef428c7235dee29d1ad960b49545c585a6597a"
   },
   "revision_kind": "R05C_ATTEMPT001_BOUNDED_FOUR_CELL_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -5262,6 +5266,15 @@
       "R05_exact_required_exit": "MET",
       "R06c_phase_decision": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
       "new_native_by_sol": 0,
+      "prompt_sender": "MAINTAINER_ONLY"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "SOL_PREPARE_R06C001_TECHNICAL_BUNDLE",
+      "execution": "NOT_STARTED",
+      "historical_disposition_approved": false,
+      "R06c_overall_pass": false,
+      "native_authorized": false,
       "prompt_sender": "MAINTAINER_ONLY"
     }
   ],
