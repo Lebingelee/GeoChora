@@ -192,3 +192,21 @@ recipe保留原任务 `On(akita_black_bowl_1, plate_1)` 及严格XY `<0.03 m`、
 2026-10-29 Sol接收单pilot来源安装/verify/recipe S1为`ACCEPTED_BOUNDED_R07B_PILOT_SOURCE_RECIPE_S1`。135项包哈希、109项保护输入及45项冻结源码核对通过；Sol新进程独立verify保留目标的103个payload并重建recipe通过，50项S1按原日志复用。两个独立目标的原安装/verify收据保留，Sol未重新创建第二目标。Core native admission仍false，R07b原五任务整体未通过、接收计数仍18/22。成本协议仍INVALID：0309d73不是camera输入21ea2965祖先，另有asset/benchmarks Python被旧工具归为data的LOC缺口；原结果不改写，后续须先修订跨分支成本协议/代码归属规则。token/费用/连续活动时间未知仍null。初期3次构建缺资源采样如实保留；未重跑native或pytest。Sol同时更正后继owner符号并移除未获要求的全任务完成/通用碰撞规划门；R07c仍须原重复reset、有意义公开控制、原生语义及同H5验收。
 
 独立复核入口：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07b_pilot_001/`。旧v2.1协议及INVALID记录保持；不得替换原baseline后把本轮改记有效成本。未来方案保留0309d73作为历史测量参考，另明确camera实际session输入/输出提交、共同祖先与跨分支继承成本账本，并修正asset/benchmarks Python工具的代码分类，经审阅后采用新协议版本；本次没有追溯批准新协议或启动R07c。
+
+<a id="r07c-pilot-attempt001-core-s1-plan"></a>
+
+## R07c pilot attempt001：现有Core接线与跨分支成本协议修正
+
+R07b首pilot来源安装/metadata recipe S1已获Sol接收，native admission仍false。attempt001在同camera分支做实际原owner扩展及provider-free集成，不仅重复六缺口报告；预计主动150–210分钟、上限240分钟。attempt002理想用于复查和有界native验收，需Sol另发完整执行合同，本包零native、不取得共享锁，不依赖F线未合入代码。
+
+| 改动面 | 实施位置与复用要求 | 本包出口 |
+| --- | --- | --- |
+| 成本协议 | 原R07a003 v2.1工具/reader保留；在`bench_deploy/libero/`就近建立版本化接续，保留历史0309d73 reference，新增实际camera session start/final anchors与merge-base/继承成本表；执行start→final仍须祖先链，历史reference不被冒充实际开始点。先于asset/data规则分类asset/benchmarks Python；不将测试/数据/通用Core改动免费排除 | 同祖先与跨分支正例、假commit/错误blob/跨run/重复成本/缺来源负例；本次真实记录缺usage仍null、缺继承计量保持partial；旧INVALID不改写，不声称有效总成本或成本下降 |
+| 原生source与构造 | `TaskSceneSource`/`RuntimeSource`、`assembly/references.py`、现task factory及RuntimeSession边界；benchmark composer只拥有固定task assembly。核对source真实Python合并/命名前缀/style/关节/body/site/actuator；不能把散XML直接叫compiled scene | 真实安装→source composition/身份→原Core构造接缝→fake native IO集成，XML依赖/资源mapping/时钟先验通过；无真实compile/reset/step |
+| 混合actuator与controller | `AbsoluteJointPositionActionAdapter`/`JointPositionServoBackend`仅支持position ctrl，不能把rad写进torque motor。复用既有公开Controller契约，在原controller owner最小扩展source-bound joint-target→bounded torque与双finger位置转换；保留旧默认类/行为 | 明确动作schema、torque N*m/finger m、name→slot、qpos/dof映射、finite/limit/clock/ack及fault负例；调用真实Core adapter和运行边界、只替换native IO，不造bench私有solver控制 |
+| init/public状态/evaluator | `.pruned_init`仍不unpickle；先完成准确的decode/flat-state→版本化reset需求与安全显式输入接口。free-body/pose/contact复用当前公开Snapshot/TaskState/Evaluation owners，版本化缺项不回写旧v0 | 能实现的有界合同与S1先落地；不能用当前输入证明的mapping/接触/初始化保持unavailable/NOT_ADMITTED，不填零或把native-init换随机reset冒充等价。未闭合项必须给明确所需输入/下一最小补丁 |
+| 后继验收 | 复用现有Recorder/public state/Clock/planners；不要求复刻OSC、完整task/Expert成功、通用collision planner | 记录3reset×至少64outer、原On语义正负/阈值、meaningful motion、同H5读回的精确后继合同草案；若native init/contact/worker无法provider-free贯通则明确NOT_READY，不启动native |
+
+原生20Hz控制周期与physics timestep应从已锁robosuite源码查证；允许获取固定revision的小型macros/controller/config文本，source-declared dt与compiled dt分开。不得为填unknown拒绝读取已可核实常量，也不得把常量读到当编译模型验证。Core可采用显式审议的joint-space servo而非相同OSC算法，保持原torque actuator与物理source，记录控制算法差异。
+
+本包目标为`R07C_PILOT_CORE_WIRING_S1_READY_PENDING_SOL_REVIEW`；仅当source/控制/原Core成功与故障路径S1真实贯通可用READY；其余必要init/contact/source问题仍有缺口时PARTIAL并报告，不因成本schema修好而声称全部就绪。原R07五任务出口、18/22与P99/Qualification不变。Sol复核真实diff和证据后才准备下一窗口，不要求Luna自行规划所有后继子阶段或重复旧audit。

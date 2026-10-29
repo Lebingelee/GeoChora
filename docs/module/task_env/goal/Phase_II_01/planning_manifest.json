@@ -2614,7 +2614,19 @@
       "status": "PLANNED",
       "execution": "NOT_STARTED",
       "required_evidence": "per-task S1/S2/S3 real deployment and native semantic correspondence",
-      "stop_condition": "any required task BLOCKED_CORE/BLOCKED_PROVIDER/NOT_REPRESENTABLE/FAIL/NOT_RUN blocks P99"
+      "stop_condition": "any required task BLOCKED_CORE/BLOCKED_PROVIDER/NOT_REPRESENTABLE/FAIL/NOT_RUN blocks P99",
+      "pilot_preparation": {
+        "status": "PACKAGE_PREPARED_NOT_SENT",
+        "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-core-s1-plan",
+        "scope": "Existing Core source/controller/state seams and provider-free integration plus versioned cross-branch cost protocol",
+        "native_authorized": false,
+        "expected_active_seconds": [
+          9000,
+          12600
+        ],
+        "timebox_seconds": 14400,
+        "original_five_task_exit": false
+      }
     },
     {
       "id": "R07d",
@@ -2746,12 +2758,12 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "7f7aec07de466b439437e69a59366d089aae529ea8710ff0aca0c80a66ac4ab9",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "e00f5f8b091112d7f9312a6e530b0a9721e840602320f025e43654e9d578f44a",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "9396a5cf0922b671fc82e2f7828bdc1311a0f0f9cbcadda8ddc70ba02219c896"
+    "07_Execution_Order_and_Acceptance.md": "3def8e2024b8571a89cd6d8896ccb0c1a72dc61040aee43a4a067a616086f607"
   },
-  "revision_kind": "R07B_PILOT_SOURCE_RECIPE_BOUNDED_SOL_ACCEPTANCE",
+  "revision_kind": "PREPARE_R07C_PILOT_CORE_S1_ATTEMPT001",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
