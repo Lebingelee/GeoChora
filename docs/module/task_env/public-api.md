@@ -189,8 +189,39 @@ compatible. The exact inspected MuJoCo 3.8.1 library build rejects native USD; o
 identities are rejected as unverified rather than being attributed that probe result. Every selection
 keeps `runtime_admitted=false`; there is no silent MJCF fallback or general USD-to-MJCF converter. No
 real official Panda delivery or upstream validation report was available, and F03/F04/F05 and
-Qualification remain unverified. F02 attempt002 has Sol acceptance `ACCEPTED_BOUNDED_F02` for these source contracts and fixture checks; F03 is not started. See the [Sol acceptance](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt002-sol-acceptance), [attempt001 history](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution)
+Qualification remain unverified. F02 attempt002 has Sol acceptance `ACCEPTED_BOUNDED_F02` for these source contracts and fixture checks; F03 attempt001's contract-only S1 did not complete the Core factory-to-H5 chain. See the [Sol acceptance](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt002-sol-acceptance), [attempt001 history](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution)
 and [attempt002 repair record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt002-bounded-delivery-resolver-repair).
+
+<a id="f03-versioned-usd-source-typed-free-state-and-bounded-admission"></a>
+
+### F03 versioned USD source, typed free state, and bounded admission (2026-10-29)
+
+The existing `task_env.assembly` source owner now has internal `UsdTaskSceneSourceV1` and an
+owned snapshot lease that copies only the exact immutable bytes held by the F02 loaded-delivery
+value. `task_env.runtime.sessions.source.UsdRuntimeSourceV1` binds that source to the existing
+`TaskArtifactV1`, `SceneDefinition`, scalar/free Joint maps, body/frame maps and drive targets.
+These values are construction declarations; the USD session is not admitted. `materialize()`
+rejects synthetic or unverified input and fails closed for Isaac because no Core Isaac
+`RuntimeSession` adapter is implemented. There is no new `make_env()` USD candidate route yet.
+
+The legacy `ExecutionSpec` codec and mappings remain unchanged. `legacy_execution_projection()`
+accepts an `ExecutionSpecV1` only when the existing adapter can preserve every declared choice;
+Isaac, device selections, camera overrides and nonlegacy renderer choices cannot be erased by
+projecting them into an older session. Typed free-body projection accepts an adapter-owned
+`PublicRigidBodyReadbackV1` that explicitly names world-frame velocity and its COM reference,
+converts the twist to canonical body-origin local coordinates, and checks pose consistency with
+the measured child Frame. The older MuJoCo-compatible tuple route remains unchanged. A synthetic
+named-drive receipt covers the declared seven Arm/two Finger name mapping and maps aggregate
+opening in metres to half-opening per finger; it does not represent native metadata or admission.
+
+F03 attempt001 passed 20 contract tests, 19 selected provider-free P99/reset compatibility checks,
+3 synthetic H5/cleanup checks, and the clean-commit F02/legacy 45-test set. The complete required
+`make_env → admission → reset/realization → public step → TransitionRecorder/H5 → independent
+reader → close` S1 was not run: no verified Panda USD delivery or Isaac Core RuntimeSession
+adapter exists, and the current Position candidate remains bound to its MJCF/GeoPhys or MuJoCo
+routes. The attempt is therefore partial, pending Sol review; it does not establish an Isaac
+provider, native execution, H5 integration for this new source, or Qualification. See the
+[F03 attempt001 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
 ### Static Logical Assembly value (R01a)
 

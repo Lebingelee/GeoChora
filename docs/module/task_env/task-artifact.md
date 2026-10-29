@@ -175,6 +175,25 @@ B03b temporal-rule declaration 尚未序列化到 TaskArtifact。`ResetSample-v0
 canonical execution v1 bytes 仍缺历史 golden fixture，因此相关 reader compatibility 继续 deferred，不能用合成
 数据宣称旧文件兼容。B04b 的 S1 codec/编译测试不构成 Stage-1、freeze、Provider qualification 或历史存储完整验收。
 
+Phase II-01 F03 attempt001 在既有 Assembly/RuntimeSession/control owners 中增加版本化 USD source
+声明与由 immutable F02 delivery bytes 建立的受控 snapshot lease；`UsdRuntimeSourceV1` 绑定现有
+`TaskArtifactV1`、Scene、TaskSource、reset pose、free Joint/frame 和 drive-name maps。该 source
+尚未接入 `SelectedReferenceEnv`/`make_env()`，且不是 runtime admission：synthetic/unverified delivery
+被拒绝，Isaac 也因缺少 Core RuntimeSession adapter 而 fail closed。
+
+同次实现让 `snapshot_v1()` 在 provider read 前校验静态 Scene/Joint/Frame/StateRequirements targets，
+并为新 adapter 提供显式 world-frame/COM free-body readback到 canonical body-origin local twist 的
+转换；旧 MuJoCo/GeoPhys free-joint tuple projection 保持。`ExecutionSpecV1` 只有在无字段丢失时才可
+投影到 legacy session；Isaac/device/camera override 等选择会拒绝。Panda 七 arm/双finger native
+named-drive receipt 仅是 `synthetic_fixture` 合同，开度以米表示、每指使用一半开度，不代表实际
+native metadata、session materialization、physics 或能力准入。
+
+F03 attempt001 的合同模块20项、provider-free P99/reset兼容19项、旧synthetic H5/close回归3项和
+干净提交树F02/legacy兼容45项通过；但所要求的真实 Core factory→admission→reset/realization→step→
+Recorder/H5→独立reader→close链未执行。当前没有经验证 Panda USD source，也没有Isaac Core adapter；
+不能把合同级synthetic检查表述为完整S1或新的Provider capability。F03候选等待Sol复核，F04未启动。
+细节见[Phase II-01 F03记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1)。
+
 生命周期为 `draft -> candidate -> validated -> frozen -> archived`。
 validated 表示产生检查/feasibility Evidence、等待 Judge；frozen 必须有明确批准。
 拒绝或修改 frozen 任务必须新建版本，不得原地改变语义。

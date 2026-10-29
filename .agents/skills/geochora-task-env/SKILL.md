@@ -54,6 +54,39 @@ runtime compatibility for an arbitrary build. F02 attempt002 has Sol acceptance
 delivery and provider runtime admission remain unverified. See the [F02 public API route](../../../docs/module/task_env/public-api.md#usd-delivery-and-provider-representation-selection-f02)
 and the detailed [source map](references/routes.md).
 
+## F03 Core source/state/control contract status (2026-10-29)
+
+The existing Assembly source owner exposes internal `UsdTaskSceneSourceV1` plus
+an owned snapshot lease copied from the exact immutable F02 loaded-delivery
+bytes. `UsdRuntimeSourceV1` binds the delivery, `TaskArtifactV1`, canonical
+Scene/TaskSource identities, reset pose/free Joint maps, body/Frame bindings
+and named scalar drive targets. This is a construction declaration, not a
+Provider adapter. Production `RuntimeSession.materialize()` rejects synthetic
+or unverified USD and fails closed for Isaac while its Core adapter is absent;
+there is no USD `make_env()` route. Do not pass the synthetic source onward as
+runtime evidence.
+
+`legacy_execution_projection()` preserves the exact old `ExecutionSpec`
+mapping. It projects `ExecutionSpecV1` only when all choices are representable
+by the selected legacy adapter; Isaac/device choices, camera overrides, and
+nonlegacy renderer selections fail closed. New typed free-body adapters may
+return `PublicRigidBodyReadbackV1`, explicitly naming world velocity and COM
+reference. The shared projection converts to body-origin local velocity and
+checks agreement with the measured child Frame; the existing MuJoCo-compatible
+tuple path remains intact. `IsaacNamedPositionDriveReceiptV1` is marked
+`synthetic_fixture`, maps the exact seven Panda Arm and two Finger DOFs by
+public names/metadata order, and splits aggregate hand opening in metres
+between fingers. It does not admit a Provider or attest native metadata.
+
+F03 attempt001 passed 20 contract tests, 19 selected provider-free P99/reset
+checks, 3 synthetic H5/cleanup regressions, and 45 clean-commit F02/legacy
+checks. Its required full factory→admission→reset→public-step→Recorder/H5→
+independent-reader→close chain remains incomplete because no verified Panda
+USD source or Isaac Core RuntimeSession adapter is available. The attempt is
+partial and pending Sol review; do not report full S1, Isaac runtime support,
+native execution, or Qualification. See the [F03 route and result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1)
+and [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission).
+
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
 from current inputs, then associates each expanded leaf with one existing

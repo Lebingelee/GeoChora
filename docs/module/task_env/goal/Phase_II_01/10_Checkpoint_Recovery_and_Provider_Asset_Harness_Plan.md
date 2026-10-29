@@ -1,11 +1,11 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX有界native已获 `ACCEPTED_BOUNDED_F01`；F02 attempt002经Sol独立复核获 `ACCEPTED_BOUNDED_F02`，F03待单独冻结包且未启动**。
-本计划的后续方向仍为计划状态；F00与F02分别按独立冻结包获得实现/验证授权，F02当前候选待Sol复核，不代表其他补丁行已授权或开始。
+更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt001已提交部分合同实现和定向检查，但完整Core调用链S1未完成，等待Sol复核**。
+本计划的其他方向仍待独立授权；本次仅执行F03 attempt001冻结包，不启动F04或其他slice。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00完整闭环已接收。Isaac 6.2.0.0隔离环境及依赖检查、实际API/资产核对均已完成；F01 attempt002的两次零物理步失败仍保留。F01 attempt003已由维护者授权进行GPU PhysX复验，并由Sol按原始运行源码副本、worker/parent receipts、资源账本、独立reader和定向S1完成复核，获`ACCEPTED_BOUNDED_F01`。F02 attempt002已按Sol返工要求修复并通过定向S1，当前待Sol复核；F03未启动。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt001在`develop-full`上完成部分合同实现及定向检查，缺少已验证Panda USD source与Isaac Core RuntimeSession adapter，完整factory到H5调用链未完成，待Sol复核。没有启动F04。
 
 未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。此偏好不代表Core Isaac provider已接通。
 
@@ -14,6 +14,7 @@ F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其
 R03c 接收合同由 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 维护。
 
 2026-10-28 Sol复核F00 attempt001：接收 `develop-full` 两线整合与完成事实修复/S1；33项manifest（25文件、8个Git blob）匹配，13项provider-free tests复核通过，20条原始campaign行经report validator再核一致。candidate仍为20/20 `expert_failed / gripper_readiness_timeout`，ledger round1 fail/state ready、Oracle/H5/Judge未运行；F00整体保持PARTIAL。该专家可行性缺口不作为独立F01安装/官方原生Panda+刚体对照的前置。维护者要求下一子阶段工作包，当前明确选择F01，之后按F02/F03/F04逐包推进；R04b/c可独立安排，原DAG/P99门保持。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f00_001/sol_review.md`。
+
 
 2026-10-28 维护者最新纠正顺序：先成功验收F00完整闭环，再准备/执行F01。F00 attempt001仅整合/修复/S1接收，20seed候选失败，下一包为F00 attempt002集中诊断、必要owner修复、20seed/Oracle/H5/pending Judge收口；F01草稿保留待用、未派发、未安装或启动。该选择覆盖此前独立提前F01的计划，R04b/c及原7/22/P99门仍保留。
 
@@ -306,3 +307,51 @@ F03不得建立第二Runtime/Recorder/controller或将ReferenceTaskBinding提升
 F03 attempt001包须包含：先调研并确定实际patch/caller/type表，完成所需实现、定向正反例、两次同Env reset与短轨迹真实H5写读、finalizer/close失败路径、必要文档/Skill和本地提交；不分成固定准备轮。预计150–240分钟，活跃timebox240分钟；允许包内多次修复和复跑，不以单次测试失败结束attempt。F00/F01/F02 raw、旧reader/profile、R05反馈/原R表和pins保持；R05b的camera工作树由Luna2独立持有。
 
 速度适配的已核实参考：Isaac 6.2 installed `experimental.prims`公开RigidPrim wrapper返回wxyz姿态，底层public tensor velocity为world frame且线速度在COM；参见[Omni Physics Tensor API](https://docs.omniverse.nvidia.com/kit/docs/omni_physics/107.3/extensions/runtime/source/omni.physics.tensors/docs/api/python.html)。后续需核实际安装版本与公开COM读法，并用非零COM oracle转换到canonical声明的frame/reference point，不能把两种native速度拼成同一qvel合同。
+
+<a id="f03-attempt001-contract-implementation-and-s1"></a>
+
+## F03 attempt001合同实现与S1收口状态（2026-10-29，待Sol复核）
+
+输入为`develop-full@b9015faf395c185cfb71341d60f30be07d518057`，冻结prompt SHA-256
+`951455533ef48f1128ed5951bc6e555d85ebd7fe042e5901d4d21aed54f5fd78`；输入树tracked-clean。
+本次代码提交`ed951129ab1f51bc17baa59c11ee058eb3894058`，提交仍在同一`develop-full`阶段分支。冻结包
+43个实现/文档源码hash、3个已安装Isaac公开API源码hash和828项保护输入均在初始readback中核对；attempt
+内未写入或改变F00/F01/F02保护原件及F02 Sol接收记录。
+
+实现集中在既有owners：`assembly/source.py`持有基于F02 `LoadedUsdDeliveryV1`精确immutable bytes的
+`UsdTaskSceneSourceV1`/snapshot lease；`sessions/source.py`增加绑定TaskArtifactV1、Scene、TaskSource、
+reset/free-Joint/root-frame及drive maps的`UsdRuntimeSourceV1`；API确认source身份后仍拒绝unverified/synthetic
+materialization，并在无Isaac Core `RuntimeSession` adapter时fail closed。`ExecutionSpecV1`只能在没有丢失
+device/camera/renderer选择的legacy adapter中显式投影；原legacy codec不变。`snapshot_v1()`把可静态判断的
+Joint/Frame/StateRequirements合同检查前移到provider read前，并接收显式标记world-frame/COM的typed free-body
+readback，按非identity姿态、非零线/角速度与COM offset oracle转换为body-origin local canonical状态。旧
+MuJoCo-compatible tuple路径保持。现有`leaf_control` owner增加synthetic-only七Arm/双finger命名Position drive
+receipt；乱序DOF按实际名字/顺序解析，hand opening (0–0.08 m)拆成各指一半。没有增加Provider manifest、第二Runtime、
+Recorder或公开`ReferenceTaskBinding`协议。
+
+验证账本：
+
+- `017_contract_after_latest_edits`：20/20通过；新free-state、pre-read、ExecutionSpecV1、drive receipt、
+  USD byte snapshot/source identity与production fail-closed检查。
+- `018_p99_and_reset_pure_gates`：19/19通过；仅provider-free registration、invalid config、source identity、
+  TaskSource/reset planning及旧UID/source bytes门，不运行旧provider-backed P99 test。
+- `019_legacy_h5_synthetic_reader`：1通过、2失败。通过的是既有生产TransitionRecorder/Generic H5 v3合成写读和
+  tamper reader；失败两项使用`SimpleNamespace`冒充ExecutionSpec，与本次显式typed execution合同不匹配，raw保持未改。
+- 将旧测试夹具换成正式legacy `ExecutionSpec` 后，`020_legacy_h5_and_cleanup_after_fixture_fix`为3/3通过。
+- 代码提交后干净工作树`021_f02_legacy_clean_commit_regression`中，F02与受影响旧资产identity/closure集合45/45通过，
+ 6.12秒，进程树RSS峰值采样316,342,272 bytes。
+- 更早`001–016`所有修复前失败/诊断原件均保留；另有`git diff --check`通过。每个run的argv、source hash、
+ 进程资源采样与原始stdout/stderr均位于attempt输出`evidence/runs/`。
+
+**完整S1未达成。** `make_env → 真实Core admission → reset/realization → public runner snapshot/step → typed
+publication → 本profile的TransitionRecorder/closed H5 → 独立reader → close`没有运行。真实工厂当前仅按既有
+ReferenceTaskBinding/MJCF Position candidate路由，F03没有接入USD versioned input；本地F02无官方Panda真实bytes与
+upstream validation report；`materialize()`也无Isaac adapter。把生产owner整体替换成fake session或直接调用helper来拼出
+正例会违反冻结包边界，所以没有这么做。被执行的H5回归是此前R02c synthetic H5 gate，只证明旧reader/recorder路线仍在，
+不等于新F03调用链。当前结果为`F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW`，不满足包内完整PASS token，
+不构成Isaac/provider admission、native执行、S2/S3、Qualification或F04前置的自动接收。
+
+没有启动Kit/App、GPU、GeoPhys/MuJoCo runtime、solver/materializer、native physics或资产下载；没有依赖/pin变更，
+没有merge/rebase/cherry-pick/push/tag。报告、Evidence、commands、账本和sha清单位于ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/`。建议Sol复核本次实际diff、partial S1门与
+adapter/official-source阻塞后决定是否接受bounded contract部分；F04未启动，本窗口结束后不自动启动F04。

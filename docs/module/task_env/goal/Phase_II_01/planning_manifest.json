@@ -1851,18 +1851,18 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "b853fff39613d9c6ece72424a9858b14915b433acc18a0f794ebd6c3b0835354",
+    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9f643e8159b05a5e2935c1b57cfe6a72d503aace5d557c83f92bb6f122a3f5b",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
+    "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
+    "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
+    "07_Execution_Order_and_Acceptance.md": "2913a4e42850c55cd57851b79fc0e12e3af536d453d5b359d06b660098a294c2",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
-    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "92d0ccf4492287820f905dc86655a700ef2bb0133bce6938ad6415a9587abbc9"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "935123bee2c239c735ce296d3159120cc9c08b6c679cee60ca5f13c1d1ce6b24",
+    "README.md": "b853fff39613d9c6ece72424a9858b14915b433acc18a0f794ebd6c3b0835354"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4522,7 +4522,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ATTEMPT002_BOUNDED_REPAIR_PENDING_SOL_REVIEW",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4628,7 +4628,29 @@
         "depends_on": [
           "F02"
         ],
-        "work": "Core reset/state/control/admission/factory/reader real-caller S1"
+        "work": "Core reset/state/control/admission/factory/reader real-caller S1",
+        "latest_attempt": "F03 attempt001",
+        "latest_result": "F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
+        "implementation_commits": [
+          "ed951129ab1f51bc17baa59c11ee058eb3894058"
+        ],
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/report.md",
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/evidence.json",
+        "targeted_s1": {
+          "f03_contract_tests": "20 passed",
+          "provider_free_p99_reset": "19 passed",
+          "legacy_synthetic_h5_and_cleanup": "3 passed after test fixture correction",
+          "f02_and_legacy_regression": "45 passed on clean commit"
+        },
+        "complete_core_factory_to_h5_chain": "INCOMPLETE_NOT_RUN",
+        "blockers": [
+          "no verified official Panda USD delivery/upstream validation report is available",
+          "no Isaac Core RuntimeSession adapter is implemented",
+          "SelectedReferenceEnv has no versioned USD source construction path"
+        ],
+        "native_execution": "NOT_RUN",
+        "other_slices_started": false,
+        "qualification_granted": false
       },
       {
         "id": "F04",
@@ -4666,7 +4688,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for the exact attempt003 CUDA GPU PhysX recipe; F02 attempt002 repairs R1/R2 and passes 45 targeted/legacy provider-free checks, pending Sol review; F03 not started.",
+    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for the exact attempt003 CUDA GPU PhysX recipe; F02 accepted bounded for USD delivery/report/closure and source representation selection; F03 attempt001 committed versioned source/state/execution/control contract changes and passed bounded provider-free regressions, but the required Core factory-to-H5 chain is incomplete pending Sol review.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4785,6 +4807,19 @@
           "No Isaac/Kit, solver/materializer, decoder/native compile, physics, H5, Expert, installation, download, F03 or other slice."
         ],
         "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_002/report.md",
+        "push_merge_main_tag_release": false
+      },
+      {
+        "date": "2026-10-29",
+        "slice": "F03 attempt001",
+        "authorized": true,
+        "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f03_001/luna1_prompt.md",
+        "prompt_sha256": "951455533ef48f1128ed5951bc6e555d85ebd7fe042e5901d4d21aed54f5fd78",
+        "input_head": "b9015faf395c185cfb71341d60f30be07d518057",
+        "scope": "Existing-owner implementation, bounded provider-free S1, docs/Skill sync and local commits; no Isaac/Kit/GPU/GeoPhys/MuJoCo runtime, downloads, F04 or other slice.",
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/report.md",
+        "result": "F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
+        "other_slices_started": false,
         "push_merge_main_tag_release": false
       }
     ],
@@ -5461,6 +5496,17 @@
       "real_validated_asset_delivery_received": false,
       "next_substage_auto_authorized": false,
       "other_branch_policy": "No merge/rebase/cherry-pick of develop or camera; no main changes; R05b independent."
+    },
+    "latest_f03_execution": {
+      "input_head": "b9015faf395c185cfb71341d60f30be07d518057",
+      "prompt_sha256": "951455533ef48f1128ed5951bc6e555d85ebd7fe042e5901d4d21aed54f5fd78",
+      "code_commit": "ed951129ab1f51bc17baa59c11ee058eb3894058",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/report.md",
+      "result": "F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
+      "full_s1": false,
+      "native_starts": 0,
+      "provider_runtime_starts": 0,
+      "f04_started": false
     }
   }
 }
