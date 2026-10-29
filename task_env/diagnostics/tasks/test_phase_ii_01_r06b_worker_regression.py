@@ -153,6 +153,20 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
         candidate, session, _case = _build_synthetic_case(episode_id, order_variant)
         if candidate.artifact.identity_hash != artifact.identity_hash or candidate.source != source:
             raise AssertionError('synthetic session owner received a mismatched production candidate')
+        site_maps = {
+            key: {
+                'native_name': name, 'site_id': 0,
+                'body_id': session._fixed_attachment_receipt['native_body_mappings'][
+                    'panda-arm/attachment'
+                ]['body_id'],
+                'body_native_name': 'attachment',
+            }
+            for key, name in candidate.attachment_plan.native_site_names.items()
+        }
+        session._fixed_attachment_receipt['native_site_mappings'] = site_maps
+        session._fixed_attachment_receipt['native_site_inverse'] = {
+            row['native_name']: key for key, row in site_maps.items()
+        }
         session._fixed_attachment_receipt['runtime_identity'] = runtime_identity
         payload = dict(session._fixed_attachment_receipt)
         payload.pop('receipt_identity_sha256', None)
