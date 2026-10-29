@@ -18,7 +18,7 @@ from typing import Any
 import xml.etree.ElementTree as ET
 
 
-_COMPOSITION_SCHEMA = "libero-source-composition-mjcf-v3"
+_COMPOSITION_SCHEMA = "libero-source-composition-mjcf-v4"
 _MAX_SOURCE_BYTES = 128 * 1024 * 1024
 
 
@@ -324,6 +324,89 @@ def _resolve_asset_files(
     return rewritten
 
 
+def _merge_fragment_assets(
+    output: ET.Element,
+    fragment: ET.Element,
+    *,
+    semantic_id: str,
+    source_repository: str,
+    source_path: str,
+) -> list[dict[str, Any]]:
+    """Replay pinned robosuite ``MujocoXML.merge_assets`` first-name wins.
+
+    The upstream merge checks existing ``(tag, name)`` pairs and retains the
+    first declaration. This matters for pinned LIBERO source such as
+    ``flat_stove.xml``, which repeats ``tex-stove_knob`` for different files;
+    both materials continue to reference the first retained declaration under
+    the upstream merge rule.
+    """
+    source_asset = fragment.find("asset")
+    if source_asset is None:
+        return []
+    output_asset = output.find("asset")
+    if output_asset is None:
+        output_asset = ET.SubElement(output, "asset")
+    existing = {
+        (node.tag, node.get("name")): node
+        for node in output_asset
+        if node.get("name") is not None
+    }
+    rows: list[dict[str, Any]] = []
+    for ordinal, node in enumerate(list(source_asset), start=1):
+        name = node.get("name")
+        key = (node.tag, name)
+        kept = existing.get(key) if name is not None else None
+        if kept is None:
+            output_asset.append(node)
+            if name is not None:
+                existing[key] = node
+            continue
+        incoming_attributes = dict(node.attrib)
+        kept_attributes = dict(kept.attrib)
+        rows.append({
+            "semantic_id": semantic_id,
+            "source_repository": source_repository,
+            "source_path": source_path,
+            "asset_type": node.tag,
+            "source_name": name,
+            "source_definition_ordinal": ordinal,
+            "resolution": (
+                "upstream_first_definition_identical_duplicate"
+                if incoming_attributes == kept_attributes
+                else "upstream_first_name_match_wins_conflicting_definition"
+            ),
+            "kept_attributes": kept_attributes,
+            "discarded_attributes": incoming_attributes,
+        })
+    return rows
+
+
+def _validate_composed_asset_names(root: ET.Element) -> None:
+    """Reject duplicate composed asset declarations and dangling references."""
+    asset = root.find("asset")
+    if asset is None:
+        return
+    names: dict[str, set[str]] = {}
+    for child in asset:
+        name = child.get("name")
+        if not name:
+            continue
+        bucket = names.setdefault(child.tag, set())
+        if name in bucket:
+            raise ValueError(f"composed MJCF still contains duplicate {child.tag} name {name!r}")
+        bucket.add(name)
+    for node in root.iter():
+        for attribute, asset_type in (
+            ("mesh", "mesh"), ("material", "material"), ("texture", "texture"),
+            ("hfield", "hfield"),
+        ):
+            name = node.get(attribute)
+            if name and name not in names.get(asset_type, set()):
+                raise ValueError(
+                    f"composed MJCF {node.tag} references missing {asset_type} {name!r}"
+                )
+
+
 def _append_section(output: ET.Element, source: ET.Element, section_name: str) -> None:
     section = source.find(section_name)
     if section is None:
@@ -607,6 +690,7 @@ def _compose_mjcf(
     semantic_to_body: dict[str, str] = {"main_table": "main_table"}
     ordered_objects: list[dict[str, str]] = []
     ordered_fixtures: list[dict[str, str]] = []
+    asset_merge_rows: list[dict[str, Any]] = []
     for declarations, role, movable in (
         (declared_objects, "object", True),
         (declared_fixtures, "fixture", False),
@@ -620,6 +704,10 @@ def _compose_mjcf(
             repository = "robosuite" if source_path.startswith("robosuite/") else "libero"
             fragment = read(repository, source_path, f"{role}:{instance}")
             _inline_source_defaults(fragment)
+            asset_merge_rows.extend(_merge_fragment_assets(
+                root, fragment, semantic_id=instance,
+                source_repository=repository, source_path=source_path,
+            ))
             body = _extract_libero_object(fragment, instance=instance, movable=movable)
             semantic_to_body[instance] = body.get("name", "")
             geom_names = []
@@ -635,7 +723,6 @@ def _compose_mjcf(
                 if name in geom_names:
                     raise ValueError(f"duplicate source geom name in {instance!r}: {name!r}")
                 geom_names.append(name)
-            _append_section(root, fragment, "asset")
             row = {
                 "semantic_id": instance,
                 "source_path": source_path,
@@ -650,12 +737,13 @@ def _compose_mjcf(
                 world = ET.SubElement(root, "worldbody")
             world.append(body)
 
+    _validate_composed_asset_names(root)
     # Stable output bytes: sorted attributes, fixed indentation and UTF-8 XML.
     ET.indent(root, space="  ")
     xml = ET.tostring(root, encoding="unicode", short_empty_elements=True) + "\n"
     digest = _sha(xml.encode("utf-8"))
     receipt = {
-        "schema_version": "libero-source-composition-mjcf-v3",
+        "schema_version": "libero-source-composition-mjcf-v4",
         "source_files": sorted(source_rows, key=lambda row: (row["repository"], row["path"], row["role"])),
         "semantic_body_map": semantic_to_body,
         "joint_instance_order": ["robot0", *[row["semantic_id"] for row in ordered_objects],
@@ -671,6 +759,12 @@ def _compose_mjcf(
                 row["semantic_id"]: row["geom_names"]
                 for row in (*ordered_objects, *ordered_fixtures)
             },
+        },
+        "asset_merge_receipt": {
+            "schema_version": "libero-source-asset-merge-v1",
+            "rule": "match pinned robosuite MujocoXML.merge_assets by (asset tag, name), retaining the first definition and preserving all source references",
+            "physics_attributes_changed": False,
+            "duplicate_definitions": asset_merge_rows,
         },
         "table_arena_transform": table_transform,
         "mounted_panda_transform": {

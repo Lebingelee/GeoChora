@@ -465,6 +465,40 @@ def test_compiled_libero_assets_use_receipt_bound_unique_vfs_aliases(monkeypatch
         env.reset(seed=19, options={"init_row_index": 0})
         receipt = env.value["source"].execution_source_receipt
         assert receipt is not None
+        composition = env.value["source"].composition
+        asset_merge = composition["asset_merge_receipt"]
+        assert composition["schema_version"] == "libero-source-composition-mjcf-v4"
+        assert asset_merge["schema_version"] == "libero-source-asset-merge-v1"
+        stove_texture_rows = [
+            row for row in asset_merge["duplicate_definitions"]
+            if row["semantic_id"] == "flat_stove_1"
+            and row["asset_type"] == "texture"
+            and row["source_name"] == "tex-stove_knob"
+        ]
+        assert len(stove_texture_rows) == 1
+        assert stove_texture_rows[0]["kept_attributes"]["file"].endswith("/metal.png")
+        assert stove_texture_rows[0]["discarded_attributes"]["file"].endswith("/button_dark_texture.png")
+        composed_root = ET.parse(os.environ["R07C_COMPOSED_MJCF"]).getroot()
+        composed_asset = composed_root.find("asset")
+        names_by_type = {}
+        for node in composed_asset:
+            if node.get("name"):
+                names_by_type.setdefault(node.tag, []).append(node.get("name"))
+        assert all(len(names) == len(set(names)) for names in names_by_type.values())
+        texture_files = {
+            node.get("name"): node.get("file") for node in composed_asset.findall("texture")
+        }
+        stove_material_textures = {
+            node.get("name"): texture_files[node.get("texture")]
+            for node in composed_asset.findall("material")
+            if node.get("name") in {
+                "stove_knob_base", "stove_knob_button",
+            }
+        }
+        assert stove_material_textures == {
+            "stove_knob_base": "upstream/libero/libero/libero/assets/articulated_objects/flat_stove/metal.png",
+            "stove_knob_button": "upstream/libero/libero/libero/assets/articulated_objects/flat_stove/metal.png",
+        }
         source_root = ET.fromstring(receipt.importer_xml)
         compiled_root = ET.fromstring(_FAKE_WORLD.last_compile_xml)
         source_files = [node.get("file") for node in source_root.iter() if node.get("file")]

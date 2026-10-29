@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -10,7 +11,10 @@ from bench_deploy.libero.evaluation import (
     ON_THRESHOLD_M, PILOT_TASK_UID, OnBowlPlateEvidenceV1,
     evaluate_on_bowl_plate_v1,
 )
-from bench_deploy.libero.assembly import build_source_composition_plan
+from bench_deploy.libero.assembly import (
+    _merge_fragment_assets, _validate_composed_asset_names,
+    build_source_composition_plan,
+)
 from task_env.environment import ContactSummary
 
 _MANIFEST_SHA = "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75"
@@ -31,6 +35,39 @@ def _on(evidence):
     return evaluate_on_bowl_plate_v1(
         evidence, expected_source_manifest_sha256=_MANIFEST_SHA
     )
+
+
+def test_composed_asset_merge_matches_pinned_first_name_wins_rule():
+    output = ET.fromstring('<mujoco><asset/></mujoco>')
+    fragment = ET.fromstring(
+        '<mujoco><asset>'
+        '<texture name="tex-stove_knob" file="metal.png" type="2d"/>'
+        '<material name="stove_knob_base" texture="tex-stove_knob"/>'
+        '<texture name="tex-stove_knob" file="button.png" type="2d"/>'
+        '<material name="stove_knob_button" texture="tex-stove_knob"/>'
+        '<mesh name="shared_mesh" file="shape.msh"/>'
+        '</asset><worldbody><body name="main">'
+        '<geom name="base" material="stove_knob_base" mesh="shared_mesh"/>'
+        '<geom name="button" material="stove_knob_button" mesh="shared_mesh"/>'
+        '</body></worldbody></mujoco>'
+    )
+    rows = _merge_fragment_assets(
+        output, fragment, semantic_id='flat_stove_1',
+        source_repository='libero', source_path='assets/articulated_objects/flat_stove.xml',
+    )
+    textures = output.find('asset').findall('texture')
+    materials = output.find('asset').findall('material')
+    assert len(textures) == 1
+    assert textures[0].get('name') == 'tex-stove_knob'
+    assert textures[0].get('file') == 'metal.png'
+    assert [item.get('texture') for item in materials] == [
+        'tex-stove_knob', 'tex-stove_knob',
+    ]
+    assert len(rows) == 1
+    assert rows[0]['resolution'] == 'upstream_first_name_match_wins_conflicting_definition'
+    assert rows[0]['kept_attributes']['file'] == 'metal.png'
+    assert rows[0]['discarded_attributes']['file'] == 'button.png'
+    _validate_composed_asset_names(output)
 
 
 def test_on_predicate_requires_contact_vertical_order_and_strict_xy_threshold():
