@@ -1,11 +1,11 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX有界native已获 `ACCEPTED_BOUNDED_F01`；F02 attempt001 已完成实现/S1/实际 USD source 检查，待 Sol 复核**。
+更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX有界native已获 `ACCEPTED_BOUNDED_F01`；F02 attempt002已修复嵌套USD闭包根目录和MuJoCo build归因，定向S1通过，待 Sol 复核**。
 本计划的后续方向仍为计划状态；F00与F02分别按独立冻结包获得实现/验证授权，F02当前候选待Sol复核，不代表其他补丁行已授权或开始。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00完整闭环已接收。Isaac 6.2.0.0隔离环境及依赖检查、实际API/资产核对均已完成；F01 attempt002的两次零物理步失败仍保留。F01 attempt003已由维护者授权进行GPU PhysX复验，并由Sol按原始运行源码副本、worker/parent receipts、资源账本、独立reader和定向S1完成复核，获`ACCEPTED_BOUNDED_F01`。F02 attempt001 已按独立冻结包完成本地候选，当前待 Sol 复核；F03 未启动。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00完整闭环已接收。Isaac 6.2.0.0隔离环境及依赖检查、实际API/资产核对均已完成；F01 attempt002的两次零物理步失败仍保留。F01 attempt003已由维护者授权进行GPU PhysX复验，并由Sol按原始运行源码副本、worker/parent receipts、资源账本、独立reader和定向S1完成复核，获`ACCEPTED_BOUNDED_F01`。F02 attempt002已按Sol返工要求修复并通过定向S1，当前待Sol复核；F03未启动。
 
 未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。此偏好不代表Core Isaac provider已接通。
 
@@ -249,7 +249,7 @@ Sol复核重新校验attempt003 42项SHA清单和attempt002 53项原件清单；
 
 <a id="f02-attempt001-usd-delivery-and-representation-resolution"></a>
 
-## F02 attempt001 USD delivery 与表示选择（2026-10-29，待 Sol 复核）
+## F02 attempt001 USD delivery 与表示选择（2026-10-29，历史候选；Sol要求返工）
 
 输入为 `develop-full` HEAD `1632a11774d817f2ebe36198bbc40a74e7f36974`，冻结包及460项保护路径通过readback；代码提交依次为 `9acd7a8c08cb150221dd53a70abc8e7ac2595bef`、`c12578deba177a07fc2f2869850a4d31a5ef0cd2`、`99dc62a6efe296f42dcddfad6f9aaa114c91361a`。核心出口是严格版本化USD delivery/report/representation合同、同一Assembly owner的受控bytes loader与provider resolver、catalog独立`asset_deliveries`消费字段及CLI。旧 `AssetDefinition` / `TaskSceneSource` 身份不变；旧mock box检查和编译器不会把USD误作box。
 
@@ -258,3 +258,17 @@ Sol复核重新校验attempt003 42项SHA清单和attempt002 53项原件清单；
 MuJoCo精确安装为Python/native 3.8.1/API 3008001，library SHA-256 `8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592`。一次锁保护的微型USD decoder probe在compile前由实际build拒绝：`could not decode content` / 找不到decoder，未创建`MjData`、未forward/step/render；resolver因此拒绝MuJoCo native USD，不回退MJCF，也没有通用转换器。probe supervisor曾因把worker stdout最后一行warning误作JSON而记为`PROBE_FAILED`，其原件保留；posthoc重读首条worker JSON确认实际结果为`PASS_PROBE_REJECTED_USD`。官方3.8.1文档说明decoder由build选项启用且CMake默认关闭，完整版本/API/路线调研见F02包内`evidence/provider_representation_decision.md`。
 
 S1迭代期间的launcher未启动、strict test失败及初次GeoPhys重放因缺`pxr`路径失败均保留；修正后的独立reader和GeoPhys probe分别在新run中通过。最终GeoPhys probe峰值RSS为134,708 KiB（约132 MiB）；独立reader及S1均远低于3 GiB单次限额。没有安装/升级依赖、下载官方资产、启动Isaac App、运行GPU/native physics、H5或Expert；官方Panda真实bytes及上游validated report仍未交付。Isaac 6.2.0只能在本resolver中选择原生USD表示，runtime仍`not admitted`。完整命令、运行账本、原始失败、readback和hash见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_001/`。状态为`F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW`，不是Sol接收；F03及其他slice未启动。
+
+<a id="f02-attempt002-bounded-delivery-resolver-repair"></a>
+
+## F02 attempt002 delivery/resolver 返工（2026-10-29，待 Sol 复核）
+
+输入为`develop-full` HEAD `469a6f9feef514dc7e4bbf0cc775747e37357be7`；冻结prompt SHA-256为`ac14740d501321521420ddb0f1b80bdc425fbf6b534547f8f4f3fd98443493ff`。Sol的attempt001复核提出两项定向修复；原attempt001的180项输出清单、460项保护路径及MuJoCo 3.8.1 decoder probe均复用并在本次收尾再次核对，没有更改原件。
+
+R1在Core inspector中将临时snapshot root与entry layer路径分开。新增已保存的`nested/deep/entry.usda`样例，其variant/reference与sublayer使用`../../sibling/...`指向交付根内的真实sibling层，纹理、reference、payload和两个variant分支均由OpenUSD解析；Core loader、provider resolver、实际catalog builder和独立reader都通过该manifest。另一个同样嵌套的fixture加入指向snapshot外绝对路径的有效USD sublayer，Core和独立reader均拒绝。既有18类tamper、重定位、依赖更改/stale检查保持在合并S1内通过。
+
+R2只把`native USD decoder is not enabled`归因于实际核验的完整身份`mujoco-3.8.1-libsha256-8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592`。同版本其他library hash和假设中的USD-enabled身份均以“build/decoder未核实”拒绝；所有resolver结果仍`runtime_admitted=false`。Isaac/GeoPhys的选择只表示source格式可准备，不证明任意调用方build的runtime兼容。
+
+Core实现提交为`0acadcd158850f49f92c3172af24548629ae9dc5`；更深入口回归提交为`f5e35e3b43ec90cf02e6665dd2d57463dcff2bb7`。干净提交树上的F02 26项及legacy资产身份/闭包19项合计45/45通过；最终`nested/deep/entry.usda`正反例单独运行也通过。此前一次合并集失败来自测试断言读取了`to_mapping()`中不存在的`identity_hash`，下一次运行在dirty checkout触发catalog既有provenance守卫；两次原件均保留，随后在实现提交的clean checkout修正断言并重跑全套通过。保护输入652/652匹配，attempt001的180项输出manifest也复核匹配。文档及Skill收尾提交、输出HEAD和最终hash见本attempt报告及`sha256.manifest`：`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_002/`。
+
+没有官方Panda真实bytes或upstream-validated report；该限制保持披露但不是本次门槛。未启动Isaac/Kit、solver/materializer、decoder/native compile、physics、H5或Expert，也没有依赖修改/下载。结果为`F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW`，不是Sol接收；F03和其他slice未启动。

@@ -167,7 +167,9 @@ explicit variants, file size/SHA-256 manifest, the `usd-authored-all-dependencie
 and the exact validation-report bytes. OpenUSD `UsdUtils.ComputeAllDependencies` checks layers and
 asset-valued dependencies across authored variant branches. The loader rejects unsupported USDZ,
 remote/custom resolver paths, symlinks, traversal, missing dependencies, stale bytes and report/link
-mismatches. `source_verified`, representation preparation, format match and `runtime_admitted` are
+mismatches. The entry may be nested below the delivery root; authored `../` dependencies are accepted
+when they resolve to files inside that root, while actual snapshot-root escapes are rejected.
+`source_verified`, representation preparation, format match and `runtime_admitted` are
 separate facts. A synthetic fixture requires the explicit test-only `allow_synthetic=True`; it cannot
 pass the production upstream-validated gate. Report binding checks its declared provenance and exact
 bytes but does not cryptographically authenticate an issuing organization.
@@ -178,15 +180,17 @@ in the separate `asset_deliveries` namespace and are not converted to the legacy
 mock box template. The CLI `python -m task_env.assembly.usd_delivery_cli` returns exit 0 for inspection,
 1 for a rejected input and 2 for an output-report write failure.
 
-The bounded F02 attempt001 implementation passed 24 targeted provider-free tests and 19 legacy asset
-identity tests. Its saved six-file synthetic fixture composed through OpenUSD and the GeoPhys public
-`SceneSource.usd_path` importer; the independent process re-read the exact manifest, report and bytes,
-including five dependency layers and one external asset. GeoPhys remains source import only here;
-this is not a physics/runtime result. Isaac 6.2.0 selects native USD as a representation but is not
-runtime-admitted. The inspected MuJoCo 3.8.1 build rejected the USD decoder route, so it is explicitly
-not selected; no silent MJCF fallback or general USD-to-MJCF converter is provided. No real official
-Panda delivery or upstream validation report was available, and F03/F04/F05 and Qualification remain
-unverified. The attempt is pending Sol review; see the [Phase II-01 F02 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution).
+F02 attempt001 passed 24 targeted provider-free tests and 19 legacy asset identity tests. Attempt002
+adds nested-entry and in-root sibling-dependency coverage, including a saved delivery read by a separate
+process, and retains the 18 tamper rejections. The combined F02/legacy set now passes 45 tests. GeoPhys
+remains source import only here; this is not a physics/runtime result. Isaac and GeoPhys selections mean
+only that the source format is preparable, not that an arbitrary caller-supplied build is runtime
+compatible. The exact inspected MuJoCo 3.8.1 library build rejects native USD; other MuJoCo build
+identities are rejected as unverified rather than being attributed that probe result. Every selection
+keeps `runtime_admitted=false`; there is no silent MJCF fallback or general USD-to-MJCF converter. No
+real official Panda delivery or upstream validation report was available, and F03/F04/F05 and
+Qualification remain unverified. F02 attempt002 is pending Sol review; see the [attempt001 history](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution)
+and [attempt002 repair record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt002-bounded-delivery-resolver-repair).
 
 ### Static Logical Assembly value (R01a)
 

@@ -44,7 +44,12 @@ delivery mapping, and report hashes distinct. Synthetic fixtures require an
 explicit test opt-in and never establish upstream verification. The resolver
 separates format matching, verified-source status, representation preparation,
 and runtime admission. It does not connect USD to MJCF-only `RuntimeSource` or
-admit Isaac, GeoPhys, or MuJoCo execution. See the [F02 public API route](../../../docs/module/task_env/public-api.md#usd-delivery-and-provider-representation-selection-f02)
+admit Isaac, GeoPhys, or MuJoCo execution. Entry layers may be nested below the
+delivery root, and authored `../` arcs are valid only when every resolved file
+stays inside that root. The inspected MuJoCo 3.8.1 decoder rejection is bound to
+its exact library hash; other MuJoCo build identities remain unverified. Isaac
+and GeoPhys selection indicates source representation preparation only, not
+runtime compatibility for an arbitrary build. See the [F02 public API route](../../../docs/module/task_env/public-api.md#usd-delivery-and-provider-representation-selection-f02)
 and the detailed [source map](references/routes.md).
 
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
