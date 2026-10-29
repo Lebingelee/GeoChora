@@ -253,47 +253,53 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
     option_choice = resolve_provider_representation(loaded, provider="isaacsim", provider_build_identity=builds["isaacsim"], options={"load_payloads": False})
     assert option_choice.options_sha256 != choices["isaacsim"]["options_sha256"]
 
-    from task_env.script.agent.catalog_query import build_catalog
-    from task_env.script.agent.asset_check import check_assets
-
     repo = Path(__file__).resolve().parents[3]
-    catalog = build_catalog(
-        repo,
-        providers=("geophys", "mujoco"),
-        asset_deliveries=[manifest],
-        asset_provider_build_identities=builds,
-        allow_synthetic_asset_deliveries=True,
-    )
-    assert len(catalog["asset_deliveries"]) == 1
-    assert "f02-synthetic-usd-asset" not in catalog.get("external_assets", {})
-    assert catalog["asset_deliveries"][0]["runtime_admitted"] is False
-    assert set(catalog["asset_deliveries"][0]["provider_selections"]) == set(builds)
-    spec = SimpleNamespace(
-        object_config={"object_uid": "f02-synthetic-usd-asset"},
-        scene_config={"fixtures": []},
-        required_capabilities=(),
-        spec_sha256=lambda: "f" * 64,
-    )
-    report = check_assets(spec, catalog)
-    assert report.status == "fail"
-    assert any(finding.code == "asset_missing" for finding in report.findings)
-    from task_env.script.agent.harness_compiler import CompilationRejected, compile_candidate
-    from task_env.script.agent.harness_spec_schema import CandidateSpec
+    agent_dir = repo / "task_env" / "script" / "agent"
+    sys.path.insert(0, str(agent_dir))
+    try:
+        # The CLI runs with its own directory on sys.path for its legacy sibling imports.
+        from catalog_query import build_catalog
+        from asset_check import check_assets
 
-    candidate = CandidateSpec(
-        schema_version="harness-candidate-spec-v0",
-        task_id="suite/f02-v1",
-        template="pick-lift-v0",
-        scene_config={"table_top_z": 0.462, "table_center_xy": [0.5545, 0.0], "table_half_size": [0.28, 0.20, 0.01]},
-        object_config={"object_uid": "f02-synthetic-usd-asset", "initial_pos_xy": [0.5545, 0.0], "reset_half_extent_m": 0.06, "reset_z_fixed": True},
-        success_config={"lift_height_m": 0.10, "reach_distance_m": 0.09, "gripper_closed_opening_m": 0.045},
-        timebase_config={"physics_dt": 0.002, "control_substeps": 5},
-        required_capabilities=catalog["template_details"]["pick-lift-v0"]["spec_template"]["required_capabilities"],
-        horizon=6000,
-    )
-    with pytest.raises(CompilationRejected) as rejected:
-        compile_candidate(candidate, catalog, provider="mujoco")
-    assert any(finding.code == "asset_missing" for finding in rejected.value.report.findings)
+        catalog = build_catalog(
+            repo,
+            providers=("geophys", "mujoco"),
+            asset_deliveries=[manifest],
+            asset_provider_build_identities=builds,
+            allow_synthetic_asset_deliveries=True,
+        )
+        assert len(catalog["asset_deliveries"]) == 1
+        assert "f02-synthetic-usd-asset" not in catalog.get("external_assets", {})
+        assert catalog["asset_deliveries"][0]["runtime_admitted"] is False
+        assert set(catalog["asset_deliveries"][0]["provider_selections"]) == set(builds)
+        spec = SimpleNamespace(
+            object_config={"object_uid": "f02-synthetic-usd-asset"},
+            scene_config={"fixtures": []},
+            required_capabilities=(),
+            spec_sha256=lambda: "f" * 64,
+        )
+        report = check_assets(spec, catalog)
+        assert report.status == "fail"
+        assert any(finding.code == "asset_missing" for finding in report.findings)
+        from harness_compiler import CompilationRejected, compile_candidate
+        from harness_spec_schema import CandidateSpec
+
+        candidate = CandidateSpec(
+            schema_version="harness-candidate-spec-v0",
+            task_id="suite/f02-v1",
+            template="pick-lift-v0",
+            scene_config={"table_top_z": 0.462, "table_center_xy": [0.5545, 0.0], "table_half_size": [0.28, 0.20, 0.01]},
+            object_config={"object_uid": "f02-synthetic-usd-asset", "initial_pos_xy": [0.5545, 0.0], "reset_half_extent_m": 0.06, "reset_z_fixed": True},
+            success_config={"lift_height_m": 0.10, "reach_distance_m": 0.09, "gripper_closed_opening_m": 0.045},
+            timebase_config={"physics_dt": 0.002, "control_substeps": 5},
+            required_capabilities=catalog["template_details"]["pick-lift-v0"]["spec_template"]["required_capabilities"],
+            horizon=6000,
+        )
+        with pytest.raises(CompilationRejected) as rejected:
+            compile_candidate(candidate, catalog, provider="mujoco")
+        assert any(finding.code == "asset_missing" for finding in rejected.value.report.findings)
+    finally:
+        sys.path.remove(str(agent_dir))
 
 
 @pytest.mark.parametrize(
