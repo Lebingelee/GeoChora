@@ -499,6 +499,7 @@ def _run_case(case, output_dir: Path, counters: dict, active: dict,
             },
             'warning_counts': list(warnings),
             'native_counts': {
+                'episode_id': case['episode_id'],
                 **case_counts,
                 'outer_intervals_total': case_counts['outer_intervals'],
                 'mj_step_calls_case': final_diagnostics['native_step_count'],

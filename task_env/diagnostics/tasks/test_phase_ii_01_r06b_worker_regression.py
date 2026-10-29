@@ -244,6 +244,7 @@ def test_real_run_worker_two_cases_with_synthetic_model_io_and_restored_hooks(mo
     assert result['counters']['outer_intervals'] == 128
     assert result['counters']['attempted_mj_step_calls'] == result['counters']['mj_step_calls'] == 640
     assert result['counters']['mj_forward_calls'] == 130
+    assert [case['native_counts']['episode_id'] for case in result['cases']] == ['E1', 'E2']
     assert materializations['value'] == 2
     assert engine.mj_step is originals['step']
     assert engine.mj_forward is originals['forward']
