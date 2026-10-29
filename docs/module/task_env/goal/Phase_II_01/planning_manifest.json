@@ -1798,11 +1798,11 @@
       "depends_on": [
         "R05a"
       ],
-      "status": "BOUNDED_S1_S2_PASS_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT001_FOCUSED_S1_AND_CPU_CUDA_S2_PASS; TWO_BROADER_SOURCE_CONFIG_DIGEST_FAILURES_PRESERVED",
+      "status": "CHANGES_REQUIRED_R05B",
+      "execution": "ATTEMPT001_BOUNDED_NATIVE_FACTS_REVIEWED_IMPLEMENTATION_REWORK_REQUIRED",
       "required_evidence": "S1/S2",
-      "stop_condition": "Bounded normal-profile S1/S2 complete; Sol review required before R05c. Preserve two unresolved broader construction-summary digest failures; no Qualification/P99.",
-      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-sol-acceptance-20261029",
+      "stop_condition": "F1 default reset, F2 trusted source admission, F3 wide integer IDs and F4 connected S1 must close before R05b acceptance/R05c.",
+      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair",
       "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
       "provider_branch": "codex/phase-ii-01-r05-provider",
       "implementation_commits": [
@@ -1863,7 +1863,24 @@
       },
       "native_starts_total": 3,
       "shared_lock_released": true,
-      "sol_review": "PENDING",
+      "sol_review": {
+        "date": "2026-10-29",
+        "decision": "CHANGES_REQUIRED_R05B",
+        "input_head": "175c3326568be4afca9f1fb83717460bb16264d1",
+        "manifest_matches": 70,
+        "protected_matches": 44,
+        "independent_raw_H5_reads": 2,
+        "new_native_by_sol": 0,
+        "findings": [
+          "F1 legacy public reset missing _native_feedback_profile",
+          "F2 modified asset re-receipted and admitted",
+          "F3 2**32 actuator ID truncated to slot0",
+          "F4 missing connected worker/finalizer/reader S1"
+        ],
+        "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05b_001/",
+        "next_attempt": "002",
+        "R05c_authorized": false
+      },
       "qualification_granted": false,
       "task_success_claimed": false
     },
@@ -2372,9 +2389,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "0a841f46479006eccb381fa33d4caf89c00f94819906c75325450ef8ca812b0a",
+    "05_R05_Native_Rate_Feedback.md": "3347099c2e5089af3b099c1dfc98e17ee2469999ace82974284ff56c0761fc4c",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "851ed076ad645ed51ad63de9e32da1125441a8f20c5317ba2efefa4322d68a5e"
+    "07_Execution_Order_and_Acceptance.md": "97b8890c91059cec3b69bfc2754662968b0c332bd351d1252cc318f4f52a6a6f"
   },
   "revision_kind": "R05B_ATTEMPT001_BOUNDED_IMPLEMENTATION_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -4961,6 +4978,19 @@
       "sol_review": "PENDING",
       "R05c_started": false,
       "DAG_P99_required_envelope_changed": false,
+      "qualification_granted": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "SOL_R05B001_CHANGES_REQUIRED",
+      "input_head": "175c3326568be4afca9f1fb83717460bb16264d1",
+      "findings": [
+        "F1",
+        "F2",
+        "F3",
+        "F4"
+      ],
+      "next_attempt": "R05b002",
       "qualification_granted": false
     }
   ],

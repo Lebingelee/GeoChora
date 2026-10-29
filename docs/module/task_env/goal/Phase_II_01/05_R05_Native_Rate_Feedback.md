@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态（2026-10-29）：R05a attempt001 已获 Sol 接收 `ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN`。R05b attempt001 已完成 Provider setter、Core normal-profile admission、定向 S1 和 CPU/CUDA 有界 S2，当前为 `R05B_BOUNDED_PUBLIC_NATIVE_FEEDBACK_S1_S2_PASS_PENDING_SOL_REVIEW`；两个较宽历史 construction-summary digest 断言仍未解决，详见下方执行记录。R05c未启动；旧C05c四格继续保留诊断身份。
+状态（2026-10-29）：R05a已接收；R05b attempt001经Sol复核为 `CHANGES_REQUIRED_R05B`，有界CPU/CUDA短S2事实接收，但默认reset、可信source闭包准入、Core ID溢出及真实接线S1四项阻塞未关闭。下一包attempt002，不进入R05c。
 
 ## 现有能力与 owner
 
@@ -122,3 +122,20 @@ Core 使用版本化 `ExecutionSourceReceiptV1` 固定 canonical XML 与 Importe
 CPU 与 CUDA 各有一个最终freeze下的fresh GeoPhys native worker。每轮均为 seed19、law500Hz、一次reset、2 outer/10 native、3 boundaries，完成 close；production semantic reader 与不导入 `task_env` 的独立 raw H5 reader 均通过，sample sequence 为3–12。CPU H5为46,064 bytes（`d993504e…`），进程组RSS采样最大1,089,560,576 bytes；CUDA H5为46,660 bytes（`7474ad56…`），RSS采样最大1,191,022,592 bytes、worker GPU采样最大207,618,048 bytes。共享排他锁在每个worker进程组完整退出后释放，离线 reader 在锁释放后运行。首轮 CPU `cpu_run_001` 因 resolved-configuration 少 `gripper_control_hz` 而失败并完整保留；修复后最终两轮均从同一实现/provider pin 新启动，失败H5不拼入通过结果。
 
 两个outer interval不满足Guard dwell，也没有Expert/task completion。完整CPU/CUDA × 100/500Hz任务campaign仍属于R05c；历史 missing raw/phase处置仍为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。本结果不代表P99、通用 Provider capability 或 Formal Qualification。原始报告、Evidence、命令/资源收据和run原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_001/`；Sol复核前不派发下一slice。
+
+<a id="r05b-attempt002-review-repair"></a>
+
+## R05b attempt001 Sol复核与attempt002修复（2026-10-29）
+
+Sol核对Core `175c332`、Provider `c6df840`：70项输出hash、44项保护证据匹配，两份最终原H5由独立raw reader复读通过，各2/3与10samples。零新native。整体 **CHANGES_REQUIRED_R05B**；不把短S2的执行事实当作正常路线整体验收。
+
+| 阻塞 | 原owner与精确修复 | 必需回归 |
+| --- | --- | --- |
+| F1 默认公开reset AttributeError | `SelectedReferenceEnv.__init__`所有分支初始化normal profile默认值；检查reset/重建/close全部生命周期 | 真实默认PickCube与NutAssembly public reset/step链，native IO doubles；禁止只测新factory构造 |
+| F2 闭包只自洽，变更资产重新生成receipt仍准入 | `sessions/api.py`正常profile与source/provenance owner以可信常量/manifest核对完整依赖闭包、canonical→importer转换及语义mapping；控制owner绑定实际Controller/law/config | 保留canonical XML但修改mesh bytes且重算receipt必须拒绝；不同Importer XML、source config/semantic maps、错Controller/law逐项拒绝。不能仅测snapshot事后篡改 |
+| F3 Core ID先int32截断 | `boundary.set_actuator_force_limits`原始宽度校验后才转换；保留Provider public setter | `[2**32]`不得变slot0，覆盖大unsigned、负/混合bool/重复/越界，失败零调用/零缓存变化 |
+| F4 原定接线S1未完成 | 复用既有worker/supervisor/finalizer/Recorder/reader，IO doubles下跑真实成功及错误收尾路径 | public构造→reset→step→sample/反馈/Target/Ack→H5→raw reader→close成功；错phase/stale/clock/source/缺H5/篡改/close/receipt-budget失败各有检测 |
+
+两个历史config摘要失败与本次故障分开：同路径/依赖下b5b75dd旧NutAssembly构造函数与新函数输出config digest相同，PickCube owner未改；没有完整旧环境回放，不称全部历史回归通过。attempt002提供字段级对照与来源定位，保留旧baseline/hash及日志，不通过更新旧hash消除告警。
+
+复核及无引擎反例在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05b_001/`。attempt002复用camera/Provider分支，优先保持c6df840 Provider；90–150分钟预计、180分钟主动窗口，允许范围内多轮修复/测试/native。先完整S1再fresh CPU/CUDA最小S2；沿用001每run资源/物理边界、共享锁、独立新输出/失败保留。不运行R05c全任务。develop暂不集成未接收R05b，F线不改。
