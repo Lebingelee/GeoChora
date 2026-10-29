@@ -2047,12 +2047,36 @@
       "depends_on": [
         "R05b"
       ],
-      "status": "READY_FOR_MAINTAINER_DISPATCH",
-      "execution": "ATTEMPT001_PACKAGE_PREPARED_NOT_STARTED",
+      "status": "R05C_BOUNDED_NORMAL_PROFILE_FOUR_CELL_S2_S3_PASS_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_FOUR_CELL_S2_S3_PASS_PENDING_SOL_REVIEW",
       "required_evidence": "Four separate normal-profile full task/strict Expert/Outcome/Guard and same-run H5 production+independent raw readers; CPU/CUDA x100/500Hz law",
       "stop_condition": "任一required cell失败/未运行→P99 blocked",
       "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05c-attempt001-implementation-plan",
-      "prompt_sender": "MAINTAINER_ONLY"
+      "prompt_sender": "MAINTAINER_ONLY",
+      "result": "Four independent normal-profile full episodes passed CPU/CUDA × gripper law 100/500 Hz; each has task success, strict Expert completion, close success, production H5 and independent raw-reader PASS. No P99, general Provider qualification, historical missing-raw disposition, or Qualification claim.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05c_001/report.md",
+      "latest_attempt": {
+        "attempt": "001",
+        "input_commit": "fa21b4480f9af5ecfa1f5e0dd44b4d1e176c9380",
+        "implementation_commit": "17d63889573412d0b94191d32c499fe3f1fda80a",
+        "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
+        "menagerie_commit": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+        "focused_s1": "25 passed in 9.09s; engine import tripwire 0",
+        "cells": {
+          "cpu_100": "PASS run_003",
+          "cpu_500": "PASS run_001",
+          "cuda_100": "PASS run_001",
+          "cuda_500": "PASS run_001"
+        },
+        "native_starts": 4,
+        "failed_or_partial_runs_preserved": [
+          "cpu-100/run_001 (pre-native setup failure)",
+          "cpu-100/run_002 (supervisor identity-map failure after task/H5 completion)"
+        ],
+        "sol_review": "PENDING",
+        "p99_closed": false,
+        "qualification_granted": false
+      }
     },
     {
       "id": "R06b",
@@ -2540,7 +2564,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "3cc47ec6366c4acbd31f154616ded3d9ee719b601017013a3dbd01c042e3794b",
+    "README.md": "a11efd745742d6defb37ee43961f1762896d474e30de81ec277bce84912dd09d",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2549,9 +2573,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "ac284b8249edf9ada9fdeec7e59ed0f8c430b50b520aa7b99a5a51020f8b5108",
+    "05_R05_Native_Rate_Feedback.md": "cbcc51862083ec05c2133dcd569b29dd6b62ea8cb05f54ba22fdd3aa7b53e0a9",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "1cd8713c687c21db4a22137b2f47c494d8dd79b3c308729081c551f48edca94c"
+    "07_Execution_Order_and_Acceptance.md": "88c5d052dc06714e7cce50566f1ae83de8c5dc1c3020845686adbfc2ec139047"
   },
   "revision_kind": "R05B_ATTEMPT002_BOUNDED_REPAIR_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -4235,7 +4259,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "R05b attempt002 F1–F4 repair, 19-case focused provider-free S1, bounded CPU/CUDA 500 Hz normal-profile S2, documentation and TaskEnv Skill refresh; pending Sol review. Historical broader source.config digest failures remain unresolved; R05c/P99/Qualification not claimed.",
+  "planning_submission_this_revision": "R05c attempt001 normal-profile four-cell full task/H5 S2/S3 evidence and focused S1; pending Sol review. Historical missing raw/phase disposition, P99 and Qualification remain open.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",

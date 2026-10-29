@@ -1020,5 +1020,10 @@ and reader lifecycle, not physics. The bounded native runs do not establish
 task/Expert completion, Guard dwell, native 100 Hz law, the full CPU/CUDA ×
 100/500 Hz campaign, real-time or device-resident control, general Provider
 support, P99, or Formal Qualification. Historical missing raw/phase
-disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`; R05c remains
-unstarted. See the [R05 attempt002 record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29).
+disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`. At the time of the
+R05b review R05c had not started; R05c attempt001 has since completed its four
+normal-profile cells and is pending Sol review. See the [R05 attempt002 record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29).
+
+## R05 normal native feedback evidence boundary
+
+The exact NutAssembly normal-profile route has bounded R05b short S2 and R05c full-task four-cell S2/S3 evidence for GeoPhys `c6df840`, CPU/CUDA, gripper law 100/500 Hz, and the pinned source closure. R05c is pending Sol review until recorded otherwise. These receipts do not establish general Provider support, P99, real-time 2 ms behavior, or Formal Qualification. Use the [TaskEnv routes](references/routes.md) and [R05 execution record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md) for exact boundaries.

@@ -1,8 +1,8 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前复核结论（2026-10-29）：R05b attempt002已获Sol接收 `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2`，F1–F4关闭；19项focused S1经Sol复跑通过，CPU/CUDA各两outer短S2原件独立读回通过。下一项R05c未启动，完整任务/四格/P99未关闭；见[R05接收](05_R05_Native_Rate_Feedback.md#r05b-attempt002-sol-acceptance)。后续工作包prompt由维护者自行发送，Sol不直接派发。
+当前复核结论（2026-10-29）：R05b attempt002已获Sol接收 `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2`，F1–F4关闭；19项focused S1经Sol复跑通过，CPU/CUDA各两outer短S2原件独立读回通过。R05c attempt001四格已完成、待Sol复核，P99未关闭；见[R05接收](05_R05_Native_Rate_Feedback.md#r05b-attempt002-sol-acceptance)。后续工作包prompt由维护者自行发送，Sol不直接派发。
 
-当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c 尚未启动。Luna1 独立负责 F00–F07。**
+当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c attempt001四格完成并待Sol复核。Luna1 独立负责 F00–F07。**
 
 跨分支汇总已有 **16/22 slices 获 Sol 有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a/b、R06a/b。接收等级各异：静态 S1、Audit、真实 S2/S3 不能互换，R06a 审计接收也不关闭历史 compatibility decision gate。
 尚有六个未完成的行：R05c、R06c、R07a/b/c/d。R07a 已有部分协议/来源审计接收及一项 pilot 的来源处置，但原五任务完整出口未达到，不计入 16 项。
@@ -101,7 +101,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | ACCEPTED_BOUNDED_S2；GeoPhys a53 CPU × MuJoCo3.8.1 EGL、两轮24step/53capture；见 [R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28) |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | `ACCEPTED_BOUNDED_S3`；GeoPhys a53 CPU × MuJoCo 3.8.1 EGL，双同Env H5各12/13、双reader与22项native派生篡改拒绝；见 [R04c attempt001](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-camera-h5-s3) |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2；attempt002 F1–F4关闭，19项S1复跑及CPU/CUDA短S2接收；不含完整任务 |
-| 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | PLANNED / NOT_STARTED |
+| 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | ATTEMPT001 FOUR CELLS PASS PENDING SOL REVIEW; 25 S1 passed |
 | 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；历史missing raw处置仍BLOCKED，R06c/P99不关闭。 |
 | 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | PLANNED / NOT_STARTED |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PARTIAL_AUDIT_ACCEPTED；一项 pilot 来源审计有界接收，原五任务出口未完成；详见09及主分支 Sol R07a004记录 |

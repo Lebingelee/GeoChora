@@ -193,3 +193,22 @@ Sol独立核对209项输出、81项保护hash、69项可信闭包中的67个实�
 与F线共用native排他锁，worker全生命周期持锁，退出确认后释放，离线reader不持锁。启动前available RAM>=5GiB、CUDA free>=2GiB且无其他compute worker；worker显存采样cap=min(7GiB,total-other-used-512MiB)，记录实际值。每run新目录；窗口内修复与重跑允许，不设默认一次启动额度。变更后先受影响S1再freeze实现；四格最终接收实现必须一致或有逐文件无影响审计，改变共享执行/控制/物理/reader合同必须重跑受影响格。
 
 Provider/source/task算法/pins默认保持；发现真实physics/Controller/Guard/限值/source变化必要性时，不自改冻结oracle，交Sol具体外部决定。两项旧config摘要差异仅保留已知限定，不改baseline/hash，不让它取代本轮正式格验收。R06c、R07、F线、P99与Qualification不在本包执行范围。新worker/reader/test与必要状态文档/Skill可提交本地；不merge/push/tag，不向其他Luna发消息。
+
+## R05c attempt001 执行结果（2026-10-29）
+
+状态 `R05C_BOUNDED_NORMAL_PROFILE_FOUR_CELL_S2_S3_PASS_PENDING_SOL_REVIEW`。实现与四格执行在同一 Core `17d63889573412d0b94191d32c499fe3f1fda80a`、GeoPhys `c6df840bef8d36b1150150167df08e29dc3f664c`、Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7` 下完成；输入 Core HEAD 为 `fa21b4480f9af5ecfa1f5e0dd44b4d1e176c9380`，分支 `codex/phase-ii-01-camera`。实现分类为 `COMPOSE_EXISTING`，测试与reader扩展为 `EXTEND_EXISTING`。没有修改Provider或pins，也没有改动主checkout/Isaac/F线。
+
+正式路线扩展现有C05c worker/supervisor、R05b normal constructor/solution、Recorder与reader owner；默认R05b两步模式保持不变。Normal profile经真实Core admission和Provider CPU/CUDA materialization执行完整NutAssembly episode；每格只有一次reset，source closure为69文件，seed19/NA-S0、R3 Controller、10 N、implicitfast、2 ms×5、outer 100 Hz、physics/force/Guard 500 Hz、无render。law100每outer更新一次并hold四个native substep，law500每substep更新。生产语义reader与独立raw H5 reader分别核对同run关闭文件，raw reader不导入TaskEnv。
+
+| 独立cell | transitions / native samples / boundaries | gripper update / hold | H5 bytes / SHA-256 | worker wall / RSS最大采样 | 结果 |
+| --- | ---: | ---: | --- | --- | --- |
+| CPU-100 (`run_003`) | 2443 / 12215 / 2444 | 2443 / 9772 | 21,084,400 / `fea91f61de5140271f03fcb811da22308b78a2e32da1e10d3b76d9339b0aa86c` | 260.97 s / 2,132,557,824 B | worker、close、生产reader、raw reader均通过 |
+| CPU-500 (`run_001`) | 2442 / 12210 / 2443 | 12210 / 0 | 21,001,465 / `535393cbbd9b101a179d5fcae287fa2272f6ddc87ef1794f959e6884947800e1` | 277.37 s / 2,150,445,056 B | 同上 |
+| CUDA-100 (`run_001`) | 2443 / 12215 / 2444 | 2443 / 9772 | 21,123,423 / `f5507824ffa2c3629f09fd83b5f388b6420f7b5d50e90cf2d5e1be8113115c70` | 179.02 s / 1,876,119,552 B | 同上 |
+| CUDA-500 (`run_001`) | 2442 / 12210 / 2443 | 12210 / 0 | 21,033,024 / `6068d768241780084a734fa9e2ac1854ef9b87913ce42fb73048102c8127898c` | 175.32 s / 1,867,341,824 B | 同上 |
+
+四格均为worker exit 0、native start 1、`task_success=true`、`strict_expert_complete=true`、stop reason `nutassembly-external-expert-complete`、close成功；supervisor状态passed，正式source receipt、reset/sample/sequence/时钟、Controller/Target/Ack/Guard与H5身份均由生产与独立reader闭环。每个raw reader均PASS并报告69个closure文件和完整T/T+1边界。CUDA worker最大显存采样236,978,176 B；CUDA free最低采样分别为6,571,425,792 B与6,852,444,160 B。CPU-100/CPU-500运行期间MemAvailable最低采样分别4,800,274,432 B与4,904,701,952 B，CUDA两格分别5,092,503,552 B与5,551,591,424 B。RSS/GPU/系统内存均为周期采样，不是interval内硬峰值；每run总输出均约23.4 MB，均低于预算。共享排他锁覆盖worker进程组退出，之后才释放给离线reader；结束时未发现残留worker或锁持有者。
+
+最终focused S1为 `25 passed in 9.09s`，采样最大RSS 149,300 KiB，engine import tripwire为0行；包含既有C05c、R05b回归与新增full-campaign worker/supervisor/reader正负例。每格结束后独立raw reader均PASS。首个CPU-100 `run_002`在任务完成并写出生产H5后，因supervisor字段名映射错误而未进入正式reader/finalizer通过门；它作为不通过部分证据原样保留，不并入四个正式cell。最初CPU-100 `run_001`在native前的目录预创建约定处失败、native starts为0，同样保留。修复后重新运行CPU-100 `run_003`，其余三格均与最终实现一致。完整报告、Evidence、命令、失败与成功原件及hash位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05c_001/`。
+
+本结果仅为精确NutAssembly normal profile、GeoPhys c6df840、CPU/CUDA与law 100/500 Hz四格的有界S2/S3执行证据，待Sol复核；不是P99、通用Provider capability、实时/2 ms保证或Formal Qualification。历史missing raw/phase处置仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，不在本包关闭。两项旧`source.config`摘要断言限定保持未解决；没有改写其基线，也没有声称全历史回归通过。
