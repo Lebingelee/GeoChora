@@ -23,7 +23,10 @@ def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def run(backend: str, output_dir: Path):
+def run(backend: str, output_dir: Path, *, gripper_hz: int = 500, full_episode: bool = False):
+    if full_episode:
+        from task_env.diagnostics.tasks.c05c_geophys_gripper_cadence import run_group
+        return run_group(backend, gripper_hz, output_dir, profile='normal')
     output_dir.mkdir(parents=True, exist_ok=False)
     result_path = output_dir / 'result.json'
     h5_path = output_dir / 'r05b-two-interval.h5'
@@ -165,8 +168,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--backend', choices=('cpu', 'cuda'), required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
+    parser.add_argument('--gripper-hz', type=int, choices=(100, 500), default=500)
+    parser.add_argument('--full-episode', action='store_true')
     args = parser.parse_args()
-    result = run(args.backend, args.output_dir)
+    result = run(args.backend, args.output_dir, gripper_hz=args.gripper_hz,
+                 full_episode=args.full_episode)
     if result['status'] != 'passed' or result.get('close_success') is not True:
         raise SystemExit(2)
 

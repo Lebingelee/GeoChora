@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -144,7 +145,56 @@ def _worker_resources_pass(*, backend, child_return, resource_limit_reason,
     )
 
 
-def run(backend: str, run_root: Path, python: Path):
+def check(backend: str, cell: str, python: Path, output_path: Path):
+    """Provider-free launch gate; it never starts the worker or materializes physics."""
+    if not LOCK_PATH.is_file() or not python.is_file():
+        raise RuntimeError('shared lock or selected Python executable is missing')
+    lock_fd = os.open(LOCK_PATH, os.O_RDWR)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_stat = LOCK_PATH.stat()
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    except BlockingIOError as exc:
+        raise RuntimeError('shared native lock is currently held') from exc
+    finally:
+        os.close(lock_fd)
+    core_head = subprocess.check_output(['git', '-C', str(CORE), 'rev-parse', 'HEAD'], text=True).strip()
+    core_status = subprocess.check_output(['git', '-C', str(CORE), 'status', '--porcelain'], text=True)
+    provider_root = CORE / 'GeoPhys'
+    provider_head = subprocess.check_output(['git', '-C', str(provider_root), 'rev-parse', 'HEAD'], text=True).strip()
+    provider_status = subprocess.check_output(['git', '-C', str(provider_root), 'status', '--porcelain'], text=True)
+    menagerie = subprocess.check_output(
+        ['git', '-C', str(CORE), 'ls-tree', 'HEAD', 'asset/external/mujoco_menagerie'], text=True,
+    ).split()[2]
+    if core_status.strip() or provider_status.strip():
+        raise RuntimeError('Core and Provider trees must be clean before R05c native freeze')
+    if provider_head != 'c6df840bef8d36b1150150167df08e29dc3f664c':
+        raise RuntimeError(f'unexpected GeoPhys pin: {provider_head}')
+    if menagerie != 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7':
+        raise RuntimeError(f'unexpected Menagerie pin: {menagerie}')
+    resources = _resource_snapshot(backend)
+    if not resources['eligible']:
+        raise RuntimeError(f'native resource gate is not eligible: {resources}')
+    hashes = {}
+    for path in (WORKER, READER, CORE / 'task_env/diagnostics/tasks/r05b_native_feedback_supervisor.py',
+                 CORE / 'task_env/diagnostics/tasks/c05c_geophys_gripper_cadence.py'):
+        hashes[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+    result = {
+        'schema_version': 'r05c-native-launch-check-v1', 'status': 'passed',
+        'cell': cell, 'backend': backend, 'python': str(python), 'core_head': core_head,
+        'core_clean': True, 'provider_head': provider_head, 'provider_clean': True,
+        'menagerie_pin': menagerie, 'lock_path': str(LOCK_PATH),
+        'lock_device': lock_stat.st_dev, 'lock_inode': lock_stat.st_ino,
+        'worker_hashes': hashes, 'resources': resources,
+        'native_start_count': 0, 'provider_materialization_count': 0,
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _json_write(output_path, result)
+    return result
+
+
+def run(backend: str, run_root: Path, python: Path, *, gripper_hz: int = 500,
+        full_episode: bool = False):
     run_root.mkdir(parents=True, exist_ok=False)
     worker_dir = run_root / 'worker'
     worker_log = run_root / 'native_worker.log'
@@ -222,7 +272,10 @@ def run(backend: str, run_root: Path, python: Path):
                     time.sleep(1.0)
 
         lock_stat = LOCK_PATH.stat()
-        argv = [str(python), str(WORKER), '--backend', backend, '--output-dir', str(worker_dir)]
+        argv = [str(python), str(WORKER), '--backend', backend, '--output-dir', str(worker_dir),
+                '--gripper-hz', str(gripper_hz)]
+        if full_episode:
+            argv.append('--full-episode')
         env = os.environ.copy()
         env.update({
             'PYTHONPATH': str(CORE) + os.pathsep + str(CORE / 'GeoPhys/src'),
@@ -239,16 +292,21 @@ def run(backend: str, run_root: Path, python: Path):
             pgid = child.pid
             native_started = True
             launch = {
-                'schema_version': 'r05b-native-launch-v1',
-                'backend': backend, 'argv': argv, 'cwd': str(CORE),
+                'schema_version': 'r05c-full-native-launch-v1' if full_episode else 'r05b-native-launch-v1',
+                'backend': backend, 'gripper_hz': gripper_hz, 'full_episode': full_episode,
+                'argv': argv, 'cwd': str(CORE),
                 'lock_path': str(LOCK_PATH), 'lock_device': lock_stat.st_dev,
                 'lock_inode': lock_stat.st_ino, 'lock_wait_seconds': lock_wait,
                 'lock_acquired_at_unix_s': lock_acquired_wall,
                 'native_start_count': 1, 'worker_pid': child.pid, 'worker_pgid': pgid,
                 'prelaunch_resources': snapshot,
                 'caps': {
-                    'wall_seconds': 900, 'process_group_rss_bytes': 4 * GIB,
-                    'output_bytes': 64 * MIB,
+                    'wall_seconds': 1500 if full_episode else 900,
+                    'process_group_rss_bytes': 4 * GIB,
+                    'output_bytes': 128 * MIB if full_episode else 64 * MIB,
+                    'log_bytes': 16 * MIB,
+                    'outer_steps': 6000 if full_episode else 2,
+                    'native_steps': 30000 if full_episode else 10,
                     'worker_gpu_memory_bytes': snapshot['worker_gpu_memory_cap_bytes'],
                 },
                 'thread_environment': {key: env[key] for key in (
@@ -278,6 +336,7 @@ def run(backend: str, run_root: Path, python: Path):
                     if gpu_memory > snapshot['worker_gpu_memory_cap_bytes']:
                         resource_limit_reason = 'worker_gpu_memory_cap_exceeded'
                 output_bytes = _output_size(run_root)
+                worker_log_bytes = worker_log.stat().st_size if worker_log.exists() else 0
                 elapsed = time.monotonic() - start
                 samples += 1
                 event = {
@@ -286,14 +345,17 @@ def run(backend: str, run_root: Path, python: Path):
                     'mem_available_bytes': current_mem,
                     'worker_gpu_memory_bytes': gpu_memory,
                     'output_bytes': output_bytes,
+                    'worker_log_bytes': worker_log_bytes,
                 }
                 with progress_path.open('a', encoding='utf-8') as log:
                     log.write(json.dumps(event, sort_keys=True) + '\n')
                 if group_rss > 4 * GIB:
                     resource_limit_reason = 'process_group_rss_cap_exceeded'
-                elif output_bytes > 64 * MIB:
+                elif output_bytes > (128 * MIB if full_episode else 64 * MIB):
                     resource_limit_reason = 'output_cap_exceeded'
-                elif elapsed > 900:
+                elif full_episode and worker_log_bytes > 16 * MIB:
+                    resource_limit_reason = 'worker_log_cap_exceeded'
+                elif elapsed > (1500 if full_episode else 900):
                     resource_limit_reason = 'worker_wall_cap_exceeded'
                 if resource_limit_reason:
                     _terminate_group(pgid, child)
@@ -330,6 +392,17 @@ def run(backend: str, run_root: Path, python: Path):
         reader_result = None
         reader_exit = None
         if status == 'passed':
+            full_ok = (not full_episode or (
+                worker_result.get('profile') == 'normal'
+                and worker_result.get('gripper_control_hz') == gripper_hz
+                and worker_result.get('native_feedback_profile') == 'nutassembly-native-feedback-v1'
+                and worker_result.get('close_success') is True
+                and worker_result.get('s2', {}).get('status') == 'passed'
+                and worker_result.get('s3', {}).get('status') == 'passed'
+            ))
+            if not full_ok:
+                status = 'failed_or_blocked_full_task_or_s3'
+        if status == 'passed':
             expected = {
                 name: worker_result[name] for name in (
                     'backend', 'artifact_identity', 'source_id', 'source_xml_sha256',
@@ -337,12 +410,24 @@ def run(backend: str, run_root: Path, python: Path):
                     'reset_sample_id', 'provider_materialization_id',
                 )
             }
+            if full_episode:
+                expected.update({
+                    'gripper_control_hz': gripper_hz,
+                    'transition_count': worker_result['s2']['transition_count'],
+                    'require_task_success': True,
+                    'provider_commit': worker_result['provider_build_identity']['repository_revision'],
+                    'provider_import_origin': worker_result['provider_build_identity']['import_origin'],
+                })
             expected_path = run_root / 'reader_expected.json'
             _json_write(expected_path, expected)
             reader_argv = [
-                str(python), str(READER), '--h5', worker_result['h5_path'],
+                str(python), str(READER), '--h5', (
+                    worker_result['h5_full_path'] if full_episode else worker_result['h5_path']
+                ),
                 '--expected', str(expected_path), '--output', str(run_root / 'independent_reader.json'),
             ]
+            if full_episode:
+                reader_argv.extend(['--mode', 'full'])
             reader_env = {
                 'PYTHONDONTWRITEBYTECODE': '1', 'OMP_NUM_THREADS': '1',
                 'OPENBLAS_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1',
@@ -352,19 +437,22 @@ def run(backend: str, run_root: Path, python: Path):
             with (run_root / 'independent_reader.log').open('xb') as stream:
                 reader = subprocess.run(
                     reader_argv, cwd=run_root, env=reader_env,
-                    stdout=stream, stderr=subprocess.STDOUT, timeout=60,
+                    stdout=stream, stderr=subprocess.STDOUT, timeout=180 if full_episode else 60,
                 )
             reader_exit = reader.returncode
             reader_result_path = run_root / 'independent_reader.json'
             reader_result = json.loads(reader_result_path.read_text()) if reader_result_path.is_file() else None
             reader_wall = time.monotonic() - reader_start
-            if reader_wall > 60 or reader_exit != 0 or reader_result is None or reader_result.get('result') != 'PASS':
+            if (reader_wall > (180 if full_episode else 60) or reader_exit != 0
+                    or reader_result is None or reader_result.get('result') != 'PASS'):
                 status = 'failed_or_blocked_independent_reader'
         else:
             reader_wall = None
         final = {
-            'schema_version': 'r05b-native-supervisor-result-v1',
+            'schema_version': 'r05c-full-native-supervisor-result-v1' if full_episode
+            else 'r05b-native-supervisor-result-v1',
             'status': status, 'backend': backend, 'lock_path': str(LOCK_PATH),
+            'gripper_hz': gripper_hz, 'full_episode': full_episode,
             'lock_device': lock_stat.st_dev, 'lock_inode': lock_stat.st_ino,
             'lock_wait_seconds': lock_wait, 'lock_held_through_native_worker_exit': True,
             'lock_released_at_unix_s': lock_release_wall,
@@ -397,9 +485,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--backend', choices=('cpu', 'cuda'), required=True)
     parser.add_argument('--run-root', type=Path, required=True)
+    parser.add_argument('--gripper-hz', type=int, choices=(100, 500), default=500)
+    parser.add_argument('--full-episode', action='store_true')
+    parser.add_argument('--cell', default=None)
+    parser.add_argument('--check', action='store_true')
+    parser.add_argument('--check-output', type=Path)
     parser.add_argument('--python', type=Path, default=Path('/home/lly/miniconda3/envs/geochora/bin/python'))
     args = parser.parse_args()
-    result = run(args.backend, args.run_root, args.python)
+    if args.check:
+        if not args.cell or args.check_output is None:
+            parser.error('--check requires --cell and --check-output')
+        result = check(args.backend, args.cell, args.python, args.check_output)
+        print(json.dumps(result, sort_keys=True, allow_nan=False))
+        return
+    result = run(args.backend, args.run_root, args.python, gripper_hz=args.gripper_hz,
+                 full_episode=args.full_episode)
     print(json.dumps(result, sort_keys=True, allow_nan=False))
     if result['status'] != 'passed':
         raise SystemExit(2)

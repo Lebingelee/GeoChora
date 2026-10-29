@@ -19,6 +19,7 @@ from task_env.runtime.sessions.provenance import provider_build_identity
 from task_env.tasks.nut_assembly.task import (
     NutAssemblyReferenceEnv,
     build_gripper_cadence_diagnostic_solution,
+    build_native_feedback_solution,
 )
 from task_env.trajectory.canonical.execution import expand_snapshot, load
 
@@ -334,7 +335,9 @@ def _gpu_evidence():
         return f'{type(exc).__name__}: {exc}'
 
 
-def run_group(backend, gripper_hz, output_dir):
+def run_group(backend, gripper_hz, output_dir, *, profile='diagnostic'):
+    if profile not in {'diagnostic', 'normal'}:
+        raise ValueError(f'unsupported execution profile: {profile}')
     output_dir.mkdir(parents=True, exist_ok=False)
     h5_probe = output_dir / 'geophys-cadence-probe.h5'
     h5_full = output_dir / 'geophys-external-expert-s2-s3.h5'
@@ -344,8 +347,13 @@ def run_group(backend, gripper_hz, output_dir):
     timing = defaultdict(lambda: defaultdict(list))
     _install_reader_timer(phase, timing)
     result = {
-        'schema': 'c05c-geophys-gripper-cadence-group-v1',
-        'provider': 'geophys', 'provider_revision_required': 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4',
+        'schema': 'r05c-normal-profile-four-cell-worker-v1' if profile == 'normal'
+        else 'c05c-geophys-gripper-cadence-group-v1',
+        'profile': profile,
+        'provider': 'geophys', 'provider_revision_required': (
+            'c6df840bef8d36b1150150167df08e29dc3f664c' if profile == 'normal'
+            else 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
+        ),
         'backend': backend, 'gripper_control_hz': gripper_hz,
         'native_feedback_hz': 500, 'outer_control_hz': 100,
         'physics_dt_s': 0.002, 'control_dt_s': 0.01, 'native_steps_per_interval': 5,
@@ -353,25 +361,42 @@ def run_group(backend, gripper_hz, output_dir):
         'artifact_id': 'nut-assembly-square-v1/p1_8_e/nominal-v1',
         'guard_threshold_N': 8.0, 'guard_dwell_s': 0.1,
         'force_target_N': 10.0, 'force_limit_N': 10.0,
-        'h5_probe_path': str(h5_probe), 'h5_full_path': str(h5_full),
+        'h5_probe_path': str(h5_probe) if profile == 'diagnostic' else None,
+        'h5_full_path': str(h5_full),
         'gpu_inventory': _gpu_evidence(),
         's2': {'status': 'not_run'}, 's3': {'status': 'not_run'},
     }
     env = solution = None
     try:
         start_setup = time.perf_counter()
-        env = NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(
-            backend=backend, gripper_control_hz=gripper_hz, horizon=6000,
-        )
-        solution = build_gripper_cadence_diagnostic_solution(
-            backend=backend, gripper_control_hz=gripper_hz,
-        )
+        if profile == 'normal':
+            env = NutAssemblyReferenceEnv.for_native_feedback_profile(
+                backend=backend, gripper_control_hz=gripper_hz, horizon=6000,
+            )
+            solution = build_native_feedback_solution(
+                backend=backend, gripper_control_hz=gripper_hz,
+            )
+        else:
+            env = NutAssemblyReferenceEnv.for_gripper_cadence_diagnostic(
+                backend=backend, gripper_control_hz=gripper_hz, horizon=6000,
+            )
+            solution = build_gripper_cadence_diagnostic_solution(
+                backend=backend, gripper_control_hz=gripper_hz,
+            )
         reset_observation, reset_info = env.reset_for_solution(solution, seed=19)
         initial_boundary = reset_info['expert_execution_boundary_v1']
         source = env.value['source']
+        source_receipt = getattr(source, 'execution_source_receipt', None)
+        if profile == 'normal' and source_receipt is None:
+            raise RuntimeError('normal profile is missing its versioned execution source receipt')
         provider_identity = provider_build_identity('geophys')
         if provider_identity['repository_revision'] != result['provider_revision_required']:
             raise RuntimeError(f"wrong GeoPhys checkout: {provider_identity['manifest_version']}")
+        if profile == 'normal':
+            expected_origin = str(Path(__file__).resolve().parents[3] / 'GeoPhys' / 'src' / 'geophys' / '__init__.py')
+            if (provider_identity.get('dirty_build_sha256') is not None
+                    or provider_identity.get('import_origin') != expected_origin):
+                raise RuntimeError('normal profile did not resolve the frozen clean GeoPhys import origin')
         if env.execution.backend != backend or source.config.runtime.backend != backend:
             raise RuntimeError('requested backend does not match materialized source/ExecutionSpec')
         result.update({
@@ -391,6 +416,7 @@ def run_group(backend, gripper_hz, output_dir):
             'reset_observation_keys': sorted(reset_observation),
             'runtime_config': env.value['recipe']['runtime_config'],
             'diagnostic_identity': env.value['recipe'].get('diagnostic_experiment'),
+            'native_feedback_profile': getattr(env, '_native_feedback_profile', None),
             'configuration_diff': {
                 'fixed': ['NA-S0 seed19', 'R3', '10 N target/cap', '8 N / 0.1 s Guard',
                           '500 Hz native feedback', '100 Hz outer', '2 ms native dt',
@@ -399,49 +425,56 @@ def run_group(backend, gripper_hz, output_dir):
                 'backend': backend, 'gripper_control_hz': gripper_hz,
             },
         })
+        if source_receipt is not None:
+            result['execution_source_receipt'] = source_receipt.to_mapping()
+        if profile == 'normal' and (
+                result['native_feedback_profile'] != 'nutassembly-native-feedback-v1'
+                or result['diagnostic_identity'] is not None):
+            raise RuntimeError('normal profile factory resolved a diagnostic or unexpected profile')
         setup_reset_wall = time.perf_counter() - start_setup
 
-        phase['name'] = 'probe'
-        _instrument(env, phase, timing)
-        env.start_recording(h5_probe)
-        probe_wall = []
-        for index in range(2):
-            start = time.perf_counter()
-            _, _, terminated, truncated, info = env.step_with_solution(solution)
-            probe_wall.append(time.perf_counter() - start)
-            if terminated or truncated:
-                raise RuntimeError('minimal cadence Probe ended before two complete intervals')
-        probe_finish = env.finish_recording('gripper-cadence-probe-complete')
-        probe_disk = load(h5_probe)
-        probe_expected = {
-            'backend': backend, 'gripper_control_hz': gripper_hz,
-            'artifact_identity': result['task_artifact_identity'],
-            'source_id': result['source_id'], 'source_xml_sha256': result['source_xml_sha256'],
-            'controller_identity': result['controller_identity'],
-            'solution_identity': result['solution_identity'],
-            'episode_id': initial_boundary['episode_id'], 'reset_sample_id': initial_boundary['reset_sample_id'],
-            'provider_materialization_id': initial_boundary['provider_materialization_id'],
-            'request_boundary_id': initial_boundary['identity_hash'],
-        }
-        probe_readback = validate_h5(probe_disk, probe_expected)
-        assert probe_readback['transition_count'] == 2 and probe_readback['native_sample_count'] == 10
-        assert env.state.control_step == 2 and abs(env.state.simulation_time - 0.02) <= 1e-10
-        probe_servo_counts = {
-            'updates': int(env.controller.inner.update_count),
-            'holds': int(env.controller.inner.held_count),
-        }
-        expected_probe_counts = {'updates': 10 if gripper_hz == 500 else 2,
-                                 'holds': 0 if gripper_hz == 500 else 8}
-        assert probe_servo_counts == expected_probe_counts
-        result['probe'] = {
-            'status': 'passed', 'intervals': 2, 'native_samples': probe_readback['native_sample_count'],
-            'requested_steps': 10, 'completed_steps': 10,
-            'probe_end_clock': {'control_step': int(env.state.control_step),
-                                'simulation_time_s': float(env.state.simulation_time)},
-            'servo_counts': probe_servo_counts, 'readback': probe_readback,
-            'recorder_finish': probe_finish, 'h5_sha256': _sha(h5_probe.read_bytes()),
-            'interval_wall_s': probe_wall,
-        }
+        if profile == 'diagnostic':
+            phase['name'] = 'probe'
+            _instrument(env, phase, timing)
+            env.start_recording(h5_probe)
+            probe_wall = []
+            for index in range(2):
+                start = time.perf_counter()
+                _, _, terminated, truncated, info = env.step_with_solution(solution)
+                probe_wall.append(time.perf_counter() - start)
+                if terminated or truncated:
+                    raise RuntimeError('minimal cadence Probe ended before two complete intervals')
+            probe_finish = env.finish_recording('gripper-cadence-probe-complete')
+            probe_disk = load(h5_probe)
+            probe_expected = {
+                'backend': backend, 'gripper_control_hz': gripper_hz,
+                'artifact_identity': result['task_artifact_identity'],
+                'source_id': result['source_id'], 'source_xml_sha256': result['source_xml_sha256'],
+                'controller_identity': result['controller_identity'],
+                'solution_identity': result['solution_identity'],
+                'episode_id': initial_boundary['episode_id'], 'reset_sample_id': initial_boundary['reset_sample_id'],
+                'provider_materialization_id': initial_boundary['provider_materialization_id'],
+                'request_boundary_id': initial_boundary['identity_hash'],
+            }
+            probe_readback = validate_h5(probe_disk, probe_expected)
+            assert probe_readback['transition_count'] == 2 and probe_readback['native_sample_count'] == 10
+            assert env.state.control_step == 2 and abs(env.state.simulation_time - 0.02) <= 1e-10
+            probe_servo_counts = {
+                'updates': int(env.controller.inner.update_count),
+                'holds': int(env.controller.inner.held_count),
+            }
+            expected_probe_counts = {'updates': 10 if gripper_hz == 500 else 2,
+                                     'holds': 0 if gripper_hz == 500 else 8}
+            assert probe_servo_counts == expected_probe_counts
+            result['probe'] = {
+                'status': 'passed', 'intervals': 2, 'native_samples': probe_readback['native_sample_count'],
+                'requested_steps': 10, 'completed_steps': 10,
+                'probe_end_clock': {'control_step': int(env.state.control_step),
+                                    'simulation_time_s': float(env.state.simulation_time)},
+                'servo_counts': probe_servo_counts, 'readback': probe_readback,
+                'recorder_finish': probe_finish, 'h5_sha256': _sha(h5_probe.read_bytes()),
+                'interval_wall_s': probe_wall,
+            }
         result['provider_cuda_context_evidence'] = (
             'see stdout.log for Taichi arch banner and GPU inventory above' if backend == 'cuda'
             else 'CPU requested and materialized; no CUDA context required'
@@ -449,13 +482,19 @@ def run_group(backend, gripper_hz, output_dir):
 
         # Reuse the same task-owned Solution and the same deterministic ResetSample.
         # Probe is finalized before reset; the full S2/S3 run then gets one fresh episode.
-        phase['name'] = 'full_reset'
-        before_full_reset = time.perf_counter()
-        _, full_reset_info = env.reset_for_solution(solution, seed=19)
-        full_boundary = full_reset_info['expert_execution_boundary_v1']
-        assert full_boundary['reset_sample_id'] == initial_boundary['reset_sample_id']
-        assert env.state.control_step == 0 and env.state.simulation_time == 0.0
-        full_reset_wall = time.perf_counter() - before_full_reset
+        if profile == 'diagnostic':
+            phase['name'] = 'full_reset'
+            before_full_reset = time.perf_counter()
+            _, full_reset_info = env.reset_for_solution(solution, seed=19)
+            full_boundary = full_reset_info['expert_execution_boundary_v1']
+            assert full_boundary['reset_sample_id'] == initial_boundary['reset_sample_id']
+            assert env.state.control_step == 0 and env.state.simulation_time == 0.0
+            full_reset_wall = time.perf_counter() - before_full_reset
+        else:
+            full_boundary = initial_boundary
+            full_reset_wall = 0.0
+            if env.state.control_step != 0 or env.state.simulation_time != 0.0:
+                raise RuntimeError('normal full episode must start at its one fresh reset')
         result['full_episode_identity'] = {
             'episode_id': full_boundary['episode_id'],
             'reset_sample_id': full_boundary['reset_sample_id'],
@@ -550,8 +589,8 @@ def run_group(backend, gripper_hz, output_dir):
             'second_reset_wall_s': full_reset_wall,
             'full_expert_loop_wall_s': full_loop_wall,
             'full_expert_plus_recording_and_readback_wall_s': time.perf_counter() - start_setup,
-            'probe_first_interval_includes_initial_native_compile': probe_wall[0],
-            'probe_second_interval_steady_candidate': probe_wall[1],
+            'probe_first_interval_includes_initial_native_compile': probe_wall[0] if profile == 'diagnostic' else None,
+            'probe_second_interval_steady_candidate': probe_wall[1] if profile == 'diagnostic' else None,
             'phase_costs': _timing_summary(timing),
             'note': 'read_cpu_snapshot timing includes host copy/synchronization; CUDA step timing may be asynchronous submission, so do not sum overlapping counters.',
         }
@@ -580,8 +619,12 @@ def run_group(backend, gripper_hz, output_dir):
         if env is not None:
             try:
                 env.close()
+                result['close_success'] = True
             except BaseException as close_error:
                 result['close_error'] = f'{type(close_error).__name__}: {close_error}'
+                result['close_success'] = False
+                result['status'] = 'failed_or_blocked'
+                result['s2_s3_status'] = 'failed_or_blocked_close'
         result['result_sha256'] = None
         result_path.write_text(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + '\n', encoding='utf-8')
     print(json.dumps(result, sort_keys=True, allow_nan=False))
