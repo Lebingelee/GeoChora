@@ -53,7 +53,11 @@ def _engine_module(current_io: dict):
     """Fake only the MuJoCo module boundary; every Core owner remains real."""
     module = ModuleType('mujoco')
     module.__version__ = '3.8.1'
-    module.__spec__ = importlib.machinery.ModuleSpec('mujoco', loader=None, is_package=True)
+    module.__spec__ = importlib.machinery.ModuleSpec(
+        'mujoco', loader=None, origin=(
+            '/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py'
+        ), is_package=True,
+    )
     module.__path__ = []
     module.mj_versionString = lambda: '3.8.1'
     module.mj_version = lambda: 3008001
