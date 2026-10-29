@@ -1,0 +1,77 @@
+{
+  "schema_version": "libero-pilot-owner-gap-matrix-v1",
+  "task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+  "core_native_admission_ready": false,
+  "gaps": [
+    {
+      "id": "mounted-panda-mixed-actuator-contract",
+      "owner_symbols": [
+        "task_env/controllers/absolute_joint.py::AbsoluteJointPositionController",
+        "task_env/runtime/sessions/control.py::RuntimeSession control boundary"
+      ],
+      "current_input_output": "The selected source model declares seven ordered Panda torque motors and two opposing finger position actuators; the selected gripper ranges are signed metres and the arm ranges are N*m. The current Core candidate is not a mixed torque/position controller contract.",
+      "necessary_extension": "Define a versioned, source-bound arm and finger drive/resource mapping that preserves actuator order, type, range, unit, and acknowledgement. Do not coerce torque motors into position control or merge the two finger coordinates.",
+      "s1_oracle": "Provider-free codec/contract negatives reject reordered slots, wrong actuator type, inverted finger signs, wrong units, and a false 20 Hz to 100 Hz equivalence.",
+      "native_oracle": "One selected public Env reset and action through the exact seven-motor/two-finger map; receipt reports each applied slot and source identity."
+    },
+    {
+      "id": "typed-init-and-free-body-reset",
+      "owner_symbols": [
+        "task_env/environment/task_source.py::TaskSource",
+        "task_env/assembly/source.py::TaskSceneSource",
+        "task_env/runtime/sessions/source.py::ExecutionSourceReceiptV1"
+      ],
+      "current_input_output": "The source receipt can bind immutable source bytes. The selected .pruned_init is a ZIP-with-pickle-metadata byte stream of prior-audited shape [50,92]; its ordering and conversion to Core reset state were not executed or inferred.",
+      "necessary_extension": "Specify a versioned, safe reset-state decoder/adapter with an explicit identity and object/frame mapping, or report the unsupported source format. Keep pickle execution out of the admission path unless separately reviewed and authorized.",
+      "s1_oracle": "Reject wrong init SHA, wrong entry ordering, unsupported schema, missing object/frame, and altered task source receipt before materialization.",
+      "native_oracle": "After authorized decode, reset one public Env and compare every declared object pose/joint state to the pinned source initialization oracle without private Provider reads."
+    },
+    {
+      "id": "object-frame-reference-mapping",
+      "owner_symbols": [
+        "task_env/assembly/references.py::resolve_task_references",
+        "task_env/assembly/source.py::TaskSceneSource"
+      ],
+      "current_input_output": "The benchmark names bowl, plate, fixtures, sites, and the native end-effector body. A Core FrameRef for these source names is not established by this recipe.",
+      "necessary_extension": "Resolve each source object/site/joint to a typed Core reference through the existing reference owner and preserve frame, unit, and identity provenance; reject ambiguous or absent names.",
+      "s1_oracle": "Reference resolution rejects missing, duplicate, wrong-frame, or wrong-task source names and retains the exact source receipt.",
+      "native_oracle": "Read bowl, plate, and eef references from the public typed observation on reset and after a bounded action; compare identity and frame transforms to the native source."
+    },
+    {
+      "id": "contact-backed-on-evaluator",
+      "owner_symbols": [
+        "task_env/environment/task_definition.py::TaskDefinitionBase.evaluate_predicates",
+        "task_env/environment/task_source.py"
+      ],
+      "current_input_output": "The source On(bowl, plate) predicate requires geom-group contact, vertical ordering, and strict XY body-centre distance below 0.03 m. The required public Core contact evidence is unavailable and cannot be treated as false.",
+      "necessary_extension": "Expose the exact object contact and pose evidence through an existing typed observation/state owner and make unavailable evidence explicit to the evaluator.",
+      "s1_oracle": "True requires all source conditions; false requires available negative evidence; absent contact or pose evidence returns unavailable and cannot become false or success.",
+      "native_oracle": "Compare public Core predicate inputs and result against the pinned LIBERO predicate for separated, touching, elevated, and XY-threshold boundary cases."
+    },
+    {
+      "id": "planner-and-clock-equivalence",
+      "owner_symbols": [
+        "task_env/planners/cartesian.py",
+        "task_env/planners/joint.py",
+        "task_env/runtime/sessions/control.py"
+      ],
+      "current_input_output": "The source controller is OSC_POSE at 20 Hz (0.05 s policy interval); current Core candidate metadata says 100 Hz. The source model timestep is read from an uncaptured robosuite macros constant and remains unknown. Existing planners do not establish this task's IK/collision route.",
+      "necessary_extension": "Resolve native physics/control timing from pinned configuration and select an existing Core action/drive route only when its hold, frame, and rate semantics match. Otherwise retain an explicit adapter design proposal.",
+      "s1_oracle": "Contradictory native/Core rates, unverified physics timestep, unsupported drive, or missing IK/collision oracle are rejected or remain unavailable.",
+      "native_oracle": "A bounded public action reports requested/applied action clocks and repeat count; compare to one native control interval and inspect planned path/contacts without silently resampling."
+    },
+    {
+      "id": "same-env-recording-and-readback",
+      "owner_symbols": [
+        "task_env recording/TransitionRecorder",
+        "task_env versioned semantic H5 reader",
+        "task_env/runtime/sessions/control.py"
+      ],
+      "current_input_output": "No native Env or H5 was created in R07b. The required future path is reset, step, observe, record, close, and independently read the same public Env episode.",
+      "necessary_extension": "Keep the existing recorder and reader; bind source, state, action, target, acknowledgement, episode clock, and T/T+1 identity for this task without adding a second recorder.",
+      "s1_oracle": "The planned receipt/schema rejects missing identity, stale state, clock gaps, and unavailable semantic fields before H5 publication.",
+      "native_oracle": "One bounded episode in one public Env writes and closes H5; a separate process reads the same file and matches every action/ack/state/clock/source identity."
+    }
+  ],
+  "scope_limit": "Planning metadata only; no Core implementation, native task admission, qualification, or closure of the original five-task R07 goal."
+}

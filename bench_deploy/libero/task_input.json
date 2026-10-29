@@ -1,0 +1,286 @@
+{
+  "bddl": {
+    "goal_expression": [
+      [
+        "And",
+        [
+          "On",
+          "akita_black_bowl_1",
+          "plate_1"
+        ]
+      ]
+    ],
+    "init_predicates": [
+      [
+        "On",
+        "akita_black_bowl_1",
+        "main_table_between_plate_ramekin_region"
+      ],
+      [
+        "On",
+        "akita_black_bowl_2",
+        "main_table_next_to_ramekin_region"
+      ],
+      [
+        "On",
+        "plate_1",
+        "main_table_plate_region"
+      ],
+      [
+        "On",
+        "cookies_1",
+        "main_table_box_region"
+      ],
+      [
+        "On",
+        "glazed_rim_porcelain_ramekin_1",
+        "main_table_ramekin_region"
+      ],
+      [
+        "On",
+        "wooden_cabinet_1",
+        "main_table_cabinet_region"
+      ],
+      [
+        "On",
+        "flat_stove_1",
+        "main_table_stove_region"
+      ]
+    ],
+    "path": "libero/libero/bddl_files/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.bddl",
+    "sha256": "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660c959b"
+  },
+  "cost_protocol_binding": {
+    "measurement_baseline_commit": "0309d73bb5b60f9989907c3eede8c0cd2893f29f",
+    "measurement_scope": "R07B-PILOT-001 only; general R07 setup/shared work separated from pilot incremental work",
+    "protocol_id": "R07a003-cost-protocol-v2.1",
+    "protocol_sha256": "a6f5836b65498d23e0dfb53568bdd8dee69f60f020c579957990b6a6bc59987e"
+  },
+  "native_reference": {
+    "active_scene_xml": {
+      "git_blob_sha1": "7aaf3b8b910d012fd1f7220139b4f9bc6ef0ae4b",
+      "path": "libero/libero/assets/scenes/libero_tabletop_base_style.xml",
+      "repository": "libero",
+      "selected_by": "LIBERO tabletop task source",
+      "sha256": "bb118118e3e02a0f23295c072d77c5a7c6b44cc773032dc79c17070b4e133f86"
+    },
+    "controller": {
+      "configuration_source": "robosuite.load_controller_config(default_controller=\"OSC_POSE\")",
+      "control_frequency_hz": 20,
+      "control_timestep_seconds": 0.05,
+      "core_equivalence": "NOT_ESTABLISHED",
+      "hold_policy": "Each policy action is applied across int(control_timestep / model_timestep) simulation steps in Robosuite BaseEnv; physical count not compiled.",
+      "name": "OSC_POSE",
+      "physics_timestep_seconds": null,
+      "physics_timestep_status": "UNRESOLVED_SOURCE_CONSTANT; Robosuite BaseEnv reads macros.SIMULATION_TIMESTEP, not compiled here"
+    },
+    "observation": {
+      "camera_depths": false,
+      "camera_heights": 128,
+      "camera_names": [
+        "agentview",
+        "robot0_eye_in_hand"
+      ],
+      "camera_segmentations": null,
+      "camera_widths": 128,
+      "has_offscreen_renderer": true,
+      "has_renderer": false,
+      "render_camera": "frontview",
+      "renderer": "mujoco",
+      "use_camera_obs": true
+    },
+    "planner": {
+      "ik_and_collision_policy": "Owned by native controller/config; not mapped to a Core planner.",
+      "native_route": "OSC_POSE Cartesian operational-space controller; not an independent task planner"
+    },
+    "problem_class": "Libero_Tabletop_Manipulation",
+    "robot": {
+      "actuators": [
+        {
+          "control_range": [
+            -80.0,
+            80.0
+          ],
+          "joint": "joint1",
+          "name": "torq_j1",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range": [
+            -80.0,
+            80.0
+          ],
+          "joint": "joint2",
+          "name": "torq_j2",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range": [
+            -80.0,
+            80.0
+          ],
+          "joint": "joint3",
+          "name": "torq_j3",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range": [
+            -80.0,
+            80.0
+          ],
+          "joint": "joint4",
+          "name": "torq_j4",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range": [
+            -80.0,
+            80.0
+          ],
+          "joint": "joint5",
+          "name": "torq_j5",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range": [
+            -12.0,
+            12.0
+          ],
+          "joint": "joint6",
+          "name": "torq_j6",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range": [
+            -12.0,
+            12.0
+          ],
+          "joint": "joint7",
+          "name": "torq_j7",
+          "role": "arm",
+          "type": "motor",
+          "unit": "N*m"
+        },
+        {
+          "control_range_m": [
+            0.0,
+            0.04
+          ],
+          "force_range_N": [
+            -20.0,
+            20.0
+          ],
+          "joint": "finger_joint1",
+          "name": "gripper_finger_joint1",
+          "role": "finger",
+          "type": "position",
+          "unit": "m"
+        },
+        {
+          "control_range_m": [
+            -0.04,
+            0.0
+          ],
+          "force_range_N": [
+            -20.0,
+            20.0
+          ],
+          "joint": "finger_joint2",
+          "name": "gripper_finger_joint2",
+          "role": "finger",
+          "type": "position",
+          "unit": "m"
+        }
+      ],
+      "arm_actuator_types": [
+        "motor",
+        "motor",
+        "motor",
+        "motor",
+        "motor",
+        "motor",
+        "motor"
+      ],
+      "arm_joint_names": [
+        "joint1",
+        "joint2",
+        "joint3",
+        "joint4",
+        "joint5",
+        "joint6",
+        "joint7"
+      ],
+      "base_robot_name": "Panda",
+      "finger_actuator_types": [
+        "position",
+        "position"
+      ],
+      "frames": {
+        "core_frame_reference_status": "UNRESOLVED_CORE_MAPPING",
+        "source_frame_name": "eef"
+      },
+      "gripper_name": "PandaGripper",
+      "mount_name": "RethinkMount",
+      "native_end_effector_body": "eef",
+      "robot_name": "MountedPanda",
+      "units": {
+        "arm_effort": "N*m",
+        "finger_position": "m",
+        "joint_position": "rad",
+        "rotation": "rad",
+        "translation": "m"
+      }
+    }
+  },
+  "requested_core_candidate": {
+    "control_frequency_hz": 100,
+    "control_period_seconds": 0.01,
+    "core_native_admission_ready": false,
+    "drive_or_hold_semantics": "Not mapped; native 20 Hz OSC_POSE must not be silently treated as Core 100 Hz joint position.",
+    "frame_mapping_status": "UNRESOLVED",
+    "observation_profile": "state-only",
+    "planner": "No planner selected until the current Core planner owners provide a truthful kinematic/actuation route."
+  },
+  "schema_version": "libero-pilot-deployment-input-v1",
+  "selected_pruned_init": {
+    "deserialized_by_this_package": false,
+    "format": "ZIP-with-pickle-metadata",
+    "path": "libero/libero/init_files/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.pruned_init",
+    "reset_realization": "NOT_RUN",
+    "sha256": "cbbc73792ce546c9bec181fd328a411d3183074840b282671dee481511381d0a",
+    "shape_from_prior_safe_opcode_audit": [
+      50,
+      92
+    ],
+    "size_bytes": 44271
+  },
+  "semantics": {
+    "contact_evidence": "UNAVAILABLE_UNTIL_PUBLIC_PROVIDER_STATE_EXISTS",
+    "goal_predicate": "On(akita_black_bowl_1, plate_1)",
+    "goal_threshold_m": 0.03,
+    "required_evidence": [
+      "object-object geom-group contact",
+      "vertical ordering",
+      "strict XY body-centre distance < 0.03 m"
+    ],
+    "unavailable_is_not_false": true
+  },
+  "source_manifest_sha256": "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75",
+  "source_revisions": {
+    "libero": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
+    "robosuite": "fbee5844ff5632f5b5698e204ec5357ca50be0df"
+  },
+  "task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate"
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "libero-r07c-minimal-patch-checklist-v1",
+  "pilot_task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+  "implementation_order": [
+    {
+      "step": 1,
+      "owner": "task_env public control/resource contract",
+      "minimum_change": "Add only the missing ordered mixed actuator declaration and a public controller/adapter route for seven torque slots plus two signed finger-position slots; retain source limits and explicit 20 Hz versus Core clock semantics.",
+      "required_s1": ["slot/type/unit/range contract", "invalid and reordered maps", "action/ack timing and hold identity"],
+      "native_oracle": "One public action reaches the selected source slots with correct type, signed coordinates, units, and receipt identity."
+    },
+    {
+      "step": 2,
+      "owner": "task_env task source/reset/reference owners",
+      "minimum_change": "Define the reviewed .pruned_init decode or an explicit unsupported-format boundary, then adapt the selected reset identity into existing typed task state and resolve object/site/joint/frame references through existing owners.",
+      "required_s1": ["byte and identity tamper", "missing/duplicate reference", "frame/unit mismatch", "reset schema and ordering"],
+      "native_oracle": "One public reset reports all selected object/fixture identities and typed state matching the pinned initialization oracle."
+    },
+    {
+      "step": 3,
+      "owner": "task_env observation/evaluator/planner owners",
+      "minimum_change": "Expose task-required free-body poses and contact evidence as typed public state, preserve unavailable distinctly, and determine whether an existing planner can produce a collision-aware path for the selected controller; add no private-state fallback.",
+      "required_s1": ["contact true/false/unavailable", "On threshold boundary", "pose frame identity", "planner/action semantics"],
+      "native_oracle": "Compare the public On evaluator to the pinned predicate for contact, vertical ordering, and strict XY < 0.03 m; verify a bounded planner path."
+    },
+    {
+      "step": 4,
+      "owner": "existing task factory, recorder, and semantic reader",
+      "minimum_change": "Compose only after the three prior owner contracts pass. Keep source receipt, same-Env identity, T/T+1 clocks, action/ack/state identity, and existing recorder/reader connected.",
+      "required_s1": ["public factory/admission", "continuous identity and clock", "same-H5 independent readback", "close/error paths"],
+      "native_oracle": "One fresh CPU worker, one reset, at most 1000 outer actions (50 s at the source 20 Hz horizon), one completed source task episode, close, and independent same-H5 readback. Bound inner steps from the pinned model timestep before launch; if that timestep or a required owner remains unresolved, do not start native work."
+    }
+  ],
+  "not_authorized_by_r07b": ["implementation of this checklist", "a LIBERO dependency environment", "native reset or step", "a multi-backend campaign", "P99 or Qualification claims"]
+}
