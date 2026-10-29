@@ -126,36 +126,15 @@ class IsaacSimAppOwnerV1:
         if app is not None:
             try:
                 app.close()
-                # Isaac Sim 6.2 registers a bound _atexit_close callback during
-                # SimulationApp construction. After explicit close that callback
-                # is a no-op, but it keeps the closed SimulationApp (and its
-                # shutdown pybind handles) alive until interpreter teardown.
-                # Drop that lifecycle reference, but leave framework/plugin
-                # unloading to process teardown as SimulationApp.close specifies.
-                import atexit
-
-                close_callback = getattr(app, "_atexit_close", None)
-                if callable(close_callback):
-                    self._atexit_close_unregister_attempted = True
-                    atexit.unregister(close_callback)
-                    self._atexit_close_unregister_completed = True
-                # The local bound-method reference itself retains the closed
-                # SimulationApp. Drop it before releasing the owner-held wrapper
-                # so every native handle is finalized while Carb is still loaded.
-                close_callback = None
-                self._app = None
-                del app
             except BaseException as error:
                 self._close_failure = {
                     "type": type(error).__name__, "message": str(error),
                 }
-                if (self._atexit_close_unregister_attempted
-                        and not self._atexit_close_unregister_completed):
-                    self._atexit_close_unregister_failure = {
-                        "type": type(error).__name__, "message": str(error),
-                    }
                 raise
-        self._app = None
+        # The process owner deliberately retains the closed wrapper until the
+        # isolated worker reaches its explicit terminal boundary. Core Env and
+        # Session close must never trigger native process termination or force
+        # CPython to finalize SDK objects in an unsafe unload order.
         self._closed = True
         self._close_completed = True
 

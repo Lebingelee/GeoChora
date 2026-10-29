@@ -221,7 +221,7 @@ def test_isaac_app_owner_close_failure_is_retained_and_never_retried():
     }
 
 
-def test_isaac_app_owner_leaves_framework_unload_to_process_exit(monkeypatch):
+def test_isaac_app_owner_uses_public_close_and_retains_wrapper_until_worker_exit(monkeypatch):
     import importlib.metadata
     import sys
     from types import ModuleType, SimpleNamespace
@@ -229,11 +229,9 @@ def test_isaac_app_owner_leaves_framework_unload_to_process_exit(monkeypatch):
     from task_env.runtime.sessions.isaac_native_io import IsaacSimAppOwnerV1
 
     import atexit
-    import weakref
 
     app_calls = []
     lifecycle_events = []
-    unregister_calls = []
 
     class _FakeSimulationApp:
         def __init__(self, config):
@@ -248,11 +246,9 @@ def test_isaac_app_owner_leaves_framework_unload_to_process_exit(monkeypatch):
         def __del__(self):
             lifecycle_events.append("app_wrapper_finalize")
 
-    def _unregister(callback):
-        unregister_calls.append(weakref.ref(callback.__self__))
-        lifecycle_events.append("atexit_unregister")
-
-    monkeypatch.setattr(atexit, "unregister", _unregister)
+    monkeypatch.setattr(atexit, "unregister", lambda _callback: pytest.fail(
+        "Core App close must not manage SimulationApp's private atexit callback"
+    ))
 
     simulation_app_module = ModuleType("isaacsim.simulation_app")
     simulation_app_module.SimulationApp = _FakeSimulationApp
@@ -271,85 +267,79 @@ def test_isaac_app_owner_leaves_framework_unload_to_process_exit(monkeypatch):
     monkeypatch.setattr(importlib.metadata, "version", lambda name: "6.2.0.0")
 
     owner = IsaacSimAppOwnerV1()
-    owner.open()
+    app = owner.open()
     owner.close()
 
     assert app_calls == [{
         "headless": True, "enable_cameras": False, "limit_cpu_threads": 4,
         "fast_shutdown": False,
     }]
-    assert lifecycle_events == [
-        "app_close", "atexit_unregister", "app_wrapper_finalize",
-    ]
-    assert len(unregister_calls) == 1 and unregister_calls[0]() is None
+    assert lifecycle_events == ["app_close"]
+    assert owner.app is app
     assert owner.close_receipt() == {
         "close_attempted": True, "close_completed": True,
         "close_failure": None, "closed": True, "close_attempts": 1,
         "framework_unload_attempted": False,
         "framework_unload_completed": False,
         "framework_unload_failure": None,
-        "atexit_close_unregister_attempted": True,
-        "atexit_close_unregister_completed": True,
+        "atexit_close_unregister_attempted": False,
+        "atexit_close_unregister_completed": False,
         "atexit_close_unregister_failure": None,
     }
 
 
-def test_isaac_app_owner_atexit_unregister_failure_is_retained_without_retry(monkeypatch):
-    import atexit
-
+def test_isaac_app_owner_close_does_not_drop_closed_app_reference():
     from task_env.runtime.sessions.isaac_native_io import IsaacSimAppOwnerV1
 
-    events = []
-
     class _App:
-        def close(self):
-            events.append("app_close")
+        def __init__(self):
+            self.close_count = 0
 
-        def _atexit_close(self):
-            events.append("atexit_close")
+        def close(self):
+            self.close_count += 1
 
     owner = IsaacSimAppOwnerV1()
-    owner._app = _App()
-
-    def _fail_unregister(_callback):
-        events.append("atexit_unregister")
-        raise RuntimeError("atexit unregister sentinel")
-
-    monkeypatch.setattr(atexit, "unregister", _fail_unregister)
-    with pytest.raises(RuntimeError, match="atexit unregister sentinel"):
-        owner.close()
+    app = _App()
+    owner._app = app
     owner.close()
 
-    assert events == ["app_close", "atexit_unregister"]
+    assert owner.app is app
+    assert app.close_count == 1
+    assert owner._closed and owner._close_completed
     assert owner.close_receipt() == {
-        "close_attempted": True, "close_completed": False,
-        "close_failure": {"type": "RuntimeError", "message": "atexit unregister sentinel"},
-        "closed": False, "close_attempts": 1,
+        "close_attempted": True, "close_completed": True,
+        "close_failure": None,
+        "closed": True, "close_attempts": 1,
         "framework_unload_attempted": False,
         "framework_unload_completed": False,
         "framework_unload_failure": None,
-        "atexit_close_unregister_attempted": True,
+        "atexit_close_unregister_attempted": False,
         "atexit_close_unregister_completed": False,
-        "atexit_close_unregister_failure": {
-            "type": "RuntimeError", "message": "atexit unregister sentinel",
-        },
+        "atexit_close_unregister_failure": None,
     }
 
 
-def test_f04_attempt003_budget_has_no_app_start_cap_but_keeps_worker_and_total_limits():
+def test_f04_attempt004_budget_has_no_app_start_cap_and_matches_frozen_window():
     import importlib.util
+    import json
+    import os
     from pathlib import Path
 
     repo = Path(__file__).resolve().parents[3]
-    runner_path = (repo / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
-                   / "f04_003/evidence/run_f04_native.py")
-    spec = importlib.util.spec_from_file_location("f04_attempt003_native_runner", runner_path)
+    evidence_root = os.environ.get("F04_EVIDENCE_ROOT")
+    if not evidence_root:
+        pytest.skip("run this attempt-specific budget test under the frozen F04 evidence runner")
+    runner_path = Path(evidence_root) / "run_f04_native.py"
+    budget_path = (repo / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
+                   / "sol_f04_004/execution_budget.json")
+    budget = json.loads(budget_path.read_text())
+    spec = importlib.util.spec_from_file_location("f04_attempt004_native_runner", runner_path)
     assert spec is not None and spec.loader is not None
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
+    assert runner.BUDGET == budget
 
-    # Eight prior App launches are permitted by count; wall and physics remain
-    # the actual cumulative admission budgets.
+    # App starts are uncapped, but both cumulative limits come from the package.
     order = ["official-panda", "menagerie-panda"]
     assert runner._allowed_next_families("both", False, order) == {"both"}
     assert runner._allowed_next_families("both", True, order) == {"both"}
@@ -362,22 +352,25 @@ def test_f04_attempt003_budget_has_no_app_start_cap_but_keeps_worker_and_total_l
     launches = [
         {"app_start_number": index, "worker_wall_seconds": 10.0,
          "physics_steps_observed": 500}
-        for index in range(1, 9)
+        for index in range(1, 7)
     ]
     prior_wall, prior_steps = runner._attempt_budget(launches)
-    assert (prior_wall, prior_steps) == (80.0, 4000)
-    assert runner._worker_budget_violations(prior_wall, prior_steps, 900.0, 3000) == []
+    assert (prior_wall, prior_steps) == (60.0, 3000)
+    assert runner._worker_budget_violations(prior_wall, prior_steps, 900.0, 3000, 6.0) == []
     assert "per_worker_wall_seconds" in runner._worker_budget_violations(
-        prior_wall, prior_steps, 900.001, 1,
+        prior_wall, prior_steps, 900.001, 1, 0.002,
     )
     assert "per_worker_physics_steps_including_bootstrap" in runner._worker_budget_violations(
-        prior_wall, prior_steps, 1.0, 3001,
+        prior_wall, prior_steps, 1.0, 3001, 6.002,
     )
     assert "per_attempt_worker_wall_seconds" in runner._worker_budget_violations(
-        3500.0, 4000, 101.0, 1,
+        1700.0, 3000, 101.0, 1, 0.002,
     )
     assert "per_attempt_physics_steps_including_bootstrap" in runner._worker_budget_violations(
-        80.0, 11000, 1.0, 1001,
+        80.0, 5500, 1.0, 501, 0.002,
+    )
+    assert "per_attempt_simulation_time_seconds" in runner._worker_budget_violations(
+        0.0, 5501, 1.0, 500, 1.0,
     )
 
 
@@ -641,7 +634,7 @@ def test_f04_source_family_rejects_unreviewed_reference():
     ('family_step', 'worker-failed', True),
     ('app_close', 'worker-failed', False),
 ))
-def test_f04_attempt003_both_worker_preserves_primary_and_finalizes_after_app_close(
+def test_f04_attempt004_both_worker_preserves_primary_and_finalizes_after_app_close(
         tmp_path, failure, expected_status, close_completed):
     """Exercise the combined A/B worker finalizer without importing Kit or stepping physics."""
     import json
@@ -651,8 +644,10 @@ def test_f04_attempt003_both_worker_preserves_primary_and_finalizes_after_app_cl
     import sys
 
     repo = Path(__file__).resolve().parents[3]
-    helper = (repo / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001'
-              / 'f04_003/evidence/f04_combined_worker_lifecycle_s1.py')
+    evidence_root = os.environ.get('F04_EVIDENCE_ROOT')
+    if not evidence_root:
+        pytest.skip('run this attempt-specific lifecycle test under the frozen F04 evidence runner')
+    helper = Path(evidence_root) / 'f04_combined_worker_lifecycle_s1.py'
     child_root = tmp_path / 'child'
     child_root.mkdir()
     child_env = os.environ.copy()
@@ -685,3 +680,34 @@ def test_f04_attempt003_both_worker_preserves_primary_and_finalizes_after_app_cl
     else:
         assert receipt['worker_error'] is None
         assert receipt['cleanup_error']['message'] == 'primary App close failure'
+
+
+def test_f04_attempt004_terminal_worker_parent_observes_exit_after_durable_cleanup(tmp_path):
+    """Exercise the production outer worker exit in children and observe real status in parent."""
+    import json
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    evidence_root = os.environ.get('F04_EVIDENCE_ROOT')
+    s1_output = os.environ.get('F04_S1_OUTPUT')
+    if not evidence_root or not s1_output:
+        pytest.skip('run this attempt-specific terminal worker test under the frozen F04 evidence runner')
+    harness = Path(evidence_root) / 'f04_terminal_worker_s1.py'
+    result_root = Path(s1_output) / 'terminal-worker-parent-observation'
+    child = subprocess.run(
+        [sys.executable, '-B', str(harness), '--root', str(result_root)],
+        cwd=Path(__file__).resolve().parents[3], env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'},
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180, check=False,
+    )
+    assert child.returncode == 0, f'terminal worker S1 failed: {child.stdout}\n{child.stderr}'
+    result_path = result_root / 'terminal_worker_s1_result.json'
+    result = json.loads(result_path.read_text())
+    assert result['status'] == 'PASS'
+    assert result['parent_survived_all_children'] is True
+    assert {row['scenario'] for row in result['scenarios']} == {
+        'success', 'family_failure', 'app_close_failure', 'finalize_failure', 'receipt_write_failure',
+    }
+    assert all(row['parent_survived'] and not row['atexit_finalizer_ran']
+               for row in result['scenarios'])
