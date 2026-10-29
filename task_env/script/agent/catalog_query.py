@@ -53,12 +53,58 @@ def attach_asset_bundle(catalog, bundle_path):
     return catalog
 
 
-def build_catalog(core_repo, asset_bundle=None, providers=None):
+def attach_asset_delivery(catalog, delivery_path, *, provider_build_identities=None, allow_synthetic=False):
+    """Attach a verified USD delivery in its own catalog namespace.
+
+    USD is deliberately not added to ``external_assets``: the existing box
+    template and asset checker continue to accept only their mock bundle type.
+    """
+    from task_env.assembly.usd_delivery import load_usd_asset_delivery, resolve_provider_representation
+
+    loaded = load_usd_asset_delivery(delivery_path, allow_synthetic=allow_synthetic)
+    provider_build_identities = dict(provider_build_identities or {})
+    selections = {
+        provider: resolve_provider_representation(
+            loaded,
+            provider=provider,
+            provider_build_identity=build_identity,
+        ).to_mapping()
+        for provider, build_identity in sorted(provider_build_identities.items())
+    }
+    rows = catalog.setdefault('asset_deliveries', [])
+    if any(row.get('asset_identity_hash') == loaded.delivery.asset_identity_hash for row in rows):
+        raise ValueError('duplicate USD AssetDefinition in catalog')
+    rows.append({
+        'schema_version': 'catalog-usd-asset-delivery-v1',
+        'asset_identity_hash': loaded.delivery.asset_identity_hash,
+        'delivery_sha256': loaded.delivery_sha256,
+        'source_revision': loaded.delivery.source_revision,
+        'provenance_kind': loaded.delivery.provenance_kind,
+        'source_verified': loaded.source_verified,
+        'entry_file': loaded.delivery.entry_file,
+        'entry_file_sha256': hashlib.sha256(loaded.file_bytes[loaded.delivery.entry_file]).hexdigest(),
+        'entry_prim': loaded.delivery.entry_prim,
+        'variant_selections': dict(sorted(loaded.delivery.variant_selections.items())),
+        'representation_format': loaded.delivery.representation_format,
+        'representation_id': loaded.delivery.representation_id,
+        'closure_policy': loaded.delivery.closure_policy,
+        'closure_sha256': loaded.closure_sha256,
+        'file_count': len(loaded.file_bytes),
+        'validation_report_sha256': loaded.delivery.validation_report_sha256,
+        'inspection': dict(loaded.inspection),
+        'provider_selections': selections,
+        'runtime_admitted': False,
+    })
+    return catalog
+
+
+def build_catalog(core_repo, asset_bundle=None, providers=None, *, asset_deliveries=None,
+                  asset_provider_build_identities=None, allow_synthetic_asset_deliveries=False):
     context=core_context(core_repo)
     import task_env
     from task_env.artifacts.contracts import CAPABILITY_NAMES
     from task_env.runtime.sessions import provider_manifest
-    result=dict(schema_version='harness-catalog-v0',**context,errors=[])
+    result=dict(schema_version='harness-catalog-v0',**context,errors=[],asset_deliveries=[])
     for kind in ('env','agent','object','scene'):
         registry=getattr(task_env,kind.upper()+'_REGISTRY')
         result[kind+'_uids']=list(registry.uids())
@@ -108,6 +154,13 @@ def build_catalog(core_repo, asset_bundle=None, providers=None):
         'timebase_config':{'physics_dt':.002,'control_substeps':5},
         'required_capabilities':sorted(base.required_capabilities.names),'horizon':6000}
     if asset_bundle is not None:attach_asset_bundle(result,asset_bundle)
+    for delivery_path in asset_deliveries or ():
+        attach_asset_delivery(
+            result,
+            delivery_path,
+            provider_build_identities=asset_provider_build_identities,
+            allow_synthetic=allow_synthetic_asset_deliveries,
+        )
     return result
 
 
@@ -116,9 +169,23 @@ def main():
     parser.add_argument('--core-repo',required=True,type=Path)
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--asset-bundle',type=Path,help='explicit synthetic upstream bundle overlay; Core registries unchanged')
+    parser.add_argument('--asset-delivery',action='append',type=Path,help='versioned, byte-closed USD delivery manifest; kept separate from mock external_assets')
+    parser.add_argument('--asset-provider-build',action='append',default=[],help='provider=exact-build identity for a USD representation selection; repeatable')
+    parser.add_argument('--allow-synthetic-asset-delivery',action='store_true',help='test-only opt-in for explicitly synthetic USD fixtures')
     parser.add_argument('--providers',nargs='+',default=['geophys','mujoco'],help='query manifest names; does not install or qualify providers')
     args=parser.parse_args()
-    catalog=build_catalog(args.core_repo,args.asset_bundle,args.providers)
+    provider_builds={}
+    for item in args.asset_provider_build:
+        provider,sep,build=item.partition('=')
+        if not sep or not provider or not build or provider in provider_builds:
+            parser.error('--asset-provider-build must be unique provider=exact-build entries')
+        provider_builds[provider]=build
+    catalog=build_catalog(
+        args.core_repo,args.asset_bundle,args.providers,
+        asset_deliveries=args.asset_delivery,
+        asset_provider_build_identities=provider_builds,
+        allow_synthetic_asset_deliveries=args.allow_synthetic_asset_delivery,
+    )
     save_json(catalog,args.output)
     print(json.dumps({'output':str(args.output),'env_uids':catalog['env_uids']}))
     return 0

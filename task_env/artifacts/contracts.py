@@ -219,6 +219,205 @@ class AssetDefinition(Contract):
 
 
 @dataclass(frozen=True)
+class UsdDeliveryFileV1(Contract):
+    """One exact, portable byte binding in a USD delivery closure."""
+
+    path: str
+    size_bytes: int
+    sha256: str
+
+    def validate(self):
+        if type(self.path) is not str or not self.path or "\\" in self.path:
+            raise ValueError("USD delivery path must be a relative POSIX path")
+        parts = self.path.split("/")
+        if any(part in {"", ".", ".."} for part in parts) or self.path.startswith("/"):
+            raise ValueError("USD delivery path is not canonical or escapes its root")
+        if "://" in self.path or re.match(r"^[A-Za-z]:", self.path):
+            raise ValueError("USD delivery paths cannot use URI or drive syntax")
+        if type(self.size_bytes) is not int or self.size_bytes < 0:
+            raise ValueError("USD delivery size_bytes must be a nonnegative integer")
+        if type(self.sha256) is not str or not _SHA256.fullmatch(self.sha256):
+            raise ValueError("USD delivery sha256 must be lowercase SHA-256 hex")
+
+
+@dataclass(frozen=True)
+class UsdValidationReportV1(Contract):
+    """Bound validation outcome for one exact source/output representation."""
+
+    schema_version: str
+    report_id: str
+    provenance_kind: str
+    source_asset_identity_hash: str
+    source_revision: str
+    entry_file_sha256: str
+    closure_sha256: str
+    entry_prim: str
+    variant_selection_sha256: str
+    representation_format: str
+    representation_id: str
+    input_closure_sha256: str
+    output_closure_sha256: str
+    recipe_id: str
+    recipe_version: str
+    options_sha256: str
+    checks: tuple[str, ...]
+    losses: tuple[str, ...]
+    unconsumed: tuple[str, ...]
+    passed: bool
+
+    def validate(self):
+        _choice(self.schema_version, {"usd-validation-report-v1"}, "USD report schema")
+        _name(self.report_id)
+        _choice(self.provenance_kind, {"upstream-validated", "synthetic-fixture"}, "USD report provenance")
+        for label, value in (
+            ("source_asset_identity_hash", self.source_asset_identity_hash),
+            ("entry_file_sha256", self.entry_file_sha256),
+            ("closure_sha256", self.closure_sha256),
+            ("variant_selection_sha256", self.variant_selection_sha256),
+            ("input_closure_sha256", self.input_closure_sha256),
+            ("output_closure_sha256", self.output_closure_sha256),
+            ("options_sha256", self.options_sha256),
+        ):
+            if type(value) is not str or not _SHA256.fullmatch(value):
+                raise ValueError(f"{label} must be lowercase SHA-256 hex")
+        for label, value in (("source_revision", self.source_revision), ("recipe_version", self.recipe_version)):
+            if type(value) is not str or not value or value != value.strip():
+                raise ValueError(f"{label} must be a stable nonempty string")
+        _name(self.entry_prim.lstrip("/"))
+        _name(self.representation_format)
+        _name(self.representation_id)
+        _name(self.recipe_id)
+        for label, values in (("checks", self.checks), ("losses", self.losses), ("unconsumed", self.unconsumed)):
+            if not values or (label != "checks" and any(not item for item in values)):
+                if label == "checks" or values:
+                    raise ValueError(f"{label} must contain nonempty strings")
+            if len(set(values)) != len(values):
+                raise ValueError(f"{label} must be unique")
+        if any(type(item) is not str or not item.strip() for item in self.checks + self.losses + self.unconsumed):
+            raise ValueError("report list entries must be nonempty strings")
+        if type(self.passed) is not bool:
+            raise TypeError("passed must be bool")
+        if self.input_closure_sha256 != self.output_closure_sha256 or self.closure_sha256 != self.output_closure_sha256:
+            raise ValueError("validation report must bind matching input/output/current closures")
+
+
+@dataclass(frozen=True)
+class UsdAssetDeliveryV1(Contract):
+    """Portable, versioned USD source plus byte closure and report link."""
+
+    schema_version: str
+    asset_definition: AssetDefinition
+    source_revision: str
+    provenance_kind: str
+    entry_file: str
+    entry_prim: str
+    variant_selections: Mapping[str, str]
+    representation_format: str
+    representation_id: str
+    closure_policy: str
+    files: tuple[UsdDeliveryFileV1, ...]
+    closure_sha256: str
+    validation_report_path: str
+    validation_report_sha256: str
+
+    def validate(self):
+        _choice(self.schema_version, {"usd-asset-delivery-v1"}, "USD delivery schema")
+        if not isinstance(self.asset_definition, AssetDefinition):
+            raise TypeError("asset_definition must be AssetDefinition")
+        if type(self.source_revision) is not str or not self.source_revision or self.source_revision != self.source_revision.strip():
+            raise ValueError("source_revision must be a stable nonempty string")
+        if self.asset_definition.source_revision != self.source_revision:
+            raise ValueError("delivery source_revision differs from AssetDefinition")
+        _choice(self.provenance_kind, {"upstream-validated", "synthetic-fixture"}, "USD delivery provenance")
+        if type(self.entry_file) is not str or not self.entry_file:
+            raise ValueError("entry_file must be a canonical file path")
+        if type(self.entry_prim) is not str or not self.entry_prim.startswith("/") or self.entry_prim == "/" or "//" in self.entry_prim or ".." in self.entry_prim.split("/"):
+            raise ValueError("entry_prim must be an absolute USD prim path")
+        if not isinstance(self.variant_selections, Mapping):
+            raise ValueError("variant_selections must be a mapping")
+        for name, value in self.variant_selections.items():
+            if type(name) is not str or type(value) is not str or not name.strip() or not value.strip():
+                raise ValueError("variant selections require nonempty string keys and values")
+        _name(self.representation_format)
+        _name(self.representation_id)
+        _choice(self.closure_policy, {"usd-authored-all-dependencies-v1"}, "USD closure policy")
+        if not self.files or any(not isinstance(item, UsdDeliveryFileV1) for item in self.files):
+            raise ValueError("files must contain USD delivery file bindings")
+        paths = [item.path for item in self.files]
+        if len(paths) != len(set(paths)):
+            raise ValueError("USD delivery file paths must be unique")
+        if paths != sorted(paths):
+            raise ValueError("USD delivery file paths must be sorted canonically")
+        if self.entry_file not in paths:
+            raise ValueError("entry_file is not bound by the closure manifest")
+        if type(self.closure_sha256) is not str or not _SHA256.fullmatch(self.closure_sha256):
+            raise ValueError("closure_sha256 must be lowercase SHA-256 hex")
+        if type(self.validation_report_path) is not str or not self.validation_report_path:
+            raise ValueError("validation_report_path must be canonical")
+        if self.validation_report_path in paths:
+            raise ValueError("validation report is metadata, not a source closure file")
+        if type(self.validation_report_sha256) is not str or not _SHA256.fullmatch(self.validation_report_sha256):
+            raise ValueError("validation_report_sha256 must be lowercase SHA-256 hex")
+
+    @property
+    def asset_identity_hash(self) -> str:
+        return self.asset_definition.identity_hash
+
+    @property
+    def delivery_sha256(self) -> str:
+        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class ProviderRepresentationSelectionV1(Contract):
+    """F02 representation decision; never implies provider runtime admission."""
+
+    schema_version: str
+    asset_identity_hash: str
+    delivery_sha256: str
+    closure_sha256: str
+    provider: str
+    provider_build_identity: str
+    representation_format: str
+    representation_id: str
+    decision: str
+    format_matched: bool
+    source_verified: bool
+    representation_preparable: bool
+    runtime_admitted: bool
+    rejection_reason: str | None
+    resolver_version: str
+    recipe_id: str
+    options_sha256: str
+
+    def validate(self):
+        _choice(self.schema_version, {"provider-representation-selection-v1"}, "representation selection schema")
+        for label, value in (("asset_identity_hash", self.asset_identity_hash), ("delivery_sha256", self.delivery_sha256), ("closure_sha256", self.closure_sha256), ("options_sha256", self.options_sha256)):
+            if type(value) is not str or not _SHA256.fullmatch(value):
+                raise ValueError(f"{label} must be lowercase SHA-256 hex")
+        for value in (self.provider, self.provider_build_identity, self.representation_format, self.representation_id, self.resolver_version, self.recipe_id):
+            _name(value)
+        _choice(self.decision, {"selected", "rejected"}, "representation decision")
+        for label in ("format_matched", "source_verified", "representation_preparable", "runtime_admitted"):
+            if type(getattr(self, label)) is not bool:
+                raise TypeError(f"{label} must be bool")
+        if self.runtime_admitted:
+            raise ValueError("F02 representation selection cannot admit runtime execution")
+        if self.decision == "selected" and not (self.format_matched and self.representation_preparable):
+            raise ValueError("selected representation must match format and be preparable")
+        if self.decision == "rejected" and (self.rejection_reason is None or not self.rejection_reason.strip()):
+            raise ValueError("rejected representation requires a reason")
+        if self.rejection_reason is not None and type(self.rejection_reason) is not str:
+            raise TypeError("rejection_reason must be a string or null")
+
+    @property
+    def identity_hash(self) -> str:
+        canonical = json.dumps(self.to_mapping(), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
 class EntityInstance(Contract):
     """Scene-scoped instance identity pinned to one declared asset version."""
 

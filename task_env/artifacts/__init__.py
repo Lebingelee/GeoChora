@@ -2,6 +2,7 @@
 from .contracts import (
     ActionIntent, ActuatorReference, ActuatorResourceDefinition, ArticulationDefinition,
     AssetDefinition, CameraRendererOverrideV1, CanonicalStateView, CapabilityAdmissionError, CapabilityClaim,
+    UsdDeliveryFileV1, UsdValidationReportV1, UsdAssetDeliveryV1, ProviderRepresentationSelectionV1,
     ControlGroup, EntityDefinition, EntityInstance,
     ExecutionSpec, ExecutionSpecV1, FrameDefinition, FrameReference, InitializationContract,
     JointDefinition, JointReference, PoseWorld,
@@ -50,6 +51,7 @@ from .state import (
 __all__ = [
     'ActionIntent', 'ActuatorReference', 'ActuatorResourceDefinition',
     'ArticulationDefinition', 'AssetDefinition', 'CameraRendererOverrideV1',
+    'UsdDeliveryFileV1', 'UsdValidationReportV1', 'UsdAssetDeliveryV1', 'ProviderRepresentationSelectionV1',
     'CanonicalStatePublicationV1', 'CanonicalStatePublicationV2',
     'CanonicalStateView', 'CanonicalStateViewV1', 'CanonicalStateViewV2',
     'CapabilityAdmissionError', 'CapabilityClaim', 'ControlGroup', 'EntityDefinition', 'EntityInstance',

@@ -25,6 +25,11 @@ from .fixed_attachment import (
     lower_fixed_attachment_sources,
     validate_fixed_attachment_scene,
 )
+from .usd_delivery import (
+    LoadedUsdDeliveryV1,
+    load_usd_asset_delivery,
+    resolve_provider_representation,
+)
 
 __all__ = [
     "AgentReferences",
@@ -42,4 +47,7 @@ __all__ = [
     "LoweredFixedAttachmentSourceV1",
     "lower_fixed_attachment_sources",
     "validate_fixed_attachment_scene",
+    "LoadedUsdDeliveryV1",
+    "load_usd_asset_delivery",
+    "resolve_provider_representation",
 ]
