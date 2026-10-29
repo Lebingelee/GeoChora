@@ -171,3 +171,25 @@ Sol独立核对209项输出、81项保护hash、69项可信闭包中的67个实�
 复核原件及收据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05b_002/`。原表进度16/22有界接收；下一项R05c须正式route CPU/CUDA×100/500Hz四个独立完整task/Outcome/strict Expert/同run H5及reader证据，不能以旧C05c任务结果加新短H5拼成新run PASS。R06c历史missing-raw/处置门不变。
 
 维护者最新决定：**后续工作包prompt由维护者自行发送**；Sol准备/复核并提供文件，不直接向Luna2发执行或补充prompt。本次未派下一包、未运行R05c、未merge/push或改F线。
+
+<a id="r05c-attempt001-implementation-plan"></a>
+
+## R05c attempt001 实施位置与执行合同（2026-10-29，工作包由维护者发送）
+
+前置R05b002已接收。分类COMPOSE_EXISTING，必要测试/reader扩展为EXTEND_EXISTING；四格为CPU-100、CPU-500、CUDA-100、CUDA-500，均使用正常 `NutAssemblyReferenceEnv.for_native_feedback_profile()` 与 `build_native_feedback_solution()`，`nutassembly-native-feedback-v1`、GeoPhys c6df840、精确69文件闭包、seed19/NA-S0、R3/10N/implicitfast/2ms×5/outer100Hz/无render。physics、force与Guard均500Hz，law100每outer一次update+四hold；law500五次update。旧a53 C05c诊断构造不用于新运行。
+
+| 既有owner/方法 | 本包工作与验收 |
+| --- | --- |
+| `r05b_native_feedback_s2_worker.run`、`c05c_geophys_gripper_cadence.run_group` | 在现有诊断owner内组合完整expert loop/阶段/Outcome收尾；复用正常构造、目标/Guard/控制律/Recorder，旧two-interval接口不改。可新增窄r05c入口，不能复制另一Runtime或整套旧worker。每cell从fresh worker一次reset直接完整录制，不强制重复旧两outer probe。 |
+| `r05b_native_feedback_supervisor.run`及资源/锁/finalizer helpers | 复用现有锁/进程组/资源/final receipt逻辑，以显式mode/callable/shared helper支持full campaign；保留旧R05b两步默认与S1。冻结真实command/run/cell/HEAD/pin/profile/closure，错误收尾不得发布成功。 |
+| `c05c_geophys_gripper_cadence.validate_h5(..., require_guard=True)`、既有execution.load | 正式同run H5的生产语义读回，完整检查Guard授权连续窗口、raw/closing、Native Sequence/时钟/Ack/arm hold-ramp。严格Expert/Outcome/task成功、无fault/warning、terminated/truncated false均独立从结果与磁盘核实。 |
+| `r05b_native_feedback_independent_reader.read`及现有raw JSON/H5 helpers | 显式full mode支持T>=1、T+1、law100/500与完整Outcome；同一文件盘值独立复算，不import Core/provider。保留two-interval reader原接口/拒绝门，不取消原断言。完整磁盘Guard窗口/force/更新hold/边界/Controller/episode/source/closure/build均需证据。 |
+| R05b S1/worker/finalizer/raw-reader测试 | native前跑真实owner成功链的full-complete synthetic IO和law100/500；终止/超时/缺H5/错cell身份/错phase/stale/Guard/Outcome/篡改/close/预算失败应拒绝。小synthetic fixture明确不是物理结果；原19项受影响S1保护不回退。 |
+
+每格完整task、Outcome、planned trajectory、strict Expert必须通过；task success与completion不同，不仅看raw predicate或reward。需要相同run的完整关闭H5/production semantic reader/独立raw reader、reset/source/controller/Target/Ack身份闭环。四格各自单独PASS，绝不拼接旧C05c任务成功与新短H5或不同run的片段。
+
+预算：预计120–180分钟、主动timebox240分钟（包括开发/必要修复/S1/最多四格及重跑），外部锁/资源等待另记；每S1进程180秒/采样RSS2GiB。每native cell worker wall25分钟、进程组采样RSS4GiB、输出128MiB、1个完整episode，step hard cap沿原固定horizon **6000 outer/30000 native/60 simulated seconds/1 reset**；physics计数与状态时钟推导分别记录。此上限保留原任务6000 horizon，不把旧约2442/2443步当新固定通过步数，也不调高任务horizon。attempt新输出总量1GiB，日志每run16MiB；独立reader每进程180秒/采样RSS4GiB，原文件保留。内存采样与硬逻辑/时间上限分列。
+
+与F线共用native排他锁，worker全生命周期持锁，退出确认后释放，离线reader不持锁。启动前available RAM>=5GiB、CUDA free>=2GiB且无其他compute worker；worker显存采样cap=min(7GiB,total-other-used-512MiB)，记录实际值。每run新目录；窗口内修复与重跑允许，不设默认一次启动额度。变更后先受影响S1再freeze实现；四格最终接收实现必须一致或有逐文件无影响审计，改变共享执行/控制/物理/reader合同必须重跑受影响格。
+
+Provider/source/task算法/pins默认保持；发现真实physics/Controller/Guard/限值/source变化必要性时，不自改冻结oracle，交Sol具体外部决定。两项旧config摘要差异仅保留已知限定，不改baseline/hash，不让它取代本轮正式格验收。R06c、R07、F线、P99与Qualification不在本包执行范围。新worker/reader/test与必要状态文档/Skill可提交本地；不merge/push/tag，不向其他Luna发消息。

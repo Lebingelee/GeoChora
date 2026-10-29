@@ -2047,10 +2047,12 @@
       "depends_on": [
         "R05b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
-      "required_evidence": "S2/S3",
-      "stop_condition": "任一required cell失败/未运行→P99 blocked"
+      "status": "READY_FOR_MAINTAINER_DISPATCH",
+      "execution": "ATTEMPT001_PACKAGE_PREPARED_NOT_STARTED",
+      "required_evidence": "Four separate normal-profile full task/strict Expert/Outcome/Guard and same-run H5 production+independent raw readers; CPU/CUDA x100/500Hz law",
+      "stop_condition": "任一required cell失败/未运行→P99 blocked",
+      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05c-attempt001-implementation-plan",
+      "prompt_sender": "MAINTAINER_ONLY"
     },
     {
       "id": "R06b",
@@ -2547,9 +2549,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "be296e701db63ae4c09efa563e67eb2fcfb4354bbe4892c4804796a143f791ca",
+    "05_R05_Native_Rate_Feedback.md": "ac284b8249edf9ada9fdeec7e59ed0f8c430b50b520aa7b99a5a51020f8b5108",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "656f81e922477e8ff7f8ade3df7276ef6424481d79b3fe75cec87ea9bc022f42"
+    "07_Execution_Order_and_Acceptance.md": "1cd8713c687c21db4a22137b2f47c494d8dd79b3c308729081c551f48edca94c"
   },
   "revision_kind": "R05B_ATTEMPT002_BOUNDED_REPAIR_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -5186,6 +5188,14 @@
       "next_slice": "R05c not dispatched",
       "prompt_sender": "MAINTAINER_ONLY",
       "new_native_by_sol": 0
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "SOL_PREPARE_R05C001_PACKAGE",
+      "status": "PREPARED_NOT_DISPATCHED",
+      "prompt_sender": "MAINTAINER_ONLY",
+      "new_native": 0,
+      "required_envelope_changed": false
     }
   ],
   "P00_audit": {
