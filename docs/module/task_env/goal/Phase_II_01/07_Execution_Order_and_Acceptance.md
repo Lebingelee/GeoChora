@@ -1,10 +1,10 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-2026-10-30诊断接续：[R07c D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)由维护者转交 Luna2，复用 camera checkout，修复现有 SelectedReferenceEnv → RuntimeSession → MuJoCo 统一路线。实现与最终 provider-free S1 已完成（125 passed）；本包有条件授权的 MuJoCo CPU native/H5 正在按冻结计划推进，最终状态见下方 D01 execution result。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。正常评估不要求恢复某次历史 fixture sample；18/22 与原五任务出口不变。下文旧状态保留历史时点含义。
+2026-10-30诊断接续：[R07c D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)由维护者转交 Luna2，复用 camera checkout，修复现有 SelectedReferenceEnv → RuntimeSession → MuJoCo 统一路线。最终 provider-free S1 为129 passed；冻结计划绑定的 MuJoCo 3.8.1 CPU native与同run H5独立reader已通过，状态 `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。正常评估不要求恢复某次历史 fixture sample；18/22 与原五任务出口不变。下文旧状态保留历史时点含义。
 
 当前入口（2026-10-30）：**R06c按有界required证据汇总接收；R01–R06仍为18/22 slices。R07c pilot attempt003的PARTIAL/G1-G2 BLOCKED保持其签署时点含义；独立 D01 diagnostic attempt001 已实现统一 SelectedReferenceEnv/RuntimeSession/MuJoCo 路线并通过 provider-free S1，native/H5 结果以本页 D01 execution result 为准。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
-- **Luna2**：普通[R07c pilot attempt003](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-execution-result)仍保留PARTIAL/G1-G2 BLOCKED历史状态；新的 D01 diagnostic attempt001 已完成核心接线与 S1，正在执行自己的有界 native 窗口。普通attempt历史不追溯改写。
+- **Luna2**：普通[R07c pilot attempt003](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-execution-result)仍保留PARTIAL/G1-G2 BLOCKED历史状态；独立 D01 diagnostic attempt001 已完成有界 native/H5与reader，等待Sol复核。普通attempt历史不追溯改写。
 - **R07当前边界**：R07a004来源/协议部分接收及单pilot来源准入已有Sol记录。pilot不代表原五任务R07a或R07b整体通过；TurboSquid三族仍阻塞其关联任务，不影响本包未消费这些资产的工作。保留原五任务最终P99目标、原生语义和成本/独立Human评审。
 - **Luna1**：独立负责`develop-full`的F00–F07，状态以其分支10文档及实际报告为准；本次不写主checkout/F文档、Isaac或依赖。
 - **R05完成**：精确normal-route CPU/CUDA×100/500Hz完整回合及H5双reader已获Sol接收，不承诺通用Provider/实时2ms/Qualification。

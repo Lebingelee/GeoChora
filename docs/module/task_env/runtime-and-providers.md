@@ -331,8 +331,9 @@ layout and entity-pair contact coverage/freshness. The task-owned On predicate
 requires current positive bowl/plate contact, bowl height at least the plate,
 and XY distance below 0.03 m; missing or stale contact remains unavailable.
 
-The final provider-free same-route S1 passed 125 focused cases. D01's bounded
-MuJoCo 3.8.1 CPU native result is reported in the
+The final provider-free same-route S1 passed 129 focused cases. D01's bounded
+MuJoCo 3.8.1 CPU native/H5 and independent-reader result is
+`R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`, reported in the
 [execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
 Even a successful pilot is limited to its frozen source/task/reset/controller
 intersection and does not establish the original five-task R07 goal, P99,

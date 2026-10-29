@@ -1106,15 +1106,18 @@ finally:
     env.close()
 ```
 
-The current focused provider-free set is 125 passed in
+The final focused provider-free set is 129 passed in
 `task_env/diagnostics/tasks/test_r07c_libero_core_env_s1.py`,
 `test_r07c_libero_source_control_s1.py`, `test_r07c_libero_init_state_s1.py`,
 `test_selected_consumers.py`, the R02b leaf, C05a recording, D02a state and
 R04a camera consumer tests. The run used the geochora Python 3.12 interpreter,
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, and explicit camera Core/GeoPhys `PYTHONPATH`.
 It exercised the same Selected Env/RuntimeSession/worker/Generic H5 v3 reader
-with only bottom MuJoCo model/data IO replaced. S1 does not establish native
-semantics. The D01 native/H5 status is maintained in the
+with only bottom MuJoCo model/data IO replaced. The locked MuJoCo 3.8.1 CPU
+run then produced three same-route 64/65 H5 episodes, 4,800 steps and five
+resets; the independent reader validated the H5s and parent lock/exit receipts.
+The bounded label remains pending Sol review. This does not establish broader
+task support or Qualification. The D01 native/H5 status is maintained in the
 [execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
 Do not promote the route to general task registration, five-task R07c, P99,
 Human Judge, or Qualification from this diagnostic result.

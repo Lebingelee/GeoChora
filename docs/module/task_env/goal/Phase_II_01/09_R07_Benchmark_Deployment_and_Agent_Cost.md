@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包 [D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md) 已在 camera 分支实现 SelectedReferenceEnv → RuntimeSession → MuJoCo 路线，并通过最终 provider-free S1（125 passed）；本包另有条件授权的 MuJoCo 3.8.1 CPU native/H5 正在按冻结计划执行，门状态见[D01 execution result](#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30)。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧普通 attempt003 的 partial/失败不追溯升级。五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
+当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包 [D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md) 已在 camera 分支实现 SelectedReferenceEnv → RuntimeSession → MuJoCo 路线；最终 provider-free S1 为129 passed，冻结计划下的 MuJoCo 3.8.1 CPU native/H5与同run独立reader通过，标签为 `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`，门状态见[D01 execution result](#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30)。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧普通 attempt003 的 partial/失败不追溯升级。五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
 
 状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/BLOCKED待Sol复核。新source composer恢复了上游 movable-object free-joint与命名规则；原`.pruned_init`安全解码成功，但其不含每行fixture pose或采样seed，不能完成原始reset映射。真正MuJoCo RuntimeSession mixed-control/contact consumer与同路线S1未完成，因此G1/G2未过、zero native。公开LIBERO `make_env` admission关闭；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；历史记录保持其签署时点含义，原五任务最终目标不缩减。
 
@@ -293,18 +293,24 @@ provider-free修复S1：安全decoder/source-control 32 passed；旧BaseTaskEnv 
 
 ## R07c diagnostic D01 attempt001 execution result (2026-10-30)
 
-Status before the authorized native window: implementation complete; G0–G2
-provider-free gates pass, native G3–G5 are pending. Input was camera
-`06e289aaedc5d9e540beb56807e8cb898bf57c99`; implementation commit is
-`11f652705259b2a29901ed11491dfe226c54ffce`. Final provider-free S1 run081
-passed 125 focused cases in 27.61 s with maximum sampled process-group RSS
-374,738,944 bytes. Correct camera Core/GeoPhys `PYTHONPATH` and the required
-geochora Python 3.12 executable were recorded. The S1 integration executes the
-same `SelectedReferenceEnv → RuntimeSession → MuJoCo adapter → existing H5 v3`
-route with only bottom MuJoCo public model/data IO replaced; it does not count
-as native evidence.
+Final status: `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`.
+The package input was camera HEAD `06e289aaedc5d9e540beb56807e8cb898bf57c99`;
+the native freeze bound implementation HEAD `4eaa76ba2b35a2d984559980bbf98f46bd4d333d`.
+Final provider-free S1 run111 passed 129 focused cases in 29.14 s with maximum
+sampled process-group RSS 787,726,336 bytes. It exercised the same
+`SelectedReferenceEnv → RuntimeSession → MuJoCo adapter → existing H5 v3`
+route with only bottom MuJoCo public model/data IO replaced; it is not native
+evidence. The implementation correction computes Panda aggregate finger
+aperture as `q1 - q2` because the source's second finger joint is negative;
+the independent reader cross-checks this summary against H5 observations and
+enforces the episode motion thresholds. The first locked run (run108) completed
+but its old signed-sum summary was not accepted; run110's initial rerun exposed
+one test-order assertion mismatch, fixed before run111. Both raw runs remain
+preserved and are excluded from the final S1/native result.
 
-The fixed controller/source/reset plan is frozen for one conditional CPU run:
+The final native plan was frozen in run112 (SHA-256
+`b3876b5558c6070d05d948490c63e3c4ee5aaff601fe6afd6f2de9b779327c32`) for a
+fresh CPU run on MuJoCo 3.8.1/API3008001, with renderer disabled. It binds:
 LIBERO `8f1084e3132a39270c3a13ebe37270a43ece2a01`, robosuite
 `fbee5844ff5632f5b5698e204ec5357ca50be0df`, seed 19, rows 0/1/2, 64 public
 outer intervals each, 20 Hz, 2 ms × 25, 4,800 expected `mj_step` calls, and two
@@ -313,8 +319,24 @@ joint-space PD `Kp=20`, `Kd=4`; this is not upstream OSC_POSE equivalence or a
 controller qualification. The deterministic current fixture realization is
 source-derived and recorded; historical per-row fixture parity is not claimed.
 
-The next gate is the locked MuJoCo 3.8.1/API3008001 CPU worker and same-run
-independent H5/parent receipt. No broader task/P99/qualification claims follow
-from this pilot. Final run receipts, exact gate status, resource use and local
-documentation commit are in the ignored output
+Locked run113 exited 0 in 4.83 s with maximum sampled RSS 1,402,273,792 bytes;
+its process group exited and released the shared lock. The same Env produced
+three 64-transition/65-observation H5s (192 transitions, 195 observations),
+4,800 native steps and five resets, including the separate diagnostic endpoints.
+Each episode exceeded the arm and TCP gates (0.713–0.760 rad and 0.380–0.404 m)
+and the corrected aggregate finger-aperture gate (0.04067 m). The negative and
+positive contact endpoints agreed between the Core predicate and source oracle
+with 0 and 56 bowl/plate contact pairs. Run114 independently verified all three
+H5s, worker/result and parent exit/lock receipts; it returned `verified_complete`.
+Worker outcomes are horizon-truncated, `task_success=false`, and
+`solution_completed=null`; no task completion or Expert success is claimed.
+
+Cumulative attempt native use is four locked starts, 9,600 `mj_step`, ten
+resets, and 11.3139 native wall seconds. Two earlier starts failed before reset
+and contributed zero steps/resets; run108 completed its own 4,800-step trace but
+is excluded because its worker summary used the wrong signed finger formula.
+Run113 alone supplies the accepted same-run native/H5 result. No broader
+five-task, 18/22, P99, Human Judge, D0/D1/D2, develop-full integration or
+Qualification claim follows. Full run receipts, exact gate status, resources,
+source snapshots and package manifest are in ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/`.
