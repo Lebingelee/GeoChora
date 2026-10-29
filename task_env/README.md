@@ -21,8 +21,18 @@ PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py \
 The current selected manipulation UIDs are
 `pick-cube-p16-reference-v1` and `nut-assembly-outcome-reference-v1`.
 Construct them through `from task_env import make_env`; NutAssembly advances
-only through its guarded `step_expert()` route. Task success and expert
-lifecycle completion remain separate.
+through its guarded `step_expert()` route by default. The separate advanced
+R05b profile below uses the existing task-owned external Solution route.
+Task success and Expert lifecycle completion remain separate.
+
+An advanced bounded GeoPhys native-feedback profile is available through
+`NutAssemblyReferenceEnv.for_native_feedback_profile(backend="cpu"|"cuda",
+gripper_control_hz=100|500)`; it uses the selected NutAssembly source and
+normal Core admission with a versioned source-closure receipt. R05b attempt001
+completed focused provider-free S1 plus two-outer CPU and CUDA native S2 with
+independent H5 readback, pending Sol review. This does not qualify the full
+100/500 Hz campaign, task/Expert completion, other sources or Providers, or
+Formal Qualification. See the [R05 execution record](../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29) and [public API contract](../docs/module/task_env/public-api.md#r05b-bounded-nutassembly-native-feedback-profile).
 
 ## Current developer workflows
 

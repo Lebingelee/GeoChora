@@ -1,6 +1,6 @@
 {
   "kind": "phase-ii-01-revised-planning-manifest-v1",
-  "date": "2026-10-23",
+  "date": "2026-10-29",
   "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
   "implementation_authorized": false,
   "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
@@ -1798,11 +1798,74 @@
       "depends_on": [
         "R05a"
       ],
-      "status": "READY_FOR_IMPLEMENTATION",
-      "execution": "ATTEMPT001_PACKAGE_PREPARED_NOT_STARTED",
+      "status": "BOUNDED_S1_S2_PASS_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_FOCUSED_S1_AND_CPU_CUDA_S2_PASS; TWO_BROADER_SOURCE_CONFIG_DIGEST_FAILURES_PRESERVED",
       "required_evidence": "S1/S2",
-      "stop_condition": "错phase/validity或private bypass→停止",
-      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-sol-acceptance-20261029"
+      "stop_condition": "Bounded normal-profile S1/S2 complete; Sol review required before R05c. Preserve two unresolved broader construction-summary digest failures; no Qualification/P99.",
+      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-sol-acceptance-20261029",
+      "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
+      "provider_branch": "codex/phase-ii-01-r05-provider",
+      "implementation_commits": [
+        "dc98de871b8263eb7f11ed6b38261e5fc678b774",
+        "91a3774f93905d665cedd462d658824c5daf56d7"
+      ],
+      "result": "Final-freeze Core 91a3774 and GeoPhys c6df840: Provider S1 23 passed and Core focused S1 11 passed with zero engine tripwire hits; final CPU and CUDA each completed one reset, two outer intervals, ten native steps, clean close and production plus independent raw-H5 readback. Two broader historical source.config digest assertions fail and were reproduced; retained as unresolved regression risk. No task/Expert completion, R05c, P99 or Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_001/",
+      "prompt_sha256": "42044e9dafd3f684d6b92c97bd6b06ddf817046b6152fda3ec988f2d2f40c0f3",
+      "input_snapshot_sha256": "918080fe4613c16bf9d86b16526cd0441563b1bede31cc15d52e36bf222b941e",
+      "input_head": "b5b75dda74adcab6706cb09b875dc64b92485d33",
+      "implementation_head": "91a3774f93905d665cedd462d658824c5daf56d7",
+      "provider_free_s1": {
+        "provider": "23 passed; tripwire 0; max sampled RSS 49,438,720 bytes",
+        "core_focused": "11 passed in 2.53s; tripwire 0; max sampled RSS 102,312 KiB"
+      },
+      "broader_regression": {
+        "initial": "59 passed, 2 failed in 165.38s",
+        "recheck": "2 reproduced failures in source.config digest assertions",
+        "disposition": "Unresolved; no baseline-input rerun and no historical digest constants changed."
+      },
+      "native_s2": {
+        "cpu": {
+          "run": "runs/cpu_run_002",
+          "status": "PASS",
+          "resets": 1,
+          "outer_intervals": 2,
+          "native_steps": 10,
+          "boundaries": 3,
+          "wall_seconds": 44.66022853204049,
+          "max_sampled_group_rss_bytes": 1089560576,
+          "h5_size_bytes": 46064,
+          "h5_sha256": "d993504e488407bde5a516df987f948c8cbe5e082533e1c084f49bd755a3d2cec",
+          "readers": "production and independent raw H5 PASS"
+        },
+        "cuda": {
+          "run": "runs/cuda_run_001",
+          "status": "PASS",
+          "resets": 1,
+          "outer_intervals": 2,
+          "native_steps": 10,
+          "boundaries": 3,
+          "wall_seconds": 47.59495560405776,
+          "max_sampled_group_rss_bytes": 1191022592,
+          "max_sampled_worker_gpu_bytes": 207618048,
+          "h5_size_bytes": 46660,
+          "h5_sha256": "7474ad564392db441d677b84998d78a4e3c9651c73e1128a9ee2206a768ab3e0",
+          "readers": "production and independent raw H5 PASS"
+        }
+      },
+      "source_receipt": {
+        "source_id": "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1",
+        "artifact_identity": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+        "canonical_xml_sha256": "909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d",
+        "importer_xml_sha256": "16b19e020f843dfd11b0f2086da777426cd56e015d69c5363a97e5f86dc6dc17",
+        "closure_digest": "bf08619661608cf4caa7ecacda2ab9f4cd02489fd411935a26678bdde8b07f6c",
+        "closure_files": 69
+      },
+      "native_starts_total": 3,
+      "shared_lock_released": true,
+      "sol_review": "PENDING",
+      "qualification_granted": false,
+      "task_success_claimed": false
     },
     {
       "id": "R05c",
@@ -2309,11 +2372,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "b6fc670cd607b4a1e28a340b5ca8210e08ba0fd33bfcdebc0c56b4e8f5d6d468",
+    "05_R05_Native_Rate_Feedback.md": "0a841f46479006eccb381fa33d4caf89c00f94819906c75325450ef8ca812b0a",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "0a6547b06a3cc76c4a47d383a9c7d248d647e85e5f25459e578364081fcfd8e8"
+    "07_Execution_Order_and_Acceptance.md": "851ed076ad645ed51ad63de9e32da1125441a8f20c5317ba2efefa4322d68a5e"
   },
-  "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
+  "revision_kind": "R05B_ATTEMPT001_BOUNDED_IMPLEMENTATION_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3995,7 +4058,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "DOCUMENTATION_ONLY; checkpoint c30d97e retained; recovery and F00-F07 patch direction recorded. No implementation, install, branch integration or native execution.",
+  "planning_submission_this_revision": "R05b attempt001 implementation, focused S1, bounded CPU/CUDA native S2 and documentation/Skill sync; pending Sol review. Broader construction-summary digest failures and R05c limits preserved.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4860,6 +4923,45 @@
       "new_native_by_sol": 0,
       "required_envelope_changed": false,
       "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05a_001/"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "LUNA_R05B_ATTEMPT001_BOUNDED_IMPLEMENTATION_AND_CPU_CUDA_S2_PENDING_SOL_REVIEW",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "b5b75dda74adcab6706cb09b875dc64b92485d33",
+      "implementation_head": "91a3774f93905d665cedd462d658824c5daf56d7",
+      "implementation_commits": [
+        "dc98de871b8263eb7f11ed6b38261e5fc678b774",
+        "91a3774f93905d665cedd462d658824c5daf56d7"
+      ],
+      "provider_branch": "codex/phase-ii-01-r05-provider",
+      "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
+      "prompt_sha256": "42044e9dafd3f684d6b92c97bd6b06ddf817046b6152fda3ec988f2d2f40c0f3",
+      "input_snapshot_sha256": "918080fe4613c16bf9d86b16526cd0441563b1bede31cc15d52e36bf222b941e",
+      "result": "R05B_BOUNDED_PUBLIC_NATIVE_FEEDBACK_S1_S2_PASS_PENDING_SOL_REVIEW; CPU/CUDA each 2 outer/10 native with dual-reader PASS; two broader construction-summary digest failures retained unresolved.",
+      "provider_s1": "23 passed; tripwire 0",
+      "core_focused_s1": "11 passed; tripwire 0",
+      "broader_regression": "59 passed, 2 failed; two digest failures reproduced and not labeled pre-existing without baseline rerun.",
+      "native_starts": 3,
+      "native_final_runs": [
+        "runs/cpu_run_002",
+        "runs/cuda_run_001"
+      ],
+      "shared_lock_released": true,
+      "source_closure_digest": "bf08619661608cf4caa7ecacda2ab9f4cd02489fd411935a26678bdde8b07f6c",
+      "source_closure_file_count": 69,
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_001/",
+      "documentation": [
+        "05_R05_Native_Rate_Feedback.md",
+        "07_Execution_Order_and_Acceptance.md",
+        "task_env/README.md",
+        "docs/module/task_env/public-api.md",
+        ".agents/skills/geochora-task-env/SKILL.md"
+      ],
+      "sol_review": "PENDING",
+      "R05c_started": false,
+      "DAG_P99_required_envelope_changed": false,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -5029,7 +5131,7 @@
       "authority": "Latest explicit maintainer instruction in this conversation",
       "luna2_thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
       "luna2_branch": "codex/phase-ii-01-camera",
-      "luna2_scope": "Original 07 R01-R07/P99; R05a accepted, next R05b implementation",
+      "luna2_scope": "Original 07 R01-R07/P99; R05a accepted; R05b attempt001 implementation and bounded S1/S2 complete pending Sol review; R05c not started.",
       "luna1_scope": "F00-F07 on develop-full",
       "active_stage_checkouts": 2,
       "new_worktrees": 0,

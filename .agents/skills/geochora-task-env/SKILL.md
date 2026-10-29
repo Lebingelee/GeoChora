@@ -971,7 +971,41 @@ hash/size, receipt, materialization ID, per-case counters and native named
 order/slots. Sol accepted run002 on 2026-10-29 as
 `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`; run001 remains a retained reader failure. It covers only the
 frozen Panda Arm+Hand and one `r06b-order-v1` recipe; it does not grant general
-source/provider compatibility, task success or Qualification. Historical
-raw/phase disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`, R05
-remains blocked on its formal Provider contract, and R06c/P99 is not closed.
+source/provider compatibility, task success or Qualification. At the time of
+that R06b review, historical raw/phase disposition remained
+`BLOCKED_MISSING_RAW_OR_PHASE_DECISION` and R05 was still waiting on its formal
+Provider contract; R06c/P99 was not closed.
 See the [Sol bounded acceptance](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-sol-acceptance) and [attempt003 execution result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-execution-result-2026-10-29).
+
+## R05b bounded native-feedback route (2026-10-29)
+
+The selected NutAssembly task exposes an advanced normal-profile construction:
+
+```python
+from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
+
+env = NutAssemblyReferenceEnv.for_native_feedback_profile(
+    backend="cpu", gripper_control_hz=500, horizon=6000,
+)
+try:
+    observation, info = env.reset(seed=19)
+finally:
+    env.close()
+```
+
+Use `backend="cpu"` or `"cuda"` and `gripper_control_hz=100` or `500` (default
+500). This is a normal Core-admitted profile for the exact NutAssembly Square
+nominal-v1 Artifact and canonical source closure on the pinned GeoPhys build;
+it is not the historical C05c diagnostic constructor and does not expand the
+generic Provider manifest. Its versioned source receipt binds the XML and the
+immutable dependency bytes consumed by the Importer. Keep the named actuator
+mapping, strict scalar profile, implicitfast solver, 2 ms × 5 timebase, seed19,
+and existing Controller/Solution route unchanged. Unsupported sources, builds,
+backend/runtime settings and incomplete provenance fail closed.
+
+R05b attempt001 provider-free focused S1 and final-freeze GeoPhys CPU/CUDA
+two-outer native S2 passed with production semantic and independent raw H5
+readers, pending Sol review. The two-outer run does not complete the task,
+Expert route or Guard dwell and does not qualify the full CPU/CUDA × 100/500 Hz
+campaign, real-time/device-resident control, P99 or Formal Qualification. See
+the [public API contract](../../../docs/module/task_env/public-api.md#r05b-bounded-nutassembly-native-feedback-profile) and [R05 execution record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29).

@@ -601,6 +601,43 @@ progress 由现有 `TaskLifecycleAdapter` 持有，并在 `reset_task()` 清除�
 仍只为该 outer boundary 提供时间/来源证据，不把其内部 native samples 当作多次 task commit。当前为 scalar-only S1 contract，
 Temporal rule 不进入冻结 TaskArtifact v0，也不建立持续时间 Guard 或自动接入 observation/native callback。
 
+## R05b bounded NutAssembly native-feedback profile
+
+The selected NutAssembly task has an explicit advanced normal-profile entry:
+
+```python
+from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
+
+env = NutAssemblyReferenceEnv.for_native_feedback_profile(
+    backend="cpu", gripper_control_hz=500, horizon=6000,
+)
+try:
+    observation, info = env.reset(seed=19)
+    # Continue through the existing public env.step / task Solution routes.
+finally:
+    env.close()
+```
+
+`backend` is `cpu` or `cuda`; `gripper_control_hz` is `100` or `500` (default
+`500`). This selection goes through the normal Core admission path and uses
+`nutassembly-native-feedback-v1`, not the historical C05c diagnostic
+constructor. Admission is limited to the exact NutAssembly Square nominal-v1
+Artifact, pinned canonical source and complete Importer closure, GeoPhys build,
+named arm-joint/open-actuator mapping, strict `p1_2_scalar_cpu_v0`,
+implicitfast, 2 ms × 5 native timebase, and no rendering. The versioned
+execution-source receipt binds the XML and the immutable bytes actually read
+by the Importer. The generic GeoPhys provider manifest remains conservative;
+other source/build/task intersections fail closed.
+
+R05b attempt001 exercised the exact route on GeoPhys CPU and CUDA with the
+500 Hz law: each fresh run had one reset, two outer intervals and ten native
+steps, and passed both the production semantic reader and an independent raw
+H5 reader. Focused provider-free S1 passed; the bounded result is pending Sol
+review. These short runs do not establish task or Expert completion, Guard
+dwell, the full CPU/CUDA × 100/500 Hz campaign, real-time or device-resident
+control, general Provider support, P99, or Formal Qualification. See the
+[R05 record](goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29).
+
 ## Parallel、退休和缺失路线
 
 `make_parallel_env` 要求显式 homogeneous registration。`execution="local"|"remote"`

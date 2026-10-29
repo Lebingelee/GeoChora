@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态（2026-10-29）：R05a attempt001 已获 Sol 接收 `ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN`，仅合同设计/实施决议、S1与旧probe复用出口；Provider新合同/正常route尚未落地。下一包R05b attempt001，R05c未启动；旧C05c四格继续保留诊断身份。
+状态（2026-10-29）：R05a attempt001 已获 Sol 接收 `ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN`。R05b attempt001 已完成 Provider setter、Core normal-profile admission、定向 S1 和 CPU/CUDA 有界 S2，当前为 `R05B_BOUNDED_PUBLIC_NATIVE_FEEDBACK_S1_S2_PASS_PENDING_SOL_REVIEW`；两个较宽历史 construction-summary digest 断言仍未解决，详见下方执行记录。R05c未启动；旧C05c四格继续保留诊断身份。
 
 ## 现有能力与 owner
 
@@ -108,3 +108,17 @@ Sol复核Luna提交 `e8d233a7bfd31a38d30759fdea861518616c19b7`：18项输出mani
 每S1进程180秒/2GiB RSS；每backend native run 15分钟/4GiB RSS、CUDA worker显存采样上限7GiB（启动前须留足桌面余量）、每run输出64MiB、最多32 outer/160 native/2 reset；整个attempt输出256MiB、主动180分钟。硬预算与采样最大值分列；GPU用可观测按PID/设备采样，不要求Taichi不存在的torch allocator计数。共享native锁覆盖实际worker整个生命周期；失败修复后使用新run目录并重新freeze实现commit/源码，失败原件保留，不拼接PASS。
 
 R05c的完整cell/最小delta选择由Sol按R05b实际diff决定，旧任务证据可复用事实与新正式route实际未测事实分列；当前不授权把旧task成功与新短H5拼成新run task PASS。R05b只完成本行，不提前运行/关闭R05c、R06c/P99。
+
+<a id="r05b-attempt001-execution-result-2026-10-29"></a>
+
+## R05b attempt001 执行结果（2026-10-29）
+
+状态 `R05B_BOUNDED_PUBLIC_NATIVE_FEEDBACK_S1_S2_PASS_PENDING_SOL_REVIEW`。实现分类为 `EXTEND_EXISTING`：GeoPhys 在既有 `RigidSolverStateHostIOMixin` 增加公开 `set_actuator_force_limits(ids, lower, upper)`；Core boundary 只调用该 Provider API，并在相同有效 float32 limits 时避免重复配置写。限值真实变化通过 Provider revision/invalidation 路径处理，reset/restore 后从 Core 已记录的 override 重施。GeoPhys 文档明确 native-step host primitive 的phase、同步、copy/lifetime、线程与失效边界；没有 device-resident 或实时 2 ms 承诺。
+
+Core 使用版本化 `ExecutionSourceReceiptV1` 固定 canonical XML 与 Importer 实际使用的 69 个 closure 文件，并让 Importer 从同一只读 snapshot 读取。正常profile `nutassembly-native-feedback-v1` 与历史 a53 C05c diagnostic allowlist 分离；精确限制为 NutAssembly Square nominal-v1 Artifact、该 source closure、GeoPhys clean build、CPU/CUDA、strict `p1_2_scalar_cpu_v0`、implicitfast、2 ms × 5、无渲染、固定 named arm-joint/actuator 映射和既有 Controller/seed。通用 `provider_manifest('geophys')` 未扩权；不同source或 build 不因此获得 force-aware 准入。
+
+最终native freeze为 Core `91a3774f93905d665cedd462d658824c5daf56d7`、GeoPhys `c6df840bef8d36b1150150167df08e29dc3f664c`，Menagerie pin `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`；两工作树干净。Provider owner S1 为23 passed、Core R05b focused S1 为11 passed，两个 S1 import tripwire 均为0。更宽的 Core 选择集记录为59 passed、2 failed；精确重跑复现了 `test_pickcube_minimal_task_preserves_p16_identity_config_readiness_and_reset` 与 `test_nutassembly_selected_route_preserves_artifact_assets_and_resolved_parameters` 的历史 `source.config` digest 常量不匹配。R05b未修改 PickCube source-config owner，默认 NutAssembly 调用仍走原普通构造分支；但这些断言未在包输入HEAD单独重跑，故保留为未解决回归风险，不把更宽选择集记为通过，也没有改写历史digest常量。Provider文档工具也报告7条既存的无关链接错误，原日志保留。
+
+CPU 与 CUDA 各有一个最终freeze下的fresh GeoPhys native worker。每轮均为 seed19、law500Hz、一次reset、2 outer/10 native、3 boundaries，完成 close；production semantic reader 与不导入 `task_env` 的独立 raw H5 reader 均通过，sample sequence 为3–12。CPU H5为46,064 bytes（`d993504e…`），进程组RSS采样最大1,089,560,576 bytes；CUDA H5为46,660 bytes（`7474ad56…`），RSS采样最大1,191,022,592 bytes、worker GPU采样最大207,618,048 bytes。共享排他锁在每个worker进程组完整退出后释放，离线 reader 在锁释放后运行。首轮 CPU `cpu_run_001` 因 resolved-configuration 少 `gripper_control_hz` 而失败并完整保留；修复后最终两轮均从同一实现/provider pin 新启动，失败H5不拼入通过结果。
+
+两个outer interval不满足Guard dwell，也没有Expert/task completion。完整CPU/CUDA × 100/500Hz任务campaign仍属于R05c；历史 missing raw/phase处置仍为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。本结果不代表P99、通用 Provider capability 或 Formal Qualification。原始报告、Evidence、命令/资源收据和run原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_001/`；Sol复核前不派发下一slice。
