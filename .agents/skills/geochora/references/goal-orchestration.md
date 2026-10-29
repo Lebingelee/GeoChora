@@ -25,6 +25,26 @@ scopes/checkouts and existing shared resource coordination.
 
 ## Attempt targets and limit
 
+An **attempt is one planned autonomous execution window**, not one test run,
+code edit, native process or repair cycle. Luna may diagnose, change code,
+rerun targeted checks and repeat native verification within the window without
+asking Sol for a new prompt. A successful window ends when its gates pass.
+An unresolved window ends when its planned timebox is exhausted or Luna needs
+external guidance, information or authorization from Sol to make progress.
+A routine failure with an actionable in-scope fix is work inside the current
+attempt, not a reason to hand it back immediately.
+
+Freeze the timebox and resource envelope before dispatch. Track attempt ID,
+individual run IDs, cumulative active time, external waiting time and actual
+resource use separately. Bound wall time, memory, disk and exclusive resources
+per run and where needed across the window. Do not invent a one-launch/no-retry
+cap as the default. A separate launch/retry cap needs an explicit maintainer
+constraint or a concrete documented resource/safety reason. Failures requiring
+resource recovery pause execution safely; they do not silently grant extra
+resources or force an additional attempt number. Keep failed runs immutable,
+freeze changed code/inputs for each rerun, and accept only evidence belonging
+to the intended successful run; never combine partial runs into a fake pass.
+
 1. **Attempt 1 — research and implement.** Luna investigates the actual call
    chain, confirms the patch locations and existing reusable owners, implements
    the bounded changes and performs the package's authorized checks. Include
@@ -41,14 +61,16 @@ scopes/checkouts and existing shared resource coordination.
    reassessment below is complete. Include the chosen repair, its validation
    and final substage disposition in one package.
 
-Each substage has at most **three attempts**. Count actual implementation and
-rework attempts in the index; do not reset the count through renamed packages,
-new threads/branches or newly numbered preparation rounds. Recovery from an
-interruption may continue the same attempt only when its scope/progress and
-remaining execution allowance are preserved; it does not replenish retries or
-native starts. Preserve pre-existing historical attempts without relabeling
-them. If the limit is already reached, do not issue another attempt under this
-procedure; report the unresolved result and obtain a maintainer decision on
+Each substage has at most **three attempts**. Count completed execution
+windows in the index, with their success, timebox or external-guidance handoff
+reason; record repeat tests/native runs under that window. Do not reset the
+count through renamed packages, new threads/branches or preparation rounds.
+Recovery or maintainer-directed contract correction may continue the same
+attempt: preserve its code, evidence, consumed time and run ledger, and freeze
+any explicitly changed limits before resuming. A pause or prompt revision does
+not itself spend an attempt. Preserve pre-existing historical attempts without
+relabeling them. If the limit is already reached, do not issue another attempt
+under this procedure; report the unresolved result and obtain a maintainer decision on
 the plan. An exhausted limit does not make the substage accepted.
 
 ## Mandatory reassessment before attempt 3
@@ -81,7 +103,9 @@ and compact status snapshots rather than frequent full conversation reads;
 follow the tool's wait limits. Inspect relevant visible conversation/tool
 outputs when progress changes, a blocker appears, or expected duration passes.
 Record the latest stage, completed work, blockers and last observation time.
-Elapsed time alone neither permits another prompt nor implies completion.
+At the planned timebox, unresolved work should produce a preserved handoff;
+Sol still waits for its final report and released window before the next
+prompt. Elapsed time or a failed individual run alone is not a completed handoff.
 
 When visible updates show code/validation are finished and Luna is assembling
 reports, Sol may review stable evidence read-only and privately draft next

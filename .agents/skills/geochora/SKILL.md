@@ -83,13 +83,20 @@ Follow the maintainer's [phase branch and Sol/Luna policy](../../../AGENTS.md#ph
   90–180 minutes for integration with native execution and independent readers.
   Adjust for actual difficulty and prior attempts; do not split work merely to
   fit these examples. Estimate downloads separately from active development.
-  Expected duration is not a timeout, success criterion, retry allowance or
-  permission to extend the package's hard native/resource limits.
+  State the planned attempt timebox and distinguish active work from external
+  waits. Within that window, Luna may repeatedly diagnose, edit and rerun
+  affected tests, workers and readers. A failed test or native launch does not
+  consume an attempt. End successfully when the gates pass; return an unresolved
+  attempt when the timebox is exhausted or necessary external guidance/input
+  from Sol prevents further independent progress. Keep per-run resource limits
+  separate; do not default to a single native launch or no retry without a
+  concrete resource/safety reason or an explicit maintainer constraint.
 - Keep at most one unfinished package per Luna thread. While Luna executes,
   collect new findings and proposed next steps in Sol's own review notes;
   do not send supplemental prompts, review requests, reminders or new tasks
-  into that thread. Inspect progress through read-only status tools. Passing
-  the expected duration alone does not justify interruption or another prompt.
+  into that thread. Inspect progress through read-only status tools. At the
+  planned timebox, unresolved work should be preserved for handoff; wait for
+  its final report and released window before another prompt.
 - Wait for a complete final response to the original package, including actual
   outcome (PASS/FAIL/BLOCKED), input/output HEAD, permitted local commits,
   validation and evidence paths, remaining blockers and explicit release of
@@ -120,7 +127,8 @@ For a maintainer-authorized goal covering multiple substages, follow the
 [goal orchestration procedure](references/goal-orchestration.md): locate each
 substage's implementation details in its planning document, aim for research
 and implementation in attempt 1 and review/acceptance in attempt 2, and cap
-each substage at three attempts. Before attempt 3, reassess the actual blockers,
+each substage at three execution windows. Each window may contain multiple
+repair and validation runs; count those runs separately from attempts. Before attempt 3, reassess the actual blockers,
 research relevant open-source implementations and decide whether the original
 acceptance remains achievable. Track Luna through periodic read-only checks;
 prepare future work privately during report cleanup, then independently verify

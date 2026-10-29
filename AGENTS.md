@@ -132,7 +132,12 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   [goal orchestration procedure](.agents/skills/geochora/references/goal-orchestration.md).
   Locate implementation details in the planning record before dispatch;
   target research/implementation in attempt 1 and review/acceptance in attempt
-  2, with at most three attempts per substage. Before attempt 3, reassess the
+  2, with at most three attempts per substage. An attempt is a planned
+  autonomous execution window: multiple code fixes, tests and native runs may
+  occur inside it. Unresolved work ends an attempt when its timebox is exhausted
+  or external Sol guidance is necessary; a failed run alone does not. Keep
+  per-run resource limits and run ledgers separate from attempt counting.
+  Before attempt 3, reassess the
   actual blockers, research relevant open-source implementations and record
   feasibility against the original gates. Observe Luna periodically read-only,
   prepare next steps privately during report cleanup, and verify the final
