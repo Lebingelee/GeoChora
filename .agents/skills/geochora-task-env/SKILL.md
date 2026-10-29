@@ -118,7 +118,7 @@ attempt003 closure](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint
 the [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission),
 and the [historical attempt001 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
-## F04 Isaac Core adapter and bounded two-source evidence (2026-10-29; partial, pending Sol review)
+## F04 Isaac Core adapter and bounded two-source evidence (accepted route: 2026-10-30)
 
 F04 attempt001 is a historical source/adapter candidate only; see its dated plan
 record. Attempt002 added `UsdLocalValidationReportV1` and
@@ -138,7 +138,7 @@ substeps. Each source produced two 100-transition/101-observation closed H5s;
 each interval advanced five physics steps. The independent diagnostic readback
 verified 404/404 boundary/observation rows and rejected 40/40 tamper cases.
 
-This attempt remains `F04_PARTIAL_PENDING_SOL_REVIEW`: all four episodes missed
+Historical attempt002 remains `F04_PARTIAL_PENDING_SOL_REVIEW`: all four episodes missed
 the frozen gripper opening-change gate (about 0.00974 m observed vs 0.015 m
 required) and source-calibrated FK position/orientation gates (about
 0.568–0.611 m and 0.878–0.959 rad error). The free-body drop/settle checks
@@ -167,10 +167,12 @@ F04 attempt004's technical gates passed: the exact provider-free list passed 30/
 same-run Isaac Sim 6.2.0.0 CUDA `cuda:0`/GPU PhysX worker exercised the frozen official and
 current Menagerie Panda sources through the existing Core route. Four closed H5 files passed
 independent T+1 and original physical-gate checks; the same-run parent observed worker exit 0,
-process-group completion and lock release. The package-wide candidate PASS remains unclaimed
-because G8 requires a tracked-clean handoff and two unrelated tracked documentation changes were
-preserved without staging. The technical result is not a general Isaac capability or
-Qualification.
+process-group completion and lock release. On 2026-10-30 the maintainer supplied the independent
+technical review acceptance, and the main window closed G8: the unrelated generic Skill changes
+were reviewed/committed separately, a clean tracked HEAD was observed, and the missing forward-copy
+was restored byte-for-byte from the intact original package. Status is `ACCEPTED_BOUNDED_F04` for
+the exact two deliveries/build/backend/device/profile and controlled-worker exit route. This is
+not general Isaac admission or Qualification. See the [final acceptance](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-sol-acceptance).
 
 The process-scoped App owner calls public `SimulationApp.close()` and records its outcome. Env,
 Session and adapter close release their owned resources but never terminate the caller process.

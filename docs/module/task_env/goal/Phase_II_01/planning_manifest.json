@@ -1858,11 +1858,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "c5cb79bca3dabe5e71e506963f8e600aa2e77cb38697bb4536155b91aedcdc32",
+    "07_Execution_Order_and_Acceptance.md": "564a997af1f391e79a296acfd4eac4cdb71c39e17b4ecb22bbd214fc494f5f14",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "50c4ed9ef2f3d964e6d78d41cd11cd9dd058997a0063e599210ccbd9096c4ed7",
-    "README.md": "494e9b2d3c8df43aa5a44b523e6ae64ef61f3f07417a6b9ef4ff3f7d19451a59"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "3f0b4137b5d030519b0c14c68a5dc71b8da9d20d966515608ab4d6b25b51bd30",
+    "README.md": "0d70d28a4f4966f6fb8d9e5f30ada98f58483b44b315858a0bf96f03606b5911"
   },
   "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -4577,8 +4577,8 @@
     }
   },
   "checkpoint_recovery_plan": {
-    "updated": "2026-10-29",
-    "status": "F00_F01_F02_ACCEPTED_BOUNDED; F03_ACCEPTED_BOUNDED_S1; F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW; F05_NOT_STARTED",
+    "updated": "2026-10-30",
+    "status": "F00_F01_F02_ACCEPTED_BOUNDED; F03_ACCEPTED_BOUNDED_S1; F04_ACCEPTED_BOUNDED_F04; F05_NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4776,7 +4776,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00/F01/F02 accepted within recorded bounds; F03 attempt003 accepted synthetic Core S1 only; F04 attempt004 S1/native/physical/reader/bundle technical gates pass, while package G8 tracked-clean handoff remains pending due to preserved unrelated dirty tracked documentation; F05 not started; no Qualification.",
+    "patch_rows_status": "F00/F01/F02 accepted within recorded bounds; F03 synthetic Core S1 only; F04 accepted bounded for exact two Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker exit after G8 closeout. F05 not started; no Qualification.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -5028,23 +5028,21 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F04 attempt003 final bounded repair package; maintainer forwards one frozen prompt after Sol review commit. F05 held until F04 acceptance.",
+      "selected_next": "Prepare a separately frozen F05 ready-cell package after F04 final closeout; F05 execution has not started.",
       "after_that_priority": [
-        "F02",
-        "F03",
-        "F04",
         "F05 ready cells",
-        "F06 ready cells"
+        "F06 ready cells",
+        "F07 separately scoped extension"
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
       "F02": "ACCEPTED_BOUNDED_F02; delivery/report/closure and representation selection only; no runtime admission or real upstream delivery received.",
-      "reason": "Reset-only FK mismatch and worker gripper unit defect independently localized; finger response, clock comparison and producer teardown need bounded repair under original gates. Mandatory pre-attempt003 research/feasibility recorded.",
+      "reason": "Maintainer supplied independent attempt004 technical acceptance; main window closed G8 with separate generic-Skill commit, clean tracked HEAD, exact auxiliary restoration and unchanged implementation/evidence hashes. No further F04 native needed.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
-      "F04": "CHANGES_REQUESTED_F04; no physical acceptance; attempt003 reassessment complete; raw attempt002 result immutable."
+      "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5865,7 +5863,7 @@
         "native_log_bytes": 55508
       },
       "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_004/",
-      "sol_review": "PENDING; Luna candidate only",
+      "sol_review": "ACCEPTED_BOUNDED_F04 after 2026-10-30 G8 closeout; original execution-handoff candidate status retained; see f04_final_acceptance.",
       "F05_started": false,
       "qualification_granted": false,
       "package_wide_candidate_pass": "NOT_DECLARED; G8 tracked-clean is incomplete because two unrelated tracked documentation paths were preserved without staging.",
@@ -5877,13 +5875,47 @@
     "latest_f04_authorization": "Maintainer explicitly authorized F04 attempt004 using the frozen package and input HEAD 45be9fe11809e59822f3604f5cb6b7edf00d8f45; local code/docs commits and one bounded two-source CUDA/GPU PhysX native worker were permitted. F05 and other slices remain outside scope.",
     "f04_attempt004_handoff_blocker": {
       "required_gate": "G8 repository tracked-clean after local implementation/documentation commits",
-      "status": "INCOMPLETE",
+      "status": "CLOSED_2026_10_30",
       "dirty_paths_preserved": [
         ".agents/skills/geochora/SKILL.md",
         ".agents/skills/geochora/references/goal-orchestration.md"
       ],
       "observed_before_F04_documentation_edits": true,
-      "action": "Not staged, committed, stashed, or overwritten because these are unrelated writer changes; report to Sol for ownership disposition."
+      "action": "Not staged, committed, stashed, or overwritten because these are unrelated writer changes; report to Sol for ownership disposition.",
+      "historical_status": "INCOMPLETE",
+      "resolution": "Main window independently reviewed/committed the two generic Skill edits in 875954f101033568a3e1f5e439ed86be3cf29cc2; observed tracked-clean HEAD; F04 implementation and frozen evidence unchanged."
+    },
+    "f04_final_acceptance": {
+      "date": "2026-10-30",
+      "decision": "ACCEPTED_BOUNDED_F04",
+      "technical_review_source": "Maintainer supplied the temporary conversation independent technical review and acceptance decision in this main conversation. Reused; no native/reader rerun by main closeout.",
+      "input_head": "34297bf68e44e440275308a5bd396e062e01c972",
+      "implementation_commit": "294bea9f1ea61c9e775697e4b176c14dae6a5231",
+      "separate_generic_skill_commit": "875954f101033568a3e1f5e439ed86be3cf29cc2",
+      "G8_clean_tree_head": "875954f101033568a3e1f5e439ed86be3cf29cc2",
+      "G8_clean_observed": true,
+      "original_frozen_package_files_verified": 9,
+      "original_output_files_verified": 364,
+      "updated_output_files": 365,
+      "protected_inputs_verified": 2134,
+      "native_sources_verified": 27,
+      "hash_mismatches": 0,
+      "original_frozen_manifest_unchanged": true,
+      "restored_auxiliary": "f04_004/send_to_luna1.txt",
+      "auxiliary_sha256": "9890287536e58bf5e4d43564daf8df85b7a0376b108d8936a28e192d566c8fc9",
+      "output_manifest_sha256": "1f603ab553c0216fe8c7bed79c8e91f03bfcc3b0ae1abb41c477dfa9895e503c",
+      "native_plan_sha256": "9642018755dc57c20366f9864f42b25f3dc97e7f57344e84b97a6a421fc84049",
+      "scope": "two frozen local-validated official/Menagerie Panda deliveries; Isaac6.2.0.0, cuda:0 GPU PhysX, best_effort, state-only, 100Hz x5x2ms, controlled dedicated-worker exit",
+      "natural_python_kit_teardown_repair_claimed": false,
+      "upstream_source_verified_upgraded": false,
+      "canonical_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-sol-acceptance",
+      "closeout": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_closeout_f04_004/",
+      "final_head_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_closeout_f04_004/final_receipt.json",
+      "native_starts_during_closeout": 0,
+      "software_tests_during_closeout": 0,
+      "F05_started": false,
+      "fifth_native_required": false,
+      "qualification_granted": false
     }
   }
 }

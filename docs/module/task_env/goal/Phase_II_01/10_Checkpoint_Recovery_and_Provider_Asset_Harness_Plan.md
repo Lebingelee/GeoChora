@@ -620,3 +620,27 @@ provider-free读取/collection、reader和bundle各自run ledger及失败修复�
 本attempt的S1/native/物理/独立reader/bundle技术门全部通过，但没有声明包内全门候选PASS：G8要求的最终tracked-clean因两份无关文件仍dirty而未满足。当前限于冻结的两个Panda delivery/source、Isaac 6.2.0.0/CUDA `cuda:0`/GPU PhysX execution/profile和本次public Position/Core/H5路线；不授予更广Isaac provider admission、其他source/build/device支持、Human Judge、D0/D1/D2、P99、Qualification或training-ready。等待写入者处理无关dirty文件后由Sol决定接收与否；F05未启动。
 
 完整prompt、snapshot/readback、输入保护检查、S1/native/reader/bundle artifacts、逐run账本、资源/锁回执、Skill review和manifest见`f04_004/`。Sol复核前，当前仅声明Luna候选；代码写入和native锁窗口已释放。
+
+<a id="f04-sol-acceptance"></a>
+
+## F04 最终有界接收与G8收口（2026-10-30）
+
+**登记：`ACCEPTED_BOUNDED_F04`。** 维护者在本对话转述临时审核窗口的独立技术接收决定：364/364输出、2,134/2,134保护输入、27/27 native源码hash通过；四份H5的404行观测与原物理门复算、2,000次advance核对、同run parent/worker/plan及10个持久化文件绑定、受控退出实现/S1/40类tamper/bundle审阅通过。主窗口复用该技术复核，不把它声称为自己新运行的native或reader。
+
+### G8与文件完整性
+
+- 收口输入HEAD为`34297bf68e44e440275308a5bd396e062e01c972`；实现提交仍为`294bea9f1ea61c9e775697e4b176c14dae6a5231`。
+- 主窗口单独审阅两份通用Skill原修改，提交`875954f101033568a3e1f5e439ed86be3cf29cc2`；只涉及诊断流程与Runtime迁移方向文档，不混入F04实现提交。该HEAD实际观察到tracked tree clean，G8清树条件满足。
+- 原冻结目录`sol_f04_004`完整9/9，SHA全部匹配；执行输出原364/364匹配。缺失项仅为执行目录的`send_to_luna1.txt`副本，已从原包逐字节恢复，SHA为`9890287536e58bf5e4d43564daf8df85b7a0376b108d8936a28e192d566c8fc9`。
+- 原冻结清单保持不变；更新前的输出清单另存为`sol_closeout_f04_004/attempt004_output_sha256.before_aux.manifest`，执行输出清单补入该副本后为365项。其余364个文件未改写，原Luna报告中的G8/副本遗漏描述保留为历史交接事实。
+- 主窗口再次独立哈希核对2,134个保护输入、27个native源码及两处F04实现文件，与收口前基线一致。原物理oracle、source delivery、H5/witness、reader、worker/parent receipts均保持原字节。此次收口无软件测试重跑、无Kit/native/solver启动。
+
+收口核对、通用Skill审阅与最终HEAD/clean-state回执保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_closeout_f04_004/`。本次接收文档提交之后的真实HEAD由其中`final_receipt.json`绑定；该提交只更新接收状态与索引，不改变native输入/实现/证据。
+
+### 接收边界与后继
+
+仅接收冻结的official Panda和当前Menagerie Panda两组local-validated delivery、Isaac Sim 6.2.0.0、CUDA `cuda:0` / GPU PhysX、`best_effort`、state-only、100Hz outer / 5×2ms及专用worker受控退出路线：同run四episode、四H5、2,072 total steps、404个T+1边界/观测、原物理门、40/40 tamper和bundle通过，parent实测exit0且进程组结束。
+
+该接收不声称自然Python/Kit析构已经修复，不升级为上游`source_verified`，不扩大到其他资产/source/build/device/profile、通用Isaac provider、Human Judge、D0/D1/D2、P99、Qualification或training-ready。attempt001–003及attempt003五次`-11`原件保持不变。F04的普通attempt与维护者授权诊断attempt004分别保留，不通过重命名抹去历史。
+
+**无需第五轮native。F05尚未启动，后续必须单独冻结范围、真实HEAD和执行预算后再派包。** 原7/22、R05a/compatibility blockers及其他分支状态不因本次收口改变。

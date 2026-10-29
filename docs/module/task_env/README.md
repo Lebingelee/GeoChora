@@ -16,7 +16,7 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
 | 首个失败边界、重试/恢复与升级 | [troubleshooting](troubleshooting.md) |
 
-F04 attempt004修正专用worker的进程终结边界；`Env.close()`/Session/adapter close只关闭各自资源，不结束调用方。30/30 provider-free S1、一个同run官方Panda+Menagerie Panda CUDA/GPU PhysX worker、四份closed H5、原物理oracle、404/404独立T+1读回、40/40篡改拒绝、同run bundle及父观察exit 0均通过。技术门通过，尚未声明G1–G8全门PASS：恢复执行时已有两份无关tracked文档dirty，为保护其写入者而未暂存，故包要求的tracked-clean交接待解决。仅限冻结source/build/device/profile，不代表通用provider admission或Qualification。attempt001–003失败原件及attempt003的五个`-11`原样保留；F05未启动。详见[attempt004收口记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure)。
+F04 attempt004于2026-10-30完成技术复核与G8收口，登记`ACCEPTED_BOUNDED_F04`。30/30 provider-free S1、一个同run官方Panda+Menagerie Panda CUDA/GPU PhysX worker、四份closed H5、原物理oracle、404/404独立T+1读回、40/40篡改拒绝、同run bundle及父观察exit0通过。接收限于冻结source、Isaac 6.2.0.0、`cuda:0`、GPU PhysX、best_effort、state-only和专用worker受控退出路线；不声称自然Python/Kit析构已修复，也不代表通用provider admission或Qualification。此前无关Skill dirty已独立提交，转述副本按原SHA补齐；历史失败原件保留，F05未启动。详见[F04最终接收](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-sol-acceptance)。
 
 F03 attempt003 已由 Sol 接收为 `ACCEPTED_BOUNDED_F03_S1`，范围限于 synthetic I/O 下的 Core 调用链与最终 T+1 reader；attempt002 的真实 CPU Pendulum 三步范围偏差仍作为历史原件保留且不计入接收证据。F04 attempt001/002保持历史状态；attempt002与attempt003证据分别见[F04 attempt002](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native)和[attempt003](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate)。
 
