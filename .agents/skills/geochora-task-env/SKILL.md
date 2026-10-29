@@ -953,7 +953,8 @@ not infer qpos addresses, dof addresses or ctrl slots from tuple order. qpos
 and dof use their separate native dimensions (`nq` and `nv`); an `nq != nv`
 fixture is synthetic evidence only. The fixed Panda Arm+Hand attachment path
 also pins exact source bytes and canonical joint declaration order. A
-rehashed/rebound source that reverses Hand sibling declarations is refused by
+source that reverses Hand sibling declarations while keeping the original
+Scene Articulation.joints order is refused by
 `lower_fixed_attachment_sources()` before provider materialization. That
 rejection does not demonstrate successful physical execution of a reordered
 source; general source/native permutation support remains unproven and blocked.
@@ -962,3 +963,9 @@ because those production owners and source/profile inputs were unchanged; it
 did not rerun native at the current HEAD. Read the current result, evidence
 limits and historical missing-byte blocker in the [R06 compatibility
 record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt001-实施结果2026-10-29).
+
+Sol reviewed attempt001 as partial: a coherent source/Scene reorder was not
+exercised by that negative. Core admission also pins original source hashes
+and Asset provenance, and the MuJoCo adapter pins compiled orders. R06b002
+plans one explicit derived recipe through these existing owners; it is not
+yet implemented or accepted. Preserve the original recipe and its strict gates.

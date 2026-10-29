@@ -1,6 +1,6 @@
 # R06 — Compatibility / Mapping / Regression Governance
 
-状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt001已完成provider-free S1并复用未受影响的精确source S2证据，物理source-order permutation支持门仍BLOCKED、待Sol复核；compatibility decision gate仍因历史原件/处置决定缺失而BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
+状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt001已完成provider-free S1并复用未受影响的精确source S2证据，Sol已接收其部分S1/精确source复用事实，物理source-order permutation支持门仍BLOCKED；compatibility decision gate仍因历史原件/处置决定缺失而BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
 
 ## 映射与机械语义保护
 
@@ -98,3 +98,22 @@ Attempt001于2026-10-29完成源码调查、覆盖矩阵、detector/相邻fixtur
 | 历史原件 | `geophys-transition-h5/v1`、canonical trajectory outer-v0、canonical-execution-v1及早期typed-force JSON原bytes仍缺失；byte compatibility未证明，处置未批准，compatibility decision gate保持 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。 |
 
 最终定向S1进程均在包预算内，最长墙钟54.10秒，十个provider-free/static进程累计墙钟152.54秒，最大RSS 1,760,472 KiB；`r03b_fixed_attachment_probe.py --static-only`未导入Provider/编译/step。native额度未使用，共享flock未取得。保留的早期失败日志记录了初始断言和夹具不完整；修复后各最终集合通过。完整命令、RSS、输出hash、输入保护hash、原始日志及复用矩阵见ignored报告。
+
+
+<a id="r06b-attempt002-repair-plan"></a>
+
+## R06b attempt001 Sol复核与attempt002实施定位（2026-10-29）
+
+Sol复核camera `4d032f8`：33项输出hash、24项输入冻结校验及相关生产文件未变均匹配；接收 `ACCEPT_PARTIAL_S1_AND_EXACT_SOURCE_REUSE`，**R06b未完成**。本次未重跑测试/native。复核记录在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06b_001/`。
+
+需修正上文拒绝原因的解释：attempt001虽然同步了source/closure/Asset/Scene/plan身份，但没有改变Hand `Articulation.joints`的原tuple顺序；因此该负例证明XML声明与Scene关节顺序不一致会被拒绝，不能证明一致重排的Scene/source也无法lower。除此之外，Core admission仍钉死原source hash/Asset provenance，adapter仍钉死三类native顺序；这两处是新增物理变体的独立准入缺口。
+
+| owner / 方法 | attempt002有界修复与验收 |
+| --- | --- |
+| `position_candidate/fixed_attachment_candidate.py::_entity_scene/_scene_and_bindings/_plan_and_source/build_fixed_attachment_candidate`；`attached_leaf_candidate.py::build_attached_leaf_candidate` | 在原构造链增加显式、内部使用的一种derived order recipe；Hand两个finger sibling子树反序，Arm七actuator声明反序。派生bytes与Scene Joint顺序一致；重建Asset/Assembly/plan/Artifact/reset/leaf/source identities并保留原默认bytes/hash。资产版本/来源明确派生，追踪原revision/hash和recipe，不能冒充原Menagerie文件。 |
+| `assembly/fixed_attachment.py::_validate_source_declarations/lower_fixed_attachment_sources` | 复用严格声明检查；一份确定性recipe校验归此既有owner，确认只改变指定元素顺序。原始与新派生source配对均精确校验；任意属性/缺失/重复/别名/错Scene顺序仍拒绝。 |
+| `runtime/sessions/api.py::_validate_fixed_attachment_materialization_source` | 在原exact pair之外，只准入上述可重建派生pair及其Asset provenance；不以caller boolean、仅自报hash或通用skip开放任意source。未知变体仍在native import前拒绝。 |
+| `runtime/sessions/mujoco.py::_validate_fixed_attachment_scene_model/_make_fixed_attachment_receipt/_admit_attached_leaf_control_plan` | 原exact order oracle保留；为派生pair核验明确的body/joint/actuator顺序，semantic name→实际ID/qpos/dof/ctrl→逆映射由现有adapter生成。保留维度/root/mount/transmission/tendon/equality/limits/collision门。 |
+| 既有leaf/Env/Recorder；`load_leaf_control_records_h5`；R06b诊断worker/reader | 先provider-free通过真实worker到final receipt及异常close链，再冻结实现commit、两case、source闭包和预算。一worker分别运行原始及派生recipe，各64步/65观测；同run public state/Target/Ack/clock/H5与独立reader对应。旧reader/profile严格合同不放松；若现有语义profile可原样容纳新source identity则复用，否则显式新分派复用Recorder。 |
+
+预计90–180分钟，最多一次MuJoCo3.8.1 CPU worker、无重试、两次materialize/reset、128 outer/640实际mj_step、无render；与Luna1 F01共享排他锁。详细RAM/wall/output/等待及oracle限制由冻结工作包确定。未通过所有适用门只报告partial，不把S1拒绝或receipt tuple反序替代物理重排成功。历史原件处置保持独立BLOCKED；R05/R06c/P99未获解锁。attempt002争取收口；若核心门仍失败，第三次前须按项目Skill重新评估并调研，不自动续跑。
