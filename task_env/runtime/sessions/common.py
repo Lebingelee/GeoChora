@@ -297,6 +297,7 @@ class _SessionValues:
         scene.validate()
         if not isinstance(requirements, StateRequirements):
             raise TypeError('typed state projection requires StateRequirements')
+        requirements.validate()
         if self._source.scene_definition is not None and (
             self._source.scene_definition.identity_hash != scene.identity_hash
         ):
@@ -307,20 +308,109 @@ class _SessionValues:
         if any(item.sample_domain != 'evaluation_boundary' for item in requirements.requirements):
             raise ValueError('native interval requirements need NativeIntervalEvidence, not snapshot_v1')
 
-        state_v0, free_joint_native = self._snapshot_with_native_free_joints()
-        scalar_names = set(state_v0.joint_position)
+        # Validate every statically knowable binding before a provider read. In
+        # particular, a malformed Frame/Joint mapping must not consume a native
+        # boundary merely because the old implementation checked it afterward.
+        if not isinstance(joint_bindings, Mapping):
+            raise TypeError('typed Joint bindings must be a mapping')
+        if not isinstance(frame_bindings, Mapping):
+            raise TypeError('typed Frame bindings must be a mapping')
+        scalar_names = set(self._source.joints)
         free_names = set(self._source.free_joints)
-        if set(joint_bindings) != scalar_names | free_names:
-            raise ValueError('typed Joint bindings must cover each source scalar/free joint exactly')
-        if set(frame_bindings) != set(state_v0.pose_world):
-            raise ValueError('typed Frame bindings must cover each source body/frame exactly')
+        if scalar_names & free_names:
+            raise ValueError('RuntimeSource has overlapping scalar and free Joint names')
+        expected_joint_names = scalar_names | free_names
+        if set(joint_bindings) != expected_joint_names:
+            raise ValueError('typed Joint bindings must exactly cover source scalar/free joints')
+        expected_frame_names = set(self._source.bodies) | set(self._source.frames)
+        if set(self._source.bodies) & set(self._source.frames):
+            raise ValueError('RuntimeSource body and frame names overlap')
+        if set(frame_bindings) != expected_frame_names:
+            raise ValueError('typed Frame bindings must exactly cover source body/frame names')
+        scene_joints = {
+            (joint.parent_frame.entity_id, joint.joint_id): joint
+            for articulation in scene.articulations or ()
+            for joint in articulation.joints
+        }
+        scene_frames = {(frame.entity_id, frame.frame_id) for frame in scene.frames or ()}
+        scene_entities = {entity.entity_id for entity in scene.entities}
+        bound_joint_definitions = set()
         for name, definition in joint_bindings.items():
-            if not isinstance(definition, JointDefinition):
-                raise TypeError(f'typed Joint binding {name!r} must be a JointDefinition')
+            if type(name) is not str or not isinstance(definition, JointDefinition):
+                raise TypeError(f'typed Joint binding {name!r} must map a string to JointDefinition')
+            definition.validate()
+            key = (definition.parent_frame.entity_id, definition.joint_id)
+            if key not in scene_joints:
+                raise ValueError(f'typed Joint binding {name!r} is not the declared Scene Joint')
+            if definition != scene_joints[key]:
+                raise ValueError(f'typed Joint binding {name!r} differs from its Scene definition')
+            if key in bound_joint_definitions:
+                raise ValueError(f'typed Joint binding {name!r} duplicates a Scene Joint binding')
+            bound_joint_definitions.add(key)
             if name in scalar_names and definition.kind not in {'revolute', 'continuous', 'prismatic'}:
                 raise ValueError(f'scalar source Joint {name!r} has a non-scalar Scene definition')
             if name in free_names and definition.kind != 'floating':
                 raise ValueError(f'free source Joint {name!r} requires a floating Scene definition')
+        bound_frames = set()
+        for name, reference in frame_bindings.items():
+            if type(name) is not str or not isinstance(reference, FrameReference):
+                raise TypeError(f'typed Frame binding {name!r} must map a string to FrameReference')
+            reference.validate()
+            key = (reference.entity_id, reference.frame_id)
+            if key not in scene_frames:
+                raise ValueError(f'typed Frame binding {name!r} is not a declared Scene Frame')
+            if key in bound_frames:
+                raise ValueError(f'typed Frame binding {name!r} duplicates a Scene Frame binding')
+            bound_frames.add(key)
+        for name, native_name in (*self._source.joints.items(), *self._source.free_joints.items()):
+            if type(name) is not str or type(native_name) is not str:
+                raise TypeError('RuntimeSource Joint names and native binding values must be strings')
+
+        # Requirement targets are part of the request contract, not something
+        # learned from a provider read. Reject wrong-Scene IDs and required
+        # fields this projection cannot publish before consuming a boundary.
+        from ...artifacts.state import StateFieldRequirement
+
+        bound_joint_ids = {
+            (definition.parent_frame.entity_id, definition.joint_id)
+            for definition in joint_bindings.values()
+        }
+        bound_frame_ids = {
+            (reference.entity_id, reference.frame_id)
+            for reference in frame_bindings.values()
+        }
+        for requirement in requirements.requirements:
+            if type(requirement) is not StateFieldRequirement:
+                raise TypeError('StateRequirements entries must be StateFieldRequirement values')
+            requirement.validate()
+            if requirement.entity_id not in scene_entities:
+                raise ValueError(
+                    f'StateRequirement Entity {requirement.entity_id!r} is not in the declared Scene'
+                )
+            if requirement.field_name in {'joint_position', 'joint_velocity'}:
+                key = (requirement.entity_id, requirement.subject_id)
+                if key not in scene_joints:
+                    raise ValueError('StateRequirement Joint target is not in the declared Scene')
+                if key not in bound_joint_ids and requirement.requiredness == 'required':
+                    raise ValueError('required StateRequirement Joint is not bound by RuntimeSource')
+            elif requirement.field_name == 'frame_pose_world':
+                key = (requirement.entity_id, requirement.subject_id)
+                if key not in scene_frames:
+                    raise ValueError('StateRequirement Frame target is not in the declared Scene')
+                if key not in bound_frame_ids and requirement.requiredness == 'required':
+                    raise ValueError('required StateRequirement Frame is not bound by RuntimeSource')
+            elif requirement.requiredness == 'required':
+                raise ValueError(
+                    f"snapshot_v1 cannot publish required state field {requirement.field_name!r}"
+                )
+
+        state_v0, free_joint_native = self._snapshot_with_native_free_joints()
+        if set(state_v0.joint_position) != scalar_names:
+            raise ValueError('provider scalar readback names differ from RuntimeSource bindings')
+        if set(free_joint_native) != free_names:
+            raise ValueError('provider free-joint readback names differ from RuntimeSource bindings')
+        if set(frame_bindings) != set(state_v0.pose_world):
+            raise ValueError('typed Frame bindings must cover each source body/frame exactly')
 
         boundary = StateBoundaryIdentity(
             'state-boundary-identity-v1',
@@ -348,7 +438,67 @@ class _SessionValues:
         joint_values = list(scalar_projection.joints)
         for name in sorted(free_names):
             definition = joint_bindings[name]
-            raw_position, raw_velocity = free_joint_native[name]
+            native_readback = free_joint_native[name]
+            from .free_joint_state import (
+                PublicRigidBodyReadbackV1,
+                world_com_twist_to_body_origin_local,
+            )
+            if type(native_readback) is PublicRigidBodyReadbackV1:
+                native_readback.validate()
+                frame = definition.child_frame
+                if native_readback.body_frame != frame:
+                    raise ValueError(f'free source Joint {name!r} readback body Frame mismatch')
+                pose_names = [
+                    semantic for semantic, reference in frame_bindings.items()
+                    if reference == frame
+                ]
+                if len(pose_names) != 1 or pose_names[0] not in state_v0.pose_world:
+                    raise ValueError(
+                        f'free source Joint {name!r} child Frame must resolve to one measured pose'
+                    )
+                measured_pose = state_v0.pose_world[pose_names[0]]
+                position_error = max(
+                    abs(float(measured_pose.position[index])
+                        - float(native_readback.position_world_m[index]))
+                    for index in range(3)
+                )
+                orientation_direct = math.sqrt(sum(
+                    (float(measured_pose.quaternion_wxyz[index])
+                     - float(native_readback.orientation_world_from_body_wxyz[index])) ** 2
+                    for index in range(4)
+                ))
+                orientation_antipodal = math.sqrt(sum(
+                    (float(measured_pose.quaternion_wxyz[index])
+                     + float(native_readback.orientation_world_from_body_wxyz[index])) ** 2
+                    for index in range(4)
+                ))
+                if position_error > 1.0e-9 or min(orientation_direct, orientation_antipodal) > 1.0e-9:
+                    raise ValueError(
+                        f'free source Joint {name!r} pose differs from its measured child Frame'
+                    )
+                raw_position = (
+                    *native_readback.position_world_m,
+                    *native_readback.orientation_world_from_body_wxyz,
+                )
+                linear_local, angular_local = world_com_twist_to_body_origin_local(
+                    position_world_m=native_readback.position_world_m,
+                    orientation_world_from_body_wxyz=native_readback.orientation_world_from_body_wxyz,
+                    com_offset_body_m=native_readback.com_offset_body_m,
+                    linear_velocity_world_at_com_m_s=native_readback.linear_velocity_world_at_com_m_s,
+                    angular_velocity_world_rad_s=native_readback.angular_velocity_world_rad_s,
+                    velocity_frame=native_readback.velocity_frame,
+                    linear_reference_point=native_readback.linear_reference_point,
+                )
+                raw_velocity = (*linear_local, *angular_local)
+                velocity_expressed_in = frame
+                velocity_reference_point = frame
+            else:
+                # Compatibility path for the existing MuJoCo/GeoPhys adapter
+                # return layout. New adapters must return the explicit typed
+                # value above instead of inheriting this qpos/qvel convention.
+                raw_position, raw_velocity = native_readback
+                velocity_expressed_in = definition.child_frame
+                velocity_reference_point = definition.child_frame
             if len(raw_position) != 7 or len(raw_velocity) != 6:
                 raise ValueError(f'free source Joint {name!r} must have qpos/qvel widths 7/6')
             frame = definition.child_frame
@@ -357,9 +507,10 @@ class _SessionValues:
             }:
                 raise ValueError(f'free source Joint {name!r} requires its child Frame in the typed projection')
             q = pose(raw_position[:3], raw_position[3:]).quaternion_wxyz
-            linear_local = _world_linear_velocity_in_body_frame(q, raw_velocity[:3])
-            # Both MuJoCo-compatible components are expressed in the free body's
-            # frame: linear velocity is rotated from world; angular qvel is local.
+            if type(native_readback) is not PublicRigidBodyReadbackV1:
+                linear_local = _world_linear_velocity_in_body_frame(q, raw_velocity[:3])
+                # Legacy MuJoCo-compatible components are in the free body's
+                # frame: linear velocity arrives world-frame, angular is local.
             value = TypedJointStateValue(
                 'typed-joint-state-v1',
                 definition.parent_frame.entity_id,
@@ -369,9 +520,9 @@ class _SessionValues:
                 (*tuple(float(v) for v in raw_position[:3]), *q),
                 definition.velocity_representation,
                 (*tuple(float(v) for v in linear_local),
-                 *tuple(float(v) for v in raw_velocity[3:])),
-                frame,
-                frame,
+                 *tuple(float(v) for v in (angular_local if type(native_readback) is PublicRigidBodyReadbackV1 else raw_velocity[3:]))),
+                velocity_expressed_in,
+                velocity_reference_point,
             )
             value.validate_against(definition)
             joint_values.append(value)

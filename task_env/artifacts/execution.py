@@ -11,6 +11,8 @@ from typing import get_type_hints
 from .contracts import (
     CanonicalStateView,
     Contract,
+    ExecutionSpec,
+    ExecutionSpecV1,
     PoseWorld,
     _SHA256,
     _choice,
@@ -22,6 +24,39 @@ from .contracts import (
 
 def canonical_json(value: Mapping) -> str:
     return json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+
+def legacy_execution_projection(value: ExecutionSpec | ExecutionSpecV1) -> ExecutionSpec:
+    """Project V1 only when every V1-only choice is explicitly absent.
+
+    This is a compatibility bridge for existing CPU sessions, not a fallback
+    for a provider/device/profile that lacks a V1 adapter.
+    """
+    if type(value) is ExecutionSpec:
+        value.validate()
+        return value
+    if type(value) is not ExecutionSpecV1:
+        raise TypeError('execution projection requires ExecutionSpec or ExecutionSpecV1')
+    value.validate()
+    if value.physics_provider == 'isaacsim':
+        raise ValueError('Isaac Sim ExecutionSpecV1 is contract-only; no Core RuntimeSession adapter is admitted')
+    if value.physics_device is not None:
+        raise ValueError('legacy RuntimeSession has no physics_device field; refusing lossy ExecutionSpecV1 projection')
+    if value.camera_overrides:
+        raise ValueError('legacy RuntimeSession cannot preserve ExecutionSpecV1 camera overrides')
+    renderer = value.render_default
+    if (renderer.provider, renderer.backend, renderer.profile, renderer.device) != (
+        'none', 'cpu', 'none', None,
+    ):
+        raise ValueError('legacy RuntimeSession cannot preserve the declared ExecutionSpecV1 renderer selection')
+    return ExecutionSpec(
+        value.physics_provider,
+        value.physics_profile,
+        renderer.provider,
+        value.physics_backend,
+        value.provider_seed,
+        value.determinism_mode,
+    )
 
 
 @dataclass(frozen=True)

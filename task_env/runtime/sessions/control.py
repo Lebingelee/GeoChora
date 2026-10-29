@@ -563,6 +563,10 @@ def materialize_control(
     leaf_plan=None,
     diagnostic_profile=None,
 ):
+    from ...artifacts.execution import legacy_execution_projection
+
+    declared_execution = execution
+    execution = legacy_execution_projection(execution)
     if leaf_plan is not None:
         from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
         from .provenance import provider_build_identity
@@ -730,7 +734,7 @@ def materialize_control(
         from .api import _DUAL_POSITION_MATERIALIZATION_AUTHORITY
         materialization_authority = _DUAL_POSITION_MATERIALIZATION_AUTHORITY
     session = materialize(
-        artifact, execution, source=source,
+        artifact, declared_execution, source=source,
         manifest=admission_manifest,
         _materialization_authority=materialization_authority,
         _diagnostic_profile=diagnostic_profile,

@@ -7,8 +7,8 @@ import posixpath
 import re
 import xml.etree.ElementTree as ET
 
-from ...artifacts import SceneDefinition
-from ...assembly.source import TaskSceneSource
+from ...artifacts import SceneDefinition, TaskArtifactV1
+from ...assembly.source import TaskSceneSource, UsdTaskSceneSourceV1
 
 
 def project_scene_definition_v3_to_mjcf(source_xml: str, scene_definition: SceneDefinition) -> str:
@@ -178,3 +178,111 @@ class RuntimeSource:
             if sources[self.fixed_attachment_plan.parent_entity_id].xml != self.scene_source.xml:
                 raise ValueError('fixed Attachment primary SceneSource must be its parent Entity source')
             object.__setattr__(self, 'fixed_attachment_sources', MappingProxyType(sources))
+
+
+@dataclass(frozen=True)
+class UsdRuntimeSourceV1:
+    """Provider-neutral, versioned construction input for a verified USD delivery.
+
+    This declaration deliberately has no native runtime admission. It binds
+    the already loaded delivery and canonical task/scene identities until a
+    provider adapter consumes the same immutable bytes.
+    """
+
+    schema_version: str
+    task_artifact: TaskArtifactV1
+    scene_definition: SceneDefinition
+    scene_source: UsdTaskSceneSourceV1
+    joints: Mapping[str, str]
+    bodies: Mapping[str, str]
+    frames: Mapping[str, str]
+    free_joints: Mapping[str, str]
+    joint_targets: Mapping[str, str]
+
+    def __post_init__(self):
+        if self.schema_version != 'usd-runtime-source-v1':
+            raise ValueError('unsupported USD RuntimeSource schema')
+        if type(self.task_artifact) is not TaskArtifactV1:
+            raise TypeError('USD RuntimeSource requires TaskArtifactV1')
+        if type(self.scene_definition) is not SceneDefinition:
+            raise TypeError('USD RuntimeSource requires SceneDefinition')
+        if type(self.scene_source) is not UsdTaskSceneSourceV1:
+            raise TypeError('USD RuntimeSource requires the versioned USD TaskSceneSource')
+        for field in ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets'):
+            values = dict(getattr(self, field))
+            if any(type(key) is not str or not key.strip()
+                   or type(value) is not str or not value.strip()
+                   for key, value in values.items()):
+                raise TypeError('USD RuntimeSource bindings require nonempty canonical/native strings')
+            object.__setattr__(self, field, MappingProxyType(values))
+        self.validate()
+
+    @property
+    def source_closure_digest(self) -> str:
+        return self.scene_source.source_closure_sha256
+
+    @property
+    def source_id(self) -> str:
+        return self.scene_source.source_id
+
+    @property
+    def runtime_admitted(self) -> bool:
+        # F02 representation selection is not runtime admission.
+        return False
+
+    def validate(self) -> None:
+        self.task_artifact.validate()
+        self.scene_definition.validate()
+        self.scene_source.validate()
+        self.task_artifact.validate_scene(self.scene_definition)
+        if self.scene_source.scene_identity_sha256 != self.scene_definition.identity_hash:
+            raise ValueError('USD RuntimeSource does not bind the exact SceneDefinition')
+        if self.scene_source.task_source_identity_sha256 != self.task_artifact.task_source_identity_hash:
+            raise ValueError('USD RuntimeSource does not bind the exact TaskSource identity')
+        delivery_asset = self.scene_source.loaded_delivery.delivery.asset_definition
+        scene_assets = {
+            (asset.asset_id, asset.asset_version): asset
+            for asset in self.scene_definition.assets
+        }
+        if scene_assets.get((delivery_asset.asset_id, delivery_asset.asset_version)) != delivery_asset:
+            raise ValueError('USD delivery AssetDefinition is not the exact declared Scene asset')
+
+        scalar_names = set()
+        floating_entity_ids = set()
+        for articulation in self.scene_definition.articulations or ():
+            for joint in articulation.joints:
+                name = f'{articulation.entity_id}/{joint.joint_id}'
+                if joint.kind in {'revolute', 'continuous', 'prismatic'}:
+                    scalar_names.add(name)
+                elif joint.kind == 'floating':
+                    if articulation.entity_id in floating_entity_ids:
+                        raise ValueError('USD RuntimeSource admits at most one floating root Joint per Entity')
+                    floating_entity_ids.add(articulation.entity_id)
+                elif joint.kind != 'fixed':
+                    raise ValueError(f'USD RuntimeSource has unsupported joint kind: {joint.kind!r}')
+        if set(self.joints) != set(self.task_artifact.legacy_joint_bindings):
+            raise ValueError('USD RuntimeSource scalar Joint keys must match TaskArtifact v1 bindings')
+        if set(self.joints) != scalar_names:
+            raise ValueError('USD RuntimeSource scalar Joint map must exactly cover the Scene scalar Joints')
+        reset_pose_names = set(self.task_artifact.initialization.poses_world)
+        if set(self.free_joints) != reset_pose_names:
+            raise ValueError('USD RuntimeSource free Joint map must exactly cover TaskArtifact reset pose names')
+        for semantic_name in self.free_joints:
+            reference = self.task_artifact.legacy_frame_bindings.get(semantic_name)
+            if reference is None or reference.entity_id not in floating_entity_ids:
+                raise ValueError('USD RuntimeSource reset pose must bind an Entity with a floating root Joint')
+
+        runtime_frames = set(self.task_artifact.legacy_frame_bindings)
+        if set(self.bodies) & set(self.frames):
+            raise ValueError('USD RuntimeSource body and Frame mappings overlap')
+        if set(self.bodies) | set(self.frames) != runtime_frames:
+            raise ValueError('USD RuntimeSource body/Frame maps must exactly cover runtime Scene Frames')
+        if set(self.joint_targets) != scalar_names:
+            raise ValueError('USD RuntimeSource joint target map must exactly cover scalar Scene Joints')
+        native_targets = tuple(self.joint_targets.values())
+        if len(native_targets) != len(set(native_targets)):
+            raise ValueError('USD RuntimeSource must give each scalar Joint an exclusive native target')
+
+    def assert_fresh(self) -> None:
+        self.validate()
+        self.scene_source.assert_fresh()

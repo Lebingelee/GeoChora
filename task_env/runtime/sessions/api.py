@@ -7,14 +7,17 @@ from .provenance import provider_build_identity
 from ...artifacts import (
     CanonicalStatePublicationV1, CanonicalStatePublicationV2,
     CanonicalStateView, CapabilityClaim, ExecutionSpec,
+    ExecutionSpecV1,
     FrameReference, JointDefinition, ProviderCapabilityManifest, SceneDefinition,
     StateRequirements, TaskArtifact, TaskArtifactV1, admit_capabilities,
 )
-from ...artifacts.execution import EpisodeResetPlanV1, RealizedInitialState, ResetSample
+from ...artifacts.execution import (
+    EpisodeResetPlanV1, RealizedInitialState, ResetSample, legacy_execution_projection,
+)
 from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, NativeControlFeedbackSampleV1,
 )
-from .source import RuntimeSource
+from .source import RuntimeSource, UsdRuntimeSourceV1
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
@@ -116,13 +119,30 @@ def _diagnostic_manifest(artifact, execution, source, profile_id):
     )
 
 
-def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec, *, source: RuntimeSource,
+def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
+    declared_execution = execution
+    if type(source) is UsdRuntimeSourceV1:
+        if type(declared_execution) is not ExecutionSpecV1:
+            raise TypeError('USD RuntimeSource requires an explicit ExecutionSpecV1')
+        declared_execution.validate()
+        source.validate()
+        if declared_execution.physics_provider != source.scene_source.representation.provider:
+            raise ValueError('USD source representation provider differs from ExecutionSpecV1')
+        if (source.task_artifact.identity_hash != artifact.identity_hash
+                or source.scene_definition.identity_hash != artifact.scene_identity_hash):
+            raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
+        if not source.scene_source.source_verified:
+            raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
+        if not declared_execution.physics_provider == 'isaacsim':
+            raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
+        raise ValueError('Isaac Sim USD Core RuntimeSession adapter is not implemented; refusing materialization')
+    execution = legacy_execution_projection(execution)
     actual = (provider_manifest(execution.physics_provider) if _diagnostic_profile is None
               else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile))
     # A caller may restrict a manifest for negative admission, never expand support.
@@ -158,7 +178,13 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         raise ValueError('source joint bindings do not cover initialization')
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
-    return _materialize_admitted(artifact, execution, source)
+    session = _materialize_admitted(artifact, execution, source)
+    if type(declared_execution) is ExecutionSpecV1:
+        # Keep the exact V1 declaration alongside the legacy-compatible adapter
+        # view. It remains provenance; it is never reconstructed from defaults.
+        session._declared_execution_spec_v1 = declared_execution
+        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+    return session
 
 
 def _validate_v1_materialization_source(

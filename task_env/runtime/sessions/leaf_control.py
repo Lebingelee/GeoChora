@@ -17,8 +17,10 @@ from typing import Protocol, runtime_checkable
 from ...artifacts import (
     ActuatorReference,
     CanonicalStatePublicationV1,
+    ExecutionSpecV1,
     FrameReference,
     JointReference,
+    RendererSelectionV1,
     SceneDefinition,
     StateBoundaryIdentity,
     StateRequirements,
@@ -160,6 +162,226 @@ class LeafNativeTendonMappingV1:
             raise ValueError("unsupported leaf native tendon mapping schema")
         _stable_identity(self.tendon_identity, "canonical tendon identity")
         _token(self.native_name, "native tendon name")
+
+
+@dataclass(frozen=True)
+class IsaacNamedPositionDriveV1:
+    """One canonical scalar Joint mapped to a public named DOF position drive."""
+
+    schema_version: str
+    canonical_joint: JointReference
+    native_dof_name: str
+    native_dof_index: int
+    position_unit: str
+    lower_limit: float
+    upper_limit: float
+
+    def __post_init__(self):
+        if self.schema_version != 'isaac-named-position-drive-v1':
+            raise ValueError('unsupported Isaac named Position drive schema')
+        if type(self.canonical_joint) is not JointReference:
+            raise TypeError('Isaac named Position drive requires JointReference')
+        self.canonical_joint.validate()
+        _token(self.native_dof_name, 'native DOF name')
+        if type(self.native_dof_index) is not int or self.native_dof_index < 0:
+            raise ValueError('native DOF index must be a nonnegative integer')
+        if self.position_unit not in {'radian', 'meter'}:
+            raise ValueError('native position drive unit must be radian or meter')
+        if (type(self.lower_limit) not in (int, float)
+                or type(self.upper_limit) not in (int, float)
+                or not math.isfinite(float(self.lower_limit))
+                or not math.isfinite(float(self.upper_limit))
+                or self.lower_limit >= self.upper_limit):
+            raise ValueError('native DOF limits must be finite and increasing')
+
+
+@dataclass(frozen=True)
+class IsaacNamedPositionDriveReceiptV1:
+    """Synthetic S1 receipt for named Panda DOF drives; not runtime admission."""
+
+    schema_version: str
+    provenance_kind: str
+    scene_identity_sha256: str
+    source_closure_sha256: str
+    execution_identity_sha256: str
+    provider_build_identity: str
+    physics_profile: str
+    backend: str
+    device: str
+    determinism_mode: str
+    physics_dt_s: float
+    control_substeps: int
+    writer_id: str
+    native_dof_count: int
+    drives: tuple[IsaacNamedPositionDriveV1, ...]
+
+    def __post_init__(self):
+        if self.schema_version != 'isaac-named-position-drive-receipt-v1':
+            raise ValueError('unsupported Isaac named Position drive receipt schema')
+        if self.provenance_kind != 'synthetic_fixture':
+            raise ValueError('F03 named Position drive receipt must remain synthetic_fixture')
+        for value, label in (
+            (self.scene_identity_sha256, 'Scene'),
+            (self.source_closure_sha256, 'source closure'),
+            (self.execution_identity_sha256, 'ExecutionSpec'),
+        ):
+            _sha(value, label)
+        for value, label in (
+            (self.provider_build_identity, 'provider build'),
+            (self.physics_profile, 'physics profile'),
+            (self.backend, 'backend'),
+            (self.determinism_mode, 'determinism mode'),
+            (self.writer_id, 'writer ID'),
+        ):
+            _token(value, label)
+        if (type(self.physics_dt_s) not in (int, float)
+                or isinstance(self.physics_dt_s, bool)
+                or not math.isfinite(float(self.physics_dt_s))
+                or float(self.physics_dt_s) != 0.002
+                or type(self.control_substeps) is not int
+                or self.control_substeps != 5):
+            raise ValueError('F03 drive receipt requires the 2 ms / five-substep timebase')
+        if (self.backend, self.device, self.determinism_mode) != ('cuda', 'cuda:0', 'best_effort'):
+            raise ValueError('F03 target execution is Isaac CUDA cuda:0 with best_effort determinism')
+        if type(self.device) is not str:
+            raise TypeError('F03 target device must be a string')
+        if self.provider_build_identity != 'isaacsim-6.2.0.0':
+            raise ValueError('F03 target drive receipt requires Isaac Sim 6.2.0.0')
+        if type(self.native_dof_count) is not int or self.native_dof_count != 9:
+            raise ValueError('F03 Panda drive receipt requires exactly nine named scalar DOFs')
+        if type(self.drives) is not tuple or any(type(item) is not IsaacNamedPositionDriveV1 for item in self.drives):
+            raise TypeError('drive receipt requires an immutable tuple of exact named drive entries')
+        expected = {
+            JointReference('panda-main', f'joint{index}'): (f'panda_joint{index}', 'radian')
+            for index in range(1, 8)
+        }
+        expected.update({
+            JointReference('panda-main', 'finger_joint1'): ('panda_finger_joint1', 'meter'),
+            JointReference('panda-main', 'finger_joint2'): ('panda_finger_joint2', 'meter'),
+        })
+        by_joint = {}
+        for drive in self.drives:
+            if drive.canonical_joint in by_joint:
+                raise ValueError('duplicate canonical Joint in Isaac drive receipt')
+            by_joint[drive.canonical_joint] = drive
+        if set(by_joint) != set(expected):
+            raise ValueError('Isaac drive receipt must exactly cover seven Arm and two finger Joints')
+        if any((drive.native_dof_name, drive.position_unit) != expected[joint]
+               for joint, drive in by_joint.items()):
+            raise ValueError('Isaac native DOF name or unit differs from the F03 Panda mapping')
+        indices = [drive.native_dof_index for drive in self.drives]
+        names = [drive.native_dof_name for drive in self.drives]
+        if sorted(indices) != list(range(9)) or len(names) != len(set(names)):
+            raise ValueError('Isaac native DOF indices must be a permutation of nine unique named DOFs')
+
+    @property
+    def identity_sha256(self) -> str:
+        payload = {
+            'schema_version': self.schema_version,
+            'provenance_kind': self.provenance_kind,
+            'scene_identity_sha256': self.scene_identity_sha256,
+            'source_closure_sha256': self.source_closure_sha256,
+            'execution_identity_sha256': self.execution_identity_sha256,
+            'provider_build_identity': self.provider_build_identity,
+            'physics_profile': self.physics_profile,
+            'backend': self.backend,
+            'device': self.device,
+            'determinism_mode': self.determinism_mode,
+            'physics_dt_s': float(self.physics_dt_s),
+            'control_substeps': self.control_substeps,
+            'writer_id': self.writer_id,
+            'native_dof_count': self.native_dof_count,
+            'drives': [
+                (item.canonical_joint.entity_id, item.canonical_joint.joint_id,
+                 item.native_dof_name, item.native_dof_index, item.position_unit,
+                 float(item.lower_limit), float(item.upper_limit))
+                for item in self.drives
+            ],
+        }
+        return _digest(payload)
+
+    def commands(self, arm_position: Mapping[str, float], hand_opening_m: float):
+        """Resolve by native name and return index-ordered per-DOF targets."""
+        expected_arm = {f'panda-main/joint{index}' for index in range(1, 8)}
+        if not isinstance(arm_position, Mapping) or set(arm_position) != expected_arm:
+            raise ValueError('Arm Position request must exactly cover canonical joint1 through joint7')
+        values = dict(arm_position)
+        for name, value in values.items():
+            if type(name) is not str or type(value) not in (int, float) or not math.isfinite(float(value)):
+                raise ValueError('Arm Position targets must be finite non-boolean numbers')
+        if type(hand_opening_m) not in (int, float) or not math.isfinite(float(hand_opening_m)):
+            raise ValueError('Hand opening target must be a finite non-boolean number')
+        if not 0.0 <= float(hand_opening_m) <= 0.08:
+            raise ValueError('Hand opening target must be within [0, 0.08] metres')
+        targets = {JointReference('panda-main', name.split('/', 1)[1]): float(value)
+                   for name, value in values.items()}
+        half_opening = float(hand_opening_m) / 2.0
+        targets.update({
+            JointReference('panda-main', 'finger_joint1'): half_opening,
+            JointReference('panda-main', 'finger_joint2'): half_opening,
+        })
+        by_index = []
+        for drive in self.drives:
+            value = targets[drive.canonical_joint]
+            if value < drive.lower_limit or value > drive.upper_limit:
+                raise ValueError(f'native target exceeds the declared limit for {drive.native_dof_name}')
+            by_index.append((drive.native_dof_index, drive.native_dof_name, float(value)))
+        return tuple(sorted(by_index))
+
+
+def compile_isaac_named_position_drive_receipt_v1(
+    *, execution: ExecutionSpecV1, scene_identity_sha256: str,
+    source_closure_sha256: str, provider_build_identity: str,
+    writer_id: str, native_dof_names: tuple[str, ...],
+    native_position_limits: Mapping[str, tuple[float, float]],
+) -> IsaacNamedPositionDriveReceiptV1:
+    """Compile an explicitly synthetic receipt from public-style DOF metadata."""
+    if type(execution) is not ExecutionSpecV1:
+        raise TypeError('named Isaac drive receipt requires ExecutionSpecV1')
+    execution.validate()
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.determinism_mode) != ('isaacsim', 'cuda', 'cuda:0', 'best_effort'):
+        raise ValueError('named Isaac drive receipt requires the declared CUDA 0 best_effort execution')
+    if (type(execution.render_default) is not RendererSelectionV1
+            or (execution.render_default.provider, execution.render_default.backend,
+                execution.render_default.profile, execution.render_default.device)
+            != ('none', 'cpu', 'none', None)):
+        raise ValueError('F03 named drive receipt is state-only and does not admit rendering')
+    if execution.camera_overrides:
+        raise ValueError('F03 named drive receipt does not admit camera overrides')
+    if type(native_dof_names) is not tuple or any(type(name) is not str or not name for name in native_dof_names):
+        raise TypeError('public DOF metadata must be an immutable tuple of names')
+    if len(native_dof_names) != 9 or len(set(native_dof_names)) != 9:
+        raise ValueError('public DOF metadata must contain nine unique scalar names')
+    limits = dict(native_position_limits)
+    if set(limits) != set(native_dof_names):
+        raise ValueError('public DOF limits must exactly cover the named DOF metadata')
+    expected = [
+        *((JointReference('panda-main', f'joint{index}'), f'panda_joint{index}', 'radian')
+          for index in range(1, 8)),
+        (JointReference('panda-main', 'finger_joint1'), 'panda_finger_joint1', 'meter'),
+        (JointReference('panda-main', 'finger_joint2'), 'panda_finger_joint2', 'meter'),
+    ]
+    by_name = {name: (joint, unit) for joint, name, unit in expected}
+    if set(native_dof_names) != set(by_name):
+        raise ValueError('public DOF names differ from the exact Panda Arm+Hand name set')
+    drives = []
+    for index, name in enumerate(native_dof_names):
+        limits_for_name = limits[name]
+        if type(limits_for_name) not in (tuple, list) or len(limits_for_name) != 2:
+            raise TypeError(f'public DOF limits for {name!r} must be a two-value tuple/list')
+        joint, unit = by_name[name]
+        drives.append(IsaacNamedPositionDriveV1(
+            'isaac-named-position-drive-v1', joint, name, index, unit,
+            limits_for_name[0], limits_for_name[1],
+        ))
+    return IsaacNamedPositionDriveReceiptV1(
+        'isaac-named-position-drive-receipt-v1', 'synthetic_fixture',
+        scene_identity_sha256, source_closure_sha256, execution.identity_hash,
+        provider_build_identity, execution.physics_profile, execution.physics_backend,
+        execution.physics_device, execution.determinism_mode, 0.002, 5,
+        writer_id, len(native_dof_names), tuple(drives),
+    )
 
 
 @dataclass(frozen=True)

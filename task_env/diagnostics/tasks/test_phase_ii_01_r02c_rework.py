@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from task_env.artifacts.state import StateBoundaryIdentity, StateRequirements, StateSampleClock
+from task_env.artifacts import ExecutionSpec
 from task_env.controllers.canonical.leaf_profiles import (
     ArmPositionTargetV1, HandPositionTargetV1,
 )
@@ -341,7 +342,7 @@ def test_materialize_control_closes_new_session_once_when_leaf_admission_fails(
     monkeypatch.setattr(control_module, "admit_capabilities", lambda *_args: None)
     monkeypatch.setattr(control_module, "materialize", lambda *_args, **_kwargs: session)
     monkeypatch.setattr(provenance, "provider_build_identity", lambda _provider: candidate.provider_build_identity)
-    execution = SimpleNamespace(physics_provider="mujoco", backend="cpu", render_provider="none")
+    execution = ExecutionSpec("mujoco", "p1_2_scalar_cpu_v0", "none", "cpu", 0, "strict")
     try:
         with pytest.raises(RuntimeError, match="injected leaf admission failure") as caught:
             control_module.materialize_control(
