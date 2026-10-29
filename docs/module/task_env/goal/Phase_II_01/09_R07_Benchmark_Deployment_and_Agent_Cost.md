@@ -252,3 +252,24 @@ init decoder/原行flat-state mapping、public对象pose/contact、ControlMap实
 
 
 2026-10-29 Sol复核R07c pilot attempt002：`PARTIAL_WORK_RETAINED_REWORK_REQUIRED`。139项包哈希、32项保护输入、122项输入Git blob通过；15/29/43项S1与3个native deselect按原日志保留。实际组合XML的free joint为0，可动物体被固定，缺上游object实例化/free joint语义；同Env S1仍走GeoPhys consumer，未证明约定MuJoCo路线。init/placement、生产contact与freshness、native验证仍缺。planning manifest中07/09的旧hash不匹配，Sol当前修复，原报告不改。接收数18/22不变；第三attempt前须完成这些具体owner/方法方案及上游复用可行性判断，未授权native或下一attempt。复核原件：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_002/`。
+
+
+<a id="r07c-pilot-attempt003-final-repair-plan"></a>
+
+## R07c pilot attempt003：最后一次修复与有条件原生验收
+
+前两轮root cause已明确：散XML模板拼接遗漏上游object实例化（实际产物free joint=0）；BaseTaskEnv旧bootstrap硬接GeoPhys，不能代表MuJoCo路线。成本reader拒绝门和同Env生命周期S1保留，不重做平台。attempt003为最后一次自主窗口，预计主动240–360分钟、总timebox420分钟，多次修复/测试/native运行按run记录，不另算attempt。
+
+已核锁定上游可复用实现：robosuite `models/objects/objects.py::MujocoXMLObject.__init__/_get_object_subtree`（object子树、free joint、geom处理）、`utils/binding_utils.py::MjSimState.from_flattened/flatten`（time+qpos+qvel，na=0）、LIBERO `envs/env_wrapper.py::ControlEnv.regenerate_obs_from_state`与`bddl_base_domain.py::_reset_internal`（原状态回放与fixture变换）。源版本、notice沿已接受manifest，不安装上游框架；复用其纯数据/XML语义，不调用上游环境或不安全unpickle。检索发现旧`simulation/binding_utils.py`路径不存在，正确owner为utils，已更正。`.pruned_init`静态检查为ZIP两成员archive/data.pkl、archive/version，protocol2 NumPy f8数组、shape50×92；GLOBAL/REDUCE只能按已知格式符号解释，不能执行对象构造。未知opcode/shape/布局拒绝。
+
+| 面 | 实施位置与选择 | 验收门 |
+| --- | --- | --- |
+| 动态source | bench_deploy/libero/assembly.py::_compose_mjcf；沿锁定object/fixture/robot/mount/arena代码还原实例化、顺序/前缀/变换/options | 可动物体free joint与fixture joints精确匹配上游；依赖、引用、物理属性、稳定bytes及篡改门 |
+| init/reset | bench_deploy/libero就近纯数据decoder/semantic reset配方；Core现ResetSample/EpisodeResetPlan与runtime reset owners | 50×92原数据有hash；按上游joint遍历顺序证明nq/nv/layout与semantic映射，不能仅凭长度猜；原qvel不能静默清零；fixture静态pose先于state restore |
+| MuJoCo消费 | task_env/runtime/sessions/source.py/api.py/control.py/mujoco.py、tasks/reference_env.py现binding seam及controllers owner；版本化内部candidate opt-in，不扩大旧position/tendon gate | 现RuntimeSession负责compile/reset/step/close，mixed torque与signed finger在原peer最小扩展；原Env入口消费，无benchmark Runtime。BaseTaskEnv GeoPhys假接线不能代替 |
+| public状态 | MuJoCo peer把原生public API转为typed pose/contact，现TaskState/evaluation owners消费 | source/materialization/episode/boundary/query覆盖绑定；未知/过期与false分开；同一public状态On严格阈值比较 |
+| 原生收口 | 同route完整fake-native叶S1、worker/finalizer/reader通过后，冻结本run源码/source/动作/增益/映射/预算 | 同一Env三次原始init reset各64outer、25×2ms/outer；公开motion/contact与原On，闭合H5 T/T+1独立读回。单pilot通过仍不是五任务R07c整体、P99或Qualification |
+
+可行性判断：固定source、50×92数据和上游恢复布局均可取得，存在沿现RuntimeSession/Env扩展的实现路线，无需新框架或资产授权决定；风险是mixed-control admission与原joint order/fixture placement精确对应，必须在native前做provider-free证据。只有证明布局/source/consumer而非猜测才可进入物理门。允许在本attempt内通过完整前置门后做MuJoCo3.8.1 CPU有界验证，不再为普通字段/finalizer问题另开attempt。若布局或现owner不可支持，在门前如实BLOCKED并给维护者决策，不降低验收或自行第四轮。
+
+包规定每native进程600秒、采样RSS2GiB、硬RSS3GiB，累计native墙钟3600秒、20000物理substeps、30次reset，输出1GiB；共享锁独占worker全部生命周期，无锁不导入native。S1每进程180秒/2GiB，多次修复重跑。源码/输入/增益/阈值在每run启动前冻结，变更另建run并留旧件；禁止用不同run片段拼PASS。详细资源、物理判据和断路门由同一冻结prompt约束。下一prompt由维护者转发，无自动派发。

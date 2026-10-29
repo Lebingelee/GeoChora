@@ -282,3 +282,6 @@ R07c attempt002返工计划现已由维护者发送并执行；以上计划文�
 
 
 2026-10-29 Sol复核R07c pilot attempt002：`PARTIAL_WORK_RETAINED_REWORK_REQUIRED`。139项包哈希、32项保护输入、122项输入Git blob通过；15/29/43项S1与3个native deselect按原日志保留。实际组合XML的free joint为0，可动物体被固定，缺上游object实例化/free joint语义；同Env S1仍走GeoPhys consumer，未证明约定MuJoCo路线。init/placement、生产contact与freshness、native验证仍缺。planning manifest中07/09的旧hash不匹配，Sol当前修复，原报告不改。接收数18/22不变；第三attempt前须完成这些具体owner/方法方案及上游复用可行性判断，未授权native或下一attempt。复核原件：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_002/`。
+
+
+R07c pilot下一窗口为attempt003最后修复包，按[具体方案](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-final-repair-plan)推进。先source/原init/真实MuJoCo consumer和同路线S1，门全过才在同attempt做有界native；未过门不启动。保留18/22及五任务出口，不自动第四轮。
