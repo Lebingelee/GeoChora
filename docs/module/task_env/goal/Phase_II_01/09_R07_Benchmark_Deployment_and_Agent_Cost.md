@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；Core native admission关闭、成本INVALID。原五任务整体仍未完成，维护者选择先用来源可准入的少量LIBERO任务跑通闭环，首pilot固定spatial bowl→plate。下文“本轮仅规划/未执行”保留原审计时点，不覆盖当前状态；原五任务最终目标不缩减。
+状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt001的Core/controller/evaluator S1及cost protocol continuation candidate已交回PARTIAL待Sol复核。source composition尚未发出MJCF，`make_env` native admission关闭，zero native；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；下文较早规划与审计保持其时点含义，原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -47,7 +47,7 @@ LIBERO 固定 inspected candidate：`8f1084e3132a39270c3a13ebe37270a43ece2a01`�
 
 真实接触对照继续追踪到 robosuite v1.4.0 的 [MujocoEnv.check_contact](https://github.com/ARISE-Initiative/robosuite/blob/fbee5844ff5632f5b5698e204ec5357ca50be0df/robosuite/environments/base.py)：按两个 geom groups 在当次 native contact list 中任一方向匹配。该 native 私有数据访问只用于独立原生对照进程；GeoChora 部署必须经 Provider public/canonical contact publication，不能把 `env.sim.data` 穿进 Core/benchmark adapter。
 
-现有 [TaskDefinition/lifecycle](../../../../../task_env/environment/task_definition.py) 支持显式 predicate evaluator 和 unavailable/no_evaluator，但没有任意 BDDL 自动 compiler。当前 [TaskArtifact bridge](../../../../../task_env/environment) 的冻结语义字段和 selected task predicate 也不自动承载这些 generic On/site/contact/fixture-joint 语义。是否能以 task-owned evaluator + Provider public state 精确表达，需要 R07a 逐谓词输出需求表。contact/site/fixture joint 无公开可用值时 **BLOCKED_CORE/BLOCKED_PROVIDER**；在批准合同内无法表达时 **NOT_REPRESENTABLE**，不能填False/静默简化或增加未经要求的temporal gate。
+现有 [TaskDefinition/lifecycle](../../../../../task_env/environment/task_definition.py) 支持显式 predicate evaluator 和 unavailable/no_evaluator，但没有任意 BDDL 自动 compiler。当前 [TaskArtifact bridge](../../../../../task_env/environment/task_definition.py) 的冻结语义字段和 selected task predicate 也不自动承载这些 generic On/site/contact/fixture-joint 语义。是否能以 task-owned evaluator + Provider public state 精确表达，需要 R07a 逐谓词输出需求表。contact/site/fixture joint 无公开可用值时 **BLOCKED_CORE/BLOCKED_PROVIDER**；在批准合同内无法表达时 **NOT_REPRESENTABLE**，不能填False/静默简化或增加未经要求的temporal gate。
 
 ## 3. 机器人、依赖与资产准备
 
@@ -210,3 +210,17 @@ R07b首pilot来源安装/metadata recipe S1已获Sol接收，native admission仍
 原生20Hz控制周期与physics timestep应从已锁robosuite源码查证；允许获取固定revision的小型macros/controller/config文本，source-declared dt与compiled dt分开。不得为填unknown拒绝读取已可核实常量，也不得把常量读到当编译模型验证。Core可采用显式审议的joint-space servo而非相同OSC算法，保持原torque actuator与物理source，记录控制算法差异。
 
 本包目标为`R07C_PILOT_CORE_WIRING_S1_READY_PENDING_SOL_REVIEW`；仅当source/控制/原Core成功与故障路径S1真实贯通可用READY；其余必要init/contact/source问题仍有缺口时PARTIAL并报告，不因成本schema修好而声称全部就绪。原R07五任务出口、18/22与P99/Qualification不变。Sol复核真实diff和证据后才准备下一窗口，不要求Luna自行规划所有后继子阶段或重复旧audit。
+
+<a id="r07c-pilot-attempt001-execution-result-2026-10-29"></a>
+
+## R07c pilot attempt001 执行结果（2026-10-29）
+
+输入为camera branch `codex/phase-ii-01-camera` HEAD `e07e7929105ad70b524f31b63c2b72025bc24c85`；实现和文档收尾分别提交，最终HEAD与证据/报告列于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_001/`。GeoPhys和Menagerie pins未变。该窗口零native、零shared lock，不导入真实模拟引擎、不compile/load/reset/step。
+
+**Core source/control接线：部分完成。** `MountedPandaMixedActuatorAdapter`使用TaskDefinition扩展hook与真实`resolve_task_references`，保留7个torque arm槽和两个signed position finger槽、显式unqualified PD增益及source 20Hz / 2ms×25候选时钟。真实BaseTaskEnv action conversion与RuntimeBoundary调用到fake native IO，验证首条AppliedControl和write/close故障传播。版本化`ContactSummary`区分available-empty和unavailable；当前boundary不提供entity-pair query，候选On predicate对此返回unavailable。
+
+`bench_deploy.libero.assembly.build_source_composition_plan`重读既有103载荷安装树并验证manifest、独立verify receipt、全体payload bytes及32项固定source-text references；8个对象/fixture semantic names确定且计划hash可复现。它只产出**composition declaration**：上游Libero/robosuite Python模型合并未执行，compiled body/joint/actuator映射和MJCF均为空。Core `make_env`尚无LIBERO source composer / Scene-v3 RuntimeSource consumer / candidate factory，`.pruned_init`行与Core reset state对应未知，故没有可native admission的路径。
+
+最终provider-free candidate S1为25 passed；受影响predicate/fault-lifecycle/observation节点为39 passed，另2个真实provider节点按零engine边界deselected；成本协议v2.2 synthetic S1为8 passed。source installation/verify receipt按原冻结回执复用并交叉校验；旧v2.1 INVALID原结果不改。v2.2 lineage/LOC structural result绑定session start、final commit、历史reference `0309d73bb5b60f9989907c3eede8c0cd2893f29f`、实际common ancestor `b0b26e95ddfd7b5128401261f05541bb19586372` 与copy-bound prior sources。缺实际token usage、收费来源、连续开发时间、历史继承成本，均为null并注明原因；结构S1不能声称完整实测或累计R07成本。
+
+状态为`R07C_PILOT_PARTIAL_PENDING_SOL_REVIEW`，不满足原计划的`CORE_WIRING_S1_READY`或native readiness。固定source composition、TaskEnv construction/admission、`.pruned_init`安全解释和reset、public object-pose/contact route、同Env Recorder/H5/independent-reader/worker-finalizer仍需后续冻结合同解决。原五任务目标、18/22、P99、Formal Qualification与Human Judge均未改变；没有自动授权下一attempt。

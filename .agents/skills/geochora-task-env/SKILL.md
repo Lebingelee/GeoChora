@@ -1041,3 +1041,22 @@ Use the [current R06 scope/index record](../../../docs/module/task_env/goal/Phas
 `asset/benchmarks/libero/tools/source_bundle.py` now implements the single bowl-to-plate pilot's source manifest, local install, independent verify and metadata recipe CLI. `bench_deploy/libero/` owns the task-specific recipe and original-owner gap plan. Sol accepted source/recipe S1 only; no Core task UID/native route, reset, step, On semantics equivalence, H5 execution or Qualification is admitted by this delivery. Use the [source CLI guide](../../../asset/benchmarks/libero/README.md) and [recipe guide](../../../bench_deploy/libero/README.md). Preserve mixed torque/finger actuator sources and unavailable contact/init state. Original R07 requires repeated resets, meaningful public motion and native semantics/readback, not full task/Expert success or a universal collision planner.
 
 Cost protocol v2.1 returned INVALID because its fixed historical baseline is not an ancestor of camera's execution input; asset/benchmarks Python code also needs correct LOC attribution. Preserve that result; source installation success is not valid measured Agent cost. Reconcile the future cross-branch protocol before admitting a cost claim.
+
+## R07c single-task candidate boundary (2026-10-29)
+
+The R07c provider-free candidate work does **not** create an admitted LIBERO
+`make_env()` route. Its verified source composition plan binds fixed bytes and
+semantic names but does not emit merged MJCF or compiled references. The
+`.pruned_init` reset mapping remains unresolved, and the current GeoPhys
+boundary reports contact data as unavailable because no public entity-pair
+query is implemented. Missing contact evidence must not be mapped to `False`.
+
+`bench_deploy.libero.task.LiberoPilotControlHookV1` and
+`task_env.controllers.mounted_panda_mixed.MountedPandaMixedActuatorAdapter`
+are internal candidate hooks, not stable public imports or a supported
+provider profile. Their synthetic tests preserve seven torque arm slots,
+signed two-finger position slots, explicit unqualified gains and the
+source-declared 20 Hz / 2 ms × 25 timebase only. They do not show native
+stability, task-semantic equivalence, recorder/H5 execution, P99 or
+Qualification. See the [R07c execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-execution-result-2026-10-29)
+for the remaining owner gates.

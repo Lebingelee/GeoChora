@@ -2611,15 +2611,25 @@
       "depends_on": [
         "R07b"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "PILOT_ATTEMPT001_PARTIAL_PENDING_SOL_REVIEW_FULL_FIVE_TASK_EXIT_PENDING",
+      "execution": "PILOT_ATTEMPT001_PARTIAL; NATIVE_ADMISSION_FALSE",
       "required_evidence": "per-task S1/S2/S3 real deployment and native semantic correspondence",
       "stop_condition": "any required task BLOCKED_CORE/BLOCKED_PROVIDER/NOT_REPRESENTABLE/FAIL/NOT_RUN blocks P99",
       "pilot_preparation": {
-        "status": "PACKAGE_PREPARED_NOT_SENT",
+        "status": "ATTEMPT001_DELIVERED_PARTIAL_PENDING_SOL_REVIEW",
         "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-core-s1-plan",
         "scope": "Existing Core source/controller/state seams and provider-free integration plus versioned cross-branch cost protocol",
         "native_authorized": false,
+        "input_head": "e07e7929105ad70b524f31b63c2b72025bc24c85",
+        "implementation_commits_pending_report": false,
+        "implementation_commits": [
+          "7f1d1f8d"
+        ],
+        "provider_free_core_s1": "25 passed in final run; predicate/fault-lifecycle/observation regressions 39 passed and 2 real-provider nodes deselected; cost continuation fixtures 8 passed",
+        "composition": "32 fixed source inputs and 8 semantic names bound; no merged MJCF or compiled slot mapping",
+        "cost_protocol": "v2.2 candidate structurally partial; usage/time/billing/inherited costs remain unknown",
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_001/",
+        "native_starts": 0,
         "expected_active_seconds": [
           9000,
           12600
@@ -2750,7 +2760,7 @@
     }
   },
   "document_sha256": {
-    "README.md": "18050c556972fe5c8265d77f928eeb24f2a09882f17cf23304536cdc8bbbe5c6",
+    "README.md": "14d7db4ab6ee93feed450dd1c2566510739fe7fa6cb1b515cc3bb1737a9a1cb8",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2758,12 +2768,12 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "e00f5f8b091112d7f9312a6e530b0a9721e840602320f025e43654e9d578f44a",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "86813f971f7f2c9e1f514c18368ac891741b4feacb4f8cda989a6dcc463a2e62",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "3def8e2024b8571a89cd6d8896ccb0c1a72dc61040aee43a4a067a616086f607"
+    "07_Execution_Order_and_Acceptance.md": "d3ba610cd195e2548640bd863a2aaf28de8647acca33b832afcf62e9e15ce07e"
   },
-  "revision_kind": "PREPARE_R07C_PILOT_CORE_S1_ATTEMPT001",
+  "revision_kind": "R07C_PILOT_ATTEMPT001_PARTIAL_DELIVERY",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -5482,6 +5492,20 @@
       "cost_status": "INVALID_RETAINED",
       "new_native": false,
       "R07b_full_five_task_exit": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "R07C_PILOT_ATTEMPT001_PARTIAL_DELIVERY",
+      "input_HEAD": "e07e7929105ad70b524f31b63c2b72025bc24c85",
+      "status": "R07C_PILOT_PARTIAL_PENDING_SOL_REVIEW",
+      "provider_free_core_s1": "25 candidate tests passed; affected owner regressions 39 passed with 2 real-provider nodes deselected",
+      "cost_protocol": "v2.2 candidate structural result partial; complete measurement not established",
+      "core_native_admission_ready": false,
+      "native_starts": 0,
+      "accepted_count_unchanged": "18/22",
+      "full_five_task_exit": false,
+      "qualification_granted": false,
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_001/"
     }
   ],
   "P00_audit": {
