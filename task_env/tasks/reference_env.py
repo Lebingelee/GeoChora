@@ -2372,6 +2372,32 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     first_error = error
                 else:
                     first_error.add_note(f'LIBERO source receipt cleanup also failed: {type(error).__name__}: {error}')
+            if self.session is None and self._libero_close_receipt is None:
+                source = self.value.get('source')
+                fault = self._execution_fault
+                self._libero_close_receipt = {
+                    'schema_version': 'r07c-d01-selected-close-v1',
+                    # No RuntimeSession was published. The selected environment
+                    # and its receipt-owned source snapshot have still completed
+                    # their cleanup attempt; keep that distinct from a native
+                    # RuntimeSession close receipt.
+                    'session_closed': True,
+                    'session_materialized': False,
+                    'session_close_status': 'not_materialized',
+                    'environment_closed': True,
+                    'cleanup_completed': first_error is None,
+                    'cleanup_error': None if first_error is None else {
+                        'type': type(first_error).__name__, 'message': str(first_error),
+                    },
+                    'source_id': (
+                        None if source is None else source.scene_source.source_id
+                    ),
+                    'source_closure_digest': (
+                        None if source is None else source.source_closure_digest
+                    ),
+                    'execution_fault_phase': None if fault is None else fault.phase,
+                    'execution_fault_message': None if fault is None else fault.message,
+                }
             self._closed, self._stopped = True, True
             if first_error is not None:
                 raise first_error

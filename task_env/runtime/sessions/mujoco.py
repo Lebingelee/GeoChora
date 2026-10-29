@@ -4,6 +4,7 @@ import math
 import hashlib
 import json
 import numpy as np
+from pathlib import PurePosixPath
 
 from .common import _SessionValues, pose
 from .source import lower_mujoco_scene_source, source_asset_bytes
@@ -13,6 +14,62 @@ def _source_asset_bytes(base_dir, source_xml):
     """Backward-compatible private spelling for the shared source owner."""
 
     return source_asset_bytes(base_dir, source_xml)
+
+
+def _lower_libero_mjcf_assets(receipt):
+    """Give every receipt-bound asset a unique flat MuJoCo VFS name.
+
+    MuJoCo's in-memory VFS rejects distinct source files that share a
+    basename.  The source receipt remains byte-for-byte authoritative; only
+    this compiler input copy receives deterministic aliases.
+    """
+    root = ET.fromstring(receipt.importer_xml)
+    compiler = root.find('compiler')
+    if compiler is not None and any(compiler.get(key) for key in ('meshdir', 'texturedir')):
+        raise ValueError('LIBERO receipt MJCF must use explicit source asset paths without compiler directories')
+    payloads = {
+        name: payload for name, payload in receipt.closure_files.items()
+        if name not in {'scene.xml', 'canonical-source.xml'}
+    }
+    referenced: set[str] = set()
+    aliases: dict[str, str] = {}
+    alias_payloads: dict[str, bytes] = {}
+    for node in root.iter():
+        raw_path = node.get('file')
+        if raw_path is None:
+            continue
+        if node.tag == 'include':
+            raise ValueError('LIBERO mixed source does not admit nested MJCF includes')
+        if (not raw_path or raw_path.startswith('/') or '\\' in raw_path
+                or any(part in {'', '.', '..'} for part in raw_path.split('/'))):
+            raise ValueError(f'LIBERO source asset path is not canonical: {raw_path!r}')
+        if raw_path not in payloads:
+            raise ValueError(f'LIBERO source asset is missing from its immutable receipt: {raw_path!r}')
+        referenced.add(raw_path)
+        alias = aliases.get(raw_path)
+        if alias is None:
+            suffix = PurePosixPath(raw_path).suffix
+            alias = f'gch_{hashlib.sha256(raw_path.encode("utf-8")).hexdigest()}{suffix}'
+            if alias in alias_payloads:
+                raise ValueError('LIBERO deterministic MuJoCo asset alias collision')
+            aliases[raw_path] = alias
+            alias_payloads[alias] = payloads[raw_path]
+        node.set('file', alias)
+    if referenced != set(payloads):
+        raise ValueError(
+            'LIBERO source asset references differ from the immutable receipt: '
+            f'unreferenced={sorted(set(payloads) - referenced)}'
+        )
+    rows = [
+        {
+            'source_path': logical,
+            'vfs_name': aliases[logical],
+            'sha256': hashlib.sha256(payloads[logical]).hexdigest(),
+            'size_bytes': len(payloads[logical]),
+        }
+        for logical in sorted(aliases)
+    ]
+    return ET.tostring(root, encoding='unicode'), alias_payloads, rows
 
 
 class _MuJoCoSession(_SessionValues):
@@ -32,8 +89,14 @@ class _MuJoCoSession(_SessionValues):
                 raise ValueError('unsupported MuJoCo RuntimeSession materialization profile')
             try:
                 self._initialize_libero_mixed(artifact, source)
-            except BaseException:
-                self.close()
+            except BaseException as error:
+                try:
+                    self.close()
+                except BaseException as cleanup_error:
+                    error.add_note(
+                        'LIBERO RuntimeSession constructor cleanup also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
                 raise
             return
         import mujoco
@@ -106,12 +169,9 @@ class _MuJoCoSession(_SessionValues):
         self._mj = mujoco
         self._runtime_identity = self._fixed_runtime_identity(mujoco)
         self._provider_build_identity = provider_build_identity('mujoco')
-        assets = {
-            name: payload for name, payload in receipt.closure_files.items()
-            if name not in {'scene.xml', 'canonical-source.xml'}
-        }
+        compile_xml, assets, asset_aliases = _lower_libero_mjcf_assets(receipt)
         self._model = mujoco.MjModel.from_xml_string(
-            receipt.importer_xml.decode('utf-8'), assets=assets,
+            compile_xml, assets=assets,
         )
         self._data = mujoco.MjData(self._model)
         self._native_steps = 0
@@ -229,6 +289,7 @@ class _MuJoCoSession(_SessionValues):
             'source_closure_digest': source.source_closure_digest,
             'source_id': source.scene_source.source_id,
             'source_files': list(_source_closure_manifest(receipt.closure_files)),
+            'compiler_asset_aliases': asset_aliases,
             'named_joint_addresses': {key: list(value) for key, value in self._joint_addresses.items()},
             'named_free_joint_addresses': {key: list(value) for key, value in self._free_addresses.items()},
             'named_body_ids': dict(self._bodies), 'named_frame_ids': dict(self._frames),

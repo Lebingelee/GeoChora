@@ -63,6 +63,8 @@ class _World:
         self.ctrl_write_count = 0
         self.bad_joint_address = None
         self.closes = 0
+        self.last_compile_xml = None
+        self.last_assets = None
 
 
 class _Contact:
@@ -239,9 +241,10 @@ class _FakeModel:
 
     @classmethod
     def from_xml_string(cls, xml: str, *, assets=None):
-        del assets
         world = _FAKE_WORLD
         world.calls["compile"] += 1
+        world.last_compile_xml = xml
+        world.last_assets = dict(assets or {})
         if world.fail_compile:
             raise RuntimeError(world.fail_compile)
         model = cls(xml, world)
@@ -451,6 +454,68 @@ def _candidate(monkeypatch, *, horizon=4):
         horizon=horizon,
     )
     return env
+
+
+def test_compiled_libero_assets_use_receipt_bound_unique_vfs_aliases(monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _candidate(monkeypatch)
+    try:
+        env.reset(seed=19, options={"init_row_index": 0})
+        receipt = env.value["source"].execution_source_receipt
+        assert receipt is not None
+        source_root = ET.fromstring(receipt.importer_xml)
+        compiled_root = ET.fromstring(_FAKE_WORLD.last_compile_xml)
+        source_files = [node.get("file") for node in source_root.iter() if node.get("file")]
+        compiled_files = [node.get("file") for node in compiled_root.iter() if node.get("file")]
+        aliases = env.session.compiled_layout_receipt["compiler_asset_aliases"]
+        rows_by_source = {row["source_path"]: row for row in aliases}
+        assert len(rows_by_source) == len(aliases)
+        assert set(rows_by_source) == set(source_files)
+        assert set(_FAKE_WORLD.last_assets) == {row["vfs_name"] for row in aliases}
+        assert set(compiled_files) == set(_FAKE_WORLD.last_assets)
+        assert len(set(compiled_files)) == len(rows_by_source)
+        assert all("/" not in name and "\\" not in name for name in _FAKE_WORLD.last_assets)
+        for source_path, row in rows_by_source.items():
+            payload = receipt.closure_files[source_path]
+            assert row["sha256"] == hashlib.sha256(payload).hexdigest()
+            assert row["size_bytes"] == len(payload)
+            assert _FAKE_WORLD.last_assets[row["vfs_name"]] == payload
+        metal_paths = [path for path in rows_by_source if path.endswith("/metal.png")]
+        assert len(metal_paths) >= 2
+        assert len({rows_by_source[path]["vfs_name"] for path in metal_paths}) == len(metal_paths)
+        # Repeated references to one source path share one compiler alias, while
+        # the immutable importer snapshot retains its original path strings.
+        assert len(source_files) > len(set(source_files))
+        assert receipt.importer_xml == receipt.closure_files["scene.xml"]
+    finally:
+        env.close()
+
+
+def test_failed_materialization_preserves_primary_error_and_reports_cleanup(tmp_path, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    _FAKE_WORLD.fail_compile = "synthetic primary source compile failure"
+    env = _candidate(monkeypatch)
+    result = run_libero_candidate_worker(
+        env, output_dir=tmp_path / "failed_materialization", steps=1,
+    )
+    assert result["status"] == "failed"
+    assert result["worker_error"] == {
+        "type": "RuntimeError", "message": "synthetic primary source compile failure",
+    }
+    assert result["close_error"] is None
+    close = result["final_session_close_receipt"]
+    assert close["schema_version"] == "r07c-d01-selected-close-v1"
+    assert close["session_closed"] is True
+    assert close["session_materialized"] is False
+    assert close["session_close_status"] == "not_materialized"
+    assert close["environment_closed"] is True
+    assert close["cleanup_completed"] is True
+    with pytest.raises(ValueError, match="incomplete or reports a lifecycle failure"):
+        consume_libero_candidate_bundle(tmp_path / "failed_materialization/worker_result.json")
 
 
 def _contact_pair_only_when_source_pose_is_on(model, data):
