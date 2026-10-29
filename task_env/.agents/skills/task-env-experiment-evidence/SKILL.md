@@ -131,3 +131,8 @@ protect historical evidence through stable IDs such as task ID, artifact
 version/hash, experiment ID, and Core version. Producing Evidence does not
 automatically create or validate a PhysPi Skill; PhysPi owns retention,
 distillation, validation, and promotion of Agent experience.
+
+
+## Compatibility and order-regression Evidence
+
+For Scene, source, control, and recording compatibility probes, freeze the exact input bytes and recipe separately from derived bytes. Join each case's source closure to its Scene, Assembly, TaskArtifact, effective plan, reset, materialization receipt, Episode, and H5 identities. Preserve source declaration order and canonical semantic order as distinct fields from provider-native body, joint, address, and actuator-slot order; validate every forward and inverse mapping by names. Do not infer native order support from tuple permutations, synthetic adapter fixtures, or provider-free S1. Label reused S2/S3 evidence with its own frozen source/profile/HEAD, and label newly executed same-run S2 separately. Strict H5 readback must bind T/T+1 observations, Target/Ack, native slots, state order, clock, close, and source identity to the exact run. A bounded regression result does not grant Provider admission, historical byte compatibility, P99 closure, or Qualification.

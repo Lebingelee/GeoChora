@@ -1784,12 +1784,12 @@
         "R02c",
         "R03b"
       ],
-      "status": "PARTIAL_ACCEPTED_S1_REUSE_PHYSICAL_ORDER_PENDING",
-      "execution": "ATTEMPT001_PROVIDER_FREE_S1_PASS; EXACT_SOURCE_S2_REUSED; PHYSICAL_ORDER_NATIVE_GATE_BLOCKED",
+      "status": "PARTIAL_E1_NATIVE_PASS_E2_COUNTER_INSTRUMENTATION_FAILURE",
+      "execution": "ATTEMPT001_S1_AND_EXACT_SOURCE_S2_ACCEPTED; ATTEMPT002_S1_PASS; E1_NATIVE_PASS; E2_NATIVE_NOT_MATERIALIZED; NO_RETRY",
       "required_evidence": "S1/S2",
-      "stop_condition": "真实物理顺序变体未受当前精确source合同准入；不得以synthetic拒绝门声称物理重排支持。",
-      "result": "Attempt001 added distinguishable semantic-to-ctrl-slot and independent nq/nv address-bound detectors, plus a rehashed Hand source-order mutation rejected before provider materialization. Selected provider-free S1 suites passed; accepted R02c005/R03b/R03c exact-source evidence was reused because production owners/source/profile inputs were unchanged. No native worker launched. Physical source/native order permutation remains BLOCKED; historical raw/phase disposition gate remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/report.md",
+      "stop_condition": "Attempt002 sole native start is spent. E1 baseline passed; E2 failed before underlying materialization due nested worker counter instrumentation. Re-evaluate before any attempt003; physical-order S2/S3 remains incomplete.",
+      "result": "Attempt001 partial S1/exact-source reuse remains accepted. Attempt002 implemented one deterministic Arm actuator/Hand finger source-order recipe and passed the selected provider-free S1 set (202 passed). The sole MuJoCo worker completed baseline E1 (64/65 H5, 320 steps, motion/close/strict production reader); the worker then rejected E2 before underlying materialization because the per-case instrumentation wrapper was nested and double-counted. E1 raw H5 was independently read after lock release; E2 has no receipt/H5/native evidence. No retry. R06b physical-order gate remains blocked; historical raw/phase disposition remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/report.md",
       "attempt001": {
         "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
         "branch": "codex/phase-ii-01-camera",
@@ -1860,6 +1860,50 @@
         "native_max_mj_step": 640,
         "historical_compatibility": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
         "attempt_limit": 3
+      },
+      "attempt002_execution": {
+        "input_head": "c05beb3c542c7050b407d994b345654de4788092",
+        "implementation_head": "baa544dad4a024ec235f9209420de734ec59f797",
+        "implementation_commits": [
+          "baa544dad4a024ec235f9209420de734ec59f797"
+        ],
+        "native_contract_sha256": "b65c2018c731ae91dc56022aa90a94164c6e3a172e1a6085a59ecbdbb00ea4f6",
+        "native_start_count": 1,
+        "native_worker_returncode": 1,
+        "native_worker_wall_seconds": 8.23728666990064,
+        "native_lock_released": true,
+        "native_rss_sample": "NOT_RETAINED; maximum unknown",
+        "s1": {
+          "status": "PASS",
+          "tests_passed": 202,
+          "pytest_wall_seconds": 78.06,
+          "measured_wall_seconds": 78.51000990788452,
+          "max_group_rss_observed_bytes": 586563584,
+          "rss_limit_bytes": 2147483648
+        },
+        "E1": {
+          "status": "NATIVE_BASELINE_CASE_PASS",
+          "materializations": 1,
+          "resets": 1,
+          "outer_intervals": 64,
+          "observations": 65,
+          "mj_step_calls": 320,
+          "mj_forward_calls": 65,
+          "simulated_seconds": 0.6400000000000005,
+          "production_h5_reader": "PASS",
+          "post_failure_independent_raw_readback": "PASS",
+          "H5_sha256": "91624a7e930bfdb841bb4c0f28a13bcde5497a9cf7a83f2468d729d94e4034c1"
+        },
+        "E2": {
+          "status": "BLOCKED_BEFORE_UNDERLYING_MATERIALIZATION",
+          "reason": "per-case materialize wrapper nested across episodes and double-counted",
+          "H5": "NOT_CREATED"
+        },
+        "two_case_raw_readback": "NOT_RUN; no E2 H5/native result",
+        "physical_order_gate": "BLOCKED; no derived native receipt/physical order evidence",
+        "historical_compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/report.md"
       }
     },
     {
@@ -2016,9 +2060,9 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "2ebd74d9bb2faf3423b5139b73d99d8e3b0898d34c264d3c8c2d3dfb93b8057b",
+    "README.md": "af5450c3f7637604913bc605dca35352d78468f1abfe3ccf5e11ab8d46c60011",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "21c9604f1c501be1a1a89a6d497d51bf1722d1040f44c82e479e3498270f6e18",
+    "06_R06_Compatibility_and_Regression.md": "792fcd0e3db34bac1eccaeac5ba416c53477d7095c162c8869e24b277e3afdea",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2027,7 +2071,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "2dc62e98afdcc8632012ea0f9f0ae30e786720cf720e158494b9a3851c31f40f"
+    "07_Execution_Order_and_Acceptance.md": "81767c91bc3c999e378670816ee10e6b3018e919c976ebcbfd6f482a7f98ef94"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4529,6 +4573,30 @@
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_001/",
       "qualification_granted": false,
       "DAG_P99_required_envelope_changed": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "LUNA_R06B_ATTEMPT002_NATIVE_E1_PASS_E2_INSTRUMENTATION_FAILURE",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "c05beb3c542c7050b407d994b345654de4788092",
+      "implementation_head": "baa544dad4a024ec235f9209420de734ec59f797",
+      "implementation_commits": [
+        "baa544dad4a024ec235f9209420de734ec59f797"
+      ],
+      "native_contract_sha256": "b65c2018c731ae91dc56022aa90a94164c6e3a172e1a6085a59ecbdbb00ea4f6",
+      "result": "PARTIAL_NATIVE_COUNTER_INSTRUMENTATION_FAILURE_PENDING_SOL_REVIEW",
+      "provider_free_s1": "202 passed; max sampled group RSS 586563584 bytes; pytest 78.06s",
+      "native_start_count": 1,
+      "native_worker_returncode": 1,
+      "E1": "64 transitions/65 observations; 320 steps; 0.64s; motion/reset/mount/close/production-reader pass; post-failure independent raw H5 readback pass",
+      "E2": "blocked before underlying materialization by nested per-case counter wrapper; no H5 or derived-order physical evidence",
+      "lock_released": true,
+      "native_retry": false,
+      "physical_order_gate": "BLOCKED",
+      "historical_compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/",
+      "qualification_granted": false,
+      "DAG_P99_required_envelope_changed": false
     }
   ],
   "P00_audit": {
@@ -5379,6 +5447,24 @@
         "cumulative_wall_seconds": 152.54,
         "timed_processes": 10
       }
+    },
+    "r06b_attempt002": {
+      "date": "2026-10-29",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "c05beb3c542c7050b407d994b345654de4788092",
+      "implementation_head": "baa544dad4a024ec235f9209420de734ec59f797",
+      "native_start_count": 1,
+      "status": "ATTEMPT002_PARTIAL_E1_PASS_E2_INSTRUMENTATION_BLOCKED_PENDING_SOL_REVIEW",
+      "implementation_commit": "baa544dad4a024ec235f9209420de734ec59f797",
+      "native_contract_sha256": "b65c2018c731ae91dc56022aa90a94164c6e3a172e1a6085a59ecbdbb00ea4f6",
+      "native_lock_released": true,
+      "E1": "PASS; same-run baseline H5 and motion; partial raw readback pass",
+      "E2": "NOT_MATERIALIZED; worker counter instrumentation failure; no retry",
+      "physical_order_gate": "BLOCKED",
+      "historical_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/report.md",
+      "next_attempt": "NOT_AUTHORIZED_BY_THIS_PACKAGE; Sol must reassess before any attempt003",
+      "qualification_granted": false
     }
   }
 }

@@ -117,3 +117,21 @@ Sol复核camera `4d032f8`：33项输出hash、24项输入冻结校验及相关�
 | 既有leaf/Env/Recorder；`load_leaf_control_records_h5`；R06b诊断worker/reader | 先provider-free通过真实worker到final receipt及异常close链，再冻结实现commit、两case、source闭包和预算。一worker分别运行原始及派生recipe，各64步/65观测；同run public state/Target/Ack/clock/H5与独立reader对应。旧reader/profile严格合同不放松；若现有语义profile可原样容纳新source identity则复用，否则显式新分派复用Recorder。 |
 
 预计90–180分钟，最多一次MuJoCo3.8.1 CPU worker、无重试、两次materialize/reset、128 outer/640实际mj_step、无render；与Luna1 F01共享排他锁。详细RAM/wall/output/等待及oracle限制由冻结工作包确定。未通过所有适用门只报告partial，不把S1拒绝或receipt tuple反序替代物理重排成功。历史原件处置保持独立BLOCKED；R05/R06c/P99未获解锁。attempt002争取收口；若核心门仍失败，第三次前须按项目Skill重新评估并调研，不自动续跑。
+
+
+<a id="r06b-attempt002-execution-result-2026-10-29"></a>
+
+## R06b attempt002执行结果（2026-10-29）
+
+结果：`PARTIAL_NATIVE_COUNTER_INSTRUMENTATION_FAILURE_PENDING_SOL_REVIEW`。实现冻结HEAD为 `baa544dad4a024ec235f9209420de734ec59f797`，camera代码实现提交为 `baa544d`；同包文档/receipt提交另列manifest。native contract SHA-256为 `b65c2018c731ae91dc56022aa90a94164c6e3a172e1a6085a59ecbdbb00ea4f6`，只绑定上述HEAD、当前实现文件、两个source closure、case顺序/IDs、预算/oracle与保护输入。
+
+| 门 | 实际结果 |
+| --- | --- |
+| provider-free S1 | 最终定向集合 **202 passed**；pytest 78.06s、采样墙钟78.51s、进程组RSS最大采样586,563,584 bytes，低于2GiB门。attempt001的未受影响exact-source S2只按原Sol接收范围复用，不冒称本HEAD重跑。 |
+| native worker/锁 | 仅启动1次；共享排他锁等待约0.00002s并覆盖worker，worker退出码1、墙钟8.24s。监督器随后写 `lock_released_after_group=true`；失败收尾未保留RSS样本，峰值RSS未知。无重试。 |
+| E1 pinned baseline | 一次materialization/reset，64 transitions/65 observations、320 `mj_step`/65 forward、0.64s；reset/mount、Arm运动/回home、Hand开合/equality、warning、Env close均通过。production H5 reader及worker严格tamper门通过；H5 SHA-256 `91624a7e930bfdb841bb4c0f28a13bcde5497a9cf7a83f2468d729d94e4034c1`。worker失败后另起零Core/provider-import raw reader读取此单份H5，T/T+1、named slots与same-run joins通过；该读回发生在锁释放后，只属于E1，不是完整同窗口reader出口。 |
+| E2 derived order | candidate/source closure与冻结identity匹配，但在 public reset 的 materialize call 前，worker抛出 `R06b per-worker materialization budget of two attempts exceeded`。根因是 `_run_case` 每episode再次包裹已被上一case替换的 `control_module.materialize_control`，使E2单次包装调用嵌套增加同一全局计数；底层E2 materializer未调用，没有E2 native receipt、H5或物理顺序证据。 |
+| 独立raw reader | E1单文件读取PASS；E2无H5。完整两case `raw_readback.json` 未生成，R06b S3/同run双case门不通过。 |
+| 其余gate | E1的物理运动不代表派生顺序native通过；R06b总体状态保持partial，不能报 `R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`。历史 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`、R05 provider合同阻塞、R06c/P99/Qualification均不变。不得在本attempt重试native；是否安排attempt003由Sol重新评估。 |
+
+执行包与原始收据：`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/`；完整worker失败trace在 `native/native_failure.json`，E1成功case在 `native/E1_result.json`，E1 raw读回在 `E1_raw_readback.json`，共享锁最终状态在 `native_window.json`。本次曾在provider-free目标集合之外误运行一个R04b pytest入口：该测试自身因冻结HEAD/clean-tree preflight在R06b dirty状态下拒绝，未到其worker/compile/step，但pytest进程导入了MuJoCo；此协议偏离已如实记录在 `report.md`/`commands.json`，不计入R06b S1且不抹除。

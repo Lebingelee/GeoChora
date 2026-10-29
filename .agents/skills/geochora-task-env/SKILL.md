@@ -965,7 +965,13 @@ limits and historical missing-byte blocker in the [R06 compatibility
 record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt001-实施结果2026-10-29).
 
 Sol reviewed attempt001 as partial: a coherent source/Scene reorder was not
-exercised by that negative. Core admission also pins original source hashes
-and Asset provenance, and the MuJoCo adapter pins compiled orders. R06b002
-plans one explicit derived recipe through these existing owners; it is not
-yet implemented or accepted. Preserve the original recipe and its strict gates.
+exercised by that negative. R06b attempt002 implemented one explicit derived
+recipe through the existing owners and passed its selected provider-free S1
+set (202 checks). Its sole MuJoCo 3.8.1 CPU worker completed baseline E1,
+then the per-case materialization counter wrapper nested across episodes and
+blocked E2 before the underlying materializer. E1's H5 passed production and
+partial raw readback; no derived-order native receipt/H5 exists, the native
+start is spent, and the R06b physical-order gate remains incomplete. Do not
+retry or claim R06b completion from this receipt; any attempt003 requires Sol
+reassessment. Preserve the original recipe and strict gates. See the current
+[attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt002-execution-result-2026-10-29).
