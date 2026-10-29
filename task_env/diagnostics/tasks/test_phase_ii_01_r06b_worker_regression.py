@@ -33,6 +33,7 @@ def _build_synthetic_case(episode_id: str, order_variant: bool):
     receipt = session.fixed_attachment_receipt
     return candidate, session, {
         'episode_id': episode_id,
+        'order_variant': order_variant,
         'candidate': _candidate_identity(candidate),
         'native_expected': {
             'native_body_order': receipt['native_body_order'],
