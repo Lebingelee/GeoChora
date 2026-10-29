@@ -124,14 +124,22 @@ def _snapshot_relative(path_value: str, root: Path, *, label: str) -> str:
     return str(_validate_relative_path(relative, label=label))
 
 
-def _inspect_snapshot(entry_path: Path, entry_prim: str, variant_selections: Mapping[str, str]):
-    """Compose a closed local snapshot and return required logical file paths."""
+def _inspect_snapshot(
+    snapshot_root: Path,
+    entry_path: Path,
+    entry_prim: str,
+    variant_selections: Mapping[str, str],
+):
+    """Compose a closed local snapshot and return required root-relative paths."""
     try:
         from pxr import Ar, Sdf, Usd, UsdUtils
     except Exception as error:  # pxr is deliberately a use-time dependency
         raise RuntimeError("OpenUSD is unavailable in this Python environment") from error
 
-    root = entry_path.parent
+    root = snapshot_root.resolve(strict=True)
+    entry_path = entry_path.resolve(strict=True)
+    if not entry_path.is_relative_to(root):
+        raise ValueError("USD entry layer is outside its frozen byte snapshot")
     root_layer = Sdf.Layer.FindOrOpen(str(entry_path))
     if root_layer is None:
         raise ValueError("OpenUSD could not open the delivery entry layer")
@@ -294,6 +302,7 @@ def load_usd_asset_delivery(
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(raw)
         required, inspection = _inspect_snapshot(
+            snapshot,
             snapshot.joinpath(*PurePosixPath(delivery.entry_file).parts),
             delivery.entry_prim,
             delivery.variant_selections,
@@ -336,7 +345,18 @@ def resolve_provider_representation(
     format_matched = provider in {"isaacsim", "geophys"}
     preparable = format_matched
     decision = "selected" if preparable else "rejected"
-    reason = None if preparable else "native USD decoder is not enabled in the inspected MuJoCo 3.8.1 build"
+    inspected_mujoco_build = (
+        "mujoco-3.8.1-libsha256-8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592"
+    )
+    if provider != "mujoco":
+        reason = None
+        recipe_id = "native-usd-source-v1"
+    elif provider_build_identity == inspected_mujoco_build:
+        reason = "native USD decoder is not enabled in the inspected MuJoCo 3.8.1 build"
+        recipe_id = "mujoco-3.8.1-usd-decoder-rejected-v1"
+    else:
+        reason = "MuJoCo build identity and USD decoder status have not been verified"
+        recipe_id = "mujoco-usd-build-unverified-v1"
     return ProviderRepresentationSelectionV1(
         schema_version="provider-representation-selection-v1",
         asset_identity_hash=loaded.delivery.asset_identity_hash,
@@ -352,8 +372,8 @@ def resolve_provider_representation(
         representation_preparable=preparable,
         runtime_admitted=False,
         rejection_reason=reason,
-        resolver_version="f02-usd-representation-resolver-v1",
-        recipe_id="native-usd-source-v1" if preparable else "mujoco-usd-build-gate-v1",
+        resolver_version="f02-usd-representation-resolver-v2",
+        recipe_id=recipe_id,
         options_sha256=options_hash,
     )
 

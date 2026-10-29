@@ -63,6 +63,61 @@ def _rebuild_closure(root: Path, delivery):
     return file_bytes
 
 
+def _build_nested_sibling_fixture(output_dir: Path) -> Path:
+    """Put the entry below the delivery root and its authored arcs in a sibling."""
+    manifest_path = build_fixture(output_dir)
+    root = manifest_path.parent
+    delivery = _read_manifest(root)
+    remapped = {}
+    for item in delivery["files"]:
+        old_path = item["path"]
+        new_path = "nested/entry.usda" if old_path == "entry.usda" else f"sibling/{old_path}"
+        source = root / old_path
+        raw = source.read_bytes()
+        if old_path == "entry.usda":
+            text = raw.decode("utf-8")
+            text = text.replace("@materials/look.usda@", "@../sibling/materials/look.usda@")
+            text = text.replace("@refs/model.usda@", "@../sibling/refs/model.usda@")
+            text = text.replace("@variants/low.usda@", "@../sibling/variants/low.usda@")
+            raw = text.encode("utf-8")
+        target = root / new_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+        source.unlink()
+        remapped[old_path] = new_path
+        item["path"] = new_path
+    delivery["entry_file"] = remapped["entry.usda"]
+    file_bytes = _rebuild_closure(root, delivery)
+    report = _read_report(root, delivery)
+    report["entry_file_sha256"] = hashlib.sha256(file_bytes[delivery["entry_file"]]).hexdigest()
+    report["closure_sha256"] = delivery["closure_sha256"]
+    report["input_closure_sha256"] = delivery["closure_sha256"]
+    report["output_closure_sha256"] = delivery["closure_sha256"]
+    _write_report_and_manifest(root, delivery, report)
+    return root / "delivery.json"
+
+
+def _add_outside_layer_dependency(manifest: Path, outside_layer: Path) -> None:
+    from pxr import Sdf, Usd, UsdGeom
+
+    outside_stage = Usd.Stage.CreateNew(str(outside_layer))
+    UsdGeom.Xform.Define(outside_stage, "/Outside")
+    outside_stage.GetRootLayer().Save()
+    root = manifest.parent
+    delivery = _read_manifest(root)
+    report = _read_report(root, delivery)
+    entry_path = root / delivery["entry_file"]
+    entry_layer = Sdf.Layer.FindOrOpen(str(entry_path))
+    entry_layer.subLayerPaths.append(str(outside_layer.resolve()))
+    entry_layer.Save()
+    file_bytes = _rebuild_closure(root, delivery)
+    report["entry_file_sha256"] = hashlib.sha256(file_bytes[delivery["entry_file"]]).hexdigest()
+    report["closure_sha256"] = delivery["closure_sha256"]
+    report["input_closure_sha256"] = delivery["closure_sha256"]
+    report["output_closure_sha256"] = delivery["closure_sha256"]
+    _write_report_and_manifest(root, delivery, report)
+
+
 def _reader(root: Path):
     return subprocess.run(
         [sys.executable, str(READER), "--delivery", str(root / "delivery.json")],
@@ -242,6 +297,9 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
     assert choices["geophys"]["decision"] == "selected"
     assert choices["mujoco"]["decision"] == "rejected"
     assert choices["mujoco"]["format_matched"] is False
+    assert choices["mujoco"]["rejection_reason"] == (
+        "native USD decoder is not enabled in the inspected MuJoCo 3.8.1 build"
+    )
     assert all(item["runtime_admitted"] is False for item in choices.values())
     assert all(item["source_verified"] is False for item in choices.values())
     another_build = resolve_provider_representation(
@@ -250,6 +308,26 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
     assert another_build.identity_hash != resolve_provider_representation(
         loaded, provider="isaacsim", provider_build_identity=builds["isaacsim"]
     ).identity_hash
+    other_mujoco_build = resolve_provider_representation(
+        loaded,
+        provider="mujoco",
+        provider_build_identity="mujoco-3.8.1-libsha256-" + "0" * 64,
+    )
+    inspected_mujoco_build = resolve_provider_representation(
+        loaded, provider="mujoco", provider_build_identity=builds["mujoco"]
+    )
+    hypothetical_mujoco_build = resolve_provider_representation(
+        loaded,
+        provider="mujoco",
+        provider_build_identity="mujoco-usd-enabled-unverified-build",
+    )
+    assert other_mujoco_build.decision == hypothetical_mujoco_build.decision == "rejected"
+    assert other_mujoco_build.rejection_reason == hypothetical_mujoco_build.rejection_reason == (
+        "MuJoCo build identity and USD decoder status have not been verified"
+    )
+    assert other_mujoco_build.identity_hash != inspected_mujoco_build.identity_hash
+    assert hypothetical_mujoco_build.identity_hash != other_mujoco_build.identity_hash
+    assert other_mujoco_build.runtime_admitted is hypothetical_mujoco_build.runtime_admitted is False
     option_choice = resolve_provider_representation(loaded, provider="isaacsim", provider_build_identity=builds["isaacsim"], options={"load_payloads": False})
     assert option_choice.options_sha256 != choices["isaacsim"]["options_sha256"]
 
@@ -300,6 +378,61 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
         assert any(finding.category == "asset_missing" for finding in rejected.value.report.findings)
     finally:
         sys.path.remove(str(agent_dir))
+
+
+def test_nested_entry_and_root_sibling_dependency_roundtrip_core_catalog_and_reader(tmp_path):
+    manifest = _build_nested_sibling_fixture(tmp_path / "nested-delivery")
+    loaded = load_usd_asset_delivery(manifest, allow_synthetic=True)
+    assert loaded.delivery.entry_file == "nested/entry.usda"
+    assert loaded.inspection["entry_prim_valid"] is True
+    assert "sibling/materials/look.usda" in loaded.file_bytes
+    assert "sibling/textures/grid.bin" in loaded.file_bytes
+    selection = resolve_provider_representation(
+        loaded, provider="geophys", provider_build_identity="geophys-test-build"
+    )
+    assert selection.decision == "selected"
+    assert selection.runtime_admitted is False
+
+    # The saved delivery is reread in another process; that reader does not import the Core loader.
+    readback = _reader(manifest.parent)
+    assert readback.returncode == 0, readback.stdout + readback.stderr
+    assert json.loads(readback.stdout)["result"] == "PASS"
+
+    repo = Path(__file__).resolve().parents[3]
+    agent_dir = repo / "task_env" / "script" / "agent"
+    sys.path.insert(0, str(agent_dir))
+    try:
+        from catalog_query import build_catalog
+
+        catalog = build_catalog(
+            repo,
+            providers=("mujoco",),
+            asset_deliveries=[manifest],
+            asset_provider_build_identities={
+                "mujoco": "mujoco-3.8.1-libsha256-8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592"
+            },
+            allow_synthetic_asset_deliveries=True,
+        )
+    finally:
+        sys.path.remove(str(agent_dir))
+    row = catalog["asset_deliveries"][0]
+    assert row["entry_file"] == "nested/entry.usda"
+    assert row["provider_selections"]["mujoco"]["rejection_reason"] == (
+        "native USD decoder is not enabled in the inspected MuJoCo 3.8.1 build"
+    )
+    assert row["provider_selections"]["mujoco"]["runtime_admitted"] is False
+
+
+def test_nested_entry_rejects_authored_layer_outside_snapshot_root(tmp_path):
+    manifest = _build_nested_sibling_fixture(tmp_path / "escaping-delivery")
+    outside_layer = tmp_path / "outside.usda"
+    _add_outside_layer_dependency(manifest, outside_layer)
+
+    with pytest.raises(ValueError, match="outside the frozen USD byte snapshot"):
+        load_usd_asset_delivery(manifest, allow_synthetic=True)
+    readback = _reader(manifest.parent)
+    assert readback.returncode != 0
+    assert json.loads(readback.stdout)["result"] == "REJECTED"
 
 
 @pytest.mark.parametrize(
