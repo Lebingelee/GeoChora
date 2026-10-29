@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+当前复核结论（2026-10-29）：R05b001为`CHANGES_REQUIRED_R05B`，下一包attempt002；三项可复现行为缺陷及接线S1缺口见[R05修复表](05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair)。R05c保持未启动，下文较早状态按当时时点保留。
+
 当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt001 已完成实现、定向 S1 与 CPU/CUDA 有界 S2，待 Sol 复核；R05c 尚未启动。Luna1 独立负责 F00–F07。**
 
 跨分支汇总已有 **15/22 slices 获 Sol 有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a、R06a/b。接收等级各异：静态 S1、Audit、真实 S2/S3 不能互换，R06a 审计接收也不关闭历史 compatibility decision gate。

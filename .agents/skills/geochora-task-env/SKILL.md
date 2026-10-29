@@ -979,6 +979,11 @@ See the [Sol bounded acceptance](../../../docs/module/task_env/goal/Phase_II_01/
 
 ## R05b bounded native-feedback route (2026-10-29)
 
+Sol review of attempt001 requires changes: default reference reset initialization,
+trusted asset-closure admission and wide actuator-ID validation are not yet
+accepted. This section locates the implementation owners; it does not establish
+a working general route. See the [R05 repair plan](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair).
+
 The selected NutAssembly task exposes an advanced normal-profile construction:
 
 ```python
