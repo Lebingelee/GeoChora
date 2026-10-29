@@ -148,12 +148,19 @@
       "depends_on": [
         "P00"
       ],
-      "status": "BLOCKED_PROVIDER_CONTRACT",
-      "execution": "SOL_PREFLIGHT_ONLY; CADENCE_PROBE_NOT_RUN",
+      "status": "READY_FOR_CONTRACT_FORMALIZATION",
+      "execution": "R05A_ATTEMPT001_PREPARED_NOT_YET_EXECUTED",
       "required_evidence": "Audit/S1/probe",
       "stop_condition": "无owner合同→BLOCKED_PROVIDER_CONTRACT",
-      "blocker": "Current pinned GeoPhys Reader forbids routine per-substep host snapshot; formal Provider API/phase/device/cadence/cost decision not established. Historical C05c is diagnostic-only.",
-      "scope_decision": "Maintainer selected independent R04a while R05a remains BLOCKED_PROVIDER_CONTRACT; no DAG/P99 waiver and no R05a execution."
+      "blocker": "Normal host native-step contract and exact admission remain to be formalized; no known cadence physics failure. Existing typed sample/freshness and four diagnostic cells passed.",
+      "scope_decision": "Maintainer assigns Luna2 to original 07 goals, prioritizing R05; Luna1 owns F00-F07. No qualification or required-envelope waiver.",
+      "historical_preflight_20261026": {
+        "status": "BLOCKED_PROVIDER_CONTRACT",
+        "execution": "SOL_PREFLIGHT_ONLY; CADENCE_PROBE_NOT_RUN",
+        "blocker": "Current pinned GeoPhys Reader forbids routine per-substep host snapshot; formal Provider API/phase/device/cadence/cost decision not established. Historical C05c is diagnostic-only.",
+        "scope_decision": "Maintainer selected independent R04a while R05a remains BLOCKED_PROVIDER_CONTRACT; no DAG/P99 waiver and no R05a execution."
+      },
+      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-implementation-20261029"
     },
     {
       "id": "R04a",
@@ -2120,10 +2127,16 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PLANNED",
+      "status": "PARTIAL_AUDIT_ACCEPTED_FULL_FIVE_TASK_EXIT_PENDING",
       "execution": "NOT_STARTED",
       "required_evidence": "source audit / measurement protocol / feasibility",
-      "stop_condition": "unresolved required semantic/source/protocol gate blocks deployment"
+      "stop_condition": "unresolved required semantic/source/protocol gate blocks deployment",
+      "cross_branch_reference": {
+        "branch": "develop-full",
+        "head": "1632a11774d817f2ebe36198bbc40a74e7f36974",
+        "review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_004/sol_review.md",
+        "scope": "Protocol and source-audit partial acceptance; single pilot source eligibility; not full five-task exit or benchmark deployment; no code integration."
+      }
     },
     {
       "id": "R07b",
@@ -2256,7 +2269,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "cb2e5eff1b2eeee1a295eb8dd60e8b3660bbbdd21ccc440c24d7d55a8491da7c",
+    "README.md": "8ec02386b5a875fde5d0a4ee00adc958910a5df3f74b98213362a5111d6d0f65",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2265,9 +2278,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
+    "05_R05_Native_Rate_Feedback.md": "1b741ea94447c2646c7a64adc2bfa0bfe9fe6b3865238a7d348afacdba4f6861",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "dbbd178a307183effb996b6ed4952f9a772903e371a8d4dfe92bb04f35f0e5e7"
+    "07_Execution_Order_and_Acceptance.md": "2a69f716cf398b8df9d924753aca3b1a7d5e8a6a3d9cc7bd6d07919b97b0a6be"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4793,6 +4806,18 @@
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/",
       "qualification_granted": false,
       "DAG_P99_required_envelope_changed": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "SOL_R05_RECONCILIATION_AND_LUNA2_PRIORITY_ASSIGNMENT",
+      "source_camera_head": "7ebd49c73bf97c38caec1f839d103641d0d3a589",
+      "source_main_head": "1632a11774d817f2ebe36198bbc40a74e7f36974",
+      "accepted_slices": 14,
+      "r05a": "READY_FOR_CONTRACT_FORMALIZATION; not accepted",
+      "historical_four_cells": "CPU/CUDA x100/500Hz diagnostic task/S3 passed; preserved identities and no new cadence failure",
+      "native_tests_started_by_sol": 0,
+      "required_envelope_changed": false,
+      "review_root": "workspace/maintenance/r05_phase_ii_ii01_reconciliation_20261029_001/"
     }
   ],
   "P00_audit": {
@@ -4957,6 +4982,29 @@
       "audit_only_ignored_output": "Luna preserves raw workspace output; Sol as designated owner commits the maintained summary/index after review. No raw Evidence or empty commit required.",
       "stage_other_writer_files": false,
       "push_merge_tag_release_authorized": false
+    },
+    "current_assignment_20261029": {
+      "authority": "Latest explicit maintainer instruction in this conversation",
+      "luna2_thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
+      "luna2_branch": "codex/phase-ii-01-camera",
+      "luna2_scope": "Original 07 R01-R07/P99 table; next R05a then reviewed R05b/c",
+      "luna1_scope": "F00-F07 on develop-full",
+      "active_stage_checkouts": 2,
+      "new_worktrees": 0,
+      "accepted_slice_count": 14,
+      "remaining_slices": [
+        "R05a",
+        "R05b",
+        "R05c",
+        "R06c",
+        "R07a",
+        "R07b",
+        "R07c",
+        "R07d"
+      ],
+      "native_lock": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock",
+      "one_unfinished_package_per_thread": true,
+      "merge_push_authorized": false
     }
   },
   "checkpoint_recovery_plan": {

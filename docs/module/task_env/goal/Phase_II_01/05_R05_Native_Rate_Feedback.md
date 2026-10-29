@@ -1,12 +1,12 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态：REVISED_DRAFT；R05a 为 BLOCKED_PROVIDER_CONTRACT（Sol preflight，无新cadence probe）；R05b/c 仍 PLANNED / NOT_STARTED。Provider 合同批准是本 Goal 独立前置；不把 C05c 诊断调用改名为支持。
+状态（2026-10-29）：R05a `READY_FOR_CONTRACT_FORMALIZATION`，准备 attempt001；旧 `BLOCKED_PROVIDER_CONTRACT` 为历史 Sol preflight，未做 R05 新 cadence 实验。R05a 尚未接收，R05b/c 仍 PLANNED / NOT_STARTED。旧 C05c 四格实际通过；本 Goal 补齐正式合同及正常准入，不重复证明已有频率功能。
 
 ## 现有能力与 owner
 
 Provider [RobotArmObservationReader](../../../../../GeoPhys/src/control/robot_arm_observation.py) 和公开 `control.robot_arm` export，Core [native feedback adapter](../../../../../task_env/runtime/sessions/geophys.py)、[boundary](../../../../../task_env/runtime/boundary.py)、[RuntimeSession API](../../../../../task_env/runtime/sessions/api.py)、[typed state](../../../../../task_env/artifacts/state.py) 是唯一复用路径。EXTEND_EXISTING；Provider 拥有 native state/sample refresh，Core 绑定 episode/reset/evaluation，不建立 force state store 或另一个 Reader facade。
 
-GeoPhys a53 已提供 reset-forward freshness/typed raw force 的精确 CPU 交集；现有 Reader 文档明确 host snapshot 用于低频采样，不应逐 simulation substep 使用。原 C05c CPU/CUDA × 100/500Hz full runs 为维护者批准的每 2ms host Reader **诊断例外**；历史 H5/phase/Guard 事实保留，但不证明常规 500 Hz 支持或 device-resident Controller。
+GeoPhys a53 已提供 typed force sample、phase/sequence/generation/state/config revisions、reset refresh 与 invalidate；Core 已有 Native Sequence/Guard/Recorder 消费。Reader 文档的 host snapshot 用途限制与 R05 正式目标存在待收口差异，但不是运行时频率上限。原 C05c CPU/CUDA × 100/500Hz 四组在维护者批准的诊断交集中完成真实任务及同文件 S3，原 H5 仍在且 hash 已核实。100Hz 组仅降低夹爪 law 更新频率，force/Guard 仍逐 2ms native step 采样；CUDA 为 GPU physics、host Controller。不得把这些事实说成频率失败，也不得直接升级为正式或 device-resident 支持。
 
 ## Provider 公共合同需明确的字段与行为
 
@@ -46,3 +46,26 @@ R05 不作为 R01/R02/R03 Position-only 前置；R04 也不依赖 R05。仅整�
 这些基础 reset/step 检查可以独立推进，不要求本页 500Hz/双 backend 合同先通过；
 它们的成功也不能关闭 `R05a=BLOCKED_PROVIDER_CONTRACT` 或替代 R05b/c 的正式 sample/freshness/cadence 证据。
 Isaac R1 force-aware 若需要读取力，同样先核 source/transmission、单位/phase/freshness 和公开能力，不能借 Position 准入。
+
+<a id="r05a-implementation-20261029"></a>
+
+## R05a attempt001 实施定位（2026-10-29）
+
+分类 `EXTEND_EXISTING`。Luna2 在现有 camera 阶段分支完成一次合同研究/布置窗口，预计60–90分钟、主动工作timebox120分钟；窗口内允许多轮定向S1修正，不把一次失败当作attempt耗尽。本包不启动R05b/c；owner决议候选交Sol审阅后才成为R05a接收依据，缺口不得靠删除diagnostic字样掩盖。
+
+| 层级 / 现有 owner与方法 | R05a 必须交付的定位与决定 | 后继改动位置 |
+| --- | --- | --- |
+| GeoPhys `src/control/robot_arm_observation.py`：`RobotArmActuatorForceSampleV1`、`read_cpu_snapshot`、`refresh_reset_force_sample`、`invalidate_actuator_force_sample`；公开 `control.robot_arm` exports | 逐字段/行为对应本页六类合同；CPU/CUDA、owned copy、同步、重复读取、线程/close边界分别核实。已实现/缺实现/只缺说明分列 | R05b优先扩现有Reader及 `docs/reference/control-observation.md`；不新建Reader facade/状态库 |
+| GeoPhys `src/solvers/rigid/state/host_io.py` 的 force status、reset refresh、begin/complete与失效owner | 从调用链确认reset-forward与completed-step pre-integration的真实意义；state/config写入、失败/重建失效与sample时间不能靠字段名猜测 | 只有证明实际失效缺陷才修owner；Core不调用其私有方法/数组 |
+| Core `runtime/boundary.py`、`runtime/sessions/geophys.py`、`artifacts/state.py` | public sample到typed measurement、episode/reset/evaluation identity、NaN/错phase/旧generation与required消费的真实路径、已有S1及缺口 | R05b有界修复既有adapter；不复制NativeFeedback/Recorder |
+| Core `runtime/sessions/api.py::_diagnostic_manifest`、既有provider registry/manifest owner、`tasks/nut_assembly/task.py` | 列出CPU正常路线与CUDA process-local diagnostic白名单的精确差别，提出版本化正常admission及source/build/backend/profile拒绝门 | R05b在既有注册/构造入口扩展；不能全局放行CUDA、不能把所有force-aware leaf一并准入 |
+| `controllers/canonical/gripper_execution.py::EqualRateGripperServo`、`tasks/nut_assembly/solution.py::NativeRateGripperServo`与既有Native Sequence/Guard | 固定500Hz physics/force/Guard、100Hz outer，law100Hz更新+4hold或law500Hz逐步更新；reset首样本、ack、hold/ramp及H5对应规则 | 复用生产算法，不为R05另建控制循环 |
+| `diagnostics/tasks/c05c_geophys_gripper_cadence.py::run_group/validate_h5`、原四格result/probe/H5 | 建立原证据→新条款复用矩阵、可复用源码hash/identity和受影响差异；只为新增条款补defect-sensitive S1与后继最小native | 原四格task success保留在旧身份；R05c正常合同新证据单独记录，不拼接新旧run |
+
+原证据根：ignored `workspace/maintenance/nutassembly_gripper_cadence_geophys_20261022/`。跨分支/对话纠偏收据：ignored `workspace/maintenance/r05_phase_ii_ii01_reconciliation_20261029_001/`。后者核实原H5 hash/root及源码未变，未重新运行历史完整S3；R05a必须继续区分已核实内容和原报告结论。
+
+**R05a出口**：可审阅的正式host native-step合同候选（包括明确支持/拒绝交集、刷新/失效/同步/线程/close行为）、条款到公开方法/调用者/证据的矩阵、最小probe的逐项复用或确缺说明、CPU/CUDA成本预算、R05b精确补丁与测试清单及新pin必要性判定。已有证据足以覆盖未变化的最小probe时不重跑；本attempt不新增native，若出现不能靠源码/S1/原probe回答的决策关键未知项，具体指出再由Sol一次性定后继范围。
+
+Provider正式说明如需改动，R05a交付对应owner可落地候选文本/patch与是否需新API的判定；R05b再落入Provider仓库并冻结实际commit/gitlink，不能用Core文档替Provider当前公共合同作已生效宣称。Sol是本包合同审阅/接收责任人，不让Luna因“尚无神秘外部owner签字”循环返回同一句BLOCKED；若确需维护者范围决定，须提供实际不支持的方法/行为和可选择的具体方案。
+
+R05b/c实施预算由本包提出后Sol随实施合同冻结。无实时要求、无device-resident要求；历史Reader约0.3ms不是未来强制阈值。保持原CPU/CUDA×100/500Hz四格required，范围内改动补最小delta证据；只有输入/算法改变推翻原任务证据时才重跑受影响完整cell。
