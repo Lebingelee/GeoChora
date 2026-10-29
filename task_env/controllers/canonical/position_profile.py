@@ -269,15 +269,19 @@ class PandaPositionServoProfileV1:
         it is not a replacement for USD delivery validation or native admission.
         """
         from ...runtime.sessions.source import UsdRuntimeSourceV1
-        from ...runtime.sessions.leaf_control import IsaacNamedPositionDriveReceiptV1
+        from ...runtime.sessions.leaf_control import (
+            GeoPhysUsdPositionDriveReceiptV1, IsaacNamedPositionDriveReceiptV1,
+        )
         from ...artifacts import ExecutionSpecV1
 
         if (type(artifact) is not TaskArtifactV1 or type(source) is not UsdRuntimeSourceV1
                 or type(execution) is not ExecutionSpecV1):
             raise TypeError('versioned Position profile requires TaskArtifactV1, ExecutionSpecV1 and UsdRuntimeSourceV1')
         if (native_drive_receipt is not None
-                and type(native_drive_receipt) is not IsaacNamedPositionDriveReceiptV1):
-            raise TypeError('versioned Position profile requires the named DOF drive receipt when supplied')
+                and type(native_drive_receipt) not in (
+                    IsaacNamedPositionDriveReceiptV1, GeoPhysUsdPositionDriveReceiptV1,
+                )):
+            raise TypeError('versioned Position profile requires a supported named drive receipt when supplied')
         source.validate()
         execution.validate()
         if source.task_artifact.identity_hash != artifact.identity_hash:
@@ -302,7 +306,7 @@ class PandaPositionServoProfileV1:
               native_drive_receipt.device,
               native_drive_receipt.determinism_mode) != (
               scene.identity_hash, source.source_closure_digest,
-              execution.identity_hash, 'isaacsim-6.2.0.0', execution.physics_profile,
+              execution.identity_hash, native_drive_receipt.provider_build_identity, execution.physics_profile,
               execution.physics_backend, execution.physics_device,
               execution.determinism_mode):
             raise ValueError('named DOF receipt does not bind the exact USD Scene/source closure')
@@ -316,17 +320,21 @@ class PandaPositionServoProfileV1:
             target_by_joint = dict(source.joint_targets)
         else:
             if any(source.joints.get(name) != native for name, native in expected_joint_bindings.items()):
-                raise ValueError('synthetic Position USD source joint names differ from the F03 mapping')
+                if type(native_drive_receipt) is not GeoPhysUsdPositionDriveReceiptV1:
+                    raise ValueError('synthetic Position USD source joint names differ from the F03 mapping')
             target_by_joint = {
                 f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
                 for item in native_drive_receipt.drives
             }
+            if type(native_drive_receipt) is GeoPhysUsdPositionDriveReceiptV1 and dict(source.joints) != target_by_joint:
+                raise ValueError('GeoPhys source Joint names differ from its model-bound drive receipt')
             if dict(source.joint_targets) != target_by_joint:
                 raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')
         hand_binding = source.bodies.get('panda-main/hand')
         if type(hand_binding) is not str or not hand_binding.strip():
             raise ValueError('PositionServoV1 USD hand state requires an explicit source Frame binding')
-        if native_drive_receipt is not None and hand_binding != 'hand':
+        if (type(native_drive_receipt) is IsaacNamedPositionDriveReceiptV1
+                and hand_binding != 'hand'):
             raise ValueError('synthetic Position USD hand state must retain its exact F03 hand mapping')
         if type(kinematics_source_xml) is not str or not kinematics_source_xml.strip():
             raise ValueError('PositionServoV1 requires a nonempty source-calibrated kinematics description')

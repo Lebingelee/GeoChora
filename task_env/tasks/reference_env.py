@@ -251,10 +251,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if (provider, backend) != (
                     _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend):
                 raise ValueError('selected construction provider/backend differs from ExecutionSpecV1')
-            if (_execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend,
-                    _execution_spec_v1.physics_device, _execution_spec_v1.determinism_mode) != (
-                    'isaacsim', 'cuda', 'cuda:0', 'best_effort'):
-                raise ValueError('F03 versioned selected construction requires its exact Isaac CUDA target')
+            execution_route = (
+                _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend,
+                _execution_spec_v1.physics_device, _execution_spec_v1.determinism_mode,
+                _execution_spec_v1.physics_profile,
+            )
+            allowed_versioned_routes = {
+                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'physx-gpu-f03-s1'),
+                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f04-position-v1'),
+                ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
+            }
+            if execution_route not in allowed_versioned_routes:
+                raise ValueError('versioned Position construction has an unsupported provider execution route')
         self._declared_execution_spec_v1 = _execution_spec_v1
         if _diagnostic_gripper_control_hz is None:
             if (_execution_spec_v1 is None
@@ -1015,12 +1023,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             info['state_boundary_identity'] = boundary.to_mapping()
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
-            if self.value.get('f04_position_input') is not None:
-                # F04's state-only public route needs the actual typed
-                # free-body twist and Frame poses in the reset/step result so
-                # native H5 witnesses can be built without provider-private
-                # reads. The publication is the same Core-owned value used by
-                # observation projection and Position control.
+            if (self.value.get('f04_position_input') is not None
+                    or self.value.get('f05_position_input') is not None):
+                # Versioned USD state-only routes expose the Core-owned typed
+                # publication used by observations and Position control.
                 info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
             if self.camera_observation_config is not None:
                 from ..observations.capture import DynamicCameraObservationConsumerV1
@@ -2466,16 +2472,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
         f03_input = self.value.get('f03_position_input')
         f04_input = self.value.get('f04_position_input')
-        if f03_input is not None or f04_input is not None:
+        f05_input = self.value.get('f05_position_input')
+        if f03_input is not None or f04_input is not None or f05_input is not None:
             f04_route = f04_input is not None
-            versioned_input = f04_input if f04_route else f03_input
+            f05_route = f05_input is not None
+            versioned_input = f05_input if f05_route else f04_input if f04_route else f03_input
             source = self.value['source']
             source_scene = source.scene_source
             loaded = source_scene.loaded_delivery
             delivery = loaded.delivery
             representation = source_scene.representation
             drive_receipt = (getattr(self.session, '_drive_receipt', None)
-                             if f04_route else self.value['native_drive_receipt'])
+                             if f04_route or f05_route else self.value['native_drive_receipt'])
             native_metadata = self.session._native_io_metadata
             reset_receipt = self.session._reset_write_receipt
             if reset_receipt is None:
@@ -2496,11 +2504,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'schema_version': (
                     'f04-isaac-core-position-recording-profile-v1' if f04_native else
                     'f04-core-position-synthetic-io-s1-profile-v1' if f04_route else
+                    'f05-geophys-position-synthetic-io-s1-profile-v1' if f05_route else
                     'f03-core-call-chain-recording-profile-v1'
                 ),
                 'profile_id': (
                     'f04-isaac-panda-position-native-v1' if f04_native else
                     'f04-local-source-synthetic-io-s1-v1' if f04_route else
+                    'f05-geophys-usd-position-synthetic-io-s1-v1' if f05_route else
                     'f03-versioned-usd-position-synthetic-s1-v1'
                 ),
                 'provenance_kind': 'native_runtime' if f04_native else 'synthetic_fixture',
@@ -2563,6 +2573,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
                 'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
                 'native_position_drive_receipt': asdict(drive_receipt),
+                **({'public_model_identity_sha256': drive_receipt.public_model_identity_sha256} if f05_route else {}),
                 'native_runtime_io_metadata': native_metadata.to_mapping(),
                 **({'native_public_bootstrap_receipt': bootstrap} if f04_native else {}),
                 'native_source_mappings': {
@@ -2570,12 +2581,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'frames': dict(source.frames), 'free_joints': dict(source.free_joints),
                     'joint_targets': dict(source.joint_targets),
                 },
-                ('source_calibrated_kinematics_source_sha256' if f04_route
+                ('source_calibrated_kinematics_source_sha256' if f04_route or f05_route
                  else 'static_kinematics_source_sha256'): versioned_input.kinematics_source_sha256,
                 'reset_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
                 'recording_scope': (
                     'F04 exact Isaac 6.2.0.0 cuda:0 GPU PhysX Position execution'
-                    if f04_native else 'Core synthetic S1 conformance; no provider physics or native admission'
+                    if f04_native else
+                    'F05 public GeoPhys host-model synthetic S1; no provider solver or physics admission'
+                    if f05_route else 'Core synthetic S1 conformance; no provider physics or native admission'
                 ),
             }
             action_components = tuple(action_schema.components)
@@ -2584,6 +2597,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'env_name': (
                         'SelectedReferenceEnv.F04IsaacPandaPosition' if f04_native else
                         'SelectedReferenceEnv.F04LocalSourceSyntheticIOS1' if f04_route else
+                        'SelectedReferenceEnv.F05GeoPhysUsdSyntheticIOS1' if f05_route else
                         'SelectedReferenceEnv.F03VersionedPositionS1'
                     ),
                     'task_name': self.artifact.task_id,
@@ -2860,7 +2874,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         applied_payload = applied.to_mapping()
         f03_input = self.value.get('f03_position_input')
         f04_input = self.value.get('f04_position_input')
-        if f03_input is not None or f04_input is not None:
+        f05_input = self.value.get('f05_position_input')
+        if f03_input is not None or f04_input is not None or f05_input is not None:
             native_ack = getattr(self.session, '_last_native_position_ack', None)
             native_advances = getattr(self.session, '_last_interval_advances', ())
             advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)
@@ -2869,7 +2884,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
             applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
             applied_payload['native_interval_advance_attempts'] = advance_attempts
-            if f04_input is not None:
+            if f04_input is not None or f05_input is not None:
                 native_io = getattr(self.session, '_native_io', None)
                 provenance = getattr(native_io, 'execution_provenance_kind', None)
                 if provenance == 'native_runtime':

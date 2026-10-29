@@ -567,11 +567,17 @@ def materialize_control(
     from ...artifacts.execution import legacy_execution_projection
 
     declared_execution = execution
-    from .api import _current_f03_s1_native_io_context
+    from .api import _current_f03_s1_native_io_context, _current_f05_s1_native_io_context
     f03_scope = _current_f03_s1_native_io_context()
+    f05_scope = _current_f05_s1_native_io_context()
     f03_s1 = f03_scope is not None
+    f05_s1 = f05_scope is not None
+    if f03_s1 and f05_s1:
+        raise ValueError('F03 and F05 synthetic admission scopes cannot overlap')
+    s1_scope = f03_scope if f03_s1 else f05_scope
+    synthetic_s1 = s1_scope is not None
     f04_native = False
-    if f03_s1:
+    if synthetic_s1:
         from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
 
         profile_values = (
@@ -581,26 +587,34 @@ def materialize_control(
         if (type(declared_execution) is not ExecutionSpecV1
                 or not profile_values
                 or any(getattr(profile, 'native_drive_receipt', None)
-                       is not f03_scope.input_v1.native_drive_receipt for profile in profile_values)):
-            raise ValueError('F03 S1 control admission requires its exact declared ExecutionSpecV1 and named-drive Profile')
-        f03_scope.validate_call(
+                       is not s1_scope.input_v1.native_drive_receipt for profile in profile_values)):
+            raise ValueError('synthetic S1 control admission requires its exact declared ExecutionSpecV1 and named-drive Profile')
+        s1_scope.validate_call(
             artifact, declared_execution, source,
-            drive_receipt=f03_scope.input_v1.native_drive_receipt,
+            drive_receipt=s1_scope.input_v1.native_drive_receipt,
         )
         if manifest is not None or diagnostic_profile is not None or leaf_plan is not None:
-            raise ValueError('F03 S1 control admission cannot combine with caller manifests or other diagnostics')
+            raise ValueError('synthetic S1 control admission cannot combine with caller manifests or other diagnostics')
         execution = ExecutionSpec(
             declared_execution.physics_provider, declared_execution.physics_profile,
             'none', declared_execution.physics_backend,
             declared_execution.provider_seed, declared_execution.determinism_mode,
         )
         f03_capabilities = sorted(set(CONTROL_REQUIRED.names) | set(artifact.required_capabilities.names))
+        manifest_provider = 'isaacsim' if f03_s1 else 'geophys'
+        manifest_version = '6.2.0.0' if f03_s1 else 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
+        manifest_adapter = (
+            'f03-private-synthetic-core-s1-v1' if f03_s1
+            else 'f05-private-geophys-usd-synthetic-s1-v1'
+        )
         actual_manifest = ProviderCapabilityManifest(
-            'provider-capability-v0', 'isaacsim', '6.2.0.0',
-            'f03-private-synthetic-core-s1-v1', 'cuda',
-            declared_execution.physics_profile, 'none', 'best_effort',
+            'provider-capability-v0', manifest_provider, manifest_version,
+            manifest_adapter, declared_execution.physics_backend,
+            declared_execution.physics_profile, 'none', declared_execution.determinism_mode,
             tuple(CapabilityClaim(
-                capability, 'tested', 'f03-002-private-synthetic-core-conformance-only',
+                capability, 'tested',
+                'f03-private-synthetic-core-conformance-only' if f03_s1
+                else 'f05-public-geophys-host-lowering-synthetic-s1-only',
             ) for capability in f03_capabilities),
             ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
             'synthetic-S1-only; not runtime admission or provider qualification',
@@ -688,14 +702,14 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if not f03_s1 and not f04_native and diagnostic_profile is None:
+    if not synthetic_s1 and not f04_native and diagnostic_profile is None:
         actual_manifest = provider_manifest(execution.physics_provider)
-    elif not f03_s1 and not f04_native:
+    elif not synthetic_s1 and not f04_native:
         from .api import _diagnostic_manifest
         if manifest is not None:
             raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
         actual_manifest = _diagnostic_manifest(artifact, execution, source, diagnostic_profile)
-    if manifest is not None and not f03_s1:
+    if manifest is not None and not synthetic_s1:
         admit_capabilities(CONTROL_REQUIRED, manifest, execution)
     admit_capabilities(CONTROL_REQUIRED, actual_manifest, execution)
     admission_manifest = manifest
@@ -718,7 +732,7 @@ def materialize_control(
             if (not profiles or len(profiles) > 2
                     or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)):
                 raise TypeError('unsupported explicit Controller profile set')
-            if (not f03_s1 and not f04_native and (execution.physics_provider not in {'geophys', 'mujoco'}
+            if (not synthetic_s1 and not f04_native and (execution.physics_provider not in {'geophys', 'mujoco'}
                                 or execution.backend != 'cpu')):
                 raise ValueError('PositionServoV1 materialization is limited to GeoPhys/MuJoCo CPU')
             if controller_binding_plan is None:
@@ -744,8 +758,8 @@ def materialize_control(
                 profile._validate_source(source)
                 expected_targets.update(profile._target_bindings)
                 expected_open.append(profile.open_actuator)
-            if f03_s1:
-                drive_receipt = f03_scope.input_v1.native_drive_receipt
+            if synthetic_s1:
+                drive_receipt = s1_scope.input_v1.native_drive_receipt
                 expected_named_targets = {
                     f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
                     for item in drive_receipt.drives
@@ -753,7 +767,7 @@ def materialize_control(
                 if (len(profiles) != 1 or profiles[0].open_actuator is not None
                         or profiles[0].native_drive_receipt is not drive_receipt
                         or dict(source.joint_targets) != expected_named_targets):
-                    raise ValueError('F03 Position source must match the exact nine-DOF named drive receipt')
+                    raise ValueError('synthetic Position source must match the exact nine-DOF named drive receipt')
             elif f04_native:
                 if (len(profiles) != 1 or profiles[0].open_actuator is not None
                         or profiles[0].native_drive_receipt is not None
@@ -851,6 +865,30 @@ def materialize_control(
             except BaseException as cleanup_error:
                 admission_error.add_note(
                     f'F04 App owner cleanup after receipt admission failure also failed: '
+                    f'{type(cleanup_error).__name__}: {cleanup_error}'
+                )
+            raise
+    elif f05_s1:
+        try:
+            from .leaf_control import GeoPhysUsdPositionDriveReceiptV1
+            receipt = getattr(session, '_drive_receipt', None)
+            metadata = getattr(session, '_native_io_metadata', None)
+            if (type(receipt) is not GeoPhysUsdPositionDriveReceiptV1
+                    or receipt is not f05_scope.input_v1.native_drive_receipt
+                    or receipt.provenance_kind != 'synthetic_fixture'
+                    or metadata.provider_build_identity != receipt.provider_build_identity
+                    or metadata.physics_provider != 'geophys'
+                    or dict(source.joint_targets) != {
+                        f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+                        for item in receipt.drives
+                    }):
+                raise ValueError('F05 GeoPhys receipt differs from exact host-lowered USD source/control mapping')
+        except BaseException as admission_error:
+            try:
+                session.close()
+            except BaseException as cleanup_error:
+                admission_error.add_note(
+                    f'F05 RuntimeSession cleanup after receipt admission failure also failed: '
                     f'{type(cleanup_error).__name__}: {cleanup_error}'
                 )
             raise

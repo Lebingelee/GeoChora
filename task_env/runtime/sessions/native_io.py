@@ -281,6 +281,7 @@ class UsdCoreRuntimeSession(_SessionValues):
         if type(source) is not UsdRuntimeSourceV1:
             raise TypeError('F03 Core RuntimeSession requires the exact UsdRuntimeSourceV1')
         from .leaf_control import (
+            GeoPhysUsdPositionDriveReceiptV1,
             IsaacNamedPositionDriveReceiptV1,
             compile_isaac_named_position_drive_receipt_from_native_metadata_v1,
         )
@@ -306,6 +307,8 @@ class UsdCoreRuntimeSession(_SessionValues):
         if execution_provenance not in {'native_runtime', 'synthetic_fixture'}:
             raise ValueError('native I/O owner reported an unsupported execution provenance')
         if drive_receipt is None:
+            if execution.physics_provider != 'isaacsim':
+                raise ValueError('only the exact admitted Isaac route can defer named-drive receipt compilation')
             drive_receipt = compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
                 execution=execution, source=source,
                 scene_identity_sha256=source.scene_definition.identity_hash,
@@ -315,8 +318,11 @@ class UsdCoreRuntimeSession(_SessionValues):
             if execution_provenance == 'synthetic_fixture':
                 from dataclasses import replace
                 drive_receipt = replace(drive_receipt, provenance_kind='synthetic_fixture')
-        if type(drive_receipt) is not IsaacNamedPositionDriveReceiptV1:
-            raise TypeError('Core RuntimeSession requires the existing named-drive receipt owner')
+        if type(drive_receipt) not in (IsaacNamedPositionDriveReceiptV1, GeoPhysUsdPositionDriveReceiptV1):
+            raise TypeError('Core RuntimeSession requires a supported named-drive receipt owner')
+        if ((type(drive_receipt) is IsaacNamedPositionDriveReceiptV1 and execution.physics_provider != 'isaacsim')
+                or (type(drive_receipt) is GeoPhysUsdPositionDriveReceiptV1 and execution.physics_provider != 'geophys')):
+            raise ValueError('named-drive receipt provider differs from the declared ExecutionSpec')
         if drive_receipt.provenance_kind != execution_provenance:
             raise ValueError('named-drive receipt provenance does not match the loaded USD source')
         if (self._native_io_metadata.provider_build_identity != drive_receipt.provider_build_identity

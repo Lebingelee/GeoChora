@@ -47,6 +47,9 @@ _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
 _F03_S1_NATIVE_IO_CONTEXT: ContextVar[object | None] = ContextVar(
     'task_env_f03_s1_native_io_context', default=None,
 )
+_F05_S1_NATIVE_IO_CONTEXT: ContextVar[object | None] = ContextVar(
+    'task_env_f05_s1_native_io_context', default=None,
+)
 
 
 class _F03S1NativeIOContext:
@@ -109,6 +112,53 @@ def _f03_s1_native_io_context(input_v1, factory):
 
 def _current_f03_s1_native_io_context():
     return _F03_S1_NATIVE_IO_CONTEXT.get()
+
+
+class _F05S1NativeIOContext:
+    """Private lexical conformance scope for one exact F05 GeoPhys S1 input."""
+
+    def __init__(self, input_v1, factory):
+        from ...tasks.position_candidate.builder import F05PositionCandidateInputV1
+
+        if type(input_v1) is not F05PositionCandidateInputV1:
+            raise TypeError('F05 S1 I/O scope requires exact F05PositionCandidateInputV1')
+        input_v1.validate()
+        if not callable(factory):
+            raise TypeError('F05 S1 I/O factory must be callable')
+        if (input_v1.runtime_source.scene_source.source_verified
+                or input_v1.runtime_source.runtime_admitted
+                or input_v1.runtime_source.scene_source.representation.runtime_admitted):
+            raise ValueError('F05 synthetic S1 must not promote source verification or runtime admission')
+        self.input_v1 = input_v1
+        self.factory = factory
+
+    def validate_call(self, artifact, execution, source, *, drive_receipt=None):
+        declared = self.input_v1
+        if (artifact is not declared.artifact or source is not declared.runtime_source
+                or type(execution) is not ExecutionSpecV1
+                or execution.identity_hash != declared.execution.identity_hash
+                or drive_receipt is not declared.native_drive_receipt):
+            raise ValueError('F05 S1 native-I/O scope differs from its exact source/execution/receipt')
+        declared.validate()
+        renderer = execution.render_default
+        if (renderer.provider, renderer.backend, renderer.profile, renderer.device,
+                execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
+            raise ValueError('F05 S1 scope requires its exact no-renderer ExecutionSpecV1')
+
+
+@contextmanager
+def _f05_s1_native_io_context(input_v1, factory):
+    """Install a private F05-only low-level I/O replacement for Core S1."""
+    scope = _F05S1NativeIOContext(input_v1, factory)
+    token = _F05_S1_NATIVE_IO_CONTEXT.set(scope)
+    try:
+        yield scope
+    finally:
+        _F05_S1_NATIVE_IO_CONTEXT.reset(token)
+
+
+def _current_f05_s1_native_io_context():
+    return _F05_S1_NATIVE_IO_CONTEXT.get()
 
 
 class RuntimeSession(Protocol):
@@ -325,6 +375,42 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         if (source.task_artifact.identity_hash != artifact.identity_hash
                 or source.scene_definition.identity_hash != artifact.scene_identity_hash):
             raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
+        f05_scope = _current_f05_s1_native_io_context()
+        if f05_scope is not None:
+            from .native_io import UsdCoreRuntimeSession
+
+            drive_receipt = f05_scope.input_v1.native_drive_receipt
+            f05_scope.validate_call(
+                artifact, declared_execution, source, drive_receipt=drive_receipt,
+            )
+            if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
+                raise ValueError('F05 synthetic S1 scope cannot combine with other admission authorities')
+            native_io = f05_scope.factory(
+                artifact=artifact, execution=declared_execution, source=source,
+                drive_receipt=drive_receipt, input_v1=f05_scope.input_v1,
+            )
+            required_methods = (
+                'metadata', 'write_reset', 'read_state', 'write_position_targets',
+                'advance', 'close',
+            )
+            if any(not callable(getattr(native_io, name, None)) for name in required_methods):
+                raise TypeError('F05 S1 factory must implement only the typed NativeRuntimeIOV1 port')
+            try:
+                session = UsdCoreRuntimeSession(
+                    artifact, declared_execution, source, native_io, drive_receipt,
+                )
+            except BaseException as materialization_error:
+                try:
+                    native_io.close()
+                except BaseException as cleanup_error:
+                    materialization_error.add_note(
+                        'F05 native-I/O cleanup after Core admission failure also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
+                raise
+            session._declared_execution_spec_v1 = declared_execution
+            session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+            return session
         f03_scope = _current_f03_s1_native_io_context()
         if f03_scope is not None:
             from .native_io import F03CoreRuntimeSession

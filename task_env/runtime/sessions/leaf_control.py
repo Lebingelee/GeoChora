@@ -361,6 +361,214 @@ class IsaacNamedPositionDriveReceiptV1:
         return tuple(sorted(by_index))
 
 
+@dataclass(frozen=True)
+class GeoPhysUsdPositionDriveV1:
+    """One public GeoPhys USD force-drive bound to a named canonical Joint."""
+
+    schema_version: str
+    canonical_joint: JointReference
+    native_dof_name: str
+    native_dof_index: int
+    native_actuator_name: str
+    native_actuator_index: int
+    position_unit: str
+    lower_limit: float
+    upper_limit: float
+    gain: float
+    bias0: float
+    stiffness: float
+    damping: float
+    desired_velocity: float
+    coordinate_offset: float
+    joint_q0: float
+    control_limited: bool
+    control_lower: float
+    control_upper: float
+    force_limited: bool
+    force_lower: float
+    force_upper: float
+
+    def __post_init__(self):
+        if self.schema_version != 'geophys-usd-position-drive-v1':
+            raise ValueError('unsupported GeoPhys USD Position drive schema')
+        if type(self.canonical_joint) is not JointReference:
+            raise TypeError('GeoPhys USD drive requires JointReference')
+        self.canonical_joint.validate()
+        _token(self.native_dof_name, 'GeoPhys native DOF name')
+        _stable_identity(self.native_actuator_name, 'GeoPhys native actuator name')
+        if (type(self.native_dof_index) is not int or self.native_dof_index < 0
+                or type(self.native_actuator_index) is not int or self.native_actuator_index < 0):
+            raise ValueError('GeoPhys native joint and actuator indices must be nonnegative integers')
+        if self.position_unit not in {'radian', 'meter'}:
+            raise ValueError('GeoPhys native Position unit must be radian or meter')
+        numeric = (
+            self.lower_limit, self.upper_limit, self.gain, self.bias0,
+            self.stiffness, self.damping, self.desired_velocity,
+            self.coordinate_offset, self.joint_q0,
+            self.control_lower, self.control_upper,
+            self.force_lower, self.force_upper,
+        )
+        if any(type(value) not in (int, float) or isinstance(value, bool)
+               or not math.isfinite(float(value)) for value in numeric):
+            raise ValueError('GeoPhys USD drive numeric metadata must be finite non-boolean values')
+        if (self.lower_limit >= self.upper_limit or self.gain == 0.0
+                or self.stiffness < 0.0 or self.damping < 0.0
+                or self.control_lower > self.control_upper
+                or self.force_lower > self.force_upper
+                or type(self.control_limited) is not bool
+                or type(self.force_limited) is not bool):
+            raise ValueError('GeoPhys USD drive limits or affine control law are invalid')
+
+
+@dataclass(frozen=True)
+class GeoPhysUsdPositionDriveReceiptV1:
+    """Model-bound USD drive facts; it does not admit GeoPhys production runtime."""
+
+    schema_version: str
+    provenance_kind: str
+    scene_identity_sha256: str
+    source_closure_sha256: str
+    public_model_identity_sha256: str
+    execution_identity_sha256: str
+    provider_build_identity: str
+    physics_profile: str
+    backend: str
+    device: str
+    determinism_mode: str
+    physics_dt_s: float
+    control_substeps: int
+    writer_id: str
+    native_dof_count: int
+    drives: tuple[GeoPhysUsdPositionDriveV1, ...]
+
+    def __post_init__(self):
+        if self.schema_version != 'geophys-usd-position-drive-receipt-v1':
+            raise ValueError('unsupported GeoPhys USD Position drive receipt schema')
+        if self.provenance_kind not in {'synthetic_fixture', 'native_runtime'}:
+            raise ValueError('GeoPhys drive receipt provenance must be explicit')
+        for value, label in (
+            (self.scene_identity_sha256, 'Scene'),
+            (self.source_closure_sha256, 'source closure'),
+            (self.public_model_identity_sha256, 'public model'),
+            (self.execution_identity_sha256, 'ExecutionSpec'),
+        ):
+            _sha(value, label)
+        for value, label in (
+            (self.provider_build_identity, 'provider build'),
+            (self.physics_profile, 'physics profile'),
+            (self.backend, 'backend'),
+            (self.device, 'device'),
+            (self.determinism_mode, 'determinism mode'),
+        ):
+            _token(value, label)
+        _stable_identity(self.writer_id, 'writer ID')
+        if (type(self.physics_dt_s) not in (int, float) or isinstance(self.physics_dt_s, bool)
+                or not math.isfinite(float(self.physics_dt_s)) or float(self.physics_dt_s) != 0.002
+                or type(self.control_substeps) is not int or self.control_substeps != 5):
+            raise ValueError('GeoPhys Panda drive receipt requires five 2 ms control substeps')
+        if type(self.native_dof_count) is not int or self.native_dof_count != 9:
+            raise ValueError('GeoPhys Panda drive receipt requires exactly nine scalar DOFs')
+        if type(self.drives) is not tuple or any(type(item) is not GeoPhysUsdPositionDriveV1 for item in self.drives):
+            raise TypeError('GeoPhys drive receipt requires exact immutable drive rows')
+        expected = {
+            JointReference('panda-main', f'joint{index}') for index in range(1, 8)
+        } | {
+            JointReference('panda-main', 'finger_joint1'),
+            JointReference('panda-main', 'finger_joint2'),
+        }
+        joints = [row.canonical_joint for row in self.drives]
+        dofs = [row.native_dof_name for row in self.drives]
+        actuators = [row.native_actuator_name for row in self.drives]
+        dof_indices = [row.native_dof_index for row in self.drives]
+        actuator_indices = [row.native_actuator_index for row in self.drives]
+        if (set(joints) != expected or len(joints) != len(set(joints))
+                or len(dofs) != len(set(dofs)) or len(actuators) != len(set(actuators))
+                or sorted(dof_indices) != list(range(9))
+                or len(actuator_indices) != len(set(actuator_indices))):
+            raise ValueError('GeoPhys Panda drive rows must exactly bind nine unique named DOF/actuator channels')
+
+    @property
+    def identity_sha256(self) -> str:
+        return _digest({
+            'schema_version': self.schema_version,
+            'provenance_kind': self.provenance_kind,
+            'scene_identity_sha256': self.scene_identity_sha256,
+            'source_closure_sha256': self.source_closure_sha256,
+            'public_model_identity_sha256': self.public_model_identity_sha256,
+            'execution_identity_sha256': self.execution_identity_sha256,
+            'provider_build_identity': self.provider_build_identity,
+            'physics_profile': self.physics_profile,
+            'backend': self.backend, 'device': self.device,
+            'determinism_mode': self.determinism_mode,
+            'physics_dt_s': float(self.physics_dt_s),
+            'control_substeps': self.control_substeps,
+            'writer_id': self.writer_id,
+            'drives': [(
+                row.canonical_joint.entity_id, row.canonical_joint.joint_id,
+                row.native_dof_name, row.native_dof_index,
+                row.native_actuator_name, row.native_actuator_index,
+                row.position_unit, float(row.lower_limit), float(row.upper_limit),
+                float(row.gain), float(row.bias0), float(row.stiffness),
+                float(row.damping), float(row.desired_velocity),
+                float(row.coordinate_offset), float(row.joint_q0),
+                row.control_limited, float(row.control_lower), float(row.control_upper),
+                row.force_limited, float(row.force_lower), float(row.force_upper),
+            ) for row in self.drives],
+        })
+
+    def commands(self, arm_position: Mapping[str, float], hand_opening_m: float):
+        expected_arm = {f'panda-main/joint{index}' for index in range(1, 8)}
+        if not isinstance(arm_position, Mapping) or set(arm_position) != expected_arm:
+            raise ValueError('Arm Position request must exactly cover canonical joint1 through joint7')
+        if any(type(name) is not str or type(value) not in (int, float)
+               or isinstance(value, bool) or not math.isfinite(float(value))
+               for name, value in arm_position.items()):
+            raise ValueError('Arm Position targets must be finite non-boolean numbers')
+        if (type(hand_opening_m) not in (int, float) or isinstance(hand_opening_m, bool)
+                or not math.isfinite(float(hand_opening_m)) or not 0.0 <= float(hand_opening_m) <= 0.08):
+            raise ValueError('Hand opening target must be a finite value in [0, 0.08] metres')
+        finger_upper = {row.canonical_joint.joint_id: float(row.upper_limit) for row in self.drives
+                        if row.canonical_joint.joint_id in {'finger_joint1', 'finger_joint2'}}
+        if set(finger_upper) != {'finger_joint1', 'finger_joint2'}:
+            raise ValueError('GeoPhys receipt is missing one of the two finger limits')
+        if float(hand_opening_m) > 2.0 * min(finger_upper.values()) + 2e-9:
+            raise ValueError('Hand opening target exceeds the two GeoPhys native finger limits')
+        positions = {JointReference('panda-main', key.split('/', 1)[1]): float(value)
+                     for key, value in arm_position.items()}
+        half = min(float(hand_opening_m) / 2.0, min(finger_upper.values()))
+        positions[JointReference('panda-main', 'finger_joint1')] = half
+        positions[JointReference('panda-main', 'finger_joint2')] = half
+        result = []
+        for row in self.drives:
+            value = positions[row.canonical_joint]
+            if not row.lower_limit <= value <= row.upper_limit:
+                raise ValueError(f'Position target exceeds native limit for {row.native_dof_name}')
+            result.append((row.native_dof_index, row.native_dof_name, value))
+        return tuple(sorted(result))
+
+    def control_inputs(self, targets: tuple[tuple[int, str, float], ...]):
+        """Map canonical q targets to the public model's affine force-drive ctrl."""
+        by_name = {row.native_dof_name: row for row in self.drives}
+        if (type(targets) is not tuple or len(targets) != 9
+                or {name for _index, name, _value in targets} != set(by_name)):
+            raise ValueError('GeoPhys control mapping requires the exact nine named Position targets')
+        controls = []
+        for index, name, target in targets:
+            row = by_name[name]
+            if (type(index) is not int or index != row.native_dof_index
+                    or type(target) not in (int, float) or isinstance(target, bool)
+                    or not math.isfinite(float(target))):
+                raise ValueError('GeoPhys Position target index/value differs from its model-bound receipt')
+            native_target = float(target) + row.coordinate_offset
+            value = (row.stiffness * native_target + row.damping * row.desired_velocity - row.bias0) / row.gain
+            if not math.isfinite(value):
+                raise ValueError('GeoPhys affine Position control is non-finite')
+            if row.control_limited and not row.control_lower <= value <= row.control_upper:
+                raise ValueError(f'GeoPhys Position control exceeds native ctrl range for {name}')
+            controls.append((row.native_actuator_index, row.native_actuator_name, value))
+        return tuple(sorted(controls))
+
+
 def compile_isaac_named_position_drive_receipt_v1(
     *, execution: ExecutionSpecV1, scene_identity_sha256: str,
     source_closure_sha256: str, provider_build_identity: str,
