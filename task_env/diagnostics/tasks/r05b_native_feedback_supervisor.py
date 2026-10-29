@@ -122,6 +122,28 @@ def _resource_snapshot(backend):
     }
 
 
+def _worker_resources_pass(*, backend, child_return, resource_limit_reason,
+                           worker_result, rss_sample_count, rss_max_sample_bytes,
+                           minimum_mem_available_sample_bytes,
+                           minimum_gpu_free_sample_bytes):
+    """Require an initialized resource receipt before accepting worker output."""
+    resource_receipt_ready = (
+        type(rss_sample_count) is int and rss_sample_count > 0
+        and type(rss_max_sample_bytes) is int and rss_max_sample_bytes > 0
+        and type(minimum_mem_available_sample_bytes) is int
+        and minimum_mem_available_sample_bytes > 0
+        and (backend != 'cuda' or (
+            type(minimum_gpu_free_sample_bytes) is int
+            and minimum_gpu_free_sample_bytes > 0
+        ))
+    )
+    return bool(
+        resource_receipt_ready and child_return == 0 and resource_limit_reason is None
+        and worker_result is not None and worker_result.get('status') == 'passed'
+        and worker_result.get('close_success') is True
+    )
+
+
 def run(backend: str, run_root: Path, python: Path):
     run_root.mkdir(parents=True, exist_ok=False)
     worker_dir = run_root / 'worker'
@@ -295,10 +317,15 @@ def run(backend: str, run_root: Path, python: Path):
 
         worker_result_path = worker_dir / 'result.json'
         worker_result = json.loads(worker_result_path.read_text()) if worker_result_path.is_file() else None
-        status = 'passed' if (
-            child_return == 0 and resource_limit_reason is None
-            and worker_result is not None and worker_result.get('status') == 'passed'
-            and worker_result.get('close_success') is True
+        status = 'passed' if _worker_resources_pass(
+            backend=backend,
+            child_return=child_return,
+            resource_limit_reason=resource_limit_reason,
+            worker_result=worker_result,
+            rss_sample_count=samples,
+            rss_max_sample_bytes=maximum_rss,
+            minimum_mem_available_sample_bytes=minimum_mem,
+            minimum_gpu_free_sample_bytes=minimum_gpu_free,
         ) else 'failed_or_blocked'
         reader_result = None
         reader_exit = None

@@ -237,10 +237,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise TypeError('selected reference requires an explicit task binding')
         if _diagnostic_gripper_control_hz is not None and _native_feedback_gripper_control_hz is not None:
             raise ValueError('diagnostic and normal native-feedback profiles are mutually exclusive')
+        # Initialize lifecycle state for every selected-reference route.  Reset
+        # reads these fields after rebuilding the binding, including the
+        # ordinary public PickCube/NutAssembly and Position candidate routes.
+        self._diagnostic_profile = None
+        self._diagnostic_gripper_control_hz = None
+        self._native_feedback_profile = None
+        self._native_feedback_gripper_control_hz = None
         if _diagnostic_gripper_control_hz is None and _native_feedback_gripper_control_hz is None:
             if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
-            self._diagnostic_profile = None
             build_value = lambda: self.binding.build(provider)
         elif _diagnostic_gripper_control_hz is not None:
             if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
@@ -637,7 +643,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     source=self.value['source'], binding=ControlBinding('panda-v1/gripper', .08),
                     diagnostic_profile=(self._diagnostic_profile
                                         if self.backend == 'cuda' else None),
-                    native_feedback_profile=self._native_feedback_profile)
+                    native_feedback_profile=self._native_feedback_profile,
+                    selected_controller=(self.controller
+                                         if self._native_feedback_profile is not None else None),
+                    selected_solution=(external_solution or self.solution
+                                       if self._native_feedback_profile is not None else None),
+                    native_feedback_gripper_control_hz=(
+                        self.value['resolved_configuration'].get('gripper_control_hz')
+                        if self._native_feedback_profile is not None else None
+                    ))
             phase = 'runtime_reset'
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')

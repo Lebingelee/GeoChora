@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from numbers import Real
+from numbers import Integral, Real
 
 import numpy as np
 
@@ -131,17 +131,33 @@ class GeoPhysRuntimeBoundary:
             raise ValueError("actuator force limit must be finite and non-negative")
         if isinstance(actuator_ids, (str, bytes)):
             raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
-        raw_ids = np.asarray(actuator_ids)
-        if raw_ids.ndim == 1 and raw_ids.size == 0:
+        if isinstance(actuator_ids, np.ndarray):
+            if actuator_ids.ndim != 1 or actuator_ids.dtype.kind not in {'i', 'u'}:
+                raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
+            raw_values = tuple(actuator_ids.tolist())
+        else:
+            try:
+                raw_values = tuple(actuator_ids)
+            except TypeError as error:
+                raise TypeError(
+                    'actuator force-limit ids must be a one-dimensional integer sequence'
+                ) from error
+            if any(isinstance(value, (bool, np.bool_)) or not isinstance(value, Integral)
+                   for value in raw_values):
+                raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
+        if not raw_values:
             return
-        if raw_ids.ndim != 1 or raw_ids.dtype.kind not in {'i', 'u'}:
-            raise TypeError('actuator force-limit ids must be a one-dimensional integer sequence')
-        ids = raw_ids.astype(np.int32, copy=False)
-        if np.unique(ids).size != ids.size:
+        ids_as_python_ints = tuple(int(value) for value in raw_values)
+        if len(set(ids_as_python_ints)) != len(ids_as_python_ints):
             raise ValueError('actuator force-limit ids must be unique')
         actuator_count = int(getattr(self._physics, "n_actuators", 0))
-        if ids.size and (int(ids.min()) < 0 or int(ids.max()) >= actuator_count):
+        int32 = np.iinfo(np.int32)
+        if any(value < 0 or value >= actuator_count or value > int32.max
+               for value in ids_as_python_ints):
             raise ValueError("actuator force-limit ids exceed the compiled actuator range")
+        # Only narrow after the original integer values have passed all range
+        # and uniqueness checks.  In particular, 2**32 must never alias slot 0.
+        ids = np.asarray(ids_as_python_ints, dtype=np.int32)
         effective_limit = float(np.float32(limit))
         if not np.isfinite(effective_limit):
             raise ValueError('actuator force limit is not representable as float32')

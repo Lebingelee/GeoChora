@@ -563,6 +563,9 @@ def materialize_control(
     leaf_plan=None,
     diagnostic_profile=None,
     native_feedback_profile=None,
+    selected_controller=None,
+    selected_solution=None,
+    native_feedback_gripper_control_hz=None,
 ):
     if leaf_plan is not None:
         from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
@@ -623,6 +626,70 @@ def materialize_control(
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
     if diagnostic_profile is not None and native_feedback_profile is not None:
         raise ValueError('diagnostic and normal native-feedback admissions are mutually exclusive')
+    if native_feedback_profile is not None:
+        import hashlib
+        from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
+        from ...controllers.canonical.execution import StableArmTargetHold
+        from ...controllers.canonical.gripper_execution import EqualRateGripperServo
+        from ...tasks.nut_assembly.solution import (
+            NativeRateGripperServo, NutAssemblyOutcomeSolutionV1,
+            ReferenceExecutionController,
+        )
+        from ...controllers.canonical.contracts import digest
+        expected_controller_identity = {
+            100: '3363817cfcb2913591b630c0bb6a6c942347778b90df23b34e7dd039e2f7ca8d',
+            500: 'e4db6123ec8d86ebcb229187d2dee578d43284cac9ce50252d7fe938617f745c',
+        }
+        expected_inner_type = {
+            100: EqualRateGripperServo,
+            500: NativeRateGripperServo,
+        }
+        actual_controller = getattr(getattr(selected_controller, 'hold', None), 'controller', None)
+        if (type(native_feedback_gripper_control_hz) is not int
+                or native_feedback_gripper_control_hz not in expected_controller_identity
+                or type(selected_controller) is not ReferenceExecutionController
+                or type(selected_controller.hold) is not StableArmTargetHold
+                or type(actual_controller) is not ProductionCanonicalPandaControllerR3
+                or selected_controller.gripper_rate_hz != native_feedback_gripper_control_hz
+                or selected_controller.identity != expected_controller_identity[native_feedback_gripper_control_hz]
+                or type(selected_controller.inner) is not expected_inner_type[native_feedback_gripper_control_hz]
+                or selected_controller.inner.rate_hz != native_feedback_gripper_control_hz
+                or selected_controller.inner.outer_dt_s != 0.01
+                or selected_controller.inner.controller is not actual_controller
+                or digest(asdict(actual_controller.config)) !=
+                    '46e7a5aa81005a48f04f4183ff6a790a0b17716418de6b277404a234b5aa905b'
+                or digest(asdict(actual_controller.gripper_config)) !=
+                    '322155ae1e86c0410cbf3a096f92b1d2f243719f19f5310431c2ab83b1ad907d'
+                or digest(actual_controller.physical_profile) !=
+                    '0d3e4c367487eb156db3271eecdf051fda7b17e8568f5a7fdfb51ee33e576f7c'
+                or (actual_controller.feedforward_gain, actual_controller.position_feedback_s,
+                    actual_controller.rotation_feedback_s, actual_controller.joint_velocity_limit_rad_s,
+                    actual_controller.reference_lead_limit_rad, actual_controller.inner_physics_dt_s,
+                    actual_controller.dls_damping, actual_controller.rotation_row_weight) !=
+                    (1.0, 4.0, 4.0, 2.0, 0.15, 0.002, 0.02, 0.22)
+                or actual_controller.gripper_config.force_limit_N != 10.0
+                or type(selected_solution) is not NutAssemblyOutcomeSolutionV1
+                or selected_solution.identity != '5590d2865c683d90c2aa38878d7c488bb1785914004c186946c76c6d7ebc9f04'
+                or selected_solution.require_native_feedback_contract is not True
+                or digest(asdict(selected_solution.config)) !=
+                    '9d8675d99f6659bbf4be654013c6c2fe52eedc957571b407ad4343a7587c32ce'
+                or selected_solution.base_controller_identity !=
+                    '89eaab0630a9ada53a1db065d79aa4d3d996941791d49dd913fa0452565fb54e'
+                or selected_solution.control_dt != 0.01
+                or selected_solution.physics_dt_s != 0.002
+                or selected_solution.source_closure_digest is not None
+                or selected_solution.provider != execution.physics_provider
+                or selected_solution.task_artifact_hash != artifact.identity_hash
+                or selected_solution.source_id != source.scene_source.source_id
+                or selected_solution.source_xml_sha256 != hashlib.sha256(
+                    source.scene_source.xml.encode('utf-8')
+                ).hexdigest()):
+            raise ValueError(
+                'R05b normal profile requires the exact admitted R3 Controller, 10 N cap, '
+                'NutAssembly Solution identity, and selected 100/500 Hz law'
+            )
+        if source.config.runtime.backend != execution.backend:
+            raise ValueError('R05b selected Controller/source backend mismatch')
     if diagnostic_profile is None and native_feedback_profile is None:
         actual_manifest = provider_manifest(execution.physics_provider)
     elif diagnostic_profile is not None:

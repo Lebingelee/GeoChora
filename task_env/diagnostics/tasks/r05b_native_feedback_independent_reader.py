@@ -12,6 +12,10 @@ import numpy as np
 
 
 CANONICAL_XML_SHA256 = '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
+TRUSTED_SOURCE_MANIFEST = (
+    Path(__file__).resolve().parents[2] / 'tasks' / 'nut_assembly'
+    / 'r05b_trusted_execution_source_manifest.json'
+)
 
 
 def _canonical_digest(value):
@@ -47,12 +51,19 @@ def read(h5_path: Path, expected_path: Path):
     metadata = value['metadata']
     provenance = metadata['source_provenance']
     receipt = json.loads(provenance['runtime_execution_source_receipt_json'])
+    trusted = json.loads(TRUSTED_SOURCE_MANIFEST.read_text(encoding='utf-8'))
     if receipt['schema_version'] != 'runtime-execution-source-receipt-v1':
         raise ValueError('raw HDF5 source receipt version mismatch')
     if receipt['canonical_xml_sha256'] != CANONICAL_XML_SHA256:
         raise ValueError('raw HDF5 canonical source XML digest mismatch')
-    if _closure_digest(receipt['files']) != receipt['source_closure_digest']:
-        raise ValueError('raw HDF5 source closure manifest digest mismatch')
+    if (trusted.get('schema_version') != 'r05b-trusted-execution-source-manifest-v1'
+            or receipt['source_id'] != trusted['source_id']
+            or receipt['canonical_xml_sha256'] != trusted['canonical_xml_sha256']
+            or receipt['importer_xml_sha256'] != trusted['importer_xml_sha256']
+            or receipt['files'] != trusted['files']
+            or receipt['source_closure_digest'] != trusted['source_closure_digest']
+            or _closure_digest(receipt['files']) != trusted['source_closure_digest']):
+        raise ValueError('raw HDF5 source receipt differs from the trusted full source closure')
     identity_values = {
         'backend': metadata['execution']['backend'],
         'artifact_identity': metadata['task_artifact_hash'],
@@ -81,6 +92,10 @@ def read(h5_path: Path, expected_path: Path):
     phases = []
     evaluation_times = []
     sample_times = []
+    source_generations = set()
+    state_revisions = []
+    configuration_revisions = []
+    native_indices = []
     for transition_index, transition in enumerate(value['transitions']):
         interval = transition['interval']
         if interval['control_step'] != transition_index or interval['native_step_count'] != 5:
@@ -98,20 +113,34 @@ def read(h5_path: Path, expected_path: Path):
                 raise ValueError('raw HDF5 target hash differs from its acknowledgement')
             provider_sample = sample['provider_feedback_sample']
             force = provider_sample['actuator_force_measurement']
+            native_index = transition_index * 5 + substep_index
             expected_phase = (
                 'reset_forward' if transition_index == 0 and substep_index == 0
                 else 'native_step_pre_integration'
             )
             if not force['valid'] or force['phase'] != expected_phase:
                 raise ValueError('raw HDF5 force sample validity/phase mismatch')
+            if (force['native_step_index'] != native_index
+                    or force['evaluation_control_step'] != transition_index
+                    or force['sample_sequence'] != sample['sample_sequence']
+                    or type(force['sample_sequence']) is not int
+                    or force['sample_sequence'] < 1
+                    or type(force['source_generation']) is not int
+                    or type(force['state_revision']) is not int
+                    or type(force['configuration_revision']) is not int):
+                raise ValueError('raw HDF5 force sample generation/revision/index identity mismatch')
             eval_time = transition_index * 0.01 + substep_index * 0.002
             expected_sample_time = 0.0 if expected_phase == 'reset_forward' else eval_time - 0.002
             if (abs(float(force['evaluation_simulation_time_s']) - eval_time) > 1e-10
                     or abs(float(force['native_sample_time_s']) - expected_sample_time) > 1e-10):
                 raise ValueError('raw HDF5 evaluation/sample clocks mismatch')
             raw_force = float(force['signed_force_N'])
-            if not np.isfinite(raw_force):
-                raise ValueError('raw HDF5 force is nonfinite')
+            if (not np.isfinite(raw_force)
+                    or not np.isfinite(float(force['actuator_ctrl']))
+                    or force['actuator_id'] != 'actuator8'
+                    or force['force_unit'] != 'N'
+                    or force['invalid_reason'] is not None):
+                raise ValueError('raw HDF5 force/control measurement is nonfinite or invalid')
             closing = float(sample['feedback']['gripper']['closing_force_N'])
             if abs(closing - max(0.0, -raw_force)) > 1e-10:
                 raise ValueError('raw HDF5 raw/closing force mapping mismatch')
@@ -122,9 +151,17 @@ def read(h5_path: Path, expected_path: Path):
             phases.append(force['phase'])
             evaluation_times.append(float(force['evaluation_simulation_time_s']))
             sample_times.append(float(force['native_sample_time_s']))
+            source_generations.add(force['source_generation'])
+            state_revisions.append(force['state_revision'])
+            configuration_revisions.append(force['configuration_revision'])
+            native_indices.append(force['native_step_index'])
 
-    if len(sequence) != 10 or any(b != a + 1 for a, b in zip(sequence, sequence[1:])):
-        raise ValueError('raw HDF5 native sample sequence is incomplete/nonmonotonic')
+    if (len(sequence) != 10 or any(b != a + 1 for a, b in zip(sequence, sequence[1:]))
+            or any(b != a + 1 for a, b in zip(native_indices, native_indices[1:]))
+            or len(source_generations) != 1
+            or any(b <= a for a, b in zip(state_revisions, state_revisions[1:]))
+            or any(b < a for a, b in zip(configuration_revisions, configuration_revisions[1:]))):
+        raise ValueError('raw HDF5 native sample sequence/generation/revision is incomplete or stale')
     if (episode_ids != {expected['episode_id']}
             or reset_ids != {expected['reset_sample_id']}
             or materialization_ids != {expected['provider_materialization_id']}):
@@ -149,6 +186,9 @@ def read(h5_path: Path, expected_path: Path):
         'transition_count': len(value['transitions']),
         'native_sample_count': len(sequence),
         'sample_sequences': sequence,
+        'source_generation': next(iter(source_generations)),
+        'state_revisions': state_revisions,
+        'configuration_revisions': configuration_revisions,
         'sample_phases': phases,
         'evaluation_times_s': evaluation_times,
         'native_sample_times_s': sample_times,

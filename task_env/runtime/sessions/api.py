@@ -122,8 +122,11 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
     """Admit one exact normal NutAssembly GeoPhys force-feedback profile."""
     from dataclasses import replace
     import hashlib
+    import json
     from pathlib import Path
-    from ...assembly.assets import _source_closure_digest
+    from dataclasses import asdict
+    from ...assembly.assets import _source_closure_digest, _source_closure_manifest
+    from ...controllers.canonical.contracts import digest
 
     if profile_id != _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE:
         raise ValueError('unknown normal native-feedback admission profile')
@@ -145,12 +148,60 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
     if receipt is None:
         raise ValueError('R05b admission requires the versioned immutable execution source receipt')
     receipt.validate_snapshot()
+    trusted_path = (
+        Path(__file__).resolve().parents[2] / 'tasks' / 'nut_assembly'
+        / 'r05b_trusted_execution_source_manifest.json'
+    )
+    trusted = json.loads(trusted_path.read_text(encoding='utf-8'))
+    if trusted.get('schema_version') != 'r05b-trusted-execution-source-manifest-v1':
+        raise ValueError('R05b trusted source manifest has an unsupported schema')
+    actual_files = list(_source_closure_manifest(receipt.closure_files))
+    if (actual_files != trusted['files']
+            or receipt.source_closure_digest != trusted['source_closure_digest']
+            or _source_closure_digest(receipt.closure_files) != trusted['source_closure_digest']):
+        raise ValueError('R05b source receipt differs from the trusted full source closure')
+    canonical_bytes = receipt.closure_files.get('canonical-source.xml')
+    importer_bytes = receipt.importer_xml
+    expected_importer_bytes = receipt.closure_files.get('scene.xml')
+    if (not isinstance(canonical_bytes, bytes)
+            or hashlib.sha256(canonical_bytes).hexdigest() != trusted['canonical_xml_sha256']
+            or not isinstance(expected_importer_bytes, bytes)
+            or importer_bytes != expected_importer_bytes
+            or hashlib.sha256(importer_bytes).hexdigest() != trusted['importer_xml_sha256']
+            or source.scene_source.xml.encode('utf-8') != canonical_bytes
+            or Path(source.scene_source.base_dir).resolve() != Path(receipt.snapshot_root).resolve()):
+        raise ValueError('R05b canonical/importer source bytes differ from the trusted snapshot')
+    expected_joints = {
+        **{f'panda-v1/joint{index}': f'joint{index}' for index in range(1, 8)},
+        'panda-v1/finger_joint1': 'finger_joint1',
+        'panda-v1/finger_joint2': 'finger_joint2',
+    }
+    expected_bodies = {
+        'square-nut-v1': 'SquareNut', 'square-peg-v1': 'peg1',
+        'round-peg-v1': 'peg2', 'panda-v1/base': 'link0',
+    }
+    if (receipt.source_id != trusted['source_id']
+            or source.joints != expected_joints
+            or source.bodies != expected_bodies
+            or source.frames != {'panda-v1/ee': 'nutassembly_ee_site'}
+            or source.free_joints != {'square-nut-v1': 'SquareNut_joint'}
+            or source.joint_targets != {
+                f'panda-v1/joint{index}': f'actuator{index}' for index in range(1, 8)
+            }
+            or tuple(source.open_actuators) != ('actuator8',)):
+        raise ValueError('R05b source semantic and actuator mappings differ from the exact allowlist')
+    expected_config_digest = {
+        'cpu': '64e9a4d05abe80c20141a16aa1abf1a3de366ac6e75e2740b6d7313839e537d1',
+        'cuda': '52e2e14a51492a8e534ee0ba88cc7ec9597d6a31816eaba89f1a7a3094baece9',
+    }[execution.backend]
+    if digest(asdict(source.config)) != expected_config_digest:
+        raise ValueError('R05b source configuration differs from exact allowlist')
     if (source.task_artifact_hash != artifact.identity_hash
             or source.scene_source.source_id !=
             'nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1'
             or receipt.canonical_xml_sha256 !=
             '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
-            or receipt.source_closure_digest != _source_closure_digest(receipt.closure_files)
+            or receipt.canonical_xml_sha256 != trusted['canonical_xml_sha256']
             or source.config.runtime.backend != execution.backend
             or source.config.runtime.physics_dt != 0.002
             or source.config.runtime.control_substeps != 5
