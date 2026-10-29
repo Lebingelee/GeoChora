@@ -52,6 +52,7 @@ def _build_synthetic_case(episode_id: str, order_variant: bool):
 def _engine_module(current_io: dict):
     """Fake only the MuJoCo module boundary; every Core owner remains real."""
     module = ModuleType('mujoco')
+    module.__r06b_synthetic__ = True
     module.__version__ = '3.8.1'
     module.__spec__ = importlib.machinery.ModuleSpec(
         'mujoco', loader=None, origin=(
@@ -100,7 +101,7 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
         'schema': 'r06b-native-start-ledger-v1', 'native_start_count': 1,
         'native_worker': 'r06b_order_worker.py',
     }) + '\n')
-    freeze = Path('/home/lly/Program_Files/Geochora/workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/package_input/input_snapshot.json')
+    freeze = Path('/home/lly/Program_Files/Geochora/workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/resume001/package_input/input_snapshot.json')
     snapshot = json.loads(freeze.read_text())
     relevant_code = [
         'task_env/artifacts/contracts.py', 'task_env/assembly/fixed_attachment.py',
@@ -189,6 +190,8 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
         return original_step(*args, **kwargs)
 
     engine.mj_step = partial_step
+    # run_worker owns restoration to the exact hooks it observed at entry.
+    originals['step'] = engine.mj_step
     if failure == 'primary_and_cleanup':
         original_close = SelectedReferenceEnv.close
         close_count = {'value': 0}
@@ -252,6 +255,11 @@ def test_real_run_worker_two_cases_with_synthetic_model_io_and_restored_hooks(mo
     assert all(row['phase'] == 'public_typed_dispatch' for row in trace)
     assert {row['episode_id']: len([item for item in trace if item['episode_id'] == row['episode_id']])
             for row in trace} == {'E1': 320, 'E2': 320}
+    for episode_id in ('E1', 'E2'):
+        episode_trace = [item for item in trace if item['episode_id'] == episode_id]
+        assert {item['outer'] for item in episode_trace} == set(range(1, 65))
+        assert all(sum(item['outer'] == outer for item in episode_trace) == 5
+                   for outer in range(1, 65))
 
 
 @pytest.mark.parametrize('failure', [
@@ -414,6 +422,10 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
             })
         receipt = supervisor.run_supervisor(contract_path)
         assert receipt['rss_sample_count'] in (0, 1)
+        assert receipt['process_group_exit_confirmed_before_unlock'] is True
+        assert receipt['reader_completed_before_unlock'] is True
+        assert receipt['lock_released_after_group'] is True
+        assert receipt['rss_peak_is_sampled_not_interval_hard_peak'] is (receipt['rss_sample_count'] > 0)
         if mode == 'success':
             assert receipt['status'] == 'R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW'
             assert receipt['lock_held_until_raw_reader_exit'] is True
@@ -432,8 +444,11 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
             if mode == 'popen_failure':
                 assert receipt['primary_error']['message'] == 'synthetic Popen failure'
                 assert receipt['rss_peak_sampled_group_bytes'] is None
+                assert receipt['rss_samples'] == []
             else:
                 assert receipt['primary_error']['message'] == 'synthetic RSS sampling failure'
                 assert receipt['cleanup_error']['message'] == 'synthetic cleanup failure'
+                assert receipt['rss_peak_sampled_group_bytes'] is None
+                assert receipt['rss_samples'] == []
         assert receipt['lock_released_after_group'] is True
         assert receipt['worker_start_ledger_sha256'] is not None

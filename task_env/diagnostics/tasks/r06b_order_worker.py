@@ -45,14 +45,19 @@ FROZEN_ORACLES = {
     'warning_counts': 'must equal reset baseline at every boundary',
     'action_waveform': 'r03c_E3_arm_hand_active_intervals_1_64',
 }
-FROZEN_TAMPER_MATRIX = [
+FROZEN_PRODUCTION_TAMPER_MATRIX = [
     'target_identity', 'ack_writer', 'prepared_command', 'source_digest',
     'configuration_identity', 'missing_writer', 'duplicate_slot',
     'boundary_observation', 't_plus_one', 'attachment_plan_hash', 'entity_binding', 'native_tcp',
-    'raw_source_hash', 'raw_target', 'raw_ack', 'raw_native_slot', 'raw_state_order', 'raw_clock',
-    'raw_contract_digest', 'raw_worker_result_file', 'raw_worker_result_receipt',
-    'raw_duplicate_case', 'raw_missing_case', 'raw_swapped_case',
 ]
+FROZEN_RAW_TAMPER_MATRIX = [
+    'raw_source_hash', 'raw_target', 'raw_ack', 'raw_native_slot', 'raw_state_order', 'raw_clock',
+    'raw_contract_digest', 'raw_worker_result_file', 'raw_worker_result_size',
+    'raw_worker_result_receipt', 'raw_worker_materialization', 'raw_worker_native_order',
+    'raw_worker_native_slot', 'raw_worker_case_counters', 'raw_worker_aggregate_counters',
+    'raw_worker_candidate', 'raw_duplicate_case', 'raw_missing_case', 'raw_swapped_case', 'raw_wrong_run',
+]
+FROZEN_TAMPER_MATRIX = [*FROZEN_PRODUCTION_TAMPER_MATRIX, *FROZEN_RAW_TAMPER_MATRIX]
 
 
 def _write_json(path: Path, value) -> None:
@@ -467,8 +472,10 @@ def _run_case(case, output_dir: Path, counters: dict, active: dict,
         tamper_output = output_dir / 'reader_tamper' / case['episode_id']
         tamper_output.mkdir(parents=True, exist_ok=True)
         tamper_results = _tamper_checks(h5_path, tamper_output)
-        if len(tamper_results) < 7 or any(not item['rejected'] for item in tamper_results):
-            raise ValueError('strict leaf reader did not reject its frozen tamper matrix')
+        actual_tamper_names = [item.get('case') for item in tamper_results]
+        if (actual_tamper_names != FROZEN_PRODUCTION_TAMPER_MATRIX
+                or any(not item['rejected'] for item in tamper_results)):
+            raise ValueError('strict H5 reader did not reject the exact frozen production tamper matrix')
         result = {
             'episode_id': case['episode_id'], 'order_variant': case['order_variant'],
             'candidate': live_identity, 'native_receipt': attachment_receipt,

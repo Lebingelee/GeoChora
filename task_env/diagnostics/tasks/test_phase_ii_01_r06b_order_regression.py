@@ -470,6 +470,7 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
     def case_for(candidate, episode_id, h5_path, receipt):
         return {
             'episode_id': episode_id,
+            'order_variant': episode_id == 'E2',
             'candidate': {
                 'task_source_identity_sha256': candidate.artifact.task_source_identity_hash,
                 'task_artifact_identity_sha256': candidate.artifact.identity_hash,
@@ -528,12 +529,18 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
         }
         return {
             'episode_id': episode_id,
+            'order_variant': case['order_variant'],
+            'candidate': case['candidate'],
             'h5': {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                    'bytes': path.stat().st_size, 'transition_count': 64,
                    'observation_count': 65, 'production_reader': 'PASS'},
             'native_receipt': {
                 'receipt_identity_sha256': source_receipt['receipt_identity_sha256'],
                 'provider_materialization_id': source_receipt['provider_materialization_id'],
+                'native_body_order': source_receipt['native_body_order'],
+                'native_joint_order': source_receipt['native_joint_order'],
+                'native_actuator_order': source_receipt['native_actuator_order'],
+                'native_actuator_mappings': source_receipt['native_actuator_mappings'],
             },
             'native_counts': {
                 **counts, 'episode_id': episode_id, 'mj_step_calls_case': 320,
@@ -599,12 +606,8 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
                                 data=json.dumps(rows, sort_keys=True),
                                 dtype=h5py.string_dtype(encoding='utf-8'))
 
-    tamper_labels = {
-        'raw_source_hash', 'raw_target', 'raw_ack', 'raw_native_slot', 'raw_clock',
-        'raw_state_order', 't_plus_one', 'raw_worker_result_file',
-        'raw_worker_result_receipt', 'raw_duplicate_case', 'raw_missing_case',
-        'raw_swapped_case', 'raw_contract_digest', 'raw_wrong_run',
-    }
+    from task_env.diagnostics.tasks.r06b_order_worker import FROZEN_RAW_TAMPER_MATRIX
+    tamper_labels = set(FROZEN_RAW_TAMPER_MATRIX)
     results = {}
     for label in sorted(tamper_labels):
         tampered_root = tmp_path / f'raw-tamper-{label}'
@@ -616,6 +619,7 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
         case_h5 = tampered_root / 'cases/E2/E2.h5'
         if label == 'raw_source_hash':
             tampered_contract['cases'][1]['candidate']['source_closure_sha256'] = '0' * 64
+            result_data['cases'][1]['candidate'] = tampered_contract['cases'][1]['candidate']
             digest = hashlib.sha256(json.dumps(
                 {key: value for key, value in tampered_contract.items() if key != 'contract_sha256'},
                 sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False,
@@ -640,8 +644,23 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
             _tamper_observation_count(case_h5)
         elif label == 'raw_worker_result_file':
             result_data['cases'][1]['h5']['sha256'] = '0' * 64
+        elif label == 'raw_worker_result_size':
+            result_data['cases'][1]['h5']['bytes'] -= 1
         elif label == 'raw_worker_result_receipt':
             result_data['cases'][1]['native_receipt']['receipt_identity_sha256'] = '0' * 64
+        elif label == 'raw_worker_materialization':
+            result_data['cases'][1]['native_receipt']['provider_materialization_id'] = 'wrong-run'
+        elif label == 'raw_worker_native_order':
+            result_data['cases'][1]['native_receipt']['native_actuator_order'].reverse()
+        elif label == 'raw_worker_native_slot':
+            result_data['cases'][1]['native_receipt']['native_actuator_mappings'][
+                'panda-arm/actuator1']['ctrl_slot'] = 0
+        elif label == 'raw_worker_case_counters':
+            result_data['cases'][1]['native_counts']['mj_step_calls'] = 319
+        elif label == 'raw_worker_aggregate_counters':
+            result_data['counters']['cases']['E2']['mj_forward_calls'] = 64
+        elif label == 'raw_worker_candidate':
+            result_data['cases'][1]['candidate']['scene_identity_sha256'] = '0' * 64
         elif label == 'raw_duplicate_case':
             result_data['cases'][1] = dict(result_data['cases'][0])
         elif label == 'raw_missing_case':

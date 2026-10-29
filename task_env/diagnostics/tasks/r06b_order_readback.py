@@ -287,6 +287,9 @@ def run_readback(contract_path: Path, native_result_path: Path) -> dict[str, obj
         worker_case = worker_by_id[case['episode_id']]
         worker_h5 = worker_case.get('h5')
         worker_receipt = worker_case.get('native_receipt')
+        if (worker_case.get('candidate') != case.get('candidate')
+                or worker_case.get('order_variant') is not case.get('order_variant')):
+            raise ValueError(f'{case["episode_id"]} worker candidate identity/recipe differs from the contract')
         if (not isinstance(worker_h5, dict) or not isinstance(worker_receipt, dict)
                 or worker_h5.get('path') != str(path)
                 or worker_h5.get('sha256') != witness['sha256']
@@ -300,6 +303,18 @@ def run_readback(contract_path: Path, native_result_path: Path) -> dict[str, obj
                 or worker_receipt.get('provider_materialization_id')
                 != witness['provider_materialization_id']):
             raise ValueError(f'{case["episode_id"]} attachment receipt/materialization differs from worker result')
+        native_expected = case.get('native_expected')
+        if not isinstance(native_expected, dict):
+            raise ValueError(f'{case["episode_id"]} contract has no frozen named native order')
+        for field in ('native_body_order', 'native_joint_order', 'native_actuator_order'):
+            if (worker_receipt.get(field) != native_expected.get(field)
+                    or witness.get(field) != native_expected.get(field)):
+                raise ValueError(f'{case["episode_id"]} worker/raw native order join differs at {field}')
+        worker_actuator_maps = worker_receipt.get('native_actuator_mappings')
+        if (not isinstance(worker_actuator_maps, dict)
+                or {key: row.get('ctrl_slot') for key, row in worker_actuator_maps.items()
+                    if isinstance(row, dict)} != native_expected.get('actuator_slots')):
+            raise ValueError(f'{case["episode_id"]} worker named native ctrl slots differ from the contract')
         case_counts = measured_case_counts.get(case['episode_id'])
         native_counts = worker_case.get('native_counts')
         if (not isinstance(case_counts, dict) or not isinstance(native_counts, dict)

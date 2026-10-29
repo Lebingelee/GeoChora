@@ -280,10 +280,33 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
                     termination = _terminate_group(group_pgid, process)
             except BaseException as error:
                 cleanup_error = {'type': type(error).__name__, 'message': str(error)}
-        if group_pgid is not None and _process_group_pids(group_pgid):
-            cleanup_error = cleanup_error or {
-                'type': 'ProcessGroupStillAlive', 'message': f'process group {group_pgid} remained alive',
-            }
+        group_finished = group_pgid is None
+        group_state_error = None
+        if group_pgid is not None:
+            try:
+                remaining = _process_group_pids(group_pgid)
+                if remaining:
+                    try:
+                        os.killpg(group_pgid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    if process is not None:
+                        process.wait()
+                    # The lock stays held until every member of this owned
+                    # process group has exited, including after cleanup errors.
+                    while True:
+                        remaining = _process_group_pids(group_pgid)
+                        if not remaining:
+                            break
+                        try:
+                            os.killpg(group_pgid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        time.sleep(0.1)
+                group_finished = True
+            except BaseException as error:
+                group_state_error = {'type': type(error).__name__, 'message': str(error)}
+                cleanup_error = cleanup_error or group_state_error
         if outcome is None:
             outcome = {'status': 'NATIVE_SUPERVISOR_FAILED', 'native_worker_started': process is not None}
         samples_observed = bool(rss_samples)
@@ -317,7 +340,10 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
             'primary_error': primary_error,
             'cleanup_error': cleanup_error,
             'lock_held_through_cleanup': True,
-            'lock_released_after_group': False,
+            'process_group_exit_confirmed_before_unlock': group_finished,
+            'process_group_state_error': group_state_error,
+            'reader_completed_before_unlock': reader_started is None or reader_wall_seconds is not None,
+            'lock_released_after_group': group_finished,
         }
         try:
             _write_json(output_dir / 'native_window.json', final)
@@ -327,7 +353,6 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
         finally:
             os.close(lock_fd)
-        final['lock_released_after_group'] = not bool(group_pgid and _process_group_pids(group_pgid))
         final['lock_released_at_unix_s'] = time.time()
         if cleanup_error is not None:
             final['cleanup_error'] = cleanup_error
