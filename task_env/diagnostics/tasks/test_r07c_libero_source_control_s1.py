@@ -40,10 +40,10 @@ from task_env.runtime.boundary import GeoPhysRuntimeBoundary
 
 _JOINTS = tuple(
     f"robot0_joint{index}" for index in range(1, 8)
-) + ("robot0_finger_joint1", "robot0_finger_joint2")
+) + ("gripper0_finger_joint1", "gripper0_finger_joint2")
 _ACTUATORS = tuple(
     f"robot0_torq_j{index}" for index in range(1, 8)
-) + ("robot0_gripper_finger_joint1", "robot0_gripper_finger_joint2")
+) + ("gripper0_gripper_finger_joint1", "gripper0_gripper_finger_joint2")
 _CTRL_RANGE = np.asarray(
     [(-80.0, 80.0)] * 5 + [(-12.0, 12.0)] * 2 + [(0.0, 0.04), (-0.04, 0.0)],
     dtype=np.float32,
@@ -271,9 +271,11 @@ def test_torque_limits_are_clamped_and_reported_as_clipping():
         _references(joints=(_JOINTS[1], _JOINTS[0], *_JOINTS[2:])),
         _references(joints=_JOINTS[:-1]),
         _references(joints=(*_JOINTS[:-1], _JOINTS[0])),
+        _references(joints=(*_JOINTS[:7], "robot0_finger_joint1", "robot0_finger_joint2")),
         _references(actuators=(_ACTUATORS[1], _ACTUATORS[0], *_ACTUATORS[2:])),
         _references(actuators=_ACTUATORS[:-1]),
         _references(actuators=(*_ACTUATORS[:-1], _ACTUATORS[0])),
+        _references(actuators=(*_ACTUATORS[:7], "robot0_gripper_finger_joint1", "robot0_gripper_finger_joint2")),
         _references(ctrl_range=np.asarray([(-1.0, 1.0)] * 9, dtype=np.float32)),
     ],
 )
@@ -605,9 +607,19 @@ def test_static_mjcf_composition_namespaces_instances_and_binds_exact_output_has
     from bench_deploy.libero.assembly import build_source_composition_plan
 
     install = tmp_path / "install"
+    table_geoms = (
+        '<geom name="table_collision" type="box" size=".4 .4 .025"/>'
+        '<geom name="table_visual" type="box" size=".4 .4 .025"/>'
+        '<site name="table_top"/>'
+        + "".join(f'<geom name="table_leg{i}_visual" type="cylinder" size=".025 .1"/>' for i in range(1, 5))
+    )
     sources = {
-        ("libero", "libero/libero/assets/scenes/arena.xml"): b'<mujoco model="arena"><worldbody><body name="table"/></worldbody></mujoco>',
-        ("libero", "libero/libero/assets/objects/bowl.xml"): b'<mujoco model="bowl"><worldbody><body name="object"><freejoint/><geom name="bowl_geom" type="sphere" size=".03"/></body></worldbody></mujoco>',
+        ("libero", "libero/libero/assets/scenes/arena.xml"): (
+            '<mujoco model="arena"><worldbody><body name="table">' + table_geoms
+            + '</body></worldbody></mujoco>'
+        ).encode(),
+        ("libero", "libero/libero/assets/objects/bowl.xml"): b'<mujoco model="bowl"><worldbody><body name="wrapper"><body name="object"><geom name="bowl_geom" group="0" type="sphere" size=".03"/></body></body></worldbody></mujoco>',
+        ("libero", "libero/libero/bddl_files/test.bddl"): b'(:fixtures main_table - table) (:objects bowl_1 bowl_2 - bowl)',
         ("robosuite", "robosuite/models/assets/robots/panda/robot.xml"): (
             b'<mujoco model="panda"><worldbody><body name="base"><body name="right_hand"/></body></worldbody><actuator>'
             + b"".join(f'<motor name="torq_j{i}" joint="joint{i}" ctrlrange="-80 80"/>'.encode() for i in range(1, 8))
@@ -671,6 +683,10 @@ def test_static_mjcf_composition_namespaces_instances_and_binds_exact_output_has
             },
             "robot": {"actuators": [{"name": f"torq_j{i}"} for i in range(1, 8)]},
         },
+        "bddl": {
+            "path": "libero/libero/bddl_files/test.bddl",
+            "sha256": hashlib.sha256(sources[("libero", "libero/libero/bddl_files/test.bddl")]).hexdigest(),
+        },
     }
     task_input_bytes = json.dumps(task_input, sort_keys=True, separators=(",", ":")).encode()
     unsigned_receipt = {
@@ -711,9 +727,13 @@ def test_static_mjcf_composition_namespaces_instances_and_binds_exact_output_has
     assert xml == second["mjcf_xml"]
     assert first["output"]["composed_mjcf_sha256"] == hashlib.sha256(xml.encode()).hexdigest()
     assert first["composition_receipt"]["semantic_body_map"] == {
-        "bowl_1": "bowl_1", "bowl_2": "bowl_2", "main_table": "main_table",
+        "bowl_1": "bowl_1_main", "bowl_2": "bowl_2_main", "main_table": "main_table",
     }
-    assert 'name="bowl_1"' in xml and 'name="bowl_2"' in xml
-    assert 'name="mount__base"' in xml and 'name="panda_base"' in xml
-    assert 'name="gripper_finger_joint1"' in xml
+    assert 'name="bowl_1_main"' in xml and 'name="bowl_2_main"' in xml
+    assert 'name="bowl_1_joint0" type="free" damping="0.0005"' in xml
+    assert 'name="bowl_2_joint0" type="free" damping="0.0005"' in xml
+    assert 'name="mount0_base"' in xml and 'name="robot0_base"' in xml
+    assert 'name="gripper0_gripper_finger_joint1"' in xml
+    assert xml.count('type="free"') == 2
+    assert first["composition_receipt"]["movable_object_instances"][0]["semantic_id"] == "bowl_1"
     assert first["core_seam"]["compiled_scene_xml_sha256"] == first["output"]["composed_mjcf_sha256"]

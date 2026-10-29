@@ -109,14 +109,24 @@ class MountedPandaControlMapV1:
             raise ValueError("MountedPanda map names must be unique")
         if any(not _NAME_RE.fullmatch(value) for value in (*joints, *actuators)):
             raise ValueError("MountedPanda map names contain invalid characters")
-        joint_prefix = joints[0][: -len("joint1")]
-        actuator_prefix = actuators[0][: -len("torq_j1")]
-        expected_joints = tuple(joint_prefix + name for name in (*_ARM_JOINTS, *_FINGER_JOINTS))
-        expected_actuators = tuple(
-            actuator_prefix + name for name in (*_ARM_ACTUATORS, *_FINGER_ACTUATORS)
+        arm_joint_prefix = joints[0][: -len("joint1")]
+        finger_joint_prefix = joints[7][: -len("finger_joint1")]
+        arm_actuator_prefix = actuators[0][: -len("torq_j1")]
+        finger_actuator_prefix = actuators[7][: -len("gripper_finger_joint1")]
+        expected_joints = (
+            *(arm_joint_prefix + name for name in _ARM_JOINTS),
+            *(finger_joint_prefix + name for name in _FINGER_JOINTS),
+        )
+        expected_actuators = (
+            *(arm_actuator_prefix + name for name in _ARM_ACTUATORS),
+            *(finger_actuator_prefix + name for name in _FINGER_ACTUATORS),
         )
         if joints != expected_joints or actuators != expected_actuators:
-            raise ValueError("MountedPanda source joint/actuator ordering or common prefix is invalid")
+            raise ValueError("MountedPanda source joint/actuator ordering or resource prefixes are invalid")
+        if (arm_joint_prefix, arm_actuator_prefix) != ("robot0_", "robot0_") or (
+            finger_joint_prefix, finger_actuator_prefix
+        ) != ("gripper0_", "gripper0_"):
+            raise ValueError("MountedPanda resource prefixes differ from the pinned LIBERO assembly")
         object.__setattr__(self, "joint_names", joints)
         object.__setattr__(self, "actuator_names", actuators)
         object.__setattr__(self, "joint_qpos_ids", _readonly_int_vector(
@@ -180,18 +190,28 @@ class MountedPandaControlMapV1:
             agent = agents[agent_uid]
         except (KeyError, TypeError) as exc:
             raise ValueError(f"resolved Agent is missing: {agent_uid}") from exc
-        expected_joint_suffixes = (*_ARM_JOINTS, *_FINGER_JOINTS)
-        expected_actuator_suffixes = (*_ARM_ACTUATORS, *_FINGER_ACTUATORS)
         joint_names = tuple(agent.joint_names)
         actuator_names = tuple(agent.actuator_names)
         if len(joint_names) != 9 or len(actuator_names) != 9:
             raise ValueError("resolved Agent must expose all nine ordered MountedPanda resources")
-        joint_prefix = joint_names[0][: -len("joint1")]
-        actuator_prefix = actuator_names[0][: -len("torq_j1")]
-        if joint_names != tuple(joint_prefix + value for value in expected_joint_suffixes):
+        expected_joints = (
+            *(joint_names[0][: -len("joint1")] + value for value in _ARM_JOINTS),
+            *(joint_names[7][: -len("finger_joint1")] + value for value in _FINGER_JOINTS),
+        )
+        expected_actuators = (
+            *(actuator_names[0][: -len("torq_j1")] + value for value in _ARM_ACTUATORS),
+            *(actuator_names[7][: -len("gripper_finger_joint1")] + value
+              for value in _FINGER_ACTUATORS),
+        )
+        if joint_names != expected_joints:
             raise ValueError("resolved joint name order differs from the pinned MountedPanda source")
-        if actuator_names != tuple(actuator_prefix + value for value in expected_actuator_suffixes):
+        if actuator_names != expected_actuators:
             raise ValueError("resolved actuator name order differs from the pinned MountedPanda source")
+        if (joint_names[0][: -len("joint1")] != "robot0_"
+                or joint_names[7][: -len("finger_joint1")] != "gripper0_"
+                or actuator_names[0][: -len("torq_j1")] != "robot0_"
+                or actuator_names[7][: -len("gripper_finger_joint1")] != "gripper0_"):
+            raise ValueError("resolved resource prefixes differ from the pinned LIBERO assembly")
         try:
             mapped_joint_ids = tuple(int(names.joints[name]) for name in joint_names)
             mapped_actuator_ids = tuple(int(names.actuators[name]) for name in actuator_names)

@@ -7,15 +7,18 @@ object, site and placement pieces through upstream Python model owners.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+import math
 import posixpath
 from pathlib import Path, PurePosixPath
+import re
 from typing import Any
 import xml.etree.ElementTree as ET
 
 
-_COMPOSITION_SCHEMA = "libero-source-composition-mjcf-v2"
+_COMPOSITION_SCHEMA = "libero-source-composition-mjcf-v3"
 _MAX_SOURCE_BYTES = 128 * 1024 * 1024
 
 
@@ -266,7 +269,7 @@ def _prefix_fragment_names(root: ET.Element, prefix: str, *, preserve: frozenset
     for element in root.iter():
         name = element.get("name")
         if name and name not in preserve:
-            replacement = f"{prefix}__{name}"
+            replacement = f"{prefix}{name}"
             if name in names and names[name] != replacement:
                 raise ValueError(f"duplicate MJCF local name in {prefix}: {name}")
             names[name] = replacement
@@ -332,24 +335,158 @@ def _append_section(output: ET.Element, source: ET.Element, section_name: str) -
         target.append(child)
 
 
+def _inline_source_defaults(fragment: ET.Element) -> None:
+    """Apply the pinned robosuite MujocoXML default-class expansion rule."""
+    defaults = fragment.find("default")
+    if defaults is None:
+        return
+    classes = {
+        item.get("class"): {child.tag: child for child in item}
+        for item in defaults
+        if item.get("class") is not None
+    }
+
+    def expand(element: ET.Element) -> None:
+        class_name = element.attrib.pop("class", None)
+        if class_name is not None:
+            template = classes.get(class_name)
+            if template is None:
+                raise ValueError(f"MJCF default class is unresolved: {class_name}")
+            defaults_for_tag = template.get(element.tag)
+            if defaults_for_tag is not None:
+                for key, value in defaults_for_tag.attrib.items():
+                    if element.get(key) is None:
+                        element.set(key, value)
+        for child in list(element):
+            expand(child)
+
+    expand(fragment)
+    fragment.remove(defaults)
+
+
+def _extract_libero_object(
+    fragment: ET.Element,
+    *,
+    instance: str,
+    movable: bool,
+) -> ET.Element:
+    """Mirror the pinned MujocoXMLObject subtree, geometry and joint policy."""
+    world = fragment.find("worldbody")
+    if world is None:
+        raise ValueError("pinned LIBERO object source has no worldbody")
+    candidates = [body for body in world.iter("body") if body.get("name") == "object"]
+    if len(candidates) != 1:
+        raise ValueError("pinned LIBERO object source must contain exactly one body named 'object'")
+    body = copy.deepcopy(candidates[0])
+    body.set("name", "main")
+    parents = {child: parent for parent in body.iter() for child in parent}
+    for geom in tuple(body.iter("geom")):
+        if geom.get("group") not in {"0", "1"}:
+            parent = parents.get(geom)
+            if parent is None:
+                raise ValueError("pinned object geom has no parent")
+            parent.remove(geom)
+    if movable:
+        ET.SubElement(body, "joint", {
+            "name": "joint0", "type": "free", "damping": "0.0005",
+        })
+    site = ET.SubElement(body, "site", {
+        "name": "default_site", "pos": "0 0 0", "size": "0.002 0.002 0.002",
+        "rgba": "1 0 0 0", "type": "sphere", "group": "0",
+    })
+    del site
+    _prefix_fragment_names(body, f"{instance}_")
+    return body
+
+
+def _set_table_arena_source_parameters(arena: ET.Element) -> dict[str, Any]:
+    """Apply the fixed LIBERO TableArena constructor values to active scene XML."""
+    table = next((body for body in arena.iter("body") if body.get("name") == "table"), None)
+    if table is None:
+        raise ValueError("active LIBERO arena XML has no semantic table body")
+    size = (1.0, 1.2, 0.05)
+    offset = (0.0, 0.0, 0.90)
+    friction = (0.6, 0.005, 0.0001)
+    half = tuple(value / 2.0 for value in size)
+    center = (offset[0], offset[1], offset[2] - half[2])
+    table.set("name", "main_table")
+    table.set("pos", " ".join(f"{value:g}" for value in center))
+    collision = table.find("./geom[@name='table_collision']")
+    visual = table.find("./geom[@name='table_visual']")
+    top = table.find("./site[@name='table_top']")
+    if collision is None or visual is None or top is None:
+        raise ValueError("pinned TableArena XML is missing the table collision/visual/top source elements")
+    size_text = " ".join(f"{value:g}" for value in half)
+    collision.set("size", size_text)
+    collision.set("friction", " ".join(f"{value:g}" for value in friction))
+    visual.set("size", size_text)
+    top.set("pos", f"0 0 {half[2]:g}")
+    leg_geom_names = ("table_leg1_visual", "table_leg2_visual", "table_leg3_visual", "table_leg4_visual")
+    dxs, dys = (0.1, -0.1, -0.1, 0.1), (0.1, 0.1, -0.1, -0.1)
+    leg_center_z = (offset[2] - half[2]) / 2.0
+    for name, dx, dy in zip(leg_geom_names, dxs, dys):
+        leg = table.find(f"./geom[@name='{name}']")
+        if leg is None:
+            raise ValueError(f"pinned TableArena is missing {name}")
+        x = math.copysign(half[0], dx) - dx if half[0] > abs(dx * 2.0) else 0.0
+        y = math.copysign(half[1], dy) - dy if half[1] > abs(dy * 2.0) else 0.0
+        leg.set("pos", f"{x:g} {y:g} {-leg_center_z:g}")
+        leg.set("size", f"0.025 {leg_center_z:g}")
+    return {
+        "table_body": "main_table",
+        "full_size_m": list(size),
+        "table_offset_m": list(offset),
+        "table_center_m": list(center),
+        "friction": list(friction),
+        "has_legs": True,
+    }
+
+
+def _ordered_bddl_instances(data: bytes, section_name: str) -> list[tuple[str, str]]:
+    """Read one flat pinned BDDL instance section in its lexical category order."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("pinned BDDL source is not UTF-8") from exc
+    match = re.search(rf"\(:{re.escape(section_name)}\b(.*?)\)", text, re.DOTALL)
+    if match is None:
+        raise ValueError(f"pinned BDDL source has no :{section_name} section")
+    section = "\n".join(line.split(";", 1)[0] for line in match.group(1).splitlines())
+    tokens = section.split()
+    instances: list[str] = []
+    rows: list[tuple[str, str]] = []
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if token == "-":
+            if not instances or i + 1 >= len(tokens):
+                raise ValueError(f"malformed pinned BDDL :{section_name} declaration")
+            category = tokens[i + 1]
+            rows.extend((instance, category) for instance in instances)
+            instances.clear()
+            i += 2
+        else:
+            instances.append(token)
+            i += 1
+    if instances:
+        raise ValueError(f"pinned BDDL :{section_name} has untyped trailing instances")
+    return rows
+
+
 def _compose_mjcf(
     task_input: dict,
     manifest: dict,
     payloads: dict[str, bytes],
     install_root: Path,
 ) -> tuple[str, dict[str, Any]]:
-    """Emit a deterministic, source-bound static MJCF composition candidate.
-
-    The source code's runtime placement sampler remains a separate, explicitly
-    unresolved step; this function composes the exact XML fragments only.
-    """
+    """Compose the source-derived LIBERO tree without claiming reset equivalence."""
     task = manifest["task"]
     input_ref = task_input["native_reference"]["active_scene_xml"]
     source_rows: list[dict[str, str]] = []
     resources: set[str] = set()
-    root = ET.Element("mujoco", {"model": "libero_r07c_pilot_candidate_v2"})
+    root = ET.Element("mujoco", {"model": "libero_r07c_pilot_candidate_v3"})
     ET.SubElement(root, "compiler", {"angle": "radian", "autolimits": "true"})
-    ET.SubElement(root, "option", {"timestep": "0.002", "gravity": "0 0 -9.81", "integrator": "implicitfast"})
+    ET.SubElement(root, "option", {"timestep": "0.002", "gravity": "0 0 -9.81"})
 
     def read(repository: str, path: str, role: str) -> ET.Element:
         data = _source_payload(manifest, payloads, repository, path)
@@ -359,13 +496,9 @@ def _compose_mjcf(
         resources.update(_resolve_asset_files(fragment, path, repository, install_root, payloads))
         return fragment
 
-    arena = _parse_mjcf(
-        _source_payload(manifest, payloads, input_ref["repository"], input_ref["path"]),
-        f"{input_ref['repository']}/{input_ref['path']}",
-    )
-    arena_digest = _sha(
-        _source_payload(manifest, payloads, input_ref["repository"], input_ref["path"])
-    )
+    arena_bytes = _source_payload(manifest, payloads, input_ref["repository"], input_ref["path"])
+    arena = _parse_mjcf(arena_bytes, f"{input_ref['repository']}/{input_ref['path']}")
+    arena_digest = _sha(arena_bytes)
     source_rows.append({"repository": input_ref["repository"], "path": input_ref["path"],
                         "role": "active_scene", "sha256": arena_digest})
     # The pinned style source records these two upstream rewrite rules. Apply
@@ -376,48 +509,17 @@ def _compose_mjcf(
         for element in arena.iter(rule.get("element", "")):
             if element.get("name") == rule.get("name") and element.get("file") == rule.get("declared_ref"):
                 element.set("file", rule["effective_ref"])
-    # Re-run resolution after style substitution.
+    _inline_source_defaults(arena)
     resources.update(_resolve_asset_files(
         arena, input_ref["path"], input_ref["repository"], install_root, payloads
     ))
-    table = next((body for body in arena.iter("body") if body.get("name") == "table"), None)
-    if table is None:
-        raise ValueError("active LIBERO arena XML has no semantic table body")
-    table.set("name", "main_table")
-    for section_name in ("asset", "worldbody", "actuator", "sensor", "contact", "default", "tendon", "equality", "keyframe"):
+    table_transform = _set_table_arena_source_parameters(arena)
+    for section_name in ("asset", "worldbody", "actuator", "sensor", "contact", "tendon", "equality", "keyframe"):
         _append_section(root, arena, section_name)
 
-    type_sources = task.get("type_to_source_and_xml", {})
-    semantic_to_body: dict[str, str] = {"main_table": "main_table"}
-    # The XML's exact source-declared body templates are instantiated once per
-    # semantic object/fixture. Runtime BDDL placement sampling is not claimed.
-    for collection, role in ((task.get("objects_instance_to_type", {}), "object"),
-                             (task.get("fixtures_instance_to_type", {}), "fixture")):
-        for instance, type_name in sorted(collection.items()):
-            if type_name == "table":
-                semantic_to_body[instance] = "main_table"
-                continue
-            source = type_sources[type_name]
-            source_path = source.get("asset_source", source.get("xml_source"))
-            repository = "robosuite" if source_path.startswith("robosuite/") else "libero"
-            fragment = read(repository, source_path, f"{role}:{instance}")
-            _prefix_fragment_names(fragment, instance)
-            world = fragment.find("worldbody")
-            bodies = [] if world is None else world.findall("body")
-            if len(bodies) != 1:
-                raise ValueError(f"source object must expose exactly one world root body: {source_path}")
-            bodies[0].set("name", instance)
-            semantic_to_body[instance] = instance
-            for section_name in ("asset",):
-                _append_section(root, fragment, section_name)
-            target_world = root.find("worldbody")
-            if target_world is None:
-                target_world = ET.SubElement(root, "worldbody")
-            target_world.append(bodies[0])
-
-    # Compose the pinned robot, mount and gripper sources as a declared static
-    # tree. The source code also applies placement transforms and samplers; the
-    # tree hash here therefore attests only this XML composition.
+    # LIBERO's ManipulationTask merges arena, then one robot, then movable
+    # objects followed by fixtures. Match that source order because the init
+    # flattened state stores native qpos/qvel in compiled joint order.
     robot_paths = {
         (row.get("repository"), row.get("path"))
         for row in (*manifest.get("source_code_references", ()), *manifest.get("selected_xml_sources", ()))
@@ -435,48 +537,140 @@ def _compose_mjcf(
     robot = read(robot_repo, robot_path, "mounted_panda_robot")
     mount = read(mount_repo, mount_path, "rethink_mount")
     gripper = read(gripper_repo, gripper_path, "panda_gripper")
-    _prefix_fragment_names(robot, "robot", preserve=frozenset({
-        "joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7",
-        "torq_j1", "torq_j2", "torq_j3", "torq_j4", "torq_j5", "torq_j6", "torq_j7",
-    }))
-    _prefix_fragment_names(mount, "mount")
-    _prefix_fragment_names(gripper, "gripper", preserve=frozenset({
-        "finger_joint1", "finger_joint2", "gripper_finger_joint1", "gripper_finger_joint2",
-        "right_gripper", "eef", "grip_site",
-    }))
-    robot_body = robot.find("worldbody/body")
-    mount_body = mount.find("worldbody/body")
-    gripper_body = gripper.find("worldbody/body")
-    if robot_body is None or mount_body is None or gripper_body is None:
-        raise ValueError("robot, mount and gripper fragments must each have a world root body")
-    robot_body.set("name", "panda_base")
-    # Attach the gripper at the source-defined right_hand end body.
-    hand = next((body for body in robot_body.iter("body") if body.get("name") == "robot__right_hand"), None)
+    for fragment in (robot, mount, gripper):
+        _inline_source_defaults(fragment)
+    _prefix_fragment_names(robot, "robot0_")
+    _prefix_fragment_names(mount, "mount0_")
+    _prefix_fragment_names(gripper, "gripper0_")
+    robot_world, mount_world, gripper_world = (item.find("worldbody") for item in (robot, mount, gripper))
+    if robot_world is None or mount_world is None or gripper_world is None:
+        raise ValueError("pinned robot, mount and gripper sources require worldbody sections")
+    robot_roots, mount_roots, gripper_roots = (list(item.findall("body")) for item in (robot_world, mount_world, gripper_world))
+    if len(robot_roots) != 1 or len(mount_roots) != 1 or len(gripper_roots) != 1:
+        raise ValueError("pinned robot, mount and gripper must each have one world root body")
+    robot_body, mount_body, gripper_body = robot_roots[0], mount_roots[0], gripper_roots[0]
+    if robot_body.get("name") != "robot0_base" or mount_body.get("name") != "mount0_base":
+        raise ValueError("robot or mount root body name differs from pinned source")
+    hand = next((body for body in robot_body.iter("body") if body.get("name") == "robot0_right_hand"), None)
     if hand is None:
         raise ValueError("pinned Panda XML has no right_hand gripper attachment body")
     hand.append(gripper_body)
+
+    # MountedPanda.set_base_xpos(table offset) and RobotModel.add_mount derive
+    # these transforms from the source model offsets. The current RethinkMount
+    # XML root body has source base z=-0.922 and its source top offset is -0.01.
+    robot_base_pos = tuple(float(v) for v in robot_body.get("pos", "0 0 0").split())
+    mount_source_base_pos = tuple(float(v) for v in mount_body.get("pos", "0 0 0").split())
+    if len(robot_base_pos) != 3 or len(mount_source_base_pos) != 3:
+        raise ValueError("robot and mount source base offsets must each contain three coordinates")
+    mount_top_offset = (0.0, 0.0, -0.01)
+    requested_base = (-0.16 - 1.0 / 2.0, 0.0, 0.0)
+    mount_relative = tuple(a - b for a, b in zip(robot_base_pos, mount_top_offset))
+    mount_bottom = tuple(a - b for a, b in zip(mount_source_base_pos, mount_top_offset))
+    robot_bottom = tuple(a + b for a, b in zip(mount_bottom, robot_base_pos))
+    robot_world_pos = tuple(a - b for a, b in zip(requested_base, robot_bottom))
+    mount_body.set("pos", " ".join(f"{value:g}" for value in mount_relative))
+    robot_body.set("pos", " ".join(f"{value:g}" for value in robot_world_pos))
+    robot_body.append(mount_body)
+    for joint in robot.iter("joint"):
+        name = joint.get("name", "")
+        suffix = name.removeprefix("robot0_")
+        if suffix in {f"joint{i}" for i in range(1, 6)}:
+            joint.set("damping", "0.1")
+        elif suffix in {"joint6", "joint7"}:
+            joint.set("damping", "0.01")
     world = root.find("worldbody")
-    assert world is not None
-    world.append(mount_body)
+    if world is None:
+        world = ET.SubElement(root, "worldbody")
     world.append(robot_body)
-    for fragment in (robot, gripper):
-        _append_section(root, fragment, "asset")
-        _append_section(root, fragment, "actuator")
-    _append_section(root, mount, "asset")
+    for fragment in (robot, gripper, mount):
+        for section_name in ("asset", "actuator", "sensor", "contact", "tendon", "equality", "keyframe"):
+            _append_section(root, fragment, section_name)
+
+    bddl_ref = task_input.get("bddl", {})
+    bddl_path = bddl_ref.get("path")
+    if type(bddl_path) is not str:
+        raise ValueError("task input must bind the exact BDDL declaration source")
+    bddl_bytes = _source_payload(manifest, payloads, "libero", bddl_path)
+    if _sha(bddl_bytes) != bddl_ref.get("sha256"):
+        raise ValueError("pinned BDDL declaration bytes differ from task input")
+    source_rows.append({"repository": "libero", "path": bddl_path,
+                        "role": "ordered_task_instances", "sha256": _sha(bddl_bytes)})
+    declared_objects = _ordered_bddl_instances(bddl_bytes, "objects")
+    declared_fixtures = _ordered_bddl_instances(bddl_bytes, "fixtures")
+    object_map = task.get("objects_instance_to_type", {})
+    fixture_map = task.get("fixtures_instance_to_type", {})
+    if dict(declared_objects) != object_map or dict(declared_fixtures) != fixture_map:
+        raise ValueError("pinned BDDL instance declarations differ from the frozen task maps")
+
+    type_sources = task.get("type_to_source_and_xml", {})
+    semantic_to_body: dict[str, str] = {"main_table": "main_table"}
+    ordered_objects: list[dict[str, str]] = []
+    ordered_fixtures: list[dict[str, str]] = []
+    for declarations, role, movable in (
+        (declared_objects, "object", True),
+        (declared_fixtures, "fixture", False),
+    ):
+        for instance, type_name in declarations:
+            if type_name == "table":
+                semantic_to_body[instance] = "main_table"
+                continue
+            source = type_sources[type_name]
+            source_path = source.get("asset_source", source.get("xml_source"))
+            repository = "robosuite" if source_path.startswith("robosuite/") else "libero"
+            fragment = read(repository, source_path, f"{role}:{instance}")
+            _inline_source_defaults(fragment)
+            body = _extract_libero_object(fragment, instance=instance, movable=movable)
+            semantic_to_body[instance] = body.get("name", "")
+            _append_section(root, fragment, "asset")
+            row = {
+                "semantic_id": instance,
+                "source_path": source_path,
+                "body_name": body.get("name", ""),
+                "joint_policy": "free_joint_joint0_damping_0.0005" if movable else "no_root_joint_fixture_internal_joints_preserved",
+                "geom_groups": ["0", "1"],
+            }
+            (ordered_objects if movable else ordered_fixtures).append(row)
+            world = root.find("worldbody")
+            if world is None:
+                world = ET.SubElement(root, "worldbody")
+            world.append(body)
 
     # Stable output bytes: sorted attributes, fixed indentation and UTF-8 XML.
     ET.indent(root, space="  ")
     xml = ET.tostring(root, encoding="unicode", short_empty_elements=True) + "\n"
     digest = _sha(xml.encode("utf-8"))
     receipt = {
-        "schema_version": "libero-static-mjcf-composition-receipt-v1",
+        "schema_version": "libero-source-composition-mjcf-v3",
         "source_files": sorted(source_rows, key=lambda row: (row["repository"], row["path"], row["role"])),
         "semantic_body_map": semantic_to_body,
+        "joint_instance_order": ["robot0", *[row["semantic_id"] for row in ordered_objects],
+                                  *[row["semantic_id"] for row in ordered_fixtures]],
+        "movable_object_instances": ordered_objects,
+        "fixture_instances": ordered_fixtures,
+        "table_arena_transform": table_transform,
+        "mounted_panda_transform": {
+            "schema_version": "libero-mounted-panda-transform-v1",
+            "robot_root_body": "robot0_base",
+            "mount_root_body": "mount0_base",
+            "mount_parent_body": "robot0_base",
+            "gripper_parent_body": "robot0_right_hand",
+            "requested_base_bottom_m": list(requested_base),
+            "robot_root_pos_m": list(robot_world_pos),
+            "mount_child_pos_m": list(mount_relative),
+            "mount_top_offset_m": list(mount_top_offset),
+            "mount_source_root_pos_m": list(mount_source_base_pos),
+            "formulas": ["mount_relative=robot_base_offset-mount_top_offset",
+                         "robot_bottom_offset=mount_source_root_pos-mount_top_offset+robot_base_offset",
+                         "robot_root_pos=requested_base_bottom-robot_bottom_offset"],
+        },
         "resource_references": sorted(resources),
         "output_sha256": digest,
         "output_bytes": len(xml.encode("utf-8")),
-        "placement_status": "STATIC_XML_ONLY_UPSTREAM_BDDL_AND_SITE_SAMPLERS_NOT_EXECUTED",
-        "pruned_init_status": "NOT_DECODED_OR_MAPPED",
+        "physics_options": {"timestep_s": 0.002, "gravity_m_s2": [0.0, 0.0, -9.81],
+                            "integrator": "MuJoCo default; no implicitfast override"},
+        "placement_status": "DYNAMIC_FREE_ROOTS_COMPOSED; ORIGINAL_FIXTURE_BODY_POSES_NOT_IN_PRUNED_INIT",
+        "pruned_init_status": "SAFE_DECODER_AND_SOURCE_NAME_LAYOUT_SEPARATE; COMPILED_MODEL_CONFIRMATION_REQUIRED",
     }
     receipt["receipt_sha256"] = _sha(_canonical(receipt))
     return xml, receipt
@@ -651,7 +845,7 @@ def build_source_composition_plan(
     composition = {
         "schema_version": _COMPOSITION_SCHEMA,
         "status": (
-            "STATIC_SOURCE_XML_COMPOSED_RUNTIME_PLACEMENT_NOT_EXECUTED"
+            "SOURCE_DERIVED_MJCF_COMPOSED_ORIGINAL_FIXTURE_POSES_UNRESOLVED"
             if compose_mjcf else "SOURCE_BYTES_VERIFIED_COMPOSITION_SKIPPED"
         ),
         "identity": {
@@ -682,15 +876,15 @@ def build_source_composition_plan(
             },
             {
                 "owner": "LIBERO BDDLBaseDomain._load_model / TableArena / ManipulationTask",
-                "operation": "apply origin/camera/style; add every fixture and movable object; merge task arena, MountedPanda, assets, sites, and object assets",
+                "operation": "apply TableArena geometry, source style, named object subtrees, movable root joints, and MountedPanda model transforms in ManipulationTask order",
                 "active_scene_xml": active_scene,
                 "style_properties": source_resolution.get("scene_style_properties"),
                 "style_rewrite_rules": source_resolution.get("scene_style_rewrite_rules"),
-                "status": "SOURCE_RULES_BOUND_NOT_REPLAYED",
+                "status": "SOURCE_RULES_REPLAYED; ORIGINAL_PER_ROW_FIXTURE_BODY_POSES_STILL_MISSING",
             },
             {
                 "owner": "LIBERO BDDLBaseDomain._load_fixtures_in_arena / _load_objects_in_arena",
-                "operation": "instantiate frozen instance-to-type maps with upstream object classes and names",
+                "operation": "instantiate frozen instance-to-type maps in insertion order; movable classes receive default free joint and fixtures keep internal joints with fixed root",
                 "semantic_name_mapping": sorted(semantic_rows, key=lambda row: (row["role"], row["instance_name"])),
             },
             {
@@ -701,7 +895,7 @@ def build_source_composition_plan(
                     [item.get("name") for item in task_input.get("native_reference", {}).get("robot", {}).get("actuators", ())]
                     if composition_receipt is not None else None
                 ),
-                "status": "STATIC_MJCF_NAMES_BOUND_NATIVE_LAYOUT_UNVERIFIED" if composition_receipt is not None else "SOURCE_BYTES_BOUND_COMPILED_LAYOUT_UNVERIFIED",
+                "status": "SOURCE_MJCF_NAMES_BOUND_COMPILED_LAYOUT_UNVERIFIED" if composition_receipt is not None else "SOURCE_BYTES_BOUND_COMPILED_LAYOUT_UNVERIFIED",
             },
         ],
         "core_seam": {
@@ -716,7 +910,7 @@ def build_source_composition_plan(
             "composed_mjcf_bytes": None if composition_receipt is None else composition_receipt["output_bytes"],
             "composition_receipt_sha256": None if composition_receipt is None else composition_receipt["receipt_sha256"],
             "compiled_scene_identity": None,
-            "status": "STATIC_XML_COMPOSED_NOT_NATIVE_COMPILED" if compose_mjcf else "NOT_COMPOSED_TEST_PREFLIGHT_ONLY",
+            "status": "SOURCE_MJCF_COMPOSED_NOT_NATIVE_COMPILED" if compose_mjcf else "NOT_COMPOSED_TEST_PREFLIGHT_ONLY",
         },
         "composition_receipt": composition_receipt,
         "semantic_to_compiled_body_names": {} if composition_receipt is None else composition_receipt["semantic_body_map"],
@@ -736,7 +930,7 @@ def build_assembly(task_input: dict, manifest: dict) -> dict:
         "native_arena_xml": task_input["native_reference"]["active_scene_xml"],
         "source_manifest_id": manifest["manifest_id"],
         "asset_closure": manifest["asset_closure"],
-        "source_consumption": "A deterministic static MJCF candidate is composed from the verified active arena, object, fixture, Panda, mount and gripper XML sources; upstream BDDL/site placement and pruned-init realization remain unexecuted.",
+        "source_consumption": "A deterministic source-derived MJCF applies the LIBERO object subtree/free-joint policy, fixture internal joints, table parameters, and MountedPanda transforms; original fixture pose reset metadata and native compilation remain unresolved.",
         "factory_owner": "bench_deploy.libero.core_candidate.build_libero_pilot_env explicitly constructs an internal BaseTaskEnv candidate; it is not registered with make_env",
         "task_source_owner": "bench_deploy.libero.core_candidate.LiberoPilotSceneComposer -> task_env.assembly.compile_task_scene -> GeoPhys SceneSource",
         "reference_owner": "task_env/assembly/references.py::resolve_task_references",

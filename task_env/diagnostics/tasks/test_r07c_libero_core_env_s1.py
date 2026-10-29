@@ -291,17 +291,17 @@ def _candidate_xml() -> str:
         <body name="flat_stove_1"><geom name="stove_geom" type="box" size=".1 .1 .02"/></body>
         <body name="wooden_cabinet_1"><geom name="cabinet_geom" type="box" size=".1 .1 .2"/></body>
         <body name="panda_base">
-          <body name="robot__link0"><joint name="joint1" type="hinge"/>
-            <body name="robot__link1"><joint name="joint2" type="hinge"/>
-              <body name="robot__link2"><joint name="joint3" type="hinge"/>
-                <body name="robot__link3"><joint name="joint4" type="hinge"/>
-                  <body name="robot__link4"><joint name="joint5" type="hinge"/>
-                    <body name="robot__link5"><joint name="joint6" type="hinge"/>
-                      <body name="robot__link6"><joint name="joint7" type="hinge"/>
+          <body name="robot__link0"><joint name="robot0_joint1" type="hinge"/>
+            <body name="robot__link1"><joint name="robot0_joint2" type="hinge"/>
+              <body name="robot__link2"><joint name="robot0_joint3" type="hinge"/>
+                <body name="robot__link3"><joint name="robot0_joint4" type="hinge"/>
+                  <body name="robot__link4"><joint name="robot0_joint5" type="hinge"/>
+                    <body name="robot__link5"><joint name="robot0_joint6" type="hinge"/>
+                      <body name="robot__link6"><joint name="robot0_joint7" type="hinge"/>
                         <body name="robot__link7"><body name="robot__right_hand">
                           <body name="right_gripper"><site name="grip_site"/>
-                            <body name="eef"><body name="gripper__leftfinger"><joint name="finger_joint1" type="slide"/></body>
-                              <body name="gripper__rightfinger"><joint name="finger_joint2" type="slide"/></body>
+                            <body name="eef"><body name="gripper__leftfinger"><joint name="gripper0_finger_joint1" type="slide"/></body>
+                              <body name="gripper__rightfinger"><joint name="gripper0_finger_joint2" type="slide"/></body>
                             </body>
                           </body>
                         </body></body>
@@ -315,15 +315,15 @@ def _candidate_xml() -> str:
         </body>
       </worldbody>
       <actuator>
-        <motor name="torq_j1" joint="joint1" ctrlrange="-80 80"/>
-        <motor name="torq_j2" joint="joint2" ctrlrange="-80 80"/>
-        <motor name="torq_j3" joint="joint3" ctrlrange="-80 80"/>
-        <motor name="torq_j4" joint="joint4" ctrlrange="-80 80"/>
-        <motor name="torq_j5" joint="joint5" ctrlrange="-80 80"/>
-        <motor name="torq_j6" joint="joint6" ctrlrange="-12 12"/>
-        <motor name="torq_j7" joint="joint7" ctrlrange="-12 12"/>
-        <position name="gripper_finger_joint1" joint="finger_joint1" ctrlrange="0 .04"/>
-        <position name="gripper_finger_joint2" joint="finger_joint2" ctrlrange="-.04 0"/>
+        <motor name="robot0_torq_j1" joint="robot0_joint1" ctrlrange="-80 80"/>
+        <motor name="robot0_torq_j2" joint="robot0_joint2" ctrlrange="-80 80"/>
+        <motor name="robot0_torq_j3" joint="robot0_joint3" ctrlrange="-80 80"/>
+        <motor name="robot0_torq_j4" joint="robot0_joint4" ctrlrange="-80 80"/>
+        <motor name="robot0_torq_j5" joint="robot0_joint5" ctrlrange="-80 80"/>
+        <motor name="robot0_torq_j6" joint="robot0_joint6" ctrlrange="-12 12"/>
+        <motor name="robot0_torq_j7" joint="robot0_joint7" ctrlrange="-12 12"/>
+        <position name="gripper0_gripper_finger_joint1" joint="gripper0_finger_joint1" ctrlrange="0 .04"/>
+        <position name="gripper0_gripper_finger_joint2" joint="gripper0_finger_joint2" ctrlrange="-.04 0"/>
       </actuator>
     </mujoco>"""
 
@@ -405,7 +405,7 @@ def test_real_core_env_compile_lifecycle_fault_recorder_h5_and_independent_read(
         assert success_records["outcome"].final_boundary == 1
         with h5py.File(h5_path, "r") as handle:
             assert len(handle["reward"]) == 1
-            assert len(handle["action/joint1"]) == 1
+            assert len(handle["action/robot0_joint1"]) == 1
             meta = yaml.safe_load(handle["meta/env_meta"][()].decode("utf-8"))
             assert meta["action_schema"]["schema_id"] == "libero.mounted_panda_mixed_action.v1"
             assert meta["reference_profile"]["composed_mjcf_sha256"] == xml_sha

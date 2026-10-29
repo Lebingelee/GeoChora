@@ -83,11 +83,11 @@ class LiberoMountedPandaAgent(AgentComponent):
                 "robot__link7", "robot__right_hand", "right_gripper", "eef",
                 "gripper__leftfinger", "gripper__rightfinger",
             ),
-            joint_names=tuple(f"joint{i}" for i in range(1, 8))
-            + ("finger_joint1", "finger_joint2"),
+            joint_names=tuple(f"robot0_joint{i}" for i in range(1, 8))
+            + ("gripper0_finger_joint1", "gripper0_finger_joint2"),
             site_names=("grip_site",),
-            actuator_names=tuple(f"torq_j{i}" for i in range(1, 8))
-            + ("gripper_finger_joint1", "gripper_finger_joint2"),
+            actuator_names=tuple(f"robot0_torq_j{i}" for i in range(1, 8))
+            + ("gripper0_gripper_finger_joint1", "gripper0_gripper_finger_joint2"),
         )
 
     def initial_state_spec(self) -> InitialStateSpec:
@@ -95,9 +95,10 @@ class LiberoMountedPandaAgent(AgentComponent):
         # .pruned_init row. The task initialization row remains unmapped.
         return InitialStateSpec(
             joint_positions=(
-                ("joint1", 0.0), ("joint2", -0.161037389), ("joint3", 0.0),
-                ("joint4", -2.44459747), ("joint5", 0.0), ("joint6", 2.22675220),
-                ("joint7", float(np.pi / 4.0)),
+                ("robot0_joint1", 0.0), ("robot0_joint2", -0.161037389),
+                ("robot0_joint3", 0.0), ("robot0_joint4", -2.44459747),
+                ("robot0_joint5", 0.0), ("robot0_joint6", 2.22675220),
+                ("robot0_joint7", float(np.pi / 4.0)),
             ),
             notes=("Pinned MountedPanda.init_qpos only; not LIBERO .pruned_init.",),
         )
