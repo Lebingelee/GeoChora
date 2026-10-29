@@ -119,7 +119,16 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
         'output_dir': str(output), 'cases': contract_cases,
         'limits': worker.FROZEN_LIMITS, 'oracles': worker.FROZEN_ORACLES,
         'reader_tamper_matrix': worker.FROZEN_TAMPER_MATRIX,
-        'submodule_pins': snapshot['pins'],
+        # The model IO below is synthetic, but the production frozen-contract
+        # guard still validates the live checkout.  Bind this fixture to the
+        # current tree's actual gitlinks instead of replaying the historical
+        # R06b snapshot's (different) GeoPhys pin.
+        'submodule_pins': {
+            relative: subprocess.check_output(
+                ['git', 'rev-parse', 'HEAD'], cwd=root / relative, text=True,
+            ).strip()
+            for relative in ('GeoPhys', 'asset/external/mujoco_menagerie')
+        },
         'code_sha256': {name: worker._sha(root / name) for name in relevant_code},
         'protected_sha256': snapshot['protected_evidence'],
         'mujoco_static': {'files_sha256': {}},
@@ -261,6 +270,29 @@ def test_real_run_worker_two_cases_with_synthetic_model_io_and_restored_hooks(mo
         assert {item['outer'] for item in episode_trace} == set(range(1, 65))
         assert all(sum(item['outer'] == outer for item in episode_trace) == 5
                    for outer in range(1, 65))
+
+
+def test_real_worker_rejects_digest_valid_wrong_pin_before_model_io(monkeypatch, tmp_path):
+    from task_env.diagnostics.tasks.r06b_order_worker import _contract_digest
+
+    worker, contract_path, output, _engine, _originals, materializations = _prepare_worker(
+        monkeypatch, tmp_path,
+    )
+    contract = json.loads(contract_path.read_text())
+    current_pin = contract['submodule_pins']['GeoPhys']
+    contract['submodule_pins']['GeoPhys'] = '0' * 40
+    assert contract['submodule_pins']['GeoPhys'] != current_pin
+    contract['contract_sha256'] = _contract_digest(contract)
+    contract_path.write_text(json.dumps(contract, sort_keys=True, indent=2) + '\n')
+
+    with pytest.raises(ValueError, match='protected submodule pin changed: GeoPhys'):
+        worker.run_worker(contract_path)
+
+    # The contract digest and all other live fields are valid, so this proves
+    # the production pin guard itself ran before the synthetic materializer.
+    assert materializations['value'] == 0
+    assert not (output / 'native/native_progress.json').exists()
+    assert not (output / 'native/native_failure.json').exists()
 
 
 @pytest.mark.parametrize('failure', [
