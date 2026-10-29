@@ -1,7 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-29）：**F00已获Sol有界接收；Isaac 6.2.0.0安装及S1通过；F01 attempt002首次Kit启动在EULA提示处、首个物理步前退出，条件性重试待维护者确认；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
-当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。F01 attempt002复用已通过S1并完成真实API/资产静态核对；一次启动已消耗、physics steps为0，第二次启动仅在维护者确认已接受NVIDIA Omniverse EULA后按包内门槛考虑。未启动F02，待Sol复核后再推进。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。详见10当前分工。
+当前入口（2026-10-29）：**F00已获Sol有界接收；Isaac 6.2.0.0安装及11项定向S1通过；F01 attempt002两次Kit启动均未到达physics step，第二次worker因 `isaacsim.robot_motion.examples` 模块不可用而失败，2/2启动额度已用；F02保持HELD，等待Sol复核；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
+当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。F01 attempt002的第二次worker记录 `ModuleNotFoundError`、0 physics trace，关闭调用返回后父进程以 `-11` 退出；同run reader为 `REJECTED_NATIVE_GATES`。资源预算内、共享锁已释放；本次不满足F01 bounded native baseline。F02未启动，待Sol复核后再推进。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。详见10当前分工。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。

@@ -4522,7 +4522,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ATTEMPT002_NATIVE_BOOTSTRAP_EULA_BLOCKED_BEFORE_PHYSICS; RETRY_CONFIRMATION_PENDING",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ATTEMPT002_NATIVE_API_IMPORT_BLOCKED_BEFORE_PHYSICS; BOTH_APP_STARTS_CONSUMED; SOL_REVIEW_PENDING",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -5146,7 +5146,7 @@
         "5deeadb54be99457ccbd41d1c8b69cccb164dda3",
         "5904f8e52fad5388bbe0b841079eb725ee2016de"
       ],
-      "status": "NATIVE_BOOTSTRAP_EULA_BLOCKED_BEFORE_PHYSICS_PENDING_MAINTAINER_CONFIRMATION",
+      "status": "INSTALL_API_S1_PASS; NATIVE_FAILED_API_IMPORT_BEFORE_PHYSICS; BOTH_STARTS_CONSUMED; SOL_REVIEW_PENDING",
       "metadata": "PASS: Isaac Sim/core/extscache-kit 6.2.0.0, Python 3.12.14, Torch 2.11.0+cu128, NumPy 2.3.1",
       "pip_check": "PASS",
       "installed_api_source_and_asset_recipe": "RECORDED_BEFORE_KIT_START",
@@ -5160,22 +5160,62 @@
         "resource_abort": false,
         "timeout": false
       },
-      "native_retry_eligibility": "Package-eligible only as an exact pre-physics EULA bootstrap stop; second start requires maintainer confirmation of prior EULA acceptance and explicit flag.",
-      "second_native_start": "HELD_PENDING_MAINTAINER_CONFIRMATION",
+      "native_retry_eligibility": "First start was an exact zero-physics EULA bootstrap stop; maintainer confirmation enabled the single package-conditional second start. No starts remain.",
+      "second_native_start": 2,
       "sol_review": "PENDING",
       "f02": "HELD",
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/report.md",
-      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/"
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/",
+      "maintainer_eula_confirmation": "CONFIRMED; package-conditional second start executed with explicit flags; evidence: workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/maintainer_eula_confirmation.json",
+      "second_native_failure": {
+        "stage": "app_start",
+        "type": "ModuleNotFoundError",
+        "reason": "No module named isaacsim.robot_motion.examples while importing ManipulationScenario",
+        "physics_steps": 0,
+        "trace_rows": 0,
+        "worker_receipt_exit_code": 1,
+        "parent_process_exit_code": -11,
+        "worker_wall_seconds": 821.4871737391222,
+        "app_closed": true,
+        "cleanup_errors": [],
+        "resource_abort": false,
+        "timeout": false,
+        "supervisor_failure_category": "ordinary_bootstrap_api_asset_wiring"
+      },
+      "native_budget_outcome": {
+        "app_starts_used": 2,
+        "app_starts_max": 2,
+        "physics_steps_total": 0,
+        "physics_steps_max": 1200,
+        "simulation_time_total_s": 0.0,
+        "simulation_time_max_s": 10.0,
+        "lock_held_seconds_second_start": 829.9258154698182,
+        "lock_released": true,
+        "preflight_mem_available_bytes": 8280596480,
+        "preflight_gpu0_free_mib": 6643,
+        "minimum_mem_available_bytes": 3082502144,
+        "minimum_gpu0_free_mib": 6138,
+        "maximum_worker_group_rss_bytes": 6594056192,
+        "network_rx_delta_bytes": 47273450,
+        "ov_cache_growth_bytes": 52,
+        "over_budget_items": []
+      },
+      "independent_reader": {
+        "native_001": "REJECTED_NATIVE_GATES; trace_rows=0; frozen supervisor source hash differs from current reader source",
+        "native_002": "REJECTED_NATIVE_GATES; trace_rows=0; fixed plan and frozen source hashes match"
+      },
+      "native_baseline": "NOT_PASSED"
     },
     "f01_attempt002_documentation_validation": {
-      "mode": "TARGETED_STATIC_ONLY",
+      "mode": "TARGETED_STATIC_ONLY_AFTER_NATIVE_ATTEMPT",
       "markdown_hashes_verified": 12,
       "local_relative_links_exist": 139,
       "missing_local_paths": 0,
       "skill_navigation_link": "PASS",
       "global_docs_validator": "NOT_RUN_PER_PACKAGE",
-      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/evidence/docs/static_link_check.json",
-      "receipt_sha256": "6f3534f32ab25bcbe2315388981b91b470ad45321e2e5b93e4f43d60ea44d7d4"
+      "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/evidence/docs/static_link_check_final.json",
+      "receipt_sha256": "8c7092a48e051b0fa3edc2670eada892c9833eb5b586f624d24513797361abbb",
+      "markdown_hashes_artifact": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f01_002/evidence/docs/markdown_hashes_final.json"
     }
   }
 }
