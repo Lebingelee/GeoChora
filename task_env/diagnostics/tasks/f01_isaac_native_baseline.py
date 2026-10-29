@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.metadata
 import json
 import math
@@ -51,7 +52,7 @@ def default_plan() -> dict[str, Any]:
             "headless": True,
             "renderer": "MinimalRendering",
             "fast_shutdown": False,
-            "limit_cpu_threads": 1,
+            "limit_cpu_threads": 16,
             "disable_viewport_updates": True,
             "enable_crashreporter": False,
             "multi_gpu": False,
@@ -67,8 +68,8 @@ def default_plan() -> dict[str, Any]:
         },
         "scene": {
             "physics_engine": "PhysX",
-            "physics_device": "cpu",
-            "gpu_dynamics": False,
+            "physics_device": "cuda:0",
+            "gpu_dynamics": True,
             "dt_seconds": DT,
             "stage_meters_per_unit": 1.0,
             "stage_up_axis": "Z",
@@ -123,6 +124,23 @@ def _strict_json_value(value: Any, warnings: list[dict[str, str]] | None = None,
     if hasattr(value, "value") and isinstance(value.value, (str, int, float)):
         return _strict_json_value(value.value, warnings, path)
     raise TypeError(f"unsupported strict JSON value at {path}: {type(value).__name__}")
+
+
+def _terminate_native_worker(exit_code: int) -> None:
+    """Exit the isolated Kit worker without Python/native plugin finalizers.
+
+    The native worker has already completed ``SimulationApp.close`` and written
+    its durable result receipt before this is called.  Kit 6.2's graceful
+    shutdown returns before framework/plugin unload; on this host, unloading
+    SimulationManager during CPython finalization can segfault.  The supervisor
+    owns the parent process and reads the receipt independently.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (OSError, ValueError):
+            pass
+    os._exit(int(exit_code))
 
 
 def _write_json_new(path: Path, value: Any) -> None:
@@ -399,6 +417,7 @@ def _initial_report(run_dir: Path, evidence_kind: str, run_id: str) -> dict[str,
         "schema": SCHEMA,
         "run_id": run_id,
         "run_dir": str(run_dir),
+        "worker_pid": os.getpid(),
         "evidence_kind": evidence_kind,
         "status": "INCOMPLETE",
         "pass": False,
@@ -542,6 +561,18 @@ def run_worker(run_dir: Path, plan: dict[str, Any], *, driver_factory: Callable[
         report["worker_error"] = _failure(exc, stage_name)
     finally:
         if driver is not None:
+            # Capture counters while the SimulationManager still owns a live
+            # simulation. Isaac shutdown resets these counters to zero.
+            try:
+                counters = driver.final_counters()
+                report["physics_steps_at_end"] = counters.get("physics_index")
+                if report["physics_steps_at_start"] is not None and report["physics_steps_at_end"] is not None:
+                    report["total_physics_steps"] = int(report["physics_steps_at_end"]) - int(report["physics_steps_at_start"])
+                report["simulation_time_end_s"] = counters.get("simulation_time_s")
+                if report["simulation_time_start_s"] is not None and report["simulation_time_end_s"] is not None:
+                    report["total_simulation_time_s"] = float(report["simulation_time_end_s"]) - float(report["simulation_time_start_s"])
+            except BaseException as exc:
+                report["cleanup_errors"].append(_failure(exc, "final_counters"))
             try:
                 mark_stage("native_stop_cleanup")
                 driver.stop()
@@ -560,16 +591,6 @@ def run_worker(run_dir: Path, plan: dict[str, Any], *, driver_factory: Callable[
             report["timeline_stop_attempts"] = int(getattr(driver, "timeline_stop_attempts", 0))
             report["callbacks_registered"] = int(getattr(driver, "callbacks_registered", 0))
             report["callbacks_deregistered"] = int(getattr(driver, "callbacks_deregistered", 0))
-            try:
-                counters = driver.final_counters()
-                report["physics_steps_at_end"] = counters.get("physics_index")
-                if report["physics_steps_at_start"] is not None and report["physics_steps_at_end"] is not None:
-                    report["total_physics_steps"] = int(report["physics_steps_at_end"]) - int(report["physics_steps_at_start"])
-                report["simulation_time_end_s"] = counters.get("simulation_time_s")
-                if report["simulation_time_start_s"] is not None and report["simulation_time_end_s"] is not None:
-                    report["total_simulation_time_s"] = float(report["simulation_time_end_s"]) - float(report["simulation_time_start_s"])
-            except BaseException as exc:
-                report["cleanup_errors"].append(_failure(exc, "final_counters"))
         if trace is not None:
             try:
                 trace.close()
@@ -765,6 +786,16 @@ class FakeDriver:
         self.app_closed = True
 
 
+def _enable_extension_and_import(
+    app_utils: Any, *, extension_name: str, module_name: str
+) -> Any:
+    """Enable a Kit Python extension before importing its registered module."""
+    if not app_utils.enable_extension(extension_name):
+        raise RuntimeError(f"{extension_name} extension did not enable")
+    app_utils.update_app(steps=1)
+    return importlib.import_module(module_name)
+
+
 class NativeDriver:
     """Isaac 6.2 implementation of the task-local physics IO boundary."""
     def __init__(self, plan: dict[str, Any], report: dict[str, Any]):
@@ -774,6 +805,7 @@ class NativeDriver:
         self.app_utils = None
         self.SimulationManager = None
         self.SimulationEvent = None
+        self._scenario_type = None
         self.scenario = None
         self.articulation = None
         self.cube = None
@@ -802,36 +834,60 @@ class NativeDriver:
         from isaacsim.simulation_app import SimulationApp
 
         self.app = SimulationApp(dict(self.plan["application"]))
+        requested_threads = int(self.plan["application"]["limit_cpu_threads"])
+        effective_threads = min(os.cpu_count() or 1, requested_threads)
+        import carb
+
+        carb_threads = int(
+            carb.settings.get_settings().get_as_int("/plugins/carb.tasking.plugin/threadCount")
+        )
+        self.report["application_runtime"] = {
+            "limit_cpu_threads_requested": requested_threads,
+            "limit_cpu_threads_effective": effective_threads,
+            "carb_task_thread_count": carb_threads,
+            "omp_num_threads": os.environ.get("OMP_NUM_THREADS"),
+        }
+        if carb_threads != effective_threads or os.environ.get("OMP_NUM_THREADS") != str(effective_threads):
+            raise RuntimeError(
+                "Isaac Sim Carbonite/OMP thread pool does not match the bounded application plan"
+            )
         from isaacsim.core.experimental.utils import app as app_utils
         from isaacsim.core.experimental.objects import Cube, GroundPlane
         from isaacsim.core.experimental.prims import Articulation, GeomPrim, RigidPrim
         from isaacsim.core.simulation_manager import SimulationEvent, SimulationManager
-        from isaacsim.robot_motion.examples.manipulation import ManipulationScenario
         import omni.usd
         from pxr import UsdGeom
 
         self.app_utils = app_utils
         self.SimulationManager = SimulationManager
         self.SimulationEvent = SimulationEvent
-        if not app_utils.enable_extension("isaacsim.robot_motion.examples"):
-            raise RuntimeError("isaacsim.robot_motion.examples extension did not enable")
-        app_utils.update_app(steps=1)
+        manipulation = _enable_extension_and_import(
+            app_utils,
+            extension_name="isaacsim.robot_motion.examples",
+            module_name="isaacsim.robot_motion.examples.manipulation",
+        )
+        self._scenario_type = manipulation.ManipulationScenario
         self.stage = omni.usd.get_context().get_stage()
         if self.stage is None:
             raise RuntimeError("SimulationApp did not create a USD stage")
         UsdGeom.SetStageMetersPerUnit(self.stage, 1.0)
         UsdGeom.SetStageUpAxis(self.stage, UsdGeom.Tokens.z)
         GroundPlane(self.plan["scene"]["ground_path"], templates=None, sizes=100.0)
-        self.scenario = ManipulationScenario("franka", robot_prim_path=self.plan["robot"]["prim_path"])
+        self.scenario = self._scenario_type(
+            "franka", robot_prim_path=self.plan["robot"]["prim_path"]
+        )
         self.articulation = self.scenario.setup_scene()
-        SimulationManager.setup_simulation(dt=self.plan["scene"]["dt_seconds"], device="cpu")
+        SimulationManager.setup_simulation(
+            dt=self.plan["scene"]["dt_seconds"], device=self.plan["scene"]["physics_device"]
+        )
         scenes = SimulationManager.get_physics_scenes()
         if len(scenes) != 1:
             raise RuntimeError(f"expected one PhysX scene, found {len(scenes)}")
         self.physics_scene = scenes[0]
-        self.physics_scene.set_enabled_gpu_dynamics(False)
-        if self.physics_scene.get_enabled_gpu_dynamics() is not False:
-            raise RuntimeError("PhysX GPU dynamics could not be disabled")
+        requested_gpu_dynamics = bool(self.plan["scene"]["gpu_dynamics"])
+        self.physics_scene.set_enabled_gpu_dynamics(requested_gpu_dynamics)
+        if self.physics_scene.get_enabled_gpu_dynamics() is not requested_gpu_dynamics:
+            raise RuntimeError("PhysX GPU dynamics did not match the frozen plan")
         Cube(
             self.plan["scene"]["cube_path"],
             sizes=self.plan["scene"]["cube_edge_m"],
@@ -872,6 +928,8 @@ class NativeDriver:
         if physics_inventory["unexpected_rigid_body_paths"] or len(physics_inventory["physics_scene_paths"]) != 1:
             raise RuntimeError(f"unexpected physical objects in baseline scene: {physics_inventory}")
         import omni.usd
+        from pxr import UsdGeom
+
         app_utils = self.app_utils
         manager = self.SimulationManager
         # The official robot is authored before the first physical step; its
@@ -910,10 +968,13 @@ class NativeDriver:
         self._time_start = before_time
         self.callback_uid = manager.register_callback(self._on_physics_step, event=self.SimulationEvent.PHYSICS_POST_STEP)
         self.callbacks_registered = 1
+        camera_paths = self._camera_paths()
+        kit_viewport_camera_paths = [path for path in camera_paths if path.startswith("/OmniverseKit_")]
+        task_camera_paths = [path for path in camera_paths if path not in kit_viewport_camera_paths]
         self._scene_identity = {
             "physics_scene_type": type(self.physics_scene).__name__,
             "physics_scene_module": type(self.physics_scene).__module__,
-            "physics_device_configured": "cpu",
+            "physics_device_configured": str(self.plan["scene"]["physics_device"]),
             "physics_dt_s": float(self.physics_scene.get_dt()),
             "gpu_dynamics_enabled": bool(self.physics_scene.get_enabled_gpu_dynamics()),
             "stage_meters_per_unit": float(UsdGeom.GetStageMetersPerUnit(self.stage)),
@@ -922,7 +983,9 @@ class NativeDriver:
             "robot_prim_path": self.plan["robot"]["prim_path"],
             "ground_prim_path": self.plan["scene"]["ground_path"],
             "cube_prim_path": self.plan["scene"]["cube_path"],
-            "stage_camera_prim_paths": self._camera_paths(),
+            "stage_camera_prim_paths": camera_paths,
+            "kit_viewport_camera_prim_paths": kit_viewport_camera_paths,
+            "task_camera_prim_paths": task_camera_paths,
             "static_overlap_check": overlap,
             "physics_inventory": physics_inventory,
             "official_scenario_added_dome_light": self.stage.GetPrimAtPath("/World/DomeLight").IsValid(),
@@ -1104,10 +1167,11 @@ class NativeDriver:
         # Rebuild the wrappers through the scenario's documented bind-existing
         # lifecycle. No USD or articulation data is rewritten between rounds.
         self.scenario.cleanup()
-        from isaacsim.robot_motion.examples.manipulation import ManipulationScenario
         from isaacsim.core.experimental.prims import RigidPrim
 
-        self.scenario = ManipulationScenario("franka", robot_prim_path=ROBOT_PATH)
+        self.scenario = self._scenario_type(
+            "franka", robot_prim_path=ROBOT_PATH
+        )
         self.articulation = self.scenario.bind_existing_robot()
         self.cube = RigidPrim(CUBE_PATH)
         if not self.articulation.is_physics_tensor_entity_valid() or not self.cube.is_physics_tensor_entity_valid():
@@ -1260,6 +1324,8 @@ def main(argv: list[str] | None = None) -> int:
                                          "status": outcome.get("report", {}).get("status"),
                                          "result_path": outcome.get("result_path"), "trace_path": outcome.get("trace_path")}),
                      sort_keys=True, allow_nan=False))
+    if args.native_worker:
+        _terminate_native_worker(int(outcome["exit_code"]))
     return int(outcome["exit_code"])
 
 

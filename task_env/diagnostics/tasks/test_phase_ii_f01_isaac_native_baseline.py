@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 from task_env.diagnostics.tasks import f01_isaac_native_baseline as worker
 from task_env.diagnostics.tasks import f01_isaac_native_reader as reader
@@ -29,6 +30,80 @@ def _env() -> dict[str, str]:
     env = dict(os.environ)
     env.update({"PYTHONPATH": str(REPO), "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"})
     return env
+
+
+class F01PlanTests(unittest.TestCase):
+    def test_plan_uses_a_non_deadlocking_native_thread_pool(self) -> None:
+        plan = worker.default_plan()
+        reader_plan = reader._expected_plan("thread-pool-plan-check")
+
+        self.assertEqual(plan["application"]["limit_cpu_threads"], 16)
+        self.assertFalse(plan["application"]["fast_shutdown"])
+        self.assertEqual(reader_plan["application"]["limit_cpu_threads"], 16)
+        self.assertEqual(plan, {key: value for key, value in reader_plan.items() if key != "run_id"})
+
+    def test_native_plan_targets_gpu_physx(self) -> None:
+        plan = worker.default_plan()
+        self.assertEqual(plan["scene"]["physics_device"], "cuda:0")
+        self.assertIs(plan["scene"]["gpu_dynamics"], True)
+        self.assertEqual(reader._expected_plan("gpu-plan-check")["scene"], plan["scene"])
+
+    def test_kit_viewport_cameras_are_not_misclassified_as_task_sensors(self) -> None:
+        cameras = sorted(reader.KIT_VIEWPORT_CAMERAS)
+        identity = {
+            "stage_camera_prim_paths": cameras,
+            "kit_viewport_camera_prim_paths": cameras,
+            "task_camera_prim_paths": [],
+        }
+        self.assertTrue(reader._camera_inventory_has_no_task_cameras(identity))
+        identity["stage_camera_prim_paths"] = cameras + ["/World/task_camera"]
+        identity["task_camera_prim_paths"] = ["/World/task_camera"]
+        self.assertFalse(reader._camera_inventory_has_no_task_cameras(identity))
+
+    def test_reader_requires_supervisor_observed_worker_vram(self) -> None:
+        worker_receipt = {"run_id": "gpu-run", "worker_pid": 42}
+        parent = {
+            "run_id": "gpu-run",
+            "process_monitor": {
+                "exit_code": 0, "stop_reason": None, "gpu_process_pid": 42,
+                "max_sampled_gpu_process_memory_mib": 1200,
+            },
+        }
+        self.assertTrue(reader._parent_proves_gpu_vram(parent, worker_receipt))
+        parent["process_monitor"]["max_sampled_gpu_process_memory_mib"] = 0
+        self.assertFalse(reader._parent_proves_gpu_vram(parent, worker_receipt))
+
+    def test_supervisor_reads_vram_for_the_native_worker_pid(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["nvidia-smi"], returncode=0, stdout="41, 900\n42, 1350\n", stderr=""
+        )
+        with mock.patch.object(supervisor.subprocess, "run", return_value=completed):
+            self.assertEqual(supervisor._gpu_process_memory_mib(42), 1350)
+            self.assertIsNone(supervisor._gpu_process_memory_mib(99))
+
+    def test_final_counters_are_captured_before_app_close_resets_them(self) -> None:
+        class ResetCountersOnClose(worker.FakeDriver):
+            def close(self) -> None:
+                super().close()
+                self._index = 0
+                self._time = 0.0
+
+        with tempfile.TemporaryDirectory(prefix="f01-counter-order-") as temp:
+            run_dir = Path(temp)
+            plan = worker.default_plan()
+            plan["run_id"] = "counter-order"
+            (run_dir / "run_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+            outcome = worker.run_worker(
+                run_dir,
+                plan,
+                driver_factory=ResetCountersOnClose,
+                evidence_kind="synthetic_fixture",
+            )
+        self.assertEqual(outcome["exit_code"], 0)
+        report = outcome["report"]
+        self.assertEqual(report["physics_steps_at_start"], 3)
+        self.assertEqual(report["physics_steps_at_end"], 484)
+        self.assertEqual(report["total_physics_steps"], 481)
 
 
 class F01WorkerCliTests(unittest.TestCase):
@@ -165,6 +240,99 @@ class F01WorkerCliTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
         self.assertFalse(imported & {"isaacsim", "omni", "pxr", "mujoco", "f01_isaac_native_baseline"})
+
+
+class F01NativeExtensionOrderTests(unittest.TestCase):
+    def test_python_module_import_follows_extension_enable_and_app_update(self) -> None:
+        events: list[tuple[str, object]] = []
+
+        class AppUtils:
+            @staticmethod
+            def enable_extension(name: str) -> bool:
+                events.append(("enable", name))
+                return True
+
+            @staticmethod
+            def update_app(*, steps: int) -> None:
+                events.append(("update", steps))
+
+        module = object()
+        with mock.patch.object(
+            worker.importlib,
+            "import_module",
+            side_effect=lambda name: events.append(("import", name)) or module,
+        ):
+            loaded = worker._enable_extension_and_import(
+                AppUtils(),
+                extension_name="isaacsim.robot_motion.examples",
+                module_name="isaacsim.robot_motion.examples.manipulation",
+            )
+
+        self.assertIs(loaded, module)
+        self.assertEqual(
+            events,
+            [
+                ("enable", "isaacsim.robot_motion.examples"),
+                ("update", 1),
+                ("import", "isaacsim.robot_motion.examples.manipulation"),
+            ],
+        )
+
+    def test_failed_extension_enable_does_not_attempt_python_import(self) -> None:
+        events: list[tuple[str, object]] = []
+
+        class AppUtils:
+            @staticmethod
+            def enable_extension(name: str) -> bool:
+                events.append(("enable", name))
+                return False
+
+            @staticmethod
+            def update_app(*, steps: int) -> None:
+                events.append(("update", steps))
+
+        with mock.patch.object(worker.importlib, "import_module") as import_module:
+            with self.assertRaisesRegex(RuntimeError, "extension did not enable"):
+                worker._enable_extension_and_import(
+                    AppUtils(),
+                    extension_name="isaacsim.robot_motion.examples",
+                    module_name="isaacsim.robot_motion.examples.manipulation",
+                )
+
+        self.assertEqual(events, [("enable", "isaacsim.robot_motion.examples")])
+        import_module.assert_not_called()
+
+
+class F01NativeExitTests(unittest.TestCase):
+    def test_native_worker_terminates_only_after_durable_result_exists(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="f01-native-exit-") as tmp:
+            run_dir = Path(tmp)
+            plan = worker.default_plan()
+            plan["run_id"] = "native-exit"
+            (run_dir / "run_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+            result_path = run_dir / worker.RESULT_NAME
+            outcome = {
+                "exit_code": 1,
+                "report": {"status": "FAILED_WORKER"},
+                "result_path": str(result_path),
+                "trace_path": str(run_dir / worker.TRACE_NAME),
+            }
+
+            def fake_run_worker(*_args: object, **kwargs: object) -> dict[str, object]:
+                self.assertEqual(kwargs["evidence_kind"], "real_native")
+                worker._write_json_new(result_path, {"status": "FAILED_WORKER"})
+                return outcome
+
+            def fake_terminate(exit_code: int) -> None:
+                self.assertEqual(exit_code, 1)
+                self.assertEqual(json.loads(result_path.read_text())["status"], "FAILED_WORKER")
+
+            with mock.patch.object(worker, "run_worker", side_effect=fake_run_worker), \
+                 mock.patch.object(worker, "_terminate_native_worker", side_effect=fake_terminate) as terminate:
+                result = worker.main(["--native-worker", "--run-dir", str(run_dir)])
+
+            self.assertEqual(result, 1)
+            terminate.assert_called_once_with(1)
 
 
 class F01SupervisorMonitorTests(unittest.TestCase):

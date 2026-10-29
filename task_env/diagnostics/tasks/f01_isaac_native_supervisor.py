@@ -78,6 +78,26 @@ def _gpu_free_mib() -> int | None:
         return None
 
 
+def _gpu_process_memory_mib(pid: int) -> int | None:
+    """Return nvidia-smi's process-scoped VRAM usage for one worker PID."""
+    try:
+        completed = subprocess.run(
+            ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
+            check=True, capture_output=True, text=True, timeout=5,
+        )
+        for line in completed.stdout.splitlines():
+            columns = [column.strip() for column in line.split(",", 1)]
+            if len(columns) != 2 or int(columns[0]) != pid:
+                continue
+            memory_text = columns[1].split()[0]
+            if memory_text.upper() in {"N/A", "[N/A]"}:
+                return None
+            return int(memory_text)
+    except (OSError, ValueError, subprocess.SubprocessError, IndexError):
+        return None
+    return None
+
+
 def _network_rx_bytes() -> int | None:
     try:
         total = 0
@@ -153,6 +173,8 @@ def _sample(pgid: int) -> dict[str, Any]:
         "mem_available_bytes": _mem_available_bytes(),
         "worker_group_rss_bytes": _proc_group_rss_bytes(pgid),
         "gpu0_free_mib": _gpu_free_mib(),
+        "gpu_process_pid": pgid,
+        "gpu_process_memory_mib": _gpu_process_memory_mib(pgid),
         "host_network_rx_bytes": _network_rx_bytes(),
     }
 
@@ -244,6 +266,12 @@ def monitor_process(proc: subprocess.Popen[Any], log_path: Path, *, started: flo
         "wall_seconds": time.monotonic() - started,
         "samples": samples,
         "termination": termination,
+        "gpu_process_pid": proc.pid,
+        "max_sampled_gpu_process_memory_mib": max(
+            (s.get("gpu_process_memory_mib") for s in samples
+             if isinstance(s.get("gpu_process_memory_mib"), int)),
+            default=None,
+        ),
         "max_sampled_worker_group_rss_bytes": max((s.get("worker_group_rss_bytes", 0) or 0 for s in samples), default=0),
         "min_sampled_mem_available_bytes": min((s.get("mem_available_bytes") for s in samples if isinstance(s.get("mem_available_bytes"), int)), default=None),
         "min_sampled_gpu0_free_mib": min((s.get("gpu0_free_mib") for s in samples if isinstance(s.get("gpu0_free_mib"), int)), default=None),

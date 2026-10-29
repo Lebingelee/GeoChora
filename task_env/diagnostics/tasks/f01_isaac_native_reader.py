@@ -36,6 +36,12 @@ CUBE_START = (0.8, 0.0, 0.25)
 CUBE_EDGE_M = 0.05
 CUBE_MASS_KG = 0.08
 ROBOT_ASSET = "/Isaac/Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda"
+KIT_VIEWPORT_CAMERAS = {
+    "/OmniverseKit_Persp",
+    "/OmniverseKit_Front",
+    "/OmniverseKit_Top",
+    "/OmniverseKit_Right",
+}
 
 
 def _expected_plan(run_id: str) -> dict[str, Any]:
@@ -45,7 +51,7 @@ def _expected_plan(run_id: str) -> dict[str, Any]:
         "run_id": run_id,
         "application": {
             "headless": True, "renderer": "MinimalRendering", "fast_shutdown": False,
-            "limit_cpu_threads": 1, "disable_viewport_updates": True,
+            "limit_cpu_threads": 16, "disable_viewport_updates": True,
             "enable_crashreporter": False, "multi_gpu": False, "max_gpu_count": 1,
         },
         "robot": {
@@ -54,7 +60,7 @@ def _expected_plan(run_id: str) -> dict[str, Any]:
             "selected_joint": ARM, "target_delta_rad": 0.1,
         },
         "scene": {
-            "physics_engine": "PhysX", "physics_device": "cpu", "gpu_dynamics": False,
+            "physics_engine": "PhysX", "physics_device": "cuda:0", "gpu_dynamics": True,
             "dt_seconds": DT, "stage_meters_per_unit": 1.0, "stage_up_axis": "Z",
             "ground_path": "/World/ground_plane", "ground_visual_template": None,
             "cube_path": "/World/f01_cube", "cube_edge_m": CUBE_EDGE_M,
@@ -88,6 +94,39 @@ def _json(path: Path) -> Any:
 
 def _finite_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+
+
+def _camera_inventory_has_no_task_cameras(identity: Any) -> bool:
+    if not isinstance(identity, dict):
+        return False
+    all_cameras = identity.get("stage_camera_prim_paths")
+    kit_cameras = identity.get("kit_viewport_camera_prim_paths")
+    task_cameras = identity.get("task_camera_prim_paths")
+    if not all(
+        isinstance(paths, list) and all(type(path) is str for path in paths)
+        for paths in (all_cameras, kit_cameras, task_cameras)
+    ):
+        return False
+    return (
+        set(all_cameras) == set(kit_cameras) | set(task_cameras)
+        and not (set(kit_cameras) & set(task_cameras))
+        and set(kit_cameras) == KIT_VIEWPORT_CAMERAS
+        and task_cameras == []
+    )
+
+
+def _parent_proves_gpu_vram(parent_receipt: Any, receipt: dict[str, Any]) -> bool:
+    monitor = parent_receipt.get("process_monitor") if isinstance(parent_receipt, dict) else None
+    return (
+        isinstance(parent_receipt, dict)
+        and parent_receipt.get("run_id") == receipt.get("run_id")
+        and isinstance(monitor, dict)
+        and monitor.get("exit_code") == 0
+        and monitor.get("stop_reason") is None
+        and monitor.get("gpu_process_pid") == receipt.get("worker_pid")
+        and type(monitor.get("max_sampled_gpu_process_memory_mib")) is int
+        and monitor["max_sampled_gpu_process_memory_mib"] > 0
+    )
 
 
 def _finite_vector(value: Any, length: int) -> bool:
@@ -241,7 +280,8 @@ def _check_round(rows: list[dict[str, Any]], reset_state: dict[str, Any], round_
     return checks
 
 
-def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool = False) -> dict[str, Any]:
+def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool = False,
+           parent_receipt_path: Path | None = None) -> dict[str, Any]:
     receipt = _json(result_path)
     if not isinstance(receipt, dict):
         raise ValueError("worker receipt must be a JSON object")
@@ -296,6 +336,16 @@ def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool
         and receipt.get("plan_sha256") == disk_plan_hash
     )
 
+    application_runtime = receipt.get("application_runtime") or {}
+    effective_threads = application_runtime.get("limit_cpu_threads_effective")
+    checks["simulation_thread_pool_capacity"] = (
+        application_runtime.get("limit_cpu_threads_requested") == 16
+        and type(effective_threads) is int
+        and 2 <= effective_threads <= 16
+        and application_runtime.get("carb_task_thread_count") == effective_threads
+        and application_runtime.get("omp_num_threads") == str(effective_threads)
+    )
+
     source_paths = {
         "implementation_sha256": Path(__file__).with_name("f01_isaac_native_baseline.py"),
         "reader_source_sha256": Path(__file__).resolve(),
@@ -313,9 +363,24 @@ def verify(result_path: Path, trace_path: Path, *, allow_synthetic_fixture: bool
     checks["frozen_source_hashes_match"] = source_hashes_match
 
     identity = receipt.get("scene_identity") or {}
-    checks["cpu_physx_and_no_gpu_dynamics"] = identity.get("physics_scene_type") == "PhysxScene" and identity.get("physics_device_configured") == "cpu" and identity.get("gpu_dynamics_enabled") is False
+    checks["gpu_physx_on_cuda"] = (
+        identity.get("physics_scene_type") == "PhysxScene"
+        and identity.get("physics_device_configured") == "cuda:0"
+        and identity.get("gpu_dynamics_enabled") is True
+    )
     checks["fixed_stage_identity"] = identity.get("stage_meters_per_unit") == 1.0 and identity.get("stage_up_axis") == "Z"
-    checks["official_robot_and_no_camera"] = identity.get("robot_prim_path") == "/World/robot" and identity.get("stage_camera_prim_paths") == []
+    checks["official_robot_and_no_task_camera"] = (
+        identity.get("robot_prim_path") == "/World/robot"
+        and _camera_inventory_has_no_task_cameras(identity)
+    )
+
+    if parent_receipt_path is None:
+        parent_receipt_path = Path(result_path).parent / "parent_exit_receipt.json"
+    try:
+        parent_receipt = _json(parent_receipt_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        parent_receipt = None
+    checks["gpu_process_vram_observed"] = _parent_proves_gpu_vram(parent_receipt, receipt)
     checks["static_overlap_precheck"] = (
         isinstance(identity.get("static_overlap_check"), dict)
         and identity["static_overlap_check"].get("robot_collision_prim_count", 0) > 0
@@ -486,10 +551,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--result", type=Path, required=True)
     parser.add_argument("--trace", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--parent-exit-receipt", type=Path)
     parser.add_argument("--allow-synthetic-fixture", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     try:
-        result = verify(args.result, args.trace, allow_synthetic_fixture=args.allow_synthetic_fixture)
+        result = verify(args.result, args.trace, allow_synthetic_fixture=args.allow_synthetic_fixture,
+                        parent_receipt_path=args.parent_exit_receipt)
     except Exception as exc:
         result = {"schema": "f01-independent-reader-v1", "status": "READER_ERROR", "error": {"type": type(exc).__name__, "message": str(exc)}}
     payload = json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n"
