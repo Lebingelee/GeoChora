@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "2913a4e42850c55cd57851b79fc0e12e3af536d453d5b359d06b660098a294c2",
+    "07_Execution_Order_and_Acceptance.md": "9d46c17a922cb97aea2a65acf1a93d6ea83993068c1bb450619ea856319e36fc",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "935123bee2c239c735ce296d3159120cc9c08b6c679cee60ca5f13c1d1ce6b24",
-    "README.md": "b853fff39613d9c6ece72424a9858b14915b433acc18a0f794ebd6c3b0835354"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "8cfc6b6adff32efde07a024b686795c0f3e081010e6187e2519bd32ca707524e",
+    "README.md": "8936f9cfa37a6a056978995b698df6361b3ad60c3e8f1f03ac50f84e067675d0"
   },
-  "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
+  "revision_kind": "F03_ATTEMPT002_CORE_CALL_CHAIN_S1_CANDIDATE_UPDATE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -4354,6 +4354,17 @@
       "Isaac_env_writes_by_agents": "paused under maintainer ownership",
       "original_7_22_P99_changed": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r04b_001/sol_review.md"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "F03_ATTEMPT002_SYNTHETIC_CORE_CHAIN_PENDING_SOL_WITH_EXECUTION_SCOPE_DEVIATION",
+      "input_head": "7ceb97da71cc4b26711165eae1bad457a9ae6747",
+      "implementation_commit": "54201eab61e317786a92d0af26e407601a11063a",
+      "result": "F03_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION",
+      "synthetic_chain": "same Env 2 resets; two T4/T+1=5 H5; 5 synthetic advances per interval; independent 8-class tamper rejection",
+      "scope_deviation": "run031 included an unintended real CPU Pendulum step; preserve for Sol review",
+      "F04_started": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md"
     }
   ],
   "P00_audit": {
@@ -4522,7 +4533,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_CORE_CALL_CHAIN_S1_CANDIDATE_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION_AND_LEGACY_ENV_LIMIT",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4629,28 +4640,60 @@
           "F02"
         ],
         "work": "Core reset/state/control/admission/factory/reader real-caller S1",
-        "latest_attempt": "F03 attempt001",
-        "latest_result": "F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
+        "latest_attempt": "F03 attempt002",
+        "latest_result": "F03_CORE_CALL_CHAIN_S1_CANDIDATE_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION_AND_LEGACY_ENV_LIMIT",
         "implementation_commits": [
-          "ed951129ab1f51bc17baa59c11ee058eb3894058"
+          "ed951129ab1f51bc17baa59c11ee058eb3894058",
+          "54201eab61e317786a92d0af26e407601a11063a"
         ],
-        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/report.md",
-        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/evidence.json",
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/evidence.json",
         "targeted_s1": {
-          "f03_contract_tests": "20 passed",
-          "provider_free_p99_reset": "19 passed",
-          "legacy_synthetic_h5_and_cleanup": "3 passed after test fixture correction",
-          "f02_and_legacy_regression": "45 passed on clean commit"
+          "f03_core_chain_fault_module": "5 passed in run036; includes wrong build/device, partial reset, partial apply, missing Ack, partial advance, publication, append, finalize and close facts",
+          "independent_f03_h5_reader": "2 files; 8 transitions, 10 observations and 8 tamper classes checked in run033",
+          "source_state_frame_execution_contract": "20 passed in run023",
+          "c02b_position_profile_and_h5": "15 passed in run026",
+          "p99_public_candidate": "15 passed in run027",
+          "legacy_r02c_reader": "2 passed in run029",
+          "f02_plus_legacy_clean_checkout": "45 passed in run037 after implementation commit"
         },
-        "complete_core_factory_to_h5_chain": "INCOMPLETE_NOT_RUN",
+        "complete_core_factory_to_h5_chain": "SYNTHETIC_CORE_S1_PASS_PENDING_SOL_REVIEW",
         "blockers": [
-          "no verified official Panda USD delivery/upstream validation report is available",
-          "no Isaac Core RuntimeSession adapter is implemented",
-          "SelectedReferenceEnv has no versioned USD source construction path"
+          "no verified official Panda USD delivery/upstream validation report",
+          "no Isaac Core RuntimeSession adapter; production materialize remains fail closed"
         ],
         "native_execution": "NOT_RUN",
         "other_slices_started": false,
-        "qualification_granted": false
+        "qualification_granted": false,
+        "attempt001_historical": {
+          "latest_attempt": "F03 attempt001",
+          "latest_result": "F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
+          "implementation_commits": [
+            "ed951129ab1f51bc17baa59c11ee058eb3894058"
+          ],
+          "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/report.md",
+          "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/evidence.json",
+          "targeted_s1": {
+            "f03_contract_tests": "20 passed",
+            "provider_free_p99_reset": "19 passed",
+            "legacy_synthetic_h5_and_cleanup": "3 passed after test fixture correction",
+            "f02_and_legacy_regression": "45 passed on clean commit"
+          },
+          "complete_core_factory_to_h5_chain": "INCOMPLETE_NOT_RUN",
+          "blockers": [
+            "no verified official Panda USD delivery/upstream validation report is available",
+            "no Isaac Core RuntimeSession adapter is implemented",
+            "SelectedReferenceEnv has no versioned USD source construction path"
+          ],
+          "native_execution": "NOT_RUN",
+          "other_slices_started": false,
+          "qualification_granted": false
+        },
+        "execution_scope_deviation": "run031_selected_fault_lifecycle_legacy_regression_r1 included and stepped the real CPU Pendulum route; package forbade real physics. Run preserved; 82 passes do not erase deviation.",
+        "provider_runtime_starts": 0,
+        "f04_started": false,
+        "legacy_regression_limit": "Run030 selected old R03c attached H5 synthetic subset: 2 passed, 5 failed because current recorded MuJoCo 3.12.0 identity differs from frozen reader requirement 3.8.1; run028 also exposes current header API 3012000 vs frozen 3008001. No pins changed.",
+        "result_limits": "Technical Core call chain is synthetic S1 only; the overall package has a real CPU Pendulum execution-scope deviation and a selected old R03c H5 regression environment mismatch; pending Sol review."
       },
       {
         "id": "F04",
@@ -4688,7 +4731,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for the exact attempt003 CUDA GPU PhysX recipe; F02 accepted bounded for USD delivery/report/closure and source representation selection; F03 attempt001 committed versioned source/state/execution/control contract changes and passed bounded provider-free regressions, but the required Core factory-to-H5 chain is incomplete pending Sol review.",
+    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for exact attempt003 CUDA GPU PhysX recipe; F02 accepted bounded for delivery/report/closure and representation selection. F03 attempt002 connected versioned synthetic source through existing Core factory/reset/state/control/public step/Recorder/H5/independent reader/close owners and passed targeted synthetic S1 checks; pending Sol review because run031 also exceeded the package zero-physics scope by stepping real CPU Pendulum. Production Isaac adapter, verified Panda delivery and provider admission remain absent.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4698,46 +4741,25 @@
     ],
     "new_native_runs": 0,
     "software_tests_run_this_documentation_revision": [
-      "Final clean-checkout F02 module plus affected legacy asset identity/closure subset: 45 passed in 5.76 s; sampled process-tree peak RSS 315658240 bytes; see f02_002/evidence/runs/008_final_s1_clean.",
-      "Final nested/deep entry, root-sibling arcs and snapshot-escape pair: 2 passed in 1.106 s; sampled process-tree peak RSS 272990208 bytes; see f02_002/evidence/runs/006_multilevel_entry."
+      "F03 call-chain/fault tests: 5 passed; run036_final_f03_core_chain_faults_r3.",
+      "F03 independent reader: two H5, eight tamper classes; run033_final_independent_h5_reader_r1.",
+      "F03 frame/state/execution contract: 20 passed; run023_f03_contract_frame_state_regression_r1.",
+      "C02b Position/H5: 15 passed; run026; P99 candidate: 15 passed; run027; old R02c reader: 2 passed; run029.",
+      "F02 attempt002 plus affected legacy asset identity/closure tests on clean implementation commit: 45 passed; run037. Dirty-tree precursor run024 had 25/26 and is retained.",
+      "Protected F00/F01/F02/Sol F02/F03 attempt001 hash manifests: 676/676 files pass; run038.",
+      "Touched Markdown relative links + 12 document hashes + manifest + git diff --check: pass; run041 (157 links).",
+      "TaskEnv Skill static metadata/local-link/source-path checker: pass; run040."
     ],
     "local_update_receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
     "documentation_validation": {
-      "mode": "STATIC_DOCUMENTATION_ONLY",
-      "focused_checks_passed": 14,
-      "markdown_hashes": 12,
-      "local_links": 132,
-      "anchors": 24,
-      "reused_source_hashes": 28,
-      "original_slice_records_DAG_P99_required_envelope_unchanged": true,
-      "historical_validation_receipt_unchanged": true,
-      "git_diff_check": "PASS",
-      "module_skill_static_check": "PASS with existing geochora interpreter; default python3 lacks PyYAML, no dependency installed",
-      "global_validator": {
-        "exit_code": 1,
-        "errors_before": 176,
-        "errors_after": 176,
-        "new_errors": [],
-        "counts_before": {
-          "docs": 83,
-          "task_env": 36,
-          "markdown": 41,
-          "task_env_markdown": 27,
-          "machine_or_other": 42
-        },
-        "counts_after": {
-          "docs": 84,
-          "task_env": 37,
-          "markdown": 42,
-          "task_env_markdown": 28,
-          "machine_or_other": 42
-        },
-        "limitation": "existing consolidation count/history-scope failures remain; one new planning Markdown increases counts; no thresholds relaxed"
-      },
-      "software_tests": [],
-      "provider_imports": 0,
-      "native_starts": 0,
-      "receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json"
+      "status": "PASS",
+      "bounded_local_links_checked": 157,
+      "phase_markdown_hashes_checked": 12,
+      "planning_manifest_json": "PASS",
+      "module_skill_checker": "PASS; run040_taskenv_skill_static_check_r1",
+      "protected_input_manifests": "676/676 PASS; run038_protected_inputs_hash_recheck_r1",
+      "touched_doc_hash_link_checker": "PASS; run041_final_docs_hash_links_manifest_r2",
+      "global_docs_validator": "NOT_RUN"
     },
     "latest_r03c_execution": {
       "attempt": "004",
@@ -4821,6 +4843,20 @@
         "result": "F03_CONTRACT_IMPLEMENTATION_PARTIAL_PENDING_SOL_REVIEW",
         "other_slices_started": false,
         "push_merge_main_tag_release": false
+      },
+      {
+        "date": "2026-10-29",
+        "slice": "F03 attempt002",
+        "authorized": true,
+        "source": "Maintainer direct instruction in the Luna1 conversation",
+        "input_head": "7ceb97da71cc4b26711165eae1bad457a9ae6747",
+        "scope": "Existing-owner implementation of the actual Core call chain to the lowest synthetic NativeRuntimeIO boundary; bounded synthetic S1/reader/regressions; docs/Skill and local commit.",
+        "prohibitions": [
+          "No Kit/App/GPU/native/provider physics or native lock.",
+          "No F04 or other slice, no branch integration, push or tag."
+        ],
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
+        "result": "SYNTHETIC_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION"
       }
     ],
     "f00_attempt001": {
@@ -4932,7 +4968,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F03 attempt001 package preparation on develop-full; execute only after separate frozen dispatch.",
+      "selected_next": "Sol review of F03 attempt002 candidate and its disclosed execution-scope deviation; keep F04 and every other slice held.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -4944,10 +4980,11 @@
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
       "F02": "ACCEPTED_BOUNDED_F02; delivery/report/closure and representation selection only; no runtime admission or real upstream delivery received.",
-      "reason": "Sol independently reviewed F02 attempt002 diff/evidence and closed R1/R2; no later slice dispatched by this acceptance.",
+      "reason": "F02 attempt002 remains accepted. Maintainer authorized F03 attempt002; the synthetic Core chain and clean-checkout F02 regressions passed. One unintended real CPU Pendulum step occurred in run031, and the selected R03c old H5 regression subset is limited by MuJoCo 3.12.0 vs frozen 3.8.1 identity; Sol must review both preserved facts before the table advances.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
-      "F03": "READY_FOR_SEPARATELY_FROZEN_PACKAGE_NOT_STARTED"
+      "F03": "SYNTHETIC_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION",
+      "F04": "HELD_NOT_STARTED_PENDING_SOL_REVIEW_OF_F03"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5223,7 +5260,7 @@
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
     },
-    "latest_authorization": "Maintainer delegated F02 attempt002 on 2026-10-29 using the frozen package at sol_f02_002; repair the two Sol findings, run bounded provider-free S1/reader checks and local commits, preserve protected originals, then return to Sol. F03 and every other slice remain held.",
+    "latest_authorization": "Maintainer directly authorized F03 attempt002 in this conversation on 2026-10-29: complete the actual Core versioned candidate/source/reset/state/control/public-step/Recorder/H5/independent-reader/close chain through the lowest synthetic NativeRuntimeIO boundary, run bounded affected regressions, update docs/Skill, and commit locally. F04 and all other slices remain held pending Sol review.",
     "f01_attempt002_execution": {
       "date": "2026-10-29",
       "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
@@ -5498,6 +5535,25 @@
       "other_branch_policy": "No merge/rebase/cherry-pick of develop or camera; no main changes; R05b independent."
     },
     "latest_f03_execution": {
+      "input_head": "7ceb97da71cc4b26711165eae1bad457a9ae6747",
+      "instruction_source": "maintainer direct conversation instruction, 2026-10-29; frozen copy in f03_002/package_input.md",
+      "authorization_copy_sha256": "7b1d693e5cc479c7a0610a6b49161af7b46954599ca27e6483795eeb13f66003",
+      "preserved_attempt001_commit": "ed951129ab1f51bc17baa59c11ee058eb3894058",
+      "implementation_commit": "54201eab61e317786a92d0af26e407601a11063a",
+      "current_result": "F03_CORE_CALL_CHAIN_S1_CANDIDATE_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION_AND_LEGACY_ENV_LIMIT",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/evidence.json",
+      "synthetic_h5_files": 2,
+      "transitions_each": 4,
+      "observations_each": 5,
+      "synthetic_advances_per_interval": 5,
+      "independent_h5_tamper_classes_rejected": 8,
+      "kit_app_gpu_provider_runtime_starts": 0,
+      "real_cpu_pendulum_scope_deviation_run": "031_selected_fault_lifecycle_legacy_regression_r1",
+      "f04_started": false,
+      "sol_review": "PENDING; execution-scope deviation and legacy R03c environment mismatch disclosed"
+    },
+    "previous_f03_execution_attempt001": {
       "input_head": "b9015faf395c185cfb71341d60f30be07d518057",
       "prompt_sha256": "951455533ef48f1128ed5951bc6e555d85ebd7fe042e5901d4d21aed54f5fd78",
       "code_commit": "ed951129ab1f51bc17baa59c11ee058eb3894058",
@@ -5507,6 +5563,22 @@
       "native_starts": 0,
       "provider_runtime_starts": 0,
       "f04_started": false
+    },
+    "f03_attempt002_execution": {
+      "input_head": "7ceb97da71cc4b26711165eae1bad457a9ae6747",
+      "branch": "develop-full",
+      "implementation_commit": "54201eab61e317786a92d0af26e407601a11063a",
+      "status": "F03_CORE_CALL_CHAIN_S1_CANDIDATE_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION_AND_LEGACY_ENV_LIMIT",
+      "full_core_call_chain": "PASS_SYNTHETIC_S1_ONLY",
+      "run_031_scope_deviation": "REAL_CPU_PENDULUM_STEP_OCCURRED",
+      "production_admission": "FAIL_CLOSED_SYNTHETIC_OR_UNVERIFIED_USD_AND_NO_ISAAC_ADAPTER",
+      "f02_clean_regression": "45_PASSED_RUN037",
+      "native_starts": 0,
+      "f04_started": false,
+      "other_slices_started": false,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
+      "legacy_r03c_selected_subset": "2_PASSED_5_FAILED_CURRENT_MUJOCO_3.12_VS_FROZEN_3.8.1"
     }
   }
 }

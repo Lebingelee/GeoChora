@@ -376,18 +376,17 @@ pose写入、零速度、Controller step cursor/episode/boundary重置和上一s
 advance receipt及10个observation boundary，拒绝source/execution/receipt/state/Target/Ack/clock/T+1共8类篡改；旧非identity
 姿态、非零速度、COM偏移frame oracle由原20项合同套件覆盖。
 
-定向失败路径验证覆盖native metadata build拒绝、partial reset receipt、partial Position Ack、advance发生副作用后抛错、
+定向失败路径验证覆盖native metadata build/device拒绝、partial reset receipt、partial Position Ack、低层Target写入后missing Ack、advance发生副作用后抛错、
 typed publication读失败、真实Recorder容量append拒绝、H5 finalize失败及同时发生的close失败。故障保留首错、reset/Ack/advance
 部分事实及没有伪造Recorder transition；finalization错误继续作为primary，close错误附为异常note。生产`materialize()`在private
 scope外仍拒绝synthetic/unverified USD，且无Isaac Core RuntimeSession adapter；private S1 scope的identity检查和
 Control owner已有`admit_capabilities`调用不等同于真实Isaac/生产USD准入。synthetic S1不建立provider admission、native
 execution或Qualification。
 
-定向结果：F03完整调用链/故障模块5 passed；F03 source/state/frame/execution合同20 passed；C02b旧Position profile/H5
-15 passed；P99 public candidate 15 passed；旧R02c生产Recorder/H5 reader 2 passed；F02 suite初次在25/26通过，唯一失败是
-它要求Core checkout clean而实施尚未提交，须在本次最终commit后按原命令重跑。另有两项旧环境冲突：R02c version guard从当前
-安装读取到MuJoCo header API 3012000而冻结旧测试要求3008001；R03c synthetic H5 reader用当前MuJoCo 3.12.0 metadata触发其
-严格3.8.1 profile拒绝。没有改动Provider pin/依赖；这些失败原件保留。C02b的一处旧test source fixture缺少现有可选
+定向结果：F03完整调用链/故障模块在加入设备错配与missing Ack负例后5 passed（run036）；F03 source/state/frame/execution合同20 passed（run023）；C02b旧Position profile/H5
+15 passed（run026）；P99 public candidate 15 passed（run027）；旧R02c生产Recorder/H5 reader 2 passed（run029）。F02 attempt002的原26项+legacy 19项在实现提交`54201eab61e317786a92d0af26e407601a11063a`后以clean checkout复跑45/45通过（run037）；此前dirty checkout的25/26事实仍保留（run024）。另有两项旧环境限制：R02c version guard从当前
+安装读取到MuJoCo header API 3012000而冻结旧测试要求3008001（run028）；R03c选择的附件H5纯synthetic回归2/7通过、5项
+因该组fixture记录当前MuJoCo 3.12.0而旧reader严格要求3.8.1失败（run030）。没有改动Provider pin/依赖；这些失败原件保留。C02b的一处旧test source fixture缺少现有可选
 `fixed_attachment_plan`字段，按owner现有合同补齐fixture后15项回归通过。
 
 **执行范围偏差需Sol处置。** run `031_selected_fault_lifecycle_legacy_regression_r1`误包含
