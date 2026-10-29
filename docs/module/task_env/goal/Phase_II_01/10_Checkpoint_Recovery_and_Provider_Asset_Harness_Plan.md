@@ -1,6 +1,6 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt001为 `PARTIAL_PENDING_SOL_REVIEW`**。
+更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt001经Sol复核为 `PARTIAL_CONFIRMED_REWORK_REQUIRED_F05`**。
 F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001完成Menagerie候选的source/control基础、GeoPhys隔离MJCF importer修复及合成Core S1；官方Panda在GeoPhys public import前因 authored `maxDepenetrationVelocity=inf` 被拒，故真实source cell未就绪。详情见[F05执行结果](#f05-attempt001-execution-result)。
 
 ### 当前双Luna分工（2026-10-29）
@@ -694,3 +694,29 @@ G5 provider-free最终冻结节点11/11通过。实际Core `make_env → version
 G6变更后复验：F02可执行的25项通过；clean-checkout provenance节点未在有授权tracked diff的工作树运行，当前运行结果不代表clean-checkout门。F03冻结25项通过；F04四项S1通过。合成结果不构成GeoPhys物理、Isaac或MuJoCo USD执行。F05 MuJoCo 3.8.1 USD decoder拒绝按精确build原件复用；其他MuJoCo build及split Attachment未运行。完整commands/run ledger、源码/来源映射、reader与资源记录见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_001/`。
 
 本attempt按`PARTIAL_PENDING_SOL_REVIEW`交付，不报`F05_SOURCE_CONTROL_S1_PASS_PENDING_SOL_REVIEW`：官方Panda public import/source cell尚未通过，且没有任何provider physics/native执行。本结果不授予GeoPhys USD生产admission、three-provider closure、S2/S3、Qualification或F06；等待Sol复核。
+
+
+<a id="f05-attempt001-sol-review"></a>
+
+## F05 attempt001 Sol复核与attempt002返工计划（2026-10-30）
+
+**决定：`PARTIAL_CONFIRMED_REWORK_REQUIRED_F05`。** 核对Core实现`24f3cca1`、文档HEAD`5f5e9010`及隔离GeoPhys候选`41f8b517`；654/654输出、2,520/2,520保护输入全部匹配。Menagerie public USD import/host lowering、MJCF importer局部修复和合成Core执行保留为真实局部成果；不接收完整G2/G5、F05总出口或three-provider closure。production GeoPhys USD继续fail closed，F06未启动。完整复核和反例保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_001/`；原Luna报告及所有失败原件不改写。
+
+### 返工位置与门
+
+| 问题 | 实际缺口与attempt002修复 |
+| --- | --- |
+| typed state/H5联验 | 独立reader仅验证typed view格式、boundary和clock，没有逐值联验。Sol在副本中把末行finger position改动10mm，原H5/witness身份不变，reader仍accepted。新reader须对全部T+1的关节、hand、free-body观测作独立映射及存储精度核对，加入reset/末行/velocity/姿态等负例，旧漏检反例保留 |
+| 实际provider身份 | S1实际从候选`41f8b517`导入，representation/receipt和F05 input却硬写旧pin`a53a8cfe`。在现有representation/receipt/input/metadata owner区分requested target与actual producer，绑定真实commit、import origin和内容；不能拿candidate证明旧pin。保留Isaac receipt旧ABI |
+| 检查实现可复用性 | 新tracked S1 test从固定ignored `f05_001/evidence`导入helper和reader。将本轮新增可复用检查逻辑移入既有diagnostics owner，显式配置冻结资产/provider路径；raw证据仍ignored，不要求重构全部旧F04 fixture |
+| 官方USD属性 | 目前首个+inf异常尚未说明后续mimic/PhysX属性是否可消费。遍历冻结source完整authored属性和关系，逐项列retained/host consumed/unsupported及public consumer；仅可在provider source/import owner做有依据的无损保留/显式拒绝，不删除属性、不硬改有限数、不用独立双指drive替代mimic，不在本包加solver |
+
+Sol额外尝试一个F02先前未完成的catalog节点，仍因完整Git状态含既有无关untracked handoff而`core_dirty=true`失败，不能称clean-checkout通过；这与tracked clean不同。原失败、命令和tripwire保留；不暂存/隐藏/删除他人文件，不改catalog provenance gate。下一包复用未受影响回归；该节点仅在真实满足clean条件时重跑，否则准确记录环境阻塞及未覆盖内容。
+
+已核对NVIDIA官方资料：[PhysxSchema](https://docs.omniverse.nvidia.com/kit/docs/omni_physics/107.3/dev_guide/schemas/physxschema.html)搜索摘录将rigid-body cap写为`[0, inf)`；[PhysX SDK 5.3.1](https://nvidia-omniverse.github.io/PhysX/physx/5.3.1/_api_build/class_px_rigid_body.html)底层setter为`(0, PX_MAX_F32]`。该SDK版本及[ovphysx属性表](https://nvidia-omniverse.github.io/PhysX/ovphysx/latest/population/PhysxRigidBodyAPI.html)不等于冻结Isaac6.2的实际+inf语义；`maxLinearVelocity`的clamp说明不能移用。**目前不判资产错误，也不预批+inf到FLT_MAX的转换。** 优先读取本地冻结Isaac/schema和对应公开源码；无可信消费规则时保留source/拒绝该cell并给精确待决项。不能把source inventory保留标为solver支持。
+
+### 窗口、分支与资源
+
+下一包为F05普通attempt002，目标是修复已证实的R1/R2、使S1检查可复用并一次明确官方source能力边界；本包通过只可接收source/control/S1有界范围，不替代F05后续物理与MuJoCo USD出口。沿用`develop-full`和现有provider topic/worktree，零新增Core或provider分支/worktree；主仓gitlink保持a53，候选在41f8上继续本地提交并保留供复核，不push/merge。
+
+预计活跃120–210分钟，timebox300分钟（最后30分钟收口），子进程wall≤300秒、RSS≤3GiB、threads≤4、单个重检查；启动MemAvailable≥4GiB，低于1GiB中止；新证据≤512MiB、日志≤64MiB、cache增长≤1GiB。官方资料网络≤50MiB、资产下载/依赖变更为0。Kit/App、solver/backend init、kernel JIT、GPU、renderer、MuJoCo native compile、physics steps全部为0。只允许公开USD source/host模型与受控bottom-I/O synthetic Core链；production admission不开放，F06/F07不启动。一个完整prompt由维护者转述；输入HEAD、保护hash和旧反例由post-planning冻结包绑定。若需要改变资产语义、solver实现或native授权，返回具体缺口，不能自行扩大范围。三轮普通attempt计数不因拆包或改名重置。

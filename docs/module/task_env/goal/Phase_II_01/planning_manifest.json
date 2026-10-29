@@ -1858,10 +1858,10 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "41c3e5219f77e8a6824553f6f34d6886040b15f094b4f1fb72d148ea50d02c0e",
+    "07_Execution_Order_and_Acceptance.md": "22843b570e2c738f9aa3111e1c81811efc13d386a629c07cd1e39b2fa77cfbb3",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "78f27ec08c0092b4ebe24b22fb412c2a6de5c47455068356b962af8b0418dfdc",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "649e527cc92e0cedbfd84ad1679121b942dcac5d48db62e51ecc010435ceffbd",
     "README.md": "0d70d28a4f4966f6fb8d9e5f30ada98f58483b44b315858a0bf96f03606b5911"
   },
   "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
@@ -6002,6 +6002,37 @@
         "global_docs_validator": "NOT_RUN_PER_PACKAGE"
       },
       "implementation_commit": "24f3cca1"
+    },
+    "f05_attempt001_sol_review": {
+      "date": "2026-10-30",
+      "status": "PARTIAL_CONFIRMED_REWORK_REQUIRED_F05",
+      "input_head": "5f5e9010a30918d7ce6430507cec7352e53538b4",
+      "output_manifest_verified": 654,
+      "protected_inputs_verified": 2520,
+      "hash_mismatches": 0,
+      "reader_counterexample": "original closed episode-00 accepted; copied final typed finger position minus 0.01 m also accepted; original files unchanged",
+      "provider_identity_finding": "actual candidate 41f8b517; representation/receipt hardcode base a53a8cfe",
+      "check_implementation_finding": "tracked F05 test imports new helper and reader from ignored f05_001/evidence",
+      "official_source_status": "rejected at authored +inf; mimic consumption not established; do not label asset invalid or silently clamp",
+      "software_tests_run": 1,
+      "software_tests_result": "F02 catalog node failed because existing unrelated untracked handoff makes full git status dirty; historical and new failures retained",
+      "native_starts": 0,
+      "physics_steps": 0,
+      "provider_gitlink_changed": false,
+      "F06_started": false,
+      "canonical_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-sol-review",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_001",
+      "next_package": {
+        "attempt": 2,
+        "status": "PREPARED_NOT_DISPATCHED",
+        "scope": "reader numeric binding, actual producer identity, tracked diagnostic support, official USD attribute inventory/disposition; zero native",
+        "expected_active_minutes": [
+          120,
+          210
+        ],
+        "timebox_minutes": 300,
+        "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_002/luna1_prompt.md"
+      }
     }
   }
 }

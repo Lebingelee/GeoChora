@@ -245,3 +245,6 @@ R07a attempt003 Sol复核：有界v2.1成本协议技术修正/S1接收并冻结
 
 
 2026-10-30，F05 attempt001 完成 Menagerie 的 GeoPhys public USD host import/lowering、模型绑定 Position-drive oracle、隔离 MJCF site importer 修复及现有 Core 路线 synthetic S1；11/11 冻结 S1 节点、F02 25项、F03 25项、F04 4项受影响回归通过。官方 Panda 在 public import 处因 authored `maxDepenetrationVelocity=inf` 被拒，未修改源文件或放宽检查；不把 Menagerie synthetic S1 当成 Panda 真实 cell。production GeoPhys USD 仍 fail closed，F05 总状态为 `PARTIAL_PENDING_SOL_REVIEW`，F06 未启动。详细结果见[10 F05 attempt001执行记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-execution-result)。
+
+
+2026-10-30 Sol复核F05 attempt001：654/654输出、2,520/2,520保护输入匹配；状态登记`PARTIAL_CONFIRMED_REWORK_REQUIRED_F05`。发现独立reader漏检typed joint与H5数值不一致（末行10mm副本反例仍accepted），以及actual candidate provider与旧pin receipt身份不一致；新增检查helper/reader尚依赖ignored执行目录。下一包attempt002集中修复这些问题并明确官方Panda +inf/mimic完整属性边界，仍为零native。额外一个F02 catalog节点因既有untracked handoff使完整Git状态dirty而失败，未隐藏该文件或称clean gate通过。F06继续HELD，详见[10 Sol复核](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-sol-review)。
