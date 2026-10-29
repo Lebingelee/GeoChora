@@ -148,11 +148,11 @@
       "depends_on": [
         "P00"
       ],
-      "status": "R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT001_COMPLETE_PENDING_SOL_REVIEW",
+      "status": "ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN",
+      "execution": "ATTEMPT001_CONTRACT_DESIGN_S1_AND_HISTORICAL_PROBE_REUSE_ACCEPTED",
       "required_evidence": "Audit/S1/probe",
       "stop_condition": "Sol review/acceptance required before R05b; normal capability, Provider setter and source/build-bound admission remain unimplemented.",
-      "blocker": "Candidate is complete but not accepted. R05b must add a Provider-owned force-limit setter, remove Core private-field access/redundant configuration writes, and bind exact source/build/backend/profile/integrator admission; no cadence physics failure is known.",
+      "blocker": "R05a design gate resolved; actual Provider public setter/contract and normal admission implementation remain R05b work.",
       "scope_decision": "Maintainer assigns Luna2 to original 07 goals, prioritizing R05; Luna1 owns F00-F07. No qualification or required-envelope waiver.",
       "historical_preflight_20261026": {
         "status": "BLOCKED_PROVIDER_CONTRACT",
@@ -174,6 +174,21 @@
         "shared_native_lock_acquired": false,
         "deliverables": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/",
         "sol_review": "PENDING",
+        "qualification_granted": false
+      },
+      "result": "Accepted contract/implementation decision and 4 provider-free S1; public normal route not yet implemented; new formal R05c cells not accepted.",
+      "sol_review": {
+        "date": "2026-10-29",
+        "input_head": "e8d233a7bfd31a38d30759fdea861518616c19b7",
+        "decision": "ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN",
+        "manifest_entries": 18,
+        "protected_inputs": 20,
+        "input_sources": 31,
+        "raw_h5_structural_readbacks": 8,
+        "pytest_rerun_by_sol": false,
+        "new_native_by_sol": 0,
+        "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05a_001/",
+        "next_slice": "R05b",
         "qualification_granted": false
       }
     },
@@ -1783,10 +1798,11 @@
       "depends_on": [
         "R05a"
       ],
-      "status": "PLANNED",
-      "execution": "NOT_STARTED",
+      "status": "READY_FOR_IMPLEMENTATION",
+      "execution": "ATTEMPT001_PACKAGE_PREPARED_NOT_STARTED",
       "required_evidence": "S1/S2",
-      "stop_condition": "错phase/validity或private bypass→停止"
+      "stop_condition": "错phase/validity或private bypass→停止",
+      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-sol-acceptance-20261029"
     },
     {
       "id": "R05c",
@@ -2284,7 +2300,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "59b1398c05917158bbd8527a951429e3d99476d952788ddcb01cad075582c28c",
+    "README.md": "22cdf6331d014f9e4e08d989305ee24ebb2b97ff25e930339253822fdad8213c",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2293,9 +2309,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "5903b695091b5e8b47e2d6de4d0eb7c02fef2e9a013513c8b7dddd2071c161a6",
+    "05_R05_Native_Rate_Feedback.md": "b6fc670cd607b4a1e28a340b5ca8210e08ba0fd33bfcdebc0c56b4e8f5d6d468",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "927aeb974e855c6717b95854f61ea475b531a86181457dfba5ecac86a5ab969e"
+    "07_Execution_Order_and_Acceptance.md": "0a6547b06a3cc76c4a47d383a9c7d248d647e85e5f25459e578364081fcfd8e8"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4833,6 +4849,17 @@
       "native_tests_started_by_sol": 0,
       "required_envelope_changed": false,
       "review_root": "workspace/maintenance/r05_phase_ii_ii01_reconciliation_20261029_001/"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "SOL_ACCEPT_R05A_AND_PREPARE_R05B",
+      "input_head": "e8d233a7bfd31a38d30759fdea861518616c19b7",
+      "decision": "ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN",
+      "accepted_slice_count": 15,
+      "next_slice": "R05b",
+      "new_native_by_sol": 0,
+      "required_envelope_changed": false,
+      "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05a_001/"
     }
   ],
   "P00_audit": {
@@ -5002,13 +5029,12 @@
       "authority": "Latest explicit maintainer instruction in this conversation",
       "luna2_thread": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
       "luna2_branch": "codex/phase-ii-01-camera",
-      "luna2_scope": "Original 07 R01-R07/P99 table; next R05a then reviewed R05b/c",
+      "luna2_scope": "Original 07 R01-R07/P99; R05a accepted, next R05b implementation",
       "luna1_scope": "F00-F07 on develop-full",
       "active_stage_checkouts": 2,
       "new_worktrees": 0,
-      "accepted_slice_count": 14,
+      "accepted_slice_count": 15,
       "remaining_slices": [
-        "R05a",
         "R05b",
         "R05c",
         "R06c",
@@ -5020,6 +5046,16 @@
       "native_lock": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock",
       "one_unfinished_package_per_thread": true,
       "merge_push_authorized": false
+    },
+    "r05_provider_dependency_branch": {
+      "reason": "R05b public force-limit setter and Provider contract require an owned, reviewable dependency commit/gitlink",
+      "base": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+      "local_branch": "codex/phase-ii-01-r05-provider",
+      "location": "camera GeoPhys checkout only",
+      "new_core_worktrees": 0,
+      "active_core_checkouts": 2,
+      "additional_provider_topic_branches": 1,
+      "disposition": "retain reviewed Provider commit on local topic; update camera Core gitlink only; later integration subject to separate authorization; main F-line pin unchanged"
     }
   },
   "checkpoint_recovery_plan": {

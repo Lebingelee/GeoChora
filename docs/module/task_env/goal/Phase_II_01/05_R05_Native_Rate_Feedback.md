@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态（2026-10-29）：R05a attempt001 已形成合同候选与 R05b/c 精确实施计划，状态 `R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW`；尚未由 Sol 接收，R05b/c 仍 PLANNED / NOT_STARTED。旧 C05c 四格实际通过；本 Goal 收口正式合同与正常准入，不把旧诊断结果改名为正式能力。
+状态（2026-10-29）：R05a attempt001 已获 Sol 接收 `ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN`，仅合同设计/实施决议、S1与旧probe复用出口；Provider新合同/正常route尚未落地。下一包R05b attempt001，R05c未启动；旧C05c四格继续保留诊断身份。
 
 ## 现有能力与 owner
 
@@ -85,3 +85,26 @@ Provider正式说明如需改动，R05a交付对应owner可落地候选文本/pa
 R05b 顺序建议：先完成 Provider public setter、Core idempotent configuration call 与 source/build-bound normal admission；在 native 前通过真实 public construction 接线的 worker/finalizer/independent-reader 成功和 tamper/identity 负例 S1；再运行每 backend 的最小 reset + 两 outer probe。R05c 四格保持分别必需，每格使用正式 route 与独立 H5；旧 full-task 证据只对未受影响的物理任务/控制律输出复用，任一 source、solver、integrator、force law、reset、Controller 或 task 输入改变时重跑受影响完整 cell。预算上限和条件见 ignored `cost_budget.md`，由 Sol 在后继工作包冻结。
 
 本合同候选由 Sol 实际审阅后才可能接收。旧 R05a preflight 阻塞记录和 C05c 诊断记录继续保留；R05b/c、原 DAG、Required Envelope、P99 与 Qualification 状态不因本次文档更新而改变。
+
+<a id="r05a-sol-acceptance-20261029"></a>
+
+## R05a Sol接收与R05b实施合同（2026-10-29）
+
+Sol复核Luna提交 `e8d233a7bfd31a38d30759fdea861518616c19b7`：18项输出manifest、20项保护hash、31项输入source核对、12份Markdown hash匹配；四probe各2/3、四full H5分别2443/2444、2442/2443、2443/2444、2442/2443及native index递增由独立h5py进程核实。复用原4项provider-free S1，Sol零新pytest/native，不把结构核验称为完整S3重跑。接收 `ACCEPTED_BOUNDED_R05A_CONTRACT_PLAN`，不是Provider API生效、R05b/c或Qualification接收。完整复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05a_001/`。
+
+### R05b attempt001：EXTEND_EXISTING
+
+预计90–150分钟、主动窗口上限180分钟；同窗口可多轮修复/S1/native，不设置默认一次启动额度。Core复用camera分支；其中GeoPhys checkout从a53建立一个本地 `codex/phase-ii-01-r05-provider` 依赖topic，原因是public setter修复属于Provider且必须有可追溯commit/gitlink。不新增Core分支/worktree、不改主checkout或其GeoPhys副本；后续整合分别审阅Core/Provider提交，未经授权不push/merge。
+
+| 改动点 | 实施与验收要求 |
+| --- | --- |
+| Provider public setter | `RigidSolverStateHostIOMixin`增加中性effort bounds的公开setter；整数ID、非bool、不截断float，有限且float32可表示的精确shape/range/重复ID检查。整批校验后再写，真实变更才增加configuration revision并失效；相同有效值幂等，零physics推进。失败不能留下错误valid状态。private fields仅留Provider内部。 |
+| Core boundary | 调用public setter，消除私有字段访问；相同cap不重复上传，reset/restore必须使Core缓存与Provider实际配置一致；不改变控制律/限值/源物理参数。 |
+| 正式public读取说明 | Provider说明定义独立native-step host primitive及同步/phase/单位/线程/lifetime限制，不依赖Core import或Task token；Core负责窄NutAssembly来源/build/backend/profile/Controller准入。不得把一般effort槽统一称N。 |
+| 源内容与准入 | 复用现有source-closure-v1算法，精确绑定XML及Importer实际消费依赖的同一不可变文件快照；版本化receipt归source/provenance owner。旧v0 RuntimeSource在无Scene时禁止nonnull closure digest，不能直接赋值、伪造Scene或为此迁移旧v0。新正常profile绑定实际Provider clean commit/origin、Artifact/source/mapping/timebase/integrator/backend/law/Controller；generic manifest不扩，旧a53 diagnostic白名单不改成新pin。 |
+| 接线与测试 | S1覆盖真实构造/reset/step/sample/Guard/Ack/Recorder/reader/close链；native仅以IO doubles替换。setter批次拒绝/幂等/reset缓存、同boundary重复读、跨boundary旧值/错phase/generation/revision/NaN/错源、finalizer和独立reader成功/篡改/收尾门在native前通过。旧a53 diagnostic S1可mock历史build，但另测新build被旧diagnostic拒绝。 |
+| 最小S2 | CPU和CUDA分别一个fresh run，500Hz law、seed19、implicitfast、2ms×5，目标各2 outer/10 native；验证首reset样本、连续样本、重复cap/读、零额外推进、source/build/clock与同run小H5/独立reader。不得以两个outer声称完成task/Guard dwell/Expert；R05c留待后续。 |
+
+每S1进程180秒/2GiB RSS；每backend native run 15分钟/4GiB RSS、CUDA worker显存采样上限7GiB（启动前须留足桌面余量）、每run输出64MiB、最多32 outer/160 native/2 reset；整个attempt输出256MiB、主动180分钟。硬预算与采样最大值分列；GPU用可观测按PID/设备采样，不要求Taichi不存在的torch allocator计数。共享native锁覆盖实际worker整个生命周期；失败修复后使用新run目录并重新freeze实现commit/源码，失败原件保留，不拼接PASS。
+
+R05c的完整cell/最小delta选择由Sol按R05b实际diff决定，旧任务证据可复用事实与新正式route实际未测事实分列；当前不授权把旧task成功与新短H5拼成新run task PASS。R05b只完成本行，不提前运行/关闭R05c、R06c/P99。
