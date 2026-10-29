@@ -31,6 +31,48 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
+def _public_motion_metrics(initial_joints: np.ndarray, final_joints: np.ndarray,
+                           initial_ee_pose: np.ndarray, final_ee_pose: np.ndarray) -> dict[str, float]:
+    """Measure arm, TCP, and signed Panda finger-aperture motion from public state."""
+    initial = np.asarray(initial_joints, dtype=np.float64)
+    final = np.asarray(final_joints, dtype=np.float64)
+    initial_ee = np.asarray(initial_ee_pose, dtype=np.float64)
+    final_ee = np.asarray(final_ee_pose, dtype=np.float64)
+    if (initial.shape != (9,) or final.shape != (9,)
+            or initial_ee.shape != (7,) or final_ee.shape != (7,)
+            or not all(np.isfinite(values).all() for values in (initial, final, initial_ee, final_ee))):
+        raise ValueError("public motion gate requires finite seven-arm/two-finger and TCP pose receipts")
+    # Panda finger_joint2 uses a negative signed coordinate.  Aggregate
+    # opening is q1 - q2, matching the public controller's [opening/2,
+    # -opening/2] mapping; summing the signed coordinates cancels symmetric
+    # motion and understates the physical aperture change.
+    initial_opening = float(initial[7] - initial[8])
+    final_opening = float(final[7] - final[8])
+    return {
+        "arm_joint_max_abs_delta_rad": float(np.max(np.abs(final[:7] - initial[:7]))),
+        "tcp_translation_delta_m": float(np.linalg.norm(final_ee[:3] - initial_ee[:3])),
+        "aggregate_finger_position_delta_m": abs(final_opening - initial_opening),
+    }
+
+
+def _validate_public_motion_gate(summary: Mapping[str, Any], initial_joints: np.ndarray,
+                                 final_joints: np.ndarray, initial_ee_pose: np.ndarray,
+                                 final_ee_pose: np.ndarray, *, require_thresholds: bool) -> dict[str, float]:
+    """Cross-check worker summary against H5 state and enforce the full pilot gate."""
+    actual = _public_motion_metrics(initial_joints, final_joints, initial_ee_pose, final_ee_pose)
+    for name, value in actual.items():
+        reported = summary.get(name)
+        if (isinstance(reported, bool) or not isinstance(reported, (int, float))
+                or not np.isfinite(reported) or not np.isclose(float(reported), value, rtol=0.0, atol=1e-7)):
+            raise ValueError(f"worker motion summary {name} differs from independent public H5 state")
+    if require_thresholds:
+        if actual["arm_joint_max_abs_delta_rad"] < 0.05 and actual["tcp_translation_delta_m"] < 0.02:
+            raise ValueError("per-episode public motion gate requires arm delta >=0.05 rad or TCP delta >=0.02 m")
+        if actual["aggregate_finger_position_delta_m"] < 0.005:
+            raise ValueError("per-episode public motion gate requires aggregate finger opening delta >=0.005 m")
+    return actual
+
+
 def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
                                 run_record_path: Path, expected_lock_path: Path) -> dict[str, Any]:
     """Bind the semantic bundle to its bounded native parent process receipt."""
@@ -218,10 +260,11 @@ def _episode_record(env, *, output_dir: Path, episode_index: int, row_index: int
         "prior_session_close_receipt": previous_close,
         "control_plan": env.get_record_metadata()["control_plan"],
         "action_trace": action_trace,
-        "motion_summary": {
-            "arm_joint_max_abs_delta_rad": float(np.max(np.abs(final_joints[:7] - initial_joints[:7]))),
-            "aggregate_finger_position_delta_m": float(abs(np.sum(final_joints[7:9] - initial_joints[7:9]))),
-        },
+        "motion_summary": _public_motion_metrics(
+            initial_joints, final_joints,
+            np.asarray(reset_observation["state"]["ee_pose"], dtype=np.float64),
+            np.asarray(final_observation["state"]["ee_pose"], dtype=np.float64),
+        ),
         "initial_observation": _state_observation_receipt(reset_observation),
         "final_observation": _state_observation_receipt(final_observation),
         "final_info": {
@@ -727,6 +770,10 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                         (bowl_poses if name == "bowl_body_pose" else plate_poses)[obs_index],
                         np.asarray(endpoint.get("privileged_state", {}).get(name), dtype=np.float64)):
                     raise ValueError("independent H5 initial/final object pose differs from its public receipt")
+        motion = _validate_public_motion_gate(
+            episode.get("motion_summary", {}), joints[0], joints[-1], ee_poses[0], ee_poses[-1],
+            require_thresholds=semantic["transition_count"] == 64,
+        )
         total_t += semantic["transition_count"]
         total_obs += semantic["observation_count"]
         total_native += int(progress["native_step_count"])
@@ -734,6 +781,7 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                             "transition_count": semantic["transition_count"],
                             "observation_count": semantic["observation_count"],
                             "episode_id": semantic["outcome"].episode_id,
+                            "motion": motion,
                             "h5_sha256": episode["h5"]["sha256"]})
     if (total_t != report.get("transition_count") or total_obs != report.get("observation_count")
             or total_native != report.get("native_step_count")):

@@ -456,6 +456,37 @@ def _candidate(monkeypatch, *, horizon=4):
     return env
 
 
+def test_r07c_d01_motion_gate_uses_signed_finger_aperture_delta():
+    from bench_deploy.libero.core_candidate_worker import (
+        _public_motion_metrics, _validate_public_motion_gate,
+    )
+
+    initial_joints = np.zeros(9, dtype=np.float64)
+    initial_joints[7:9] = (0.02, -0.02)
+    final_joints = initial_joints.copy()
+    final_joints[0] += 0.06
+    final_joints[7:9] = (0.01, -0.01)
+    ee_pose = np.asarray([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+
+    summary = _public_motion_metrics(initial_joints, final_joints, ee_pose, ee_pose)
+    assert summary["aggregate_finger_position_delta_m"] == pytest.approx(0.02)
+    assert summary["arm_joint_max_abs_delta_rad"] == pytest.approx(0.06)
+    assert _validate_public_motion_gate(
+        summary, initial_joints, final_joints, ee_pose, ee_pose, require_thresholds=True,
+    ) == summary
+
+    no_aperture_change = final_joints.copy()
+    no_aperture_change[7:9] = initial_joints[7:9]
+    insufficient_summary = _public_motion_metrics(
+        initial_joints, no_aperture_change, ee_pose, ee_pose,
+    )
+    with pytest.raises(ValueError, match="aggregate finger opening delta"):
+        _validate_public_motion_gate(
+            insufficient_summary, initial_joints, no_aperture_change, ee_pose, ee_pose,
+            require_thresholds=True,
+        )
+
+
 def test_compiled_libero_assets_use_receipt_bound_unique_vfs_aliases(monkeypatch):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
