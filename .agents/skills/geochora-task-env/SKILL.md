@@ -1059,16 +1059,16 @@ calls a peer's public `read_contact_summary()` and requires a typed
 peer still has no pair query. Missing contact evidence must not be mapped to
 `False`, and this optional hook does not grant provider or benchmark support.
 
-`bench_deploy.libero.task.LiberoPilotControlHookV1` and
-`task_env.controllers.mounted_panda_mixed.MountedPandaMixedActuatorAdapter`
-are internal candidate hooks, not stable public imports or a supported
-provider profile. Their synthetic tests preserve seven torque arm slots,
-signed two-finger position slots, explicit unqualified gains and the
-source-declared 20 Hz / 2 ms × 25 timebase only. Attempt002 exercises the
+`bench_deploy.libero.task.LiberoPilotControlHookV1` and the former mounted-
+Panda mixed adapter were internal candidate hooks, not stable public imports
+or a supported provider profile. Their synthetic tests preserved seven torque
+arm slots, signed two-finger position slots, explicit unqualified gains and
+the source-declared 20 Hz / 2 ms × 25 timebase only. Attempt002 exercised the
 existing v3 recorder, finalizer and report consumer with synthetic IO; this
-does not establish a physical trajectory, native stability, task-semantic
+did not establish a physical trajectory, native stability, task-semantic
 equivalence, P99 or Qualification. See the [R07c attempt002 execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-execution-result-2026-10-29)
-for remaining owner gates and evidence limits.
+for remaining historical owner gates and evidence limits. D01's replacement
+route and current S1/native status are recorded below.
 
 ## R07c D01 diagnostic route (2026-10-30)
 
