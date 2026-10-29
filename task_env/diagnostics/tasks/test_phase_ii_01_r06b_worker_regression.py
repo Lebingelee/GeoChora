@@ -77,6 +77,7 @@ def _engine_module(current_io: dict):
 
 def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
     from task_env.diagnostics.tasks import r03c_attached_leaf_probe, r06b_order_worker as worker
+    import r03c_attached_leaf_probe as worker_probe_module
     from task_env.runtime.sessions import api, control
 
     root = worker.ROOT
@@ -123,6 +124,7 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
     monkeypatch.setitem(sys.modules, 'mujoco', engine)
     runtime_identity = {'package_version': '3.8.1', 'runtime_version': '3.8.1', 'api_version': 3008001}
     monkeypatch.setattr(r03c_attached_leaf_probe, '_native_identity', lambda _mj, _static: runtime_identity)
+    monkeypatch.setattr(worker_probe_module, '_native_identity', lambda _mj, _static: runtime_identity)
     originals = {
         'control_materialize': control.materialize_control,
         'reference_materialize': sys.modules['task_env.tasks.reference_env'].materialize_control,
