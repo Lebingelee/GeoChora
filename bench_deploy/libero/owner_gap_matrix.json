@@ -6,18 +6,19 @@
     {
       "id": "mounted-panda-mixed-actuator-contract",
       "owner_symbols": [
-        "task_env/controllers/absolute_joint.py::AbsoluteJointPositionController",
-        "task_env/runtime/sessions/control.py::RuntimeSession control boundary"
+        "task_env/controllers/absolute_joint.py::AbsoluteJointPositionActionAdapter",
+        "task_env/runtime/sessions/api.py::RuntimeSession; task_env/runtime/sessions/control.py::materialize_control",
+        "task_env/controllers/joint_position.py::JointPositionServoBackend"
       ],
       "current_input_output": "The selected source model declares seven ordered Panda torque motors and two opposing finger position actuators; the selected gripper ranges are signed metres and the arm ranges are N*m. The current Core candidate is not a mixed torque/position controller contract.",
-      "necessary_extension": "Define a versioned, source-bound arm and finger drive/resource mapping that preserves actuator order, type, range, unit, and acknowledgement. Do not coerce torque motors into position control or merge the two finger coordinates.",
+      "necessary_extension": "First assess the existing action adapter, JointPositionServoBackend and runtime control owners. Extend only the proven gap in source-bound mixed arm/finger resource mapping while retaining ordered type, range, unit and acknowledgement. Do not replace torque motors with position actuators or invent a second controller framework.",
       "s1_oracle": "Provider-free codec/contract negatives reject reordered slots, wrong actuator type, inverted finger signs, wrong units, and a false 20 Hz to 100 Hz equivalence.",
       "native_oracle": "One selected public Env reset and action through the exact seven-motor/two-finger map; receipt reports each applied slot and source identity."
     },
     {
       "id": "typed-init-and-free-body-reset",
       "owner_symbols": [
-        "task_env/environment/task_source.py::TaskSource",
+        "task_env/environment/task_source.py::TaskSourceV1",
         "task_env/assembly/source.py::TaskSceneSource",
         "task_env/runtime/sessions/source.py::ExecutionSourceReceiptV1"
       ],
@@ -55,7 +56,7 @@
         "task_env/planners/joint.py",
         "task_env/runtime/sessions/control.py"
       ],
-      "current_input_output": "The source controller is OSC_POSE at 20 Hz (0.05 s policy interval); current Core candidate metadata says 100 Hz. The source model timestep is read from an uncaptured robosuite macros constant and remains unknown. Existing planners do not establish this task's IK/collision route.",
+      "current_input_output": "The source controller is OSC_POSE at 20 Hz (0.05 s policy interval); current Core candidate metadata says 100 Hz. The source model timestep is read from an uncaptured robosuite macros constant and remains unknown. Existing waypoint planners are available; this task's source/drive/IK mapping is not admitted. A new generic collision-aware planner is not a prerequisite.",
       "necessary_extension": "Resolve native physics/control timing from pinned configuration and select an existing Core action/drive route only when its hold, frame, and rate semantics match. Otherwise retain an explicit adapter design proposal.",
       "s1_oracle": "Contradictory native/Core rates, unverified physics timestep, unsupported drive, or missing IK/collision oracle are rejected or remain unavailable.",
       "native_oracle": "A bounded public action reports requested/applied action clocks and repeat count; compare to one native control interval and inspect planned path/contacts without silently resampling."

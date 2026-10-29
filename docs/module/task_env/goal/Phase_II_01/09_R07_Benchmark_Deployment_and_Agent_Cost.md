@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已完成，等待Sol复核。原五任务整体仍未完成，维护者选择先用来源可准入的少量LIBERO任务跑通闭环，首pilot固定spatial bowl→plate。下文“本轮仅规划/未执行”保留原审计时点，不覆盖当前状态；原五任务最终目标不缩减。
+状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；Core native admission关闭、成本INVALID。原五任务整体仍未完成，维护者选择先用来源可准入的少量LIBERO任务跑通闭环，首pilot固定spatial bowl→plate。下文“本轮仅规划/未执行”保留原审计时点，不覆盖当前状态；原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -185,3 +185,10 @@ recipe保留原任务 `On(akita_black_bowl_1, plate_1)` 及严格XY `<0.03 m`、
 输出和逐命令原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07b_pilot_001/`，安装树位于对应 `_install/`。成本事实按R07a003 v2.1原口径记录；该协议固定测量基线 `0309d73bb5b60f9989907c3eede8c0cd2893f29f` 不在本camera输入 `21ea2965a1660a60d9f236793eb01f02e05ee7b6` 的祖先链中，因此协议校验结果如实保留为 INVALID，不更改基线或声称有效LOC/Agent成本测量。token usage与货币费用不可用；活动时间未连续计量，保留null及原因。
 
 状态为 `R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW`。这只是单pilot来源/配方S1出口，原五任务总目标、18/22接收数、R07c、P99与Qualification均保持未关闭。详见本包 `report.md`、`evidence.json` 与 `commands.json`。
+
+
+## R07b pilot attempt001 Sol接收（2026-10-29）
+
+2026-10-29 Sol接收单pilot来源安装/verify/recipe S1为`ACCEPTED_BOUNDED_R07B_PILOT_SOURCE_RECIPE_S1`。135项包哈希、109项保护输入及45项冻结源码核对通过；Sol新进程独立verify保留目标的103个payload并重建recipe通过，50项S1按原日志复用。两个独立目标的原安装/verify收据保留，Sol未重新创建第二目标。Core native admission仍false，R07b原五任务整体未通过、接收计数仍18/22。成本协议仍INVALID：0309d73不是camera输入21ea2965祖先，另有asset/benchmarks Python被旧工具归为data的LOC缺口；原结果不改写，后续须先修订跨分支成本协议/代码归属规则。token/费用/连续活动时间未知仍null。初期3次构建缺资源采样如实保留；未重跑native或pytest。Sol同时更正后继owner符号并移除未获要求的全任务完成/通用碰撞规划门；R07c仍须原重复reset、有意义公开控制、原生语义及同H5验收。
+
+独立复核入口：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07b_pilot_001/`。旧v2.1协议及INVALID记录保持；不得替换原baseline后把本轮改记有效成本。未来方案保留0309d73作为历史测量参考，另明确camera实际session输入/输出提交、共同祖先与跨分支继承成本账本，并修正asset/benchmarks Python工具的代码分类，经审阅后采用新协议版本；本次没有追溯批准新协议或启动R07c。

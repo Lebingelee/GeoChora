@@ -1,8 +1,8 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收。R07b pilot attempt001的source/recipe S1已交付、待Sol复核，尚未计入接收数；R07a五任务整体及R07c/d仍未完成。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
+当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收。R07b pilot attempt001的source/recipe S1已获Sol有界接收，原五任务整体未完成，接收数不增加；R07a五任务整体及R07c/d仍未完成。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
-- **Luna2**：在`codex/phase-ii-01-camera`完成[R07b单任务pilot attempt001](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-attempt001-execution-result-2026-10-29)：source install与provider-free recipe S1交付，等待Sol复核；native为0，不启动R07c。
+- **Luna2**：在`codex/phase-ii-01-camera`完成[R07b单任务pilot attempt001](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-attempt001-execution-result-2026-10-29)：source install与provider-free recipe S1已获Sol有界接收；native为0，不启动R07c。
 - **R07当前边界**：R07a004来源/协议部分接收及单pilot来源准入已有Sol记录。pilot不代表原五任务R07a或R07b整体通过；TurboSquid三族仍阻塞其关联任务，不影响本包未消费这些资产的工作。保留原五任务最终P99目标、原生语义和成本/独立Human评审。
 - **Luna1**：独立负责`develop-full`的F00–F07，状态以其分支10文档及实际报告为准；本次不写主checkout/F文档、Isaac或依赖。
 - **R05完成**：精确normal-route CPU/CUDA×100/500Hz完整回合及H5双reader已获Sol接收，不承诺通用Provider/实时2ms/Qualification。
@@ -98,7 +98,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；R06c后续已按本页当前勘误接收；P99未关闭。 |
 | 18 | R06c | R06b,R03c,R04c,R05c | required交集/证据/范围汇总 | S1/S2/S3 | 真实受影响回归/缺required证据→停止 | `ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION`；attempt002技术包与历史范围勘误收口；18/22，非Qualification |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PARTIAL_AUDIT_ACCEPTED；一项 pilot 来源审计有界接收，原五任务出口未完成；详见09及主分支 Sol R07a004记录 |
-| 20 | R07b | R07a（首pilot来源/协议已部分接收） | asset/benchmarks与bench_deploy、安装校验/最小配方/owner缺口 | S1 | 消费资产来源/闭包未核验→停止该任务；不绕Core gate | 单任务pilot工作包待维护者发送；原五任务整体未通过 |
+| 20 | R07b | R07a（首pilot来源/协议已部分接收） | asset/benchmarks与bench_deploy、安装校验/最小配方/owner缺口 | S1 | 消费资产来源/闭包未核验→停止该任务；不绕Core gate | `ACCEPTED_BOUNDED_R07B_PILOT_SOURCE_RECIPE_S1`；来源/配方S1接收，native admission关闭，成本INVALID，原五任务整体未通过 |
 | 21 | R07c | R07b | 五Task真实构造/reset/motion/Controller/Planner/语义/H5 | S1/S2/S3 | 任一required Task阻塞/不可表示/失败/未测→P99 blocked | PLANNED / NOT_STARTED |
 | 22 | R07d | R07c | session成本报告与独立human代码质量审阅 | Audit/independent review | 无来源/无独立review或虚构usage→阻塞 | PLANNED / NOT_STARTED |
 
@@ -261,3 +261,6 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 
 
 2026-10-29 R07b pilot attempt001：camera输入HEAD `21ea2965a1660a60d9f236793eb01f02e05ee7b6`；实现提交 `b1d5c8719f2289b6ee9fb20a5d0a22a8486d6c93`。来源manifest `4ad168e4…d30a75` 含103项载荷、89文件/76,512,539-byte实际首pilot闭包；两个fresh install/verify与recipe CLI完成，provider-free S1 50 passed，真实engine/provider tripwire 0。`source_install_ready=true`，`recipe_s1_ready=true`，`core_native_admission_ready=false`；无native/共享锁。R07a003 v2.1成本记录按原协议核验，但其固定0309d73测量baseline不在本输入HEAD祖先链，结果INVALID；token/费用未知、活动时间无连续计量。状态`R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW`，尚不计接收，18/22与五任务/P99/R07c/R07d保持。报告及原件见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07b_pilot_001/`。
+
+
+2026-10-29 Sol接收单pilot来源安装/verify/recipe S1为`ACCEPTED_BOUNDED_R07B_PILOT_SOURCE_RECIPE_S1`。135项包哈希、109项保护输入及45项冻结源码核对通过；Sol新进程独立verify保留目标的103个payload并重建recipe通过，50项S1按原日志复用。两个独立目标的原安装/verify收据保留，Sol未重新创建第二目标。Core native admission仍false，R07b原五任务整体未通过、接收计数仍18/22。成本协议仍INVALID：0309d73不是camera输入21ea2965祖先，另有asset/benchmarks Python被旧工具归为data的LOC缺口；原结果不改写，后续须先修订跨分支成本协议/代码归属规则。token/费用/连续活动时间未知仍null。初期3次构建缺资源采样如实保留；未重跑native或pytest。Sol同时更正后继owner符号并移除未获要求的全任务完成/通用碰撞规划门；R07c仍须原重复reset、有意义公开控制、原生语义及同H5验收。
