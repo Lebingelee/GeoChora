@@ -629,14 +629,17 @@ execution-source receipt binds the XML and the immutable bytes actually read
 by the Importer. The generic GeoPhys provider manifest remains conservative;
 other source/build/task intersections fail closed.
 
-R05b attempt001 exercised the exact route on GeoPhys CPU and CUDA with the
-500 Hz law: each fresh run had one reset, two outer intervals and ten native
-steps, and passed both the production semantic reader and an independent raw
-H5 reader. Focused provider-free S1 passed; the bounded result is pending Sol
-review. These short runs do not establish task or Expert completion, Guard
-dwell, the full CPU/CUDA × 100/500 Hz campaign, real-time or device-resident
-control, general Provider support, P99, or Formal Qualification. See the
-[R05 record](goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29).
+R05b attempt001's CPU/CUDA short runs were reviewed by Sol and returned
+`CHANGES_REQUIRED_R05B` for default reset initialization, re-receipted source
+admission, pre-narrowing actuator-ID checks, and connected worker/reader S1.
+Attempt002 closed those four findings on Core commit `1193f2f` while reusing
+GeoPhys `c6df840`. The focused provider-free S1 passed 19 tests. Fresh CPU and
+CUDA runs with the 500 Hz law each completed one reset, two outer intervals and
+ten native steps; the production semantic reader and independent raw H5 reader
+both passed. The bounded attempt002 result is pending Sol review. These short
+runs do not establish task or Expert completion, Guard dwell, the full CPU/CUDA
+× 100/500 Hz campaign, real-time or device-resident control, general Provider
+support, P99, or Formal Qualification. See the [R05 attempt002 record](goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29).
 
 ## Parallel、退休和缺失路线
 

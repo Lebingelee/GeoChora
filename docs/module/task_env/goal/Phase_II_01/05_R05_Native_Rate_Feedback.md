@@ -139,3 +139,21 @@ Sol核对Core `175c332`、Provider `c6df840`：70项输出hash、44项保护证�
 两个历史config摘要失败与本次故障分开：同路径/依赖下b5b75dd旧NutAssembly构造函数与新函数输出config digest相同，PickCube owner未改；没有完整旧环境回放，不称全部历史回归通过。attempt002提供字段级对照与来源定位，保留旧baseline/hash及日志，不通过更新旧hash消除告警。
 
 复核及无引擎反例在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05b_001/`。attempt002复用camera/Provider分支，优先保持c6df840 Provider；90–150分钟预计、180分钟主动窗口，允许范围内多轮修复/测试/native。先完整S1再fresh CPU/CUDA最小S2；沿用001每run资源/物理边界、共享锁、独立新输出/失败保留。不运行R05c全任务。develop暂不集成未接收R05b，F线不改。
+
+<a id="r05b-attempt002-execution-result-2026-10-29"></a>
+
+## R05b attempt002 执行结果（2026-10-29）
+
+状态 `R05B_ATTEMPT002_BOUNDED_S1_S2_PASS_PENDING_SOL_REVIEW`。本包从Core输入 `ba83b5978c3d99f255543f43a332a3a6e8702cde` 开始，在同一 `codex/phase-ii-01-camera` 分支提交实现冻结 `1193f2f18d1330c6bc77488c053f88de27952f4b`；GeoPhys沿用干净 `codex/phase-ii-01-r05-provider` / `c6df840bef8d36b1150150167df08e29dc3f664c`，Menagerie pin仍为 `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。未改Provider、依赖或主checkout。实施分类仍为 `EXTEND_EXISTING`。
+
+F1–F4均已按复核owner修复：所有 `SelectedReferenceEnv` 构造分支在reset前初始化诊断/normal profile状态；normal admission现在比较预先冻结的69项全闭包manifest、canonical XML和Importer `scene.xml`实际字节、来源语义映射及backend配置摘要；`materialize_control`在Runtime materialize前绑定精确R3 Controller、NutAssembly Solution、100/500 Hz law与10 N force cap；actuator ID在任何int32转换前以原始整数值检查，失败不调用Provider或更新override。reader拒绝错误source receipt与phase/generation/revision/sequence/clock/force字段，supervisor要求已初始化的worker资源采样和成功close才接受结果。可信manifest只保存仓库相对路径/hash，不写入机器绝对资产路径。
+
+最终focused S1命令包含既有C05c 4例与新R05b suite，共 `19 passed in 9.00s`；采样最大RSS `149,100 KiB`，tripwire JSONL为0行。新S1覆盖默认PickCube/NutAssembly public reset/step、新normal profile CPU/CUDA与100/500 Hz Controller选择、真实Core admission/Guard/Ack/Recorder与production reader工作流（底层native IO为明确标记的synthetic double）、真实worker成功/finalizer及独立raw reader、F1–F4篡改与资源/close失败拒绝。GeoPhys Provider commit与owner test未变化，复用attempt001的 `23 passed` S1及0 tripwire结果；更宽attempt001构造选择集的两个历史 `source.config` digest断言仍单独保留，未在本包重跑或改写其常量。
+
+实现freeze `1193f2f` 下重新启动CPU和CUDA各一个normal-profile fresh worker。两者均为seed19、500 Hz law、implicitfast、2 ms×5、1 reset、2 outer/10 native、3 boundaries；production semantic reader和独立raw H5 reader均通过，10个sample sequence为3–12，首样本 `reset_forward`，其后为 `native_step_pre_integration`。CPU H5为45,993 bytes、SHA-256 `3304e64a5adb71cf89ee698bb9bb7c732c0c9ba0895b0b7fa093003ebba09529`；worker wall 45.72 s、进程组RSS最大采样1,091,686,400 bytes。CUDA H5为46,523 bytes、SHA-256 `08b96a206a797634ec4c97fe3463226dbe91b0ed635de263dc7089eaf5bfbdd2`；worker wall 28.57 s、进程组RSS最大采样996,683,776 bytes、worker GPU最大采样207,618,048 bytes；worker运行期间GPU free最低采样6,781,140,992 bytes，MemAvailable最低采样6,363,549,696 bytes。每轮输出约164 KiB，远低于预算。资源数据是按周期采样值，不宣称硬件峰值。
+
+两次锁等待均约0.03 s；排他锁在worker进程组退出后释放，`close_success=true`、worker exit 0、进程组无残留，独立reader在锁释放后运行。两轮结束后的 `fuser` 与针对共享锁路径的 `lslocks`均无持有者。attempt001原CPU/CUDA H5也用本次严格reader再次离线读回通过，各含69闭包文件及10 samples；该旧证据仅复核兼容性，不与attempt002 run拼接。
+
+一次仅用于补录CUDA预检字段的本地辅助脚本因字段名写错产生 `KeyError`；它未更改代码或来源输入。已保留错误收据，正式supervisor随后自行完成锁、MemAvailable、GPU free、compute app、预算与worker收据检查，CUDA结果和reader通过。
+
+本状态待Sol复核，不等同于R05b接收。两个outer未达到Guard dwell，也不构成Task/Expert完成；未证明100 Hz law的native S2、完整CPU/CUDA×100/500 Hz campaign、实时/device-resident控制、P99或Formal Qualification。R05c仍未启动。历史missing raw/phase处置继续为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。报告、Evidence、运行原件与收据保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_002/`。

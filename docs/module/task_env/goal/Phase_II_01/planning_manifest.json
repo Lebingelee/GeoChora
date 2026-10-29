@@ -1798,23 +1798,24 @@
       "depends_on": [
         "R05a"
       ],
-      "status": "CHANGES_REQUIRED_R05B",
-      "execution": "ATTEMPT001_BOUNDED_NATIVE_FACTS_REVIEWED_IMPLEMENTATION_REWORK_REQUIRED",
+      "status": "IMPLEMENTED_S1_S2_PASS_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT002_F1_F4_REPAIRS_AND_BOUNDED_CPU_CUDA_S2_COMPLETE_PENDING_SOL_REVIEW",
       "required_evidence": "S1/S2",
-      "stop_condition": "F1 default reset, F2 trusted source admission, F3 wide integer IDs and F4 connected S1 must close before R05b acceptance/R05c.",
+      "stop_condition": "F1–F4 were closed and attempt002 S1/S2 passed; Sol review is required before R05b acceptance or R05c. Historical missing raw/phase compatibility remains blocked.",
       "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair",
       "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
       "provider_branch": "codex/phase-ii-01-r05-provider",
       "implementation_commits": [
         "dc98de871b8263eb7f11ed6b38261e5fc678b774",
-        "91a3774f93905d665cedd462d658824c5daf56d7"
+        "91a3774f93905d665cedd462d658824c5daf56d7",
+        "1193f2f18d1330c6bc77488c053f88de27952f4b"
       ],
-      "result": "Final-freeze Core 91a3774 and GeoPhys c6df840: Provider S1 23 passed and Core focused S1 11 passed with zero engine tripwire hits; final CPU and CUDA each completed one reset, two outer intervals, ten native steps, clean close and production plus independent raw-H5 readback. Two broader historical source.config digest assertions fail and were reproduced; retained as unresolved regression risk. No task/Expert completion, R05c, P99 or Qualification.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_001/",
+      "result": "R05b attempt002 closed F1–F4, passed 19 focused C05c/R05b provider-free S1 tests, and completed fresh CPU/CUDA 500 Hz normal-profile S2 runs under the same Core/GeoPhys freeze; production and independent raw H5 readers passed. Pending Sol review; no task/Expert completion, native 100 Hz law, full campaign, R05c, P99 or Qualification.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_002/",
       "prompt_sha256": "42044e9dafd3f684d6b92c97bd6b06ddf817046b6152fda3ec988f2d2f40c0f3",
       "input_snapshot_sha256": "918080fe4613c16bf9d86b16526cd0441563b1bede31cc15d52e36bf222b941e",
       "input_head": "b5b75dda74adcab6706cb09b875dc64b92485d33",
-      "implementation_head": "91a3774f93905d665cedd462d658824c5daf56d7",
+      "implementation_head": "1193f2f18d1330c6bc77488c053f88de27952f4b",
       "provider_free_s1": {
         "provider": "23 passed; tripwire 0; max sampled RSS 49,438,720 bytes",
         "core_focused": "11 passed in 2.53s; tripwire 0; max sampled RSS 102,312 KiB"
@@ -1861,7 +1862,7 @@
         "closure_digest": "bf08619661608cf4caa7ecacda2ab9f4cd02489fd411935a26678bdde8b07f6c",
         "closure_files": 69
       },
-      "native_starts_total": 3,
+      "native_starts_total": 5,
       "shared_lock_released": true,
       "sol_review": {
         "date": "2026-10-29",
@@ -1882,7 +1883,160 @@
         "R05c_authorized": false
       },
       "qualification_granted": false,
-      "task_success_claimed": false
+      "task_success_claimed": false,
+      "attempt002": {
+        "status": "R05B_ATTEMPT002_BOUNDED_S1_S2_PASS_PENDING_SOL_REVIEW",
+        "prompt_sha256": "32c53bef7206b7167400333481951830b9ea47f210f56854bf2b4983a08f412b",
+        "input_snapshot_sha256": "6f194933146984f245596324c07f1c106926ffa39941ae72ef3740d039c56678",
+        "input_head": "ba83b5978c3d99f255543f43a332a3a6e8702cde",
+        "implementation_commit": "1193f2f18d1330c6bc77488c053f88de27952f4b",
+        "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
+        "menagerie_pin": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+        "closed_review_findings": [
+          "F1",
+          "F2",
+          "F3",
+          "F4"
+        ],
+        "provider_free_s1": {
+          "result": "19 passed in 9.00s",
+          "included": "C05c cadence 4 cases plus R05b focused S1",
+          "max_sampled_rss_bytes": 152678400,
+          "tripwire_hits": 0
+        },
+        "provider_s1_reused": {
+          "result": "23 passed; tripwire 0",
+          "source": "unchanged Provider commit c6df840 from attempt001"
+        },
+        "old_h5_revalidation": {
+          "cpu": {
+            "source_run": "r05b_001/runs/cpu_run_002",
+            "result": "PASS",
+            "native_samples": 10,
+            "closure_files": 69,
+            "h5_sha256": "d993504e488407bde5a516df987f948c8e5be082533e1c084f49bd755a3d2cec"
+          },
+          "cuda": {
+            "source_run": "r05b_001/runs/cuda_run_001",
+            "result": "PASS",
+            "native_samples": 10,
+            "closure_files": 69,
+            "h5_sha256": "7474ad564392db441d677b84998d78a4e3c9651c73e1128a9ee2206a768ab3e0"
+          }
+        },
+        "native_s2": {
+          "cpu": {
+            "run": "runs/cpu_run_001",
+            "status": "passed",
+            "resets": 1,
+            "outer_intervals": 2,
+            "native_steps": 10,
+            "boundaries": 3,
+            "sample_sequences": [
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "worker_close_success": true,
+            "worker_exit_code": 0,
+            "wall_seconds": 45.721636534901336,
+            "process_group_rss_max_sample_bytes": 1091686400,
+            "process_group_rss_sample_count": 45,
+            "minimum_mem_available_sample_bytes": 6269628416,
+            "minimum_gpu_free_sample_bytes": null,
+            "worker_gpu_memory_max_sample_bytes": null,
+            "output_bytes_at_worker_exit": 164370,
+            "h5_size_bytes": 45993,
+            "h5_sha256": "3304e64a5adb71cf89ee698bb9bb7c732c0c9ba0895b0b7fa093003ebba09529",
+            "production_reader": "PASS",
+            "independent_raw_reader": "PASS",
+            "lock_wait_seconds": 0.033979861065745354,
+            "lock_held_through_worker_exit": true,
+            "lock_released_before_reader": true
+          },
+          "cuda": {
+            "run": "runs/cuda_run_001",
+            "status": "passed",
+            "resets": 1,
+            "outer_intervals": 2,
+            "native_steps": 10,
+            "boundaries": 3,
+            "sample_sequences": [
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "worker_close_success": true,
+            "worker_exit_code": 0,
+            "wall_seconds": 28.573368360986933,
+            "process_group_rss_max_sample_bytes": 996683776,
+            "process_group_rss_sample_count": 27,
+            "minimum_mem_available_sample_bytes": 6363549696,
+            "minimum_gpu_free_sample_bytes": 6781140992,
+            "worker_gpu_memory_max_sample_bytes": 207618048,
+            "output_bytes_at_worker_exit": 161807,
+            "h5_size_bytes": 46523,
+            "h5_sha256": "08b96a206a797634ec4c97fe3463226dbe91b0ed635de263dc7089eaf5bfbdd2",
+            "production_reader": "PASS",
+            "independent_raw_reader": "PASS",
+            "lock_wait_seconds": 0.03696573991328478,
+            "lock_held_through_worker_exit": true,
+            "lock_released_before_reader": true
+          }
+        },
+        "native_starts": 2,
+        "shared_lock_released": true,
+        "resource_sampling": "approximately once per second; RSS/GPU values are sampled maxima, not hard peaks",
+        "historical_source_config_digest_failures": "Two broader attempt001 assertions remain unresolved and were not rerun or rewritten in attempt002.",
+        "sol_review": "PENDING",
+        "R05c_started": false,
+        "qualification_granted": false,
+        "task_success_claimed": false,
+        "source_receipt": {
+          "source_id": "nut-assembly-square-v1/canonical-source-nutassembly-nominal-v1",
+          "artifact_identity": "99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe",
+          "canonical_xml_sha256": "909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d",
+          "importer_xml_sha256": "16b19e020f843dfd11b0f2086da777426cd56e015d69c5363a97e5f86dc6dc17",
+          "closure_digest": "bf08619661608cf4caa7ecacda2ab9f4cd02489fd411935a26678bdde8b07f6c",
+          "closure_files": 69,
+          "trusted_manifest_sha256": "0895a65980b97650bcc91ed9ee8a536958a15b0bc8d5703f5eab5ffdebd5c7d6"
+        },
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_002/report.md",
+        "implementation_paths": [
+          "task_env/diagnostics/tasks/r05b_native_feedback_independent_reader.py",
+          "task_env/diagnostics/tasks/r05b_native_feedback_supervisor.py",
+          "task_env/diagnostics/tasks/test_phase_ii_01_r05b_native_feedback_s1.py",
+          "task_env/runtime/boundary.py",
+          "task_env/runtime/sessions/api.py",
+          "task_env/runtime/sessions/control.py",
+          "task_env/tasks/reference_env.py",
+          "task_env/tasks/nut_assembly/r05b_trusted_execution_source_manifest.json"
+        ],
+        "documentation_paths": [
+          "docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md",
+          "docs/module/task_env/goal/Phase_II_01/07_Execution_Order_and_Acceptance.md",
+          "docs/module/task_env/goal/Phase_II_01/README.md",
+          "docs/module/task_env/public-api.md",
+          ".agents/skills/geochora-task-env/SKILL.md",
+          ".agents/skills/geochora-task-env/references/routes.md",
+          "docs/module/task_env/goal/Phase_II_01/planning_manifest.json"
+        ]
+      },
+      "attempt002_sol_review": "PENDING"
     },
     {
       "id": "R05c",
@@ -2380,7 +2534,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "22cdf6331d014f9e4e08d989305ee24ebb2b97ff25e930339253822fdad8213c",
+    "README.md": "bd029fc3de8a57a7cc6b85f885bcc85326a5471260c72058b7ef6309bfd8e9d1",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2389,11 +2543,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "3347099c2e5089af3b099c1dfc98e17ee2469999ace82974284ff56c0761fc4c",
+    "05_R05_Native_Rate_Feedback.md": "13b11b7a634bae99a6646c6d0a3fd5210798689be001c423e3ad1c66a12fe34e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "e57bb5e6d00642585f105280d6a9fdc812f8cc429f23a45ce5f8763e046e4af6"
+    "07_Execution_Order_and_Acceptance.md": "c0e462718552465c1247990fed75080be05fd6600d9a8b9758d193cb5a221ae5"
   },
-  "revision_kind": "R05B_ATTEMPT001_BOUNDED_IMPLEMENTATION_RESULT_PENDING_SOL_REVIEW",
+  "revision_kind": "R05B_ATTEMPT002_BOUNDED_REPAIR_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -4075,7 +4229,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "R05b attempt001 implementation, focused S1, bounded CPU/CUDA native S2 and documentation/Skill sync; pending Sol review. Broader construction-summary digest failures and R05c limits preserved.",
+  "planning_submission_this_revision": "R05b attempt002 F1–F4 repair, 19-case focused provider-free S1, bounded CPU/CUDA 500 Hz normal-profile S2, documentation and TaskEnv Skill refresh; pending Sol review. Historical broader source.config digest failures remain unresolved; R05c/P99/Qualification not claimed.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4992,6 +5146,32 @@
       ],
       "next_attempt": "R05b002",
       "qualification_granted": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "LUNA_R05B_ATTEMPT002_BOUNDED_REPAIR_AND_CPU_CUDA_S2_PENDING_SOL_REVIEW",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "ba83b5978c3d99f255543f43a332a3a6e8702cde",
+      "implementation_head": "1193f2f18d1330c6bc77488c053f88de27952f4b",
+      "provider_branch": "codex/phase-ii-01-r05-provider",
+      "provider_commit": "c6df840bef8d36b1150150167df08e29dc3f664c",
+      "prompt_sha256": "32c53bef7206b7167400333481951830b9ea47f210f56854bf2b4983a08f412b",
+      "input_snapshot_sha256": "6f194933146984f245596324c07f1c106926ffa39941ae72ef3740d039c56678",
+      "result": "F1–F4 repaired; focused S1 19 passed; fresh CPU/CUDA each 2 outer/10 native with production and independent raw readers PASS; pending Sol review.",
+      "native_starts": 2,
+      "native_runs": [
+        "r05b_002/runs/cpu_run_001",
+        "r05b_002/runs/cuda_run_001"
+      ],
+      "shared_lock_released": true,
+      "source_closure_digest": "bf08619661608cf4caa7ecacda2ab9f4cd02489fd411935a26678bdde8b07f6c",
+      "source_closure_file_count": 69,
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_002/",
+      "sol_review": "PENDING",
+      "R05c_started": false,
+      "DAG_P99_required_envelope_changed": false,
+      "qualification_granted": false,
+      "task_success_claimed": false
     }
   ],
   "P00_audit": {

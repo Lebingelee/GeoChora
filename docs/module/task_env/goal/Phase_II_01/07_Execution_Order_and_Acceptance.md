@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前复核结论（2026-10-29）：R05b001为`CHANGES_REQUIRED_R05B`，下一包attempt002；三项可复现行为缺陷及接线S1缺口见[R05修复表](05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair)。R05c保持未启动，下文较早状态按当时时点保留。
+当前复核结论（2026-10-29）：R05b attempt001的Sol复核为`CHANGES_REQUIRED_R05B`；attempt002已关闭F1–F4，19项focused S1及CPU/CUDA各2 outer/10 native双reader通过，当前状态`R05B_ATTEMPT002_BOUNDED_S1_S2_PASS_PENDING_SOL_REVIEW`。Sol复核前R05b不视为接收，R05c保持未启动；细节见[R05 attempt002结果](05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29)。
 
 当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt001 已完成实现、定向 S1 与 CPU/CUDA 有界 S2，待 Sol 复核；R05c 尚未启动。Luna1 独立负责 F00–F07。**
 
@@ -100,7 +100,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 12 | R03c | R03b,R02c | 装配态public Env控制/记录 | S2/S3 | 不同diagnostic路径拼接或不完整H5→失败 | attempt004 ACCEPTED_BOUNDED_S2_S3：正式receipt/progress complete；四份同run 64/65 H5由独立reader读取，256 transitions/260 observations、48/48 tamper拒绝。只限冻结Panda Arm+Hand/MuJoCo 3.8.1 CPU/seed31/timebase/config；其他provider、Attachment和Qualification未准入 |
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | ACCEPTED_BOUNDED_S2；GeoPhys a53 CPU × MuJoCo3.8.1 EGL、两轮24step/53capture；见 [R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28) |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | `ACCEPTED_BOUNDED_S3`；GeoPhys a53 CPU × MuJoCo 3.8.1 EGL，双同Env H5各12/13、双reader与22项native派生篡改拒绝；见 [R04c attempt001](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-camera-h5-s3) |
-| 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | READY_FOR_R05B_ATTEMPT001；先S1再CPU/CUDA最小S2，未完成 |
+| 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | attempt002已在Core `1193f2f` / GeoPhys `c6df840` 完成F1–F4、19项focused S1及CPU/CUDA各2 outer/10 native双reader；待Sol复核，不是R05b接收。R05c仍未授权/未开始 |
 | 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | PLANNED / NOT_STARTED |
 | 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；历史missing raw处置仍BLOCKED，R06c/P99不关闭。 |
 | 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | PLANNED / NOT_STARTED |
@@ -247,3 +247,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-29 R05b attempt001在 `codex/phase-ii-01-camera` 完成Provider公开effort-limit setter、Core source-receipt/正常profile admission及必要接线；最终Core为 `91a3774f93905d665cedd462d658824c5daf56d7`，GeoPhys为 `c6df840bef8d36b1150150167df08e29dc3f664c`，两者clean。Provider S1 23 passed、Core focused R05b S1 11 passed，tripwire均为0；较宽construction选择集59 passed/2个历史source-config digest断言失败并保留为未解决，不声称该选择集全绿。最终freeze下fresh CPU与CUDA各2 outer/10 native，production与独立raw H5 readers通过，close和共享锁释放成功。结果状态 `R05B_BOUNDED_PUBLIC_NATIVE_FEEDBACK_S1_S2_PASS_PENDING_SOL_REVIEW`；accepted count仍15/22，等待Sol审阅后再更新接收计数。详细范围/失败/限制见[R05b attempt001执行结果](05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29)和ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_001/`。R05c未启动，missing raw/phase blocker、DAG、Required Envelope、P99与Qualification不变。
 
 2026-10-29 Sol复核R05b001为CHANGES_REQUIRED_R05B：原CPU/CUDA短S2和hash/原H5读回事实接收，另复现默认public reset缺字段、修改mesh重算receipt仍获准及Core大整数ID截断；原定worker/finalizer/reader接线S1不完整。下一包R05b002按[R05修复表](05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair)收口；原15/22接收计数不变，不进入R05c。
+
+2026-10-29，R05b attempt002在固定camera Core `1193f2f`、GeoPhys `c6df840` 上关闭F1–F4；19项focused provider-free S1通过，fresh CPU/CUDA各以normal profile完成两outer/十native，生产reader及独立raw reader均通过。结果待Sol复核；没有R05b接收、R05c、P99或Qualification结论。详见[R05 attempt002记录](05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29)。

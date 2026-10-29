@@ -979,12 +979,7 @@ See the [Sol bounded acceptance](../../../docs/module/task_env/goal/Phase_II_01/
 
 ## R05b bounded native-feedback route (2026-10-29)
 
-Sol review of attempt001 requires changes: default reference reset initialization,
-trusted asset-closure admission and wide actuator-ID validation are not yet
-accepted. This section locates the implementation owners; it does not establish
-a working general route. See the [R05 repair plan](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-review-repair).
-
-The selected NutAssembly task exposes an advanced normal-profile construction:
+The selected NutAssembly task has an explicit advanced normal-profile entry:
 
 ```python
 from task_env.tasks.nut_assembly.task import NutAssemblyReferenceEnv
@@ -999,18 +994,29 @@ finally:
 ```
 
 Use `backend="cpu"` or `"cuda"` and `gripper_control_hz=100` or `500` (default
-500). This is a normal Core-admitted profile for the exact NutAssembly Square
-nominal-v1 Artifact and canonical source closure on the pinned GeoPhys build;
-it is not the historical C05c diagnostic constructor and does not expand the
-generic Provider manifest. Its versioned source receipt binds the XML and the
-immutable dependency bytes consumed by the Importer. Keep the named actuator
-mapping, strict scalar profile, implicitfast solver, 2 ms × 5 timebase, seed19,
-and existing Controller/Solution route unchanged. Unsupported sources, builds,
-backend/runtime settings and incomplete provenance fail closed.
+500). This route uses the normal Core admission path and
+`nutassembly-native-feedback-v1`; it does not use the historical C05c
+diagnostic constructor or expand the generic Provider manifest. Admission
+requires the exact NutAssembly Square nominal-v1 Artifact, trusted 69-file
+canonical/importer closure, GeoPhys build and import origin, semantic joint/body/
+actuator mapping, backend configuration, strict scalar profile, implicitfast,
+2 ms × 5 timebase, and the selected R3 Controller/Solution/law with 10 N cap.
+Changed source bytes, mappings, build, profile or control configuration fail
+closed. The immutable execution-source receipt keeps the v0 `RuntimeSource`
+ABI unchanged.
 
-R05b attempt001 provider-free focused S1 and final-freeze GeoPhys CPU/CUDA
-two-outer native S2 passed with production semantic and independent raw H5
-readers, pending Sol review. The two-outer run does not complete the task,
-Expert route or Guard dwell and does not qualify the full CPU/CUDA × 100/500 Hz
-campaign, real-time/device-resident control, P99 or Formal Qualification. See
-the [public API contract](../../../docs/module/task_env/public-api.md#r05b-bounded-nutassembly-native-feedback-profile) and [R05 execution record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt001-execution-result-2026-10-29).
+Sol's review of attempt001 requested four repairs: initialize profile lifecycle
+state on every selected-reference constructor route, reject modified assets even
+when a new receipt is computed, validate actuator IDs before int32 narrowing,
+and exercise the connected worker/finalizer/reader path in S1. Attempt002
+implemented these fixes on Core commit `1193f2f` and passed 19 focused
+provider-free tests. Fresh GeoPhys CPU and CUDA runs at 500 Hz each completed
+one reset, two outer intervals and ten native steps; both the production
+semantic reader and independent raw H5 reader passed. This result is pending
+Sol review, not slice acceptance. The S1 synthetic-IO path proves Core wiring
+and reader lifecycle, not physics. The bounded native runs do not establish
+task/Expert completion, Guard dwell, native 100 Hz law, the full CPU/CUDA ×
+100/500 Hz campaign, real-time or device-resident control, general Provider
+support, P99, or Formal Qualification. Historical missing raw/phase
+disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`; R05c remains
+unstarted. See the [R05 attempt002 record](../../../docs/module/task_env/goal/Phase_II_01/05_R05_Native_Rate_Feedback.md#r05b-attempt002-execution-result-2026-10-29).
