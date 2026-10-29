@@ -889,3 +889,12 @@ failure, the task-owned runner now selects definitions from its fixed Scene; a
 new provider-free regression passed. No native retry verified the correction,
 so this result remains S2 incomplete/S3 not run pending Sol review. It adds no
 new provider admission, general Attachment support or Qualification.
+
+
+<a id="f05-attempt001-source-control-result"></a>
+
+## F05 attempt001: USD source/control result (partial; pending Sol review)
+
+F05 attempt001 exercised the existing versioned Position-candidate and `SelectedReferenceEnv` Core route with a lowest-level synthetic `NativeRuntimeIOV1` replacement. The Menagerie local-validated USD reached GeoPhys public import and host rigid-model lowering through an isolated candidate provider tree; two same-Env synthetic episodes were recorded to closed H5 files and independently read back. This is bounded S1 evidence only.
+
+The frozen official Panda delivery was rejected at GeoPhys public import because `/panda/panda_link0` authors a non-finite `maxDepenetrationVelocity` (`inf`). The source was not edited or simplified. Its real source/mimic cell remains incomplete. The isolated GeoPhys importer fix is not integrated into the Core checkout's pinned GeoPhys gitlink. Production GeoPhys USD materialization continues to fail closed, including for a locally validated source outside the private S1 scope. No GeoPhys physics, Isaac, MuJoCo USD, S2/S3, general provider admission, or Qualification was exercised. See the [F05 execution record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-execution-result).

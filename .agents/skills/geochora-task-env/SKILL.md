@@ -179,7 +179,7 @@ Session and adapter close release their owned resources but never terminate the 
 Only the dedicated outer native-worker boundary performs controlled process termination, after
 H5/witness/receipt durability, and preserves the actual result code. Do not describe this as
 successful natural interpreter/Kit teardown. Preserve attempt003's five `-11` exits and all other
-historical failures; F05 remains unstarted. See the [attempt004 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
+historical failures; at F04 closeout, F05 had not yet started. See the [attempt004 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
 
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
@@ -1115,3 +1115,10 @@ defaults to CUDA GPU PhysX (`cuda:0`, `gpu_dynamics=true`). Freeze and verify
 the device and GPU process evidence in each run package; use a CPU recipe only
 when the maintainer explicitly specifies it for that package. See the
 [Phase II-01 F01 closeout](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f01-attempt003-sol-acceptance).
+
+
+## F05 attempt001 source/control result (2026-10-30; partial, pending Sol review)
+
+F05 attempt001 added an internal USD source composer and model-bound GeoPhys force-drive receipt in the existing source/control owners. Menagerie local-validated USD passed public import/host lowering using isolated provider candidate commit `41f8b517...`; this is not evidence for the Core checkout's pinned `a53a8cf...` provider. The actual Core Position route, Recorder, independent H5 reader and close owners passed the bounded synthetic S1 with two episodes. Keep `synthetic_fixture`, `runtime_admitted=false`, and `source_verified=false`.
+
+The frozen official Panda source was rejected by public GeoPhys import at `/panda/panda_link0` because authored `maxDepenetrationVelocity` is infinite. Do not remove the source property or treat importer retention as consumption. Production GeoPhys USD materialization remains rejected; no GeoPhys physics, Isaac, MuJoCo USD, S2/S3 or Qualification claim follows. See [F05 execution result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-execution-result).

@@ -3638,7 +3638,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "F04 attempt004 records a passed 30/30 provider-free S1, one same-run official/current Panda CUDA/GPU PhysX execution, four closed H5 files, original physical-gate readback, independent reader, parent exit and bundle receipts. Its package-wide candidate PASS remains unclaimed because G8 tracked-clean is incomplete due to two unrelated tracked documentation changes preserved without staging. Attempt001-003 failures remain historical and F05 is unstarted; the original R-slice DAG/P99 dependencies are unchanged.",
+  "planning_submission_this_revision": "F05 attempt001 source/control implementation and synthetic Core S1 returned PARTIAL_PENDING_SOL_REVIEW. Menagerie source/host lowering and S1 ran with isolated GeoPhys candidate 41f8b517; official Panda was rejected at public import for authored maxDepenetrationVelocity=inf. No provider physics/native, production GeoPhys USD admission, Qualification, or F06. See f05_attempt001_execution.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -5028,7 +5028,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F05 attempt001 source/control foundation and actual Core S1; package prepared for maintainer forwarding, not executed.",
+      "selected_next": "Sol review of F05 attempt001 PARTIAL result; F06 remains unstarted and requires a separate reviewed package.",
       "after_that_priority": [
         "F05 ready cells",
         "F06 ready cells",
@@ -5042,7 +5042,9 @@
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
-      "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only."
+      "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
+      "F05": "PARTIAL_PENDING_SOL_REVIEW; Menagerie source/control foundation and synthetic Core S1 candidate reported; official Panda source cell blocked at public GeoPhys import by authored non-finite maxDepenetrationVelocity; production USD admission remains closed.",
+      "F06": "NOT_STARTED; not authorized by F05 attempt001."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5951,6 +5953,55 @@
       "mujoCo_usd_cell": "existing exact decoder rejection reused, other builds unverified; no install/build/native probe",
       "F06_authorized": false,
       "full_F05_acceptance_claimed": false
+    },
+    "f05_attempt001_execution": {
+      "date": "2026-10-30",
+      "attempt": 1,
+      "status": "PARTIAL_PENDING_SOL_REVIEW",
+      "input_head": "b087afee98e97875c0875175e3a756820d9a0b33",
+      "branch": "develop-full",
+      "provider_pin": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+      "provider_candidate_commit": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_candidate_gitlink_integrated": false,
+      "G3_provider_site_regression": "27/27 passed on isolated provider candidate; MJCF primitive site size normalization only; strict helper and source bytes unchanged",
+      "G2_Menagerie": "public USD import and host lowering passed on isolated candidate provider; 13 bodies, 12 joints, 83 shapes, 9 drive facts, 95 frames; 15 DOF/9 actuators; no mimic relation",
+      "G2_official_Panda": "blocked at public import: panda_link0 authored maxDepenetrationVelocity is non-finite (inf); source retained unchanged; mimic/physics cell not ready",
+      "G4": "model-bound GeoPhys force-drive affine mapping oracle passed for units, bias, q0/offset, force caps, ordering, angular/prismatic and unsupported-law rejection; no physical force-control claim",
+      "G5": "11/11 final provider-free S1 nodes passed; same Env two synthetic episodes, each T=8/T+1=9 and 40 synthetic advances; two closed H5 independently read back; 18 boundaries/observations, 16 transitions and 80 advances verified; six tamper classes rejected; eight fault/lifecycle cases passed",
+      "G6": "F02 25 executable tests, F03 25 tests, F04 four S1 tests passed after changes; one F02 clean-checkout provenance node not run in dirty source tree; F03 historic post-change exact set preserved",
+      "native_starts": 0,
+      "solver_initializations": 0,
+      "physics_steps": 0,
+      "Kit_starts": 0,
+      "production_GeoPhys_USD_admission": "FAIL_CLOSED",
+      "F06_started": false,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_001/report.md",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_001/",
+      "next": "Sol review; do not start F06",
+      "documentation_validation": {
+        "phase_ii_01_markdown_files": 12,
+        "phase_markdown_sha256": {
+          "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
+          "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
+          "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
+          "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
+          "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
+          "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
+          "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
+          "07_Execution_Order_and_Acceptance.md": "42cfc990d45ead04e92525a18b4022eebb7d52be7c41b67dca8bbfb01a6005d4",
+          "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
+          "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
+          "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "b84003550ff91044acd0e7c4404bfcd5199d5fd42ff43794feee1e1f2c8b168d",
+          "README.md": "0d70d28a4f4966f6fb8d9e5f30ada98f58483b44b315858a0bf96f03606b5911"
+        },
+        "touched_links_and_anchors": "5 Markdown files; PASS",
+        "task_env_skill_static_check": "PASS using configured Core Python",
+        "planning_manifest_json": "PASS",
+        "git_diff_check": "PASS",
+        "global_docs_validator": "NOT_RUN_PER_PACKAGE"
+      },
+      "implementation_commit": "24f3cca1"
     }
   }
 }

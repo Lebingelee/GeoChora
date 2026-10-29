@@ -1,7 +1,7 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt001工作包准备中，未执行**。
-F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05首包的具体source/control缺口、owner、隔离provider工作树计划和零native预算见[首包计划](#f05-attempt001-source-control-foundation)。
+更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt001为 `PARTIAL_PENDING_SOL_REVIEW`**。
+F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001完成Menagerie候选的source/control基础、GeoPhys隔离MJCF importer修复及合成Core S1；官方Panda在GeoPhys public import前因 authored `maxDepenetrationVelocity=inf` 被拒，故真实source cell未就绪。详情见[F05执行结果](#f05-attempt001-execution-result)。
 
 ### 当前双Luna分工（2026-10-29）
 
@@ -678,3 +678,19 @@ F04已获`ACCEPTED_BOUNDED_F04`，F05总目标保持本节第5表的三provider 
 G1：输入/保护hash及所有权完整；G2：真实USD import/host lowering与属性处置报告（每个来源独立结果，失败也保留）；G3：已知MJCF site importer复现、修复及primitive/strict-helper回归；G4：控制单位/零位/drive law和model-bound映射正负例；G5：真实Core工厂到两个same-Env synthetic episode、完整T+1/H5独立读回及fault/cleanup检查；G6：F02/F03/F04受影响S1回归，旧Isaac receipt/hash/reader保持；G7：docs/Skill/源码/来源/预算/run ledger和本地提交完整，tracked变更只含本包范围。只有相应门通过才可报告`F05_SOURCE_CONTROL_S1_PASS_PENDING_SOL_REVIEW`，仍不等于F05总接收或S2/S3。未完成的public capability必须报PARTIAL/BLOCKED并指出下一包的具体修复，不用仅有报告取代本包已知可做实现。
 
 预计活跃180–270分钟，timebox360分钟（最后30分钟收口）。每source-only import/model或S1子进程wall≤300秒、RSS≤3GiB，单进程/最多4CPU threads；同时只运行一个资源密集检查。启动MemAvailable≥4GiB，低于1GiB中止；新evidence≤512MiB、日志≤64MiB、cache增长≤1GiB。无安装/升级/新资产下载，网络仅官方资料≤50MiB。严禁`ti.init/init_test_backend`、solver/simulator构造、MuJoCo native compile/step、Isaac/Kit、renderer。source-only import/host model必须有tripwire和实际零初始化计数；触发即停留证。每5–10分钟只读可观察进展；一个完整prompt，维护者转述，Sol不直接消息派发。原三轮attempt与本F05 attempt001分别计数，失败run在窗口内修复，不随意提前结束。
+
+<a id="f05-attempt001-execution-result"></a>
+
+### F05 attempt001 execution result (2026-10-30; PARTIAL_PENDING_SOL_REVIEW)
+
+输入为`develop-full@b087afee98e97875c0875175e3a756820d9a0b33`；Core实现/S1提交为`24f3cca1`。GeoPhys根gitlink仍为`a53a8cfed7c9d6464274b5c96fca601271dc4ee4`，Menagerie仍为`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。隔离provider候选已在`codex/phase-ii-01-f05-geophys`产生本地提交`41f8b517c5f92cd6e59907394dc42714b78702a7`，主仓gitlink没有更新；候选root/HEAD及每次S1实际import origin均保存在ignored F05 Evidence。主仓保留原13项S1源码及历史失败；本次不启动Kit/native/solver/physics。
+
+G1输入/保护回读通过。G2 Menagerie F04 delivery经Core owned snapshot、GeoPhys public USD import与public host rigid-model lowering成功：13 bodies、12 joints、83 shapes、9 drive facts、95 imported frames；canonical runtime mapping 13/13通过；host model为15 DOF/9 actuators，Menagerie没有USD mimic关系。该代码执行于隔离candidate provider commit `41f8b517...`，并非main pin的运行证据。官方Panda同delivery在public import入口因`/panda/panda_link0` authored `maxDepenetrationVelocity` 非有限（`inf`）而被GeoPhys拒绝；没有修改源、删mimic、替换几何或绕过该检查，因此official source/mimic cell未就绪。
+
+G3隔离GeoPhys importer回归27/27通过，修复只规范化MJCF primitive importer的有效尺寸维；通用strict padded helper和原MJCF bytes保持不变。G4 model-bound receipt及独立数值oracle核对公开force-drive的单位转换、affine bias、force cap、乱序DOF/actuator、非零rest/velocity/坐标offset、不同length/mass尺度与angular/prismatic输入；acceleration drive和非有限authored stiffness被拒。Source-authored `maxForce` 保留为模型元数据，Core ack不声明实际force control。
+
+G5 provider-free最终冻结节点11/11通过。实际Core `make_env → versioned candidate → source/admission → Session/reset → Controller/typed state → public step → Recorder/H5 → independent reader → close`仅替换最低NativeRuntimeIO；Menagerie S1同一Env两episode，每轮T=8、T+1=9、每interval 5次synthetic advance，输出两份closed H5。独立reader核验18/18 boundaries、18/18 observations、16 transitions、80 synthetic advances；两份文件的末行/观测/episode/source/receipt/Ack篡改均按明确原因拒绝。另8种startup/reset/snapshot/prewrite/partial apply/missing Ack/advance/close故障均验证primary fault与exactly-once close；Recorder append/finalize与Core lifecycle旧回归复用F03冻结节点。生产GeoPhys USD在S1 scope外继续fail closed。
+
+G6变更后复验：F02可执行的25项通过；clean-checkout provenance节点未在有授权tracked diff的工作树运行，当前运行结果不代表clean-checkout门。F03冻结25项通过；F04四项S1通过。合成结果不构成GeoPhys物理、Isaac或MuJoCo USD执行。F05 MuJoCo 3.8.1 USD decoder拒绝按精确build原件复用；其他MuJoCo build及split Attachment未运行。完整commands/run ledger、源码/来源映射、reader与资源记录见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_001/`。
+
+本attempt按`PARTIAL_PENDING_SOL_REVIEW`交付，不报`F05_SOURCE_CONTROL_S1_PASS_PENDING_SOL_REVIEW`：官方Panda public import/source cell尚未通过，且没有任何provider physics/native执行。本结果不授予GeoPhys USD生产admission、three-provider closure、S2/S3、Qualification或F06；等待Sol复核。
