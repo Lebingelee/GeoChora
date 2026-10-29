@@ -1858,10 +1858,10 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "c0c06153f14cd58d03ce19124116d539d6b93507c7b2c7baad26f4df86debd5d",
+    "07_Execution_Order_and_Acceptance.md": "42439b142303be5f7eb5f2e4fa0f0ec897c96cff45d06ed08bee891fc229685a",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "a2700c0f0bac81ee9ccab860ae4431876b1f6d5cdd46947723e1ba3239d58300",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "30ea197dee5ac6704371efc632f9fd9bd4d8edd97575825a243dd1c48487eb6f",
     "README.md": "494e9b2d3c8df43aa5a44b523e6ae64ef61f3f07417a6b9ef4ff3f7d19451a59"
   },
   "revision_kind": "F04_ATTEMPT002_LOCAL_DERIVED_DELIVERY_AND_TWO_SOURCE_ISAAC_PARTIAL",
@@ -5737,7 +5737,7 @@
       "qualification_granted": false
     },
     "f04_attempt003_package_plan": {
-      "status": "REASSESSMENT_COMPLETE_PACKAGE_TO_BE_FROZEN_AFTER_SOL_COMMIT",
+      "status": "EXECUTED_PARTIAL_PENDING_SOL_REVIEW",
       "attempt": 3,
       "target_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
       "branch": "develop-full",
@@ -5760,7 +5760,57 @@
       "original_gates_preserved": true,
       "new_branch_or_worktree": false,
       "F05_authorized": false,
-      "result_if_unresolved": "return complete failed/blocked evidence; no attempt004 without maintainer decision"
+      "result_if_unresolved": "return complete failed/blocked evidence; no attempt004 without maintainer decision",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/",
+      "F05_started": false
+    },
+    "f04_attempt003_execution": {
+      "status": "F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW",
+      "attempt": 3,
+      "branch": "develop-full",
+      "input_head": "151a3e27cc1212f909c594f4246e79a81bf3ff48",
+      "prompt_sha256": "f393f6f5030c3f2081aceb8cd4ec69e0f884cd97e13f622da63a6a7da7e8b931",
+      "protected_inputs": "1219/1219 SHA-256 matches; prompt package manifest verified",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/",
+      "provider_free_s1": "29/29 exact node IDs pass; no Kit/native start",
+      "native_runs": [
+        {
+          "run_id": "001_f04_attempt003_both",
+          "parent_exit_code": -11,
+          "physics_steps": 2072
+        },
+        {
+          "run_id": "002_f04_attempt003_both_framework_unload",
+          "parent_exit_code": -11,
+          "physics_steps": 2072
+        },
+        {
+          "run_id": "003_f04_attempt003_both_atexit_release",
+          "parent_exit_code": -11,
+          "physics_steps": 2072
+        },
+        {
+          "run_id": "004_f04_attempt003_both_no_manual_plugin_unload",
+          "parent_exit_code": -11,
+          "physics_steps": 2072
+        },
+        {
+          "run_id": "005_f04_attempt003_both_faulthandler",
+          "parent_exit_code": -11,
+          "physics_steps": 2072
+        }
+      ],
+      "native_budget_used": {
+        "app_starts": 5,
+        "physics_steps_including_bootstrap": 10360,
+        "simulated_seconds": 20.72,
+        "worker_wall_seconds": 1923.680268744938
+      },
+      "latest_reader": "404/404 boundaries and observations, 2000 advances, 40/40 tamper rejections and physical gates passed; diagnostic only because parent exit was -11",
+      "cross_family_bundle_gate": "NOT_RUN after abnormal parent exit",
+      "F05_started": false,
+      "qualification_granted": false,
+      "sol_review": "PENDING"
     }
   }
 }

@@ -8,7 +8,7 @@ import sys
 
 REPO = Path(__file__).resolve().parents[3]
 BASE = REPO / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
-EVIDENCE = BASE / "f04_002/evidence"
+EVIDENCE = BASE / "f04_003/evidence"
 if str(EVIDENCE) not in sys.path:
     sys.path.insert(0, str(EVIDENCE))
 from build_f04_candidates import build as _build_candidate  # noqa: E402

@@ -38,9 +38,9 @@ _F04_MENAGERIE_PANDA_REVISION = 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7'
 _F04_OFFICIAL_PANDA_LOCAL_REVISION = 's3-prefix-last-modified-2026-10-07T01:07:07Z-through-2026-10-07T01:07:09Z'
 _F04_OFFICIAL_PANDA_SOURCE_CLOSURE_SHA256 = '7ba946a0b02623525dc6b92db9f1000f85fb2e9ea140a0ec6fabb6f818f6c072'
 _F04_MENAGERIE_PANDA_SOURCE_CLOSURE_SHA256 = 'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a'
-_F04_LOCAL_CHECKER_SHA256 = '9863ee00a3fa76f5fbe943f74fb1866e12acd5e6cd72a991c93472f016a11dbb'
-_F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '071fcd34bcf5abcf30f91b34c6d23f2958e1000a8bbca77edc1cb9084d7cc98f'
-_F04_MENAGERIE_LOCAL_RECIPE_SHA256 = 'dc5f1c896a98767dc1cf25e226a4cb086c99042dc4024ea2bdcf6a758c24b3f3'
+_F04_LOCAL_CHECKER_SHA256 = '047fc1e436d846296ae3d051c56e9f17d7d0ed378653989b3bc28dc00e77ec23'
+_F04_OFFICIAL_LOCAL_RECIPE_SHA256 = '158fb4ca7de5c49b0a430f46b08ff5953c5562baec507a04d91e9d55640c1558'
+_F04_MENAGERIE_LOCAL_RECIPE_SHA256 = '3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
@@ -229,8 +229,8 @@ def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
         raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
     if source.scene_source.locally_validated:
         if (not delivery.locally_validated or delivery.report.provenance_kind != 'local-validated'
-                or delivery.report.recipe_id != 'f04-physx-task-scene-overlay-v1'
-                or delivery.report.checker_id != 'geochora-f04-local-usd-checker-v1'
+                or delivery.report.recipe_id != 'f04-physx-task-scene-overlay-v2'
+                or delivery.report.checker_id != 'geochora-f04-local-usd-checker-v2'
                 or delivery.report.checker_sha256 != _F04_LOCAL_CHECKER_SHA256
                 or delivery.report.recipe_sha256 != delivery.delivery.recipe_sha256
                 or not delivery.report.passed):

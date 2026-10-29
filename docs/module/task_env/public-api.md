@@ -316,6 +316,30 @@ Current result: `F04_PARTIAL_PENDING_SOL_REVIEW`. Do not infer physical acceptan
 admission for other sources/builds, S2/S3, Human Judge approval, or Qualification. The
 attempt002 ledger and raw/derived evidence are in the [F04 attempt002 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native).
 
+<a id="f04-isaac-core-adapter-attempt003"></a>
+
+### F04 attempt003: bounded repair candidate, native exit unresolved (2026-10-29; pending Sol review)
+
+Attempt003 retained the exact two-source local-validation allowlist and original physical gates.
+It added a public Isaac kinematics refresh after reset without a physics step, routed worker
+gripper metres through the existing normalized Core action contract, corrected independent
+reader clock comparison tolerance, and recorded App close completion and producer receipts.
+The selected provider-free S1 set passed 29/29 exact node IDs with no Kit/native start.
+
+Five combined official-Panda/Menagerie-Panda runs each produced the four planned episodes
+(100 transitions/101 observations per file, five accepted 2 ms steps per interval). All five
+parent-observed worker exits were `-11`, so none is a complete native PASS. A separate diagnostic
+reader on the latest run verified 404/404 boundary and observation rows, 2,000 advances and
+rejected 40/40 tamper cases; its frozen physical metrics passed for those files. Because the
+parent process exit was abnormal, this readback is diagnostic only and the cross-family bundle
+gate was not promoted to acceptance. The latest producer receipts report completed App/session
+close and the aggregate was written before the parent exit. Preserve all five failed run records.
+
+Current candidate status is `F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW`. The original
+physical thresholds, source/build/device profile and F05 hold remain unchanged. This does not
+grant Isaac provider admission, S2/S3 acceptance, Human Judge approval or Qualification. See the
+[attempt003 execution candidate](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate).
+
 ### Static Logical Assembly value (R01a)
 
 ```python

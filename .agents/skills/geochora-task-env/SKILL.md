@@ -151,6 +151,18 @@ the producer's root aggregate receipt; parent-side reconciliation is separately
 labeled and raw receipts remain preserved. No broader Isaac/provider,
 Qualification or F05 claim follows. See [F04 attempt002](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native).
 
+F04 attempt003 added the public reset kinematics refresh, worker action-unit
+conversion through the existing Core action contract, 1e-12-second reader clock
+tolerance, and explicit graceful App-close receipts. Its exact provider-free S1
+set passed 29/29. Five combined A/B native runs completed all four episodes but
+each parent-observed worker exit was `-11`. The latest run's independent reader
+verified all 404 boundary/observation rows, 2,000 substep advances, 40/40
+tamper rejections and the frozen physical metrics; because the worker exit was
+abnormal, that readback remains diagnostic and is not native acceptance. Current
+status is `F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW`; preserve every
+failed run, keep the original thresholds, and do not start F05. Details are in
+the [attempt003 closeout](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate).
+
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
 from current inputs, then associates each expanded leaf with one existing

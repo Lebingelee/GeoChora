@@ -551,3 +551,44 @@ worker family receipts与H5已写入，但Isaac `SimulationApp.close()`使用快
 预计活跃150–240分钟，timebox360分钟，预留最后30分钟收口；外部锁等待单记、最多20分钟。每native worker≤900s、累计≤3600s，含全部bootstrap/失败run在内每run≤3000 physics steps/6模拟秒、窗口≤12000/24秒；CPU threads≤4。启动MemAvailable≥6GiB、GPU free≥5GiB；worker group采样RSS≤10GiB，MemAvailable<768MiB或GPU free<256MiB即安全中止；网络接收增量与缓存增长各≤2GiB，新证据≤512MiB、日志≤128MiB。每S1进程≤300s/RSS≤3GiB。所有native/转换经既有锁与supervisor；默认`cuda:0` GPU PhysX、`best_effort`、state-only。**不设任意App启动次数上限**，实际启动逐次记账，重跑受累计时间/步数/内存/磁盘约束；旧attempt002的2/2冻结记录保留。
 
 包准备完成后由维护者一次转述给Luna1；Sol不直接派发、不中途追加任务。执行前以Sol复核提交后的真实HEAD另存prompt SHA与protected snapshot；F05–F07不在本包自动授权范围。
+
+<a id="f04-attempt003-execution-candidate"></a>
+
+## F04 attempt003 execution candidate：父进程异常退出，等待Sol复核（2026-10-29）
+
+输入为`develop-full@151a3e27cc1212f909c594f4246e79a81bf3ff48`，branch和冻结Gitlink吻合；prompt、snapshot与package manifest复核通过，1,219/1,219 protected file hashes匹配。此前attempt001/002、F00–F03和全部历史失败原件保留。实现与物理oracle沿用本attempt原冻结身份。以下是Luna候选事实，不是Sol接收。
+
+### 本次修复和定向S1
+
+| Owner | 修复 | 验收与限制 |
+| --- | --- | --- |
+| `IsaacSimNativeRuntimeIOV1.write_reset/read_state` | reset后经public `SimulationManager.get_physics_simulation_view().update_articulations_kinematic()`刷新，并校验刷新前后native step/time不变 | provider-free方法级S1通过；native reader的四episode reset FK行符合原阈值 |
+| worker `_structured_action` → Core `prepare_structured_action` / Position Controller | 将物理`opening_m`映射为既有normalized action `u=2*opening_m/0.08-1` | S1验证0.04→0、0.02→-0.5、0.08→1及非有限/越界拒绝；native gripper实际开合超过原0.015m门 |
+| F04独立H5 reader | 对计算秒数用`rtol=0, atol=1e-12s`，整数clock、identity、step和hash仍严格比较 | 20类篡改/每source的检查保留；未修改旧reader、H5或ABI |
+| `IsaacSimAppOwnerV1`与combined worker | 启用`fast_shutdown=False`；分开close attempted/completed/failure；close返回后注销atexit callback，producer aggregate再落盘 | provider-free生命周期S1通过；latest producer receipt报告App close一次且complete，aggregate存在；交叉解除插件仍交由进程退出 |
+
+冻结的29项provider-free S1 exact node IDs全部通过，Kit/native/physics启动为0。冻结native实现源码和oracle未更改；原reset、动作horizon和物理阈值保持不变。
+
+### 五次A/B native运行与最后一次诊断读回
+
+同一个固定配方按official Panda→Menagerie Panda运行，每个worker均完成4个episode、2,000次public physics step与72次bootstrap step，共2,072 steps/4.144模拟秒；每episode 100 transitions/101 observations和500 accepted advances。五次native worker父级退出码均为`-11`，逐run证据和失败日志均保留：
+
+| Run | 父级exit | Steps | wall(s) | 处置 |
+| --- | ---: | ---: | ---: | --- |
+| `001_f04_attempt003_both` | -11 | 2072 | 391.375 | 保留首次完整A/B数据与关闭原件 |
+| `002_f04_attempt003_both_framework_unload` | -11 | 2072 | 382.281 | 去除显式framework/plugin unload后仍复现 |
+| `003_f04_attempt003_both_atexit_release` | -11 | 2072 | 382.319 | 调整atexit bound-method引用释放后仍复现 |
+| `004_f04_attempt003_both_no_manual_plugin_unload` | -11 | 2072 | 384.677 | 不手动卸载插件仍复现 |
+| `005_f04_attempt003_both_faulthandler` | -11 | 2072 | 383.029 | 启用`PYTHONFAULTHANDLER=1`；未生成Python traceback，退出问题仍未解决 |
+
+累计5次App start、10,360 physics steps/20.72 simulated seconds与1,923.680 worker wall seconds；不超过12,000 steps/3,600s预算。latest process group sampled RSS最大5,? bytes (resource receipt精确值为6,055,677,952 bytes)，最低MemAvailable 3,370,852,352 bytes，最低GPU空闲4,900MiB；无安全中止阈值触发，logs 51,370 bytes，network接收增量22,048,609 bytes，Omniverse cache增长0，输出树393,384,550 bytes。资源均为采样值；当前累计step余量不足以重新执行一套完整A/B门，因此未再启动native。
+
+第五次producer在SIGSEGV前已写入根aggregate；报告中的`app_owner`为`close_attempted=true`、`close_completed=true`、`close_attempts=1`，四个Core session也记录已关闭，worker error和cleanup error为空。父级supervisor仍观察到进程exit `-11`，`PYTHONFAULTHANDLER=1`未输出fatal Python stack；没有取得core dump。共享native锁在父级完成进程组退出和资源测量后释放。
+
+在失败run005的四份H5上另行启动两个Core Python独立reader进程，仅用于诊断：逐文件核验101/101 boundary、101/101 observation、100 transitions和500 advances；总计404行、2,000 advances，40/40 copy-only tamper拒绝。reader重算的原物理门均通过：arm excursion约0.02192/0.02335rad、gripper变化约0.02683m、FK最大位置误差约0.0000472m、最大姿态误差约0.0001203rad、free-body drop约0.395m、late settled z约0.505m。结果已明确标为diagnostic-only。没有运行cross-family bundle gate，也没有将worker的episode receipts与reader诊断拼接成通过；parent exit是完整native验收门，仍失败。
+
+### 当前出口
+
+本attempt为`F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW`。reset刷新、动作单位、reader clock和producer aggregate缺口已由本attempt代码/S1及第五次worker/reader事实支持；但五次父进程异常退出阻止完整native验收。保留状态为候选，不自授Sol接收、Isaac provider admission、S2/S3、Human Judge、P99、Qualification或training-ready。`F04`原物理阈值不变，`F05`未启动。
+
+完整逐run原件、四份H5/witness、native receipts、资源/锁账本、reader诊断、input readback和sha清单见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/`。下一步由Sol审查实际diff及退出证据后决定；本attempt不启动额外slice或attempt。

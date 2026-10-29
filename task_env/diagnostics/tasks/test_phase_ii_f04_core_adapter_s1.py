@@ -67,9 +67,9 @@ def test_f04_candidate_reset_is_bound_over_the_local_support_recipe(family):
     candidate = build_candidate(family)
     delivery_root = (
         Path(__file__).resolve().parents[3]
-        / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/assets"
-        / ("local_official_panda_r007" if family == "official-panda"
-           else "local_menagerie_panda_r007")
+        / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/assets"
+        / ("local_official_panda_r009" if family == "official-panda"
+           else "local_menagerie_panda_r009")
     )
     delivery = json.loads((delivery_root / "usd_delivery.json").read_text())
     recipe_path = delivery_root / delivery["recipe_path"]
@@ -286,19 +286,87 @@ def test_f04_local_delivery_through_real_core_env_recorder_s1(tmp_path, monkeypa
     }, indent=2) + "\n")
 
 
+@pytest.mark.parametrize(("opening_m", "normalized"), ((0.04, 0.0), (0.02, -0.5), (0.08, 1.0)))
+def test_f04_attempt003_worker_opening_uses_real_core_normalized_action_route(
+        monkeypatch, opening_m, normalized):
+    """Exercise worker conversion through Core prepare/Controller/Target owners."""
+    import builtins
+    import importlib.util
+    import sys
+
+    from task_env.registry import make_env
+    from task_env.runtime.sessions import isaac_native_io
+    from task_env.runtime.sessions.control import prepare_structured_action
+
+    worker_path = (Path(__file__).resolve().parents[3]
+                   / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
+                     "/f04_003/evidence/f04_native_core_worker.py")
+    spec = importlib.util.spec_from_file_location("f04_attempt003_worker_s1", worker_path)
+    assert spec is not None and spec.loader is not None
+    worker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(worker)
+
+    input_v1 = build_candidate("official-panda")
+    created = []
+
+    def low_io_factory(artifact, execution, source):
+        io = _S1NativeIO(artifact=artifact, execution=execution, source=source, input_v1=input_v1)
+        created.append(io)
+        return io
+
+    monkeypatch.setattr(isaac_native_io, "create_isaac_native_runtime_io", low_io_factory)
+    forbidden = ("isaacsim", "omni", "carb", "torch", "mujoco", "GeoPhys")
+    original_import = builtins.__import__
+
+    def import_tripwire(name, *args, **kwargs):
+        if any(name == prefix or name.startswith(prefix + ".") for prefix in forbidden):
+            raise AssertionError(f"native/provider import is forbidden in Core action S1: {name}")
+        return original_import(name, *args, **kwargs)
+
+    env = make_env(
+        "panda-position-servo-candidate-v1",
+        config={"versioned_input": input_v1, "horizon": 4},
+    )
+    before_modules = set(sys.modules)
+    try:
+        env.reset(seed=31)
+        current = {item.joint_id: float(item.position[0])
+                   for item in env.typed_state.view.joints if item.entity_id == "panda-main"}
+        arm_goal = [current[f"joint{i}"] for i in range(1, 8)]
+        builtins.__import__ = import_tripwire
+        for invalid in (float("nan"), -0.001, 0.080001):
+            with pytest.raises(ValueError, match="finite metres"):
+                worker._structured_action(env, arm_goal, invalid)
+        request = worker._structured_action(env, arm_goal, opening_m)
+        prepared = prepare_structured_action(env.position_plan, request)
+        assert len(prepared) == 1
+        assert prepared[0][1].values[-1] == pytest.approx(normalized, abs=0.0)
+        _observation, _reward, _terminated, _truncated, _info = env.step(request)
+        _canonical, position_target, applied = env.last_position_transition
+        assert position_target.target.gripper.opening_m == pytest.approx(opening_m, abs=1e-15)
+        assert applied.target_hash == position_target.target.identity_hash
+        assert created[-1].advances == 5
+    finally:
+        builtins.__import__ = original_import
+        env.close()
+    assert created[-1].close_count == 1
+    assert not any(name == prefix or name.startswith(prefix + ".")
+                   for name in (set(sys.modules) - before_modules) for prefix in forbidden)
+
+
 @pytest.mark.parametrize("family,mutated_relative", (
-    ("local_official_panda_r007", "metadata/physx_task_scene_recipe.json"),
-    ("local_official_panda_r007", "metadata/f04_local_usd_checker.py"),
-    ("local_official_panda_r007", "metadata/local_validation_report.json"),
-    ("local_official_panda_r007", "derived/panda.usda"),
-    ("local_menagerie_panda_r007", "support/official/report.json"),
-    ("local_menagerie_panda_r007", "support/converter_manifest.json"),
+    ("local_official_panda_r009", "metadata/physx_task_scene_recipe.json"),
+    ("local_official_panda_r009", "metadata/f04_local_usd_checker.py"),
+    ("local_official_panda_r009", "metadata/local_validation_report.json"),
+    ("local_official_panda_r009", "derived/panda.usda"),
+    ("local_menagerie_panda_r009", "support/official/report.json"),
+    ("local_menagerie_panda_r009", "support/converter_manifest.json"),
 ))
 def test_f04_local_delivery_tampering_fails_core_loader(tmp_path, family, mutated_relative):
     from task_env.assembly.usd_delivery import load_usd_asset_delivery
 
     root = (Path(__file__).resolve().parents[3] /
-            "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/assets" /
+            "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/assets" /
             family)
     copied = tmp_path / family
     shutil.copytree(root, copied)

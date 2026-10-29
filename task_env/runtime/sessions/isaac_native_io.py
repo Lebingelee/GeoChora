@@ -43,13 +43,22 @@ class IsaacSimAppOwnerV1:
         self._close_requested = False
         self.start_attempts = 0
         self.close_attempts = 0
+        self._close_attempted = False
+        self._close_completed = False
+        self._close_failure: dict[str, str] | None = None
+        self._framework_unload_attempted = False
+        self._framework_unload_completed = False
+        self._framework_unload_failure: dict[str, str] | None = None
+        self._atexit_close_unregister_attempted = False
+        self._atexit_close_unregister_completed = False
+        self._atexit_close_unregister_failure: dict[str, str] | None = None
 
     @property
     def app(self):
         return self._app
 
     def open(self):
-        if self._closed:
+        if self._closed or self._close_attempted:
             raise RuntimeError("Isaac App owner cannot reopen after close")
         if self._app is None:
             installed = importlib_metadata.version("isaacsim")
@@ -64,6 +73,9 @@ class IsaacSimAppOwnerV1:
                 "headless": True,
                 "enable_cameras": False,
                 "limit_cpu_threads": 4,
+                # Kit's default fast shutdown can terminate Python before the
+                # worker writes its producer-owned completion receipt.
+                "fast_shutdown": False,
             })
             import carb
 
@@ -72,13 +84,19 @@ class IsaacSimAppOwnerV1:
             ))
             try:
                 _validate_isaac_task_thread_count(actual)
-            except RuntimeError:
-                self._close_now()
+            except RuntimeError as primary:
+                try:
+                    self._close_now()
+                except BaseException as cleanup_error:
+                    primary.add_note(
+                        "Isaac App cleanup after task-thread validation also failed: "
+                        f"{type(cleanup_error).__name__}: {cleanup_error}"
+                    )
                 raise
         return self._app
 
     def close(self) -> None:
-        if self._closed:
+        if self._closed or self._close_attempted:
             return
         if self._process_lifetime_holds:
             self._close_requested = True
@@ -87,7 +105,7 @@ class IsaacSimAppOwnerV1:
 
     def retain_process_lifetime(self) -> None:
         """Keep the process App alive while sequential Core Env leases are exchanged."""
-        if self._closed:
+        if self._closed or self._close_attempted:
             raise RuntimeError("cannot retain a closed process Isaac App")
         self._process_lifetime_holds += 1
 
@@ -99,14 +117,63 @@ class IsaacSimAppOwnerV1:
             self._close_now()
 
     def _close_now(self) -> None:
-        if self._closed:
+        if self._closed or self._close_attempted:
             return
         self.close_attempts += 1
-        self._closed = True
+        self._close_attempted = True
         self._close_requested = False
-        app, self._app = self._app, None
+        app = self._app
         if app is not None:
-            app.close()
+            try:
+                app.close()
+                # Isaac Sim 6.2 registers a bound _atexit_close callback during
+                # SimulationApp construction. After explicit close that callback
+                # is a no-op, but it keeps the closed SimulationApp (and its
+                # shutdown pybind handles) alive until interpreter teardown.
+                # Drop that lifecycle reference, but leave framework/plugin
+                # unloading to process teardown as SimulationApp.close specifies.
+                import atexit
+
+                close_callback = getattr(app, "_atexit_close", None)
+                if callable(close_callback):
+                    self._atexit_close_unregister_attempted = True
+                    atexit.unregister(close_callback)
+                    self._atexit_close_unregister_completed = True
+                # The local bound-method reference itself retains the closed
+                # SimulationApp. Drop it before releasing the owner-held wrapper
+                # so every native handle is finalized while Carb is still loaded.
+                close_callback = None
+                self._app = None
+                del app
+            except BaseException as error:
+                self._close_failure = {
+                    "type": type(error).__name__, "message": str(error),
+                }
+                if (self._atexit_close_unregister_attempted
+                        and not self._atexit_close_unregister_completed):
+                    self._atexit_close_unregister_failure = {
+                        "type": type(error).__name__, "message": str(error),
+                    }
+                raise
+        self._app = None
+        self._closed = True
+        self._close_completed = True
+
+    def close_receipt(self) -> dict[str, object]:
+        """Expose whether the native App close call was attempted and returned."""
+        return {
+            "close_attempted": self._close_attempted,
+            "close_completed": self._close_completed,
+            "close_failure": self._close_failure,
+            "closed": self._closed,
+            "close_attempts": self.close_attempts,
+            "framework_unload_attempted": self._framework_unload_attempted,
+            "framework_unload_completed": self._framework_unload_completed,
+            "framework_unload_failure": self._framework_unload_failure,
+            "atexit_close_unregister_attempted": self._atexit_close_unregister_attempted,
+            "atexit_close_unregister_completed": self._atexit_close_unregister_completed,
+            "atexit_close_unregister_failure": self._atexit_close_unregister_failure,
+        }
 
 
 def _process_app_owner() -> IsaacSimAppOwnerV1:
@@ -439,6 +506,7 @@ class IsaacSimNativeRuntimeIOV1:
         written_joints: list[str] = []
         written_free: list[str] = []
         attempted = 0
+        before = self._counter()
         try:
             positions = [0.0] * len(self._dof_names)
             for semantic, native in self._source.joints.items():
@@ -459,8 +527,31 @@ class IsaacSimNativeRuntimeIOV1:
                                     angular_velocities=(0.0, 0.0, 0.0))
                 written_free.append(semantic)
             self._sync()
-            self._episode_origin_step, self._episode_origin_time = self._counter()
+            simulation_view = self._manager.get_physics_simulation_view()
+            if simulation_view is None:
+                raise RuntimeError("public Isaac physics simulation view is unavailable for reset refresh")
+            refresh = getattr(simulation_view, "update_articulations_kinematic", None)
+            if not callable(refresh):
+                raise RuntimeError("public Isaac simulation view lacks articulation kinematic refresh")
+            refresh_result = refresh()
+            if refresh_result is False:
+                raise RuntimeError("public Isaac articulation kinematic refresh reported failure")
+            self._sync()
+            after = self._counter()
+            if after != before:
+                raise RuntimeError(
+                    "public Isaac reset setters/kinematic refresh advanced physics or changed time: "
+                    f"before={before!r}, after={after!r}"
+                )
+            self._episode_origin_step, self._episode_origin_time = after
             self._native_step_count = 0
+            self._last_reset_refresh_receipt = {
+                "api": "SimulationManager.get_physics_simulation_view().update_articulations_kinematic",
+                "step_index_before": before[0], "step_index_after": after[0],
+                "simulation_time_before_s": before[1], "simulation_time_after_s": after[1],
+                "refresh_return": refresh_result,
+                "physics_advanced": False,
+            }
             return NativeResetWriteReceiptV1(
                 "native-reset-write-receipt-v1", sample.sample_id,
                 tuple(sorted(written_joints)), tuple(sorted(written_free)),
