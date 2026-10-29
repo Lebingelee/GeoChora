@@ -1,8 +1,8 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收。R07b pilot attempt001的source/recipe S1已获Sol有界接收；R07c pilot attempt002已交回PARTIAL实现包待Sol复核，Core native admission仍关闭，原五任务整体未完成，接收数不增加。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
+当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收。R07b pilot attempt001的source/recipe S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/G1-G2 BLOCKED实现包待Sol复核，Core native admission仍关闭，原五任务整体未完成，接收数不增加。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
-- **Luna2**：`codex/phase-ii-01-camera`上的[R07c pilot attempt002](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-execution-result-2026-10-29)已交回PARTIAL待Sol复核。固定MJCF source组合及同一现有Core Env provider-free fault/Recorder S1已通过；没有公开benchmark UID，`.pruned_init`映射、上游runtime placement、compiled IDs、生产contact peer和native语义仍未验证，native为0。
+- **Luna2**：`codex/phase-ii-01-camera`上的[R07c pilot attempt003](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-execution-result)已交回PARTIAL/G1-G2 BLOCKED待Sol复核。source composer恢复movable-object free joint；安全解码原始init rows，但fixture placement缺失；同路线MuJoCo RuntimeSession consumer、contact freshness与G2 S1仍未实现，native为0。
 - **R07当前边界**：R07a004来源/协议部分接收及单pilot来源准入已有Sol记录。pilot不代表原五任务R07a或R07b整体通过；TurboSquid三族仍阻塞其关联任务，不影响本包未消费这些资产的工作。保留原五任务最终P99目标、原生语义和成本/独立Human评审。
 - **Luna1**：独立负责`develop-full`的F00–F07，状态以其分支10文档及实际报告为准；本次不写主checkout/F文档、Isaac或依赖。
 - **R05完成**：精确normal-route CPU/CUDA×100/500Hz完整回合及H5双reader已获Sol接收，不承诺通用Provider/实时2ms/Qualification。
@@ -99,7 +99,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 18 | R06c | R06b,R03c,R04c,R05c | required交集/证据/范围汇总 | S1/S2/S3 | 真实受影响回归/缺required证据→停止 | `ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION`；attempt002技术包与历史范围勘误收口；18/22，非Qualification |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PARTIAL_AUDIT_ACCEPTED；一项 pilot 来源审计有界接收，原五任务出口未完成；详见09及主分支 Sol R07a004记录 |
 | 20 | R07b | R07a（首pilot来源/协议已部分接收） | asset/benchmarks与bench_deploy、安装校验/最小配方/owner缺口 | S1 | 消费资产来源/闭包未核验→停止该任务；不绕Core gate | `ACCEPTED_BOUNDED_R07B_PILOT_SOURCE_RECIPE_S1`；来源/配方S1接收，native admission关闭，成本INVALID，原五任务整体未通过 |
-| 21 | R07c | R07b | 五Task真实构造/reset/motion/Controller/Planner/语义/H5 | S1/S2/S3 | 任一required Task阻塞/不可表示/失败/未测→P99 blocked | pilot attempt002已交回PARTIAL待Sol复核；单task provider-free Core S1已接线，`.pruned_init`/placement/compiled IDs/contact/native语义未解决；无native准入，五Task验收未完成 |
+| 21 | R07c | R07b | 五Task真实构造/reset/motion/Controller/Planner/语义/H5 | S1/S2/S3 | 任一required Task阻塞/不可表示/失败/未测→P99 blocked | pilot attempt003已交回PARTIAL/G1-G2 BLOCKED待Sol复核；source free-joint修复与安全decoder S1通过，但原fixture placement缺失且MuJoCo RuntimeSession mixed consumer/contact freshness/S1未接通；无native准入，五Task验收未完成 |
 | 22 | R07d | R07c | session成本报告与独立human代码质量审阅 | Audit/independent review | 无来源/无独立review或虚构usage→阻塞 | PLANNED / NOT_STARTED |
 
 P99直接依赖 **R06c,R07d**；R06c已获有界接收，R07四行仍未完成。当前历史范围以r06c_scope_reconciliation.json为准；修改reader或产生真实回归时重开精确受影响门，不能用未知旧文件作无限恢复前置。
@@ -284,4 +284,4 @@ R07c attempt002返工计划现已由维护者发送并执行；以上计划文�
 2026-10-29 Sol复核R07c pilot attempt002：`PARTIAL_WORK_RETAINED_REWORK_REQUIRED`。139项包哈希、32项保护输入、122项输入Git blob通过；15/29/43项S1与3个native deselect按原日志保留。实际组合XML的free joint为0，可动物体被固定，缺上游object实例化/free joint语义；同Env S1仍走GeoPhys consumer，未证明约定MuJoCo路线。init/placement、生产contact与freshness、native验证仍缺。planning manifest中07/09的旧hash不匹配，Sol当前修复，原报告不改。接收数18/22不变；第三attempt前须完成这些具体owner/方法方案及上游复用可行性判断，未授权native或下一attempt。复核原件：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_002/`。
 
 
-R07c pilot下一窗口为attempt003最后修复包，按[具体方案](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-final-repair-plan)推进。先source/原init/真实MuJoCo consumer和同路线S1，门全过才在同attempt做有界native；未过门不启动。保留18/22及五任务出口，不自动第四轮。
+R07c pilot attempt003已按[最后修复包](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-final-repair-plan)执行并交回PARTIAL。原始fixture pose/seed不在`.pruned_init`中，且真实MuJoCo consumer与contact freshness仍未接通；G1/G2未过，故零native。接收数18/22及五任务出口保持，不自动第四轮；维护者须先审阅实际diff、原始证据和具体阻塞，再决定后续。

@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt002已交回PARTIAL待Sol复核，成本reader拒绝门、静态MJCF组合和同一Core Env provider-free S1已完成。公开LIBERO `make_env` admission关闭，`.pruned_init`映射、上游运行时placement、compiled IDs、生产contact query及native语义未验证，zero native；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；下文较早规划与审计保持其时点含义，原五任务最终目标不缩减。
+状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/BLOCKED待Sol复核。新source composer恢复了上游 movable-object free-joint与命名规则；原`.pruned_init`安全解码成功，但其不含每行fixture pose或采样seed，不能完成原始reset映射。真正MuJoCo RuntimeSession mixed-control/contact consumer与同路线S1未完成，因此G1/G2未过、zero native。公开LIBERO `make_env` admission关闭；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；历史记录保持其签署时点含义，原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -273,3 +273,13 @@ init decoder/原行flat-state mapping、public对象pose/contact、ControlMap实
 可行性判断：固定source、50×92数据和上游恢复布局均可取得，存在沿现RuntimeSession/Env扩展的实现路线，无需新框架或资产授权决定；风险是mixed-control admission与原joint order/fixture placement精确对应，必须在native前做provider-free证据。只有证明布局/source/consumer而非猜测才可进入物理门。允许在本attempt内通过完整前置门后做MuJoCo3.8.1 CPU有界验证，不再为普通字段/finalizer问题另开attempt。若布局或现owner不可支持，在门前如实BLOCKED并给维护者决策，不降低验收或自行第四轮。
 
 包规定每native进程600秒、采样RSS2GiB、硬RSS3GiB，累计native墙钟3600秒、20000物理substeps、30次reset，输出1GiB；共享锁独占worker全部生命周期，无锁不导入native。S1每进程180秒/2GiB，多次修复重跑。源码/输入/增益/阈值在每run启动前冻结，变更另建run并留旧件；禁止用不同run片段拼PASS。详细资源、物理判据和断路门由同一冻结prompt约束。下一prompt由维护者转发，无自动派发。
+
+<a id="r07c-pilot-attempt003-execution-result"></a>
+
+## R07c pilot attempt003 执行结果（2026-10-29）
+
+状态：`R07C_PILOT_PARTIAL_G1_G2_BLOCKED_PENDING_SOL_REVIEW`。输入HEAD为`3fcfb0c0b78c3659751c0918e02b0aea8d2e65d3`，source manifest SHA-256为`4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75`。G0冻结输入/单writer/资源预检通过。上游source适配输出确定性MJCF，静态审计见到五个movable free joints、fixture内部关节、源顺序及named resources；合法`.pruned_init`由不执行pickle构造器的固定格式decoder读取，50×92原始行hash保留。source-derived nq/nv布局仍未由compiled MuJoCo model验证。
+
+G1被原始reset信息缺失阻断：92个值覆盖time/qpos/qvel，不含`wooden_cabinet_1`与`flat_stove_1`的每行placement；上游将其作为reset采样后的`model.body_pos/body_quat`写入，固定输入也没有配套seed。禁止用XML默认pose或新采样补值，故无法证明rows0/1/2的原始场景。G2同样未通过：本轮只修复了mixed adapter对`robot0_` arm与`gripper0_` finger前缀的名称校验；当前LIBERO候选依然走`BaseTaskEnv → GeoPhys`，没有接入MuJoCo `_MuJoCoSession` mixed torque/position、原reset、fresh contact与SelectedReferenceEnv/Recorder同路线。旧fake-leaf S1不代表G2。contact freshness仍无producer及公开episode/materialization/boundary绑定。
+
+provider-free修复S1：安全decoder/source-control 32 passed；旧BaseTaskEnv synthetic fake-leaf/worker/H5回归2 passed，保留5个synthetic H5。曾有前缀/旧fixture字段失败，已在本attempt修复并重跑；失败原因记录于attempt输出。G3未冻结MuJoCo run；G4/G5未执行。MuJoCo 3.8.1 CPU未导入、未编译、未reset/step；native starts=0，reset=0，mj_step=0，共享锁未占用。无MuJoCo native H5、无contact正例。实现提交和报告见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_003/`；本结果不增加18/22，不关闭五任务/P99/Qualification/Human Judge/R07d，不自动授权第四attempt。

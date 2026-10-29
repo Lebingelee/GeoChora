@@ -2611,8 +2611,8 @@
       "depends_on": [
         "R07b"
       ],
-      "status": "PILOT_ATTEMPT002_PARTIAL_PENDING_SOL_REVIEW_FULL_FIVE_TASK_EXIT_PENDING",
-      "execution": "PILOT_ATTEMPT002_PARTIAL; NATIVE_ADMISSION_FALSE",
+      "status": "PILOT_ATTEMPT003_PARTIAL_G1_G2_BLOCKED_PENDING_SOL_REVIEW_FULL_FIVE_TASK_EXIT_PENDING",
+      "execution": "PILOT_ATTEMPT003_PARTIAL; G1_G2_BLOCKED; NATIVE_ADMISSION_FALSE",
       "required_evidence": "per-task S1/S2/S3 real deployment and native semantic correspondence",
       "stop_condition": "any required task BLOCKED_CORE/BLOCKED_PROVIDER/NOT_REPRESENTABLE/FAIL/NOT_RUN blocks P99",
       "pilot_preparation": {
@@ -2713,7 +2713,7 @@
         "next_attempt_authorized": false
       },
       "pilot_attempt003_plan": {
-        "status": "READY_FOR_MAINTAINER_FORWARD",
+        "status": "EXECUTION_RESULT_RECORDED_PARTIAL_BLOCKED",
         "anchor": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-final-repair-plan",
         "expected_active_minutes": [
           240,
@@ -2726,6 +2726,39 @@
         "reset_budget": 30,
         "fourth_attempt_authorized": false,
         "acceptance_count_unchanged": "18/22"
+      },
+      "pilot_attempt003_execution": {
+        "date": "2026-10-29",
+        "status": "R07C_PILOT_PARTIAL_G1_G2_BLOCKED_PENDING_SOL_REVIEW",
+        "input_head": "3fcfb0c0b78c3659751c0918e02b0aea8d2e65d3",
+        "implementation_commit": "147381e7062bd41b77bc6a660207aa29e17835dc",
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_003/",
+        "gates": {
+          "G0": "PASS; frozen inputs/pins/clean checkout/resource and lock preflight",
+          "G1": "BLOCKED; fixed .pruned_init rows omit fixture model.body_pos/body_quat and sampler seed; compiled layout not verified",
+          "G2": "BLOCKED; mixed MuJoCo RuntimeSession/SelectedReferenceEnv consumer and public contact freshness producer not implemented; old BaseTaskEnv/GeoPhys fake S1 is not this route",
+          "G3": "NOT_STARTED; no native run freeze",
+          "G4": "NOT_RUN; conditional gate not reached",
+          "G5": "NOT_APPLICABLE; no native run"
+        },
+        "provider_free_s1": {
+          "init_and_source_control": "32 passed",
+          "legacy_core_fake_leaf_worker_h5": "2 passed; synthetic GeoPhys leaf only; not G2",
+          "synthetic_h5_artifacts": 5,
+          "native_engine_imports": 0
+        },
+        "native": {
+          "starts": 0,
+          "compiles": 0,
+          "resets": 0,
+          "mj_step_calls": 0,
+          "shared_lock": "NOT_ACQUIRED"
+        },
+        "accepted_slice_count_delta": 0,
+        "accepted_count": "18/22",
+        "original_five_task_exit": false,
+        "fourth_attempt_authorized": false,
+        "sol_review": "PENDING"
       }
     },
     {
