@@ -252,3 +252,6 @@ attempt002在输入HEAD `04c35d137c4fb93644bce730fd47fa552a38a823` 上完成atte
 独立validator使用冻结的planning manifest、受保护review列表及实际review/source/H5 bytes建立可信表。它拒绝不完整/重复slice与H5、错误decision/review/hash、跨slice review、H5 hash/size/file/run/cell/source/pin不符、未知schema及历史处置仍pending却声明PASS/18条接收/Qualification的变体；正例与27项指定负例均通过。R04c仍是GeoPhys a53 CPU physics × MuJoCo EGL renderer；R06b是MuJoCo CPU physics且GeoPhys a53 gitlink未作物理provider；R05c保持17d6388/c6df840精确profile，均未被当前输入HEAD/c6df840改写。
 
 四项历史raw仍缺失，`phase_decision.yaml`全部decision/approved_by/approval_reference为null。技术包状态为 `R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW`；R06c overall仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，17/22计数不变，R07/P99/Qualification未关闭。两项历史`source.config`摘要断言仍按独立限制记录；本包不表示全仓测试通过。完整文件与运行receipt位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/`；无native、未取共享锁。待Sol复核，不自动进入R07。
+
+
+2026-10-29 Sol已接收R06c attempt002技术包：`ACCEPTED_R06C_TECHNICAL_BUNDLE_HISTORICAL_DECISION_PENDING`。三项返工关闭，独立核对115项清单、152项保护输入与16份H5，正例和原三种漏检变体均符合预期；8/250项S1与27项负例按原日志复用。整体R06c仍`BLOCKED_MISSING_RAW_OR_PHASE_DECISION`、17/22不变，四项历史处置仍全null；R07/P99/Qualification未关闭。复核见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06c_002/`。

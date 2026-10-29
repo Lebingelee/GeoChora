@@ -2429,8 +2429,8 @@
         "R04c",
         "R05c"
       ],
-      "status": "R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW",
-      "execution": "ATTEMPT002_TECHNICAL_BUNDLE_READY; 17_ACCEPTED_REFS_CORRECTED; S1_250_PASS; 27_VALIDATOR_NEGATIVES_PASS; HISTORICAL_DECISIONS_PENDING; R06C_OVERALL_BLOCKED",
+      "status": "R06C_TECHNICAL_BUNDLE_ACCEPTED_HISTORICAL_DECISION_PENDING",
+      "execution": "ATTEMPT002_TECHNICAL_BUNDLE_ACCEPTED_BY_SOL; FOUR_HISTORICAL_DECISIONS_PENDING; R06C_OVERALL_BLOCKED",
       "required_evidence": "S1/S2/S3",
       "stop_condition": "缺required出口/历史处置→P99 blocked",
       "implementation_plan": "06_R06_Compatibility_and_Regression.md#r06c-attempt001-implementation-plan",
@@ -2521,7 +2521,16 @@
         "accepted_count": "17/22",
         "P99": "BLOCKED_DEPENDS_ON_R06C_AND_R07D",
         "qualification_granted": false,
-        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/"
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/",
+        "sol_review_status": "ACCEPTED_R06C_TECHNICAL_BUNDLE_HISTORICAL_DECISION_PENDING"
+      },
+      "sol_review": {
+        "decision": "ACCEPTED_R06C_TECHNICAL_BUNDLE_HISTORICAL_DECISION_PENDING",
+        "reviewed_head": "0e1ba2a2718159ad31a6d6cc0202fd8ae247530f",
+        "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06c_002/sol_review.md",
+        "historical_disposition_approved": false,
+        "overall": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "accepted_slice_count": 17
       }
     },
     {
@@ -2673,7 +2682,7 @@
   "document_sha256": {
     "README.md": "09498ade8d6483c2db4bde85e5e377a6b52442981324ec2396e7d789530e7a93",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "d698d62ef83e0f26760c3737794034d6ded5a90c8df5530be6fc4d2cc8f6721d",
+    "06_R06_Compatibility_and_Regression.md": "650ec4369ee8f7d1d70e9075fca341c4dde765bdb7be666f4bd721e7967caf5e",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2682,7 +2691,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "cabcf56663705506856cca2e2f707449b8631b5d76063f735217a2bf3df4a493"
+    "07_Execution_Order_and_Acceptance.md": "a9cba8b4f3000e34fdc11b28d5d77faaa83fb4c9e241a589c7928356a933486b"
   },
   "revision_kind": "R05C_ATTEMPT001_BOUNDED_FOUR_CELL_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
