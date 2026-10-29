@@ -150,7 +150,7 @@ def test_source_joint_order_mutation_is_rejected_after_identity_and_closure_rebi
     })
     plan = replace(plan, source_closure_sha256=_source_closure_digest(closure))
 
-    with pytest.raises(ValueError, match="canonical Joint order/coverage differs from source"):
+    with pytest.raises(ValueError, match="R06b derived XML differs from the one allowlisted order recipe"):
         lower_fixed_attachment_sources(
             parent_source=parent_source,
             source_by_entity=source_by_entity,

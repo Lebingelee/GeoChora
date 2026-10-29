@@ -91,7 +91,7 @@ def _prepare_worker(monkeypatch, tmp_path: Path, *, failure: str | None = None):
         'schema': 'r06b-native-start-ledger-v1', 'native_start_count': 1,
         'native_worker': 'r06b_order_worker.py',
     }) + '\n')
-    freeze = root / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/package_input/input_snapshot.json'
+    freeze = Path('/home/lly/Program_Files/Geochora/workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/package_input/input_snapshot.json')
     snapshot = json.loads(freeze.read_text())
     relevant_code = [
         'task_env/artifacts/contracts.py', 'task_env/assembly/fixed_attachment.py',
@@ -280,7 +280,7 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
     from task_env.diagnostics.tasks import r06b_order_supervisor as supervisor
     from task_env.diagnostics.tasks import r06b_order_worker as worker
 
-    outcomes = ('success', 'worker_failure', 'reader_failure', 'resource', 'popen_failure')
+    outcomes = ('success', 'worker_failure', 'reader_failure', 'resource', 'popen_failure', 'cleanup_exception')
     for mode in outcomes:
         output = tmp_path / f'supervisor-{mode}'
         output.mkdir()
@@ -288,10 +288,23 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
         lock.touch()
         monkeypatch.setattr(supervisor, 'LOCK_PATH', lock)
         monkeypatch.setattr(supervisor, '_available_bytes', lambda: 4 * 1024**3)
-        monkeypatch.setattr(supervisor, '_process_group_pids', lambda _pgid: [])
-        monkeypatch.setattr(supervisor, '_process_group_rss', lambda _pgid: [
-            {'pid': 999999, 'rss_bytes': 5 * 1024**3 if mode == 'resource' else 1024},
-        ])
+        group_pid_calls = {'value': 0}
+
+        def group_pids(_pgid):
+            if mode == 'cleanup_exception' and group_pid_calls['value'] == 0:
+                group_pid_calls['value'] += 1
+                return [999999]
+            return []
+
+        monkeypatch.setattr(supervisor, '_process_group_pids', group_pids)
+        if mode == 'cleanup_exception':
+            monkeypatch.setattr(supervisor, '_process_group_rss', lambda _pgid: (_ for _ in ()).throw(
+                RuntimeError('synthetic RSS sampling failure'),
+            ))
+        else:
+            monkeypatch.setattr(supervisor, '_process_group_rss', lambda _pgid: [
+                {'pid': 999999, 'rss_bytes': 5 * 1024**3 if mode == 'resource' else 1024},
+            ])
         real_time = supervisor.time
         monkeypatch.setattr(supervisor, 'time', SimpleNamespace(
             monotonic=real_time.monotonic, time=real_time.time, sleep=lambda _seconds: None,
@@ -300,10 +313,25 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
             'output_dir': str(output), 'contract_sha256': 'a' * 64,
             'input_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=worker.ROOT, text=True).strip(),
             'branch': subprocess.check_output(['git', 'branch', '--show-current'], cwd=worker.ROOT, text=True).strip(),
+            'limits': worker.FROZEN_LIMITS, 'oracles': worker.FROZEN_ORACLES,
+            'reader_tamper_matrix': worker.FROZEN_TAMPER_MATRIX,
+            'submodule_pins': {
+                'GeoPhys': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=worker.ROOT / 'GeoPhys', text=True).strip(),
+                'asset/external/mujoco_menagerie': subprocess.check_output(
+                    ['git', 'rev-parse', 'HEAD'], cwd=worker.ROOT / 'asset/external/mujoco_menagerie', text=True,
+                ).strip(),
+            },
+            'code_sha256': {
+                name: worker._sha(worker.ROOT / name) for name in (
+                    'task_env/diagnostics/tasks/r06b_order_worker.py',
+                    'task_env/diagnostics/tasks/r06b_order_supervisor.py',
+                )
+            },
+            'protected_sha256': {},
         }
+        contract['contract_sha256'] = worker._contract_digest(contract)
         contract_path = output / 'contract.json'
         contract_path.write_text(json.dumps(contract) + '\n')
-        monkeypatch.setattr(worker, '_check_frozen_contract', lambda *_args: None)
 
         class FakeProcess:
             pid = 999999
@@ -319,6 +347,8 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
 
             def poll(self):
                 self.polls += 1
+                if mode == 'cleanup_exception':
+                    return None
                 if self.polls > 1:
                     self.returncode = 1 if mode == 'worker_failure' else 0
                 return self.returncode
@@ -332,6 +362,13 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
 
         class FakeRun:
             def __call__(self, *_args, **_kwargs):
+                import fcntl
+                probe_fd = os.open(lock, os.O_RDWR)
+                try:
+                    with pytest.raises(BlockingIOError):
+                        fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally:
+                    os.close(probe_fd)
                 if mode == 'success':
                     (output / 'raw_readback.json').write_text(json.dumps({'status': 'synthetic-pass'}))
                 return FakeRunResult()
@@ -343,9 +380,14 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
 
         fake_subprocess = SimpleNamespace(Popen=popen, run=FakeRun(), STDOUT=subprocess.STDOUT)
         monkeypatch.setattr(supervisor, 'subprocess', fake_subprocess)
-        monkeypatch.setattr(supervisor, '_terminate_group', lambda _pgid, proc: {
-            'term_sent': True, 'kill_sent': False, 'term_wait_seconds': 0.0,
-        })
+        if mode == 'cleanup_exception':
+            def cleanup_failure(_pgid, _proc):
+                raise RuntimeError('synthetic cleanup failure')
+            monkeypatch.setattr(supervisor, '_terminate_group', cleanup_failure)
+        else:
+            monkeypatch.setattr(supervisor, '_terminate_group', lambda _pgid, proc: {
+                'term_sent': True, 'kill_sent': False, 'term_wait_seconds': 0.0,
+            })
         receipt = supervisor.run_supervisor(contract_path)
         assert receipt['rss_sample_count'] in (0, 1)
         if mode == 'success':
@@ -363,7 +405,11 @@ def test_supervisor_persists_failure_resources_and_releases_fake_lock(monkeypatc
             assert receipt['rss_peak_sampled_group_bytes'] == 5 * 1024**3
         else:
             assert receipt['status'] == 'NATIVE_SUPERVISOR_FAILED'
-            assert receipt['primary_error']['message'] == 'synthetic Popen failure'
-            assert receipt['rss_peak_sampled_group_bytes'] is None
+            if mode == 'popen_failure':
+                assert receipt['primary_error']['message'] == 'synthetic Popen failure'
+                assert receipt['rss_peak_sampled_group_bytes'] is None
+            else:
+                assert receipt['primary_error']['message'] == 'synthetic RSS sampling failure'
+                assert receipt['cleanup_error']['message'] == 'synthetic cleanup failure'
         assert receipt['lock_released_after_group'] is True
         assert receipt['worker_start_ledger_sha256'] is not None
