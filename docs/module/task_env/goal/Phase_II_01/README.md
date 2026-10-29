@@ -191,3 +191,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-28，Sol复核R03c attempt004，接收 `ACCEPTED_BOUNDED_S2_S3`。实际启动exit 0、正式receipt及complete progress存在；50项原始文件hash、16项冻结源码hash、1280 step trace、四份H5与独立readback的hash及冻结门一致，48/48 tamper拒绝。接收仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置；RSS为边界采样，非interval内硬峰值。复用33项provider-free S1，没有新增native或软件测试。复核报告：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md`。
 
 2026-10-29，Sol完成R04c attempt001最终复核，接收ACCEPTED_BOUNDED_S3：162项输出hash和68项恢复source一致；复用两份12/13 H5的独立semantic/raw读回，原8+10项S1及22项native派生拒绝结果保留，无新native或测试套件重跑。仅限GeoPhys a53 CPU × MuJoCo3.8.1 EGL × seed31单Panda Position双D04交集，不是task success/Qualification；camera分支未merge。R05b/c仍受R05a正式合同阻塞，R06b可独立准备但历史compatibility处置gate不关闭。详见[R04接收记录](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-sol接收2026-10-29)。
+
+R06b attempt002经Sol复核仅接收部分S1/E1事实；派生E2未materialize。第三次前重评已完成，恢复canonical旧规范化并修复worker/supervisor，详细边界见[R06重评](06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment)。未接收通用Articulation v1顺序变更，R06b/R06c/P99未完成。

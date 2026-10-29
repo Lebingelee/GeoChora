@@ -135,3 +135,28 @@ Sol复核camera `4d032f8`：33项输出hash、24项输入冻结校验及相关�
 | 其余gate | E1的物理运动不代表派生顺序native通过；R06b总体状态保持partial，不能报 `R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`。历史 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`、R05 provider合同阻塞、R06c/P99/Qualification均不变。不得在本attempt重试native；是否安排attempt003由Sol重新评估。 |
 
 执行包与原始收据：`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/`；完整worker失败trace在 `native/native_failure.json`，E1成功case在 `native/E1_result.json`，E1 raw读回在 `E1_raw_readback.json`，共享锁最终状态在 `native_window.json`。本次曾在provider-free目标集合之外误运行一个R04b pytest入口：该测试自身因冻结HEAD/clean-tree preflight在R06b dirty状态下拒绝，未到其worker/compile/step，但pytest进程导入了MuJoCo；此协议偏离已如实记录在 `report.md`/`commands.json`，不计入R06b S1且不抹除。
+
+
+<a id="r06b-attempt003-reassessment"></a>
+
+## R06b attempt002 Sol复核与attempt003前重评（2026-10-29）
+
+Sol核对camera `4b74276`：178项输出hash（71,228,096 bytes）、native冻结640项代码及165项保护路径均匹配。接收部分S1/E1实际执行事实，决定 `ACCEPT_PARTIAL_E1_FACTS_WITH_REWORK_REQUIRED`；R06b未完成。无Sol新native或测试套件重跑。完整复核和开源调研/可行性记录在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06b_002/`。
+
+除了已报告的materialize wrapper跨case重复嵌套，还需修复：worker把空dict而非共享active传给case，导致trace归因不完整；S1未跑真正worker双case/finalizer；supervisor失败路径未保存RSS采样。不能通过提高两次materialization上限修复这些问题。
+
+**修正上一包设计：canonical Joint order无需等于source traversal。** attempt002改变通用`ArticulationDefinition.joints`规范化，在同一v1 schema下使未排序旧输入的canonical mapping/identity变化，未获兼容接收。003必须恢复原joint_id排序，将特定source遍历顺序留在严格source recipe和native receipt中，通过显式name mapping衔接；不是新建schema或放宽任意XML。
+
+| owner / 方法 | attempt003最后一次有界修复及门 |
+| --- | --- |
+| `artifacts/contracts.py::ArticulationDefinition.validate`；Scene strict codecs；既有Scene/identity测试 | 恢复旧排序；逆序输入构造/解码/serialization/hash与旧规范化一致。原始默认Task/Scene身份不变。 |
+| `assembly/fixed_attachment.py::_validate_source_declarations/lower_fixed_attachment_sources`；既有recipe/helper与candidate | canonical覆盖和named拓扑/type/axis/pose校验不变；在独立校验原exact或唯一derived recipe之后，按该recipe校验XML traversal而非要求canonical tuple等于native顺序。保留unknown/bytes/provenance/alias/missing拒绝；不得仅改set去掉source顺序门。 |
+| `r06b_order_worker.py::_run_case/run_worker` | 一个scope owner安装/恢复materialize查找别名及step/forward hooks；不累计wrapper。共享active传给case；总计和case计数分开。真实双case worker/finalizer provider-free成功/失败与原hook恢复通过再native。 |
+| `r06b_order_supervisor.py::run_supervisor`；原raw reader | 所有成功/失败路径保存已观测RSS、primary/cleanup和锁收据；未知不能报0。真实engine import须限制于唯一worker；S1显式清单/guard，完整argv可审计。 |
+| 原Env/leaf/Recorder/production reader与raw witness | 一worker两case仍各64/65、320step，累计128/130、640step、1.28s；原物理/identity/reader门保留。新closure/Scene等变更后重新freeze，旧E1/失败原件不改。 |
+
+前置重评结论 `FEASIBLE_WITH_BOUNDED_REWORK`：Python标准库contextmanager/ExitStack、unittest.mock的scope恢复、pytest monkeypatch.context可借鉴，无需新库/框架；MuJoCo官方named resource映射与已有adapter适配。引用与取舍见重评。E2从未真实编译/步进，物理结果仍未知，不能保证第三次通过。预计90–180分钟，仅第三次完整实施/验证/收尾包，最多1worker，无重试，仍与Luna1共享native锁。003若失败即报告未完成交回维护者，不自动第四次、不改变原required门。
+
+R04b误导入MuJoCo与argv未保留的偏离保持记录。历史missing raw/Phase处置、R05、R06c/P99与Qualification均不改变；本包不进入R07或F线。主checkout由Luna1持有，不触碰其dirty文件。
+
+独立reader补充复核：`run_readback`还需重算contract digest并将worker result的exact两case、H5 hash/size、receipt/materialization/counters逐项与实际文件绑定；单纯H5内部self-hash不足以排除错run。003补这些原same-run门的反例，整理tamper清单名与实际执行结果的对应，不新增物理范围。

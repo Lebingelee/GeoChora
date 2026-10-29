@@ -220,3 +220,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 
 
 2026-10-29 R06b attempt002：实现冻结HEAD `baa544dad4a024ec235f9209420de734ec59f797`；provider-free S1 202 passed（进程组RSS最大采样586,563,584 bytes）。唯一MuJoCo 3.8.1 CPU worker在共享锁内启动一次并exit 1。baseline E1完成64/65 H5、320 steps/0.64s、物理/close/production-reader门，worker失败后E1单文件独立raw回读通过；derived E2在Core materialize调用前因跨case重复嵌套的计数包装器误报超出2次物化预算，未编译/运行、无E2 H5。原native失败原件保留，监督器已释放锁；不重试。R06b仍未完成物理重排/双caseH5门，历史missing-raw决定仍BLOCKED；attempt003需Sol重新评估，不自动推进R05/R06c/R07/LIBERO。报告见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/report.md`。
+
+2026-10-29 Sol复核R06b002：部分E1事实接收、总体未完成；确认counter hook泄漏、真实worker双case S1缺失及通用Articulation v1规范化回归。已完成[003前重评](06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment)及官方开源模式调研，可在既有owner有界修复后执行第三次也是最后一次attempt。没有解锁R06c/R07，不自动第四次；历史missing raw与R05阻塞保持。

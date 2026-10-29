@@ -975,3 +975,10 @@ start is spent, and the R06b physical-order gate remains incomplete. Do not
 retry or claim R06b completion from this receipt; any attempt003 requires Sol
 reassessment. Preserve the original recipe and strict gates. See the current
 [attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt002-execution-result-2026-10-29).
+
+R06b002 Sol review accepts only partial S1/E1 facts. The same-schema change
+to ArticulationDefinition joint normalization is not accepted; R06b003 must
+restore canonical joint_id normalization and keep source/native order in the
+validated recipe and explicit mappings. Its real two-case worker must be
+exercised with synthetic native IO before another bounded native run. See
+[the reassessment](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment).
