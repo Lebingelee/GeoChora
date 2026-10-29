@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-当前统筹（2026-10-29）：Luna2负责原07执行表，下一包优先R05a正式合同/精确准入差异；Luna1独立负责F00–F07。跨分支14/22 slices已有有界接收，余R05a/b/c、R06c、R07a–d；R07a部分协议/一项pilot来源审计不等于原五任务出口。旧C05c CPU/CUDA×100/500Hz四格已通过，R05没有已知频率物理失败；见[07当前入口](07_Execution_Order_and_Acceptance.md)与[R05实施定位](05_R05_Native_Rate_Feedback.md#r05a-implementation-20261029)。下文早期入口及历史记录按各自时点保留。
+当前统筹（2026-10-29）：Luna2负责原07执行表；R05a attempt001已交正式host native-step合同候选与R05b/c实施计划，待Sol复核；Luna1独立负责F00–F07。跨分支14/22 slices已有有界接收，余R05a/b/c、R06c、R07a–d；R07a部分协议/一项pilot来源审计不等于原五任务出口。旧C05c CPU/CUDA×100/500Hz四格已通过，R05没有已知频率物理失败；见[07当前入口](07_Execution_Order_and_Acceptance.md)与[R05 attempt001候选](05_R05_Native_Rate_Feedback.md#r05a-attempt001-contract-candidate-20261029)。下文早期入口及历史记录按各自时点保留。
 
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。
 维护者于2026-10-28纠正顺序：F00 attempt001仅完成整合/完成事实修复与S1，20/20 seeds 因 `gripper_readiness_timeout` 失败；随后要求完整验收F00后才准备/执行F01。attempt002已在 `develop-full` 完成公开 A/B 归因、合成输入修复、20-seed campaign、Oracle/H5独立回读及pending Judge包，完整出口及有限复核修正已获Sol **`ACCEPTED_BOUNDED_F00`**。历史attempt001失败原件保留；详见 [10 F00 Sol接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f00-sol-acceptance)。
@@ -195,3 +195,5 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-29，Sol完成R04c attempt001最终复核，接收ACCEPTED_BOUNDED_S3：162项输出hash和68项恢复source一致；复用两份12/13 H5的独立semantic/raw读回，原8+10项S1及22项native派生拒绝结果保留，无新native或测试套件重跑。仅限GeoPhys a53 CPU × MuJoCo3.8.1 EGL × seed31单Panda Position双D04交集，不是task success/Qualification；camera分支未merge。R05b/c仍受R05a正式合同阻塞，R06b可独立准备但历史compatibility处置gate不关闭。详见[R04接收记录](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-sol接收2026-10-29)。
 
 R06b attempt002经Sol复核仅接收部分S1/E1事实；派生E2未materialize。第三次前重评已完成，恢复canonical旧规范化并修复worker/supervisor，详细边界见[R06重评](06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment)。未接收通用Articulation v1顺序变更，R06b/R06c/P99未完成。
+
+2026-10-29 R05a attempt001 已完成合同候选、条款矩阵、旧证据复用/成本预算及精确R05b/c计划，状态 `R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW`。既有 provider-free cadence S1 4/4 passed；没有新 native、GeoPhys/Core生产代码或 pin 改动。具体发现、原始状态分别见 [R05候选](05_R05_Native_Rate_Feedback.md#r05a-attempt001-contract-candidate-20261029) 与 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/`；R05b仍待Sol复核和后继包。

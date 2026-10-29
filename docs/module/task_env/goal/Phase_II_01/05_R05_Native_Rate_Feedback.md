@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态（2026-10-29）：R05a `READY_FOR_CONTRACT_FORMALIZATION`，准备 attempt001；旧 `BLOCKED_PROVIDER_CONTRACT` 为历史 Sol preflight，未做 R05 新 cadence 实验。R05a 尚未接收，R05b/c 仍 PLANNED / NOT_STARTED。旧 C05c 四格实际通过；本 Goal 补齐正式合同及正常准入，不重复证明已有频率功能。
+状态（2026-10-29）：R05a attempt001 已形成合同候选与 R05b/c 精确实施计划，状态 `R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW`；尚未由 Sol 接收，R05b/c 仍 PLANNED / NOT_STARTED。旧 C05c 四格实际通过；本 Goal 收口正式合同与正常准入，不把旧诊断结果改名为正式能力。
 
 ## 现有能力与 owner
 
@@ -68,4 +68,20 @@ Isaac R1 force-aware 若需要读取力，同样先核 source/transmission、单
 
 Provider正式说明如需改动，R05a交付对应owner可落地候选文本/patch与是否需新API的判定；R05b再落入Provider仓库并冻结实际commit/gitlink，不能用Core文档替Provider当前公共合同作已生效宣称。Sol是本包合同审阅/接收责任人，不让Luna因“尚无神秘外部owner签字”循环返回同一句BLOCKED；若确需维护者范围决定，须提供实际不支持的方法/行为和可选择的具体方案。
 
-R05b/c实施预算由本包提出后Sol随实施合同冻结。无实时要求、无device-resident要求；历史Reader约0.3ms不是未来强制阈值。保持原CPU/CUDA×100/500Hz四格required，范围内改动补最小delta证据；只有输入/算法改变推翻原任务证据时才重跑受影响完整cell。
+<a id="r05a-attempt001-contract-candidate-20261029"></a>
+
+### R05a attempt001 合同候选（2026-10-29，待 Sol 复核）
+
+状态为 `R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW`，不是 R05a 接收、正常 capability、正式 Qualification 或 R05b 授权。本 attempt 只跑 provider-free 的既有 cadence S1：`test_c05c_geophys_gripper_cadence.py` 4 passed；没有启动新 native，也没有取得共享 native 锁。合同矩阵、原证据复用、成本、Provider 文档候选和精确补丁计划在 ignored 输出 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/`。
+
+现有实现已提供 owned `float32` actuator 数组副本、reset-forward 与 implicitfast pre-integration 样本、generation/sequence/revision/phase/validity、状态与 ctrl 写失效、以及 Core 的 source/episode/reset/evaluation/sample 顺序校验。Provider v1 没有 sample-time、source-id、actuator refs 或 per-index unit；`force_unit="N"` 只适用于已审计的 Panda 固定 tendon 标量绑定，不能描述任意数组。Core 以 `native_step_index` 和 `physics_dt` 派生 `native_sample_time_s`，并单独保留 evaluation boundary clock。
+
+当前确定的 R05b 行为缺口：`GeoPhysRuntimeBoundary._apply_actuator_force_limit_overrides()` 在 Core 侧读写 Provider 私有 `act_forcerange_field` / `act_forcelimited_field`，且每次 `GeoPhysSession.apply_control()` 都重复上传同一限值并增加 configuration revision；Provider 没有公开的 force-limit setter。另一个接线缺口是普通 manifest 中没有单任务 force capability：GeoPhys CUDA 目前只有 process-local diagnostic manifest，CPU 诊断运行不等于正式 force admission。C05c 的 source closure digest 为空，现有 diagnostic manifest 只检查文本 source id；后继 admission 需绑定 source XML/closure bytes、顺序映射、Provider build、backend、profile、solver/integrator、TaskArtifact 与实际 Controller。
+
+候选范围仅为 NutAssembly 单一 source 的 GeoPhys CPU 与 CUDA physics、host Controller、strict `p1_2_scalar_cpu_v0`、implicitfast、2 ms×5、100 Hz outer；force/Guard 仍为 500 Hz，夹爪 law 为 100 Hz（更新一次并 hold 四步）或 500 Hz（每 native step 更新）。这不是 device-resident 或 2 ms real-time 保证。Provider 已有“诊断/低频”文档与该窄路径 per-step 观测之间需要 Provider owner 文档收口；R05a 已提供精确候选。无需新增 Reader facade；R05b 需要在既有 Provider host-I/O owner 增加公开 force-limit setter，并用新 clean Provider commit/gitlink 绑定版本，不能机械替换 a53 常量。
+
+旧 C05c 两步 probe 与四份 full-task/S3 H5 均已复核哈希、source、Artifact、seed19、integrator 与 cadence；不复制受保护 H5。CPU100 原 `result.json` 的 S2 完成且 strict Expert/Outcome 完成，但 S3 初始读回 assertion 使原顶层结果保持 failed、`s3=not_run`；同一 H5 的独立 follow-up 读回随后通过。其他三格原结果及 S3 均通过。它们仍是 a53 下的诊断证据，不能证明新正常 admission。
+
+R05b 顺序建议：先完成 Provider public setter、Core idempotent configuration call 与 source/build-bound normal admission；在 native 前通过真实 public construction 接线的 worker/finalizer/independent-reader 成功和 tamper/identity 负例 S1；再运行每 backend 的最小 reset + 两 outer probe。R05c 四格保持分别必需，每格使用正式 route 与独立 H5；旧 full-task 证据只对未受影响的物理任务/控制律输出复用，任一 source、solver、integrator、force law、reset、Controller 或 task 输入改变时重跑受影响完整 cell。预算上限和条件见 ignored `cost_budget.md`，由 Sol 在后继工作包冻结。
+
+本合同候选由 Sol 实际审阅后才可能接收。旧 R05a preflight 阻塞记录和 C05c 诊断记录继续保留；R05b/c、原 DAG、Required Envelope、P99 与 Qualification 状态不因本次文档更新而改变。

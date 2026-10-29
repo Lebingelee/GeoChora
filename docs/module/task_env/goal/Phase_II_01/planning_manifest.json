@@ -148,11 +148,11 @@
       "depends_on": [
         "P00"
       ],
-      "status": "READY_FOR_CONTRACT_FORMALIZATION",
-      "execution": "R05A_ATTEMPT001_PREPARED_NOT_YET_EXECUTED",
+      "status": "R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_COMPLETE_PENDING_SOL_REVIEW",
       "required_evidence": "Audit/S1/probe",
-      "stop_condition": "无owner合同→BLOCKED_PROVIDER_CONTRACT",
-      "blocker": "Normal host native-step contract and exact admission remain to be formalized; no known cadence physics failure. Existing typed sample/freshness and four diagnostic cells passed.",
+      "stop_condition": "Sol review/acceptance required before R05b; normal capability, Provider setter and source/build-bound admission remain unimplemented.",
+      "blocker": "Candidate is complete but not accepted. R05b must add a Provider-owned force-limit setter, remove Core private-field access/redundant configuration writes, and bind exact source/build/backend/profile/integrator admission; no cadence physics failure is known.",
       "scope_decision": "Maintainer assigns Luna2 to original 07 goals, prioritizing R05; Luna1 owns F00-F07. No qualification or required-envelope waiver.",
       "historical_preflight_20261026": {
         "status": "BLOCKED_PROVIDER_CONTRACT",
@@ -160,7 +160,22 @@
         "blocker": "Current pinned GeoPhys Reader forbids routine per-substep host snapshot; formal Provider API/phase/device/cadence/cost decision not established. Historical C05c is diagnostic-only.",
         "scope_decision": "Maintainer selected independent R04a while R05a remains BLOCKED_PROVIDER_CONTRACT; no DAG/P99 waiver and no R05a execution."
       },
-      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-implementation-20261029"
+      "implementation_plan": "05_R05_Native_Rate_Feedback.md#r05a-implementation-20261029",
+      "latest_attempt": {
+        "date": "2026-10-29",
+        "attempt": "001",
+        "branch": "codex/phase-ii-01-camera",
+        "input_head": "43253c83bb89aae9e88b185718e81daf94bfbf77",
+        "status": "R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW",
+        "provider_free_s1": "test_c05c_geophys_gripper_cadence.py: 4 passed; 1.14 s; max RSS 66,332 KiB",
+        "source_hashes_matched": 31,
+        "protected_evidence_hashes_matched": 20,
+        "new_native_processes": 0,
+        "shared_native_lock_acquired": false,
+        "deliverables": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/",
+        "sol_review": "PENDING",
+        "qualification_granted": false
+      }
     },
     {
       "id": "R04a",
@@ -2269,7 +2284,7 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "8ec02386b5a875fde5d0a4ee00adc958910a5df3f74b98213362a5111d6d0f65",
+    "README.md": "59b1398c05917158bbd8527a951429e3d99476d952788ddcb01cad075582c28c",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "06_R06_Compatibility_and_Regression.md": "85ac767d8156382c236c2d5618d0dd7d90c70c44a6b7a740be67f94405945e10",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
@@ -2278,9 +2293,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
-    "05_R05_Native_Rate_Feedback.md": "1b741ea94447c2646c7a64adc2bfa0bfe9fe6b3865238a7d348afacdba4f6861",
+    "05_R05_Native_Rate_Feedback.md": "5903b695091b5e8b47e2d6de4d0eb7c02fef2e9a013513c8b7dddd2071c161a6",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "2a69f716cf398b8df9d924753aca3b1a7d5e8a6a3d9cc7bd6d07919b97b0a6be"
+    "07_Execution_Order_and_Acceptance.md": "927aeb974e855c6717b95854f61ea475b531a86181457dfba5ecac86a5ab969e"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -5709,6 +5724,24 @@
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/report.md",
       "next_attempt": "NOT_AUTHORIZED_BY_THIS_PACKAGE; Sol must reassess before any attempt003",
       "qualification_granted": false
+    },
+    "r05a_attempt001": {
+      "date": "2026-10-29",
+      "branch": "codex/phase-ii-01-camera",
+      "input_head": "43253c83bb89aae9e88b185718e81daf94bfbf77",
+      "status": "R05A_CONTRACT_AND_IMPLEMENTATION_PLAN_READY_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/report.md",
+      "contract_matrix": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/contract_matrix.json",
+      "evidence_reuse": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/evidence_reuse.json",
+      "s1": "4 passed; provider-free, engine import tripwire; max RSS 66,332 KiB",
+      "old_c05c": "four protected probe/full H5 byte identities verified in place; CPU100 original result failure and same-H5 passing follow-up both preserved",
+      "new_native_processes": 0,
+      "shared_native_lock": "NOT_ACQUIRED",
+      "provider_api": "No new force-read facade needed for exact NutAssembly intersection; public Provider force-limit setter required for Core boundary",
+      "normal_admission": "Not implemented; CUDA remains diagnostic-only and generic CPU manifest is not force capability",
+      "qualification_granted": false,
+      "sol_review": "PENDING",
+      "implementation_commit_recorded_in_report": true
     }
   }
 }
