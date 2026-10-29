@@ -2650,6 +2650,21 @@
           "cost reader independent lineage and completeness",
           "actual composed source and real existing Core Env success/fault S1"
         ]
+      },
+      "pilot_attempt002_plan": {
+        "status": "PREPARED_NOT_SENT",
+        "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-rework-plan",
+        "expected_active_seconds": [
+          10800,
+          14400
+        ],
+        "timebox_seconds": 18000,
+        "new_native_authorized": false,
+        "work": [
+          "independent cost reader lineage/completeness",
+          "actual composed source and real Core Env lifecycle/recording S1"
+        ],
+        "overall_R07c_accepted": false
       }
     },
     {
@@ -2782,12 +2797,12 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "0e66380ee3feaaff91b0b6eda2e938a63b355540fdfd5196f51f2e3edf755ff6",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "fdf43cb14299dafe8d39d3bc05eec2bc5a2b0e4822074b5cda9a22ad84f70ef9",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "21cdc206ffbc3f3ff68022ecc5776e788ca44590b2c90f540f894b63adec307d"
+    "07_Execution_Order_and_Acceptance.md": "bd1904cc7f716461370a97d8512462a6223b220a710db7e727c9092c95e26660"
   },
-  "revision_kind": "R07C_PILOT_ATTEMPT001_SOL_PARTIAL_REVIEW",
+  "revision_kind": "PREPARE_R07C_PILOT_ATTEMPT002_REWORK",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",

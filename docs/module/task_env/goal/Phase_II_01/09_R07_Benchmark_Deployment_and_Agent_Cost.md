@@ -227,3 +227,15 @@ R07b首pilot来源安装/metadata recipe S1已获Sol接收，native admission仍
 
 
 2026-10-29 Sol复核R07c pilot attempt001：`PARTIAL_WORK_RETAINED_REWORK_REQUIRED`，保留mixed control/contact合同与25/39/8项S1原结果，source仍声明计划、完整Env调用链未贯通。独立成本reader接受合法自哈希的伪造commit及partial→measured变体，v2.2不予技术冻结，必须补拒绝门。下一包须实际source composition与原Core构造/reset/step/fault/recording的provider-free完整链，仅native叶IO可fake；未授权native，不改变18/22/五任务/P99/Qualification。复核原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_001/`。
+
+<a id="r07c-pilot-attempt002-rework-plan"></a>
+
+## R07c pilot attempt002：完整source与Core调用链返工
+
+Sol复核attempt001为PARTIAL_WORK_RETAINED_REWORK_REQUIRED，保留controller/contact合同与25/39/8项S1，成本v2.2未冻结。下一窗口在同camera分支完成两类已复现缺口：①独立reader核验Git lineage、identity/快照/blob及真实缺项，不接受重签hash后的假commit/假MEASURED；②输出真实确定性组合MJCF，进入原Core构造/reset/step/fault/Recorder完整路径，只有native叶IO替换为显式fake。不再以declaration plan、SimpleNamespace._convert_action、手工boundary.apply和另一个对象close拼接当集成通过。
+
+真实实现位置沿bench_deploy/libero/assembly.py（固定上游组合胶水）、task.py/evaluation.py、task_env/assembly/compiler.py::compile_task_scene及source/reference owners、environment/env.py::BaseTaskEnv.__init__/reset/step/close、runtime boundary/provider peer、现Recorder/H5 readers；先查已有source composer/控制/状态owner，最小扩展、不新建Runtime或TaskEnv。选定MuJoCo CPU后继，fake IO须在该实际运行路径的同一叶边界替换，不用另一个Provider的单方法测试冒充该路线。
+
+init decoder/原行flat-state mapping、public对象pose/contact、ControlMap实际source绑定及typed故障记录能在纯S1内完成的本轮落地；源名字/声明布局与compiled native IDs分别记录，不能伪造编译。缺必需源事实时列具体输入和阻塞，不换随机reset、不把缺contact填False。零native/零compile/不import上游env；允许基于已锁source编写有界确定性XML组合及无pickle hooks的纯数据解码，未支持opcode明确拒绝。
+
+预计主动180–240分钟、timebox300分钟；窗口内多轮修复测试。目标R07C_PILOT_CORE_WIRING_S1_READY_PENDING_SOL_REVIEW（不是R07c物理通过）；源组合/真实Env成功与故障/同H5读回没有完成则准确PARTIAL。现源码变化后重新跑受影响S1和原拒绝门，避免降低旧gate。上次native draft保持历史，生成新draft及明确ready blockers。若本次仍核心未解，第三attempt前必须重新梳理实际阻碍、官方/开源可复用方案和原门可行性；本包不自动第三轮或新native。
