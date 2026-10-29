@@ -227,3 +227,16 @@ R06b/R03c/R04c/R05c的各自有界出口均已获Sol接收，原表17/22接收�
 四项缺件逐项形成restore/retain-deferred/precise-retirement的影响及待决选项：三类H5没有已知原bytes/hash，eb870 JSON是单独历史Evidence项，不套reader retirement。恢复必须真实已批准来源与身份链；本包不全盘/云端扫描、不合成替代、不删reader。推荐保留当前reader、明确暂未证明历史bytes兼容并由维护者单独决定是否接受本阶段有限延期及其R06c/P99后果；推荐不是授权，传递本prompt也不是scope waiver。
 
 技术汇总可完成，但在本阶段决定仍pending时，只能返回 `R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW`，R06c overall仍BLOCKED_MISSING_RAW_OR_PHASE_DECISION，不能将17变18或把P99/R07判通过。报告应列精确待决问题/可选处置文本，Sol复核后由维护者决定；不要仅返回“缺件blocked”而不给完整技术包。后续prompt由维护者发送。
+
+
+<a id="r06c-attempt001-技术验收与历史待决包-2026-10-29"></a>
+
+## R06c attempt001 技术验收与历史待决包（2026-10-29）
+
+R06c attempt001在输入HEAD `5764ebea777271a724bac34218fe5bbd830853bc`、GeoPhys `c6df840bef8d36b1150150167df08e29dc3f664c` 上完成17条已接收R01–R06证据的source-bound汇总、16个required H5原件的原位hash核验、owner/version差异索引及四项历史缺件的维护者待决模板。结果 `R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW`；R06c overall仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，accepted count仍17/22，R07/P99及Qualification未关闭。
+
+定向provider-free重测11个文件得到242 passed、7 failed；7项均为R06b worker synthetic contract的GeoPhys旧pin `a53` 与当前pin `c6df840` 不一致，worker按冻结合同保护在native/model IO前拒绝。import tripwire未发现engine/provider导入。该重测记为带明确限制的部分复核；原R06b003 run002仍按原freeze与Sol receipt引用，不把本次fail改成全绿或新native回归。R06a六项legacy matrix、Sol已对同一H5 bytes完成的reader结果，以及未受影响源/reader均按精确review/hash复用。
+
+四个原始artifact仍缺；三项旧H5 byte compatibility `NOT_PROVEN`，早期`eb870f6f` JSON原hash未知且当前同路径文件为后续版本。`phase_decision.yaml`四项的 `decision`、`approved_by`、`approval_reference` 全为null。`decision_options.md`提供RESTORE、RETAIN_AND_DEFER_THIS_STAGE与精确退休/范围变更的逐项后果及可复制回复；推荐只是提案，不构成延期、reader退休或P99豁免。
+
+完整交付包位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/`：`acceptance.json`、`acceptance_report.md`、`version_difference_index.md`、`versions/source_diff_index.json`、待决模板、validator/fixtures、commands与原始检查日志。无native、未取得共享锁、不触碰Provider pin。Sol复核前不改变历史compatibility gate，也不启动R07。

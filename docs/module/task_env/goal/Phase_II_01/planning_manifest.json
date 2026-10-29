@@ -2429,14 +2429,35 @@
         "R04c",
         "R05c"
       ],
-      "status": "READY_FOR_TECHNICAL_CONSOLIDATION_HISTORICAL_DECISION_PENDING",
-      "execution": "ATTEMPT001_PACKAGE_PREPARED_NOT_STARTED",
+      "status": "R06C_TECHNICAL_BUNDLE_READY_HISTORICAL_DECISION_REQUIRED_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT001_TECHNICAL_EVIDENCE_BUNDLE_READY; FOUR_HISTORICAL_DECISIONS_PENDING; R06C_OVERALL_BLOCKED",
       "required_evidence": "S1/S2/S3",
       "stop_condition": "缺required出口/历史处置→P99 blocked",
       "implementation_plan": "06_R06_Compatibility_and_Regression.md#r06c-attempt001-implementation-plan",
       "historical_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
       "prompt_sender": "MAINTAINER_ONLY",
-      "scope": "Technical acceptance bundle/source-evidence applicability/targeted S1 and offline checks; pending independent phase decision; no new native"
+      "scope": "Technical acceptance bundle/source-evidence applicability/targeted S1 and offline checks; pending independent phase decision; no new native",
+      "result": "17 accepted source-bound R01-R06 rows and 16 required H5 hashes were consolidated; selected provider-free recheck 242 passed/7 old R06b worker frozen-pin guards failed; no new native. Four original artifacts remain missing and no Phase II-01 disposition is approved. R06c overall remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION; P99 and Qualification remain open.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/acceptance_report.md",
+      "attempt001_execution": {
+        "input_head": "5764ebea777271a724bac34218fe5bbd830853bc",
+        "branch": "codex/phase-ii-01-camera",
+        "prompt_sha256": "70c7153b22924dced1ba2ef1b7bcf7bb28ebd1ac1721e42e90039c19964a0c49",
+        "input_snapshot_sha256": "bf1321ae133fe0f473ff6d89f884ece345ae26755879645541b6dbcec756f74f",
+        "accepted_slice_count": 17,
+        "required_h5_hashes_rechecked": 16,
+        "s1_passed": 242,
+        "s1_failed": 7,
+        "s1_failure_reason": "R06b worker frozen contract expects GeoPhys a53, current worktree pin c6df840; guard refused before worker/model/native IO",
+        "forbidden_engine_imports": 0,
+        "new_native_starts": 0,
+        "shared_native_lock_acquired": false,
+        "historical_decision_status": "PENDING_MAINTAINER_DECISION",
+        "R06c_overall": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "P99": "BLOCKED_DEPENDS_ON_R06C_AND_R07D",
+        "qualification_granted": false,
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_001/"
+      }
     },
     {
       "id": "R07a",
@@ -2585,9 +2606,9 @@
     "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
   },
   "document_sha256": {
-    "README.md": "e5be4095295d925feedab1bf0264b6b10767209adcd4f6de4affd3fca71af6fb",
+    "README.md": "616f81d5afbae93ddc458e9a76cac6253898b6d99a6c3598e2ff449c5fd57371",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "517148ca1553f0c1d6abd641d3ba18cf5e8d8eb7ccd6e6b1123e9a33baf732b4",
+    "06_R06_Compatibility_and_Regression.md": "d2f2347c6b31dd590095a9fd99286618db7e523d432107899cbd838a24843b93",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2596,7 +2617,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "f3d9d05bec18cc7a9d86e0b225ef428c7235dee29d1ad960b49545c585a6597a"
+    "07_Execution_Order_and_Acceptance.md": "e7c88dfa0490d6a972641a2de13872fd10807be352e6292f4f21d02da258d20f"
   },
   "revision_kind": "R05C_ATTEMPT001_BOUNDED_FOUR_CELL_RESULT_PENDING_SOL_REVIEW",
   "benchmark_audit": {
