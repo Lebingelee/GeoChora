@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态：**REVISED_DRAFT / PLANNED / NOT_STARTED**。本轮仅源码审计与规划修订，不启动 P00/R07a，不把审阅检查计为部署验收。独立父 Goal；不归入 R06 Compatibility。全阶段候选为 **7 父 Goal / 22 切片**，尚待维护者批准。
+状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；原五任务整体仍未完成。维护者选择先用来源可准入的少量LIBERO任务跑通闭环，首pilot固定spatial bowl→plate；下一包为R07b pilot attempt001。下文“本轮仅规划/未执行”保留原审计时点，不覆盖当前状态；原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -147,3 +147,26 @@ R07a交付source/asset/license/embodiment/fixture/资源/缺口与go/no-go recom
 建议阶段依赖 **P99 ← R06c, R07d**，保留R01–R06原required gates；R06b修正为依赖R06a/R01c/R02c/R03b。[07](07_Execution_Order_and_Acceptance.md)为统一执行表。七Goal/22切片仍是candidate，所有implementation NOT_STARTED。
 
 维护者待决：7/22/DAG最终范围、5Task的初版state-only/robot/controller/frequency/安全trajectory与tolerance/预算、generic source/reset/contact/evaluator缺口的原owner扩展范围、逐资产许可与依赖兼容、RoboCasa仅feasibility边界、成本instrumentation与独立human reviewer/可选reference实验设计。任一Required Task无法表示或准入须显式scope decision，不能换题/放宽predicate/自动延期。Release、Scoped Engineering Acceptance、测试、Formal Qualification独立；本轮不签maintainer决定。
+
+<a id="r07b-pilot-attempt001-plan"></a>
+
+## R07b pilot attempt001：来源安装与部署配方实施定位（2026-10-29）
+
+前置：R06c已接收；R07a004的Sol审阅已准许首pilot的来源级推进。首任务固定 `libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate`，reserve stack任务本包不实施。原五任务保留，R07a不重开attempt005。只消费首pilot所需且已核验的源文件；93条已审计mesh/texture路径是起点，不自动等于包含BDDL/XML/init及所有依赖的完整安装闭包。安装原件留ignored版本化目录，tracked roots保留manifest/refs/notice/recipe/工具，不提交模型二进制。
+
+| 层与真实owner | 本包允许实现/必须消除的缺口 | 本包验收 |
+| --- | --- | --- |
+| `asset/benchmarks/libero/`（拟建benchmark源交付区）；现`assembly/assets.py` closure helper | 可复现的显式revision/per-file hash来源manifest；从已验证cache安装到独立目标，verify仅消费manifest；解析XML include/file及upstream路径解析约定，缺依赖明确报出；原cache只读 | 真安装/再验证，独立目标重建；坏hash、重复/漏文件、越界路径、错revision/错任务、缺notice/未准入asset族拒绝；不import native |
+| `bench_deploy/libero/`（拟建配方区）；现`assembly/source.py::TaskSceneSource`、`environment/task_source.py` | task/robot/controller/planner/observation/assembly/evaluation同一pilot配方与入口、source/init引用、成本协议绑定；TaskSceneSource只是xml/base_dir/source_id，不代表完整原生benchmark composer或任意BDDL compiler | CLI实际读安装receipt并生成有身份的声明配方；跨文件字段接线/错误输入S1，缺Core能力显式未准入 |
+| `registry.py::make_env`、`TaskDefinitionBase`、`RuntimeSource/ExecutionSourceReceiptV1` | 明确未来公开构造入口、source消费与不可变receipt接线；本包不注册一个实际不能执行的UID、不私造TaskArtifact字段 | owner/方法/输入输出/错误/最小扩展清单；fake IO验证已有可调用接缝，不能冒称native admission |
+| 现controller/action adapters、`planners/joint.py`、`planners/cartesian.py` | MountedPanda七torque motor+双finger position与Menagerie tendon Position不同；原20Hz/physics dt/hold/关节符号/TCP逐项声明；Cartesian planner不带IK | 维度/单位/frame/drive语义S1；缺motor控制或IK必须列准确Core门，不改actuator类型/机器人求绿 |
+| `artifacts/contracts.py` reset/state与`TaskDefinitionBase.evaluate_predicates` | free-body/native init row布局、site/object/contact语义不能猜；On保留contact、XY严格阈值及高度，不换lift_height；pickle/init只当bytes核hash | 固定版本原输入与待扩展合同，available/false/unavailable分开；无torch.load/unpickle/native semantic等价声明 |
+| Recorder/readers、public observation/clock | 沿当前Core记录/回读owner规划后续T/T+1与identity链，不建立benchmark Recorder/Runtime | R07c具体运行配方、oracle、成本与预算提案；本包不写真实轨迹/不运行R07c |
+
+本包分类为COMPOSE_EXISTING来源/工具与benchmark-specific配方；没有现成完整安装器时只新增benchmark交付胶水，禁止第二Core框架。当前共用Core/Provider合同扩展先写明确最小补丁位置，留下一包在原owner内实现。未知输入导致的schema/字段/调用差错应在本包真实CLI与S1处理，不拖到native。
+
+成本协议采用R07a003经Sol冻结v2.1候选与其精确hash；测量baseline为0309d73bb5b60f9989907c3eede8c0cd2893f29f，warm cache盘点；R07触发的通用改动计setup/shared。真实模型usage不可得填null+原因，不能用synthetic成本冒充本次会话。独立Human质量评审在R07d，不阻塞本包源安装。
+
+预计主动90–150分钟，上限180分钟。provider-free S1/本地install+verify可多次修正重跑；每进程180秒/采样RSS2GiB，输出128MiB，独立安装目标256MiB；额外缺失固定文本来源最多32MiB，不下载未审计模型/不装上游运行环境。零native/零共享锁，原因是R07b的源/配方S1交付；不把attempt视为一次测试额度。
+
+目标交付为`R07B_PILOT_SOURCE_RECIPE_S1_PASS_PENDING_SOL_REVIEW`或准确PARTIAL/BLOCKED，必须区分source_install_ready与core_native_admission_ready。所有本包源/配方S1通过也不等于R07b原五任务整体完成，不增加18/22、不表示R07c/P99/Qualification通过。下一包由Sol审阅完整报告后准备、维护者发送。

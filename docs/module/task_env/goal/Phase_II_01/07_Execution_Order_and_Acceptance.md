@@ -1,20 +1,13 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前复核结论（2026-10-29）：R05c attempt001四格已获Sol接收 `ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3`；R05a/b/c精确required出口完成。Sol独立读回四H5与完整Guard/Outcome/strict Expert，复跑当前focused集合26 passed；详情见[R05c接收](05_R05_Native_Rate_Feedback.md#r05c-attempt001-sol-acceptance)。后续prompt由维护者发送；下一项R06c仍须历史missing-raw的独立阶段处置，P99未关闭。
+当前入口（2026-10-29）：**R06c已按有界required证据汇总接收；R01–R06共18/22 slices已接收，剩余R07a/b/c/d四行。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
-当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c attempt001四格已获有界接收。R06c attempt002技术包完成，等待Sol复核；四项历史缺件仍待维护者决定。Luna1 独立负责 F00–F07。**
+- **Luna2**：继续在`codex/phase-ii-01-camera`开发原07表；下一包为[R07b单任务pilot实施](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-pilot-attempt001-plan)，先用已接收来源的spatial bowl→plate建立source manifest/install+verify及部署配方，不重开R07a第五attempt，不启动R07c/native。
+- **R07当前边界**：R07a004来源/协议部分接收及单pilot来源准入已有Sol记录。pilot不代表原五任务R07a或R07b整体通过；TurboSquid三族仍阻塞其关联任务，不影响本包未消费这些资产的工作。保留原五任务最终P99目标、原生语义和成本/独立Human评审。
+- **Luna1**：独立负责`develop-full`的F00–F07，状态以其分支10文档及实际报告为准；本次不写主checkout/F文档、Isaac或依赖。
+- **R05完成**：精确normal-route CPU/CUDA×100/500Hz完整回合及H5双reader已获Sol接收，不承诺通用Provider/实时2ms/Qualification。
 
-跨分支汇总已有 **17/22 slices 获 Sol 有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a–c、R06a/b。接收等级各异：静态 S1、Audit、真实 S2/S3 不能互换，R06a 审计接收也不关闭历史 compatibility decision gate。
-尚有五个未完成的行：R06c、R07a/b/c/d。R07a 已有部分协议/来源审计接收及一项 pilot 的来源处置，但原五任务完整出口未达到，不计入 17 项。
-
-- **Luna2 / 本表**：复用 `codex/phase-ii-01-camera` 与既有独立 checkout；R04b 为 `ACCEPTED_BOUNDED_S2`、R04c 为 `ACCEPTED_BOUNDED_S3`、R06b003 run002 为 `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`。这些提交尚未合入 `develop-full`，主分支旧状态不能推翻其接收。
-- **Luna1 / F线**：复用 `develop-full`；截至主分支 `1632a11774d817f2ebe36198bbc40a74e7f36974`，F00、F01 已获有界接收。F01 限 Isaac 原生 Panda+刚体对照，不能视作 Core Isaac provider 接通。后续 F 状态以主分支 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 为准，本表不代写在途 F 证据。
-- **执行顺序**：R05a 合同候选已获接收 → R05b 精确准入/公开配置 setter/失效规则已获有界 S1/S2接收 → R05c 正式合同下 CPU/CUDA × 100/500Hz Evidence → R06c 汇总；R06c 还须单独解决历史 missing raw/本阶段处置。R07 按其前置独立逐包推进；P99 仍要求 R06c 与 R07d，不缩减原五任务目标。
-- **R05事实纠正**：旧 C05c 四组真实任务与同文件 S3 均已通过，现存原 H5 hash 已复核；R05 没有已知频率物理失败。R05a attempt001 的 provider-free cadence S1 为 4 passed，合同候选/成本/实施计划已交 ignored `r05a_001/`，当时状态为待复核；后续R05a设计及R05b有界实现已获接收。详见 [R05 attempt001 候选](05_R05_Native_Rate_Feedback.md#r05a-attempt001-contract-candidate-20261029)。
-
-当前共两个活动阶段 checkout，不因 R05 新建 Core 分支/worktree；保留历史 refs。双方 native 使用同一排他锁，一个 Luna 线程只持一个未完成工作包，等待完整报告及窗口释放后再派下一包。下文 2026-10-25 单分支表保留为当时安排，当前分工以上述维护者决定为准。
-
-原 7父Goal/22切片 DAG、Required Envelope 和 P99 保留。新增 F00–F07 由 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 管理；本次状态核对不授予 Qualification。
+后续prompt由维护者发送。每线程一个完整窗口；Luna完整报告与写入窗口释放后再由Sol复核。维持两个活动checkout，native共享排他锁；本次R07b为provider-free源安装/配方窗口，不需native锁。原7Goal/22切片及五任务P99目标保留，新增F00–F07由[10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)独立管理。
 
 2026-10-29 R05a attempt001：输入为 camera 分支 `43253c83bb89aae9e88b185718e81daf94bfbf77`；复核当前 GeoPhys Reader/host-I/O、Core boundary/session/admission、NutAssembly cadence/Guard/Recorder callers 与受保护 C05c 原件。provider-free `test_c05c_geophys_gripper_cadence.py` 4/4 通过（1.14 s，峰值 RSS 66,332 KiB）；新 native=0、共享 native 锁未取。合同候选确认 a53 已实现 typed sample freshness/phase，但 generic source/unit/references 需限缩到精确 Panda 固定 tendon mapping；Core force-cap 仍读写 Provider 私有 field 且重复递增 configuration revision，normal CPU/CUDA force admission 尚未建立。报告、矩阵、复用证据、预算和 R05b/c 计划在 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05a_001/`；状态 pending Sol review，不改变 14/22 accepted count、DAG、Required Envelope、P99 或 Qualification。
 
@@ -102,14 +95,14 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | `ACCEPTED_BOUNDED_S3`；GeoPhys a53 CPU × MuJoCo 3.8.1 EGL，双同Env H5各12/13、双reader与22项native派生篡改拒绝；见 [R04c attempt001](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-camera-h5-s3) |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2；attempt002 F1–F4关闭，19项S1复跑及CPU/CUDA短S2接收；不含完整任务 |
 | 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3；17d6388四格完整任务/H5/双reader接收，精确交集见R05 |
-| 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；历史missing raw处置仍BLOCKED，R06c/P99不关闭。 |
-| 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | attempt002技术包已完成，等待Sol复核；17条接收/16份H5已校验，四项历史决定pending；R06c overall仍BLOCKED |
+| 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；R06c后续已按本页当前勘误接收；P99未关闭。 |
+| 18 | R06c | R06b,R03c,R04c,R05c | required交集/证据/范围汇总 | S1/S2/S3 | 真实受影响回归/缺required证据→停止 | `ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION`；attempt002技术包与历史范围勘误收口；18/22，非Qualification |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PARTIAL_AUDIT_ACCEPTED；一项 pilot 来源审计有界接收，原五任务出口未完成；详见09及主分支 Sol R07a004记录 |
-| 20 | R07b | R07a | asset/benchmarks与bench_deploy责任/verified manifests/最小配方 | S1 | 许可/闭包/一般Core能力缺失→BLOCKED | PLANNED / NOT_STARTED |
+| 20 | R07b | R07a（首pilot来源/协议已部分接收） | asset/benchmarks与bench_deploy、安装校验/最小配方/owner缺口 | S1 | 消费资产来源/闭包未核验→停止该任务；不绕Core gate | 单任务pilot工作包待维护者发送；原五任务整体未通过 |
 | 21 | R07c | R07b | 五Task真实构造/reset/motion/Controller/Planner/语义/H5 | S1/S2/S3 | 任一required Task阻塞/不可表示/失败/未测→P99 blocked | PLANNED / NOT_STARTED |
 | 22 | R07d | R07c | session成本报告与独立human代码质量审阅 | Audit/independent review | 无来源/无独立review或虚构usage→阻塞 | PLANNED / NOT_STARTED |
 
-P99 直接依赖 **R06c, R07d**，且复核所有 22 slices 的 required contract、运行与独立范围决定。R06a 记录缺口可以形成自己的 ledger，但不代表 compatibility decision gate 已接受；R06c/P99 不能把未决决定忽略。各 slice 自带受影响兼容检查，R06b/c 不取代局部回归。
+P99直接依赖 **R06c,R07d**；R06c已获有界接收，R07四行仍未完成。当前历史范围以r06c_scope_reconciliation.json为准；修改reader或产生真实回归时重开精确受影响门，不能用未知旧文件作无限恢复前置。
 
 2026-10-26，Sol已接收R01a的静态codec/S1出口；R01b/c仍未启动。R05a受当前GeoPhys正式native-rate合同缺口阻塞：公开Reader限制逐substep host snapshot，旧C05c仅为诊断例外。此为preflight阻塞，不是R05a Audit/S1/probe完成，也不改为DEFERRED。维护者选择在R05a阻塞期间先推进独立R04a；R04a原23项S1通过但Sol复核发现identity绑定缺口，下一包为R04a attempt002定向返工，不改变DAG、R05a blocker或P99 required Camera gate。R04b/c仍按原依赖未执行。
 

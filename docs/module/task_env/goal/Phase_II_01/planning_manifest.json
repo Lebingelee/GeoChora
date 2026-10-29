@@ -1,7 +1,7 @@
 {
   "kind": "phase-ii-01-revised-planning-manifest-v1",
   "date": "2026-10-29",
-  "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
+  "status": "IN_PROGRESS_18_OF_22_BOUNDED_ACCEPTED",
   "implementation_authorized": false,
   "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
   "goal_count": 7,
@@ -341,9 +341,11 @@
             "current_candidate_path": null,
             "current_candidate_sha256": null,
             "retirement_impact": "Retiring the v1 config/write/inspection route changes legacy format availability and regression fixtures; no internal semantic replay caller was found.",
-            "phase_ii_01_decision": null,
+            "phase_ii_01_decision": "INHERIT_EXISTING_ACCEPTED_LIMITATION",
             "approved_by": null,
-            "approval_reference": null
+            "approval_reference": null,
+            "historical_reported_raw_evidence": "MISSING_RAW_EVIDENCE",
+            "current_reconciliation_reference": "r06c_scope_reconciliation.json"
           },
           {
             "id": "b04a_canonical_trajectory_outer_v0_h5",
@@ -352,10 +354,10 @@
               "outer_schema": "task-env-canonical-trajectory-v0"
             },
             "historical_disposition": "ACCEPTED-DEFERRED",
-            "raw_evidence": "MISSING_RAW_EVIDENCE",
-            "byte_compatibility": "NOT_PROVEN",
+            "raw_evidence": "PUBLISHED_ORIGINALS_PRESENT_HASH_VERIFIED",
+            "byte_compatibility": "EXACT_FILES_HAVE_HISTORICAL_P00_READBACK; NO_UNIVERSAL_OR_CURRENT_NATIVE_REPLAY_CLAIM",
             "original_path": null,
-            "original_path_reason": "The frozen evidence index and P00 inventory record the format domain but no per-file path.",
+            "original_path_reason": "Old audit missed three tracked published L2 files; see reconciliation",
             "original_raw_sha256": null,
             "original_hash_reason": "No original file bytes or per-file raw hash is recorded.",
             "source_pin_context": "B04a reconstruction pin above; exact source-to-missing-file binding unavailable.",
@@ -364,12 +366,14 @@
               "reader": "load dispatches v0 to CanonicalTrajectory.from_mapping and verifies logical identity and numeric projections.",
               "current_consumer": "task_env.trajectory.reference_replay.reexecute_selected recognizes outer-v0 and calls canonical.h5.load; selected re-execution comparison utility, not a newly claimed Core production capability."
             },
-            "current_candidate_path": null,
-            "current_candidate_sha256": null,
+            "current_candidate_path": "docs/releases/v1.1/evidence/raw/l2/p2_0_b_s4_5_a_20261016/5d57272d/pickcube_mujoco_seed31.h5",
+            "current_candidate_sha256": "e22bcadbb142c81f2bdd8f12a432b82b22cef0c25ddeba8cec29f764bca87ae8",
             "retirement_impact": "Would remove the strict outer-v0 H5 reader and selected-reference replay route; legacy-matrix negative/version coverage is affected.",
-            "phase_ii_01_decision": null,
+            "phase_ii_01_decision": "CORRECT_EVIDENCE_INDEX",
             "approved_by": null,
-            "approval_reference": null
+            "approval_reference": null,
+            "historical_reported_raw_evidence": "MISSING_RAW_EVIDENCE",
+            "current_reconciliation_reference": "r06c_scope_reconciliation.json"
           },
           {
             "id": "b04a_canonical_execution_v1_h5",
@@ -395,9 +399,11 @@
             "current_candidate_path": null,
             "current_candidate_sha256": null,
             "retirement_impact": "Would remove legacy execution H5/streaming read and selected-reference replay support; this is narrower than removing current v2/v3 writing.",
-            "phase_ii_01_decision": null,
+            "phase_ii_01_decision": "INHERIT_EXISTING_ACCEPTED_LIMITATION",
             "approved_by": null,
-            "approval_reference": null
+            "approval_reference": null,
+            "historical_reported_raw_evidence": "MISSING_RAW_EVIDENCE",
+            "current_reconciliation_reference": "r06c_scope_reconciliation.json"
           },
           {
             "id": "c02b_eb870_typed_force_s2_probe_json",
@@ -429,13 +435,15 @@
             "current_candidate_identity": "Later c02b-r1-typed-force-probe-v1 content; not proof of the lost eb870 original bytes. The current candidate records GeoPhys revision a53a8cfed7c9d6464274b5c96fca601271dc4ee4 and closure aa4ca97bbe3c61b30752ba0dedc6c88a24394f03fe1b53519052d460ff9abc47.",
             "related_later_source": "GeoPhys a53 evidence is separate and does not restore the eb870 JSON.",
             "retirement_impact": "No reader retirement applies; any decision concerns retaining/excluding this historical diagnostic Evidence requirement.",
-            "phase_ii_01_decision": null,
+            "phase_ii_01_decision": "INHERIT_EXISTING_ACCEPTED_LIMITATION",
             "approved_by": null,
-            "approval_reference": null
+            "approval_reference": null,
+            "historical_reported_raw_evidence": "MISSING_RAW_EVIDENCE",
+            "current_reconciliation_reference": "r06c_scope_reconciliation.json"
           }
         ],
         "recovery_option": {
-          "status": "NOT_AVAILABLE_IN_REVIEWED_INDEXES",
+          "status": "OUTER_V0_ORIGINALS_PRESENT; OTHER_TRUE_HISTORICAL_BYTES_UNIDENTIFIED",
           "minimum_input": "An approved archive/member that contains the exact original bytes plus the original SHA-256 or a documented source/chain-of-custody binding; retain and read a copy without replacing prior Evidence."
         },
         "retirement_option": {
@@ -443,14 +451,12 @@
           "scope": "Separate exact-format decisions for each H5 reader/support route; the diagnostic JSON has no production reader and requires a different Evidence-scope decision."
         },
         "continued_deferral_option": {
-          "status": "UNAPPROVED",
+          "status": "INHERITED_EXISTING_SCOPE_LIMITATION; NO_NEW_RETIREMENT",
           "scope": "Explicitly retain MISSING_RAW_EVIDENCE and NOT_PROVEN/NOT_APPLICABLE facts and state the consequence for R06b/R06c/P99; define an approved archive/hash condition for reopening."
         },
         "decision_gate": {
-          "status": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
-          "decision": null,
-          "approved_by": null,
-          "approval_reference": null,
+          "status": "RECONCILED_WITH_EXISTING_PHASE_II_DISPOSITION",
+          "reference": "r06c_scope_reconciliation.json",
           "qualification_granted": false
         },
         "targeted_s1": {
@@ -459,7 +465,14 @@
           "passed": 6,
           "scope_note": "Current strict codecs/version routing and synthetic negative coverage only; no missing original H5/JSON bytes loaded."
         },
-        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md"
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06a_001/report.md",
+        "historical_decision_gate_at_audit": {
+          "status": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+          "decision": null,
+          "approved_by": null,
+          "approval_reference": null,
+          "qualification_granted": false
+        }
       },
       "sol_review": {
         "date": "2026-10-26",
@@ -467,7 +480,7 @@
         "result": "ACCEPTED_AUDIT_S1_BOUNDED",
         "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/sol_review.md",
         "receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06a_001/review_receipt.json",
-        "compatibility_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "compatibility_decision_gate": "RECONCILED_WITH_EXISTING_PHASE_II_DISPOSITION",
         "targeted_s1_passed": 6,
         "next_slice": "R01b",
         "qualification_granted": false
@@ -2429,15 +2442,15 @@
         "R04c",
         "R05c"
       ],
-      "status": "R06C_TECHNICAL_BUNDLE_ACCEPTED_HISTORICAL_DECISION_PENDING",
-      "execution": "ATTEMPT002_TECHNICAL_BUNDLE_ACCEPTED_BY_SOL; FOUR_HISTORICAL_DECISIONS_PENDING; R06C_OVERALL_BLOCKED",
+      "status": "ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION",
+      "execution": "ATTEMPT002_TECHNICAL_ACCEPTED; MAINTAINER_DIRECTED_SCOPE_RECONCILIATION_COMPLETE",
       "required_evidence": "S1/S2/S3",
-      "stop_condition": "缺required出口/历史处置→P99 blocked",
+      "stop_condition": "Affected current regression or missing required evidence blocks; unchanged unidentified old goldens retain accepted limitations",
       "implementation_plan": "06_R06_Compatibility_and_Regression.md#r06c-attempt001-implementation-plan",
-      "historical_decision_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+      "historical_decision_gate": "RECONCILED_WITH_EXISTING_PHASE_II_DISPOSITION",
       "prompt_sender": "MAINTAINER_ONLY",
-      "scope": "Technical acceptance bundle/source-evidence applicability/targeted S1 and offline checks; pending independent phase decision; no new native",
-      "result": "Attempt002 fixes the seven R06b worker fixture failures and adds digest-valid wrong-pin rejection. The focused worker set passed 8 nodes; the original 11-file adjacent set passed 250 tests. All 17 accepted rows now bind explicit Sol review/source files and hashes, including the accepted R06b003 review/commit/implementation/run002. Sixteen original H5 files were rehashed against exact source/run/cell records. The positive bundle validator and 27 specified mutation rejections passed. No new native or engine/provider imports. Four historical raw artifacts remain missing and decisions remain null; overall R06c stays BLOCKED_MISSING_RAW_OR_PHASE_DECISION, 17/22 and P99/Qualification unchanged.",
+      "scope": "Bounded R01-R06 evidence aggregation; inherited legacy limitations; no new native/replay/Qualification",
+      "result": "Technical attempt002 accepted; canonical outer-v0 published originals present and hash-verified; generic/execution-v1 true old rollout bytes remain unproven, old synthetic fixtures retained; eb870 JSON loss remains historical limitation. Scope reconciliation closes R06c bounded gate; 18/22. R07/P99 remain incomplete.",
       "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06c_002/acceptance_report.md",
       "attempt001_execution": {
         "input_head": "5764ebea777271a724bac34218fe5bbd830853bc",
@@ -2529,8 +2542,10 @@
         "reviewed_head": "0e1ba2a2718159ad31a6d6cc0202fd8ae247530f",
         "review_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r06c_002/sol_review.md",
         "historical_disposition_approved": false,
-        "overall": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
-        "accepted_slice_count": 17
+        "overall": "ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION",
+        "accepted_slice_count": 18,
+        "scope_reconciliation": "r06c_scope_reconciliation.json",
+        "new_retirement_or_unknown_compatibility_approved": false
       }
     },
     {
@@ -2557,7 +2572,15 @@
       "status": "PLANNED",
       "execution": "NOT_STARTED",
       "required_evidence": "S1 source/license/manifest/admission",
-      "stop_condition": "unverified assets, Core/Provider gaps remain BLOCKED"
+      "stop_condition": "unverified assets, Core/Provider gaps remain BLOCKED",
+      "pilot_execution": {
+        "status": "PACKAGE_PREPARED_NOT_SENT",
+        "task": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+        "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07b-pilot-attempt001-plan",
+        "upstream_pilot_source_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_004/sol_review.md",
+        "new_native_authorized": false,
+        "full_five_task_exit": false
+      }
     },
     {
       "id": "R07c",
@@ -2585,8 +2608,8 @@
       "R06c",
       "R07d"
     ],
-    "also_requires": "all22 slice contracts; all prior R01-R06 gates; five source-pinned LIBERO deployments; session-bound descriptive Agent cost/independent quality; RoboCasa feasibility; explicit historical-compatibility disposition",
-    "status": "PLANNED_NOT_STARTED"
+    "also_requires": "all22 bounded slice contracts; original five source-pinned LIBERO deployments; session-bound Agent cost and independent Human quality; RoboCasa feasibility; historical limitations per r06c_scope_reconciliation.json",
+    "status": "BLOCKED_REMAINING_R07_REQUIRED_GATES"
   },
   "required_envelope": {
     "R03_first_provider": "MuJoCo 3.8.1 CPU independent Panda Arm/Hand Position fixed attachment",
@@ -2669,31 +2692,42 @@
   },
   "missing_raw_evidence": {
     "B04a": [
-      "geophys-transition-h5/v1",
-      "canonical trajectory outer-v0",
-      "canonical-execution-v1"
+      "geophys-transition-h5/v1 true historical rollout",
+      "canonical-execution-v1 true historical rollout"
     ],
-    "B04a_disposition": "ACCEPTED-DEFERRED; raw bytes missing; byte compatibility NOT_PROVEN",
+    "B04a_disposition": "INHERIT_ACCEPTED_DEFERRED; outer-v0 published originals present",
     "early_eb870_typed_force": "MISSING_RAW_EVIDENCE",
     "retirement_or_new_stage_continued_deferral_approved": false,
-    "phase_ii_01_disposition": "PENDING_MAINTAINER_DECISION; see slices.R06a.compatibility_ledger",
-    "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
+    "phase_ii_01_disposition": "INHERIT_PRIOR_SCOPE_AND_CORRECT_INDEX; r06c_scope_reconciliation.json",
+    "compatibility_gate": "RECONCILED_WITH_EXISTING_PHASE_II_DISPOSITION",
+    "historical_audit_before_reconciliation": {
+      "B04a": [
+        "geophys-transition-h5/v1",
+        "canonical trajectory outer-v0",
+        "canonical-execution-v1"
+      ],
+      "B04a_disposition": "ACCEPTED-DEFERRED; raw bytes missing; byte compatibility NOT_PROVEN",
+      "early_eb870_typed_force": "MISSING_RAW_EVIDENCE",
+      "retirement_or_new_stage_continued_deferral_approved": false,
+      "phase_ii_01_disposition": "PENDING_MAINTAINER_DECISION; see slices.R06a.compatibility_ledger",
+      "compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION"
+    }
   },
   "document_sha256": {
-    "README.md": "09498ade8d6483c2db4bde85e5e377a6b52442981324ec2396e7d789530e7a93",
+    "README.md": "66a1277041bd4498afd39f7c35b36382ade6cecb23cb0ad39d227eaf9bc58026",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "650ec4369ee8f7d1d70e9075fca341c4dde765bdb7be666f4bd721e7967caf5e",
+    "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "1d84182debb390417263b48c90eaa91b2bd2baff6832e39595782dcf8d46264a",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "a9cba8b4f3000e34fdc11b28d5d77faaa83fb4c9e241a589c7928356a933486b"
+    "07_Execution_Order_and_Acceptance.md": "f65bec14353d3e64c1a581831fd60daa02b39e4741468730d5feb9812447af11"
   },
-  "revision_kind": "R05C_ATTEMPT001_BOUNDED_FOUR_CELL_RESULT_PENDING_SOL_REVIEW",
+  "revision_kind": "R06C_SCOPE_RECONCILIATION_AND_R07B_PILOT_PLAN",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -4371,6 +4405,15 @@
       "reason": "No deployment authorized or started; planning commit is not a measured deployment baseline",
       "R07_triggered_Core_extensions": "count as setup/shared or per-task incremental with owner/source/session bindings",
       "preexisting_R01_R06_foundation": "separate provenance and excluded-cost boundary; no free-implementation or causal cost-reduction inference"
+    },
+    "pilot_source_protocol_reference": {
+      "status": "TECHNICALLY_FROZEN_V2_1_BOUNDED",
+      "path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07a_003/protocol/r07_agent_cost_protocol_v2_1.json",
+      "sha256": "a6f5836b65498d23e0dfb53568bdd8dee69f60f020c579957990b6a6bc59987e",
+      "measurement_baseline": "0309d73bb5b60f9989907c3eede8c0cd2893f29f",
+      "cache": "warm",
+      "supersedes_prior_unfrozen_planning_fields_for_pilot": true,
+      "five_task_order_unchanged": true
     }
   },
   "advisory_review": "REVISE_PLAN",
@@ -5371,6 +5414,15 @@
       "R06c_overall_pass": false,
       "native_authorized": false,
       "prompt_sender": "MAINTAINER_ONLY"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "R06C_SCOPE_RECONCILIATION_AND_R07B_PILOT_PLAN",
+      "authority": "Maintainer directs correction after historical-decision/develop-byte review",
+      "accepted_count": 18,
+      "R06c": "ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION",
+      "R07b": "single pilot source/recipe S1 package only",
+      "R07_P99_qualification_closed": false
     }
   ],
   "P00_audit": {

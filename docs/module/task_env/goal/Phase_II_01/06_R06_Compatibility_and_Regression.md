@@ -1,6 +1,19 @@
 # R06 — Compatibility / Mapping / Regression Governance
 
-状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt003 run002已获Sol有界接收（ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION）；历史原件/处置决定缺失使compatibility decision gate仍BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
+状态（2026-10-29）：R06a、R06b与R06c均获相应有界接收；R06c为required证据汇总接收，历史限制按下节勘误承接。P99仍待R07完整出口。
+
+<a id="r06c-scope-reconciliation"></a>
+
+## 当前范围勘误与 R06c 收口（2026-10-29）
+
+维护者要求依据旧 develop、原对话和既有范围决定纠正文档。依据 [Phase II维护者决定](../../../../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)及[本阶段勘误记录](r06c_scope_reconciliation.json)，承接已接受的B04a reader延期与eb870历史来源限制，不将相同未变更限制重复升级为R06c全局阻塞。原Phase II冻结决定、旧报告、原失败、旧R06c validator及待决模板保持签署时点内容；本节取代下文旧“须重新批准四项否则阻塞”的当前适用性。
+
+- **canonical outer-v0原件存在**：v1.1 L2的三份PickCube H5，在develop、B04a重建提交1fb3a558、v1.1.0及当前磁盘中SHA相同；具体路径/hash见勘误记录。旧P00已有同bytes读回。此前“L2无一命中/原路径hash全未知”的普遍结论撤回；不声称任意未命名golden已恢复或当前native replay已重跑。
+- **generic v1与execution v1**：旧P00保留与当时索引hash一致的synthetic fixture；不是历史rollout原件。保留旧读写/检查支持及ACCEPTED-DEFERRED，真实历史bytes兼容仍NOT_PROVEN，不删reader也不把fixture改称原件。
+- **eb870 JSON**：旧测试默认目录覆盖导致原bytes丢失，当前a53副本不是原件。承接已接受的历史provenance限制，不重造或要求重复物理执行“恢复”旧文件。
+- 新修改若影响具体legacy reader、输入格式或调用者，仍须针对受影响交集补证；本次没有批准未来回归、reader retirement或任意格式兼容。
+
+Sol已接收attempt002技术包：真实生产freeze guard未改，focused8项/相邻250项S1、27项validator拒绝例及17条既有Sol绑定/16份H5核查满足技术出口。结合上述范围勘误，**R06c接收为`ACCEPTED_BOUNDED_R06C_REQUIRED_EVIDENCE_AGGREGATION`，当前18/22**。未增加native，也未新授Qualification；两个旧source.config摘要断言仍独立记录。P99仍须R07a–d原五任务出口和其余required门，当前未通过。
 
 ## 映射与机械语义保护
 
@@ -19,9 +32,7 @@
 
 保持 Scene v1/v2/v3 strict decode/mapping/hash、旧 Artifact/Entity identities、ResetSample/timebase、Position/R1 source-bound targets/acks、Recorder fault/T/T+1、旧 Provider capability manifest 与 UID/defaults。新 Assembly/Profile/Camera metadata 采用明确版本，未知字段/版本拒绝，不能用 global skip/删断言获得兼容 PASS。
 
-三类历史 H5 原件：`geophys-transition-h5/v1`、canonical trajectory outer-v0、canonical-execution-v1，继续 **ACCEPTED-DEFERRED / MISSING_RAW_EVIDENCE / bytes compatibility NOT_PROVEN**。早期 GeoPhys eb870f6f typed-force JSON 被覆盖的原 bytes 仍 MISSING_RAW_EVIDENCE；同路径现存文件不是丢失原件，a53 新收据不能恢复它。历史 [B04a](../Phase_II/B_Development_Record.md#b04a) 与 [C02b](../Phase_II/C_Development_Record.md#c02b) 不回写。
-
-只可从批准备份恢复原 bytes 并核 hash；synthetic、新格式 H5、摘要 hash 或相同任务重跑都不是恢复。Reader retirement/支持范围缩减必须另获维护者批准，并列精确 reader/格式/迁移影响，不自动执行。若不能恢复又没有 retirement/继续延期的本阶段独立决定，R06 compatibility decision gate 保持 BLOCKED；不能把 Phase II 旧延期当作 Phase II-01 自动豁免。
+当前原件状态与gate以后文历史审计之上的“当前范围勘误”及机器勘误记录为准；不再把三种格式统一表述为原件缺失。只以真实bytes和可核验来源判断恢复，保留各自版本/reader路由。
 
 Evidence 分三栏：① 原 Phase II 固定 source/pin 收据；② 本轮仅文档/静态校验；③ 未来新 source/profile/Provider 交集的 S1/S2/S3。GeoPhys dual Position `4436787e` 不能改写为 a53 重跑；当前 a53 单 Panda/Camera pairing 不转移为 split-leaf Assembly 支持。未来 Provider pin 变化必须独立准入与新证据，旧 pin/原日志/原 hash 不移动。
 
@@ -31,7 +42,7 @@ Evidence 分三栏：① 原 Phase II 固定 source/pin 收据；② 本轮仅�
 
 | ID | 前置 | 工作与交付 | 必需 Evidence / Stop Condition |
 | --- | --- | --- | --- |
-| R06a | P00 | 原件/备份可恢复性、版本/缺口 ledger、恢复/退休/继续延期待审批方案 | Audit/S1：缺失不改 PASS；没有本阶段精确决定则 compatibility gate 未关闭 |
+| R06a | P00 | 原件/备份可恢复性、版本/缺口 ledger、恢复/退休/继续延期待审批方案 | Audit/S1：原审计保留；当前原件状态及既有延期按本阶段勘误记录承接 |
 | R06b | R06a,R01c,R02c,R03b | 新/旧 Schema、source、profile、native 顺序/coupling、UID/default/admission 正负回归 | S1/S2：错顺序、联动/资源/identity、版本误派发会失败；旧范围不退化 |
 | R06c | R06b,R03c,R04c,R05c | 汇总所有 required 源码/Provider/backend/camera/reader交集，交付 P99 包 | S1/S2/S3 原始 receipts+checksums，FAIL/NOT_RUN/BLOCKED 分列；缺 required gate 不产生阶段 PASS |
 
@@ -40,6 +51,8 @@ P99 包应有 `acceptance_report.md`、`acceptance.json`、独立 `phase_decisio
 <a id="r06a-legacy-original-audit"></a>
 
 ## R06a 历史原件审计（2026-10-26）
+
+> 以下为当时审计记录，非当前缺件清单；其中canonical outer-v0及L2检索结论已由本页2026-10-29勘误更正。旧报告不改写。
 
 审计边界仅复用 `evidence_index.json`、P00 `missing_originals.json`、所列 v1.1 备份/恢复索引和已知工作目录；未全盘扫描、未访问云端或其他机器。v1.1 L2 本地归档含22项有界证据副本，无一命中这四项历史域/路径，且不是完整工作区备份。source-recovery索引列出的7个manifest路径中，2个可读且未含目标域，5个在当前checkout中不存在。恢复清单没有列出以下四项原件。前三项的原件路径与原始文件 SHA-256 均为 `UNKNOWN`，索引无逐文件 bytes identity。B04a source-bound reconstruction 的 Core `f9543b8725d2990966743f49cebf9d68493b6b06` / GeoPhys `4436787e` 是重建来源事实，不能绑定为每个丢失文件的原始身份。
 
@@ -68,7 +81,7 @@ R06b新增R03b前置，以便对真实lowering/root与native顺序映射做回�
 版本化并保留现有 R02c/R03c exact reader；不能为接 Isaac 删除 MuJoCo3.8.1/64/65 的旧交集校验。
 Harness 的 canonical H5 与 leaf Generic H5 各沿现有 owner 扩展，storage roundtrip 不代正式 replay。
 新三 provider 运行保留精确 execution/source/build 身份，不回写旧 pin 的证据。
-本页四项 missing raw/处置决定与 R06c/P99 阻塞保持，不以新资产验证报告或新 H5 自动填补历史 bytes。
+历史限制按本页当前勘误承接；新资产报告或新H5不能替代旧bytes。F线不重开已接收R06c，也不关闭R07/P99。
 
 ## R06b attempt001 实施定位（2026-10-29）
 
