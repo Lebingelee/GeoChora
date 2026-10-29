@@ -189,7 +189,7 @@ compatible. The exact inspected MuJoCo 3.8.1 library build rejects native USD; o
 identities are rejected as unverified rather than being attributed that probe result. Every selection
 keeps `runtime_admitted=false`; there is no silent MJCF fallback or general USD-to-MJCF converter. No
 real official Panda delivery or upstream validation report was available, and F03/F04/F05 and
-Qualification remain unverified. F02 attempt002 is pending Sol review; see the [attempt001 history](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution)
+Qualification remain unverified. F02 attempt002 has Sol acceptance `ACCEPTED_BOUNDED_F02` for these source contracts and fixture checks; F03 is not started. See the [Sol acceptance](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt002-sol-acceptance), [attempt001 history](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution)
 and [attempt002 repair record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt002-bounded-delivery-resolver-repair).
 
 ### Static Logical Assembly value (R01a)

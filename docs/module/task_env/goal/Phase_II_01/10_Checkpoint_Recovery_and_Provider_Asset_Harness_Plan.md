@@ -1,6 +1,6 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX有界native已获 `ACCEPTED_BOUNDED_F01`；F02 attempt002已修复嵌套USD闭包根目录和MuJoCo build归因，定向S1通过，待 Sol 复核**。
+更新于 2026-10-29。状态：**F00已有 `ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX有界native已获 `ACCEPTED_BOUNDED_F01`；F02 attempt002经Sol独立复核获 `ACCEPTED_BOUNDED_F02`，F03待单独冻结包且未启动**。
 本计划的后续方向仍为计划状态；F00与F02分别按独立冻结包获得实现/验证授权，F02当前候选待Sol复核，不代表其他补丁行已授权或开始。
 
 ### 当前双Luna分工（2026-10-29）
@@ -272,3 +272,13 @@ R2只把`native USD decoder is not enabled`归因于实际核验的完整身份`
 Core实现提交为`0acadcd158850f49f92c3172af24548629ae9dc5`；更深入口回归提交为`f5e35e3b43ec90cf02e6665dd2d57463dcff2bb7`。干净提交树上的F02 26项及legacy资产身份/闭包19项合计45/45通过；最终`nested/deep/entry.usda`正反例单独运行也通过。此前一次合并集失败来自测试断言读取了`to_mapping()`中不存在的`identity_hash`，下一次运行在dirty checkout触发catalog既有provenance守卫；两次原件均保留，随后在实现提交的clean checkout修正断言并重跑全套通过。保护输入652/652匹配，attempt001的180项输出manifest也复核匹配。文档及Skill收尾提交、输出HEAD和最终hash见本attempt报告及`sha256.manifest`：`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_002/`。
 
 没有官方Panda真实bytes或upstream-validated report；该限制保持披露但不是本次门槛。未启动Isaac/Kit、solver/materializer、decoder/native compile、physics、H5或Expert，也没有依赖修改/下载。结果为`F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW`，不是Sol接收；F03和其他slice未启动。
+
+<a id="f02-attempt002-sol-acceptance"></a>
+
+## F02 attempt002 Sol接收（2026-10-29）
+
+Sol对`develop-full@21fd6ee22e08690383bc6fbc1497430d6b20cfdc`的实际diff与原冻结包完成复核：163项输出清单与652项保护路径全部匹配，独立重跑F02 26项及legacy 19项合并45/45通过（5.75秒）。保留原Sol缺陷复现脚本不改，回放确认嵌套entry成功、未知MuJoCo build不再继承已探测build结论；根内sibling与实际根外依赖由生产loader/catalog及独立reader分别通过/拒绝。
+
+接收为`ACCEPTED_BOUNDED_F02`，覆盖版本化USD交付/报告绑定、bytes闭包、选定本地USD依赖策略和provider表示选择，以及实际Core/catalog消费路径。实际实现与更深布局回归分别绑定`0acadcd158850f49f92c3172af24548629ae9dc5`、`f5e35e3b43ec90cf02e6665dd2d57463dcff2bb7`；本次Sol没有修改实现或测试、没有新增native/decoder/physics/H5/Expert运行。attempt001的GeoPhys source-only与精确MuJoCo build拒绝证据复用原件，不迁移为新运行或其他build能力。
+
+真实官方Panda bytes及上游validated report仍未取得；synthetic fixture不能替代真实交付或几何/物性等价验证，所有runtime admission保持false，Qualification为NOT_ASSESSED。F03的F02合同前置已满足，但F03尚未启动，仍需单独冻结实施包。无须第三次F02 attempt。独立复核与收据见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f02_002/`；历史候选与失败原件保持签署时点。
