@@ -11,6 +11,7 @@ import pytest
 
 from task_env.diagnostics.tasks import r05b_native_feedback_s2_worker as worker
 from task_env.diagnostics.tasks import r05b_native_feedback_independent_reader as reader
+from task_env.diagnostics.tasks import r05b_native_feedback_supervisor as supervisor
 
 
 ARTIFACT = '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
@@ -176,6 +177,40 @@ def test_full_worker_route_selects_real_normal_profile_owner(monkeypatch, tmp_pa
     result = worker.run('cuda', tmp_path / 'run', gripper_hz=100, full_episode=True)
     assert result['status'] == 'synthetic-route-dispatch'
     assert called == {'backend': 'cuda', 'law': 100, 'output': tmp_path / 'run', 'profile': 'normal'}
+
+
+def test_full_supervisor_reader_identity_mapping_and_completion_gate():
+    worker_result = {
+        'status': 'passed', 'profile': 'normal',
+        'native_feedback_profile': 'nutassembly-native-feedback-v1',
+        'gripper_control_hz': 100, 'close_success': True,
+        'backend': 'cpu', 'task_artifact_identity': ARTIFACT,
+        'source_id': SOURCE, 'source_xml_sha256': CANONICAL,
+        'controller_identity': CONTROLLER, 'solution_identity': SOLUTION,
+        'episode_id': EPISODE, 'reset_sample_id': RESET,
+        'provider_materialization_id': MATERIALIZATION,
+        'provider_build_identity': {'repository_revision': PROVIDER,
+                                    'import_origin': '/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/GeoPhys/src/geophys/__init__.py'},
+        's2': {'status': 'passed', 'transition_count': 12, 'terminated': False,
+               'truncated': False, 'runtime_fault': None,
+               'solution_outcome_report': {
+                   'task_success': True, 'planned_trajectory_completed': True,
+                   'outcome_complete': True, 'readiness_warnings': [],
+                   'original_expert_lifecycle_status': {'expert_complete': True, 'expert_failed': False},
+               }},
+        's3': {'status': 'passed'},
+    }
+    assert supervisor._full_worker_result_pass(worker_result, 100)
+    expected = supervisor._reader_expected(worker_result, full_episode=True, gripper_hz=100)
+    assert expected['artifact_identity'] == ARTIFACT
+    assert expected['transition_count'] == 12
+    assert expected['provider_commit'] == PROVIDER
+    assert not supervisor._full_worker_result_pass(
+        {**worker_result, 's3': {'status': 'failed'}}, 100,
+    )
+    assert not supervisor._full_worker_result_pass(
+        {**worker_result, 'close_success': False}, 100,
+    )
 
 
 @pytest.mark.parametrize('law_hz,expected_updates,expected_holds', [(100, 12, 48), (500, 60, 0)])

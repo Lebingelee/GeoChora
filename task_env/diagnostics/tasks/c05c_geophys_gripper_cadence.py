@@ -404,7 +404,10 @@ def run_group(backend, gripper_hz, output_dir, *, profile='diagnostic'):
             'task_artifact_identity': env.artifact.identity_hash,
             'source_id': source.scene_source.source_id,
             'source_xml_sha256': hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
-            'source_closure_digest': source.source_closure_digest,
+            'source_closure_digest': (
+                source_receipt.source_closure_digest if source_receipt is not None
+                else source.source_closure_digest
+            ),
             'controller_identity': env.controller.identity,
             'solution_identity': solution.identity,
             'reset_sample_id': initial_boundary['reset_sample_id'],

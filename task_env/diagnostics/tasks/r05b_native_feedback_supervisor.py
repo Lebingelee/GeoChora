@@ -145,6 +145,56 @@ def _worker_resources_pass(*, backend, child_return, resource_limit_reason,
     )
 
 
+def _full_worker_result_pass(worker_result, gripper_hz):
+    if not isinstance(worker_result, dict):
+        return False
+    outcome = worker_result.get('s2', {}).get('solution_outcome_report', {})
+    lifecycle = outcome.get('original_expert_lifecycle_status', {})
+    return bool(
+        worker_result.get('status') == 'passed'
+        and worker_result.get('profile') == 'normal'
+        and worker_result.get('native_feedback_profile') == 'nutassembly-native-feedback-v1'
+        and worker_result.get('gripper_control_hz') == gripper_hz
+        and worker_result.get('close_success') is True
+        and worker_result.get('s2', {}).get('status') == 'passed'
+        and worker_result.get('s3', {}).get('status') == 'passed'
+        and outcome.get('task_success') is True
+        and outcome.get('planned_trajectory_completed') is True
+        and outcome.get('outcome_complete') is True
+        and lifecycle.get('expert_complete') is True
+        and lifecycle.get('expert_failed') is False
+        and not outcome.get('readiness_warnings')
+        and not worker_result.get('s2', {}).get('terminated')
+        and not worker_result.get('s2', {}).get('truncated')
+        and worker_result.get('runtime_fault') is None
+    )
+
+
+def _reader_expected(worker_result, *, full_episode, gripper_hz):
+    expected = {
+        'backend': worker_result['backend'],
+        'artifact_identity': worker_result.get('task_artifact_identity', worker_result.get('artifact_identity')),
+        'source_id': worker_result['source_id'],
+        'source_xml_sha256': worker_result['source_xml_sha256'],
+        'controller_identity': worker_result['controller_identity'],
+        'solution_identity': worker_result['solution_identity'],
+        'episode_id': worker_result['episode_id'],
+        'reset_sample_id': worker_result['reset_sample_id'],
+        'provider_materialization_id': worker_result['provider_materialization_id'],
+    }
+    if full_episode:
+        expected.update({
+            'gripper_control_hz': gripper_hz,
+            'transition_count': worker_result['s2']['transition_count'],
+            'require_task_success': True,
+            'provider_commit': worker_result['provider_build_identity']['repository_revision'],
+            'provider_import_origin': worker_result['provider_build_identity']['import_origin'],
+        })
+    if any(value is None for value in expected.values()):
+        raise ValueError('worker result is missing a reader identity field')
+    return expected
+
+
 def check(backend: str, cell: str, python: Path, output_path: Path):
     """Provider-free launch gate; it never starts the worker or materializes physics."""
     if not LOCK_PATH.is_file() or not python.is_file():
@@ -392,32 +442,13 @@ def run(backend: str, run_root: Path, python: Path, *, gripper_hz: int = 500,
         reader_result = None
         reader_exit = None
         if status == 'passed':
-            full_ok = (not full_episode or (
-                worker_result.get('profile') == 'normal'
-                and worker_result.get('gripper_control_hz') == gripper_hz
-                and worker_result.get('native_feedback_profile') == 'nutassembly-native-feedback-v1'
-                and worker_result.get('close_success') is True
-                and worker_result.get('s2', {}).get('status') == 'passed'
-                and worker_result.get('s3', {}).get('status') == 'passed'
-            ))
+            full_ok = (not full_episode or _full_worker_result_pass(worker_result, gripper_hz))
             if not full_ok:
                 status = 'failed_or_blocked_full_task_or_s3'
         if status == 'passed':
-            expected = {
-                name: worker_result[name] for name in (
-                    'backend', 'artifact_identity', 'source_id', 'source_xml_sha256',
-                    'controller_identity', 'solution_identity', 'episode_id',
-                    'reset_sample_id', 'provider_materialization_id',
-                )
-            }
-            if full_episode:
-                expected.update({
-                    'gripper_control_hz': gripper_hz,
-                    'transition_count': worker_result['s2']['transition_count'],
-                    'require_task_success': True,
-                    'provider_commit': worker_result['provider_build_identity']['repository_revision'],
-                    'provider_import_origin': worker_result['provider_build_identity']['import_origin'],
-                })
+            expected = _reader_expected(
+                worker_result, full_episode=full_episode, gripper_hz=gripper_hz,
+            )
             expected_path = run_root / 'reader_expected.json'
             _json_write(expected_path, expected)
             reader_argv = [
