@@ -136,6 +136,83 @@ class AppliedCanonicalControl(Contract):
 
 
 @dataclass(frozen=True)
+class MixedActuatorTargetV1(Contract):
+    """Named mixed actuator values bound to one Selected Runtime boundary."""
+
+    schema_version: str
+    task_artifact_hash: str
+    source_id: str
+    source_closure_digest: str
+    controller_identity: str
+    provider_materialization_id: str
+    episode_id: str
+    reset_sample_id: str
+    control_step: int
+    state_revision: int
+    simulation_time_s: float
+    joint_torque_Nm: Mapping[str, float]
+    finger_position_m: Mapping[str, float]
+
+    def validate(self):
+        import re
+        if self.schema_version != 'mixed-actuator-target-v1':
+            raise ValueError('unsupported mixed actuator target schema')
+        for name in ('task_artifact_hash', 'source_closure_digest'):
+            if type(getattr(self, name)) is not str or re.fullmatch(r'[0-9a-f]{64}', getattr(self, name)) is None:
+                raise ValueError(f'{name} must be a lowercase SHA-256')
+        for name in ('source_id', 'controller_identity', 'provider_materialization_id',
+                     'episode_id', 'reset_sample_id'):
+            if type(getattr(self, name)) is not str or not getattr(self, name).strip():
+                raise ValueError(f'{name} must be nonempty')
+        if (type(self.control_step) is not int or self.control_step < 0
+                or type(self.state_revision) is not int or self.state_revision < 0
+                or not math.isfinite(float(self.simulation_time_s)) or self.simulation_time_s < 0):
+            raise ValueError('mixed actuator target boundary is invalid')
+        torques = dict(self.joint_torque_Nm)
+        fingers = dict(self.finger_position_m)
+        if len(torques) != 7 or set(torques) != {f'joint{i}' for i in range(1, 8)}:
+            raise ValueError('mixed actuator target requires the seven named Panda arm joints')
+        if len(fingers) != 2 or set(fingers) != {'finger_joint1', 'finger_joint2'}:
+            raise ValueError('mixed actuator target requires the two named finger joints')
+        if any(type(name) is not str or not name.strip() for name in (*torques, *fingers)):
+            raise ValueError('mixed actuator target names must be nonempty')
+        if any(not math.isfinite(float(value)) for value in (*torques.values(), *fingers.values())):
+            raise ValueError('mixed actuator target values must be finite')
+        object.__setattr__(self, 'simulation_time_s', float(self.simulation_time_s))
+
+    @property
+    def identity_hash(self):
+        return digest(self.to_mapping())
+
+
+@dataclass(frozen=True)
+class AppliedMixedActuatorV1(Contract):
+    """Named source actuator acknowledgement; native slots remain private."""
+
+    schema_version: str
+    target_hash: str
+    provider_name: str
+    joint_torque_Nm: Mapping[str, float]
+    finger_position_m: Mapping[str, float]
+    clipped: bool
+    mapping: str
+
+    def validate(self):
+        if self.schema_version != 'applied-mixed-actuator-v1':
+            raise ValueError('unsupported mixed actuator acknowledgement schema')
+        if not isinstance(self.target_hash, str) or len(self.target_hash) != 64:
+            raise ValueError('mixed actuator acknowledgement requires its target hash')
+        if not isinstance(self.provider_name, str) or not self.provider_name.strip():
+            raise ValueError('mixed actuator acknowledgement requires provider identity')
+        if type(self.clipped) is not bool or not isinstance(self.mapping, str) or not self.mapping.strip():
+            raise ValueError('mixed actuator acknowledgement mapping is invalid')
+        for mapping in (self.joint_torque_Nm, self.finger_position_m):
+            if any(not isinstance(name, str) or not name.strip() or not math.isfinite(float(value))
+                   for name, value in mapping.items()):
+                raise ValueError('mixed actuator acknowledgement values must be finite and named')
+
+
+@dataclass(frozen=True)
 class ControlGroupActionV1(Contract):
     """One entity/group slice of a complete, statically bound action request."""
 

@@ -16,13 +16,23 @@ def _source_asset_bytes(base_dir, source_xml):
 
 
 class _MuJoCoSession(_SessionValues):
-    def __init__(self, artifact, source):
+    def __init__(self, artifact, source, *, materialization_profile=None):
         self._initialize_values(artifact, source, 'mujoco')
+        self._materialization_profile = materialization_profile
         if source.fixed_attachment_plan is not None:
             try:
                 self._initialize_fixed_attachment(artifact, source)
             except Exception:
                 # The existing adapter owns every partially-created native value.
+                self.close()
+                raise
+            return
+        if materialization_profile is not None:
+            if materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+                raise ValueError('unsupported MuJoCo RuntimeSession materialization profile')
+            try:
+                self._initialize_libero_mixed(artifact, source)
+            except BaseException:
                 self.close()
                 raise
             return
@@ -81,6 +91,212 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_interval_writers = set()
         self._leaf_consumed_boundaries = set()
         self._validate_canonical_scene_model()
+
+    def _initialize_libero_mixed(self, artifact, source):
+        """Compile one receipt-bound LIBERO model and preflight every named slot."""
+        from .provenance import provider_build_identity
+        from ...assembly.assets import _source_closure_manifest
+
+        receipt = source.execution_source_receipt
+        if receipt is None:
+            raise ValueError('LIBERO materialization requires its immutable source receipt')
+        receipt.validate_snapshot()
+        import mujoco
+
+        self._mj = mujoco
+        self._runtime_identity = self._fixed_runtime_identity(mujoco)
+        self._provider_build_identity = provider_build_identity('mujoco')
+        assets = {
+            name: payload for name, payload in receipt.closure_files.items()
+            if name not in {'scene.xml', 'canonical-source.xml'}
+        }
+        self._model = mujoco.MjModel.from_xml_string(
+            receipt.importer_xml.decode('utf-8'), assets=assets,
+        )
+        self._data = mujoco.MjData(self._model)
+        self._native_steps = 0
+        self._preprocess_calls = 0
+        self._forward_calls = 0
+        self._reset_count = 0
+        self._last_close_receipt = None
+        self._mixed_fault = None
+        self._mixed_pending_target = None
+        self._mixed_consumed_boundaries = set()
+        self._reset_time_origin = 0.0
+        self._last_reset_readback_v1 = None
+        self._fixed_attachment_close_receipt = None
+        self._force_sample_sequence = 0
+        self._force_configuration_revision = 0
+        self._last_force_limit_N = None
+        self._completed_actuator_ctrl = None
+        self._completed_force_measurement = None
+        if (int(self._model.nq), int(self._model.nv), int(self._model.na), int(self._model.nu)) != (48, 43, 0, 9):
+            raise ValueError('compiled LIBERO nq/nv/na/nu differs from the fixed source layout')
+        if float(self._model.opt.timestep) != artifact.timebase.physics_dt:
+            raise ValueError('compiled LIBERO MuJoCo timestep differs from TaskArtifact')
+        self._joint_addresses = {
+            semantic: self._addresses(native, free=False) for semantic, native in source.joints.items()
+        }
+        self._free_addresses = {
+            semantic: self._addresses(native, free=True) for semantic, native in source.free_joints.items()
+        }
+        self._bodies = {
+            semantic: int(self._model.body(native).id) for semantic, native in source.bodies.items()
+        }
+        self._frames = {
+            semantic: int(self._model.site(native).id) for semantic, native in source.frames.items()
+        }
+        self._torque_actuators = {
+            semantic: int(self._model.actuator(native).id)
+            for semantic, native in source.torque_actuators.items()
+        }
+        self._position_actuators = {
+            semantic: int(self._model.actuator(native).id)
+            for semantic, native in source.position_actuators.items()
+        }
+        expected_dims = {
+            **{f'joint{i}': (i - 1, i - 1) for i in range(1, 8)},
+            'finger_joint1': (7, 7), 'finger_joint2': (8, 8),
+            'wooden_cabinet_1.top_level': (44, 39),
+            'wooden_cabinet_1.middle_level': (45, 40),
+            'wooden_cabinet_1.bottom_level': (46, 41),
+            'flat_stove_1.button': (47, 42),
+        }
+        for semantic, (qpos, dof) in expected_dims.items():
+            if self._joint_addresses.get(semantic) != (qpos, dof):
+                raise ValueError(f'compiled scalar joint order differs from .pruned_init layout: {semantic}')
+        expected_free_order = (
+            'akita_black_bowl_1', 'akita_black_bowl_2', 'cookies_1',
+            'glazed_rim_porcelain_ramekin_1', 'plate_1',
+        )
+        for offset, semantic in enumerate(expected_free_order):
+            if self._free_addresses.get(semantic) != (9 + 7 * offset, 9 + 6 * offset):
+                raise ValueError(f'compiled free-joint order differs from .pruned_init layout: {semantic}')
+        for semantic, aid in self._torque_actuators.items():
+            joint_name = f'robot0_{semantic}'
+            joint_id = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, joint_name))
+            if (joint_id < 0
+                    or int(self._model.actuator_trntype[aid]) != int(self._mj.mjtTrn.mjTRN_JOINT)
+                    or int(self._model.actuator_trnid[aid, 0]) != joint_id
+                    or int(self._model.jnt_type[joint_id]) != int(self._mj.mjtJoint.mjJNT_HINGE)):
+                raise ValueError(f'compiled torque actuator does not drive the named hinge: {semantic}')
+            low, high = (float(value) for value in self._model.actuator_ctrlrange[aid])
+            expected_range = (-80.0, 80.0) if semantic in {f'joint{i}' for i in range(1, 6)} else (-12.0, 12.0)
+            if not bool(self._model.actuator_ctrllimited[aid]) or (low, high) != expected_range:
+                raise ValueError(f'compiled torque actuator range differs from source: {semantic}')
+        expected_position_ranges = {'finger_joint1': (0.0, 0.04), 'finger_joint2': (-0.04, 0.0)}
+        for semantic, aid in self._position_actuators.items():
+            joint_name = 'gripper0_' + semantic
+            joint_id = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, joint_name))
+            low, high = (float(value) for value in self._model.actuator_ctrlrange[aid])
+            if (joint_id < 0
+                    or int(self._model.actuator_trntype[aid]) != int(self._mj.mjtTrn.mjTRN_JOINT)
+                    or int(self._model.actuator_trnid[aid, 0]) != joint_id
+                    or not bool(self._model.actuator_ctrllimited[aid])
+                    or (low, high) != expected_position_ranges[semantic]):
+                raise ValueError(f'compiled finger position actuator differs from source contract: {semantic}')
+        self._contact_geom_ids = {}
+        for semantic, names in source.contact_geom_groups.items():
+            ids = tuple(int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_GEOM, name)) for name in names)
+            if not ids or any(index < 0 for index in ids):
+                raise ValueError(f'compiled geom group is incomplete: {semantic}')
+            self._contact_geom_ids[semantic] = frozenset(ids)
+        named_torque_actuators = {
+            semantic: {
+                'name': source.torque_actuators[semantic], 'id': aid,
+                'transmission_type': 'joint', 'transmission_target': f'robot0_{semantic}',
+                'control_limited': bool(self._model.actuator_ctrllimited[aid]),
+                'control_range': [float(value) for value in self._model.actuator_ctrlrange[aid]],
+            }
+            for semantic, aid in self._torque_actuators.items()
+        }
+        named_position_actuators = {
+            semantic: {
+                'name': source.position_actuators[semantic], 'id': aid,
+                'transmission_type': 'joint', 'transmission_target': f'gripper0_{semantic}',
+                'control_limited': bool(self._model.actuator_ctrllimited[aid]),
+                'control_range': [float(value) for value in self._model.actuator_ctrlrange[aid]],
+            }
+            for semantic, aid in self._position_actuators.items()
+        }
+        self._current_ctrl = self._data.ctrl.copy()
+        self._compiled_layout_receipt = {
+            'schema_version': 'r07c-d01-compiled-model-layout-v1',
+            'dimensions': {'nq': int(self._model.nq), 'nv': int(self._model.nv),
+                           'na': int(self._model.na), 'nu': int(self._model.nu),
+                           'njnt': int(self._model.njnt), 'nbody': int(self._model.nbody),
+                           'nsite': int(self._model.nsite), 'ngeom': int(self._model.ngeom)},
+            'source_closure_digest': source.source_closure_digest,
+            'source_id': source.scene_source.source_id,
+            'source_files': list(_source_closure_manifest(receipt.closure_files)),
+            'named_joint_addresses': {key: list(value) for key, value in self._joint_addresses.items()},
+            'named_free_joint_addresses': {key: list(value) for key, value in self._free_addresses.items()},
+            'named_body_ids': dict(self._bodies), 'named_frame_ids': dict(self._frames),
+            'named_torque_actuator_ids': dict(self._torque_actuators),
+            'named_position_actuator_ids': dict(self._position_actuators),
+            'named_torque_actuator_layout': named_torque_actuators,
+            'named_position_actuator_layout': named_position_actuators,
+            'named_contact_geom_groups': {
+                semantic: [
+                    {'name': name, 'id': int(self._mj.mj_name2id(
+                        self._model, self._mj.mjtObj.mjOBJ_GEOM, name,
+                    ))}
+                    for name in names
+                ]
+                for semantic, names in source.contact_geom_groups.items()
+            },
+        }
+
+    @property
+    def compiled_layout_receipt(self):
+        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+            raise RuntimeError('compiled LIBERO layout is unavailable for this session profile')
+        return json.loads(json.dumps(self._compiled_layout_receipt, sort_keys=True))
+
+    @property
+    def runtime_identity(self):
+        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+            raise RuntimeError('pinned MuJoCo runtime identity is unavailable for this profile')
+        return json.loads(json.dumps({
+            'runtime': self._runtime_identity,
+            'provider_build': self._provider_build_identity,
+        }, sort_keys=True))
+
+    @property
+    def runtime_progress_receipt(self):
+        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+            raise RuntimeError('mixed runtime progress is unavailable for this session profile')
+        return {
+            'schema_version': 'r07c-d01-runtime-progress-v1',
+            'provider_materialization_id': self._provider_materialization_id,
+            'episode_id': self._episode_id,
+            'reset_sample_id': self._reset_sample_id,
+            'reset_count': int(self._reset_count),
+            'control_step': int(self._control_step),
+            'state_revision': int(self._state_revision),
+            'native_step_count': int(self._native_steps),
+            'preprocess_call_count': int(self._preprocess_calls),
+            'forward_call_count': int(self._forward_calls),
+            'simulation_time_native_s': float(self._data.time),
+            'simulation_time_episode_s': float(self._data.time - self._reset_time_origin),
+            'source_id': self._source.scene_source.source_id,
+            'source_closure_digest': self._source.source_closure_digest,
+        }
+
+    @property
+    def close_receipt(self):
+        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+            raise RuntimeError('mixed close evidence is unavailable for this session profile')
+        if self._last_close_receipt is None:
+            raise RuntimeError('mixed RuntimeSession close has not completed')
+        return json.loads(json.dumps(self._last_close_receipt, sort_keys=True))
+
+    @property
+    def reset_readback_v1(self):
+        self._require_reset()
+        if self._last_reset_readback_v1 is None:
+            raise RuntimeError('versioned reset readback is unavailable before the admitted reset')
+        return self._last_reset_readback_v1
 
     @staticmethod
     def _fixed_runtime_identity(mujoco):
@@ -1184,6 +1400,9 @@ class _MuJoCoSession(_SessionValues):
         return int(self._model.jnt_qposadr[joint]), int(self._model.jnt_dofadr[joint])
 
     def reset(self, sample):
+        if (self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1'
+                and getattr(sample, 'schema_version', None) == 'reset-sample-v1'):
+            return self._reset_libero_mixed(sample)
         self._begin_reset()
         self._validate_sample(sample)
         self._last_typed_force_publication = None
@@ -1239,6 +1458,143 @@ class _MuJoCoSession(_SessionValues):
         self._cache_completed_actuator_force()
         return realized
 
+    def _reset_libero_mixed(self, sample):
+        """Apply the exact v1 time, qvel, free-root, and fixture reset in one pass."""
+        from ...artifacts import ResetReadbackV1, ResetSampleV1
+
+        if type(sample) is not ResetSampleV1:
+            raise TypeError('LIBERO mixed materialization requires ResetSampleV1')
+        self._validate_sample(sample)
+        if self._mixed_fault is not None:
+            raise RuntimeError('LIBERO MuJoCo session is fault-latched')
+        self._begin_reset()
+        model, data, mj = self._model, self._data, self._mj
+        # Every name/value/range is checked before the first mutable native write.
+        if (set(sample.joint_position) != set(self._joint_addresses)
+                or set(sample.joint_velocity) != set(self._joint_addresses)
+                or set(sample.poses_world) != set(self._free_addresses)
+                or set(sample.free_joint_velocity) != set(self._free_addresses)
+                or set(sample.fixture_pose_world) != set(self._source.fixture_bodies)):
+            raise ValueError('LIBERO ResetSampleV1 does not cover the compiled source layout')
+        for semantic, value in sample.joint_position.items():
+            qpos, _ = self._joint_addresses[semantic]
+            native_name = self._source.joints[semantic]
+            jid = int(model.joint(native_name).id)
+            if bool(model.jnt_limited[jid]):
+                low, high = (float(item) for item in model.jnt_range[jid])
+                if not low <= float(value) <= high:
+                    raise ValueError(f'LIBERO reset position exceeds source joint limits: {semantic}')
+            if not math.isfinite(float(sample.joint_velocity[semantic])):
+                raise ValueError(f'LIBERO reset velocity is non-finite: {semantic}')
+        for semantic, pose_value in sample.fixture_pose_world.items():
+            body_id = self._bodies[semantic]
+            if int(model.body_parentid[body_id]) != 0:
+                raise ValueError(f'LIBERO fixture root is not a world child: {semantic}')
+            pose_value.validate()
+        for semantic, pose_value in sample.poses_world.items():
+            pose_value.validate()
+            velocity = sample.free_joint_velocity[semantic]
+            if len(velocity) != 6 or any(not math.isfinite(float(item)) for item in velocity):
+                raise ValueError(f'LIBERO free-body velocity is invalid: {semantic}')
+        for semantic, value in sample.joint_position.items():
+            if semantic not in {'finger_joint1', 'finger_joint2'}:
+                continue
+            aid = self._position_actuators[semantic]
+            low, high = (float(item) for item in model.actuator_ctrlrange[aid])
+            if not low <= float(value) <= high:
+                raise ValueError(f'LIBERO initial finger target exceeds source actuator range: {semantic}')
+
+        try:
+            mj.mj_resetData(model, data)
+            self._native_steps = 0
+            self._reset_count += 1
+            self._preprocess_calls = 0
+            self._forward_calls = 0
+            self._reset_time_origin = float(sample.simulation_time_s)
+            # LIBERO's normal route runs its non-integrating mj_step1
+            # preprocessing before the placement sampler is applied. The
+            # selected .pruned_init row is restored after these placements.
+            mj.mj_step1(model, data)
+            self._preprocess_calls += 1
+            for semantic, fixture_pose in sample.fixture_pose_world.items():
+                body_id = self._bodies[semantic]
+                model.body_pos[body_id, :] = fixture_pose.position
+                model.body_quat[body_id, :] = fixture_pose.quaternion_wxyz
+            for semantic, sampled_pose in sample.sampled_poses_world.items():
+                qpos, dof = self._free_addresses[semantic]
+                data.qpos[qpos:qpos + 7] = (*sampled_pose.position, *sampled_pose.quaternion_wxyz)
+                data.qvel[dof:dof + 6] = 0.0
+            # Restore the complete named .pruned_init state after ordinary
+            # BDDL placements; fixture root transforms intentionally remain
+            # the current sampler realization because the row has no roots.
+            for semantic, value in sample.joint_position.items():
+                qpos, dof = self._joint_addresses[semantic]
+                data.qpos[qpos] = float(value)
+                data.qvel[dof] = float(sample.joint_velocity[semantic])
+            for semantic, pose_value in sample.poses_world.items():
+                qpos, dof = self._free_addresses[semantic]
+                data.qpos[qpos:qpos + 7] = (*pose_value.position, *pose_value.quaternion_wxyz)
+                data.qvel[dof:dof + 6] = sample.free_joint_velocity[semantic]
+            data.time = self._reset_time_origin
+            data.ctrl[:] = 0.0
+            for semantic, actuator_id in self._position_actuators.items():
+                data.ctrl[actuator_id] = float(sample.joint_position[semantic])
+            self._current_ctrl = data.ctrl.copy()
+            mj.mj_forward(model, data)
+            self._forward_calls = 1
+            self._mixed_consumed_boundaries.clear()
+            self._mixed_pending_target = None
+            realized = self._realized(sample)
+            joints = {name: float(data.qpos[address[0]])
+                      for name, address in self._joint_addresses.items()}
+            velocities = {name: float(data.qvel[address[1]])
+                          for name, address in self._joint_addresses.items()}
+            free_poses = {
+                name: pose(data.qpos[qpos:qpos + 3], data.qpos[qpos + 3:qpos + 7])
+                for name, (qpos, _) in self._free_addresses.items()
+            }
+            free_velocities = {
+                name: tuple(float(value) for value in data.qvel[dof:dof + 6])
+                for name, (_, dof) in self._free_addresses.items()
+            }
+            fixture_poses = {
+                name: pose(data.xpos[body_id], data.xquat[body_id])
+                for name, body_id in ((key, self._bodies[key]) for key in self._source.fixture_bodies)
+            }
+            receipt = ResetReadbackV1(
+                schema_version='runtime-reset-readback-v1',
+                source_id=self._source.scene_source.source_id,
+                source_closure_digest=self._source.source_closure_digest,
+                provider_materialization_id=self._provider_materialization_id,
+                episode_id=self._episode_id, reset_sample_id=self._reset_sample_id,
+                simulation_time_s=float(data.time), joint_position=joints,
+                joint_velocity=velocities, poses_world=free_poses,
+                free_joint_velocity=free_velocities,
+                free_joint_velocity_frame='mujoco_world_linear_local_angular_v1',
+                fixture_pose_world=fixture_poses,
+                native_step_count=int(self._native_steps),
+                preprocess_call_count=int(self._preprocess_calls),
+                forward_call_count=int(self._forward_calls),
+            )
+            receipt.validate()
+            if (receipt.joint_position != sample.joint_position
+                    or receipt.joint_velocity != sample.joint_velocity
+                    or receipt.free_joint_velocity != sample.free_joint_velocity
+                    or receipt.simulation_time_s != sample.simulation_time_s):
+                raise ValueError('LIBERO reset readback does not match the frozen row receipt')
+            for name, expected in sample.fixture_pose_world.items():
+                actual = receipt.fixture_pose_world[name]
+                if (not np.allclose(actual.position, expected.position, rtol=0.0, atol=1e-12)
+                        or not np.allclose(actual.quaternion_wxyz, expected.quaternion_wxyz,
+                                           rtol=0.0, atol=1e-12)):
+                    raise ValueError(f'LIBERO fixture readback differs from sampled root pose: {name}')
+            self._last_reset_readback_v1 = receipt
+            return realized
+        except BaseException as error:
+            self._mixed_fault = {'phase': 'reset', 'error': f'{type(error).__name__}: {error}'}
+            self._reset_done = False
+            raise
+
     def _snapshot_with_native_free_joints(self):
         self._require_reset()
         data = self._data
@@ -1250,7 +1606,19 @@ class _MuJoCoSession(_SessionValues):
             self._mj.mju_mat2Quat(quaternion, data.site_xmat[index])
             poses[name] = pose(data.site_xpos[index], quaternion)
         time = data.time
-        if self._artifact.timebase.control_substeps > 1 and not self._inner_interval_active:
+        if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+            elapsed = float(data.time) - self._reset_time_origin
+            expected = self._native_steps * self._artifact.timebase.physics_dt
+            bound = (self._native_steps + 2) * max(
+                math.ulp(float(data.time)), math.ulp(self._reset_time_origin),
+                math.ulp(expected), math.ulp(self._artifact.timebase.physics_dt),
+            )
+            if not math.isfinite(elapsed) or abs(elapsed - expected) > bound:
+                raise ValueError('LIBERO native/reset-origin clock or integration count mismatch')
+            if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
+                raise ValueError('LIBERO native/canonical step-count mismatch')
+            time = self._control_step * self._artifact.timebase.control_dt
+        elif self._artifact.timebase.control_substeps > 1 and not self._inner_interval_active:
             if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
                 raise ValueError('MuJoCo native/canonical step-count mismatch')
             expected = self._native_steps * self._artifact.timebase.physics_dt
@@ -1458,6 +1826,8 @@ class _MuJoCoSession(_SessionValues):
         return sample
 
     def apply_control(self, target):
+        if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+            return self.apply_mixed_actuator_target(target)
         from .control import validate_target
         from ...controllers.canonical.contracts import AppliedCanonicalControl
         validate_target(self, target)
@@ -1489,8 +1859,140 @@ class _MuJoCoSession(_SessionValues):
             realized, opening, target.gripper.force_limit_N, clipped,
             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
 
+    def bind_mixed_controller(self, controller_identity):
+        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+            raise RuntimeError('mixed Controller binding is restricted to the LIBERO profile')
+        if self._reset_done or hasattr(self, '_mixed_controller_identity'):
+            raise RuntimeError('mixed Controller can be bound exactly once before reset')
+        if type(controller_identity) is not str or not controller_identity.strip():
+            raise ValueError('mixed Controller identity must be a nonempty stable value')
+        if (controller_identity != self._source.mixed_controller_identity
+                or self._source.mixed_controller_profile_id != 'libero-spatial-bowl-to-plate-joint-space-pd-v1'):
+            raise ValueError('mixed Controller identity differs from the source-bound admission')
+        self._mixed_controller_identity = controller_identity
+
+    def apply_mixed_actuator_target(self, target):
+        from ...controllers.canonical.contracts import AppliedMixedActuatorV1, MixedActuatorTargetV1
+        self._require_reset()
+        if self._mixed_fault is not None:
+            raise RuntimeError('LIBERO MuJoCo session is fault-latched')
+        if type(target) is not MixedActuatorTargetV1:
+            raise TypeError('LIBERO RuntimeSession requires MixedActuatorTargetV1')
+        target.validate()
+        state = self.snapshot()
+        if (not hasattr(self, '_mixed_controller_identity')
+                or target.controller_identity != self._mixed_controller_identity
+                or target.task_artifact_hash != self._artifact.identity_hash
+                or target.source_id != self._source.scene_source.source_id
+                or target.source_closure_digest != self._source.source_closure_digest
+                or target.provider_materialization_id != self._provider_materialization_id
+                or target.episode_id != self._episode_id
+                or target.reset_sample_id != self._reset_sample_id
+                or target.control_step != self._control_step
+                or target.state_revision != self._state_revision
+                or target.simulation_time_s != state.simulation_time):
+            raise ValueError('mixed actuator target identity or boundary is stale/mismatched')
+        boundary = (target.episode_id, target.reset_sample_id, target.control_step, target.state_revision)
+        if boundary in self._mixed_consumed_boundaries or self._mixed_pending_target is not None:
+            raise ValueError('mixed actuator target boundary was already consumed or is still pending')
+        torques, fingers = dict(target.joint_torque_Nm), dict(target.finger_position_m)
+        if set(torques) != set(self._torque_actuators) or set(fingers) != set(self._position_actuators):
+            raise ValueError('mixed actuator target does not cover the exact named source slots')
+        values = {}
+        for semantic, aid in self._torque_actuators.items():
+            value = float(torques[semantic])
+            low, high = (float(item) for item in self._model.actuator_ctrlrange[aid])
+            if not math.isfinite(value) or not low <= value <= high:
+                raise ValueError(f'mixed actuator torque is outside its named source range: {semantic}')
+            values[aid] = value
+        for semantic, aid in self._position_actuators.items():
+            value = float(fingers[semantic])
+            low, high = (float(item) for item in self._model.actuator_ctrlrange[aid])
+            if not math.isfinite(value) or not low <= value <= high:
+                raise ValueError(f'mixed finger position is outside its signed source range: {semantic}')
+            values[aid] = value
+        try:
+            for aid, value in values.items():
+                self._data.ctrl[aid] = value
+            self._current_ctrl = self._data.ctrl.copy()
+        except BaseException as error:
+            self._mixed_fault = {'phase': 'partial_control_apply', 'error': f'{type(error).__name__}: {error}'}
+            raise
+        self._mixed_consumed_boundaries.add(boundary)
+        self._mixed_pending_target = target
+        result = AppliedMixedActuatorV1(
+            'applied-mixed-actuator-v1', target.identity_hash, 'mujoco',
+            torques, fingers, False,
+            'named_joint_torque_and_signed_finger_position_control_zoh_20hz',
+        )
+        result.validate()
+        return result
+
+    def read_contact_summary_v2(self, requested_pairs):
+        from ...environment.types import ContactSummaryV2
+        self._require_reset()
+        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+            raise RuntimeError('geom-group contact is limited to the admitted LIBERO profile')
+        normalized = []
+        for pair in requested_pairs:
+            if len(pair) != 2 or pair[0] == pair[1]:
+                raise ValueError('contact query requires distinct entity pairs')
+            normalized.append(tuple(sorted((str(pair[0]), str(pair[1])))))
+        if len(set(normalized)) != len(normalized):
+            raise ValueError('contact query contains duplicate/reversed entity pairs')
+        requested = tuple(sorted(normalized))
+        groups = self._source.contact_geom_groups
+        if any(left not in groups or right not in groups for left, right in requested):
+            return ContactSummaryV2.unavailable(
+                source_id=self._source.scene_source.source_id,
+                source_closure_digest=self._source.source_closure_digest,
+                provider_materialization_id=self._provider_materialization_id,
+                episode_id=self._episode_id, reset_sample_id=self._reset_sample_id,
+                control_step=self._control_step, state_revision=self._state_revision,
+                simulation_time_s=self.snapshot().simulation_time,
+                requested_pairs=requested, reason='unknown_entity_or_geom_group',
+            )
+        counts = {f'{left}/{right}': 0 for left, right in requested}
+        for index in range(int(self._data.ncon)):
+            contact = self._data.contact[index]
+            left_geom, right_geom = int(contact.geom1), int(contact.geom2)
+            for left, right in requested:
+                left_ids, right_ids = self._contact_geom_ids[left], self._contact_geom_ids[right]
+                if ((left_geom in left_ids and right_geom in right_ids)
+                        or (right_geom in left_ids and left_geom in right_ids)):
+                    counts[f'{left}/{right}'] += 1
+        return ContactSummaryV2(
+            self._source.scene_source.source_id, self._source.source_closure_digest,
+            self._provider_materialization_id, self._episode_id, self._reset_sample_id,
+            self._control_step, self._state_revision, self.snapshot().simulation_time,
+            requested, requested, counts,
+            {name: tuple(values) for name, values in groups.items()},
+        )
+
     def step(self):
         self._require_reset()
+        if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+            if self._mixed_fault is not None:
+                raise RuntimeError('LIBERO MuJoCo session is fault-latched')
+            if self._mixed_pending_target is None:
+                raise RuntimeError('LIBERO outer step requires exactly one fresh mixed target')
+            try:
+                for _ in range(self._artifact.timebase.control_substeps):
+                    self._mj.mj_step(self._model, self._data)
+                    self._native_steps += 1
+                self._mj.mj_forward(self._model, self._data)
+                self._forward_calls += 1
+                self._control_step += 1
+                self._state_revision += 1
+                self._mixed_pending_target = None
+                return self.snapshot()
+            except BaseException as error:
+                self._mixed_fault = {
+                    'phase': 'outer_advance', 'error': f'{type(error).__name__}: {error}',
+                    'native_steps_completed': int(self._native_steps),
+                    'control_boundary': int(self._control_step),
+                }
+                raise
         for _ in range(self._artifact.timebase.control_substeps):
             self._mj.mj_step(self._model, self._data)
             self._native_steps += 1
@@ -1511,6 +2013,23 @@ class _MuJoCoSession(_SessionValues):
 
     def close(self):
         if not self._closed:
+            if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+                self._last_close_receipt = {
+                    'schema_version': 'r07c-d01-runtime-close-v1',
+                    'provider_materialization_id': self._provider_materialization_id,
+                    'episode_id': self._episode_id,
+                    'reset_sample_id': self._reset_sample_id,
+                    'session_closed': True,
+                    'model_released': getattr(self, '_model', None) is not None,
+                    'data_released': getattr(self, '_data', None) is not None,
+                    'reset_count': int(getattr(self, '_reset_count', 0)),
+                    'control_step': int(getattr(self, '_control_step', 0)),
+                    'native_step_count': int(getattr(self, '_native_steps', 0)),
+                    'preprocess_call_count': int(getattr(self, '_preprocess_calls', 0)),
+                    'forward_call_count': int(getattr(self, '_forward_calls', 0)),
+                    'source_id': self._source.scene_source.source_id,
+                    'source_closure_digest': self._source.source_closure_digest,
+                }
             if getattr(self._source, 'fixed_attachment_plan', None) is not None:
                 model, data = getattr(self, '_model', None), getattr(self, '_data', None)
                 self._fixed_attachment_close_receipt = {

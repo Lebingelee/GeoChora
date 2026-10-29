@@ -11,9 +11,11 @@ import hashlib
 import io
 import math
 import pickletools
+import re
 import struct
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ET
 import zipfile
 
 
@@ -22,6 +24,38 @@ ROWS = 50
 WIDTH = 92
 ROW_BYTES = WIDTH * 8
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024
+PILOT_SOURCE_MANIFEST_SHA256 = "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75"
+PILOT_BDDL_SHA256 = "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660c959b"
+PILOT_RESET_SAMPLER_ID = "libero-bddl-normal-placement-v1"
+PILOT_RESET_SAMPLER_VERSION = "libero-8f1084e3-robosuite-fbee5844-tabletop-table-region-v1"
+PILOT_TABLE_TOP_Z_M = 0.90
+PILOT_MOVABLE_Z_OFFSET_M = 0.01
+PILOT_TABLE_FULL_THICKNESS_M = 0.05
+PILOT_FIXTURE_Z_OFFSET_M = PILOT_MOVABLE_Z_OFFSET_M - PILOT_TABLE_FULL_THICKNESS_M
+PILOT_INIT_ORDER = (
+    "sample_object_properties", "mj_step1", "sample_fixtures_and_objects",
+    "restore_selected_init_row", "mj_forward",
+)
+PILOT_MOVABLES = (
+    ("akita_black_bowl_1", "between_plate_ramekin_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/akita_black_bowl/akita_black_bowl.xml"),
+    ("akita_black_bowl_2", "next_to_ramekin_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/akita_black_bowl/akita_black_bowl.xml"),
+    ("plate_1", "plate_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/plate/plate.xml"),
+    ("cookies_1", "box_region", "upstream/libero/libero/libero/assets/stable_hope_objects/cookies/cookies.xml"),
+    ("glazed_rim_porcelain_ramekin_1", "ramekin_region", "upstream/libero/libero/libero/assets/stable_scanned_objects/glazed_rim_porcelain_ramekin/glazed_rim_porcelain_ramekin.xml"),
+)
+PILOT_MOVABLE_OBJECT_CLASSES = {
+    "akita_black_bowl_1": "libero.libero.envs.objects.google_scanned_objects.AkitaBlackBowl",
+    "akita_black_bowl_2": "libero.libero.envs.objects.google_scanned_objects.AkitaBlackBowl",
+    "plate_1": "libero.libero.envs.objects.google_scanned_objects.Plate",
+    "cookies_1": "libero.libero.envs.objects.hope_objects.Cookies",
+    "glazed_rim_porcelain_ramekin_1": (
+        "libero.libero.envs.objects.google_scanned_objects.GlazedRimPorcelainRamekin"
+    ),
+}
+PILOT_FIXTURES = (
+    ("wooden_cabinet_1", "cabinet_region", "upstream/libero/libero/libero/assets/articulated_objects/wooden_cabinet.xml"),
+    ("flat_stove_1", "stove_region", "upstream/libero/libero/libero/assets/articulated_objects/flat_stove.xml"),
+)
 _MEMBERS = {"archive/data.pkl", "archive/version"}
 _GLOBAL_SYMBOLS = {
     "numpy.core.multiarray _reconstruct",
@@ -189,7 +223,400 @@ def init_layout_v1() -> dict[str, Any]:
     }
 
 
+def _parse_sexpr(text: str):
+    """Parse the fixed BDDL data syntax without importing BDDL or executing code."""
+    tokens = re.findall(r"\(|\)|[^\s()]+", text)
+    stack: list[list[Any]] = []
+    root: list[Any] = []
+    current = root
+    for token in tokens:
+        if token == "(":
+            child: list[Any] = []
+            current.append(child)
+            stack.append(current)
+            current = child
+        elif token == ")":
+            if not stack:
+                raise ValueError("pinned BDDL has an unmatched closing parenthesis")
+            current = stack.pop()
+        else:
+            current.append(token)
+    if stack:
+        raise ValueError("pinned BDDL has an unmatched opening parenthesis")
+    return root
+
+
+def _find_form(tree, head: str):
+    pending = list(tree)
+    found = []
+    while pending:
+        item = pending.pop()
+        if isinstance(item, list):
+            if item and item[0] == head:
+                found.append(item)
+            pending.extend(item)
+    if len(found) != 1:
+        raise ValueError(f"pinned BDDL must contain one {head!r} form")
+    return found[0]
+
+
+def _task_regions_and_initial_state(install_root: Path, source_manifest: dict):
+    manifest_path = Path(__file__).resolve().parents[2] / "asset/benchmarks/libero/source_manifest.json"
+    manifest_bytes = manifest_path.read_bytes()
+    if hashlib.sha256(manifest_bytes).hexdigest() != PILOT_SOURCE_MANIFEST_SHA256:
+        raise ValueError("LIBERO source manifest differs from the frozen pilot identity")
+    canonical_manifest = json_loads(manifest_bytes)
+    if source_manifest != canonical_manifest:
+        raise ValueError("provided LIBERO source manifest differs from the tracked frozen manifest")
+    rows = {row.get("install_path"): row for row in source_manifest.get("files", ())}
+    bddl_path = "upstream/libero/libero/libero/bddl_files/libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.bddl"
+    row = rows.get(bddl_path)
+    if row is None or row.get("sha256") != PILOT_BDDL_SHA256:
+        raise ValueError("frozen LIBERO BDDL is absent from its source manifest")
+    root = Path(install_root).resolve(strict=True)
+    target = root / bddl_path
+    if target.is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest() != PILOT_BDDL_SHA256:
+        raise ValueError("installed LIBERO BDDL bytes differ from the frozen source")
+    tree = _parse_sexpr(target.read_text(encoding="utf-8"))
+    bddl = _find_form(tree, "define")
+    regions_form = _find_form(bddl, ":regions")
+    initial_form = _find_form(bddl, ":init")
+    states = tuple(
+        (str(item[0]).lower(), str(item[1]), str(item[2]))
+        for item in initial_form[1:] if isinstance(item, list) and len(item) == 3
+    )
+    expected_states = (
+        ("on", "akita_black_bowl_1", "main_table_between_plate_ramekin_region"),
+        ("on", "akita_black_bowl_2", "main_table_next_to_ramekin_region"),
+        ("on", "plate_1", "main_table_plate_region"),
+        ("on", "cookies_1", "main_table_box_region"),
+        ("on", "glazed_rim_porcelain_ramekin_1", "main_table_ramekin_region"),
+        ("on", "wooden_cabinet_1", "main_table_cabinet_region"),
+        ("on", "flat_stove_1", "main_table_stove_region"),
+    )
+    if states != expected_states:
+        raise ValueError("pinned LIBERO BDDL initial-state order or content changed")
+    expected_placement_order = tuple(name for name, _, _ in (*PILOT_MOVABLES, *PILOT_FIXTURES))
+    if tuple(item[1] for item in states) != expected_placement_order:
+        raise ValueError("pinned LIBERO placement order differs from the BDDL initial-state order")
+    result = {}
+    for region in regions_form[1:]:
+        if not isinstance(region, list) or not region:
+            continue
+        name = str(region[0])
+        target_form = next((entry for entry in region[1:] if isinstance(entry, list) and entry[:1] == [":target"]), None)
+        ranges_form = next((entry for entry in region[1:] if isinstance(entry, list) and entry[:1] == [":ranges"]), None)
+        yaw_form = next((entry for entry in region[1:] if isinstance(entry, list) and entry[:1] == [":yaw_rotation"]), None)
+        if target_form is None or len(target_form) != 2 or ranges_form is None:
+            continue
+        ranges = tuple(tuple(float(value) for value in rectangle) for rectangle in ranges_form[1])
+        yaw_ranges = ((0.0, 0.0),) if yaw_form is None else tuple(
+            tuple(_bddl_number(value) for value in pair) for pair in yaw_form[1]
+        )
+        if (any(len(item) != 4 or any(not math.isfinite(value) for value in item) for item in ranges)
+                or not yaw_ranges
+                or any(len(item) != 2 or any(not math.isfinite(value) for value in item)
+                       for item in yaw_ranges)):
+            raise ValueError(f"pinned BDDL region {name!r} has an unsupported range shape")
+        result[name] = {"target": str(target_form[1]), "ranges": ranges, "yaw_ranges": yaw_ranges}
+    required_regions = {name for _, name, _ in (*PILOT_MOVABLES, *PILOT_FIXTURES)}
+    if not required_regions <= set(result):
+        raise ValueError("pinned BDDL does not cover every selected normal-reset region")
+    if any(result[name]["target"] != "main_table" for _, name, _ in (*PILOT_MOVABLES, *PILOT_FIXTURES)):
+        raise ValueError("pilot reset changed from table-region sampling to conditional placements")
+    return result, states
+
+
+def _bddl_number(value: str) -> float:
+    if value.startswith("("):
+        raise ValueError("nested BDDL yaw range is malformed")
+    # LIBERO's BDDL parser evaluates a fixed Python math expression. This narrow
+    # parser admits only the exact pi forms used by the selected source.
+    if value == "pi":
+        return math.pi
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\*pi(?:/([0-9]+(?:\.[0-9]+)?))?", value)
+    if match:
+        result = float(match.group(1)) * math.pi
+        return result if match.group(2) is None else result / float(match.group(2))
+    return float(value)
+
+
+def json_loads(value: bytes):
+    import json
+    return json.loads(value)
+
+
+def _object_placement_properties(install_root: Path, source_manifest: dict, source_path: str):
+    rows = {row.get("install_path"): row for row in source_manifest.get("files", ())}
+    row = rows.get(source_path)
+    if row is None or not isinstance(row.get("sha256"), str):
+        raise ValueError(f"pinned LIBERO object XML is missing from manifest: {source_path}")
+    root = Path(install_root).resolve(strict=True)
+    target = root / source_path
+    if target.is_symlink():
+        raise ValueError("LIBERO reset object XML may not be a symlink")
+    payload = target.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != row["sha256"]:
+        raise ValueError(f"installed object XML bytes differ from manifest: {source_path}")
+    xml = ET.fromstring(payload)
+    object_root = xml.find("./worldbody/body")
+    if object_root is None:
+        raise ValueError(f"pinned object XML has no unique worldbody root: {source_path}")
+    sites = {site.get("name"): site.get("pos") for site in object_root.findall("site")}
+    needed = {"bottom_site", "top_site", "horizontal_radius_site"}
+    if set(sites) < needed:
+        # The articulated sources name the main root rather than an anonymous body.
+        sites = {site.get("name").removeprefix("main_"): site.get("pos") for site in object_root.findall("site")}
+    if not needed <= set(sites):
+        raise ValueError(f"pinned object XML omits the LIBERO placement sampler sites: {source_path}")
+    bottom = tuple(float(value) for value in sites["bottom_site"].split())
+    top = tuple(float(value) for value in sites["top_site"].split())
+    radius_pos = tuple(float(value) for value in sites["horizontal_radius_site"].split())
+    if len(bottom) != 3 or len(top) != 3 or len(radius_pos) != 3:
+        raise ValueError("LIBERO placement sampler site coordinates have invalid dimensions")
+    return {
+        "asset_sha256": row["sha256"], "bottom_offset": bottom, "top_offset": top,
+        "horizontal_radius": radius_pos[0],
+    }
+
+
+def sample_libero_normal_reset_v1(
+    *,
+    init_bytes: bytes,
+    install_root: Path,
+    source_manifest: dict,
+    task_artifact_hash: str,
+    source_id: str,
+    source_closure_digest: str,
+    task_seed: int,
+    init_row_index: int,
+):
+    """Return the pinned normal BDDL placement plus source-bound ResetSampleV1.
+
+    This is a narrow pure-Python translation of LIBERO's fixed normal reset
+    sampler. It uses RandomState to match upstream ``np.random.seed`` and
+    restores the selected safe-decoded .pruned_init row after sampling.
+    """
+    from task_env.artifacts import PoseWorld, ResetSampleV1
+
+    if type(task_seed) is not int or task_seed < 0:
+        raise ValueError("LIBERO normal reset requires a nonnegative integer task seed")
+    if type(init_row_index) is not int or not 0 <= init_row_index < ROWS:
+        raise ValueError("LIBERO init row must be in [0,49]")
+    decoded = decode_pruned_init_bytes(init_bytes)
+    regions, ordered_states = _task_regions_and_initial_state(install_root, source_manifest)
+    source_digest = source_id.split(":", 1)[1] if isinstance(source_id, str) and ":" in source_id else ""
+    if (not isinstance(source_id, str) or not source_id.startswith("libero-spatial-pilot-v1:")
+            or not re.fullmatch(r"[0-9a-f]{64}", source_digest)
+            or not isinstance(source_closure_digest, str) or len(source_closure_digest) != 64):
+        raise ValueError("LIBERO candidate source/closure identity is malformed")
+    import numpy as np
+    rng = np.random.RandomState(task_seed)
+    placed: dict[str, dict[str, Any]] = {}
+    asset_properties: dict[str, dict[str, Any]] = {}
+    draw_rows = []
+    for object_name, region_name, source_path in PILOT_MOVABLES:
+        properties = asset_properties.setdefault(
+            source_path, _object_placement_properties(install_root, source_manifest, source_path),
+        )
+        region = regions[region_name]
+        selected = None
+        for attempt in range(5000):
+            range_index = int(rng.randint(len(region["ranges"])))
+            x0, y0, x1, y1 = region["ranges"][range_index]
+            # The selected LIBERO problem registers TableRegionSampler, whose
+            # defaults keep each movable's horizontal-radius boundary inside
+            # its BDDL rectangle. Fixture samplers use different defaults.
+            x0 += properties["horizontal_radius"]
+            x1 -= properties["horizontal_radius"]
+            y0 += properties["horizontal_radius"]
+            y1 -= properties["horizontal_radius"]
+            x = float(rng.uniform(low=x0, high=x1))
+            y = float(rng.uniform(low=y0, high=y1))
+            z = PILOT_MOVABLE_Z_OFFSET_M + PILOT_TABLE_TOP_Z_M - properties["bottom_offset"][2]
+            overlaps = False
+            for other in placed.values():
+                distance = float(np.linalg.norm((x - other["position"][0], y - other["position"][1])))
+                vertical = z - other["position"][2]
+                if (distance <= properties["horizontal_radius"] + other["horizontal_radius"]
+                        and vertical <= other["top_offset"][2] - properties["bottom_offset"][2]):
+                    overlaps = True
+                    break
+            if overlaps:
+                continue
+            # GoogleScannedObject/HopeBaseObject use the same fixed x-axis
+            # rotation. The upstream class sampler calls uniform even when the
+            # endpoints coincide, so retain that RNG draw.
+            angle = float(rng.uniform(low=math.pi / 2, high=math.pi / 2))
+            quaternion = (math.cos(angle / 2), math.sin(angle / 2), 0.0, 0.0)
+            selected = {
+                "position": (x, y, z), "quaternion_wxyz": quaternion,
+                "range_index": range_index, "attempt": attempt + 1,
+                "object_class": PILOT_MOVABLE_OBJECT_CLASSES[object_name],
+                "source_sampler": "libero.envs.regions.workspace_region_sampler.TableRegionSampler",
+                "region_ranges_m": [x0 - properties["horizontal_radius"],
+                                    y0 - properties["horizontal_radius"],
+                                    x1 + properties["horizontal_radius"],
+                                    y1 + properties["horizontal_radius"]],
+                "x_sample_bounds_m": [x0, x1], "y_sample_bounds_m": [y0, y1],
+                "x_sample_interval_m": [min(x0, x1), max(x0, x1)],
+                "y_sample_interval_m": [min(y0, y1), max(y0, y1)],
+                "horizontal_radius_margin_m": properties["horizontal_radius"],
+                "z_offset_m": PILOT_MOVABLE_Z_OFFSET_M,
+                "rotation_axis": "x", "rotation_range_rad": [math.pi / 2, math.pi / 2],
+                "rotation_angle_rad": angle,
+            }
+            placed[object_name] = {
+                **selected, "horizontal_radius": properties["horizontal_radius"],
+                "top_offset": properties["top_offset"], "bottom_offset": properties["bottom_offset"],
+            }
+            break
+        if selected is None:
+            raise ValueError(f"LIBERO upstream sampler exhausted 5000 placements for {object_name}")
+        draw_rows.append({"object": object_name, "region": region_name, **selected})
+
+    fixture_poses = {}
+    for fixture_name, region_name, source_path in PILOT_FIXTURES:
+        properties = asset_properties.setdefault(
+            source_path, _object_placement_properties(install_root, source_manifest, source_path),
+        )
+        region = regions[region_name]
+        selected = None
+        for attempt in range(5000):
+            range_index = int(rng.randint(len(region["ranges"])))
+            x0, y0, x1, y1 = region["ranges"][range_index]
+            x = float(rng.uniform(low=x0, high=x1))
+            y = float(rng.uniform(low=y0, high=y1))
+            angle_low, angle_high = region["yaw_ranges"][min(range_index, len(region["yaw_ranges"]) - 1)]
+            angle = float(rng.uniform(low=min(angle_low, angle_high), high=max(angle_low, angle_high)))
+            z = PILOT_FIXTURE_Z_OFFSET_M + PILOT_TABLE_TOP_Z_M - properties["bottom_offset"][2]
+            quaternion = (math.cos(angle / 2), 0.0, 0.0, math.sin(angle / 2))
+            selected = {
+                "position": (x, y, z), "quaternion_wxyz": quaternion,
+                "range_index": range_index, "attempt": attempt + 1,
+                "source_sampler": "robosuite.utils.placement_samplers.MultiRegionRandomSampler",
+                "region_ranges_m": [x0, y0, x1, y1],
+                "x_sample_bounds_m": [x0, x1], "y_sample_bounds_m": [y0, y1],
+                "x_sample_interval_m": [min(x0, x1), max(x0, x1)],
+                "y_sample_interval_m": [min(y0, y1), max(y0, y1)],
+                "horizontal_radius_margin_m": 0.0,
+                "z_offset_m": PILOT_FIXTURE_Z_OFFSET_M,
+                "rotation_axis": "z", "rotation_range_rad": [angle_low, angle_high],
+                "rotation_angle_rad": angle,
+            }
+            break
+        if selected is None:
+            raise ValueError(f"LIBERO upstream sampler exhausted 5000 placements for {fixture_name}")
+        draw_rows.append({"object": fixture_name, "region": region_name, **selected})
+        fixture_poses[fixture_name] = PoseWorld(selected["position"], selected["quaternion_wxyz"])
+
+    layout = init_layout_v1()
+    row = decoded.row(init_row_index)
+    qpos_names, qvel_names = layout["qpos_names"], layout["qvel_names"]
+    qpos_by_name = dict(zip(qpos_names, row[layout["qpos_slice"][0]:layout["qpos_slice"][1]], strict=True))
+    qvel_by_name = dict(zip(qvel_names, row[layout["qvel_slice"][0]:layout["qvel_slice"][1]], strict=True))
+    joint_names = (
+        *(f"joint{index}" for index in range(1, 8)), "finger_joint1", "finger_joint2",
+        "wooden_cabinet_1.top_level", "wooden_cabinet_1.middle_level",
+        "wooden_cabinet_1.bottom_level", "flat_stove_1.button",
+    )
+    object_names = tuple(name for name, _, _ in PILOT_MOVABLES)
+    joint_position = {name: float(qpos_by_name[name]) for name in joint_names}
+    joint_velocity = {name: float(qvel_by_name[name]) for name in joint_names}
+    poses_world = {}
+    free_velocity = {}
+    for name in object_names:
+        base = f"{name}.free"
+        coords = tuple(float(qpos_by_name[f"{base}[{index}]"]) for index in range(7))
+        poses_world[name] = PoseWorld(coords[:3], coords[3:])
+        free_velocity[name] = tuple(float(qvel_by_name[f"{base}[{index}]"]) for index in range(6))
+    sample = ResetSampleV1.create(
+        schema_version="reset-sample-v1", task_artifact_hash=task_artifact_hash,
+        source_id=source_id, source_closure_digest=source_closure_digest,
+        sampler_id=PILOT_RESET_SAMPLER_ID, sampler_version=PILOT_RESET_SAMPLER_VERSION,
+        task_seed=task_seed, init_row_index=init_row_index,
+        init_row_sha256=decoded.row_sha256[init_row_index], joint_position=joint_position,
+        joint_velocity=joint_velocity,
+        sampled_poses_world={name: PoseWorld(placed[name]["position"], placed[name]["quaternion_wxyz"])
+                             for name in object_names},
+        poses_world=poses_world, free_joint_velocity=free_velocity,
+        free_joint_velocity_frame="mujoco_world_linear_local_angular_v1",
+        fixture_pose_world=fixture_poses,
+        simulation_time_s=float(row[0]), velocity_policy="named_qvel_and_free_joint_qvel_v1",
+        control_policy="named_torque_and_finger_position_by_source_v1",
+        initialization_order=PILOT_INIT_ORDER, settle_steps=0,
+    )
+    receipt = {
+        "schema_version": "libero-normal-reset-realization-v1",
+        "task_seed": task_seed, "init_row_index": init_row_index,
+        "init_row_sha256": decoded.row_sha256[init_row_index],
+        "source_manifest_sha256": PILOT_SOURCE_MANIFEST_SHA256,
+        "bddl_sha256": PILOT_BDDL_SHA256, "ordered_initial_states": [list(item) for item in ordered_states],
+        "sampler_id": PILOT_RESET_SAMPLER_ID, "sampler_version": PILOT_RESET_SAMPLER_VERSION,
+        "rng": {
+            "generator": "numpy.random.RandomState / legacy np.random.seed compatible MT19937",
+            "seed": task_seed,
+            "scope": "dedicated candidate placement stream; not the upstream process-global RNG state",
+            "sampler_draw_order": [item[0] for item in (*PILOT_MOVABLES, *PILOT_FIXTURES)],
+        },
+        "reset_order_source": [
+            "RobotEnv._reset_internal calls robot.reset before BDDLBaseDomain._reset_internal",
+            "BDDL property initializers run before mj_step1; this task has none",
+            "mj_step1 runs before BDDL placement sampler values are applied",
+            "movable free-joint poses and fixture model root poses are applied in BDDL initial-state order",
+            "Base.reset calls sim.forward after BDDL reset",
+            "LIBERO metric restores the selected pruned_init row after env.reset and forwards state",
+        ],
+        "candidate_reset_application_order": [
+            "mj_resetData", "mj_step1", "apply_sampled_fixture_root_poses",
+            "apply_sampled_movable_free_joint_poses", "restore_all_pruned_init_joint_and_free_state",
+            "restore_source_simulation_time", "mj_forward",
+        ],
+        "robot_initial_state_handling": (
+            "candidate does not reproduce upstream Robot.reset noise; the complete selected row restores all "
+            "named robot joint positions and velocities after placement"
+        ),
+        "placement_sampler": {
+            "bddl_problem_name": "libero_tabletop_manipulation",
+            "movable_object_classes": PILOT_MOVABLE_OBJECT_CLASSES,
+            "movable_class": "libero.envs.regions.workspace_region_sampler.TableRegionSampler",
+            "fixture_class": "robosuite.utils.placement_samplers.MultiRegionRandomSampler",
+            "append_order": [item[0] for item in (*PILOT_MOVABLES, *PILOT_FIXTURES)],
+            "movable_boundary_margin": "horizontal_radius_site; ensure_object_boundary_in_range=True",
+            "movable_overlap_rule": "2d horizontal distance <= summed radii AND vertical gap <= top-bottom offsets",
+            "fixture_boundary_margin": 0.0,
+            "fixture_overlap_check": False,
+            "movable_rotation": {"axis": "x", "range_rad": [math.pi / 2, math.pi / 2]},
+            "fixture_rotation": "per-BDDL-region yaw_rotation about z; uniform(low=min, high=max)",
+        },
+        "workspace_offset_m": [0.0, 0.0, PILOT_TABLE_TOP_Z_M],
+        "movable_z_offset_m": PILOT_MOVABLE_Z_OFFSET_M,
+        "fixture_z_offset_m": PILOT_FIXTURE_Z_OFFSET_M,
+        "object_property_initializers": [], "mj_step1": "called once before placements; non-integrating preprocessing",
+        "placements_before_pruned_init_restore": draw_rows,
+        "placement_draws_per_attempt": ["range_index", "x_uniform", "y_uniform", "yaw_uniform"],
+        "placement_attempt_counts": {item["object"]: item["attempt"] for item in draw_rows},
+        "asset_placement_geometry": {
+            path: {
+                "asset_sha256": value["asset_sha256"],
+                "bottom_offset_m": list(value["bottom_offset"]),
+                "top_offset_m": list(value["top_offset"]),
+                "horizontal_radius_m": value["horizontal_radius"],
+            }
+            for path, value in asset_properties.items()
+        },
+        "restoration": "selected pruned_init row overwrites robot, five free roots, four fixture scalar joints, time and qvel; fixture root pose remains sampled",
+        "fixture_pose_world": {
+            name: {"position": list(value.position), "quaternion_wxyz": list(value.quaternion_wxyz)}
+            for name, value in fixture_poses.items()
+        },
+        "mj_forward": "called once after named model/data restore; no integration",
+        "upstream_metric_dummy_policy_steps": "not part of reset; not executed in this deployment pilot",
+    }
+    return sample, receipt
+
+
 __all__ = [
     "DecodedInitV1", "INIT_SHA256", "decode_pruned_init_bytes",
-    "init_layout_v1", "read_pruned_init",
+    "init_layout_v1", "read_pruned_init", "sample_libero_normal_reset_v1",
 ]

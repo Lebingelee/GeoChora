@@ -6,6 +6,7 @@ mixed in one episode. Rendering and legacy TaskEnv configuration are rejected.
 """
 from dataclasses import dataclass
 from collections import OrderedDict
+from collections.abc import Mapping
 from pathlib import Path
 import hashlib
 import json
@@ -21,7 +22,7 @@ from ..controllers.canonical.contracts import RequestedAction, digest
 from ..environment.protocols import TaskEnvironmentComponent
 from ..environment.types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
 from ..planners.completion import ExpertExecutionInfo
-from ..runtime.sessions.api import PROFILE
+from ..runtime.sessions.api import PROFILE, materialize
 from ..runtime.sessions.control import ControlBinding, materialize_control
 
 METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1',
@@ -80,6 +81,10 @@ class ReferenceTaskBinding:
     runtime_episode_identity: bool = False
     build_gripper_cadence_diagnostic: Callable | None = None
     build_native_feedback_profile: Callable | None = None
+    build_libero_mixed_profile: Callable | None = None
+    reset_sample_with_options: Callable | None = None
+    mixed_control_profile_id: str | None = None
+    pre_reset_session_validator: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -94,6 +99,12 @@ class ReferenceTaskBinding:
             raise ValueError('native sample and interval receipt factories must be supplied together')
         if self.control_request_required and self.native_sample_factory is None:
             raise ValueError('native controller requests require the selected native sample contract')
+        if (self.build_libero_mixed_profile is None) != (self.reset_sample_with_options is None):
+            raise ValueError('LIBERO mixed construction and option-aware reset sample owners must be paired')
+        if self.build_libero_mixed_profile is not None and self.mixed_control_profile_id != (
+            'libero-spatial-bowl-to-plate-mixed-v1'
+        ):
+            raise ValueError('LIBERO mixed binding requires its fixed profile identity')
 
 
 class SelectedReferenceEnv(TaskEnvironmentComponent):
@@ -170,9 +181,36 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise TypeError('leaf candidate attachment opt-in was not preserved by the selected environment')
         return env
 
+    @classmethod
+    def from_libero_diagnostic_candidate(cls, binding, *, provider='mujoco', backend='cpu', horizon=64):
+        """Construct the fixed internal LIBERO mixed-actuator diagnostic route."""
+        if not isinstance(binding, ReferenceTaskBinding):
+            raise TypeError('LIBERO diagnostic requires the existing ReferenceTaskBinding owner')
+        if (provider, backend) != ('mujoco', 'cpu'):
+            raise ValueError('R07c D01 admits only the pinned MuJoCo CPU diagnostic profile')
+        if (binding.build_libero_mixed_profile is None
+                or binding.reset_sample_with_options is None
+                or binding.mixed_control_profile_id != 'libero-spatial-bowl-to-plate-mixed-v1'):
+            raise TypeError('binding does not own the exact LIBERO mixed diagnostic profile')
+        candidate_type = cls
+        if not hasattr(cls, 'uid'):
+            candidate_type = type(
+                'LiberoDiagnosticSelectedReferenceEnv', (cls,),
+                {'uid': 'r07c-d01-libero-spatial-bowl-to-plate-v1'},
+            )
+        env = candidate_type(
+            provider=provider, backend=backend, horizon=horizon,
+            _binding=binding, _libero_mixed_candidate=True,
+        )
+        if not getattr(env, 'libero_mixed_profile', False):
+            env.close()
+            raise TypeError('candidate did not construct the admitted LIBERO mixed Controller profile')
+        return env
+
     def _bind_selected_controller(self, value):
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
 
+        self.libero_mixed_profile = False
         leaf_plan = value.get('leaf_plan')
         if leaf_plan is not None:
             from ..controllers.canonical.leaf_plan import EffectiveLeafPlanV1
@@ -190,6 +228,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.leaf_plan = None
 
         raw = value['controller']
+        if value.get('selected_controller_kind') == 'mixed_actuator_v1':
+            source = value.get('source')
+            if (self.binding is None
+                    or self.binding.mixed_control_profile_id != 'libero-spatial-bowl-to-plate-mixed-v1'
+                    or not callable(getattr(raw, 'compute_target', None))
+                    or not callable(getattr(raw, 'identity_mapping', None))
+                    or type(getattr(raw, 'identity', None)) is not str
+                    or getattr(raw, 'profile_id', None) != 'libero-spatial-bowl-to-plate-joint-space-pd-v1'
+                    or getattr(source, 'mixed_controller_profile_id', None) != raw.profile_id
+                    or getattr(source, 'mixed_controller_identity', None) != raw.identity):
+                raise TypeError('LIBERO mixed route requires its fixed task-local controller profile')
+            self.libero_mixed_profile = True
+            self.position_profiles = ()
+            self.position_profile = False
+            self.controller = raw
+            return
         profiles = tuple(raw) if isinstance(raw, (tuple, list)) else (raw,)
         if profiles and all(isinstance(item, PandaPositionServoProfileV1) for item in profiles):
             if len(profiles) > 2 or len({item.writer_id for item in profiles}) != len(profiles):
@@ -213,7 +267,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                  _binding=None, _diagnostic_gripper_control_hz=None,
                  _native_feedback_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
-                 _fixed_attachment_leaf_position_candidate=False):
+                 _fixed_attachment_leaf_position_candidate=False,
+                 _libero_mixed_candidate=False):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
         if camera_observation_config is not None:
@@ -233,9 +288,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise ValueError('leaf Position candidate admits MuJoCo CPU only')
         if _fixed_attachment_leaf_position_candidate and not _leaf_position_candidate:
             raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
+        if _libero_mixed_candidate and (
+            (provider, backend) != ('mujoco', 'cpu')
+            or self.binding.build_libero_mixed_profile is None
+            or self.binding.mixed_control_profile_id != 'libero-spatial-bowl-to-plate-mixed-v1'
+        ):
+            raise ValueError('LIBERO mixed candidate requires its exact MuJoCo CPU binding')
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
-        if _diagnostic_gripper_control_hz is not None and _native_feedback_gripper_control_hz is not None:
+        if sum((bool(_libero_mixed_candidate), _diagnostic_gripper_control_hz is not None,
+                _native_feedback_gripper_control_hz is not None)) > 1:
             raise ValueError('diagnostic and normal native-feedback profiles are mutually exclusive')
         # Initialize lifecycle state for every selected-reference route.  Reset
         # reads these fields after rebuilding the binding, including the
@@ -244,7 +306,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._diagnostic_gripper_control_hz = None
         self._native_feedback_profile = None
         self._native_feedback_gripper_control_hz = None
-        if _diagnostic_gripper_control_hz is None and _native_feedback_gripper_control_hz is None:
+        self._libero_mixed_candidate = bool(_libero_mixed_candidate)
+        if _libero_mixed_candidate:
+            build_value = lambda: self.binding.build_libero_mixed_profile(provider, backend)
+        elif _diagnostic_gripper_control_hz is None and _native_feedback_gripper_control_hz is None:
             if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             build_value = lambda: self.binding.build(provider)
@@ -292,6 +357,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.artifact = self.value['artifact']
         self.solution = self.value['solution']
         self._bind_selected_controller(self.value)
+        self._libero_initial_value_pending = bool(_libero_mixed_candidate)
         self.dual_entity_position = len(self.position_profiles) == 2
         if camera_observation_config is not None and not self.position_profile:
             raise ValueError('the R04a camera consumer is admitted only by the existing Position candidate')
@@ -302,9 +368,21 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'task_artifact_hash': self.artifact.identity_hash,
             'construction_id': self.value['construction_id'],
             'control_dt': self.artifact.timebase.control_dt}
+        self.supports_structured_control_recording = bool(_libero_mixed_candidate)
+        if _libero_mixed_candidate:
+            self.metadata['action_schema'] = {
+                'schema_id': 'libero-joint-space-absolute-v1',
+                'schema_version': 1, 'controller_kind': 'absolute_joint',
+                'reference': 'joint_coordinates', 'dimension': 8,
+                'components': [*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'],
+            }
+            self.metadata['env_id'] = self.uid
         self.action_space = Box(-np.inf, np.inf, (8,), dtype=np.float64)
         keys = [key for _, key in self.binding.object_poses]
         state_spaces = {'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32)}
+        if _libero_mixed_candidate:
+            state_spaces['joint_position'] = Box(-np.inf, np.inf, (9,), dtype=np.float32)
+            state_spaces['boundary_identity_sha256'] = Box(0, 255, (32,), dtype=np.uint8)
         if self.position_profile:
             state_spaces.update({
                 'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
@@ -402,6 +480,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = None
         self._stopped = True
         self._position_episode_end = None
+        self._libero_episode_end = None
+        self._libero_close_receipt = None
+        self._libero_reset_context = None
+        self._libero_reset_plan = None
         self._published_position_state = None
         self._published_position_typed_state = None
         self._published_position_obs = None
@@ -417,6 +499,19 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         """Return the latched selected-route execution fault, if any."""
 
         return self._execution_fault
+
+    def get_runtime_progress_receipt(self):
+        if not getattr(self, 'libero_mixed_profile', False) or self.session is None:
+            raise StageUnavailableError('mixed runtime progress is unavailable on this selected route')
+        return self.session.runtime_progress_receipt
+
+    @property
+    def close_receipt(self):
+        if not getattr(self, 'libero_mixed_profile', False):
+            raise StageUnavailableError('LIBERO close evidence is unavailable on this selected route')
+        if self._libero_close_receipt is None:
+            raise RuntimeError('LIBERO selected environment close has not completed')
+        return dict(self._libero_close_receipt)
 
     def _latch_fault(
         self,
@@ -511,10 +606,41 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _reset(self, *, seed=_RESET_SEED_UNSET, options=None, external_solution=None):
         if self._closed:
             raise RuntimeError('environment is closed')
-        if options:
+        libero_reset_plan = None
+        if self._libero_mixed_candidate:
+            if options is None:
+                options = {}
+            if not isinstance(options, dict) or set(options) - {'init_row_index', 'reset_plan_v1'}:
+                raise ValueError('LIBERO mixed reset options admit init_row_index or a source-bound ResetPlanV1')
+            if 'reset_plan_v1' in options:
+                from ..artifacts import ResetPlanV1
+                libero_reset_plan = options['reset_plan_v1']
+                if type(libero_reset_plan) is not ResetPlanV1:
+                    raise TypeError('LIBERO reset_plan_v1 must be the public ResetPlanV1 contract')
+                libero_reset_plan.validate()
+                sample = libero_reset_plan.reset_sample
+                if (libero_reset_plan.purpose != 'diagnostic_contact_endpoint'
+                        or 'init_row_index' in options
+                        or sample.task_artifact_hash != self.artifact.identity_hash
+                        or sample.source_id != self.value['source'].scene_source.source_id
+                        or sample.source_closure_digest != self.value['source'].source_closure_digest):
+                    raise ValueError('LIBERO diagnostic ResetPlanV1 purpose or source identity is invalid')
+                if seed is _RESET_SEED_UNSET:
+                    seed = sample.task_seed
+                elif type(seed) is not int or seed != sample.task_seed:
+                    raise ValueError('LIBERO diagnostic ResetPlanV1 seed differs from reset seed')
+            elif ('init_row_index' in options and
+                  (type(options['init_row_index']) is not int
+                   or not 0 <= options['init_row_index'] < 50)):
+                raise ValueError('LIBERO init_row_index must be an integer in [0,49]')
+        elif options:
             raise ValueError('selected reference reset options are not supported')
         if seed is _RESET_SEED_UNSET:
-            if getattr(self, 'position_profile', False):
+            if self._libero_mixed_candidate and libero_reset_plan is not None:
+                seed = libero_reset_plan.reset_sample.task_seed
+            elif self._libero_mixed_candidate and self.session is not None:
+                seed = self.sample.task_seed
+            elif getattr(self, 'position_profile', False):
                 seed = self.value['reset_plan'].reset_sample.task_seed
             else:
                 seed = 19
@@ -542,8 +668,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_obs = None
             self._published_position_info = None
             self._published_position_evaluation = None
+        if self._libero_mixed_candidate:
+            # Keep a rejected reset plan from changing the live episode's
+            # metadata/cache. All ResetPlan identity and seed checks above are
+            # preflight; publish the new plan only when replacement begins.
+            self._libero_reset_plan = libero_reset_plan
         self._stopped = True
         previous_session, self.session = self.session, None
+        previous_value = self.value
         previous_session_close_attempted = False
         phase = 'camera_reset_close'
         try:
@@ -552,9 +684,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if previous_session is not None:
                 previous_session_close_attempted = True
                 previous_session.close()
+                if self._libero_mixed_candidate:
+                    self._libero_close_receipt = previous_session.close_receipt
+            previous_receipt = getattr(previous_value.get('source'), 'execution_source_receipt', None)
             phase = 'selected_reconstruction'
             # A new construction resets all controller/arm-hold/servo owner memory.
-            if self._diagnostic_profile is not None:
+            if self._libero_mixed_candidate and self._libero_initial_value_pending:
+                self._libero_initial_value_pending = False
+            elif self._libero_mixed_candidate:
+                self.value = self.binding.build_libero_mixed_profile(self.provider, self.backend)
+            elif self._diagnostic_profile is not None:
                 self.value = self.binding.build_gripper_cadence_diagnostic(
                     self.provider, self.backend, self._diagnostic_gripper_control_hz,
                     external_solution is None,
@@ -567,6 +706,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             else:
                 self.value = (self.binding.build_external(self.provider)
                               if external_solution is not None else self.binding.build(self.provider))
+            replacement_receipt = getattr(
+                self.value.get('source'), 'execution_source_receipt', None,
+            )
+            if (self._libero_mixed_candidate and previous_receipt is not None
+                    and previous_receipt is not replacement_receipt):
+                previous_receipt.close()
             if self.value['artifact'] != self.artifact:
                 raise ValueError('selected Artifact changed between construction and reset')
             if external_solution is not None:
@@ -584,6 +729,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 if reset_plan is None:
                     raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlanV1')
                 self.sample = reset_plan.reset_sample
+            elif self._libero_mixed_candidate:
+                self.sample = self.binding.reset_sample_with_options(
+                    self.artifact, seed, options, self.value['source'],
+                )
+                self._selected_episode_id = uuid4().hex
             else:
                 self.sample = self.binding.reset_sample(self.artifact, seed)
                 self._selected_episode_id = uuid4().hex
@@ -637,6 +787,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
                     )
+            elif self._libero_mixed_candidate:
+                self.position_profile = False
+                self.session = materialize(
+                    self.artifact, self.execution, source=self.value['source'],
+                    _libero_mixed_profile=self.binding.mixed_control_profile_id,
+                )
+                self.session.bind_mixed_controller(self.controller.identity)
+                if self.binding.pre_reset_session_validator is None:
+                    raise ValueError('LIBERO candidate requires compiled-layout validation before reset')
+                self._compiled_layout_pre_reset = self.binding.pre_reset_session_validator(
+                    self.session, self.value,
+                )
             else:
                 self.position_profile = False
                 self.session = materialize_control(self.artifact, self.execution,
@@ -656,6 +818,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.position_profile:
                 reset_plan = self.value.get('reset_plan')
                 self.realized = self.session.reset_plan(reset_plan)
+            elif self._libero_mixed_candidate and self._libero_reset_plan is not None:
+                self.realized = self.session.reset_plan(self._libero_reset_plan)
             else:
                 self.realized = self.session.reset(self.sample)
             if self.binding.runtime_episode_identity:
@@ -677,6 +841,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     for profile in self.position_profiles:
                         profile.reset(self.typed_state, self.position_plan)
                 self.feedback = None
+            elif self.libero_mixed_profile:
+                self.feedback = None
+                self.controller.reset(self.state)
             else:
                 phase = 'controller_feedback'
                 self.feedback = self.session.control_feedback(self.state)
@@ -684,7 +851,29 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             phase = 'reset_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info['provider'] = self.provider
-            if not self.position_profile:
+            if self.libero_mixed_profile:
+                realization = self.value['reset_realizations'].get(self.sample.sample_id)
+                if not isinstance(realization, dict):
+                    raise ValueError('LIBERO reset sample has no matching source-derived realization receipt')
+                self._libero_reset_context = {
+                    'reset_sample_v1': self.sample.to_mapping(),
+                    'reset_realization_v1': realization,
+                    'reset_readback_v1': self.session.reset_readback_v1.to_mapping(),
+                }
+                self.info.update({
+                    **self._libero_reset_context,
+                    'compiled_model_layout_v1': self.session.compiled_layout_receipt,
+                    'pre_reset_compiled_validation_v1': self._compiled_layout_pre_reset,
+                })
+                if self._libero_reset_plan is not None:
+                    plan_receipt = {
+                        'reset_plan_v1': self._libero_reset_plan.to_mapping(),
+                        'reset_plan_identity_sha256': self._libero_reset_plan.identity_hash,
+                        'reset_plan_evidence_v1': self.session.reset_plan_evidence,
+                    }
+                    self._libero_reset_context.update(plan_receipt)
+                    self.info.update(plan_receipt)
+            if not self.position_profile and not self.libero_mixed_profile:
                 self._publish_execution_info(self.info)
             self._last_position_terminated = False
             self._last_position_truncated = False
@@ -702,7 +891,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 reset_solution.reset(self.obs, self.info, self.metadata,
                                     **self.binding.reset_expert_kwargs(self))
             phase = 'arm_schedule_reset'
-            if all(callable(getattr(self.controller, name, None))
+            if self.libero_mixed_profile:
+                self.arm_schedule = None
+            elif all(callable(getattr(self.controller, name, None))
                    for name in ('begin', 'target', 'applied')):
                 # The Controller itself owns acknowledged arm hold/ramp memory.
                 self.arm_schedule = self.controller
@@ -712,6 +903,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._active_native_interval_receipt = None
             self._stopped, self._episode_mode = False, None
             self._position_episode_end = None
+            self._libero_episode_end = None
             self._published_position_state = self.state
             self._published_position_typed_state = getattr(self, 'typed_state', None)
             self._published_position_obs = self.obs
@@ -874,6 +1066,132 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self.binding.validate_external_solution(self.value, solution)
 
     def observation(self, state):
+        if getattr(self, 'libero_mixed_profile', False):
+            from ..environment.types import TaskEvaluation
+            from ..environment.task_definition import TaskPredicateResultV1
+            from ..controllers.canonical.contracts import digest
+
+            source = self.value['source']
+            pair = ('akita_black_bowl_1', 'plate_1')
+            contact = self.session.read_contact_summary_v2((pair,))
+            expected_identity = (
+                source.scene_source.source_id, source.source_closure_digest,
+                self.session.provider_materialization_id, self.session.episode_id,
+                self.sample.sample_id, int(state.control_step), float(state.simulation_time),
+            )
+            observed_identity = (
+                contact.source_id, contact.source_closure_digest,
+                contact.provider_materialization_id, contact.episode_id,
+                contact.reset_sample_id, int(contact.control_step),
+                float(contact.simulation_time_s),
+            )
+            if observed_identity != expected_identity:
+                raise ValueError('LIBERO contact query is stale or belongs to another runtime boundary')
+            requested = (pair,)
+            if contact.status == 'available' and (
+                    contact.requested_pairs != requested or contact.covered_pairs != requested):
+                predicate = TaskPredicateResultV1.unavailable('contact_query_coverage_mismatch')
+            elif contact.status == 'unavailable':
+                predicate = TaskPredicateResultV1.unavailable(contact.reason or 'contact_unavailable')
+            else:
+                count = contact.pair_counts.get('akita_black_bowl_1/plate_1')
+                if type(count) is not int or count < 0:
+                    raise ValueError('LIBERO contact summary omitted the exact covered pair count')
+                from bench_deploy.libero.evaluation import OnBowlPlateEvidenceV1
+                evidence = OnBowlPlateEvidenceV1(
+                    task_uid=self.artifact.task_id,
+                    source_manifest_sha256=self.value['source_manifest_sha256'],
+                    frame_id='world',
+                    bowl_center_m=tuple(state.pose_world['akita_black_bowl_1'].position),
+                    plate_center_m=tuple(state.pose_world['plate_1'].position),
+                    geom_group_contact=bool(count),
+                )
+                predicate = self.binding.evaluate(evidence, self.artifact.semantics)
+            if not isinstance(predicate, TaskPredicateResultV1):
+                raise TypeError('LIBERO binding evaluator must return TaskPredicateResultV1')
+            success = bool(predicate.value) if predicate.status == 'available' else False
+            metrics = {
+                'on_bowl_plate_available': predicate.status == 'available',
+                'on_bowl_plate': success,
+            }
+            evaluation = TaskEvaluation(reward=1.0 if success else 0.0, success=success,
+                                        metrics=metrics)
+            boundary_identity = {
+                'source_id': source.scene_source.source_id,
+                'source_closure_digest': source.source_closure_digest,
+                'provider_materialization_id': self.session.provider_materialization_id,
+                'episode_id': self.session.episode_id,
+                'reset_sample_id': self.sample.sample_id,
+                'control_step': int(state.control_step),
+                'simulation_time_s': float(state.simulation_time),
+            }
+            boundary_digest = digest(boundary_identity)
+            ee = state.pose_world['panda-v1/ee']
+            obs = {
+                'state': {
+                    'ee_pose': np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32),
+                    'joint_position': np.asarray(
+                        [state.joint_position[f'joint{i}'] for i in range(1, 8)]
+                        + [state.joint_position['finger_joint1'], state.joint_position['finger_joint2']],
+                        dtype=np.float32,
+                    ),
+                    'boundary_identity_sha256': np.frombuffer(
+                        bytes.fromhex(boundary_digest), dtype=np.uint8,
+                    ).copy(),
+                },
+                'privileged_state': {
+                    key + '_body_pose': np.asarray(
+                        [(*state.pose_world[semantic].position,
+                          *state.pose_world[semantic].quaternion_wxyz)], dtype=np.float32,
+                    ) for semantic, key in self.binding.object_poses
+                },
+            }
+            contact_mapping = {
+                'schema_version': contact.schema_version,
+                'source_id': contact.source_id,
+                'source_closure_digest': contact.source_closure_digest,
+                'provider_materialization_id': contact.provider_materialization_id,
+                'episode_id': contact.episode_id,
+                'reset_sample_id': contact.reset_sample_id,
+                'control_step': contact.control_step,
+                'state_revision': contact.state_revision,
+                'simulation_time_s': contact.simulation_time_s,
+                'requested_pairs': [list(item) for item in contact.requested_pairs],
+                'covered_pairs': [list(item) for item in contact.covered_pairs],
+                'pair_counts': dict(contact.pair_counts),
+                'geom_groups': {key: list(value) for key, value in contact.geom_groups.items()},
+                'status': contact.status,
+                'reason': contact.reason,
+            }
+            info = {
+                'is_success': success, 'task_failure': False,
+                'task_metrics': dict(evaluation.metrics),
+                'control_step': int(state.control_step),
+                'simulation_time_s': float(state.simulation_time),
+                'predicate_v1': {'on_bowl_plate': {
+                    'status': predicate.status, 'value': predicate.value,
+                    'reason': predicate.reason,
+                }},
+                'contact_summary_v2': contact_mapping,
+                'source_id': source.scene_source.source_id,
+                'source_xml_sha256': source.execution_source_receipt.canonical_xml_sha256,
+                'source_closure_digest': source.source_closure_digest,
+                'provider_materialization_id': self.session.provider_materialization_id,
+                'episode_id': self.session.episode_id,
+                'reset_sample_id': self.sample.sample_id,
+                'state_boundary_identity_sha256': boundary_digest,
+                'boundary_context_v1': {
+                    'schema_version': 'r07c-d01-boundary-context-v1',
+                    **boundary_identity,
+                    'state_boundary_identity_sha256': boundary_digest,
+                    'contact_summary_v2': contact_mapping,
+                    'predicate_v1': {
+                        'status': predicate.status, 'value': predicate.value,
+                        'reason': predicate.reason,
+                    },
+                },
+            }
+            return obs, info, evaluation
         if getattr(self, 'position_profile', False):
             if getattr(self, 'leaf_position_profile', False):
                 evaluation = self.binding.evaluate(state, self.artifact.semantics)
@@ -1032,6 +1350,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise RuntimeError(self.binding.external_action_error)
         if self._episode_mode in {'expert', 'external_solution'}:
             raise RuntimeError('cannot mix external actions with selected Solution execution')
+        if getattr(self, 'libero_mixed_profile', False):
+            return self._step_libero_mixed(action)
         from ..controllers.canonical.contracts import StructuredActionRequestV1
         if getattr(self, 'position_profile', False):
             if self._stopped or self.session is None:
@@ -1061,6 +1381,136 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise TypeError('structured ControllerGroup actions require PositionServoV1')
         self._episode_mode = 'external'
         return self._step(action)
+
+    def _step_libero_mixed(self, action):
+        """Run one named mixed-actuator interval through the admitted session."""
+        from ..controllers.canonical.contracts import (
+            ControlGroupActionV1, StructuredActionRequestV1,
+        )
+        from ..trajectory.canonical.episode import StructuredControlTransitionV1
+
+        if self._stopped or self.session is None:
+            raise RuntimeError('reset required or LIBERO episode already stopped')
+        if self.state.control_step >= self.horizon:
+            self.stop('horizon_reached')
+            raise RuntimeError('LIBERO selected horizon is exhausted')
+        values = np.asarray(action, dtype=np.float64)
+        if values.shape != (8,) or not np.isfinite(values).all():
+            raise ValueError('LIBERO joint-space action requires seven finite radians and opening meters')
+        values_tuple = tuple(float(value) for value in values)
+        before = self.state
+        source = self.value['source']
+        receipt = source.execution_source_receipt
+        action_schema_id = 'libero-joint-space-absolute-v1'
+        components = tuple(f'joint{index}' for index in range(1, 8)) + ('aggregate_opening_m',)
+        request = StructuredActionRequestV1(
+            'structured-action-request-v1', receipt.canonical_xml_sha256,
+            self.controller.identity,
+            (ControlGroupActionV1(
+                'control-group-action-v1', 'panda-v1', 'mixed-actuation',
+                action_schema_id, values_tuple,
+            ),),
+        )
+        request.validate()
+        # Pure task-local computation is preflighted before the RuntimeSession write.
+        target = self.controller.compute_target(
+            values_tuple, before,
+            task_artifact_hash=self.artifact.identity_hash,
+            source_id=source.scene_source.source_id,
+            source_closure_digest=source.source_closure_digest,
+            provider_materialization_id=self.session.provider_materialization_id,
+            episode_id=self.session.episode_id,
+            reset_sample_id=self.sample.sample_id,
+            state_revision=before.control_step,
+        )
+        applied = None
+        interval_attempted = False
+        interval_completed = False
+        phase = 'mixed_control_application'
+        try:
+            applied = self.session.apply_mixed_actuator_target(target)
+            interval_attempted = True
+            phase = 'mixed_physics_step'
+            self.state = self.session.step()
+            interval_completed = True
+            phase = 'mixed_observation'
+            self.obs, self.info, self.evaluation = self.observation(self.state)
+            self.info.update({
+                'provider': self.provider,
+                'external_action': values_tuple,
+                'universal_action': values_tuple,
+                'mixed_controller_target_v1': target.to_mapping(),
+                'mixed_applied_control_v1': applied.to_mapping(),
+            })
+            target_payload = target.to_mapping()
+            applied_payload = applied.to_mapping()
+            transition = StructuredControlTransitionV1(
+                'structured-control-transition-v1', request, ({
+                    'writer_id': 'libero-spatial-mixed-controller-v1',
+                    'action_schema_id': action_schema_id,
+                    'components': components,
+                    'groups': ({
+                        'entity_id': 'panda-v1', 'group_id': 'mixed-actuation',
+                        'action_components': components,
+                    },),
+                    'requested_action': {
+                        'schema_version': action_schema_id,
+                        'values': values_tuple,
+                        'unit': 'rad_x7_plus_aggregate_opening_m',
+                    },
+                    'canonical_action': {
+                        'schema_version': 'libero-joint-space-canonical-v1',
+                        'interpreted_values': values_tuple,
+                        'controller_identity': self.controller.identity,
+                        'hold_policy': self.controller.config.hold_policy,
+                    },
+                    'controller_target': {
+                        'schema_version': target.schema_version,
+                        'payload': target_payload,
+                        'identity_hash': target.identity_hash,
+                    },
+                    'applied_control': {
+                        'schema_version': applied.schema_version,
+                        'payload': applied_payload,
+                        'target_hash': applied.target_hash,
+                    },
+                },),
+            )
+            transition.validate()
+            terminated = False
+            truncated = self.state.control_step >= self.horizon
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                phase = 'mixed_recorder_append'
+                self.recorder.append_transition(
+                    values_tuple, values_tuple, self.obs, float(self.evaluation.reward),
+                    bool(self.evaluation.success), terminated, truncated, self.info,
+                    structured_control=transition,
+                )
+            self._episode_mode = 'external'
+            if truncated:
+                self.stop('horizon_reached')
+                self.info['episode_end_v1'] = self._libero_episode_end.to_mapping()
+            return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
+        except BaseException as error:
+            after = None
+            readback_error = None
+            if interval_attempted:
+                try:
+                    after = self.session.snapshot()
+                    self.state = after
+                except BaseException as snapshot_error:
+                    readback_error = f'{type(snapshot_error).__name__}: {snapshot_error}'
+            self._latch_fault(
+                phase, error, before_state=before, after_state=after,
+                interval_attempted=interval_attempted,
+                interval_completed=interval_completed,
+                native_substeps_expected=self.artifact.timebase.control_substeps,
+                # Physics completed, but append_transition failed before the
+                # Recorder published a complete T/T+1 transition.
+                transition_status='not_recorded',
+                readback_error=readback_error,
+            )
+            raise
 
     def step_with_solution(self, solution):
         """Run one caller-owned Solution action through the selected lifecycle.
@@ -1885,6 +2335,47 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def close(self):
         if self._closed:
             return
+        if getattr(self, 'libero_mixed_profile', False):
+            first_error = None
+            try:
+                # A latched interval fault can leave the Recorder at the
+                # prior complete T/T+1 boundary. Do not synthesize a stop
+                # event or try to freeze that incomplete trajectory; retain
+                # the original fault and proceed with resource cleanup.
+                if (self.session is not None and self._libero_episode_end is None
+                        and self._execution_fault is None):
+                    self.stop('environment_close')
+                if (self.recorder is not None and getattr(self.recorder, 'active', False)
+                        and self._execution_fault is None):
+                    reason = (self._libero_episode_end.outcome.end_reason
+                              if self._libero_episode_end is not None else 'environment_close')
+                    self.finish_recording(reason)
+            except BaseException as error:
+                first_error = error
+            try:
+                if self.session is not None:
+                    active_session = self.session
+                    active_session.close()
+                    self._libero_close_receipt = active_session.close_receipt
+                    self.session = None
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(f'LIBERO session close also failed: {type(error).__name__}: {error}')
+            receipt = getattr(self.value.get('source'), 'execution_source_receipt', None)
+            try:
+                if receipt is not None:
+                    receipt.close()
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(f'LIBERO source receipt cleanup also failed: {type(error).__name__}: {error}')
+            self._closed, self._stopped = True, True
+            if first_error is not None:
+                raise first_error
+            return
         if not getattr(self, 'position_profile', False):
             first_error = None
             if self.session is not None:
@@ -2027,6 +2518,49 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
         if self._closed:
             raise RuntimeError('cannot stop a closed selected environment')
+        if getattr(self, 'libero_mixed_profile', False):
+            if not isinstance(reason, str) or not reason.strip() or reason != reason.strip():
+                raise ValueError('Stop reason must be a trimmed non-empty string')
+            if self._libero_episode_end is not None:
+                return self._libero_episode_end
+            if self.session is None or getattr(self, 'state', None) is None:
+                raise RuntimeError('LIBERO reset must complete before Stop')
+            from ..trajectory.canonical.episode import make_episode_end_v1
+            fault = self._execution_fault
+            end_reason = 'execution_fault' if fault is not None else (
+                'horizon_reached' if reason == 'horizon_reached' else 'external_stop'
+            )
+            predicate = self.info.get('predicate_v1', {}).get('on_bowl_plate', {})
+            success = (predicate.get('value') if predicate.get('status') == 'available' else None)
+            event_sequence = 0
+            if self.recorder is not None and getattr(self.recorder, 'active', False):
+                event_sequence = self.recorder.next_boundary_event_sequence(int(self.state.control_step))
+            payload = {
+                'requested_reason': reason,
+                'control_step': int(self.state.control_step),
+                'simulation_time_s': float(self.state.simulation_time),
+                'source_id': self.value['source'].scene_source.source_id,
+                'source_closure_digest': self.value['source'].source_closure_digest,
+                'reset_sample_id': self.sample.sample_id,
+                'controller_identity': self.controller.identity,
+                'predicate_status': predicate.get('status'),
+            }
+            if fault is not None:
+                payload['fault'] = fault.to_mapping()
+            self._libero_episode_end = make_episode_end_v1(
+                episode_id=self.session.episode_id,
+                final_boundary=int(self.state.control_step),
+                end_reason=end_reason,
+                terminated=False,
+                truncated=True,
+                bootstrap_allowed=fault is None,
+                source='task_env.selected_reference.libero_mixed_v1',
+                payload=payload,
+                event_sequence=event_sequence,
+                task_success=(None if fault is not None else success),
+            )
+            self._stopped = True
+            return self._libero_episode_end
         if not getattr(self, 'position_profile', False):
             raise StageUnavailableError(
                 'Stop/Outcome is only admitted for the PositionServoV1 candidate; '
@@ -2089,8 +2623,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from ..runtime.sessions.provenance import provider_build_identity
         from ..runtime.sessions import common as session_common
         if (self.session is None or self.state.control_step != 0 or self.recorder is not None
-                or self._stopped or self._position_episode_end is not None):
+                or self._stopped or self._position_episode_end is not None
+                or self._libero_episode_end is not None):
             raise RuntimeError('recording starts exactly once at reset boundary')
+        if getattr(self, 'libero_mixed_profile', False):
+            from ..recorders import RecorderConfig, TransitionRecorder
+
+            path = Path(path)
+            if path.suffix != '.h5':
+                path = path.with_name(path.name + '.h5')
+            if path.exists():
+                raise FileExistsError(path)
+            self.recorder = TransitionRecorder(RecorderConfig(
+                schema_version='v3', max_transitions=max(self.horizon, 1),
+            ))
+            self.recording_path = path
+            self.recorder.begin_episode(self.obs, dict(self.info), self.get_record_metadata())
+            return
         if getattr(self, 'position_profile', False):
             from ..recorders import RecorderConfig, TransitionRecorder
 
@@ -2214,6 +2763,38 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self.info['task_metrics'])
 
     def finish_recording(self, reason):
+        if getattr(self, 'libero_mixed_profile', False):
+            from ..recorders import load_structured_control_records_h5
+
+            if self.recorder is None or not getattr(self.recorder, 'active', False):
+                raise RuntimeError('no active LIBERO recording')
+            if self._libero_episode_end is None:
+                self.stop(str(reason))
+            episode_end = self._libero_episode_end
+            outcome = episode_end.outcome
+            allowed_reasons = {
+                outcome.end_reason,
+                str(episode_end.boundary_event.payload.get('requested_reason', '')),
+            }
+            if str(reason) not in allowed_reasons:
+                raise ValueError('LIBERO recording finalization reason disagrees with EpisodeOutcome')
+            if self.recorder.transition_count != outcome.final_boundary:
+                raise RuntimeError('LIBERO H5 T does not match the final complete control boundary')
+            trajectory = self.recorder.end_episode(
+                outcome.end_reason, outcome=outcome, end_event=episode_end.boundary_event,
+            )
+            output = self.recorder.save_h5(self.recording_path.parent, self.recording_path.name)
+            loaded = load_structured_control_records_h5(output)
+            if (loaded['transition_count'] != trajectory.transition_count
+                    or loaded['observation_count'] != len(trajectory.observations)
+                    or loaded['outcome'] != outcome):
+                raise ValueError('LIBERO Generic H5 v3 structured-control readback mismatch')
+            return {
+                'schema_id': 'task-env-h5', 'schema_version': 'v3',
+                'transition_count': loaded['transition_count'],
+                'observation_count': loaded['observation_count'],
+                'outcome': outcome.to_mapping(), 'path': str(output),
+            }
         if getattr(self, 'position_profile', False):
             from ..recorders import (
                 load_leaf_control_records_h5, load_structured_control_records_h5,
@@ -2415,6 +2996,88 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'effective_leaf_plan_identity_sha256': self.leaf_plan.identity_sha256,
                 'attachment_plan_identity_sha256': self.value['fixed_attachment_plan'].identity_hash,
                 'attachment_receipt_identity_sha256': attachment['receipt_identity_sha256'],
+            },
+        }
+
+    def get_record_metadata(self):
+        """Return the JSON-safe recorder identity for the fixed mixed candidate."""
+        if not getattr(self, 'libero_mixed_profile', False):
+            raise StageUnavailableError('selected reference recording metadata is not available on this route')
+        source = self.value['source']
+        receipt = source.execution_source_receipt
+        reset_context = self._libero_reset_context
+        if not isinstance(reset_context, dict):
+            raise RuntimeError('LIBERO recording metadata has no current reset context')
+        reset_sample = reset_context.get('reset_sample_v1')
+        reset_realization = reset_context.get('reset_realization_v1')
+        reset_readback = reset_context.get('reset_readback_v1')
+        if not all(isinstance(item, Mapping) for item in (reset_realization, reset_readback)):
+            raise RuntimeError('LIBERO recording requires the current reset realization/readback receipts')
+        reset_realization = dict(reset_realization)
+        reset_readback = dict(reset_readback)
+        return {
+            'env_metadata': {
+                'env_name': 'SelectedReferenceEnv.LiberoMixedDiagnosticV1',
+                'task_name': self.artifact.task_id,
+                'task_version': self.artifact.artifact_version,
+                'physics_dt': self.artifact.timebase.physics_dt,
+                'control_substeps': self.artifact.timebase.control_substeps,
+                'control_frequency': 1.0 / self.artifact.timebase.control_dt,
+                'action_schema': {
+                    'schema_id': 'libero-joint-space-absolute-v1',
+                    'components': [*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'],
+                    'units': ['radian'] * 7 + ['meter_total_opening'],
+                },
+                'observation_schema': {
+                    'state.ee_pose': 'world_position_m_quaternion_wxyz',
+                    'state.joint_position': 'seven_arm_then_two_signed_finger_positions_rad_m',
+                    'state.boundary_identity_sha256': 'selected RuntimeSession source/episode/control boundary SHA-256',
+                    'privileged_state.*_body_pose': 'world_body_center_m_quaternion_wxyz',
+                },
+                'provider': self.provider, 'backend': self.backend,
+                'evidence_class': 'diagnostic_candidate',
+            },
+            'universal_action_schema': {
+                'version': 'libero-joint-space-absolute-v1', 'dimension': 8,
+                'components': [*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'],
+            },
+            'resolved_config': {
+                'provider': self.provider, 'backend': self.backend, 'horizon': self.horizon,
+                'physics_dt': self.artifact.timebase.physics_dt,
+                'control_substeps': self.artifact.timebase.control_substeps,
+                'control_dt': self.artifact.timebase.control_dt,
+                'integrator': self.value['source'].config.runtime.integrator,
+                'controller_profile_id': self.controller.profile_id,
+                'controller_identity': self.controller.identity,
+                'hold_policy': self.controller.config.hold_policy,
+            },
+            'control_plan': self.controller.identity_mapping(),
+            'task_context': {
+                'schema_version': 'r07c-d01-libero-episode-context-v1',
+                'task_artifact_identity_hash': self.artifact.identity_hash,
+                'source_id': source.scene_source.source_id,
+                'source_xml_sha256': receipt.canonical_xml_sha256,
+                'source_closure_digest': source.source_closure_digest,
+                'source_manifest_sha256': self.value['source_manifest_sha256'],
+                'controller_identity': self.controller.identity,
+                'provider_materialization_id': self.session.provider_materialization_id,
+                'episode_id': self.session.episode_id,
+                'init_row_index': self.sample.init_row_index,
+                'init_row_sha256': self.sample.init_row_sha256,
+                'reset_sample_id': self.sample.sample_id,
+                'simulation_time_s': self.sample.simulation_time_s,
+                'reset_sample_v1': reset_sample,
+                'reset_realization_v1': reset_realization,
+                'reset_readback_v1': reset_readback,
+            },
+            'candidate_identity': {
+                'task_artifact_identity_hash': self.artifact.identity_hash,
+                'source_id': source.scene_source.source_id,
+                'source_xml_sha256': receipt.canonical_xml_sha256,
+                'source_closure_digest': receipt.source_closure_digest,
+                'provider_materialization_id': self.session.provider_materialization_id,
+                'controller_identity': self.controller.identity,
+                'source_manifest_sha256': self.value['source_manifest_sha256'],
             },
         }
 

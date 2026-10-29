@@ -260,16 +260,54 @@ class RuntimeSource:
     fixed_attachment_assembly: object | None = None
     fixed_attachment_sources: Mapping[str, TaskSceneSource] | None = None
     execution_source_receipt: ExecutionSourceReceiptV1 | None = None
+    torque_actuators: Mapping[str, str] = field(default_factory=dict)
+    position_actuators: Mapping[str, str] = field(default_factory=dict)
+    actuator_units: Mapping[str, str] = field(default_factory=dict)
+    fixture_bodies: tuple[str, ...] = ()
+    contact_geom_groups: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    mixed_controller_profile_id: str | None = None
+    mixed_controller_identity: str | None = None
 
     def __post_init__(self):
-        for field in ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets'):
+        for field in (
+            'joints', 'bodies', 'frames', 'free_joints', 'joint_targets',
+            'torque_actuators', 'position_actuators', 'actuator_units',
+        ):
             values = dict(getattr(self, field))
             if any(type(k) is not str or type(v) is not str for k, v in values.items()):
                 raise TypeError('source bindings require names, not indices')
             object.__setattr__(self, field, MappingProxyType(values))
+        fixtures = tuple(self.fixture_bodies)
+        if any(type(name) is not str or not name.strip() for name in fixtures):
+            raise TypeError('fixture body bindings require nonempty names')
+        if len(set(fixtures)) != len(fixtures):
+            raise ValueError('fixture body bindings must be unique')
+        object.__setattr__(self, 'fixture_bodies', fixtures)
+        groups = {str(entity): tuple(names) for entity, names in dict(self.contact_geom_groups).items()}
+        if any(not entity.strip() or not names or any(type(name) is not str or not name.strip() for name in names)
+               or len(set(names)) != len(names) for entity, names in groups.items()):
+            raise ValueError('contact geom groups require unique named source geoms')
+        object.__setattr__(self, 'contact_geom_groups', MappingProxyType(groups))
+        if (self.mixed_controller_profile_id is None) != (self.mixed_controller_identity is None):
+            raise ValueError('mixed Controller profile and identity must be bound together')
+        if self.mixed_controller_profile_id is not None:
+            if (type(self.mixed_controller_profile_id) is not str
+                    or not self.mixed_controller_profile_id.strip()
+                    or type(self.mixed_controller_identity) is not str
+                    or not re.fullmatch(r'[0-9a-f]{64}', self.mixed_controller_identity)):
+                raise ValueError('mixed Controller source binding requires a profile and SHA-256 identity')
+        if self.torque_actuators and self.position_actuators:
+            all_actuators = (*self.torque_actuators.values(), *self.position_actuators.values())
+            if len(set(all_actuators)) != len(all_actuators):
+                raise ValueError('direct-control actuator bindings must have a single named writer')
+            if set(self.actuator_units) != set(all_actuators):
+                raise ValueError('direct-control actuator units must exactly cover named actuator bindings')
+            if any(unit not in {'N*m', 'm'} for unit in self.actuator_units.values()):
+                raise ValueError('direct-control units are limited to source-bound N*m and m')
+            if (any(self.actuator_units[name] != 'N*m' for name in self.torque_actuators.values())
+                    or any(self.actuator_units[name] != 'm' for name in self.position_actuators.values())):
+                raise ValueError('direct-control unit differs from actuator role')
         if self.scene_definition is None:
-            if self.source_closure_digest is not None:
-                raise ValueError('source closure digest requires a canonical Scene input')
             if self.execution_source_receipt is not None:
                 receipt = self.execution_source_receipt
                 if type(receipt) is not ExecutionSourceReceiptV1:
@@ -277,6 +315,11 @@ class RuntimeSource:
                 if (receipt.source_id != self.scene_source.source_id
                         or receipt.canonical_xml_sha256 != hashlib.sha256(self.scene_source.xml.encode('utf-8')).hexdigest()):
                     raise ValueError('execution source receipt differs from its RuntimeSource XML/label')
+                if (self.source_closure_digest is not None
+                        and self.source_closure_digest != receipt.source_closure_digest):
+                    raise ValueError('RuntimeSource closure digest differs from its source receipt')
+            elif self.source_closure_digest is not None:
+                raise ValueError('legacy source closure digest requires an immutable execution source receipt')
             return
         if self.execution_source_receipt is not None:
             raise ValueError('versioned execution source receipt is only admitted for the frozen v0 NutAssembly route')

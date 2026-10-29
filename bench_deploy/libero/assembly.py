@@ -290,7 +290,7 @@ def _resolve_asset_files(
     install_root: Path,
     payloads: dict[str, bytes],
 ) -> list[str]:
-    """Rewrite relative MJCF file references to verified-install absolute paths."""
+    """Normalize MJCF references to verified-install-relative closure paths."""
     install_rel = PurePosixPath("upstream") / repository / PurePosixPath(source_path)
     model_dir = install_rel.parent
     compiler = root.find("compiler")
@@ -316,8 +316,8 @@ def _resolve_asset_files(
             absolute.relative_to(install_root.resolve(strict=True))
         except ValueError as exc:
             raise ValueError(f"MJCF asset escaped verified install: {source_path}:{raw}") from exc
-        rewritten.append(str(absolute))
-        element.set("file", str(absolute))
+        rewritten.append(target)
+        element.set("file", target)
     if compiler is not None:
         compiler.attrib.pop("meshdir", None)
         compiler.attrib.pop("texturedir", None)
@@ -622,11 +622,25 @@ def _compose_mjcf(
             _inline_source_defaults(fragment)
             body = _extract_libero_object(fragment, instance=instance, movable=movable)
             semantic_to_body[instance] = body.get("name", "")
+            geom_names = []
+            for geom_index, geom in enumerate(body.iter("geom")):
+                name = geom.get("name")
+                if not name:
+                    # The upstream task gives several object geoms no names.
+                    # Stable names are metadata only; retaining the original
+                    # unnamed geoms would make exact public contact groups
+                    # impossible to bind through MuJoCo's name API.
+                    name = f"libero_contact_{instance}_{geom_index:03d}"
+                    geom.set("name", name)
+                if name in geom_names:
+                    raise ValueError(f"duplicate source geom name in {instance!r}: {name!r}")
+                geom_names.append(name)
             _append_section(root, fragment, "asset")
             row = {
                 "semantic_id": instance,
                 "source_path": source_path,
                 "body_name": body.get("name", ""),
+                "geom_names": geom_names,
                 "joint_policy": "free_joint_joint0_damping_0.0005" if movable else "no_root_joint_fixture_internal_joints_preserved",
                 "geom_groups": ["0", "1"],
             }
@@ -648,6 +662,16 @@ def _compose_mjcf(
                                   *[row["semantic_id"] for row in ordered_fixtures]],
         "movable_object_instances": ordered_objects,
         "fixture_instances": ordered_fixtures,
+        "contact_geom_name_transform": {
+            "schema_version": "libero-contact-source-name-transform-v1",
+            "scope": "unnamed geoms inside task object and fixture source bodies",
+            "rule": "libero_contact_{semantic_id}_{zero_based_body_geom_index:03d}",
+            "physics_attributes_changed": False,
+            "groups": {
+                row["semantic_id"]: row["geom_names"]
+                for row in (*ordered_objects, *ordered_fixtures)
+            },
+        },
         "table_arena_transform": table_transform,
         "mounted_panda_transform": {
             "schema_version": "libero-mounted-panda-transform-v1",
@@ -899,11 +923,12 @@ def build_source_composition_plan(
             },
         ],
         "core_seam": {
-            "candidate_owner": "BaseTaskEnv.compile_task_scene -> task-specific source composer -> TaskDefinitionBase.create_action_adapter",
-            "factory_route": "explicit internal LIBERO pilot candidate; no make_env UID or provider admission is registered",
+            "candidate_owner": "bench_deploy.libero.selected_candidate.build_libero_selected_candidate -> SelectedReferenceEnv.from_libero_diagnostic_candidate -> RuntimeSession.materialize",
+            "factory_route": "versioned internal diagnostic candidate through the existing SelectedReferenceEnv and RuntimeSession owners; no make_env UID or general provider capability is registered",
             "compiled_scene_xml_sha256": None if composition_receipt is None else composition_receipt["output_sha256"],
-            "importable_by_task_env": composition_receipt is not None,
-            "core_native_admission_ready": False,
+            "source_candidate_ready": composition_receipt is not None,
+            "runtime_admission": "checked by the selected diagnostic candidate before reset",
+            "formal_qualification": "NOT_GRANTED",
         },
         "output": {
             "composed_mjcf_sha256": None if composition_receipt is None else composition_receipt["output_sha256"],
@@ -930,12 +955,13 @@ def build_assembly(task_input: dict, manifest: dict) -> dict:
         "native_arena_xml": task_input["native_reference"]["active_scene_xml"],
         "source_manifest_id": manifest["manifest_id"],
         "asset_closure": manifest["asset_closure"],
-        "source_consumption": "A deterministic source-derived MJCF applies the LIBERO object subtree/free-joint policy, fixture internal joints, table parameters, and MountedPanda transforms; original fixture pose reset metadata and native compilation remain unresolved.",
-        "factory_owner": "bench_deploy.libero.core_candidate.build_libero_pilot_env explicitly constructs an internal BaseTaskEnv candidate; it is not registered with make_env",
-        "task_source_owner": "bench_deploy.libero.core_candidate.LiberoPilotSceneComposer -> task_env.assembly.compile_task_scene -> GeoPhys SceneSource",
+        "source_consumption": "A deterministic source-derived MJCF applies the LIBERO object subtree/free-joint policy, fixture internal joints, table parameters, and MountedPanda transforms; the selected diagnostic route binds its versioned fixture realization and row restore through the existing RuntimeSession reset owner.",
+        "factory_owner": "bench_deploy.libero.selected_candidate.build_libero_selected_candidate constructs the versioned SelectedReferenceEnv diagnostic candidate through the existing RuntimeSession admission route; it is not registered with make_env",
+        "task_source_owner": "bench_deploy.libero.assembly source composer -> versioned SelectedReferenceEnv candidate -> task_env/runtime/sessions/source.py RuntimeSource and ExecutionSourceReceiptV1",
         "reference_owner": "task_env/assembly/references.py::resolve_task_references",
         "runtime_source_owner": "task_env/runtime/sessions/source.py::RuntimeSource and ExecutionSourceReceiptV1",
-        "core_native_admission_ready": False,
+        "runtime_admission": "checked by the selected diagnostic candidate before reset",
+        "formal_qualification": "NOT_GRANTED",
     }
 
 

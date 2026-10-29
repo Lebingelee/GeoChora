@@ -253,9 +253,10 @@ class GeoPhysRuntimeBoundary:
             contact_reader = getattr(self._physics, "read_contact_summary", None)
             if callable(contact_reader):
                 contact_summary = contact_reader()
-                if not isinstance(contact_summary, ContactSummary):
+                from ..environment.types import ContactSummaryV2
+                if not isinstance(contact_summary, (ContactSummary, ContactSummaryV2)):
                     raise TypeError(
-                        "public read_contact_summary() must return ContactSummary"
+                        "public read_contact_summary() must return a versioned ContactSummary"
                     )
             else:
                 contact_summary = ContactSummary.unavailable(

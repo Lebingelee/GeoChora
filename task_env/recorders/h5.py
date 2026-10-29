@@ -285,6 +285,14 @@ def _env_meta(trajectory: FrozenTrajectory, observation_leaves: list[dict[str, A
         "conversion_capabilities": raw.get("conversion_capabilities", {}),
         "trajectory": {"observation_count_semantics": "T+1", "transition_count_semantics": "T"},
     }
+    task_context = metadata.get("task_context")
+    if task_context is not None:
+        if not isinstance(task_context, Mapping):
+            raise ValueError("record metadata task_context must be a mapping")
+        # Optional owner-supplied, versioned context is carried verbatim so
+        # independent readers can bind a deployment-specific reset/source
+        # identity without changing the generic H5 v3 trajectory ABI.
+        result["task_context"] = dict(task_context)
     return result
 
 
@@ -376,6 +384,22 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
         "source": "structured_controls_v1_json",
         "automatic_flattening": False,
     })
+    task_context = trajectory.record_metadata.get("task_context")
+    if task_context is not None:
+        if not isinstance(task_context, Mapping):
+            raise ValueError("record metadata task_context must be a mapping")
+        _json_dataset(meta, "task_context_json", dict(task_context))
+    boundary_contexts = [
+        trajectory.reset_info.get("boundary_context_v1"),
+        *(info.get("boundary_context_v1") for info in trajectory.infos),
+    ]
+    if any(value is not None for value in boundary_contexts):
+        if any(not isinstance(value, Mapping) for value in boundary_contexts):
+            raise ValueError("versioned boundary context must be present at every T/T+1 boundary")
+        if any(value.get("schema_version") != "r07c-d01-boundary-context-v1"
+               for value in boundary_contexts):
+            raise ValueError("unsupported versioned boundary-context schema")
+        _json_dataset(meta, "boundary_context_v1_json", [dict(value) for value in boundary_contexts])
     camera_extension = _camera_observation_extension(trajectory)
     if camera_extension is not None:
         contract, boundaries, recording_binding = camera_extension
