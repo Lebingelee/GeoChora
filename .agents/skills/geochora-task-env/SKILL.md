@@ -1045,18 +1045,27 @@ Cost protocol v2.1 returned INVALID because its fixed historical baseline is not
 ## R07c single-task candidate boundary (2026-10-29)
 
 The R07c provider-free candidate work does **not** create an admitted LIBERO
-`make_env()` route. Its verified source composition plan binds fixed bytes and
-semantic names but does not emit merged MJCF or compiled references. The
-`.pruned_init` reset mapping remains unresolved, and the current GeoPhys
-boundary reports contact data as unavailable because no public entity-pair
-query is implemented. Missing contact evidence must not be mapped to `False`.
+`make_env()` route. Attempt001 bound fixed source bytes and semantic names but
+did not emit merged MJCF. Attempt002 now emits deterministic static MJCF and
+connects an internal candidate to the existing `BaseTaskEnv` source/compiler,
+lifecycle and v3 recording owners for provider-free S1. This remains internal:
+it does not register a public UID, prove native compilation, or admit a
+provider. The `.pruned_init` reset mapping, upstream BDDL/site/runtime
+placement, compiled IDs and native semantics remain unresolved.
+
+For `SnapshotRequest.contact_summary`, `GeoPhysRuntimeBoundary` optionally
+calls a peer's public `read_contact_summary()` and requires a typed
+`ContactSummary`; an absent method returns unavailable. The current GeoPhys
+peer still has no pair query. Missing contact evidence must not be mapped to
+`False`, and this optional hook does not grant provider or benchmark support.
 
 `bench_deploy.libero.task.LiberoPilotControlHookV1` and
 `task_env.controllers.mounted_panda_mixed.MountedPandaMixedActuatorAdapter`
 are internal candidate hooks, not stable public imports or a supported
 provider profile. Their synthetic tests preserve seven torque arm slots,
 signed two-finger position slots, explicit unqualified gains and the
-source-declared 20 Hz / 2 ms × 25 timebase only. They do not show native
-stability, task-semantic equivalence, recorder/H5 execution, P99 or
-Qualification. See the [R07c execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-execution-result-2026-10-29)
-for the remaining owner gates.
+source-declared 20 Hz / 2 ms × 25 timebase only. Attempt002 exercises the
+existing v3 recorder, finalizer and report consumer with synthetic IO; this
+does not establish a physical trajectory, native stability, task-semantic
+equivalence, P99 or Qualification. See the [R07c attempt002 execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-execution-result-2026-10-29)
+for remaining owner gates and evidence limits.

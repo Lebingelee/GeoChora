@@ -2611,8 +2611,8 @@
       "depends_on": [
         "R07b"
       ],
-      "status": "PILOT_ATTEMPT001_PARTIAL_PENDING_SOL_REVIEW_FULL_FIVE_TASK_EXIT_PENDING",
-      "execution": "PILOT_ATTEMPT001_PARTIAL; NATIVE_ADMISSION_FALSE",
+      "status": "PILOT_ATTEMPT002_PARTIAL_PENDING_SOL_REVIEW_FULL_FIVE_TASK_EXIT_PENDING",
+      "execution": "PILOT_ATTEMPT002_PARTIAL; NATIVE_ADMISSION_FALSE",
       "required_evidence": "per-task S1/S2/S3 real deployment and native semantic correspondence",
       "stop_condition": "any required task BLOCKED_CORE/BLOCKED_PROVIDER/NOT_REPRESENTABLE/FAIL/NOT_RUN blocks P99",
       "pilot_preparation": {
@@ -2652,8 +2652,9 @@
         ]
       },
       "pilot_attempt002_plan": {
-        "status": "PREPARED_NOT_SENT",
+        "status": "DELIVERED_PARTIAL_PENDING_SOL_REVIEW",
         "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt002-rework-plan",
+        "input_head": "fa1dc08f7b8ae7c23109f1157b0c964f563198a1",
         "expected_active_seconds": [
           10800,
           14400
@@ -2665,6 +2666,39 @@
           "actual composed source and real Core Env lifecycle/recording S1"
         ],
         "overall_R07c_accepted": false
+      },
+      "pilot_attempt002_execution": {
+        "status": "R07C_PILOT_PARTIAL_PENDING_SOL_REVIEW",
+        "implementation_commit": "26830dacce380c5f4a12b1ba61d6743ad5fb8167",
+        "implementation_commits": [
+          "26830dacce380c5f4a12b1ba61d6743ad5fb8167",
+          "cfad39248490ff6da983b17d9d7a3cfd59569c71"
+        ],
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_002/",
+        "cost_reader_provider_free_s1": "15 passed; independently checks frozen identity, Git lineage, snapshot/blob binding, incomplete measurements and inherited ledger",
+        "source_core_worker_provider_free_s1": "29 passed; static composed MJCF, same BaseTaskEnv lifecycle/fault/Recorder, synthetic worker reports and independent H5 report consumption",
+        "compatibility_owner_provider_free_s1": "43 passed; 3 real-provider nodes deselected",
+        "final_import_tripwire": "0 forbidden imports in final three S1 groups; earlier provider hits retained and excluded",
+        "composition": {
+          "status": "STATIC_SOURCE_XML_COMPOSED_RUNTIME_PLACEMENT_NOT_EXECUTED",
+          "mjcf_sha256": "22d6aa38dde89bf60309434dbd93155b7e740b3ea80df5e757801f5247e0cf16",
+          "bytes": 107165,
+          "native_compiled": false
+        },
+        "core_native_admission_ready": false,
+        "native_starts": 0,
+        "shared_native_lock": "NOT_ACQUIRED_NOT_AUTHORIZED",
+        "unresolved_gates": [
+          ".pruned_init safe decode and row-to-flat-state reset mapping",
+          "upstream BDDL/site/runtime placement replay",
+          "compiled native body/joint/site/actuator IDs and mapping",
+          "production GeoPhys typed contact query and source/episode/boundary freshness identity",
+          "native motion, contact and task-semantic correspondence"
+        ],
+        "real_agent_usage_costs": "unknown/null; historical v2.1 INVALID retained",
+        "accepted_slice_count_delta": 0,
+        "original_five_task_exit": false,
+        "review": "Pending Sol review; no attempt003 or native authorization"
       }
     },
     {

@@ -1,6 +1,6 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
-状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt001的Core/controller/evaluator S1及cost protocol continuation candidate已交回PARTIAL待Sol复核。source composition尚未发出MJCF，`make_env` native admission关闭，zero native；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；下文较早规划与审计保持其时点含义，原五任务最终目标不缩减。
+状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt002已交回PARTIAL待Sol复核，成本reader拒绝门、静态MJCF组合和同一Core Env provider-free S1已完成。公开LIBERO `make_env` admission关闭，`.pruned_init`映射、上游运行时placement、compiled IDs、生产contact query及native语义未验证，zero native；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；下文较早规划与审计保持其时点含义，原五任务最终目标不缩减。
 
 2026-10-28 规划接续：本页五任务/原生语义/成本目标保留；新增真实 USD 与 Task Harness 接入由
 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 承接。
@@ -210,6 +210,16 @@ R07b首pilot来源安装/metadata recipe S1已获Sol接收，native admission仍
 原生20Hz控制周期与physics timestep应从已锁robosuite源码查证；允许获取固定revision的小型macros/controller/config文本，source-declared dt与compiled dt分开。不得为填unknown拒绝读取已可核实常量，也不得把常量读到当编译模型验证。Core可采用显式审议的joint-space servo而非相同OSC算法，保持原torque actuator与物理source，记录控制算法差异。
 
 本包目标为`R07C_PILOT_CORE_WIRING_S1_READY_PENDING_SOL_REVIEW`；仅当source/控制/原Core成功与故障路径S1真实贯通可用READY；其余必要init/contact/source问题仍有缺口时PARTIAL并报告，不因成本schema修好而声称全部就绪。原R07五任务出口、18/22与P99/Qualification不变。Sol复核真实diff和证据后才准备下一窗口，不要求Luna自行规划所有后继子阶段或重复旧audit。
+
+<a id="r07c-pilot-attempt002-execution-result-2026-10-29"></a>
+
+## R07c pilot attempt002 执行结果（2026-10-29）
+
+输入为 camera branch `codex/phase-ii-01-camera` HEAD `fa1dc08f7b8ae7c23109f1157b0c964f563198a1`；GeoPhys pin `c6df840bef8d36b1150150167df08e29dc3f664c`、Menagerie pin `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。独立成本reader已从冻结输入、协议、只读Git对象和快照blob关系重算lineage/identity/measurement completeness；原合法自哈希伪造commit、nonancestor、wrong merge-base、snapshot/blob不匹配与partial→measured变体均进入对应拒绝门。测试只证明结构/拒绝逻辑；usage、token、费用、连续活动时间和历史继承金额仍未知。
+
+同一 `BaseTaskEnv` candidate经过实际Core构造、`reset()`、`step()`、fault latch/recovery、现有Recorder和H5 v3 readers、`close()` finalizer。source composer由锁定的LIBERO/robosuite字节输出确定性107,165-byte MJCF，SHA-256 `22d6aa38dde89bf60309434dbd93155b7e740b3ea80df5e757801f5247e0cf16`；source/resource/name收据见本窗口ignored evidence。最后provider-free S1为成本reader 15 passed、source/Core Env及candidate worker/report consumer 29 passed、兼容owner 43 passed、3个真实provider节点deselected。最终三组process-wide import tripwire无命中。早期一次兼容回归尝试真实Pendulum并命中GeoPhys的日志保留，未计作pass。合成H5仅用于S1，不是物理轨迹；无native、无模型compile、未取得共享锁。
+
+结果状态 `R07C_PILOT_PARTIAL_PENDING_SOL_REVIEW`，未满足 `CORE_WIRING_S1_READY`。`.pruned_init`原bytes没有解码或映射到flat-state；LIBERO BDDL/site/runtime placement没有重放；声明semantic names仍不是compiled IDs；当前GeoPhys没有实现可选typed `read_contact_summary()` peer方法，生产contact保持unavailable。native模型、compiled references、公开object pose/contact freshness、真实reset/运动与On语义等价都未验证，`core_native_admission_ready=false`。成本v2.2 candidate不升格为实际总成本，旧v2.1 `INVALID`保持。接收数18/22、原五任务目标、P99、Qualification、Human Judge不变；完整报告及机器收据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_002/`，等待Sol按diff复核，不自动开启attempt003。
 
 <a id="r07c-pilot-attempt001-execution-result-2026-10-29"></a>
 
