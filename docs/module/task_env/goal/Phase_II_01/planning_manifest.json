@@ -1858,11 +1858,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "ed5b239576737914a0304c7f742958bcf994dff2b3bb81609f2ff2a3c98cf4a2",
+    "07_Execution_Order_and_Acceptance.md": "c0c06153f14cd58d03ce19124116d539d6b93507c7b2c7baad26f4df86debd5d",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "70dc81126f20db1a6048a26e81557399e700d20624af8375b7ebcbb11a551992",
-    "README.md": "8936f9cfa37a6a056978995b698df6361b3ad60c3e8f1f03ac50f84e067675d0"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "a2700c0f0bac81ee9ccab860ae4431876b1f6d5cdd46947723e1ba3239d58300",
+    "README.md": "494e9b2d3c8df43aa5a44b523e6ae64ef61f3f07417a6b9ef4ff3f7d19451a59"
   },
   "revision_kind": "F04_ATTEMPT002_LOCAL_DERIVED_DELIVERY_AND_TWO_SOURCE_ISAAC_PARTIAL",
   "benchmark_audit": {
@@ -4560,7 +4560,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_ACCEPTED_BOUNDED_F03_S1; F04_PARTIAL_PENDING_SOL_REVIEW",
+    "status": "F00_F01_F02_ACCEPTED_BOUNDED; F03_ACCEPTED_BOUNDED_S1; F04_CHANGES_REQUESTED_AFTER_ATTEMPT002; ATTEMPT003_REASSESSMENT_COMPLETE",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4758,7 +4758,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for exact attempt003 CUDA GPU PhysX recipe; F02 accepted bounded for delivery/report/closure and representation selection. F03 attempt002 connected versioned synthetic source through existing Core factory/reset/state/control/public step/Recorder/H5/independent reader/close owners and passed targeted synthetic S1 checks; pending Sol review because run031 also exceeded the package zero-physics scope by stepping real CPU Pendulum. Production Isaac adapter, verified Panda delivery and provider admission remain absent.",
+    "patch_rows_status": "F00/F01/F02 accepted within their recorded bounds; F03 attempt003 accepted synthetic Core S1 only; F04 attempt002 actual two-source Core/Isaac partial result reviewed, changes requested. F05 not started; no Qualification.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -5010,7 +5010,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F04 attempt002 actual diff, partial native/reader evidence and retained failures; no F05 until review and a new package.",
+      "selected_next": "F04 attempt003 final bounded repair package; maintainer forwards one frozen prompt after Sol review commit. F05 held until F04 acceptance.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -5022,11 +5022,11 @@
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
       "F02": "ACCEPTED_BOUNDED_F02; delivery/report/closure and representation selection only; no runtime admission or real upstream delivery received.",
-      "reason": "F04 attempt002 exercised the exact local-validation and Core/Isaac route for both frozen Panda samples, but all episodes failed frozen gripper/FK thresholds and the original reader rejects valid float clocks. Sol review is next; native App budget is consumed.",
+      "reason": "Reset-only FK mismatch and worker gripper unit defect independently localized; finger response, clock comparison and producer teardown need bounded repair under original gates. Mandatory pre-attempt003 research/feasibility recorded.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
-      "F04": "F04_PARTIAL_PENDING_SOL_REVIEW; attempt002 provider-free S1 20/20, two source families run through CUDA/GPU PhysX, four H5 structural readbacks; gripper and FK physical gates fail, original reader clock and producer aggregate receipt ordering need repair."
+      "F04": "CHANGES_REQUESTED_F04; no physical acceptance; attempt003 reassessment complete; raw attempt002 result immutable."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5699,9 +5699,68 @@
       "physical_gates": "All four episodes fail gripper opening change (~0.00974m vs 0.015m) and source-calibrated FK position (~0.568-0.611m vs 0.01m) and orientation (~0.878-0.959rad vs 0.08rad). Free-body drop/settle passed; thresholds unchanged.",
       "resource": "No recorded budget overrun; sample maxima/minima and lock/exit receipts in run ledger.",
       "producer_root_receipt": "Missing because fast SimulationApp.close terminates before aggregate receipt write; parent reconciliation separately labeled.",
-      "sol_review": "PENDING",
+      "sol_review": "CHANGES_REQUESTED_F04; see separate f04_attempt002_sol_review; original partial report retained.",
       "f05_started": false,
       "qualification_granted": false
+    },
+    "f04_attempt002_sol_review": {
+      "date": "2026-10-29",
+      "decision": "CHANGES_REQUESTED_F04",
+      "input_head": "75d25f35c6327f3e84064b683aaf165b473f1c3a",
+      "implementation_commit": "75d25f35c6327f3e84064b683aaf165b473f1c3a",
+      "review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f04_002/sol_review.md",
+      "offline_evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f04_002/offline_review.json",
+      "independent_hash_checks": {
+        "output_files": 977,
+        "prior_protected": 228,
+        "attempt001_files": 207,
+        "native_sources": 26,
+        "mismatches": 0
+      },
+      "offline_rows": 404,
+      "h5_joint_hand_rows_matching": 404,
+      "fk_failures_only_reset": true,
+      "official_after_reset_fk_max_m": 6.321292366646168e-07,
+      "official_after_reset_fk_max_rad": 1.196554893248381e-06,
+      "menagerie_after_reset_fk_max_m": 3.545565361282258e-05,
+      "menagerie_after_reset_fk_max_rad": 9.026710696631948e-05,
+      "gripper_defect": "worker sends meters into normalized action; requested open 0.08 becomes physical target 0.0432m",
+      "remaining_risks": [
+        "GPU public zero-step kinematic refresh",
+        "finger drive/mimic response under original horizon/gates",
+        "graceful App close returns and producer aggregate persists"
+      ],
+      "software_tests_rerun": 0,
+      "native_starts": 0,
+      "reused_S1": "Luna run105, 20/20; synthetic IO success does not exercise reset refresh or worker-unit correctness",
+      "F05_started": false,
+      "qualification_granted": false
+    },
+    "f04_attempt003_package_plan": {
+      "status": "REASSESSMENT_COMPLETE_PACKAGE_TO_BE_FROZEN_AFTER_SOL_COMMIT",
+      "attempt": 3,
+      "target_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
+      "branch": "develop-full",
+      "plan_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-sol-review-and-attempt003-plan",
+      "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f04_003/luna1_prompt.md",
+      "package_index": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f04_003/input_snapshot.json",
+      "input_head_policy": "actual post-review commit HEAD; exact hash and prompt SHA frozen in package index; maintainer manually forwards",
+      "expected_active_minutes": [
+        150,
+        240
+      ],
+      "active_timebox_minutes": 360,
+      "report_reserve_minutes": 30,
+      "native_worker_wall_seconds": 900,
+      "cumulative_worker_wall_seconds": 3600,
+      "per_run_steps_including_bootstrap_max": 3000,
+      "cumulative_steps_max": 12000,
+      "arbitrary_app_start_limit": null,
+      "old_attempt002_two_start_limit": "preserved historical frozen plan; not inherited",
+      "original_gates_preserved": true,
+      "new_branch_or_worktree": false,
+      "F05_authorized": false,
+      "result_if_unresolved": "return complete failed/blocked evidence; no attempt004 without maintainer decision"
     }
   }
 }

@@ -505,3 +505,49 @@ worker family receipts与H5已写入，但Isaac `SimulationApp.close()`使用快
 若后续获得新attempt授权，最小修复点为：从公开运动学/关节顺序复核两来源kinematics binding与FK对齐；针对真实PhysX drive检查手指effective stiffness/damping/limits/targets，不能只改变阈值；在保留更精确的binary-clock语义下修正reader比较；将aggregate receipt写入安排在可能`os._exit`的App close之前，或让独立parent receipt成为正式producer-owned协议后更新reader/合同。对这些变更需先在provider-free受影响S1验证，再按新source hashes和冻结oracles执行新native run。本attempt预算已耗尽，不在本包内重启Kit。
 
 完整report、evidence、commands、run ledger、资源/锁记录、local delivery报告、四份H5/witness及原失败日志位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/`。此前F00–F03、F04 attempt001原件保持保留；不启动F05或其他slice。
+
+<a id="f04-attempt002-sol-review-and-attempt003-plan"></a>
+
+## F04 attempt002 Sol复核与attempt003前重评（2026-10-29）
+
+**决策：`CHANGES_REQUESTED_F04`。** 复核输入为`develop-full@75d25f35c6327f3e84064b683aaf165b473f1c3a`，tracked tree clean。保留实现与全部失败原件；F04尚未接收，F05不启动。Sol本轮只读源码、哈希、已有H5/witness及公开资料，未启动Kit、GPU physics或其他solver，也未重复软件测试。20/20 S1是复用Luna run105证据。
+
+独立校验977/977输出文件、228/228旧保护输入、207/207 attempt001清单和26/26冻结native源码均匹配。四份H5的SHA与原witness一致；另逐行复算404个边界的source-bound FK并核对H5 joint/hand observation，404/404匹配。详细结果位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f04_002/`。原报告的2,072 native steps、四个物理失败episode、reader clock误拒及producer根receipt缺失均成立；parent reconciliation不能补成producer关闭完成证明。
+
+### 已定位缺口与补丁owner
+
+| 缺口 / 证据 | 原因与有界修复 | Owner / 方法 |
+| --- | --- | --- |
+| reset FK超差；两来源各两episode的最大误差都在index 0 | 关节setter后link pose尚未同步。后续400行均满足原FK门：A最大约6.33e-7 m / 1.20e-6 rad，B约3.55e-5 m / 9.03e-5 rad。优先修reset数据刷新；不重标FK以拟合错误的第0行，不丢弃该行 | `runtime/sessions/isaac_native_io.py::write_reset/read_state/_read_views`；通过public simulation view刷新articulation kinematics，再发布一致的typed state；刷新前后原生step/time必须不变 |
+| 打开请求0.08 m实际目标0.0432 m；0.04/0.02 m也被解释为0.0416/0.0408 m | workspace worker直接把米值填入normalized gripper component；`prepare_structured_action`不转换单位。worker应使用`u=2*opening_m/0.08-1`，冻结0.04→0、0.02→-0.5、0.08→1的真实Core调用正例 | F04 native worker `_structured_action` → `control.py::prepare_structured_action` → `CanonicalPandaController.compute`；保持现有public action语义 |
+| 仅修单位仍可能开合不足 | 当前controller命令步长参数5/2500=0.002 m，而派生finger drive stiffness=400、damping=80；旧轨迹显示每interval开度只变化约9.75e-5 m。该低响应是剩余可行性风险，不能把单位修正当作物理已通过 | 既有local derivation/checker及drive receipt路径：校准两来源实际finger/mimic/drive关系；优先评估局部finger stiffness与既有2500命令参数对齐。只允许有依据的本地派生drive调整，记录单位、有效值、目标/实测、recipe/closure/report hash；不改全局Controller默认值、原始资产、质量/碰撞或物理阈值 |
+| reader用精确相等比较浮点时间 | 保留整数step/index、身份/hash比较；只对计算得到的秒数使用`rtol=0, atol=1e-12 s`。生产reader与独立reader分别检查，超容差、NaN、时钟错位和identity篡改仍拒绝 | 复制旧independent reader到新attempt后修复；既有structured H5 loader仅在实际发现同缺陷时定向修复。不得改旧H5/旧reader或把physical fail吞成PASS |
+| App fast shutdown使producer aggregate丢失；owner在close调用前标closed | 优先显式`fast_shutdown=False`，使close返回后写producer根aggregate；区分close attempted/completed/failed，保留primary与cleanup错误。由现有外部watchdog兜底；超时不能声明关闭成功 | `IsaacSimAppOwnerV1.open/_close_now`、worker `finally/main`、既有F01 supervisor及bundle reader；不另建进程/Runtime管理器 |
+| S1正例替换整个native I/O，未覆盖reset刷新和worker单位链 | 增加实际adapter方法调用与public API fake seam：setter→refresh→read顺序、计数不推进、刷新缺失/失败拒绝、开/合动作含义、close失败与结果落盘。不要继续只验证替身I/O | 既有F04两个S1模块、真实worker/reader及native adapter；engine import tripwire保持启用 |
+
+这里的后400行分组仅用于定位错误；正式验收继续包含四个reset行，合计404行。不允许通过额外未记账的physics step刷新第0行，也不允许用Controller FK代替provider实测Frame。
+
+### 第三轮前公开资料与实现评估
+
+访问日期2026-10-29。优先采用现有Core owner，不新增依赖：
+
+- [Isaac Lab v2.3.0 ArticulationData源码](https://raw.githubusercontent.com/isaac-sim/IsaacLab/v2.3.0/source/isaaclab/isaaclab/assets/articulation/articulation_data.py)的`body_link_pose_w`在读取link transforms前调用`update_articulations_kinematic()`；BSD-3-Clause。只借用公开刷新顺序，不引入Lab/torch状态容器或其private成员。[官方2.3 changelog 0.24.12](https://docs.nvidia.com/isaaclab/2.3/references/extensions-changelog)记录相同的reset后link pose陈旧缺陷。与本轮证据吻合，但仍需6.2 GPU实测。
+- 本机固定Isaac Sim 6.2.0.0源码已确认public `SimulationManager.get_physics_simulation_view()`；旧`get_physics_sim_view()`在该版本已deprecated。应使用前者取得view，再核验刷新API存在和零step/time变化。禁止照搬Lab private view；若公开调用无法满足零步reset，保留阻塞，不能隐藏一次积分。
+- [官方SimulationApp API](https://docs.isaacsim.omniverse.nvidia.com/latest/py/source/extensions/isaacsim.simulation_app/docs/api.html)与[公开源码](https://raw.githubusercontent.com/isaac-sim/IsaacSim/develop/source/extensions/isaacsim.simulation_app/isaacsim/simulation_app/simulation_app.py)解释fast shutdown的进程退出行为。网页为滚动版，仅作机制参考；实际补丁以本机6.2源码及冻结SHA为依据。公开源码标Apache-2.0；调用已有配置即可，不复制teardown框架。
+- 不采用ovphysx独立runtime、额外Isaac Lab依赖、private tensor/view补丁、人工parent伪造close完成或重新实现Panda控制器。它们不解决当前owner中的小范围接线缺陷，且增加生命周期与资格边界。
+
+**可行性结论：有依据进入最后一轮有界修复，但尚不保证物理通过。** 无缺失外部资产前置；两组已授权local-validated输入可继续使用。FK、action单位、clock和close均有具体owner及可验证修复路线；剩余不确定性是GPU零积分刷新、finger drive/mimic有效响应以及graceful teardown。attempt003须在同一窗口内实施、定向S1、必要修复/重跑与收口；若公开API或剩余资源不能满足原门，返回未解决结果供维护者决定，不创建attempt004或转入F05。
+
+### attempt003冻结执行顺序与出口
+
+1. 回读Sol复核、真实HEAD、保护bytes和原native plan；复制workspace脚本到新`f04_003`，旧目录只读。
+2. 按上表修复并完成provider-free实际调用检查；使用Core MuJoCo 3.8.1环境做旧路线定向回归。Isaac Python只桥接已授权的缺失Python依赖，不安装/升级、混入其他引擎或提前导入PXR/Kit。
+3. 在App前验证CLI `both`、必要依赖、序列化、reader成功/篡改路径、失败后的完整receipt写回；冻结精确nodeid、每run代码/输入hash、source/drive身份、预算和原物理oracle。
+4. 由既有supervisor及共享native锁执行同一worker的A/B两来源，每来源同Env两次reset；每episode100 public intervals、101 observations、5×2ms、100Hz。完整通过run独立成套验收，失败run保留，不能拼接结果。
+5. 四H5独立读回含404个边界/观测、全部原物理门、每family至少20类篡改与cross-source/episode graft拒绝；producer aggregate和退出后parent exit/lock/resource记录各自真实。report、ledger、hash、必要docs/Skill同步、本地提交及窗口释放均在包内完成。
+
+原物理阈值、reset、motion schedule与horizon不变，以attempt002 `native_plan.json`的`physical_acceptance`/`motion_schedule`字节内容为基准；更改派生drive须新recipe/report/closure和来源标定receipt，不能沿用旧验证结论。
+
+预计活跃150–240分钟，timebox360分钟，预留最后30分钟收口；外部锁等待单记、最多20分钟。每native worker≤900s、累计≤3600s，含全部bootstrap/失败run在内每run≤3000 physics steps/6模拟秒、窗口≤12000/24秒；CPU threads≤4。启动MemAvailable≥6GiB、GPU free≥5GiB；worker group采样RSS≤10GiB，MemAvailable<768MiB或GPU free<256MiB即安全中止；网络接收增量与缓存增长各≤2GiB，新证据≤512MiB、日志≤128MiB。每S1进程≤300s/RSS≤3GiB。所有native/转换经既有锁与supervisor；默认`cuda:0` GPU PhysX、`best_effort`、state-only。**不设任意App启动次数上限**，实际启动逐次记账，重跑受累计时间/步数/内存/磁盘约束；旧attempt002的2/2冻结记录保留。
+
+包准备完成后由维护者一次转述给Luna1；Sol不直接派发、不中途追加任务。执行前以Sol复核提交后的真实HEAD另存prompt SHA与protected snapshot；F05–F07不在本包自动授权范围。
