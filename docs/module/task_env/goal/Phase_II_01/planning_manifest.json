@@ -4676,8 +4676,8 @@
     ],
     "new_native_runs": 0,
     "software_tests_run_this_documentation_revision": [
-      "Final F02 targeted module plus affected legacy asset identity/closure subset: 45 passed in the clean output checkout; see f02_002/evidence/runs/004_full_s1_clean_commit and final rerun.",
-      "Final multilevel nested-entry/root-sibling and outside-snapshot regression pair: 2 passed in f02_002/evidence/runs/006_multilevel_entry."
+      "Final clean-checkout F02 module plus affected legacy asset identity/closure subset: 45 passed in 5.76 s; sampled process-tree peak RSS 315658240 bytes; see f02_002/evidence/runs/008_final_s1_clean.",
+      "Final nested/deep entry, root-sibling arcs and snapshot-escape pair: 2 passed in 1.106 s; sampled process-tree peak RSS 272990208 bytes; see f02_002/evidence/runs/006_multilevel_entry."
     ],
     "local_update_receipt": "workspace/maintenance/phase_ii_01_plan_update_20261028_001/receipt.json",
     "documentation_validation": {
@@ -5375,12 +5375,15 @@
       "targeted_tests": {
         "F02_module": 26,
         "legacy_asset_identity_closure": 19,
-        "combined_passed": 45
+        "combined_passed": 45,
+        "combined_elapsed_seconds": 5.76,
+        "combined_peak_process_tree_rss_bytes_sampled": 315658240
       },
       "new_layout_pair": {
         "passed": 2,
         "elapsed_seconds": 1.106,
-        "peak_process_tree_rss_bytes_sampled": 272990208
+        "peak_process_tree_rss_bytes_sampled": 272990208,
+        "final_run_id": "006_multilevel_entry"
       },
       "native_or_solver_starts": 0,
       "downloads_or_dependency_changes": 0,
@@ -5391,7 +5394,21 @@
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_002/report.md",
       "regression_commit": "f5e35e3b43ec90cf02e6665dd2d57463dcff2bb7",
       "nested_entry_path": "nested/deep/entry.usda",
-      "nested_sibling_arc": "../../sibling"
+      "nested_sibling_arc": "../../sibling",
+      "final_clean_s1_run_id": "008_final_s1_clean",
+      "output_head_at_final_s1": "31c024c6a8af4267182137b1f5a3e6fb9532f2ff"
+    },
+    "f02_attempt002_documentation_validation": {
+      "mode": "FOCUSED_STATIC_ONLY",
+      "task_env_skill_checker": "PASS",
+      "touched_local_links": 160,
+      "missing_links_or_anchors": 0,
+      "phase_ii_markdown_sha256_entries": 12,
+      "phase_ii_markdown_sha256": "PASS",
+      "planning_manifest_json": "PASS",
+      "git_diff_check": "PASS",
+      "global_docs_validator": "NOT_RUN_BY_PACKAGE_SCOPE",
+      "native_or_solver_runs": 0
     }
   }
 }
