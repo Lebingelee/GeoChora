@@ -231,9 +231,12 @@ class IsaacNamedPositionDriveReceiptV1:
             (self.physics_profile, 'physics profile'),
             (self.backend, 'backend'),
             (self.determinism_mode, 'determinism mode'),
-            (self.writer_id, 'writer ID'),
         ):
             _token(value, label)
+        # Canonical writer identities are Entity-qualified (for example
+        # ``panda-main/position-servo-v1``), so they are stable identifiers,
+        # not simple provider tokens.
+        _stable_identity(self.writer_id, 'writer ID')
         if (type(self.physics_dt_s) not in (int, float)
                 or isinstance(self.physics_dt_s, bool)
                 or not math.isfinite(float(self.physics_dt_s))

@@ -1,11 +1,11 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt001已提交部分合同实现和定向检查，但完整Core调用链S1未完成，等待Sol复核**。
-本计划的其他方向仍待独立授权；本次仅执行F03 attempt001冻结包，不启动F04或其他slice。
+更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt002已完成合成I/O的真实Core调用链S1候选，等待Sol复核**。
+本计划的其他方向仍待独立授权；当前结果只覆盖F03 attempt002包内synthetic S1，不启动F04或其他slice。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt001在`develop-full`上完成部分合同实现及定向检查，缺少已验证Panda USD source与Isaac Core RuntimeSession adapter，完整factory到H5调用链未完成，待Sol复核。没有启动F04。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt001是部分合同历史；attempt002在`develop-full`完成了同Env双reset、真实Core public step与Recorder/H5的合成I/O调用链及独立reader，待Sol复核。Production admission仍拒绝synthetic/unverified USD，Isaac Core adapter和validated Panda USD source仍缺；没有启动F04。
 
 未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。此偏好不代表Core Isaac provider已接通。
 
@@ -355,3 +355,45 @@ upstream validation report；`materialize()`也无Isaac adapter。把生产owner
 没有merge/rebase/cherry-pick/push/tag。报告、Evidence、commands、账本和sha清单位于ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_001/`。建议Sol复核本次实际diff、partial S1门与
 adapter/official-source阻塞后决定是否接受bounded contract部分；F04未启动，本窗口结束后不自动启动F04。
+
+<a id="f03-attempt002-real-core-call-chain"></a>
+
+## F03 attempt002真实Core调用链与合成I/O S1（2026-10-29，待Sol复核）
+
+输入为`develop-full@7ceb97da71cc4b26711165eae1bad457a9ae6747`；保留attempt001提交
+`ed951129ab1f51bc17baa59c11ee058eb3894058`及其所有原件。新增代码在同一既有Core owners中完成：
+`make_env()`的position candidate显式opt-in版本化输入；`SelectedReferenceEnv`保留原`ExecutionSpecV1`；
+`RuntimeSession`既有`materialize()`接入窄`NativeRuntimeIOV1` seam；公共reset、typed snapshot、现有Position
+Controller/Target/Ack、public step、原`TransitionRecorder`、Core F03 H5 profile、独立reader及close均由现有Core
+路线实际执行。私有test-only上下文只创建synthetic低层I/O，不替换Factory、source identity gate、Core Session/reset gate、
+typed projection、Control dispatcher或Recorder；版本化输入以F02 immutable delivery/Scene/TaskArtifact/TaskSource、
+reset plan、ExecutionSpecV1、static kinematics bytes和named-drive receipt绑定。旧UID默认与旧ExecutionSpec/H5 readers保留。
+
+一次同Env测试完成两次reset；每轮4个public intervals、每interval严格5次synthetic advance，产出两份各T=4/T+1=5的
+closed H5。乱序7-arm+2-finger native DOF按名字映射，opening按现有Position math拆到两指；每个H5均保存source/delivery/
+entry/variant/report/Scene/execution/device/build/reset/controller/Target/Ack/clock及boundary身份。reset实证了free-body
+pose写入、零速度、Controller step cursor/episode/boundary重置和上一session close。独立子进程重新解码两份文件、核40个
+advance receipt及10个observation boundary，拒绝source/execution/receipt/state/Target/Ack/clock/T+1共8类篡改；旧非identity
+姿态、非零速度、COM偏移frame oracle由原20项合同套件覆盖。
+
+定向失败路径验证覆盖native metadata build拒绝、partial reset receipt、partial Position Ack、advance发生副作用后抛错、
+typed publication读失败、真实Recorder容量append拒绝、H5 finalize失败及同时发生的close失败。故障保留首错、reset/Ack/advance
+部分事实及没有伪造Recorder transition；finalization错误继续作为primary，close错误附为异常note。生产`materialize()`在private
+scope外仍拒绝synthetic/unverified USD，且无Isaac Core RuntimeSession adapter；private S1 scope的identity检查和
+Control owner已有`admit_capabilities`调用不等同于真实Isaac/生产USD准入。synthetic S1不建立provider admission、native
+execution或Qualification。
+
+定向结果：F03完整调用链/故障模块5 passed；F03 source/state/frame/execution合同20 passed；C02b旧Position profile/H5
+15 passed；P99 public candidate 15 passed；旧R02c生产Recorder/H5 reader 2 passed；F02 suite初次在25/26通过，唯一失败是
+它要求Core checkout clean而实施尚未提交，须在本次最终commit后按原命令重跑。另有两项旧环境冲突：R02c version guard从当前
+安装读取到MuJoCo header API 3012000而冻结旧测试要求3008001；R03c synthetic H5 reader用当前MuJoCo 3.12.0 metadata触发其
+严格3.8.1 profile拒绝。没有改动Provider pin/依赖；这些失败原件保留。C02b的一处旧test source fixture缺少现有可选
+`fixed_attachment_plan`字段，按owner现有合同补齐fixture后15项回归通过。
+
+**执行范围偏差需Sol处置。** run `031_selected_fault_lifecycle_legacy_regression_r1`误包含
+`test_real_pendulum_scalar_env_preserves_five_tuple_clock_and_terminal_guard`：该用例创建并步进真实CPU Pendulum环境，日志加载
+Taichi；它超过本包禁止真实solver/physics的范围。run已结束，立即停止了进一步provider步进/运行；82项测试虽通过，不能抹去该偏差。
+没有启动Kit/App、GPU、MuJoCo/Isaac native、renderer或独立native锁，也未安装/下载/改pin。由于该scope偏差，结果为
+`F03_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION`；Sol须审阅后决定本包出口，不能把它表述为无偏差的
+全包PASS。报告与全部run原件在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/`。
+F04未启动，窗口结束后停止等待Sol。

@@ -222,6 +222,11 @@ class UsdRuntimeSourceV1:
         return self.scene_source.source_closure_sha256
 
     @property
+    def task_artifact_hash(self) -> str:
+        """Compatibility spelling for existing Core source-bound Controllers."""
+        return self.task_artifact.identity_hash
+
+    @property
     def source_id(self) -> str:
         return self.scene_source.source_id
 

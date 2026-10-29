@@ -161,6 +161,16 @@ class _SessionValues:
         self._scene_instance_id = f'scene-instance-{uuid4().hex}'
         self._provider_materialization_id = f'{provider}-materialization-{uuid4().hex}'
         self._inner_interval_active = False
+        from .source import UsdRuntimeSourceV1
+        if type(source) is UsdRuntimeSourceV1:
+            # A versioned USD source has no MJCF projection. Its exact timebase
+            # is checked against the typed native-I/O metadata by the admitted
+            # RuntimeSession owner before any reset write.
+            source.validate()
+            if (source.task_artifact.identity_hash != artifact.identity_hash
+                    or source.scene_definition.identity_hash != artifact.scene_identity_hash):
+                raise ValueError('USD RuntimeSession source differs from its TaskArtifact/Scene')
+            return
         root = ET.fromstring(source.scene_source.xml)
         option = root.find('option')
         explicit_timestep = None if option is None else option.get('timestep')
@@ -214,12 +224,18 @@ class _SessionValues:
         if not isinstance(plan, EpisodeResetPlanV1):
             raise TypeError('reset_plan requires EpisodeResetPlanV1')
         plan.validate()
-        source_id = self._source.scene_source.source_id
-        schema, separator, scene_hash = source_id.rpartition(':')
-        if not separator or schema not in {'scene-definition-v2', 'scene-definition-v3'}:
-            raise ValueError('RuntimeSource ID does not bind a canonical Scene identity')
-        if scene_hash != plan.role_binding.scene_identity_hash:
-            raise ValueError('EpisodeResetPlan Scene identity differs from materialized RuntimeSource')
+        from .source import UsdRuntimeSourceV1
+        if type(self._source) is UsdRuntimeSourceV1:
+            self._source.validate()
+            if self._source.scene_definition.identity_hash != plan.role_binding.scene_identity_hash:
+                raise ValueError('EpisodeResetPlan Scene identity differs from materialized USD RuntimeSource')
+        else:
+            source_id = self._source.scene_source.source_id
+            schema, separator, scene_hash = source_id.rpartition(':')
+            if not separator or schema not in {'scene-definition-v2', 'scene-definition-v3'}:
+                raise ValueError('RuntimeSource ID does not bind a canonical Scene identity')
+            if scene_hash != plan.role_binding.scene_identity_hash:
+                raise ValueError('EpisodeResetPlan Scene identity differs from materialized RuntimeSource')
         if isinstance(self._artifact, TaskArtifactV1):
             if plan.role_binding.task_source_identity_hash != self._artifact.task_source_identity_hash:
                 raise ValueError('EpisodeResetPlan Task Source differs from TaskArtifact v1 snapshot')
@@ -302,9 +318,15 @@ class _SessionValues:
             self._source.scene_definition.identity_hash != scene.identity_hash
         ):
             raise ValueError('typed state Scene differs from the materialized canonical Scene')
-        expected_source_id = f'{scene.schema_version}:{scene.identity_hash}'
-        if self._source.scene_source.source_id != expected_source_id:
-            raise ValueError('RuntimeSource ID must bind the exact typed state Scene identity')
+        from .source import UsdRuntimeSourceV1
+        if type(self._source) is UsdRuntimeSourceV1:
+            self._source.validate()
+            if self._source.scene_definition.identity_hash != scene.identity_hash:
+                raise ValueError('USD RuntimeSource ID must bind the exact typed state Scene identity')
+        else:
+            expected_source_id = f'{scene.schema_version}:{scene.identity_hash}'
+            if self._source.scene_source.source_id != expected_source_id:
+                raise ValueError('RuntimeSource ID must bind the exact typed state Scene identity')
         if any(item.sample_domain != 'evaluation_boundary' for item in requirements.requirements):
             raise ValueError('native interval requirements need NativeIntervalEvidence, not snapshot_v1')
 

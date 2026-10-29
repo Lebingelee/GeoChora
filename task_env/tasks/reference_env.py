@@ -111,7 +111,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     @classmethod
     def from_position_candidate(
         cls, binding: ReferenceTaskBinding, *, provider='geophys', backend='cpu', horizon=6000,
-        camera_observation_config=None,
+        camera_observation_config=None, execution_spec=None,
     ):
         """Explicitly construct a bounded Position profile through the selected binding."""
         from ..controllers.canonical.position_profile import PandaPositionServoProfileV1
@@ -126,9 +126,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'PositionCandidateSelectedReferenceEnv', (cls,),
                 {'uid': 'c02b-position-servo-candidate-v1'},
             )
+        if execution_spec is not None:
+            from ..artifacts import ExecutionSpecV1
+            if type(execution_spec) is not ExecutionSpecV1:
+                raise TypeError('versioned Position candidate requires ExecutionSpecV1')
+            execution_spec.validate()
+            if (provider, backend) != (
+                    execution_spec.physics_provider, execution_spec.physics_backend):
+                raise ValueError('Position candidate provider/backend differs from ExecutionSpecV1')
         env = candidate_type(
             provider=provider, backend=backend, horizon=horizon, _binding=binding,
             camera_observation_config=camera_observation_config,
+            _execution_spec_v1=execution_spec,
         )
         profiles = env.position_profiles
         if (not profiles or len(profiles) > 2
@@ -211,7 +220,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def __init__(self, *, provider='geophys', backend='cpu', horizon=6000,
                  _binding=None, _diagnostic_gripper_control_hz=None,
                  camera_observation_config=None, _leaf_position_candidate=False,
-                 _fixed_attachment_leaf_position_candidate=False):
+                 _fixed_attachment_leaf_position_candidate=False,
+                 _execution_spec_v1=None):
         if type(horizon) is not int or not 1 <= horizon <= 6000:
             raise ValueError('selected reference horizon must be an integer in [1, 6000]')
         if camera_observation_config is not None:
@@ -233,8 +243,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise ValueError('fixed Attachment leaf route requires the explicit leaf Position opt-in')
         if not isinstance(self.binding, ReferenceTaskBinding):
             raise TypeError('selected reference requires an explicit task binding')
+        if _execution_spec_v1 is not None:
+            from ..artifacts import ExecutionSpecV1
+            if type(_execution_spec_v1) is not ExecutionSpecV1:
+                raise TypeError('versioned selected construction requires ExecutionSpecV1')
+            _execution_spec_v1.validate()
+            if (provider, backend) != (
+                    _execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend):
+                raise ValueError('selected construction provider/backend differs from ExecutionSpecV1')
+            if (_execution_spec_v1.physics_provider, _execution_spec_v1.physics_backend,
+                    _execution_spec_v1.physics_device, _execution_spec_v1.determinism_mode) != (
+                    'isaacsim', 'cuda', 'cuda:0', 'best_effort'):
+                raise ValueError('F03 versioned selected construction requires its exact Isaac CUDA target')
+        self._declared_execution_spec_v1 = _execution_spec_v1
         if _diagnostic_gripper_control_hz is None:
-            if provider not in {'geophys', 'mujoco'} or backend != 'cpu':
+            if (_execution_spec_v1 is None
+                    and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             self._diagnostic_profile = None
             build_value = lambda: self.binding.build(provider)
@@ -556,7 +580,18 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             else:
                 self.sample = self.binding.reset_sample(self.artifact, seed)
                 self._selected_episode_id = uuid4().hex
-            self.execution = ExecutionSpec(self.provider, PROFILE, 'none', self.backend, 0, 'strict')
+            versioned_execution = self.value.get('execution_spec_v1')
+            if versioned_execution is not None:
+                from ..artifacts import ExecutionSpecV1
+                if (type(versioned_execution) is not ExecutionSpecV1
+                        or self._declared_execution_spec_v1 is None
+                        or versioned_execution.identity_hash != self._declared_execution_spec_v1.identity_hash):
+                    raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
+                self.execution = versioned_execution
+            else:
+                if self._declared_execution_spec_v1 is not None:
+                    raise ValueError('SelectedReferenceEnv rebuild dropped its declared ExecutionSpecV1')
+                self.execution = ExecutionSpec(self.provider, PROFILE, 'none', self.backend, 0, 'strict')
             phase = 'session_materialization'
             if self.position_profile:
                 from ..runtime.sessions.control import (
@@ -580,8 +615,31 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     f'{articulation.entity_id}/{joint.joint_id}': joint
                     for articulation in self.position_scene.articulations or ()
                     for joint in articulation.joints
-                    if joint.kind != 'fixed'
+                    if joint.kind in {'revolute', 'continuous', 'prismatic'}
                 }
+                from ..runtime.sessions.source import UsdRuntimeSourceV1
+                if type(self.value['source']) is UsdRuntimeSourceV1:
+                    # Reset poses are keyed by their canonical Frame semantic
+                    # name. Resolve each such key through the already-bound
+                    # TaskArtifact FrameReference to the unique Scene floating
+                    # Joint whose child frame it names; never infer a Joint ID
+                    # from a provider/native string.
+                    for reset_frame_name in self.value['source'].free_joints:
+                        frame_reference = self.artifact.legacy_frame_bindings.get(reset_frame_name)
+                        if frame_reference is None:
+                            raise ValueError('USD free-body reset key lacks an Artifact Frame binding')
+                        candidates = tuple(
+                            joint
+                            for articulation in self.position_scene.articulations or ()
+                            if articulation.entity_id == frame_reference.entity_id
+                            for joint in articulation.joints
+                            if joint.kind == 'floating' and joint.child_frame == frame_reference
+                        )
+                        if len(candidates) != 1:
+                            raise ValueError('USD reset Frame must resolve to exactly one Scene floating Joint')
+                        if reset_frame_name in self.position_joint_bindings:
+                            raise ValueError('USD free-body reset Joint binding overlaps a scalar binding')
+                        self.position_joint_bindings[reset_frame_name] = candidates[0]
                 from ..artifacts import FrameReference
                 self.position_frame_bindings = {
                     semantic: FrameReference(entity, frame)
@@ -1852,6 +1910,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._closed, self._stopped = True, True
             return
         first_error = None
+
+        def retain_cleanup_error(primary, label, cleanup_error):
+            if primary is None:
+                return cleanup_error
+            add_note = getattr(primary, 'add_note', None)
+            if callable(add_note):
+                add_note(f'{label} also failed: {type(cleanup_error).__name__}: {cleanup_error}')
+            return primary
+
         if self._published_position_state is not None:
             try:
                 if self._position_episode_end is None:
@@ -1863,15 +1930,17 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         try:
             self._close_camera_consumer()
         except BaseException as error:
-            if first_error is None:
-                first_error = error
+            first_error = retain_cleanup_error(
+                first_error, 'camera consumer close after Position finalization', error,
+            )
         try:
             if self.session is not None:
                 self.session.close()
                 self.session = None
         except BaseException as error:
-            if first_error is None:
-                first_error = error
+            first_error = retain_cleanup_error(
+                first_error, 'RuntimeSession close after Position finalization', error,
+            )
         finally:
             self._closed, self._stopped = True, True
         if first_error is not None:
@@ -2359,6 +2428,126 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
     def _position_record_metadata(self):
         from dataclasses import asdict
 
+        f03_input = self.value.get('f03_position_input')
+        if f03_input is not None:
+            source = self.value['source']
+            source_scene = source.scene_source
+            loaded = source_scene.loaded_delivery
+            delivery = loaded.delivery
+            representation = source_scene.representation
+            drive_receipt = self.value['native_drive_receipt']
+            native_metadata = self.session._native_io_metadata
+            reset_receipt = self.session._reset_write_receipt
+            if reset_receipt is None:
+                raise RuntimeError('F03 recording requires the successful Core reset write receipt')
+            action_schema = self.controller.controller_binding().action_schema
+            profile = {
+                'schema_version': 'f03-core-call-chain-recording-profile-v1',
+                'profile_id': 'f03-versioned-usd-position-synthetic-s1-v1',
+                'provenance_kind': 'synthetic_fixture',
+                'runtime_admitted': False,
+                'source_verified': False,
+                'task_source_identity_sha256': f03_input.task_source.identity_hash,
+                'task_artifact_identity_sha256': self.artifact.identity_hash,
+                'scene_identity_sha256': self.position_scene.identity_hash,
+                'source_id': source.source_id,
+                'source_closure_sha256': source.source_closure_digest,
+                'usd_delivery': {
+                    'asset_identity_sha256': delivery.asset_identity_hash,
+                    'delivery_sha256': loaded.delivery_sha256,
+                    'closure_sha256': loaded.closure_sha256,
+                    'provenance_kind': delivery.provenance_kind,
+                    'source_revision': delivery.source_revision,
+                    'entry_file': delivery.entry_file,
+                    'entry_prim': delivery.entry_prim,
+                    'variant_selections': dict(delivery.variant_selections),
+                    'validation_report_path': delivery.validation_report_path,
+                    'validation_report_sha256': delivery.validation_report_sha256,
+                    'validation_report_payload_sha256': hashlib.sha256(loaded.report_bytes).hexdigest(),
+                    'validation_report_id': loaded.report.report_id,
+                    'validation_report_passed': loaded.report.passed,
+                    'validation_report_provenance_kind': loaded.report.provenance_kind,
+                },
+                'representation': {
+                    'identity_sha256': representation.identity_hash,
+                    'provider': representation.provider,
+                    'provider_build_identity': representation.provider_build_identity,
+                    'decision': representation.decision,
+                    'runtime_admitted': representation.runtime_admitted,
+                    'source_verified': representation.source_verified,
+                },
+                'execution_spec_v1': self.execution.to_mapping(),
+                'execution_identity_sha256': self.execution.identity_hash,
+                'device': self.execution.physics_device,
+                'backend': self.execution.physics_backend,
+                'provider_build_identity': native_metadata.provider_build_identity,
+                'timebase': {
+                    'physics_dt_s': self.artifact.timebase.physics_dt,
+                    'control_substeps': self.artifact.timebase.control_substeps,
+                    'control_dt_s': self.artifact.timebase.control_dt,
+                    'clock_domain': 'evaluation_boundary',
+                },
+                'reset_plan_identity_sha256': self.value['reset_plan'].identity_hash,
+                'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
+                'reset_write_receipt': reset_receipt.to_mapping(),
+                'controller_identity_sha256': self.controller.identity,
+                'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
+                'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
+                'native_position_drive_receipt': asdict(drive_receipt),
+                'native_runtime_io_metadata': native_metadata.to_mapping(),
+                'native_source_mappings': {
+                    'joints': dict(source.joints), 'bodies': dict(source.bodies),
+                    'frames': dict(source.frames), 'free_joints': dict(source.free_joints),
+                    'joint_targets': dict(source.joint_targets),
+                },
+                'static_kinematics_source_sha256': f03_input.kinematics_source_sha256,
+                'reset_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
+                'recording_scope': 'Core synthetic S1 conformance; no provider physics or native admission',
+            }
+            action_components = tuple(action_schema.components)
+            return {
+                'env_metadata': {
+                    'env_name': 'SelectedReferenceEnv.F03VersionedPositionS1',
+                    'task_name': self.artifact.task_id,
+                    'task_version': self.artifact.artifact_version,
+                    'scene_uid': self.position_scene.scene_id,
+                    'agent_uids': ('panda-main',),
+                    'physics_dt': self.artifact.timebase.physics_dt,
+                    'control_substeps': self.artifact.timebase.control_substeps,
+                    'control_frequency': 1.0 / self.artifact.timebase.control_dt,
+                    'action_schema': asdict(action_schema),
+                    'observation_schema': {'leaf_specs': (
+                        {'path': 'state.ee_pose', 'semantic': 'hand_origin_tcp_pose_world'},
+                        {'path': 'state.joint_position', 'semantic': 'named_arm_then_finger_joint_positions'},
+                        {'path': 'state.hand_pose', 'semantic': 'measured_hand_frame_pose_world'},
+                        {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
+                        {'path': 'privileged_state.target_body_pose', 'semantic': 'floating_target_body_pose_world'},
+                    )},
+                    'reference_profile': profile,
+                },
+                'universal_action_schema': {
+                    'version': 'f03-core-call-chain-position-action-v1',
+                    'dimension': len(action_components), 'components': action_components,
+                },
+                'resolved_config': {
+                    'provider': self.provider, 'backend': self.backend,
+                    'device': self.execution.physics_device, 'horizon': self.horizon,
+                    'controller_profile': self.controller.profile_id,
+                    'execution_identity_sha256': self.execution.identity_hash,
+                },
+                'candidate_identity': {
+                    'task_artifact_identity_hash': self.artifact.identity_hash,
+                    'task_source_identity_sha256': f03_input.task_source.identity_hash,
+                    'scene_identity_hash': self.position_scene.identity_hash,
+                    'source_id': source.source_id,
+                    'source_closure_digest': source.source_closure_digest,
+                    'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+                    'execution_identity_sha256': self.execution.identity_hash,
+                    'controller_identity_sha256': self.controller.identity,
+                    'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
+                },
+            }
+
         if getattr(self, 'leaf_position_profile', False):
             if self.fixed_attachment_leaf_position_profile:
                 return self._attached_leaf_record_metadata(asdict)
@@ -2590,6 +2779,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         target_payload = target.target.to_mapping()
         target_hash = target.target.identity_hash
         applied_payload = applied.to_mapping()
+        if self.value.get('f03_position_input') is not None:
+            native_ack = getattr(self.session, '_last_native_position_ack', None)
+            native_advances = getattr(self.session, '_last_interval_advances', ())
+            advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)
+            if native_ack is None or len(native_advances) != self.artifact.timebase.control_substeps:
+                raise ValueError('F03 recording requires one complete native Position Ack and exact interval receipts')
+            applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
+            applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
+            applied_payload['native_interval_advance_attempts'] = advance_attempts
+            applied_payload['native_io_execution_class'] = 'synthetic_fixture_no_physics'
         canonical_action = {
             **canonical.to_mapping(),
             'position_target_v1': target.to_mapping(),

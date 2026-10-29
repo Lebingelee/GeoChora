@@ -54,7 +54,7 @@ runtime compatibility for an arbitrary build. F02 attempt002 has Sol acceptance
 delivery and provider runtime admission remain unverified. See the [F02 public API route](../../../docs/module/task_env/public-api.md#usd-delivery-and-provider-representation-selection-f02)
 and the detailed [source map](references/routes.md).
 
-## F03 Core source/state/control contract status (2026-10-29)
+## F03 Core source/state/control status (2026-10-29)
 
 The existing Assembly source owner exposes internal `UsdTaskSceneSourceV1` plus
 an owned snapshot lease copied from the exact immutable F02 loaded-delivery
@@ -78,14 +78,26 @@ tuple path remains intact. `IsaacNamedPositionDriveReceiptV1` is marked
 public names/metadata order, and splits aggregate hand opening in metres
 between fingers. It does not admit a Provider or attest native metadata.
 
-F03 attempt001 passed 20 contract tests, 19 selected provider-free P99/reset
-checks, 3 synthetic H5/cleanup regressions, and 45 clean-commit F02/legacy
-checks. Its required full factory→admission→reset→public-step→Recorder/H5→
-independent-reader→close chain remains incomplete because no verified Panda
-USD source or Isaac Core RuntimeSession adapter is available. The attempt is
-partial and pending Sol review; do not report full S1, Isaac runtime support,
-native execution, or Qualification. See the [F03 route and result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1)
-and [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission).
+F03 attempt001 is the historical partial contract result. Attempt002 adds an
+explicit versioned `make_env()` opt-in and exercised the existing Core reset,
+typed state, Position control, public step, Generic H5 v3 Recorder/finalizer,
+independent reader and close owners through a private synthetic
+`NativeRuntimeIOV1` implementation. Two same-Env episodes each produced a
+closed T=4/T+1=5 H5; a fresh reader process verified all source/execution/
+state/control/clock bindings and rejected eight tamper classes. The 20-case
+source/state/frame contract suite plus selected C02b, P99 and legacy H5
+regressions passed.
+
+This is synthetic Core S1 evidence only. The private S1 context does not
+change production admission: `materialize()` still rejects synthetic or
+unverified USD and no Isaac Core `RuntimeSession` adapter or validated Panda
+USD delivery is available. Do not report Isaac provider admission, native
+execution, S2/S3 or Qualification. One ancillary legacy fault-suite run
+accidentally stepped the real CPU Pendulum route, contrary to the F03 package's
+zero-physics scope; preserve that deviation for Sol review. See the [F03
+attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain),
+the [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission),
+and the [historical attempt001 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver

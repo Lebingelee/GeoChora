@@ -200,9 +200,15 @@ The existing `task_env.assembly` source owner now has internal `UsdTaskSceneSour
 owned snapshot lease that copies only the exact immutable bytes held by the F02 loaded-delivery
 value. `task_env.runtime.sessions.source.UsdRuntimeSourceV1` binds that source to the existing
 `TaskArtifactV1`, `SceneDefinition`, scalar/free Joint maps, body/frame maps and drive targets.
-These values are construction declarations; the USD session is not admitted. `materialize()`
-rejects synthetic or unverified input and fails closed for Isaac because no Core Isaac
-`RuntimeSession` adapter is implemented. There is no new `make_env()` USD candidate route yet.
+These values are construction declarations; the USD session is not production-admitted.
+`make_env("panda-position-servo-candidate-v1", config={"versioned_input": input_v1})` is an
+explicit versioned-input opt-in that composes the existing TaskSource, Artifact, Scene, source,
+reset plan, ExecutionSpecV1 and native-drive receipt. The old UID defaults remain unchanged.
+`SelectedReferenceEnv` keeps the exact ExecutionSpecV1 through reset/rebuild. Production
+`materialize()` rejects synthetic or unverified input and fails closed for Isaac because no Core
+Isaac `RuntimeSession` adapter is implemented. The test-only private S1 scope accepts only the
+exact synthetic fixture and substitutes the narrow native-I/O port; it is not a user config,
+provider manifest or production admission switch.
 
 The legacy `ExecutionSpec` codec and mappings remain unchanged. `legacy_execution_projection()`
 accepts an `ExecutionSpecV1` only when the existing adapter can preserve every declared choice;
@@ -214,14 +220,23 @@ the measured child Frame. The older MuJoCo-compatible tuple route remains unchan
 named-drive receipt covers the declared seven Arm/two Finger name mapping and maps aggregate
 opening in metres to half-opening per finger; it does not represent native metadata or admission.
 
-F03 attempt001 passed 20 contract tests, 19 selected provider-free P99/reset compatibility checks,
-3 synthetic H5/cleanup checks, and the clean-commit F02/legacy 45-test set. The complete required
-`make_env → admission → reset/realization → public step → TransitionRecorder/H5 → independent
-reader → close` S1 was not run: no verified Panda USD delivery or Isaac Core RuntimeSession
-adapter exists, and the current Position candidate remains bound to its MJCF/GeoPhys or MuJoCo
-routes. The attempt is therefore partial, pending Sol review; it does not establish an Isaac
-provider, native execution, H5 integration for this new source, or Qualification. See the
-[F03 attempt001 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
+F03 attempt001's partial result is superseded by attempt002 for call-chain wiring. Attempt002
+passed the actual public `make_env`/same-Env two-reset/four-step-per-episode/Generic H5 v3 route
+with a private synthetic NativeRuntimeIOV1 implementation, producing two closed H5 files at
+T=4/T+1=5. The existing Core session, reset gate, typed projections, Position Controller,
+Target/Ack checks, transition Recorder, finalizer and close ran; the fixture did not implement a
+Session, integrator or Recorder. A separate process decoded both H5 files and rejected eight
+source/execution/receipt/state/Target/Ack/clock/T+1 tamper classes. The 20-case source/state/frame
+contract suite and affected provider-free C02b/P99/H5 regressions passed.
+
+This synthetic S1 does not exercise production USD admission: the private context validates one
+exact synthetic input, while ordinary `materialize()` continues to reject it. No verified Panda
+USD delivery or Isaac Core RuntimeSession adapter is available, so provider admission, native
+execution and Qualification remain unestablished. One ancillary legacy fault-suite run
+accidentally stepped a real CPU Pendulum environment, outside its no-physics scope; the run is
+preserved and the overall attempt is pending Sol review with that execution-scope deviation.
+See the [F03 attempt002 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)
+and historical [attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
 ### Static Logical Assembly value (R01a)
 

@@ -441,7 +441,7 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
     )
     mujoco._target_actuators = {}
     mujoco._open_actuators = ()
-    mujoco._source = SimpleNamespace(open_actuators=('actuator8',))
+    mujoco._source = SimpleNamespace(open_actuators=('actuator8',), fixed_attachment_plan=None)
     mujoco._episode_id = 'episode-position-sentinel'
     mujoco._reset_sample_id = 'reset-position-sentinel'
     mujoco._native_steps = 0

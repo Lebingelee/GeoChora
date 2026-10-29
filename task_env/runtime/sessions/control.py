@@ -563,10 +563,49 @@ def materialize_control(
     leaf_plan=None,
     diagnostic_profile=None,
 ):
+    from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
 
     declared_execution = execution
-    execution = legacy_execution_projection(execution)
+    from .api import _current_f03_s1_native_io_context
+    f03_scope = _current_f03_s1_native_io_context()
+    f03_s1 = f03_scope is not None
+    if f03_s1:
+        from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
+
+        profile_values = (
+            (controller_profile,) if not isinstance(controller_profile, (tuple, list))
+            else tuple(controller_profile)
+        )
+        if (type(declared_execution) is not ExecutionSpecV1
+                or not profile_values
+                or any(getattr(profile, 'native_drive_receipt', None)
+                       is not f03_scope.input_v1.native_drive_receipt for profile in profile_values)):
+            raise ValueError('F03 S1 control admission requires its exact declared ExecutionSpecV1 and named-drive Profile')
+        f03_scope.validate_call(
+            artifact, declared_execution, source,
+            drive_receipt=f03_scope.input_v1.native_drive_receipt,
+        )
+        if manifest is not None or diagnostic_profile is not None or leaf_plan is not None:
+            raise ValueError('F03 S1 control admission cannot combine with caller manifests or other diagnostics')
+        execution = ExecutionSpec(
+            declared_execution.physics_provider, declared_execution.physics_profile,
+            'none', declared_execution.physics_backend,
+            declared_execution.provider_seed, declared_execution.determinism_mode,
+        )
+        f03_capabilities = sorted(set(CONTROL_REQUIRED.names) | set(artifact.required_capabilities.names))
+        actual_manifest = ProviderCapabilityManifest(
+            'provider-capability-v0', 'isaacsim', '6.2.0.0',
+            'f03-private-synthetic-core-s1-v1', 'cuda',
+            declared_execution.physics_profile, 'none', 'best_effort',
+            tuple(CapabilityClaim(
+                capability, 'tested', 'f03-002-private-synthetic-core-conformance-only',
+            ) for capability in f03_capabilities),
+            ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
+            'synthetic-S1-only; not runtime admission or provider qualification',
+        )
+    else:
+        execution = legacy_execution_projection(execution)
     if leaf_plan is not None:
         from ...controllers.canonical.leaf_plan import EffectiveLeafPlanV1
         from .provenance import provider_build_identity
@@ -624,14 +663,14 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if diagnostic_profile is None:
+    if not f03_s1 and diagnostic_profile is None:
         actual_manifest = provider_manifest(execution.physics_provider)
-    else:
+    elif not f03_s1:
         from .api import _diagnostic_manifest
         if manifest is not None:
             raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
         actual_manifest = _diagnostic_manifest(artifact, execution, source, diagnostic_profile)
-    if manifest is not None:
+    if manifest is not None and not f03_s1:
         admit_capabilities(CONTROL_REQUIRED, manifest, execution)
     admit_capabilities(CONTROL_REQUIRED, actual_manifest, execution)
     admission_manifest = manifest
@@ -654,7 +693,8 @@ def materialize_control(
             if (not profiles or len(profiles) > 2
                     or any(not isinstance(profile, PandaPositionServoProfileV1) for profile in profiles)):
                 raise TypeError('unsupported explicit Controller profile set')
-            if execution.physics_provider not in {'geophys', 'mujoco'} or execution.backend != 'cpu':
+            if (not f03_s1 and (execution.physics_provider not in {'geophys', 'mujoco'}
+                                or execution.backend != 'cpu')):
                 raise ValueError('PositionServoV1 materialization is limited to GeoPhys/MuJoCo CPU')
             if controller_binding_plan is None:
                 raise ValueError('PositionServoV1 requires a compiled ControlBindingPlanV1')
@@ -679,7 +719,17 @@ def materialize_control(
                 profile._validate_source(source)
                 expected_targets.update(profile._target_bindings)
                 expected_open.append(profile.open_actuator)
-            if dict(source.joint_targets) != expected_targets or set(source.open_actuators) != set(expected_open):
+            if f03_s1:
+                drive_receipt = f03_scope.input_v1.native_drive_receipt
+                expected_named_targets = {
+                    f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+                    for item in drive_receipt.drives
+                }
+                if (len(profiles) != 1 or profiles[0].open_actuator is not None
+                        or profiles[0].native_drive_receipt is not drive_receipt
+                        or dict(source.joint_targets) != expected_named_targets):
+                    raise ValueError('F03 Position source must match the exact nine-DOF named drive receipt')
+            elif dict(source.joint_targets) != expected_targets or set(source.open_actuators) != set(expected_open):
                 raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
             if binding.gripper_semantic_id != profiles[0].gripper_semantic_id:
                 raise ValueError('PositionServoV1 gripper semantic binding mismatch')

@@ -1,5 +1,7 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
 from collections.abc import Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Protocol
 
 from .provenance import provider_build_identity
@@ -25,6 +27,71 @@ PROFILE = 'p1_2_scalar_cpu_v0'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
+_F03_S1_NATIVE_IO_CONTEXT: ContextVar[object | None] = ContextVar(
+    'task_env_f03_s1_native_io_context', default=None,
+)
+
+
+class _F03S1NativeIOContext:
+    """Private, in-process conformance scope for the synthetic F03 S1 fixture."""
+
+    def __init__(self, input_v1, factory):
+        from ...tasks.position_candidate.builder import F03PositionCandidateInputV1
+
+        if type(input_v1) is not F03PositionCandidateInputV1:
+            raise TypeError('F03 S1 I/O scope requires the exact versioned Position candidate input')
+        input_v1.validate()
+        if not callable(factory):
+            raise TypeError('F03 S1 I/O factory must be callable')
+        source = input_v1.runtime_source
+        delivery = source.scene_source.loaded_delivery.delivery
+        if (source.scene_source.source_verified
+                or delivery.provenance_kind != 'synthetic-fixture'
+                or source.scene_source.representation.provider != 'isaacsim'
+                or source.scene_source.representation.provider_build_identity != 'isaacsim-6.2.0.0'
+                or source.scene_source.representation.runtime_admitted):
+            raise ValueError('F03 S1 I/O scope is limited to the exact unverified synthetic USD fixture')
+        allowed_capabilities = {
+            'rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
+            'joint_state_query', 'body_pose_query', 'frame_pose_query',
+        }
+        if not set(input_v1.artifact.required_capabilities.names) <= allowed_capabilities:
+            raise ValueError('F03 S1 I/O scope does not admit capabilities outside its exact Core state/control slice')
+        self.input_v1 = input_v1
+        self.factory = factory
+
+    def validate_call(self, artifact, execution, source, *, drive_receipt=None):
+        declared = self.input_v1
+        if (artifact is not declared.artifact or source is not declared.runtime_source
+                or type(execution) is not ExecutionSpecV1
+                or execution.identity_hash != declared.execution.identity_hash
+                or drive_receipt is not None and drive_receipt is not declared.native_drive_receipt):
+            raise ValueError('F03 S1 native-I/O scope does not match its exact frozen input identities')
+        declared.validate()
+        renderer = execution.render_default
+        if (renderer.provider, renderer.backend, renderer.profile, renderer.device,
+                execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
+            raise ValueError('F03 S1 native-I/O scope requires the declared no-renderer ExecutionSpecV1')
+
+
+@contextmanager
+def _f03_s1_native_io_context(input_v1, factory):
+    """Install one private S1 I/O factory for bounded Core conformance runs.
+
+    This is deliberately not a construction option or provider registration.
+    It can only admit the exact synthetic F03 input and never changes the
+    production fail-closed behavior outside this lexical test scope.
+    """
+    scope = _F03S1NativeIOContext(input_v1, factory)
+    token = _F03_S1_NATIVE_IO_CONTEXT.set(scope)
+    try:
+        yield scope
+    finally:
+        _F03_S1_NATIVE_IO_CONTEXT.reset(token)
+
+
+def _current_f03_s1_native_io_context():
+    return _F03_S1_NATIVE_IO_CONTEXT.get()
 
 
 class RuntimeSession(Protocol):
@@ -137,6 +204,42 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
         if (source.task_artifact.identity_hash != artifact.identity_hash
                 or source.scene_definition.identity_hash != artifact.scene_identity_hash):
             raise ValueError('USD RuntimeSource differs from the materialize TaskArtifact')
+        f03_scope = _current_f03_s1_native_io_context()
+        if f03_scope is not None:
+            from .native_io import F03CoreRuntimeSession
+
+            drive_receipt = f03_scope.input_v1.native_drive_receipt
+            f03_scope.validate_call(
+                artifact, declared_execution, source, drive_receipt=drive_receipt,
+            )
+            if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
+                raise ValueError('F03 synthetic S1 scope cannot combine with caller manifests or other admission authorities')
+            native_io = f03_scope.factory(
+                artifact=artifact, execution=declared_execution, source=source,
+                drive_receipt=drive_receipt,
+            )
+            required_methods = (
+                'metadata', 'write_reset', 'read_state', 'write_position_targets',
+                'advance', 'close',
+            )
+            if any(not callable(getattr(native_io, name, None)) for name in required_methods):
+                raise TypeError('F03 S1 factory must implement only the typed NativeRuntimeIOV1 port')
+            try:
+                session = F03CoreRuntimeSession(
+                    artifact, declared_execution, source, native_io, drive_receipt,
+                )
+            except BaseException as materialization_error:
+                try:
+                    native_io.close()
+                except BaseException as cleanup_error:
+                    materialization_error.add_note(
+                        'F03 native-I/O cleanup after Core admission failure also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
+                raise
+            session._declared_execution_spec_v1 = declared_execution
+            session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+            return session
         if not source.scene_source.source_verified:
             raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
         if not declared_execution.physics_provider == 'isaacsim':

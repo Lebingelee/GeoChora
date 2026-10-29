@@ -18,6 +18,20 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         values = {} if config is None else dict(config)
         if kwargs or render_mode is not None:
             raise ValueError('Position candidate rejects render_mode and extra keyword arguments')
+        if 'versioned_input' in values:
+            if set(values) - {'versioned_input', 'horizon'}:
+                raise ValueError('versioned Position candidate admits only versioned_input and horizon')
+            from .builder import F03PositionCandidateInputV1, build_versioned_position_candidate
+            versioned_input = values['versioned_input']
+            if type(versioned_input) is not F03PositionCandidateInputV1:
+                raise TypeError('versioned_input must be F03PositionCandidateInputV1')
+            versioned_input.validate()
+            horizon = values.get('horizon', 8)
+            if type(horizon) is not int or not 1 <= horizon <= 6000:
+                raise ValueError('Position candidate horizon must be an integer in [1, 6000]')
+            return build_versioned_position_candidate(
+                versioned_input, horizon=horizon, environment_type=cls,
+            ).env
         if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation'}:
             raise ValueError('Position candidate config admits provider/backend/horizon/source_workspace and opt-in camera_observation only')
         provider = values.get('provider', 'geophys')

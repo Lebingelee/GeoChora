@@ -194,6 +194,15 @@ Recorder/H5→独立reader→close链未执行。当前没有经验证 Panda USD
 不能把合同级synthetic检查表述为完整S1或新的Provider capability。F03候选等待Sol复核，F04未启动。
 细节见[Phase II-01 F03记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1)。
 
+F03 attempt002 已在 `develop-full` 将 opt-in `F03PositionCandidateInputV1` 接入既有 `make_env()`、
+`SelectedReferenceEnv` 和 RuntimeSession owners。仅private、精确身份约束的 synthetic S1 scope替换低层
+NativeRuntimeIO；Core reset/realization、typed snapshot、Position controller/Target/Ack、public step、
+TransitionRecorder、Generic H5 v3 finalizer、独立reader与close均真实执行。同Env两个episode各T=4/T+1=5，
+每transition恰5次synthetic advance，两份closed H5经独立进程读回并拒绝8类身份/状态/控制/clock/T+1篡改。
+生产 `materialize()` 仍拒绝synthetic/unverified USD；没有Isaac adapter、真实Panda delivery、Provider admission、native
+S2/S3或Qualification。定向Core/旧Position/P99/H5检查通过；一个伴随旧故障套件误跑真实CPU Pendulum步进，违反该包零
+physics限制，全部事实待Sol审阅，故不能无条件宣称包级PASS。见[attempt002结果](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)。
+
 生命周期为 `draft -> candidate -> validated -> frozen -> archived`。
 validated 表示产生检查/feasibility Evidence、等待 Judge；frozen 必须有明确批准。
 拒绝或修改 frozen 任务必须新建版本，不得原地改变语义。

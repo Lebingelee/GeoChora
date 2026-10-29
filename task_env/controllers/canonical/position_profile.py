@@ -43,6 +43,7 @@ _EXPECTED_TARGET_BINDINGS = {
 }
 _ALGORITHM_JOINTS = tuple(f'joint{index}' for index in range(1, 8))
 _ALGORITHM_FINGERS = ('finger_joint1', 'finger_joint2')
+_DEFAULT_OPEN_ACTUATOR = object()
 
 
 def position_state_requirements(
@@ -91,7 +92,7 @@ def _source_binding_snapshot(source):
         'bodies': dict(sorted(source.bodies.items())),
         'frames': dict(sorted(source.frames.items())),
         'joint_targets': dict(sorted(source.joint_targets.items())),
-        'open_actuators': tuple(source.open_actuators),
+        'open_actuators': tuple(getattr(source, 'open_actuators', ())),
     }
 
 
@@ -106,6 +107,7 @@ class PandaPositionServoProfileV1:
         self, *, artifact, source, scene, model, config,
         entity_id='panda-main', joint_ids=None, finger_joint_ids=None,
         hand_frame_id='hand', native_prefix='', actuator_prefix='', tcp_profile=None,
+        target_bindings=None, open_actuator=_DEFAULT_OPEN_ACTUATOR, native_drive_receipt=None,
     ):
         self.artifact = artifact
         self.source = source
@@ -143,11 +145,18 @@ class PandaPositionServoProfileV1:
             joint_id: f'panda-v1/{algorithm_id}'
             for joint_id, algorithm_id in zip(self.finger_joint_ids, _ALGORITHM_FINGERS, strict=True)
         })
-        self._target_bindings = {
+        legacy_target_bindings = {
             f'{entity_id}/{joint_id}': f'{actuator_prefix}actuator{index}'
             for index, joint_id in enumerate(self.joint_ids, 1)
         }
-        self.open_actuator = f'{actuator_prefix}actuator8'
+        self._target_bindings = dict(legacy_target_bindings if target_bindings is None else target_bindings)
+        if set(self._target_bindings) != set(legacy_target_bindings):
+            raise ValueError('PositionServoV1 target binding must cover exactly seven canonical Arm joints')
+        self.open_actuator = (
+            f'{actuator_prefix}actuator8'
+            if open_actuator is _DEFAULT_OPEN_ACTUATOR else open_actuator
+        )
+        self.native_drive_receipt = native_drive_receipt
         self.gripper_semantic_id = f'{entity_id}/gripper'
         self._algorithm = CanonicalPandaController(
             model, artifact_hash=artifact.identity_hash, config=config,
@@ -178,6 +187,8 @@ class PandaPositionServoProfileV1:
             'required_state': self.requirements.to_mapping(),
             'force_feedback': 'not-consumed-v1',
         }
+        if native_drive_receipt is not None:
+            identity_payload['native_position_drive_receipt_identity_sha256'] = native_drive_receipt.identity_sha256
         if entity_id != 'panda-main':
             identity_payload.update({
                 'schema': 'panda-entity-position-servo-v1',
@@ -198,8 +209,16 @@ class PandaPositionServoProfileV1:
         self._activation_boundary_id = None
 
     def _validate_source(self, source):
-        expected_source_id = f'{self.scene.schema_version}:{self.scene.identity_hash}'
-        if (source.task_artifact_hash != self.artifact.identity_hash
+        from ...runtime.sessions.source import UsdRuntimeSourceV1
+
+        is_usd = type(source) is UsdRuntimeSourceV1
+        expected_source_id = (
+            source.source_id if is_usd else f'{self.scene.schema_version}:{self.scene.identity_hash}'
+        )
+        source_artifact_hash = (
+            source.task_artifact.identity_hash if is_usd else source.task_artifact_hash
+        )
+        if (source_artifact_hash != self.artifact.identity_hash
                 or source.source_closure_digest != self.source.source_closure_digest
                 or source.scene_definition is None
                 or source.scene_definition.identity_hash != self.scene.identity_hash
@@ -239,6 +258,75 @@ class PandaPositionServoProfileV1:
         )
         model = PandaKinematics(materialized_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
         return cls(artifact=artifact, source=source, scene=scene, model=model, config=config)
+
+    @classmethod
+    def from_usd_source(cls, artifact, source, *, execution, kinematics_source_xml: str,
+                        native_drive_receipt, config: ActionConfig | None = None):
+        """Bind the existing Position math to a versioned USD source and named DOF receipt.
+
+        ``kinematics_source_xml`` is a static FK description for this synthetic
+        S1. It is never treated as a materialization source or runtime admission.
+        """
+        from ...runtime.sessions.source import UsdRuntimeSourceV1
+        from ...runtime.sessions.leaf_control import IsaacNamedPositionDriveReceiptV1
+        from ...artifacts import ExecutionSpecV1
+
+        if (type(artifact) is not TaskArtifactV1 or type(source) is not UsdRuntimeSourceV1
+                or type(execution) is not ExecutionSpecV1):
+            raise TypeError('versioned Position profile requires TaskArtifactV1, ExecutionSpecV1 and UsdRuntimeSourceV1')
+        if type(native_drive_receipt) is not IsaacNamedPositionDriveReceiptV1:
+            raise TypeError('versioned Position profile requires the named DOF drive receipt')
+        source.validate()
+        execution.validate()
+        if source.task_artifact.identity_hash != artifact.identity_hash:
+            raise ValueError('PositionServoV1 USD source/Artifact identity mismatch')
+        scene = source.scene_definition
+        if scene.identity_hash != artifact.scene_identity_hash:
+            raise ValueError('PositionServoV1 USD source does not bind the exact TaskArtifact Scene')
+        if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+                artifact.timebase.control_dt) != (0.002, 5, 0.01):
+            raise ValueError('PositionServoV1 requires 100 Hz outer / five 2 ms native steps')
+        if (native_drive_receipt.scene_identity_sha256,
+                native_drive_receipt.source_closure_sha256,
+                native_drive_receipt.execution_identity_sha256,
+                native_drive_receipt.provider_build_identity,
+                native_drive_receipt.physics_profile,
+                native_drive_receipt.backend,
+                native_drive_receipt.device,
+                native_drive_receipt.determinism_mode) != (
+                scene.identity_hash, source.source_closure_digest,
+                execution.identity_hash, 'isaacsim-6.2.0.0', execution.physics_profile,
+                execution.physics_backend, execution.physics_device,
+                execution.determinism_mode):
+            raise ValueError('named DOF receipt does not bind the exact USD Scene/source closure')
+        expected_joint_bindings = dict(_EXPECTED_JOINT_BINDINGS)
+        if set(source.joints) != set(expected_joint_bindings) or any(
+                source.joints.get(name) != native for name, native in expected_joint_bindings.items()):
+            raise ValueError('PositionServoV1 USD source must bind exactly seven Arm and two finger Joints')
+        if source.bodies.get('panda-main/hand') != 'hand':
+            raise ValueError('PositionServoV1 USD hand state must bind to the named hand body')
+        target_by_joint = {
+            f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+            for item in native_drive_receipt.drives
+        }
+        if dict(source.joint_targets) != target_by_joint:
+            raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')
+        if type(kinematics_source_xml) is not str or not kinematics_source_xml.strip():
+            raise ValueError('synthetic Position S1 requires a nonempty static kinematics source')
+        config = config or ActionConfig()
+        if not isinstance(config, ActionConfig):
+            raise TypeError('PositionServoV1 requires the existing ActionConfig')
+        from .kinematics import PandaKinematics
+        model = PandaKinematics(kinematics_source_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
+        arm_targets = {
+            f'panda-main/joint{index}': target_by_joint[f'panda-main/joint{index}']
+            for index in range(1, 8)
+        }
+        return cls(
+            artifact=artifact, source=source, scene=scene, model=model, config=config,
+            target_bindings=arm_targets, open_actuator=None,
+            native_drive_receipt=native_drive_receipt,
+        )
 
     @classmethod
     def for_entity(

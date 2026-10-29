@@ -9,6 +9,7 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | 构造任务、public imports、配置分支与失败行为 | [public-api](public-api.md) |
 | 冻结任务、Experiment、randomization、Evidence/Judge | [task-artifact](task-artifact.md) |
 | USD delivery、依赖闭包与 Provider 表示选择（F02 advanced） | [public-api: USD delivery](public-api.md#usd-delivery-and-provider-representation-selection-f02) |
+| F03 版本化 USD Position candidate 与合成 I/O Core S1 边界 | [public-api: F03](public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission) |
 | runtime/state/timebase、controller、Expert lifecycle、providers | [runtime-and-providers](runtime-and-providers.md) |
 | recorder/H5/replay、learning、rendering | [recording-and-learning](recording-and-learning.md) |
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
