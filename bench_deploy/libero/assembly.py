@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 from pathlib import Path, PurePosixPath
 from typing import Any
+import xml.etree.ElementTree as ET
 
 
-_COMPOSITION_SCHEMA = "libero-source-composition-declaration-v1"
+_COMPOSITION_SCHEMA = "libero-source-composition-mjcf-v2"
 _MAX_SOURCE_BYTES = 128 * 1024 * 1024
 
 
@@ -226,6 +228,260 @@ def _verify_source_text_tree(source_text_root: Path, receipt: dict) -> None:
         )
 
 
+_MJCF_REFERENCE_ATTRIBUTES = frozenset({
+    "mesh", "material", "texture", "hfield", "joint", "joint1", "joint2",
+    "body", "site", "geom", "geom1", "geom2", "tendon", "actuator",
+    "class", "childclass", "target", "objname", "refname", "name1", "name2",
+})
+
+
+def _source_payload(manifest: dict, payloads: dict[str, bytes], repository: str, path: str) -> bytes:
+    matches = [
+        row for row in manifest.get("files", ())
+        if isinstance(row, dict)
+        and row.get("repository") == repository
+        and row.get("source_path", row.get("path")) == path
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"MJCF source must resolve to one manifest row: {repository}/{path}")
+    install_path = matches[0].get("install_path")
+    if type(install_path) is not str or install_path not in payloads:
+        raise ValueError(f"MJCF bytes are absent from verified installation: {repository}/{path}")
+    return payloads[install_path]
+
+
+def _parse_mjcf(data: bytes, identity: str) -> ET.Element:
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError as exc:
+        raise ValueError(f"pinned MJCF source is malformed: {identity}") from exc
+    if root.tag != "mujoco":
+        raise ValueError(f"pinned source is not a <mujoco> document: {identity}")
+    return root
+
+
+def _prefix_fragment_names(root: ET.Element, prefix: str, *, preserve: frozenset[str] = frozenset()) -> None:
+    """Namespace a fragment's local names and rewrite its intra-fragment refs."""
+    names: dict[str, str] = {}
+    for element in root.iter():
+        name = element.get("name")
+        if name and name not in preserve:
+            replacement = f"{prefix}__{name}"
+            if name in names and names[name] != replacement:
+                raise ValueError(f"duplicate MJCF local name in {prefix}: {name}")
+            names[name] = replacement
+    for element in root.iter():
+        name = element.get("name")
+        if name in names:
+            element.set("name", names[name])
+        for attribute in _MJCF_REFERENCE_ATTRIBUTES:
+            value = element.get(attribute)
+            if value in names:
+                element.set(attribute, names[value])
+
+
+def _resolve_asset_files(
+    root: ET.Element,
+    source_path: str,
+    repository: str,
+    install_root: Path,
+    payloads: dict[str, bytes],
+) -> list[str]:
+    """Rewrite relative MJCF file references to verified-install absolute paths."""
+    install_rel = PurePosixPath("upstream") / repository / PurePosixPath(source_path)
+    model_dir = install_rel.parent
+    compiler = root.find("compiler")
+    meshdir = PurePosixPath(compiler.get("meshdir", ".")) if compiler is not None else PurePosixPath(".")
+    texturedir = PurePosixPath(compiler.get("texturedir", str(meshdir))) if compiler is not None else meshdir
+    rewritten: list[str] = []
+    for element in root.iter():
+        raw = element.get("file")
+        if not raw:
+            continue
+        file_path = PurePosixPath(raw)
+        directory = texturedir if element.tag == "texture" else meshdir
+        if file_path.is_absolute():
+            raise ValueError(f"absolute MJCF asset paths are forbidden: {source_path}:{raw}")
+        resolved = PurePosixPath(posixpath.normpath(str(model_dir / directory / file_path)))
+        if ".." in resolved.parts:
+            raise ValueError(f"MJCF asset path escapes verified install: {source_path}:{raw}")
+        target = "/".join(resolved.parts)
+        if target not in payloads:
+            raise ValueError(f"MJCF asset is outside the verified source closure: {source_path}:{raw}")
+        absolute = (install_root / target).resolve(strict=True)
+        try:
+            absolute.relative_to(install_root.resolve(strict=True))
+        except ValueError as exc:
+            raise ValueError(f"MJCF asset escaped verified install: {source_path}:{raw}") from exc
+        rewritten.append(str(absolute))
+        element.set("file", str(absolute))
+    if compiler is not None:
+        compiler.attrib.pop("meshdir", None)
+        compiler.attrib.pop("texturedir", None)
+    return rewritten
+
+
+def _append_section(output: ET.Element, source: ET.Element, section_name: str) -> None:
+    section = source.find(section_name)
+    if section is None:
+        return
+    target = output.find(section_name)
+    if target is None:
+        target = ET.SubElement(output, section_name)
+    for child in list(section):
+        target.append(child)
+
+
+def _compose_mjcf(
+    task_input: dict,
+    manifest: dict,
+    payloads: dict[str, bytes],
+    install_root: Path,
+) -> tuple[str, dict[str, Any]]:
+    """Emit a deterministic, source-bound static MJCF composition candidate.
+
+    The source code's runtime placement sampler remains a separate, explicitly
+    unresolved step; this function composes the exact XML fragments only.
+    """
+    task = manifest["task"]
+    input_ref = task_input["native_reference"]["active_scene_xml"]
+    source_rows: list[dict[str, str]] = []
+    resources: set[str] = set()
+    root = ET.Element("mujoco", {"model": "libero_r07c_pilot_candidate_v2"})
+    ET.SubElement(root, "compiler", {"angle": "radian", "autolimits": "true"})
+    ET.SubElement(root, "option", {"timestep": "0.002", "gravity": "0 0 -9.81", "integrator": "implicitfast"})
+
+    def read(repository: str, path: str, role: str) -> ET.Element:
+        data = _source_payload(manifest, payloads, repository, path)
+        digest = _sha(data)
+        source_rows.append({"repository": repository, "path": path, "role": role, "sha256": digest})
+        fragment = _parse_mjcf(data, f"{repository}/{path}")
+        resources.update(_resolve_asset_files(fragment, path, repository, install_root, payloads))
+        return fragment
+
+    arena = _parse_mjcf(
+        _source_payload(manifest, payloads, input_ref["repository"], input_ref["path"]),
+        f"{input_ref['repository']}/{input_ref['path']}",
+    )
+    arena_digest = _sha(
+        _source_payload(manifest, payloads, input_ref["repository"], input_ref["path"])
+    )
+    source_rows.append({"repository": input_ref["repository"], "path": input_ref["path"],
+                        "role": "active_scene", "sha256": arena_digest})
+    # The pinned style source records these two upstream rewrite rules. Apply
+    # them before file resolution so the composed root references the effective
+    # files actually selected by LIBERO's fixed style policy.
+    style_rules = manifest.get("source_resolution", {}).get("scene_style_rewrite_rules", ())
+    for rule in style_rules:
+        for element in arena.iter(rule.get("element", "")):
+            if element.get("name") == rule.get("name") and element.get("file") == rule.get("declared_ref"):
+                element.set("file", rule["effective_ref"])
+    # Re-run resolution after style substitution.
+    resources.update(_resolve_asset_files(
+        arena, input_ref["path"], input_ref["repository"], install_root, payloads
+    ))
+    table = next((body for body in arena.iter("body") if body.get("name") == "table"), None)
+    if table is None:
+        raise ValueError("active LIBERO arena XML has no semantic table body")
+    table.set("name", "main_table")
+    for section_name in ("asset", "worldbody", "actuator", "sensor", "contact", "default", "tendon", "equality", "keyframe"):
+        _append_section(root, arena, section_name)
+
+    type_sources = task.get("type_to_source_and_xml", {})
+    semantic_to_body: dict[str, str] = {"main_table": "main_table"}
+    # The XML's exact source-declared body templates are instantiated once per
+    # semantic object/fixture. Runtime BDDL placement sampling is not claimed.
+    for collection, role in ((task.get("objects_instance_to_type", {}), "object"),
+                             (task.get("fixtures_instance_to_type", {}), "fixture")):
+        for instance, type_name in sorted(collection.items()):
+            if type_name == "table":
+                semantic_to_body[instance] = "main_table"
+                continue
+            source = type_sources[type_name]
+            source_path = source.get("asset_source", source.get("xml_source"))
+            repository = "robosuite" if source_path.startswith("robosuite/") else "libero"
+            fragment = read(repository, source_path, f"{role}:{instance}")
+            _prefix_fragment_names(fragment, instance)
+            world = fragment.find("worldbody")
+            bodies = [] if world is None else world.findall("body")
+            if len(bodies) != 1:
+                raise ValueError(f"source object must expose exactly one world root body: {source_path}")
+            bodies[0].set("name", instance)
+            semantic_to_body[instance] = instance
+            for section_name in ("asset",):
+                _append_section(root, fragment, section_name)
+            target_world = root.find("worldbody")
+            if target_world is None:
+                target_world = ET.SubElement(root, "worldbody")
+            target_world.append(bodies[0])
+
+    # Compose the pinned robot, mount and gripper sources as a declared static
+    # tree. The source code also applies placement transforms and samplers; the
+    # tree hash here therefore attests only this XML composition.
+    robot_paths = {
+        (row.get("repository"), row.get("path"))
+        for row in (*manifest.get("source_code_references", ()), *manifest.get("selected_xml_sources", ()))
+        if isinstance(row, dict)
+    }
+    def robot_source(suffix: str) -> tuple[str, str]:
+        matches = sorted((repo, path) for repo, path in robot_paths if isinstance(path, str) and path.endswith(suffix))
+        if len(matches) != 1:
+            raise ValueError(f"expected one pinned robot source ending {suffix!r}")
+        return matches[0]
+
+    robot_repo, robot_path = robot_source("robosuite/models/assets/robots/panda/robot.xml")
+    mount_repo, mount_path = robot_source("robosuite/models/assets/mounts/rethink_mount.xml")
+    gripper_repo, gripper_path = robot_source("robosuite/models/assets/grippers/panda_gripper.xml")
+    robot = read(robot_repo, robot_path, "mounted_panda_robot")
+    mount = read(mount_repo, mount_path, "rethink_mount")
+    gripper = read(gripper_repo, gripper_path, "panda_gripper")
+    _prefix_fragment_names(robot, "robot", preserve=frozenset({
+        "joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7",
+        "torq_j1", "torq_j2", "torq_j3", "torq_j4", "torq_j5", "torq_j6", "torq_j7",
+    }))
+    _prefix_fragment_names(mount, "mount")
+    _prefix_fragment_names(gripper, "gripper", preserve=frozenset({
+        "finger_joint1", "finger_joint2", "gripper_finger_joint1", "gripper_finger_joint2",
+        "right_gripper", "eef", "grip_site",
+    }))
+    robot_body = robot.find("worldbody/body")
+    mount_body = mount.find("worldbody/body")
+    gripper_body = gripper.find("worldbody/body")
+    if robot_body is None or mount_body is None or gripper_body is None:
+        raise ValueError("robot, mount and gripper fragments must each have a world root body")
+    robot_body.set("name", "panda_base")
+    # Attach the gripper at the source-defined right_hand end body.
+    hand = next((body for body in robot_body.iter("body") if body.get("name") == "robot__right_hand"), None)
+    if hand is None:
+        raise ValueError("pinned Panda XML has no right_hand gripper attachment body")
+    hand.append(gripper_body)
+    world = root.find("worldbody")
+    assert world is not None
+    world.append(mount_body)
+    world.append(robot_body)
+    for fragment in (robot, gripper):
+        _append_section(root, fragment, "asset")
+        _append_section(root, fragment, "actuator")
+    _append_section(root, mount, "asset")
+
+    # Stable output bytes: sorted attributes, fixed indentation and UTF-8 XML.
+    ET.indent(root, space="  ")
+    xml = ET.tostring(root, encoding="unicode", short_empty_elements=True) + "\n"
+    digest = _sha(xml.encode("utf-8"))
+    receipt = {
+        "schema_version": "libero-static-mjcf-composition-receipt-v1",
+        "source_files": sorted(source_rows, key=lambda row: (row["repository"], row["path"], row["role"])),
+        "semantic_body_map": semantic_to_body,
+        "resource_references": sorted(resources),
+        "output_sha256": digest,
+        "output_bytes": len(xml.encode("utf-8")),
+        "placement_status": "STATIC_XML_ONLY_UPSTREAM_BDDL_AND_SITE_SAMPLERS_NOT_EXECUTED",
+        "pruned_init_status": "NOT_DECODED_OR_MAPPED",
+    }
+    receipt["receipt_sha256"] = _sha(_canonical(receipt))
+    return xml, receipt
+
+
 def build_source_composition_plan(
     task_input: dict,
     manifest: dict,
@@ -236,13 +492,9 @@ def build_source_composition_plan(
     verification_receipt: dict,
     source_text_root: Path | None = None,
     source_text_receipt: dict | None = None,
+    compose_mjcf: bool = True,
 ) -> dict:
-    """Verify fixed install bytes and emit a deterministic, non-native plan.
-
-    The plan carries exact source identities and semantic object/fixture names.
-    Compiled MJCF names and output XML stay null until the upstream model
-    composition steps are implemented and independently checked.
-    """
+    """Verify source bytes and emit a deterministic static MJCF candidate."""
     if task_input.get("schema_version") != "libero-pilot-deployment-input-v1":
         raise ValueError("unsupported LIBERO pilot task input")
     manifest_sha = _sha(manifest_bytes)
@@ -385,9 +637,23 @@ def build_source_composition_plan(
         raise ValueError("active scene XML is not bound to the exact verified source bytes")
 
     source_resolution = manifest.get("source_resolution", {})
+    if type(compose_mjcf) is not bool:
+        raise TypeError("compose_mjcf must be bool")
+    composed_xml, composition_receipt = (
+        _compose_mjcf(task_input, manifest, payloads, Path(install_root).resolve(strict=True))
+        if compose_mjcf else (None, None)
+    )
+    if composition_receipt is not None:
+        semantic_body_map = composition_receipt["semantic_body_map"]
+        for row in semantic_rows:
+            row["compiled_body_name"] = semantic_body_map.get(row["instance_name"])
+            row["status"] = "STATIC_COMPOSITION_NAME_BOUND_NATIVE_ID_UNVERIFIED"
     composition = {
         "schema_version": _COMPOSITION_SCHEMA,
-        "status": "DECLARATION_ONLY_UPSTREAM_MERGE_NOT_EXECUTED",
+        "status": (
+            "STATIC_SOURCE_XML_COMPOSED_RUNTIME_PLACEMENT_NOT_EXECUTED"
+            if compose_mjcf else "SOURCE_BYTES_VERIFIED_COMPOSITION_SKIPPED"
+        ),
         "identity": {
             "task_uid": task_input["task_uid"],
             "manifest_id": manifest.get("manifest_id"),
@@ -431,24 +697,36 @@ def build_source_composition_plan(
                 "owner": "robosuite MountedPanda model composition",
                 "operation": "compose Panda + RethinkMount + PandaGripper with source torque-arm and signed finger-position actuators",
                 "robot_sources": [row for row in source_rows if row["repository"] == "robosuite"],
-                "compiled_joint_actuator_slots": None,
-                "status": "SOURCE_BYTES_BOUND_COMPILED_LAYOUT_UNVERIFIED",
+                "compiled_joint_actuator_slots": (
+                    [item.get("name") for item in task_input.get("native_reference", {}).get("robot", {}).get("actuators", ())]
+                    if composition_receipt is not None else None
+                ),
+                "status": "STATIC_MJCF_NAMES_BOUND_NATIVE_LAYOUT_UNVERIFIED" if composition_receipt is not None else "SOURCE_BYTES_BOUND_COMPILED_LAYOUT_UNVERIFIED",
             },
         ],
         "core_seam": {
-            "candidate_owner": "BaseTaskEnv TaskDefinitionBase.create_action_adapter and resolve_task_references",
-            "factory_route": "no LIBERO source composer/Scene-v3 RuntimeSource consumer is currently admitted by make_env",
-            "compiled_scene_xml_sha256": None,
-            "importable_by_task_env": False,
+            "candidate_owner": "BaseTaskEnv.compile_task_scene -> task-specific source composer -> TaskDefinitionBase.create_action_adapter",
+            "factory_route": "explicit internal LIBERO pilot candidate; no make_env UID or provider admission is registered",
+            "compiled_scene_xml_sha256": None if composition_receipt is None else composition_receipt["output_sha256"],
+            "importable_by_task_env": composition_receipt is not None,
             "core_native_admission_ready": False,
         },
         "output": {
-            "composed_mjcf_sha256": None,
+            "composed_mjcf_sha256": None if composition_receipt is None else composition_receipt["output_sha256"],
+            "composed_mjcf_bytes": None if composition_receipt is None else composition_receipt["output_bytes"],
+            "composition_receipt_sha256": None if composition_receipt is None else composition_receipt["receipt_sha256"],
             "compiled_scene_identity": None,
-            "status": "NOT_COMPOSED",
+            "status": "STATIC_XML_COMPOSED_NOT_NATIVE_COMPILED" if compose_mjcf else "NOT_COMPOSED_TEST_PREFLIGHT_ONLY",
         },
+        "composition_receipt": composition_receipt,
+        "semantic_to_compiled_body_names": {} if composition_receipt is None else composition_receipt["semantic_body_map"],
+        "mjcf_xml": composed_xml,
     }
-    composition["composition_plan_sha256"] = _sha(_canonical(composition))
+    # The deterministic plan binds the output hash and receipt. The XML itself
+    # is supplied separately to SceneSource and re-hashed at that boundary.
+    plan_projection = dict(composition)
+    plan_projection.pop("mjcf_xml")
+    composition["composition_plan_sha256"] = _sha(_canonical(plan_projection))
     return composition
 
 
@@ -458,9 +736,9 @@ def build_assembly(task_input: dict, manifest: dict) -> dict:
         "native_arena_xml": task_input["native_reference"]["active_scene_xml"],
         "source_manifest_id": manifest["manifest_id"],
         "asset_closure": manifest["asset_closure"],
-        "source_consumption": "R07c binds a deterministic verified-source composition declaration; upstream Python model merge is not replayed and no composed XML is emitted.",
-        "factory_owner": "task_env.registry.py::make_env has no admitted arbitrary LIBERO source-composition route",
-        "task_source_owner": "task_env/environment/task_source.py and task_env/assembly/source.py::TaskSceneSource; current source receipt is not extended for this LIBERO candidate",
+        "source_consumption": "A deterministic static MJCF candidate is composed from the verified active arena, object, fixture, Panda, mount and gripper XML sources; upstream BDDL/site placement and pruned-init realization remain unexecuted.",
+        "factory_owner": "bench_deploy.libero.core_candidate.build_libero_pilot_env explicitly constructs an internal BaseTaskEnv candidate; it is not registered with make_env",
+        "task_source_owner": "bench_deploy.libero.core_candidate.LiberoPilotSceneComposer -> task_env.assembly.compile_task_scene -> GeoPhys SceneSource",
         "reference_owner": "task_env/assembly/references.py::resolve_task_references",
         "runtime_source_owner": "task_env/runtime/sessions/source.py::RuntimeSource and ExecutionSourceReceiptV1",
         "core_native_admission_ready": False,

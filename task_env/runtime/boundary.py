@@ -248,6 +248,19 @@ class GeoPhysRuntimeBoundary:
         if request.site_jacobians and n_sites:
             site_jacp = self._physics.read_site_jacp()
             site_jacr = self._physics.read_site_jacr()
+        contact_summary = None
+        if request.contact_summary:
+            contact_reader = getattr(self._physics, "read_contact_summary", None)
+            if callable(contact_reader):
+                contact_summary = contact_reader()
+                if not isinstance(contact_summary, ContactSummary):
+                    raise TypeError(
+                        "public read_contact_summary() must return ContactSummary"
+                    )
+            else:
+                contact_summary = ContactSummary.unavailable(
+                    "provider_contact_pair_query_not_implemented"
+                )
         return RuntimeSnapshot(
             qpos=(
                 (
@@ -318,11 +331,7 @@ class GeoPhysRuntimeBoundary:
             ),
             site_jacp=site_jacp,
             site_jacr=site_jacr,
-            contact_summary=(
-                ContactSummary.unavailable("provider_contact_pair_query_not_implemented")
-                if request.contact_summary
-                else None
-            ),
+            contact_summary=contact_summary,
             simulation_time=(
                 self._simulation_time if request.simulation_time else None
             ),

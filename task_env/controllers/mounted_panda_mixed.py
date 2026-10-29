@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 from gymnasium.spaces import Box
 
-from ..environment.types import ControlCommand, RuntimeSnapshot
+from ..environment.types import ActionModeSpec, ControlCommand, RuntimeSnapshot
 
 
 _ARM_JOINTS = tuple(f"joint{i}" for i in range(1, 8))
@@ -295,18 +295,34 @@ class MountedPandaMixedActuatorAdapter:
         return self._action_space
 
     @property
-    def action_contract(self) -> dict[str, Any]:
+    def action_contract(self) -> ActionModeSpec:
+        """Return the typed Core action schema expected by ``BaseTaskEnv``."""
+        low = tuple(float(value) for value in self.mapping.joint_position_ranges_rad[:, 0]) + (0.0,)
+        high = tuple(float(value) for value in self.mapping.joint_position_ranges_rad[:, 1]) + (0.08,)
+        return ActionModeSpec(
+            schema_id="libero.mounted_panda_mixed_action.v1",
+            schema_version="task-env-action-v2",
+            controller_kind="absolute_joint",
+            reference=None,
+            rotation_representation=None,
+            components=(*self.mapping.joint_names[:7], "opening_m"),
+            low=low,
+            high=high,
+            joint_order=self.mapping.joint_names[:7],
+            gripper_convention="physical_opening_m",
+            backend_provenance="unqualified_mounted_panda_pd_torque_position_candidate",
+        )
+
+    @property
+    def action_profile(self) -> dict[str, Any]:
+        """Detailed candidate wiring separate from the Core action schema."""
         return {
-            "schema_version": "libero-mounted-panda-mixed-action-v1",
+            "schema_version": "libero-mounted-panda-mixed-control-profile-v1",
             "source_id": self.mapping.source_id,
-            "source_xml_sha256": self.mapping.source_xml_sha256,
+            "composed_mjcf_sha256": self.mapping.source_xml_sha256,
             "mapping_identity_sha256": self.mapping.identity_hash,
-            "layout": [*self.mapping.joint_names[:7], "opening_m"],
-            "units": [*(["rad"] * 7), "m"],
-            "outputs": {
-                "arm": {"actuator_names": list(self.mapping.actuator_names[:7]), "unit": "N*m", "law": "explicit_pd_candidate"},
-                "fingers": {"actuator_names": list(self.mapping.actuator_names[7:]), "unit": "m", "mapping": ["opening_m/2", "-opening_m/2"]},
-            },
+            "arm_actuators": {"names": list(self.mapping.actuator_names[:7]), "unit": "N*m", "law": "explicit_pd_candidate"},
+            "finger_actuators": {"names": list(self.mapping.actuator_names[7:]), "unit": "m", "mapping": ["opening_m/2", "-opening_m/2"]},
             "timebase": {"control_period_s": self.config.control_period_s, "physics_dt_s": self.config.physics_dt_s, "substeps": 25},
             "gain_status": self.config.gain_status,
             "provider_admission": "NOT_ADMITTED",

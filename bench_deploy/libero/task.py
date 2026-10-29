@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from task_env.environment.task_definition import (
@@ -29,13 +30,10 @@ PILOT_ACTIVE_SCENE_XML_SHA256 = (
 
 @dataclass(frozen=True)
 class LiberoPilotControlHookV1(TaskDefinitionBase):
-    """TaskDefinition extension candidate for one explicitly bound source.
+    """TaskDefinition extension candidate bound to the composed candidate MJCF.
 
-    This is not a registered Env or a public admission route. A future
-    LIBERO TaskDefinition can delegate its existing ``create_action_adapter``
-    hook here after a real Core source construction path is established.
-    Every physical identity and gain is supplied by the caller; there are no
-    production defaults.
+    It is not a registered public Env or provider-admission route. Physical
+    identity and unqualified gains remain explicit.
     """
 
     source_id: str
@@ -47,8 +45,9 @@ class LiberoPilotControlHookV1(TaskDefinitionBase):
     def __post_init__(self) -> None:
         if self.source_id != PILOT_SOURCE_ID:
             raise ValueError("LIBERO candidate source id differs from the frozen pilot manifest")
-        if self.source_xml_sha256 != PILOT_ACTIVE_SCENE_XML_SHA256:
-            raise ValueError("LIBERO candidate active-scene XML hash differs from the frozen pilot")
+        if (type(self.source_xml_sha256) is not str
+                or re.fullmatch(r"[0-9a-f]{64}", self.source_xml_sha256) is None):
+            raise ValueError("LIBERO candidate composed MJCF identity must be a SHA-256")
         if self.agent_uid != "libero-mounted-panda-v1":
             raise ValueError("LIBERO candidate requires the fixed MountedPanda Agent identity")
 

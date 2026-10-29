@@ -13,6 +13,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -144,6 +145,19 @@ def _git(repo: Path, *args: str, timeout: float = 20.0) -> str:
     return proc.stdout.decode("utf-8", "strict").strip()
 
 
+def _git_blob(repo: Path, revision_path: str) -> bytes:
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "blob", revision_path],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30.0,
+        check=False,
+    )
+    if proc.returncode:
+        raise ValueError("verified inherited ledger Git blob is unavailable")
+    return proc.stdout
+
+
 def _validate_commit(repo: Path, value: Any, field: str) -> str:
     if not isinstance(value, str) or not HEX40.fullmatch(value):
         raise ValueError(f"{field} must be a full lowercase Git SHA-1")
@@ -237,6 +251,88 @@ def _validate_unknown_fields(record: dict, fields: tuple[str, ...], label: str) 
     return any(_unknown_field(record, field) for field in fields)
 
 
+_INHERITED_COST_FIELDS = frozenset({"active_seconds", "tokens", "amount"})
+_INHERITED_ROW_FIELDS = frozenset({
+    "aggregation_id", "source_status", "upgraded", "cost_fields", "unknown_reasons",
+})
+
+
+def _validate_inherited_costs(root: Path, repo: Path, rows: Any) -> bool:
+    """Validate only the fixed v2.2 inherited ledger fields and provenance."""
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("inherited cost ledger requires explicit rows")
+    unknown = False
+    aggregation_ids = set()
+    for index, row in enumerate(rows):
+        label = f"inherited_costs[{index}]"
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} must be an object")
+        if set(row) not in (_INHERITED_ROW_FIELDS, _INHERITED_ROW_FIELDS | {"source_evidence"}):
+            raise ValueError(f"{label} field set is invalid")
+        aggregation_id = row.get("aggregation_id")
+        if type(aggregation_id) is not str or not aggregation_id.strip() or aggregation_id in aggregation_ids:
+            raise ValueError("inherited aggregation IDs must be unique nonempty tokens")
+        aggregation_ids.add(aggregation_id)
+        status = row.get("source_status")
+        if status not in {"verified", "unverified", "INVALID"}:
+            raise ValueError(f"{label}.source_status is invalid")
+        if type(row.get("upgraded")) is not bool:
+            raise ValueError(f"{label}.upgraded must be boolean")
+        if status == "INVALID" and row["upgraded"] is not False:
+            raise ValueError("historical INVALID evidence cannot be upgraded")
+        values, reasons = row.get("cost_fields"), row.get("unknown_reasons")
+        if not isinstance(values, dict) or set(values) != _INHERITED_COST_FIELDS:
+            raise ValueError(f"{label}.cost_fields must contain exactly {sorted(_INHERITED_COST_FIELDS)}")
+        if not isinstance(reasons, dict):
+            raise ValueError(f"{label}.unknown_reasons must be an object")
+        null_fields = {field for field, value in values.items() if value is None}
+        missing_reasons = null_fields - set(reasons)
+        if missing_reasons:
+            field = sorted(missing_reasons)[0]
+            raise ValueError(f"inherited {aggregation_id}.{field}=null requires a reason")
+        if set(reasons) != null_fields:
+            raise ValueError(f"{label}.unknown_reasons contains reasons for non-null cost fields")
+        for field, value in values.items():
+            if value is None:
+                reason = reasons.get(field)
+                if type(reason) is not str or not reason.strip():
+                    raise ValueError(f"inherited {aggregation_id}.{field}=null requires a reason")
+                unknown = True
+            elif field == "tokens":
+                if type(value) is not int or value < 0:
+                    raise ValueError(f"inherited {aggregation_id}.tokens must be a nonnegative integer")
+            elif isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise ValueError(f"inherited {aggregation_id}.{field} must be a finite nonnegative number")
+        source_evidence = row.get("source_evidence")
+        if status == "verified":
+            if not isinstance(source_evidence, dict) or set(source_evidence) != {"commit", "path", "sha256"}:
+                raise ValueError(f"verified inherited ledger {aggregation_id} requires source evidence")
+            digest = source_evidence.get("sha256")
+            if type(digest) is not str or not HEX64.fullmatch(digest):
+                raise ValueError(f"verified inherited ledger {aggregation_id} has an invalid source digest")
+            commit = _validate_commit(repo, source_evidence.get("commit"), f"{label}.source_evidence.commit")
+            rel = PurePosixPath(source_evidence.get("path", ""))
+            if rel.is_absolute() or ".." in rel.parts or not rel.parts or "\\" in str(rel):
+                raise ValueError(f"verified inherited ledger {aggregation_id} has an unsafe Git path")
+            source_bytes = _git_blob(repo, f"{commit}:{rel.as_posix()}")
+            if sha256_bytes(source_bytes) != digest:
+                raise ValueError(f"verified inherited ledger {aggregation_id} does not match its Git blob")
+            ledger = json.loads(source_bytes.decode("utf-8"), parse_constant=reject_constant, object_pairs_hook=unique_object)
+            if (not isinstance(ledger, dict)
+                    or set(ledger) != {"schema_version", "aggregation_id", "source_status", "cost_fields", "unknown_reasons"}
+                    or ledger.get("schema_version") != "r07-inherited-cost-ledger-v1"
+                    or ledger.get("aggregation_id") != aggregation_id
+                    or ledger.get("source_status") != "verified"
+                    or ledger.get("cost_fields") != values
+                    or ledger.get("unknown_reasons") != reasons):
+                raise ValueError(f"verified inherited ledger {aggregation_id} content differs from its bound Git blob")
+        elif source_evidence is not None:
+            raise ValueError(f"unverified inherited ledger {aggregation_id} cannot claim verified source evidence")
+        if status in {"unverified", "INVALID"} and any(value is not None for value in values.values()):
+            raise ValueError(f"{status} inherited ledger {aggregation_id} cannot contribute measured values")
+    return unknown
+
+
 def _load_prior_loc(prior_tool: Path, expected_sha256: str):
     if sha256_file(prior_tool) != expected_sha256:
         raise ValueError("prior cost LOC tool bytes differ from the session-bound SHA-256")
@@ -255,7 +351,13 @@ def _load_prior_loc(prior_tool: Path, expected_sha256: str):
 
 
 def validate_record(root: Path, repo: Path, input_path: Path, prior_tool: Path) -> dict:
-    input_data = strict_load(input_path)
+    input_bytes = input_path.read_bytes()
+    input_sha = sha256_bytes(input_bytes)
+    input_data = json.loads(
+        input_bytes.decode("utf-8"),
+        parse_constant=reject_constant,
+        object_pairs_hook=unique_object,
+    )
     if not isinstance(input_data, dict) or input_data.get("schema_version") != "r07-cost-continuation-input-v2_2":
         raise ValueError("unsupported cost continuation input schema")
     protocol_ref = input_data.get("protocol")
@@ -326,33 +428,7 @@ def validate_record(root: Path, repo: Path, input_path: Path, prior_tool: Path) 
         raise ValueError("prior INVALID issue semantics are not preserved")
 
     inherited_rows = input_data.get("inherited_costs")
-    if not isinstance(inherited_rows, list) or not inherited_rows:
-        raise ValueError("inherited cost ledger requires explicit rows")
-    inherited_unknown = False
-    aggregation_ids = set()
-    for index, row in enumerate(inherited_rows):
-        if not isinstance(row, dict):
-            raise ValueError(f"inherited_costs[{index}] must be an object")
-        aggregation_id = row.get("aggregation_id")
-        if type(aggregation_id) is not str or not aggregation_id.strip() or aggregation_id in aggregation_ids:
-            raise ValueError("inherited aggregation IDs must be unique nonempty tokens")
-        aggregation_ids.add(aggregation_id)
-        if row.get("source_status") not in {"verified", "unverified", "INVALID"}:
-            raise ValueError("inherited source status must preserve its actual evidence class")
-        values = row.get("cost_fields")
-        reasons = row.get("unknown_reasons")
-        if not isinstance(values, dict) or not isinstance(reasons, dict):
-            raise ValueError("inherited cost values and unknown reasons are required")
-        for field, value in values.items():
-            if value is None:
-                reason = reasons.get(field)
-                if not isinstance(reason, str) or not reason.strip():
-                    raise ValueError(f"inherited {aggregation_id}.{field}=null requires a reason")
-                inherited_unknown = True
-            elif isinstance(value, (int, float)) and not isinstance(value, bool) and value < 0:
-                raise ValueError(f"inherited {aggregation_id}.{field} cannot be negative")
-        if row.get("source_status") == "INVALID" and row.get("upgraded") is not False:
-            raise ValueError("historical INVALID evidence cannot be upgraded")
+    inherited_unknown = _validate_inherited_costs(root, repo, inherited_rows)
 
     session_facts = input_data.get("session_facts")
     if not isinstance(session_facts, dict):
@@ -391,6 +467,7 @@ def validate_record(root: Path, repo: Path, input_path: Path, prior_tool: Path) 
 
     result = {
         "schema_version": "r07-cost-continuation-result-v2_2",
+        "input_sha256": input_sha,
         "protocol": {"path": protocol_ref["path"], "sha256": protocol_hash, "version": "2.2.0"},
         "source_snapshot_root": input_data["source_snapshot_root"],
         "source_evidence": {

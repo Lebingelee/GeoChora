@@ -27,6 +27,7 @@ from task_env.environment import ReferenceSpec
 from task_env.environment.task_definition import TaskDefinitionBase
 from task_env.controllers.mounted_panda_mixed import MountedPandaServoConfigV1
 from task_env.environment import (
+    ActionModeSpec,
     ContactSummary,
     EpisodePhysicsState,
     RuntimeSnapshot,
@@ -171,8 +172,9 @@ def test_taskdefinition_hook_resolves_real_task_references_and_emits_mixed_contr
     assert command.actuator_ctrl[8] == pytest.approx(-0.02)
     assert command.requested_action.shape == (8,)
     assert command.action_clipped is False
-    assert adapter.action_contract["provider_admission"] == "NOT_ADMITTED"
-    assert adapter.action_contract["timebase"] == {
+    assert isinstance(adapter.action_contract, ActionModeSpec)
+    assert adapter.action_profile["provider_admission"] == "NOT_ADMITTED"
+    assert adapter.action_profile["timebase"] == {
         "control_period_s": 0.05,
         "physics_dt_s": 0.002,
         "substeps": 25,
@@ -324,7 +326,7 @@ def test_candidate_gains_must_be_explicit_real_values_and_native_timebase():
         )
 
 
-def test_wrong_source_or_active_scene_hash_is_rejected_before_binding():
+def test_wrong_source_or_malformed_composed_mjcf_hash_is_rejected_before_binding():
     with pytest.raises(ValueError, match="frozen pilot manifest"):
         LiberoPilotControlHookV1(
             source_id="libero-pilot-candidate:" + "0" * 64,
@@ -335,10 +337,10 @@ def test_wrong_source_or_active_scene_hash_is_rejected_before_binding():
                 kd_Nm_s_per_rad=(0.1,) * 7,
             ),
         )
-    with pytest.raises(ValueError, match="active-scene XML hash"):
+    with pytest.raises(ValueError, match="composed MJCF identity"):
         LiberoPilotControlHookV1(
             source_id=PILOT_SOURCE_ID,
-            source_xml_sha256="0" * 64,
+            source_xml_sha256="0" * 63,
             agent_uid="libero-mounted-panda-v1",
             servo_config=MountedPandaServoConfigV1(
                 kp_Nm_per_rad=(1.0,) * 7,
@@ -426,6 +428,53 @@ def test_runtime_boundary_reports_unimplemented_contact_query_as_unavailable():
     )
     assert snapshot.contact_summary.status == "unavailable"
     assert snapshot.contact_summary.reason == "provider_contact_pair_query_not_implemented"
+
+
+def test_runtime_boundary_consumes_only_typed_public_contact_query():
+    class PublicContactReader:
+        n_qpos = n_dof = n_actuators = n_sites = 0
+
+        def __init__(self, result):
+            self.result = result
+
+        def snapshot(self):
+            return {}
+
+        def restore(self, _state):
+            return None
+
+        def synchronize_kinematic_state(self, *, update_site_jacobians):
+            assert update_site_jacobians is False
+
+        def read_contact_summary(self):
+            return self.result
+
+    empty = np.empty(0, dtype=np.float32)
+    initial = EpisodePhysicsState(qpos=empty, qvel=empty, qacc=empty, ctrl=empty, act=empty)
+    boundary = GeoPhysRuntimeBoundary(
+        physics=PublicContactReader(ContactSummary.available({"bowl/plate": 2})),
+        scheduler=None,
+        physics_dt=0.002,
+        ctrl_range=np.empty((0, 2), dtype=np.float32),
+        initial_state=initial,
+    )
+    snapshot = boundary.read_snapshot(
+        SnapshotRequest(qacc=False, ctrl=False, body_pose=False, site_pose=False, contact_summary=True)
+    )
+    assert snapshot.contact_summary.status == "available"
+    assert dict(snapshot.contact_summary.pair_counts) == {"bowl/plate": 2}
+
+    boundary = GeoPhysRuntimeBoundary(
+        physics=PublicContactReader({"bowl/plate": 2}),
+        scheduler=None,
+        physics_dt=0.002,
+        ctrl_range=np.empty((0, 2), dtype=np.float32),
+        initial_state=initial,
+    )
+    with pytest.raises(TypeError, match="must return ContactSummary"):
+        boundary.read_snapshot(
+            SnapshotRequest(qacc=False, ctrl=False, body_pose=False, site_pose=False, contact_summary=True)
+        )
 
 
 def test_unavailable_contact_summary_cannot_hide_counts_or_invalid_schema():
@@ -517,12 +566,12 @@ def test_source_composition_plan_is_deterministic_and_rejects_changed_install_by
     first = build_source_composition_plan(
         task_input, manifest, task_input_bytes=task_input_bytes,
         manifest_bytes=manifest_bytes, install_root=install,
-        verification_receipt=receipt,
+        verification_receipt=receipt, compose_mjcf=False,
     )
     second = build_source_composition_plan(
         task_input, manifest, task_input_bytes=task_input_bytes,
         manifest_bytes=manifest_bytes, install_root=install,
-        verification_receipt=receipt,
+        verification_receipt=receipt, compose_mjcf=False,
     )
     assert first["composition_plan_sha256"] == second["composition_plan_sha256"]
     assert first["output"]["composed_mjcf_sha256"] is None
@@ -540,7 +589,7 @@ def test_source_composition_plan_is_deterministic_and_rejects_changed_install_by
         build_source_composition_plan(
             task_input, manifest, task_input_bytes=task_input_bytes,
             manifest_bytes=manifest_bytes, install_root=install,
-            verification_receipt=forged_receipt,
+            verification_receipt=forged_receipt, compose_mjcf=False,
         )
 
     (install / "upstream/libero/libero/assets/bowl.xml").write_bytes(b"bowl changed")
@@ -548,5 +597,123 @@ def test_source_composition_plan_is_deterministic_and_rejects_changed_install_by
         build_source_composition_plan(
             task_input, manifest, task_input_bytes=task_input_bytes,
             manifest_bytes=manifest_bytes, install_root=install,
-            verification_receipt=receipt,
+            verification_receipt=receipt, compose_mjcf=False,
         )
+
+
+def test_static_mjcf_composition_namespaces_instances_and_binds_exact_output_hash(tmp_path):
+    from bench_deploy.libero.assembly import build_source_composition_plan
+
+    install = tmp_path / "install"
+    sources = {
+        ("libero", "libero/libero/assets/scenes/arena.xml"): b'<mujoco model="arena"><worldbody><body name="table"/></worldbody></mujoco>',
+        ("libero", "libero/libero/assets/objects/bowl.xml"): b'<mujoco model="bowl"><worldbody><body name="object"><freejoint/><geom name="bowl_geom" type="sphere" size=".03"/></body></worldbody></mujoco>',
+        ("robosuite", "robosuite/models/assets/robots/panda/robot.xml"): (
+            b'<mujoco model="panda"><worldbody><body name="base"><body name="right_hand"/></body></worldbody><actuator>'
+            + b"".join(f'<motor name="torq_j{i}" joint="joint{i}" ctrlrange="-80 80"/>'.encode() for i in range(1, 8))
+            + b'</actuator></mujoco>'
+        ),
+        ("robosuite", "robosuite/models/assets/mounts/rethink_mount.xml"): b'<mujoco model="mount"><worldbody><body name="base"/></worldbody></mujoco>',
+        ("robosuite", "robosuite/models/assets/grippers/panda_gripper.xml"): (
+            b'<mujoco model="gripper"><worldbody><body name="right_gripper"><site name="grip_site"/><body name="eef">'
+            b'<body name="leftfinger"><joint name="finger_joint1" type="slide"/></body>'
+            b'<body name="rightfinger"><joint name="finger_joint2" type="slide"/></body>'
+            b'</body></body></worldbody><actuator>'
+            b'<position name="gripper_finger_joint1" joint="finger_joint1" ctrlrange="0 .04"/>'
+            b'<position name="gripper_finger_joint2" joint="finger_joint2" ctrlrange="-.04 0"/>'
+            b'</actuator></mujoco>'
+        ),
+    }
+    file_rows = []
+    for (repository, source_path), data in sources.items():
+        install_path = f"upstream/{repository}/{source_path}"
+        target = install / install_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        file_rows.append({
+            "repository": repository,
+            "source_path": source_path,
+            "install_path": install_path,
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "size_bytes": len(data),
+        })
+    selected = [
+        {"repository": repo, "path": path, "sha256": hashlib.sha256(data).hexdigest()}
+        for (repo, path), data in sources.items()
+    ]
+    manifest = {
+        "manifest_id": "r07c-composition-test-v1",
+        "source_revisions": {"libero": "1" * 40, "robosuite": "2" * 40},
+        "asset_closure": {"sha256": "c" * 64, "files": []},
+        "selected_xml_sources": selected,
+        "source_code_references": [],
+        "source_resolution": {"scene_style_properties": {}, "scene_style_rewrite_rules": []},
+        "files": file_rows,
+        "task": {
+            "task_uid": PILOT_TASK_UID,
+            "type_to_source_and_xml": {
+                "bowl": {"asset_source": "libero/libero/assets/objects/bowl.xml", "class": "Bowl"},
+                "table": {"owner_source": "libero/libero/envs/arenas/table_arena.py", "class": None, "xml_source": "robosuite/models/assets/arenas/table_arena.xml"},
+            },
+            "objects_instance_to_type": {"bowl_1": "bowl", "bowl_2": "bowl"},
+            "fixtures_instance_to_type": {"main_table": "table"},
+        },
+    }
+    manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    task_input = {
+        "schema_version": "libero-pilot-deployment-input-v1",
+        "task_uid": PILOT_TASK_UID,
+        "source_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "native_reference": {
+            "active_scene_xml": {
+                "repository": "libero", "path": "libero/libero/assets/scenes/arena.xml",
+                "sha256": hashlib.sha256(sources[("libero", "libero/libero/assets/scenes/arena.xml")]).hexdigest(),
+            },
+            "robot": {"actuators": [{"name": f"torq_j{i}"} for i in range(1, 8)]},
+        },
+    }
+    task_input_bytes = json.dumps(task_input, sort_keys=True, separators=(",", ":")).encode()
+    unsigned_receipt = {
+        "schema_version": "libero-pilot-source-verify-receipt-v1",
+        "status": "VERIFIED_INDEPENDENT_REREAD",
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "manifest_id": manifest["manifest_id"],
+        "asset_closure_sha256": "c" * 64,
+        "task_uid": PILOT_TASK_UID,
+        "file_count": len(file_rows),
+        "asset_file_count": 0,
+        "asset_bytes": 0,
+        "total_bytes": sum(row["size_bytes"] for row in file_rows),
+        "payload_files": [
+            {key: row[key] for key in ("install_path", "sha256", "size_bytes")}
+            for row in file_rows
+        ],
+    }
+    verification = dict(unsigned_receipt)
+    verification["result_sha256"] = hashlib.sha256(
+        json.dumps(unsigned_receipt, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    first = build_source_composition_plan(
+        task_input, manifest,
+        task_input_bytes=task_input_bytes,
+        manifest_bytes=manifest_bytes,
+        install_root=install,
+        verification_receipt=verification,
+    )
+    second = build_source_composition_plan(
+        task_input, manifest,
+        task_input_bytes=task_input_bytes,
+        manifest_bytes=manifest_bytes,
+        install_root=install,
+        verification_receipt=verification,
+    )
+    xml = first["mjcf_xml"]
+    assert xml == second["mjcf_xml"]
+    assert first["output"]["composed_mjcf_sha256"] == hashlib.sha256(xml.encode()).hexdigest()
+    assert first["composition_receipt"]["semantic_body_map"] == {
+        "bowl_1": "bowl_1", "bowl_2": "bowl_2", "main_table": "main_table",
+    }
+    assert 'name="bowl_1"' in xml and 'name="bowl_2"' in xml
+    assert 'name="mount__base"' in xml and 'name="panda_base"' in xml
+    assert 'name="gripper_finger_joint1"' in xml
+    assert first["core_seam"]["compiled_scene_xml_sha256"] == first["output"]["composed_mjcf_sha256"]
