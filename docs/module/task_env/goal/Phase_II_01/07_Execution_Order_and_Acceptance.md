@@ -1,7 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前入口（2026-10-29）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02仍HELD且未启动，等待单独冻结工作包；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
-当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。F01 attempt002两次启动的0-step失败保持原样；attempt003在Isaac Sim 6.2.0.0、官方Panda+0.08 kg刚体、`cuda:0`/GPU dynamics下完成两轮，486 physics steps/4.05 simulated seconds，worker exit 0，32项独立reader和20项定向S1全部通过，资源/锁预算未超。该接收只覆盖记录的有界配方，不表示Core Isaac provider、当前Panda导入或Qualification。F02未启动。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。详见10当前分工。
+当前入口（2026-10-29）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02 attempt001已完成本地实现、定向S1及合成USD公开解析，候选待Sol复核；F03未启动；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
+当前集成分支为`develop-full`，既有camera/compatibility分支独立保留。F01 attempt002两次启动的0-step失败保持原样；attempt003在Isaac Sim 6.2.0.0、官方Panda+0.08 kg刚体、`cuda:0`/GPU dynamics下完成两轮，486 physics steps/4.05 simulated seconds，worker exit 0，32项独立reader和20项定向S1全部通过，资源/锁预算未超。该接收只覆盖记录的有界配方，不表示Core Isaac provider、当前Panda导入或Qualification。F02 attempt001本地候选已完成，待Sol复核；未获Sol接收前不推进F03。Luna2在R04c已接收的工作树执行R06b attempt001；R05a正式合同与历史missing raw/phase decision仍阻塞对应总gate。详见10当前分工。
 R03c attempt004的精确MuJoCo CPU S2/S3为`ACCEPTED_BOUNDED_S2_S3`，原receipt与attempt001–003失败原件保留。
 各原 slice 的当前状态以下表/manifest 为准，不能使用早期“R02a等待复核”等签署时点摘要覆盖后续接收记录。
 原 7父Goal/22切片建议 DAG 与 Required Envelope 保留，不继承 Phase II 的 PASS；总体最终批准与各 slice 已有明确授权分开。
@@ -219,3 +219,5 @@ R07a attempt003 Sol复核：有界v2.1成本协议技术修正/S1接收并冻结
 2026-10-29维护者重新分工：两位Luna均已完整返回，Sol先复核R07a004的71项输出，完整五任务仍缺三组TurboSquid来源记录；按维护者明确选择，单任务LIBERO pilot先行，原五任务/P99不自动缩减。Luna1仅执行F00–F07，下一包F00接收回读+F01 attempt002；Luna2复用camera分支扩展到独立R06b，下一包R06b attempt001。总共两个活动阶段checkout，不新建分支；代码/文档各自单写入，native使用同一排他锁，完成一包交Sol复核后才推进后继。R04c接收commit为camera的4d27651，未合入develop-full；原接收可引用，但不冒称主分支已有该差异。
 
 2026-10-29 F01 attempt002：输入HEAD `552c43aab8641608c64781fe5f6e6bfca38481a6`，实现提交 `015e620`、`5deeadb`、`5904f8e`；隔离Isaac metadata、pip check与11项provider-free S1通过，官方6.2.0.0安装源码/API/资产配方已核对。首次App进程在Kit内核启动时因EULA未接受而退出；receipt记为`app_start/SystemExit`、0 physics steps、无资源中止或超时，锁已释放。第二次启动只在维护者确认已接受EULA后执行；当前F01保持未完成，F02 HELD，Sol尚未复核。
+
+2026-10-29 F02 attempt001 Luna候选：冻结输入HEAD `1632a11774d817f2ebe36198bbc40a74e7f36974`，核心实现提交`9acd7a8`、S1/import-context修正`c12578d`与catalog category修正`99dc62a`。定向provider-free S1 24项、旧asset identity回归19项通过；独立进程读回最终合成6文件USD delivery/report/closure并通过。GeoPhys pinned public USD importer从该输入source-only导入成功；MuJoCo 3.8.1实际decoder probe拒绝USD且没有物理步进，resolver显式拒绝该native表示。首次遗漏`pxr`搜索路径的GeoPhys重放失败原件保留，补正确环境后新run通过。无真实官方Panda bytes/上游report，无Isaac App/native physics、H5或Expert运行。状态`F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW`，未视为Sol接收；F03及其他slice未启动。细节、失败账本与Evidence入口见[10 F02 attempt001](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution)。

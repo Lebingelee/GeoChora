@@ -142,6 +142,52 @@ manifest admission、native materialization 或 reset realization。Selected-ref
 | `RecorderConfig`, `TransitionRecorder`, `TransitionRecordWrapper` | `task_env.recorders` | 既有录制 contract；selected examples 使用 selected env 自有录制入口 |
 | `TransitionRecordWrapper.stop`, `load_structured_training_episode_h5` | `task_env.recorders` | v3 wrapper 仅接受显式声明 typed structured controls 的 Env；Stop 写入已有 Event/Outcome，训练读取返回原始 transition flags 与 final end/bootstrap 分离字段。v2 活跃记录 Stop/close、vector Stop、没有 structured action 的普通 TaskEnv v3 wrapper 明确拒绝 |
 
+<a id="usd-delivery-and-provider-representation-selection-f02"></a>
+
+### USD delivery and provider representation selection (F02)
+
+`task_env.artifacts` exports the strict values `UsdDeliveryFileV1`, `UsdValidationReportV1`,
+`UsdAssetDeliveryV1`, and `ProviderRepresentationSelectionV1`. The loader and resolver are owned by
+`task_env.assembly`:
+
+```python
+from task_env.assembly import load_usd_asset_delivery, resolve_provider_representation
+
+delivery = load_usd_asset_delivery("workspace/delivery/delivery.json")
+selection = resolve_provider_representation(
+    delivery,
+    provider="geophys",
+    provider_build_identity="geophys:a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+)
+assert not selection.runtime_admitted
+```
+
+The delivery keeps the original `AssetDefinition` identity and binds a portable entry path/prim,
+explicit variants, file size/SHA-256 manifest, the `usd-authored-all-dependencies-v1` closure digest,
+and the exact validation-report bytes. OpenUSD `UsdUtils.ComputeAllDependencies` checks layers and
+asset-valued dependencies across authored variant branches. The loader rejects unsupported USDZ,
+remote/custom resolver paths, symlinks, traversal, missing dependencies, stale bytes and report/link
+mismatches. `source_verified`, representation preparation, format match and `runtime_admitted` are
+separate facts. A synthetic fixture requires the explicit test-only `allow_synthetic=True`; it cannot
+pass the production upstream-validated gate. Report binding checks its declared provenance and exact
+bytes but does not cryptographically authenticate an issuing organization.
+
+The catalog consumer exposes `--asset-delivery` and `--asset-provider-build`; delivery records remain
+in the separate `asset_deliveries` namespace and are not converted to the legacy synthetic
+`external_assets` box bundle. The old asset checker/compiler continue to reject a USD delivery as a
+mock box template. The CLI `python -m task_env.assembly.usd_delivery_cli` returns exit 0 for inspection,
+1 for a rejected input and 2 for an output-report write failure.
+
+The bounded F02 attempt001 implementation passed 24 targeted provider-free tests and 19 legacy asset
+identity tests. Its saved six-file synthetic fixture composed through OpenUSD and the GeoPhys public
+`SceneSource.usd_path` importer; the independent process re-read the exact manifest, report and bytes,
+including five dependency layers and one external asset. GeoPhys remains source import only here;
+this is not a physics/runtime result. Isaac 6.2.0 selects native USD as a representation but is not
+runtime-admitted. The inspected MuJoCo 3.8.1 build rejected the USD decoder route, so it is explicitly
+not selected; no silent MJCF fallback or general USD-to-MJCF converter is provided. No real official
+Panda delivery or upstream validation report was available, and F03/F04/F05 and Qualification remain
+unverified. The attempt is pending Sol review; see the [Phase II-01 F02 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f02-attempt001-usd-delivery-and-representation-resolution).
+
 ### Static Logical Assembly value (R01a)
 
 ```python

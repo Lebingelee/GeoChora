@@ -46,6 +46,14 @@ procedural source 还可声明 generator ID/version 与规范化 scalar 参数�
 同一受控输入快照的 Source Closure Digest（文件依赖按逻辑相对路径和精确字节摘要，或 procedural 生成内容摘要）
 及 provider/importer-scoped identity。当前 public importer 未导出逐文件消费哈希，因此 Core 侧摘要仅在输入快照被
 固定并验证后才能声称绑定到该次导入；GeoPhys 的 source/IR hash 仍是 provider 自有身份，不能替代来源字节摘要。
+F02 在同一 `AssetDefinition` 之上增加了独立版本化 `UsdAssetDeliveryV1`，不改变既有声明字段或 identity。
+需分别保存 `AssetDefinition.identity_hash`（来源声明）、entry-file SHA-256（入口字节）、Source Closure
+Digest（entry 与所有 authored branch 的 layer/asset 文件）、delivery SHA-256（完整交付 mapping）和验证报告
+SHA-256（报告文件字节）。报告还绑定 source revision、entry prim、variants、representation 和输入/输出 closure；
+这些绑定可验证报告是否针对当前 delivery，但不对报告签发者做密码学认证。synthetic fixture 只验证消费合同，
+必须显式 opt in，不能作为生产 `source_verified`。表示选择也单独记录格式匹配、source 验证、可准备表示与
+runtime admission；本次 F02 均未准入 runtime。MJCF `TaskSceneSource`、旧资产 identity 和当前 RuntimeSource
+不变；USD 不塞入 XML 字段，也不因此扩张 MJCF-only execution route。
 Phase II A02 的 `scene-definition-v2` 在同一 `SceneDefinition` owner 下补充 entity-qualified authored fixed
 frames、runtime body/link anchors 与 Articulation/Joint 静态拓扑；`scene-definition-v1` 的 codec、mapping 与 hash
 保持原样。Frame composition 只解析有足够 authored transform 的路径；动态 link pose 留给 D02 canonical state。

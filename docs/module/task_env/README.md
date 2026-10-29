@@ -8,6 +8,7 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | --- | --- |
 | 构造任务、public imports、配置分支与失败行为 | [public-api](public-api.md) |
 | 冻结任务、Experiment、randomization、Evidence/Judge | [task-artifact](task-artifact.md) |
+| USD delivery、依赖闭包与 Provider 表示选择（F02 advanced） | [public-api: USD delivery](public-api.md#usd-delivery-and-provider-representation-selection-f02) |
 | runtime/state/timebase、controller、Expert lifecycle、providers | [runtime-and-providers](runtime-and-providers.md) |
 | recorder/H5/replay、learning、rendering | [recording-and-learning](recording-and-learning.md) |
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
@@ -82,3 +83,5 @@ Expert completion 和 termination/truncation 分开报告。具体数值、设�
 
 [模块 Skill](../../../.agents/skills/geochora-task-env/SKILL.md)提供 Agent 操作路由；
 [API reference](../../../task_env/doc/api/index.md)提供符号级细节，后者不是第二份能力矩阵。
+USD delivery loader 是独立的 advanced source intake：它绑定精确交付 bytes 和上游验证报告，不能替代
+MJCF-only `RuntimeSource`，也不自动授予任一 Provider 的 runtime admission。

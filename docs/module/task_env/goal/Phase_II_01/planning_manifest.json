@@ -1856,13 +1856,13 @@
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "1d795f387c0e8a6bcfad2accbf1e5052069201e34910bb8cd014f7a7953d12ba",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "4fb731bde92e56f856c3f123f0e15505c0801aebb8da1040ec389e4f60687caf",
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "078ae90490a19c1bdb68af82684563928a0002aecb2460b7f04dab2f08f2df3b"
+    "07_Execution_Order_and_Acceptance.md": "28b1290baa4d685c379e4d048be7557b6537f3d1f75155cb203cb493de516d95"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {
@@ -4522,7 +4522,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_HELD_NOT_STARTED",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ATTEMPT001_IMPLEMENTED_S1_AND_SOURCE_IMPORT_PENDING_SOL_REVIEW",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4610,7 +4610,16 @@
           "F00"
         ],
         "work": "consume validated USD delivery/source/closure/report; resolve MuJoCo USD execution route",
-        "external_gate": "fixed official asset/API recipe; F01 samples reusable, F01 native PASS not a prerequisite"
+        "external_gate": "fixed official asset/API recipe; F01 samples reusable, F01 native PASS not a prerequisite",
+        "latest_attempt": "F02 attempt001",
+        "latest_result": "F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW",
+        "implementation_commits": [
+          "9acd7a8c08cb150221dd53a70abc8e7ac2595bef",
+          "c12578deba177a07fc2f2869850a4d31a5ef0cd2",
+          "99dc62a6efe296f42dcddfad6f9aaa114c91361a"
+        ],
+        "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_001/report.md",
+        "limits": "No official validated Panda delivery; no runtime admission, Isaac App, native physics, H5, Expert, F03 or later slice."
       },
       {
         "id": "F03",
@@ -4655,7 +4664,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for the exact attempt003 CUDA GPU PhysX recipe; F02 held and not started pending a separately frozen package.",
+    "patch_rows_status": "F00 accepted bounded; F01 accepted bounded for the exact attempt003 CUDA GPU PhysX recipe; F02 attempt001 bounded delivery/resolver and actual source-import candidate complete, pending Sol review.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -4744,6 +4753,19 @@
         "maintainer_request": "Continue F01 acceptance; future Isaac Sim defaults to CUDA; prepare F01 closeout.",
         "scope": "Review frozen attempt003 evidence, replay the exact offline reader and targeted S1, update F01 execution records, and make local commits; no new Isaac App or native run; do not start F02.",
         "native_starts_this_review": 0,
+        "push_merge_main_tag_release": false
+      },
+      {
+        "date": "2026-10-29",
+        "slice": "F02 attempt001",
+        "authorized": true,
+        "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f02_001/luna1_prompt.md",
+        "prompt_sha256": "4612d45840ed11fab57b664e46f67f0f268aad728ad55348110198f8f08d1a3f",
+        "input_head": "1632a11774d817f2ebe36198bbc40a74e7f36974",
+        "scope": "strict USD delivery/report contracts, byte-bound OpenUSD authored-dependency closure, provider representation resolver, real Core catalog consumer, targeted S1, bounded source/decoder probes, current docs/Skill, local commits; no F03 or later slice",
+        "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f02_001/report.md",
+        "result": "F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW",
+        "other_slices_started": false,
         "push_merge_main_tag_release": false
       }
     ],
@@ -4856,7 +4878,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "F02 may proceed only in a separately frozen package; it was not started by this F01 closeout.",
+      "selected_next": "F02 attempt001 candidate complete; await Sol review before selecting any next slice.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -4867,10 +4889,11 @@
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
-      "F02": "HELD_NOT_STARTED; separate frozen package required",
-      "reason": "Maintainer authorized F01 attempt003 acceptance and local closeout. No subsequent slice was included in this authorization.",
+      "F02": "F02_BOUNDED_DELIVERY_RESOLVER_PASS_PENDING_SOL_REVIEW; implementation/source-only checks complete; no runtime admission; F03 not started.",
+      "reason": "Maintainer-authorized self-contained F02 attempt001 package completed by Luna; Sol review is the next handoff and no subsequent slice is authorized before review.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
-      "F07": "later extension; not required before camera"
+      "F07": "later extension; not required before camera",
+      "F03": "NOT_STARTED_PENDING_SOL_REVIEW_OF_F02"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",

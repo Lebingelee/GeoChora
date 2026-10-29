@@ -34,6 +34,19 @@ example in [Public API](../../../docs/module/task_env/public-api.md#bounded-logi
 This static contract does not change selected runtime routes or their supported
 capability envelope.
 
+## USD delivery and representation selection (F02)
+
+Use the `task_env.artifacts` strict `UsdAssetDeliveryV1` / `UsdValidationReportV1`
+values with `task_env.assembly.load_usd_asset_delivery()` and
+`resolve_provider_representation()` for byte-bound USD source intake. Preserve
+the original `AssetDefinition`; keep entry bytes, all-authored-branch closure,
+delivery mapping, and report hashes distinct. Synthetic fixtures require an
+explicit test opt-in and never establish upstream verification. The resolver
+separates format matching, verified-source status, representation preparation,
+and runtime admission. It does not connect USD to MJCF-only `RuntimeSource` or
+admit Isaac, GeoPhys, or MuJoCo execution. See the [F02 public API route](../../../docs/module/task_env/public-api.md#usd-delivery-and-provider-representation-selection-f02)
+and the detailed [source map](references/routes.md).
+
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
 from current inputs, then associates each expanded leaf with one existing
