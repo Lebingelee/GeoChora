@@ -1784,12 +1784,12 @@
         "R02c",
         "R03b"
       ],
-      "status": "PARTIAL_E1_ACCEPTED_REWORK_REQUIRED",
-      "execution": "ATTEMPT001_S1_AND_EXACT_SOURCE_S2_ACCEPTED; ATTEMPT002_S1_PASS; E1_NATIVE_PASS; E2_NATIVE_NOT_MATERIALIZED; NO_RETRY",
+      "status": "BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW",
+      "execution": "ATTEMPT003_S1_PASS; RUN001_DUAL_CASE_NATIVE_COMPLETED_RAW_READBACK_FAILED_DIAGNOSED; RUN002_SAME_WORKER_E1_E2_NATIVE_AND_INDEPENDENT_RAW_READBACK_PASS_PENDING_SOL_REVIEW",
       "required_evidence": "S1/S2",
-      "stop_condition": "Attempt002 sole native start is spent. E1 baseline passed; E2 failed before underlying materialization due nested worker counter instrumentation. Re-evaluate before any attempt003; physical-order S2/S3 remains incomplete.",
-      "result": "Attempt001 partial S1/exact-source reuse remains accepted. Attempt002 implemented one deterministic Arm actuator/Hand finger source-order recipe and passed the selected provider-free S1 set (202 passed). The sole MuJoCo worker completed baseline E1 (64/65 H5, 320 steps, motion/close/strict production reader); the worker then rejected E2 before underlying materialization because the per-case instrumentation wrapper was nested and double-counted. E1 raw H5 was independently read after lock release; E2 has no receipt/H5/native evidence. No retry. R06b physical-order gate remains blocked; historical raw/phase disposition remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION.",
-      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_002/report.md",
+      "stop_condition": "Sol reviews the implementation diff and exact run evidence before acceptance. Historical raw/phase disposition remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION; do not advance R06c/P99 or infer general Provider/source compatibility.",
+      "result": "Attempt003 resumed under the maintainer-corrected execution window. Provider-free S1 passed 249 checks. Run001 physically completed E1/E2 but its independent reader rejected missing per-case episode_id; the defect was fixed, complete S1 rerun, and fresh run002 passed both E1/E2 in one MuJoCo 3.8.1 CPU worker with production H5 and independent same-run raw readback. The bounded order-regression result is pending Sol review. Historical raw/phase disposition remains BLOCKED_MISSING_RAW_OR_PHASE_DECISION; R05 remains blocked, R06c/P99 and Qualification are not closed.",
+      "evidence_local_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/report.md",
       "attempt001": {
         "input_head": "2ed1ed5218b397d80bf062fc305fe166ebf9f410",
         "branch": "codex/phase-ii-01-camera",
@@ -1916,30 +1916,173 @@
         "global_articulation_v1_change": "NOT_ACCEPTED"
       },
       "attempt003_plan": {
-        "status": "PAUSED_FOR_MAINTAINER_CONTRACT_CORRECTION",
+        "active_seconds_remaining": 9424,
+        "active_seconds_used_before_pause": 1376,
         "attempt": 3,
         "attempt_limit": 3,
-        "thread_id": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
-        "planning_anchor": "06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment",
+        "attempt_output_bytes_max": 1073741824,
         "expected_minutes": [
           90,
           180
         ],
         "feasibility": "FEASIBLE_WITH_BOUNDED_REWORK; derived physical outcome unknown",
-        "max_outer": 128,
-        "max_mj_step": 640,
         "historical_disposition": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
-        "reader_repair": "Rehash contract; exact native result case set/file SHA/receipt/materialization/counter joins; cross-run negatives",
-        "native_workers_per_run_max": 1,
+        "implementation_commits": [
+          "1394434749da73ecd1cfa1e1f5f15eca69b61679",
+          "1bd46c6aed2659e294d2c9189580d624e53ced95",
+          "381f33aaa7e078a1016f40a2bf146e6f07039da2",
+          "2ef68e65046d087fd70a5a9f6e6e18939cb123f3",
+          "7822fb75604955da0d72308a1e891a510674c5ab",
+          "3737ca012468d73ec78c68e05d5e03a77da3a02a",
+          "d3ea90cd492648ae99b371c6eca35af8a4660d70",
+          "f6668e2c711d06bea783844ed485379fa9a9f4b2",
+          "03fba40873e651b0831ed040fec93ea12655642c"
+        ],
+        "implementation_head": "03fba40873e651b0831ed040fec93ea12655642c",
+        "maintainer_correction_anchor": "06_R06_Compatibility_and_Regression.md#r06b-attempt003-maintainer-window-correction",
+        "max_mj_step": 640,
+        "max_outer": 128,
         "native_runs_within_window": "repeat after diagnosed in-scope repairs and frozen per-run inputs; no default single-start cap",
-        "active_seconds_used_before_pause": 1376,
-        "active_seconds_remaining": 9424,
-        "per_run_output_bytes_max": 268435456,
-        "attempt_output_bytes_max": 1073741824,
-        "paused_head": "d3ea90cd492648ae99b371c6eca35af8a4660d70",
-        "s1_invocations_before_pause": 7,
         "native_starts_before_pause": 0,
-        "maintainer_correction_anchor": "06_R06_Compatibility_and_Regression.md#r06b-attempt003-maintainer-window-correction"
+        "native_workers_per_run_max": 1,
+        "pause_status_before_revision001": "PAUSED_FOR_MAINTAINER_CONTRACT_CORRECTION",
+        "paused_head": "d3ea90cd492648ae99b371c6eca35af8a4660d70",
+        "per_run_output_bytes_max": 268435456,
+        "planning_anchor": "06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment",
+        "reader_repair": "Rehash contract; exact native result case set/file SHA/receipt/materialization/counter joins; cross-run negatives",
+        "resumed_from_input_head": "a6831128e9494cca682943cad410ecacd58d74d7",
+        "s1_invocations_before_pause": 7,
+        "status": "COMPLETED_PENDING_SOL_REVIEW",
+        "thread_id": "01a18225-9aff-7f63-b2a8-589c63e7fec8"
+      },
+      "attempt003_execution": {
+        "P99": "NOT_CLOSED",
+        "R05": "BLOCKED_MISSING_PROVIDER_CONTRACT",
+        "R06c": "NOT_STARTED",
+        "branch": "codex/phase-ii-01-camera",
+        "cumulative_native_cost": {
+          "attempt_output_limit_bytes": 1073741824,
+          "materialization_attempts": 4,
+          "mj_forward_calls": 260,
+          "mj_step_calls": 1280,
+          "outer_intervals": 256,
+          "resets": 4,
+          "run_output_bytes": 146210149,
+          "simulated_seconds": 2.56,
+          "worker_starts": 2
+        },
+        "documentation_validation": {
+          "changed_relative_links": "PASS; 3 resolved and new R06b anchor confirmed",
+          "cold_start_walkthrough": "PASS; manual read-only route walkthrough, no isolated agent",
+          "git_diff_check": "PASS; repeated before documentation commit",
+          "global_document_validator": "NOT_RUN_BY_PACKAGE_INSTRUCTION",
+          "phase_markdown_hash_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/phase_markdown_sha256.manifest",
+          "phase_markdown_hashes": 12,
+          "phase_markdown_hashes_match": true,
+          "planning_manifest_json": "PASS",
+          "skill_creator_quick_validate": {
+            "geochora_task_env": "PASS",
+            "task_env_experiment_evidence": "PASS"
+          },
+          "task_env_module_skill_static_check": "PASS; metadata, local links and explicit source paths"
+        },
+        "historical_compatibility_gate": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
+        "implementation_head": "03fba40873e651b0831ed040fec93ea12655642c",
+        "input_snapshot_sha256": "736e1bc1bc365434f36a3c231b859146b9ba4cc3a614ece65066479a48be8657",
+        "main_checkout_or_isaac_touched": false,
+        "native_lock_path": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock",
+        "native_lock_released": true,
+        "paused_head": "d3ea90cd492648ae99b371c6eca35af8a4660d70",
+        "physical_order_gate": "BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW; exact recipe only",
+        "pins": {
+          "GeoPhys": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+          "asset/external/mujoco_menagerie": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7"
+        },
+        "prompt_sha256": "ab67a5f0daa0011d526a7968cbb14c9dcbcf6921999b3948d6315d5d6c5373c7",
+        "qualification_granted": false,
+        "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/report.md",
+        "resume_input_head": "a6831128e9494cca682943cad410ecacd58d74d7",
+        "resume_revision": 1,
+        "runs": [
+          {
+            "contract_sha256": "3cb05b14134b56a1e4dca094dc387266fb9421ce563696df255767f47d6fb8dc",
+            "lock_wait_seconds": 390.05779426102526,
+            "materializations": 2,
+            "mj_forward_calls": 130,
+            "mj_step_calls": 640,
+            "outer_intervals": 128,
+            "output_bytes": 73106139,
+            "raw_reader_returncode": 1,
+            "reason": "Worker counters omitted case episode_id; independent reader correctly rejected the worker/H5 case join. Original outputs retained.",
+            "resets": 2,
+            "run_id": "run_001",
+            "sampled_group_rss_peak_bytes": 395603968,
+            "simulated_seconds": 1.28,
+            "status": "NATIVE_SUPERVISOR_FAILED",
+            "worker_returncode": 0
+          },
+          {
+            "cases": [
+              {
+                "episode_id": "E1",
+                "h5_bytes": 2034080,
+                "h5_sha256": "5b10484c13de1c418a4866a28ab92b3e537417ee50fee9bd65fd6fbfe60a30cc",
+                "observations": 65,
+                "order_variant": false,
+                "outcome": "horizon_reached",
+                "task_success": false,
+                "transitions": 64
+              },
+              {
+                "episode_id": "E2",
+                "h5_bytes": 2034114,
+                "h5_sha256": "8a33923489ee0505037eda5b1e6f1327743c2033c4105b66f993f95550f130a5",
+                "observations": 65,
+                "order_variant": true,
+                "outcome": "horizon_reached",
+                "task_success": false,
+                "transitions": 64
+              }
+            ],
+            "contract_sha256": "758742668720d00ee2f5c6727d282fdd856fbfe942db76dbe756aa1d81706c40",
+            "lock_wait_seconds": 6.8659428507089615e-06,
+            "materializations": 2,
+            "mj_forward_calls": 130,
+            "mj_step_calls": 640,
+            "outer_intervals": 128,
+            "output_bytes": 73104010,
+            "raw_readback": "PASS; recomputed contract digest and exact same-run result/file/receipt/materialization/counter/order/slot joins",
+            "raw_reader_returncode": 0,
+            "resets": 2,
+            "run_id": "run_002",
+            "sampled_group_rss_peak_bytes": 413986816,
+            "simulated_seconds": 1.28,
+            "status": "R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW",
+            "worker_returncode": 0,
+            "worker_wall_seconds": 13.3779514671769
+          }
+        ],
+        "s1": {
+          "import_tripwire": "before_collection, after_collection, after_tests: forbidden engine/provider modules []",
+          "invocations": [
+            {
+              "head": "f6668e2c711d06bea783844ed485379fa9a9f4b2",
+              "id": "invocation-001",
+              "max_sampled_group_rss_bytes": 209108992,
+              "wall_seconds": 127.5172969410196
+            },
+            {
+              "head": "03fba40873e651b0831ed040fec93ea12655642c",
+              "id": "invocation-002",
+              "max_sampled_group_rss_bytes": 201252864,
+              "wall_seconds": 128.78310245508328
+            }
+          ],
+          "status": "PASS",
+          "test_files": 11,
+          "tests_passed": 249
+        },
+        "status": "R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW"
       }
     },
     {

@@ -951,34 +951,27 @@ Evidence and the Sol review remain in ignored workspace maintenance records.
 `LeafMaterializationReceiptV1` maps by semantic Joint/Actuator references; do
 not infer qpos addresses, dof addresses or ctrl slots from tuple order. qpos
 and dof use their separate native dimensions (`nq` and `nv`); an `nq != nv`
-fixture is synthetic evidence only. The fixed Panda Arm+Hand attachment path
-also pins exact source bytes and canonical joint declaration order. A
-source that reverses Hand sibling declarations while keeping the original
-Scene Articulation.joints order is refused by
-`lower_fixed_attachment_sources()` before provider materialization. That
-rejection does not demonstrate successful physical execution of a reordered
-source; general source/native permutation support remains unproven and blocked.
-R06b attempt001 reused accepted R02c005/R03b/R03c exact-source S2 evidence
-because those production owners and source/profile inputs were unchanged; it
-did not rerun native at the current HEAD. Read the current result, evidence
-limits and historical missing-byte blocker in the [R06 compatibility
-record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt001-实施结果2026-10-29).
+fixture is synthetic evidence only. The fixed Panda Arm+Hand path pins exact
+source bytes. `ArticulationDefinition.joints` v1 is canonicalized by
+`joint_id`; source traversal and provider-native body/joint/actuator order are
+separate values validated by the exact source recipe and named receipt.
 
-Sol reviewed attempt001 as partial: a coherent source/Scene reorder was not
-exercised by that negative. R06b attempt002 implemented one explicit derived
-recipe through the existing owners and passed its selected provider-free S1
-set (202 checks). Its sole MuJoCo 3.8.1 CPU worker completed baseline E1,
-then the per-case materialization counter wrapper nested across episodes and
-blocked E2 before the underlying materializer. E1's H5 passed production and
-partial raw readback; no derived-order native receipt/H5 exists, the native
-start is spent, and the R06b physical-order gate remains incomplete. Do not
-retry or claim R06b completion from this receipt; any attempt003 requires Sol
-reassessment. Preserve the original recipe and strict gates. See the current
-[attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt002-execution-result-2026-10-29).
+R06b attempt001 documented a source/Scene mismatch rejection, not a successful
+reorder. Attempt002 then implemented the derived recipe but stopped after E1
+when a nested materialization counter prevented E2 from reaching the owner;
+these are preserved historical results in the [R06 record](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md).
 
-R06b002 Sol review accepts only partial S1/E1 facts. The same-schema change
-to ArticulationDefinition joint normalization is not accepted; R06b003 must
-restore canonical joint_id normalization and keep source/native order in the
-validated recipe and explicit mappings. Its real two-case worker must be
-exercised with synthetic native IO before another bounded native run. See
-[the reassessment](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment).
+R06b attempt003 restored canonical joint normalization, exercised the existing
+worker and independent reader with a provider-free S1, and completed one
+bounded same-worker E1/E2 MuJoCo 3.8.1 CPU run. The 249-case S1 includes worker,
+supervisor, finalizer, raw-reader and strict H5 regressions; it is not physical
+evidence. The native run produced 64/65 H5s for each case and the independent
+reader joined the recomputed contract digest, exact case IDs, worker file
+hash/size, receipt, materialization ID, per-case counters and native named
+order/slots. Current state is
+`R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`. It covers only the
+frozen Panda Arm+Hand and one `r06b-order-v1` recipe; it does not grant general
+source/provider compatibility, task success or Qualification. Historical
+raw/phase disposition remains `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`, R05
+remains blocked on its formal Provider contract, and R06c/P99 is not closed.
+See the [attempt003 execution result](../../../docs/module/task_env/goal/Phase_II_01/06_R06_Compatibility_and_Regression.md#r06b-attempt003-execution-result-2026-10-29).

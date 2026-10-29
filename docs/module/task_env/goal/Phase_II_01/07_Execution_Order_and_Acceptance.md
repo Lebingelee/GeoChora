@@ -91,7 +91,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | `ACCEPTED_BOUNDED_S3`；GeoPhys a53 CPU × MuJoCo 3.8.1 EGL，双同Env H5各12/13、双reader与22项native派生篡改拒绝；见 [R04c attempt001](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-camera-h5-s3) |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | PLANNED / NOT_STARTED |
 | 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | PLANNED / NOT_STARTED |
-| 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | attempt001 Sol已接收部分S1/精确source复用，R06b未完成：定向provider-free S1通过，精确source S2/S3复用；物理重排变体只证明pre-native拒绝，没有成功执行证据；历史missing raw处置gate仍BLOCKED。 |
+| 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | attempt003 Luna报告有界双case同worker S1/S2通过，待Sol复核；历史missing raw处置gate仍BLOCKED，R06c/P99不提前关闭。 |
 | 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | PLANNED / NOT_STARTED |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PLANNED / NOT_STARTED |
 | 20 | R07b | R07a | asset/benchmarks与bench_deploy责任/verified manifests/最小配方 | S1 | 许可/闭包/一般Core能力缺失→BLOCKED | PLANNED / NOT_STARTED |
@@ -224,3 +224,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-29 Sol复核R06b002：部分E1事实接收、总体未完成；确认counter hook泄漏、真实worker双case S1缺失及通用Articulation v1规范化回归。已完成[003前重评](06_R06_Compatibility_and_Regression.md#r06b-attempt003-reassessment)及官方开源模式调研，可在既有owner有界修复后执行第三次也是最后一次attempt。没有解锁R06c/R07，不自动第四次；历史missing raw与R05阻塞保持。
 
 2026-10-29维护者纠正attempt语义：按预定自主执行窗口计数，窗口内允许多轮修复/测试/native；单次失败不等于attempt结束。R06b003已安全暂停，保留d3ea90c与已用时间/7次S1/0native；按[同attempt合同修订](06_R06_Compatibility_and_Regression.md#r06b-attempt003-maintainer-window-correction)恢复，不创建004、不追加在途实现prompt。每run资源/物理上限仍独立约束，历史状态不重写。
+
+2026-10-29 R06b attempt003恢复同一窗口后完成：run001的双case物理执行结束但raw reader因per-case计数缺少episode_id而拒绝；修复并重跑完整S1后，fresh run002在共享锁内以单MuJoCo 3.8.1 CPU worker完成E1/E2各64/65 H5，640 step/130 forward/1.28秒，同窗口独立raw reader和production reader通过。最终provider-free S1为249 passed，import tripwire未见真实engine/provider模块；run002资源与锁收尾通过。仅有界order regression结果 `R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`，尚未Sol接收；不等于任务成功、通用compatibility、R06c/P99或Qualification。四类历史raw/处置gate仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`；R05合同阻塞保持。报告、commands、Evidence及两轮完整native原件见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/`。

@@ -1,6 +1,6 @@
 # R06 — Compatibility / Mapping / Regression Governance
 
-状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt001已完成provider-free S1并复用未受影响的精确source S2证据，Sol已接收其部分S1/精确source复用事实，物理source-order permutation支持门仍BLOCKED；compatibility decision gate仍因历史原件/处置决定缺失而BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
+状态：REVISED_DRAFT；R06a Audit/S1交付已获Sol接收（ACCEPTED_AUDIT_S1_BOUNDED）；R06b attempt003已完成有界双case S1/S2交付，待Sol复核；历史原件/处置决定缺失使compatibility decision gate仍BLOCKED，R06c未启动。本 Goal 管理新支持交集与历史局限，不改 Phase II 接受决定。
 
 ## 映射与机械语义保护
 
@@ -173,3 +173,22 @@ R04b误导入MuJoCo与argv未保留的偏离保持记录。历史missing raw/Pha
 新规则：每次native run仍限一个worker、原2case/128 outer/640 step/1.28sim秒、300秒wall、4GiB RSS与共享排他锁；这些是每run上限。允许在剩余窗口内定位普通故障、修复、重新S1并另起新run目录/合同，逐run保全失败和累计成本。不再默认将一次失败视为attempt结束。单run输出256MiB、整个003累计1GiB；不能删除失败证据或拼接多run为一次PASS，遇资源/外部阻塞安全暂停并说明。最终成功run仍须独立满足baseline+derived同worker全部原门。
 
 本次是003合同修订，不是004，也不恢复001/002或触碰F线。旧003冻结包只读保留；替换包与新hash由Sol冻结后派发。完整暂停/替换收据在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_attempt_semantics_correction_20261029/`。
+
+<a id="r06b-attempt003-execution-result-2026-10-29"></a>
+
+## R06b attempt003恢复窗口执行结果（2026-10-29）
+
+结果：`R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`。这是一个完整的同worker E1 baseline + E2 derived order recipe bounded S2/native结果，尚待Sol复核。它不关闭通用compatibility、R06c/P99、R05 Provider合同、历史原件处置或Qualification。
+
+| 项目 | 实际结果 |
+| --- | --- |
+| 冻结与实现 | attempt编号仍为003；从合同修订后的resume input HEAD `a6831128e9494cca682943cad410ecacd58d74d7`继续。native实现冻结HEAD为 `03fba40873e651b0831ed040fec93ea12655642c`，分支 `codex/phase-ii-01-camera`。恢复后实现提交 `f6668e2c711d06bea783844ed485379fa9a9f4b2`、`03fba40873e651b0831ed040fec93ea12655642c`；此前attempt003实现提交保留在report/evidence。GeoPhys/Menagerie pins未变。 |
+| S1 | 同一11文件provider-free集合在两个clean implementation HEAD分别通过 **249 passed**；最终运行墙钟128.78s、最大采样进程组RSS 201,252,864 bytes。测试真实调用双case `run_worker`/`_run_case`/finalizer/strict loader/raw reader/supervisor控制流，并以明确synthetic model/data IO隔离物理engine；import tripwire在collection前后及测试后均未加载MuJoCo、Isaac、GeoPhys、Taichi。 |
+| 首轮native `run_001` | 单MuJoCo 3.8.1 CPU worker在共享flock内完成E1/E2各自64 outer、65 observations、320 `mj_step`、65 forward及H5，但独立reader因worker `native_counts`缺少case `episode_id`退出1。监督器记为 `NATIVE_SUPERVISOR_FAILED`，未计作PASS；worker与reader完成后释放锁，采样RSS峰值395,603,968 bytes。保留原结果、H5与失败日志。 |
+| 修复与重验 | 在已有worker owner补齐per-case `episode_id`并加回归断言，提交 `03fba40`。重新运行完整S1和静态native preflight，再以全新contract与 `run_002` 复测；未复用或覆盖 `run_001`。 |
+| 成功native `run_002` | 合同SHA-256 `758742668720d00ee2f5c6727d282fdd856fbfe942db76dbe756aa1d81706c40`；单worker同进程顺序运行E1 exact baseline、E2唯一derived recipe。每case一次materialize/reset、64 outer、65 observations、320 step、65 forward、0.64 simulated seconds；总计2/2、128、640、130、1.28秒。worker与独立reader均exit 0；状态为 `R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW`。 |
+| 顺序、H5与锁 | E2完整交换Hand finger sibling subtree并反转七个Arm actuator声明；raw receipt/native model的body、joint、actuator order和按名字映射到真实ID/ctrl slot符合合同，Hand资源与控制语义保持冻结oracle。两个H5各为64 transitions/65 observations，production reader和独立raw reader通过；reader重算合同digest并逐case join worker H5 hash/size、receipt、materialization ID、计数与named order/slot。共享锁覆盖worker、reader及cleanup后释放。 |
+| 资源/成本 | run002 worker墙钟13.38s；采样进程组RSS峰值413,986,816 bytes；开始时可用内存11,087,433,728 bytes；输出73,104,010 bytes，低于每run 256MiB。两个物理启动累计materialize/reset各4、outer256、step1280、forward260、模拟2.56秒；累计run输出146,210,149 bytes，低于attempt 1GiB。 |
+| 局限 | E1/E2结束均为 `horizon_reached` 且 `task_success=false`。证据只覆盖冻结Panda Arm+Hand source、r06b-order-v1 recipe、MuJoCo 3.8.1 CPU及该有界配置；不代表任意source/provider兼容。四类历史原件及Phase II-01处置仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`；R05 Provider合同阻塞、R06c/P99未关闭、无Qualification。 |
+
+完整报告、command/resource收据及sha256清单位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r06b_003/`；其中 `resume001/runs/run_001/`保留reader失败现场，`resume001/runs/run_002/`是独立完整成功run。该结果待Sol检查actual diff、manifest和available Evidence后决定是否接收。
