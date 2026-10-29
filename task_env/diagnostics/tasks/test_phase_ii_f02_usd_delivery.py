@@ -71,14 +71,14 @@ def _build_nested_sibling_fixture(output_dir: Path) -> Path:
     remapped = {}
     for item in delivery["files"]:
         old_path = item["path"]
-        new_path = "nested/entry.usda" if old_path == "entry.usda" else f"sibling/{old_path}"
+        new_path = "nested/deep/entry.usda" if old_path == "entry.usda" else f"sibling/{old_path}"
         source = root / old_path
         raw = source.read_bytes()
         if old_path == "entry.usda":
             text = raw.decode("utf-8")
-            text = text.replace("@materials/look.usda@", "@../sibling/materials/look.usda@")
-            text = text.replace("@refs/model.usda@", "@../sibling/refs/model.usda@")
-            text = text.replace("@variants/low.usda@", "@../sibling/variants/low.usda@")
+            text = text.replace("@materials/look.usda@", "@../../sibling/materials/look.usda@")
+            text = text.replace("@refs/model.usda@", "@../../sibling/refs/model.usda@")
+            text = text.replace("@variants/low.usda@", "@../../sibling/variants/low.usda@")
             raw = text.encode("utf-8")
         target = root / new_path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -383,7 +383,7 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
 def test_nested_entry_and_root_sibling_dependency_roundtrip_core_catalog_and_reader(tmp_path):
     manifest = _build_nested_sibling_fixture(tmp_path / "nested-delivery")
     loaded = load_usd_asset_delivery(manifest, allow_synthetic=True)
-    assert loaded.delivery.entry_file == "nested/entry.usda"
+    assert loaded.delivery.entry_file == "nested/deep/entry.usda"
     assert loaded.inspection["entry_prim_valid"] is True
     assert "sibling/materials/look.usda" in loaded.file_bytes
     assert "sibling/textures/grid.bin" in loaded.file_bytes
@@ -416,7 +416,7 @@ def test_nested_entry_and_root_sibling_dependency_roundtrip_core_catalog_and_rea
     finally:
         sys.path.remove(str(agent_dir))
     row = catalog["asset_deliveries"][0]
-    assert row["entry_file"] == "nested/entry.usda"
+    assert row["entry_file"] == "nested/deep/entry.usda"
     assert row["provider_selections"]["mujoco"]["rejection_reason"] == (
         "native USD decoder is not enabled in the inspected MuJoCo 3.8.1 build"
     )
