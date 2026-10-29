@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态（2026-10-29）：R05a已接收；R05b attempt001经Sol复核为 `CHANGES_REQUIRED_R05B`，有界CPU/CUDA短S2事实接收，但默认reset、可信source闭包准入、Core ID溢出及真实接线S1四项阻塞未关闭。下一包attempt002，不进入R05c。
+状态（2026-10-29）：R05a已接收；R05b attempt002经Sol复核接收 `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2`。F1–F4关闭，正常route证据仅限精确NutAssembly/GeoPhys CPU与CUDA、seed19、500Hz law、两outer短S2。R05c未启动，完整任务/四格/P99/Qualification未关闭；两项旧配置摘要差异保留。
 
 ## 现有能力与 owner
 
@@ -157,3 +157,17 @@ F1–F4均已按复核owner修复：所有 `SelectedReferenceEnv` 构造分支�
 一次仅用于补录CUDA预检字段的本地辅助脚本因字段名写错产生 `KeyError`；它未更改代码或来源输入。已保留错误收据，正式supervisor随后自行完成锁、MemAvailable、GPU free、compute app、预算与worker收据检查，CUDA结果和reader通过。
 
 本状态待Sol复核，不等同于R05b接收。两个outer未达到Guard dwell，也不构成Task/Expert完成；未证明100 Hz law的native S2、完整CPU/CUDA×100/500 Hz campaign、实时/device-resident控制、P99或Formal Qualification。R05c仍未启动。历史missing raw/phase处置继续为 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`。报告、Evidence、运行原件与收据保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05b_002/`。
+
+<a id="r05b-attempt002-sol-acceptance"></a>
+
+## R05b attempt002 Sol接收（2026-10-29）
+
+输入 `b6d4a9efa1d1c056d0ade1f62537c5bf427938ff`，实施 `1193f2f18d1330c6bc77488c053f88de27952f4b`、GeoPhys `c6df840bef8d36b1150150167df08e29dc3f664c`。接收 **ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2**；原attempt001失败和复核结论保留。
+
+Sol独立核对209项输出、81项保护hash、69项可信闭包中的67个实际Menagerie资产bytes/hash/size；两份原H5独立raw reader复读各2/3和10samples通过，CPU/CUDA原worker exit0/close/process-group/锁收据一致。Sol精确重跑focused S1 **19 passed in 9.38s**，tripwire零命中；无新native，Provider23项S1按不变c6df840复用。F1默认public reset/step真实IO-double链、F2重算receipt仍拒绝改mesh/importer、F3原始宽度ID验证、F4真实worker/Recorder/reader/finalizer正负例均关闭。
+
+原正常profile仅准入精确Artifact/source/69文件闭包/semantic mapping/config/Providerbuild/import origin/R3 Controller/Solution与law；native只测500Hz、CPU/CUDA各seed19、implicitfast、2ms×5、一reset/两outer/十native，不能声称完整task/Guard dwell/Expert。旧b5b75dd构造函数与当前NutAssembly config在同环境78字段零差异，两个历史摘要断言仍未解决，不改baseline/hash或声称全历史回归通过。
+
+复核原件及收据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05b_002/`。原表进度16/22有界接收；下一项R05c须正式route CPU/CUDA×100/500Hz四个独立完整task/Outcome/strict Expert/同run H5及reader证据，不能以旧C05c任务结果加新短H5拼成新run PASS。R06c历史missing-raw/处置门不变。
+
+维护者最新决定：**后续工作包prompt由维护者自行发送**；Sol准备/复核并提供文件，不直接向Luna2发执行或补充prompt。本次未派下一包、未运行R05c、未merge/push或改F线。

@@ -1012,8 +1012,10 @@ and exercise the connected worker/finalizer/reader path in S1. Attempt002
 implemented these fixes on Core commit `1193f2f` and passed 19 focused
 provider-free tests. Fresh GeoPhys CPU and CUDA runs at 500 Hz each completed
 one reset, two outer intervals and ten native steps; both the production
-semantic reader and independent raw H5 reader passed. This result is pending
-Sol review, not slice acceptance. The S1 synthetic-IO path proves Core wiring
+semantic reader and independent raw H5 reader passed. Sol accepted attempt002
+as `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2` after independently
+rerunning 19 focused S1 cases and reading both original H5s. This bounded result
+does not close R05c, full-task or Qualification gates. The S1 synthetic-IO path proves Core wiring
 and reader lifecycle, not physics. The bounded native runs do not establish
 task/Expert completion, Guard dwell, native 100 Hz law, the full CPU/CUDA ×
 100/500 Hz campaign, real-time or device-resident control, general Provider
