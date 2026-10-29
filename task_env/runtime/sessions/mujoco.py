@@ -1047,23 +1047,29 @@ class _MuJoCoSession(_SessionValues):
             raise ValueError(f"fixed Attachment compiled dimensions differ from the source receipt: {actual_dimensions}")
         if any(int(kind) == int(mj.mjtJoint.mjJNT_FREE) for kind in model.jnt_type):
             raise ValueError("fixed Attachment model unexpectedly contains a free joint")
+        order_variant = plan.parent_asset_version == "menagerie-b846dd12-r06b-order-v1"
+        expected_hand_fingers = (
+            ["probe_hand_right_finger", "probe_hand_left_finger"] if order_variant
+            else ["probe_hand_left_finger", "probe_hand_right_finger"]
+        )
         expected_bodies = [
             "world", "link0", "link1", "link2", "link3", "link4", "link5", "link6",
-            "link7", "attachment", "probe_hand_hand", "probe_hand_left_finger",
-            "probe_hand_right_finger",
+            "link7", "attachment", "probe_hand_hand", *expected_hand_fingers,
         ]
         actual_bodies = [mj.mj_id2name(model, mj.mjtObj.mjOBJ_BODY, index) for index in range(model.nbody)]
         if actual_bodies != expected_bodies:
             raise ValueError(f"fixed Attachment body order differs from the source oracle: {actual_bodies}")
         expected_joints = [
             *(f"joint{index}" for index in range(1, 8)),
-            "probe_hand_finger_joint1", "probe_hand_finger_joint2",
+            *(('probe_hand_finger_joint2', 'probe_hand_finger_joint1') if order_variant
+              else ('probe_hand_finger_joint1', 'probe_hand_finger_joint2')),
         ]
         actual_joints = [mj.mj_id2name(model, mj.mjtObj.mjOBJ_JOINT, index) for index in range(model.njnt)]
         if actual_joints != expected_joints:
             raise ValueError(f"fixed Attachment Joint order differs from the source oracle: {actual_joints}")
+        expected_arm_actuators = (range(7, 0, -1) if order_variant else range(1, 8))
         expected_actuators = [
-            *(f"actuator{index}" for index in range(1, 8)), "probe_hand_actuator8",
+            *(f"actuator{index}" for index in expected_arm_actuators), "probe_hand_actuator8",
         ]
         actual_actuators = [
             mj.mj_id2name(model, mj.mjtObj.mjOBJ_ACTUATOR, index) for index in range(model.nu)

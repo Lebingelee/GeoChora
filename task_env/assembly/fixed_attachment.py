@@ -14,6 +14,127 @@ from ..assembly.logical_source import project_logical_assembly_source
 from ..assembly.source import TaskSceneSource
 
 
+R06B_ORDER_RECIPE_ID = "r06b-order-v1"
+R06B_ORDER_ASSET_VERSION = "menagerie-b846dd12-r06b-order-v1"
+R06B_ORDER_SOURCE_REFERENCES = {
+    "panda-arm": "derived:menagerie:b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/panda_nohand.xml#r06b-order-v1",
+    "panda-hand": "derived:menagerie:b846dd12bc459d776cccb3dee0b1d02acbf7a9c7/franka_emika_panda/hand.xml#r06b-order-v1",
+}
+_BASE_SOURCE_SHA256 = {
+    "panda-arm": "e7090a5e2384b18a223ef532d98bf914f7f9a6b74dc8bc9f74c8291201074071",
+    "panda-hand": "d2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a",
+}
+_BASE_CANONICAL_SHA256 = {
+    "panda-arm": "0288eb09c30232117abe6e0d2a80771953ed5bde38e31830572a83f4eca1dfa4",
+    "panda-hand": "031c7c49b42230b19dfb3a12eacf022ba3e6a9f552af167c1cb1906c61e7a41b",
+}
+R06B_ORDER_SOURCE_SHA256 = {
+    "panda-arm": "e556ae24843a6ef080c604b544e9f08ff531d036f414b7544dc1c6d7e44b3270",
+    "panda-hand": "443f6d9ffbb7fc6ab27fbc8c493ab2b83a8dd2a03a431dac93eae9101eda9c29",
+}
+
+
+def _recipe_xml_root(xml: str) -> ET.Element:
+    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+    return ET.fromstring(xml, parser=parser)
+
+
+def _reverse_recipe_children(parent: ET.Element, predicate) -> None:
+    original = list(parent)
+    indexes = [
+        index for index, child in enumerate(original)
+        if isinstance(child.tag, str) and predicate(child)
+    ]
+    selected = [original[index] for index in indexes]
+    tails = [child.tail for child in selected]
+    for index, child, tail in zip(indexes, reversed(selected), tails, strict=True):
+        # Element tails are source formatting at a sibling position, not part of
+        # the moved MJCF element. Keep them in their original positions.
+        child.tail = tail
+        parent[index] = child
+
+
+def _apply_r06b_order_recipe(arm: ET.Element, hand: ET.Element) -> None:
+    actuators = arm.find("actuator")
+    if actuators is None:
+        raise ValueError("R06b order recipe requires the Arm actuator section")
+    _reverse_recipe_children(
+        actuators, lambda node: (node.get("name") or "").startswith("actuator"),
+    )
+    hand_root = hand.find("./worldbody/body[@name='hand']")
+    if hand_root is None:
+        raise ValueError("R06b order recipe requires the Hand root body")
+    wanted = {"left_finger", "right_finger"}
+    found = [
+        child for child in list(hand_root)
+        if child.tag == "body" and child.get("name") in wanted
+    ]
+    if len(found) != 2 or {child.get("name") for child in found} != wanted:
+        raise ValueError("R06b order recipe requires each named Hand finger subtree exactly once")
+    _reverse_recipe_children(
+        hand_root, lambda node: node.tag == "body" and node.get("name") in wanted,
+    )
+
+
+def _canonical_xml_sha256(root: ET.Element) -> str:
+    serialized = ET.tostring(root, encoding="unicode")
+    canonical = ET.canonicalize(serialized, with_comments=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def derive_r06b_order_sources(arm_xml: str, hand_xml: str) -> tuple[str, str]:
+    """Return the one pinned order-only derivative of the Menagerie XML pair."""
+    arm_raw, hand_raw = arm_xml.encode("utf-8"), hand_xml.encode("utf-8")
+    actual = {
+        "panda-arm": hashlib.sha256(arm_raw).hexdigest(),
+        "panda-hand": hashlib.sha256(hand_raw).hexdigest(),
+    }
+    if actual != _BASE_SOURCE_SHA256:
+        raise ValueError("R06b recipe input is not the exact pinned Menagerie source pair")
+    arm, hand = _recipe_xml_root(arm_xml), _recipe_xml_root(hand_xml)
+    _apply_r06b_order_recipe(arm, hand)
+    arm_derived = ET.tostring(arm, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    hand_derived = ET.tostring(hand, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    validate_r06b_order_sources(arm_derived, hand_derived)
+    return arm_derived, hand_derived
+
+
+def validate_r06b_order_sources(arm_xml: str, hand_xml: str) -> None:
+    """Verify pinned derivative bytes and that inverse order restores base MJCF semantics."""
+    roots = {"panda-arm": _recipe_xml_root(arm_xml), "panda-hand": _recipe_xml_root(hand_xml)}
+    actual_sha = {
+        entity: hashlib.sha256(xml.encode("utf-8")).hexdigest()
+        for entity, xml in (("panda-arm", arm_xml), ("panda-hand", hand_xml))
+    }
+    if actual_sha != R06B_ORDER_SOURCE_SHA256:
+        raise ValueError("R06b derived XML differs from the one allowlisted order recipe")
+    arm, hand = roots["panda-arm"], roots["panda-hand"]
+    actuators = [node.get("name") for node in arm.findall("./actuator/*")]
+    fingers = [node.get("name") for node in hand.findall("./worldbody/body/body")]
+    if actuators != [f"actuator{index}" for index in range(7, 0, -1)]:
+        raise ValueError("R06b Arm actuator declaration order differs from the frozen recipe")
+    if fingers != ["right_finger", "left_finger"]:
+        raise ValueError("R06b Hand finger body order differs from the frozen recipe")
+    _apply_r06b_order_recipe(arm, hand)
+    if {
+        "panda-arm": _canonical_xml_sha256(arm),
+        "panda-hand": _canonical_xml_sha256(hand),
+    } != _BASE_CANONICAL_SHA256:
+        raise ValueError("R06b inverse order operation changed non-order MJCF semantics")
+
+
+def fixed_attachment_source_recipe(arm_xml: str, hand_xml: str) -> str:
+    """Classify the exact legacy pair or validate the one admitted derivative."""
+    actual = {
+        "panda-arm": hashlib.sha256(arm_xml.encode("utf-8")).hexdigest(),
+        "panda-hand": hashlib.sha256(hand_xml.encode("utf-8")).hexdigest(),
+    }
+    if actual == _BASE_SOURCE_SHA256:
+        return "r03b-exact"
+    validate_r06b_order_sources(arm_xml, hand_xml)
+    return R06B_ORDER_RECIPE_ID
+
+
 @dataclass(frozen=True)
 class LoweredFixedAttachmentSourceV1:
     """Two separately verified source snapshots ready for MjSpec attachment."""
@@ -246,6 +367,30 @@ def lower_fixed_attachment_sources(
     parent_root, child_root = ET.fromstring(parent.xml), ET.fromstring(child.xml)
     _validate_source_declarations(parent_root, plan.parent_entity_id, scene, plan.parent_source_sha256)
     _validate_source_declarations(child_root, plan.child_entity_id, scene, plan.child_source_sha256)
+    recipe = fixed_attachment_source_recipe(parent.xml, child.xml)
+    expected_assets = (
+        (plan.parent_entity_id, plan.parent_asset_id, plan.parent_asset_version,
+         R06B_ORDER_SOURCE_REFERENCES["panda-arm"] if recipe == R06B_ORDER_RECIPE_ID
+         else "menagerie:franka_emika_panda/panda_nohand.xml"),
+        (plan.child_entity_id, plan.child_asset_id, plan.child_asset_version,
+         R06B_ORDER_SOURCE_REFERENCES["panda-hand"] if recipe == R06B_ORDER_RECIPE_ID
+         else "menagerie:franka_emika_panda/hand.xml"),
+    )
+    entity_by_id = {item.entity_id: item for item in scene.entities}
+    assets_by_identity = {
+        (asset.asset_id, asset.asset_version): asset for asset in scene.assets
+    }
+    for entity_id, asset_id, asset_version, source_reference in expected_assets:
+        entity = entity_by_id[entity_id]
+        asset = assets_by_identity[(asset_id, asset_version)]
+        expected_version = (R06B_ORDER_ASSET_VERSION if recipe == R06B_ORDER_RECIPE_ID
+                            else "menagerie-b846dd12")
+        if (asset.asset_version, asset.source_reference, asset.source_revision,
+                asset.license_id) != (
+            expected_version, source_reference,
+            "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7", "Apache-2.0",
+        ) or (entity.asset_id, entity.asset_version) != (asset_id, asset_version):
+            raise ValueError("fixed Attachment Asset provenance differs from its exact source recipe")
     for root, label, native_maps in (
         (parent_root, "parent", (
             ("body", plan.native_body_names, {k: v for k, v in plan.native_body_names.items()
