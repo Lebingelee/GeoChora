@@ -39,6 +39,8 @@ def test_public_r05b_profile_builds_and_passes_real_source_admission(backend):
     try:
         assert env._native_feedback_profile == R05B_NATIVE_FEEDBACK_PROFILE
         assert env._diagnostic_profile is None
+        assert value['resolved_configuration']['native_feedback_profile'] == R05B_NATIVE_FEEDBACK_PROFILE
+        assert value['resolved_configuration']['gripper_control_hz'] == 500
         assert value['artifact'].identity_hash == '99e374bd870c70f0dd427e34c47c6e6820aaa7067365133181a001a38239b9fe'
         assert hashlib.sha256(source.scene_source.xml.encode()).hexdigest() == (
             '909759def6bbaa4c5644a100a36625400464cd571dcab1222f807efaaf1c225d'
