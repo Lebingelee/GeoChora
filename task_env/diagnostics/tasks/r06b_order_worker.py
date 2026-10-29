@@ -48,8 +48,10 @@ FROZEN_ORACLES = {
 FROZEN_TAMPER_MATRIX = [
     'target_identity', 'ack_writer', 'prepared_command', 'source_digest',
     'configuration_identity', 'missing_writer', 'duplicate_slot',
-    'boundary_observation', 't_plus_one', 'attachment_hash', 'entity_binding', 'native_tcp',
+    'boundary_observation', 't_plus_one', 'attachment_plan_hash', 'entity_binding', 'native_tcp',
     'raw_source_hash', 'raw_target', 'raw_ack', 'raw_native_slot', 'raw_state_order', 'raw_clock',
+    'raw_contract_digest', 'raw_worker_result_file', 'raw_worker_result_receipt',
+    'raw_duplicate_case', 'raw_missing_case', 'raw_swapped_case',
 ]
 
 
@@ -258,7 +260,7 @@ def _assert_receipt(candidate, receipt, expected) -> dict[str, object]:
     }
 
 
-def _run_case(case, output_dir: Path, counters: dict, modules: dict,
+def _run_case(case, output_dir: Path, counters: dict, active: dict,
               identity: dict, native_dir: Path) -> dict[str, object]:
     from task_env.tasks.position_candidate.attached_leaf_candidate import (
         ARM_HOME, action_for_interval, build_attached_leaf_candidate,
@@ -274,7 +276,8 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
         _rotation_error, _tamper_checks,
     )
 
-    active = {'episode_id': case['episode_id'], 'outer': 0, 'phase': 'candidate_build'}
+    active.update({'episode_id': case['episode_id'], 'outer': 0, 'phase': 'candidate_build'})
+    case_counts = counters['cases'][case['episode_id']]
     _write_json(native_dir / 'native_progress.json', {'status': 'NATIVE_WORKER_RUNNING',
                 'counters': counters, 'active': active})
     candidate = build_attached_leaf_candidate(
@@ -292,19 +295,26 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
     if source_copy['source_closure_sha256'] != case['candidate']['source_closure_sha256']:
         raise ValueError('copied source closure differs from frozen candidate closure')
 
-    original_materialize = control_module.materialize_control
+    original_control_materialize = control_module.materialize_control
+    original_reference_materialize = reference_env_module.materialize_control
 
-    def counted_materialize(*args, **kwargs):
-        counters['materialization_attempts'] += 1
-        if counters['materialization_attempts'] > 2:
-            raise RuntimeError('R06b per-worker materialization budget of two attempts exceeded')
-        active['phase'] = 'runtime_materialization'
-        _write_json(native_dir / 'native_progress.json', {'status': 'NATIVE_WORKER_RUNNING',
-                    'counters': counters, 'active': active})
-        return original_materialize(*args, **kwargs)
+    def make_counted_materialize(original):
+        def counted_materialize(*args, **kwargs):
+            counters['materialization_attempts'] += 1
+            case_counts['materialization_attempts'] += 1
+            if counters['materialization_attempts'] > 2:
+                raise RuntimeError('R06b per-worker materialization budget of two attempts exceeded')
+            active['phase'] = 'runtime_materialization'
+            _write_json(native_dir / 'native_progress.json', {'status': 'NATIVE_WORKER_RUNNING',
+                        'counters': counters, 'active': active})
+            result = original(*args, **kwargs)
+            counters['materializations_completed'] += 1
+            case_counts['materializations_completed'] += 1
+            return result
+        return counted_materialize
 
-    control_module.materialize_control = counted_materialize
-    reference_env_module.materialize_control = counted_materialize
+    control_module.materialize_control = make_counted_materialize(original_control_materialize)
+    reference_env_module.materialize_control = make_counted_materialize(original_reference_materialize)
     env = candidate.env
     session = None
     primary_error = None
@@ -313,9 +323,12 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
     try:
         active['phase'] = 'public_env_reset'
         counters['resets'] += 1
+        case_counts['reset_attempts'] += 1
         if counters['resets'] > 2:
             raise RuntimeError('R06b reset budget of two attempts exceeded')
         _, reset_info = env.reset(seed=31)
+        counters['resets_completed'] += 1
+        case_counts['resets_completed'] += 1
         session = env.session
         if (reset_info.get('state_boundary_id') != env.typed_state.view.boundary.boundary_id
                 or reset_info.get('reset_sample_id') != candidate.reset_plan.reset_sample.sample_id
@@ -379,6 +392,7 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
             action = action_for_interval(candidate, interval, arm_active=True, hand_active=True)
             _, _, terminated, truncated, _ = env.step(action)
             counters['outer_intervals'] += 1
+            case_counts['outer_intervals'] += 1
             counters['simulated_seconds'] = counters['outer_intervals'] * 0.01
             if (counters['outer_intervals'] > 128 or counters['mj_step_calls'] > 640
                     or terminated or truncated != (interval == 64)):
@@ -478,8 +492,9 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
             },
             'warning_counts': list(warnings),
             'native_counts': {
-                'materializations': counters['materialization_attempts'], 'resets': counters['resets'],
-                'outer_intervals_total': 64, 'mj_step_calls_case': final_diagnostics['native_step_count'],
+                **case_counts,
+                'outer_intervals_total': case_counts['outer_intervals'],
+                'mj_step_calls_case': final_diagnostics['native_step_count'],
                 'mj_forward_calls_case': final_diagnostics['forward_call_count'],
                 'simulated_seconds_case': final_diagnostics['native_time_s'],
             },
@@ -490,6 +505,8 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
     except BaseException as error:
         primary_error = error
     finally:
+        control_module.materialize_control = original_control_materialize
+        reference_env_module.materialize_control = original_reference_materialize
         if session is None:
             session = getattr(env, 'session', None)
         if env is not None and not getattr(env, '_closed', False):
@@ -507,6 +524,7 @@ def _run_case(case, output_dir: Path, counters: dict, modules: dict,
                                    'traceback': ''.join(traceback.format_exception(cleanup_error))}),
                 'close_evidence': (None if session is None else session.fixed_attachment_close_evidence),
                 'counters': counters,
+                'case_counters': case_counts,
             }
             _write_json(native_dir / f"{case['episode_id']}_failure.json", failure)
             raise primary_error
@@ -530,9 +548,18 @@ def run_worker(contract_path: Path) -> dict[str, object]:
     if len(contract['cases']) != 2 or [case['episode_id'] for case in contract['cases']] != ['E1', 'E2']:
         raise ValueError('R06b same-worker native contract must contain baseline E1 and derived E2 exactly once')
     counters = {
-        'native_starts': 1, 'materialization_attempts': 0, 'resets': 0,
-        'outer_intervals': 0, 'mj_step_calls': 0, 'mj_forward_calls': 0,
-        'attempted_mj_step_calls': 0, 'simulated_seconds': 0.0,
+        'native_starts': 1, 'materialization_attempts': 0, 'materializations_completed': 0,
+        'resets': 0, 'resets_completed': 0, 'outer_intervals': 0,
+        'mj_step_calls': 0, 'mj_forward_calls': 0,
+        'attempted_mj_step_calls': 0, 'attempted_mj_forward_calls': 0,
+        'simulated_seconds': 0.0,
+        'cases': {case['episode_id']: {
+            'materialization_attempts': 0, 'materializations_completed': 0,
+            'reset_attempts': 0, 'resets_completed': 0,
+            'outer_intervals': 0, 'attempted_mj_step_calls': 0,
+            'mj_step_calls': 0, 'attempted_mj_forward_calls': 0,
+            'mj_forward_calls': 0,
+        } for case in contract['cases']},
     }
     active = {'episode_id': None, 'outer': 0, 'phase': 'native_import'}
     _write_json(native_dir / 'native_progress.json', {
@@ -540,22 +567,26 @@ def run_worker(contract_path: Path) -> dict[str, object]:
         'contract_sha256': contract['contract_sha256'], 'counters': counters, 'active': active,
     })
     started = time.monotonic()
+    mujoco_module = None
+    original_step = original_forward = None
     try:
-        import mujoco
+        import mujoco as mujoco_module
         from r03c_attached_leaf_probe import _native_identity
 
-        identity = _native_identity(mujoco, contract['mujoco_static'])
+        identity = _native_identity(mujoco_module, contract['mujoco_static'])
         if (identity['package_version'], identity['runtime_version'], identity['api_version']) != (
             '3.8.1', '3.8.1', 3008001,
         ):
             raise ValueError('R06b native worker is not MuJoCo package/runtime 3.8.1 API 3008001')
         _write_json(native_dir / 'runtime_identity.json', identity)
-        original_step, original_forward = mujoco.mj_step, mujoco.mj_forward
+        original_step, original_forward = mujoco_module.mj_step, mujoco_module.mj_forward
         trace = native_dir / 'native_step_trace.jsonl'
 
         def counted_step(model, data, *args, **kwargs):
             attempted = int(kwargs.get('nstep', args[0] if args else 1))
             counters['attempted_mj_step_calls'] += attempted
+            case_counts = counters['cases'][active['episode_id']]
+            case_counts['attempted_mj_step_calls'] += attempted
             if counters['mj_step_calls'] + attempted > 640:
                 raise RuntimeError('R06b native mj_step budget of 640 would be exceeded')
             try:
@@ -565,6 +596,7 @@ def run_worker(contract_path: Path) -> dict[str, object]:
                                       'successful_before': counters['mj_step_calls'], **active})
                 raise
             counters['mj_step_calls'] += attempted
+            case_counts['mj_step_calls'] += attempted
             _append_jsonl(trace, {'event': 'mj_step', 'nstep': attempted,
                                   'successful_cumulative': counters['mj_step_calls'], **active})
             if counters['mj_step_calls'] > 640:
@@ -572,20 +604,35 @@ def run_worker(contract_path: Path) -> dict[str, object]:
             return result
 
         def counted_forward(*args, **kwargs):
+            case_counts = counters['cases'][active['episode_id']]
+            counters['attempted_mj_forward_calls'] += 1
+            case_counts['attempted_mj_forward_calls'] += 1
             if counters['mj_forward_calls'] + 1 > 300:
                 raise RuntimeError('R06b mj_forward diagnostic budget of 300 would be exceeded')
             result = original_forward(*args, **kwargs)
             counters['mj_forward_calls'] += 1
+            case_counts['mj_forward_calls'] += 1
             return result
 
-        mujoco.mj_step, mujoco.mj_forward = counted_step, counted_forward
+        mujoco_module.mj_step, mujoco_module.mj_forward = counted_step, counted_forward
         results = []
         for case in contract['cases']:
             active.update({'episode_id': case['episode_id'], 'outer': 0, 'phase': 'case_start'})
-            results.append(_run_case(case, output_dir, counters, {}, identity, native_dir))
-        if (counters['materialization_attempts'], counters['resets'], counters['outer_intervals'],
-                counters['mj_step_calls'], counters['attempted_mj_step_calls']) != (2, 2, 128, 640, 640):
+            results.append(_run_case(case, output_dir, counters, active, identity, native_dir))
+        if (counters['materialization_attempts'], counters['materializations_completed'],
+                counters['resets'], counters['resets_completed'], counters['outer_intervals'],
+                counters['mj_step_calls'], counters['attempted_mj_step_calls']) != (
+                    2, 2, 2, 2, 128, 640, 640):
             raise ValueError('R06b final cumulative native counters differ from its exact bounded contract')
+        if counters['mj_forward_calls'] != 130:
+            raise ValueError('R06b final cumulative mj_forward count differs from 130')
+        for episode_id, case_counts in counters['cases'].items():
+            if (case_counts['materialization_attempts'], case_counts['materializations_completed'],
+                    case_counts['reset_attempts'], case_counts['resets_completed'],
+                    case_counts['outer_intervals'], case_counts['attempted_mj_step_calls'],
+                    case_counts['mj_step_calls'], case_counts['mj_forward_calls']) != (
+                        1, 1, 1, 1, 64, 320, 320, 65):
+                raise ValueError(f'R06b {episode_id} case counters differ from the exact bounded contract')
         if abs(counters['simulated_seconds'] - 1.28) > 1e-12:
             raise ValueError('R06b total simulated time differs from 1.28 seconds')
         if not results[0]['native_receipt']['native_actuator_order'] == [
@@ -632,6 +679,10 @@ def run_worker(contract_path: Path) -> dict[str, object]:
             'status': 'NATIVE_WORKER_FAILED', 'counters': counters, 'active': active,
         })
         raise
+    finally:
+        if mujoco_module is not None and original_step is not None and original_forward is not None:
+            mujoco_module.mj_step = original_step
+            mujoco_module.mj_forward = original_forward
 
 
 def main(argv=None) -> int:

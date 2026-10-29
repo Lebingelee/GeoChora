@@ -384,10 +384,7 @@ class ArticulationDefinition(Contract):
             raise ValueError('articulation joint graph is disconnected or cyclic')
 
         object.__setattr__(self, 'link_frame_ids', tuple(sorted(self.link_frame_ids)))
-        # Joint declaration order carries the source traversal order used by
-        # providers. Keep the caller's order so it can be compared to the
-        # source instead of silently normalizing physical model order away.
-        object.__setattr__(self, 'joints', tuple(self.joints))
+        object.__setattr__(self, 'joints', tuple(sorted(self.joints, key=lambda joint: joint.joint_id)))
 
 
 @dataclass(frozen=True)

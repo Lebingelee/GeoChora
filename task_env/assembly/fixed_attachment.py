@@ -32,6 +32,16 @@ R06B_ORDER_SOURCE_SHA256 = {
     "panda-arm": "e556ae24843a6ef080c604b544e9f08ff531d036f414b7544dc1c6d7e44b3270",
     "panda-hand": "443f6d9ffbb7fc6ab27fbc8c493ab2b83a8dd2a03a431dac93eae9101eda9c29",
 }
+_SOURCE_JOINT_TRAVERSAL = {
+    "r03b-exact": {
+        "panda-arm": tuple(f"joint{index}" for index in range(1, 8)),
+        "panda-hand": ("finger_joint1", "finger_joint2"),
+    },
+    R06B_ORDER_RECIPE_ID: {
+        "panda-arm": tuple(f"joint{index}" for index in range(1, 8)),
+        "panda-hand": ("finger_joint2", "finger_joint1"),
+    },
+}
 
 
 def _recipe_xml_root(xml: str) -> ET.Element:
@@ -153,7 +163,7 @@ def _native_names(root: ET.Element, tags: set[str]) -> set[str]:
 
 
 def _validate_source_declarations(root: ET.Element, entity_id: str, scene: SceneDefinition,
-                                  source_sha256: str) -> None:
+                                  source_sha256: str, *, expected_traversal: tuple[str, ...]) -> None:
     """Check canonical kinematics against the pinned Panda source, without native IO.
 
     Hashing two internally consistent declarations does not establish that they
@@ -225,8 +235,10 @@ def _validate_source_declarations(root: ET.Element, entity_id: str, scene: Scene
 
     for body in root.findall("./worldbody/body"):
         walk(body, None, None)
-    if tuple(expected) != tuple(joint.joint_id for joint in articulation.joints):
-        raise ValueError("fixed Attachment canonical Joint order/coverage differs from source")
+    canonical_ids = tuple(joint.joint_id for joint in articulation.joints)
+    if (len(expected) != len(set(expected)) or set(expected) != set(canonical_ids)
+            or tuple(expected) != tuple(expected_traversal)):
+        raise ValueError("fixed Attachment source traversal/Joint coverage differs from its exact recipe")
 
 
 def validate_fixed_attachment_scene(
@@ -365,9 +377,16 @@ def lower_fixed_attachment_sources(
         raise ValueError("fixed Attachment derived source closure digest mismatch")
 
     parent_root, child_root = ET.fromstring(parent.xml), ET.fromstring(child.xml)
-    _validate_source_declarations(parent_root, plan.parent_entity_id, scene, plan.parent_source_sha256)
-    _validate_source_declarations(child_root, plan.child_entity_id, scene, plan.child_source_sha256)
     recipe = fixed_attachment_source_recipe(parent.xml, child.xml)
+    traversal = _SOURCE_JOINT_TRAVERSAL[recipe]
+    _validate_source_declarations(
+        parent_root, plan.parent_entity_id, scene, plan.parent_source_sha256,
+        expected_traversal=traversal[plan.parent_entity_id],
+    )
+    _validate_source_declarations(
+        child_root, plan.child_entity_id, scene, plan.child_source_sha256,
+        expected_traversal=traversal[plan.child_entity_id],
+    )
     expected_assets = (
         (plan.parent_entity_id, plan.parent_asset_id, plan.parent_asset_version,
          R06B_ORDER_SOURCE_REFERENCES["panda-arm"] if recipe == R06B_ORDER_RECIPE_ID

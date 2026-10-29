@@ -51,6 +51,18 @@ def _process_group_rss(pgid: int) -> list[dict[str, int]]:
     return rows
 
 
+def _process_group_pids(pgid: int) -> list[int]:
+    members = []
+    for stat_path in Path('/proc').glob('[0-9]*/stat'):
+        try:
+            tail = stat_path.read_text().rsplit(')', 1)[1].split()
+            if tail[0] != 'Z' and int(tail[2]) == pgid:
+                members.append(int(stat_path.parent.name))
+        except (OSError, ValueError, IndexError):
+            continue
+    return members
+
+
 def _terminate_group(pgid: int, process: subprocess.Popen) -> dict[str, object]:
     receipt = {'term_sent': False, 'kill_sent': False, 'term_wait_seconds': 0.0}
     try:
@@ -59,15 +71,16 @@ def _terminate_group(pgid: int, process: subprocess.Popen) -> dict[str, object]:
     except ProcessLookupError:
         return receipt
     started = time.monotonic()
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
+    deadline = started + 10
+    while time.monotonic() < deadline and _process_group_pids(pgid):
+        time.sleep(0.1)
+    if _process_group_pids(pgid):
         try:
             os.killpg(pgid, signal.SIGKILL)
             receipt['kill_sent'] = True
         except ProcessLookupError:
             pass
-        process.wait()
+    process.wait()
     receipt['term_wait_seconds'] = time.monotonic() - started
     return receipt
 
@@ -123,10 +136,26 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
     group_pgid = None
     started = None
     outcome = None
+    primary_error = None
+    cleanup_error = None
     low_memory_samples = 0
     rss_samples = []
     worker_log = output_dir / 'native_worker.log'
     reader_log = output_dir / 'raw_reader.log'
+    ledger = None
+    reader_returncode = None
+    reader_started = None
+    reader_started_at_unix_s = None
+    reader_wall_seconds = None
+    memory_available = None
+    termination = None
+    environment = os.environ.copy()
+    environment.update({
+        'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1',
+        'NUMEXPR_NUM_THREADS': '1', 'CUDA_VISIBLE_DEVICES': '',
+        'PYTHONDONTWRITEBYTECODE': '1',
+        'PYTHONPATH': f"{ROOT}:{ROOT / 'GeoPhys/src'}",
+    })
     try:
         memory_available = _available_bytes()
         if memory_available < 2 * 1024 * 1024 * 1024:
@@ -135,136 +164,177 @@ def run_supervisor(contract_path: Path, *, max_lock_wait_seconds: int = 1200) ->
                 'mem_available_bytes': memory_available,
                 'minimum_bytes': 2 * 1024 * 1024 * 1024,
             }
-            _write_json(output_dir / 'native_window.json', outcome)
-            return outcome
-        ledger = {
-            'schema': 'r06b-native-start-ledger-v1', 'native_start_count': 1,
-            'native_worker': 'r06b_order_worker.py', 'contract_sha256': contract['contract_sha256'],
-            'input_head': contract['input_head'], 'branch': contract['branch'],
-            'lock_path': str(LOCK_PATH), 'lock_wait_seconds': wait_seconds,
-            'lock_device': os.fstat(lock_fd).st_dev, 'lock_inode': os.fstat(lock_fd).st_ino,
-            'lock_acquired_at_unix_s': time.time(), 'parent_pid': os.getpid(),
-            'worker_started': False,
-        }
-        _write_json(output_dir / 'native_start_ledger.json', ledger)
-        environment = os.environ.copy()
-        environment.update({
-            'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1',
-            'NUMEXPR_NUM_THREADS': '1', 'CUDA_VISIBLE_DEVICES': '',
-            'PYTHONDONTWRITEBYTECODE': '1',
-            'PYTHONPATH': f"{ROOT}:{ROOT / 'GeoPhys/src'}",
-        })
-        with worker_log.open('wb') as log:
-            process = subprocess.Popen(
-                [sys.executable, str(ROOT / 'task_env/diagnostics/tasks/r06b_order_worker.py'),
-                 '--contract', str(contract_path)],
-                cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
-            group_pgid = process.pid
-            started = time.monotonic()
-            ledger.update({'worker_started': True, 'worker_pid': process.pid,
-                           'worker_pgid': group_pgid, 'worker_started_at_unix_s': time.time()})
+        else:
+            ledger = {
+                'schema': 'r06b-native-start-ledger-v1', 'native_start_count': 1,
+                'native_worker': 'r06b_order_worker.py', 'contract_sha256': contract['contract_sha256'],
+                'input_head': contract['input_head'], 'branch': contract['branch'],
+                'lock_path': str(LOCK_PATH), 'lock_wait_seconds': wait_seconds,
+                'lock_device': os.fstat(lock_fd).st_dev, 'lock_inode': os.fstat(lock_fd).st_ino,
+                'lock_acquired_at_unix_s': time.time(), 'parent_pid': os.getpid(),
+                'worker_started': False,
+            }
             _write_json(output_dir / 'native_start_ledger.json', ledger)
-            terminate_reason = None
-            while process.poll() is None:
-                elapsed = time.monotonic() - started
-                rss_rows = _process_group_rss(group_pgid)
-                rss_total = sum(item['rss_bytes'] for item in rss_rows)
-                sample = {
-                    'elapsed_seconds': elapsed, 'mem_available_bytes': _available_bytes(),
-                    'process_rss': rss_rows, 'group_rss_bytes': rss_total,
-                }
-                rss_samples.append(sample)
-                if rss_total > 4 * 1024 * 1024 * 1024:
-                    terminate_reason = 'sampled_process_group_rss_exceeded_4_GiB'
-                if sample['mem_available_bytes'] < 768 * 1024 * 1024:
-                    low_memory_samples += 1
-                else:
-                    low_memory_samples = 0
-                if low_memory_samples >= 3:
-                    terminate_reason = 'MemAvailable_below_768_MiB_for_three_samples'
-                if elapsed > 300:
-                    terminate_reason = 'worker_wall_exceeded_300_seconds'
-                if terminate_reason:
-                    termination = _terminate_group(group_pgid, process)
-                    outcome = {
-                        'status': 'NATIVE_TERMINATED_RESOURCE_LIMIT',
-                        'terminate_reason': terminate_reason,
-                        'termination': termination,
-                        'worker_returncode': process.returncode,
+            with worker_log.open('wb') as log:
+                process = subprocess.Popen(
+                    [sys.executable, str(ROOT / 'task_env/diagnostics/tasks/r06b_order_worker.py'),
+                     '--contract', str(contract_path)],
+                    cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                group_pgid = process.pid
+                started = time.monotonic()
+                ledger.update({'worker_started': True, 'worker_pid': process.pid,
+                               'worker_pgid': group_pgid, 'worker_started_at_unix_s': time.time()})
+                _write_json(output_dir / 'native_start_ledger.json', ledger)
+                terminate_reason = None
+                while process.poll() is None:
+                    elapsed = time.monotonic() - started
+                    rss_rows = _process_group_rss(group_pgid)
+                    rss_total = sum(item['rss_bytes'] for item in rss_rows)
+                    sample = {
+                        'elapsed_seconds': elapsed, 'mem_available_bytes': _available_bytes(),
+                        'process_rss': rss_rows, 'group_rss_bytes': rss_total,
                     }
-                    break
-                time.sleep(1.0)
+                    rss_samples.append(sample)
+                    if rss_total > 4 * 1024 * 1024 * 1024:
+                        terminate_reason = 'sampled_process_group_rss_exceeded_4_GiB'
+                    if sample['mem_available_bytes'] < 768 * 1024 * 1024:
+                        low_memory_samples += 1
+                    else:
+                        low_memory_samples = 0
+                    if low_memory_samples >= 3:
+                        terminate_reason = 'MemAvailable_below_768_MiB_for_three_samples'
+                    if elapsed > 300:
+                        terminate_reason = 'worker_wall_exceeded_300_seconds'
+                    if terminate_reason:
+                        termination = _terminate_group(group_pgid, process)
+                        outcome = {
+                            'status': 'NATIVE_TERMINATED_RESOURCE_LIMIT',
+                            'terminate_reason': terminate_reason,
+                            'termination': termination,
+                            'worker_returncode': process.returncode,
+                        }
+                        break
+                    time.sleep(1.0)
             ledger.update({
                 'worker_returncode': process.returncode,
                 'worker_finished_at_unix_s': time.time(),
-                'worker_wall_seconds': time.monotonic() - started,
+                'worker_wall_seconds': None if started is None else time.monotonic() - started,
             })
             _write_json(output_dir / 'native_start_ledger.json', ledger)
-        if outcome is None:
-            successful_result = (native_dir / 'native_result.json').is_file()
-            outcome = {
-                'status': ('NATIVE_WORKER_EXITED_SUCCESS'
-                           if process.returncode == 0 and successful_result
-                           else 'NATIVE_WORKER_FAILED'),
-                'worker_returncode': process.returncode,
-                'native_result_present': successful_result,
-            }
-        if process is not None and outcome['status'] == 'NATIVE_WORKER_EXITED_SUCCESS':
-            result = json.loads((native_dir / 'native_result.json').read_text())
-            if result.get('status') != 'R06B_NATIVE_WORKER_PASS_PENDING_READBACK':
-                raise ValueError('native worker exited zero without its exact pending-success result')
-            raw_command = [
-                sys.executable, str(ROOT / 'task_env/diagnostics/tasks/r06b_order_readback.py'),
-                '--contract', str(contract_path), '--native-result',
-                str(native_dir / 'native_result.json'),
-            ]
-            with reader_log.open('wb') as log:
-                reader = subprocess.run(raw_command, cwd=ROOT, env=environment,
-                                        stdout=log, stderr=subprocess.STDOUT,
-                                        timeout=60, check=False)
-            if reader.returncode != 0:
-                raise ValueError(f'independent raw H5 witness exited {reader.returncode}')
-            raw_receipt = json.loads((output_dir / 'raw_readback.json').read_text())
-            outcome = {
-                'status': 'R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW',
-                'native_worker_returncode': process.returncode,
-                'raw_reader_returncode': reader.returncode,
-                'lock_path': str(LOCK_PATH), 'lock_wait_seconds': wait_seconds,
-                'lock_held_until_raw_reader_exit': True,
-                'native_wall_seconds': time.monotonic() - started,
-                'max_group_rss_observed_bytes': max(
-                    (item['group_rss_bytes'] for item in rss_samples), default=0,
-                ),
-                'rss_samples': rss_samples,
-                'mem_available_initial_bytes': memory_available,
-                'native_result_sha256': _sha(native_dir / 'native_result.json'),
-                'raw_readback_sha256': _sha(output_dir / 'raw_readback.json'),
-                'raw_readback': raw_receipt,
-            }
-        outcome['lock_released_after_group'] = False
-        _write_json(output_dir / 'native_window.json', outcome)
-        return outcome
+            if outcome is None:
+                successful_result = (native_dir / 'native_result.json').is_file()
+                outcome = {
+                    'status': ('NATIVE_WORKER_EXITED_SUCCESS'
+                               if process.returncode == 0 and successful_result
+                               else 'NATIVE_WORKER_FAILED'),
+                    'worker_returncode': process.returncode,
+                    'native_result_present': successful_result,
+                }
+            if outcome['status'] == 'NATIVE_WORKER_EXITED_SUCCESS':
+                result = json.loads((native_dir / 'native_result.json').read_text())
+                if result.get('status') != 'R06B_NATIVE_WORKER_PASS_PENDING_READBACK':
+                    raise ValueError('native worker exited zero without its exact pending-success result')
+                raw_command = [
+                    sys.executable, str(ROOT / 'task_env/diagnostics/tasks/r06b_order_readback.py'),
+                    '--contract', str(contract_path), '--native-result',
+                    str(native_dir / 'native_result.json'),
+                ]
+                with reader_log.open('wb') as log:
+                    reader_started = time.monotonic()
+                    reader_started_at_unix_s = time.time()
+                    try:
+                        reader = subprocess.run(raw_command, cwd=ROOT, env=environment,
+                                                stdout=log, stderr=subprocess.STDOUT,
+                                                timeout=60, check=False)
+                    finally:
+                        reader_wall_seconds = time.monotonic() - reader_started
+                reader_returncode = reader.returncode
+                if reader.returncode != 0:
+                    raise ValueError(f'independent raw H5 witness exited {reader.returncode}')
+                raw_receipt = json.loads((output_dir / 'raw_readback.json').read_text())
+                outcome = {
+                    'status': 'R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW',
+                    'native_worker_returncode': process.returncode,
+                    'raw_reader_returncode': reader.returncode,
+                    'lock_held_until_raw_reader_exit': True,
+                    'native_wall_seconds': None if started is None else time.monotonic() - started,
+                    'native_result_sha256': _sha(native_dir / 'native_result.json'),
+                    'raw_readback_sha256': _sha(output_dir / 'raw_readback.json'),
+                    'raw_readback': raw_receipt,
+                }
     except BaseException as error:
+        primary_error = {
+            'type': type(error).__name__, 'message': str(error),
+            'traceback': ''.join(__import__('traceback').format_exception(error)),
+        }
         outcome = {
             'status': 'NATIVE_SUPERVISOR_FAILED', 'native_worker_started': process is not None,
-            'worker_returncode': None if process is None else process.returncode,
-            'error_type': type(error).__name__, 'error': str(error),
-            'lock_wait_seconds': wait_seconds,
+            'worker_returncode': None if process is None else process.poll(),
         }
-        _write_json(output_dir / 'native_window.json', outcome)
-        raise
     finally:
-        if process is not None and process.poll() is None:
-            _terminate_group(group_pgid, process)
-        fcntl.flock(lock_fd, fcntl.LOCK_UN)
-        os.close(lock_fd)
-        if outcome is not None and (output_dir / 'native_window.json').is_file():
-            final = json.loads((output_dir / 'native_window.json').read_text())
-            final['lock_released_after_group'] = True
-            final['lock_released_at_unix_s'] = time.time()
+        if process is not None and group_pgid is not None:
+            try:
+                if process.poll() is None or _process_group_pids(group_pgid):
+                    termination = _terminate_group(group_pgid, process)
+            except BaseException as error:
+                cleanup_error = {'type': type(error).__name__, 'message': str(error)}
+        if group_pgid is not None and _process_group_pids(group_pgid):
+            cleanup_error = cleanup_error or {
+                'type': 'ProcessGroupStillAlive', 'message': f'process group {group_pgid} remained alive',
+            }
+        if outcome is None:
+            outcome = {'status': 'NATIVE_SUPERVISOR_FAILED', 'native_worker_started': process is not None}
+        samples_observed = bool(rss_samples)
+        final = {
+            **outcome,
+            'lock_path': str(LOCK_PATH), 'lock_wait_seconds': wait_seconds,
+            'mem_available_initial_bytes': memory_available,
+            'native_worker_started': process is not None,
+            'worker_pid': None if process is None else process.pid,
+            'worker_pgid': group_pgid,
+            'worker_returncode': None if process is None else process.poll(),
+            'worker_start_ledger': ledger,
+            'worker_start_ledger_sha256': (
+                _sha(output_dir / 'native_start_ledger.json')
+                if (output_dir / 'native_start_ledger.json').is_file() else None
+            ),
+            'worker_log': str(worker_log),
+            'worker_log_sha256': _sha(worker_log) if worker_log.is_file() else None,
+            'reader_log': str(reader_log),
+            'reader_log_sha256': _sha(reader_log) if reader_log.is_file() else None,
+            'raw_reader_returncode': reader_returncode,
+            'raw_reader_started_at_unix_s': reader_started_at_unix_s,
+            'raw_reader_wall_seconds': reader_wall_seconds,
+            'rss_sample_count': len(rss_samples),
+            'rss_peak_sampled_group_bytes': max(
+                (item['group_rss_bytes'] for item in rss_samples), default=None,
+            ),
+            'rss_samples': rss_samples,
+            'rss_peak_is_sampled_not_interval_hard_peak': samples_observed,
+            'termination': termination,
+            'primary_error': primary_error,
+            'cleanup_error': cleanup_error,
+            'lock_held_through_cleanup': True,
+            'lock_released_after_group': False,
+        }
+        try:
             _write_json(output_dir / 'native_window.json', final)
+        except BaseException as error:
+            cleanup_error = cleanup_error or {'type': type(error).__name__, 'message': str(error)}
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        finally:
+            os.close(lock_fd)
+        final['lock_released_after_group'] = not bool(group_pgid and _process_group_pids(group_pgid))
+        final['lock_released_at_unix_s'] = time.time()
+        if cleanup_error is not None:
+            final['cleanup_error'] = cleanup_error
+            if final['status'] == 'R06B_BOUNDED_ORDER_REGRESSION_PASS_PENDING_SOL_REVIEW':
+                final['status'] = 'NATIVE_SUPERVISOR_CLEANUP_FAILED'
+        _write_json(output_dir / 'native_window.json', final)
+    return final
 
 
 def main(argv=None) -> int:

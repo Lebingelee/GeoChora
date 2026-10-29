@@ -889,8 +889,8 @@ def _observation(candidate, index, boundary_id):
     }
 
 
-def _write_attached_recording(monkeypatch, tmp_path):
-    candidate = _candidate(monkeypatch, episode_id='E3')
+def _write_attached_recording(monkeypatch, tmp_path, episode_id='E3'):
+    candidate = _candidate(monkeypatch, episode_id=episode_id)
     receipt, publication, attachment = _synthetic_io(candidate)
     runtime = _SyntheticRuntime(candidate, receipt, publication, attachment)
     env = candidate.env

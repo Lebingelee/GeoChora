@@ -12,6 +12,13 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _contract_digest(contract: dict) -> str:
+    payload = {key: value for key, value in contract.items() if key != 'contract_sha256'}
+    return hashlib.sha256(json.dumps(
+        payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False,
+    ).encode()).hexdigest()
+
+
 def _read_h5(path: Path, case: dict) -> dict[str, object]:
     import h5py
     import numpy as np
@@ -233,14 +240,84 @@ def run_readback(contract_path: Path, native_result_path: Path) -> dict[str, obj
     result = json.loads(native_result_path.read_text())
     if result.get('status') != 'R06B_NATIVE_WORKER_PASS_PENDING_READBACK':
         raise ValueError('raw H5 witness requires one completed same-worker native receipt')
-    if result.get('contract_sha256') != contract.get('contract_sha256'):
+    measured_contract_sha256 = _contract_digest(contract)
+    if (contract.get('contract_sha256') != measured_contract_sha256
+            or result.get('contract_sha256') != measured_contract_sha256):
         raise ValueError('native worker result is not bound to the frozen R06b contract')
+    if result.get('input_head') != contract.get('input_head'):
+        raise ValueError('native worker result input HEAD differs from the frozen R06b contract')
+    contract_cases = contract.get('cases')
+    worker_cases = result.get('cases')
+    expected_ids = ['E1', 'E2']
+    if (not isinstance(contract_cases, list) or len(contract_cases) != 2
+            or not all(isinstance(case, dict) for case in contract_cases)
+            or not isinstance(worker_cases, list) or len(worker_cases) != 2
+            or not all(isinstance(case, dict) for case in worker_cases)):
+        raise ValueError('contract and worker result must contain two case objects each')
+    contract_ids = [case.get('episode_id') for case in contract_cases]
+    worker_ids = [case.get('episode_id') for case in worker_cases]
+    if contract_ids != expected_ids or worker_ids != expected_ids:
+        raise ValueError('contract and worker result must contain exact unique ordered E1/E2 cases')
     cases = []
-    for case in contract['cases']:
+    worker_by_id = {case['episode_id']: case for case in worker_cases}
+    measured_case_counts = result.get('counters', {}).get('cases')
+    if not isinstance(measured_case_counts, dict) or set(measured_case_counts) != set(expected_ids):
+        raise ValueError('native worker result does not contain exact per-case counters')
+    expected_counts = {
+        'materialization_attempts': 1, 'materializations_completed': 1,
+        'reset_attempts': 1, 'resets_completed': 1, 'outer_intervals': 64,
+        'attempted_mj_step_calls': 320, 'mj_step_calls': 320,
+        'attempted_mj_forward_calls': 65, 'mj_forward_calls': 65,
+    }
+    aggregate = result.get('counters', {})
+    expected_aggregate = {
+        'materialization_attempts': 2, 'materializations_completed': 2,
+        'resets': 2, 'resets_completed': 2, 'outer_intervals': 128,
+        'attempted_mj_step_calls': 640, 'mj_step_calls': 640,
+        'attempted_mj_forward_calls': 130, 'mj_forward_calls': 130,
+    }
+    if (not isinstance(aggregate, dict)
+            or any(aggregate.get(key) != value for key, value in expected_aggregate.items())):
+        raise ValueError('native worker aggregate counters differ from the two-case contract')
+    for case in contract_cases:
         path = Path(contract['output_dir']) / 'cases' / case['episode_id'] / f"{case['episode_id']}.h5"
         if not path.is_file():
             raise FileNotFoundError(path)
-        cases.append(_read_h5(path, case))
+        witness = _read_h5(path, case)
+        worker_case = worker_by_id[case['episode_id']]
+        worker_h5 = worker_case.get('h5')
+        worker_receipt = worker_case.get('native_receipt')
+        if (not isinstance(worker_h5, dict) or not isinstance(worker_receipt, dict)
+                or worker_h5.get('path') != str(path)
+                or worker_h5.get('sha256') != witness['sha256']
+                or worker_h5.get('bytes') != witness['bytes']
+                or worker_h5.get('transition_count') != 64
+                or worker_h5.get('observation_count') != 65
+                or worker_h5.get('production_reader') != 'PASS'):
+            raise ValueError(f'{case["episode_id"]} actual H5 hash/size differs from the worker result')
+        if (worker_receipt.get('receipt_identity_sha256')
+                != witness['attachment_receipt_identity_sha256']
+                or worker_receipt.get('provider_materialization_id')
+                != witness['provider_materialization_id']):
+            raise ValueError(f'{case["episode_id"]} attachment receipt/materialization differs from worker result')
+        case_counts = measured_case_counts.get(case['episode_id'])
+        native_counts = worker_case.get('native_counts')
+        if (not isinstance(case_counts, dict) or not isinstance(native_counts, dict)
+                or any(case_counts.get(key) != value for key, value in expected_counts.items())
+                or any(native_counts.get(key) != value for key, value in expected_counts.items())
+                or native_counts.get('episode_id') != case['episode_id']
+                or native_counts.get('mj_step_calls_case') != 320
+                or native_counts.get('mj_forward_calls_case') != 65
+                or abs(float(native_counts.get('simulated_seconds_case', -1)) - 0.64) > 1e-12):
+            raise ValueError(f'{case["episode_id"]} worker case counters do not join to its H5 receipt')
+        witness.update({
+            'worker_result_h5_sha256': worker_h5['sha256'],
+            'worker_result_h5_bytes': worker_h5['bytes'],
+            'worker_result_receipt_identity_sha256': worker_receipt['receipt_identity_sha256'],
+            'worker_result_materialization_id': worker_receipt['provider_materialization_id'],
+            'worker_case_counters': case_counts,
+        })
+        cases.append(witness)
     if (len(cases) != 2 or cases[0]['provider_materialization_id'] == cases[1]['provider_materialization_id']
             or cases[0]['scene_identity_sha256'] == cases[1]['scene_identity_sha256']
             or cases[0]['source_closure_sha256'] == cases[1]['source_closure_sha256']):
@@ -253,7 +330,11 @@ def run_readback(contract_path: Path, native_result_path: Path) -> dict[str, obj
     receipt = {
         'status': 'INDEPENDENT_RAW_H5_READBACK_PASS',
         'reader': 'stdlib+h5py+PyYAML; no TaskEnv/provider imports',
+        'contract_sha256': measured_contract_sha256,
+        'worker_result_sha256': _sha(native_result_path),
         'cases': cases,
+        'case_order_matches_contract_and_worker_result': True,
+        'worker_result_file_receipt_counter_joins': True,
         'materialization_ids_distinct': True,
         'source_scene_closure_ids_distinct': True,
         'forbidden_imports_seen': forbidden,

@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from task_env.artifacts import ExecutionSpec
+from task_env.artifacts import ArticulationDefinition, ExecutionSpec, SceneDefinition
 from task_env.assembly.fixed_attachment import (
     R06B_ORDER_RECIPE_ID, R06B_ORDER_SOURCE_SHA256,
     _validate_source_declarations, fixed_attachment_source_recipe,
@@ -145,7 +145,10 @@ def test_exact_default_and_one_derived_recipe_are_distinct_and_provider_free():
     assert derived.source_inventory['arm']['sha256'] == R06B_ORDER_SOURCE_SHA256['panda-arm']
     assert derived.source_inventory['hand']['sha256'] == R06B_ORDER_SOURCE_SHA256['panda-hand']
     hand = next(item for item in derived.scene.articulations if item.entity_id == 'panda-hand')
-    assert tuple(joint.joint_id for joint in hand.joints) == ('finger_joint2', 'finger_joint1')
+    assert tuple(joint.joint_id for joint in hand.joints) == ('finger_joint1', 'finger_joint2')
+    assert tuple(node.get('name') for node in ET.fromstring(
+        derived.runtime_source.fixed_attachment_sources['panda-hand'].xml
+    ).find("./worldbody/body[@name='hand']").findall('body')) == ('right_finger', 'left_finger')
     arm_group = next(group for group in derived.scene.control_groups if group.entity_id == 'panda-arm')
     assert tuple(ref.actuator_id for ref in arm_group.actuator_refs) == tuple(
         f'actuator{index}' for index in range(1, 8)
@@ -161,7 +164,31 @@ def test_exact_baseline_and_derived_sources_pass_core_preflight():
         )
 
 
-def test_legacy_mismatched_xml_scene_order_remains_rejected():
+def test_articulation_v1_reverse_joint_input_preserves_canonical_mapping_and_scene_identity():
+    baseline = build_fixed_attachment_candidate()
+    hand = next(item for item in baseline.scene.articulations if item.entity_id == 'panda-hand')
+    old_identity = baseline.scene.identity_hash
+    assert old_identity == '7981f0bb31875b35eb0973b08c1f65ac09210b55b7e9e0ea45761e4f8a4cfe9a'
+    reversed_constructor = ArticulationDefinition.from_mapping({
+        **hand.to_mapping(), 'joints': list(reversed(hand.to_mapping()['joints'])),
+    })
+    assert tuple(joint.joint_id for joint in reversed_constructor.joints) == (
+        'finger_joint1', 'finger_joint2',
+    )
+    assert reversed_constructor.to_mapping() == hand.to_mapping()
+    scene_mapping = baseline.scene.to_mapping()
+    mapped_hand = next(item for item in scene_mapping['articulations']
+                       if item['entity_id'] == 'panda-hand')
+    mapped_hand['joints'] = list(reversed(mapped_hand['joints']))
+    decoded = SceneDefinition.from_mapping(scene_mapping)
+    assert decoded.identity_hash == old_identity
+    assert decoded.to_mapping() == baseline.scene.to_mapping()
+    assert tuple(joint.joint_id for joint in next(
+        item for item in decoded.articulations if item.entity_id == 'panda-hand'
+    ).joints) == ('finger_joint1', 'finger_joint2')
+
+
+def test_scene_joint_reverse_is_canonical_equivalent_but_source_recipe_order_stays_strict():
     candidate = build_fixed_attachment_candidate()
     root = ET.fromstring(candidate.runtime_source.fixed_attachment_sources['panda-hand'].xml)
     articulation = next(item for item in candidate.scene.articulations if item.entity_id == 'panda-hand')
@@ -169,8 +196,27 @@ def test_legacy_mismatched_xml_scene_order_remains_rejected():
         replace(item, joints=tuple(reversed(item.joints))) if item.entity_id == 'panda-hand' else item
         for item in candidate.scene.articulations
     ))
-    with pytest.raises(ValueError, match='Joint order/coverage'):
-        _validate_source_declarations(root, 'panda-hand', mismatched, HAND_SHA256)
+    assert mismatched.identity_hash == candidate.scene.identity_hash
+    _validate_source_declarations(
+        root, 'panda-hand', mismatched, HAND_SHA256,
+        expected_traversal=('finger_joint1', 'finger_joint2'),
+    )
+    with pytest.raises(ValueError, match='source traversal'):
+        _validate_source_declarations(
+            root, 'panda-hand', mismatched, HAND_SHA256,
+            expected_traversal=('finger_joint2', 'finger_joint1'),
+        )
+    derived = build_fixed_attachment_candidate(order_variant=True)
+    changed_sources = dict(derived.runtime_source.fixed_attachment_sources)
+    changed_sources['panda-hand'] = replace(
+        changed_sources['panda-hand'], xml=ET.tostring(root, encoding='unicode'),
+    )
+    with pytest.raises(ValueError):
+        _validate_fixed_attachment_materialization_source(
+            derived.artifact, _execution(), replace(
+                derived.runtime_source, fixed_attachment_sources=changed_sources,
+            ),
+        )
 
 
 @pytest.mark.parametrize('tamper', [
@@ -398,11 +444,11 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
     output_dir.mkdir()
     baseline_fixture = tmp_path / 'baseline-fixture'
     baseline_fixture.mkdir()
-    baseline, _baseline_env = _write_attached_recording(monkeypatch, baseline_fixture)
+    baseline, _baseline_env = _write_attached_recording(monkeypatch, baseline_fixture, episode_id='E1')
     baseline_file = Path(_baseline_env.recording_path)
-    baseline_case_dir = output_dir / 'cases' / 'E3'
+    baseline_case_dir = output_dir / 'cases' / 'E1'
     baseline_case_dir.mkdir(parents=True)
-    shutil.copy2(baseline_file, baseline_case_dir / 'E3.h5')
+    shutil.copy2(baseline_file, baseline_case_dir / 'E1.h5')
 
     derived = _candidate(monkeypatch, order_variant=True, episode_id='E2')
     session = _session_with_synthetic_native_io(derived)
@@ -453,9 +499,10 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
     baseline_receipt = _fixed_receipt(baseline)
     contract = {
         'schema': 'r06b-order-readback-contract-test-v1',
+        'input_head': 'synthetic-test-head',
         'output_dir': str(output_dir),
         'cases': [
-            case_for(baseline, 'E3', baseline_case_dir / 'E3.h5', baseline_receipt),
+            case_for(baseline, 'E1', baseline_case_dir / 'E1.h5', baseline_receipt),
             case_for(derived, 'E2', derived_file, session.fixed_attachment_receipt),
         ],
     }
@@ -467,10 +514,32 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
     native_dir = output_dir / 'native'
     native_dir.mkdir()
     native_result_path = native_dir / 'native_result.json'
-    native_result = {
-        'status': 'R06B_NATIVE_WORKER_PASS_PENDING_READBACK',
-        'contract_sha256': contract['contract_sha256'],
-    }
+    native_result = {'status': 'R06B_NATIVE_WORKER_PASS_PENDING_READBACK'}
+
+    def worker_case(case, root):
+        episode_id = case['episode_id']
+        path = root / 'cases' / episode_id / f'{episode_id}.h5'
+        source_receipt = baseline_receipt if episode_id == 'E1' else session.fixed_attachment_receipt
+        counts = {
+            'materialization_attempts': 1, 'materializations_completed': 1,
+            'reset_attempts': 1, 'resets_completed': 1, 'outer_intervals': 64,
+            'attempted_mj_step_calls': 320, 'mj_step_calls': 320,
+            'attempted_mj_forward_calls': 65, 'mj_forward_calls': 65,
+        }
+        return {
+            'episode_id': episode_id,
+            'h5': {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                   'bytes': path.stat().st_size, 'transition_count': 64,
+                   'observation_count': 65, 'production_reader': 'PASS'},
+            'native_receipt': {
+                'receipt_identity_sha256': source_receipt['receipt_identity_sha256'],
+                'provider_materialization_id': source_receipt['provider_materialization_id'],
+            },
+            'native_counts': {
+                **counts, 'episode_id': episode_id, 'mj_step_calls_case': 320,
+                'mj_forward_calls_case': 65, 'simulated_seconds_case': 0.64,
+            },
+        }
 
     def publish(root, current_contract):
         current_contract['output_dir'] = str(root)
@@ -483,7 +552,17 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
         (root / 'native').mkdir(exist_ok=True)
         (root / 'native' / 'native_result.json').write_text(json.dumps({
             'status': native_result['status'],
+            'input_head': current_contract['input_head'],
             'contract_sha256': current_contract['contract_sha256'],
+            'counters': {
+                'materialization_attempts': 2, 'materializations_completed': 2,
+                'resets': 2, 'resets_completed': 2, 'outer_intervals': 128,
+                'attempted_mj_step_calls': 640, 'mj_step_calls': 640,
+                'attempted_mj_forward_calls': 130, 'mj_forward_calls': 130,
+                'cases': {episode: worker_case(case, root)['native_counts']
+                          for episode, case in ((c['episode_id'], c) for c in current_contract['cases'])},
+            },
+            'cases': [worker_case(case, root) for case in current_contract['cases']],
         }, sort_keys=True) + '\n')
         return contract_file, root / 'native' / 'native_result.json'
 
@@ -505,7 +584,7 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
     assert valid.returncode == 0, valid.stdout + valid.stderr
     raw_receipt = json.loads((output_dir / 'raw_readback.json').read_text())
     assert raw_receipt['status'] == 'INDEPENDENT_RAW_H5_READBACK_PASS'
-    assert [item['episode_id'] for item in raw_receipt['cases']] == ['E3', 'E2']
+    assert [item['episode_id'] for item in raw_receipt['cases']] == ['E1', 'E2']
     assert raw_receipt['forbidden_imports_seen'] == []
 
     def edit_controls(path, mutation):
@@ -520,45 +599,75 @@ def test_independent_raw_reader_accepts_two_cases_and_rejects_frozen_tamper_matr
                                 data=json.dumps(rows, sort_keys=True),
                                 dtype=h5py.string_dtype(encoding='utf-8'))
 
-    tamper_cases = {
-        'source_hash': lambda root, c: c['cases'][1]['candidate'].__setitem__(
-            'source_closure_sha256', '0' * 64),
-        'target': lambda root, c: edit_controls(
-            root / 'cases/E2/E2.h5',
-            lambda rows: rows[0]['writer_controls'][0]['controller_target'].__setitem__(
-                'identity_hash', '0' * 64),
-        ),
-        'ack': lambda root, c: edit_controls(
-            root / 'cases/E2/E2.h5',
-            lambda rows: rows[0]['writer_controls'][0]['canonical_action'][
-                'application_ack'
-            ].__setitem__('writer_id', 'tampered-writer'),
-        ),
-        'native_slot': lambda root, c: edit_controls(
-            root / 'cases/E2/E2.h5',
-            lambda rows: rows[0]['writer_controls'][0]['canonical_action'][
-                'prepared_command'
-            ]['slot_values'][0].__setitem__('ctrl_slot', 5),
-        ),
-        'clock': lambda root, c: edit_controls(
-            root / 'cases/E2/E2.h5',
-            lambda rows: rows[0]['writer_controls'][0]['canonical_action'][
-                'source_boundary'
-            ].__setitem__('control_step', 7),
-        ),
-        'state_order': lambda root, c: _swap_state_columns(root / 'cases/E2/E2.h5'),
-        't_plus_one': lambda root, c: _tamper_observation_count(root / 'cases/E2/E2.h5'),
+    tamper_labels = {
+        'raw_source_hash', 'raw_target', 'raw_ack', 'raw_native_slot', 'raw_clock',
+        'raw_state_order', 't_plus_one', 'raw_worker_result_file',
+        'raw_worker_result_receipt', 'raw_duplicate_case', 'raw_missing_case',
+        'raw_swapped_case', 'raw_contract_digest', 'raw_wrong_run',
     }
     results = {}
-    for label, mutate in tamper_cases.items():
+    for label in sorted(tamper_labels):
         tampered_root = tmp_path / f'raw-tamper-{label}'
         shutil.copytree(output_dir, tampered_root)
-        tampered_contract = json.loads((tampered_root / 'contract.json').read_text())
-        mutate(tampered_root, tampered_contract)
-        result = raw_reader(tampered_root, tampered_contract)
+        contract_file = tampered_root / 'contract.json'
+        result_path = tampered_root / 'native/native_result.json'
+        tampered_contract = json.loads(contract_file.read_text())
+        result_data = json.loads(result_path.read_text())
+        case_h5 = tampered_root / 'cases/E2/E2.h5'
+        if label == 'raw_source_hash':
+            tampered_contract['cases'][1]['candidate']['source_closure_sha256'] = '0' * 64
+            digest = hashlib.sha256(json.dumps(
+                {key: value for key, value in tampered_contract.items() if key != 'contract_sha256'},
+                sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False,
+            ).encode()).hexdigest()
+            tampered_contract['contract_sha256'] = digest
+            result_data['contract_sha256'] = digest
+        elif label == 'raw_target':
+            edit_controls(case_h5, lambda rows: rows[0]['writer_controls'][0][
+                'controller_target'].__setitem__('identity_hash', '0' * 64))
+        elif label == 'raw_ack':
+            edit_controls(case_h5, lambda rows: rows[0]['writer_controls'][0][
+                'canonical_action']['application_ack'].__setitem__('writer_id', 'tampered-writer'))
+        elif label == 'raw_native_slot':
+            edit_controls(case_h5, lambda rows: rows[0]['writer_controls'][0][
+                'canonical_action']['prepared_command']['slot_values'][0].__setitem__('ctrl_slot', 5))
+        elif label == 'raw_clock':
+            edit_controls(case_h5, lambda rows: rows[0]['writer_controls'][0][
+                'canonical_action']['source_boundary'].__setitem__('control_step', 7))
+        elif label == 'raw_state_order':
+            _swap_state_columns(case_h5)
+        elif label == 't_plus_one':
+            _tamper_observation_count(case_h5)
+        elif label == 'raw_worker_result_file':
+            result_data['cases'][1]['h5']['sha256'] = '0' * 64
+        elif label == 'raw_worker_result_receipt':
+            result_data['cases'][1]['native_receipt']['receipt_identity_sha256'] = '0' * 64
+        elif label == 'raw_duplicate_case':
+            result_data['cases'][1] = dict(result_data['cases'][0])
+        elif label == 'raw_missing_case':
+            result_data['cases'].pop()
+        elif label == 'raw_swapped_case':
+            result_data['cases'].reverse()
+        elif label == 'raw_wrong_run':
+            shutil.copy2(tampered_root / 'cases/E1/E1.h5', case_h5)
+        elif label == 'raw_contract_digest':
+            tampered_contract['cases'][1]['candidate']['source_closure_sha256'] = '0' * 64
+        if label in {'raw_target', 'raw_ack', 'raw_native_slot', 'raw_clock',
+                     'raw_state_order', 't_plus_one', 'raw_wrong_run'}:
+            result_data['cases'][1]['h5']['sha256'] = hashlib.sha256(case_h5.read_bytes()).hexdigest()
+            result_data['cases'][1]['h5']['bytes'] = case_h5.stat().st_size
+        if label in {'raw_target', 'raw_ack', 'raw_native_slot', 'raw_clock',
+                     'raw_state_order', 't_plus_one', 'raw_wrong_run', 'raw_source_hash', 'raw_contract_digest'}:
+            contract_file.write_text(json.dumps(tampered_contract, sort_keys=True, indent=2) + '\n')
+        result_path.write_text(json.dumps(result_data, sort_keys=True) + '\n')
+        result = subprocess.run(
+            [sys.executable, str(script), '--contract', str(tampered_root / 'contract.json'),
+             '--native-result', str(tampered_root / 'native/native_result.json')],
+            cwd=tampered_root, env=env, text=True, capture_output=True, timeout=30, check=False,
+        )
         results[label] = result.returncode
         assert result.returncode != 0, f'{label} tamper passed raw readback'
-    assert set(results) == {'source_hash', 'target', 'ack', 'native_slot', 'clock', 'state_order', 't_plus_one'}
+    assert set(results) == tamper_labels
     assert all(value != 0 for value in results.values())
 
 
