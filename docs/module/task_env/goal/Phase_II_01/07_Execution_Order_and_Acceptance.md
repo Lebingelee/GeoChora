@@ -1,11 +1,11 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-当前复核结论（2026-10-29）：R05b attempt002已获Sol接收 `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2`，F1–F4关闭；19项focused S1经Sol复跑通过，CPU/CUDA各两outer短S2原件独立读回通过。R05c attempt001四格已完成、待Sol复核，P99未关闭；见[R05接收](05_R05_Native_Rate_Feedback.md#r05b-attempt002-sol-acceptance)。后续工作包prompt由维护者自行发送，Sol不直接派发。
+当前复核结论（2026-10-29）：R05c attempt001四格已获Sol接收 `ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3`；R05a/b/c精确required出口完成。Sol独立读回四H5与完整Guard/Outcome/strict Expert，复跑当前focused集合26 passed；详情见[R05c接收](05_R05_Native_Rate_Feedback.md#r05c-attempt001-sol-acceptance)。后续prompt由维护者发送；下一项R06c仍须历史missing-raw的独立阶段处置，P99未关闭。
 
-当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c attempt001四格完成并待Sol复核。Luna1 独立负责 F00–F07。**
+当前入口（2026-10-29，维护者最新分工）：**本对话与 Luna2 负责原 07 执行表；R05a attempt001 已获接收，R05b attempt002已获有界S1/S2接收；R05c attempt001四格已获有界接收。Luna1 独立负责 F00–F07。**
 
-跨分支汇总已有 **16/22 slices 获 Sol 有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a/b、R06a/b。接收等级各异：静态 S1、Audit、真实 S2/S3 不能互换，R06a 审计接收也不关闭历史 compatibility decision gate。
-尚有六个未完成的行：R05c、R06c、R07a/b/c/d。R07a 已有部分协议/来源审计接收及一项 pilot 的来源处置，但原五任务完整出口未达到，不计入 16 项。
+跨分支汇总已有 **17/22 slices 获 Sol 有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a–c、R06a/b。接收等级各异：静态 S1、Audit、真实 S2/S3 不能互换，R06a 审计接收也不关闭历史 compatibility decision gate。
+尚有五个未完成的行：R06c、R07a/b/c/d。R07a 已有部分协议/来源审计接收及一项 pilot 的来源处置，但原五任务完整出口未达到，不计入 17 项。
 
 - **Luna2 / 本表**：复用 `codex/phase-ii-01-camera` 与既有独立 checkout；R04b 为 `ACCEPTED_BOUNDED_S2`、R04c 为 `ACCEPTED_BOUNDED_S3`、R06b003 run002 为 `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`。这些提交尚未合入 `develop-full`，主分支旧状态不能推翻其接收。
 - **Luna1 / F线**：复用 `develop-full`；截至主分支 `1632a11774d817f2ebe36198bbc40a74e7f36974`，F00、F01 已获有界接收。F01 限 Isaac 原生 Panda+刚体对照，不能视作 Core Isaac provider 接通。后续 F 状态以主分支 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md) 为准，本表不代写在途 F 证据。
@@ -101,7 +101,7 @@ P00-L02 attempt002由Sol收口后，下一包进入R03a具体实施/执行授权
 | 13 | R04b | R04a | 同Env真实capture/observation | S2 | stale/ghost step/teardown失败→停止 | ACCEPTED_BOUNDED_S2；GeoPhys a53 CPU × MuJoCo3.8.1 EGL、两轮24step/53capture；见 [R04b attempt002](04_R04_Dynamic_Camera_Consumer.md#r04b-attempt002-bounded-s2-execution-2026-10-28) |
 | 14 | R04c | R04b | 同H5图像/metadata/控制读回 | S3 | 错T/T+1或无semantic reader→失败 | `ACCEPTED_BOUNDED_S3`；GeoPhys a53 CPU × MuJoCo 3.8.1 EGL，双同Env H5各12/13、双reader与22项native派生篡改拒绝；见 [R04c attempt001](04_R04_Dynamic_Camera_Consumer.md#r04c-attempt001-camera-h5-s3) |
 | 15 | R05b | R05a | Provider public sample→Core admission | S1/S2 | 错phase/validity或private bypass→停止 | ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2；attempt002 F1–F4关闭，19项S1复跑及CPU/CUDA短S2接收；不含完整任务 |
-| 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | ATTEMPT001 FOUR CELLS PASS PENDING SOL REVIEW; 25 S1 passed |
+| 16 | R05c | R05b | CPU/CUDA×100/500Hz正式对照/H5 | S2/S3 | 任一required cell失败/未运行→P99 blocked | ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3；17d6388四格完整任务/H5/双reader接收，精确交集见R05 |
 | 17 | R06b | R06a,R01c,R02c,R03b | 版本/顺序/coupling保护汇总 | S1/S2 | 旧支持退化/新token混淆→停止 | `ACCEPTED_BOUNDED_R06B_ORDER_REGRESSION`；attempt003 run002有界双case/S1/S2/H5接收，详见06接收记录；历史missing raw处置仍BLOCKED，R06c/P99不关闭。 |
 | 18 | R06c | R06b,R03c,R04c,R05c | 全部required交集/证据/决议包 | S1/S2/S3 | 缺required出口/历史处置→P99 blocked | PLANNED / NOT_STARTED |
 | 19 | R07a | P00 | LIBERO5任务/原生语义/init/资产审计、RoboCasafeasibility、成本协议 | Audit/S1 | 协议或required来源/语义缺口未决→阻塞部署 | PARTIAL_AUDIT_ACCEPTED；一项 pilot 来源审计有界接收，原五任务出口未完成；详见09及主分支 Sol R07a004记录 |
@@ -253,3 +253,5 @@ R07a成本protocol须在任何R07b部署前冻结。R07d的native-reference Agen
 2026-10-29 Sol接收R05b002：209/81项hash匹配、67个实际资产bytes核对、19项S1独立复跑及原两H5独立raw读回通过；16/22有界接收。后继R05c仍未执行，工作包由维护者发送，禁止自动向Luna2派发。
 
 2026-10-29 R05c001工作包准备：前置R05b已接收，四格正常profile完整任务/Guard/Outcome/Expert/同runH5与双reader，具体owner和资源窗口见[R05c实施合同](05_R05_Native_Rate_Feedback.md#r05c-attempt001-implementation-plan)。当前仅准备，未执行；prompt由维护者发送，Sol不直接派发。
+
+2026-10-29 Sol接收R05c001：113/265项hash、四格共同native HEAD及四原H5独立完整raw读回通过；当前S1独立复跑26 passed，原25项日志保留。R05a/b/c精确required交集出口完成，17/22 slices接收。R06c运行前置满足但历史四类缺件/阶段处置未决；不自动延期/退休、不关闭P99或Qualification、不派下一包。

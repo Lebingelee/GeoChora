@@ -1,6 +1,6 @@
 # R05 — GeoPhys Formal Native-rate Feedback Contract
 
-状态（2026-10-29）：R05a已接收；R05b attempt002经Sol复核接收 `ACCEPTED_BOUNDED_R05B_PUBLIC_NATIVE_FEEDBACK_S1_S2`。F1–F4关闭，正常route证据仅限精确NutAssembly/GeoPhys CPU与CUDA、seed19、500Hz law、两outer短S2。R05c未启动，完整任务/四格/P99/Qualification未关闭；两项旧配置摘要差异保留。
+状态（2026-10-29）：R05a/b/c均获各自有界出口接收；R05c为 `ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3`。精确NutAssembly/source/GeoPhys c6df840/CPU-CUDA/100-500Hz四格完整任务与双reader通过，R05 required envelope出口完成；R06c历史missing-raw处置、R07/P99与Qualification仍未关闭。
 
 ## 现有能力与 owner
 
@@ -212,3 +212,15 @@ Provider/source/task算法/pins默认保持；发现真实physics/Controller/Gua
 最终focused S1为 `25 passed in 9.09s`，采样最大RSS 149,300 KiB，engine import tripwire为0行；包含既有C05c、R05b回归与新增full-campaign worker/supervisor/reader正负例。每格结束后独立raw reader均PASS。首个CPU-100 `run_002`在任务完成并写出生产H5后，因supervisor字段名映射错误而未进入正式reader/finalizer通过门；它作为不通过部分证据原样保留，不并入四个正式cell。最初CPU-100 `run_001`在native前的目录预创建约定处失败、native starts为0，同样保留。修复后重新运行CPU-100 `run_003`，其余三格均与最终实现一致。完整报告、Evidence、命令、失败与成功原件及hash位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r05c_001/`。
 
 本结果仅为精确NutAssembly normal profile、GeoPhys c6df840、CPU/CUDA与law 100/500 Hz四格的有界S2/S3执行证据，待Sol复核；不是P99、通用Provider capability、实时/2 ms保证或Formal Qualification。历史missing raw/phase处置仍 `BLOCKED_MISSING_RAW_OR_PHASE_DECISION`，不在本包关闭。两项旧`source.config`摘要断言限定保持未解决；没有改写其基线，也没有声称全历史回归通过。
+
+<a id="r05c-attempt001-sol-acceptance"></a>
+
+## R05c attempt001 Sol接收（2026-10-29）
+
+接收 **ACCEPTED_BOUNDED_R05C_NORMAL_PROFILE_FOUR_CELL_S2_S3**，输入camera `702c83bbb54d02f66c765eab8343d06f3839d596`，四格native共同实施HEAD `17d63889573412d0b94191d32c499fe3f1fda80a`、GeoPhys `c6df840`、精确69文件闭包/seed19/implicitfast/2ms×5/outer100Hz，physics/force/Guard500Hz、host Controller。R05a/b/c在该精确required交集出口均完成，不扩大到其他任务/source/backend/实时或device-resident支持。
+
+Sol独立核实113项输出manifest、265项保护hash、12份Markdown hash、四格contract共同HEAD及worker/reader源码。四份原H5经无Core/provider导入的raw reader完整重读：CPU100=2443/2444、CPU500=2442/2443、CUDA100=2443/2444、CUDA500=2442/2443；合计9770 transitions/9774 observations/48850 native samples。100Hz各2443 update/9772 hold，500Hz各12210 update/0hold；每格连续50样本Guard授权、完整磁盘task/Outcome/strict Expert、production reader/close/资源/排他锁门通过。RSS/VRAM均为周期采样值，非硬峰值；Sol零新native。
+
+Sol当前文件集focused S1复跑 **26 passed in 9.14s**、engine tripwire零命中；Luna原日志25 passed/9.09s继续按原时点保存，当前集合包含实施收尾新增的supervisor mapping测试，不回写旧结果。CPU100 run001前置目录失败、run002收尾失败原件保留；最终四格各自完整、未拼接旧a53或partial运行。
+
+完整Sol复核：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r05c_001/`。原表17/22 slices有界接收，余R06c与R07a–d。R06c运行前置已满足，但四类历史missing raw的本阶段恢复/退休/继续延期独立处置仍未批准，不能自动关闭compatibility/P99；两项旧source.config摘要断言保持未解决，不称全历史回归通过。后续prompt由维护者发送，本次未派包/merge/push或修改F线。
