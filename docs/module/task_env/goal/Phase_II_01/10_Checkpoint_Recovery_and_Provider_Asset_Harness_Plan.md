@@ -396,3 +396,31 @@ Taichi；它超过本包禁止真实solver/physics的范围。run已结束，立
 `F03_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION`；Sol须审阅后决定本包出口，不能把它表述为无偏差的
 全包PASS。报告与全部run原件在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/`。
 F04未启动，窗口结束后停止等待Sol。
+
+<a id="f03-attempt003-final-boundary-closure"></a>
+
+## F03 attempt003 最终 T+1 边界、兼容环境与执行范围收口（2026-10-29，待Sol复核）
+
+本次以`develop-full@7af5c818b50b2ce0a07885f614bd6c155a58765d`开工，tracked clean；GeoPhys与Menagerie Gitlink未变。沿用attempt002保留的实现提交`54201eab61e317786a92d0af26e407601a11063a`，不重建Core factory、RuntimeSession、Position Controller或Recorder，不改Provider pins/依赖。attempt001/002、F00/F01/F02原件和失败日志保持只读。
+
+### 最后boundary修复
+
+复现确认attempt002 reader只在4个transition循环里核4个source boundary，却因observation shape=T+1报告5行已核验。run003把原H5复制到新临时H5，仅翻转末行`obs/state/boundary_identity_sha256[-1,0]`；未修改的attempt002 reader接受该文件并输出PASS，证实漏检；原episode-0/1 H5 SHA-256仍为`70fa9b5d…7f01d79`和`4dcf0b61…b956b2e0`。
+
+Generic H5 v3保持不变。原文件有末尾episode-ended state boundary digest，但没有足够的逐观测typed identity和观测值摘要用于独立重建最后发布。按包内允许的最小F03 witness方案，经同一真实Core public `make_env → reset → step → existing TransitionRecorder → finish_recording → close`路线生成两轮新合成文件。witness只由public reset/step返回的observation与info生成，记录每个边界的完整`StateBoundaryIdentity`、`StateSampleClock`和observation field/digest；独立reader不读取fixture私有状态或producer PASS，也不重新运行producer。
+
+新reader对每份H5逐行核验T+1完整boundary及public observation：typed boundary digest与H5 bytes对应、source Target边界与前T行逐行相等、episode/reset/Scene/materialization连续、control step/state revision单调、每行clock正确、每个观测值对上public-return witness；最后一行另与episode-ended event/outcome、最终成功advance和public step publication clock核对。`boundary_rows_verified`仅在该行identity与观测核验完后递增。两份新H5各4 transitions/5 observations，独立回读`8/8 transitions`、`10/10 boundary rows`、`10/10 public observations`、`40` synthetic advances；最后public clock均为0.04s。
+
+原source/execution/receipt/state/Target/Ack/clock/T+1八类拒绝门继续保留。新增末行digest、episode、reset identity、clock、缺失最终observation、重复及stale observation七类copy-only拒绝；共15/15。末行reset tamper同时重算相关digest/event仍因reset sample与profile不匹配而被拒。所有tamper只操作新临时副本。两份新H5均约80KB，reader与witness、全部15类拒绝明细在ignored`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/`。
+
+### 旧兼容回归与运行范围
+
+旧run028的23/24和run030的2/7仅作为环境混用历史保留，不改原reader版本要求、old log或失败清单。Core Python preflight未import MuJoCo，记录distribution 3.8.1、header API 3008001、find_spec origin和Core site-packages路径；Isaac site-packages不在sys.path。冻结精确nodeids后，受影响R02c version/header纯检查`1/1`和R03c旧H5 synthetic reader选择集`5/5`通过。pytest collection guard拒绝任何非allowlist nodeid；`sitecustomize`在collection前启用MuJoCo/Isaac/Omniverse/Taichi/OpenUSD import与provider launcher tripwire，两个run没有tripwire事件。R03c所选synthetic tests只替换测试定义的native model/data IO叶节点，真实Core admission/reset/H5 reader仍运行；未运行R03c native case。
+
+run031误选真实CPU Pendulum的三次public step继续是attempt002历史`EXECUTION_SCOPE_DEVIATION_RETAINED`，命令、输出和原始哈希均保留，未重跑，也不计作Isaac/F03物理验收。本attempt Kit/App、GPU、renderer、MuJoCo native、GeoPhys solver/materializer、physics启动均为0，没有取得native锁。新H5 witness生成、独立reader、环境预检及旧回归进程的RSS采样最大值未达3GiB，重检查前MemAvailable超过4GiB；无依赖安装或下载。
+
+### 其余门与出口
+
+复用attempt002的F03 typed source/frame/COM oracle及fault/lifecycle证据、clean-checkout F02 45/45、C02b/P99与其他未受影响结果；本包只补末行witness、独立reader、精确受影响旧nodeids和相关文档门，没有重跑whole-module campaign。run028/030原失败原件与run031执行偏差仍在，不被新结果覆盖。普通生产`materialize()`仍拒绝synthetic/unverified USD，Isaac Core RuntimeSession adapter、validated Panda USD和production provider admission仍缺；未获得S2/S3、Qualification或F04授权。
+
+候选结果为`F03_CORE_CALL_CHAIN_S1_CLOSURE_PASS_PENDING_SOL_REVIEW`，并单列`attempt002 historical EXECUTION_SCOPE_DEVIATION_RETAINED`；Sol接收尚未发生。提交/输入输出HEAD、逐run argv/source hashes/resource ledger、witness/H5 hash、保护清单复核、Markdown hashes及失败修复过程见该目录中的`report.md`、`evidence.json`、`commands.json`、`run_ledger.json`和`sha256.manifest`。本文新增collection守卫使用pytest官方`pytest_collection_modifyitems` hook作为精确节点选择点；逐条检查T与后继观测是本项目T+1合同，不把robomimic的格式声明引入Geochora：[pytest API](https://pytest.org/en/stable/reference/reference.html#pytest_collection_modifyitems)、[robomimic dataset structure](https://robomimic.github.io/docs/datasets/overview.html#dataset-structure)。F04与其他slice保持HELD，窗口已释放，等待Sol复核。

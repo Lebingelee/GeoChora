@@ -225,17 +225,28 @@ passed the actual public `make_env`/same-Env two-reset/four-step-per-episode/Gen
 with a private synthetic NativeRuntimeIOV1 implementation, producing two closed H5 files at
 T=4/T+1=5. The existing Core session, reset gate, typed projections, Position Controller,
 Target/Ack checks, transition Recorder, finalizer and close ran; the fixture did not implement a
-Session, integrator or Recorder. A separate process decoded both H5 files and rejected eight
-source/execution/receipt/state/Target/Ack/clock/T+1 tamper classes. The 20-case source/state/frame
-contract suite and affected provider-free C02b/P99/H5 regressions passed.
+Session, integrator or Recorder. Its independent reader rejected eight source/execution/receipt/
+state/Target/Ack/clock/T+1 tamper classes.
 
-This synthetic S1 does not exercise production USD admission: the private context validates one
-exact synthetic input, while ordinary `materialize()` continues to reject it. No verified Panda
-USD delivery or Isaac Core RuntimeSession adapter is available, so provider admission, native
-execution and Qualification remain unestablished. One ancillary legacy fault-suite run
-accidentally stepped a real CPU Pendulum environment, outside its no-physics scope; the run is
-preserved and the overall attempt is pending Sol review with that execution-scope deviation.
-See the [F03 attempt002 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)
+F03 attempt003 found that the attempt002 reader iterated only the T transition-source boundaries
+while reporting T+1 verified rows. It reproduced acceptance of a copied H5 with the final stored
+boundary digest changed. Generic H5 v3 stayed unchanged. Two fresh synthetic episodes were
+recorded through the same Core route while a sidecar captured full boundary identities, clocks
+and observation fingerprints from the public reset/step return values. A separate reader now
+checks every T+1 identity and observation against those public facts, the structured-control
+source boundaries, episode-end event/outcome and final successful advance. It reports 10/10
+boundary rows and 10/10 observation rows verified across the two H5 files, and rejects the eight
+original tamper classes plus seven final-boundary/observation cases. The affected old R02c/R03c
+compatibility checks also pass in the Core Python environment with MuJoCo 3.8.1; their attempt002
+environment-mixing failures remain preserved history.
+
+This is synthetic Core S1 evidence only. Production `materialize()` continues to reject
+synthetic/unverified input; no verified Panda USD delivery or Isaac Core RuntimeSession adapter
+is available, so provider admission, native execution and Qualification remain unestablished.
+Attempt002's accidental three public steps in a real CPU Pendulum environment remain a retained
+execution-scope deviation; attempt003 itself started no native runtime or physics. Sol review is
+pending. See the [F03 attempt003 closure](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
+[attempt002 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)
 and historical [attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 
 ### Static Logical Assembly value (R01a)

@@ -1,6 +1,6 @@
 {
   "kind": "phase-ii-01-revised-planning-manifest-v1",
-  "date": "2026-10-23",
+  "date": "2026-10-29",
   "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
   "implementation_authorized": false,
   "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "9d46c17a922cb97aea2a65acf1a93d6ea83993068c1bb450619ea856319e36fc",
+    "07_Execution_Order_and_Acceptance.md": "03b53d6632b810b836f17a725211b25e3ca374a2d41b06b65d7d2265de497c7e",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "8cfc6b6adff32efde07a024b686795c0f3e081010e6187e2519bd32ca707524e",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "4d59fc3a831cd052319008fa6ac4080c96802de802c3a6f4ee5546bdcc01f003",
     "README.md": "8936f9cfa37a6a056978995b698df6361b3ad60c3e8f1f03ac50f84e067675d0"
   },
-  "revision_kind": "F03_ATTEMPT002_CORE_CALL_CHAIN_S1_CANDIDATE_UPDATE",
+  "revision_kind": "F03_ATTEMPT003_FINAL_BOUNDARY_CLOSURE_CANDIDATE_UPDATE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -4968,7 +4968,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F03 attempt002 candidate and its disclosed execution-scope deviation; keep F04 and every other slice held.",
+      "selected_next": "Sol review of F03 attempt003 closure candidate and retained attempt002 scope deviation; keep F04 and every other slice held.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -4980,11 +4980,11 @@
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
       "F02": "ACCEPTED_BOUNDED_F02; delivery/report/closure and representation selection only; no runtime admission or real upstream delivery received.",
-      "reason": "F02 attempt002 remains accepted. Maintainer authorized F03 attempt002; the synthetic Core chain and clean-checkout F02 regressions passed. One unintended real CPU Pendulum step occurred in run031, and the selected R03c old H5 regression subset is limited by MuJoCo 3.12.0 vs frozen 3.8.1 identity; Sol must review both preserved facts before the table advances.",
+      "reason": "F02 attempt002 remains accepted. F03 attempt003 now closes the T+1 independent boundary reader and correct-environment R02c/R03c checks. Attempt002 run031 remains a separately disclosed real CPU Pendulum scope deviation; Sol review is pending before any next slice.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
-      "F03": "SYNTHETIC_CORE_CALL_CHAIN_S1_PASS_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION",
-      "F04": "HELD_NOT_STARTED_PENDING_SOL_REVIEW_OF_F03"
+      "F03": "SYNTHETIC_CORE_CALL_CHAIN_S1_CLOSURE_PASS_PENDING_SOL_REVIEW; ATTEMPT002_EXECUTION_SCOPE_DEVIATION_RETAINED",
+      "F04": "HELD_NOT_STARTED_PENDING_SOL_REVIEW_OF_F03_ATTEMPT003"
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5535,23 +5535,28 @@
       "other_branch_policy": "No merge/rebase/cherry-pick of develop or camera; no main changes; R05b independent."
     },
     "latest_f03_execution": {
-      "input_head": "7ceb97da71cc4b26711165eae1bad457a9ae6747",
-      "instruction_source": "maintainer direct conversation instruction, 2026-10-29; frozen copy in f03_002/package_input.md",
+      "input_head": "7af5c818b50b2ce0a07885f614bd6c155a58765d",
+      "instruction_source": "maintainer direct conversation instruction, 2026-10-29; current prompt preserved in f03_003/input_readback.json",
       "authorization_copy_sha256": "7b1d693e5cc479c7a0610a6b49161af7b46954599ca27e6483795eeb13f66003",
       "preserved_attempt001_commit": "ed951129ab1f51bc17baa59c11ee058eb3894058",
       "implementation_commit": "54201eab61e317786a92d0af26e407601a11063a",
-      "current_result": "F03_CORE_CALL_CHAIN_S1_CANDIDATE_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION_AND_LEGACY_ENV_LIMIT",
-      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
-      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/evidence.json",
+      "current_result": "F03_CORE_CALL_CHAIN_S1_CLOSURE_PASS_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/evidence.json",
       "synthetic_h5_files": 2,
       "transitions_each": 4,
       "observations_each": 5,
       "synthetic_advances_per_interval": 5,
-      "independent_h5_tamper_classes_rejected": 8,
+      "independent_h5_tamper_classes_rejected": 15,
       "kit_app_gpu_provider_runtime_starts": 0,
       "real_cpu_pendulum_scope_deviation_run": "031_selected_fault_lifecycle_legacy_regression_r1",
       "f04_started": false,
-      "sol_review": "PENDING; execution-scope deviation and legacy R03c environment mismatch disclosed"
+      "sol_review": "PENDING; final boundary S1 closed with retained attempt002 deviation",
+      "synthetic_advances_total": 40,
+      "r02c_exact_nodeids": "1_PASSED_CORE_MUJOCO_3.8.1",
+      "r03c_exact_nodeids": "5_PASSED_CORE_MUJOCO_3.8.1",
+      "attempt002_run031_scope_deviation": "RETAINED_REAL_CPU_PENDULUM_THREE_PUBLIC_STEPS",
+      "attempt003_native_or_physics_starts": 0
     },
     "previous_f03_execution_attempt001": {
       "input_head": "b9015faf395c185cfb71341d60f30be07d518057",
@@ -5579,6 +5584,32 @@
       "qualification_granted": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md",
       "legacy_r03c_selected_subset": "2_PASSED_5_FAILED_CURRENT_MUJOCO_3.12_VS_FROZEN_3.8.1"
+    },
+    "f03_attempt003_execution": {
+      "input_head": "7af5c818b50b2ce0a07885f614bd6c155a58765d",
+      "branch": "develop-full",
+      "code_commit": "54201eab61e317786a92d0af26e407601a11063a",
+      "current_result": "F03_CORE_CALL_CHAIN_S1_CLOSURE_PASS_PENDING_SOL_REVIEW",
+      "attempt002_execution_scope_deviation": "RETAINED: run031 executed three public CPU Pendulum steps; preserved raw command/logs and not repeated",
+      "final_boundary_reader": "PASS: 10/10 T+1 boundary rows and 10/10 public observation rows across two H5 files",
+      "h5_files": 2,
+      "transitions_each": 4,
+      "observations_each": 5,
+      "synthetic_advances_total": 40,
+      "tamper_classes_rejected": 15,
+      "r02c_exact_nodeids": "1_PASSED",
+      "r03c_exact_nodeids": "5_PASSED",
+      "correct_core_mujoco_environment": "3.8.1/header_3008001/no_native_import/Isaac_site_packages_absent",
+      "native_starts": 0,
+      "physics_starts": 0,
+      "f04_started": false,
+      "other_slices_started": false,
+      "production_admission": "FAIL_CLOSED_SYNTHETIC_OR_UNVERIFIED_USD_AND_NO_ISAAC_ADAPTER",
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/evidence.json",
+      "output_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/sha256.manifest",
+      "sol_review": "PENDING; attempt002 scope deviation retained separately; F04 remains held"
     }
   }
 }

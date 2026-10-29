@@ -83,19 +83,31 @@ explicit versioned `make_env()` opt-in and exercised the existing Core reset,
 typed state, Position control, public step, Generic H5 v3 Recorder/finalizer,
 independent reader and close owners through a private synthetic
 `NativeRuntimeIOV1` implementation. Two same-Env episodes each produced a
-closed T=4/T+1=5 H5; a fresh reader process verified all source/execution/
-state/control/clock bindings and rejected eight tamper classes. The 20-case
-source/state/frame contract suite plus selected C02b, P99 and legacy H5
-regressions passed.
+closed T=4/T+1=5 H5. Its independent reader initially checked only the T
+transition-source boundaries while reporting T+1 rows verified.
+
+Attempt003 reproduced acceptance after changing only the final H5 boundary
+digest. Generic H5 v3 and the old ABI remain unchanged. Two new synthetic
+episodes were recorded through the existing Core chain with a sidecar captured
+from public reset/step observation and info returns. The independent F03
+reader checks every T+1 typed boundary and observation row, transition source
+boundary, episode-end/outcome, final successful advance and publication clock.
+It verifies 10/10 rows across two H5 files and rejects the original eight
+tamper classes plus seven end-boundary/observation cases. Exact old R02c/R03c
+compatibility node IDs pass under Core Python's MuJoCo 3.8.1, with collection
+allowlist and zero-native import/launcher tripwires enabled; the old mixed
+environment failures remain retained evidence.
 
 This is synthetic Core S1 evidence only. The private S1 context does not
 change production admission: `materialize()` still rejects synthetic or
 unverified USD and no Isaac Core `RuntimeSession` adapter or validated Panda
 USD delivery is available. Do not report Isaac provider admission, native
-execution, S2/S3 or Qualification. One ancillary legacy fault-suite run
-accidentally stepped the real CPU Pendulum route, contrary to the F03 package's
-zero-physics scope; preserve that deviation for Sol review. See the [F03
-attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain),
+execution, S2/S3 or Qualification. Attempt002's ancillary legacy test run
+accidentally executed three public steps on the real CPU Pendulum route,
+outside its zero-physics scope; preserve this historical deviation for Sol
+review. Attempt003 itself started no native runtime or physics. See the [F03
+attempt003 closure](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
+[attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain),
 the [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission),
 and the [historical attempt001 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
 

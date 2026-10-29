@@ -15,6 +15,8 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
 | 首个失败边界、重试/恢复与升级 | [troubleshooting](troubleshooting.md) |
 
+F03 attempt003 已完成合成 Core S1 的最终 T+1 boundary 与旧 MuJoCo 环境兼容收口，候选结果待 Sol 复核；这不改变 production USD fail-closed、Isaac adapter 未实现或 Qualification 未建立的限制。attempt002 的真实 CPU Pendulum 执行范围偏差仍单独保留。查看[当前 F03 边界与结果](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure)。
+
 ## 快速开始
 
 从仓库根目录执行。已发布环境记录为 Ubuntu 24.04.4/x86_64/Python 3.12.14；
