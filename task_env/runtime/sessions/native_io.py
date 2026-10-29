@@ -270,19 +270,20 @@ class NativeRuntimeIOV1(Protocol):
     def close(self) -> None: ...
 
 
-class F03CoreRuntimeSession(_SessionValues):
-    """The ordinary Core session lifecycle backed only by a native-I/O port."""
+class UsdCoreRuntimeSession(_SessionValues):
+    """Shared Core session lifecycle backed only by the native-I/O port."""
 
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, native_io: NativeRuntimeIOV1,
-                 drive_receipt):
+                 drive_receipt=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError('F03 Core RuntimeSession requires TaskArtifactV1 and ExecutionSpecV1')
         if type(source) is not UsdRuntimeSourceV1:
             raise TypeError('F03 Core RuntimeSession requires the exact UsdRuntimeSourceV1')
-        from .leaf_control import IsaacNamedPositionDriveReceiptV1
-        if type(drive_receipt) is not IsaacNamedPositionDriveReceiptV1:
-            raise TypeError('F03 Core RuntimeSession requires the existing named-drive receipt owner')
+        from .leaf_control import (
+            IsaacNamedPositionDriveReceiptV1,
+            compile_isaac_named_position_drive_receipt_from_native_metadata_v1,
+        )
         self._initialize_values(artifact, source, execution.physics_provider)
         self._execution_spec_v1 = execution
         self._native_io = native_io
@@ -290,6 +291,18 @@ class F03CoreRuntimeSession(_SessionValues):
         if type(self._native_io_metadata) is not NativeRuntimeIOMetadataV1:
             raise TypeError('native Runtime I/O metadata() must return NativeRuntimeIOMetadataV1')
         self._native_io_metadata.validate_binding(artifact, execution, source)
+        if drive_receipt is None:
+            drive_receipt = compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
+                execution=execution, source=source,
+                scene_identity_sha256=source.scene_definition.identity_hash,
+                native_metadata=self._native_io_metadata,
+                writer_id='panda-main/position-servo-v1',
+            )
+        if type(drive_receipt) is not IsaacNamedPositionDriveReceiptV1:
+            raise TypeError('Core RuntimeSession requires the existing named-drive receipt owner')
+        expected_provenance = 'native_runtime' if source.scene_source.source_verified else 'synthetic_fixture'
+        if drive_receipt.provenance_kind != expected_provenance:
+            raise ValueError('named-drive receipt provenance does not match the loaded USD source')
         if (self._native_io_metadata.provider_build_identity != drive_receipt.provider_build_identity
                 or self._native_io_metadata.native_dof_names != tuple(
                     item.native_dof_name for item in sorted(drive_receipt.drives, key=lambda item: item.native_dof_index)
@@ -391,9 +404,13 @@ class F03CoreRuntimeSession(_SessionValues):
         if set(realized) != set(target.arm_joint_order):
             raise ValueError('native Position Ack did not cover all seven named Arm Targets')
         return AppliedCanonicalControl(
-            'applied-canonical-control-v0', target.identity_hash, 'synthetic_fixture',
+            'applied-canonical-control-v0', target.identity_hash,
+            'native_runtime' if self._drive_receipt.provenance_kind == 'native_runtime' else 'synthetic_fixture',
             realized, float(target.gripper.servo_opening_m), float(target.gripper.force_limit_N),
-            False, 'synthetic_named_dof_position_targets_no_physics',
+            False,
+            ('native_named_dof_position_target_acknowledged_no_motion_claim'
+             if self._drive_receipt.provenance_kind == 'native_runtime'
+             else 'synthetic_named_dof_position_targets_no_physics'),
         )
 
     def step(self) -> CanonicalStateView:
@@ -425,9 +442,20 @@ class F03CoreRuntimeSession(_SessionValues):
             finally:
                 self._closed = True
 
+    def close_runtime_owner(self) -> None:
+        """Close process-scoped provider resources only when the Env is done."""
+        close_owner = getattr(self._native_io, 'close_runtime_owner', None)
+        if callable(close_owner):
+            close_owner()
+
+
+# Backward compatibility for F03 synthetic S1 tests; both names share one
+# lifecycle implementation and no second RuntimeSession owner is created.
+F03CoreRuntimeSession = UsdCoreRuntimeSession
+
 
 __all__ = [
-    'F03CoreRuntimeSession', 'NativeAdvanceReceiptV1', 'NativePositionWriteAckV1',
+    'F03CoreRuntimeSession', 'UsdCoreRuntimeSession', 'NativeAdvanceReceiptV1', 'NativePositionWriteAckV1',
     'NativeResetWriteReceiptV1', 'NativeRuntimeIOV1', 'NativeRuntimeIOMetadataV1',
     'NativeRuntimeReadbackV1',
 ]

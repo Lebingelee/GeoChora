@@ -60,10 +60,11 @@ The existing Assembly source owner exposes internal `UsdTaskSceneSourceV1` plus
 an owned snapshot lease copied from the exact immutable F02 loaded-delivery
 bytes. `UsdRuntimeSourceV1` binds the delivery, `TaskArtifactV1`, canonical
 Scene/TaskSource identities, reset pose/free Joint maps, body/Frame bindings
-and named scalar drive targets. This is a construction declaration, not a
-Provider adapter. Production `RuntimeSession.materialize()` rejects synthetic
-or unverified USD and fails closed for Isaac while its Core adapter is absent;
-there is no USD `make_env()` route. Do not pass the synthetic source onward as
+and named scalar drive targets. This is a construction declaration, not by
+itself Provider admission. Production `RuntimeSession.materialize()` rejects
+synthetic or unverified USD. F04 attempt001 adds a narrow Isaac adapter
+candidate to the existing Core route, but it cannot run until a source passes
+the exact F02 upstream-validated gate. Do not pass synthetic source onward as
 runtime evidence.
 
 `legacy_execution_projection()` preserves the exact old `ExecutionSpec`
@@ -76,7 +77,10 @@ checks agreement with the measured child Frame; the existing MuJoCo-compatible
 tuple path remains intact. `IsaacNamedPositionDriveReceiptV1` is marked
 `synthetic_fixture`, maps the exact seven Panda Arm and two Finger DOFs by
 public names/metadata order, and splits aggregate hand opening in metres
-between fingers. It does not admit a Provider or attest native metadata.
+between fingers. The F04 candidate can compile a `native_runtime` receipt only
+from actual public articulation names, limits, device and build metadata after
+the native view exists. Neither receipt alone admits a Provider or establishes
+qualification.
 
 F03 attempt001 is the historical partial contract result. Attempt002 adds an
 explicit versioned `make_env()` opt-in and exercised the existing Core reset,
@@ -98,18 +102,43 @@ compatibility node IDs pass under Core Python's MuJoCo 3.8.1, with collection
 allowlist and zero-native import/launcher tripwires enabled; the old mixed
 environment failures remain retained evidence.
 
-This is synthetic Core S1 evidence only. The private S1 context does not
-change production admission: `materialize()` still rejects synthetic or
-unverified USD and no Isaac Core `RuntimeSession` adapter or validated Panda
-USD delivery is available. Do not report Isaac provider admission, native
+Sol reviewed and accepted attempt003 as `ACCEPTED_BOUNDED_F03_S1`, limited to
+the synthetic-I/O Core route and final-boundary reader. This remains synthetic
+Core S1 evidence only. The private S1 context does not change production
+admission: `materialize()` still rejects synthetic or unverified USD. F04
+attempt001 adds an adapter candidate, but no validated Panda delivery has
+passed source admission. Do not report Isaac provider admission, native
 execution, S2/S3 or Qualification. Attempt002's ancillary legacy test run
 accidentally executed three public steps on the real CPU Pendulum route,
 outside its zero-physics scope; preserve this historical deviation for Sol
-review. Attempt003 itself started no native runtime or physics. See the [F03
+review; those steps are not F03 acceptance evidence. Attempt003 itself started
+no native runtime or physics. See the [F03
 attempt003 closure](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
 [attempt002 result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain),
 the [public API boundaries](../../../docs/module/task_env/public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission),
 and the [historical attempt001 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
+
+## F04 Isaac adapter candidate (2026-10-29; pending Sol review)
+
+The candidate wires the existing versioned Position input, production source
+admission, shared Core `RuntimeSession` lifecycle, native I/O boundary, named
+DOF receipt and public Env/Recorder owners. The target is Isaac Sim 6.2.0.0,
+CUDA `cuda:0`, GPU PhysX, `best_effort`, state-only and 100 Hz with five 2 ms
+steps. Its frozen provider-free selection passed 13/13; that includes the F03
+synthetic call chain and F04 rejection/cleanup boundaries, not successful F04
+materialization or physics.
+
+The official Panda bytes were inventoried and its selected variant schema shows
+7+2 joints. Production admission remains closed: the all-authored USD dependency
+closure has unresolved Robotiq and `OmniPBR.mdl` references, and the upstream
+Transformer `report.json` does not bind the F02 source-closure fields required
+by `UsdValidationReportV1`. Do not locally relabel or wrap that report to set
+`source_verified=true`. The current Menagerie source closure matches its 68-file
+inventory. The installed Isaac 6.2 converter produced a seven-file local USD
+candidate; static composition and all nine DOF limit ranges were checked,
+including radians-to-degrees for revolute USD limits. This is not an upstream
+F02 validation report and leaves `source_verified=false`. No F04 native Core/H5
+result, S2/S3 or Qualification exists. See [F04 attempt001](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt001-isaac-core-adapter).
 
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver

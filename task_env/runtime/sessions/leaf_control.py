@@ -197,7 +197,7 @@ class IsaacNamedPositionDriveV1:
 
 @dataclass(frozen=True)
 class IsaacNamedPositionDriveReceiptV1:
-    """Synthetic S1 receipt for named Panda DOF drives; not runtime admission."""
+    """Bound named-drive metadata for F03 synthetic S1 or F04 native runtime."""
 
     schema_version: str
     provenance_kind: str
@@ -218,8 +218,8 @@ class IsaacNamedPositionDriveReceiptV1:
     def __post_init__(self):
         if self.schema_version != 'isaac-named-position-drive-receipt-v1':
             raise ValueError('unsupported Isaac named Position drive receipt schema')
-        if self.provenance_kind != 'synthetic_fixture':
-            raise ValueError('F03 named Position drive receipt must remain synthetic_fixture')
+        if self.provenance_kind not in {'synthetic_fixture', 'native_runtime'}:
+            raise ValueError('named Position drive receipt provenance must be explicit')
         for value, label in (
             (self.scene_identity_sha256, 'Scene'),
             (self.source_closure_sha256, 'source closure'),
@@ -243,15 +243,15 @@ class IsaacNamedPositionDriveReceiptV1:
                 or float(self.physics_dt_s) != 0.002
                 or type(self.control_substeps) is not int
                 or self.control_substeps != 5):
-            raise ValueError('F03 drive receipt requires the 2 ms / five-substep timebase')
+            raise ValueError('Panda drive receipt requires the 2 ms / five-substep timebase')
         if (self.backend, self.device, self.determinism_mode) != ('cuda', 'cuda:0', 'best_effort'):
-            raise ValueError('F03 target execution is Isaac CUDA cuda:0 with best_effort determinism')
+            raise ValueError('Isaac target execution is CUDA cuda:0 with best_effort determinism')
         if type(self.device) is not str:
-            raise TypeError('F03 target device must be a string')
+            raise TypeError('Isaac target device must be a string')
         if self.provider_build_identity != 'isaacsim-6.2.0.0':
-            raise ValueError('F03 target drive receipt requires Isaac Sim 6.2.0.0')
+            raise ValueError('Isaac target drive receipt requires Isaac Sim 6.2.0.0')
         if type(self.native_dof_count) is not int or self.native_dof_count != 9:
-            raise ValueError('F03 Panda drive receipt requires exactly nine named scalar DOFs')
+            raise ValueError('Panda drive receipt requires exactly nine named scalar DOFs')
         if type(self.drives) is not tuple or any(type(item) is not IsaacNamedPositionDriveV1 for item in self.drives):
             raise TypeError('drive receipt requires an immutable tuple of exact named drive entries')
         expected = {
@@ -271,7 +271,7 @@ class IsaacNamedPositionDriveReceiptV1:
             raise ValueError('Isaac drive receipt must exactly cover seven Arm and two finger Joints')
         if any((drive.native_dof_name, drive.position_unit) != expected[joint]
                for joint, drive in by_joint.items()):
-            raise ValueError('Isaac native DOF name or unit differs from the F03 Panda mapping')
+            raise ValueError('Isaac native DOF name or unit differs from the Panda mapping')
         indices = [drive.native_dof_index for drive in self.drives]
         names = [drive.native_dof_name for drive in self.drives]
         if sorted(indices) != list(range(9)) or len(names) != len(set(names)):
@@ -385,6 +385,43 @@ def compile_isaac_named_position_drive_receipt_v1(
         execution.physics_device, execution.determinism_mode, 0.002, 5,
         writer_id, len(native_dof_names), tuple(drives),
     )
+
+
+def compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
+    *, execution: ExecutionSpecV1, source, scene_identity_sha256: str,
+    native_metadata, writer_id: str,
+) -> IsaacNamedPositionDriveReceiptV1:
+    """Compile a production receipt only after the public articulation view exists."""
+    from .native_io import NativeRuntimeIOMetadataV1
+    from .source import UsdRuntimeSourceV1
+
+    if type(execution) is not ExecutionSpecV1 or type(source) is not UsdRuntimeSourceV1:
+        raise TypeError('native drive receipt requires exact versioned Core contracts')
+    if type(native_metadata) is not NativeRuntimeIOMetadataV1:
+        raise TypeError('native drive receipt requires actual NativeRuntimeIOMetadataV1')
+    source.validate()
+    execution.validate()
+    if not source.scene_source.source_verified:
+        raise ValueError('native drive receipt requires an upstream-validated USD source')
+    native_metadata.validate_binding(source.task_artifact, execution, source)
+    if (native_metadata.provider_build_identity, native_metadata.physics_provider,
+            native_metadata.backend, native_metadata.device, native_metadata.determinism_mode) != (
+            'isaacsim-6.2.0.0', 'isaacsim', 'cuda', 'cuda:0', 'best_effort'):
+        raise ValueError('native drive receipt metadata differs from the exact F04 execution')
+    base = compile_isaac_named_position_drive_receipt_v1(
+        execution=execution, scene_identity_sha256=scene_identity_sha256,
+        source_closure_sha256=source.source_closure_digest,
+        provider_build_identity=native_metadata.provider_build_identity,
+        writer_id=writer_id, native_dof_names=native_metadata.native_dof_names,
+        native_position_limits=native_metadata.native_position_limits,
+    )
+    expected_targets = {
+        f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+        for item in base.drives
+    }
+    if dict(source.joint_targets) != expected_targets:
+        raise ValueError('verified USD RuntimeSource targets do not bind actual native DOF names')
+    return replace(base, provenance_kind='native_runtime')
 
 
 @dataclass(frozen=True)

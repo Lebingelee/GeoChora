@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "03b53d6632b810b836f17a725211b25e3ca374a2d41b06b65d7d2265de497c7e",
+    "07_Execution_Order_and_Acceptance.md": "b2f6494e8c0f5b7d477882c458a60649ffe4dd4984a51615d776bc6372306dfc",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "4d59fc3a831cd052319008fa6ac4080c96802de802c3a6f4ee5546bdcc01f003",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "46bc87f1def13f513acdf31f8a4903d95e2a04ed58f39fb5f25c1880d2578d02",
     "README.md": "8936f9cfa37a6a056978995b698df6361b3ad60c3e8f1f03ac50f84e067675d0"
   },
-  "revision_kind": "F03_ATTEMPT003_FINAL_BOUNDARY_CLOSURE_CANDIDATE_UPDATE",
+  "revision_kind": "F04_ATTEMPT001_ISAAC_CORE_ADAPTER_PARTIAL_CANDIDATE_UPDATE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3638,7 +3638,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "DOCUMENTATION_ONLY; checkpoint c30d97e retained; recovery and F00-F07 patch direction recorded. No implementation, install, branch integration or native execution.",
+  "planning_submission_this_revision": "F04 attempt001 implementation/S1/source investigation and bounded Menagerie USD conversion candidate; no provider admission, native Core route, or qualification claim.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4365,6 +4365,20 @@
       "scope_deviation": "run031 included an unintended real CPU Pendulum step; preserve for Sol review",
       "F04_started": false,
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_002/report.md"
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "F04_ATTEMPT001_ISAAC_CORE_ADAPTER_PARTIAL_CANDIDATE",
+      "input_head": "4e083683286931a25bd13d9136928f5777d86396",
+      "authorization": "Maintainer-provided self-contained F04 attempt001 prompt in this conversation; byte-frozen at f04_001/luna_f04_001_prompt.md.",
+      "result": "F04_PARTIAL_SOURCE_VERIFICATION_PENDING_SOL_REVIEW",
+      "implementation": "Bounded existing-Core-owner Isaac adapter candidate; provider-free S1 13/13. Native success path not exercised.",
+      "source_A": "Official package inventoried; authored dependency closure and F02-bound upstream validation remain incomplete.",
+      "source_B": "Pinned Menagerie closure preserved; local seven-file converter output statically inspected; upstream F02 report absent.",
+      "native": "No Kit/App/GPU PhysX start, no physics, no F04 H5; converter alone ran under shared native lock and released it.",
+      "f05_started": false,
+      "qualification_granted": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_001/report.md"
     }
   ],
   "P00_audit": {
@@ -4533,7 +4547,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_CORE_CALL_CHAIN_S1_CANDIDATE_PENDING_SOL_REVIEW_WITH_EXECUTION_SCOPE_DEVIATION_AND_LEGACY_ENV_LIMIT",
+    "status": "F00_ACCEPTED_BOUNDED; F01_ACCEPTED_BOUNDED_F01_GPU_PHYSX; F02_ACCEPTED_BOUNDED_F02; F03_ACCEPTED_BOUNDED_F03_S1; F04_PARTIAL_SOURCE_VERIFICATION_PENDING_SOL_REVIEW",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4968,7 +4982,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F03 attempt003 closure candidate and retained attempt002 scope deviation; keep F04 and every other slice held.",
+      "selected_next": "Sol review of F04 attempt001 partial candidate, actual diff, evidence and retained failures; do not start F05 before review and a new package.",
       "after_that_priority": [
         "F02",
         "F03",
@@ -4980,11 +4994,11 @@
       "F00_status": "ACCEPTED_BOUNDED_F00",
       "F01": "ACCEPTED_BOUNDED_F01; official Panda plus rigid body; Isaac Sim 6.2.0.0; cuda:0; GPU dynamics enabled; exact attempt003 bounds only",
       "F02": "ACCEPTED_BOUNDED_F02; delivery/report/closure and representation selection only; no runtime admission or real upstream delivery received.",
-      "reason": "F02 attempt002 remains accepted. F03 attempt003 now closes the T+1 independent boundary reader and correct-environment R02c/R03c checks. Attempt002 run031 remains a separately disclosed real CPU Pendulum scope deviation; Sol review is pending before any next slice.",
+      "reason": "Sol accepted F03 attempt003 as ACCEPTED_BOUNDED_F03_S1. F04 attempt001 started under its own frozen authorization. Its source/admission gate remains closed for both sources, so no real Core/native execution was attempted; Sol review is the next action.",
       "native_authorization": "each concrete package pins its own build/cases/budget",
       "F07": "later extension; not required before camera",
-      "F03": "SYNTHETIC_CORE_CALL_CHAIN_S1_CLOSURE_PASS_PENDING_SOL_REVIEW; ATTEMPT002_EXECUTION_SCOPE_DEVIATION_RETAINED",
-      "F04": "HELD_NOT_STARTED_PENDING_SOL_REVIEW_OF_F03_ATTEMPT003"
+      "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
+      "F04": "PARTIAL_SOURCE_VERIFICATION_PENDING_SOL_REVIEW; provider-free S1 13/13 and Menagerie static conversion candidate completed; A and B still lack F02 upstream-validated reports; no Kit/App/GPU PhysX/physics or F04 H5."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5260,7 +5274,7 @@
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
     },
-    "latest_authorization": "Maintainer directly authorized F03 attempt002 in this conversation on 2026-10-29: complete the actual Core versioned candidate/source/reset/state/control/public-step/Recorder/H5/independent-reader/close chain through the lowest synthetic NativeRuntimeIO boundary, run bounded affected regressions, update docs/Skill, and commit locally. F04 and all other slices remain held pending Sol review.",
+    "latest_authorization": "Maintainer directly authorized F04 attempt001 in the 2026-10-29 conversation: implement the bounded Isaac Core adapter, run frozen provider-free S1, investigate and prepare the two exact Panda sources, convert current pinned Menagerie Panda, and perform CUDA/GPU PhysX native validation only when the frozen source/admission and resource gates pass. No F05 or other slice.",
     "f01_attempt002_execution": {
       "date": "2026-10-29",
       "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
@@ -5551,7 +5565,7 @@
       "kit_app_gpu_provider_runtime_starts": 0,
       "real_cpu_pendulum_scope_deviation_run": "031_selected_fault_lifecycle_legacy_regression_r1",
       "f04_started": false,
-      "sol_review": "PENDING; final boundary S1 closed with retained attempt002 deviation",
+      "sol_review": "ACCEPTED_BOUNDED_F03_S1; Sol review was supplied by maintainer in the F04 authorization context; synthetic Core chain only.",
       "synthetic_advances_total": 40,
       "r02c_exact_nodeids": "1_PASSED_CORE_MUJOCO_3.8.1",
       "r03c_exact_nodeids": "5_PASSED_CORE_MUJOCO_3.8.1",
@@ -5610,6 +5624,28 @@
       "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/evidence.json",
       "output_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f03_003/sha256.manifest",
       "sol_review": "PENDING; attempt002 scope deviation retained separately; F04 remains held"
+    },
+    "f04_attempt001_execution": {
+      "input_head": "4e083683286931a25bd13d9136928f5777d86396",
+      "branch": "develop-full",
+      "result": "F04_PARTIAL_SOURCE_VERIFICATION_PENDING_SOL_REVIEW",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_001/report.md",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_001/",
+      "provider_free_s1": "13/13 exact frozen nodeids passed; F04 native success path not exercised",
+      "source_A": "Official Isaac 6.2 Panda bytes/schema inspected; unresolved authored-variant Robotiq and OmniPBR dependencies; upstream transformer report does not bind F02 identity/closure",
+      "source_B": "68/68 current Menagerie files/hash inventory verified; installed Isaac 6.2 converter produced seven-file USD; static composition and 9/9 DOF range comparisons passed; no upstream F02 report",
+      "production_source_verified": false,
+      "core_native_materialize": false,
+      "kit_app_gpu_physx_starts": 0,
+      "physics_steps": 0,
+      "h5_files": 0,
+      "conversion_worker": "exit 0; 2.139 s; 7,276,315 output bytes; zero physics; shared lock acquired/released",
+      "known_conversion_warnings": [
+        "MJCF keys unsupported; one home keyframe present",
+        "lights unsupported"
+      ],
+      "qualification_granted": false,
+      "next": "Sol review; do not start F05"
     }
   }
 }

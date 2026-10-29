@@ -1,13 +1,13 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt002已完成合成I/O的真实Core调用链S1候选，等待Sol复核**。
-本计划的其他方向仍待独立授权；当前结果只覆盖F03 attempt002包内synthetic S1，不启动F04或其他slice。
+更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt001为部分实现候选，等待Sol复核**。
+F04 attempt001已开始并完成有界S1与Menagerie Panda静态转换准备；真实Core/native闭环仍因两种源均缺少合格的F02 upstream validation report而未执行。
 
 ### 当前双Luna分工（2026-10-29）
 
-维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt001是部分合同历史；attempt002在`develop-full`完成了同Env双reset、真实Core public step与Recorder/H5的合成I/O调用链及独立reader，待Sol复核。Production admission仍拒绝synthetic/unverified USD，Isaac Core adapter和validated Panda USD source仍缺；没有启动F04。
+维护者将Luna1固定到F00–F07，停止R07资产来源调查；Luna2继续R04c之后的非F阶段。F00、F01和F02均已获Sol有界接收；F01 attempt002的两次零物理步失败仍保留。F03 attempt003已获Sol接收`ACCEPTED_BOUNDED_F03_S1`，范围仅限synthetic I/O下的真实Core链与末行reader，attempt002 CPU Pendulum三步范围偏差继续保留。F04 attempt001现有Isaac Core adapter候选，但A/B均未达到生产source admission；候选等待Sol复核。
 
-未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。此偏好不代表Core Isaac provider已接通。
+未来Isaac Sim native验证默认使用CUDA GPU PhysX（设备`cuda:0`、`gpu_dynamics=true`）；每个冻结包仍需明确记录实际设备、CUDA进程证据、GPU动态配置与资源上限。CPU配方仅在维护者为具体工作包明确指定时使用。F01已接收的GPU基线不代表Core Isaac provider已接通。
 
 F06需要真实来源与对应provider基础出口，但不要求完整五任务LIBERO或TurboSquid资产先通过。维护者另选择“少量可接收资产任务先闭环”的LIBERO pilot，按R07单独记账；它不阻塞F01官方Panda+方块，也不把benchmark的On语义改成现有lift模板来求绿。每位Luna一次只执行一个冻结包，完整返回后再派发后继。
 F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其20/20 synthetic seeds均为`expert_failed / gripper_readiness_timeout`；该失败原件保持不变。attempt002随后完成受控物理归因、输入修复、20-seed native验收、Oracle/H5独立读回和pending Judge prepare/verify。完整出口仅待Sol复核；F01仍未派发或启动。
@@ -424,3 +424,29 @@ run031误选真实CPU Pendulum的三次public step继续是attempt002历史`EXEC
 复用attempt002的F03 typed source/frame/COM oracle及fault/lifecycle证据、clean-checkout F02 45/45、C02b/P99与其他未受影响结果；本包只补末行witness、独立reader、精确受影响旧nodeids和相关文档门，没有重跑whole-module campaign。run028/030原失败原件与run031执行偏差仍在，不被新结果覆盖。普通生产`materialize()`仍拒绝synthetic/unverified USD，Isaac Core RuntimeSession adapter、validated Panda USD和production provider admission仍缺；未获得S2/S3、Qualification或F04授权。
 
 候选结果为`F03_CORE_CALL_CHAIN_S1_CLOSURE_PASS_PENDING_SOL_REVIEW`，并单列`attempt002 historical EXECUTION_SCOPE_DEVIATION_RETAINED`；Sol接收尚未发生。提交/输入输出HEAD、逐run argv/source hashes/resource ledger、witness/H5 hash、保护清单复核、Markdown hashes及失败修复过程见该目录中的`report.md`、`evidence.json`、`commands.json`、`run_ledger.json`和`sha256.manifest`。本文新增collection守卫使用pytest官方`pytest_collection_modifyitems` hook作为精确节点选择点；逐条检查T与后继观测是本项目T+1合同，不把robomimic的格式声明引入Geochora：[pytest API](https://pytest.org/en/stable/reference/reference.html#pytest_collection_modifyitems)、[robomimic dataset structure](https://robomimic.github.io/docs/datasets/overview.html#dataset-structure)。F04与其他slice保持HELD，窗口已释放，等待Sol复核。
+
+### Sol复核接收（2026-10-29）
+
+维护者本次F04执行包确认，Sol已只读复核并接收F03 attempt003为`ACCEPTED_BOUNDED_F03_S1`。范围仍限于synthetic I/O下的真实Core factory→reset→control→public step→Recorder/H5→独立reader→close；Sol复核了98项attempt输出manifest、1,044项历史保护路径，以及两份H5共10/10 boundary、10/10 observation和40次synthetic advance。attempt002 run031的真实CPU Pendulum三次public step继续保留为历史`EXECUTION_SCOPE_DEVIATION_RETAINED`，不计入F03验收证据。该接收不代表Isaac provider admission、native physics、Qualification或F04接收。
+
+<a id="f04-attempt001-isaac-core-adapter"></a>
+
+## F04 attempt001 Isaac Core adapter 与真实Panda闭环（2026-10-29，Luna候选）
+
+本attempt从`develop-full@4e083683286931a25bd13d9136928f5777d86396`开始，分支和GeoPhys/Menagerie Gitlink符合包基线；复用既有阶段分支，不触碰camera工作树。F03由Sol接收为`ACCEPTED_BOUNDED_F03_S1`，其合成Core链和F03末行reader证据可复用，run031历史执行偏差仍单独披露。
+
+实现候选沿既有owners扩展：版本化Position candidate builder增加F04精确输入；`RuntimeSession.materialize()`与Control admission增加仅对两种冻结Panda source/build/backend/device/profile交集开放的路径；`NativeRuntimeIOV1`对应的共享`UsdCoreRuntimeSession`继续持有Core reset/state/control/clock/fault生命周期，原F03名称保留为同一类兼容别名；新增Isaac Sim 6.2公共API窄adapter，真实DOF metadata到达后才编译native named-drive receipt；`SelectedReferenceEnv.close()`在session收尾后关闭进程App owner。Recorder沿用原owner，并区分F04 native与F03 synthetic的profile、bootstrap、Target/Ack和substep receipt。没有新增第二套Runtime、Env、Controller、Recorder或factory，也没有私有synthetic context生产准入。
+
+provider-free冻结列表v3为13个精确nodeid；collection 13/13，仅运行allowlist后S1为13/13通过。它复用已接收F03 synthetic Core链/故障路径，新增F04 source fail-closed、owner close一次性、prim路径、App线程数1–4约束及精确Panda来源身份正反例。该结果不覆盖F04真实adapter成功路径，也不是native或H5证据。
+
+### A：官方Panda USD
+
+官方URI及F01所用`Gripper=alternatefinger`、`Mesh=performance`变体已按实际Isaac 6.2内容源读取。对象列表与本地字节库存匹配63/63，共47,066,494 bytes；入口SHA-256为`cbdbfc4481e0420aa30c2e57c39cce91006cb29b93bc2e06becaf4304c20ea30`。OpenUSD静态variant检查记录340 prim、7个Arm和2个Finger关节。
+
+生产F02 source gate仍未满足。按现有F02 all-authored dependency closure检查，官方源还引用不在该prefix交付内的`Robotiq/2F-85/Robotiq_2F_85.usda`和`OmniPBR.mdl`；检查失败原件保留。源包的`report.json`是实际下载的NVIDIA Transformer report，21条transformer规则报告成功，但其输入路径被redact，且不绑定本次entry SHA、all-branch closure hash或F02 source/revision/variant身份，类型也不是`UsdValidationReportV1`。不能把它包装/重标为F02 upstream-validated报告或据此设置`source_verified=true`。因此A尚未进入真实Core materialization、Kit、GPU PhysX、public Env或H5。
+
+### B：当前Menagerie Panda
+
+当前Menagerie Gitlink固定为`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`。本次将当前工作树中的`panda.xml`及其68个固定闭包文件逐项与既有source inventory比较，68/68 bytes和SHA匹配，合计34,307,151 bytes，保留原文件不变。受共享native worker启动资源门限制，转换器没有运行：最近一次锁内预检MemAvailable为6,081,589,248 bytes，低于要求的6 GiB；GPU空闲6,637 MiB，高于5 GiB。预检未启动converter worker，锁已释放。故B目前没有USD输出/转换报告，也没有Core/native/H5验收。
+
+本次没有启动Kit/App、Isaac GPU PhysX或物理步进；没有F04 H5、独立native reader、真实Target/Ack运动或碰撞响应证据。共享锁只在Menagerie转换期间持有，converter退出后已释放。当前官方样本仍缺可由F02接受、绑定完整依赖闭包的上游验证报告；Menagerie虽已生成7文件USD候选并完成静态组合/DOF范围检查，也仍缺F02 upstream validation report，不能设置`source_verified=true`。Candidate总体为`F04_PARTIAL_SOURCE_VERIFICATION`，不满足A/B闭环或F04全包token，不表示Sol接收、Provider admission、S2/S3或Qualification。完整调用链/接口表、源文件/hash、run原件、资源及保护输入检查见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_001/`。

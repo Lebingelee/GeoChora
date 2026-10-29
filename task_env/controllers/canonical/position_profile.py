@@ -261,7 +261,7 @@ class PandaPositionServoProfileV1:
 
     @classmethod
     def from_usd_source(cls, artifact, source, *, execution, kinematics_source_xml: str,
-                        native_drive_receipt, config: ActionConfig | None = None):
+                        native_drive_receipt=None, config: ActionConfig | None = None):
         """Bind the existing Position math to a versioned USD source and named DOF receipt.
 
         ``kinematics_source_xml`` is a static FK description for this synthetic
@@ -274,8 +274,9 @@ class PandaPositionServoProfileV1:
         if (type(artifact) is not TaskArtifactV1 or type(source) is not UsdRuntimeSourceV1
                 or type(execution) is not ExecutionSpecV1):
             raise TypeError('versioned Position profile requires TaskArtifactV1, ExecutionSpecV1 and UsdRuntimeSourceV1')
-        if type(native_drive_receipt) is not IsaacNamedPositionDriveReceiptV1:
-            raise TypeError('versioned Position profile requires the named DOF drive receipt')
+        if (native_drive_receipt is not None
+                and type(native_drive_receipt) is not IsaacNamedPositionDriveReceiptV1):
+            raise TypeError('versioned Position profile requires the named DOF drive receipt when supplied')
         source.validate()
         execution.validate()
         if source.task_artifact.identity_hash != artifact.identity_hash:
@@ -286,33 +287,48 @@ class PandaPositionServoProfileV1:
         if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
                 artifact.timebase.control_dt) != (0.002, 5, 0.01):
             raise ValueError('PositionServoV1 requires 100 Hz outer / five 2 ms native steps')
-        if (native_drive_receipt.scene_identity_sha256,
-                native_drive_receipt.source_closure_sha256,
-                native_drive_receipt.execution_identity_sha256,
-                native_drive_receipt.provider_build_identity,
-                native_drive_receipt.physics_profile,
-                native_drive_receipt.backend,
-                native_drive_receipt.device,
-                native_drive_receipt.determinism_mode) != (
-                scene.identity_hash, source.source_closure_digest,
-                execution.identity_hash, 'isaacsim-6.2.0.0', execution.physics_profile,
-                execution.physics_backend, execution.physics_device,
-                execution.determinism_mode):
+        if native_drive_receipt is None:
+            if not source.scene_source.source_verified:
+                raise ValueError('deferred native receipt is allowed only for an upstream-validated USD source')
+            if execution.physics_profile != 'isaac-gpu-physx-f04-position-v1':
+                raise ValueError('deferred native receipt requires the exact F04 Isaac profile')
+        elif (native_drive_receipt.scene_identity_sha256,
+              native_drive_receipt.source_closure_sha256,
+              native_drive_receipt.execution_identity_sha256,
+              native_drive_receipt.provider_build_identity,
+              native_drive_receipt.physics_profile,
+              native_drive_receipt.backend,
+              native_drive_receipt.device,
+              native_drive_receipt.determinism_mode) != (
+              scene.identity_hash, source.source_closure_digest,
+              execution.identity_hash, 'isaacsim-6.2.0.0', execution.physics_profile,
+              execution.physics_backend, execution.physics_device,
+              execution.determinism_mode):
             raise ValueError('named DOF receipt does not bind the exact USD Scene/source closure')
         expected_joint_bindings = dict(_EXPECTED_JOINT_BINDINGS)
-        if set(source.joints) != set(expected_joint_bindings) or any(
-                source.joints.get(name) != native for name, native in expected_joint_bindings.items()):
+        if set(source.joints) != set(expected_joint_bindings):
             raise ValueError('PositionServoV1 USD source must bind exactly seven Arm and two finger Joints')
-        if source.bodies.get('panda-main/hand') != 'hand':
-            raise ValueError('PositionServoV1 USD hand state must bind to the named hand body')
-        target_by_joint = {
-            f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
-            for item in native_drive_receipt.drives
-        }
-        if dict(source.joint_targets) != target_by_joint:
-            raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')
+        if native_drive_receipt is None:
+            if (len(set(source.joints.values())) != 9
+                    or dict(source.joints) != dict(source.joint_targets)):
+                raise ValueError('deferred F04 source must bind canonical Joints to exact native target names')
+            target_by_joint = dict(source.joint_targets)
+        else:
+            if any(source.joints.get(name) != native for name, native in expected_joint_bindings.items()):
+                raise ValueError('synthetic Position USD source joint names differ from the F03 mapping')
+            target_by_joint = {
+                f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+                for item in native_drive_receipt.drives
+            }
+            if dict(source.joint_targets) != target_by_joint:
+                raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')
+        hand_binding = source.bodies.get('panda-main/hand')
+        if type(hand_binding) is not str or not hand_binding.strip():
+            raise ValueError('PositionServoV1 USD hand state requires an explicit source Frame binding')
+        if native_drive_receipt is not None and hand_binding != 'hand':
+            raise ValueError('synthetic Position USD hand state must retain its exact F03 hand mapping')
         if type(kinematics_source_xml) is not str or not kinematics_source_xml.strip():
-            raise ValueError('synthetic Position S1 requires a nonempty static kinematics source')
+            raise ValueError('PositionServoV1 requires a nonempty source-calibrated kinematics description')
         config = config or ActionConfig()
         if not isinstance(config, ActionConfig):
             raise TypeError('PositionServoV1 requires the existing ActionConfig')

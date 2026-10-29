@@ -241,13 +241,44 @@ compatibility checks also pass in the Core Python environment with MuJoCo 3.8.1;
 environment-mixing failures remain preserved history.
 
 This is synthetic Core S1 evidence only. Production `materialize()` continues to reject
-synthetic/unverified input; no verified Panda USD delivery or Isaac Core RuntimeSession adapter
-is available, so provider admission, native execution and Qualification remain unestablished.
-Attempt002's accidental three public steps in a real CPU Pendulum environment remain a retained
-execution-scope deviation; attempt003 itself started no native runtime or physics. Sol review is
-pending. See the [F03 attempt003 closure](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
+synthetic/unverified input. Sol accepted F03 attempt003 as `ACCEPTED_BOUNDED_F03_S1`, limited to
+the synthetic-I/O Core route and its final-boundary reader. Attempt002's accidental three public
+steps in a real CPU Pendulum environment remain a retained execution-scope deviation; they are
+not F03 acceptance evidence. F04 attempt001 now has a narrow Isaac adapter implementation
+candidate, but no upstream-validated Panda delivery has passed the existing source gate, so
+production provider admission and native execution remain unestablished. See the [F03 attempt003 closure](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt003-final-boundary-closure),
 [attempt002 result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt002-real-core-call-chain)
 and historical [attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f03-attempt001-contract-implementation-and-s1).
+
+<a id="f04-isaac-core-adapter-attempt001"></a>
+
+### F04 Isaac Core adapter candidate (2026-10-29; partial, pending Sol review)
+
+F04 attempt001 adds a bounded implementation candidate inside the existing Position factory,
+Control admission, shared `UsdCoreRuntimeSession`/`NativeRuntimeIOV1` boundary and
+`SelectedReferenceEnv` close owner. Its exact target is Isaac Sim 6.2.0.0, CUDA `cuda:0`, GPU
+PhysX, `best_effort`, state-only, 100 Hz with five 2 ms steps. The process-scoped App owner and
+per-Env session owner are distinct; the six-I/O adapter creates its native drive receipt from
+actual articulation metadata after the public view exists. It does not expose a synthetic
+production switch or mark the provider generally supported.
+
+The frozen provider-free S1 list passed 13/13, including the accepted F03 synthetic Core chain,
+F04 unverified-source rejection, close ordering, explicit USD prim paths and a 1–4 thread bound.
+This is not evidence of a successful F04 native adapter call, target motion, collision response,
+or a new F04 H5.
+
+The official NVIDIA Panda package bytes and the 7+2 joint variant schema were inspected, but the
+F02 loader's all-authored closure still has unresolved Robotiq and `OmniPBR.mdl` dependencies.
+The package's upstream `report.json` is a transformer report and does not bind the source closure
+and identity fields required by `UsdValidationReportV1`. No local wrapper or locally authored
+PASS is used to make `source_verified` true. The current Menagerie closure matches all 68 files
+in its existing inventory. The installed Isaac 6.2 converter produced a seven-file USD
+candidate; static composition and all nine DOF limit ranges were checked, including
+radians-to-degrees for revolute USD limits. This local conversion does not provide the missing
+upstream F02 validation report and leaves `source_verified=false`. Thus the F04 candidate
+remains partial: neither A nor B has production Core/native/H5 evidence, and provider admission,
+S2/S3 and Qualification are not established.
+See the [F04 attempt001 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt001-isaac-core-adapter).
 
 ### Static Logical Assembly value (R01a)
 

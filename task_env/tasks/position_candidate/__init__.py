@@ -21,10 +21,13 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         if 'versioned_input' in values:
             if set(values) - {'versioned_input', 'horizon'}:
                 raise ValueError('versioned Position candidate admits only versioned_input and horizon')
-            from .builder import F03PositionCandidateInputV1, build_versioned_position_candidate
+            from .builder import (
+                F03PositionCandidateInputV1, F04PositionCandidateInputV1,
+                build_versioned_position_candidate,
+            )
             versioned_input = values['versioned_input']
-            if type(versioned_input) is not F03PositionCandidateInputV1:
-                raise TypeError('versioned_input must be F03PositionCandidateInputV1')
+            if type(versioned_input) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1):
+                raise TypeError('versioned_input must be an exact supported F03/F04 Position input')
             versioned_input.validate()
             horizon = values.get('horizon', 8)
             if type(horizon) is not int or not 1 <= horizon <= 6000:

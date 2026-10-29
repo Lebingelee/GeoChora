@@ -24,6 +24,15 @@ from .source import RuntimeSource, UsdRuntimeSourceV1
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
+F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
+_F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
+    'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
+    'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
+)
+_F04_MENAGERIE_PANDA_SOURCE_REFERENCE = (
+    'mujoco-menagerie://franka_emika_panda/panda.xml'
+)
+_F04_MENAGERIE_PANDA_REVISION = 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7'
 _DUAL_POSITION_MATERIALIZATION_AUTHORITY = object()
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271dc4ee4'
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
@@ -140,6 +149,64 @@ def provider_manifest(provider: str) -> ProviderCapabilityManifest:
     )
 
 
+def _validate_f04_source_family(delivery) -> None:
+    """Bind the two F04 source families to their exact stable source identities."""
+    definition = delivery.asset_definition
+    if definition.source_reference not in {
+            _F04_OFFICIAL_PANDA_SOURCE_REFERENCE,
+            _F04_MENAGERIE_PANDA_SOURCE_REFERENCE,
+    }:
+        raise ValueError('F04 production materialization is limited to the two frozen Panda source families')
+    if (definition.source_reference == _F04_MENAGERIE_PANDA_SOURCE_REFERENCE
+            and (definition.source_revision != _F04_MENAGERIE_PANDA_REVISION
+                 or delivery.source_revision != _F04_MENAGERIE_PANDA_REVISION)):
+        raise ValueError('F04 Menagerie Panda source must bind the current frozen provider Gitlink')
+    if definition.source_reference == _F04_OFFICIAL_PANDA_SOURCE_REFERENCE:
+        expected_variants = {
+            '/panda#Gripper': 'alternatefinger',
+            '/panda#Mesh': 'performance',
+            '/panda#Physics': 'physx',
+        }
+        if dict(delivery.variant_selections) != expected_variants:
+            raise ValueError('F04 official Panda source must bind the exact F01 gripper/mesh/physics variants')
+
+
+def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
+    """Admit only the exact F04 Panda/source/runtime intersection."""
+    if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
+        raise TypeError('F04 Isaac materialization requires TaskArtifactV1 and ExecutionSpecV1')
+    execution.validate()
+    source.validate()
+    delivery = source.scene_source.loaded_delivery
+    definition = delivery.delivery.asset_definition
+    if not delivery.source_verified:
+        raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
+    _validate_f04_source_family(delivery)
+    if source.scene_source.representation.provider != 'isaacsim':
+        raise ValueError('F04 adapter requires the exact Isaac Sim representation')
+    if (source.scene_source.representation.provider_build_identity,
+            source.scene_source.representation.representation_format,
+            source.scene_source.representation.runtime_admitted) != (
+            'isaacsim-6.2.0.0', 'usd', False):
+        raise ValueError('F04 source representation must be USD prepared for Isaac Sim 6.2.0.0')
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.determinism_mode, execution.physics_profile) != (
+            'isaacsim', 'cuda', 'cuda:0', 'best_effort', F04_ISAAC_POSITION_PROFILE):
+        raise ValueError('unsupported Isaac provider/build/backend/device/profile intersection')
+    if (execution.render_default.provider, execution.render_default.backend,
+            execution.render_default.profile, execution.render_default.device,
+            execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
+        raise ValueError('F04 Isaac Position profile is state-only and does not admit task cameras')
+    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+            artifact.timebase.control_dt) != (0.002, 5, 0.01):
+        raise ValueError('F04 Isaac Position profile requires 100 Hz / five 2 ms physics steps')
+    if (source.task_artifact.identity_hash != artifact.identity_hash
+            or source.scene_definition.identity_hash != artifact.scene_identity_hash):
+        raise ValueError('F04 USD source does not bind the exact TaskArtifact and Scene')
+    if not (set(artifact.required_capabilities.names) <= set(CAPABILITIES)):
+        raise ValueError('F04 Isaac profile does not implement every TaskArtifact capability')
+
+
 def _diagnostic_manifest(artifact, execution, source, profile_id):
     """Return a process-local admission view for one non-capability diagnostic.
 
@@ -244,7 +311,38 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             raise ValueError('synthetic or unverified USD source is not admitted for production materialization')
         if not declared_execution.physics_provider == 'isaacsim':
             raise ValueError('no USD Core RuntimeSession adapter is admitted for the selected provider')
-        raise ValueError('Isaac Sim USD Core RuntimeSession adapter is not implemented; refusing materialization')
+        if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
+            raise ValueError('F04 Isaac materialization does not accept caller-supplied admission authorities')
+        _validate_f04_isaac_position_source(artifact, declared_execution, source)
+        from .isaac_native_io import create_isaac_native_runtime_io
+        from .native_io import UsdCoreRuntimeSession
+
+        native_io = None
+        try:
+            native_io = create_isaac_native_runtime_io(artifact, declared_execution, source)
+            session = UsdCoreRuntimeSession(
+                artifact, declared_execution, source, native_io, drive_receipt=None,
+            )
+        except BaseException as materialization_error:
+            if native_io is not None:
+                try:
+                    native_io.close()
+                except BaseException as cleanup_error:
+                    materialization_error.add_note(
+                        'Isaac native-I/O cleanup after Core admission failure also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
+                try:
+                    native_io.close_runtime_owner()
+                except BaseException as cleanup_error:
+                    materialization_error.add_note(
+                        'Isaac App owner cleanup after Core admission failure also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
+            raise
+        session._declared_execution_spec_v1 = declared_execution
+        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+        return session
     execution = legacy_execution_projection(execution)
     actual = (provider_manifest(execution.physics_provider) if _diagnostic_profile is None
               else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile))

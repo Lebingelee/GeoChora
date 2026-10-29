@@ -1904,10 +1904,30 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self._closed:
             return
         if not getattr(self, 'position_profile', False):
-            if self.session is not None:
-                self.session.close()
-                self.session = None
+            first_error = None
+            session, self.session = self.session, None
+            if session is not None:
+                try:
+                    session.close()
+                except BaseException as error:
+                    first_error = error
+                try:
+                    close_owner = getattr(session, 'close_runtime_owner', None)
+                    if callable(close_owner):
+                        close_owner()
+                except BaseException as error:
+                    if first_error is None:
+                        first_error = error
+                    else:
+                        add_note = getattr(first_error, 'add_note', None)
+                        if callable(add_note):
+                            add_note(
+                                'Runtime owner close after session close also failed: '
+                                f'{type(error).__name__}: {error}'
+                            )
             self._closed, self._stopped = True, True
+            if first_error is not None:
+                raise first_error
             return
         first_error = None
 
@@ -1934,13 +1954,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 first_error, 'camera consumer close after Position finalization', error,
             )
         try:
-            if self.session is not None:
-                self.session.close()
-                self.session = None
-        except BaseException as error:
-            first_error = retain_cleanup_error(
-                first_error, 'RuntimeSession close after Position finalization', error,
-            )
+            session, self.session = self.session, None
+            if session is not None:
+                try:
+                    session.close()
+                except BaseException as error:
+                    first_error = retain_cleanup_error(
+                        first_error, 'RuntimeSession close after Position finalization', error,
+                    )
+                try:
+                    close_owner = getattr(session, 'close_runtime_owner', None)
+                    if callable(close_owner):
+                        close_owner()
+                except BaseException as error:
+                    first_error = retain_cleanup_error(
+                        first_error, 'Runtime owner close after Position finalization', error,
+                    )
         finally:
             self._closed, self._stopped = True, True
         if first_error is not None:
@@ -2429,25 +2458,40 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         from dataclasses import asdict
 
         f03_input = self.value.get('f03_position_input')
-        if f03_input is not None:
+        f04_input = self.value.get('f04_position_input')
+        if f03_input is not None or f04_input is not None:
+            f04_native = f04_input is not None
+            versioned_input = f04_input if f04_native else f03_input
             source = self.value['source']
             source_scene = source.scene_source
             loaded = source_scene.loaded_delivery
             delivery = loaded.delivery
             representation = source_scene.representation
-            drive_receipt = self.value['native_drive_receipt']
+            drive_receipt = (getattr(self.session, '_drive_receipt', None)
+                             if f04_native else self.value['native_drive_receipt'])
             native_metadata = self.session._native_io_metadata
             reset_receipt = self.session._reset_write_receipt
             if reset_receipt is None:
-                raise RuntimeError('F03 recording requires the successful Core reset write receipt')
+                raise RuntimeError('versioned USD recording requires the successful Core reset write receipt')
+            expected_provenance = 'native_runtime' if f04_native else 'synthetic_fixture'
+            if (drive_receipt is None or drive_receipt.provenance_kind != expected_provenance):
+                raise RuntimeError('versioned USD recording receipt provenance differs from its execution route')
+            if f04_native:
+                if not source.scene_source.source_verified:
+                    raise RuntimeError('F04 recording requires the source-verified production delivery')
+                bootstrap = self.session._native_io.bootstrap_receipt()
+            else:
+                bootstrap = None
             action_schema = self.controller.controller_binding().action_schema
             profile = {
-                'schema_version': 'f03-core-call-chain-recording-profile-v1',
-                'profile_id': 'f03-versioned-usd-position-synthetic-s1-v1',
-                'provenance_kind': 'synthetic_fixture',
-                'runtime_admitted': False,
-                'source_verified': False,
-                'task_source_identity_sha256': f03_input.task_source.identity_hash,
+                'schema_version': ('f04-isaac-core-position-recording-profile-v1'
+                                   if f04_native else 'f03-core-call-chain-recording-profile-v1'),
+                'profile_id': ('f04-isaac-panda-position-native-v1'
+                               if f04_native else 'f03-versioned-usd-position-synthetic-s1-v1'),
+                'provenance_kind': 'native_runtime' if f04_native else 'synthetic_fixture',
+                'runtime_admitted': bool(f04_native),
+                'source_verified': bool(f04_native),
+                'task_source_identity_sha256': versioned_input.task_source.identity_hash,
                 'task_artifact_identity_sha256': self.artifact.identity_hash,
                 'scene_identity_sha256': self.position_scene.identity_hash,
                 'source_id': source.source_id,
@@ -2495,19 +2539,25 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
                 'native_position_drive_receipt': asdict(drive_receipt),
                 'native_runtime_io_metadata': native_metadata.to_mapping(),
+                **({'native_public_bootstrap_receipt': bootstrap} if f04_native else {}),
                 'native_source_mappings': {
                     'joints': dict(source.joints), 'bodies': dict(source.bodies),
                     'frames': dict(source.frames), 'free_joints': dict(source.free_joints),
                     'joint_targets': dict(source.joint_targets),
                 },
-                'static_kinematics_source_sha256': f03_input.kinematics_source_sha256,
+                ('source_calibrated_kinematics_source_sha256' if f04_native
+                 else 'static_kinematics_source_sha256'): versioned_input.kinematics_source_sha256,
                 'reset_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
-                'recording_scope': 'Core synthetic S1 conformance; no provider physics or native admission',
+                'recording_scope': (
+                    'F04 exact Isaac 6.2.0.0 cuda:0 GPU PhysX Position execution'
+                    if f04_native else 'Core synthetic S1 conformance; no provider physics or native admission'
+                ),
             }
             action_components = tuple(action_schema.components)
             return {
                 'env_metadata': {
-                    'env_name': 'SelectedReferenceEnv.F03VersionedPositionS1',
+                    'env_name': ('SelectedReferenceEnv.F04IsaacPandaPosition'
+                                 if f04_native else 'SelectedReferenceEnv.F03VersionedPositionS1'),
                     'task_name': self.artifact.task_id,
                     'task_version': self.artifact.artifact_version,
                     'scene_uid': self.position_scene.scene_id,
@@ -2526,7 +2576,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'reference_profile': profile,
                 },
                 'universal_action_schema': {
-                    'version': 'f03-core-call-chain-position-action-v1',
+                    'version': ('f04-isaac-core-position-action-v1'
+                                if f04_native else 'f03-core-call-chain-position-action-v1'),
                     'dimension': len(action_components), 'components': action_components,
                 },
                 'resolved_config': {
@@ -2537,7 +2588,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 },
                 'candidate_identity': {
                     'task_artifact_identity_hash': self.artifact.identity_hash,
-                    'task_source_identity_sha256': f03_input.task_source.identity_hash,
+                    'task_source_identity_sha256': versioned_input.task_source.identity_hash,
                     'scene_identity_hash': self.position_scene.identity_hash,
                     'source_id': source.source_id,
                     'source_closure_digest': source.source_closure_digest,
@@ -2779,16 +2830,21 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         target_payload = target.target.to_mapping()
         target_hash = target.target.identity_hash
         applied_payload = applied.to_mapping()
-        if self.value.get('f03_position_input') is not None:
+        f03_input = self.value.get('f03_position_input')
+        f04_input = self.value.get('f04_position_input')
+        if f03_input is not None or f04_input is not None:
             native_ack = getattr(self.session, '_last_native_position_ack', None)
             native_advances = getattr(self.session, '_last_interval_advances', ())
             advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)
             if native_ack is None or len(native_advances) != self.artifact.timebase.control_substeps:
-                raise ValueError('F03 recording requires one complete native Position Ack and exact interval receipts')
+                raise ValueError('versioned USD recording requires a complete native Position Ack and interval receipts')
             applied_payload['native_position_write_ack_v1'] = native_ack.to_mapping()
             applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
             applied_payload['native_interval_advance_attempts'] = advance_attempts
-            applied_payload['native_io_execution_class'] = 'synthetic_fixture_no_physics'
+            applied_payload['native_io_execution_class'] = (
+                'native_runtime_accepted_physics' if f04_input is not None
+                else 'synthetic_fixture_no_physics'
+            )
         canonical_action = {
             **canonical.to_mapping(),
             'position_target_v1': target.to_mapping(),

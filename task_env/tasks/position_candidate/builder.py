@@ -96,18 +96,67 @@ class F03PositionCandidateInputV1:
             raise ValueError('F03 named drive receipt does not bind the full versioned source/execution/control input')
 
 
-def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1, *, horizon=8,
+@dataclass(frozen=True)
+class F04PositionCandidateInputV1:
+    """Production construction input whose named receipt is deferred to native metadata."""
+
+    schema_version: str
+    task_source: TaskSourceV1
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: ExecutionSpecV1
+    reset_plan: EpisodeResetPlanV1
+    kinematics_source_xml: str
+    kinematics_source_sha256: str
+
+    def validate(self):
+        if self.schema_version != 'f04-position-candidate-input-v1':
+            raise ValueError('unsupported F04 Position candidate input schema')
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1):
+            raise TypeError('F04 Position input requires exact versioned Core contracts')
+        self.runtime_source.validate()
+        self.artifact.validate()
+        self.execution.validate()
+        self.reset_plan.validate()
+        if (self.runtime_source.task_artifact.identity_hash != self.artifact.identity_hash
+                or self.runtime_source.scene_definition.identity_hash != self.artifact.scene_identity_hash
+                or self.runtime_source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
+                or self.runtime_source.scene_source.scene_identity_sha256 != self.runtime_source.scene_definition.identity_hash
+                or self.task_source.scene_ref != self.runtime_source.scene_definition.scene_id
+                or self.task_source.task_id != self.artifact.task_id
+                or self.task_source.version != self.artifact.artifact_version
+                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
+                or self.reset_plan.role_binding.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
+                or self.reset_plan.reset_sample.task_artifact_hash != self.artifact.identity_hash):
+            raise ValueError('F04 Position input source/TaskSource/Artifact/reset identities disagree')
+        from task_env.runtime.sessions.api import _validate_f04_isaac_position_source
+        _validate_f04_isaac_position_source(self.artifact, self.execution, self.runtime_source)
+        if not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str:
+            raise ValueError('F04 Position input requires source-calibrated kinematics bytes')
+        actual_hash = hashlib.sha256(self.kinematics_source_xml.encode('utf-8')).hexdigest()
+        if self.kinematics_source_sha256 != actual_hash:
+            raise ValueError('F04 source-calibrated kinematics hash mismatch')
+
+
+def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
+    if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1):
+        raise TypeError('versioned Position candidate requires an exact F03 or F04 input contract')
     input_v1.validate()
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
+    native_drive_receipt = getattr(input_v1, 'native_drive_receipt', None)
     profile = PandaPositionServoProfileV1.from_usd_source(
         artifact, source, execution=input_v1.execution,
         kinematics_source_xml=input_v1.kinematics_source_xml,
-        native_drive_receipt=input_v1.native_drive_receipt,
+        native_drive_receipt=native_drive_receipt,
     )
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     if input_v1.reset_plan.reset_sample.task_seed < 0:
@@ -120,8 +169,9 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1, *,
             'reset_plan': input_v1.reset_plan,
             'controller_binding_plan': plan,
             'execution_spec_v1': input_v1.execution,
-            'f03_position_input': input_v1,
-            'native_drive_receipt': input_v1.native_drive_receipt,
+            'f03_position_input': input_v1 if type(input_v1) is F03PositionCandidateInputV1 else None,
+            'f04_position_input': input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
+            'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
                 'artifact': artifact.identity_hash,
                 'source': source.source_id,
@@ -130,7 +180,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1, *,
                 'reset_plan': input_v1.reset_plan.identity_hash,
                 'execution': input_v1.execution.identity_hash,
                 'controller': profile.identity,
-                'drive_receipt': input_v1.native_drive_receipt.identity_sha256,
+                'drive_receipt': (None if native_drive_receipt is None
+                                  else native_drive_receipt.identity_sha256),
                 'kinematics_source_sha256': input_v1.kinematics_source_sha256,
             }),
             'resolved_configuration': {
@@ -140,7 +191,9 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1, *,
                 'profile_id': profile.profile_id,
                 'execution_identity_sha256': input_v1.execution.identity_hash,
             },
-            'source_revision': 'F03-versioned-usd-synthetic-s1-v1',
+            'source_revision': ('F03-versioned-usd-synthetic-s1-v1'
+                                if type(input_v1) is F03PositionCandidateInputV1
+                                else 'F04-versioned-usd-native-candidate-v1'),
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
                 'kinematics_source': input_v1.kinematics_source_sha256,
@@ -174,8 +227,9 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1, *,
         artifact=artifact, reset_plan=input_v1.reset_plan,
         source=source, controller_binding_plan=plan,
         execution=input_v1.execution,
-        native_drive_receipt=input_v1.native_drive_receipt,
-        f03_position_input=input_v1,
+        native_drive_receipt=native_drive_receipt,
+        f03_position_input=input_v1 if type(input_v1) is F03PositionCandidateInputV1 else None,
+        f04_position_input=input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
     )
 
 
