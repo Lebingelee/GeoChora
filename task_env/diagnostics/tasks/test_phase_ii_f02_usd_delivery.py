@@ -280,7 +280,7 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
         )
         report = check_assets(spec, catalog)
         assert report.status == "fail"
-        assert any(finding.code == "asset_missing" for finding in report.findings)
+        assert any(finding.category == "asset_missing" for finding in report.findings)
         from harness_compiler import CompilationRejected, compile_candidate
         from harness_spec_schema import CandidateSpec
 
@@ -297,7 +297,7 @@ def test_real_core_loader_resolver_catalog_and_mock_asset_boundary(tmp_path):
         )
         with pytest.raises(CompilationRejected) as rejected:
             compile_candidate(candidate, catalog, provider="mujoco")
-        assert any(finding.code == "asset_missing" for finding in rejected.value.report.findings)
+        assert any(finding.category == "asset_missing" for finding in rejected.value.report.findings)
     finally:
         sys.path.remove(str(agent_dir))
 
