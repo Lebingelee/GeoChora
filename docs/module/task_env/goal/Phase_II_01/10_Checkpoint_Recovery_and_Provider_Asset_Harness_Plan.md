@@ -1,7 +1,7 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt002已完成两来源有界真实Core/Isaac运行但物理门失败，等待Sol复核**。
-F04 attempt001仍保留为静态候选的历史状态。attempt002增加仅针对两个冻结Panda派生样本的`local-validated`来源合同，接通既有Core/Isaac路径并生成四份H5；抓手开合、来源标定FK及原reader时钟比较尚未收口，故F04总体仍为PARTIAL。
+更新于 2026-10-29。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01 attempt003为 `ACCEPTED_BOUNDED_F01`；F02 attempt002为 `ACCEPTED_BOUNDED_F02`；F03 attempt003由Sol接收为 `ACCEPTED_BOUNDED_F03_S1`；F04 attempt004为 `F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW` Luna候选，等待Sol复核**。
+F04 attempt001–003的历史状态和失败原件继续保留。attempt004在既有Core owners上修复worker退出边界，完成两个冻结Panda source的同run CUDA/GPU PhysX闭环、S1、原物理门、独立reader和bundle检查；本次候选未扩展来源/build/device准入，不表示Sol接收或Qualification。F05尚未启动。
 
 ### 当前双Luna分工（2026-10-29）
 
@@ -592,3 +592,31 @@ worker family receipts与H5已写入，但Isaac `SimulationApp.close()`使用快
 本attempt为`F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW`。reset刷新、动作单位、reader clock和producer aggregate缺口已由本attempt代码/S1及第五次worker/reader事实支持；但五次父进程异常退出阻止完整native验收。保留状态为候选，不自授Sol接收、Isaac provider admission、S2/S3、Human Judge、P99、Qualification或training-ready。`F04`原物理阈值不变，`F05`未启动。
 
 完整逐run原件、四份H5/witness、native receipts、资源/锁账本、reader诊断、input readback和sha清单见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_003/`。下一步由Sol审查实际diff及退出证据后决定；本attempt不启动额外slice或attempt。
+
+<a id="f04-attempt004-controlled-exit-two-source-closure"></a>
+
+## F04 attempt004 controlled-exit two-source closure（2026-10-29，Luna候选）
+
+本attempt从`develop-full@45be9fe11809e59822f3604f5cb6b7edf00d8f45`开始，分支及冻结输入/保护文件复核通过。实现提交为`294bea9f1ea61c9e775697e4b176c14dae6a5231`；结果文档提交另行记录。attempt001–003原报告、失败日志、-11退出事实、物理门及物理阈值均保持不变。
+
+### 受控退出 owner 与范围
+
+`IsaacSimAppOwnerV1.close()`在Core owner内只调用公开`SimulationApp.close()`一次并记成功/失败；不注销atexit、不卸载framework/plugin、不释放仍由进程管理的wrapper以触发非预期析构，也不在`Env.close()`、`Session.close()`或adapter.close()里终结调用方进程。App close返回后，专用worker保留进程级wrapper引用，完成H5/witness/family/root receipts的flush与fsync后，在最外层worker边界按真实退出码调用受控进程终结。该策略复用F01既有受控worker路线并保留非零退出码；它证明本包专用worker的可观测终结，不声称自然Python/Kit析构本身已修复。
+
+更新后的精确provider-free列表为30个nodeid，collection及执行均通过，30/30、28.58秒，Kit/native启动为0。额外无Kit父子进程S1执行五个scenario：成功退出0；worker、App.close、finalizer及durable receipt失败均以1退出；每个scenario父进程仍存活且未运行atexit finalizer。bundle绑定正例通过，并拒绝非零退出、缺父级观察、PID不匹配、App未close和durability不完整。
+
+### 同一A/B native run及独立读回
+
+冻结计划`evidence/native_plan.json` SHA-256为`9642018755dc57c20366f9864f42b25f3dc97e7f57344e84b97a6a421fc84049`，精确使用Isaac Sim 6.2.0.0、CUDA `cuda:0`、GPU PhysX、`best_effort`、state-only、100Hz outer及5×2ms physics steps。一个native worker按official Panda→当前Menagerie Panda顺序完成同一App内两个source，每个source两轮同Env reset，共4个episode；每episode100 intervals/101 observations，每interval五个accepted physics step。合计2,000 public physics steps、72 bootstrap steps、2,072 physics steps/4.144模拟秒；无source/run拼接。
+
+原`original_physical_oracle.json`阈值未更改。独立reader从四份新closed H5验证404/404 boundary和observation、400 transitions、2,000 accepted advances；每份T=100/T+1=101；四episode的arm motion/return、gripper opening、source-calibrated FK、free-body reset/drop/downward speed/settling检查均通过。40/40 H5 tamper拒绝；bundle另拒绝cross-family和same-family cross-episode witness graft。
+
+父进程实测worker exit 0，PGID完全退出，无TERM/KILL、stop reason或超预算项；App.close一次且成功，所有Core session关闭，最终aggregate在App.close及文件durability之后写入。锁从启动持续持有到worker退出及资源测量，之后释放。worker wall 407.613s，采样最大进程组RSS 6,179,176,448 bytes，采样最低MemAvailable 3,305,910,272 bytes，采样最低GPU空闲5,227MiB、进程显存采样峰值1,719MiB；网络接收122,280,532 bytes、Omniverse cache增长0、输出树13,709,856 bytes、native日志55,508 bytes。以上资源峰谷均为采样值。单worker/本attempt native budgets均满足。
+
+provider-free读取/collection、reader和bundle各自run ledger及失败修复历史保存在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_004/`。其中保留早期过期nodeid collection失败、首轮S1 budget误断言、缺少OpenUSD bridge的freeze失败、attempt003 -11 bundle预期拒绝，以及把root receipt误传为family receipt的reader调用错误；后续修正均用新run ID，不覆盖原件。
+
+### 当前出口与限制
+
+本attempt候选状态为`F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW`，不是Sol接收。该证据限于冻结的两个Panda delivery/source、Isaac 6.2.0.0/CUDA `cuda:0`/GPU PhysX execution/profile和本次public Position/Core/H5路线；不授予更广Isaac provider admission、其他source/build/device支持、Human Judge、D0/D1/D2、P99、Qualification或training-ready。F05未启动。
+
+完整prompt、snapshot/readback、输入保护检查、S1/native/reader/bundle artifacts、逐run账本、资源/锁回执、Skill review和manifest见`f04_004/`。Sol复核前，当前仅声明Luna候选；代码写入和native锁窗口已释放。

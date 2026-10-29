@@ -340,6 +340,34 @@ physical thresholds, source/build/device profile and F05 hold remain unchanged. 
 grant Isaac provider admission, S2/S3 acceptance, Human Judge approval or Qualification. See the
 [attempt003 execution candidate](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate).
 
+<a id="f04-isaac-core-adapter-attempt004"></a>
+
+### F04 attempt004: controlled worker exit and two-source CUDA closure (2026-10-29; candidate pending Sol review)
+
+`IsaacSimAppOwnerV1.close()` closes the public SimulationApp once and reports the result. Core
+`Env.close()`, `Session.close()` and adapter close do not terminate the caller process. The
+dedicated native worker retains the process-scoped wrapper through durable H5/witness/receipt
+finalization, then exits at its outer boundary with the actual worker result code. This is a
+controlled worker-exit contract; it does not claim that natural Python/Kit finalization is clean.
+
+The exact provider-free S1 allowlist passed 30/30, including five subprocess finalization
+scenarios whose parents survived. One same-run Isaac Sim 6.2.0.0 worker exercised both frozen
+Panda source families on CUDA `cuda:0`/GPU PhysX, `best_effort`, state-only at 100 Hz with five
+2 ms physics steps. It produced four closed H5 files, each with 100 transitions and 101
+observations; the run recorded 2,000 public physics steps and 72 bootstrap steps. The independent
+reader verified all 404 T+1 boundary/observation rows and 2,000 advances, rejected 40/40 tamper
+cases, and recomputed all original arm, gripper, calibrated-FK and free-body physical gates.
+The same-run bundle rejected cross-family and cross-episode witness grafts. The parent observed
+worker exit 0 and a fully exited process group; the shared lock was released after exit and
+resource measurement.
+
+Current candidate status is
+`F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW`. This is limited to the two
+frozen Panda deliveries and exact build/backend/device/profile. It does not establish general
+Isaac admission, other source/build/device combinations, Human Judge approval, P99, Qualification
+or training-ready status. F04 attempt001–003 evidence is unchanged, including all five attempt003
+`-11` exits; F05 has not started. See the [attempt004 record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
+
 ### Static Logical Assembly value (R01a)
 
 ```python

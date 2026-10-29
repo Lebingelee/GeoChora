@@ -10,13 +10,13 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | 冻结任务、Experiment、randomization、Evidence/Judge | [task-artifact](task-artifact.md) |
 | USD delivery、依赖闭包与 Provider 表示选择（F02 advanced） | [public-api: USD delivery](public-api.md#usd-delivery-and-provider-representation-selection-f02) |
 | F03 版本化 USD Position candidate 与合成 I/O Core S1 边界 | [public-api: F03](public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission) |
-| F04 Isaac Core adapter 与两类 Panda 来源的有界结果 | [public-api: F04 attempt003](public-api.md#f04-isaac-core-adapter-attempt003) |
+| F04 Isaac Core adapter 与两类 Panda 来源的有界结果 | [public-api: F04 attempt004](public-api.md#f04-isaac-core-adapter-attempt004) |
 | runtime/state/timebase、controller、Expert lifecycle、providers | [runtime-and-providers](runtime-and-providers.md) |
 | recorder/H5/replay、learning、rendering | [recording-and-learning](recording-and-learning.md) |
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
 | 首个失败边界、重试/恢复与升级 | [troubleshooting](troubleshooting.md) |
 
-F04 attempt003修复了reset后的public kinematics refresh、gripper单位换算、reader时钟容差及App关闭回执路径。五次A/B CUDA/GPU PhysX worker均完成四episode并生成H5，但父级进程以`-11`退出；latest run的独立reader与冻结物理门通过仅作为诊断结果。因此当前仍为 `F04_PARTIAL_NATIVE_WORKER_SIGSEGV_PENDING_SOL_REVIEW`，不表示完整native验收、通用provider admission或Qualification。详见[attempt003收口记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate)。
+F04 attempt004修正专用worker的进程终结边界；`Env.close()`/Session/adapter close只关闭各自资源，不结束调用方。30/30 provider-free S1、一个同run官方Panda+Menagerie Panda CUDA/GPU PhysX worker、四份closed H5、原物理oracle、404/404独立T+1读回、40/40篡改拒绝、同run bundle及父观察exit 0均通过。候选为`F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW`，仍待Sol复核；仅限冻结source/build/device/profile，不代表通用provider admission或Qualification。attempt001–003失败原件及attempt003的五个`-11`原样保留；F05未启动。详见[attempt004收口记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure)。
 
 F03 attempt003 已由 Sol 接收为 `ACCEPTED_BOUNDED_F03_S1`，范围限于 synthetic I/O 下的 Core 调用链与最终 T+1 reader；attempt002 的真实 CPU Pendulum 三步范围偏差仍作为历史原件保留且不计入接收证据。F04 attempt001/002保持历史状态；attempt002与attempt003证据分别见[F04 attempt002](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native)和[attempt003](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate)。
 

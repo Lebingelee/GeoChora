@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "42439b142303be5f7eb5f2e4fa0f0ec897c96cff45d06ed08bee891fc229685a",
+    "07_Execution_Order_and_Acceptance.md": "177014dc3a9d6b602c8322b4a171b4d8c616a9c60c131c69040158ca394dcb1f",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "30ea197dee5ac6704371efc632f9fd9bd4d8edd97575825a243dd1c48487eb6f",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "a7d4c8dbce7c6060db6cb6217926ed226f3919b2bbab4388a4b122d030212505",
     "README.md": "494e9b2d3c8df43aa5a44b523e6ae64ef61f3f07417a6b9ef4ff3f7d19451a59"
   },
-  "revision_kind": "F04_ATTEMPT002_LOCAL_DERIVED_DELIVERY_AND_TWO_SOURCE_ISAAC_PARTIAL",
+  "revision_kind": "F04_ATTEMPT004_CONTROLLED_EXIT_TWO_SOURCE_BOUNDED_CANDIDATE_PENDING_SOL_REVIEW",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3638,7 +3638,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "F04 attempt002 adds exact-sample local-derived USD delivery/report contracts and an existing-Core Isaac adapter route, records 20/20 provider-free S1 plus two-source CUDA/GPU PhysX runs and four H5 readbacks; frozen gripper/FK thresholds fail and reader clock comparison requires repair. No F04 acceptance or F05 claim.",
+  "planning_submission_this_revision": "F04 attempt004 records the controlled worker-exit repair, exact 30/30 provider-free S1, one same-run official/current Panda CUDA/GPU PhysX execution, four closed H5 files, original physical-gate readback, independent reader, parent exit and bundle receipts. Candidate awaits Sol review; attempt001-003 failures remain historical and F05 is unstarted. The original R-slice DAG/P99 dependencies are unchanged.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4392,6 +4392,19 @@
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_002/report.md",
       "f05_started": false,
       "qualification_granted": false
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "F04_ATTEMPT004_CONTROLLED_EXIT_TWO_SOURCE_BOUNDED_CANDIDATE",
+      "input_head": "45be9fe11809e59822f3604f5cb6b7edf00d8f45",
+      "implementation_commit": "294bea9f1ea61c9e775697e4b176c14dae6a5231",
+      "result": "F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW",
+      "native_run": "013_f04_attempt004_both_controlled_exit; parent-observed worker exit 0; 2072 physics steps including bootstrap; 4.144 simulated seconds; one App start",
+      "reader": "404/404 T+1 boundaries and observations; 2000 advances; 40/40 tamper rejection; original physical gates passed",
+      "prior_attempt003_minus11_failures_preserved": true,
+      "F05_started": false,
+      "qualification_granted": false,
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_004/"
     }
   ],
   "P00_audit": {
@@ -4560,7 +4573,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-29",
-    "status": "F00_F01_F02_ACCEPTED_BOUNDED; F03_ACCEPTED_BOUNDED_S1; F04_CHANGES_REQUESTED_AFTER_ATTEMPT002; ATTEMPT003_REASSESSMENT_COMPLETE",
+    "status": "F00_F01_F02_ACCEPTED_BOUNDED; F03_ACCEPTED_BOUNDED_S1; F04_ATTEMPT004_CANDIDATE_PASS_PENDING_SOL_REVIEW; F05_NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -4758,7 +4771,7 @@
         "work": "broader scenes/render and selected Newton route"
       }
     ],
-    "patch_rows_status": "F00/F01/F02 accepted within their recorded bounds; F03 attempt003 accepted synthetic Core S1 only; F04 attempt002 actual two-source Core/Isaac partial result reviewed, changes requested. F05 not started; no Qualification.",
+    "patch_rows_status": "F00/F01/F02 accepted within recorded bounds; F03 attempt003 accepted synthetic Core S1 only; F04 attempt004 Luna candidate passes the frozen two-source bounded Core/Isaac S1/S2/S3 gates pending Sol review; F05 not started; no Qualification.",
     "open_technical_questions": [
       "GeoPhys public two-source fixed-tree preservation of actuator/tendon/equality/collision/mapping",
       "Isaac actual version API/drive/state/app-session lifecycle and force phase/freshness",
@@ -5811,6 +5824,46 @@
       "F05_started": false,
       "qualification_granted": false,
       "sol_review": "PENDING"
-    }
+    },
+    "f04_attempt004_execution": {
+      "status": "F04_BOUNDED_CONTROLLED_EXIT_S1_S2_S3_PASS_PENDING_SOL_REVIEW",
+      "attempt": 4,
+      "branch": "develop-full",
+      "input_head": "45be9fe11809e59822f3604f5cb6b7edf00d8f45",
+      "implementation_commit": "294bea9f1ea61c9e775697e4b176c14dae6a5231",
+      "prompt_sha256": "5cd6286a5df4cf204c678c6a00decb12f57165af3c8de416b2f870b3d74cbbd9",
+      "provider_free_s1": "30/30 exact node IDs; no Kit/native start",
+      "native_run": "013_f04_attempt004_both_controlled_exit; one App worker; official Panda and current Menagerie Panda on Isaac Sim 6.2.0.0 CUDA cuda:0/GPU PhysX",
+      "native_totals": {
+        "app_starts": 1,
+        "episodes": 4,
+        "h5_files": 4,
+        "public_transitions": 400,
+        "observations": 404,
+        "public_physics_steps": 2000,
+        "bootstrap_physics_steps": 72,
+        "total_physics_steps": 2072,
+        "simulated_seconds": 4.144,
+        "worker_wall_seconds": 407.612525842851
+      },
+      "parent_exit": "0 observed independently; worker process group exited; no TERM/KILL/stop reason; shared lock released after exit and resource measurement",
+      "independent_reader": "404/404 T+1 boundaries and observations; 400 transitions; 2000 advances; 40/40 tamper rejections; original physical oracle passed for all four episodes",
+      "bundle": "PASS; same-run binding and durable 10-file receipt set; cross-family and same-family cross-episode witness grafts rejected",
+      "resource_samples": {
+        "max_worker_group_rss_bytes": 6179176448,
+        "min_mem_available_bytes": 3305910272,
+        "min_gpu_free_mib": 5227,
+        "max_process_gpu_memory_mib": 1719,
+        "network_rx_delta_bytes": 122280532,
+        "omniverse_cache_growth_bytes": 0,
+        "output_tree_bytes": 13709856,
+        "native_log_bytes": 55508
+      },
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f04_004/",
+      "sol_review": "PENDING; Luna candidate only",
+      "F05_started": false,
+      "qualification_granted": false
+    },
+    "latest_f04_authorization": "Maintainer explicitly authorized F04 attempt004 using the frozen package and input HEAD 45be9fe11809e59822f3604f5cb6b7edf00d8f45; local code/docs commits and one bounded two-source CUDA/GPU PhysX native worker were permitted. F05 and other slices remain outside scope."
   }
 }
