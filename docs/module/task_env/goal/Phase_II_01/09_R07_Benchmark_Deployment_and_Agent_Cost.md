@@ -224,3 +224,6 @@ R07b首pilot来源安装/metadata recipe S1已获Sol接收，native admission仍
 最终provider-free candidate S1为25 passed；受影响predicate/fault-lifecycle/observation节点为39 passed，另2个真实provider节点按零engine边界deselected；成本协议v2.2 synthetic S1为8 passed。source installation/verify receipt按原冻结回执复用并交叉校验；旧v2.1 INVALID原结果不改。v2.2 lineage/LOC structural result绑定session start、final commit、历史reference `0309d73bb5b60f9989907c3eede8c0cd2893f29f`、实际common ancestor `b0b26e95ddfd7b5128401261f05541bb19586372` 与copy-bound prior sources。缺实际token usage、收费来源、连续开发时间、历史继承成本，均为null并注明原因；结构S1不能声称完整实测或累计R07成本。
 
 状态为`R07C_PILOT_PARTIAL_PENDING_SOL_REVIEW`，不满足原计划的`CORE_WIRING_S1_READY`或native readiness。固定source composition、TaskEnv construction/admission、`.pruned_init`安全解释和reset、public object-pose/contact route、同Env Recorder/H5/independent-reader/worker-finalizer仍需后续冻结合同解决。原五任务目标、18/22、P99、Formal Qualification与Human Judge均未改变；没有自动授权下一attempt。
+
+
+2026-10-29 Sol复核R07c pilot attempt001：`PARTIAL_WORK_RETAINED_REWORK_REQUIRED`，保留mixed control/contact合同与25/39/8项S1原结果，source仍声明计划、完整Env调用链未贯通。独立成本reader接受合法自哈希的伪造commit及partial→measured变体，v2.2不予技术冻结，必须补拒绝门。下一包须实际source composition与原Core构造/reset/step/fault/recording的provider-free完整链，仅native叶IO可fake；未授权native，不改变18/22/五任务/P99/Qualification。复核原件位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_001/`。

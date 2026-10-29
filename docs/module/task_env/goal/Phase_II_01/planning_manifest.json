@@ -2636,6 +2636,20 @@
         ],
         "timebox_seconds": 14400,
         "original_five_task_exit": false
+      },
+      "pilot_sol_review": {
+        "decision": "PARTIAL_WORK_RETAINED_REWORK_REQUIRED",
+        "reviewed_head": "b7fb37e4d9e7fa8bc575d1cf4deb58291da6c9c9",
+        "review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_001/sol_review.md",
+        "cost_protocol_v2_2_accepted": false,
+        "source_composition": "DECLARATION_ONLY",
+        "Core_env_end_to_end_S1": false,
+        "native_authorized": false,
+        "next_attempt_not_started": true,
+        "required_rework": [
+          "cost reader independent lineage and completeness",
+          "actual composed source and real existing Core Env success/fault S1"
+        ]
       }
     },
     {
@@ -2768,12 +2782,12 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "86813f971f7f2c9e1f514c18368ac891741b4feacb4f8cda989a6dcc463a2e62",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "0e66380ee3feaaff91b0b6eda2e938a63b355540fdfd5196f51f2e3edf755ff6",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "d3ba610cd195e2548640bd863a2aaf28de8647acca33b832afcf62e9e15ce07e"
+    "07_Execution_Order_and_Acceptance.md": "21cdc206ffbc3f3ff68022ecc5776e788ca44590b2c90f540f894b63adec307d"
   },
-  "revision_kind": "R07C_PILOT_ATTEMPT001_PARTIAL_DELIVERY",
+  "revision_kind": "R07C_PILOT_ATTEMPT001_SOL_PARTIAL_REVIEW",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
