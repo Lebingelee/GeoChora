@@ -121,6 +121,27 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   Sol reviews the actual diff and available Evidence before sending the next
   slice. Luna's reported PASS is input to that review, not automatic acceptance.
   Keep one writer at a time and use the same phase branch across handoffs.
+- Keep one unfinished package per Luna thread. Follow the
+  [project Skill's prompt and duration protocol](.agents/skills/geochora/SKILL.md#one-complete-prompt-per-luna-execution-window):
+  freeze a complete prompt and expected duration before dispatch, observe
+  progress read-only, and wait for its complete final report and released
+  window before sending one reviewed continuation or next package. Do not
+  append findings or tasks during execution; elapsed estimates and idle or
+  interrupted status alone do not establish a complete handoff.
+- For goals spanning substages, follow the project Skill's
+  [goal orchestration procedure](.agents/skills/geochora/references/goal-orchestration.md).
+  Locate implementation details in the planning record before dispatch;
+  target research/implementation in attempt 1 and review/acceptance in attempt
+  2, with at most three attempts per substage. An attempt is a planned
+  autonomous execution window: multiple code fixes, tests and native runs may
+  occur inside it. Unresolved work ends an attempt when its timebox is exhausted
+  or external Sol guidance is necessary; a failed run alone does not. Keep
+  per-run resource limits and run ledgers separate from attempt counting.
+  Before attempt 3, reassess the
+  actual blockers, research relevant open-source implementations and record
+  feasibility against the original gates. Observe Luna periodically read-only,
+  prepare next steps privately during report cleanup, and verify the final
+  report against actual changes, commands and evidence before dispatching.
 - Size packages to the change. A basic change with known owners normally
   combines implementation, targeted validation, necessary in-scope fixes and
   local commit(s) in one package. Separate preparation only for unknowns that
@@ -132,10 +153,12 @@ API/qualification-sensitive changes. A source diff alone does not validate a Ski
   or an unapproved extension of the original completion criteria.
 - Freeze HEAD and protected input bytes for each Luna execution window,
   including ignored-output-only audits. Sol lands review/summary/document
-  commits after Luna returns and before issuing the next package. If urgent
-  maintainer steering changes an in-flight baseline, explicitly interrupt or
-  amend that package with the exact commit/diff/hashes; preserve the old
-  snapshot and require readback before resuming.
+  commits after Luna returns and before issuing the next package. Explicit
+  maintainer redirection or an immediate safety/resource issue may require
+  interruption: confirm the current execution/window has ended, preserve its
+  prompt/snapshot/progress, then issue one replacement package identifying
+  what it supersedes and the exact changed scope/commit/diff/hashes; require
+  readback before resuming. Do not add a second prompt to an active execution.
 - If a gate fails, Sol issues one bounded rework package. If the next table row
   is blocked, record the blocker and any explicit decision to advance an
   independent ready row; do not silently reorder work or add dependencies.

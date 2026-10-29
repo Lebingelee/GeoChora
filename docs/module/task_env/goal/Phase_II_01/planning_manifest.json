@@ -1916,7 +1916,7 @@
         "global_articulation_v1_change": "NOT_ACCEPTED"
       },
       "attempt003_plan": {
-        "status": "REASSESSED_READY_FOR_PACKAGE",
+        "status": "PAUSED_FOR_MAINTAINER_CONTRACT_CORRECTION",
         "attempt": 3,
         "attempt_limit": 3,
         "thread_id": "01a18225-9aff-7f63-b2a8-589c63e7fec8",
@@ -1926,12 +1926,20 @@
           180
         ],
         "feasibility": "FEASIBLE_WITH_BOUNDED_REWORK; derived physical outcome unknown",
-        "native_workers_max": 1,
-        "native_retries": 0,
         "max_outer": 128,
         "max_mj_step": 640,
         "historical_disposition": "BLOCKED_MISSING_RAW_OR_PHASE_DECISION",
-        "reader_repair": "Rehash contract; exact native result case set/file SHA/receipt/materialization/counter joins; cross-run negatives"
+        "reader_repair": "Rehash contract; exact native result case set/file SHA/receipt/materialization/counter joins; cross-run negatives",
+        "native_workers_per_run_max": 1,
+        "native_runs_within_window": "repeat after diagnosed in-scope repairs and frozen per-run inputs; no default single-start cap",
+        "active_seconds_used_before_pause": 1376,
+        "active_seconds_remaining": 9424,
+        "per_run_output_bytes_max": 268435456,
+        "attempt_output_bytes_max": 1073741824,
+        "paused_head": "d3ea90cd492648ae99b371c6eca35af8a4660d70",
+        "s1_invocations_before_pause": 7,
+        "native_starts_before_pause": 0,
+        "maintainer_correction_anchor": "06_R06_Compatibility_and_Regression.md#r06b-attempt003-maintainer-window-correction"
       }
     },
     {
@@ -2090,7 +2098,7 @@
   "document_sha256": {
     "README.md": "cae2031ac99865e67d371984d93ee8526b5b8386c5b99f640d945c7a63b9b9a8",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "4178556d1e4c1258073a2b86594935b293984188c16aabd18424b785ad8dea0d",
+    "06_R06_Compatibility_and_Regression.md": "45e72fec075852e6c00429e3bc11444d73a879331c291f58aa282bde7a7b0143",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
@@ -2099,7 +2107,7 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "4393f99b4faf37bb2fc5719d96ff3245e158e1418d35d528a19f2ec7184e8d9a",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "c7791770456563f18f38c1ab73ea7501ea4f41a1a848e95c6d2933a98e2425c5"
+    "07_Execution_Order_and_Acceptance.md": "240a0a6dbef4e02f91aa0fd9b4537e717d125c87493a04b1ca812ecc8dd16be3"
   },
   "revision_kind": "CHECKPOINT_RECOVERY_PROVIDER_USD_HARNESS_PLAN_UPDATE",
   "benchmark_audit": {

@@ -160,3 +160,16 @@ Sol核对camera `4b74276`：178项输出hash（71,228,096 bytes）、native冻�
 R04b误导入MuJoCo与argv未保留的偏离保持记录。历史missing raw/Phase处置、R05、R06c/P99与Qualification均不改变；本包不进入R07或F线。主checkout由Luna1持有，不触碰其dirty文件。
 
 独立reader补充复核：`run_readback`还需重算contract digest并将worker result的exact两case、H5 hash/size、receipt/materialization/counters逐项与实际文件绑定；单纯H5内部self-hash不足以排除错run。003补这些原same-run门的反例，整理tamper清单名与实际执行结果的对应，不新增物理范围。
+
+
+<a id="r06b-attempt003-maintainer-window-correction"></a>
+
+## R06b attempt003维护者执行窗口纠正（2026-10-29）
+
+维护者明确：一次attempt允许预定时间内多轮代码修复、测试和native验证；不能因Sol默认设置的“一次native启动”用尽就结束。未解决时，预定时间耗尽或确需Sol外部指导才结束attempt。此前报告、运行失败与attempt编号保留，不重写历史。
+
+在途003已按维护者改向停稳，camera HEAD `d3ea90c`、clean；约22分56秒主动窗口已用，7次S1累计约219秒，native启动0次。现有代码/全部检查输出保留，不另开attempt。主项目Skill与AGENTS已明确该语义；恢复包修订同一003的运行合同，保留已用时间和run ledger。剩余主动时间9424秒（180分钟减原窗口1376秒），控制暂停与外部锁等待另记，不能恢复成全新180分钟。
+
+新规则：每次native run仍限一个worker、原2case/128 outer/640 step/1.28sim秒、300秒wall、4GiB RSS与共享排他锁；这些是每run上限。允许在剩余窗口内定位普通故障、修复、重新S1并另起新run目录/合同，逐run保全失败和累计成本。不再默认将一次失败视为attempt结束。单run输出256MiB、整个003累计1GiB；不能删除失败证据或拼接多run为一次PASS，遇资源/外部阻塞安全暂停并说明。最终成功run仍须独立满足baseline+derived同worker全部原门。
+
+本次是003合同修订，不是004，也不恢复001/002或触碰F线。旧003冻结包只读保留；替换包与新hash由Sol冻结后派发。完整暂停/替换收据在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_attempt_semantics_correction_20261029/`。
