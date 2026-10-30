@@ -23,19 +23,21 @@ _GAIN_SOURCE = (
     'explicit D01 bounded diagnostic choice; not copied from or equivalent to the upstream OSC_POSE controller'
 )
 _GAIN_STABILITY_RATIONALE = (
-    'The unsaturated continuous joint-space error model has positive diagonal Kp and Kd; with a positive-definite '
-    'Panda mass matrix its linearized second-order dynamics are dissipative and asymptotically stable. A planned '
-    '0.08 rad setpoint change gives a 1.6 Nm proportional component at the source-state baseline, below the smallest '
-    '12 Nm source motor limit; actual tracking error may differ, and the adapter clamps every torque to the compiled '
-    'source ctrlrange. This is a bounded engineering rationale, not a proof for the saturated coupled 20 Hz '
-    'sample-and-hold system or a controller qualification; native motion and fault gates remain required.'
+    'Native D01 attempt002 evidence showed Kp=20/Kd=4 allowed the held second arm joint to drift about 0.78 rad '
+    'within 12 boundaries while a limited scene button also exceeded its range. This unqualified retry uses '
+    'Kp=100/Kd=20 uniformly '
+    'to increase proportional hold and derivative damping by the same factor. A planned 0.08 rad target change '
+    'on joints1-3 gives an 8 Nm proportional component at the source-state baseline, below their 80 Nm source '
+    'motor limits; actual tracking error and gravity loads may differ, and the adapter clamps every torque to the '
+    'compiled source ctrlrange. This is an evidence-driven bounded diagnostic choice, not a proof for the saturated '
+    'coupled 20 Hz sample-and-hold system or a controller qualification; native motion and fault gates remain required.'
 )
 
 
 @dataclass(frozen=True)
 class LiberoMixedControlConfigV1:
-    kp_Nm_per_rad: tuple[float, ...] = (20.0,) * 7
-    kd_Nm_s_per_rad: tuple[float, ...] = (4.0,) * 7
+    kp_Nm_per_rad: tuple[float, ...] = (100.0,) * 7
+    kd_Nm_s_per_rad: tuple[float, ...] = (20.0,) * 7
     control_frequency_hz: int = 20
     physics_dt_s: float = 0.002
     control_substeps: int = 25
