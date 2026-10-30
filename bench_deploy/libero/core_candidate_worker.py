@@ -31,6 +31,31 @@ _TASK1_COMPOSITION_PLAN_SHA256 = "b00fc11157c4d7ea7fee4ecaf8e099f6bf2d780704af80
 _TASK1_SOURCE_MANIFEST_SHA256 = "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75"
 _TASK1_ASSET_CLOSURE_SHA256 = "f56207a835e80c04e7b4746a90fd3fd39b6170326a54b1445df5244d5047ca05"
 _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256 = "3881f687e5306ff66b0774b1385bb69716951d52d1f24d9625e1981a40f1a6a7"
+_PINNED_MUJOCO_RUNTIME_IDENTITY = {
+    "provider_build": {
+        "dirty_build_sha256": None,
+        "import_origin": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
+        "manifest_version": "package:3.8.1",
+        "origin_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
+        "package_version": "3.8.1", "provider": "mujoco",
+        "repository_revision": None,
+    },
+    "runtime": {
+        "api_version": 3008001,
+        "binding_path": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/_functions.cpython-312-x86_64-linux-gnu.so",
+        "binding_sha256": "9067239d3126392729430d12d077ab4b298c61d2ea1209c9333823be410359e3",
+        "mapped_native_libraries": [{
+            "path": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/libmujoco.so.3.8.1",
+            "sha256": "8969010a8325d32b9b154159862ffe3b112277cc993983a0168f7dbe2efe0592",
+        }],
+        "package_path": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/__init__.py",
+        "package_sha256": "f8e5b528617004b6215e16cb0c945faf1f8c7b5d798e5b92e3aabce19c838497",
+        "package_version": "3.8.1",
+        "public_header_path": "/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages/mujoco/include/mujoco/mujoco.h",
+        "public_header_sha256": "d5ccfb227eb06586edfb4def5812a8082c1cbdf8e6dc5c3176abd9772a57fd07",
+        "renderer_initialized": False, "runtime_version": "3.8.1",
+    },
+}
 
 
 def _canonical(value: Any) -> bytes:
@@ -547,6 +572,28 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
             ))):
         raise ValueError("Solution reset omitted its public episode/source/readback receipts")
     episode_dir = output_dir / f"episode_{episode_index:02d}_row_{row_index:02d}"
+    episode_dir.mkdir(parents=True, exist_ok=False)
+    pre_reset = reset_info.get("pre_reset_compiled_validation_v1")
+    if not isinstance(pre_reset, Mapping):
+        raise ValueError("Solution reset omitted its pre-reset compiled/runtime identity receipt")
+    start_receipt = {
+        "schema_version": "r07-v210-task-solution-start-receipt-v1",
+        "episode_index": episode_index, "row_index": row_index, "seed": seed,
+        "task_uid": env.artifact.task_id,
+        "task_artifact_identity_hash": env.artifact.identity_hash,
+        "solution_identity": solution.identity,
+        "episode_id": episode_id,
+        "source_id": reset_info.get("source_id"),
+        "source_xml_sha256": reset_info.get("source_xml_sha256"),
+        "source_closure_digest": reset_info.get("source_closure_digest"),
+        "compiled_model_layout_v1": reset_info.get("compiled_model_layout_v1"),
+        "pre_reset_compiled_validation_v1": dict(pre_reset),
+        "reset_sample": reset_sample,
+        "reset_realization": reset_realization,
+        "reset_readback": reset_readback,
+    }
+    _write_json(episode_dir / "start_receipt.json", start_receipt)
+    start_receipt_bytes = (episode_dir / "start_receipt.json").read_bytes()
     h5_path = episode_dir / "trajectory.h5"
     env.start_recording(h5_path)
     final_info = dict(reset_info)
@@ -605,6 +652,12 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
         "source_closure_digest": reset_info.get("source_closure_digest"),
         "compiled_model_layout_v1": reset_info.get("compiled_model_layout_v1"),
         "pre_reset_compiled_validation_v1": reset_info.get("pre_reset_compiled_validation_v1"),
+        "start_receipt": {
+            "relative_path": str((episode_dir / "start_receipt.json").relative_to(output_dir.resolve())),
+            "bytes": len(start_receipt_bytes),
+            "sha256": hashlib.sha256(start_receipt_bytes).hexdigest(),
+            "receipt": start_receipt,
+        },
         "reset_sample": reset_sample,
         "reset_realization": reset_realization,
         "reset_readback": reset_readback,
@@ -768,6 +821,16 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
             except BaseException:
                 pass
     solution_route = solution_factory is not None
+    attempted_episode_receipts = []
+    if solution_route:
+        for start_path in sorted(output_dir.glob("episode_*_row_*/start_receipt.json")):
+            raw_start = start_path.read_bytes()
+            attempted_episode_receipts.append({
+                "relative_path": str(start_path.relative_to(output_dir.resolve())),
+                "bytes": len(raw_start),
+                "sha256": hashlib.sha256(raw_start).hexdigest(),
+                "receipt": json.loads(raw_start.decode("utf-8")),
+            })
     payload = {
         "schema_version": (
             "r07-v210-task-solution-worker-result-v1" if solution_route
@@ -781,6 +844,7 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
         "observation_count": sum(int(item["h5"]["observation_count"] or 0) for item in episodes),
         "native_step_count": sum(int(item["runtime_progress"]["native_step_count"]) for item in episodes),
         "episodes": episodes,
+        "attempted_episode_receipts": attempted_episode_receipts if solution_route else None,
         "source_bundle": source_bundle,
         "diagnostic_endpoints": diagnostic_endpoints,
         "reset_count": len(episodes) + len(diagnostic_endpoints),
@@ -803,25 +867,30 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
 
 
 def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any], *,
-                                   require_motion_thresholds: bool) -> dict[str, Any]:
+                                   require_motion_thresholds: bool,
+                                   require_mujoco_runtime_identity: bool) -> dict[str, Any]:
     """Independent provider-free H5/source/outcome readback for the v2.1.0 route."""
     from .solution import solution_identity_v1
     payload = {key: value for key, value in report.items() if key != "result_sha256"}
     if hashlib.sha256(_canonical(payload)).hexdigest() != report.get("result_sha256"):
         raise ValueError("task Solution worker result digest mismatch")
+    attempted_episode_receipts = report.get("attempted_episode_receipts")
     if (report.get("schema_version") != "r07-v210-task-solution-worker-result-v1"
             or report.get("status") != "complete"
             or report.get("worker_error") is not None
             or report.get("close_error") is not None
             or report.get("episode_count") != 3
             or len(report.get("episodes", ())) != 3
+            or not isinstance(attempted_episode_receipts, list)
+            or len(attempted_episode_receipts) != 3
             or report.get("reset_count") != 3):
         raise ValueError("task Solution worker bundle is incomplete or has an invalid schema/count")
     source_readback = _verify_solution_source_bundle(bundle_path, report.get("source_bundle"))
     expected_solution_identity = solution_identity_v1(source_readback["canonical_xml_sha256"])
     total_t = total_obs = total_native = 0
     episodes = []
-    for index, (expected_row, episode) in enumerate(zip((0, 1, 2), report["episodes"], strict=True)):
+    for index, (expected_row, episode, attempted) in enumerate(zip(
+            (0, 1, 2), report["episodes"], attempted_episode_receipts, strict=True)):
         if (episode.get("schema_version") != "r07-v210-task-solution-episode-v1"
                 or episode.get("episode_index") != index or episode.get("row_index") != expected_row
                 or episode.get("seed") != 19 or episode.get("task_uid") != TASK_1
@@ -844,6 +913,31 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         if not all(isinstance(value, Mapping) for value in (
                 sample, realization, readback, progress, compiled, pre_reset)):
             raise ValueError("task Solution episode omits source/reset/progress/layout receipts")
+        runtime_identity = pre_reset.get("runtime_identity")
+        if (require_mujoco_runtime_identity
+                and runtime_identity != _PINNED_MUJOCO_RUNTIME_IDENTITY):
+            raise ValueError("task Solution pre-reset receipt does not identify the pinned MuJoCo runtime")
+        start = attempted.get("receipt")
+        start_relative = attempted.get("relative_path")
+        if (type(start_relative) is not str or Path(start_relative).is_absolute()
+                or ".." in Path(start_relative).parts):
+            raise ValueError("task Solution start receipt path is unsafe")
+        start_path = (bundle_path.parent / start_relative).resolve(strict=True)
+        if bundle_path.parent not in start_path.parents:
+            raise ValueError("task Solution start receipt escaped its worker bundle")
+        start_raw = start_path.read_bytes()
+        if (len(start_raw) != attempted.get("bytes")
+                or hashlib.sha256(start_raw).hexdigest() != attempted.get("sha256")
+                or start != json.loads(start_raw.decode("utf-8"))
+                or start.get("schema_version") != "r07-v210-task-solution-start-receipt-v1"
+                or start.get("episode_index") != index or start.get("row_index") != expected_row
+                or start.get("seed") != 19 or start.get("task_uid") != TASK_1
+                or start.get("solution_identity") != expected_solution_identity
+                or start.get("episode_id") != episode.get("episode_id")
+                or start.get("source_id") != episode.get("source_id")
+                or start.get("source_closure_digest") != episode.get("source_closure_digest")
+                or start.get("pre_reset_compiled_validation_v1") != pre_reset):
+            raise ValueError("task Solution start receipt differs from its episode/runtime identity")
         if (sample.get("init_row_index") != expected_row
                 or sample.get("source_id") != episode.get("source_id")
                 or sample.get("source_closure_digest") != episode.get("source_closure_digest")
@@ -1098,6 +1192,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         "status": "verified_complete",
         "source_bundle": source_readback,
         "motion_thresholds_required": bool(require_motion_thresholds),
+        "mujoco_runtime_identity_required": bool(require_mujoco_runtime_identity),
         "episode_count": len(episodes),
         "transition_count": total_t,
         "observation_count": total_obs,
@@ -1110,13 +1205,15 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
 
 def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path: Path | None = None,
                                     expected_lock_path: Path | None = None,
-                                    require_motion_thresholds: bool = False) -> dict[str, Any]:
+                                    require_motion_thresholds: bool = False,
+                                    require_mujoco_runtime_identity: bool = False) -> dict[str, Any]:
     """Provider-free independent readback of a completed worker and all H5s."""
     bundle_path = Path(bundle_path).resolve(strict=True)
     report = json.loads(bundle_path.read_text(encoding="utf-8"))
     if report.get("schema_version") == "r07-v210-task-solution-worker-result-v1":
         result = _consume_libero_solution_bundle(
             bundle_path, report, require_motion_thresholds=require_motion_thresholds,
+            require_mujoco_runtime_identity=require_mujoco_runtime_identity,
         )
         if parent_run_record_path is not None:
             if expected_lock_path is None:
@@ -1632,12 +1729,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--composition-plan", type=Path)
     parser.add_argument("--install-root", type=Path)
     parser.add_argument("--require-motion-thresholds", action="store_true")
+    parser.add_argument("--require-mujoco-runtime-identity", action="store_true")
     args = parser.parse_args(argv)
     if args.read_bundle:
         receipt = consume_libero_candidate_bundle(
             Path(args.read_bundle), parent_run_record_path=args.parent_run_record,
             expected_lock_path=args.expected_lock_path,
             require_motion_thresholds=args.require_motion_thresholds,
+            require_mujoco_runtime_identity=args.require_mujoco_runtime_identity,
         )
         print(json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False))
         return 0

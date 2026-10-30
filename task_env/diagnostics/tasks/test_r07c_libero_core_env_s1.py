@@ -2183,6 +2183,11 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert result["episode_count"] == 3
     assert result["reset_count"] == 3
     assert result["native_step_count"] == 75
+    assert len(result["attempted_episode_receipts"]) == 3
+    assert all(
+        item["receipt"]["pre_reset_compiled_validation_v1"]["reset_not_yet_applied"] is True
+        for item in result["attempted_episode_receipts"]
+    )
     assert [item["row_index"] for item in result["episodes"]] == [0, 1, 2]
     assert result["episodes"][0]["prior_session_close_receipt"] is None
     assert all(
@@ -2199,6 +2204,25 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert receipt["episode_count"] == 3
     assert receipt["observation_count"] == 6
     assert receipt["solution_completed_episodes"] == 0
+    runtime_receipt = consume_libero_candidate_bundle(
+        bundle / "worker_result.json", require_mujoco_runtime_identity=True,
+    )
+    assert runtime_receipt["mujoco_runtime_identity_required"] is True
+    tampered_runtime_bundle = tmp_path / "tampered_runtime_identity_bundle"
+    shutil.copytree(bundle, tampered_runtime_bundle)
+    tampered_worker_path = tampered_runtime_bundle / "worker_result.json"
+    tampered_worker = json.loads(tampered_worker_path.read_text())
+    tampered_worker["episodes"][0]["pre_reset_compiled_validation_v1"][
+        "runtime_identity"]["provider_build"]["package_version"] = "3.8.2"
+    tampered_payload = {key: value for key, value in tampered_worker.items() if key != "result_sha256"}
+    tampered_worker["result_sha256"] = hashlib.sha256(json.dumps(
+        tampered_payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    tampered_worker_path.write_text(json.dumps(tampered_worker, sort_keys=True))
+    with pytest.raises(ValueError, match="pinned MuJoCo runtime"):
+        consume_libero_candidate_bundle(
+            tampered_worker_path, require_mujoco_runtime_identity=True,
+        )
 
     parent_dir = tmp_path / "runs/native_synthetic_001"
     parent_dir.mkdir(parents=True)
