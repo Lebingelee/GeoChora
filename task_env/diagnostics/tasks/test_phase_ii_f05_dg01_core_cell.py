@@ -13,6 +13,7 @@ from task_env.diagnostics.tasks.f05_dg01_h5_reader import (
     _verify_exit,
     _verify_reset_write_receipt,
 )
+from task_env.tasks.reference_env import _dg01_position_recording_receipt_failures
 
 
 def test_schedule_lookup_requires_one_phase_and_preserves_boundaries():
@@ -27,6 +28,36 @@ def test_schedule_lookup_requires_one_phase_and_preserves_boundaries():
         _phase_at(100, schedule)
     with pytest.raises(ValueError, match="no unique frozen schedule row"):
         _phase_at(50, [*schedule, {"start": 50, "stop": 60, "phase": "overlap"}])
+
+
+def test_position_recording_binds_write_receipt_to_nested_canonical_target():
+    from types import SimpleNamespace
+
+    canonical = SimpleNamespace(identity_hash="canonical-target-identity")
+    position_target = SimpleNamespace(
+        identity_hash="outer-position-target-identity", target=canonical,
+    )
+    applied = SimpleNamespace(target_hash=canonical.identity_hash)
+    model_receipt = {"identity_sha256": "model-receipt-identity"}
+    write_receipt = {
+        "target_identity_sha256": canonical.identity_hash,
+        "source_closure_sha256": "source-closure-identity",
+        "model_receipt_identity_sha256": model_receipt["identity_sha256"],
+    }
+    advances = tuple({"substep_index": index} for index in range(5))
+
+    assert _dg01_position_recording_receipt_failures(
+        write_receipt, model_receipt, "source-closure-identity", position_target,
+        applied, 5, advances, 5,
+    ) == ()
+    wrong_outer_identity = {
+        **write_receipt,
+        "target_identity_sha256": position_target.identity_hash,
+    }
+    assert _dg01_position_recording_receipt_failures(
+        wrong_outer_identity, model_receipt, "source-closure-identity",
+        position_target, applied, 5, advances, 5,
+    ) == ("position_write_target_identity",)
 
 
 def test_independent_fk_applies_source_joint_before_child_body_transform(tmp_path: Path):

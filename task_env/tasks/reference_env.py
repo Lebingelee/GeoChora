@@ -41,6 +41,35 @@ def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
     return (int(native_steps) + 2) * clock_ulp
 
 
+def _dg01_position_recording_receipt_failures(
+    write_receipt, model_receipt, source_closure_digest, target, applied,
+    advance_attempts, advances, expected_substeps,
+):
+    """Name the failed public receipts required by the DG01 recording boundary."""
+    failures = []
+    if not isinstance(write_receipt, dict):
+        failures.append('missing_position_write_receipt')
+    else:
+        expected_target_hash = target.target.identity_hash
+        if write_receipt.get('target_identity_sha256') != expected_target_hash:
+            failures.append('position_write_target_identity')
+        if write_receipt.get('source_closure_sha256') != source_closure_digest:
+            failures.append('position_write_source_closure')
+        if (not isinstance(model_receipt, dict)
+                or write_receipt.get('model_receipt_identity_sha256')
+                != model_receipt.get('identity_sha256')):
+            failures.append('position_write_model_receipt')
+    if not isinstance(model_receipt, dict):
+        failures.append('missing_model_receipt')
+    if applied.target_hash != target.target.identity_hash:
+        failures.append('applied_control_target_identity')
+    if advance_attempts != expected_substeps:
+        failures.append('interval_advance_attempt_count')
+    if len(advances) != expected_substeps:
+        failures.append('accepted_interval_advance_count')
+    return tuple(failures)
+
+
 def _identity_seed(seed):
     return seed
 
@@ -3089,13 +3118,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             advances = tuple(getattr(self.session, '_last_dg01_interval_advances', ()))
             advance_attempts = getattr(self.session, '_last_dg01_interval_advance_attempts', None)
             model_receipt = getattr(self.session, '_f05_dg01_model_receipt', None)
-            if (not isinstance(write_receipt, dict) or not isinstance(model_receipt, dict)
-                    or write_receipt.get('target_identity_sha256') != target.identity_hash
-                    or write_receipt.get('source_closure_sha256') != self.value['source'].source_closure_digest
-                    or write_receipt.get('model_receipt_identity_sha256') != model_receipt.get('identity_sha256')
-                    or advance_attempts != self.artifact.timebase.control_substeps
-                    or len(advances) != self.artifact.timebase.control_substeps):
-                raise ValueError('DG01 recording requires its exact model-bound control write and five accepted advances')
+            receipt_failures = _dg01_position_recording_receipt_failures(
+                write_receipt, model_receipt, self.value['source'].source_closure_digest,
+                target, applied, advance_attempts, advances,
+                self.artifact.timebase.control_substeps,
+            )
+            if receipt_failures:
+                raise ValueError(
+                    'DG01 recording receipt gate failed: ' + ', '.join(receipt_failures)
+                )
             if any(
                 item.get('substep_index') != index
                 or item.get('native_step_index') != (
