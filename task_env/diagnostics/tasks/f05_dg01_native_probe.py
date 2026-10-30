@@ -411,13 +411,46 @@ def run_n1(output: Path, *, expected_model_receipt_identity_sha256: str,
         write_receipt = getattr(core_session, '_last_dg01_position_application', None)
         advances = tuple(getattr(core_session, '_last_dg01_interval_advances', ()))
         applied = env.last_position_transition[2]
-        if (env.state.control_step != 1 or abs(env.state.simulation_time - 0.01) > 1e-12
-                or len(advances) != 5 or not isinstance(write_receipt, dict)
-                or write_receipt.get('model_receipt_identity_sha256') != expected_model_receipt_identity_sha256
-                or write_receipt['gripper']['effective_force_range_N'] != [-5.0, 5.0]
-                or abs(write_receipt['gripper']['applied_opening_m'] - 0.02) > 1e-12
-                or abs(applied.gripper_force_limit_N - 5.0) > 1e-12):
-            raise RuntimeError('N1 actual Core interval did not publish its exact 5-substep position/force receipt')
+        gripper_receipt = write_receipt.get('gripper', {}) if isinstance(write_receipt, dict) else {}
+        core_checks = {
+            'control_step_is_one': env.state.control_step == 1,
+            'simulation_time_is_0_01_s': abs(env.state.simulation_time - 0.01) <= 1e-12,
+            'five_accepted_advances': len(advances) == 5,
+            'write_receipt_is_present': isinstance(write_receipt, dict),
+            'write_receipt_model_identity_matches': (
+                isinstance(write_receipt, dict)
+                and write_receipt.get('model_receipt_identity_sha256')
+                == expected_model_receipt_identity_sha256
+            ),
+            'effective_force_range_is_minus5_plus5_N': (
+                gripper_receipt.get('effective_force_range_N') == [-5.0, 5.0]
+            ),
+            'applied_opening_is_0_02_m': (
+                abs(float(gripper_receipt.get('applied_opening_m', float('inf'))) - 0.02) <= 1e-12
+            ),
+            'applied_force_limit_is_5_N': abs(float(applied.gripper_force_limit_N) - 5.0) <= 1e-12,
+        }
+        _write_jsonl(event_path, {
+            'phase': 'selected_reference_core_interval_readback',
+            'readback': {
+                'checks': core_checks,
+                'control_step': int(env.state.control_step),
+                'simulation_time_s': float(env.state.simulation_time),
+                'native_steps': int(getattr(core_session, '_native_steps', 0)),
+                'advance_receipt_count': len(advances),
+                'advance_receipt_types': [type(item).__name__ for item in advances],
+                'position_write_receipt': write_receipt,
+                'applied_control': applied.to_mapping(),
+                'reward': float(reward),
+                'terminated': bool(terminated),
+                'truncated': bool(truncated),
+            },
+        })
+        if not all(core_checks.values()):
+            raise RuntimeError(
+                'N1 actual Core interval receipt gate failed: '
+                + json.dumps(core_checks, sort_keys=True, allow_nan=False)
+            )
         core_result = {
             'schema_version': 'f05-dg01-n1-core-interval-v1',
             'selected_reference_env': type(env).__name__,
