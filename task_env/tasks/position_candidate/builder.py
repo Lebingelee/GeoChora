@@ -284,6 +284,12 @@ class F05NativePositionCandidateInputV1:
                 execution.physics_profile, execution.determinism_mode) != (
                 'geophys', 'cpu', 'cpu', 'geophys-usd-position-f05-native-v1', 'best_effort'):
             raise ValueError('F05 native input requires the exact GeoPhys CPU native execution identity')
+        if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+                artifact.timebase.control_dt) != (0.002, 5, 0.01):
+            raise ValueError('F05 native input requires 100 Hz / five 2 ms physics steps')
+        from ...runtime.sessions.api import CAPABILITIES
+        if not set(artifact.required_capabilities.names) <= set(CAPABILITIES):
+            raise ValueError('F05 native input requests unsupported TaskArtifact capabilities')
         renderer = execution.render_default
         if ((renderer.provider, renderer.backend, renderer.profile, renderer.device,
                 execution.camera_overrides) != ('none', 'cpu', 'none', None, ())):

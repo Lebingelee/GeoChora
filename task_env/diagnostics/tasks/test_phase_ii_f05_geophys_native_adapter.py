@@ -204,6 +204,41 @@ def test_f05_native_candidate_rejects_wrong_device_and_source_family_before_runt
         build_native_input('official-panda')
 
 
+@pytest.mark.parametrize('unsupported', ['timebase', 'capability'])
+def test_f05_native_materialization_rejects_unsupported_artifact_before_native_factory(monkeypatch, unsupported):
+    from dataclasses import replace
+    from task_env.artifacts.execution import ResetSample
+    from task_env.runtime.sessions import api, geophys_native_io
+
+    candidate, _setup = build_native_input('menagerie-panda')
+    if unsupported == 'timebase':
+        artifact = replace(candidate.artifact, timebase=replace(
+            candidate.artifact.timebase, physics_dt=.004, control_dt=.02,
+        ))
+        expected = '100 Hz / five 2 ms physics steps'
+    else:
+        artifact = replace(candidate.artifact, required_capabilities=replace(
+            candidate.artifact.required_capabilities,
+            names=tuple(sorted(set(candidate.artifact.required_capabilities.names) | {'rgb_camera'})),
+        ))
+        expected = 'unsupported TaskArtifact capabilities'
+    source = replace(candidate.runtime_source, task_artifact=artifact)
+    sample_values = candidate.reset_plan.reset_sample.to_mapping()
+    sample_values['task_artifact_hash'] = artifact.identity_hash
+    plan = replace(candidate.reset_plan, reset_sample=ResetSample.create(**sample_values))
+    rejected = replace(candidate, artifact=artifact, runtime_source=source, reset_plan=plan)
+    native_calls = []
+
+    def forbidden_factory(**_kwargs):
+        native_calls.append(True)
+        raise AssertionError('unsupported Artifact reached native factory')
+
+    monkeypatch.setattr(geophys_native_io, 'create_f05_geophys_native_io', forbidden_factory)
+    with pytest.raises(ValueError, match=expected):
+        api.materialize(artifact, rejected.execution, source=source, _f05_native_input=rejected)
+    assert not native_calls
+
+
 def test_f05_native_versioned_input_reaches_shared_factory_without_native_materialization(monkeypatch):
     from types import SimpleNamespace
     from task_env.registry import make_env
