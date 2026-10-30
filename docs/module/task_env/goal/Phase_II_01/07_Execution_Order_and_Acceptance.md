@@ -1,5 +1,9 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+<a id="f05-successor-replan-20261030"></a>
+
+**2026-10-30 F05后继规划入口**：维护者要求按网页审阅重新组织F05。当前规划采用同源多表示主线（Menagerie MJCF/MuJoCo、USD/Isaac、USD/GeoPhys），原同USD三Provider门列为后继延期单元，旧F05仍PARTIAL且原门未通过。官方Panda→GeoPhys兼容独立排期；USD/Isaac资产优先输入策略保留。见[11路线与语义约束](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)及[12执行指南](12_F05_F07_Execution_Playbook.md)。本轮只调整文档，Scope Decision/实际工作包/预算待冻结，所有successor stage为PLANNED/NOT_EXECUTED；不启动F06/F07或原F05 attempt004。F线owner为`develop-full`，本分支文档同步不证明已合入其实现；R线范围/进度及旧接收/失败保留。下文未更新的旧时点路线由11/12管理其后继，不能据旧默认入口派包。
+
 当前入口（2026-10-29，双线集成）：**Luna1在 `develop-full` 推进F00–F07；Luna2在 `codex/phase-ii-01-camera` 推进原R01–R07/P99；`develop`汇总已交付checkpoint；`main`固定上一稳定版v2.0.0。**
 
 原表 **15/22 slices获Sol有界接收**：R01a–c、R02a–c、R03a–c、R04a–c、R05a、R06a/b。接收等级各异，R06a不关闭历史compatibility decision。剩余R05b/c、R06c、R07a–d；R07a已有部分协议/单pilot来源审计，原五任务出口仍未完成。

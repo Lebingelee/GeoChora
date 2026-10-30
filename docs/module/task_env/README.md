@@ -1,5 +1,7 @@
 # TaskEnv
 
+2026-10-30后继规划：F05按“同源多表示”重新组织，原同USD三Provider门显式延期且历史F05仍PARTIAL；这不是新能力接收或实施授权。见[11后继路线](goal/Phase_II_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)与[12执行指南](goal/Phase_II_01/12_F05_F07_Execution_Playbook.md)。F线owner为`develop-full`，本分支现有实现/验证范围按下文及本地记录，不因文档同步扩大。
+
 `task_env/` 是 GeoChora Core 唯一实现，负责 task/environment lifecycle、provider admission、
 controller/observation、录制与学习/渲染接入边界。当前发布基线是
 [v1.1.0](../../releases/v1.1/README.md)，其 bounded acceptance 不等于新的正式 qualification。

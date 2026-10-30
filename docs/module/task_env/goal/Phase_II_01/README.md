@@ -1,5 +1,9 @@
 # Phase II-01 修订规划交付包
 
+<a id="f05-successor-replan-20261030"></a>
+
+**2026-10-30 F05后继规划入口**：维护者要求按网页审阅重新组织F05。当前规划采用同源多表示主线（Menagerie MJCF/MuJoCo、USD/Isaac、USD/GeoPhys），原同USD三Provider门列为后继延期单元，旧F05仍PARTIAL且原门未通过。官方Panda→GeoPhys兼容独立排期；USD/Isaac资产优先输入策略保留。见[11路线与语义约束](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)及[12执行指南](12_F05_F07_Execution_Playbook.md)。本轮只调整文档，Scope Decision/实际工作包/预算待冻结，所有successor stage为PLANNED/NOT_EXECUTED；不启动F06/F07或原F05 attempt004。F线owner为`develop-full`，本分支文档同步不证明已合入其实现；R线范围/进度及旧接收/失败保留。下文未更新的旧时点路线由11/12管理其后继，不能据旧默认入口派包。
+
 当前统筹（2026-10-29）：Luna2负责原07执行表；R05a合同设计已获有界接收，R05b attempt001正在执行；Luna1独立负责F00–F07。跨分支15/22 slices已有有界接收，余R05b/c、R06c、R07a–d；R07a部分协议/一项pilot来源审计不等于原五任务出口。旧C05c CPU/CUDA×100/500Hz四格已通过，R05没有已知频率物理失败；见[07当前入口](07_Execution_Order_and_Acceptance.md)与[R05接收与实施合同](05_R05_Native_Rate_Feedback.md#r05a-sol-acceptance-20261029)。当前develop集成两线交付checkpoint、main保持v2.0.0，详见[分支记录](../../../../maintenance/phase_ii_01_branch_integration_20261029/README.md)。下文早期入口及历史记录按各自时点保留。
 
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。

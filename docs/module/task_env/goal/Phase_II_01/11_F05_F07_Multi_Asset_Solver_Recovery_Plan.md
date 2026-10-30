@@ -1,0 +1,121 @@
+# F05–F07 后继重规划：多格式资产、统一物理语义与多求解器闭环（规划方向已采纳；执行待冻结）
+
+> **状态**：`PLANNING_DIRECTION_ADOPTED / EXECUTION_CONTRACT_PENDING / NOT_DISPATCHED`。维护者于2026-10-30要求将网页审阅路线纳入当前文档，并在派包前完成跨分支同步。本轮只落地规划；不构成实施、native、安装、发布或Qualification授权。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004。
+>
+> 原网页稿SHA-256：`94506530bb4d3751a6abed2c43b0ade32768e144b00b667599221edb65665519`；仓库补充解释见[第9节](#repository-adoption)。F线规划owner为`develop-full`；其他分支同步本文不表示已经集成该分支的实现或native结果。
+
+## 0. 事实来源和状态边界
+
+- 审查 HEAD：`develop-full@b24a1ac84bbfb32f91864ddc8121ea8af23a6c31`，`develop@41cbf537fd3d5a6d3ad07136bf2c868e0d149d62`。真正派包时必须重新 fetch/检查 HEAD、dirty、gitlinks 与现有 writer 状态。
+- F00/F01/F02：各自 `ACCEPTED_BOUNDED_*`；F03：`ACCEPTED_BOUNDED_F03_S1`；F04：`ACCEPTED_BOUNDED_F04`；F05：`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1` 与 `ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`，总体仍 `F05_OVERALL_PARTIAL`；F06/F07 尚未启动。
+- F05 原合同仍要求**同一声明 USD 交付**在 Isaac/GeoPhys/MuJoCo 三 Provider 的真实 Core 闭环，另有 split Attachment 单元。此要求未被本提案静默替换。
+- F05 原三个普通 attempt 已耗尽；任何新增原生运行或重定 F05 验收都要求维护者的新 Scope Decision 和有界工作包。历史 attempt001–003 与 F04 的原始失败和已接收证据均原样保留。
+- 现存已知阻塞：官方 Panda USD `maxDepenetrationVelocity=+inf`／PhysX mimic 的 GeoPhys 消费，固定 MuJoCo 3.8.1 build 缺 USD decoder，split Attachment；F02 clean catalog、F04 ignored fixture/cold-checkout 限制；该列表不是全部软件缺陷的证明。
+
+权威索引：[07 Execution Order](07_Execution_Order_and_Acceptance.md)、[10 historical F log](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)、[08 Codex handoff](08_Codex_Phase_II_01_Planning_Prompt.md)。上游背景：Menagerie Panda `franka_emika_panda/panda.xml` 与 README；Isaac Lab 3.0 多后端资产导入；MuJoCo OpenUSD decoder（实验性，须单独构建）。
+
+## 1. 原则和目标
+
+**目标**：同一物理资产源（和可追溯的派生表示）在多个物理求解器中具有统一身份、可比较的物理结构、兼容的 Canonical State/Control，以及稳定的 Task 评价语义；**不要求不同 Solver 的数值轨迹相同**。
+
+**不要求**：所有 Provider 必须原生解析同一文件后缀；所有源扩展必须无损映射；所有 Solver 都必须支持所有物理特性；GeoChora 建第二套 Scene/Runtime/Recorder/Controller；v2.1.0 立即实现完整 HPG 或真实机器人接口。
+
+**硬性边界**：支持的源格式（USD、MJCF、URDF，后续可扩展）只是 serialization；物理能力（rigid body、articulation、mimic、tendon、joint drive、materials 等）才决定执行兼容性。`file parsed != semantic complete != model lowered != native consumed != task accepted`。
+
+## 2. 共享 Panda 的选择与资格
+
+**首选共同来源**：Google DeepMind MuJoCo Menagerie 的 `franka_emika_panda`，按仓库固定 gitlink（当前 Menagerie `b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`）及完整文件闭包冻结；优先复用 F04/F05 的 `local_menagerie_panda_r009` 派生 USD，与原 MJCF 建立 source→recipe→derived 的追溯关系。Menagerie README 描述 finger equality、tendon、position actuators，不能在转换时把它们默默丢失。
+
+| 执行路径 | 现有范围或预期 | 身份与资格限制 |
+|---|---|---|
+| Menagerie 固定源 MJCF → MuJoCo | 上游原生模型可用；GeoChora 既有 MJCF selected/bounded 路径作为可能复用基础 | **尚未**证明同一 r009 的 Source/Task/Core 全合同闭环；不得充作 USD 三 Provider 原门。 |
+| Menagerie → 本地验证 USD r009 → Isaac Sim PhysX | F04 冻结两 Panda 的 exact native cell 有界接收 | 不代表任意 Menagerie revision、转换配方或更多任务通过。 |
+| Menagerie → 本地验证 USD r009 → GeoPhys CPU | F05 attempt003 exact native cell 有界接收 | 只对应隔离 GeoPhys candidate、零 COM free cube/support、特定 solver/build、两 episode。 |
+| Menagerie USD → MuJoCo USD decoder | 现有固定 wheel/build 阻塞 | 仅在明确批准 USD-enabled build / 精确 decoder、导入能力与执行验证后才可能通过。 |
+| Menagerie 表示 → Newton / MJWarp | 后续候选 | 目前**没有 GeoChora native accepted cell**，不纳入 F05 自动必选。 |
+
+**资格策略**：以 `Panda Source Family` 为统一 source identity，但每个 representation 具有独立 SHA/recipe/validation identity；不得以共同名称等同所有字节和动力学。检查 source/model 的 link/joint/control/frame 映射、左右 finger 与 TCP、关节位置/速度方向、root/free joint、collision、质量/COM/惯性、mimic/equality/tendon、drive mode/gains/limit，以及物理交互必要关系。来源改动使相关证据失效。
+
+**保留官方 Panda**：官方 Isaac Panda USD 不删除、不篡改、不改写旧 F05 失败。将其标为 *secondary compatibility / regression case*：将 `+inf`、PhysX mimic 视作解释与 solver 消费问题，需独立具体的 feature mapping 或 fail-closed；不再阻塞经明确批准的 Menagerie 共同基线。是否改变它在原 F05 required envelope 中的身份，由维护者另行批准。
+
+## 3. 资产处理的最小设计：复用现有 owner
+
+处理链路：
+
+```text
+Source Asset + exact closure / license / revision
+    → format-aware reader (USD / MJCF / URDF)
+    → semantic feature inventory + entity-qualified references
+    → existing AssetDefinition / SceneDefinition / Assembly / Task bindings
+    → provider-specific representation selection + feature coverage
+    → provider-owned lowering / public model readback
+    → Core Canonical State / Canonical Control / Task Lifecycle
+    → Recorder / independent oracle / Judge
+```
+
+**不引入通用新 Runtime 或独立 Scene IR**。所谓 `Canonical Physical View` 仅为现有资产、Scene、Joint、Frame、Actuator 及报告组合成的**逻辑语义视图**；其版本化合同是否需要扩展，应由缺口审查决定。USD 是一等来源和交换格式，MJCF/URDF 保留原生路径；适合时通过声明的派生配方导向 USD，不强制所有来源无条件转换为 USD。
+
+应复用的 owner：`asset/` 原始资产引用与 identity；`task_env/assembly/` 的 Source/Delivery、闭包与组合；`task_env/artifacts/` 的类型化 Scene/State/Receipt；`task_env/runtime/sessions/` 的 admission/native state mapping 与 provider-owned lowering；`task_env/controllers/` 的 Canonical Target/leaf mapping；`task_env/environment/` 的 Task Semantics；Recorder/Evidence 不改成第二套。
+
+### 3.1 Physical Feature Inventory（候选附加审核视图）
+
+以**对象级精确引用**记录 `source_format, source_revision, source_sha, feature_path, kind, source_semantics, normalized_semantics, units/frame, mapping_method, status, provenance`。起步仅覆盖 F05 Panda 需要的：rigid body、mass/inertia/COM、collision、fixed/free/joint、joint axis/limit、actuator/drive、mimic/equality/tendon、frame/TCP、source extension；不为完整软体/流体等预设字段。
+
+状态必须区分：`recognized`、`normalized_verified`、`native_consumed_verified`、`unsupported`、`unknown`、`not_required_for_this_cell`。`retained_in_file` 不等于 `host consumed`；`selected` 不等于 `runtime admitted`。不能只列出字段名字不验证效果；不应使用不可靠的字符串驱动更改原 Source。
+
+### 3.2 Compatibility Matrix（用户视图与机器证据分离）
+
+每个单元取决于 `(Asset source SHA, representation SHA, recipe SHA, provider build, solver/backend/device, intended Task/feature set)`，不只是文件扩展名。用户矩阵保留 `PASS_BOUNDED`、`CONVERTIBLE_UNVERIFIED`、`BLOCKED_FEATURE`、`BLOCKED_BUILD`、`UNKNOWN` 等态；原始证据单独绑定。对相同源的不同格式，每格分 `parse / normalize / lower / native state-control / task` 五门。
+
+### 3.3 State 和 Control 的必保语义
+
+同一 Joint/Frame 的 Entity-qualified ID、维度、SI 单位、关节顺序与方向、姿态四元数顺序、COM/Link Frame 和控制模式必须一致。Native mapping 为 `canonical → native` 的明确双向适配（init/write 与 readback），不要求 solver 数值演化相同。Source/State/Control/Task 必须回读与独立证据验证，缺失状态 fail closed 或 `unavailable`，禁止造零补洞。
+
+## 4. F05 后继的两条门槛：不得静默降低
+
+**A — 后继规划主线“同源多表示”互操作门**（执行合同与预算待首包冻结）：固定 Menagerie Panda Source Family，在 MuJoCo MJCF、Isaac USD、GeoPhys USD 走各自有证据的 Representation；复用一个 Canonical Identity/Joint/Frame/Task 定义，至少验证统一 joint/FK、gripper response、free-body/reset/state/control、T+1/H5/close。该门面向架构目标；**不是原 F05 同一 USD 总门的替代凭据**。
+
+**B — 原 F05 “同一 USD 三 Provider”门**：保持 `HELD`，直到具有 USD-enabled MuJoCo 的固定 build/decoder、相同 USD delivery 和相同生产 Core 路线的 native/reader/物理证据；当前固定 MuJoCo build 不满足。官方 Panda `+inf`/PhysX mimic、split Attachment 作为原门独立遗留事实持续列示。若维护者选择以 A 替代 B 为新的 F05 出口，必须先签署明确的 **Scope Decision**，写清旧门如何归档（DEFERRED/NOT_QUALIFIED）、新验收交集与后继依赖，不能将旧门记 PASS。
+
+**本轮规划裁定**：按A组织后继路线，B在后继计划中显式延期；原B合同及旧F05总体仍保持未通过/HELD，不回填PASS。首个successor工作包之前再冻结具体Scope Decision、A的完整required feature集、B与官方兼容/split单元的延期处置和F06对应依赖。不是F05 attempt004，不追溯改变历史 `F05_OVERALL_PARTIAL`；原B的三次普通窗口仍记满，后继范围独立建账。
+
+## 5. 候选后继路线（不是原 F00–F07 已批准 DAG 的变更）
+
+| 候选包 | 内容与最小出口 | 前置/阻塞 |
+|---|---|---|
+| F05-S0 semantic inventory（静态） | 冻结 Menagerie MJCF/r009 USD、官方 Panda USD、相关 closure/recipe；给出结构/属性/损失与控制映射对照，识别 blockers | 文档和已验证文件可访问；不启动 solver；若 ignored 本地 r009 bytes 不可恢复，记 `SOURCE_UNAVAILABLE` |
+| F05-S1 shared Panda route（受控实现/验证） | 精确完成 Menagerie MJCF→MuJoCo 与 r009 USD→Isaac/GeoPhys 的语义/状态/控制/读回对照；复用已接收 native evidence，只对**未覆盖输入**运行所授权的验证 | 维护者批准新范围、每 run 真实启动预算；不得用 raw upstream MuJoCo 代替 Core cell |
+| F05-S2 optional USD-decoder/official compatibility（独立） | 固定 USD-enabled MuJoCo build 实际入口测试，或单独研究官方 Panda `+inf`/mimic 的 GeoPhys 等价消费；成果按 cell 记 | 不作为 F05-S1 自动依赖；不能无限期延展 attempt |
+| F06 task harness | 在明确获准的 ready intersection 实施真实任务 20-seed、Expert/Oracle/H5、四报告/pending Judge；On/In/region 独立任务谓词 | F00 接受+对应 provider/asset/task native 已达门；保留 F06 原要求，**不能用 F05-S1 语义 smoke 代替** |
+| F07 mixed-asset/provider extension | 组合不同来源的机器人/物体/fixture（如 MJCF robot + USD fixture），检验闭包、Assembly、Task/State、Provider matrix；Newton 单独候选精确 solver profile | 通过实际 ready cells 后才排期，不自动要求全部 LIBERO，R07 原预算/门另计 |
+
+## 6. F06/F07 不变项与扩展项
+
+F06 仍要求受控真实来源、可复现 Expert、至少 20 seeds、四报告、独立 task/Expert/lifecycle/storage/Oracle 校验与 pending Judge；不可用/失败 seed 如实记录。物理资产一致性的检查是新增*前置验证建议*，不替换其原本 Gate。F07 的更复杂场景按单元扩展：先一机器人＋刚体/fixture，再 mixed-format scene，再 articulated cabinet，最后 Newton/其他 solver 的具体 build；相关能力保留 `UNKNOWN` 直到实际验证。
+
+## 7. 工程/治理条件
+
+- 先检现有 owner、production caller、negative tests、文件格式与上游公开 API；对每项变化标注 `FIX_EXISTING / EXTEND_EXISTING / COMPOSE_EXISTING / NEW_IMPLEMENTATION`。
+- 保留历史签署 Evidence、旧 V1 Hash、已接收 TaskArtifact/Scene 与 Reader，新增合同用版本化 additive path；旧源保留 byte/hash。
+- 不破坏与 `develop` 的 R04c/R05a 等独立写入线；先确认单 writer、后冻结真实 HEAD/保护清单。本次文档调整**不授权** native、安装、push、merge、Qualification。
+- 本轮同步 [07]、[08]、README、manifest和Skill中的规划入口/状态，不预填任何执行PASS；历史`validation_receipt.json`保持原字节。原R线DAG/P99不因本次F线重规划变化。
+
+## 8. 已选方向与执行前待冻结项
+
+本轮文档采用Menagerie共同基线和A同源多表示主线，将B同USD三Provider列为后继延期单元；官方Panda→GeoPhys兼容独立排期，split Attachment列为F07候选且旧F05相应门仍未通过。F06可在后继合同明确批准的ready asset/provider/task intersection推进，不继承全部Provider通过，也不能绕过本cell的required feature。
+
+首个执行包必须形成明确的Scope Decision与真实输入：新required/deferred表、每cell源码/来源/build/profile、Task与控制器门、可复用证据及失效项、累计资源/timebox/重试、writer窗口、exact acceptance。具体数值未冻结则不启动；本文件不替代该包。Newton只保留F07候选，不自动要求新增Runtime或安装。
+
+<a id="repository-adoption"></a>
+
+## 9. 仓库接入时的约束澄清
+
+1. **共享基线与资产策略分开**。Menagerie是这一轮跨Provider校准的共同来源；USD及Isaac系列资产仍是一等输入。官方资产走Isaac原生路线的优先级不被取消，官方→GeoPhys的secondary身份只限定兼容单元，不能泛化为拒绝官方资产。
+2. **r009不能直接判等价**。固定原MJCF含双指equality、`split` tendon与8个actuator；现有r009有界路线使用9个驱动通道。旧native证明原门下的动作/FK/落体，不证明这些结构和控制语义完整等价。S0必须逐特性核对机器人及cube/support的几何、质量/COM/惯性、接触材料、控制和耦合。关键关系丢失或未知时S1阻塞；必要的新派生配方另定版本、声明变化，不覆盖r009，不按共同Panda名称认定等价。
+3. **逻辑身份与精确hash分开**。共享entity-qualified Joint/Frame及Task/Action含义；不同representation/recipe/build保留独立identity。现有Scene/Artifact如包含格式/表示信息，可有不同精确hash，须有显式对应及等价证据，不伪造同一hash。logical view仅为既有owner与报告的组合，不预设新的通用Scene IR。
+4. **先环境、后控制、再任务**。先核construct/reset/native public state/close及模型合理性，再验证空载hold/点位追踪和gripper/free-body，最后进入Task与Solution。FK读回一致不等于目标追踪稳定；Ack不等于位置达到。位置/方向误差、漂移、稳定时间等oracle与阈值在执行包中确定，不能从旧粗粒度motion/FK门自动继承为控制器合格。
+5. **S0是前置语义门，不是固定准备轮**。只为影响实现选择的未知拆包；已知owner的实现、定向验证与收口可在一个完整successor窗口内安排。S0未通过时不进入依赖它的native。stage编号与S0/S1验证成本层级分开记录；attempt按完整窗口计，run/修复次数另记。
+6. **证据与运行预算**。复用旧证据仅限source/recipe/模型/控制/接口/任务/阈值等受影响输入未变且覆盖新门的交集。每Provider在完整包中冻结累计wall/steps/RAM/VRAM/磁盘/锁预算及允许修复重跑，不默认一次launch，也不要求每次已授权的包内重跑重新问许可。失败原件和每run的新代码/输入freeze保留。
+7. **跨分支与可恢复性**。F线owner为`develop-full`，`develop`只同步规划，camera/R07保持独立scope和writer。ignored r009/fixture、隔离GeoPhys候选及未集成gitlink是复现限制，先核可恢复交付与实际producer；不能用文档同步冒充实现合入。camera窗口未释放时只备补丁，不更改该worktree或HEAD。
+
+本轮所有后继stage为PLANNED/NOT_EXECUTED；旧F05 partial、旧Required门与Evidence原件保持签署时事实。当前路由以本文件与[12执行指南](12_F05_F07_Execution_Playbook.md)为准，[10历史记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)保留旧门与执行历史，[07执行表](07_Execution_Order_and_Acceptance.md)给出后继依赖选择；本轮没有派包。
