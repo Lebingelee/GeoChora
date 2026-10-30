@@ -203,6 +203,12 @@ G3提供了已有GeoPhys USD Core Position synthetic route的实际Core/S1证据
 
 结果标签为`F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。旧F05状态仍`F05_OVERALL_PARTIAL`，attempt001 evidence与r009/历史输出字节保留；successor窗口计数2/3；F06/F07和Qualification均未启动。完整命令、原始证据和最终readback见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/report.md`。
 
+## 14. DG01 提前诊断 Goal01 结果（2026-10-30；候选通过，待Sol复核）
+
+维护者随后单独授权DG01共同基线与原Menagerie MJCF→Task scene→现有Core→MuJoCo CPU路线。该诊断Goal不是普通successor attempt004，也不改写上方successor001/002的历史结论。DG01 N0/N1及实际Core N2 cell通过冻结的模型、语义、物理、Recorder/H5、独立reader、负例和资源门，候选标签为`F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`。它只覆盖固定Menagerie revision/build/profile和本任务scene，不证明r009 USD等价、GeoPhys/USD ready、三路线闭合或Qualification。
+
+实际执行receipt、阶段计划、native H5、独立cold reader、14类内层负例、资源/进程组/锁证据和实现提交列表见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal01/window_001/`。Sol复核DG01前不得冻结或执行DG02；F06/F07和普通successor计数仍按原状态管理。
+
 
 <a id="f05-early-diagnostic-three-goals"></a>
 

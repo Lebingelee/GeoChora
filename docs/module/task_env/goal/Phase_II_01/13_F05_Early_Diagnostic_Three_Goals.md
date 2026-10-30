@@ -1,13 +1,13 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：维护者已明确指定提前诊断模式；DG01工作包准备，尚未执行；DG02/DG03为待适配基线。**
+> **状态：DG01 Goal01 的 MuJoCo/MJCF/CPU Core cell 已完成冻结门与证据核验，候选结果为 `F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`；DG02/DG03仍为待适配基线。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
 
 2026-10-30维护者决定提前进入诊断模式，要求将整个新F05分成三个长期Goal，由其转述给Luna持续实施；每个Goal结束后Sol根据实际报告调整下一Goal，直到三个全部完成。由此**暂停普通successor三窗口序列**，不派普通003；普通001/002及2/3历史不重置、不删除，也不改成接收。明确指定诊断后的窗口另记，不设固定attempt次数上限；执行时间、native累计资源和输入冻结仍严格有效。
 
-旧F05三轮、OVERALL_PARTIAL、已接受精确cell及失败原件保留。successor001经Sol复核PARTIAL；002候选PARTIAL，诊断审计有进展但完整S0尚不在本次规划提交中自动接收。002输出295项清单已核对匹配；本轮源diff仅新增/改进审计与测试和文档，生产Core/provider三路线接线仍未完成、native为0。新诊断不把这些缺口当既成能力。
+旧F05三轮、OVERALL_PARTIAL、已接受精确cell及失败原件保留。successor001经Sol复核PARTIAL；普通successor002执行时的静态审计与三路线阻断按其原始报告保留。该历史结果不代表后来单独授权的DG01路线。旧r009和GeoPhys/USD限制不因MuJoCo候选通过而改变。
 
 此次不创建第二Runtime；一个CoreRuntime/Controller/Recorder/factory经provideradapter调用各原生宿主。USD/Isaac优先、同源多表示与统一物理语义维持；B同USD三Provider、官方Panda→GeoPhys兼容、Attachment、Newtonsolver仍延期。新F05不包含F06的真实任务20seed/Expert/Oracle/Judge，也不授FormalQualification。
 
@@ -57,4 +57,12 @@ DG01不启动GeoPhyssolver、IsaacApp、GPU、renderer或Newton；隔离provider
 
 候选标签分别为`F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`、`F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`、`F05_DG03_ISAAC_AND_THREE_ROUTE_CLOSURE_PASS_PENDING_SOL_REVIEW`。只有Sol独立复核三个Goal及最终一致性矩阵后才能登记`ACCEPTED_BOUNDED_F05_SUCCESSOR_A_THREE_CELL`。这保留旧F05partial，不授通用格式/资产/solver支持或Qualification。
 
-本轮仅创建诊断规划与完整prompt/冻结包，零软件测试、零native，不自动创建Luna工具Goal或向其他线程发消息。文档/Skill/hash与保护核对收据随包保留。
+## 7. DG01 Goal01 实际执行结果（2026-10-30；候选通过，待Sol复核）
+
+维护者转述的完整DG01包已在冻结的同一持续Goal/window内执行。输入`develop-full@6d4e222866474b0ce4399183a35c337f58303349`，原prompt/snapshot及5,906项保护输入按冻结快照核验。实现通过现有non-leaf Position candidate、TaskSource/Artifact/ResetPlan、SelectedReferenceEnv、MuJoCo RuntimeSession、typed state和Recorder路径接通Menagerie Panda MJCF与派生cube/support任务scene；不把旧r009 USD或旧GeoPhys/S1证据当作本路线证据。实现commit为`e410f97d90e1e88806318d11c47dc54d013dad5c`，其后的规划/Skill与收口commit列在DG01输出报告。
+
+N0公开模型编译读取到`nq=16, nv=15, nu=8, njnt=10, neq=1, ntendon=1`；N1以非对称q/dq、标量力限幅、tendon wrap消融及equality正/负对照验证原源传动关系，并通过一个实际Core控制区间。N2冻结计划SHA为`e48dae904bf757f9b864eebf129619990638f174d00fe4f1fbdc53e701c60c32`：同一SelectedReferenceEnv两段各300 interval、5×2ms，合计3,000 accepted physics steps；两个H5各含301 observations、300 transitions。worker exit=0、环境关闭、进程组退出且共享锁释放；进程组峰值RSS 498,450,432 bytes，最低MemAvailable 6,796,738,560 bytes，采样最大间隔0.2001s。冷读器在绑定新Reader代码的RUN009内通过两个episode和14/14类负例。RUN008事后冷读仅为诊断证据，不代替RUN009。
+
+reader按H5 v3直接存放的`boundary_events_v1_json`校验`episode_ended`事件，区分raw Task predicate与未评估的lifecycle success；物理门、Task门和14类内层篡改门未降低。目标定向provider-free测试20/20通过。DG01所需source/task recipe、logical-to-native映射、公开model/consumer receipt、完整运行计划、H5、冷读器、资源和失败尝试均保存在`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal01/window_001/`。
+
+结果标签为`F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`，只覆盖这个固定Menagerie revision、派生任务scene、Task/Action合同、Core路由、MuJoCo 3.8.1 CPU profile和有界控制cell。Sol复核前不登记接收；旧`F05_OVERALL_PARTIAL`、GeoPhys/USD缺口和普通successor001/002记录不变。DG02/DG03、F06/F07及Qualification均未启动/授予。DG01 Goal保留为待Sol独立复核状态；完成本窗口不自动推进后续Goal。

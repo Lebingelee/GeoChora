@@ -1,6 +1,6 @@
 {
   "kind": "phase-ii-01-revised-planning-manifest-v1",
-  "date": "2026-10-29",
+  "date": "2026-10-30",
   "status": "REVISED_DRAFT_AWAITING_MAINTAINER_GOAL_DAG_APPROVAL",
   "implementation_authorized": false,
   "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
@@ -1863,11 +1863,11 @@
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
     "README.md": "8bdccecc6f138291597f103f7c1539b5602a91ce12ae3dc019f78d61792daad1",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b017eaeb0c13f3d2c93cd2e8a3aa279ccb1cb6c13db1ad93d3e78ae508e3c826",
-    "12_F05_F07_Execution_Playbook.md": "4d880071c8b64ab15ddb611b6d8d67a3e540c4026b21bda73d294203957af21a",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "8ef49450cbe22d9cddb73cff43e98376fefc9c0f131f4c6e9c7fae48a8ce519e"
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
+    "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
+    "13_F05_Early_Diagnostic_Three_Goals.md": "221462a5203660ac6d822458b5b6557322d82c7703bdc6f5ea0c3fa1a78b9d8d"
   },
-  "revision_kind": "F05_SUCCESSOR_ATTEMPT001_S0_INVENTORY_PASS_READINESS_BLOCKED_BY_FEATURE_PENDING_SOL_REVIEW",
+  "revision_kind": "F05_DG01_GOAL01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3641,7 +3641,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "The explicitly authorized F05 successor attempt001 static S0 package completed on develop-full at the frozen input HEAD. Tracked diagnostic commit 9634491a6438f1fcbe3eab367a8070abe678be33; inventory PASS and cross-representation readiness BLOCKED_BY_FEATURE. No native, physics, solver, App, GPU, or renderer starts; F06/F07 remain unstarted. Legacy F05 attempts and PARTIAL remain unchanged. See checkpoint_recovery_plan.f05_successor_attempt001_execution_20261030 and its ignored output package; Sol review pending.",
+  "planning_submission_this_revision": "The maintainer-directed DG01 Goal01 has completed its exact Menagerie MJCF-to-Core-to-MuJoCo 3.8.1 CPU candidate route at the frozen input and implementation commits. N0/N1 evidence and the same-Env N2 2x300 Core cell passed its physical, H5, independent-reader, 14-negative and resource/exit gates. The bounded result is pending Sol review; ordinary F05 remains OVERALL_PARTIAL, GeoPhys/USD and Isaac/USD Goals remain unstarted, and no Qualification is granted. See checkpoint_recovery_plan.dg01_goal01_window_001 and the ignored output package.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4455,6 +4455,24 @@
       "qualification_granted": false,
       "legacy_F05_overall": "F05_OVERALL_PARTIAL_UNCHANGED",
       "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/"
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "F05_DG01_GOAL01_MUJOCO_CORE_CELL_CANDIDATE",
+      "input_head": "6d4e222866474b0ce4399183a35c337f58303349",
+      "implementation_commit": "e410f97d90e1e88806318d11c47dc54d013dad5c",
+      "result": "F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW",
+      "native_route": "Frozen Menagerie Panda MJCF + versioned DG01 cube/support scene through existing TaskEnv Core/SelectedReferenceEnv/MuJoCo 3.8.1 CPU route.",
+      "n0": "Exact public model compile/readback nq16 nv15 nu8 njnt10 neq1 ntendon1; zero compile physics steps.",
+      "n1": "Source tendon scalar law/cap/projection, asymmetric state, wrap ablation, equality positive/negative and actual one-interval Core route passed.",
+      "n2_run": "DG01_N2_FORMAL_CORE_CELL_001_RUN009; 3000 accepted steps, 2 x 300 transitions, 5 substeps x 0.002s.",
+      "run_plan_sha256": "e48dae904bf757f9b864eebf129619990638f174d00fe4f1fbdc53e701c60c32",
+      "reader": "Two closed H5 files; independent cold reader passed all 14 negative mutation classes.",
+      "resource": "Worker exit 0, process group gone, shared lock released; peak PG RSS 498450432 bytes; minimum MemAvailable 6796738560 bytes.",
+      "legacy_f05": "F05_OVERALL_PARTIAL unchanged; r009 and previous attempts/evidence preserved.",
+      "f06_f07_started": false,
+      "qualification_granted": false,
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal01/window_001/report.md"
     }
   ],
   "P00_audit": {
@@ -4623,7 +4641,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-30",
-    "status": "F00_F01_F02_ACCEPTED_BOUNDED; F03_ACCEPTED_BOUNDED_S1; F04_ACCEPTED_BOUNDED_F04; F05_SOURCE_CONTROL_S1_AND_MENAGERIE_GEOPHYS_CPU_NATIVE_ACCEPTED_BOUNDED; F05_OVERALL_PARTIAL; F06_F07_NOT_STARTED",
+    "status": "F05_OVERALL_PARTIAL_UNCHANGED; DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW; DG02_DG03_NOT_STARTED; F06_F07_NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -5073,11 +5091,11 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F05 attempt002 candidate result; overall F05 remains partial and F06 remains unstarted pending a separate reviewed package.",
+      "selected_next": "Sol independent review of the DG01 Goal01 source diff and complete N0/N1/N2 evidence; do not start DG02 until DG01 is accepted and the next package is refrozen.",
       "after_that_priority": [
-        "F05 ready cells",
-        "F06 ready cells",
-        "F07 separately scoped extension"
+        "After Sol accepts DG01, freeze DG02 against the actual reviewed HEAD and updated common semantic contract.",
+        "Keep DG03 pending DG02 review and a new package.",
+        "F06 and F07 remain separate and unstarted."
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
@@ -5088,8 +5106,9 @@
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
       "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
-      "F05": "F05_SOURCE_CONTROL_S1_REPAIR_PASS_PENDING_SOL_REVIEW for attempt002 repair scope; F05_OVERALL_PARTIAL because official Panda source/import is still blocked and F02 clean-provenance node is not verified. Production GeoPhys USD admission remains closed.",
-      "F06": "NOT_STARTED; not authorized by F05 attempt002."
+      "F05": "Ordinary F05 remains F05_OVERALL_PARTIAL. Separate DG01 Goal01 candidate passes its scoped MuJoCo/MJCF/CPU Core cell and awaits Sol review; no GeoPhys/USD or Isaac/USD conclusion follows.",
+      "F06": "NOT_STARTED; no authorization from DG01.",
+      "DG01_goal01": "F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW; run_plan_sha256=e48dae904bf757f9b864eebf129619990638f174d00fe4f1fbdc53e701c60c32; 3000 Core accepted steps; two H5 episodes; 14/14 independent-reader negative mutations."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -6723,6 +6742,16 @@
       "preparation_tests": 0,
       "preparation_native": 0
     },
-    "latest_f05_successor_diagnostic_plan": "f05_early_diagnostic_three_goals_20261030"
+    "latest_f05_successor_diagnostic_plan": "f05_early_diagnostic_three_goals_20261030",
+    "dg01_goal01_window_001": {
+      "input_head": "6d4e222866474b0ce4399183a35c337f58303349",
+      "implementation_commit": "e410f97d90e1e88806318d11c47dc54d013dad5c",
+      "result": "F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW",
+      "run_plan_sha256": "e48dae904bf757f9b864eebf129619990638f174d00fe4f1fbdc53e701c60c32",
+      "accepted_physics_steps": 3000,
+      "episodes": 2,
+      "reader_negative_mutations_passed": 14,
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal01/window_001/"
+    }
   }
 }

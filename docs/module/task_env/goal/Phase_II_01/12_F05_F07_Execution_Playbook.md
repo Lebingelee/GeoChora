@@ -135,4 +135,10 @@ Luna 仅执行一个已授权包，提交包内 local commits 和原始路径/�
 
 ### 2026-10-30维护者指定提前诊断：三个长期Goal
 
-当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01包准备后由维护者转述；DG02/03为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。
+当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01完整包已由维护者转述并执行，实际候选状态见[13第7节](13_F05_Early_Diagnostic_Three_Goals.md)；DG02/03仍为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。
+
+### DG01 Goal01 执行结果（2026-10-30；候选通过，待Sol复核）
+
+DG01以单独的长期诊断Goal执行，不是普通successor attempt004。原Menagerie MJCF、派生cube/support scene与当前Core/MuJoCo CPU路线已完成S1、N0公开模型编译、N1 tendon/equality/限力探针及N2同Env双episode正式cell。N2接受3,000 physics steps；worker exit=0，两个H5分别为301 observations/300 transitions；独立reader通过全部14类负例。精确范围、物理门、plan/source/code hash、失败attempt、资源与过程收据见[13第7节](13_F05_Early_Diagnostic_Three_Goals.md)及ignored输出`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal01/window_001/`。
+
+候选标签为`F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`。普通F05仍`F05_OVERALL_PARTIAL`；GeoPhys/USD与Isaac/USD路线尚未执行，不能由MuJoCo结果推断等价。DG02只有在Sol独立接收DG01后，按真实HEAD和语义变化重新冻结包；F06/F07、Qualification均未启动/授予。
