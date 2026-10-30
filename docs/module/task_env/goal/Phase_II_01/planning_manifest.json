@@ -1858,11 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "20c1850cbfd77fbeb680c2f1f5224b6b5907bf787d7c861de856564aa066b043",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
+    "07_Execution_Order_and_Acceptance.md": "9ea7b3f55dfb30f1f20a08153e9d600fa1242cc70bf87231336931ad9979b530",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "5b700fa53f2179ebf5b468153a05e959b82f6b34eeb5b012ff41a6cc255c5e37",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "65d98c5f36fd75227a037932c58fbd4d53a9ab975308f791619624e09ebb58ac",
-    "README.md": "3afe72557889c48cde64e23b82510e256ddd82c3d9544e74919ce9390c904558"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
+    "README.md": "6cd67649cb2569a88796af4feeb2d714219e2edfd6cd66cb8855c28a3b48e115",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "3127f18fc5aa25288f3efca7d8776ea875c923a2427ead7abc30148bfae0c073",
+    "12_F05_F07_Execution_Playbook.md": "57f035bd36d6383903e00f2b8acce58a06cae585d11f66a0c761c011b0b88354"
   },
   "revision_kind": "F05_ATTEMPT003_MENAGERIE_GEOPHYS_CPU_NATIVE_CELL_PASS_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6343,6 +6345,54 @@
       "cold_checkout_fixture_independence": "NOT_VERIFIED; inherited ignored F04 fixture dependency retained",
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_003/",
       "canonical_decision": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-sol-acceptance"
+    },
+    "latest_f05_planning": "f05_successor_replan_20261030",
+    "f05_successor_replan_20261030": {
+      "status": "PLANNING_DIRECTION_ADOPTED_EXECUTION_CONTRACT_PENDING",
+      "date": "2026-10-30",
+      "authority": "Maintainer requested review of web-GPT11/12 and documentation updates on develop-full/develop/camera before considering dispatch; attached execution instructions are design inputs, not execution authorization.",
+      "owner_branch": "develop-full",
+      "document_copy_branch": "develop-full",
+      "code_integration_claim": false,
+      "review_baseline": "develop-full@b24a1ac84bbfb32f91864ddc8121ea8af23a6c31",
+      "plan": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md",
+      "playbook": "12_F05_F07_Execution_Playbook.md",
+      "selected_planning_route": "A same-source multi-representation; Menagerie MJCF/MuJoCo and USD/Isaac/GeoPhys",
+      "legacy_F05": "OVERALL_PARTIAL; ordinaryattempt001-003 unchanged; same-USD three-provider gate not passed",
+      "legacy_same_USD_gate": "DEFERRED_IN_SUCCESSOR_PLAN; original evidence/gate retained HELD, never PASS",
+      "official_Panda_GeoPhys": "separate secondary compatibility cell; native Isaac USD asset strategy remains first-class",
+      "split_Attachment": "F07 candidate; original F05 split gate remains unpassed; exact scope decision to freeze",
+      "F06_dependency": "candidate dependency on approved successor ready asset/provider/task cell plus original F00/Harness gates; no automatic dispatch or success claim",
+      "F07": "mixed-source scenes and selected Newton profile are future cells; no automatic native/API support",
+      "source_family_equivalence": "NOT_VERIFIED; original8actuator/equality/tendon versus boundedr0099drive semantics must be inventoried",
+      "scope_decision": "planning direction selected; exact required/deferred execution contract and budgets to freeze before package",
+      "successor_stages": {
+        "S0_semantic_inventory": "PLANNED_NOT_EXECUTED",
+        "S1_shared_core_cell": "PLANNED_NOT_EXECUTED",
+        "S2a_USD_decoder": "DEFERRED_NOT_EXECUTED",
+        "S2b_official_compatibility": "DEFERRED_NOT_EXECUTED"
+      },
+      "successor_execution_windows": 0,
+      "ordinary_attempt004_authorized": false,
+      "implementation_authorized_by_this_change": false,
+      "native_authorized_by_this_change": false,
+      "work_package_dispatched": false,
+      "Qualification": false,
+      "camera_sync": "PATCH_ONLY_UNTIL_WRITER_RELEASE; recheck actual HEAD before apply",
+      "branch_workflow": {
+        "planned_active_branches": [
+          "develop-full",
+          "develop",
+          "codex/phase-ii-01-camera"
+        ],
+        "new_branches": 0,
+        "temporary_develop_docs_checkout": 1,
+        "reason": "isolated documentation synchronization without switching shared root; remove clean temporary checkout after commit"
+      },
+      "web_review_source_sha256": {
+        "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "94506530bb4d3751a6abed2c43b0ade32768e144b00b667599221edb65665519",
+        "12_F05_F07_Execution_Playbook.md": "6107b5a70a09b16aa7b06da7617bef0dae44fff1cbdf93139c2b6ad03ac78b5f"
+      }
     }
   }
 }

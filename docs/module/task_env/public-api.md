@@ -919,3 +919,9 @@ The current independent reader re-read both same-run H5 files and verified 202/2
 This bounded cell does not change the main GeoPhys gitlink; the source remains `local-validated` and `source_verified=false`, and no general USD admission follows. The authored official Panda `+inf` and PhysX mimic consumption, fixed MuJoCo 3.8.1 USD decoder, and split Attachment remain held. F05 overall remains partial; no F06, Expert/Harness, GPU, Isaac/Kit, MuJoCo native or Qualification follows. See the [F05 attempt003 execution record](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-menagerie-geophys-cpu-native-result).
 
 Sol accepted this exact cell on 2026-10-30 as `ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`. The versioned native input also rejects unsupported Artifact timebases and capability requirements before the native factory, including direct RuntimeSession materialization; the admitted timebase is 100 Hz outer / five 2 ms advances. The two rejection guards were verified without native execution; the original CPU007 producer identity remains `cdc14993…`. See the [Sol review decision](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-sol-acceptance).
+
+<a id="f05-successor-design-only"></a>
+
+## F05后继：同源多表示规划（2026-10-30；尚无新增API）
+
+后继路线见[11](goal/Phase_II_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)与[12](goal/Phase_II_01/12_F05_F07_Execution_Playbook.md)：按同一物理来源的可追溯表示选择provider，保留精确representation/recipe/build身份，复用既有Core owner。Semantic feature inventory是候选审核报告，不是新公共Scene IR或已实现通用loader；本轮没有扩展当前USD loader、MJCF source或公共构造签名。原同USD门和旧F05 partial不回填PASS，不能把文档中的MJCF/MuJoCo successor cell当作已接收API。各分支已有实现仍依其本地源码和bounded evidence判断。

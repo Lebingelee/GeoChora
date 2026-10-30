@@ -1,5 +1,9 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+<a id="f05-successor-replan-20261030"></a>
+
+**2026-10-30 F05后继规划入口**：维护者要求按网页审阅重新组织F05。当前规划采用同源多表示主线（Menagerie MJCF/MuJoCo、USD/Isaac、USD/GeoPhys），原同USD三Provider门列为后继延期单元，旧F05仍PARTIAL且原门未通过。官方Panda→GeoPhys兼容独立排期；USD/Isaac资产优先输入策略保留。见[11路线与语义约束](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)及[12执行指南](12_F05_F07_Execution_Playbook.md)。本轮只调整文档，Scope Decision/实际工作包/预算待冻结，所有successor stage为PLANNED/NOT_EXECUTED；不启动F06/F07或原F05 attempt004。F线owner为`develop-full`，本分支文档同步不证明已合入其实现；R线范围/进度及旧接收/失败保留。下文未更新的旧时点路线由11/12管理其后继，不能据旧默认入口派包。
+
 2026-10-30当前后继状态：F04已完成最终接收；F05 attempt003的精确Menagerie GeoPhys CPU native cell经Sol复核获`ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`，F05总体仍`F05_OVERALL_PARTIAL`。同一Env两episode共1,000 native steps；原物理oracle、202/202独立H5边界/观测、36类H5 tamper、同run bundle、父观察exit 0/进程组结束/锁释放通过。官方Panda `+inf`/PhysX mimic、MuJoCo USD decoder和split Attachment仍HELD；F06未启动。详见[10 F05 attempt003 Sol接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-sol-acceptance)。
 
 当前入口（2026-10-30）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02 attempt002获`ACCEPTED_BOUNDED_F02`；F03 attempt003获Sol接收`ACCEPTED_BOUNDED_F03_S1`；attempt002真实CPU Pendulum三步范围偏差继续保留；F04 attempt004获`ACCEPTED_BOUNDED_F04`；F05 attempt002 source/control/S1获`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，attempt003 Menagerie GeoPhys CPU native cell获`ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`，F05总体仍PARTIAL；official Panda/mimic、MuJoCo USD仍HELD；F06/F07未启动；camera分支R04c已接收，Luna1当前职责仅F00–F07**。

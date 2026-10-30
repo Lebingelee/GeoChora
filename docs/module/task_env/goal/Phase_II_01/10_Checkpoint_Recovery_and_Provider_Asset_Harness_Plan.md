@@ -1,5 +1,9 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
+<a id="f05-successor-replan-20261030"></a>
+
+**2026-10-30 F05后继规划入口**：维护者要求按网页审阅重新组织F05。当前规划采用同源多表示主线（Menagerie MJCF/MuJoCo、USD/Isaac、USD/GeoPhys），原同USD三Provider门列为后继延期单元，旧F05仍PARTIAL且原门未通过。官方Panda→GeoPhys兼容独立排期；USD/Isaac资产优先输入策略保留。见[11路线与语义约束](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)及[12执行指南](12_F05_F07_Execution_Playbook.md)。本轮只调整文档，Scope Decision/实际工作包/预算待冻结，所有successor stage为PLANNED/NOT_EXECUTED；不启动F06/F07或原F05 attempt004。F线owner为`develop-full`，本分支文档同步不证明已合入其实现；R线范围/进度及旧接收/失败保留。下文未更新的旧时点路线由11/12管理其后继，不能据旧默认入口派包。
+
 更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04登记 `ACCEPTED_BOUNDED_F04`；F05 attempt002 source/control/S1登记 `ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，attempt003 Menagerie GeoPhys CPU exact cell获`ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`，F05总体仍 `F05_OVERALL_PARTIAL`**。
 F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001的Menagerie source/control与synthetic S1成果、以及官方Panda `maxDepenetrationVelocity=inf` 阻塞继续保留。attempt002修复reader数值联验和producer身份，并完成官方USD属性消费边界调查；官方source cell仍在GeoPhys public import被拒，生产USD materialize维持fail closed。详情见[F05 attempt002结果](#f05-attempt002-reader-producer-and-source-boundary)。
 
