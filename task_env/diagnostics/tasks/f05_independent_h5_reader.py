@@ -980,10 +980,22 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
         raise ReaderReject('structured_transition_count', 'native H5 lacks 100 structured controls')
     boundaries = []
     for index, entry in enumerate(public_rows):
+        typed_raw = entry.get('canonical_state_view_v1')
+        if not isinstance(typed_raw, dict):
+            raise ReaderReject('typed_state_missing', f'native boundary {index} has no canonical typed state')
+        _validate_typed_unit_layout(typed_raw, contract, receipt, index)
+        clock = entry.get('state_sample_clock')
+        if (type(entry.get('control_step')) is not int or entry['control_step'] != index
+                or not isinstance(clock, dict)
+                or (clock.get('schema_version'), clock.get('clock_domain'), clock.get('sample_index')) != (
+                    'state-sample-clock-v1', 'evaluation_boundary', index)
+                or not _seconds_match(entry.get('simulation_time_s'), index * .01)
+                or not _seconds_match(clock.get('simulation_time_s'), index * .01)):
+            raise ReaderReject('boundary_clock', f'native public boundary {index} control/sample clock is invalid')
         try:
             boundary = StateBoundaryIdentity.from_mapping(entry.get('state_boundary_identity', {}))
             boundary.validate()
-            view = decode_canonical_state_view(entry.get('canonical_state_view_v1', {}))
+            view = decode_canonical_state_view(typed_raw)
             view.validate()
         except Exception as error:
             raise ReaderReject('boundary_identity', f'native public boundary {index} is invalid: {error}') from error
@@ -991,7 +1003,6 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
                 or view.boundary.to_mapping() != boundary.to_mapping()
                 or view.sample_clock.to_mapping() != entry.get('state_sample_clock')):
             raise ReaderReject('typed_state_boundary', f'native boundary {index} typed identity/clock differs')
-        clock = entry.get('state_sample_clock', {})
         if (entry.get('control_step') != index or boundary.control_step != index
                 or boundary.state_revision != index or clock.get('sample_index') != index
                 or clock.get('clock_domain') != 'evaluation_boundary'
@@ -1005,13 +1016,11 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
         fields = _observation_fields(path, index)
         if fields != entry.get('observation_fields') or entry.get('observation_identity_sha256') != _fingerprint_fields(fields):
             raise ReaderReject('observation_witness', f'native H5 observation row {index} differs from public return values')
-        typed = entry.get('canonical_state_view_v1')
-        _validate_typed_unit_layout(typed, contract, receipt, index)
-        _check_typed_numeric_observation_path(path, index, typed, contract, receipt)
+        _check_typed_numeric_observation_path(path, index, typed_raw, contract, receipt)
         ext = typed_rows[index]
         if (ext.get('boundary_index') != index or ext.get('state_boundary_identity') != boundary.to_mapping()
                 or ext.get('state_sample_clock') != clock
-                or ext.get('canonical_state_view_v1') != typed):
+                or ext.get('canonical_state_view_v1') != typed_raw):
             raise ReaderReject('typed_state_h5_mismatch', f'native H5 typed state extension row {index} differs from public witness')
         if index and (boundary.episode_id, boundary.reset_sample_id, boundary.scene_instance_id,
                       boundary.provider_materialization_id, boundary.scene_identity_hash) != (
