@@ -98,12 +98,16 @@ render.single/camera historical CLIs 明确退休，替代的 Pendulum examples 
 ## R07c D01 same-route H5 evidence (2026-10-30)
 
 The fixed LIBERO diagnostic candidate records through the existing Generic H5
-v3 `TransitionRecorder` and selected environment lifecycle. The worker closes
-one H5 for each source row; each native episode must preserve T transitions and
-T+1 observations, typed requested/target/applied controls, reset/source
-identity, state and evaluation clocks, current contact evidence, and explicit
-episode outcome. An independent provider-free reader validates the H5s and the
-worker/parent exit receipts. The final D01 reader outcome is in the
-[R07c D01 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
-Synthetic S1 H5s prove wiring and rejection behavior only; H5 integrity does
-not establish task success, replay, or Qualification.
+v3 `TransitionRecorder` and selected environment lifecycle. Attempt002 run004
+closed one H5 for each of source rows 0, 1, and 2. Each episode preserves 64
+transitions and 65 observations, typed requested/target/applied controls,
+reset/source identity, state and evaluation clocks, contact evidence, and an
+explicit episode outcome. The independent provider-free reader verified all
+three files (192 transitions, 195 observations), physical-monitor identity and
+coverage, worker/result digest, and parent exit/lock receipts. Five copied
+actual-run bundles were rejected for digest tampering, an interior measured
+limit excursion, warning count, missing warning counters, or compiled-model
+identity mismatch. The result is pending Sol review in the
+[R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+Synthetic S1 H5s prove wiring and rejection behavior only; even this bounded
+native H5 evidence does not establish task success, replay, or Qualification.

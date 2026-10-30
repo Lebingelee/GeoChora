@@ -1072,31 +1072,31 @@ route and current S1/native status are recorded below.
 
 ## R07c D01 diagnostic route (2026-10-30)
 
-The D01 diagnostic replaces the prior candidate's BaseTaskEnv/GeoPhys active
-route with the existing
+The D01 diagnostic uses the existing
 `bench_deploy.libero.selected_candidate.build_libero_selected_candidate()` →
-`SelectedReferenceEnv.from_libero_diagnostic_candidate()` →
-`RuntimeSession.materialize()` → MuJoCo session path. The candidate is fixed to
-the spatial bowl-to-plate source, MuJoCo CPU and the pinned LIBERO/robosuite
-inputs. It is an internal diagnostic entry, not a `make_env()` UID and not a
-general Provider capability.
+`SelectedReferenceEnv` → `RuntimeSession.materialize()` → MuJoCo session path.
+The selected task binding and its source/reset/controller/evaluation remain
+internal and fixed to the spatial bowl-to-plate source, MuJoCo CPU, and pinned
+LIBERO/robosuite inputs. It is not a `make_env()` UID or a general Provider
+capability.
 
-Core owns the selected lifecycle, mixed target/Ack contract, source-bound
-materialization, reset/readback, contact freshness, typed observations and
-existing Generic H5 v3 recording. `bench_deploy/libero/` owns the task-specific
-sampler, planner, On oracle and explicit unqualified joint-space PD gains. The
-route maps seven named torque actuators and two signed finger position
-actuators at 20 Hz, holding torques over 25 × 2 ms steps. The reset is derived
-from pinned BDDL/sampler source using a recorded deterministic fixture
-realization, then restores the complete named `.pruned_init` row; historical
-per-row fixture parity is not claimed. The required contract treats missing
-or stale contact as unavailable; the revision-consumer gap identified below
-still needs repair. The controller is not equivalent to upstream OSC_POSE.
+Core owns the selected lifecycle, generic source-bound `MixedActuatorPlanV1`
+admission, named mixed target/Ack contract, reset/readback, contact freshness,
+typed observations, and existing Generic H5 v3 recording. The Core route does
+not branch on LIBERO identity, fixed layout names, or task-specific channel
+count. `bench_deploy/libero/` owns task source semantics, sampler, planner, On
+oracle, and explicit unqualified joint-space PD gains. The bounded attempt002
+controller maps seven named torque actuators and two signed finger position
+actuators at 20 Hz, holding torques over 25 × 2 ms steps, with `Kp=100`,
+`Kd=20`, and a 16 mm aggregate opening target. These gains are not equivalent
+to upstream OSC_POSE. The deterministic reset realization is source-derived
+and restores a complete named `.pruned_init` row; historical per-row fixture
+parity is not claimed.
 
-Runtime entry example (requires a separately authorized native window and the
-frozen launcher/shared lock). Calling reset/step below materializes MuJoCo;
-this code is not a provider-free smoke. The S1 test harness installs only the
-bottom public model/data stand-in before using the same entry:
+The following runtime entry materializes MuJoCo; it is not a provider-free
+smoke. The bounded native attempt required its frozen launcher and shared
+lock. The S1 harness installs only bottom public model/data primitives before
+using the same construction/admission/lifecycle/recorder/reader path:
 
 ```python
 from bench_deploy.libero.selected_candidate import build_libero_selected_candidate
@@ -1110,24 +1110,23 @@ finally:
     env.close()
 ```
 
-The final focused provider-free set is 129 passed in
-`task_env/diagnostics/tasks/test_r07c_libero_core_env_s1.py`,
-`test_r07c_libero_source_control_s1.py`, `test_r07c_libero_init_state_s1.py`,
-`test_selected_consumers.py`, the R02b leaf, C05a recording, D02a state and
-R04a camera consumer tests. The run used the geochora Python 3.12 interpreter,
-`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, and explicit camera Core/GeoPhys `PYTHONPATH`.
-It exercised the same Selected Env/RuntimeSession/worker/Generic H5 v3 reader
-with only bottom MuJoCo model/data IO replaced. The locked MuJoCo 3.8.1 CPU
-run then produced three same-route 64/65 H5 episodes, 4,800 steps and five
-resets; the independent reader validated the H5s and parent lock/exit receipts.
-Sol review of attempt001 retained these execution facts but requires rework:
-the production contact consumer omitted state_revision validation, incompatible
-reset schemas could write before rejection, and the reader did not detect a
-measured finger range exceedance. Core's benchmark evidence construction must
-also move through the existing task binding. Current disposition is
-`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`; stale-contact rejection and
-full bounded S2/S3 acceptance are not established. This does not establish broader
-task support or Qualification. The D01 native/H5 status is maintained in the
-[execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
-Do not promote the route to general task registration, five-task R07c, P99,
-Human Judge, or Qualification from this diagnostic result.
+Attempt002's final provider-free same-route S1 passed 19 focused cases in
+`task_env/diagnostics/tasks/test_r07c_libero_core_env_s1.py`, including the
+non-LIBERO different-name/channel-count fixture and contact/reset/monitor/
+reader-failure cases. It used the geochora Python 3.12 interpreter with plugin
+autoload disabled and explicit camera Core/GeoPhys `PYTHONPATH`. The locked
+MuJoCo 3.8.1/API3008001 CPU run004 produced three 64-transition/65-observation
+H5 episodes, 4,800 native steps and five resets. Its per-step monitor covered
+13 limited scalar joints with zero excursion and zero warning counts. The
+independent provider-free reader verified the H5s and parent lock/exit receipt;
+five actual-run tamper copies were rejected.
+
+Current disposition is
+`R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`, limited to
+the frozen source/task/controller/seed/reset/MuJoCo CPU intersection. The
+worker episodes are not task success or Expert completion. This does not
+promote the route to general task registration, five-task R07c, P99, Human
+Judge, or Qualification. Attempt001's
+`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED` is preserved as its signed
+historical review. See the
+[attempt002 execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).

@@ -4,7 +4,7 @@
 
 维护者追加：attempt002必须清除D01新增公共Core中的LIBERO专用入口、任务/布局/控制/初始化白名单和专用记录schema，沿既有owner转为source-bound typed contract；以非LIBERO、不同命名/通道数量的同链路synthetic fixture验证，不能仅改名。benchmark语义、来源规则与策略仍归bench_deploy。此项与已有返工合为一个完整窗口，未派发前冻结实际HEAD与预算。
 
-当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包 [D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md) 已在 camera 分支实现 SelectedReferenceEnv → RuntimeSession → MuJoCo 路线；最终 provider-free S1 为129 passed，冻结计划下的 MuJoCo 3.8.1 CPU native/H5与同run独立reader通过，标签为 `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`，门状态见[D01 execution result](#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30)。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧普通 attempt003 的 partial/失败不追溯升级。五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
+当前诊断接续（2026-10-30）：维护者授权的 D01 diagnostic attempt002 已完成并等待 Sol 复核，目标仍为原五任务 R07c。公共 Core 已改为 generic source-bound typed mixed-control admission；最终 provider-free S1 为19 passed。MuJoCo 3.8.1/API3008001 CPU run004完成三回合、4,800 native steps、五次 reset、三份同run H5；独立 provider-free reader与五类实际bundle篡改拒绝通过，标签为 `R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`，完整事实见[D01 attempt002 execution result](#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30)。attempt001 review状态和旧普通 attempt003 的 partial/失败不追溯升级；本次不宣称历史 fixture-to-row parity、task success 或 Expert completion。五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
 
 状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/BLOCKED待Sol复核。新source composer恢复了上游 movable-object free-joint与命名规则；原`.pruned_init`安全解码成功，但其不含每行fixture pose或采样seed，不能完成原始reset映射。真正MuJoCo RuntimeSession mixed-control/contact consumer与同路线S1未完成，因此G1/G2未过、zero native。公开LIBERO `make_env` admission关闭；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；历史记录保持其签署时点含义，原五任务最终目标不缩减。
 
@@ -344,3 +344,87 @@ five-task, 18/22, P99, Human Judge, D0/D1/D2, develop-full integration or
 Qualification claim follows. Full run receipts, exact gate status, resources,
 source snapshots and package manifest are in ignored
 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/`.
+
+<a id="r07c-diagnostic-d01-attempt002-execution-result-2026-10-30"></a>
+
+## R07c diagnostic D01 attempt002 execution result (2026-10-30)
+
+Status: `R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`.
+This is a bounded result for the frozen LIBERO spatial bowl-to-plate source,
+MuJoCo 3.8.1/API3008001 CPU, seed 19, rows 0/1/2, task-owned controller and
+source-derived reset realization. It is not acceptance, Qualification, task
+success, or closure of the original five-task R07 goal.
+
+The package input was camera HEAD
+`566ed511252d0afca5c247ba1ea8eac0c2b2a11b` on `codex/phase-ii-01-camera`,
+with GeoPhys pin `c6df840bef8d36b1150150167df08e29dc3f664c` and Menagerie pin
+`b846dd12bc459d776cccb3dee0b1d02acbf7a9c7`. The implementation commits are
+`73e573fa20ae0656cc6bef193fe233bc96d3df5b` (generic mixed-control selected
+runtime ownership), `b2108d55052995a4639f4340fb29044279798df3` (safe 16 mm
+aggregate aperture target), and `47d38ac40a3aa1a54107582cd4db75403dc6e0e5`
+(evidence-driven unqualified PD gains `Kp=100`, `Kd=20`). The Core now admits
+source-bound typed mixed actuator channels without LIBERO-specific task,
+layout, or channel-count branches. A different-name/channel-count synthetic
+fixture exercised the same SelectedReferenceEnv/RuntimeSession/adapter path.
+
+Final provider-free S1 run `s1_full_pd100_001` passed 19 focused cases in
+12.5791 s; maximum sampled process-group RSS was 669,437,952 bytes. It covered
+generic shared-route fixture, contact revision, reset-before-mutation,
+fault/cleanup, recording/reader semantics, monitor behavior, and tamper
+negatives. The S1 substitutes only bottom public MuJoCo model/data primitives;
+it does not count as native evidence.
+
+The first two locked native runs exposed real source-limit failures and remain
+preserved: `native_001` exited 2 at step 262 when `finger_joint2` exceeded its
+upper limit by about 0.0000816 m; after fixing the task planner aperture target,
+`native_002` exited 2 at step 304 when `flat_stove_1.button` exceeded its lower
+limit by about 0.0000621 m, while the second arm joint had drifted substantially
+under `Kp=20/Kd=4`. Both close receipts report zero MuJoCo warnings and successful
+resource release. Their failed-worker budget charges conservatively reserve
+4,928 steps and five resets each, instead of using their measured 262/1 and
+304/1 close counts. `native_003` was rejected by the start-memory guard at
+6,358,085,632 bytes, below the 6 GiB minimum; it acquired no lock and started
+no native worker.
+
+The final frozen plan `native/native_004/frozen_plan.json` binds the clean
+implementation HEAD `47d38ac40a3aa1a54107582cd4db75403dc6e0e5`, exact source and
+closure digests, controller/action/plan identities, MuJoCo package/binding/
+library/header hashes, launcher hash, and remaining budget. Locked run004
+started with 6,689,480,704 bytes MemAvailable, completed in 6.0084 s with
+maximum sampled process-group RSS 1,546,661,888 bytes, and wrote 4,559,549
+bytes. It exited 0, confirmed its process group had exited, and released the
+shared lock. The same selected Env produced three 64-transition/65-observation
+H5 v3 episodes (192 transitions, 195 observations), 4,800 `mj_step` calls and
+five resets. Each episode passed arm/TCP and aggregate finger-opening motion
+gates. The per-step monitor covered 13 limited scalar joints, reported zero
+maximum excursion and all-zero warning counters. The negative/positive public
+contact endpoints matched the source oracle (0 and 56 bowl/plate contacts).
+Each episode ended at its 64-step horizon with `terminated=false`,
+`truncated=true`, `task_success=false`, and `solution_completed=null`.
+
+Independent reader run `reader_native_004` returned `verified_complete` for the
+three H5s and verified 192 transitions, 195 observations, 4,800 native steps,
+five resets, both endpoints, and parent exit/lock receipts. Its import tripwire
+confirmed no provider/native runtime modules loaded. Five copied bundles made
+from native run004 were rejected: stale result digest, re-sealed H5 interior
+limit excursion, nonzero warning counter, missing warning counters, and wrong
+compiled-model monitor identity. The actual native bundle and H5 files remain
+unchanged.
+
+The attempt's locked native budget ledger records three worker starts, 9.3652
+seconds, 14,656 conservatively charged `mj_step` calls, and 15 resets. The
+14,656 step total includes the two failed-run worst-case reserves; measured
+close receipts for those failures were 262 and 304 steps. `native_003` did not
+acquire the lock and is not a native start. Resource peaks are launcher samples,
+not hard maxima. Token usage, cost, and continuous active time were not
+available and remain unknown. The full report, gate receipt, commands, source
+and run evidence, tamper matrix, documentation/Skill receipts, and manifests
+are in ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_002/`.
+
+The fixed diagnostic is still not registered in `make_env()`. No task success,
+Expert completion, historical per-row fixture parity, general Provider route,
+other LIBERO task, five-task R07 completion, 18/22 count change, P99, Human
+Judge, Formal Qualification, F05 integration, merge, or push follows. Attempt001
+review and all failed run receipts remain unchanged; this result awaits Sol's
+independent diff/evidence review.

@@ -312,15 +312,18 @@ Artifact/sample/algorithm/config 但读取 live state；两者独立 gate，cont
 
 ## R07c D01 selected mixed-control diagnostic (2026-10-30)
 
-The fixed LIBERO spatial pilot now enters through
-`SelectedReferenceEnv.from_libero_diagnostic_candidate()` and the existing
-`RuntimeSession.materialize()` / MuJoCo session owners. Its source-bound profile
-maps seven named torque motors and two signed finger position actuators. The
-task-owned controller uses absolute seven-joint targets, explicit unqualified
-`Kp=20 Nm/rad`, `Kd=4 Nm·s/rad`, 20 Hz outer control and a zero-order hold over
-25 × 2 ms native steps. Source actuator limits are checked against the
-compiled model. This is not the upstream OSC_POSE controller and provides no
-normal `make_env()` or generic Provider admission.
+The fixed LIBERO spatial pilot enters through its internal task binding and the
+existing `SelectedReferenceEnv` / `RuntimeSession.materialize()` / MuJoCo
+session owners. Core admission consumes generic source-bound
+`MixedActuatorPlanV1` channel declarations and verifies them against compiled
+actuator metadata; no LIBERO task, layout, or fixed channel-count whitelist is
+used in the shared Core path. The task-owned controller maps seven named
+torque motors and two signed finger position actuators. Attempt002's bounded
+run used absolute seven-joint targets, explicit unqualified `Kp=100 Nm/rad`,
+`Kd=20 Nm·s/rad`, a 16 mm aggregate opening target, 20 Hz outer control, and a
+zero-order hold over 25 × 2 ms native steps. Source actuator limits are checked
+against the compiled model. This is not the upstream OSC_POSE controller and
+provides no normal `make_env()` route or general Provider admission.
 
 Reset uses a pinned-source-derived deterministic tabletop/fixture realization,
 then restores one complete named `.pruned_init` row including source time and
@@ -331,10 +334,14 @@ layout and entity-pair contact coverage/freshness. The task-owned On predicate
 requires current positive bowl/plate contact, bowl height at least the plate,
 and XY distance below 0.03 m; missing or stale contact remains unavailable.
 
-The final provider-free same-route S1 passed 129 focused cases. D01's bounded
-MuJoCo 3.8.1 CPU native/H5 and independent-reader result is
-`R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`, reported in the
-[execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
-Even a successful pilot is limited to its frozen source/task/reset/controller
-intersection and does not establish the original five-task R07 goal, P99,
-Formal Qualification, or a general LIBERO Provider route.
+Attempt002's final provider-free same-route S1 passed 19 focused cases. Its
+locked MuJoCo 3.8.1/API3008001 CPU run completed three 64-transition episodes
+(4,800 `mj_step`, five resets); per-step monitoring covered 13 limited scalar
+joints, found no excursion, and recorded zero warnings. The independent
+provider-free reader verified all H5 v3 observations and the parent exit/lock
+receipt; actual-run tamper copies reached and failed the intended semantic
+gates. Result: `R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`
+under the
+[execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+This bounded result does not establish the original five-task R07 goal, P99,
+Formal Qualification, task success, or a general LIBERO Provider route.

@@ -2893,18 +2893,18 @@
     }
   },
   "document_sha256": {
-    "README.md": "14d7db4ab6ee93feed450dd1c2566510739fe7fa6cb1b515cc3bb1737a9a1cb8",
+    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
-    "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "b35672720b48992d3f29779fd450c67f9e2c4b64fcd54d40698335b276057d33",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
-    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "c840492e507245eb7ffde49485de0d29652b666f5a3a0868f495f773f02ab9dc"
+    "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
+    "07_Execution_Order_and_Acceptance.md": "36d5011bfc255d2a8d1dbbfc9ea4f4c05b15d26974331a4b67aba0ff54f0c584",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "84279d99359dc558f34ca2e66cb6a55c05b80c80a33a377c8fc5e17067d5c8e9",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
+    "README.md": "14d7db4ab6ee93feed450dd1c2566510739fe7fa6cb1b515cc3bb1737a9a1cb8"
   },
   "revision_kind": "PREPARE_R07C_PILOT_ATTEMPT002_REWORK",
   "benchmark_audit": {
@@ -6651,5 +6651,41 @@
       240,
       360
     ]
+  },
+  "r07c_diag_d01_attempt002": {
+    "date": "2026-10-30",
+    "slice": "R07c diagnostic D01 attempt002",
+    "status": "R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW",
+    "prompt_sha256": "17cab753286dc09ec9590877d82239e6bb0f816c6578e89e853ff0a1a646c774",
+    "input_head": "566ed511252d0afca5c247ba1ea8eac0c2b2a11b",
+    "implementation_head": "47d38ac40a3aa1a54107582cd4db75403dc6e0e5",
+    "implementation_commits": [
+      "73e573fa20ae0656cc6bef193fe233bc96d3df5b",
+      "b2108d55052995a4639f4340fb29044279798df3",
+      "47d38ac40a3aa1a54107582cd4db75403dc6e0e5"
+    ],
+    "provider_free_s1": "19 passed; final run s1_full_pd100_001",
+    "native_run": "native_004; MuJoCo 3.8.1/API3008001 CPU; exit 0; 4800 mj_step; 5 resets; 3 H5s; maximum sampled RSS 1546661888 bytes",
+    "independent_reader": "reader_native_004; verified_complete; 192 transitions/195 observations; parent exit and lock release verified",
+    "actual_bundle_tamper_cases": 5,
+    "native_attempt_ledger": {
+      "locked_worker_starts": 3,
+      "native_wall_seconds": 9.3652,
+      "conservatively_charged_mj_step": 14656,
+      "conservatively_charged_resets": 15,
+      "failed_runs_preserved": [
+        "native_001",
+        "native_002"
+      ],
+      "prelock_memory_rejection": "native_003; 6358085632 bytes below 6 GiB; no worker/lock"
+    },
+    "phase_markdown_hash_manifest": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_002/phase_markdown_sha256.manifest",
+    "phase_markdown_hashes": 12,
+    "accepted_slices_unchanged": "18/22",
+    "five_task_r07c_closed": false,
+    "qualification": false,
+    "p99_or_human_judge": false,
+    "f05_integration_or_push": false,
+    "sol_review": "PENDING"
   }
 }

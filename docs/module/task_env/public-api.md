@@ -723,17 +723,29 @@ finally:
 ```
 
 This is an internal, source-fixed diagnostic constructor; it is not registered
-in `make_env()`, does not widen general MuJoCo admission, and accepts only the
-pinned LIBERO task on MuJoCo CPU. It reuses the selected lifecycle, typed
-mixed-control route, observation/evaluator, and existing H5 v3 Recorder. The
-source-derived deterministic fixture realization is recorded with the complete
-named `.pruned_init` row restore; it does not claim historical fixture-to-row
-parity. Final provider-free S1 passed 129 focused cases. The bounded MuJoCo
-3.8.1 CPU native/H5 and independent-reader result is
-the historical Luna candidate label `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`.
-Sol review retained the execution facts but requires contact-revision/reset
-admission and measured-limit/reader repairs, plus task-owned evidence construction;
-current disposition is `R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`. This internal
-diagnostic remains unregistered in `make_env()` and does not grant general
-Provider support or Qualification. Details and limits are recorded in the
-[R07c D01 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
+in `make_env()` and accepts only the pinned LIBERO spatial candidate on MuJoCo
+CPU. Its task binding owns LIBERO source/reset/controller/evaluation semantics;
+the shared Core route consumes the generic, source-bound
+`MixedActuatorPlanV1` and named mixed commands through the existing selected
+environment, runtime session, provider adapter, and H5 v3 recorder. The Core
+contract does not whitelist LIBERO names, layout sizes, or task identifiers.
+
+The deterministic fixture realization is derived from pinned task source and
+recorded with the complete named `.pruned_init` row restore; it does not claim
+historical fixture-to-row parity. Attempt002's final provider-free same-route
+S1 passed 19 focused cases. Locked MuJoCo 3.8.1/API3008001 CPU run004 completed
+three 64-transition episodes with 4,800 native steps, five resets, two
+contact endpoints, and three H5 v3 files. The independent provider-free reader
+verified 192 transitions, 195 observations, physical monitor receipts, and
+parent exit/lock release; five tampered copies of the actual native bundle were
+rejected. All 13 limited scalar joints stayed within source bounds, warning
+counters remained zero, and the bounded motion gates passed. The controller
+uses explicit unqualified joint-space PD gains `Kp=100`, `Kd=20` and a 16 mm
+aggregate opening target; this is not upstream OSC_POSE equivalence or a
+controller qualification. The attempt002 result is
+`R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`, limited to
+this frozen source/task/controller/seed/reset/provider intersection. Attempt001
+and ordinary pilot history retain their original signed-time dispositions.
+This entry does not grant a general LIBERO Provider route, task success,
+five-task R07 completion, P99, or Qualification. See the
+[R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).

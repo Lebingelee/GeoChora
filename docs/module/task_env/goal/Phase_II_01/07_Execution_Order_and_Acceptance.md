@@ -1,12 +1,12 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-2026-10-30 Sol复核：D01 attempt001增量保留但需返工，未接收完整S2/S3；contact revision、reset admission-before-write、实测限位/reader及benchmark语义所有权缺口见[复核记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。下一包仅D01 diagnostic attempt002集中修复，复用camera，维护者转交后执行；不前进D02/R07d或集成F线。
+2026-10-30 Sol复核：D01 attempt001增量保留但需返工，未接收完整S2/S3；contact revision、reset admission-before-write、实测限位/reader及benchmark语义所有权缺口见[复核记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。该复核后的 attempt002 已按独立冻结包完成实施与 bounded S2/S3，等待 Sol 复核；下文 attempt001 内容保持其签署时点含义。
 
-2026-10-30诊断接续：[R07c D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)由维护者转交 Luna2，复用 camera checkout，修复现有 SelectedReferenceEnv → RuntimeSession → MuJoCo 统一路线。最终 provider-free S1 为129 passed；冻结计划绑定的 MuJoCo 3.8.1 CPU native与同run H5独立reader已通过，状态 `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。正常评估不要求恢复某次历史 fixture sample；18/22 与原五任务出口不变。下文旧状态保留历史时点含义。
+2026-10-30诊断接续：attempt001复核后，独立 D01 diagnostic attempt002 已清除公共 Core 的 LIBERO 专用分支，完成 contact/reset/monitor/reader 修复与不同模型 same-route fixture。最终 provider-free S1 为19 passed；锁内 MuJoCo 3.8.1/API3008001 CPU run004完成三回合、4,800 native steps、五次 reset 和三份 H5，独立 reader 与五类实际bundle篡改拒绝通过，状态 `R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。历史 per-row fixture parity 未宣称；18/22 与原五任务出口不变。下文旧状态保留历史时点含义。
 
-当前入口（2026-10-30）：**R06c按有界required证据汇总接收；R01–R06仍为18/22 slices。R07c pilot attempt003的PARTIAL/G1-G2 BLOCKED保持其签署时点含义；独立 D01 diagnostic attempt001 已实现统一 SelectedReferenceEnv/RuntimeSession/MuJoCo 路线并通过 provider-free S1，native/H5 结果以本页 D01 execution result 为准。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
+当前入口（2026-10-30）：**R06c按有界required证据汇总接收；R01–R06仍为18/22 slices。R07c pilot attempt003的PARTIAL/G1-G2 BLOCKED及D01 diagnostic attempt001复核状态均保持各自签署时点含义；D01 attempt002已完成bounded S2/S3，等待 Sol 复核。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。
 
-- **Luna2**：普通[R07c pilot attempt003](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-execution-result)仍保留PARTIAL/G1-G2 BLOCKED历史状态；独立 D01 diagnostic attempt001 已完成有界 native/H5与reader，等待Sol复核。普通attempt历史不追溯改写。
+- **Luna2**：普通[R07c pilot attempt003](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt003-execution-result)仍保留PARTIAL/G1-G2 BLOCKED历史状态；D01 attempt001复核结论保留，attempt002 bounded S2/S3 已完成并等待 Sol 复核。普通attempt历史不追溯改写。
 - **R07当前边界**：R07a004来源/协议部分接收及单pilot来源准入已有Sol记录。pilot不代表原五任务R07a或R07b整体通过；TurboSquid三族仍阻塞其关联任务，不影响本包未消费这些资产的工作。保留原五任务最终P99目标、原生语义和成本/独立Human评审。
 - **Luna1**：独立负责`develop-full`的F00–F07，状态以其分支10文档及实际报告为准；本次不写主checkout/F文档、Isaac或依赖。
 - **R05完成**：精确normal-route CPU/CUDA×100/500Hz完整回合及H5双reader已获Sol接收，不承诺通用Provider/实时2ms/Qualification。
