@@ -162,6 +162,10 @@ def _disable_all_actuator_forces(model):
 def _run_equality_probe(model, mujoco, *, equality_active, steps, variant):
     data = mujoco.MjData(model)
     mujoco.mj_resetData(model, data)
+    model.opt.disableflags = (
+        int(model.opt.disableflags)
+        | int(mujoco.mjtDisableBit.mjDSBL_CONTACT)
+    )
     _disable_all_actuator_forces(model)
     data.ctrl[:] = 0.0
     data.eq_active[:] = 1 if equality_active else 0
@@ -194,6 +198,8 @@ def _run_equality_probe(model, mujoco, *, equality_active, steps, variant):
         'equality_active': equality_active,
         'actuator_forces_disabled': True,
         'actuator_force_range_variant': [0.0, 0.0],
+        'contact_collisions_disabled': True,
+        'model_disableflags': int(model.opt.disableflags),
         'steps': steps,
         'initial_difference_m': initial_difference,
         'final_difference_m': final_difference,
