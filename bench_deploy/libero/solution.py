@@ -22,10 +22,13 @@ from task_env.controllers.canonical.kinematics import (
 )
 from task_env.planners.contracts import ExpertAction
 
+from .controller import LiberoMixedControlConfigV1
+from .source_gravity import SOURCE_GRAVITY_PROFILE_V1
 from .task_contracts import TASK_1
 
 
 SOLUTION_SCHEMA = "libero-bowl-to-plate-solution-v1"
+SOLUTION_SCHEMA_V2 = "libero-bowl-to-plate-solution-v2"
 TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
 SITE_NAME = "gripper0_grip_site"
@@ -35,6 +38,11 @@ _JOINT_LIMITS = np.asarray((
     (-3.0718, -0.0698), (-2.8973, 2.8973), (-0.0175, 3.7525),
     (-2.8973, 2.8973),
 ), dtype=np.float64)
+_JOINT_NAMES = tuple(f"joint{index}" for index in range(1, 8))
+_POSITION_LIMITS = {
+    name: (float(limits[0]), float(limits[1]))
+    for name, limits in zip(_JOINT_NAMES, _JOINT_LIMITS, strict=True)
+}
 _OPENING_BY_STAGE = {
     # Leave 10 mm per finger inside the signed source joint limits. Native
     # attempts measured roughly 5 mm overshoot near the open stop; the physical
@@ -66,6 +74,55 @@ def solution_identity_v1(
         "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v3",
         "tcp_id": TCP_ID,
         "algorithm": "public-observation-damped-jacobian-waypoints-v2",
+        "waypoints_m": {
+            "approach_z": 0.15, "grasp_z": 0.05,
+            "lift_z": 0.20, "place_tcp_z_above_plate": 0.085,
+        },
+        "opening_m": _OPENING_BY_STAGE,
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "max_cartesian_increment_m": selected_config.max_cartesian_increment_m,
+            "max_joint_increment_rad": selected_config.max_joint_increment_rad,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
+def solution_identity_v2(
+    source_xml_sha256: str,
+    source_closure_digest: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+) -> str:
+    """Bind task #1's public-observation plan and source gravity primitive."""
+    for value, label in ((source_xml_sha256, "source XML"),
+                         (source_closure_digest, "source closure")):
+        if (type(value) is not str or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)):
+            raise ValueError(f"LIBERO Solution v2 requires a lowercase {label} SHA-256")
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    controller = LiberoMixedControlConfigV1()
+    controller.validate()
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V2,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v3",
+        "tcp_id": TCP_ID,
+        "algorithm": "public-observation-damped-jacobian-waypoints-v2",
+        "gravity_compensation": {
+            "profile_id": SOURCE_GRAVITY_PROFILE_V1,
+            "model": "same-source-closure-independent-mujoco-static-bias-v1",
+            "torque_formula": "qfrc_bias-minus-qfrc_passive-at-zero-joint-velocity",
+            "position_target_encoding": "planner-target-plus-gravity-torque-over-controller-kp",
+            "controller_kp_Nm_per_rad": list(controller.kp_Nm_per_rad),
+            "joint_limits_rad": {key: list(value) for key, value in _POSITION_LIMITS.items()},
+            "no_extra_physics_step": True,
+        },
         "waypoints_m": {
             "approach_z": 0.15, "grasp_z": 0.05,
             "lift_z": 0.20, "place_tcp_z_above_plate": 0.085,
@@ -393,7 +450,85 @@ class LiberoPickPlaceSolutionV1:
         self.failure_reason = str(reason)
 
 
+class LiberoPickPlaceSolutionV2(LiberoPickPlaceSolutionV1):
+    """Task #1 public-observation Solution with source-bound gravity bias."""
+
+    def __init__(self, source_xml: bytes | str, *, source_closure_digest: str,
+                 gravity_bias_model, config: LiberoPickPlaceSolutionConfigV1 | None = None):
+        super().__init__(source_xml, config=config)
+        if getattr(gravity_bias_model, "profile_id", None) != SOURCE_GRAVITY_PROFILE_V1:
+            raise TypeError("LIBERO Solution v2 requires the source MJCF gravity-bias primitive")
+        if (getattr(gravity_bias_model, "source_xml_sha256", None) != self.source_xml_sha256
+                or getattr(gravity_bias_model, "source_closure_digest", None) != source_closure_digest):
+            raise ValueError("LIBERO Solution v2 gravity model differs from its source XML/closure")
+        self.source_closure_digest = source_closure_digest
+        self.gravity_bias_model = gravity_bias_model
+        self.identity = solution_identity_v2(
+            self.source_xml_sha256, self.source_closure_digest, self.config,
+        )
+        self._gravity_queries = 0
+
+    def reset(self, observation, info: Mapping[str, object], metadata, **kwargs) -> None:
+        super().reset(observation, info, metadata, **kwargs)
+        if info.get("source_closure_digest") != self.source_closure_digest:
+            raise ValueError("LIBERO Solution v2 reset closure differs from its gravity model")
+        self._gravity_queries = 0
+
+    def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
+        planned = super().act(observation, info)
+        joints, _ee_position = _state_vector(observation)
+        gravity = np.asarray(self.gravity_bias_model.gravity_torque(joints), dtype=np.float64)
+        controller = LiberoMixedControlConfigV1()
+        controller.validate()
+        kp = np.asarray(controller.kp_Nm_per_rad, dtype=np.float64)
+        if gravity.shape != (7,) or not np.isfinite(gravity).all():
+            raise ValueError("LIBERO source gravity primitive must return seven finite N*m values")
+        planner_target = np.asarray(planned.action[:7], dtype=np.float64)
+        correction = gravity / kp
+        compensated_target = planner_target + correction
+        for index, name in enumerate(_JOINT_NAMES):
+            low, high = _POSITION_LIMITS[name]
+            if not low <= compensated_target[index] <= high:
+                raise ValueError(f"gravity-compensated target would leave the source range: {name}")
+        action_values = np.asarray((*compensated_target, float(planned.action[7])), dtype=np.float32)
+        diagnostics = dict(planned.diagnostics)
+        diagnostics.update({
+            "gravity_compensation_profile_id": SOURCE_GRAVITY_PROFILE_V1,
+            "gravity_bias_Nm": [float(value) for value in gravity],
+            "gravity_target_offset_rad": [float(value) for value in correction],
+            "planner_joint_target_rad": [float(value) for value in planner_target],
+            "gravity_compensated_joint_target_rad": [float(value) for value in compensated_target],
+            "gravity_source_model_identity_sha256": self.gravity_bias_model.model_identity_sha256,
+        })
+        self._gravity_queries += 1
+        self._last_action_receipt.update({
+            "planner_action": [float(value) for value in planned.action],
+            "gravity_bias_Nm": [float(value) for value in gravity],
+            "gravity_target_offset_rad": [float(value) for value in correction],
+            "gravity_compensated_action": [float(value) for value in action_values],
+            "gravity_source_model_identity_sha256": self.gravity_bias_model.model_identity_sha256,
+            "diagnostics": diagnostics,
+        })
+        return ExpertAction(action=action_values, stage=planned.stage, diagnostics=diagnostics)
+
+    def outcome_report(self) -> dict[str, object]:
+        report = super().outcome_report()
+        return {
+            **report,
+            "solution_schema_version": SOLUTION_SCHEMA_V2,
+            "source_closure_digest": self.source_closure_digest,
+            "gravity_compensation": self.gravity_compensation_receipt(),
+        }
+
+    def gravity_compensation_receipt(self) -> dict[str, object]:
+        return {
+            **self.gravity_bias_model.identity_mapping(),
+            "episode_query_count": self._gravity_queries,
+        }
+
+
 __all__ = [
-    "SOLUTION_SCHEMA", "LiberoPickPlaceSolutionConfigV1",
-    "LiberoPickPlaceSolutionV1", "solution_identity_v1",
+    "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2",
+    "LiberoPickPlaceSolutionConfigV1", "LiberoPickPlaceSolutionV1",
+    "LiberoPickPlaceSolutionV2", "solution_identity_v1", "solution_identity_v2",
 ]

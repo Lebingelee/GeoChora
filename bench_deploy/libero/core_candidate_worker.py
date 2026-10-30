@@ -333,7 +333,10 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
     """Bind the semantic bundle to its bounded native parent process receipt."""
     record_path = Path(run_record_path).resolve(strict=True)
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    is_solution = result.get("schema_version") == "r07-v210-task-solution-worker-result-v1"
+    is_solution = result.get("schema_version") in {
+        "r07-v210-task-solution-worker-result-v1",
+        "r07-v210-task-solution-worker-result-v2",
+    }
     accepted_schemas = {"r07-v210-required123-run-record-v1"} if is_solution else {"r07c-d01-run-record-v1"}
     if record.get("schema_version") not in accepted_schemas:
         raise ValueError("parent run record schema is unsupported")
@@ -555,7 +558,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
                              row_index: int, seed: int, max_steps: int,
                              solution_factory) -> dict[str, Any]:
     """Run one task-owned Solution through the same SelectedReferenceEnv."""
-    solution = solution_factory()
+    solution = solution_factory(output_dir)
     if type(getattr(solution, "identity", None)) is not str or len(solution.identity) != 64:
         raise TypeError("task Solution factory must return a versioned 64-hex identity")
     reset_observation, reset_info = env.reset_for_solution(
@@ -577,7 +580,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     if not isinstance(pre_reset, Mapping):
         raise ValueError("Solution reset omitted its pre-reset compiled/runtime identity receipt")
     start_receipt = {
-        "schema_version": "r07-v210-task-solution-start-receipt-v1",
+        "schema_version": "r07-v210-task-solution-start-receipt-v2",
         "episode_index": episode_index, "row_index": row_index, "seed": seed,
         "task_uid": env.artifact.task_id,
         "task_artifact_identity_hash": env.artifact.identity_hash,
@@ -622,7 +625,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     except BaseException as exc:
         fault = getattr(env, "execution_fault", None)
         failure_receipt = {
-            "schema_version": "r07-v210-task-solution-failure-receipt-v1",
+            "schema_version": "r07-v210-task-solution-failure-receipt-v2",
             "episode_index": episode_index, "row_index": row_index, "seed": seed,
             "task_uid": env.artifact.task_id,
             "task_artifact_identity_hash": env.artifact.identity_hash,
@@ -670,7 +673,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     initial_ee = np.asarray(reset_observation["state"]["ee_pose"], dtype=np.float64)
     final_ee = np.asarray(final_observation["state"]["ee_pose"], dtype=np.float64)
     return {
-        "schema_version": "r07-v210-task-solution-episode-v1",
+        "schema_version": "r07-v210-task-solution-episode-v2",
         "episode_index": episode_index,
         "row_index": row_index,
         "seed": seed,
@@ -699,6 +702,10 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
         "solution_completed": bool(solution.done),
         "solution_failed": bool(solution.failed),
         "solution_failure_reason": getattr(solution, "failure_reason", None),
+        "gravity_compensation": (
+            solution.gravity_compensation_receipt()
+            if callable(getattr(solution, "gravity_compensation_receipt", None)) else None
+        ),
         "episode_end_v1": episode_end,
         "final_info": {
             "is_success": final_info.get("is_success"),
@@ -799,7 +806,8 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
                                 rows: tuple[int, ...] = (0, 1, 2), steps: int = 64,
                                 solution_factory=None,
                                 source_closure_files: Mapping[str, bytes] | None = None,
-                                composition_plan_bytes: bytes | None = None) -> dict[str, Any]:
+                                composition_plan_bytes: bytes | None = None,
+                                solution_resource_closer=None) -> dict[str, Any]:
     """Run same-instance public resets, action route, H5 closure and receipts."""
     output_dir = Path(output_dir).resolve()
     if tuple(rows) != (0, 1, 2) or type(seed) is not int or seed != 19:
@@ -816,6 +824,8 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
     worker_error = None
     close_error = None
     close_receipt = None
+    solution_resource_close_error = None
+    solution_resource_close_receipt = None
     try:
         if solution_factory is not None:
             if source_closure_files is None or not isinstance(composition_plan_bytes, bytes):
@@ -842,6 +852,11 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
     except BaseException as exc:
         worker_error = {"type": type(exc).__name__, "message": str(exc)}
     finally:
+        if callable(solution_resource_closer):
+            try:
+                solution_resource_close_receipt = solution_resource_closer()
+            except BaseException as exc:
+                solution_resource_close_error = {"type": type(exc).__name__, "message": str(exc)}
         try:
             env.close()
             close_receipt = env.close_receipt
@@ -873,10 +888,11 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
             })
     payload = {
         "schema_version": (
-            "r07-v210-task-solution-worker-result-v1" if solution_route
+            "r07-v210-task-solution-worker-result-v2" if solution_route
             else "r07c-d01-libero-worker-result-v1"
         ),
         "status": "complete" if (worker_error is None and close_error is None
+                                  and solution_resource_close_error is None
                                   and len(episodes) == len(rows)
                                   and (solution_route or len(diagnostic_endpoints) == 2)) else "failed",
         "episode_count": len(episodes),
@@ -895,6 +911,8 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
             "failed_episodes": sum(bool(item.get("solution_failed")) for item in episodes),
         } if solution_route else None,
         "final_session_close_receipt": close_receipt,
+        "solution_resource_close_receipt": solution_resource_close_receipt,
+        "solution_resource_close_error": solution_resource_close_error,
         "worker_error": worker_error,
         "close_error": close_error,
         "worker_process_group_cleanup": "parent_must_confirm_after_worker_exit",
@@ -911,16 +929,22 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                                    require_motion_thresholds: bool,
                                    require_mujoco_runtime_identity: bool) -> dict[str, Any]:
     """Independent provider-free H5/source/outcome readback for the v2.1.0 route."""
-    from .solution import solution_identity_v1
+    from .solution import solution_identity_v1, solution_identity_v2
+    schema = report.get("schema_version")
+    solution_v2 = schema == "r07-v210-task-solution-worker-result-v2"
     payload = {key: value for key, value in report.items() if key != "result_sha256"}
     if hashlib.sha256(_canonical(payload)).hexdigest() != report.get("result_sha256"):
         raise ValueError("task Solution worker result digest mismatch")
     attempted_episode_receipts = report.get("attempted_episode_receipts")
     failed_episode_receipts = report.get("failed_episode_receipts")
-    if (report.get("schema_version") != "r07-v210-task-solution-worker-result-v1"
+    if (schema not in {
+                "r07-v210-task-solution-worker-result-v1",
+                "r07-v210-task-solution-worker-result-v2",
+            }
             or report.get("status") != "complete"
             or report.get("worker_error") is not None
             or report.get("close_error") is not None
+            or (solution_v2 and report.get("solution_resource_close_error") is not None)
             or report.get("episode_count") != 3
             or len(report.get("episodes", ())) != 3
             or not isinstance(attempted_episode_receipts, list)
@@ -930,12 +954,30 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             or report.get("reset_count") != 3):
         raise ValueError("task Solution worker bundle is incomplete or has an invalid schema/count")
     source_readback = _verify_solution_source_bundle(bundle_path, report.get("source_bundle"))
-    expected_solution_identity = solution_identity_v1(source_readback["canonical_xml_sha256"])
+    expected_solution_identity = (
+        solution_identity_v2(source_readback["canonical_xml_sha256"],
+                             source_readback["source_closure_digest"])
+        if solution_v2 else solution_identity_v1(source_readback["canonical_xml_sha256"])
+    )
+    resource_close = report.get("solution_resource_close_receipt")
+    if solution_v2 and (
+        not isinstance(resource_close, Mapping)
+        or resource_close.get("schema_version") != "libero-source-gravity-model-close-v1"
+        or resource_close.get("closed") is not True
+        or resource_close.get("model_released") is not True
+        or resource_close.get("data_released") is not True
+        or resource_close.get("mj_step_call_count") != 0
+    ):
+        raise ValueError("task Solution source gravity model is not explicitly closed")
     total_t = total_obs = total_native = 0
     episodes = []
     for index, (expected_row, episode, attempted) in enumerate(zip(
             (0, 1, 2), report["episodes"], attempted_episode_receipts, strict=True)):
-        if (episode.get("schema_version") != "r07-v210-task-solution-episode-v1"
+        expected_episode_schema = (
+            "r07-v210-task-solution-episode-v2" if solution_v2
+            else "r07-v210-task-solution-episode-v1"
+        )
+        if (episode.get("schema_version") != expected_episode_schema
                 or episode.get("episode_index") != index or episode.get("row_index") != expected_row
                 or episode.get("seed") != 19 or episode.get("task_uid") != TASK_1
                 or episode.get("source_id") != source_readback.get("source_id")
@@ -973,7 +1015,10 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         if (len(start_raw) != attempted.get("bytes")
                 or hashlib.sha256(start_raw).hexdigest() != attempted.get("sha256")
                 or start != json.loads(start_raw.decode("utf-8"))
-                or start.get("schema_version") != "r07-v210-task-solution-start-receipt-v1"
+                or start.get("schema_version") != (
+                    "r07-v210-task-solution-start-receipt-v2" if solution_v2
+                    else "r07-v210-task-solution-start-receipt-v1"
+                )
                 or start.get("episode_index") != index or start.get("row_index") != expected_row
                 or start.get("seed") != 19 or start.get("task_uid") != TASK_1
                 or start.get("solution_identity") != expected_solution_identity
@@ -1158,6 +1203,22 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         action_trace = episode.get("action_trace")
         if not isinstance(action_trace, list) or len(action_trace) != count:
             raise ValueError("task Solution action trace does not cover every H5 transition")
+        gravity_receipt = episode.get("gravity_compensation")
+        if solution_v2:
+            if (not isinstance(gravity_receipt, Mapping)
+                    or gravity_receipt.get("profile_id") != "libero-source-mjcf-gravity-bias-v1"
+                    or gravity_receipt.get("source_xml_sha256") != source_readback.get("canonical_xml_sha256")
+                    or gravity_receipt.get("source_closure_digest") != source_readback.get("source_closure_digest")
+                    or type(gravity_receipt.get("model_identity_sha256")) is not str
+                    or len(gravity_receipt["model_identity_sha256"]) != 64
+                    or gravity_receipt.get("episode_query_count") != count
+                    or gravity_receipt.get("forward_call_count") != total_t + count
+                    or gravity_receipt.get("mj_step_call_count") != 0
+                    or gravity_receipt.get("calculation") != "zero_velocity_qfrc_bias_minus_qfrc_passive_v1"
+                    or gravity_receipt.get("runtime_identity", {}).get("mujoco_version") != "3.8.1"
+                    or gravity_receipt.get("runtime_identity", {}).get("api_version") != 3008001
+                    or resource_close.get("model_identity_sha256") != gravity_receipt.get("model_identity_sha256")):
+                raise ValueError("task Solution source gravity receipt is missing or identity-mismatched")
         for transition_index, action in enumerate(action_trace):
             if (not isinstance(action, Mapping)
                     or type(action.get("control_step")) is not int
@@ -1171,6 +1232,28 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     or not np.allclose(np.asarray(action.get("solution_action"), dtype=np.float64),
                                        actions[transition_index], rtol=0.0, atol=1e-7)):
                 raise ValueError("task Solution action trace differs from public H5 control rows")
+            if solution_v2:
+                diagnostics = action["solution_diagnostics"]
+                bias = np.asarray(diagnostics.get("gravity_bias_Nm"), dtype=np.float64)
+                offset = np.asarray(diagnostics.get("gravity_target_offset_rad"), dtype=np.float64)
+                planner_target = np.asarray(diagnostics.get("planner_joint_target_rad"), dtype=np.float64)
+                compensated_target = np.asarray(
+                    diagnostics.get("gravity_compensated_joint_target_rad"), dtype=np.float64,
+                )
+                public_action = np.asarray(action.get("solution_action"), dtype=np.float64)
+                if (diagnostics.get("gravity_compensation_profile_id")
+                        != "libero-source-mjcf-gravity-bias-v1"
+                        or diagnostics.get("gravity_source_model_identity_sha256")
+                        != gravity_receipt.get("model_identity_sha256")
+                        or any(value.shape != (7,) or not np.isfinite(value).all()
+                               for value in (bias, offset, planner_target, compensated_target))
+                        or public_action.shape != (8,)
+                        or not np.allclose(offset, bias / 100.0, rtol=0.0, atol=1e-10)
+                        or not np.allclose(compensated_target, planner_target + offset,
+                                           rtol=0.0, atol=1e-10)
+                        or not np.allclose(public_action[:7], compensated_target,
+                                           rtol=0.0, atol=1e-6)):
+                    raise ValueError("task Solution action does not preserve the source gravity compensation formula")
         initial_observation = episode.get("initial_observation")
         final_observation = episode.get("final_observation")
         if not isinstance(initial_observation, Mapping) or not isinstance(final_observation, Mapping):
@@ -1220,6 +1303,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             "observation_count": observation_count,
             "h5_sha256": episode["h5"]["sha256"],
             "physical_state_monitor": monitor_summary,
+            "gravity_compensation": gravity_receipt if solution_v2 else None,
         })
         total_t += count
         total_obs += observation_count
@@ -1227,12 +1311,17 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     close = report.get("final_session_close_receipt")
     if not isinstance(close, Mapping) or close.get("session_closed") is not True:
         raise ValueError("task Solution worker omitted a successful final RuntimeSession close receipt")
+    if solution_v2 and resource_close.get("forward_call_count") != total_t:
+        raise ValueError("task Solution gravity forward-call count differs from the complete H5 transition total")
     if (report.get("transition_count") != total_t
             or report.get("observation_count") != total_obs
             or report.get("native_step_count") != total_native):
         raise ValueError("task Solution aggregate worker counters differ from independently read H5s")
     return {
-        "schema_version": "r07-v210-task-solution-independent-reader-v1",
+        "schema_version": (
+            "r07-v210-task-solution-independent-reader-v2" if solution_v2
+            else "r07-v210-task-solution-independent-reader-v1"
+        ),
         "status": "verified_complete",
         "source_bundle": source_readback,
         "motion_thresholds_required": bool(require_motion_thresholds),
@@ -1254,7 +1343,10 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
     """Provider-free independent readback of a completed worker and all H5s."""
     bundle_path = Path(bundle_path).resolve(strict=True)
     report = json.loads(bundle_path.read_text(encoding="utf-8"))
-    if report.get("schema_version") == "r07-v210-task-solution-worker-result-v1":
+    if report.get("schema_version") in {
+        "r07-v210-task-solution-worker-result-v1",
+        "r07-v210-task-solution-worker-result-v2",
+    }:
         result = _consume_libero_solution_bundle(
             bundle_path, report, require_motion_thresholds=require_motion_thresholds,
             require_mujoco_runtime_identity=require_mujoco_runtime_identity,
@@ -1788,7 +1880,8 @@ def main(argv: list[str] | None = None) -> int:
         if not all((args.source_xml, args.composition_plan, args.install_root)):
             parser.error("--task-solution-1 requires --source-xml, --composition-plan, and --install-root")
         from .selected_candidate import build_libero_solution_candidate
-        from .solution import LiberoPickPlaceSolutionV1
+        from .solution import LiberoPickPlaceSolutionV2
+        from .source_gravity import MujocoSourceGravityBiasV1
         from task_env.runtime.sessions.source import source_asset_bytes
 
         source_xml = args.source_xml.resolve(strict=True).read_bytes()
@@ -1805,11 +1898,49 @@ def main(argv: list[str] | None = None) -> int:
             "scene.xml": source_xml,
             **source_asset_bytes(install_root, source_xml.decode("utf-8")),
         }
+
+        class _Task1SolutionFactory:
+            def __init__(self):
+                self.gravity_model = None
+                self.bundle_root = None
+
+            def __call__(self, bundle_root):
+                candidate_root = Path(bundle_root).resolve(strict=True)
+                if self.gravity_model is None:
+                    self.bundle_root = candidate_root
+                    self.gravity_model = MujocoSourceGravityBiasV1(
+                        bundle_root=candidate_root,
+                        source_closure_files=source_files,
+                        source_xml_sha256=env.metadata["source_xml_sha256"],
+                        source_closure_digest=env.metadata["source_closure_digest"],
+                        composition_plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
+                    )
+                elif candidate_root != self.bundle_root:
+                    raise ValueError("same-Env Solution factory received a different worker source bundle")
+                return LiberoPickPlaceSolutionV2(
+                    source_xml,
+                    source_closure_digest=env.metadata["source_closure_digest"],
+                    gravity_bias_model=self.gravity_model,
+                )
+
+            def close_resources(self):
+                if self.gravity_model is not None:
+                    return self.gravity_model.close()
+                return {
+                    "schema_version": "libero-source-gravity-model-close-v1",
+                    "profile_id": "libero-source-mjcf-gravity-bias-v1",
+                    "model_created": False, "forward_call_count": 0,
+                    "mj_step_call_count": 0, "closed": True,
+                    "model_released": True, "data_released": True,
+                }
+
+        solution_factory = _Task1SolutionFactory()
         result = run_libero_candidate_worker(
             env, output_dir=Path(args.run_worker), steps=args.steps,
-            solution_factory=lambda: LiberoPickPlaceSolutionV1(source_xml),
+            solution_factory=solution_factory,
             source_closure_files=source_files,
             composition_plan_bytes=plan_bytes,
+            solution_resource_closer=solution_factory.close_resources,
         )
     else:
         from .selected_candidate import build_libero_selected_candidate

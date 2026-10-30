@@ -101,8 +101,8 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool = False) -> TaskArtif
 
     artifact = TaskArtifact(
         'task-artifact-v0',
-        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v1',
-        TASK_ID, 'diagnostic-v1' if not solution_profile else 'bounded-solution-v1',
+        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v2',
+        TASK_ID, 'diagnostic-v1' if not solution_profile else 'bounded-solution-v2',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
             ActionIntent('absolute_joint', None, 'none', 'arm_joint_position_and_gripper'),
@@ -267,8 +267,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
     if solution_profile:
-        from .solution import solution_identity_v1
-        solution_identity = solution_identity_v1(expected_xml_sha)
+        from .solution import solution_identity_v2
+        solution_identity = solution_identity_v2(
+            expected_xml_sha, source_receipt.source_closure_digest,
+        )
     return {
         'artifact': artifact, 'source': source, 'controller': controller,
         'selected_controller_kind': 'mixed_actuator_v1', 'solution': None,
@@ -616,15 +618,17 @@ def build_libero_selected_candidate(
         }
 
     def validate_external_solution(value, solution):
-        from .solution import LiberoPickPlaceSolutionV1, solution_identity_v1
+        from .solution import LiberoPickPlaceSolutionV2, solution_identity_v2
 
-        if not isinstance(solution, LiberoPickPlaceSolutionV1):
-            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV1')
+        if not isinstance(solution, LiberoPickPlaceSolutionV2):
+            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV2')
         expected_source = value['source_sha256']['composed_candidate_xml']
+        expected_closure = value['source_sha256']['source_closure_digest']
         if (solution.task_uid != value['artifact'].task_id
                 or solution.source_xml_sha256 != expected_source
+                or solution.source_closure_digest != expected_closure
                 or solution.identity != value.get('solution_identity')
-                or solution.identity != solution_identity_v1(expected_source)):
+                or solution.identity != solution_identity_v2(expected_source, expected_closure)):
             raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
 
     binding = ReferenceTaskBinding(

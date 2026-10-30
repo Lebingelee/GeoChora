@@ -38,6 +38,58 @@ from task_env.recorders import load_structured_control_records_h5
 _FORBIDDEN_ROOTS = {"geophys", "taichi", "isaacsim", "omni", "robosuite", "libero", "torch", "genesis"}
 
 
+class _GravityBiasDouble:
+    """Provider-free lowest-primitive substitute for the source bias query."""
+
+    profile_id = "libero-source-mjcf-gravity-bias-v1"
+
+    def __init__(self, source_xml_sha256, source_closure_digest):
+        self.source_xml_sha256 = source_xml_sha256
+        self.source_closure_digest = source_closure_digest
+        self.model_identity_sha256 = hashlib.sha256(
+            f"{source_xml_sha256}:{source_closure_digest}:gravity-double".encode()
+        ).hexdigest()
+        self.forward_calls = 0
+        self.closed = False
+
+    def gravity_torque(self, joint_position_rad):
+        values = np.asarray(joint_position_rad, dtype=np.float64)
+        assert values.shape == (7,) and np.isfinite(values).all()
+        self.forward_calls += 1
+        return np.asarray((0.0, -19.2, 0.1, 18.1, 0.0, 2.1, 0.0), dtype=np.float64)
+
+    def identity_mapping(self):
+        return {
+            "profile_id": self.profile_id,
+            "model_identity_sha256": self.model_identity_sha256,
+            "source_xml_sha256": self.source_xml_sha256,
+            "source_closure_digest": self.source_closure_digest,
+            "composition_plan_sha256": "c" * 64,
+            "model_dimensions": {"nq": 48, "nv": 43, "nbody": 38, "njnt": 18},
+            "runtime_identity": {"mujoco_version": "3.8.1", "api_version": 3008001},
+            "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
+            "forward_call_count": self.forward_calls,
+            "mj_step_call_count": 0,
+        }
+
+    def close(self):
+        assert not self.closed
+        self.closed = True
+        return {
+            "schema_version": "libero-source-gravity-model-close-v1",
+            "profile_id": self.profile_id,
+            "model_identity_sha256": self.model_identity_sha256,
+            "source_xml_sha256": self.source_xml_sha256,
+            "source_closure_digest": self.source_closure_digest,
+            "model_created": True,
+            "forward_call_count": self.forward_calls,
+            "mj_step_call_count": 0,
+            "closed": True,
+            "model_released": True,
+            "data_released": True,
+        }
+
+
 class _ImportTripwire(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         del path, target
@@ -2091,7 +2143,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV1
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV2
     from task_env.runtime.sessions.source import source_asset_bytes
     from task_env.recorders import load_structured_control_records_h5
 
@@ -2108,8 +2160,16 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         composition_plan_path=plan_path,
         horizon=100,
     )
-    solution = LiberoPickPlaceSolutionV1(xml)
-    wrong_source_solution = LiberoPickPlaceSolutionV1(xml + b"\n<!-- different immutable source bytes -->\n")
+    closure_digest = env.metadata["source_closure_digest"]
+    solution = LiberoPickPlaceSolutionV2(
+        xml, source_closure_digest=closure_digest,
+        gravity_bias_model=_GravityBiasDouble(xml_sha, closure_digest),
+    )
+    wrong_xml = xml + b"\n<!-- different immutable source bytes -->\n"
+    wrong_source_solution = LiberoPickPlaceSolutionV2(
+        wrong_xml, source_closure_digest=closure_digest,
+        gravity_bias_model=_GravityBiasDouble(hashlib.sha256(wrong_xml).hexdigest(), closure_digest),
+    )
     try:
         assert env.observation_space["state"]["joint_position"].shape == (9,)
         with pytest.raises(ValueError, match="does not match the selected task/source/profile"):
@@ -2128,6 +2188,14 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         assert info["selected_solution_action_v1"]["solution_identity"] == solution.identity
         assert info["selected_solution_action_v1"]["stage"] == "approach"
         assert float(info["external_action"][-1]) == pytest.approx(0.06)
+        diagnostics = info["selected_solution_action_v1"]["diagnostics"]
+        assert diagnostics["gravity_compensation_profile_id"] == "libero-source-mjcf-gravity-bias-v1"
+        assert np.allclose(
+            diagnostics["gravity_compensated_joint_target_rad"],
+            np.asarray(diagnostics["planner_joint_target_rad"])
+            + np.asarray(diagnostics["gravity_bias_Nm"]) / 100.0,
+            rtol=0.0, atol=1e-10,
+        )
         assert info["control_step"] == 1
         assert env.recorder.transition_count == 1
         assert env.execution_fault is None
@@ -2151,7 +2219,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV1
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV2
     from task_env.runtime.sessions.source import source_asset_bytes
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
@@ -2173,11 +2241,16 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         "scene.xml": xml,
         **source_asset_bytes(install_root, xml.decode("utf-8")),
     }
+    closure_digest = env.metadata["source_closure_digest"]
+    gravity_model = _GravityBiasDouble(xml_sha, closure_digest)
     result = run_libero_candidate_worker(
         env, output_dir=bundle, steps=1,
-        solution_factory=lambda: LiberoPickPlaceSolutionV1(xml),
+        solution_factory=lambda _bundle_root: LiberoPickPlaceSolutionV2(
+            xml, source_closure_digest=closure_digest, gravity_bias_model=gravity_model,
+        ),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
+        solution_resource_closer=gravity_model.close,
     )
     assert result["status"] == "complete"
     assert result["episode_count"] == 3
@@ -2197,9 +2270,11 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert all(item["solution_completed"] is False for item in result["episodes"])
     assert result["close_error"] is None
     assert result["final_session_close_receipt"]["session_closed"] is True
+    assert result["solution_resource_close_receipt"]["closed"] is True
+    assert result["solution_resource_close_receipt"]["forward_call_count"] == 3
 
     receipt = consume_libero_candidate_bundle(bundle / "worker_result.json")
-    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v1"
+    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v2"
     assert receipt["status"] == "verified_complete"
     assert receipt["episode_count"] == 3
     assert receipt["observation_count"] == 6
@@ -2232,11 +2307,16 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         composition_plan_path=plan_path, horizon=100,
     )
     _FAKE_WORLD.fail_step_after = 0
+    failed_closure_digest = failed_env.metadata["source_closure_digest"]
+    failed_gravity_model = _GravityBiasDouble(xml_sha, failed_closure_digest)
     failure_result = run_libero_candidate_worker(
         failed_env, output_dir=tmp_path / "solution_worker_failure_bundle", steps=1,
-        solution_factory=lambda: LiberoPickPlaceSolutionV1(xml),
+        solution_factory=lambda _bundle_root: LiberoPickPlaceSolutionV2(
+            xml, source_closure_digest=failed_closure_digest, gravity_bias_model=failed_gravity_model,
+        ),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
+        solution_resource_closer=failed_gravity_model.close,
     )
     assert failure_result["status"] == "failed"
     assert len(failure_result["attempted_episode_receipts"]) == 1

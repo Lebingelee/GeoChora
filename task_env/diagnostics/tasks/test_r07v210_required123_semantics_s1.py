@@ -20,7 +20,7 @@ from bench_deploy.libero.controller import (
 from bench_deploy.libero.task_contracts import TASK_2, TASK_3
 from bench_deploy.libero.solution import (
     LiberoPickPlaceSolutionConfigV1,
-    solution_identity_v1,
+    solution_identity_v1, solution_identity_v2,
 )
 from task_env.controllers.canonical.kinematics import (
     PandaKinematics,
@@ -41,6 +41,95 @@ def test_task_one_solution_identity_binds_bounded_motion_rate():
     assert default_identity == solution_identity_v1(source_sha, config)
     slower = replace(config, max_cartesian_increment_m=0.001)
     assert solution_identity_v1(source_sha, slower) != default_identity
+
+
+def test_task_one_solution_v2_identity_binds_source_gravity_compensation():
+    config = LiberoPickPlaceSolutionConfigV1()
+    source_sha = "f" * 64
+    closure_sha = "e" * 64
+    identity = solution_identity_v2(source_sha, closure_sha)
+    assert identity == solution_identity_v2(source_sha, closure_sha, config)
+    assert solution_identity_v2(source_sha, "d" * 64) != identity
+    assert solution_identity_v2("a" * 64, closure_sha) != identity
+    slower = replace(config, max_cartesian_increment_m=0.001)
+    assert solution_identity_v2(source_sha, closure_sha, slower) != identity
+
+
+def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitive(tmp_path):
+    import hashlib
+    import json
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from bench_deploy.libero.source_gravity import MujocoSourceGravityBiasV1
+    from task_env.assembly.assets import _source_closure_digest
+
+    xml = b'<mujoco><worldbody/></mujoco>'
+    closure = {
+        "canonical-source.xml": xml,
+        "scene.xml": xml,
+        "upstream/example.bin": b"source asset bytes",
+    }
+    bundle = tmp_path / "bundle"
+    closure_root = bundle / "source_inputs/closure"
+    for logical, raw in closure.items():
+        path = closure_root / logical
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+    plan = {
+        "identity": {"task_uid": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate"},
+        "output": {"composed_mjcf_sha256": hashlib.sha256(xml).hexdigest()},
+    }
+    plan_bytes = json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()
+    (bundle / "source_inputs/composition_plan.json").write_bytes(plan_bytes)
+
+    class FakeModel:
+        nq = nv = njnt = 7
+        nbody = 8
+        qpos0 = np.zeros(7)
+        jnt_qposadr = np.arange(7)
+        jnt_dofadr = np.arange(7)
+
+        @classmethod
+        def from_xml_path(cls, path):
+            assert Path(path).read_bytes() == xml
+            return cls()
+
+    class FakeData:
+        def __init__(self, model):
+            self.qpos = np.zeros(model.nq)
+            self.qvel = np.zeros(model.nv)
+            self.qfrc_bias = np.zeros(model.nv)
+            self.qfrc_passive = np.zeros(model.nv)
+
+    def fake_name2id(model, obj_type, name):
+        assert obj_type == 0
+        return int(name[-1]) - 1
+
+    def fake_forward(model, data):
+        data.qfrc_bias[:] = data.qpos
+
+    fake_mujoco = SimpleNamespace(
+        __version__="3.8.1", mj_version=lambda: 3008001,
+        MjModel=FakeModel, MjData=FakeData,
+        mjtObj=SimpleNamespace(mjOBJ_JOINT=0),
+        mj_name2id=fake_name2id, mj_forward=fake_forward,
+    )
+    source_xml_sha = hashlib.sha256(xml).hexdigest()
+    source_closure = _source_closure_digest(closure)
+    model = MujocoSourceGravityBiasV1(
+        bundle_root=bundle, source_closure_files=closure,
+        source_xml_sha256=source_xml_sha, source_closure_digest=source_closure,
+        composition_plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
+        mujoco_api=fake_mujoco,
+    )
+    assert np.array_equal(model.gravity_torque(np.arange(7, dtype=np.float64)), np.arange(7))
+    assert model.forward_calls == 1
+    close = model.close()
+    assert close["closed"] and close["model_released"] and close["data_released"]
+    assert close["mj_step_call_count"] == 0
+    with pytest.raises(RuntimeError, match="closed"):
+        model.gravity_torque(np.zeros(7))
 
 
 def test_task_one_controller_identity_binds_unqualified_braking_experiment():
