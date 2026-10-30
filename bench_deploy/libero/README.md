@@ -48,7 +48,7 @@ position targets. It updates at 20 Hz, holds each torque target across 25
 2 ms physics steps, and applies the source actuator ranges. The accepted
 R07c native004 evidence used its frozen diagnostic `Kp=100`, `Kd=20` and a
 16 mm aggregate finger target. The current R07 v2.1.0 task #1 experiment uses
-source-closure-bound static gravity feed-forward with `Kp=20` and `Kd=4`
+source-closure-bound static gravity feed-forward with `Kp=40` and `Kd=8`
 (joint2 `Kd=8`); its profile is explicitly unqualified and follows native
 run009's early oscillation and joint3 limit failure. These are separate
 versioned profiles, neither equivalent to upstream OSC_POSE. Bind gains and

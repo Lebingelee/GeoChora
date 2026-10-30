@@ -1572,8 +1572,8 @@ def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reade
         and action["selected_public_action"][7] == pytest.approx(0.016)
         for episode in result["episodes"] for action in episode["action_trace"]
     )
-    assert result["episodes"][0]["control_plan"]["kp_Nm_per_rad"] == [20.0] * 7
-    assert result["episodes"][0]["control_plan"]["kd_Nm_s_per_rad"] == [4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0]
+    assert result["episodes"][0]["control_plan"]["kp_Nm_per_rad"] == [40.0] * 7
+    assert result["episodes"][0]["control_plan"]["kd_Nm_s_per_rad"] == [8.0, 16.0, 8.0, 8.0, 8.0, 8.0, 8.0]
     assert [episode["row_index"] for episode in result["episodes"]] == [0, 1, 2]
     assert result["transition_count"] == 36
     assert result["observation_count"] == 39
@@ -2190,10 +2190,15 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         assert float(info["external_action"][-1]) == pytest.approx(0.06)
         diagnostics = info["selected_solution_action_v1"]["diagnostics"]
         assert diagnostics["gravity_compensation_profile_id"] == "libero-source-mjcf-gravity-bias-v1"
+        from bench_deploy.libero.controller import LiberoMixedControllerV1
+        controller_kp = np.asarray(
+            LiberoMixedControllerV1().identity_mapping()["kp_Nm_per_rad"],
+            dtype=np.float64,
+        )
         assert np.allclose(
             diagnostics["gravity_compensated_joint_target_rad"],
             np.asarray(diagnostics["planner_joint_target_rad"])
-            + np.asarray(diagnostics["gravity_bias_Nm"]) / 20.0,
+            + np.asarray(diagnostics["gravity_bias_Nm"]) / controller_kp,
             rtol=0.0, atol=1e-10,
         )
         assert info["control_step"] == 1

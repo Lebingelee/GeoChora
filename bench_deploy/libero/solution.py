@@ -111,7 +111,7 @@ def solution_identity_v2(
         "task_uid": TASK_1,
         "source_xml_sha256": source_xml_sha256,
         "source_closure_digest": source_closure_digest,
-        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v4",
+        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v5",
         "tcp_id": TCP_ID,
         "algorithm": "public-observation-damped-jacobian-waypoints-v2",
         "gravity_compensation": {

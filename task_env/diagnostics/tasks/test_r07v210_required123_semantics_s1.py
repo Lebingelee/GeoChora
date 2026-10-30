@@ -162,14 +162,14 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
 
 def test_task_one_controller_identity_binds_unqualified_braking_experiment():
     config = LiberoMixedControlConfigV1()
-    assert config.kp_Nm_per_rad == (20.0,) * 7
-    assert config.kd_Nm_s_per_rad == (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0)
-    assert config.gain_status == "diagnostic_unqualified_PD_20Hz_kp20_kd2_8_v4"
+    assert config.kp_Nm_per_rad == (40.0,) * 7
+    assert config.kd_Nm_s_per_rad == (8.0, 16.0, 8.0, 8.0, 8.0, 8.0, 8.0)
+    assert config.gain_status == "diagnostic_unqualified_PD_20Hz_kp40_kd8_16_v5"
     controller = LiberoMixedControllerV1(config)
     receipt = controller.identity_mapping()
-    assert receipt["profile_id"] == "libero-spatial-bowl-to-plate-joint-space-pd-v4"
-    assert receipt["kp_Nm_per_rad"] == [20.0] * 7
-    assert receipt["kd_Nm_s_per_rad"] == [4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0]
+    assert receipt["profile_id"] == "libero-spatial-bowl-to-plate-joint-space-pd-v5"
+    assert receipt["kp_Nm_per_rad"] == [40.0] * 7
+    assert receipt["kd_Nm_s_per_rad"] == [8.0, 16.0, 8.0, 8.0, 8.0, 8.0, 8.0]
     assert receipt["qualification"] == "diagnostic_only_unqualified_gains"
 
 
