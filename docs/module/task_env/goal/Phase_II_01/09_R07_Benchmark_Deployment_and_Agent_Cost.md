@@ -505,3 +505,27 @@ other LIBERO task, five-task R07 completion, 18/22 count change, P99, Human
 Judge, Formal Qualification, F05 integration, merge, or push follows. Attempt001
 review and all failed run receipts remain unchanged; this result awaits Sol's
 independent diff/evidence review.
+
+<a id="r07-v210-required123-window001"></a>
+
+## v2.1.0 required #1/#2/#3 综合工作包（2026-10-30，准备待维护者转发）
+
+维护者要求构建交给 Luna 的 R07 工作包，完成当前三任务并形成 R00–R07 收尾前置；另明确任务 #2/#3 的来源尚未补齐，授权下载资产、确定来源并在 bench_deploy 接好导入。本包是当前范围的综合实施窗口，不把旧 R07a/pilot 三次普通 attempt 或 D01 两次诊断历史清零。目标含来源/install/recipe、三任务 Solution、九格部署与分层成功、必要公共 owner 修复、Harness 兼容接线及 R07d/收尾证据准备；人工独立质量决定、P99 总接收和发布仍不由 Luna 自签。
+
+输入以 `sol_r07_v210_required123_001/input_snapshot.json` 的 post-planning HEAD 为准；复用 camera 分支，维护者手工转发一个完整 prompt，不自动派发。包目录在 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_r07_v210_required123_001/`，新交付根 `r07_v210_required123_001/`，具体 source、门、预算、保护输入、primary references 和 SHA 由该包冻结。当前状态为 **PREPARED_CONDITIONAL_SOURCE_AND_PROVIDER_GATES**，不是已经具备九格 native 能力；source 查明与必要扩展纳入同窗口，不另设纯准备轮。
+
+| 现 owner / 实际方法 | 本包实施定位与验收 |
+| --- | --- |
+| `asset/benchmarks/libero/tools/source_bundle.py`；已有 R07a004 family/path 索引 | 在已审计 pinned cache 基础扩展三个精确任务的来源 manifest/install/verify；下载缺失的原始闭包与来源条款证据，绑定 wine_bottle/wine_rack 两族具体字节。优先复用103项 pilot，原 manifest 保留；仍缺具体来源时仅阻断受影响任务，不换资产/假 license/抹来源门 |
+| `bench_deploy/libero/assembly.py::build_source_composition_plan/_compose_mjcf`、`init_state.py::decode_pruned_init_bytes/sample_libero_normal_reset_v1`、`selected_candidate.py::build_libero_selected_candidate` | 将单pilot硬编码局限扩展为 task-owned 精确三任务输入/布局；#2/#3原 `.pruned_init` 50×79，按来源与compiled命名验证，不能套50×92。保留 source physics、fixture normal reset→row restore，复用 generic source-bound Core |
+| `bench_deploy/libero/evaluation.py`、`controller.py`、现 `TaskExpertSolver` 与 `CanonicalPandaController/PandaKinematics` owners | 实施 On(object)、Open(middle joint)、On(region) 三种原语义与观察；Solution 只消费 public observation/info并经现 planner/controller执行。现kinematics只认特定Menagerie chain，先验证/扩展source-bound建模，不能直接把MountedPanda伪装成该模型；task-owned三个stage策略，公开完成事实/失败/close清楚 |
+| `SelectedReferenceEnv/ReferenceTaskBinding`、`sessions/api/common/control/mujoco/geophys`、F线 `native_io/isaac_native_io/geophys_native_io/free_joint_state` | 从固定 `develop-full@bb5b6fca` 的 Git blobs只读复用必要 F04/F05 增量，适配到camera同一owner并保留D01 generic mixed/reset/contact拒绝门；不整体覆盖旧文件、不向主checkout写入、不移动main F状态。CPU GeoPhys、CPU MuJoCo、CUDA Isaac state-only；source/model-bound metadata/contact/drive/reset/readback才准入 |
+| camera 自有 GeoPhys submodule 现 `codex/phase-ii-01-r05-provider` | 仅当已有公开能力不足，允许必要 public host-I/O/contact/metadata/source lowering补丁，先查其AGENTS与公开owner；不改solver算法/physics kernel/原资产物理。候选41f8 F05 worktree只读参考；本地provider补丁有独立commit/实际build身份与camera gitlink，主checkout/pin不动 |
+| `task_env/script/agent` catalog/spec/compiler/completion_facts、Generic H5与独立reader | 一个 task recipe/source/evaluator/Solution真源供 bench_deploy 与Harness消费；若需新schema在原owner显式扩展，保留synthetic mock、完成事实、ledger/Oracle/Judge合同。准备版本化接入契约与实际同Core source/caller S1；不运行无关F06 20seedcampaign、不把本次episode冒称Harness通过 |
+| 现成本protocol/reader、09/07/manifest/Skill | 记录本session实际commit/diff/复用/失败/active-wall与可取得usage；未知null+原因，旧INVALID不改。交独立Human审阅输入、当前required/optional矩阵和R00–R07收尾剩余门，不自签Human/P99/Release |
+
+实施顺序：冻结/来源与可复用差异→same-route S1→逐任务 MuJoCo Solution成功→必要GeoPhys/Isaac适配及各至少一任务成功→补齐剩余部署格→独立reader/成本/文档/commit/窗口释放。来源未决期间可并行进行不消费受阻资产的实现和任务1；不同native provider串行持共享锁。每格最终冻结 seed19、原 rows0/1/2 三次同Env episode（horizon≤1000 control steps），至少一完整成功仅对required-success格要求；其余格允许task failure/horizon，但必须通过部署/物理/记录与close门。旧D01的±0.15rad/64step是诊断范围，不限制新Solution整段行程，也不被新成功追溯改签。
+
+预计主动480–660分钟，attempt工作timebox780分钟（末60分钟交接），外部锁/输入等待另记且累计≤60分钟；同窗可多轮修复/运行，不固定launch次数。预算详见包：MuJoCo/GeoPhys CPU，Isaac6.2 GPU PhysX cuda:0；每CPU worker≤1800s、Isaac≤2400s，单worker≤150000实际native steps/12reset；累计CPU wall≤14400s/1000000steps、Isaac wall≤7200s/500000steps，all≤200reset。provider-free≤300s/3GiB，CPU启动可用RAM≥6GiB/RSS≤4GiB，Isaac启动RAM≥6GiB/GPU free≥5GiB/RSS≤10GiB；RAM<1GiB或GPU free<256MiB中止。资产下载/新资产≤1GiB，资料≤64MiB，evidence≤2GiB，cache增长≤2GiB，原始资产/失败证据不删除；不安装或升级engine/依赖、不启动training/render/Newton。
+
+本包没有启动实现或native；Sol准备阶段不修改F线、provider或原始证据。Luna必须回报实际完成/未完成/来源与provider阻碍、完整账本与本地提交；整体通过标签仅为 `R07_V210_REQUIRED123_GATES_PASS_PENDING_SOL_REVIEW`。达不到门则准确PARTIAL，保留有用增量与独立ready项，不反复交同一份调查、自动加预算或自行开下一个attempt。Sol收到完整报告和已释放窗口后再独立复核，决定收尾/集中返工；不因本包宽范围而预批无限后继窗口。

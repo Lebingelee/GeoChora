@@ -2930,11 +2930,11 @@
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
     "07_Execution_Order_and_Acceptance.md": "f8deb7a2c71769fe84de36bb8693ba259e7542522189206461afe31e74ae332c",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "0bd962fa6f033a1dd714c39cb04540ecd36339e8a4a4d0f9c3269aa7330a5373",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "cba5c9244e783e167a8ccaf914e5937f49a8ccdb58d351a767b130b0a68265b2",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "c4ef7ea160f9e120393e15c80063b8a82c71a17f33bf70e66e933ac8100866cf",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9fb531d491228cdf707b9a764588853c6ae46db35275c0194f975501caed70a",
     "README.md": "1f244f43c8a3e20a99b032762801cbd61980ee29eec4fee487fd91b0b3e1ec69"
   },
-  "revision_kind": "V2_1_0_OPTIONAL_LIBERO_SUPPLEMENTS_AND_R00_R07_CLOSEOUT_DIRECTION",
+  "revision_kind": "PREPARE_R07_V210_REQUIRED123_COMPREHENSIVE_LUNA_WINDOW001",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -4632,7 +4632,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "Documentation-only: tasks 4/5 become optional v2.1.0 supplements; required tasks 1/2/3 completion opens R00-R07 closeout under existing R07d/P99 gates; no implementation/native/release or acceptance promotion.",
+  "planning_submission_this_revision": "Implementation-ready directions with conditional per-task source/provider/native admission; one complete maintainer-forwarded Luna window, no execution by Sol.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -6989,5 +6989,33 @@
       "route_completion_implies_whole_version_or_f_line_completion": false,
       "merge_push_tag_release_or_qualification_authorized": false
     }
+  },
+  "r07_v210_required123_work_package_001": {
+    "date": "2026-10-30",
+    "status": "PREPARED_CONDITIONAL_SOURCE_AND_PROVIDER_GATES",
+    "authority": "Direct maintainer request for full R07 tasks 1/2/3 and manual Luna package; maintainer confirms missing assets/source and authorizes downloading/investigating/import integration",
+    "plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-v210-required123-window001",
+    "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_r07_v210_required123_001/",
+    "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_001/",
+    "planning_input_head": "c7220d8dd22ea8d36d2b304a34d218d28addf17b",
+    "execution_input_head": "post-planning HEAD frozen in package input_snapshot.json",
+    "checkout": "camera existing worktree",
+    "branch": "codex/phase-ii-01-camera",
+    "target": "Luna, maintainer-forwarded only; no automatic thread message",
+    "expanded_scope_window": 1,
+    "old_r07a_and_pilot_and_d01_history_preserved": true,
+    "ordinary_attempt_limit_per_unresolved_new_substage": 3,
+    "expected_active_minutes": [
+      480,
+      660
+    ],
+    "timebox_minutes": 780,
+    "report_reserve_minutes": 60,
+    "independent_human_quality_and_p99_acceptance_self_signing_allowed": false,
+    "new_native_started_by_sol": 0,
+    "implementation_started_by_sol": false,
+    "new_branches_or_worktrees": 0,
+    "main_f_line_writes": false,
+    "next": "Await maintainer forwarding, complete execution report and released window, then independent Sol review"
   }
 }
