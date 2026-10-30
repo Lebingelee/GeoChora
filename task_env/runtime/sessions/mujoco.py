@@ -1829,6 +1829,43 @@ class _MuJoCoSession(_SessionValues):
                 self._native_steps += 1
                 self._cache_completed_actuator_force()
                 if track_dg01:
+                    cube_geom_id = int(self._model.geom('free_cube_geom').id)
+                    support_geom_id = int(self._model.geom('support_geom').id)
+                    support_distances = []
+                    for contact_index in range(int(self._data.ncon)):
+                        contact = self._data.contact[contact_index]
+                        if {int(contact.geom1), int(contact.geom2)} == {
+                                cube_geom_id, support_geom_id}:
+                            support_distances.append(float(contact.dist))
+                    gripper_actuator_id = int(self._open_actuators[0])
+                    finger_dof_addresses = {}
+                    for finger_name in ('finger_joint1', 'finger_joint2'):
+                        finger_joint_id = int(self._mj.mj_name2id(
+                            self._model, self._mj.mjtObj.mjOBJ_JOINT, finger_name,
+                        ))
+                        if finger_joint_id < 0:
+                            raise ValueError(
+                                f'DG01 interval evidence cannot resolve {finger_name}'
+                            )
+                        finger_dof_addresses[finger_name] = int(
+                            self._model.jnt_dofadr[finger_joint_id]
+                        )
+                    moment_row_start = int(self._data.moment_rowadr[gripper_actuator_id])
+                    moment_row_count = int(self._data.moment_rownnz[gripper_actuator_id])
+                    moment_values = {
+                        int(self._data.moment_colind[index]): float(
+                            self._data.actuator_moment[index]
+                        )
+                        for index in range(moment_row_start, moment_row_start + moment_row_count)
+                    }
+                    tendon_moment = [
+                        moment_values.get(finger_dof_addresses[name], 0.0)
+                        for name in ('finger_joint1', 'finger_joint2')
+                    ]
+                    finger_actuator_force = [
+                        float(self._data.qfrc_actuator[finger_dof_addresses[name]])
+                        for name in ('finger_joint1', 'finger_joint2')
+                    ]
                     accepted_advances.append({
                         'substep_index': substep_index,
                         'native_step_index': int(self._native_steps),
@@ -1836,6 +1873,27 @@ class _MuJoCoSession(_SessionValues):
                         'time_after_s': float(self._data.time),
                         'actuator_ctrl': [float(value) for value in self._data.ctrl],
                         'actuator_force': [float(value) for value in self._data.actuator_force],
+                        'gripper_tendon_readback': {
+                            'actuator_id': gripper_actuator_id,
+                            'control': float(self._data.ctrl[gripper_actuator_id]),
+                            'length_m': float(self._data.actuator_length[gripper_actuator_id]),
+                            'length_rate_m_s': float(self._data.actuator_velocity[gripper_actuator_id]),
+                            'scalar_force_N': float(self._data.actuator_force[gripper_actuator_id]),
+                            'tendon_generalized_force_moment': tendon_moment,
+                            'finger_qfrc_actuator_N': finger_actuator_force,
+                            'scalar_force_from_moment_prediction_N': [
+                                value * float(self._data.actuator_force[gripper_actuator_id])
+                                for value in tendon_moment
+                            ],
+                        },
+                        'cube_support_contact': {
+                            'cube_geom_id': cube_geom_id,
+                            'support_geom_id': support_geom_id,
+                            'contact_count': len(support_distances),
+                            'minimum_distance_m': (
+                                min(support_distances) if support_distances else None
+                            ),
+                        },
                     })
                     self._last_dg01_interval_advances = tuple(accepted_advances)
         finally:
