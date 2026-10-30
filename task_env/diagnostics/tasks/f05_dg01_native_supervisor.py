@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import atexit
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -117,10 +119,46 @@ def run(plan_path: Path, receipt_path: Path):
         lock.close()
         raise RuntimeError('shared native execution lock is held by another writer') from exc
 
+    cleanup_state = {
+        'lock': lock,
+        'process': None,
+        'process_group_id': None,
+        'released': False,
+        'signals': [],
+    }
+    previous_handlers = {
+        signum: signal.getsignal(signum)
+        for signum in (signal.SIGINT, signal.SIGTERM)
+    }
+
+    def note_signal(signum, _frame):
+        cleanup_state['signals'].append(signum)
+
+    def emergency_cleanup():
+        process = cleanup_state['process']
+        process_group_id = cleanup_state['process_group_id']
+        if process is not None and process_group_id is not None:
+            if _group_exists(process_group_id):
+                _terminate_group(process, process_group_id, limits['term_grace_s'])
+        if not cleanup_state['released']:
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            except (OSError, ValueError):
+                pass
+            try:
+                lock.close()
+            except OSError:
+                pass
+            cleanup_state['released'] = True
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
+
+    for signum in previous_handlers:
+        signal.signal(signum, note_signal)
+    atexit.register(emergency_cleanup)
+
     start_mem = _mem_available_bytes()
     if start_mem < limits['start_mem_available_bytes_min']:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
-        lock.close()
         raise RuntimeError(f'native start gate failed: MemAvailable={start_mem}')
 
     run_dir = receipt_path.parent
@@ -142,17 +180,24 @@ def run(plan_path: Path, receipt_path: Path):
     process = None
     process_group_id = None
     with stdout_path.open('x', encoding='utf-8') as stdout, stderr_path.open('x', encoding='utf-8') as stderr:
+        if cleanup_state['signals']:
+            raise RuntimeError('DG01 supervisor was interrupted before native worker start')
         process = subprocess.Popen(
             argv, cwd=workdir, env=env, stdout=stdout, stderr=stderr,
             stdin=subprocess.DEVNULL, start_new_session=True,
         )
         process_group_id = process.pid
+        cleanup_state['process'] = process
+        cleanup_state['process_group_id'] = process_group_id
         deadline = start_monotonic + limits['worker_wall_s_max']
         next_sample = start_monotonic
         exited_at = None
         while True:
             now = time.monotonic()
             return_code = process.poll()
+            if cleanup_state['signals'] and violation is None:
+                signum = cleanup_state['signals'][-1]
+                violation = f'supervisor_signal_{signal.Signals(signum).name}'
             if return_code is not None and exited_at is None:
                 exited_at = now
             rss = _process_group_rss_bytes(process_group_id)
@@ -192,7 +237,7 @@ def run(plan_path: Path, receipt_path: Path):
     result = {
         'schema_version': 'f05-dg01-native-supervisor-receipt-v1',
         'run_id': plan['run_id'],
-        'run_plan_sha256': __import__('hashlib').sha256(plan_path.read_bytes()).hexdigest(),
+        'run_plan_sha256': hashlib.sha256(plan_path.read_bytes()).hexdigest(),
         'started_utc': started,
         'finished_utc': _utc_now(),
         'wall_seconds': time.monotonic() - start_monotonic,
@@ -221,6 +266,10 @@ def run(plan_path: Path, receipt_path: Path):
         stream.write('\n')
     fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
     lock.close()
+    cleanup_state['released'] = True
+    for signum, handler in previous_handlers.items():
+        signal.signal(signum, handler)
+    atexit.unregister(emergency_cleanup)
     if violation is not None or return_code != 0 or remaining_group:
         raise RuntimeError(
             f'DG01 native worker did not complete cleanly: exit={return_code}, '
