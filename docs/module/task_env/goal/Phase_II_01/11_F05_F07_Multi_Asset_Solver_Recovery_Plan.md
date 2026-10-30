@@ -119,3 +119,19 @@ F06 仍要求受控真实来源、可复现 Expert、至少 20 seeds、四报告
 7. **跨分支与可恢复性**。F线owner为`develop-full`，`develop`只同步规划，camera/R07保持独立scope和writer。ignored r009/fixture、隔离GeoPhys候选及未集成gitlink是复现限制，先核可恢复交付与实际producer；不能用文档同步冒充实现合入。camera窗口未释放时只备补丁，不更改该worktree或HEAD。
 
 本轮所有后继stage为PLANNED/NOT_EXECUTED；旧F05 partial、旧Required门与Evidence原件保持签署时事实。当前路由以本文件与[12执行指南](12_F05_F07_Execution_Playbook.md)为准，[10历史记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)保留旧门与执行历史，[07执行表](07_Execution_Order_and_Acceptance.md)给出后继依赖选择；本轮没有派包。
+
+<a id="successor-attempt001-contract"></a>
+
+## 10. 新路线三窗口与首包合同（2026-10-30）
+
+维护者随后明确要求按新路线重新规划F05，仍设三个attempt，并准备首包供其转述。新账为 **F05 successor，最多三个完整执行窗口，总额度跨S0/S1共享**；不是每个stage另给三轮，也不是旧F05 attempt004。旧三轮及`F05_OVERALL_PARTIAL`、同USD三Provider原门未通过、已接收精确cell和失败Evidence均保留。后继范围采用A同源多表示；B同USD门及官方Panda→GeoPhys兼容延期，split Attachment后移为F07候选，均不回填PASS。USD／Isaac资产优先策略与一个Core Runtime保持。
+
+新A required集合暂按完整物理语义冻结：机器人link/joint/frame/axis/limit、质量/COM/惯性、碰撞与接触材料、equality/mimic、tendon及传动、drive law/gain/damping/ctrl与force limits、free-body/support、canonical state/control/Task含义；不同表示保留独立精确hash。S0可以完整识别loss/unknown并被接收为审计成果，但关键loss/unknown仍阻止S1 native准入；不能将“已登记差异”改写为“已等价”。必要的新派生recipe必须单独版本化，不能默默将r009作为完整等价源。
+
+首包 **`F05_SUCCESSOR_ATTEMPT001_SOURCE_SEMANTICS`**，执行S0语义盘点、可重复的tracked诊断工具与10类定向负例、后续真实补丁/迁移图、文档及本地提交。原MJCF的8-actuator/equality/tendon与r0099-drive及重标定参数为已知重点；来源、有效默认值、变换/单位、消费者和旧Evidence覆盖逐特性绑定。静态检查不能证明solver消费。输出必须同时给`inventory_status`和`cross_representation_readiness`，允许前者PASS、后者BLOCKED_BY_FEATURE。
+
+执行窗口预计150–240分钟，timebox300分钟，最后30分钟收口；每静态child wall≤300s、采样PG RSS≤3GiB、启动MemAvailable≥4GiB、低于1GiB中止、采样≤0.25s、单重进程、最多4CPU线程；本窗口child累计wall≤3600s，新Evidence≤256MiB，官方资料网络≤25MiB。零solver/physics/App/GPU/renderer、零依赖/资产下载或安装、零实际格式转换。允许OpenUSD只读组成及明确无engine-init的公开GeoPhys source/host检查；不compile/load MuJoCo模型。Scope Decision仅授权转述后的首包静态实施；后续native预算和准确cell仍须新包冻结，不能从本三轮额度推定授权。
+
+尝试目标：001完成语义审计与可实施修复方案；002依据Sol复核完成已批准的表示/控制接线及环境→空载控制证据；003仅在复评后作有界修复与收口。后两窗口为规划，不预授native。若S0证明关键语义无法等价，先交具体owner/缺失能力及需维护者裁定的来源变更，不能消耗后两轮重复审计或降低门。
+
+复用`develop-full`及现有隔离GeoPhys worktree；零新branch/worktree，不切换或修改develop/camera，不更新gitlink。完整包在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_successor_001/`；输出`f05_successor_001/`。实际输入HEAD及保护hash由首包snapshot绑定。当前仅PREPARED_FOR_MAINTAINER_RELAY；窗口未执行、未发送。后继F06仍按获准ready cell及原20-seed／Expert／Oracle／四报告／pending Judge门另行派包。

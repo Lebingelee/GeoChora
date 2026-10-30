@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "9ea7b3f55dfb30f1f20a08153e9d600fa1242cc70bf87231336931ad9979b530",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "4c396ef6b563e22a963c97bc3bed4424eb47f4a892bdc313871ebd3381c17495",
+    "07_Execution_Order_and_Acceptance.md": "0aa87077bd37f2bef817bdc40dd2c81aa0d028f738c0e7c949f65feec79d24db",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "f39a059508715cb8da2208605ed0cf2e7da5af96f326d20967a9aa70fc805a14",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "6cd67649cb2569a88796af4feeb2d714219e2edfd6cd66cb8855c28a3b48e115",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "3127f18fc5aa25288f3efca7d8776ea875c923a2427ead7abc30148bfae0c073",
-    "12_F05_F07_Execution_Playbook.md": "d2c525cf378632f823b803d14b797a5301c3e116caca99f16248b4ebb0e60cb8"
+    "README.md": "f0cdf267e568ae70ba81b6858d7bbafbf996920f769aa61e5f38cf657c97abaf",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "e904990a3db58247350248ee7ab5f2379545e1324f352b903a4dfa30edcfbf08",
+    "12_F05_F07_Execution_Playbook.md": "f10dd803de3b6ccb77560362ff0af965c8b3554a01ad5b228e2673131edf366a"
   },
   "revision_kind": "F05_ATTEMPT003_MENAGERIE_GEOPHYS_CPU_NATIVE_CELL_PASS_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6414,6 +6414,46 @@
       "Qualification": false,
       "receipt": "workspace/maintenance/f05_f07_replan_20261030_001/camera_closeout_001/final_receipt.json",
       "camera_documentation_commit": "a474d1b77cbb67f6c1acca030a174073840866c2"
-    }
+    },
+    "f05_successor_execution_contract_20261030": {
+      "authority": "Maintainer explicitly requested new-route F05 planning with threeattempts and preparation of firstpackage for manualrelay.",
+      "status": "ATTEMPT001_PREPARED_FOR_MAINTAINER_RELAY_NOT_SENT_NOT_EXECUTED",
+      "source_goal_account": "F05_SUCCESSOR",
+      "attempt_limit_total_across_stages": 3,
+      "legacy_attempts_preserved": [
+        1,
+        2,
+        3
+      ],
+      "legacy_status": "F05_OVERALL_PARTIAL",
+      "first_attempt": 1,
+      "completed_successor_windows": 0,
+      "package_id": "F05_SUCCESSOR_ATTEMPT001_SOURCE_SEMANTICS",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_successor_001/",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/",
+      "prompt_sha256": "0cf653eb36d5820b8e12e70d357a849a81316ecf9689a744d24ff91941bda262",
+      "stage": "S0 semantic inventory+tracked diagnostic+10negative types+nextpatch plan",
+      "cross_stage_counter": "not3attempts perstage",
+      "readiness_rule": "inventory PASS can coexist BLOCKED_BY_FEATURE; no implicit physicalequivalence",
+      "native_allowed": false,
+      "native_budget": 0,
+      "production_implementation_changes_allowed": false,
+      "diagnostic_implementation_after_relay_allowed": true,
+      "expected_active_minutes": [
+        150,
+        240
+      ],
+      "timebox_minutes": 300,
+      "canonical_contract": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract",
+      "required_deferred": "A physicalfeatures required; B sameUSD and officialGeoPhys deferred;split F07candidate;oldgates notpassed",
+      "F06_F07_started": false,
+      "Qualification": false,
+      "future_windows": "002implementation/acceptance and003boundedrepair are plans only; newscope/nativebudget gates required",
+      "preparation_software_tests": 0,
+      "preparation_native_starts": 0,
+      "branch_worktrees": "reuse develop-full+read-only existingGeoPhys;0new;no writes to develop/camera",
+      "remote_fetch": "origin nonexistent; corrected git fetch --no-tags public succeeded;no merge/rebase"
+    },
+    "latest_f05_successor_execution_contract": "f05_successor_execution_contract_20261030"
   }
 }

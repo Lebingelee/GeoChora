@@ -1,6 +1,6 @@
 # Codex — Phase II-01 当前规划与后继派包入口
 
-更新于2026-10-30。**本轮仅调整文档；F05 successor尚未派包、实施或启动native。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
+更新于2026-10-30。**新F05 successor三个完整attempt已按维护者后续指令规划；attempt001完整静态包已准备供转述，尚未执行、无native。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
 
 ## 先读当前入口
 
@@ -31,3 +31,7 @@
 本轮只改规划、入口、manifest/hash与Skill的计划说明，未运行软件测试/native、未安装依赖、未更改source/gitlinks或原始Evidence。历史2026-10-28的R03c/c30恢复说明可从Git历史恢复，不能继续作为默认“下一包attempt003”。当前执行事实见各分支本地slice记录和F线owner记录。
 
 文档同步范围为`develop-full`、`develop`和camera，各分支分别提交。camera已在维护者确认writer释放、HEAD/dirty/补丁复核后落地；同步状态见各分支manifest的`f05_replan_camera_sync_20261030`及收口回执。跨分支操作使用隔离文档checkout，不切换共享根目录，临时checkout提交后清理；零新branch，main、发布分支与历史worktree保持。
+
+## 最新首包入口
+
+维护者要求新路线仍设三个attempt；按[11首包合同](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)执行，三个窗口跨S0/S1共享。ignored完整包`sol_f05_successor_001/`冻结真实HEAD/来源/保护输入/预算/owner；转述后只授权001静态诊断实施与定向验证，本包native预算0。001输出S0 inventory与S1 readiness两个状态；r009的equality/tendon/drive差异未解决时不得进入依赖native。原F05三轮/partial保持，不命名004。后两窗口只规划，待Sol复核再冻结实际实现/资源合同，不自动运行F06/F07。

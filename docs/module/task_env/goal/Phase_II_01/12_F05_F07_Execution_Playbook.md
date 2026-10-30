@@ -114,3 +114,7 @@ Luna 仅执行一个已授权包，提交包内 local commits 和原始路径/�
 - 旧native证据必须按[11第9节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#repository-adoption)确认覆盖范围；关键语义差异未解决则BLOCKED_BY_FEATURE，不只比较关节名称或hash。
 - F06不以状态/控制smoke代替真实任务20-seed/Expert/Oracle/四报告/pending Judge；F07与原R07路线分开。
 - 三条分支的规划文档分别同步；camera已在维护者确认writer释放及实际HEAD/补丁检查后落地，实际提交见manifest同步记录和收口回执。文档同步不等于实现合入，也不授权执行工作包。
+
+## 7. 维护者后续指令与首包
+
+维护者于2026-10-30要求重新按新F05路线设置三个attempt并构建首包。执行以[11首包合同](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)和冻结包为准：三个窗口跨successor S0/S1共享；001是静态审计工具、负例验证与下一实施方案，原三次F05不重命名。转述本完整包后仅授权001范围，native仍为0。准确INPUT_HEAD、保护路径、allowed owners、机器输出、否决门和预算见`sol_f05_successor_001/input_snapshot.json`与`luna1_prompt.md`。后续scope变更须由维护者明确裁定；不用缺失的旧ignored fixture或共同名称推断等价。

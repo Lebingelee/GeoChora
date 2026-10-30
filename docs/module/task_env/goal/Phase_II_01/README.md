@@ -1,5 +1,7 @@
 # Phase II-01 修订规划交付包
 
+**新F05 successor首包（2026-10-30）**：维护者要求新路线总计三个attempt；001静态语义诊断工具、10类负例与下一补丁图完整包已准备供转述，未执行/native=0。S0/S1共享三轮；旧F05三轮与PARTIAL保留。见[首包Scope/预算/出口](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)。
+
 <a id="f05-successor-replan-20261030"></a>
 
 **2026-10-30 F05后继规划入口**：维护者要求按网页审阅重新组织F05。当前规划采用同源多表示主线（Menagerie MJCF/MuJoCo、USD/Isaac、USD/GeoPhys），原同USD三Provider门列为后继延期单元，旧F05仍PARTIAL且原门未通过。官方Panda→GeoPhys兼容独立排期；USD/Isaac资产优先输入策略保留。见[11路线与语义约束](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)及[12执行指南](12_F05_F07_Execution_Playbook.md)。本轮只调整文档，Scope Decision/实际工作包/预算待冻结，所有successor stage为PLANNED/NOT_EXECUTED；不启动F06/F07或原F05 attempt004。F线owner为`develop-full`，本分支文档同步不证明已合入其实现；R线范围/进度及旧接收/失败保留。下文未更新的旧时点路线由11/12管理其后继，不能据旧默认入口派包。
