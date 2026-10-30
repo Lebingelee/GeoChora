@@ -165,3 +165,65 @@ candidate.env.close()
     assert evidence['materialize_control_admitted_exact_candidate'] is True
     assert evidence['materialization_stopped_at_native_boundary'] is True
     assert len(evidence['derived_scene_sha256']) == 64
+
+
+def test_position_control_boundary_is_carried_only_during_session_apply(monkeypatch):
+    from types import SimpleNamespace
+
+    import task_env.runtime.sessions.control as session_control
+    from task_env.artifacts.state import StateBoundaryIdentity, StateSampleClock
+    from task_env.controllers.canonical.contracts import (
+        CanonicalControlTarget,
+        GripperControlTarget,
+        PositionControlTargetV1,
+    )
+
+    boundary = StateBoundaryIdentity(
+        'state-boundary-identity-v1', 'episode-1', 'reset-' + 'a' * 64,
+        'b' * 64, 'scene-instance-1', 'provider-materialization-1', 0, 0,
+    )
+    clock = StateSampleClock('state-sample-clock-v1', 'evaluation_boundary', 0, 0.0)
+    joints = tuple(f'panda-main/joint{index}' for index in range(1, 8))
+    canonical = CanonicalControlTarget(
+        'canonical-control-v0', 'c' * 64, 'd' * 64, joints,
+        {name: 0.0 for name in joints}, {name: 0.0 for name in joints},
+        GripperControlTarget('panda-main/gripper', .04, 5.0, .04),
+    )
+    target = PositionControlTargetV1(
+        'position-control-target-v1', 'writer-v1', 'd' * 64, 'e' * 64,
+        'f' * 64, boundary, clock, canonical,
+    )
+    profile = SimpleNamespace(
+        writer_id='writer-v1', identity='d' * 64,
+        source=SimpleNamespace(source_closure_digest='f' * 64),
+        gripper_semantic_id='panda-main/gripper',
+        artifact=SimpleNamespace(identity_hash='c' * 64),
+    )
+    publication = SimpleNamespace(view=SimpleNamespace(boundary=boundary, sample_clock=clock))
+    monkeypatch.setattr(
+        session_control,
+        '_validate_position_source_boundary',
+        lambda *_args, **_kwargs: 'e' * 64,
+    )
+
+    class Session:
+        def __init__(self):
+            self._position_applied_boundary_ids = set()
+            self._position_target_in_flight = None
+            self._position_target_source_boundary_in_flight = None
+            self.seen_boundary = None
+
+        def apply_control(self, applied_target):
+            self.seen_boundary = self._position_target_source_boundary_in_flight
+            return SimpleNamespace(target_hash=applied_target.identity_hash)
+
+    session = Session()
+    acknowledgement = session_control.apply_position_control_target(
+        session, target, controller_profile=profile, plan=object(),
+        publication=publication, scene=None, joint_bindings=None, frame_bindings=None,
+    )
+
+    assert session.seen_boundary is boundary
+    assert acknowledgement.target_hash == canonical.identity_hash
+    assert session._position_target_in_flight is None
+    assert session._position_target_source_boundary_in_flight is None

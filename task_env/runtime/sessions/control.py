@@ -1303,10 +1303,12 @@ def apply_position_control_target(
     # Close the same-boundary replay window before crossing into the Provider.
     consumed.add(consumed_key)
     session._position_target_in_flight = target.target.identity_hash
+    session._position_target_source_boundary_in_flight = target.source_boundary
     try:
         acknowledgement = session.apply_control(target.target)
     finally:
         session._position_target_in_flight = None
+        session._position_target_source_boundary_in_flight = None
     if acknowledgement.target_hash != target.target.identity_hash:
         raise ValueError('Provider acknowledgement does not match the applied canonical target')
     return acknowledgement

@@ -1750,6 +1750,15 @@ class _MuJoCoSession(_SessionValues):
         self._current_ctrl = self._data.ctrl.copy()
         self._last_dg01_position_application = None
         if self._f05_dg01_input is not None:
+            from ...artifacts.state import StateBoundaryIdentity
+
+            source_boundary = getattr(
+                self, '_position_target_source_boundary_in_flight', None,
+            )
+            if type(source_boundary) is not StateBoundaryIdentity:
+                raise ValueError(
+                    'DG01 MuJoCo control requires the validated PositionControlTargetV1 source boundary'
+                )
             source_gripper_record = self._f05_dg01_model_receipt['actuators']['actuator8']
             arm_controls = {
                 name: {
@@ -1769,7 +1778,7 @@ class _MuJoCoSession(_SessionValues):
                 'episode_id': self._episode_id,
                 'reset_sample_id': self._reset_sample_id,
                 'target_identity_sha256': target.identity_hash,
-                'source_boundary': target.source_boundary.to_mapping(),
+                'source_boundary': source_boundary.to_mapping(),
                 'arm_actuator_controls': arm_controls,
                 'gripper': {
                     'semantic_id': target.gripper.semantic_id,
