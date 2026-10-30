@@ -16,7 +16,7 @@ def _source_asset_bytes(base_dir, source_xml):
     return source_asset_bytes(base_dir, source_xml)
 
 
-def _lower_libero_mjcf_assets(receipt):
+def _lower_receipt_mjcf_assets(receipt):
     """Give every receipt-bound asset a unique flat MuJoCo VFS name.
 
     MuJoCo's in-memory VFS rejects distinct source files that share a
@@ -26,7 +26,7 @@ def _lower_libero_mjcf_assets(receipt):
     root = ET.fromstring(receipt.importer_xml)
     compiler = root.find('compiler')
     if compiler is not None and any(compiler.get(key) for key in ('meshdir', 'texturedir')):
-        raise ValueError('LIBERO receipt MJCF must use explicit source asset paths without compiler directories')
+        raise ValueError('mixed actuator receipt MJCF must use explicit source asset paths without compiler directories')
     payloads = {
         name: payload for name, payload in receipt.closure_files.items()
         if name not in {'scene.xml', 'canonical-source.xml'}
@@ -39,25 +39,25 @@ def _lower_libero_mjcf_assets(receipt):
         if raw_path is None:
             continue
         if node.tag == 'include':
-            raise ValueError('LIBERO mixed source does not admit nested MJCF includes')
+            raise ValueError('mixed actuator mixed source does not admit nested MJCF includes')
         if (not raw_path or raw_path.startswith('/') or '\\' in raw_path
                 or any(part in {'', '.', '..'} for part in raw_path.split('/'))):
-            raise ValueError(f'LIBERO source asset path is not canonical: {raw_path!r}')
+            raise ValueError(f'mixed actuator source asset path is not canonical: {raw_path!r}')
         if raw_path not in payloads:
-            raise ValueError(f'LIBERO source asset is missing from its immutable receipt: {raw_path!r}')
+            raise ValueError(f'mixed actuator source asset is missing from its immutable receipt: {raw_path!r}')
         referenced.add(raw_path)
         alias = aliases.get(raw_path)
         if alias is None:
             suffix = PurePosixPath(raw_path).suffix
             alias = f'gch_{hashlib.sha256(raw_path.encode("utf-8")).hexdigest()}{suffix}'
             if alias in alias_payloads:
-                raise ValueError('LIBERO deterministic MuJoCo asset alias collision')
+                raise ValueError('mixed actuator deterministic MuJoCo asset alias collision')
             aliases[raw_path] = alias
             alias_payloads[alias] = payloads[raw_path]
         node.set('file', alias)
     if referenced != set(payloads):
         raise ValueError(
-            'LIBERO source asset references differ from the immutable receipt: '
+            'mixed actuator source asset references differ from the immutable receipt: '
             f'unreferenced={sorted(set(payloads) - referenced)}'
         )
     rows = [
@@ -73,9 +73,9 @@ def _lower_libero_mjcf_assets(receipt):
 
 
 class _MuJoCoSession(_SessionValues):
-    def __init__(self, artifact, source, *, materialization_profile=None):
+    def __init__(self, artifact, source, *, mixed_actuator_plan=None):
         self._initialize_values(artifact, source, 'mujoco')
-        self._materialization_profile = materialization_profile
+        self._mixed_actuator_plan = mixed_actuator_plan
         if source.fixed_attachment_plan is not None:
             try:
                 self._initialize_fixed_attachment(artifact, source)
@@ -84,17 +84,18 @@ class _MuJoCoSession(_SessionValues):
                 self.close()
                 raise
             return
-        if materialization_profile is not None:
-            if materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
-                raise ValueError('unsupported MuJoCo RuntimeSession materialization profile')
+        if mixed_actuator_plan is not None:
+            from ...controllers.canonical.contracts import MixedActuatorPlanV1
+            if type(mixed_actuator_plan) is not MixedActuatorPlanV1:
+                raise TypeError('unsupported typed mixed actuator plan')
             try:
-                self._initialize_libero_mixed(artifact, source)
+                self._initialize_mixed_actuator(artifact, source)
             except BaseException as error:
                 try:
                     self.close()
                 except BaseException as cleanup_error:
                     error.add_note(
-                        'LIBERO RuntimeSession constructor cleanup also failed: '
+                        'mixed actuator RuntimeSession constructor cleanup also failed: '
                         f'{type(cleanup_error).__name__}: {cleanup_error}'
                     )
                 raise
@@ -155,21 +156,21 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_consumed_boundaries = set()
         self._validate_canonical_scene_model()
 
-    def _initialize_libero_mixed(self, artifact, source):
-        """Compile one receipt-bound LIBERO model and preflight every named slot."""
+    def _initialize_mixed_actuator(self, artifact, source):
+        """Compile one receipt-bound mixed actuator model and preflight every named slot."""
         from .provenance import provider_build_identity
         from ...assembly.assets import _source_closure_manifest
 
         receipt = source.execution_source_receipt
         if receipt is None:
-            raise ValueError('LIBERO materialization requires its immutable source receipt')
+            raise ValueError('mixed actuator materialization requires its immutable source receipt')
         receipt.validate_snapshot()
         import mujoco
 
         self._mj = mujoco
         self._runtime_identity = self._fixed_runtime_identity(mujoco)
         self._provider_build_identity = provider_build_identity('mujoco')
-        compile_xml, assets, asset_aliases = _lower_libero_mjcf_assets(receipt)
+        compile_xml, assets, asset_aliases = _lower_receipt_mjcf_assets(receipt)
         self._model = mujoco.MjModel.from_xml_string(
             compile_xml, assets=assets,
         )
@@ -190,10 +191,13 @@ class _MuJoCoSession(_SessionValues):
         self._last_force_limit_N = None
         self._completed_actuator_ctrl = None
         self._completed_force_measurement = None
-        if (int(self._model.nq), int(self._model.nv), int(self._model.na), int(self._model.nu)) != (48, 43, 0, 9):
-            raise ValueError('compiled LIBERO nq/nv/na/nu differs from the fixed source layout')
+        self._mixed_actuator_plan.validate()
+        if (self._mixed_actuator_plan.task_artifact_hash != artifact.identity_hash
+                or self._mixed_actuator_plan.source_id != source.scene_source.source_id
+                or self._mixed_actuator_plan.source_closure_digest != source.source_closure_digest):
+            raise ValueError('compiled mixed actuator plan differs from the admitted Artifact/source')
         if float(self._model.opt.timestep) != artifact.timebase.physics_dt:
-            raise ValueError('compiled LIBERO MuJoCo timestep differs from TaskArtifact')
+            raise ValueError('compiled mixed actuator MuJoCo timestep differs from TaskArtifact')
         self._joint_addresses = {
             semantic: self._addresses(native, free=False) for semantic, native in source.joints.items()
         }
@@ -214,89 +218,118 @@ class _MuJoCoSession(_SessionValues):
             semantic: int(self._model.actuator(native).id)
             for semantic, native in source.position_actuators.items()
         }
-        expected_dims = {
-            **{f'joint{i}': (i - 1, i - 1) for i in range(1, 8)},
-            'finger_joint1': (7, 7), 'finger_joint2': (8, 8),
-            'wooden_cabinet_1.top_level': (44, 39),
-            'wooden_cabinet_1.middle_level': (45, 40),
-            'wooden_cabinet_1.bottom_level': (46, 41),
-            'flat_stove_1.button': (47, 42),
-        }
-        for semantic, (qpos, dof) in expected_dims.items():
-            if self._joint_addresses.get(semantic) != (qpos, dof):
-                raise ValueError(f'compiled scalar joint order differs from .pruned_init layout: {semantic}')
-        expected_free_order = (
-            'akita_black_bowl_1', 'akita_black_bowl_2', 'cookies_1',
-            'glazed_rim_porcelain_ramekin_1', 'plate_1',
-        )
-        for offset, semantic in enumerate(expected_free_order):
-            if self._free_addresses.get(semantic) != (9 + 7 * offset, 9 + 6 * offset):
-                raise ValueError(f'compiled free-joint order differs from .pruned_init layout: {semantic}')
-        for semantic, aid in self._torque_actuators.items():
-            joint_name = f'robot0_{semantic}'
-            joint_id = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, joint_name))
-            if (joint_id < 0
-                    or int(self._model.actuator_trntype[aid]) != int(self._mj.mjtTrn.mjTRN_JOINT)
-                    or int(self._model.actuator_trnid[aid, 0]) != joint_id
-                    or int(self._model.jnt_type[joint_id]) != int(self._mj.mjtJoint.mjJNT_HINGE)):
-                raise ValueError(f'compiled torque actuator does not drive the named hinge: {semantic}')
+        self._channel_actuator_ids = {}
+        self._channel_records = {}
+        for channel in self._mixed_actuator_plan.channels:
+            if channel.semantic_id in source.torque_actuators:
+                actuator_map = source.torque_actuators
+                expected_mode = 'joint_torque'
+            elif channel.semantic_id in source.position_actuators:
+                actuator_map = source.position_actuators
+                expected_mode = 'joint_position'
+            else:
+                raise ValueError(f'mixed actuator channel is not mapped by RuntimeSource: {channel.semantic_id}')
+            if channel.drive_mode != expected_mode:
+                raise ValueError(f'mixed actuator drive mode differs from RuntimeSource: {channel.semantic_id}')
+            aid = int(self._mj.mj_name2id(
+                self._model, self._mj.mjtObj.mjOBJ_ACTUATOR, channel.actuator_name,
+            ))
+            joint_id = int(self._mj.mj_name2id(
+                self._model, self._mj.mjtObj.mjOBJ_JOINT, channel.joint_name,
+            ))
+            if (aid < 0 or joint_id < 0 or actuator_map[channel.semantic_id] != channel.actuator_name
+                    or source.joints.get(channel.semantic_id) != channel.joint_name):
+                raise ValueError(f'mixed actuator channel does not resolve through named source bindings: {channel.semantic_id}')
+            if (int(self._model.actuator_trntype[aid]) != int(self._mj.mjtTrn.mjTRN_JOINT)
+                    or int(self._model.actuator_trnid[aid, 0]) != joint_id):
+                raise ValueError(f'mixed actuator must drive its declared source joint: {channel.semantic_id}')
+            gear = np.asarray(self._model.actuator_gear[aid], dtype=np.float64).reshape(-1)
+            if (gear.shape != (6,) or not np.isfinite(gear).all()
+                    or not np.array_equal(gear, np.asarray((1.0, 0, 0, 0, 0, 0), dtype=np.float64))
+                    or int(self._model.actuator_dyntype[aid]) != int(self._mj.mjtDyn.mjDYN_NONE)):
+                raise ValueError(f'mixed actuator must use a unit scalar gear and stateless drive law: {channel.semantic_id}')
+            joint_type = int(self._model.jnt_type[joint_id])
+            unit_for_joint = {
+                int(self._mj.mjtJoint.mjJNT_HINGE): 'rad',
+                int(self._mj.mjtJoint.mjJNT_SLIDE): 'm',
+            }.get(joint_type)
+            if channel.drive_mode == 'joint_torque':
+                if joint_type != int(self._mj.mjtJoint.mjJNT_HINGE) or channel.unit != 'N*m':
+                    raise ValueError(f'torque channel requires a hinge and N*m units: {channel.semantic_id}')
+                if (int(self._model.actuator_gaintype[aid]) != int(self._mj.mjtGain.mjGAIN_FIXED)
+                        or int(self._model.actuator_biastype[aid]) != int(self._mj.mjtBias.mjBIAS_NONE)
+                        or float(self._model.actuator_gainprm[aid, 0]) != 1.0):
+                    raise ValueError(f'torque channel is not a unit-gain motor: {channel.semantic_id}')
+            else:
+                if channel.unit != unit_for_joint:
+                    raise ValueError(f'position channel unit differs from compiled joint type: {channel.semantic_id}')
+                if (int(self._model.actuator_gaintype[aid]) != int(self._mj.mjtGain.mjGAIN_FIXED)
+                        or int(self._model.actuator_biastype[aid]) != int(self._mj.mjtBias.mjBIAS_AFFINE)
+                        or not math.isfinite(float(self._model.actuator_gainprm[aid, 0]))
+                        or float(self._model.actuator_gainprm[aid, 0]) <= 0.0
+                        or not np.isclose(
+                            float(self._model.actuator_biasprm[aid, 1]),
+                            -float(self._model.actuator_gainprm[aid, 0]),
+                            rtol=0.0, atol=1.0e-12,
+                        )
+                        or not np.isfinite(np.asarray(self._model.actuator_biasprm[aid], dtype=np.float64)).all()):
+                    raise ValueError(f'position channel is not a fixed-gain affine servo: {channel.semantic_id}')
             low, high = (float(value) for value in self._model.actuator_ctrlrange[aid])
-            expected_range = (-80.0, 80.0) if semantic in {f'joint{i}' for i in range(1, 6)} else (-12.0, 12.0)
-            if not bool(self._model.actuator_ctrllimited[aid]) or (low, high) != expected_range:
-                raise ValueError(f'compiled torque actuator range differs from source: {semantic}')
-        expected_position_ranges = {'finger_joint1': (0.0, 0.04), 'finger_joint2': (-0.04, 0.0)}
-        for semantic, aid in self._position_actuators.items():
-            joint_name = 'gripper0_' + semantic
-            joint_id = int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_JOINT, joint_name))
-            low, high = (float(value) for value in self._model.actuator_ctrlrange[aid])
-            if (joint_id < 0
-                    or int(self._model.actuator_trntype[aid]) != int(self._mj.mjtTrn.mjTRN_JOINT)
-                    or int(self._model.actuator_trnid[aid, 0]) != joint_id
-                    or not bool(self._model.actuator_ctrllimited[aid])
-                    or (low, high) != expected_position_ranges[semantic]):
-                raise ValueError(f'compiled finger position actuator differs from source contract: {semantic}')
+            if (not bool(self._model.actuator_ctrllimited[aid])
+                    or not np.allclose((low, high), channel.control_range, rtol=0.0, atol=1.0e-10)):
+                raise ValueError(f'compiled actuator range differs from its source-bound plan: {channel.semantic_id}')
+            self._channel_actuator_ids[channel.semantic_id] = aid
+            self._channel_records[channel.semantic_id] = {
+                'actuator_name': channel.actuator_name, 'actuator_id': aid,
+                'joint_name': channel.joint_name, 'joint_id': joint_id,
+                'drive_mode': channel.drive_mode, 'unit': channel.unit,
+                'control_limited': True, 'control_range': [low, high],
+                'transmission_type': 'joint',
+                'gain_type': int(self._model.actuator_gaintype[aid]),
+                'bias_type': int(self._model.actuator_biastype[aid]),
+            }
         self._contact_geom_ids = {}
         for semantic, names in source.contact_geom_groups.items():
             ids = tuple(int(self._mj.mj_name2id(self._model, self._mj.mjtObj.mjOBJ_GEOM, name)) for name in names)
             if not ids or any(index < 0 for index in ids):
                 raise ValueError(f'compiled geom group is incomplete: {semantic}')
             self._contact_geom_ids[semantic] = frozenset(ids)
-        named_torque_actuators = {
-            semantic: {
-                'name': source.torque_actuators[semantic], 'id': aid,
-                'transmission_type': 'joint', 'transmission_target': f'robot0_{semantic}',
-                'control_limited': bool(self._model.actuator_ctrllimited[aid]),
-                'control_range': [float(value) for value in self._model.actuator_ctrlrange[aid]],
-            }
-            for semantic, aid in self._torque_actuators.items()
-        }
-        named_position_actuators = {
-            semantic: {
-                'name': source.position_actuators[semantic], 'id': aid,
-                'transmission_type': 'joint', 'transmission_target': f'gripper0_{semantic}',
-                'control_limited': bool(self._model.actuator_ctrllimited[aid]),
-                'control_range': [float(value) for value in self._model.actuator_ctrlrange[aid]],
-            }
-            for semantic, aid in self._position_actuators.items()
-        }
+        for semantic, record in self._channel_records.items():
+            record['transmission_target'] = source.joints[semantic]
         self._current_ctrl = self._data.ctrl.copy()
         self._compiled_layout_receipt = {
-            'schema_version': 'r07c-d01-compiled-model-layout-v1',
+            'schema_version': 'compiled-model-layout-v1',
             'dimensions': {'nq': int(self._model.nq), 'nv': int(self._model.nv),
                            'na': int(self._model.na), 'nu': int(self._model.nu),
                            'njnt': int(self._model.njnt), 'nbody': int(self._model.nbody),
                            'nsite': int(self._model.nsite), 'ngeom': int(self._model.ngeom)},
             'source_closure_digest': source.source_closure_digest,
             'source_id': source.scene_source.source_id,
+            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
+            'canonical_xml_sha256': receipt.canonical_xml_sha256,
             'source_files': list(_source_closure_manifest(receipt.closure_files)),
             'compiler_asset_aliases': asset_aliases,
             'named_joint_addresses': {key: list(value) for key, value in self._joint_addresses.items()},
             'named_free_joint_addresses': {key: list(value) for key, value in self._free_addresses.items()},
+            'named_joint_limits': {
+                semantic: {
+                    'joint_name': source.joints[semantic],
+                    'joint_id': int(self._mj.mj_name2id(
+                        self._model, self._mj.mjtObj.mjOBJ_JOINT, source.joints[semantic],
+                    )),
+                    'limited': bool(self._model.jnt_limited[int(self._mj.mj_name2id(
+                        self._model, self._mj.mjtObj.mjOBJ_JOINT, source.joints[semantic],
+                    ))]),
+                    'range': [float(value) for value in self._model.jnt_range[int(self._mj.mj_name2id(
+                        self._model, self._mj.mjtObj.mjOBJ_JOINT, source.joints[semantic],
+                    ))]],
+                }
+                for semantic in self._joint_addresses
+            },
             'named_body_ids': dict(self._bodies), 'named_frame_ids': dict(self._frames),
             'named_torque_actuator_ids': dict(self._torque_actuators),
             'named_position_actuator_ids': dict(self._position_actuators),
-            'named_torque_actuator_layout': named_torque_actuators,
-            'named_position_actuator_layout': named_position_actuators,
+            'named_actuator_channels': self._channel_records,
             'named_contact_geom_groups': {
                 semantic: [
                     {'name': name, 'id': int(self._mj.mj_name2id(
@@ -310,13 +343,13 @@ class _MuJoCoSession(_SessionValues):
 
     @property
     def compiled_layout_receipt(self):
-        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
-            raise RuntimeError('compiled LIBERO layout is unavailable for this session profile')
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('compiled mixed actuator layout is unavailable for this session')
         return json.loads(json.dumps(self._compiled_layout_receipt, sort_keys=True))
 
     @property
     def runtime_identity(self):
-        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+        if self._mixed_actuator_plan is None:
             raise RuntimeError('pinned MuJoCo runtime identity is unavailable for this profile')
         return json.loads(json.dumps({
             'runtime': self._runtime_identity,
@@ -325,10 +358,10 @@ class _MuJoCoSession(_SessionValues):
 
     @property
     def runtime_progress_receipt(self):
-        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+        if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed runtime progress is unavailable for this session profile')
         return {
-            'schema_version': 'r07c-d01-runtime-progress-v1',
+            'schema_version': 'runtime-progress-v1',
             'provider_materialization_id': self._provider_materialization_id,
             'episode_id': self._episode_id,
             'reset_sample_id': self._reset_sample_id,
@@ -342,11 +375,13 @@ class _MuJoCoSession(_SessionValues):
             'simulation_time_episode_s': float(self._data.time - self._reset_time_origin),
             'source_id': self._source.scene_source.source_id,
             'source_closure_digest': self._source.source_closure_digest,
+            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
+            'physical_state_monitor': self.physical_state_monitor_receipt,
         }
 
     @property
     def close_receipt(self):
-        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
+        if self._mixed_actuator_plan is None:
             raise RuntimeError('mixed close evidence is unavailable for this session profile')
         if self._last_close_receipt is None:
             raise RuntimeError('mixed RuntimeSession close has not completed')
@@ -1461,11 +1496,16 @@ class _MuJoCoSession(_SessionValues):
         return int(self._model.jnt_qposadr[joint]), int(self._model.jnt_dofadr[joint])
 
     def reset(self, sample):
-        if (self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1'
-                and getattr(sample, 'schema_version', None) == 'reset-sample-v1'):
-            return self._reset_libero_mixed(sample)
-        self._begin_reset()
+        if self._mixed_actuator_plan is not None:
+            from ...artifacts import ResetSampleV1
+            if type(sample) is not ResetSampleV1:
+                raise TypeError('source-bound mixed actuator session requires ResetSampleV1 before native reset')
+            return self._reset_mixed_actuator(sample)
+        from ...artifacts.execution import ResetSample
+        if type(sample) is not ResetSample:
+            raise TypeError('legacy MuJoCo RuntimeSession requires ResetSample v0 before reset')
         self._validate_sample(sample)
+        self._begin_reset()
         self._last_typed_force_publication = None
         self._mj.mj_resetData(self._model, self._data)
         self._native_steps = 0
@@ -1519,16 +1559,15 @@ class _MuJoCoSession(_SessionValues):
         self._cache_completed_actuator_force()
         return realized
 
-    def _reset_libero_mixed(self, sample):
-        """Apply the exact v1 time, qvel, free-root, and fixture reset in one pass."""
-        from ...artifacts import ResetReadbackV1, ResetSampleV1
+    def _preflight_mixed_actuator_reset(self, sample):
+        """Validate a source-bound reset completely before changing session state."""
+        from ...artifacts import ResetSampleV1
 
         if type(sample) is not ResetSampleV1:
-            raise TypeError('LIBERO mixed materialization requires ResetSampleV1')
+            raise TypeError('mixed actuator mixed materialization requires ResetSampleV1')
         self._validate_sample(sample)
         if self._mixed_fault is not None:
-            raise RuntimeError('LIBERO MuJoCo session is fault-latched')
-        self._begin_reset()
+            raise RuntimeError('mixed actuator MuJoCo session is fault-latched')
         model, data, mj = self._model, self._data, self._mj
         # Every name/value/range is checked before the first mutable native write.
         if (set(sample.joint_position) != set(self._joint_addresses)
@@ -1536,7 +1575,7 @@ class _MuJoCoSession(_SessionValues):
                 or set(sample.poses_world) != set(self._free_addresses)
                 or set(sample.free_joint_velocity) != set(self._free_addresses)
                 or set(sample.fixture_pose_world) != set(self._source.fixture_bodies)):
-            raise ValueError('LIBERO ResetSampleV1 does not cover the compiled source layout')
+            raise ValueError('mixed actuator ResetSampleV1 does not cover the compiled source layout')
         for semantic, value in sample.joint_position.items():
             qpos, _ = self._joint_addresses[semantic]
             native_name = self._source.joints[semantic]
@@ -1544,27 +1583,40 @@ class _MuJoCoSession(_SessionValues):
             if bool(model.jnt_limited[jid]):
                 low, high = (float(item) for item in model.jnt_range[jid])
                 if not low <= float(value) <= high:
-                    raise ValueError(f'LIBERO reset position exceeds source joint limits: {semantic}')
+                    raise ValueError(f'mixed actuator reset position exceeds source joint limits: {semantic}')
             if not math.isfinite(float(sample.joint_velocity[semantic])):
-                raise ValueError(f'LIBERO reset velocity is non-finite: {semantic}')
+                raise ValueError(f'mixed actuator reset velocity is non-finite: {semantic}')
         for semantic, pose_value in sample.fixture_pose_world.items():
             body_id = self._bodies[semantic]
             if int(model.body_parentid[body_id]) != 0:
-                raise ValueError(f'LIBERO fixture root is not a world child: {semantic}')
+                raise ValueError(f'mixed actuator fixture root is not a world child: {semantic}')
             pose_value.validate()
         for semantic, pose_value in sample.poses_world.items():
             pose_value.validate()
             velocity = sample.free_joint_velocity[semantic]
             if len(velocity) != 6 or any(not math.isfinite(float(item)) for item in velocity):
-                raise ValueError(f'LIBERO free-body velocity is invalid: {semantic}')
-        for semantic, value in sample.joint_position.items():
-            if semantic not in {'finger_joint1', 'finger_joint2'}:
-                continue
-            aid = self._position_actuators[semantic]
+                raise ValueError(f'mixed actuator free-body velocity is invalid: {semantic}')
+        for semantic, aid in self._position_actuators.items():
+            value = sample.joint_position[semantic]
             low, high = (float(item) for item in model.actuator_ctrlrange[aid])
             if not low <= float(value) <= high:
-                raise ValueError(f'LIBERO initial finger target exceeds source actuator range: {semantic}')
+                raise ValueError(f'mixed actuator initial position target exceeds source actuator range: {semantic}')
+        return model, data, mj
 
+    def _preflight_reset_plan_sample(self, sample):
+        if self._mixed_actuator_plan is not None:
+            self._preflight_mixed_actuator_reset(sample)
+
+    def _reset_mixed_actuator(self, sample):
+        """Apply the exact v1 time, qvel, free-root, and fixture reset in one pass."""
+        from ...artifacts import ResetReadbackV1
+
+        model, data, mj = self._preflight_mixed_actuator_reset(sample)
+
+        # Preserve an existing valid episode when schema, source, names or
+        # ranges fail preflight. The reset gate changes only when the complete
+        # source-bound sample is ready for its first native write.
+        self._begin_reset()
         try:
             mj.mj_resetData(model, data)
             self._native_steps = 0
@@ -1572,9 +1624,8 @@ class _MuJoCoSession(_SessionValues):
             self._preprocess_calls = 0
             self._forward_calls = 0
             self._reset_time_origin = float(sample.simulation_time_s)
-            # LIBERO's normal route runs its non-integrating mj_step1
-            # preprocessing before the placement sampler is applied. The
-            # selected .pruned_init row is restored after these placements.
+            # Source-bound ResetSampleV1 declares the non-integrating native
+            # preprocessing and restore order before this single reset pass.
             mj.mj_step1(model, data)
             self._preprocess_calls += 1
             for semantic, fixture_pose in sample.fixture_pose_world.items():
@@ -1585,9 +1636,8 @@ class _MuJoCoSession(_SessionValues):
                 qpos, dof = self._free_addresses[semantic]
                 data.qpos[qpos:qpos + 7] = (*sampled_pose.position, *sampled_pose.quaternion_wxyz)
                 data.qvel[dof:dof + 6] = 0.0
-            # Restore the complete named .pruned_init state after ordinary
-            # BDDL placements; fixture root transforms intentionally remain
-            # the current sampler realization because the row has no roots.
+            # Restore the complete source-bound scalar/free state after task
+            # placements; fixture root transforms remain sampler-owned.
             for semantic, value in sample.joint_position.items():
                 qpos, dof = self._joint_addresses[semantic]
                 data.qpos[qpos] = float(value)
@@ -1606,6 +1656,7 @@ class _MuJoCoSession(_SessionValues):
             self._mixed_consumed_boundaries.clear()
             self._mixed_pending_target = None
             realized = self._realized(sample)
+            self._initialize_physical_monitor()
             joints = {name: float(data.qpos[address[0]])
                       for name, address in self._joint_addresses.items()}
             velocities = {name: float(data.qvel[address[1]])
@@ -1642,14 +1693,15 @@ class _MuJoCoSession(_SessionValues):
                     or receipt.joint_velocity != sample.joint_velocity
                     or receipt.free_joint_velocity != sample.free_joint_velocity
                     or receipt.simulation_time_s != sample.simulation_time_s):
-                raise ValueError('LIBERO reset readback does not match the frozen row receipt')
+                raise ValueError('mixed actuator reset readback does not match the frozen row receipt')
             for name, expected in sample.fixture_pose_world.items():
                 actual = receipt.fixture_pose_world[name]
                 if (not np.allclose(actual.position, expected.position, rtol=0.0, atol=1e-12)
                         or not np.allclose(actual.quaternion_wxyz, expected.quaternion_wxyz,
                                            rtol=0.0, atol=1e-12)):
-                    raise ValueError(f'LIBERO fixture readback differs from sampled root pose: {name}')
+                    raise ValueError(f'mixed actuator fixture readback differs from sampled root pose: {name}')
             self._last_reset_readback_v1 = receipt
+            self._assert_physical_monitor_clean_at_reset()
             return realized
         except BaseException as error:
             self._mixed_fault = {'phase': 'reset', 'error': f'{type(error).__name__}: {error}'}
@@ -1667,7 +1719,7 @@ class _MuJoCoSession(_SessionValues):
             self._mj.mju_mat2Quat(quaternion, data.site_xmat[index])
             poses[name] = pose(data.site_xpos[index], quaternion)
         time = data.time
-        if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+        if self._mixed_actuator_plan is not None:
             elapsed = float(data.time) - self._reset_time_origin
             expected = self._native_steps * self._artifact.timebase.physics_dt
             bound = (self._native_steps + 2) * max(
@@ -1675,9 +1727,9 @@ class _MuJoCoSession(_SessionValues):
                 math.ulp(expected), math.ulp(self._artifact.timebase.physics_dt),
             )
             if not math.isfinite(elapsed) or abs(elapsed - expected) > bound:
-                raise ValueError('LIBERO native/reset-origin clock or integration count mismatch')
+                raise ValueError('mixed actuator native/reset-origin clock or integration count mismatch')
             if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
-                raise ValueError('LIBERO native/canonical step-count mismatch')
+                raise ValueError('mixed actuator native/canonical step-count mismatch')
             time = self._control_step * self._artifact.timebase.control_dt
         elif self._artifact.timebase.control_substeps > 1 and not self._inner_interval_active:
             if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
@@ -1887,8 +1939,8 @@ class _MuJoCoSession(_SessionValues):
         return sample
 
     def apply_control(self, target):
-        if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
-            return self.apply_mixed_actuator_target(target)
+        if self._mixed_actuator_plan is not None:
+            return self.apply_mixed_actuator_command(target)
         from .control import validate_target
         from ...controllers.canonical.contracts import AppliedCanonicalControl
         validate_target(self, target)
@@ -1921,28 +1973,30 @@ class _MuJoCoSession(_SessionValues):
             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
 
     def bind_mixed_controller(self, controller_identity):
-        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
-            raise RuntimeError('mixed Controller binding is restricted to the LIBERO profile')
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('mixed Controller binding is restricted to the mixed actuator profile')
         if self._reset_done or hasattr(self, '_mixed_controller_identity'):
             raise RuntimeError('mixed Controller can be bound exactly once before reset')
         if type(controller_identity) is not str or not controller_identity.strip():
             raise ValueError('mixed Controller identity must be a nonempty stable value')
-        if (controller_identity != self._source.mixed_controller_identity
-                or self._source.mixed_controller_profile_id != 'libero-spatial-bowl-to-plate-joint-space-pd-v1'):
+        if controller_identity != self._mixed_actuator_plan.controller_identity:
             raise ValueError('mixed Controller identity differs from the source-bound admission')
         self._mixed_controller_identity = controller_identity
 
-    def apply_mixed_actuator_target(self, target):
-        from ...controllers.canonical.contracts import AppliedMixedActuatorV1, MixedActuatorTargetV1
+    def apply_mixed_actuator_command(self, target):
+        from ...controllers.canonical.contracts import (
+            AppliedMixedActuatorCommandV1, MixedActuatorCommandV1,
+        )
         self._require_reset()
         if self._mixed_fault is not None:
-            raise RuntimeError('LIBERO MuJoCo session is fault-latched')
-        if type(target) is not MixedActuatorTargetV1:
-            raise TypeError('LIBERO RuntimeSession requires MixedActuatorTargetV1')
+            raise RuntimeError('mixed actuator MuJoCo session is fault-latched')
+        if type(target) is not MixedActuatorCommandV1:
+            raise TypeError('mixed actuator RuntimeSession requires MixedActuatorCommandV1')
         target.validate()
         state = self.snapshot()
         if (not hasattr(self, '_mixed_controller_identity')
                 or target.controller_identity != self._mixed_controller_identity
+                or target.plan_identity_hash != self._mixed_actuator_plan.identity_hash
                 or target.task_artifact_hash != self._artifact.identity_hash
                 or target.source_id != self._source.scene_source.source_id
                 or target.source_closure_digest != self._source.source_closure_digest
@@ -1956,22 +2010,24 @@ class _MuJoCoSession(_SessionValues):
         boundary = (target.episode_id, target.reset_sample_id, target.control_step, target.state_revision)
         if boundary in self._mixed_consumed_boundaries or self._mixed_pending_target is not None:
             raise ValueError('mixed actuator target boundary was already consumed or is still pending')
-        torques, fingers = dict(target.joint_torque_Nm), dict(target.finger_position_m)
-        if set(torques) != set(self._torque_actuators) or set(fingers) != set(self._position_actuators):
-            raise ValueError('mixed actuator target does not cover the exact named source slots')
-        values = {}
-        for semantic, aid in self._torque_actuators.items():
-            value = float(torques[semantic])
-            low, high = (float(item) for item in self._model.actuator_ctrlrange[aid])
-            if not math.isfinite(value) or not low <= value <= high:
-                raise ValueError(f'mixed actuator torque is outside its named source range: {semantic}')
+        channels = {item.semantic_id: item for item in self._mixed_actuator_plan.channels}
+        requested = dict(target.channel_values)
+        units = dict(target.channel_units)
+        if set(requested) != set(channels) or set(units) != set(channels):
+            raise ValueError('mixed actuator command does not cover the declared source channels')
+        values, applied_values = {}, {}
+        for semantic, channel in channels.items():
+            value = float(requested[semantic])
+            aid = self._channel_actuator_ids[semantic]
+            low, high = channel.control_range
+            actual_low, actual_high = (float(item) for item in self._model.actuator_ctrlrange[aid])
+            if (units[semantic] != channel.unit
+                    or not math.isfinite(value)
+                    or not low <= value <= high
+                    or (actual_low, actual_high) != (low, high)):
+                raise ValueError(f'mixed actuator command is outside its typed source range: {semantic}')
             values[aid] = value
-        for semantic, aid in self._position_actuators.items():
-            value = float(fingers[semantic])
-            low, high = (float(item) for item in self._model.actuator_ctrlrange[aid])
-            if not math.isfinite(value) or not low <= value <= high:
-                raise ValueError(f'mixed finger position is outside its signed source range: {semantic}')
-            values[aid] = value
+            applied_values[semantic] = value
         try:
             for aid, value in values.items():
                 self._data.ctrl[aid] = value
@@ -1981,10 +2037,10 @@ class _MuJoCoSession(_SessionValues):
             raise
         self._mixed_consumed_boundaries.add(boundary)
         self._mixed_pending_target = target
-        result = AppliedMixedActuatorV1(
-            'applied-mixed-actuator-v1', target.identity_hash, 'mujoco',
-            torques, fingers, False,
-            'named_joint_torque_and_signed_finger_position_control_zoh_20hz',
+        result = AppliedMixedActuatorCommandV1(
+            'applied-mixed-actuator-command-v1', target.identity_hash, 'mujoco',
+            applied_values, units, False,
+            'source_bound_named_actuator_channels_zero_order_hold_v1',
         )
         result.validate()
         return result
@@ -1992,8 +2048,8 @@ class _MuJoCoSession(_SessionValues):
     def read_contact_summary_v2(self, requested_pairs):
         from ...environment.types import ContactSummaryV2
         self._require_reset()
-        if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
-            raise RuntimeError('geom-group contact is limited to the admitted LIBERO profile')
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('geom-group contact is limited to the admitted mixed actuator profile')
         normalized = []
         for pair in requested_pairs:
             if len(pair) != 2 or pair[0] == pair[1]:
@@ -2032,15 +2088,19 @@ class _MuJoCoSession(_SessionValues):
 
     def step(self):
         self._require_reset()
-        if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+        if self._mixed_actuator_plan is not None:
             if self._mixed_fault is not None:
-                raise RuntimeError('LIBERO MuJoCo session is fault-latched')
+                raise RuntimeError('mixed actuator MuJoCo session is fault-latched')
             if self._mixed_pending_target is None:
-                raise RuntimeError('LIBERO outer step requires exactly one fresh mixed target')
+                raise RuntimeError('mixed actuator outer step requires exactly one fresh mixed target')
             try:
                 for _ in range(self._artifact.timebase.control_substeps):
                     self._mj.mj_step(self._model, self._data)
                     self._native_steps += 1
+                    self._observe_physical_state(
+                        phase='native_step', control_boundary=self._control_step + 1,
+                        native_step=self._native_steps,
+                    )
                 self._mj.mj_forward(self._model, self._data)
                 self._forward_calls += 1
                 self._control_step += 1
@@ -2072,11 +2132,103 @@ class _MuJoCoSession(_SessionValues):
         self._cache_completed_actuator_force()
         self._mj.mj_forward(self._model, self._data)
 
+    def _warning_counts(self):
+        warnings = getattr(self._data, 'warning', ())
+        return [int(item.number) for item in warnings]
+
+    def _initialize_physical_monitor(self):
+        ranges = {}
+        for semantic, (qpos, _dof) in self._joint_addresses.items():
+            joint_id = int(self._mj.mj_name2id(
+                self._model, self._mj.mjtObj.mjOBJ_JOINT, self._source.joints[semantic],
+            ))
+            if bool(self._model.jnt_limited[joint_id]):
+                low, high = (float(value) for value in self._model.jnt_range[joint_id])
+                ranges[semantic] = {
+                    'joint_name': self._source.joints[semantic],
+                    'qpos_address': int(qpos), 'range': [low, high],
+                    'minimum_observed': float(self._data.qpos[qpos]),
+                    'maximum_observed': float(self._data.qpos[qpos]),
+                }
+        if not ranges:
+            raise ValueError('physical monitor requires at least one source-limited scalar joint')
+        self._physical_monitor_tolerance = 1.0e-8
+        self._physical_monitor = {
+            'schema_version': 'physical-state-monitor-v1',
+            'source_id': self._source.scene_source.source_id,
+            'source_closure_digest': self._source.source_closure_digest,
+            'canonical_xml_sha256': self._source.execution_source_receipt.canonical_xml_sha256,
+            'provider_materialization_id': self._provider_materialization_id,
+            'episode_id': self._episode_id,
+            'reset_sample_id': self._reset_sample_id,
+            'compiled_model_identity_sha256': hashlib.sha256(json.dumps(
+                self._compiled_layout_receipt, sort_keys=True, separators=(',', ':'),
+            ).encode()).hexdigest(),
+            'joint_ranges': ranges,
+            'maximum_excursion': 0.0,
+            'tolerance': self._physical_monitor_tolerance,
+            'first_violation': None,
+            'warning_counts': self._warning_counts(),
+            'samples_including_reset': 0,
+            'status': 'pending',
+        }
+        self._observe_physical_state(phase='reset', control_boundary=0, native_step=0)
+
+    def _observe_physical_state(self, *, phase, control_boundary, native_step):
+        monitor = self._physical_monitor
+        qpos = np.asarray(self._data.qpos)
+        qvel = np.asarray(self._data.qvel)
+        warning_counts = self._warning_counts()
+        finite = bool(np.isfinite(qpos).all() and np.isfinite(qvel).all()
+                      and math.isfinite(float(self._data.time)))
+        if not finite and monitor['first_violation'] is None:
+            monitor['first_violation'] = {
+                'kind': 'non_finite_state', 'phase': phase,
+                'control_boundary': int(control_boundary), 'native_step': int(native_step),
+            }
+        maximum_excursion = float(monitor['maximum_excursion'])
+        if finite:
+            for semantic, row in monitor['joint_ranges'].items():
+                value = float(qpos[row['qpos_address']])
+                low, high = row['range']
+                row['minimum_observed'] = min(float(row['minimum_observed']), value)
+                row['maximum_observed'] = max(float(row['maximum_observed']), value)
+                excursion = max(0.0, float(low) - value, value - float(high))
+                maximum_excursion = max(maximum_excursion, excursion)
+                if excursion > self._physical_monitor_tolerance and monitor['first_violation'] is None:
+                    monitor['first_violation'] = {
+                        'kind': 'joint_limit_exceeded', 'semantic_id': semantic,
+                        'joint_name': row['joint_name'], 'position': value,
+                        'range': list(row['range']), 'excursion': excursion,
+                        'phase': phase, 'control_boundary': int(control_boundary),
+                        'native_step': int(native_step),
+                    }
+        monitor['maximum_excursion'] = maximum_excursion
+        monitor['warning_counts'] = warning_counts
+        monitor['samples_including_reset'] = int(monitor['samples_including_reset']) + 1
+        any_warning = any(warning_counts)
+        monitor['status'] = 'failed' if (monitor['first_violation'] is not None or any_warning) else 'passed'
+        monitor['last_control_boundary'] = int(control_boundary)
+        monitor['native_step_count'] = int(native_step)
+        monitor['simulation_time_s'] = float(self._data.time)
+        if not finite or monitor['first_violation'] is not None or any_warning:
+            raise RuntimeError('physical state monitor found non-finite state, a joint limit excursion, or a MuJoCo warning')
+
+    def _assert_physical_monitor_clean_at_reset(self):
+        if self._physical_monitor['status'] != 'passed':
+            raise RuntimeError('physical state monitor rejected the reset boundary')
+
+    @property
+    def physical_state_monitor_receipt(self):
+        if self._mixed_actuator_plan is None or not hasattr(self, '_physical_monitor'):
+            raise RuntimeError('physical state monitor is unavailable for this session')
+        return json.loads(json.dumps(self._physical_monitor, sort_keys=True))
+
     def close(self):
         if not self._closed:
-            if self._materialization_profile == 'libero-spatial-bowl-to-plate-mixed-v1':
+            if self._mixed_actuator_plan is not None:
                 self._last_close_receipt = {
-                    'schema_version': 'r07c-d01-runtime-close-v1',
+                    'schema_version': 'runtime-close-v1',
                     'provider_materialization_id': self._provider_materialization_id,
                     'episode_id': self._episode_id,
                     'reset_sample_id': self._reset_sample_id,
@@ -2090,6 +2242,10 @@ class _MuJoCoSession(_SessionValues):
                     'forward_call_count': int(getattr(self, '_forward_calls', 0)),
                     'source_id': self._source.scene_source.source_id,
                     'source_closure_digest': self._source.source_closure_digest,
+                    'physical_state_monitor': (
+                        self.physical_state_monitor_receipt
+                        if hasattr(self, '_physical_monitor') else None
+                    ),
                 }
             if getattr(self._source, 'fixed_attachment_plan', None) is not None:
                 model, data = getattr(self, '_model', None), getattr(self, '_data', None)

@@ -24,7 +24,6 @@ _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_REVISION = 'a53a8cfed7c9d6464274b5c96fca601271d
 _GEOPHYS_C05C_CADENCE_DIAGNOSTIC_PROFILE = 'nutassembly-gripper-cadence-v1'
 _GEOPHYS_R05B_NATIVE_FEEDBACK_REVISION = 'c6df840bef8d36b1150150167df08e29dc3f664c'
 _GEOPHYS_R05B_NATIVE_FEEDBACK_PROFILE = 'nutassembly-native-feedback-v1'
-_LIBERO_D01_MIXED_PROFILE = 'libero-spatial-bowl-to-plate-mixed-v1'
 
 
 class RuntimeSession(Protocol):
@@ -32,6 +31,8 @@ class RuntimeSession(Protocol):
     def provider_materialization_id(self) -> str: ...
     @property
     def episode_id(self) -> str: ...
+    @property
+    def state_revision(self) -> int: ...
     def reset(self, sample: ResetSample) -> RealizedInitialState: ...
     def reset_plan(self, plan: EpisodeResetPlanV1 | ResetPlanV1) -> RealizedInitialState: ...
     def snapshot(self) -> CanonicalStateView: ...
@@ -238,150 +239,105 @@ def _r05b_native_feedback_manifest(artifact, execution, source, profile_id):
     )
 
 
-def _libero_d01_mixed_manifest(artifact, execution, source, profile_id):
-    """Admit only the frozen LIBERO diagnostic's source-bound mixed profile."""
+def _mixed_actuator_manifest(artifact, execution, source):
+    """Admit the bounded, typed source-bound mixed actuator route."""
     from dataclasses import replace
     import hashlib
+    from pathlib import Path
+    from ...controllers.canonical.contracts import MixedActuatorPlanV1
 
-    if profile_id != _LIBERO_D01_MIXED_PROFILE:
-        raise ValueError('unknown LIBERO mixed RuntimeSession profile')
-    if (not isinstance(artifact, TaskArtifact)
-            or artifact.artifact_id != 'libero-spatial-bowl-to-plate-v1/mixed-v1'
-            or artifact.task_id != 'libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate'
-            or (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
-                artifact.timebase.control_dt) != (0.002, 25, 0.05)):
-        raise ValueError('LIBERO mixed admission requires the exact 2 ms / 20 Hz pilot Artifact')
+    plan = getattr(source, 'mixed_actuator_plan', None)
+    if type(plan) is not MixedActuatorPlanV1:
+        raise ValueError('mixed actuator admission requires its typed source-bound plan')
+    plan.validate()
+    if not isinstance(artifact, TaskArtifact):
+        raise ValueError('mixed actuator admission requires TaskArtifact v0')
     if (execution.physics_provider, execution.backend, execution.render_provider,
             execution.physics_profile, execution.determinism_mode) != (
             'mujoco', 'cpu', 'none', PROFILE, 'strict'):
-        raise ValueError('LIBERO mixed admission requires strict MuJoCo CPU state-only execution')
-    if (source.mixed_controller_profile_id != 'libero-spatial-bowl-to-plate-joint-space-pd-v1'
-            or type(source.mixed_controller_identity) is not str
-            or len(source.mixed_controller_identity) != 64):
-        raise ValueError('LIBERO mixed admission requires the exact source-bound Controller profile')
+        raise ValueError('mixed actuator admission requires strict MuJoCo CPU state-only execution')
+    if (plan.task_artifact_hash != artifact.identity_hash
+            or plan.source_id != source.scene_source.source_id
+            or plan.source_closure_digest != source.source_closure_digest):
+        raise ValueError('mixed actuator plan differs from its Artifact or RuntimeSource identity')
+    if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
+            or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+            or source.config.runtime.backend != 'cpu'
+            or source.config.runtime.integrator != 'implicitfast'
+            or source.config.render.camera_obs):
+        raise ValueError('mixed actuator source requires the supported strict scalar CPU envelope')
     receipt = getattr(source, 'execution_source_receipt', None)
     if (receipt is None or source.scene_definition is not None
             or source.scene_source.source_id != receipt.source_id
-            or source.scene_source.source_id != (
-                'libero-spatial-pilot-v1:' + source.scene_source.source_id.split(':', 1)[-1]
-            )
             or source.scene_source.base_dir is None
             or source.source_closure_digest != receipt.source_closure_digest
             or source.scene_source.xml.encode('utf-8') != receipt.importer_xml
-            or source.scene_source.base_dir.resolve() != receipt.snapshot_root):
-        raise ValueError('LIBERO admission requires its immutable, in-tree execution source receipt')
+            or Path(source.scene_source.base_dir).resolve() != receipt.snapshot_root):
+        raise ValueError('mixed actuator admission requires its immutable execution source receipt')
     receipt.validate_snapshot()
     if (hashlib.sha256(receipt.importer_xml).hexdigest() != receipt.canonical_xml_sha256
             or receipt.closure_files.get('scene.xml') != receipt.importer_xml):
-        raise ValueError('LIBERO source receipt does not bind the importer XML bytes')
-    expected_joints = {
-        **{f'joint{i}': f'robot0_joint{i}' for i in range(1, 8)},
-        'finger_joint1': 'gripper0_finger_joint1',
-        'finger_joint2': 'gripper0_finger_joint2',
-        'wooden_cabinet_1.top_level': 'wooden_cabinet_1_top_level',
-        'wooden_cabinet_1.middle_level': 'wooden_cabinet_1_middle_level',
-        'wooden_cabinet_1.bottom_level': 'wooden_cabinet_1_bottom_level',
-        'flat_stove_1.button': 'flat_stove_1_button',
-    }
-    expected_free = {
-        name: f'{name}_joint0' for name in (
-            'akita_black_bowl_1', 'akita_black_bowl_2', 'cookies_1',
-            'glazed_rim_porcelain_ramekin_1', 'plate_1',
-        )
-    }
-    if (source.task_artifact_hash != artifact.identity_hash
-            or source.scene_source.source_id.split(':')[1] != hashlib.sha256(receipt.importer_xml).hexdigest()
-            or source.joints != expected_joints
-            or source.free_joints != expected_free
-            or source.torque_actuators != {f'joint{i}': f'robot0_torq_j{i}' for i in range(1, 8)}
-            or source.position_actuators != {
-                'finger_joint1': 'gripper0_gripper_finger_joint1',
-                'finger_joint2': 'gripper0_gripper_finger_joint2',
-            }
-            or source.actuator_units != {
-                **{f'robot0_torq_j{i}': 'N*m' for i in range(1, 8)},
-                'gripper0_gripper_finger_joint1': 'm',
-                'gripper0_gripper_finger_joint2': 'm',
-            }
-            or source.frames != {'panda-v1/ee': 'gripper0_grip_site'}
-            or source.bodies.get('main_table') != 'main_table'
-            or set(source.fixture_bodies) != {'wooden_cabinet_1', 'flat_stove_1'}
-            or set(source.bodies) != {
-                'main_table', 'akita_black_bowl_1', 'akita_black_bowl_2', 'cookies_1',
-                'glazed_rim_porcelain_ramekin_1', 'plate_1', 'wooden_cabinet_1',
-                'flat_stove_1',
-            }
-            or set(source.contact_geom_groups) != {
-                'akita_black_bowl_1', 'akita_black_bowl_2', 'cookies_1',
-                'glazed_rim_porcelain_ramekin_1', 'plate_1', 'wooden_cabinet_1',
-                'flat_stove_1',
-            }
-            or source.config.runtime.integrator != 'implicitfast'
-            or source.config.runtime.physics_dt != 0.002
-            or source.config.runtime.control_substeps != 25
-            or source.config.runtime.backend != 'cpu'
-            or source.config.render.camera_obs):
-        raise ValueError('LIBERO mixed source maps differ from the fixed semantic actuator/state profile')
-    base = provider_manifest('mujoco')
-    claims = tuple(base.capabilities) + (
-        CapabilityClaim('contact_detection', 'tested',
-                         f'{profile_id}/source={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}'),
+        raise ValueError('mixed actuator source receipt does not bind importer XML bytes')
+    if source.task_artifact_hash != artifact.identity_hash:
+        raise ValueError('mixed actuator RuntimeSource differs from the exact Artifact')
+    if not source.torque_actuators or not source.position_actuators:
+        raise ValueError('supported mixed actuator profile requires torque and position channels')
+    if not set(source.contact_geom_groups) <= set(source.bodies) | set(source.fixture_bodies):
+        raise ValueError('contact geom groups must bind named source bodies or fixtures')
+    evidence = (
+        f'mixed-actuator-plan={plan.identity_hash}/artifact={artifact.identity_hash}/'
+        f'source={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}'
     )
-    unsupported = tuple(item for item in base.known_unsupported if item != 'contact_detection')
+    base = provider_manifest('mujoco')
+    claims = tuple(base.capabilities)
+    unsupported = base.known_unsupported
+    if source.contact_geom_groups:
+        claims += (CapabilityClaim('contact_detection', 'tested', evidence),)
+        unsupported = tuple(item for item in unsupported if item != 'contact_detection')
     return replace(
-        base,
-        adapter_version='task-env-r07c-d01-libero-mixed-v1',
-        capabilities=claims,
-        known_unsupported=unsupported,
-        evidence_reference=(f'{profile_id}/artifact={artifact.identity_hash}/'
-                            f'source={receipt.canonical_xml_sha256}/closure={receipt.source_closure_digest}'),
+        base, adapter_version='task-env-mixed-actuator-source-v1',
+        capabilities=claims, known_unsupported=unsupported, evidence_reference=evidence,
     )
 
 
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec, *, source: RuntimeSource,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
-                _native_feedback_profile=None, _libero_mixed_profile=None) -> RuntimeSession:
+                _native_feedback_profile=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     active_profiles = tuple(profile for profile in (
-        _diagnostic_profile, _native_feedback_profile, _libero_mixed_profile,
+        _diagnostic_profile, _native_feedback_profile,
     ) if profile is not None)
-    if len(active_profiles) > 1:
+    if len(active_profiles) > 1 or (active_profiles and source.mixed_actuator_plan is not None):
         raise ValueError('RuntimeSession process-local admissions are mutually exclusive')
-    actual = (
-        provider_manifest(execution.physics_provider)
-        if not active_profiles
-        else _diagnostic_manifest(artifact, execution, source, _diagnostic_profile)
-        if _diagnostic_profile is not None
-        else _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
-        if _native_feedback_profile is not None
-        else _libero_d01_mixed_manifest(artifact, execution, source, _libero_mixed_profile)
-    )
-    # A caller may restrict a manifest for negative admission, never expand support.
+    if _diagnostic_profile is not None:
+        actual = _diagnostic_manifest(artifact, execution, source, _diagnostic_profile)
+    elif _native_feedback_profile is not None:
+        actual = _r05b_native_feedback_manifest(artifact, execution, source, _native_feedback_profile)
+    elif source.mixed_actuator_plan is not None:
+        actual = _mixed_actuator_manifest(artifact, execution, source)
+    else:
+        actual = provider_manifest(execution.physics_provider)
     if manifest is not None:
-        if _diagnostic_profile is not None:
-            raise ValueError('diagnostic admission cannot be combined with a caller-supplied manifest')
-        if _native_feedback_profile is not None:
-            raise ValueError('R05b normal admission does not accept caller-supplied manifests')
-        if _libero_mixed_profile is not None:
-            raise ValueError('LIBERO mixed admission does not accept caller-supplied manifests')
+        if active_profiles or source.mixed_actuator_plan is not None:
+            raise ValueError('bounded process-local admission does not accept caller-supplied manifests')
         admit_capabilities(artifact.required_capabilities, manifest, execution)
     admit_capabilities(artifact.required_capabilities, actual, execution)
     if _native_feedback_profile is not None:
         from ...artifacts import RequiredCapabilitySet
         admit_capabilities(RequiredCapabilitySet(('actuator_force_query',)), actual, execution)
-    if _libero_mixed_profile is not None:
+    if source.mixed_actuator_plan is not None and source.contact_geom_groups:
         from ...artifacts import RequiredCapabilitySet
         admit_capabilities(RequiredCapabilitySet(('contact_detection',)), actual, execution)
     if execution.render_provider != 'none':
         raise ValueError('P1.2 rendering is unsupported')
     if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
-        or source.config.runtime.control_substeps != artifact.timebase.control_substeps
-        or source.config.runtime.backend != execution.backend
-        or source.config.render.camera_obs):
+            or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+            or source.config.runtime.backend != execution.backend
+            or source.config.render.camera_obs):
         raise ValueError('source execution/timebase mismatch')
     if source.task_artifact_hash != artifact.identity_hash:
         raise ValueError('source/Artifact mismatch')
@@ -404,8 +360,7 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
     if not set(artifact.semantics.required_poses) <= set(source.bodies) | set(source.frames):
         raise ValueError('source pose bindings do not cover semantics')
     return _materialize_admitted(
-        artifact, execution, source,
-        materialization_profile=_libero_mixed_profile,
+        artifact, execution, source, mixed_actuator_plan=source.mixed_actuator_plan,
     )
 
 
@@ -604,13 +559,13 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if lowered.source_closure_sha256 != source.source_closure_digest:
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
-def _materialize_admitted(artifact, execution, source, *, materialization_profile=None):
+def _materialize_admitted(artifact, execution, source, *, mixed_actuator_plan=None):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
         return _GeoPhysSession(artifact, source)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
-        return _MuJoCoSession(artifact, source, materialization_profile=materialization_profile)
+        return _MuJoCoSession(artifact, source, mixed_actuator_plan=mixed_actuator_plan)
     if execution.physics_provider == 'sapien':
         from .sapien import _SapienSession
         return _SapienSession(artifact, source)

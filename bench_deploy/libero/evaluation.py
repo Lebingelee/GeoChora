@@ -14,6 +14,8 @@ from task_env.environment import (
     TaskPredicateEvaluationV1,
     TaskPredicateResultV1,
 )
+from task_env.environment.types import TaskEvaluation
+from task_env.controllers.canonical.contracts import digest
 
 
 PILOT_TASK_UID = (
@@ -95,6 +97,111 @@ def evaluate_on_bowl_plate_v1(
     return TaskPredicateResultV1.available(xy_distance < ON_THRESHOLD_M)
 
 
+def observe_selected_reference_v1(env, state):
+    """Build this task's observation and predicate from public runtime values."""
+    source = env.value['source']
+    pair = ('akita_black_bowl_1', 'plate_1')
+    contact = env.session.read_contact_summary_v2((pair,))
+    requested = (pair,)
+    if contact.status == 'available' and (
+            contact.requested_pairs != requested or contact.covered_pairs != requested):
+        predicate = TaskPredicateResultV1.unavailable('contact_query_coverage_mismatch')
+    elif contact.status == 'unavailable':
+        predicate = TaskPredicateResultV1.unavailable(contact.reason or 'contact_unavailable')
+    else:
+        count = contact.pair_counts.get('akita_black_bowl_1/plate_1')
+        if type(count) is not int or count < 0:
+            raise ValueError('contact summary omitted the exact covered pair count')
+        evidence = OnBowlPlateEvidenceV1(
+            task_uid=env.artifact.task_id,
+            source_manifest_sha256=env.value['source_manifest_sha256'],
+            frame_id='world',
+            bowl_center_m=tuple(state.pose_world['akita_black_bowl_1'].position),
+            plate_center_m=tuple(state.pose_world['plate_1'].position),
+            geom_group_contact=bool(count),
+        )
+        predicate = env.binding.evaluate(evidence, env.artifact.semantics)
+    if not isinstance(predicate, TaskPredicateResultV1):
+        raise TypeError('task observation callback must return TaskPredicateResultV1')
+    success = bool(predicate.value) if predicate.status == 'available' else False
+    evaluation = TaskEvaluation(
+        reward=1.0 if success else 0.0, success=success,
+        metrics={'on_bowl_plate_available': predicate.status == 'available',
+                 'on_bowl_plate': success},
+    )
+    boundary_identity = {
+        'source_id': source.scene_source.source_id,
+        'source_closure_digest': source.source_closure_digest,
+        'provider_materialization_id': env.session.provider_materialization_id,
+        'episode_id': env.session.episode_id,
+        'reset_sample_id': env.sample.sample_id,
+        'control_step': int(state.control_step),
+        'state_revision': int(env.session.state_revision),
+        'simulation_time_s': float(state.simulation_time),
+    }
+    boundary_digest = digest(boundary_identity)
+    ee = state.pose_world['panda-v1/ee']
+    obs = {
+        'state': {
+            'ee_pose': np.asarray((*ee.position, *ee.quaternion_wxyz), dtype=np.float32),
+            'joint_position': np.asarray(
+                [state.joint_position[f'joint{i}'] for i in range(1, 8)]
+                + [state.joint_position['finger_joint1'], state.joint_position['finger_joint2']],
+                dtype=np.float32,
+            ),
+            'boundary_identity_sha256': np.frombuffer(bytes.fromhex(boundary_digest), dtype=np.uint8).copy(),
+        },
+        'privileged_state': {
+            key + '_body_pose': np.asarray(
+                [(*state.pose_world[semantic].position, *state.pose_world[semantic].quaternion_wxyz)],
+                dtype=np.float32,
+            ) for semantic, key in env.binding.object_poses
+        },
+    }
+    contact_mapping = {
+        'schema_version': contact.schema_version,
+        'source_id': contact.source_id,
+        'source_closure_digest': contact.source_closure_digest,
+        'provider_materialization_id': contact.provider_materialization_id,
+        'episode_id': contact.episode_id,
+        'reset_sample_id': contact.reset_sample_id,
+        'control_step': contact.control_step,
+        'state_revision': contact.state_revision,
+        'simulation_time_s': contact.simulation_time_s,
+        'requested_pairs': [list(item) for item in contact.requested_pairs],
+        'covered_pairs': [list(item) for item in contact.covered_pairs],
+        'pair_counts': dict(contact.pair_counts),
+        'geom_groups': {key: list(value) for key, value in contact.geom_groups.items()},
+        'status': contact.status, 'reason': contact.reason,
+    }
+    predicate_mapping = {
+        'status': predicate.status, 'value': predicate.value, 'reason': predicate.reason,
+    }
+    info = {
+        'is_success': success, 'task_failure': False,
+        'task_metrics': dict(evaluation.metrics),
+        'control_step': int(state.control_step),
+        'simulation_time_s': float(state.simulation_time),
+        'predicate_v1': {'on_bowl_plate': predicate_mapping},
+        'contact_summary_v2': contact_mapping,
+        'source_id': source.scene_source.source_id,
+        'source_xml_sha256': source.execution_source_receipt.canonical_xml_sha256,
+        'source_closure_digest': source.source_closure_digest,
+        'provider_materialization_id': env.session.provider_materialization_id,
+        'episode_id': env.session.episode_id,
+        'reset_sample_id': env.sample.sample_id,
+        'state_boundary_identity_sha256': boundary_digest,
+        'boundary_context_v1': {
+            'schema_version': 'task-observation-context-v1',
+            **boundary_identity,
+            'state_boundary_identity_sha256': boundary_digest,
+            'contact_summary_v2': contact_mapping,
+            'predicate_v1': predicate_mapping,
+        },
+    }
+    return obs, info, evaluation
+
+
 def build_evaluation(task_input: dict, manifest: dict) -> dict:
     semantics = task_input["semantics"]
     return {
@@ -117,4 +224,5 @@ __all__ = [
     "OnBowlPlateEvidenceV1",
     "build_evaluation",
     "evaluate_on_bowl_plate_v1",
+    "observe_selected_reference_v1",
 ]

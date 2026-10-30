@@ -10,13 +10,18 @@ from dataclasses import asdict
 import hashlib
 import json
 from pathlib import Path
+import numpy as np
+from gymnasium.spaces import Box, Dict
 
 from task_env.artifacts import (
     ActionIntent, EntityDefinition, InitializationContract, RequiredCapabilitySet,
     SemanticDefinition, TaskArtifact, Timebase, UniformDimension, WorldDefinition,
 )
 from task_env.assembly.source import TaskSceneSource
-from task_env.controllers.canonical.contracts import digest
+from task_env.controllers.canonical.contracts import (
+    ControlGroupActionV1, MixedActuatorChannelV1, MixedActuatorPlanV1,
+    StructuredActionRequestV1, digest,
+)
 from task_env.environment.configuration import resolve_env_config
 from task_env.runtime.sessions.source import (
     ExecutionSourceReceiptV1, RuntimeSource, source_asset_bytes,
@@ -24,7 +29,9 @@ from task_env.runtime.sessions.source import (
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
 from .controller import LiberoMixedControllerV1
-from .evaluation import PILOT_TASK_UID, evaluate_on_bowl_plate_v1
+from .evaluation import (
+    PILOT_TASK_UID, evaluate_on_bowl_plate_v1, observe_selected_reference_v1,
+)
 from .init_state import (
     INIT_SHA256, PILOT_SOURCE_MANIFEST_SHA256, decode_pruned_init_bytes,
     init_layout_v1, sample_libero_normal_reset_v1,
@@ -199,6 +206,31 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'glazed_rim_porcelain_ramekin_1', 'plate_1',
         )
     }
+    torque_bindings = {f'joint{i}': f'robot0_torq_j{i}' for i in range(1, 8)}
+    position_bindings = {
+        'finger_joint1': 'gripper0_gripper_finger_joint1',
+        'finger_joint2': 'gripper0_gripper_finger_joint2',
+    }
+    controller_limits = controller.identity_mapping()['torque_limits_Nm']
+    mixed_plan = MixedActuatorPlanV1(
+        'mixed-actuator-plan-v1', artifact.identity_hash, scene_source.source_id,
+        source_receipt.source_closure_digest, controller.identity,
+        tuple([
+            MixedActuatorChannelV1(
+                semantic, actuator, joints[semantic], 'joint_torque', 'N*m',
+                (-float(controller_limits[semantic]), float(controller_limits[semantic])),
+            ) for semantic, actuator in torque_bindings.items()
+        ] + [
+            MixedActuatorChannelV1(
+                'finger_joint1', position_bindings['finger_joint1'], joints['finger_joint1'],
+                'joint_position', 'm', (0.0, 0.04),
+            ),
+            MixedActuatorChannelV1(
+                'finger_joint2', position_bindings['finger_joint2'], joints['finger_joint2'],
+                'joint_position', 'm', (-0.04, 0.0),
+            ),
+        ]),
+    )
     source = RuntimeSource(
         task_artifact_hash=artifact.identity_hash,
         scene_source=scene_source,
@@ -211,11 +243,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         agents=(), objects=tuple(key for key in expected_bodies if key != 'main_table'),
         source_closure_digest=source_receipt.source_closure_digest,
         execution_source_receipt=source_receipt,
-        torque_actuators={f'joint{i}': f'robot0_torq_j{i}' for i in range(1, 8)},
-        position_actuators={
-            'finger_joint1': 'gripper0_gripper_finger_joint1',
-            'finger_joint2': 'gripper0_gripper_finger_joint2',
-        },
+        torque_actuators=torque_bindings,
+        position_actuators=position_bindings,
         actuator_units={
             **{f'robot0_torq_j{i}': 'N*m' for i in range(1, 8)},
             'gripper0_gripper_finger_joint1': 'm',
@@ -223,9 +252,9 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         },
         fixture_bodies=('wooden_cabinet_1', 'flat_stove_1'),
         contact_geom_groups={key: tuple(value) for key, value in groups.items()},
-        mixed_controller_profile_id=controller.profile_id,
-        mixed_controller_identity=controller.identity,
+        mixed_actuator_plan=mixed_plan,
     )
+    controller.plan_identity_hash = mixed_plan.identity_hash
     return {
         'artifact': artifact, 'source': source, 'controller': controller,
         'selected_controller_kind': 'mixed_actuator_v1', 'solution': None,
@@ -289,7 +318,27 @@ def build_libero_selected_candidate(
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache['value'])
         value['controller'] = LiberoMixedControllerV1()
+        value['controller'].plan_identity_hash = value['source'].mixed_actuator_plan.identity_hash
         value['reset_realizations'] = reset_receipts
+        components = tuple([*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'])
+        value['action_schema'] = {
+            'schema_id': 'libero-joint-space-absolute-v1', 'schema_version': 1,
+            'controller_kind': 'absolute_joint', 'reference': 'joint_coordinates',
+            'dimension': len(components), 'components': components,
+        }
+        object_names = ('akita_black_bowl_1', 'plate_1')
+        value['action_space'] = Box(-np.inf, np.inf, (len(components),), dtype=np.float64)
+        value['observation_space'] = Dict({
+            'state': Dict({
+                'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
+                'joint_position': Box(-np.inf, np.inf, (len(value['source'].joints),), dtype=np.float32),
+                'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
+            }),
+            'privileged_state': Dict({
+                name + '_body_pose': Box(-np.inf, np.inf, (1, 7), dtype=np.float32)
+                for name in object_names
+            }),
+        })
         return value
 
     def reset_with_options(artifact, seed, options, source):
@@ -341,6 +390,142 @@ def build_libero_selected_candidate(
             evidence, expected_source_manifest_sha256=PILOT_SOURCE_MANIFEST_SHA256,
         )
 
+    def prepare_mixed_control(env, action, state):
+        values = np.asarray(action, dtype=np.float64)
+        components = tuple(env.value['action_schema']['components'])
+        if values.shape != (len(components),) or not np.isfinite(values).all():
+            raise ValueError('task action must be a finite vector matching its declared action schema')
+        values_tuple = tuple(float(item) for item in values)
+        source = env.value['source']
+        plan = source.mixed_actuator_plan
+        request = StructuredActionRequestV1(
+            'structured-action-request-v1',
+            source.execution_source_receipt.canonical_xml_sha256,
+            plan.identity_hash,
+            (ControlGroupActionV1(
+                'control-group-action-v1', 'panda-v1', 'mixed-actuation',
+                env.value['action_schema']['schema_id'], values_tuple,
+            ),),
+        )
+        request.validate()
+        target = env.controller.compute_target(
+            values_tuple, state,
+            task_artifact_hash=env.artifact.identity_hash,
+            source_id=source.scene_source.source_id,
+            source_closure_digest=source.source_closure_digest,
+            provider_materialization_id=env.session.provider_materialization_id,
+            episode_id=env.session.episode_id,
+            reset_sample_id=env.sample.sample_id,
+            state_revision=env.session.state_revision,
+        )
+        return {
+            'action_values': values_tuple,
+            'universal_action': values_tuple,
+            'request': request,
+            'target': target,
+            'writer_control': {
+                'writer_id': 'libero-spatial-mixed-controller-v1',
+                'action_schema_id': env.value['action_schema']['schema_id'],
+                'components': components,
+                'groups': ({
+                    'entity_id': 'panda-v1', 'group_id': 'mixed-actuation',
+                    'action_components': components,
+                },),
+                'requested_action': {
+                    'schema_version': env.value['action_schema']['schema_id'],
+                    'values': values_tuple,
+                    'unit': 'rad_x7_plus_aggregate_opening_m',
+                },
+                'canonical_action': {
+                    'schema_version': 'libero-joint-space-canonical-v1',
+                    'interpreted_values': values_tuple,
+                    'controller_identity': env.controller.identity,
+                    'hold_policy': env.controller.config.hold_policy,
+                },
+            },
+        }
+
+    def observe_mixed_control(env, state):
+        return observe_selected_reference_v1(env, state)
+
+    def mixed_record_metadata(env):
+        source = env.value['source']
+        receipt = source.execution_source_receipt
+        reset_context = env.info
+        if not isinstance(reset_context, dict):
+            raise RuntimeError('task recording metadata has no reset context')
+        reset_sample = reset_context.get('reset_sample_v1')
+        reset_realization = reset_context.get('reset_realization_v1')
+        reset_readback = reset_context.get('reset_readback_v1')
+        if not all(isinstance(item, dict) for item in (reset_realization, reset_readback)):
+            raise RuntimeError('task recording metadata requires reset realization/readback receipts')
+        components = list(env.value['action_schema']['components'])
+        return {
+            'env_metadata': {
+                'env_name': 'SelectedReferenceEnv.LiberoMixedDiagnosticV1',
+                'task_name': env.artifact.task_id,
+                'task_version': env.artifact.artifact_version,
+                'physics_dt': env.artifact.timebase.physics_dt,
+                'control_substeps': env.artifact.timebase.control_substeps,
+                'control_frequency': 1.0 / env.artifact.timebase.control_dt,
+                'action_schema': {
+                    'schema_id': env.value['action_schema']['schema_id'],
+                    'components': components,
+                    'units': ['radian'] * 7 + ['meter_total_opening'],
+                },
+                'observation_schema': {
+                    'state.ee_pose': 'world_position_m_quaternion_wxyz',
+                    'state.joint_position': 'seven_arm_then_two_signed_finger_positions_rad_m',
+                    'state.boundary_identity_sha256': 'selected RuntimeSession boundary identity SHA-256',
+                    'privileged_state.*_body_pose': 'world_body_center_m_quaternion_wxyz',
+                },
+                'provider': env.provider, 'backend': env.backend,
+                'evidence_class': 'diagnostic_candidate',
+            },
+            'universal_action_schema': {
+                'version': env.value['action_schema']['schema_id'],
+                'dimension': len(components), 'components': components,
+            },
+            'resolved_config': {
+                'provider': env.provider, 'backend': env.backend, 'horizon': env.horizon,
+                'physics_dt': env.artifact.timebase.physics_dt,
+                'control_substeps': env.artifact.timebase.control_substeps,
+                'control_dt': env.artifact.timebase.control_dt,
+                'integrator': source.config.runtime.integrator,
+                'controller_profile_id': env.controller.profile_id,
+                'controller_identity': env.controller.identity,
+                'hold_policy': env.controller.config.hold_policy,
+            },
+            'control_plan': env.controller.identity_mapping(),
+            'task_context': {
+                'schema_version': 'libero-episode-context-v1',
+                'task_artifact_identity_hash': env.artifact.identity_hash,
+                'source_id': source.scene_source.source_id,
+                'source_xml_sha256': receipt.canonical_xml_sha256,
+                'source_closure_digest': source.source_closure_digest,
+                'source_manifest_sha256': env.value['source_manifest_sha256'],
+                'controller_identity': env.controller.identity,
+                'provider_materialization_id': env.session.provider_materialization_id,
+                'episode_id': env.session.episode_id,
+                'init_row_index': env.sample.init_row_index,
+                'init_row_sha256': env.sample.init_row_sha256,
+                'reset_sample_id': env.sample.sample_id,
+                'simulation_time_s': env.sample.simulation_time_s,
+                'reset_sample_v1': reset_sample,
+                'reset_realization_v1': reset_realization,
+                'reset_readback_v1': reset_readback,
+            },
+            'candidate_identity': {
+                'task_artifact_identity_hash': env.artifact.identity_hash,
+                'source_id': source.scene_source.source_id,
+                'source_xml_sha256': receipt.canonical_xml_sha256,
+                'source_closure_digest': source.source_closure_digest,
+                'provider_materialization_id': env.session.provider_materialization_id,
+                'controller_identity': env.controller.identity,
+                'source_manifest_sha256': env.value['source_manifest_sha256'],
+            },
+        }
+
     def validate_compiled_session(session, value):
         receipt = session.compiled_layout_receipt
         dimensions = receipt['dimensions']
@@ -355,6 +540,39 @@ def build_libero_selected_candidate(
             raise ValueError('compiled LIBERO torque actuator map differs from RuntimeSource')
         if set(receipt['named_position_actuator_ids']) != set(value['source'].position_actuators):
             raise ValueError('compiled LIBERO finger actuator map differs from RuntimeSource')
+        expected_scalar_addresses = {
+            **{f'joint{i}': [i - 1, i - 1] for i in range(1, 8)},
+            'finger_joint1': [7, 7], 'finger_joint2': [8, 8],
+            'wooden_cabinet_1.top_level': [44, 39],
+            'wooden_cabinet_1.middle_level': [45, 40],
+            'wooden_cabinet_1.bottom_level': [46, 41],
+            'flat_stove_1.button': [47, 42],
+        }
+        expected_free_addresses = {
+            name: [9 + 7 * index, 9 + 6 * index]
+            for index, name in enumerate((
+                'akita_black_bowl_1', 'akita_black_bowl_2', 'cookies_1',
+                'glazed_rim_porcelain_ramekin_1', 'plate_1',
+            ))
+        }
+        if (receipt['named_joint_addresses'] != expected_scalar_addresses
+                or receipt['named_free_joint_addresses'] != expected_free_addresses):
+            raise ValueError('compiled scalar joint order differs from the fixed source init layout')
+        expected_channels = {
+            channel.semantic_id: channel for channel in value['source'].mixed_actuator_plan.channels
+        }
+        compiled_channels = receipt.get('named_actuator_channels')
+        if not isinstance(compiled_channels, dict) or set(compiled_channels) != set(expected_channels):
+            raise ValueError('compiled named actuator channels differ from the fixed source plan')
+        for semantic, channel in expected_channels.items():
+            record = compiled_channels[semantic]
+            if (record.get('actuator_name') != channel.actuator_name
+                    or record.get('joint_name') != channel.joint_name
+                    or record.get('drive_mode') != channel.drive_mode
+                    or record.get('unit') != channel.unit
+                    or record.get('control_range') != list(channel.control_range)
+                    or record.get('control_limited') is not True):
+                raise ValueError(f'compiled actuator differs from the fixed source channel: {semantic}')
         if (receipt['source_id'] != value['source'].scene_source.source_id
                 or receipt['source_closure_digest'] != value['source'].source_closure_digest):
             raise ValueError('compiled LIBERO layout receipt is not source-bound')
@@ -375,12 +593,14 @@ def build_libero_selected_candidate(
         external_actions=True, interval_mode='grouped', recorder_mode='canonical',
         reset_seed=lambda seed: seed,
         runtime_episode_identity=True,
-        build_libero_mixed_profile=build_value,
+        build_mixed_control_profile=build_value,
         reset_sample_with_options=reset_with_options,
-        mixed_control_profile_id=PROFILE_ID,
+        prepare_mixed_control=prepare_mixed_control,
+        observe_mixed_control=observe_mixed_control,
+        mixed_record_metadata=mixed_record_metadata,
         pre_reset_session_validator=validate_compiled_session,
     )
-    env = SelectedReferenceEnv.from_libero_diagnostic_candidate(
+    env = SelectedReferenceEnv.from_mixed_control_candidate(
         binding, provider='mujoco', backend='cpu', horizon=horizon,
     )
     # The shared sample owner retains reset and source facts for the public

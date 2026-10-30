@@ -169,14 +169,12 @@ class MixedActuatorTargetV1(Contract):
                 or not math.isfinite(float(self.simulation_time_s)) or self.simulation_time_s < 0):
             raise ValueError('mixed actuator target boundary is invalid')
         torques = dict(self.joint_torque_Nm)
-        fingers = dict(self.finger_position_m)
-        if len(torques) != 7 or set(torques) != {f'joint{i}' for i in range(1, 8)}:
-            raise ValueError('mixed actuator target requires the seven named Panda arm joints')
-        if len(fingers) != 2 or set(fingers) != {'finger_joint1', 'finger_joint2'}:
-            raise ValueError('mixed actuator target requires the two named finger joints')
-        if any(type(name) is not str or not name.strip() for name in (*torques, *fingers)):
+        positions = dict(self.finger_position_m)
+        if not torques or not positions or set(torques) & set(positions):
+            raise ValueError('mixed actuator target requires disjoint named torque and position channels')
+        if any(type(name) is not str or not name.strip() for name in (*torques, *positions)):
             raise ValueError('mixed actuator target names must be nonempty')
-        if any(not math.isfinite(float(value)) for value in (*torques.values(), *fingers.values())):
+        if any(not math.isfinite(float(value)) for value in (*torques.values(), *positions.values())):
             raise ValueError('mixed actuator target values must be finite')
         object.__setattr__(self, 'simulation_time_s', float(self.simulation_time_s))
 
@@ -210,6 +208,153 @@ class AppliedMixedActuatorV1(Contract):
             if any(not isinstance(name, str) or not name.strip() or not math.isfinite(float(value))
                    for name, value in mapping.items()):
                 raise ValueError('mixed actuator acknowledgement values must be finite and named')
+
+
+@dataclass(frozen=True)
+class MixedActuatorChannelV1(Contract):
+    """One source-bound scalar channel in a bounded mixed-control plan."""
+
+    semantic_id: str
+    actuator_name: str
+    joint_name: str
+    drive_mode: str
+    unit: str
+    control_range: tuple[float, float]
+    hold_policy: str = 'zero_order_hold_per_control_interval_v1'
+
+    def validate(self):
+        for name in (self.semantic_id, self.actuator_name, self.joint_name):
+            if type(name) is not str or not name.strip():
+                raise ValueError('mixed-control channel names must be nonempty strings')
+        if (self.drive_mode, self.unit) not in {
+            ('joint_torque', 'N*m'), ('joint_position', 'rad'),
+            ('joint_position', 'm'),
+        }:
+            raise ValueError('mixed-control channel drive mode and unit are unsupported')
+        if self.hold_policy != 'zero_order_hold_per_control_interval_v1':
+            raise ValueError('mixed-control channel hold policy is unsupported')
+        if (not isinstance(self.control_range, (tuple, list)) or len(self.control_range) != 2
+                or any(not math.isfinite(float(value)) for value in self.control_range)
+                or float(self.control_range[0]) > float(self.control_range[1])):
+            raise ValueError('mixed-control channel requires a finite ordered control range')
+        object.__setattr__(self, 'control_range', tuple(float(value) for value in self.control_range))
+
+
+@dataclass(frozen=True)
+class MixedActuatorPlanV1(Contract):
+    """Typed source-bound admission for named mixed actuator control.
+
+    It carries declarations only. Provider adapters still resolve names and
+    verify transmission, native drive metadata, units, and limits after compile.
+    """
+
+    schema_version: str
+    task_artifact_hash: str
+    source_id: str
+    source_closure_digest: str
+    controller_identity: str
+    channels: tuple[MixedActuatorChannelV1, ...]
+
+    def validate(self):
+        import re
+        for name in ('task_artifact_hash', 'source_closure_digest', 'controller_identity'):
+            if type(getattr(self, name)) is not str or re.fullmatch(r'[0-9a-f]{64}', getattr(self, name)) is None:
+                raise ValueError(f'mixed-control {name} must be a lowercase SHA-256')
+        if self.schema_version != 'mixed-actuator-plan-v1':
+            raise ValueError('unsupported mixed actuator plan schema')
+        if type(self.source_id) is not str or not self.source_id.strip():
+            raise ValueError('mixed actuator plan requires a source identity')
+        channels = tuple(self.channels)
+        if not channels or any(type(channel) is not MixedActuatorChannelV1 for channel in channels):
+            raise TypeError('mixed actuator plan requires typed channel declarations')
+        for channel in channels:
+            channel.validate()
+        names = [channel.semantic_id for channel in channels]
+        actuators = [channel.actuator_name for channel in channels]
+        if len(names) != len(set(names)) or len(actuators) != len(set(actuators)):
+            raise ValueError('mixed actuator plan channel and actuator writers must be unique')
+        object.__setattr__(self, 'channels', tuple(sorted(channels, key=lambda item: item.semantic_id)))
+
+    @property
+    def identity_hash(self):
+        return digest(self.to_mapping())
+
+
+@dataclass(frozen=True)
+class MixedActuatorCommandV1(Contract):
+    """Generic named actuator values bound to one selected runtime boundary."""
+
+    schema_version: str
+    plan_identity_hash: str
+    task_artifact_hash: str
+    source_id: str
+    source_closure_digest: str
+    controller_identity: str
+    provider_materialization_id: str
+    episode_id: str
+    reset_sample_id: str
+    control_step: int
+    state_revision: int
+    simulation_time_s: float
+    channel_values: Mapping[str, float]
+    channel_units: Mapping[str, str]
+
+    def validate(self):
+        import re
+        if self.schema_version != 'mixed-actuator-command-v1':
+            raise ValueError('unsupported mixed actuator command schema')
+        for name in ('plan_identity_hash', 'task_artifact_hash', 'source_closure_digest', 'controller_identity'):
+            if type(getattr(self, name)) is not str or re.fullmatch(r'[0-9a-f]{64}', getattr(self, name)) is None:
+                raise ValueError(f'mixed actuator command {name} must be a lowercase SHA-256')
+        for name in ('source_id', 'provider_materialization_id', 'episode_id', 'reset_sample_id'):
+            if type(getattr(self, name)) is not str or not getattr(self, name).strip():
+                raise ValueError(f'mixed actuator command {name} must be nonempty')
+        if (type(self.control_step) is not int or self.control_step < 0
+                or type(self.state_revision) is not int or self.state_revision < 0
+                or not math.isfinite(float(self.simulation_time_s)) or self.simulation_time_s < 0):
+            raise ValueError('mixed actuator command boundary is invalid')
+        values, units = dict(self.channel_values), dict(self.channel_units)
+        if not values or set(values) != set(units):
+            raise ValueError('mixed actuator command values and units must cover the same channels')
+        if any(type(name) is not str or not name.strip() for name in values):
+            raise ValueError('mixed actuator command channel names must be nonempty')
+        if any(not math.isfinite(float(value)) for value in values.values()):
+            raise ValueError('mixed actuator command values must be finite')
+        if any(unit not in {'N*m', 'rad', 'm'} for unit in units.values()):
+            raise ValueError('mixed actuator command units are unsupported')
+        object.__setattr__(self, 'simulation_time_s', float(self.simulation_time_s))
+
+    @property
+    def identity_hash(self):
+        return digest(self.to_mapping())
+
+
+@dataclass(frozen=True)
+class AppliedMixedActuatorCommandV1(Contract):
+    """Provider acknowledgement for a completely preflighted mixed command."""
+
+    schema_version: str
+    target_hash: str
+    provider_name: str
+    channel_values: Mapping[str, float]
+    channel_units: Mapping[str, str]
+    clipped: bool
+    mapping: str
+
+    def validate(self):
+        import re
+        if (self.schema_version != 'applied-mixed-actuator-command-v1'
+                or type(self.target_hash) is not str or re.fullmatch(r'[0-9a-f]{64}', self.target_hash) is None):
+            raise ValueError('invalid applied mixed actuator command identity')
+        if type(self.provider_name) is not str or not self.provider_name.strip():
+            raise ValueError('applied mixed actuator command requires provider identity')
+        values, units = dict(self.channel_values), dict(self.channel_units)
+        if not values or set(values) != set(units):
+            raise ValueError('applied mixed actuator values and units must cover the same channels')
+        if any(not math.isfinite(float(value)) for value in values.values()):
+            raise ValueError('applied mixed actuator values must be finite')
+        if type(self.clipped) is not bool or type(self.mapping) is not str or not self.mapping.strip():
+            raise ValueError('applied mixed actuator receipt metadata is invalid')
 
 
 @dataclass(frozen=True)

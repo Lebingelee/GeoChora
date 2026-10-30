@@ -65,6 +65,8 @@ class _World:
         self.closes = 0
         self.last_compile_xml = None
         self.last_assets = None
+        self.joint_excursion_at_step = None
+        self.warning_at_step = None
 
 
 class _Contact:
@@ -114,6 +116,12 @@ class _FakeModel:
             timestep=float(option.get("timestep", "0.002")) if option is not None else 0.002,
         )
         self._world = world
+        joint_defaults = {}
+        for default in root.iter("default"):
+            class_name = default.get("class")
+            joint_default = default.find("joint")
+            if class_name and joint_default is not None:
+                joint_defaults[class_name] = dict(joint_default.attrib)
         self._joint_ids: dict[str, int] = {}
         self._body_ids: dict[str, int] = {"world": 0}
         self._site_ids: dict[str, int] = {}
@@ -187,14 +195,20 @@ class _FakeModel:
             joint_nodes.extend(body.findall("freejoint"))
         self.njnt = len(joint_nodes)
         self.jnt_type = np.zeros(self.njnt, dtype=np.int32)
+        self.jnt_axis = np.zeros((self.njnt, 3), dtype=np.float64)
         self.jnt_qposadr = np.zeros(self.njnt, dtype=np.int32)
         self.jnt_dofadr = np.zeros(self.njnt, dtype=np.int32)
         self.jnt_limited = np.zeros(self.njnt, dtype=np.uint8)
         self.jnt_range = np.zeros((self.njnt, 2), dtype=np.float64)
+        self.jnt_bodyid = np.asarray(self._joint_body, dtype=np.int32)
         qpos_cursor = dof_cursor = 0
         for jid, node in enumerate(joint_nodes):
-            kind = "free" if node.tag == "freejoint" else node.get("type", "hinge")
+            inherited = joint_defaults.get(node.get("class"), {})
+            kind = "free" if node.tag == "freejoint" else node.get("type", inherited.get("type", "hinge"))
             self.jnt_type[jid] = {"free": 0, "hinge": 1, "slide": 2}.get(kind, 99)
+            self.jnt_axis[jid] = _floats(
+                node.get("axis", inherited.get("axis")), 3, (0.0, 0.0, 1.0),
+            )
             self.jnt_qposadr[jid], self.jnt_dofadr[jid] = qpos_cursor, dof_cursor
             if kind == "free":
                 self._free_by_body[self._joint_body[jid]] = (qpos_cursor, dof_cursor)
@@ -203,10 +217,10 @@ class _FakeModel:
             else:
                 qpos_cursor += 1
                 dof_cursor += 1
-            raw_range = node.get("range")
+            raw_range = node.get("range", inherited.get("range"))
             if raw_range is not None:
                 self.jnt_range[jid] = _floats(raw_range, 2, (0.0, 0.0))
-                self.jnt_limited[jid] = node.get("limited", "auto") != "false"
+                self.jnt_limited[jid] = node.get("limited", inherited.get("limited", "auto")) != "false"
         self.nq, self.nv, self.na = qpos_cursor, dof_cursor, 0
         self.qpos0 = np.zeros(self.nq, dtype=np.float64)
         for qpos, _ in self._free_by_body.values():
@@ -219,6 +233,16 @@ class _FakeModel:
         self.actuator_ctrllimited = np.zeros(self.nu, dtype=np.uint8)
         self.actuator_trntype = np.zeros(self.nu, dtype=np.int32)
         self.actuator_trnid = np.full((self.nu, 2), -1, dtype=np.int32)
+        # The Core adapter admits drive units from public compiled actuator
+        # metadata. These synthetic arrays model only the MuJoCo public fields
+        # consumed by that admission path; no solver or integration is faked
+        # above the leaf primitive boundary.
+        self.actuator_gaintype = np.zeros(self.nu, dtype=np.int32)
+        self.actuator_biastype = np.zeros(self.nu, dtype=np.int32)
+        self.actuator_gainprm = np.zeros((self.nu, 10), dtype=np.float64)
+        self.actuator_biasprm = np.zeros((self.nu, 10), dtype=np.float64)
+        self.actuator_gear = np.zeros((self.nu, 6), dtype=np.float64)
+        self.actuator_dyntype = np.zeros(self.nu, dtype=np.int32)
         for aid, actuator in enumerate(actuator_nodes):
             name = actuator.get("name")
             if not name or name in self._actuator_ids:
@@ -228,6 +252,14 @@ class _FakeModel:
                 actuator.get("ctrlrange"), 2, (-np.inf, np.inf),
             )
             self.actuator_ctrllimited[aid] = actuator.get("ctrllimited", "auto") != "false" and actuator.get("ctrlrange") is not None
+            self.actuator_gear[aid, 0] = _floats(actuator.get("gear"), 1, (1.0,))[0]
+            if actuator.tag == "motor":
+                self.actuator_gainprm[aid, 0] = 1.0
+            elif actuator.tag == "position":
+                self.actuator_biastype[aid] = 1  # fixed-gain affine servo
+                self.actuator_gainprm[aid, 0] = float(actuator.get("kp", "1"))
+                self.actuator_biasprm[aid, 1] = -self.actuator_gainprm[aid, 0]
+                self.actuator_biasprm[aid, 2] = -float(actuator.get("kv", "0"))
             joint_name = actuator.get("joint")
             if joint_name in self._joint_ids:
                 self.actuator_trnid[aid, 0] = self._joint_ids[joint_name]
@@ -276,6 +308,7 @@ class _FakeData:
         self.site_xmat = np.tile(np.eye(3, dtype=np.float64).reshape(1, 9), (model.nsite, 1))
         self.contact: list[_Contact] = []
         self.ncon = 0
+        self.warning = [types.SimpleNamespace(number=0) for _ in range(8)]
         self._write_counter = 0
         self._world = model._world
 
@@ -316,6 +349,9 @@ def _fake_api(monkeypatch):
     fake.MjData = _FakeData
     fake.mjtJoint = types.SimpleNamespace(mjJNT_FREE=0, mjJNT_HINGE=1, mjJNT_SLIDE=2)
     fake.mjtTrn = types.SimpleNamespace(mjTRN_JOINT=0)
+    fake.mjtGain = types.SimpleNamespace(mjGAIN_FIXED=0)
+    fake.mjtBias = types.SimpleNamespace(mjBIAS_NONE=0, mjBIAS_AFFINE=1)
+    fake.mjtDyn = types.SimpleNamespace(mjDYN_NONE=0)
     fake.mjtObj = types.SimpleNamespace(mjOBJ_JOINT=1, mjOBJ_BODY=2, mjOBJ_SITE=3, mjOBJ_ACTUATOR=4, mjOBJ_GEOM=5)
 
     def name2id(model, kind, name):
@@ -368,6 +404,8 @@ def _reset_data(model: _FakeModel, data: _FakeData):
     data.time = 0.0
     data.contact = []
     data.ncon = 0
+    for warning in data.warning:
+        warning.number = 0
 
 
 def _step(model: _FakeModel, data: _FakeData):
@@ -391,6 +429,13 @@ def _step(model: _FakeModel, data: _FakeData):
         if model.jnt_limited[joint_id]:
             low, high = model.jnt_range[joint_id]
             data.qpos[qpos] = float(np.clip(data.qpos[qpos], low, high))
+    excursion = world.joint_excursion_at_step
+    if excursion is not None and world.calls["step"] == excursion[2]:
+        joint_name, value, _step_number = excursion
+        joint_id = model._joint_ids[joint_name]
+        data.qpos[int(model.jnt_qposadr[joint_id])] = float(value)
+    if world.warning_at_step is not None and world.calls["step"] == world.warning_at_step:
+        data.warning[0].number = 1
     data.time += dt
 
 
@@ -415,15 +460,18 @@ def _forward(model: _FakeModel, data: _FakeData):
     for index, (body_id, node) in enumerate(model._site_lookup.values()):
         local_position = np.asarray(_floats(node.get("pos"), 3, (0.0, 0.0, 0.0)))
         data.site_xpos[index] = data.xpos[body_id] + _quat_matrix(data.xquat[body_id]) @ local_position
-    data.site_xmat[index] = _quat_matrix(data.xquat[body_id]).reshape(9)
+        data.site_xmat[index] = _quat_matrix(data.xquat[body_id]).reshape(9)
     data.contact = []
     pair = world.contact_pair(model, data) if callable(world.contact_pair) else world.contact_pair
     if pair is not None:
         left, right = pair
-        left_ids = [value for name, value in model._geom_ids.items()
-                    if name.startswith(f"libero_contact_{left}_")]
-        right_ids = [value for name, value in model._geom_ids.items()
-                     if name.startswith(f"libero_contact_{right}_")]
+        if type(left) is int and type(right) is int:
+            left_ids, right_ids = [left], [right]
+        else:
+            left_ids = [value for name, value in model._geom_ids.items()
+                        if name.startswith(f"libero_contact_{left}_")]
+            right_ids = [value for name, value in model._geom_ids.items()
+                         if name.startswith(f"libero_contact_{right}_")]
         if left_ids and right_ids:
             data.contact = [_Contact(left_ids[0], right_ids[0])]
     data.ncon = len(data.contact)
@@ -454,6 +502,699 @@ def _candidate(monkeypatch, *, horizon=4):
         horizon=horizon,
     )
     return env
+
+
+def _synthetic_mixed_candidate(monkeypatch, *, horizon=4):
+    """Build a different-name, different-dimension candidate through production owners."""
+    import hashlib
+    from gymnasium.spaces import Box, Dict
+
+    from task_env.artifacts import (
+        ActionIntent, EntityDefinition, ExecutionSpec, InitializationContract,
+        PoseWorld, RequiredCapabilitySet, ResetSampleV1, SemanticDefinition,
+        TaskArtifact, Timebase, WorldDefinition,
+    )
+    from task_env.assembly.source import TaskSceneSource
+    from task_env.controllers.canonical.contracts import (
+        AppliedMixedActuatorCommandV1, ControlGroupActionV1,
+        MixedActuatorChannelV1, MixedActuatorCommandV1, MixedActuatorPlanV1,
+        StructuredActionRequestV1, digest,
+    )
+    from task_env.environment.configuration import resolve_env_config
+    from task_env.environment.types import TaskEvaluation
+    from task_env.runtime.sessions.source import ExecutionSourceReceiptV1, RuntimeSource
+    from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
+
+    _fake_api(monkeypatch)
+    _FAKE_WORLD.contact_pair = lambda model, data: (
+        model._geom_ids["anchor_collision"], model._geom_ids["payload_collision"],
+    )
+    xml = b'''<mujoco model="synthetic_three_channel_fixture">
+      <compiler angle="radian"/>
+      <option timestep="0.002" integrator="implicitfast"/>
+      <worldbody>
+        <body name="anchor_body" pos="0 0 0">
+          <joint name="hinge_orchid" type="hinge" range="-2 2" limited="true"/>
+          <joint name="hinge_cobalt" type="hinge" range="-1 1" limited="true"/>
+          <geom name="anchor_collision" type="sphere" size="0.04"/>
+        </body>
+        <body name="slider_carriage" pos="0.1 0 0">
+          <joint name="slide_fern" type="slide" axis="1 0 0" range="0 0.2" limited="true"/>
+          <geom name="carriage_collision" type="sphere" size="0.02"/>
+        </body>
+        <body name="payload_body" pos="0.3 0 0.1">
+          <freejoint name="payload_free"/>
+          <geom name="payload_collision" type="sphere" size="0.03"/>
+        </body>
+      </worldbody>
+      <actuator>
+        <motor name="motor_orchid" joint="hinge_orchid" ctrllimited="true" ctrlrange="-2 2"/>
+        <motor name="motor_cobalt" joint="hinge_cobalt" ctrllimited="true" ctrlrange="-1 1"/>
+        <position name="servo_fern" joint="slide_fern" kp="25" kv="1" ctrllimited="true" ctrlrange="0 0.2"/>
+      </actuator>
+    </mujoco>'''
+    artifact = TaskArtifact(
+        "task-artifact-v0", "synthetic-three-channel-v1", "synthetic-contact-motion-v1", "fixture-v1",
+        WorldDefinition(
+            "world-v0", "SI_right_handed_z_up_wxyz",
+            (
+                EntityDefinition("anchor", "scene", "asset:synthetic-anchor-v1", (),
+                                 ("torque_orchid", "torque_cobalt"), "synthetic-rigid", "source-collision", {}),
+                EntityDefinition("carriage", "movable", "asset:synthetic-carriage-v1", (),
+                                 ("slide_fern",), "synthetic-rigid", "source-collision", {}),
+                EntityDefinition("payload", "movable", "asset:synthetic-payload-v1", (), (),
+                                 "synthetic-rigid", "source-collision", {}),
+            ),
+            ActionIntent("absolute_joint", None, "none", "arm_joint_position_and_gripper"),
+            ("joint_state_query", "body_pose_query", "contact_detection"), (),
+        ),
+        InitializationContract(
+            "initialization-v0", {"payload": PoseWorld((0.3, 0.0, 0.1), (1.0, 0.0, 0.0, 0.0))},
+            {"torque_orchid": 0.0, "torque_cobalt": 0.0, "slide_fern": 0.03}, (),
+            "source_bound_named_reset_sample", "synthetic_row_v1", 0,
+        ),
+        SemanticDefinition(
+            "semantics-v0", "synthetic_contact_semantics_v1", ("anchor", "payload"),
+            ("torque_orchid", "torque_cobalt", "slide_fern"), {}, "synthetic_bounded_motion",
+        ),
+        Timebase(0.002, 2, 0.004),
+        RequiredCapabilitySet((
+            "joint_position_actuation", "joint_state_query", "body_pose_query", "contact_detection",
+        )),
+    )
+    source_id = "synthetic-three-channel-source-v1"
+    receipt = ExecutionSourceReceiptV1.create(
+        source_id=source_id, canonical_xml=xml, importer_xml=xml,
+        closure_files={"canonical-source.xml": xml},
+    )
+    scene_source = TaskSceneSource(xml.decode(), receipt.snapshot_root, source_id)
+    controller_identity = hashlib.sha256(b"synthetic-controller-v1").hexdigest()
+    config = resolve_env_config(
+        task_uid=artifact.task_id, scene_uid="synthetic-scene-v1",
+        runtime={
+            "backend": "cpu", "physics_dt": 0.002, "control_substeps": 2,
+            "integrator": "implicitfast", "prewarm": False,
+        },
+        render={"camera_obs": False}, episode={"horizon": horizon, "ignore_done": False},
+        success_definition="synthetic_bounded_motion",
+    )
+
+    class _SyntheticController:
+        identity = controller_identity
+        profile_id = "synthetic-three-channel-controller-v1"
+        plan_identity_hash = ""
+
+        def reset(self, _state):
+            return None
+
+        def identity_mapping(self):
+            return {
+                "schema_version": "synthetic-controller-v1",
+                "identity_sha256": self.identity,
+                "profile_id": self.profile_id,
+                "components": ["torque_orchid_Nm", "torque_cobalt_Nm", "slide_fern_m"],
+                "hold_policy": "zero_order_hold_per_control_interval_v1",
+            }
+
+        def compute_target(self, values, state, *, task_artifact_hash, source_id,
+                           source_closure_digest, provider_materialization_id,
+                           episode_id, reset_sample_id, state_revision):
+            values = tuple(float(value) for value in values)
+            return MixedActuatorCommandV1(
+                "mixed-actuator-command-v1", self.plan_identity_hash,
+                task_artifact_hash, source_id, source_closure_digest, self.identity,
+                provider_materialization_id, episode_id, reset_sample_id,
+                int(state.control_step), int(state_revision), float(state.simulation_time),
+                {"torque_orchid": values[0], "torque_cobalt": values[1], "slide_fern": values[2]},
+                {"torque_orchid": "N*m", "torque_cobalt": "N*m", "slide_fern": "m"},
+            )
+
+    active = {}
+    reset_receipts = {}
+    action_schema = {
+        "schema_id": "synthetic-three-channel-action-v1", "schema_version": 1,
+        "controller_kind": "mixed_actuator_v1", "dimension": 3,
+        "components": ("torque_orchid_Nm", "torque_cobalt_Nm", "slide_fern_m"),
+    }
+    component_names = action_schema["components"]
+
+    def build_value(provider, backend):
+        if (provider, backend) != ("mujoco", "cpu"):
+            raise ValueError("synthetic fixture admits MuJoCo CPU only")
+        controller = _SyntheticController()
+        plan = MixedActuatorPlanV1(
+            "mixed-actuator-plan-v1", artifact.identity_hash, source_id,
+            receipt.source_closure_digest, controller.identity,
+            (
+                MixedActuatorChannelV1(
+                    "torque_orchid", "motor_orchid", "hinge_orchid", "joint_torque", "N*m", (-2.0, 2.0),
+                ),
+                MixedActuatorChannelV1(
+                    "torque_cobalt", "motor_cobalt", "hinge_cobalt", "joint_torque", "N*m", (-1.0, 1.0),
+                ),
+                MixedActuatorChannelV1(
+                    "slide_fern", "servo_fern", "slide_fern", "joint_position", "m", (0.0, 0.2),
+                ),
+            ),
+        )
+        controller.plan_identity_hash = plan.identity_hash
+        source = RuntimeSource(
+            task_artifact_hash=artifact.identity_hash, scene_source=scene_source,
+            joints={"torque_orchid": "hinge_orchid", "torque_cobalt": "hinge_cobalt", "slide_fern": "slide_fern"},
+            bodies={"anchor": "anchor_body", "payload": "payload_body"}, frames={},
+            free_joints={"payload": "payload_free"}, joint_targets={}, open_actuators=(),
+            composition=None, config=config, scene=None, agents=(), objects=("payload",),
+            source_closure_digest=receipt.source_closure_digest,
+            execution_source_receipt=receipt,
+            torque_actuators={"torque_orchid": "motor_orchid", "torque_cobalt": "motor_cobalt"},
+            position_actuators={"slide_fern": "servo_fern"},
+            actuator_units={"motor_orchid": "N*m", "motor_cobalt": "N*m", "servo_fern": "m"},
+            contact_geom_groups={"anchor": ("anchor_collision",), "payload": ("payload_collision",)},
+            mixed_actuator_plan=plan,
+        )
+        value = {
+            "artifact": artifact, "source": source, "controller": controller,
+            "selected_controller_kind": "mixed_actuator_v1", "solution": None,
+            "construction_id": digest({"artifact": artifact.identity_hash, "plan": plan.identity_hash}),
+            "action_schema": action_schema,
+            "action_space": Box(-np.inf, np.inf, (3,), dtype=np.float64),
+            "observation_space": Dict({
+                "state": Dict({
+                    "joint_position": Box(-np.inf, np.inf, (3,), dtype=np.float32),
+                    "boundary_identity_sha256": Box(0, 255, (32,), dtype=np.uint8),
+                }),
+                "privileged_state": Dict({
+                    "payload_body_pose": Box(-np.inf, np.inf, (1, 7), dtype=np.float32),
+                }),
+            }),
+            "reset_realizations": reset_receipts,
+        }
+        active["value"] = value
+        return value
+
+    def reset_sample_with_options(task_artifact, seed, options, source):
+        if task_artifact.identity_hash != artifact.identity_hash or source.scene_source.source_id != source_id:
+            raise ValueError("synthetic reset source/artifact identity mismatch")
+        if type(seed) is not int or seed < 0:
+            raise ValueError("synthetic reset seed must be a nonnegative integer")
+        pose = PoseWorld((0.3, 0.0, 0.1), (1.0, 0.0, 0.0, 0.0))
+        sample = ResetSampleV1.create(
+            schema_version="reset-sample-v1", task_artifact_hash=artifact.identity_hash,
+            source_id=source_id, source_closure_digest=source.source_closure_digest,
+            sampler_id="synthetic-source-bound-row-v1", sampler_version="v1",
+            task_seed=seed, init_row_index=0,
+            init_row_sha256=hashlib.sha256(f"synthetic-row:{seed}".encode()).hexdigest(),
+            joint_position={"torque_orchid": 0.0, "torque_cobalt": 0.0, "slide_fern": 0.03},
+            joint_velocity={"torque_orchid": 0.0, "torque_cobalt": 0.0, "slide_fern": 0.0},
+            sampled_poses_world={"payload": pose}, poses_world={"payload": pose},
+            free_joint_velocity={"payload": (0.0,) * 6},
+            free_joint_velocity_frame="mujoco_world_linear_local_angular_v1",
+            fixture_pose_world={}, simulation_time_s=0.0,
+            velocity_policy="named_qvel_and_free_joint_qvel_v1",
+            control_policy="named_mixed_actuator_channels_by_source_v1",
+            initialization_order=(
+                "sample_source_properties", "native_preprocess", "sample_task_placements",
+                "restore_source_bound_state", "forward_derived_state",
+            ),
+            settle_steps=0,
+        )
+        reset_receipts[sample.sample_id] = {
+            "schema_version": "synthetic-reset-realization-v1",
+            "source_id": source_id, "source_closure_digest": source.source_closure_digest,
+            "reset_sample_id": sample.sample_id, "seed": seed,
+            "synthetic_fixture": True,
+        }
+        return sample
+
+    def prepare(env, action, state):
+        vector = np.asarray(action, dtype=np.float64)
+        if vector.shape != (3,) or not np.isfinite(vector).all():
+            raise ValueError("synthetic action must be a finite three-channel vector")
+        values = tuple(float(value) for value in vector)
+        source = env.value["source"]
+        plan = source.mixed_actuator_plan
+        request = StructuredActionRequestV1(
+            "structured-action-request-v1", source.execution_source_receipt.canonical_xml_sha256,
+            plan.identity_hash, (ControlGroupActionV1(
+                "control-group-action-v1", "anchor", "mixed-drive", action_schema["schema_id"], values,
+            ),),
+        )
+        target = env.controller.compute_target(
+            values, state, task_artifact_hash=env.artifact.identity_hash,
+            source_id=source.scene_source.source_id, source_closure_digest=source.source_closure_digest,
+            provider_materialization_id=env.session.provider_materialization_id,
+            episode_id=env.session.episode_id, reset_sample_id=env.sample.sample_id,
+            state_revision=env.session.state_revision,
+        )
+        return {
+            "action_values": values, "universal_action": values, "request": request, "target": target,
+            "writer_control": {
+                "writer_id": "synthetic-three-channel-writer-v1",
+                "action_schema_id": action_schema["schema_id"],
+                "components": component_names,
+                "groups": ({"entity_id": "anchor", "group_id": "mixed-drive",
+                            "action_components": component_names},),
+                "requested_action": {"schema_version": action_schema["schema_id"],
+                                     "values": values, "unit": "N*m,N*m,m"},
+                "canonical_action": {"schema_version": "synthetic-canonical-action-v1",
+                                     "interpreted_values": values,
+                                     "controller_identity": env.controller.identity,
+                                     "hold_policy": "zero_order_hold_per_control_interval_v1"},
+            },
+        }
+
+    def observe(env, state):
+        source = env.value["source"]
+        contact = env.session.read_contact_summary_v2((("anchor", "payload"),))
+        contact_mapping = {
+            "schema_version": contact.schema_version,
+            "source_id": contact.source_id,
+            "source_closure_digest": contact.source_closure_digest,
+            "provider_materialization_id": contact.provider_materialization_id,
+            "episode_id": contact.episode_id,
+            "reset_sample_id": contact.reset_sample_id,
+            "control_step": contact.control_step,
+            "state_revision": contact.state_revision,
+            "simulation_time_s": contact.simulation_time_s,
+            "requested_pairs": [list(pair) for pair in contact.requested_pairs],
+            "covered_pairs": [list(pair) for pair in contact.covered_pairs],
+            "pair_counts": dict(contact.pair_counts),
+            "geom_groups": {name: list(values) for name, values in contact.geom_groups.items()},
+            "status": contact.status, "reason": contact.reason,
+        }
+        boundary = {
+            "source_id": source.scene_source.source_id,
+            "source_closure_digest": source.source_closure_digest,
+            "provider_materialization_id": env.session.provider_materialization_id,
+            "episode_id": env.session.episode_id,
+            "reset_sample_id": env.sample.sample_id,
+            "control_step": int(state.control_step),
+            "state_revision": int(env.session.state_revision),
+            "simulation_time_s": float(state.simulation_time),
+        }
+        boundary_hash = digest(boundary)
+        pose = state.pose_world["payload"]
+        observation = {
+            "state": {
+                "joint_position": np.asarray([
+                    state.joint_position[name] for name in ("torque_orchid", "torque_cobalt", "slide_fern")
+                ], dtype=np.float32),
+                "boundary_identity_sha256": np.frombuffer(bytes.fromhex(boundary_hash), dtype=np.uint8).copy(),
+            },
+            "privileged_state": {
+                "payload_body_pose": np.asarray([(*pose.position, *pose.quaternion_wxyz)], dtype=np.float32),
+            },
+        }
+        context = {
+            "schema_version": "synthetic-task-observation-context-v1",
+            **boundary, "state_boundary_identity_sha256": boundary_hash,
+            "contact_summary_v2": contact_mapping,
+            "task_semantics": {"schema_version": "synthetic-contact-semantic-v1", "contact_available": contact.status == "available"},
+        }
+        info = {**boundary, "contact_summary_v2": contact_mapping,
+                "boundary_context_v1": context, "state_boundary_identity_sha256": boundary_hash,
+                "synthetic_task_context": {"fixture": True}}
+        return observation, info, TaskEvaluation(0.0, False, {"synthetic": True})
+
+    def record_metadata(env):
+        source = env.value["source"]
+        context = {
+            "schema_version": "synthetic-task-episode-context-v1",
+            "task_artifact_identity_hash": env.artifact.identity_hash,
+            "source_id": source.scene_source.source_id,
+            "source_closure_digest": source.source_closure_digest,
+            "provider_materialization_id": env.session.provider_materialization_id,
+            "episode_id": env.session.episode_id,
+            "reset_sample_id": env.sample.sample_id,
+            "reset_sample_v1": env.sample.to_mapping(),
+        }
+        return {
+            "env_metadata": {
+                "env_name": "SelectedReferenceEnv.SyntheticMixedControlFixtureV1",
+                "task_name": env.artifact.task_id, "task_version": env.artifact.artifact_version,
+                "physics_dt": env.artifact.timebase.physics_dt,
+                "control_substeps": env.artifact.timebase.control_substeps,
+                "control_frequency": 1.0 / env.artifact.timebase.control_dt,
+                "action_schema": {"schema_id": action_schema["schema_id"],
+                                  "components": list(component_names), "units": ["N*m", "N*m", "m"]},
+                "observation_schema": {"state.joint_position": "two hinge radians then one slide meter"},
+                "provider": env.provider, "backend": env.backend,
+                "evidence_class": "synthetic_fixture",
+            },
+            "universal_action_schema": {"version": action_schema["schema_id"],
+                                        "dimension": 3, "components": list(component_names)},
+            "resolved_config": {"provider": env.provider, "backend": env.backend,
+                                "physics_dt": env.artifact.timebase.physics_dt,
+                                "control_substeps": env.artifact.timebase.control_substeps,
+                                "control_dt": env.artifact.timebase.control_dt,
+                                "integrator": source.config.runtime.integrator,
+                                "controller_profile_id": env.controller.profile_id,
+                                "controller_identity": env.controller.identity,
+                                "hold_policy": "zero_order_hold_per_control_interval_v1"},
+            "control_plan": env.controller.identity_mapping(),
+            "task_context": context,
+            "candidate_identity": {"task_artifact_identity_hash": env.artifact.identity_hash,
+                                   "source_id": source.scene_source.source_id,
+                                   "source_closure_digest": source.source_closure_digest,
+                                   "provider_materialization_id": env.session.provider_materialization_id,
+                                   "controller_identity": env.controller.identity,
+                                   "plan_identity_hash": source.mixed_actuator_plan.identity_hash},
+        }
+
+    def validate_compiled(session, value):
+        receipt = session.compiled_layout_receipt
+        plan = value["source"].mixed_actuator_plan
+        if (receipt.get("schema_version") != "compiled-model-layout-v1"
+                or receipt.get("plan_identity_hash") != plan.identity_hash
+                or receipt.get("dimensions", {}).get("nu") != 3
+                or set(receipt.get("named_actuator_channels", {})) != {item.semantic_id for item in plan.channels}
+                or set(receipt.get("named_joint_addresses", {})) != set(value["source"].joints)):
+            raise ValueError("synthetic pre-reset compiled receipt differs from its typed three-channel plan")
+        return {"schema_version": "synthetic-pre-reset-validation-v1",
+                "compiled_layout": receipt, "reset_not_yet_applied": True,
+                "runtime_identity": session.runtime_identity}
+
+    binding = ReferenceTaskBinding(
+        build=lambda provider: build_value(provider, "cpu"),
+        reset_sample=lambda task_artifact, seed: reset_sample_with_options(
+            task_artifact, seed, {}, active["value"]["source"],
+        ),
+        evaluate=lambda _evidence, _semantics: None,
+        object_poses=(("payload", "payload"),), external_actions=True,
+        interval_mode="grouped", recorder_mode="canonical", reset_seed=lambda seed: seed,
+        runtime_episode_identity=True, build_mixed_control_profile=build_value,
+        reset_sample_with_options=reset_sample_with_options,
+        prepare_mixed_control=prepare, observe_mixed_control=observe,
+        mixed_record_metadata=record_metadata, pre_reset_session_validator=validate_compiled,
+    )
+    env = SelectedReferenceEnv.from_mixed_control_candidate(
+        binding, provider="mujoco", backend="cpu", horizon=horizon,
+    )
+    return env
+
+
+def _read_synthetic_mixed_h5(path: Path):
+    """Independent fixture reader for the generic public v3 boundary/control contract."""
+    loaded = load_structured_control_records_h5(path)
+    if loaded["observation_count"] != loaded["transition_count"] + 1:
+        raise ValueError("synthetic H5 is missing a complete T+1 observation boundary")
+    contexts = loaded["boundary_contexts"]
+    if not isinstance(contexts, list) or len(contexts) != loaded["observation_count"]:
+        raise ValueError("synthetic H5 is missing its owner-defined boundary context")
+    for index, context in enumerate(contexts):
+        if context.get("schema_version") != "synthetic-task-observation-context-v1":
+            raise ValueError("synthetic H5 contains an unknown task context schema")
+        contact = context.get("contact_summary_v2")
+        if not isinstance(contact, dict):
+            raise ValueError("synthetic H5 is missing the public contact query")
+        for key in (
+            "source_id", "source_closure_digest", "provider_materialization_id",
+            "episode_id", "reset_sample_id", "control_step", "state_revision",
+            "simulation_time_s",
+        ):
+            if contact.get(key) != context.get(key):
+                raise ValueError(f"synthetic H5 contact identity is stale at {key}")
+        if context.get("control_step") != index:
+            raise ValueError("synthetic H5 boundary order is not contiguous")
+    for index, transition in enumerate(loaded["structured_controls"]):
+        if transition is None or len(transition.writer_controls) != 1:
+            raise ValueError("synthetic H5 is missing a typed request/target/ack transition")
+        writer = transition.writer_controls[0]
+        target = writer["controller_target"]["payload"]
+        applied = writer["applied_control"]["payload"]
+        expected_names = {"torque_orchid", "torque_cobalt", "slide_fern"}
+        if set(target["channel_values"]) != expected_names or set(applied["channel_values"]) != expected_names:
+            raise ValueError("synthetic H5 mixed-control channels differ from the typed plan")
+        if (target["channel_values"] != applied["channel_values"]
+                or target["channel_units"] != applied["channel_units"]
+                or applied["target_hash"] != writer["controller_target"]["identity_hash"]
+                or target["control_step"] != index):
+            raise ValueError("synthetic H5 target/Ack or control boundary identity differs")
+    return loaded
+
+
+def test_generic_three_channel_candidate_uses_shared_core_runtime_and_recorder(tmp_path, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    rows = []
+    try:
+        for seed in (31, 32, 33):
+            observation, reset_info = env.reset(seed=seed)
+            assert env.value["artifact"].task_id == "synthetic-contact-motion-v1"
+            dimensions = reset_info["compiled_model_layout_v1"]["dimensions"]
+            assert (dimensions["nq"], dimensions["nv"], dimensions["nu"]) == (10, 9, 3)
+            assert reset_info["contact_summary_v2"]["state_revision"] == env.session.state_revision
+            assert observation["state"]["joint_position"].shape == (3,)
+            output = tmp_path / f"synthetic_episode_{seed}.h5"
+            env.start_recording(output)
+            for _ in range(2):
+                observation, _, _, truncated, info = env.step(np.asarray([0.25, -0.15, 0.05]))
+                assert info["contact_summary_v2"]["state_revision"] == env.session.state_revision
+                assert set(info["mixed_actuator_command_v1"]["channel_values"]) == {
+                    "torque_orchid", "torque_cobalt", "slide_fern",
+                }
+            assert truncated is True
+            final = env.finish_recording("horizon_reached")
+            assert final["transition_count"] == 2
+            assert final["observation_count"] == 3
+            loaded = _read_synthetic_mixed_h5(output)
+            assert loaded["transition_count"] == 2
+            assert loaded["observation_count"] == 3
+            assert [row["control_step"] for row in loaded["boundary_contexts"]] == [0, 1, 2]
+            rows.append({
+                "seed": seed, "episode_id": loaded["outcome"].episode_id,
+                "reset_sample_id": reset_info["reset_sample_v1"]["sample_id"],
+                "h5_path": output.name, "h5_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                "transition_count": loaded["transition_count"],
+                "observation_count": loaded["observation_count"],
+                "source_id": reset_info["source_id"],
+                "source_closure_digest": reset_info["source_closure_digest"],
+                "mixed_actuator_plan_identity": env.value["source"].mixed_actuator_plan.identity_hash,
+                "compiled_dimensions": reset_info["compiled_model_layout_v1"]["dimensions"],
+                "evidence_class": "synthetic_provider_free_s1",
+            })
+        # A stale owner context must be rejected by the independent reader.
+        stale = tmp_path / "stale_contact_revision.h5"
+        shutil.copy2(tmp_path / "synthetic_episode_31.h5", stale)
+        with h5py.File(stale, "r+") as handle:
+            contexts = json.loads(handle["meta/boundary_context_v1_json"][()].decode("utf-8"))
+            contexts[1]["contact_summary_v2"]["state_revision"] -= 1
+            handle["meta/boundary_context_v1_json"][()] = json.dumps(
+                contexts, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+        with pytest.raises(ValueError, match="contact identity is stale at state_revision"):
+            _read_synthetic_mixed_h5(stale)
+    finally:
+        env.close()
+    assert env.close_receipt["session_closed"] is True
+
+    # Exercise the same generic route's partial-writer failure and close path.
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    failed = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        observation, _ = failed.reset(seed=41)
+        initial_steps = _FAKE_WORLD.calls["step"]
+        _FAKE_WORLD.partial_ctrl_after = _FAKE_WORLD.ctrl_write_count + 1
+        with pytest.raises(RuntimeError, match="partial actuator control write"):
+            failed.step(np.asarray([0.25, -0.15, 0.05]))
+        assert _FAKE_WORLD.calls["step"] == initial_steps
+        assert failed.execution_fault is not None
+        assert failed.execution_fault.phase == "mixed_control_application"
+    finally:
+        failed.close()
+    assert failed.close_receipt["session_closed"] is True
+
+
+def test_reset_schema_and_provider_rejection_precede_runtime_mutation(tmp_path, monkeypatch):
+    global _FAKE_WORLD
+    from task_env.artifacts import ExecutionSpec, PoseWorld, ResetSampleV1
+    from task_env.artifacts.execution import ResetSample
+
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        observation, _ = env.reset(seed=51)
+        session = env.session
+        state_before = session.snapshot()
+        reset_calls = _FAKE_WORLD.calls["reset"]
+        legacy_sample = ResetSample.create(
+            schema_version="reset-sample-v0", task_artifact_hash=env.artifact.identity_hash,
+            sampler_id="legacy-schema-negative", sampler_version="v1", task_seed=51,
+            joint_position=dict(env.sample.joint_position), poses_world=dict(env.sample.poses_world),
+            velocity_policy="zero_named_joint_and_entity_velocities",
+            control_policy="arm_targets_at_initial_joints_gripper_open", settle_steps=0,
+        )
+        with pytest.raises(TypeError, match="requires ResetSampleV1 before native reset"):
+            session.reset(legacy_sample)
+        assert _FAKE_WORLD.calls["reset"] == reset_calls
+        assert env.session is session and session.snapshot() == state_before
+        action = np.asarray([0.1, -0.1, 0.04], dtype=np.float64)
+        env.step(action)  # Rejected reset left the previously admitted episode usable.
+    finally:
+        env.close()
+    assert env.close_receipt["session_closed"] is True
+
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    from task_env.diagnostics.tasks.c02b_position_candidate import build_position_candidate
+
+    package = build_position_candidate(tmp_path / "legacy_position", provider="mujoco", horizon=2)
+    legacy_env = package.env
+    try:
+        legacy_env.reset(seed=package.reset_plan.reset_sample.task_seed)
+        session = legacy_env.session
+        calls_before = dict(_FAKE_WORLD.calls)
+        source_sample = package.reset_plan.reset_sample
+        # This is a well-formed v1 value intentionally unrelated to the
+        # legacy source.  The legacy session must reject the schema before it
+        # inspects source identity or mutates/reset native state.
+        unrelated_pose = PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+        mixed_sample = ResetSampleV1.create(
+            schema_version="reset-sample-v1", task_artifact_hash=package.artifact.identity_hash,
+            source_id=package.source.scene_source.source_id,
+            source_closure_digest=package.source.source_closure_digest,
+            sampler_id="wrong-profile-reset", sampler_version="v1",
+            task_seed=source_sample.task_seed, init_row_index=0,
+            init_row_sha256=hashlib.sha256(b"legacy-reset-negative-row").hexdigest(),
+            joint_position=dict(source_sample.joint_position),
+            joint_velocity={name: 0.0 for name in source_sample.joint_position},
+            sampled_poses_world={"unrelated_free_body": unrelated_pose},
+            poses_world={"unrelated_free_body": unrelated_pose},
+            free_joint_velocity={"unrelated_free_body": (0.0,) * 6},
+            free_joint_velocity_frame="mujoco_world_linear_local_angular_v1",
+            fixture_pose_world={}, simulation_time_s=0.0,
+            velocity_policy="named_qvel_and_free_joint_qvel_v1",
+            control_policy="named_mixed_actuator_channels_by_source_v1",
+            initialization_order=(
+                "sample_source_properties", "native_preprocess", "sample_task_placements",
+                "restore_source_bound_state", "forward_derived_state",
+            ),
+            settle_steps=0,
+        )
+        with pytest.raises(TypeError, match="requires ResetSample v0 before reset"):
+            session.reset(mixed_sample)
+        assert _FAKE_WORLD.calls == calls_before
+        assert legacy_env.session is session
+    finally:
+        legacy_env.close()
+    assert legacy_env._closed is True
+    assert session._closed is True
+
+    # Process-local mixed admission must reject an unsupported provider before
+    # it reaches provider import or any native materialization path.
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    unsupported = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        from task_env.runtime.sessions.api import materialize
+
+        with pytest.raises(ValueError, match="strict MuJoCo CPU state-only"):
+            materialize(
+                unsupported.artifact,
+                ExecutionSpec("geophys", "p1_2_scalar_cpu_v0", "none", "cpu", 0, "strict"),
+                source=unsupported.value["source"],
+            )
+        assert _FAKE_WORLD.calls["compile"] == 0
+        assert _FAKE_WORLD.calls["reset"] == 0
+    finally:
+        unsupported.close()
+
+
+def test_contact_state_revision_rejected_before_recording_and_latched(tmp_path, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        env.reset(seed=61)
+        session = env.session
+        original_observer = env.binding.observe_mixed_control
+
+        def stale_contact(environment, state):
+            observation, info, evaluation = original_observer(environment, state)
+            info = dict(info)
+            contact = dict(info["contact_summary_v2"])
+            contact["state_revision"] -= 1
+            info["contact_summary_v2"] = contact
+            return observation, info, evaluation
+
+        object.__setattr__(env.binding, "observe_mixed_control", stale_contact)
+        reset_revision = env.session.state_revision
+        reset_steps = _FAKE_WORLD.calls["step"]
+        with pytest.raises(ValueError, match="stale or belongs to another state revision"):
+            env.observation(env.state)
+        assert _FAKE_WORLD.calls["step"] == reset_steps
+        assert env.session.state_revision == reset_revision
+
+        env.start_recording(tmp_path / "stale_contact.h5")
+        assert env.recorder.transition_count == 0
+        assert env.recorder.observation_count == 1
+        with pytest.raises(ValueError, match="stale or belongs to another state revision"):
+            env.step(np.asarray([0.1, -0.1, 0.04], dtype=np.float64))
+        assert env.execution_fault is not None
+        assert env.execution_fault.phase == "mixed_observation"
+        # Observation validation runs before the Recorder can append the
+        # physically advanced but stale-contact boundary.
+        assert env.recorder.transition_count == 0
+        assert env.recorder.observation_count == 1
+    finally:
+        env.close()
+    assert env.close_receipt["session_closed"] is True
+    assert session._closed is True
+
+
+@pytest.mark.parametrize("failure_kind", ("joint_limit", "warning"))
+def test_physical_monitor_fails_on_first_native_step(failure_kind, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _candidate(monkeypatch, horizon=2)
+    session = None
+    try:
+        observation, _ = env.reset(seed=19, options={"init_row_index": 0})
+        session = env.session
+        action = np.asarray([*observation["state"]["joint_position"][:7], 0.04], dtype=np.float64)
+        prepared = env.binding.prepare_mixed_control(env, action, env.state)
+        plan = env.value["source"].mixed_actuator_plan
+        target = prepared["target"]
+        channel_by_name = {channel.semantic_id: channel for channel in plan.channels}
+        assert set(target.channel_values) == set(channel_by_name)
+        assert all(
+            channel_by_name[name].control_range[0] <= value <= channel_by_name[name].control_range[1]
+            for name, value in target.channel_values.items()
+        )
+        next_native_step = _FAKE_WORLD.calls["step"] + 1
+        if failure_kind == "joint_limit":
+            limit = session.compiled_layout_receipt["named_joint_limits"]["joint1"]["range"][1]
+            _FAKE_WORLD.joint_excursion_at_step = ("robot0_joint1", limit + 1.0e-4, next_native_step)
+            message = "joint limit excursion"
+        else:
+            _FAKE_WORLD.warning_at_step = next_native_step
+            message = "MuJoCo warning"
+        with pytest.raises(RuntimeError, match="physical state monitor.*" + message):
+            env.step(action)
+        monitor = session.physical_state_monitor_receipt
+        assert monitor["status"] == "failed"
+        assert monitor["native_step_count"] == 1
+        assert monitor["samples_including_reset"] == 2
+        if failure_kind == "joint_limit":
+            assert monitor["first_violation"]["kind"] == "joint_limit_exceeded"
+            assert monitor["first_violation"]["native_step"] == 1
+            assert monitor["first_violation"]["control_boundary"] == 1
+            assert monitor["first_violation"]["excursion"] == pytest.approx(1.0e-4)
+        else:
+            assert monitor["first_violation"] is None
+            assert monitor["warning_counts"][0] == 1
+        assert env.execution_fault is not None
+        assert env.execution_fault.phase == "mixed_physics_step"
+    finally:
+        env.close()
+    assert env.close_receipt["session_closed"] is True
+    assert env.close_receipt["physical_state_monitor"]["status"] == "failed"
 
 
 def test_r07c_d01_motion_gate_uses_signed_finger_aperture_delta():
@@ -573,7 +1314,7 @@ def test_failed_materialization_preserves_primary_error_and_reports_cleanup(tmp_
     }
     assert result["close_error"] is None
     close = result["final_session_close_receipt"]
-    assert close["schema_version"] == "r07c-d01-selected-close-v1"
+    assert close["schema_version"] == "mixed-control-selected-close-v1"
     assert close["session_closed"] is True
     assert close["session_materialized"] is False
     assert close["session_close_status"] == "not_materialized"
@@ -857,7 +1598,7 @@ def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reade
     with h5py.File(final_state_h5, "r+") as handle:
         handle["obs/state/joint_position"][-1, 0] += 0.5
     _reseal_bundle(final_state_result)
-    with pytest.raises(ValueError, match="final observation differs"):
+    with pytest.raises(ValueError, match="native-step monitor extrema"):
         consume_libero_candidate_bundle(final_state_result)
 
     row_copy = tmp_path / "tampered_row"
@@ -894,10 +1635,10 @@ def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reade
         receipt = layout_report["episodes"][0]
         for key in receipt_path:
             receipt = receipt[key]
-        receipt["named_torque_actuator_layout"]["joint1"]["transmission_target"] = "robot0_joint2"
+        receipt["named_actuator_channels"]["joint1"]["transmission_target"] = "robot0_joint2"
     layout_result.write_text(json.dumps(layout_report, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     _reseal_bundle(layout_result)
-    with pytest.raises(ValueError, match="compiled torque transmission/range"):
+    with pytest.raises(ValueError, match="compiled actuator transmission/drive/range"):
         consume_libero_candidate_bundle(layout_result)
 
     runtime_copy = tmp_path / "tampered_runtime_identity"
@@ -915,26 +1656,90 @@ def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reade
     shutil.copytree(original, sign_copy)
     sign_result = sign_copy / "worker_result.json"
     sign_h5 = sign_copy / result["episodes"][0]["h5"]["relative_path"]
-    from task_env.controllers.canonical.contracts import MixedActuatorTargetV1
+    from task_env.controllers.canonical.contracts import MixedActuatorCommandV1
 
     def reverse_second_finger(rows):
         writer = rows[0]["writer_controls"][0]
         target_payload = writer["controller_target"]["payload"]
-        target_payload["finger_position_m"]["finger_joint2"] = 0.01
-        target = MixedActuatorTargetV1.from_mapping(target_payload)
+        target_payload["channel_values"]["finger_joint2"] = 0.01
+        target = MixedActuatorCommandV1.from_mapping(target_payload)
         writer["controller_target"]["payload"] = target.to_mapping()
         writer["controller_target"]["identity_hash"] = target.identity_hash
         applied = writer["applied_control"]
         applied["target_hash"] = target.identity_hash
         applied["payload"].update(
             target_hash=target.identity_hash,
-            joint_torque_Nm=dict(target.joint_torque_Nm),
-            finger_position_m=dict(target.finger_position_m),
+            channel_values=dict(target.channel_values),
+            channel_units=dict(target.channel_units),
         )
     _rewrite_h5_json(sign_h5, "meta/structured_controls_v1_json", reverse_second_finger)
     _reseal_bundle(sign_result)
     with pytest.raises(ValueError, match="finger sign or aggregate-opening"):
         consume_libero_candidate_bundle(sign_result)
+
+    monitor_copy = tmp_path / "tampered_physical_monitor"
+    shutil.copytree(original, monitor_copy)
+    monitor_result = monitor_copy / "worker_result.json"
+    monitor_payload = json.loads(monitor_result.read_text(encoding="utf-8"))
+    monitor_payload["episodes"][0]["physical_state_monitor"]["joint_ranges"][
+        "finger_joint2"]["maximum_observed"] = 0.001
+    monitor_result.write_text(json.dumps(monitor_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    _reseal_bundle(monitor_result)
+    with pytest.raises(ValueError, match="differs from public RuntimeSession progress"):
+        consume_libero_candidate_bundle(monitor_result)
+
+    warning_copy = tmp_path / "tampered_physical_warning"
+    shutil.copytree(original, warning_copy)
+    warning_result = warning_copy / "worker_result.json"
+    warning_payload = json.loads(warning_result.read_text(encoding="utf-8"))
+    warning_payload["episodes"][0]["physical_state_monitor"]["warning_counts"] = [1]
+    warning_payload["episodes"][0]["runtime_progress"]["physical_state_monitor"]["warning_counts"] = [1]
+    warning_result.write_text(json.dumps(warning_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    _reseal_bundle(warning_result)
+    with pytest.raises(ValueError, match="MuJoCo warning"):
+        consume_libero_candidate_bundle(warning_result)
+
+    missing_warning_copy = tmp_path / "missing_physical_warning_counters"
+    shutil.copytree(original, missing_warning_copy)
+    missing_warning_result = missing_warning_copy / "worker_result.json"
+    missing_warning_payload = json.loads(missing_warning_result.read_text(encoding="utf-8"))
+    missing_warning_payload["episodes"][0]["physical_state_monitor"].pop("warning_counts")
+    missing_warning_payload["episodes"][0]["runtime_progress"][
+        "physical_state_monitor"].pop("warning_counts")
+    missing_warning_result.write_text(
+        json.dumps(missing_warning_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8",
+    )
+    _reseal_bundle(missing_warning_result)
+    with pytest.raises(ValueError, match="omits warning counters"):
+        consume_libero_candidate_bundle(missing_warning_result)
+
+    model_monitor_copy = tmp_path / "wrong_compiled_physical_monitor"
+    shutil.copytree(original, model_monitor_copy)
+    model_monitor_result = model_monitor_copy / "worker_result.json"
+    model_monitor_payload = json.loads(model_monitor_result.read_text(encoding="utf-8"))
+    model_monitor_payload["episodes"][0]["physical_state_monitor"][
+        "compiled_model_identity_sha256"] = "0" * 64
+    model_monitor_payload["episodes"][0]["runtime_progress"]["physical_state_monitor"][
+        "compiled_model_identity_sha256"] = "0" * 64
+    model_monitor_result.write_text(
+        json.dumps(model_monitor_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8",
+    )
+    _reseal_bundle(model_monitor_result)
+    with pytest.raises(ValueError, match="bound to a different compiled model"):
+        consume_libero_candidate_bundle(model_monitor_result)
+
+    recovered_excursion_copy = tmp_path / "midtrajectory_excursion_then_recovery"
+    shutil.copytree(original, recovered_excursion_copy)
+    recovered_excursion_result = recovered_excursion_copy / "worker_result.json"
+    recovered_excursion_h5 = recovered_excursion_copy / result["episodes"][0]["h5"]["relative_path"]
+    with h5py.File(recovered_excursion_h5, "r+") as handle:
+        # Keep every typed target/Ack valid and the final observation unchanged.
+        # This single interior public state is out of range and later recovers.
+        handle["obs/state/joint_position"][1, 0] = 100.0
+        assert handle["obs/state/joint_position"][-1, 0] != 100.0
+    _reseal_bundle(recovered_excursion_result)
+    with pytest.raises(ValueError, match="H5 joint observations escape the native-step monitor extrema"):
+        consume_libero_candidate_bundle(recovered_excursion_result)
 
     episode_copy = tmp_path / "tampered_episode"
     shutil.copytree(original, episode_copy)
@@ -1110,7 +1915,7 @@ def test_selected_rejects_invalid_action_before_native_and_reset_forward_failure
     try:
         env.reset(seed=19, options={"init_row_index": 0})
         steps_before = _FAKE_WORLD.calls["step"]
-        with pytest.raises(ValueError, match="seven finite radians"):
+        with pytest.raises(ValueError, match="finite vector matching its declared action schema"):
             env.step(np.asarray([np.nan] * 8))
         assert _FAKE_WORLD.calls["step"] == steps_before
         assert env.execution_fault is None
@@ -1196,11 +2001,68 @@ def test_reset_plan_preflight_rejects_seed_mismatch_without_closing_live_session
             env.reset(seed=20, options={"reset_plan_v1": plan})
 
         assert env.session is session
-        assert env._libero_reset_plan is None
+        assert env._mixed_reset_plan is None
         assert close_calls == []
         assert _FAKE_WORLD.calls["compile"] == compile_count
         assert _FAKE_WORLD.calls["reset"] == reset_count
         assert _FAKE_WORLD.calls["step"] == 0
+    finally:
+        env.close()
+
+
+def test_reset_plan_source_layout_and_range_preflight_preserve_live_session(monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _candidate(monkeypatch)
+    try:
+        observation, info = env.reset(seed=19, options={"init_row_index": 0})
+        from task_env.artifacts import ResetPlanV1, ResetSampleV1
+
+        session = env.session
+        state_before = session.snapshot()
+        reset_count = _FAKE_WORLD.calls["reset"]
+        step_count = _FAKE_WORLD.calls["step"]
+        sample_map = info["reset_sample_v1"]
+
+        wrong_source_map = dict(sample_map)
+        wrong_source_map["source_id"] = "wrong-source-identity"
+        wrong_source = ResetSampleV1.create(**wrong_source_map)
+        wrong_source_plan = ResetPlanV1("reset-plan-v1", wrong_source, "task_episode")
+        with pytest.raises(ValueError, match="Artifact/source identity"):
+            env.reset(seed=19, options={"reset_plan_v1": wrong_source_plan})
+        assert env.session is session
+        assert session.snapshot() == state_before
+        assert _FAKE_WORLD.calls["reset"] == reset_count
+
+        missing_channel_map = dict(sample_map)
+        missing_channel_map["joint_position"] = dict(sample_map["joint_position"])
+        missing_channel_map["joint_velocity"] = dict(sample_map["joint_velocity"])
+        missing_channel_map["joint_position"].pop("joint1")
+        missing_channel_map["joint_velocity"].pop("joint1")
+        missing_channel = ResetSampleV1.create(**missing_channel_map)
+        missing_channel_plan = ResetPlanV1("reset-plan-v1", missing_channel, "task_episode")
+        with pytest.raises(ValueError, match="reset semantic bindings mismatch"):
+            session.reset_plan(missing_channel_plan)
+        assert session.snapshot() == state_before
+        assert session._reset_plan_gate_required is False
+        assert _FAKE_WORLD.calls["reset"] == reset_count
+
+        out_of_range_map = dict(sample_map)
+        out_of_range_map["joint_position"] = dict(sample_map["joint_position"])
+        out_of_range_map["joint_position"]["joint1"] = 100.0
+        out_of_range = ResetSampleV1.create(**out_of_range_map)
+        out_of_range_plan = ResetPlanV1("reset-plan-v1", out_of_range, "task_episode")
+        with pytest.raises(ValueError, match="reset position exceeds source joint limits"):
+            session.reset_plan(out_of_range_plan)
+        assert env.session is session
+        assert session.snapshot() == state_before
+        assert session._reset_plan_gate_required is False
+        assert _FAKE_WORLD.calls["reset"] == reset_count
+
+        action = np.asarray([*observation["state"]["joint_position"][:7], 0.04], dtype=np.float64)
+        env.step(action)
+        assert _FAKE_WORLD.calls["step"] == step_count + 25
     finally:
         env.close()
 

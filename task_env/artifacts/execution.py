@@ -114,7 +114,7 @@ class ResetSampleV1(Contract):
         for name in ('source_id', 'sampler_id', 'sampler_version'):
             _name(getattr(self, name))
         if (type(self.task_seed) is not int or self.task_seed < 0
-                or type(self.init_row_index) is not int or not 0 <= self.init_row_index < 50
+                or type(self.init_row_index) is not int or self.init_row_index < 0
                 or type(self.settle_steps) is not int or self.settle_steps != 0):
             raise ValueError('ResetSampleV1 seed, row, and settle count are invalid')
         if self.sample_id != 'reset-' + self.identity_hash:
@@ -125,13 +125,22 @@ class ResetSampleV1(Contract):
             raise ValueError('unsupported ResetSampleV1 velocity policy')
         if self.free_joint_velocity_frame != 'mujoco_world_linear_local_angular_v1':
             raise ValueError('unsupported MuJoCo free-joint qvel frame')
-        if self.control_policy != 'named_torque_and_finger_position_by_source_v1':
+        if self.control_policy not in {
+            'named_torque_and_finger_position_by_source_v1',
+            'named_mixed_actuator_channels_by_source_v1',
+        }:
             raise ValueError('unsupported ResetSampleV1 control policy')
-        if tuple(self.initialization_order) != (
+        order = tuple(self.initialization_order)
+        legacy_order = (
             'sample_object_properties', 'mj_step1', 'sample_fixtures_and_objects',
             'restore_selected_init_row', 'mj_forward',
-        ):
-            raise ValueError('ResetSampleV1 initialization order differs from the pinned upstream route')
+        )
+        generic_order = (
+            'sample_source_properties', 'native_preprocess', 'sample_task_placements',
+            'restore_source_bound_state', 'forward_derived_state',
+        )
+        if order not in {legacy_order, generic_order}:
+            raise ValueError('ResetSampleV1 initialization order is unsupported')
         joint_position = dict(self.joint_position)
         joint_velocity = dict(self.joint_velocity)
         sampled_poses = dict(self.sampled_poses_world)

@@ -15,7 +15,9 @@ from typing import Any
 import h5py
 import numpy as np
 
-from task_env.controllers.canonical.contracts import AppliedMixedActuatorV1, MixedActuatorTargetV1, digest
+from task_env.controllers.canonical.contracts import (
+    AppliedMixedActuatorCommandV1, MixedActuatorCommandV1, digest,
+)
 from task_env.artifacts import PoseWorld, ResetPlanV1, ResetSampleV1
 from task_env.recorders import inspect_trajectory_h5, load_structured_control_records_h5
 
@@ -71,6 +73,94 @@ def _validate_public_motion_gate(summary: Mapping[str, Any], initial_joints: np.
         if actual["aggregate_finger_position_delta_m"] < 0.005:
             raise ValueError("per-episode public motion gate requires aggregate finger opening delta >=0.005 m")
     return actual
+
+
+def _validate_physical_state_monitor(
+    monitor: Any, progress: Mapping[str, Any], compiled: Mapping[str, Any],
+    observed_joints: np.ndarray,
+) -> dict[str, Any]:
+    """Check the provider's per-native-step physical receipt independently."""
+    if not isinstance(monitor, Mapping) or monitor != progress.get("physical_state_monitor"):
+        raise ValueError("episode physical-state monitor is missing or differs from public RuntimeSession progress")
+    native_steps = progress.get("native_step_count")
+    if (monitor.get("schema_version") != "physical-state-monitor-v1"
+            or monitor.get("status") != "passed"
+            or monitor.get("first_violation") is not None
+            or type(native_steps) is not int or native_steps < 0
+            or monitor.get("native_step_count") != native_steps
+            or monitor.get("samples_including_reset") != native_steps + 1
+            or monitor.get("source_id") != progress.get("source_id")
+            or monitor.get("source_closure_digest") != progress.get("source_closure_digest")
+            or monitor.get("provider_materialization_id") != progress.get("provider_materialization_id")
+            or monitor.get("episode_id") != progress.get("episode_id")
+            or monitor.get("reset_sample_id") != progress.get("reset_sample_id")
+            or monitor.get("canonical_xml_sha256") != compiled.get("canonical_xml_sha256")):
+        raise ValueError("physical-state monitor identity, status, or per-step count is invalid")
+    expected_model_hash = hashlib.sha256(json.dumps(
+        compiled, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
+    if monitor.get("compiled_model_identity_sha256") != expected_model_hash:
+        raise ValueError("physical-state monitor is bound to a different compiled model")
+    tolerance = monitor.get("tolerance")
+    if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+            or not np.isfinite(tolerance) or not 0.0 <= float(tolerance) <= 1.0e-8):
+        raise ValueError("physical-state monitor tolerance exceeds the frozen numeric bound")
+    limits = compiled.get("named_joint_limits")
+    addresses = compiled.get("named_joint_addresses")
+    ranges = monitor.get("joint_ranges")
+    if not isinstance(limits, Mapping) or not isinstance(addresses, Mapping) or not isinstance(ranges, Mapping):
+        raise ValueError("physical-state monitor omits compiled limited-joint bindings")
+    expected_limited = {name: row for name, row in limits.items() if row.get("limited") is True}
+    if set(ranges) != set(expected_limited):
+        raise ValueError("physical-state monitor does not cover every compiled limited scalar joint")
+    maximum_excursion = 0.0
+    for name, expected in expected_limited.items():
+        row = ranges[name]
+        low, high = expected.get("range", ())
+        if (row.get("joint_name") != expected.get("joint_name")
+                or row.get("qpos_address") != addresses.get(name, [None])[0]
+                or row.get("range") != expected.get("range")):
+            raise ValueError(f"physical-state monitor source range differs from compiled joint: {name}")
+        minimum, maximum = row.get("minimum_observed"), row.get("maximum_observed")
+        if (type(minimum) not in (int, float) or type(maximum) not in (int, float)
+                or not np.isfinite((minimum, maximum)).all() or minimum > maximum):
+            raise ValueError(f"physical-state monitor extrema are malformed: {name}")
+        excursion = max(0.0, float(low) - float(minimum), float(maximum) - float(high))
+        maximum_excursion = max(maximum_excursion, excursion)
+        if excursion > float(tolerance):
+            raise ValueError(f"measured physical state exceeded a compiled joint limit: {name}")
+    reported_excursion = monitor.get("maximum_excursion")
+    if (isinstance(reported_excursion, bool) or not isinstance(reported_excursion, (int, float))
+            or not np.isfinite(reported_excursion)
+            or not np.isclose(float(reported_excursion), maximum_excursion, rtol=0.0, atol=1e-12)):
+        raise ValueError("physical-state monitor maximum excursion differs from its recorded extrema")
+    warning_counts = monitor.get("warning_counts")
+    if (not isinstance(warning_counts, list)
+            or any(type(value) is not int or value < 0 for value in warning_counts)
+            or any(warning_counts)):
+        raise ValueError("physical-state monitor omits warning counters or records a MuJoCo warning")
+    joint_names = [*(f"joint{i}" for i in range(1, 8)), "finger_joint1", "finger_joint2"]
+    if observed_joints.shape[1] != len(joint_names):
+        raise ValueError("H5 joint observations do not cover the task's mapped monitor channels")
+    for index, name in enumerate(joint_names):
+        row = ranges.get(name)
+        if row is None:
+            raise ValueError(f"physical-state monitor omitted observed task joint: {name}")
+        # H5 state channels are float32; this tolerance only accounts for that
+        # serialization quantization, not for source-limit excursion.
+        if (float(np.min(observed_joints[:, index])) < float(row["minimum_observed"]) - 2.0e-7
+                or float(np.max(observed_joints[:, index])) > float(row["maximum_observed"]) + 2.0e-7):
+            raise ValueError(f"public H5 joint observations escape the native-step monitor extrema: {name}")
+    return {
+        "status": "verified_physical_state_monitor",
+        "native_step_count": native_steps,
+        "samples_including_reset": monitor["samples_including_reset"],
+        "limited_joint_count": len(ranges),
+        "warning_counts": list(warning_counts),
+        "maximum_excursion": float(reported_excursion),
+        "tolerance": float(tolerance),
+        "compiled_model_identity_sha256": expected_model_hash,
+    }
 
 
 def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
@@ -214,8 +304,8 @@ def _episode_record(env, *, output_dir: Path, episode_index: int, row_index: int
             "truncated": bool(truncated),
             "control_step": int(info.get("control_step", -1)),
             "simulation_time_s": float(info.get("simulation_time_s", float("nan"))),
-            "mixed_controller_target_v1": info.get("mixed_controller_target_v1"),
-            "mixed_applied_control_v1": info.get("mixed_applied_control_v1"),
+            "mixed_actuator_command_v1": info.get("mixed_actuator_command_v1"),
+            "applied_mixed_actuator_command_v1": info.get("applied_mixed_actuator_command_v1"),
         })
         if terminated or truncated:
             break
@@ -270,11 +360,12 @@ def _episode_record(env, *, output_dir: Path, episode_index: int, row_index: int
         "final_info": {
             "predicate_v1": final_info.get("predicate_v1"),
             "contact_summary_v2": final_info.get("contact_summary_v2"),
-            "mixed_controller_target_v1": final_info.get("mixed_controller_target_v1"),
-            "mixed_applied_control_v1": final_info.get("mixed_applied_control_v1"),
+            "mixed_actuator_command_v1": final_info.get("mixed_actuator_command_v1"),
+            "applied_mixed_actuator_command_v1": final_info.get("applied_mixed_actuator_command_v1"),
             "episode_end_v1": final_info.get("episode_end_v1"),
         },
         "runtime_progress": progress,
+        "physical_state_monitor": progress.get("physical_state_monitor"),
         "finalizer": finalized,
         "h5": {
             "relative_path": str(h5_path.relative_to(output_dir.resolve())),
@@ -449,7 +540,7 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
         # Counts beyond nq/nv/na/nu are model-dependent inventory, but every
         # value and the fixed source dimensions must be retained.
         dimensions = compiled.get("dimensions")
-        if (compiled.get("schema_version") != "r07c-d01-compiled-model-layout-v1"
+        if (compiled.get("schema_version") != "compiled-model-layout-v1"
                 or not isinstance(dimensions, dict)
                 or any(type(dimensions.get(name)) is not int for name in (
                     "nq", "nv", "na", "nu", "njnt", "nbody", "nsite", "ngeom",
@@ -492,41 +583,47 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                 or not isinstance(frame_ids, dict) or set(frame_ids) != {"panda-v1/ee"}
                 or type(frame_ids.get("panda-v1/ee")) is not int or frame_ids["panda-v1/ee"] <= 0):
             raise ValueError("compiled named Body/Frame inventory differs from the fixed LIBERO source map")
-        expected_torque_ranges = {
-            **{f"joint{i}": [-80.0, 80.0] for i in range(1, 6)},
-            "joint6": [-12.0, 12.0], "joint7": [-12.0, 12.0],
+        expected_channel_specs = {
+            **{
+                f"joint{i}": {
+                    "actuator_name": f"robot0_torq_j{i}",
+                    "joint_name": f"robot0_joint{i}", "drive_mode": "joint_torque",
+                    "unit": "N*m", "control_range": [-80.0, 80.0] if i <= 5 else [-12.0, 12.0],
+                } for i in range(1, 8)
+            },
+            "finger_joint1": {
+                "actuator_name": "gripper0_gripper_finger_joint1",
+                "joint_name": "gripper0_finger_joint1", "drive_mode": "joint_position",
+                "unit": "m", "control_range": [0.0, 0.04],
+            },
+            "finger_joint2": {
+                "actuator_name": "gripper0_gripper_finger_joint2",
+                "joint_name": "gripper0_finger_joint2", "drive_mode": "joint_position",
+                "unit": "m", "control_range": [-0.04, 0.0],
+            },
         }
         torque_ids = compiled.get("named_torque_actuator_ids")
         position_ids = compiled.get("named_position_actuator_ids")
-        torque_layout = compiled.get("named_torque_actuator_layout")
-        position_layout = compiled.get("named_position_actuator_layout")
-        if (not isinstance(torque_ids, dict) or set(torque_ids) != set(expected_torque_ranges)
+        channel_layout = compiled.get("named_actuator_channels")
+        if (not isinstance(torque_ids, dict) or set(torque_ids) != {f"joint{i}" for i in range(1, 8)}
                 or not isinstance(position_ids, dict) or set(position_ids) != {"finger_joint1", "finger_joint2"}
-                or not isinstance(torque_layout, dict) or set(torque_layout) != set(expected_torque_ranges)
-                or not isinstance(position_layout, dict) or set(position_layout) != {"finger_joint1", "finger_joint2"}):
+                or not isinstance(channel_layout, dict) or set(channel_layout) != set(expected_channel_specs)):
             raise ValueError("compiled actuator receipt omits a named torque or finger slot")
         actuator_ids = []
-        for name, expected_range in expected_torque_ranges.items():
-            entry = torque_layout[name]
-            expected_index = name.removeprefix("joint")
-            if (type(torque_ids[name]) is not int or entry.get("id") != torque_ids[name]
-                    or entry.get("name") != f"robot0_torq_j{expected_index}"
+        for name, spec in expected_channel_specs.items():
+            entry = channel_layout[name]
+            expected_id = torque_ids.get(name) if name in torque_ids else position_ids.get(name)
+            if (type(expected_id) is not int or entry.get("actuator_id") != expected_id
+                    or entry.get("actuator_name") != spec["actuator_name"]
+                    or entry.get("joint_name") != spec["joint_name"]
+                    or entry.get("transmission_target") != spec["joint_name"]
                     or entry.get("transmission_type") != "joint"
-                    or entry.get("transmission_target") != f"robot0_{name}"
+                    or entry.get("drive_mode") != spec["drive_mode"]
+                    or entry.get("unit") != spec["unit"]
                     or entry.get("control_limited") is not True
-                    or entry.get("control_range") != expected_range):
-                raise ValueError(f"compiled torque transmission/range receipt is invalid: {name}")
-            actuator_ids.append(torque_ids[name])
-        for name, expected_range in {"finger_joint1": [0.0, 0.04], "finger_joint2": [-0.04, 0.0]}.items():
-            entry = position_layout[name]
-            if (type(position_ids[name]) is not int or entry.get("id") != position_ids[name]
-                    or entry.get("name") != f"gripper0_gripper_{name}"
-                    or entry.get("transmission_type") != "joint"
-                    or entry.get("transmission_target") != f"gripper0_{name}"
-                    or entry.get("control_limited") is not True
-                    or entry.get("control_range") != expected_range):
-                raise ValueError(f"compiled finger transmission/range receipt is invalid: {name}")
-            actuator_ids.append(position_ids[name])
+                    or entry.get("control_range") != spec["control_range"]):
+                raise ValueError(f"compiled actuator transmission/drive/range receipt is invalid: {name}")
+            actuator_ids.append(expected_id)
         if sorted(actuator_ids) != list(range(9)):
             raise ValueError("compiled actuator layout does not uniquely cover all nine ctrl slots")
         geom_groups = compiled.get("named_contact_geom_groups")
@@ -647,12 +744,15 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
             ])
             if actions.shape != (semantic["transition_count"], 8) or not np.isfinite(actions).all():
                 raise ValueError("independent H5 public actions are incomplete or non-finite")
+        monitor_summary = _validate_physical_state_monitor(
+            episode.get("physical_state_monitor"), progress, compiled, joints,
+        )
         if (task_context.get("init_row_index") != expected_row
                 or task_context.get("reset_sample_id") != sample.get("sample_id")
                 or task_context.get("source_id") != episode.get("source_id")
                 or task_context.get("source_closure_digest") != episode.get("source_closure_digest")):
             raise ValueError("independent H5 task context is not bound to the worker's reset row/source")
-        if (task_context.get("schema_version") != "r07c-d01-libero-episode-context-v1"
+        if (task_context.get("schema_version") != "libero-episode-context-v1"
                 or task_context.get("episode_id") != episode.get("episode_id")
                 or task_context.get("provider_materialization_id") != progress.get("provider_materialization_id")
                 or task_context.get("controller_identity") != episode.get("control_plan", {}).get("identity_sha256")):
@@ -662,16 +762,18 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
             raise ValueError("independent H5 omits typed control target/Ack on one or more transitions")
         boundary_identity_fields = (
             "source_id", "source_closure_digest", "provider_materialization_id",
-            "episode_id", "reset_sample_id", "control_step", "simulation_time_s",
+            "episode_id", "reset_sample_id", "control_step", "state_revision",
+            "simulation_time_s",
         )
         for index, boundary in enumerate(boundaries):
             if (not isinstance(boundary, dict)
-                    or boundary.get("schema_version") != "r07c-d01-boundary-context-v1"
+                    or boundary.get("schema_version") != "task-observation-context-v1"
                     or any(boundary.get(name) != task_context.get(name) for name in (
                         "source_id", "source_closure_digest", "provider_materialization_id",
                         "episode_id", "reset_sample_id",
                     ))
                     or boundary.get("control_step") != index
+                    or boundary.get("state_revision") != index
                     or boundary.get("simulation_time_s") != index * 0.05):
                 raise ValueError("independent H5 T/T+1 boundary order, clock, or episode identity mismatch")
             identity = {name: boundary[name] for name in boundary_identity_fields}
@@ -690,7 +792,7 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                         "episode_id", "reset_sample_id", "control_step", "simulation_time_s",
                     ))):
                 raise ValueError("independent H5 contact query coverage/freshness is incomplete")
-            if contact.get("state_revision") != boundary.get("control_step"):
+            if contact.get("state_revision") != boundary.get("state_revision"):
                 raise ValueError("independent H5 contact summary belongs to a stale state revision")
             count = contact.get("pair_counts", {}).get("akita_black_bowl_1/plate_1")
             if type(count) is not int or count < 0:
@@ -732,8 +834,8 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
             raw_ack = writer.get("applied_control", {}).get("payload")
             if not isinstance(raw_target, Mapping) or not isinstance(raw_ack, Mapping):
                 raise ValueError("independent H5 structured control lacks the named target/Ack payload")
-            target = MixedActuatorTargetV1.from_mapping(dict(raw_target))
-            ack = AppliedMixedActuatorV1.from_mapping(dict(raw_ack))
+            target = MixedActuatorCommandV1.from_mapping(dict(raw_target))
+            ack = AppliedMixedActuatorCommandV1.from_mapping(dict(raw_ack))
             if target.identity_hash != writer["controller_target"].get("identity_hash"):
                 raise ValueError("independent H5 target payload identity hash mismatch")
             if ack.target_hash != target.identity_hash:
@@ -748,13 +850,26 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                     or target.control_step != index or target.state_revision != index
                     or target.simulation_time_s != index * 0.05):
                 raise ValueError("independent H5 target/source/boundary identity mismatch")
-            if (dict(ack.joint_torque_Nm) != dict(target.joint_torque_Nm)
-                    or dict(ack.finger_position_m) != dict(target.finger_position_m)
-                    or ack.provider_name != "mujoco"):
+            expected_units = {
+                **{f"joint{i}": "N*m" for i in range(1, 8)},
+                "finger_joint1": "m", "finger_joint2": "m",
+            }
+            torque_limits = {
+                **{f"joint{i}": 80.0 for i in range(1, 6)},
+                "joint6": 12.0, "joint7": 12.0,
+            }
+            if (set(target.channel_values) != set(expected_units)
+                    or dict(target.channel_units) != expected_units
+                    or any(abs(float(target.channel_values[name])) > torque_limits[name]
+                           for name in torque_limits)
+                    or dict(ack.channel_values) != dict(target.channel_values)
+                    or dict(ack.channel_units) != dict(target.channel_units)
+                    or ack.provider_name != "mujoco"
+                    or target.plan_identity_hash != compiled.get("plan_identity_hash")):
                 raise ValueError("independent H5 native Ack does not match the named target")
             opening = float(request_values[7])
             expected_fingers = {"finger_joint1": opening / 2.0, "finger_joint2": -opening / 2.0}
-            if any(not np.isclose(target.finger_position_m[name], value, rtol=0.0, atol=1e-7)
+            if any(not np.isclose(target.channel_values[name], value, rtol=0.0, atol=1e-7)
                    for name, value in expected_fingers.items()):
                 raise ValueError("independent H5 target finger sign or aggregate-opening conversion is invalid")
         for endpoint_name, obs_index in (("initial_observation", 0), ("final_observation", -1)):
@@ -782,6 +897,7 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                             "observation_count": semantic["observation_count"],
                             "episode_id": semantic["outcome"].episode_id,
                             "motion": motion,
+                            "physical_state_monitor": monitor_summary,
                             "h5_sha256": episode["h5"]["sha256"]})
     if (total_t != report.get("transition_count") or total_obs != report.get("observation_count")
             or total_native != report.get("native_step_count")):
@@ -856,7 +972,8 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
             raise ValueError("diagnostic endpoint Core/source On predicate positive-negative oracle mismatch")
         boundary_identity = {key: contact[key] for key in (
             "source_id", "source_closure_digest", "provider_materialization_id",
-            "episode_id", "reset_sample_id", "control_step", "simulation_time_s",
+            "episode_id", "reset_sample_id", "control_step", "state_revision",
+            "simulation_time_s",
         )}
         if observation.get("boundary_identity_sha256") != digest(boundary_identity):
             raise ValueError("diagnostic endpoint observation/contact boundary identity mismatch")

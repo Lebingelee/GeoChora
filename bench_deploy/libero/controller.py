@@ -8,7 +8,7 @@ import math
 
 import numpy as np
 
-from task_env.controllers.canonical.contracts import MixedActuatorTargetV1
+from task_env.controllers.canonical.contracts import MixedActuatorCommandV1
 
 
 _JOINTS = tuple(f'joint{i}' for i in range(1, 8))
@@ -105,12 +105,13 @@ class LiberoMixedControllerV1:
             velocity = float(state.joint_velocity[name])
             raw = self.config.kp_Nm_per_rad[index] * error - self.config.kd_Nm_s_per_rad[index] * velocity
             torques[name] = float(np.clip(raw, -_TORQUE_LIMITS[name], _TORQUE_LIMITS[name]))
-        return MixedActuatorTargetV1(
-            'mixed-actuator-target-v1', task_artifact_hash, source_id,
-            source_closure_digest, self.identity, provider_materialization_id,
+        return MixedActuatorCommandV1(
+            'mixed-actuator-command-v1', self.plan_identity_hash, task_artifact_hash,
+            source_id, source_closure_digest, self.identity, provider_materialization_id,
             episode_id, reset_sample_id, int(state.control_step), int(state_revision),
-            float(state.simulation_time), torques,
-            {'finger_joint1': opening / 2.0, 'finger_joint2': -opening / 2.0},
+            float(state.simulation_time),
+            {**torques, 'finger_joint1': opening / 2.0, 'finger_joint2': -opening / 2.0},
+            {**{name: 'N*m' for name in torques}, 'finger_joint1': 'm', 'finger_joint2': 'm'},
         )
 
     def identity_mapping(self):

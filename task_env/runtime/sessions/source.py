@@ -265,8 +265,7 @@ class RuntimeSource:
     actuator_units: Mapping[str, str] = field(default_factory=dict)
     fixture_bodies: tuple[str, ...] = ()
     contact_geom_groups: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
-    mixed_controller_profile_id: str | None = None
-    mixed_controller_identity: str | None = None
+    mixed_actuator_plan: object | None = None
 
     def __post_init__(self):
         for field in (
@@ -288,14 +287,6 @@ class RuntimeSource:
                or len(set(names)) != len(names) for entity, names in groups.items()):
             raise ValueError('contact geom groups require unique named source geoms')
         object.__setattr__(self, 'contact_geom_groups', MappingProxyType(groups))
-        if (self.mixed_controller_profile_id is None) != (self.mixed_controller_identity is None):
-            raise ValueError('mixed Controller profile and identity must be bound together')
-        if self.mixed_controller_profile_id is not None:
-            if (type(self.mixed_controller_profile_id) is not str
-                    or not self.mixed_controller_profile_id.strip()
-                    or type(self.mixed_controller_identity) is not str
-                    or not re.fullmatch(r'[0-9a-f]{64}', self.mixed_controller_identity)):
-                raise ValueError('mixed Controller source binding requires a profile and SHA-256 identity')
         if self.torque_actuators and self.position_actuators:
             all_actuators = (*self.torque_actuators.values(), *self.position_actuators.values())
             if len(set(all_actuators)) != len(all_actuators):
@@ -307,6 +298,31 @@ class RuntimeSource:
             if (any(self.actuator_units[name] != 'N*m' for name in self.torque_actuators.values())
                     or any(self.actuator_units[name] != 'm' for name in self.position_actuators.values())):
                 raise ValueError('direct-control unit differs from actuator role')
+        if self.mixed_actuator_plan is not None:
+            from ...controllers.canonical.contracts import MixedActuatorPlanV1
+            plan = self.mixed_actuator_plan
+            if type(plan) is not MixedActuatorPlanV1:
+                raise TypeError('mixed actuator source binding requires MixedActuatorPlanV1')
+            plan.validate()
+            if (plan.task_artifact_hash != self.task_artifact_hash
+                    or plan.source_id != self.scene_source.source_id
+                    or plan.source_closure_digest != self.source_closure_digest):
+                raise ValueError('mixed actuator plan does not bind this Artifact/source/closure')
+            declared = {item.semantic_id: item for item in plan.channels}
+            expected = {
+                **{name: ('joint_torque', actuator, 'N*m')
+                   for name, actuator in self.torque_actuators.items()},
+                **{name: ('joint_position', actuator, self.actuator_units[actuator])
+                   for name, actuator in self.position_actuators.items()},
+            }
+            if set(declared) != set(expected):
+                raise ValueError('mixed actuator plan does not cover the source control channels exactly')
+            for semantic, channel in declared.items():
+                drive, actuator, unit = expected[semantic]
+                if (channel.drive_mode, channel.actuator_name, channel.unit) != (drive, actuator, unit):
+                    raise ValueError(f'mixed actuator plan differs from the source channel: {semantic}')
+                if semantic not in self.joints or channel.joint_name != self.joints[semantic]:
+                    raise ValueError(f'mixed actuator plan joint differs from source binding: {semantic}')
         if self.scene_definition is None:
             if self.execution_source_receipt is not None:
                 receipt = self.execution_source_receipt

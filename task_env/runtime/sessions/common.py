@@ -183,6 +183,12 @@ class _SessionValues:
         return self._provider_materialization_id
 
     @property
+    def state_revision(self):
+        """Current RuntimeSession publication revision for freshness checks."""
+        self._require_open()
+        return int(self._state_revision)
+
+    @property
     def episode_id(self):
         """Provider-owned identity for the latest successfully reset episode."""
         self._require_reset()
@@ -215,13 +221,22 @@ class _SessionValues:
         self._require_open()
         if isinstance(plan, ResetPlanV1):
             plan.validate()
-            if self._materialization_profile != 'libero-spatial-bowl-to-plate-mixed-v1':
-                raise ValueError('source-bound ResetPlanV1 is limited to its admitted runtime profile')
+            if getattr(self._source, 'mixed_actuator_plan', None) is None:
+                raise ValueError('source-bound ResetPlanV1 requires an admitted typed source profile')
             sample = plan.reset_sample
             if (sample.task_artifact_hash != self._artifact.identity_hash
                     or sample.source_id != self._source.scene_source.source_id
                     or sample.source_closure_digest != self._source.source_closure_digest):
                 raise ValueError('ResetPlanV1 Artifact/source/closure differs from RuntimeSource')
+            # Complete schema and identity checks before changing the active
+            # session gate or invoking a provider reset implementation.
+            if sample.schema_version != 'reset-sample-v1':
+                raise ValueError('ResetPlanV1 requires ResetSampleV1')
+            if getattr(self._source, 'mixed_actuator_plan', None) is not None:
+                preflight = getattr(self, '_preflight_reset_plan_sample', None)
+                if not callable(preflight):
+                    raise RuntimeError('mixed actuator RuntimeSession lacks pre-mutation reset preflight')
+                preflight(sample)
             self._reset_plan_gate_required = True
             self._reset_plan_gate_open = False
             self._reset_plan_evidence = None
