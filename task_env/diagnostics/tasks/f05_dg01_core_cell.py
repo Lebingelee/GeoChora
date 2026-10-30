@@ -187,8 +187,8 @@ def run(plan_path: Path, output: Path) -> dict:
         raise ValueError("DG01 Core candidate Position ActionConfig differs from its frozen plan")
     if env.controller.identity != plan.get("controller_identity_sha256"):
         raise ValueError("DG01 Core candidate controller identity differs from its frozen plan")
-    if env.position_plan.identity_hash != plan.get("controller_binding_plan_identity_sha256"):
-        raise ValueError("DG01 Core control binding plan differs from its frozen plan")
+    if candidate.controller_binding_plan.identity_hash != plan.get("controller_binding_plan_identity_sha256"):
+        raise ValueError("DG01 candidate control binding plan differs from its frozen plan")
     session_ids = []
     session_handles = []
     episodes = []
@@ -225,6 +225,8 @@ def run(plan_path: Path, output: Path) -> dict:
             episode_started = time.monotonic()
             previous_sessions = tuple(session_handles)
             _, reset_info = env.reset(seed=int(plan["task_seed"]))
+            if env.position_plan.identity_hash != plan.get("controller_binding_plan_identity_sha256"):
+                raise ValueError("DG01 live Core control binding plan differs from its frozen plan")
             if not all(getattr(previous, "_closed", False) for previous in previous_sessions):
                 raise RuntimeError("same-Env reset did not close its prior RuntimeSession")
             session = env.session

@@ -141,6 +141,7 @@ print(json.dumps({
     'source_closure_sha256': candidate.source_closure_digest,
     'derived_scene_sha256': candidate.derived_source_sha256,
     'controller_identity_sha256': profile.identity,
+    'binding_plan_identity_sha256': candidate.controller_binding_plan.identity_hash,
     'controller_action_config': __import__('dataclasses').asdict(profile.config),
     'panda_closure_sha256': candidate.panda_closure_digest,
     'panda_file_count': candidate.panda_file_count,
@@ -173,6 +174,7 @@ candidate.env.close()
     ]
     assert evidence['materialize_control_admitted_exact_candidate'] is True
     assert evidence['controller_action_config']['joint_position_correction_gain'] == 1.0
+    assert len(evidence['binding_plan_identity_sha256']) == 64
     assert evidence['materialization_stopped_at_native_boundary'] is True
     assert len(evidence['derived_scene_sha256']) == 64
 
