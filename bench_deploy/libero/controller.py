@@ -20,28 +20,29 @@ _POSITION_LIMITS = {
     'joint7': (-2.8973, 2.8973),
 }
 _GAIN_SOURCE = (
-    'R07 task #1 failure-driven unqualified stabilization experiment; not copied from or equivalent to upstream OSC_POSE'
+    'R07 task #1 failure-driven unqualified 20 Hz sample-and-hold experiment; '
+    'not copied from or equivalent to upstream OSC_POSE'
 )
 _GAIN_STABILITY_RATIONALE = (
-    'Native R07 task #1 attempt006 reached 148 successful boundaries before joint2 crossed its source upper limit; '
-    'attempt007 showed uniform Kp=200/Kd=40 saturated all seven torque channels and drove joint4 across its lower '
-    'range within 10 boundaries. This unqualified follow-up restores uniform Kp=100 and Kd=20, raising Kd to 40 '
-    'only for joint2, whose attempt006 public trace retained outward velocity while its target had already reversed. '
-    'The source motor ctrlrange and joint limits remain unchanged; every torque remains clamped to the compiled '
-    'source ctrlrange. This is a bounded control-parameter experiment, not a proof for the coupled 20 Hz '
-    'sample-and-hold system or a controller qualification; native motion and fault gates remain required.'
+    'Native R07 task #1 run009 with source gravity feed-forward and Kp=100/Kd=20 (joint2 Kd=40) crossed '
+    'joint3 by 0.004751 rad at boundary25 after several joints began oscillating and saturating. The prior '
+    'v3 run008 without feed-forward reached boundary196 before joint2 crossed its upper source limit by '
+    '0.002073 rad. This unqualified follow-up scales the gains fivefold down to Kp=20/Kd=4 (joint2 Kd=8) '
+    'to test lower closed-loop bandwidth under the fixed 20 Hz outer loop and 2 ms x 25 hold. Source motor '
+    'ctrlranges and joint limits remain unchanged; every torque remains clamped to the compiled source '
+    'ctrlrange. This is an experiment, not a stability proof or controller qualification.'
 )
 
 
 @dataclass(frozen=True)
 class LiberoMixedControlConfigV1:
-    kp_Nm_per_rad: tuple[float, ...] = (100.0,) * 7
-    kd_Nm_s_per_rad: tuple[float, ...] = (20.0, 40.0, 20.0, 20.0, 20.0, 20.0, 20.0)
+    kp_Nm_per_rad: tuple[float, ...] = (20.0,) * 7
+    kd_Nm_s_per_rad: tuple[float, ...] = (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0)
     control_frequency_hz: int = 20
     physics_dt_s: float = 0.002
     control_substeps: int = 25
     hold_policy: str = 'joint_torque_zero_order_hold_per_outer_step_v1'
-    gain_status: str = 'diagnostic_unqualified_PD_20Hz_kp100_kd2_40_v3'
+    gain_status: str = 'diagnostic_unqualified_PD_20Hz_kp20_kd2_8_v4'
 
     def validate(self):
         if (len(self.kp_Nm_per_rad), len(self.kd_Nm_s_per_rad)) != (7, 7):
@@ -58,7 +59,7 @@ class LiberoMixedControlConfigV1:
 class LiberoMixedControllerV1:
     """Map absolute joint targets to seven torques and two signed finger positions."""
 
-    profile_id = 'libero-spatial-bowl-to-plate-joint-space-pd-v3'
+    profile_id = 'libero-spatial-bowl-to-plate-joint-space-pd-v4'
 
     def __init__(self, config: LiberoMixedControlConfigV1 | None = None):
         self.config = config or LiberoMixedControlConfigV1()

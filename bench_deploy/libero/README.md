@@ -45,10 +45,14 @@ to policy evaluation and are not part of this deployment pilot.
 
 The fixed controller sends seven named arm torques and two signed finger
 position targets. It updates at 20 Hz, holds each torque target across 25
-2 ms physics steps, and applies the source actuator ranges. The accepted native004 evidence uses diagnostic joint-space `Kp=100`,
-`Kd=20` and a 16 mm aggregate finger target; the earlier `Kp=20/Kd=4`
-recipe describes historical trials. Bind gains and targets to the frozen run
-configuration; neither is an upstream OSC_POSE equivalence claim. The existing joint planner
+2 ms physics steps, and applies the source actuator ranges. The accepted
+R07c native004 evidence used its frozen diagnostic `Kp=100`, `Kd=20` and a
+16 mm aggregate finger target. The current R07 v2.1.0 task #1 experiment uses
+source-closure-bound static gravity feed-forward with `Kp=20` and `Kd=4`
+(joint2 `Kd=8`); its profile is explicitly unqualified and follows native
+run009's early oscillation and joint3 limit failure. These are separate
+versioned profiles, neither equivalent to upstream OSC_POSE. Bind gains and
+targets to each frozen run configuration. The existing joint planner
 produces the bounded targets; neither it nor the benchmark worker calls
 `mj_step`.
 

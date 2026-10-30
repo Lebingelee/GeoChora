@@ -111,7 +111,7 @@ def solution_identity_v2(
         "task_uid": TASK_1,
         "source_xml_sha256": source_xml_sha256,
         "source_closure_digest": source_closure_digest,
-        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v3",
+        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v4",
         "tcp_id": TCP_ID,
         "algorithm": "public-observation-damped-jacobian-waypoints-v2",
         "gravity_compensation": {
@@ -120,6 +120,7 @@ def solution_identity_v2(
             "torque_formula": "qfrc_bias-minus-qfrc_passive-at-zero-joint-velocity",
             "position_target_encoding": "planner-target-plus-gravity-torque-over-controller-kp",
             "controller_kp_Nm_per_rad": list(controller.kp_Nm_per_rad),
+            "controller_kd_Nm_s_per_rad": list(controller.kd_Nm_s_per_rad),
             "joint_limits_rad": {key: list(value) for key, value in _POSITION_LIMITS.items()},
             "no_extra_physics_step": True,
         },
