@@ -176,3 +176,29 @@ native前：受影响S1必须走实际Core构造/typed state/control/Recorder，
 预计主动300–420分钟，timebox480分钟、最后45分钟收口；每cell累计≤8000steps，总≤24000steps/native wall≤5400s，含失败/bootstrap/诊断/ablation。具体更小worker/route限制见execution_budget。启动MemAvailable≥6GiB、Isaac GPU free≥5120MiB；CPU PG RSS≤4GiB、Isaac≤10GiB，MemAvailable<1GiB或GPU free<256MiB中止，≤4线程、单重进程且共享native锁独占。不能降低内存门。新Evidence≤768MiB，资产下载/依赖安装为0。修复重跑在同窗口预算内，不默认一次launch。
 
 仅G0–G8与三cell均通过才可报 `F05_SUCCESSOR_A_THREE_CELL_PASS_PENDING_SOL_REVIEW`；只有S0修复通过则报 `F05_SUCCESSOR_S0_REPAIR_PASS_S1_BLOCKED_PENDING_SOL_REVIEW`，其余部分为 `F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。全部等待Sol独立复核，不自动ACCEPTED。旧F05 OVERALL_PARTIAL和旧Evidence不变，F06/F07未启动，Qualification未授予。本轮准备仅文档/包/哈希检查，零software tests、零native。
+
+
+<a id="successor-attempt002-execution"></a>
+
+## 13. successor attempt002 执行结果（2026-10-30；PARTIAL，待Sol复核）
+
+执行输入为`develop-full@03ec5efeb01ae6e6067d708fb2930895cdd9a683`。冻结prompt SHA-256为`3343335567569fc88201a95975131cf8e94369fcb806ede690fb4b79e1e5b90e`，snapshot SHA-256为`a45d44fd5937c0db12a42d93dab8a43f83794f0feb0f803aae0b28c470188270`。本轮将successor窗口计数推进到2/3，且仅修改原审计owner及本节所列定向文档/Skill；隔离GeoPhys worktree仍在输入HEAD `41f8b517c5f92cd6e59907394dc42714b78702a7` 且未修改，主仓GeoPhys gitlink不变。实现commit与文档commit、完整逐项Gate和输出hash由ignored报告包及planning manifest绑定。
+
+R1–R3审计修复在`task_env/diagnostics/tasks/f05_source_family_audit.py`及其focused tests中：真实CLI统一执行byte-bound loader、MJCF effective/default/include解析、OpenUSD composed/authored schema inventory、normalized object comparison、严格report validator和readiness派生；15/15语义负例重绑外层hash后均在预期校验阶段拒绝。joint映射验证显式接受合法遍历排列并检查一对一地址/路径；独立source oracle核对9个joint、11个body质量/COM/惯性及静态anchor/axis/limit，计算source scalar drive clip/限力/tendon Jacobian投影。几何inventory记录源81个geom与USD目标81个prim在24个body/group/kind桶中数量一致，collision schema计数一致；该检查不验证顶点一对一、cook、接触响应、过滤参数或材料物理消费。静态run `s0_static_009` 的inventory为PASS，readiness明确为`BLOCKED_BY_FEATURE`，不能解释为表示等价。
+
+R4未能实现三条生产Route。owner/consumer审计形成具体阻断：MuJoCo现有F05 source-bound candidate/admission不存在，现有leaf profile断言旧(9,9,8,9,1,1)且task freebody另需精确版本profile；GeoPhys目标保留了源mimic/tendon字段，但公开host model/consumer尚未证实源compliance、fixed-tendon Jacobian与scalar actuator clip/force law，且八个drive raw值漂移；Isaac当前准入仍是F04 position route，无F05 profile和完整constraint/transmission receipt。没有通过删改原源、r009或required feature伪造实现；三条cell的native前置特性均未通过，因此三个native invocation与physics steps均为0。原cube/support在r009中由recipe作者登记，但本包未建立其完整物理consumer等价。
+
+对本机 Isaac Sim 6.2.0.0 安装包的静态源码核验补充了实现边界（没有启动 Isaac App/PhysX）：`PhysxMimicJointAPI` 的生成 schema 标为 deprecated，mjcf importer changelog 与 `MjcToPhysxConversionRule` 明确把 mimic 留在 NewtonMimicAPI 并由 Newton runtime 消费；Physx tendon schema 存在，但标为 draft。转换工具可将符合固定 gain / affine bias 的 `MjcActuator` 参数转换为标准 DriveAPI stiffness/damping，并可写入 max force；代码没有消费 F05 `ctrlrange`、非对称 force clamp 或 `MjcTendon` 传动/Jacobian。故这是具体的后续研究入口，不构成当前允许 PhysX/Core route 对冻结 r009 的源 equality/tendon/actuator law 证明，也不表示相关 API 不存在。文件路径、哈希及代码区间记录在输出包 `isaac62_static_schema_review.json`。
+
+G3提供了已有GeoPhys USD Core Position synthetic route的实际Core/S1证据：11项provider-free S1通过、GeoPhys native adapter定向回归9项通过；两个同Env synthetic episode各8 transitions/9 boundary+observation rows/40 synthetic advances，独立closed-H5 reader验证两份文件并拒绝30类tamper，另有8种IO/reset/close故障路径收据。该IO明确为`synthetic_fixture`、`runtime_admitted=false`、native physics steps=0；它不证明F05源family consumer，也不替代任何三条cell的完整300 interval native run。
+
+| Gate | 结果 | 范围与限制 |
+| --- | --- | --- |
+| G0 | PASS | frozen HEAD、branch、protected inputs、source/runtime/provider bytes核对；保留无关untracked文档原字节，provider候选未变 |
+| G1 | PASS_WITH_STATIC_LIMITS | authored/effective inventory、独立normalize、真实15类负例与CLI validator trace完成；静态shape/contact消费仍未等价 |
+| G2 | PARTIAL / BLOCKED_BY_FEATURE | 三个route各有现有owner方法、真实缺口及最小版本化扩展图；三路线生产方法未接线、未提交representation/receipt |
+| G3 | PARTIAL | 既有GeoPhys synthetic Core链与adapter回归通过；没有三个F05 route-specific profile的S1 |
+| G4–G7 | BLOCKED / NOT_RUN | required feature及source-to-consumer proof未完成；未生成native run plan/receipt、未启动任何native cell或独立native H5 replay |
+| G8 | PASS | 本地诊断与文档/Skill提交均完成；Skill检查通过；全局文档校验错误列表与冻结基线216项完全一致；5592项保护输入、12个runtime文件、隔离GeoPhys候选与原Menagerie revision复核未变；tracked tree已clean且只保留原有无关untracked文档；worker进程组结束、native锁可用并已释放。Sol独立复核仍待完成。 |
+
+结果标签为`F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。旧F05状态仍`F05_OVERALL_PARTIAL`，attempt001 evidence与r009/历史输出字节保留；successor窗口计数2/3；F06/F07和Qualification均未启动。完整命令、原始证据和最终readback见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/report.md`。

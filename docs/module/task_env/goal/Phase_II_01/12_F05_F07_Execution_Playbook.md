@@ -128,4 +128,4 @@ Luna 仅执行一个已授权包，提交包内 local commits 和原始路径/�
 
 当前冻结方案以[11第12节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract)及sol_f05_successor_002完整包为准；尚未执行。R1–R4原缺口、三路线现有owner扩展、实际Core S1、准确commit/source/model/reader/plan冻结及三cell条件native同一窗口完成；修复与重跑不另计attempt。required物理语义、旧物理门保持，不把源8actuator误作8DOF，也不把合法joint遍历排列当身份错误。
 
-每cell关键source→public model→consumer语义已解决才可native；独立H5、追踪/稳定/耦合和真实退出均须通过。三cell均完成才可报新F05候选PASS，S0完整但native feature阻塞仍报相应PARTIAL，等待Sol复核。480分钟timebox和CPU/GPU/step资源门以包内budget为准，不继承旧额度。旧F05 PARTIAL不改，F06/F07不启动。
+每cell关键source→public model→consumer语义已解决才可native；002中三个cell均因该前置缺口未启动，native调用/step为0。静态 inventory PASS不提升为cross-representation readiness。完整Gate和最小阻断证据见[11第13节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-execution)及ignored输出报告。旧F05 PARTIAL不改，F06/F07不启动，Sol复核仍待进行。

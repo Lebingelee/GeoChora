@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "65d74a98fd80fc6462a18873224b374008b22414bf4e157497b0ac97c26e56aa",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "190a16a9d6daef479b21b782368591ecac3b5ac2850b207ef318d865e025c972",
+    "07_Execution_Order_and_Acceptance.md": "86755852bbb01426be57906c9454740e28378447e9bf681e9e6583bcd6ac102c",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "9ad21176d3578a2078fbc33e3857a3c50bd2c572ad8d1c3221997f748935cfa9",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "82ead7f648c920b0ead09cf5d63d6af066c520596df9d63e73d39f4b82557890",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "c6276e55728f54748402f4034ca0ef31071abf5bf750f361d5548feabdf99970",
-    "12_F05_F07_Execution_Playbook.md": "3c0005099c4c66a6cfda9507360070c4aaca601e8e93a36c7a7e70ce031d724c"
+    "README.md": "6aa9e5fa8dcaa24f9f4d1c95b4fcbb831ac881620bbff901582e53cacfb8eab7",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "327d97be3da2549b28a77fac3b0e4df0f99bc1e24ec985449ea9e155c1de40d8",
+    "12_F05_F07_Execution_Playbook.md": "7aeecbeb8e26e6332f6d71ce9a927a8fd4be448abb3dc4f488d6edda6188f52c"
   },
   "revision_kind": "F05_SUCCESSOR_ATTEMPT001_S0_INVENTORY_PASS_READINESS_BLOCKED_BY_FEATURE_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6545,7 +6545,7 @@
       "child_process_group_gone": true,
       "task_env_skill_sha256": "6dc2e22af14e9c6e9084a35fb7ecc7caf6c33a9a6a88003baea201c3acccf1b7"
     },
-    "latest_f05_successor_execution": "f05_successor_attempt001_execution_20261030",
+    "latest_f05_successor_execution": "f05_successor_attempt002_execution_20261030",
     "f05_successor_attempt001_sol_review_20261030": {
       "date": "2026-10-30",
       "status": "F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED",
@@ -6619,6 +6619,61 @@
       "preparation_native_starts": 0,
       "canonical_contract": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract",
       "supersedes": "only static-only prospective next-window suggestion in attempt001 review; historical decision/raw evidence intact"
+    },
+    "f05_successor_attempt002_execution_20261030": {
+      "date": "2026-10-30",
+      "status": "F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW",
+      "package_id": "F05_SUCCESSOR_ATTEMPT002_SEMANTIC_REPAIR_AND_CORE_CELLS",
+      "attempt": 2,
+      "successor_windows_used": 2,
+      "successor_window_limit": 3,
+      "input_branch": "develop-full",
+      "input_head": "03ec5efeb01ae6e6067d708fb2930895cdd9a683",
+      "implementation_commits": [
+        "fad050a55403104cd53d23b85e63833516eb1dfa",
+        "22183ac289716cc92a49b36a23116e124edaa0f7"
+      ],
+      "documentation_commits": "this local documentation/Skill closeout commit; exact final HEAD is in ignored final_tree_readback.json and report.md",
+      "output_head": "captured after closeout in ignored final_tree_readback.json",
+      "prompt_sha256": "3343335567569fc88201a95975131cf8e94369fcb806ede690fb4b79e1e5b90e",
+      "snapshot_sha256": "a45d44fd5937c0db12a42d93dab8a43f83794f0feb0f803aae0b28c470188270",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/",
+      "static_final_run": "s0_static_009",
+      "static_inventory_status": "PASS",
+      "cross_representation_readiness": "BLOCKED_BY_FEATURE",
+      "semantic_negative_cases": "15/15 rejected through expected actual validator stages with rebound outer hashes",
+      "static_geometry_counts": "81 source geoms; 81 target Mesh/Cube prims; all 24 body/group/kind buckets and collision schemas/enabled values count consistently; vertex/contact/cook/consumer equivalence not established",
+      "core_s1": "existing GeoPhys USD Position synthetic path only; source-control S1 11/11, adapter regression 9/9, two 8-transition episodes, 30 tamper rejections, eight fault paths; synthetic_fixture/runtime_admitted=false/native_steps=0",
+      "route_status": {
+        "mujoco_mjcf_cpu": "BLOCKED_BY_CORE_ADMISSION_AND_SOURCE_BOUND_PROFILE",
+        "geophys_usd_cpu": "BLOCKED_BY_REQUIRED_FEATURE_CONSUMER_UNKNOWN",
+        "isaac_usd_cuda_physx": "BLOCKED_BY_PROFILE_AND_REQUIRED_FEATURE_CONSUMER_UNKNOWN"
+      },
+      "native_starts": 0,
+      "physics_steps": 0,
+      "renderer_gpu_starts": 0,
+      "G0": "PASS",
+      "G1": "PASS_WITH_STATIC_LIMITS",
+      "G2": "PARTIAL_BLOCKED_BY_FEATURE",
+      "G3": "PARTIAL_EXISTING_SYNTHETIC_CORE_PATH_ONLY",
+      "G4_G7": "BLOCKED_NOT_RUN",
+      "G8": "PASS",
+      "legacy_F05": "F05_OVERALL_PARTIAL; old attempts 001-003 and Evidence immutable",
+      "F06_F07_started": false,
+      "Qualification": false,
+      "provider_candidate_head": "41f8b517c5f92cd6e59907394dc42714b78702a7; clean and unchanged",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/report.md",
+      "Sol_review": "PENDING",
+      "document_sha256": {
+        "07_Execution_Order_and_Acceptance.md": "86755852bbb01426be57906c9454740e28378447e9bf681e9e6583bcd6ac102c",
+        "08_Codex_Phase_II_01_Planning_Prompt.md": "9ad21176d3578a2078fbc33e3857a3c50bd2c572ad8d1c3221997f748935cfa9",
+        "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "f300f6d24aff0dee0323ca765cae1d78726b736126bcd4f7f4c4497708d9e4af",
+        "12_F05_F07_Execution_Playbook.md": "7aeecbeb8e26e6332f6d71ce9a927a8fd4be448abb3dc4f488d6edda6188f52c",
+        "README.md": "6aa9e5fa8dcaa24f9f4d1c95b4fcbb831ac881620bbff901582e53cacfb8eab7"
+      },
+      "task_env_skill_sha256": "acb3ee15421bc6dcd214193c487dddf7ced65bc83227d0f87241bf86e1472c5d",
+      "isaac62_static_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/isaac62_static_schema_review.json",
+      "doc_validation": "exit 1; 216 errors exactly match frozen historical baseline (0 changed, 0 unexpected categories)"
     },
     "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030"
   }
