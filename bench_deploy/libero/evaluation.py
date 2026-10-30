@@ -17,12 +17,14 @@ from task_env.environment import (
 from task_env.environment.types import TaskEvaluation
 from task_env.controllers.canonical.contracts import digest
 
+from .task_contracts import TASK_1, TASK_2, TASK_3
 
-PILOT_TASK_UID = (
-    "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_"
-    "and_place_it_on_the_plate"
-)
+
+PILOT_TASK_UID = TASK_1
 ON_THRESHOLD_M = 0.03
+MIDDLE_DRAWER_OPEN_THRESHOLD_M = -0.14
+STOVE_FRONT_SITE_Z_TOLERANCE_M = 0.005
+STOVE_FRONT_SITE_MAX_HEIGHT_M = 0.10
 
 
 def _position(value: Any, name: str) -> tuple[float, float, float] | None:
@@ -68,6 +70,146 @@ class OnBowlPlateEvidenceV1:
         object.__setattr__(self, "plate_center_m", _position(self.plate_center_m, "plate_center_m"))
 
 
+@dataclass(frozen=True)
+class LiberoPredicateBoundaryV1:
+    """Identity binding shared by state-derived LIBERO goal evidence."""
+
+    task_uid: str
+    source_manifest_sha256: str
+    source_id: str
+    source_closure_digest: str
+    provider_materialization_id: str
+    episode_id: str
+    reset_sample_id: str
+    control_step: int
+    state_revision: int
+    simulation_time_s: float
+    schema_version: str = "libero-predicate-boundary-v1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "libero-predicate-boundary-v1":
+            raise ValueError("unsupported LIBERO predicate boundary schema")
+        if self.task_uid not in {TASK_1, TASK_2, TASK_3}:
+            raise ValueError("LIBERO predicate boundary task identity is unsupported")
+        for name in ("source_manifest_sha256", "source_closure_digest"):
+            value = getattr(self, name)
+            if type(value) is not str or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+                raise ValueError(f"{name} must be a lowercase SHA-256")
+        for name in ("source_id", "provider_materialization_id", "episode_id", "reset_sample_id"):
+            if type(getattr(self, name)) is not str or not getattr(self, name).strip():
+                raise ValueError(f"{name} must be nonempty")
+        if (type(self.control_step) is not int or self.control_step < 0
+                or type(self.state_revision) is not int or self.state_revision < 0
+                or isinstance(self.simulation_time_s, bool)
+                or not math.isfinite(float(self.simulation_time_s))
+                or self.simulation_time_s < 0):
+            raise ValueError("LIBERO predicate boundary clock is invalid")
+        object.__setattr__(self, "simulation_time_s", float(self.simulation_time_s))
+
+
+@dataclass(frozen=True)
+class OpenMiddleDrawerEvidenceV1:
+    boundary: LiberoPredicateBoundaryV1
+    joint_name: str
+    joint_position_m: float
+    schema_version: str = "libero-open-middle-drawer-evidence-v1"
+
+
+@dataclass(frozen=True)
+class StoveFrontRegionEvidenceV1:
+    boundary: LiberoPredicateBoundaryV1
+    object_name: str
+    site_name: str
+    object_position_world_m: tuple[float, float, float] | None
+    site_position_world_m: tuple[float, float, float] | None
+    site_mat_world: tuple[tuple[float, float, float], ...] | None
+    site_size_m: tuple[float, float, float] | None
+    site_parent_name: str | None
+    parent_geom_group_contact: bool | None
+    schema_version: str = "libero-stove-front-region-evidence-v1"
+
+
+def _same_boundary(evidence: LiberoPredicateBoundaryV1,
+                   expected: LiberoPredicateBoundaryV1 | None, task_uid: str) -> str | None:
+    if expected is None:
+        return "expected_state_boundary_unavailable"
+    if evidence.task_uid != task_uid or expected.task_uid != task_uid:
+        return "task_identity_mismatch"
+    if evidence != expected:
+        return "stale_state_boundary_identity"
+    return None
+
+
+def evaluate_open_middle_drawer_v1(
+    evidence: OpenMiddleDrawerEvidenceV1 | None,
+    *,
+    expected_boundary: LiberoPredicateBoundaryV1 | None,
+) -> TaskPredicateResultV1:
+    """Apply the pinned LIBERO ``Open`` test to the named middle drawer joint."""
+    if evidence is None:
+        return TaskPredicateResultV1.unavailable("public_open_joint_state_unavailable")
+    if not isinstance(evidence, OpenMiddleDrawerEvidenceV1):
+        raise TypeError("Open evaluator requires OpenMiddleDrawerEvidenceV1")
+    if evidence.schema_version != "libero-open-middle-drawer-evidence-v1":
+        raise ValueError("unsupported Open evidence schema")
+    mismatch = _same_boundary(evidence.boundary, expected_boundary, TASK_2)
+    if mismatch:
+        return TaskPredicateResultV1.unavailable(mismatch)
+    if evidence.joint_name != "wooden_cabinet_1.middle_level":
+        return TaskPredicateResultV1.unavailable("middle_drawer_joint_identity_mismatch")
+    value = evidence.joint_position_m
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        return TaskPredicateResultV1.unavailable("middle_drawer_joint_state_invalid")
+    return TaskPredicateResultV1.available(float(value) < MIDDLE_DRAWER_OPEN_THRESHOLD_M)
+
+
+def evaluate_stove_front_region_v1(
+    evidence: StoveFrontRegionEvidenceV1 | None,
+    *,
+    expected_boundary: LiberoPredicateBoundaryV1 | None,
+) -> TaskPredicateResultV1:
+    """Apply the pinned ``SiteObject.under`` formula to plate and stove-front site.
+
+    The source multiplies the world displacement by the site matrix directly;
+    this evaluator keeps that operand order and the source's strict bounds.
+    """
+    if evidence is None:
+        return TaskPredicateResultV1.unavailable("public_stove_front_site_state_unavailable")
+    if not isinstance(evidence, StoveFrontRegionEvidenceV1):
+        raise TypeError("region evaluator requires StoveFrontRegionEvidenceV1")
+    if evidence.schema_version != "libero-stove-front-region-evidence-v1":
+        raise ValueError("unsupported stove-front region evidence schema")
+    mismatch = _same_boundary(evidence.boundary, expected_boundary, TASK_3)
+    if mismatch:
+        return TaskPredicateResultV1.unavailable(mismatch)
+    if (evidence.object_name != "plate_1"
+            or evidence.site_name != "main_table_stove_front_region"
+            or evidence.site_parent_name != "main_table"):
+        return TaskPredicateResultV1.unavailable("stove_front_region_identity_mismatch")
+    if evidence.parent_geom_group_contact is None:
+        return TaskPredicateResultV1.unavailable("site_parent_contact_unavailable")
+    if type(evidence.parent_geom_group_contact) is not bool:
+        return TaskPredicateResultV1.unavailable("site_parent_contact_invalid")
+    if not evidence.parent_geom_group_contact:
+        return TaskPredicateResultV1.available(False)
+    object_position = _position(evidence.object_position_world_m, "object_position_world_m")
+    site_position = _position(evidence.site_position_world_m, "site_position_world_m")
+    if object_position is None or site_position is None:
+        return TaskPredicateResultV1.unavailable("stove_front_pose_unavailable")
+    matrix = np.asarray(evidence.site_mat_world, dtype=np.float64)
+    size = np.asarray(evidence.site_size_m, dtype=np.float64)
+    if matrix.shape != (3, 3) or not np.isfinite(matrix).all():
+        return TaskPredicateResultV1.unavailable("stove_front_site_matrix_unavailable")
+    if (size.shape != (3,) or not np.isfinite(size).all() or np.any(size <= 0)):
+        return TaskPredicateResultV1.unavailable("stove_front_site_size_invalid")
+    delta = matrix @ (np.asarray(object_position) - np.asarray(site_position))
+    return TaskPredicateResultV1.available(bool(
+        size[2] - STOVE_FRONT_SITE_Z_TOLERANCE_M < delta[2]
+        < size[2] + STOVE_FRONT_SITE_MAX_HEIGHT_M
+        and np.all(np.abs(delta[:2]) < size[:2])
+    ))
+
+
 def evaluate_on_bowl_plate_v1(
     evidence: OnBowlPlateEvidenceV1 | None,
     *,
@@ -103,24 +245,53 @@ def observe_selected_reference_v1(env, state):
     pair = ('akita_black_bowl_1', 'plate_1')
     contact = env.session.read_contact_summary_v2((pair,))
     requested = (pair,)
-    if contact.status == 'available' and (
+    expected_contact_identity = (
+        source.scene_source.source_id,
+        source.source_closure_digest,
+        env.session.provider_materialization_id,
+        env.session.episode_id,
+        env.sample.sample_id,
+        int(state.control_step),
+        int(env.session.state_revision),
+        float(state.simulation_time),
+    )
+    observed_contact_identity = (
+        contact.source_id, contact.source_closure_digest,
+        contact.provider_materialization_id, contact.episode_id,
+        contact.reset_sample_id, contact.control_step,
+        contact.state_revision, contact.simulation_time_s,
+    )
+    if observed_contact_identity != expected_contact_identity:
+        predicate = TaskPredicateResultV1.unavailable('contact_summary_stale_or_wrong_boundary')
+    elif contact.status == 'available' and (
             contact.requested_pairs != requested or contact.covered_pairs != requested):
         predicate = TaskPredicateResultV1.unavailable('contact_query_coverage_mismatch')
     elif contact.status == 'unavailable':
         predicate = TaskPredicateResultV1.unavailable(contact.reason or 'contact_unavailable')
     else:
-        count = contact.pair_counts.get('akita_black_bowl_1/plate_1')
-        if type(count) is not int or count < 0:
-            raise ValueError('contact summary omitted the exact covered pair count')
-        evidence = OnBowlPlateEvidenceV1(
-            task_uid=env.artifact.task_id,
-            source_manifest_sha256=env.value['source_manifest_sha256'],
-            frame_id='world',
-            bowl_center_m=tuple(state.pose_world['akita_black_bowl_1'].position),
-            plate_center_m=tuple(state.pose_world['plate_1'].position),
-            geom_group_contact=bool(count),
-        )
-        predicate = env.binding.evaluate(evidence, env.artifact.semantics)
+        try:
+            has_contact = contact.pair_has_contact(
+                'akita_black_bowl_1', 'plate_1', control_step=int(state.control_step),
+                state_revision=int(env.session.state_revision),
+                simulation_time_s=float(state.simulation_time),
+            )
+        except ValueError:
+            predicate = TaskPredicateResultV1.unavailable('contact_summary_stale_or_wrong_boundary')
+            has_contact = None
+        if has_contact is None:
+            pass
+        elif type(has_contact) is not bool:
+            raise ValueError('contact summary did not return a boolean pair result')
+        else:
+            evidence = OnBowlPlateEvidenceV1(
+                task_uid=env.artifact.task_id,
+                source_manifest_sha256=env.value['source_manifest_sha256'],
+                frame_id='world',
+                bowl_center_m=tuple(state.pose_world['akita_black_bowl_1'].position),
+                plate_center_m=tuple(state.pose_world['plate_1'].position),
+                geom_group_contact=has_contact,
+            )
+            predicate = env.binding.evaluate(evidence, env.artifact.semantics)
     if not isinstance(predicate, TaskPredicateResultV1):
         raise TypeError('task observation callback must return TaskPredicateResultV1')
     success = bool(predicate.value) if predicate.status == 'available' else False
@@ -219,10 +390,13 @@ def build_evaluation(task_input: dict, manifest: dict) -> dict:
 
 
 __all__ = [
-    "ON_THRESHOLD_M",
+    "ON_THRESHOLD_M", "MIDDLE_DRAWER_OPEN_THRESHOLD_M",
+    "STOVE_FRONT_SITE_Z_TOLERANCE_M", "STOVE_FRONT_SITE_MAX_HEIGHT_M",
     "PILOT_TASK_UID",
-    "OnBowlPlateEvidenceV1",
+    "OnBowlPlateEvidenceV1", "LiberoPredicateBoundaryV1",
+    "OpenMiddleDrawerEvidenceV1", "StoveFrontRegionEvidenceV1",
     "build_evaluation",
+    "evaluate_open_middle_drawer_v1", "evaluate_stove_front_region_v1",
     "evaluate_on_bowl_plate_v1",
     "observe_selected_reference_v1",
 ]

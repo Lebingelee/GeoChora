@@ -1303,7 +1303,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._episode_mode = 'external'
         return self._step(action)
 
-    def _step_mixed_control(self, action):
+    def _step_mixed_control(self, action, *, proposal=None, observer_solution=None):
         """Run one task-prepared named command through the existing RuntimeSession."""
         from ..controllers.canonical.contracts import (
             AppliedMixedActuatorCommandV1, MixedActuatorCommandV1, StructuredActionRequestV1,
@@ -1315,6 +1315,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         if self.state.control_step >= self.horizon:
             self.stop('horizon_reached')
             raise RuntimeError('selected mixed-control horizon is exhausted')
+        if (proposal is None) != (observer_solution is None):
+            raise ValueError('mixed Solution actions require both proposal and Solution owner')
+        if proposal is not None:
+            from ..planners.contracts import ExpertAction
+            if type(proposal) is not ExpertAction:
+                raise TypeError('mixed-control Solution must return the existing ExpertAction contract')
+            if self._external_solution_owner is None or observer_solution is not self._external_solution_owner:
+                raise ValueError('mixed-control Solution does not own the selected episode')
+            if not np.array_equal(np.asarray(action), proposal.action):
+                raise ValueError('mixed-control Solution proposal action was changed before preparation')
         before = self.state
         prepared = self.binding.prepare_mixed_control(self, action, before)
         if not isinstance(prepared, Mapping) or set(prepared) != {
@@ -1371,6 +1381,32 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'mixed_actuator_command_v1': target.to_mapping(),
                 'applied_mixed_actuator_command_v1': applied.to_mapping(),
             })
+            if proposal is not None:
+                phase = 'mixed_solution_observation'
+                extra = self.binding.observe_expert_kwargs(self, ())
+                if not isinstance(extra, Mapping):
+                    raise TypeError('mixed Solution observation kwargs must be a mapping')
+                observer_solution.observe(
+                    self.obs, float(self.evaluation.reward), bool(self.evaluation.failure),
+                    bool(self.state.control_step >= self.horizon), self.info, **dict(extra),
+                )
+                if hasattr(observer_solution, 'outcome_report'):
+                    report = observer_solution.outcome_report()
+                    if not isinstance(report, Mapping):
+                        raise TypeError('mixed Solution outcome_report() must return a mapping')
+                    self.info.update(dict(report))
+                self.info.update(
+                    selected_policy_execution_complete=bool(observer_solution.done),
+                    selected_policy_execution_failed=bool(observer_solution.failed),
+                    expert_failure_reason=getattr(observer_solution, 'failure_reason', None),
+                    selected_solution_action_v1={
+                        'solution_identity': getattr(observer_solution, 'identity', None),
+                        'stage': proposal.stage,
+                        'diagnostics': dict(proposal.diagnostics),
+                    },
+                )
+                if bool(observer_solution.done) and bool(observer_solution.failed):
+                    raise ValueError('mixed Solution cannot be complete and failed at one boundary')
             transition = StructuredControlTransitionV1(
                 'structured-control-transition-v1', request, ({
                     **dict(writer_control),
@@ -1387,8 +1423,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 },),
             )
             transition.validate()
-            terminated = False
+            terminated = bool(self.evaluation.failure) if proposal is not None else False
             truncated = self.state.control_step >= self.horizon
+            if proposal is not None and observer_solution.done:
+                terminated = False
+                truncated = False
+            if proposal is not None and observer_solution.failed and not truncated:
+                terminated = True
             if self.recorder is not None and getattr(self.recorder, 'active', False):
                 phase = 'mixed_recorder_append'
                 self.recorder.append_transition(
@@ -1396,8 +1437,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     bool(self.evaluation.success), terminated, truncated, self.info,
                     structured_control=transition,
                 )
-            self._episode_mode = 'external'
-            if truncated:
+            self._episode_mode = 'external_solution' if proposal is not None else 'external'
+            if proposal is not None and observer_solution.done:
+                self.stop('solution_completed')
+                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
+            elif proposal is not None and observer_solution.failed and not truncated:
+                self.stop('solution_failed')
+                self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
+            elif truncated:
                 self.stop('horizon_reached')
                 self.info['episode_end_v1'] = self._mixed_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
@@ -1442,13 +1489,32 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             raise RuntimeError('reset required or episode already stopped')
         if self._episode_mode in {'expert', 'external'}:
             raise RuntimeError('cannot mix external Solution and other selected execution modes')
+        if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
+            raise RuntimeError('external Solution already stopped')
+        if getattr(self, 'mixed_control_profile', False):
+            try:
+                proposal = solution.act(self.obs, self.info)
+                from ..planners.contracts import ExpertAction
+                if type(proposal) is not ExpertAction:
+                    raise TypeError('mixed external Solution act() must return ExpertAction')
+            except BaseException as error:
+                self._latch_fault('mixed_external_solution_proposal', error, before_state=self.state)
+                if self.binding.abort_solution_on_runtime_error:
+                    try:
+                        solution.abort('runtime_error')
+                    except BaseException as abort_error:
+                        add_note = getattr(error, 'add_note', None)
+                        if callable(add_note):
+                            add_note(f'mixed external Solution abort also failed: {abort_error!r}')
+                raise
+            return self._step_mixed_control(
+                proposal.action, proposal=proposal, observer_solution=solution,
+            )
         try:
             self._require_published_execution_info()
         except BaseException as error:
             self._latch_fault('public_execution_readiness', error, before_state=self.state)
             raise
-        if getattr(solution, 'done', False) or getattr(solution, 'failed', False):
-            raise RuntimeError('external Solution already stopped')
         try:
             proposal = solution.act(self.obs, self.info)
             from ..planners.contracts import ExpertAction
@@ -2460,9 +2526,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise RuntimeError('mixed-control reset must complete before Stop')
             from ..trajectory.canonical.episode import make_episode_end_v1
             fault = self._execution_fault
-            end_reason = 'execution_fault' if fault is not None else (
-                'horizon_reached' if reason == 'horizon_reached' else 'external_stop'
-            )
+            solution = self._external_solution_owner
+            solution_done = bool(getattr(solution, 'done', False)) if solution is not None else None
+            solution_failed = bool(getattr(solution, 'failed', False)) if solution is not None else None
+            if reason == 'solution_completed' and solution_done is not True:
+                raise ValueError('solution_completed requires the active caller-owned Solution to be done')
+            if reason == 'solution_failed' and solution_failed is not True:
+                raise ValueError('solution_failed requires the active caller-owned Solution to be failed')
+            if fault is not None:
+                end_reason = 'execution_fault'
+                terminated, truncated, bootstrap_allowed = False, True, False
+            elif reason == 'solution_completed':
+                end_reason = 'solution_completed'
+                terminated, truncated, bootstrap_allowed = False, False, True
+            elif reason == 'solution_failed':
+                end_reason = 'solution_failed'
+                terminated, truncated, bootstrap_allowed = True, False, False
+            elif reason == 'horizon_reached':
+                end_reason = 'horizon_reached'
+                terminated, truncated, bootstrap_allowed = False, True, True
+            else:
+                end_reason = 'external_stop'
+                terminated, truncated, bootstrap_allowed = False, True, True
             success = None if fault is not None else bool(self.evaluation.success)
             event_sequence = 0
             if self.recorder is not None and getattr(self.recorder, 'active', False):
@@ -2477,19 +2562,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'controller_identity': self.controller.identity,
                 'task_evaluation_success': success,
             }
+            if solution is not None:
+                payload['solution_identity'] = getattr(solution, 'identity', None)
+                payload['solution_done'] = solution_done
+                payload['solution_failed'] = solution_failed
+                payload['solution_failure_reason'] = getattr(solution, 'failure_reason', None)
             if fault is not None:
                 payload['fault'] = fault.to_mapping()
             self._mixed_episode_end = make_episode_end_v1(
                 episode_id=self.session.episode_id,
                 final_boundary=int(self.state.control_step),
                 end_reason=end_reason,
-                terminated=False,
-                truncated=True,
-                bootstrap_allowed=fault is None,
+                terminated=terminated,
+                truncated=truncated,
+                bootstrap_allowed=bootstrap_allowed,
                 source='task_env.selected_reference.mixed_control_v1',
                 payload=payload,
                 event_sequence=event_sequence,
                 task_success=(None if fault is not None else success),
+                solution_completed=(
+                    None if solution is None else
+                    bool(solution_done and not solution_failed)
+                ),
             )
             self._stopped = True
             return self._mixed_episode_end

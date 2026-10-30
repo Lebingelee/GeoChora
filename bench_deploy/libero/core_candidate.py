@@ -23,4 +23,18 @@ def build_libero_pilot_env(
     )
 
 
-__all__ = ['build_libero_pilot_env']
+def build_libero_solution_env(
+    *, xml: str, composed_mjcf_sha256: str, install_root: Path,
+    composition_plan_path: Path, horizon: int = 1000,
+):
+    """Build the task #1 caller-owned Solution profile on the same Core route."""
+    from .selected_candidate import build_libero_solution_candidate
+
+    return build_libero_solution_candidate(
+        xml=xml, composed_mjcf_sha256=composed_mjcf_sha256,
+        install_root=Path(install_root), composition_plan_path=Path(composition_plan_path),
+        horizon=horizon,
+    )
+
+
+__all__ = ['build_libero_pilot_env', 'build_libero_solution_env']

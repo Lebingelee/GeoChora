@@ -58,7 +58,7 @@ INIT_RELATIVE_PATH = (
 TASK_ID = PILOT_TASK_UID
 
 
-def _artifact(init_bytes: bytes) -> TaskArtifact:
+def _artifact(init_bytes: bytes, *, solution_profile: bool = False) -> TaskArtifact:
     decoded = decode_pruned_init_bytes(init_bytes)
     layout = init_layout_v1()
     qpos = dict(zip(
@@ -100,7 +100,9 @@ def _artifact(init_bytes: bytes) -> TaskArtifact:
     from task_env.runtime.sessions.api import CAPABILITIES
 
     artifact = TaskArtifact(
-        'task-artifact-v0', ARTIFACT_ID, TASK_ID, 'diagnostic-v1',
+        'task-artifact-v0',
+        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v1',
+        TASK_ID, 'diagnostic-v1' if not solution_profile else 'bounded-solution-v1',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
             ActionIntent('absolute_joint', None, 'none', 'arm_joint_position_and_gripper'),
@@ -127,7 +129,7 @@ def _artifact(init_bytes: bytes) -> TaskArtifact:
 
 def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         install_root: Path, composition_plan_path: Path,
-                        init_path: Path, horizon: int):
+                        init_path: Path, horizon: int, solution_profile: bool = False):
     xml_bytes = Path(xml_path).read_bytes() if xml_bytes_override is None else bytes(xml_bytes_override)
     plan_bytes = Path(composition_plan_path).read_bytes()
     plan = json.loads(plan_bytes)
@@ -145,7 +147,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     if hashlib.sha256(manifest_bytes).hexdigest() != PILOT_SOURCE_MANIFEST_SHA256:
         raise ValueError('tracked LIBERO source manifest differs from the frozen pilot identity')
     source_manifest = json.loads(manifest_bytes)
-    artifact = _artifact(init_bytes)
+    artifact = _artifact(init_bytes, solution_profile=solution_profile)
     controller = LiberoMixedControllerV1()
     if controller.profile_id != CONTROLLER_PROFILE_ID:
         raise ValueError('LIBERO task-local controller profile changed')
@@ -161,7 +163,11 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     scene_source = TaskSceneSource(
         xml=importer_xml.decode('utf-8'), base_dir=source_receipt.snapshot_root,
         source_id=source_receipt.source_id,
-        diagnostics=('R07c D01 immutable importer snapshot; physical attributes preserved from composed MJCF',),
+        diagnostics=(
+            ('R07c D01 immutable importer snapshot; physical attributes preserved from composed MJCF',)
+            if not solution_profile else
+            ('R07 v2.1.0 task #1 immutable importer snapshot; physical attributes preserved from composed MJCF',)
+        ),
     )
     semantic_bodies = dict(plan['semantic_to_compiled_body_names'])
     expected_bodies = {
@@ -189,7 +195,11 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'integrator': 'implicitfast', 'prewarm': False,
         },
         render={'camera_obs': False}, episode={'horizon': horizon, 'ignore_done': False},
-        success_definition='diagnostic LIBERO On(bowl,plate) source predicate',
+        success_definition=(
+            'diagnostic LIBERO On(bowl,plate) source predicate'
+            if not solution_profile else
+            'pinned LIBERO On(akita_black_bowl_1,plate_1) task success and caller-owned Solution completion'
+        ),
     )
     joints = {
         **{f'joint{i}': f'robot0_joint{i}' for i in range(1, 8)},
@@ -255,6 +265,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         mixed_actuator_plan=mixed_plan,
     )
     controller.plan_identity_hash = mixed_plan.identity_hash
+    solution_identity = None
+    if solution_profile:
+        from .solution import solution_identity_v1
+        solution_identity = solution_identity_v1(expected_xml_sha)
     return {
         'artifact': artifact, 'source': source, 'controller': controller,
         'selected_controller_kind': 'mixed_actuator_v1', 'solution': None,
@@ -275,6 +289,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'source_closure_digest': source.source_closure_digest,
             'controller_identity': controller.identity,
         }),
+        'solution_identity': solution_identity,
+        'solution_profile': bool(solution_profile),
         'resolved_configuration': asdict(config),
         'reset_realizations': {},
         'init_bytes': init_bytes,
@@ -291,10 +307,19 @@ def build_libero_selected_candidate(
     install_root: Path = DEFAULT_INSTALL_ROOT,
     init_path: Path | None = None,
     horizon: int = 64,
+    _solution_profile: bool = False,
 ):
-    """Construct the fixed internal SelectedReferenceEnv diagnostic candidate."""
-    if type(horizon) is not int or not 1 <= horizon <= 64:
-        raise ValueError('R07c D01 candidate horizon must be in [1,64]')
+    """Construct the fixed LIBERO candidate through the existing Core route.
+
+    The default retains the frozen D01 diagnostic envelope. The task-owned
+    solution wrapper below selects the separately versioned full Solution
+    profile and its bounded horizon.
+    """
+    if type(_solution_profile) is not bool:
+        raise TypeError('internal LIBERO Solution profile selector must be bool')
+    maximum_horizon = 1000 if _solution_profile else 64
+    if type(horizon) is not int or not 1 <= horizon <= maximum_horizon:
+        raise ValueError(f'LIBERO candidate horizon must be in [1,{maximum_horizon}]')
     install_root = Path(install_root).resolve(strict=True)
     if init_path is None:
         init_path = install_root / INIT_RELATIVE_PATH
@@ -303,13 +328,15 @@ def build_libero_selected_candidate(
 
     def build_value(provider, backend):
         if (provider, backend) != ('mujoco', 'cpu'):
-            raise ValueError('R07c D01 candidate is limited to MuJoCo CPU')
+            route = 'R07 v2.1.0 task #1 Solution candidate' if _solution_profile else 'R07c D01 candidate'
+            raise ValueError(f'{route} is limited to MuJoCo CPU')
         if 'value' not in value_cache:
             xml_bytes = None if xml is None else (xml.encode('utf-8') if isinstance(xml, str) else bytes(xml))
             value_cache['value'] = _build_fixed_source(
                 xml_path=Path(xml_path), xml_bytes_override=xml_bytes, install_root=install_root,
                 composition_plan_path=Path(composition_plan_path),
                 init_path=Path(init_path), horizon=horizon,
+                solution_profile=_solution_profile,
             )
             if (composed_mjcf_sha256 is not None
                     and value_cache['value']['source_sha256']['composed_candidate_xml'] != composed_mjcf_sha256):
@@ -331,7 +358,7 @@ def build_libero_selected_candidate(
         value['observation_space'] = Dict({
             'state': Dict({
                 'ee_pose': Box(-np.inf, np.inf, (7,), dtype=np.float32),
-                'joint_position': Box(-np.inf, np.inf, (len(value['source'].joints),), dtype=np.float32),
+                'joint_position': Box(-np.inf, np.inf, (9,), dtype=np.float32),
                 'boundary_identity_sha256': Box(0, 255, (32,), dtype=np.uint8),
             }),
             'privileged_state': Dict({
@@ -462,7 +489,9 @@ def build_libero_selected_candidate(
         components = list(env.value['action_schema']['components'])
         return {
             'env_metadata': {
-                'env_name': 'SelectedReferenceEnv.LiberoMixedDiagnosticV1',
+                'env_name': ('SelectedReferenceEnv.LiberoMixedDiagnosticV1'
+                             if not _solution_profile else
+                             'SelectedReferenceEnv.LiberoMixedSolutionV1'),
                 'task_name': env.artifact.task_id,
                 'task_version': env.artifact.artifact_version,
                 'physics_dt': env.artifact.timebase.physics_dt,
@@ -480,7 +509,8 @@ def build_libero_selected_candidate(
                     'privileged_state.*_body_pose': 'world_body_center_m_quaternion_wxyz',
                 },
                 'provider': env.provider, 'backend': env.backend,
-                'evidence_class': 'diagnostic_candidate',
+                'evidence_class': ('diagnostic_candidate' if not _solution_profile
+                                   else 'bounded_solution_candidate'),
             },
             'universal_action_schema': {
                 'version': env.value['action_schema']['schema_id'],
@@ -504,6 +534,7 @@ def build_libero_selected_candidate(
                 'source_xml_sha256': receipt.canonical_xml_sha256,
                 'source_closure_digest': source.source_closure_digest,
                 'source_manifest_sha256': env.value['source_manifest_sha256'],
+                'solution_identity': env.value.get('solution_identity'),
                 'controller_identity': env.controller.identity,
                 'provider_materialization_id': env.session.provider_materialization_id,
                 'episode_id': env.session.episode_id,
@@ -523,6 +554,7 @@ def build_libero_selected_candidate(
                 'provider_materialization_id': env.session.provider_materialization_id,
                 'controller_identity': env.controller.identity,
                 'source_manifest_sha256': env.value['source_manifest_sha256'],
+                'solution_identity': env.value.get('solution_identity'),
             },
         }
 
@@ -583,6 +615,18 @@ def build_libero_selected_candidate(
             'reset_not_yet_applied': True,
         }
 
+    def validate_external_solution(value, solution):
+        from .solution import LiberoPickPlaceSolutionV1, solution_identity_v1
+
+        if not isinstance(solution, LiberoPickPlaceSolutionV1):
+            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV1')
+        expected_source = value['source_sha256']['composed_candidate_xml']
+        if (solution.task_uid != value['artifact'].task_id
+                or solution.source_xml_sha256 != expected_source
+                or solution.identity != value.get('solution_identity')
+                or solution.identity != solution_identity_v1(expected_source)):
+            raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
+
     binding = ReferenceTaskBinding(
         build=lambda provider: build_value(provider, 'cpu'),
         reset_sample=lambda artifact, seed: reset_with_options(
@@ -594,6 +638,8 @@ def build_libero_selected_candidate(
         reset_seed=lambda seed: seed,
         runtime_episode_identity=True,
         build_mixed_control_profile=build_value,
+        build_external=(lambda provider: build_value(provider, 'cpu')) if _solution_profile else None,
+        validate_external_solution=validate_external_solution if _solution_profile else None,
         reset_sample_with_options=reset_with_options,
         prepare_mixed_control=prepare_mixed_control,
         observe_mixed_control=observe_mixed_control,
@@ -603,10 +649,36 @@ def build_libero_selected_candidate(
     env = SelectedReferenceEnv.from_mixed_control_candidate(
         binding, provider='mujoco', backend='cpu', horizon=horizon,
     )
+    if _solution_profile:
+        env.metadata.update({
+            'provider': 'mujoco', 'backend': 'cpu',
+            'solution_identity': env.value['solution_identity'],
+            'source_xml_sha256': env.value['source_sha256']['composed_candidate_xml'],
+            'source_closure_digest': env.value['source_sha256']['source_closure_digest'],
+        })
     # The shared sample owner retains reset and source facts for the public
     # reset receipt; it is private recipe state, not a second runtime owner.
     env.value['reset_realizations'] = reset_receipts
     return env
 
 
-__all__ = ['build_libero_selected_candidate']
+def build_libero_solution_candidate(
+    *, xml_path: Path = DEFAULT_OUTPUT_ROOT / 'source/composed_candidate.xml',
+    xml: str | bytes | None = None,
+    composed_mjcf_sha256: str | None = None,
+    composition_plan_path: Path = DEFAULT_OUTPUT_ROOT / 'source/composition_plan.json',
+    install_root: Path = DEFAULT_INSTALL_ROOT,
+    init_path: Path | None = None,
+    horizon: int = 1000,
+):
+    """Construct the versioned task #1 Solution through existing Core owners."""
+    if type(horizon) is not int or not 1 <= horizon <= 1000:
+        raise ValueError('LIBERO task Solution horizon must be in [1,1000]')
+    return build_libero_selected_candidate(
+        xml_path=xml_path, xml=xml, composed_mjcf_sha256=composed_mjcf_sha256,
+        composition_plan_path=composition_plan_path, install_root=install_root,
+        init_path=init_path, horizon=horizon, _solution_profile=True,
+    )
+
+
+__all__ = ['build_libero_selected_candidate', 'build_libero_solution_candidate']

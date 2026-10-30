@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from io import BytesIO
+import os
 import zipfile
 
 import pytest
@@ -14,6 +15,10 @@ _INIT = Path(
     "/home/lly/Program_Files/Geochora/workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/"
     "r07b_pilot_001_install/final_001/upstream/libero/libero/libero/init_files/libero_spatial/"
     "pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate.pruned_init"
+)
+_THREE_TASK_SOURCE_ROOT = (
+    Path(os.environ["R07_V210_SOURCE_INPUTS"])
+    if "R07_V210_SOURCE_INPUTS" in os.environ else None
 )
 
 
@@ -64,3 +69,40 @@ def test_init_parser_rejects_extra_zip_members_and_archive_versions():
         archive.writestr("archive/version", b"4\n")
     with pytest.raises(ValueError, match="archive version"):
         init_state._read_archive_payload(wrong_version.getvalue())
+
+
+@pytest.mark.parametrize(
+    ("task_uid", "filename"),
+    (
+        ("libero_goal/open_the_middle_drawer_of_the_cabinet",
+         "open_the_middle_drawer_of_the_cabinet.pruned_init"),
+        ("libero_goal/push_the_plate_to_the_front_of_the_stove",
+         "push_the_plate_to_the_front_of_the_stove.pruned_init"),
+    ),
+)
+def test_required_goal_task_rows_use_their_own_pinned_50_by_79_contract(task_uid, filename):
+    if _THREE_TASK_SOURCE_ROOT is None or not _THREE_TASK_SOURCE_ROOT.is_dir():
+        pytest.skip("set R07_V210_SOURCE_INPUTS to the frozen upstream candidate bytes")
+    decoded = init_state.read_pruned_init(
+        _THREE_TASK_SOURCE_ROOT / filename, task_uid=task_uid,
+    )
+    layout = init_state.init_layout_v1(task_uid)
+    assert (decoded.row_count, decoded.width) == (50, 79)
+    assert len(decoded.row(49)) == 79
+    assert len(decoded.row_sha256) == 50
+    assert layout["shape"] == [50, 79]
+    assert (layout["expected_nq"], layout["expected_nv"]) == (41, 37)
+    assert len(layout["qpos_names"]) == 41
+    assert len(layout["qvel_names"]) == 37
+    assert layout["task_uid"] == task_uid
+
+
+def test_init_contract_rejects_unknown_task_and_wrong_task_bytes():
+    with pytest.raises(ValueError, match="outside required task set"):
+        init_state.decode_pruned_init_bytes(b"not an init array", task_uid="libero_goal/other")
+    if _THREE_TASK_SOURCE_ROOT is not None and _THREE_TASK_SOURCE_ROOT.is_dir():
+        task2 = (_THREE_TASK_SOURCE_ROOT / "open_the_middle_drawer_of_the_cabinet.pruned_init").read_bytes()
+        with pytest.raises(ValueError, match="pinned input SHA256"):
+            init_state.decode_pruned_init_bytes(
+                task2, task_uid="libero_goal/push_the_plate_to_the_front_of_the_stove",
+            )

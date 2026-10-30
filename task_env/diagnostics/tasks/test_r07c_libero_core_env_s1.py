@@ -8,6 +8,7 @@ remain the production implementations.
 from __future__ import annotations
 
 import builtins
+from dataclasses import replace
 import hashlib
 import importlib.abc
 import importlib.util
@@ -16,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import types
 import xml.etree.ElementTree as ET
@@ -2033,7 +2035,7 @@ def test_contact_query_and_semantic_oracle_use_same_real_core_path(tmp_path, mon
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
     _fake_api(monkeypatch)
-    env = _candidate(monkeypatch, horizon=2)
+    env = _candidate(monkeypatch, horizon=3)
     try:
         reset_obs, _ = env.reset(seed=19, options={"init_row_index": 0})
         _FAKE_WORLD.contact_pair = ("akita_black_bowl_1", "plate_1")
@@ -2047,6 +2049,18 @@ def test_contact_query_and_semantic_oracle_use_same_real_core_path(tmp_path, mon
         _, _, _, _, negative = env.step(np.asarray([*current[:7], 0.04]))
         assert negative["contact_summary_v2"]["pair_counts"]["akita_black_bowl_1/plate_1"] == 0
         assert negative["predicate_v1"]["on_bowl_plate"]["value"] is False
+
+        read_contact = env.session.read_contact_summary_v2
+
+        def stale_contact(requested_pairs):
+            current_contact = read_contact(requested_pairs)
+            return replace(current_contact, state_revision=current_contact.state_revision - 1)
+
+        monkeypatch.setattr(env.session, "read_contact_summary_v2", stale_contact)
+        with pytest.raises(ValueError, match="contact summary is stale"):
+            env.step(np.asarray([*current[:7], 0.04]))
+        assert env.execution_fault is not None
+        assert env.execution_fault.phase == "mixed_observation"
     finally:
         env.close()
     common = {
@@ -2066,6 +2080,210 @@ def test_contact_query_and_semantic_oracle_use_same_real_core_path(tmp_path, mon
         OnBowlPlateEvidenceV1(**{**common, "bowl_center_m": (0.03, 0.0, 0.90)}),
         expected_source_manifest_sha256=source_manifest,
     ).value is False
+
+
+def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tmp_path, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    fake = _fake_api(monkeypatch)
+    assert getattr(fake, "__r07c_s1_synthetic_fixture__", False) is True
+    import hashlib
+    from bench_deploy.libero.selected_candidate import (
+        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
+    )
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV1
+    from task_env.runtime.sessions.source import source_asset_bytes
+    from task_env.recorders import load_structured_control_records_h5
+
+    xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
+    xml = xml_path.read_bytes()
+    xml_sha = hashlib.sha256(xml).hexdigest()
+    plan_path = Path(os.environ.get(
+        "R07_V210_COMPOSITION_PLAN",
+        str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
+    ))
+    env = build_libero_solution_candidate(
+        xml=xml, composed_mjcf_sha256=xml_sha,
+        install_root=Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
+        composition_plan_path=plan_path,
+        horizon=100,
+    )
+    solution = LiberoPickPlaceSolutionV1(xml)
+    wrong_source_solution = LiberoPickPlaceSolutionV1(xml + b"\n<!-- different immutable source bytes -->\n")
+    try:
+        assert env.observation_space["state"]["joint_position"].shape == (9,)
+        with pytest.raises(ValueError, match="does not match the selected task/source/profile"):
+            env.reset_for_solution(wrong_source_solution, seed=19, options={"init_row_index": 0})
+        assert env.session is None
+        assert _FAKE_WORLD.calls["reset"] == 0
+
+        reset_obs, reset_info = env.reset_for_solution(
+            solution, seed=19, options={"init_row_index": 0},
+        )
+        assert reset_info["reset_sample_v1"]["sample_id"] == reset_info["reset_sample_id"]
+        assert reset_obs["state"]["joint_position"].shape == (9,)
+        env.start_recording(tmp_path / "libero_solution_s1.h5")
+        observation, _reward, terminated, truncated, info = env.step_with_solution(solution)
+        assert not terminated and not truncated
+        assert info["selected_solution_action_v1"]["solution_identity"] == solution.identity
+        assert info["selected_solution_action_v1"]["stage"] == "approach"
+        assert info["control_step"] == 1
+        assert env.recorder.transition_count == 1
+        assert env.execution_fault is None
+
+        end = env.stop("provider_free_solution_s1_complete")
+        assert end.outcome.solution_completed is False
+        finalized = env.finish_recording(end.outcome.end_reason)
+        readback = load_structured_control_records_h5(finalized["path"])
+        assert readback["transition_count"] == 1
+        assert readback["observation_count"] == 2
+        assert readback["outcome"].solution_completed is False
+        assert observation["state"]["boundary_identity_sha256"].shape == (32,)
+    finally:
+        env.close()
+
+
+def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    from bench_deploy.libero.selected_candidate import (
+        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
+    )
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV1
+    from task_env.runtime.sessions.source import source_asset_bytes
+
+    xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
+    xml = xml_path.read_bytes()
+    xml_sha = hashlib.sha256(xml).hexdigest()
+    plan_path = Path(os.environ.get(
+        "R07_V210_COMPOSITION_PLAN",
+        str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
+    ))
+    install_root = Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT)
+    env = build_libero_solution_candidate(
+        xml=xml, composed_mjcf_sha256=xml_sha,
+        install_root=install_root,
+        composition_plan_path=plan_path, horizon=100,
+    )
+    bundle = tmp_path / "solution_worker_bundle"
+    closure_files = {
+        "canonical-source.xml": xml,
+        "scene.xml": xml,
+        **source_asset_bytes(install_root, xml.decode("utf-8")),
+    }
+    result = run_libero_candidate_worker(
+        env, output_dir=bundle, steps=1,
+        solution_factory=lambda: LiberoPickPlaceSolutionV1(xml),
+        source_closure_files=closure_files,
+        composition_plan_bytes=plan_path.read_bytes(),
+    )
+    assert result["status"] == "complete"
+    assert result["episode_count"] == 3
+    assert result["reset_count"] == 3
+    assert result["native_step_count"] == 75
+    assert [item["row_index"] for item in result["episodes"]] == [0, 1, 2]
+    assert result["episodes"][0]["prior_session_close_receipt"] is None
+    assert all(
+        item["prior_session_close_receipt"]["session_closed"] is True
+        for item in result["episodes"][1:]
+    )
+    assert all(item["solution_completed"] is False for item in result["episodes"])
+    assert result["close_error"] is None
+    assert result["final_session_close_receipt"]["session_closed"] is True
+
+    receipt = consume_libero_candidate_bundle(bundle / "worker_result.json")
+    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v1"
+    assert receipt["status"] == "verified_complete"
+    assert receipt["episode_count"] == 3
+    assert receipt["observation_count"] == 6
+    assert receipt["solution_completed_episodes"] == 0
+
+    parent_dir = tmp_path / "runs/native_synthetic_001"
+    parent_dir.mkdir(parents=True)
+    stdout_path = parent_dir / "stdout.log"
+    stderr_path = parent_dir / "stderr.log"
+    stdout_summary = {
+        "status": result["status"], "result_sha256": result["result_sha256"],
+        "episode_count": result["episode_count"],
+        "transition_count": result["transition_count"],
+        "observation_count": result["observation_count"],
+        "native_step_count": result["native_step_count"],
+    }
+    stdout_path.write_text(json.dumps(stdout_summary) + "\n", encoding="utf-8")
+    stderr_path.write_text("", encoding="utf-8")
+    expected_lock = Path(
+        "/home/lly/Program_Files/Geochora/workspace/maintenance/"
+        "phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock"
+    )
+    argv = [
+        sys.executable, "-m", "bench_deploy.libero.core_candidate_worker",
+        "--run-worker", str(bundle), "--steps", "1", "--task-solution-1",
+        "--source-xml", str(xml_path), "--composition-plan", str(plan_path),
+        "--install-root", str(install_root),
+    ]
+    parent_record = {
+        "schema_version": "r07-v210-required123-run-record-v1",
+        "exit_code": 0, "termination_reason": None,
+        "process_group_confirmed_exited": True,
+        "lock_path": str(expected_lock), "lock_acquired": True,
+        "lock_released_after_group_exit": True,
+        "argv": argv,
+        "cwd": "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
+        "environment": {
+            "PYTHONPATH": (
+                "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/GeoPhys/src:"
+                "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora"
+            ),
+        },
+        "stdout_path": str(stdout_path.relative_to(tmp_path)),
+        "stdout_bytes": stdout_path.stat().st_size,
+        "stderr_path": str(stderr_path.relative_to(tmp_path)),
+        "stderr_bytes": stderr_path.stat().st_size,
+    }
+    parent_record_path = parent_dir / "run_record.json"
+    parent_record_path.write_text(json.dumps(parent_record, sort_keys=True), encoding="utf-8")
+    parent_verified = consume_libero_candidate_bundle(
+        bundle / "worker_result.json", parent_run_record_path=parent_record_path,
+        expected_lock_path=expected_lock,
+    )
+    assert parent_verified["parent_process"]["status"] == "verified_parent_exit_and_lock_release"
+    reader_code = """
+import importlib.abc, sys
+DENIED = {"mujoco", "taichi", "isaacsim", "omni", "torch"}
+class BlockNativeEngines(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".", 1)[0] in DENIED:
+            raise AssertionError(f"native engine import during independent readback: {fullname}")
+        return None
+sys.meta_path.insert(0, BlockNativeEngines())
+from bench_deploy.libero.core_candidate_worker import main
+result = main(["--read-bundle", sys.argv[1], "--parent-run-record", sys.argv[2],
+               "--expected-lock-path", sys.argv[3]])
+assert not any(name.split(".", 1)[0] in DENIED for name in sys.modules)
+raise SystemExit(result)
+"""
+    reader_process = subprocess.run(
+        [sys.executable, "-c", reader_code, str(bundle / "worker_result.json"),
+         str(parent_record_path), str(expected_lock)],
+        cwd="/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+        capture_output=True, text=True, timeout=300, check=False,
+    )
+    assert reader_process.returncode == 0, reader_process.stderr
+    assert json.loads(reader_process.stdout)["parent_process"]["lock_released_after_group_exit"] is True
+
+    tampered = tmp_path / "tampered_solution_bundle"
+    shutil.copytree(bundle, tampered)
+    h5_path = tampered / result["episodes"][0]["h5"]["relative_path"]
+    h5_path.write_bytes(h5_path.read_bytes() + b"tamper")
+    with pytest.raises(ValueError, match="H5 bytes or digest differ"):
+        consume_libero_candidate_bundle(tampered / "worker_result.json")
+    h5_path.write_bytes((bundle / result["episodes"][0]["h5"]["relative_path"]).read_bytes())
+    xml_path = tampered / "source_inputs/closure/canonical-source.xml"
+    xml_path.write_bytes(xml_path.read_bytes() + b"\n<!-- tamper -->\n")
+    with pytest.raises(ValueError, match="source closure bytes differ"):
+        consume_libero_candidate_bundle(tampered / "worker_result.json")
 
 
 def test_reset_plan_preflight_rejects_seed_mismatch_without_closing_live_session(monkeypatch):

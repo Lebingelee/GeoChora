@@ -18,6 +18,8 @@ from typing import Any
 import xml.etree.ElementTree as ET
 import zipfile
 
+from .task_contracts import TASK_1, task_source_contract_v1
+
 
 INIT_SHA256 = "cbbc73792ce546c9bec181fd328a411d3183074840b282671dee481511381d0a"
 ROWS = 50
@@ -72,12 +74,14 @@ class DecodedInitV1:
     values: tuple[float, ...]
     raw_bytes: bytes
     row_sha256: tuple[str, ...]
+    row_count: int = ROWS
+    width: int = WIDTH
 
     def row(self, index: int) -> tuple[float, ...]:
-        if type(index) is not int or not 0 <= index < ROWS:
-            raise ValueError("initial-state row index must be in [0, 49]")
-        start = index * WIDTH
-        return self.values[start:start + WIDTH]
+        if type(index) is not int or not 0 <= index < self.row_count:
+            raise ValueError(f"initial-state row index must be in [0, {self.row_count - 1}]")
+        start = index * self.width
+        return self.values[start:start + self.width]
 
 
 def _read_archive_payload(data: bytes) -> bytes:
@@ -103,13 +107,17 @@ def _read_archive_payload(data: bytes) -> bytes:
     return payload
 
 
-def _require_archive(data: bytes) -> bytes:
-    if hashlib.sha256(data).hexdigest() != INIT_SHA256:
-        raise ValueError("pruned_init bytes do not match the pinned input SHA256")
+def _require_archive(data: bytes, *, expected_sha256: str = INIT_SHA256) -> bytes:
+    if hashlib.sha256(data).hexdigest() != expected_sha256:
+        raise ValueError("pruned_init bytes do not match the pinned input SHA256 for this task")
     return _read_archive_payload(data)
 
 
-def _tokenize_fixed_array(payload: bytes) -> bytes:
+def _tokenize_fixed_array(payload: bytes, *, expected_shape: tuple[int, int] = (ROWS, WIDTH)) -> bytes:
+    if (type(expected_shape) is not tuple or len(expected_shape) != 2
+            or any(type(value) is not int or value <= 0 for value in expected_shape)):
+        raise ValueError("pruned_init expected shape must be a pair of positive integers")
+    rows, width = expected_shape
     try:
         ops = list(pickletools.genops(payload))
     except Exception as exc:
@@ -132,7 +140,7 @@ def _tokenize_fixed_array(payload: bytes) -> bytes:
     ).split()
     if names != list(expected_names):
         raise ValueError("pruned_init opcode stream differs from the fixed ndarray format")
-    if ops[0][1] != 2 or ops[23][1] != 1 or ops[24][1] != ROWS or ops[25][1] != WIDTH:
+    if ops[0][1] != 2 or ops[23][1] != 1 or ops[24][1] != rows or ops[25][1] != width:
         raise ValueError("pruned_init protocol or array dimensions differ from the fixed input")
     if ops[30][1] != "f8" or ops[39][1] != 3 or ops[40][1] != "<":
         raise ValueError("pruned_init dtype is not little-endian float64")
@@ -145,30 +153,38 @@ def _tokenize_fixed_array(payload: bytes) -> bytes:
     if ops[52][1] != 3 or ops[55][1] != 5:
         raise ValueError("pruned_init pickle memo references differ from the fixed input")
 
+    expected_bytes = rows * width * 8
     raw_candidates = [arg for op, arg, _ in ops if op.name == "BINUNICODE" and isinstance(arg, str)
-                      and len(arg) == ROWS * ROW_BYTES]
+                      and len(arg) == expected_bytes]
     if len(raw_candidates) != 1:
         raise ValueError("pruned_init must contain exactly one fixed-size raw array string")
     try:
         raw = raw_candidates[0].encode("latin1", errors="strict")
     except UnicodeEncodeError as exc:
         raise ValueError("pruned_init raw array string is not a latin1 byte encoding") from exc
-    if len(raw) != ROWS * ROW_BYTES:
+    if len(raw) != expected_bytes:
         raise ValueError("pruned_init raw array byte length differs from its shape")
     return raw
 
 
-def decode_pruned_init_bytes(data: bytes) -> DecodedInitV1:
-    """Read the pinned (50, 92) float64 array without executing pickle code."""
+def decode_pruned_init_bytes(data: bytes, *, task_uid: str = TASK_1) -> DecodedInitV1:
+    """Read one exact required task array without executing pickle code.
+
+    The task identity selects a frozen SHA-256 and shape.  Callers cannot pass
+    arbitrary dimensions or a caller-supplied hash to broaden the decoder.
+    """
+    contract = task_source_contract_v1(task_uid)
     archive_sha = hashlib.sha256(data).hexdigest() if isinstance(data, bytes) else ""
-    payload = _require_archive(data)
-    raw = _tokenize_fixed_array(payload)
+    payload = _require_archive(data, expected_sha256=contract.init_sha256)
+    raw = _tokenize_fixed_array(payload, expected_shape=contract.init_shape)
     values = tuple(value[0] for value in struct.iter_unpack("<d", raw))
-    if len(values) != ROWS * WIDTH or any(not math.isfinite(value) for value in values):
-        raise ValueError("pruned_init values must be exactly 50×92 finite float64 numbers")
+    rows, width = contract.init_shape
+    if len(values) != rows * width or any(not math.isfinite(value) for value in values):
+        raise ValueError(f"pruned_init values must be exactly {rows}×{width} finite float64 numbers")
+    row_bytes = width * 8
     row_hashes = tuple(
-        hashlib.sha256(raw[index * ROW_BYTES:(index + 1) * ROW_BYTES]).hexdigest()
-        for index in range(ROWS)
+        hashlib.sha256(raw[index * row_bytes:(index + 1) * row_bytes]).hexdigest()
+        for index in range(rows)
     )
     return DecodedInitV1(
         source_sha256=archive_sha,
@@ -176,51 +192,62 @@ def decode_pruned_init_bytes(data: bytes) -> DecodedInitV1:
         values=values,
         raw_bytes=raw,
         row_sha256=row_hashes,
+        row_count=rows,
+        width=width,
     )
 
 
-def read_pruned_init(path: Path) -> DecodedInitV1:
-    """Read and validate the exact frozen `.pruned_init` file."""
-    return decode_pruned_init_bytes(Path(path).read_bytes())
+def read_pruned_init(path: Path, *, task_uid: str = TASK_1) -> DecodedInitV1:
+    """Read and validate one exact frozen `.pruned_init` file."""
+    return decode_pruned_init_bytes(Path(path).read_bytes(), task_uid=task_uid)
 
 
-def init_layout_v1() -> dict[str, Any]:
-    """Return the source-derived expected name layout; not compiled-model proof."""
+def init_layout_v1(task_uid: str = TASK_1) -> dict[str, Any]:
+    """Return the task's declared flat row layout; not compiled-model proof."""
+    contract = task_source_contract_v1(task_uid)
     robot = [*(f"joint{i}" for i in range(1, 8)), "finger_joint1", "finger_joint2"]
-    objects = (
-        "akita_black_bowl_1", "akita_black_bowl_2", "cookies_1",
-        "glazed_rim_porcelain_ramekin_1", "plate_1",
-    )
+    objects = contract.movable_instances
     qpos = list(robot)
     qvel = list(robot)
     for name in objects:
         qpos.extend(f"{name}.free[{i}]" for i in range(7))
         qvel.extend(f"{name}.free[{i}]" for i in range(6))
-    qpos.extend((
-        "wooden_cabinet_1.top_level", "wooden_cabinet_1.middle_level",
-        "wooden_cabinet_1.bottom_level", "flat_stove_1.button",
-    ))
-    qvel.extend((
-        "wooden_cabinet_1.top_level", "wooden_cabinet_1.middle_level",
-        "wooden_cabinet_1.bottom_level", "flat_stove_1.button",
-    ))
-    if (len(qpos), len(qvel)) != (48, 43):
-        raise AssertionError("internal LIBERO state layout arithmetic changed")
-    return {
-        "schema_version": "libero-pruned-init-name-layout-v1",
+    qpos.extend(contract.fixture_joint_names)
+    qvel.extend(contract.fixture_joint_names)
+    rows, width = contract.init_shape
+    qpos_end = 1 + len(qpos)
+    if qpos_end + len(qvel) != width:
+        raise ValueError("task source declaration and selected init row width disagree")
+    layout = {
+        "schema_version": (
+            "libero-pruned-init-name-layout-v1" if task_uid == TASK_1
+            else "libero-pruned-init-name-layout-v2"
+        ),
+        "task_uid": task_uid,
+        "source_revision": "8f1084e3132a39270c3a13ebe37270a43ece2a01",
         "source_order": ["mounted_panda", *objects, "wooden_cabinet_1", "flat_stove_1"],
         "qpos_names": qpos,
         "qvel_names": qvel,
         "time_index": 0,
-        "qpos_slice": [1, 49],
-        "qvel_slice": [49, 92],
-        "expected_nq": 48,
-        "expected_nv": 43,
+        "shape": [rows, width],
+        "qpos_slice": [1, qpos_end],
+        "qvel_slice": [qpos_end, width],
+        "expected_nq": len(qpos),
+        "expected_nv": len(qvel),
         "expected_na": 0,
         "fixture_body_pose_fields_in_flattened_state": False,
         "compiled_model_verification": "REQUIRED_BEFORE_NATIVE",
-        "status": "SOURCE_DERIVED_LAYOUT; FIXTURE_POSES_MISSING_FROM_INIT_ROWS",
+        "status": (
+            "SOURCE_DERIVED_LAYOUT; FIXTURE_POSES_MISSING_FROM_INIT_ROWS"
+            if task_uid == TASK_1 else "SOURCE_DECLARED_LAYOUT; FIXTURE_POSES_MISSING_FROM_INIT_ROWS"
+        ),
     }
+    # Preserve the already-consumed v1 projection byte-for-byte for the first
+    # task.  The new fields are part of the v2 declaration only.
+    if task_uid == TASK_1:
+        for key in ("task_uid", "source_revision", "shape"):
+            layout.pop(key)
+    return layout
 
 
 def _parse_sexpr(text: str):
