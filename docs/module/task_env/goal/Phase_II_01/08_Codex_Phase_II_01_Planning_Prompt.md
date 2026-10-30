@@ -49,3 +49,8 @@
 ### 2026-10-30维护者指定提前诊断：三个长期Goal
 
 当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01包准备后由维护者转述；DG02/03为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。
+
+
+### DG01接收后的当前派包点（2026-10-30）
+
+DG01已由Sol独立接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`，含实际obs reader修复后的原H5冷读22类negative。当前仅可转述`sol_f05_dg02_001/luna_goal_prompt.md`及其snapshot/manifest完整包；旧goal_02_baseline不可直接执行。DG02实施保真USD、GeoPhys既有约束/tendon/actuator消费者与9DOF/8actuator的精确Core路线，允许有界N0/N1先于完整生产readiness；N2仍须production/S1/plan冻结。完整scope/预算/保护及Sol决定见[13第8节](13_F05_Early_Diagnostic_Three_Goals.md)。Sol准备阶段未启动DG02 Goal/native，DG03仍等待DG02完成并复核。

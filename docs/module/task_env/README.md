@@ -101,3 +101,6 @@ Expert completion 和 termination/truncation 分开报告。具体数值、设�
 [API reference](../../../task_env/doc/api/index.md)提供符号级细节，后者不是第二份能力矩阵。
 USD delivery loader 是独立的 advanced source intake：它绑定精确交付 bytes 和上游验证报告，不能替代
 MJCF-only `RuntimeSource`，也不自动授予任一 Provider 的 runtime admission。
+
+
+**DG01 Sol接收 / DG02下一包（2026-10-30）：** 精确DG01单元已接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`。Sol修复实际obs核验后，原H5冷读通过602obs、600transitions、3000steps和22类负例；原producer/H5未改，无新native。DG02已准备保真USD→GeoPhys公开约束/传动消费者→既有Core的长期Goal包，等待维护者转述；尚未获得该路线通过结论。旧F05 overall partial不变，DG03/F06/F07仍未启动，详见[当前编排](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md)。

@@ -1859,15 +1859,15 @@
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
     "07_Execution_Order_and_Acceptance.md": "8060743d170f87d32a482b13ad36ca956a59d4cfe3c7797971434f5646f477fa",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "491e573f62a2ea7050f2a9c5ec7df7dabbcdac05a0c5009ea3594864a4c1ac29",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "a9aa3bfd66f8b5fe2200d8d7d8fc91fedeb0144d7abc8cc398d041e75fce7916",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "8bdccecc6f138291597f103f7c1539b5602a91ce12ae3dc019f78d61792daad1",
+    "README.md": "11553804d8f6955a0886e36ed2de836919cbbf096b2fdf2a6d66740073d4b5bd",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
     "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "221462a5203660ac6d822458b5b6557322d82c7703bdc6f5ea0c3fa1a78b9d8d"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "14c01b50e92525c30b7eaa0364662359d9d4a7edfe02022f18956a77bbc66edf"
   },
-  "revision_kind": "F05_DG01_GOAL01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW",
+  "revision_kind": "F05_DG01_SOL_BOUNDED_ACCEPTANCE_AND_DG02_WINDOW001_PREPARATION",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3641,7 +3641,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "The maintainer-directed DG01 Goal01 has completed its exact Menagerie MJCF-to-Core-to-MuJoCo 3.8.1 CPU candidate route at the frozen input and implementation commits. N0/N1 evidence and the same-Env N2 2x300 Core cell passed its physical, H5, independent-reader, 14-negative and resource/exit gates. The bounded result is pending Sol review; ordinary F05 remains OVERALL_PARTIAL, GeoPhys/USD and Isaac/USD Goals remain unstarted, and no Qualification is granted. See checkpoint_recovery_plan.dg01_goal01_window_001 and the ignored output package.",
+  "planning_submission_this_revision": "Sol accepted the exact DG01 Core/MuJoCo cell after independently fixing actual-observation verification and cold-reading unchanged RUN009 H5 with 22 negatives. DG02 is prepared for manual relay on the post-review/docs HEAD; faithful USD/public GeoPhys consumers/Core integration and staged native are its scope. No DG02 native or Qualification was started. Historical ordinary F05 partial and candidate records remain unchanged.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4641,7 +4641,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-30",
-    "status": "F05_OVERALL_PARTIAL_UNCHANGED; DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW; DG02_DG03_NOT_STARTED; F06_F07_NOT_STARTED",
+    "status": "F05_OVERALL_PARTIAL_UNCHANGED; DG01_ACCEPTED_BOUNDED; DG02_WINDOW001_PREPARED_FOR_MANUAL_RELAY; DG03_F06_F07_NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -6742,7 +6742,7 @@
       "preparation_tests": 0,
       "preparation_native": 0
     },
-    "latest_f05_successor_diagnostic_plan": "f05_early_diagnostic_three_goals_20261030",
+    "latest_f05_successor_diagnostic_plan": "f05_dg02_window001_preparation_20261030",
     "dg01_goal01_window_001": {
       "input_head": "6d4e222866474b0ce4399183a35c337f58303349",
       "implementation_commit": "e410f97d90e1e88806318d11c47dc54d013dad5c",
@@ -6752,6 +6752,65 @@
       "episodes": 2,
       "reader_negative_mutations_passed": 14,
       "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal01/window_001/"
+    },
+    "f05_dg01_sol_review_20261030": {
+      "decision": "ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE",
+      "input_head": "326736134205c2f1524d0320eb59679b9eab825c",
+      "reader_fix_commit": "cb8c3541d99d762c177fdade93eef42985aa07cd",
+      "original_producer_unchanged": true,
+      "actual_obs": 602,
+      "transitions": 600,
+      "native_advances_original_run": 3000,
+      "reader_negative_classes": 22,
+      "original_outputs_verified": 488,
+      "protected_inputs_verified": 5906,
+      "runtime_files_verified": 12,
+      "provider_files_verified": 2852,
+      "review_native": 0,
+      "review_pytest": "NOT_RUN",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg01_001/",
+      "scope": "exact Menagerie source/DG01 task recipe/MuJoCo3.8.1CPU/Core cell; no Expert/task-solving/cross-engine contact equivalence/Qualification",
+      "documentation_validation": {
+        "validator_exit_code": 1,
+        "global_pass": false,
+        "errors": 223,
+        "baseline_errors": 216,
+        "added": [
+          "non-documentation change: task_env/diagnostics/tasks/f05_dg01_core_cell.py",
+          "non-documentation change: task_env/diagnostics/tasks/f05_dg01_h5_reader.py",
+          "non-documentation change: task_env/diagnostics/tasks/f05_dg01_native_probe.py",
+          "non-documentation change: task_env/diagnostics/tasks/f05_dg01_native_supervisor.py",
+          "non-documentation change: task_env/diagnostics/tasks/test_phase_ii_f05_dg01_core_cell.py",
+          "non-documentation change: task_env/diagnostics/tasks/test_phase_ii_f05_dg01_mujoco_core_route.py",
+          "non-documentation change: task_env/tasks/position_candidate/assets/f05_dg01_task_scene_recipe.json"
+        ],
+        "removed": [],
+        "classification": "216 frozen historical errors plus seven scope diagnostics for existing DG01 additions (six diagnostic/test Python files and task recipe); no missing-link/hash error introduced in this review. Not a global PASS.",
+        "preparation_native": 0,
+        "pytest": "NOT_RUN",
+        "module_skill_check": "PASS static metadata/local-links/sourcepaths",
+        "diff_check": "PASS"
+      }
+    },
+    "f05_dg02_window001_preparation_20261030": {
+      "package_id": "F05_EARLY_DIAGNOSTIC_DG02_GEOPHYS_USD_WINDOW001",
+      "status": "PREPARED_FOR_MANUAL_RELAY_NOT_STARTED",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_001/",
+      "input_head_authority": "post-review/docs commit in package input_snapshot.json, not self-referential here",
+      "scope": "faithfulUSD -> publicGeoPhys constraint/tendon/affine actuator -> exact existingCore cell;9scalarDOF/8actuators",
+      "provider_input": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "new_branches_worktrees": 0,
+      "native_steps_limit": 72000,
+      "native_wall_s_limit": 10800,
+      "window_timebox_minutes": 720,
+      "expected_active_hours": [
+        8,
+        16
+      ],
+      "N0_N1_before_full_route_ready": true,
+      "N2_requires_implementation_S1_and_frozen_plan": true,
+      "native_in_preparation": 0,
+      "DG03_F06_F07_started": false
     }
   }
 }
