@@ -355,9 +355,16 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
         raise ValueError("parent run record does not identify the D01 native worker module")
     if is_solution and "--task-solution-1" not in argv:
         raise ValueError("parent run record does not identify the task #1 Solution route")
-    if (not argv or Path(argv[0]).resolve() != Path(sys.executable).resolve()
-            or record.get("cwd") != "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora"):
+    if not argv or Path(argv[0]).resolve() != Path(sys.executable).resolve():
         raise ValueError("parent run record used an unpinned Python interpreter or camera checkout")
+    cwd = record.get("cwd")
+    if is_solution:
+        expected_cwd = record_path.parent.resolve()
+        if (type(cwd) is not str or Path(cwd).resolve() != expected_cwd
+                or expected_cwd != bundle_path.parent.parent.resolve()):
+            raise ValueError("task Solution parent run directory differs from its recorded bundle layout")
+    elif cwd != "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora":
+        raise ValueError("D01 parent run record did not use the pinned camera checkout")
     try:
         worker_index = argv.index("--run-worker")
         worker_dir = Path(argv[worker_index + 1]).resolve()
@@ -925,11 +932,42 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
     return result
 
 
+def _validate_source_gravity_action(control_plan: Mapping[str, Any], diagnostics: Mapping[str, Any],
+                                   public_action: np.ndarray,
+                                   expected_controller: Mapping[str, Any]) -> None:
+    """Recompute the v2 position-target compensation from the bound controller gains."""
+    if dict(control_plan) != dict(expected_controller):
+        raise ValueError("task Solution controller identity/profile differs from its frozen v2 profile")
+    try:
+        kp = np.asarray(control_plan.get("kp_Nm_per_rad"), dtype=np.float64)
+        bias = np.asarray(diagnostics.get("gravity_bias_Nm"), dtype=np.float64)
+        offset = np.asarray(diagnostics.get("gravity_target_offset_rad"), dtype=np.float64)
+        planner_target = np.asarray(diagnostics.get("planner_joint_target_rad"), dtype=np.float64)
+        compensated_target = np.asarray(
+            diagnostics.get("gravity_compensated_joint_target_rad"), dtype=np.float64,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("task Solution gravity compensation fields are malformed") from exc
+    if (any(value.shape != (7,) or not np.isfinite(value).all()
+            for value in (kp, bias, offset, planner_target, compensated_target))
+            or (kp <= 0.0).any()
+            or public_action.shape != (8,) or not np.isfinite(public_action).all()
+            or diagnostics.get("gravity_compensation_profile_id") != "libero-source-mjcf-gravity-bias-v1"):
+        raise ValueError("task Solution gravity compensation fields have invalid shape, values, or profile")
+    if (not np.allclose(offset, bias / kp, rtol=0.0, atol=1e-10)
+            or not np.allclose(compensated_target, planner_target + offset,
+                               rtol=0.0, atol=1e-10)
+            or not np.allclose(public_action[:7], compensated_target,
+                               rtol=0.0, atol=1e-6)):
+        raise ValueError("task Solution action does not preserve the source gravity compensation formula")
+
+
 def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any], *,
                                    require_motion_thresholds: bool,
                                    require_mujoco_runtime_identity: bool) -> dict[str, Any]:
     """Independent provider-free H5/source/outcome readback for the v2.1.0 route."""
     from .solution import solution_identity_v1, solution_identity_v2
+    from .controller import LiberoMixedControllerV1
     schema = report.get("schema_version")
     solution_v2 = schema == "r07-v210-task-solution-worker-result-v2"
     payload = {key: value for key, value in report.items() if key != "result_sha256"}
@@ -959,6 +997,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                              source_readback["source_closure_digest"])
         if solution_v2 else solution_identity_v1(source_readback["canonical_xml_sha256"])
     )
+    expected_controller = LiberoMixedControllerV1().identity_mapping() if solution_v2 else None
     resource_close = report.get("solution_resource_close_receipt")
     if solution_v2 and (
         not isinstance(resource_close, Mapping)
@@ -1234,26 +1273,14 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 raise ValueError("task Solution action trace differs from public H5 control rows")
             if solution_v2:
                 diagnostics = action["solution_diagnostics"]
-                bias = np.asarray(diagnostics.get("gravity_bias_Nm"), dtype=np.float64)
-                offset = np.asarray(diagnostics.get("gravity_target_offset_rad"), dtype=np.float64)
-                planner_target = np.asarray(diagnostics.get("planner_joint_target_rad"), dtype=np.float64)
-                compensated_target = np.asarray(
-                    diagnostics.get("gravity_compensated_joint_target_rad"), dtype=np.float64,
-                )
                 public_action = np.asarray(action.get("solution_action"), dtype=np.float64)
-                if (diagnostics.get("gravity_compensation_profile_id")
-                        != "libero-source-mjcf-gravity-bias-v1"
-                        or diagnostics.get("gravity_source_model_identity_sha256")
-                        != gravity_receipt.get("model_identity_sha256")
-                        or any(value.shape != (7,) or not np.isfinite(value).all()
-                               for value in (bias, offset, planner_target, compensated_target))
-                        or public_action.shape != (8,)
-                        or not np.allclose(offset, bias / 100.0, rtol=0.0, atol=1e-10)
-                        or not np.allclose(compensated_target, planner_target + offset,
-                                           rtol=0.0, atol=1e-10)
-                        or not np.allclose(public_action[:7], compensated_target,
-                                           rtol=0.0, atol=1e-6)):
+                if (diagnostics.get("gravity_source_model_identity_sha256")
+                        != gravity_receipt.get("model_identity_sha256")):
                     raise ValueError("task Solution action does not preserve the source gravity compensation formula")
+                _validate_source_gravity_action(
+                    episode.get("control_plan", {}), diagnostics, public_action,
+                    expected_controller,
+                )
         initial_observation = episode.get("initial_observation")
         final_observation = episode.get("final_observation")
         if not isinstance(initial_observation, Mapping) or not isinstance(final_observation, Mapping):

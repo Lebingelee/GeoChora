@@ -2235,7 +2235,8 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         install_root=install_root,
         composition_plan_path=plan_path, horizon=100,
     )
-    bundle = tmp_path / "solution_worker_bundle"
+    parent_dir = tmp_path / "runs" / "native_synthetic_001"
+    bundle = parent_dir / "bundle"
     closure_files = {
         "canonical-source.xml": xml,
         "scene.xml": xml,
@@ -2327,8 +2328,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert len(failure["solution"]["last_action_receipt"]["action"]) == 8
     assert failure["execution_fault"]["phase"] == "mixed_physics_step"
 
-    parent_dir = tmp_path / "runs/native_synthetic_001"
-    parent_dir.mkdir(parents=True)
+    parent_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = parent_dir / "stdout.log"
     stderr_path = parent_dir / "stderr.log"
     stdout_summary = {
@@ -2357,7 +2357,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         "lock_path": str(expected_lock), "lock_acquired": True,
         "lock_released_after_group_exit": True,
         "argv": argv,
-        "cwd": "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora",
+        "cwd": str(parent_dir),
         "environment": {
             "PYTHONPATH": (
                 "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora/GeoPhys/src:"
@@ -2376,6 +2376,15 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         expected_lock_path=expected_lock,
     )
     assert parent_verified["parent_process"]["status"] == "verified_parent_exit_and_lock_release"
+    parent_record["cwd"] = "/home/lly/.codex/worktrees/phase-ii-01-camera/Geochora"
+    parent_record_path.write_text(json.dumps(parent_record, sort_keys=True), encoding="utf-8")
+    with pytest.raises(ValueError, match="task Solution parent run directory"):
+        consume_libero_candidate_bundle(
+            bundle / "worker_result.json", parent_run_record_path=parent_record_path,
+            expected_lock_path=expected_lock,
+        )
+    parent_record["cwd"] = str(parent_dir)
+    parent_record_path.write_text(json.dumps(parent_record, sort_keys=True), encoding="utf-8")
     reader_code = """
 import importlib.abc, sys
 DENIED = {"mujoco", "taichi", "isaacsim", "omni", "torch"}

@@ -55,6 +55,34 @@ def test_task_one_solution_v2_identity_binds_source_gravity_compensation():
     assert solution_identity_v2(source_sha, closure_sha, slower) != identity
 
 
+def test_independent_reader_binds_gravity_formula_to_controller_gain_identity():
+    from bench_deploy.libero.core_candidate_worker import _validate_source_gravity_action
+
+    controller = LiberoMixedControllerV1()
+    receipt = controller.identity_mapping()
+    bias = np.asarray((0.0, -19.2, 0.1, 18.1, 0.0, 2.1, 0.0))
+    planner = np.asarray((0.1, -0.2, 0.3, -2.4, 0.0, 2.2, 0.8))
+    offset = bias / np.asarray(receipt["kp_Nm_per_rad"], dtype=np.float64)
+    compensated = planner + offset
+    diagnostics = {
+        "gravity_compensation_profile_id": "libero-source-mjcf-gravity-bias-v1",
+        "gravity_bias_Nm": bias.tolist(),
+        "gravity_target_offset_rad": offset.tolist(),
+        "planner_joint_target_rad": planner.tolist(),
+        "gravity_compensated_joint_target_rad": compensated.tolist(),
+    }
+    action = np.asarray((*compensated, 0.06), dtype=np.float64)
+    _validate_source_gravity_action(receipt, diagnostics, action, receipt)
+
+    wrong_controller = {**receipt, "kp_Nm_per_rad": [100.0] * 7}
+    with pytest.raises(ValueError, match="controller identity/profile"):
+        _validate_source_gravity_action(wrong_controller, diagnostics, action, receipt)
+
+    wrong_offset = {**diagnostics, "gravity_target_offset_rad": (bias / 100.0).tolist()}
+    with pytest.raises(ValueError, match="gravity compensation formula"):
+        _validate_source_gravity_action(receipt, wrong_offset, action, receipt)
+
+
 def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitive(tmp_path):
     import hashlib
     import json
