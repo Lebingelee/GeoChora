@@ -659,6 +659,14 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
         contract["host_model_producer_identity"] = identity.to_mapping()
         contract["host_model_producer_identity_sha256"] = identity.identity_sha256
 
+    def downgrade_producer_contract(contract):
+        contract["schema_version"] = "f05-s1-independent-input-contract-v1"
+        for key in ("host_model_producer_identity", "host_model_producer_identity_sha256"):
+            contract.pop(key, None)
+
+    run_contract_tamper("producer_contract_schema_downgrade", downgrade_producer_contract,
+                        "input_contract_schema")
+
     run_contract_tamper(
         "producer_wrong_head",
         lambda contract: replace_producer_identity(contract, commit="0" * len(

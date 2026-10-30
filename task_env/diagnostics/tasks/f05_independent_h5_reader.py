@@ -324,6 +324,13 @@ def validate_h5(path: Path, witness_path: Path, contract_path: Path):
     if (profile.get('profile_id'), profile.get('provenance_kind'), profile.get('runtime_admitted'),
             profile.get('recording_scope')) != expected_profile:
         raise ReaderReject('profile_classification', 'H5 profile is not the exact non-admitted synthetic F05 S1')
+    if (contract_schema == 'f05-s1-independent-input-contract-v1'
+            and any(profile.get(key) is not None for key in (
+                'host_model_producer_identity', 'host_model_producer_identity_sha256',
+                'typed_state_h5_witness_schema_version',
+            ))):
+        raise ReaderReject('input_contract_schema',
+                           'F05 H5 with producer identity or typed-state extension requires a v2 contract')
     if (profile.get('source_validation_provenance_kind'), profile.get('source_verified')) != ('local-validated', False):
         raise ReaderReject('source_provenance', 'H5 source was upgraded from local validation or synthetic provenance')
 
