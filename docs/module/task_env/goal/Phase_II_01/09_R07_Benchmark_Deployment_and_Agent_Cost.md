@@ -529,3 +529,15 @@ independent diff/evidence review.
 预计主动480–660分钟，attempt工作timebox780分钟（末60分钟交接），外部锁/输入等待另记且累计≤60分钟；同窗可多轮修复/运行，不固定launch次数。预算详见包：MuJoCo/GeoPhys CPU，Isaac6.2 GPU PhysX cuda:0；每CPU worker≤1800s、Isaac≤2400s，单worker≤150000实际native steps/12reset；累计CPU wall≤14400s/1000000steps、Isaac wall≤7200s/500000steps，all≤200reset。provider-free≤300s/3GiB，CPU启动可用RAM≥6GiB/RSS≤4GiB，Isaac启动RAM≥6GiB/GPU free≥5GiB/RSS≤10GiB；RAM<1GiB或GPU free<256MiB中止。资产下载/新资产≤1GiB，资料≤64MiB，evidence≤2GiB，cache增长≤2GiB，原始资产/失败证据不删除；不安装或升级engine/依赖、不启动training/render/Newton。
 
 本包没有启动实现或native；Sol准备阶段不修改F线、provider或原始证据。Luna必须回报实际完成/未完成/来源与provider阻碍、完整账本与本地提交；整体通过标签仅为 `R07_V210_REQUIRED123_GATES_PASS_PENDING_SOL_REVIEW`。达不到门则准确PARTIAL，保留有用增量与独立ready项，不反复交同一份调查、自动加预算或自行开下一个attempt。Sol收到完整报告和已释放窗口后再独立复核，决定收尾/集中返工；不因本包宽范围而预批无限后继窗口。
+
+<a id="r07-v210-required123-window002"></a>
+
+## window001 维护者暂停与 window002 集中返工（2026-10-30）
+
+维护者因耗时停止旧窗口；Luna交回clean `a6efc3e7`与暂停/worker退出事实，但没有完整最终报告，旧progress保持历史in_progress。Sol按[暂停复核](../../../../maintenance/20261030_r07_v210_window001_pause_sol_review.md)记录 `PARTIAL_PROGRESS_RETAINED_TASK1_SOLUTION_REWORK_REQUIRED`：task1环境与空载v6四点跟踪仅保留有界事实（64T/65obs/1600step，全部64边界最大TCP误差11.731mm、端点末四行最大4.057mm、原门12mm；无task/Solution成功）。旧15个native共144132step/17reset/130.819worker秒，其他任务/provider未接收。
+
+已确认任务Solution自写position-only DLS且未走现Planner/CanonicalController，gravity/Kp偏移让Solution action混入执行补偿；归档source closure后当前reader不能直接复读旧run010；旧输出距2GiB仅余约58.25MiB。新包复用source/TCP/环境事实，在现owner修复调用链和feed-forward职责、归档可读性、完整pose/grasp/stage反馈，首要收口task1/MuJoCo完整成功。归因仍以实测证据为准，不把缺姿态当已证明的唯一失败原因。
+
+`sol_r07_v210_required123_002/` 冻结一个主动150–210分钟、timebox240分钟（末30分钟收口）的单prompt，由维护者转发。新输出 `r07_v210_required123_002/`，旧目录全只读，新证据512MiB、临时512MiB；新增仅MuJoCo CPU ≤150000step/24reset/3600worker秒，资源计旧累计，禁新增GeoPhys/Isaac native或provider修改。任务2/3仅限20分钟来源增量，不放行未解资产、不擅自换题；当前三任务与九格最终门不缩减，task1子门通过不等于R07/P99收尾前置已完成。
+
+复用工作必须有现真实owner的计算路径/数值调用证据，不仅import/实例化三个类；明确原planner夹爪[-1,1]与此source总开度m/双指符号。官方LIBERO/robosuite仍为任务/reset/predicate和原控制语义来源，Geochora scripted Solution不冒称官方模仿学习基线或OSC_POSE等价；无training/demo checkpoint新增门。Luna交完整局部最终报告、原账本延续与新hash/commit/window释放，Sol复核后再决定下一eligible子项，不能自动启动attempt003。
