@@ -1,6 +1,6 @@
 # F05–F07 后继执行指南与 Codex 工作包合同（规划方向已采纳；F05 successor attempt001 S0已执行）
 
-> **Status: PLANNING_DIRECTION_ADOPTED / ATTEMPT001_S0_COMPLETE / PENDING_SOL_REVIEW / NO_NATIVE.** 本文的阶段设计规格保留原规划含义；2026-10-30冻结首包已完成静态S0、诊断实现与定向验证。该结果不启动S1/F06/F07，不授权native，也不改写旧F05结果。
+> **Status: PLANNING_DIRECTION_ADOPTED / ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED / NO_NATIVE.** 本文的阶段设计规格保留原规划含义；2026-10-30冻结首包已完成静态S0、诊断实现与定向验证。该结果不启动S1/F06/F07，不授权native，也不改写旧F05结果。
 >
 > 原网页稿SHA-256：`6107b5a70a09b16aa7b06da7617bef0dae44fff1cbdf93139c2b6ad03ac78b5f`。本文与[11的仓库约束澄清](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#repository-adoption)共同使用；`develop-full`是F线规划owner。
 
@@ -118,3 +118,7 @@ Luna 仅执行一个已授权包，提交包内 local commits 和原始路径/�
 ## 7. 维护者后续指令与首包
 
 维护者于2026-10-30要求重新按新F05路线设置三个attempt并构建首包。执行以[11首包合同](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)和冻结包为准：三个窗口跨successor S0/S1共享；001是静态审计工具、负例验证与下一实施方案，原三次F05不重命名。转述本完整包后仅授权001范围，native仍为0。准确INPUT_HEAD、保护路径、allowed owners、机器输出、否决门和预算见`sol_f05_successor_001/input_snapshot.json`与`luna1_prompt.md`。后续scope变更须由维护者明确裁定；不用缺失的旧ignored fixture或共同名称推断等价。
+
+## 8. attempt001 Sol复核后的返工入口
+
+完整S0 inventory PASS尚未接收，复核状态`F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED`。来源/原始字段采集与零native证据保留；下个窗口针对[11所列原包缺口](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review)补齐真实诊断路径、authored apiSchemas、有效默认及单位/惯性/传动静态核验和具体owner决策。S0 inventory可在真实物理差异未解时PASS，但须完成盘点与缺陷检测；不以所有特性unknown代替可执行静态调查。尚未批准S1 native，F06/F07未启动，窗口计数1/3。

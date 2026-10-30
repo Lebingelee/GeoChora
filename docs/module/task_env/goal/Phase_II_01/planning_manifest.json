@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "2fa644f42eb7b6e3b7b54e396758a93bda35256cd942964adedf28637042ba02",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "668248b62c8fa5e0a1bb572f5973fa23d4024d301753e003762247f66c20d6ac",
+    "07_Execution_Order_and_Acceptance.md": "88c7ad158f00511031579fb5173f10210192cba20bbbad5eaf94d79ec4e723db",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "dbd72a6821705ed229bb6660b7d649b2dd50110678453ddefb9466cb91392e9f",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "65815901e1ae071ece485b4ed8e74a7d109d440662b19acc94811d46bdca9309",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "9ffb47d9360ef0b58e308f8a6d4b1e270295266eaa1e75d52ebe35803a357818",
-    "12_F05_F07_Execution_Playbook.md": "24dfdc18f9a6afcb983a481873a333a4f159d12457b162f3e7721745ca919ab0"
+    "README.md": "87834bd0ff27aefee9784af4a616eb8fbd7b2b398eae70b138b3b5a4e15404ef",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "4100527b1820ffe673ec9aa43ad23b761e561500286c8a7400f85c2c0f1c423e",
+    "12_F05_F07_Execution_Playbook.md": "e6925809c5bd8415b1561815b96842e07cba245603f701e4c3a3e956f6e4a136"
   },
   "revision_kind": "F05_SUCCESSOR_ATTEMPT001_S0_INVENTORY_PASS_READINESS_BLOCKED_BY_FEATURE_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6545,6 +6545,44 @@
       "child_process_group_gone": true,
       "task_env_skill_sha256": "6dc2e22af14e9c6e9084a35fb7ecc7caf6c33a9a6a88003baea201c3acccf1b7"
     },
-    "latest_f05_successor_execution": "f05_successor_attempt001_execution_20261030"
+    "latest_f05_successor_execution": "f05_successor_attempt001_execution_20261030",
+    "f05_successor_attempt001_sol_review_20261030": {
+      "date": "2026-10-30",
+      "status": "F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED",
+      "inventory_status_sol": "PARTIAL",
+      "cross_representation_readiness": "BLOCKED_BY_FEATURE",
+      "review_input_head": "fc803e2318b4468a48370a7a8c3d50b3fab8927b",
+      "reported_inventory_PASS_retained_as_historical_candidate": true,
+      "output_hashes": "142/142",
+      "protected_inputs": "5401/5401",
+      "original_package": "14/14",
+      "runtime_hashes": "12/12",
+      "provider_hashes": "748/748",
+      "independent_actual_cli": "exit0;10.611s;PGgone;separateoutput;no native",
+      "independent_counterexamples": {
+        "authored_apiSchemas_omitted_prims": 99,
+        "real_comparison_semantic_validator_calls": 0,
+        "missing_compiler_angle": "wronglydefaults radian;3.8.1degree expected",
+        "named_joint_paths": "nine unique explicitbijections possible;traversalorder not identity defect"
+      },
+      "required_rework": [
+        "authored+registered schema provenance",
+        "real loader/normalizer/reportvalidator and10negative types",
+        "staticunits/frame/inertia/tendon/Jacobian/asymmetricforce/limit oracles",
+        "method-level3provider route and evidence migration feasibility; cube/support A/S1 not F07"
+      ],
+      "native_starts": 0,
+      "S1_native_authorized": false,
+      "F06_F07_started": false,
+      "successor_windows_used": 1,
+      "successor_windows_limit": 3,
+      "next_package": "boundedattempt002rework of originalS0gaps;not dispatched by thisreview",
+      "legacy_F05": "OVERALL_PARTIAL;oldthreeattempts intact",
+      "Qualification": false,
+      "diagnostic_implementation_changed_by_Sol": false,
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor_001/sol_review.md",
+      "canonical_decision": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review"
+    },
+    "latest_f05_successor_sol_review": "f05_successor_attempt001_sol_review_20261030"
   }
 }

@@ -1,6 +1,6 @@
 # Codex — Phase II-01 当前规划与后继派包入口
 
-更新于2026-10-30。**新F05 successor三个完整attempt已按维护者指令规划；attempt001 S0静态包已执行，inventory PASS、readiness BLOCKED_BY_FEATURE、无native，待Sol复核。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
+更新于2026-10-30。**新F05 successor三个完整attempt已按维护者指令规划；attempt001已执行并经Sol复核为PARTIAL_REWORK_REQUIRED；完整S0 PASS未接收，readiness BLOCKED_BY_FEATURE、无native。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
 
 ## 先读当前入口
 
@@ -35,3 +35,5 @@
 ## 最新首包入口
 
 维护者要求新路线仍设三个attempt；三个窗口跨S0/S1共享。ignored包`sol_f05_successor_001/`冻结输入与预算；attempt001已完成S0静态盘点，两个状态分别为inventory PASS与readiness BLOCKED_BY_FEATURE，native预算实际使用0。r009 authored mimic/tendon存在局部对应，但约束参数与consumer未确立、8个actuator drive均有raw numeric drift，不能进入依赖native。旧F05三轮/PARTIAL保持，不命名004。窗口1/3待Sol复核；后两窗口须重新冻结实现/资源合同，不自动运行F06/F07。细节见11执行结果及ignored输出目录`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/`。
+
+最新Sol复核要求见[11审查记录](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review)：下个窗口先修authored schema、默认语义/归一化、实际报告路径负例及方法级计划；同名Joint必须显式映射，不以遍历顺序变化推定identity缺失。当前Panda＋cube/support属于A/S1 required，不能整体延期到F07。此说明不自动派包或授权native。

@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-2026-10-30后续维护者指令及首包结果：新F05 successor按同源多表示路线重设三个完整attempt（跨S0/S1共享）；首包F05_SUCCESSOR_ATTEMPT001_SOURCE_SEMANTICS已完成S0静态盘点与tracked诊断。inventory_status=PASS，cross_representation_readiness=BLOCKED_BY_FEATURE；native/physics/solver/App/GPU/renderer=0。旧F05三次及PARTIAL不变，successor窗口已用1/3，F06/F07未启动，待Sol复核。精确输入由包snapshot绑定，见[11首包合同与执行结果](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)。
+2026-10-30 Sol复核：F05 successor attempt001为`F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED`。来源闭包和原始字段采集有效；完整S0 inventory PASS未接收，Sol inventory=PARTIAL、readiness=BLOCKED_BY_FEATURE。主要缺口为authored schema遗漏、真实语义负例未接线、归一化/传动力oracle及后续补丁图不足。窗口已用1/3，原F05三轮/PARTIAL保留，S1 native与F06/F07不启动。见[11 Sol复核](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review)。
 
 <a id="f05-successor-replan-20261030"></a>
 

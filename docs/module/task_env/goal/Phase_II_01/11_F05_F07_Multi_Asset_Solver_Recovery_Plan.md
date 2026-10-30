@@ -1,6 +1,6 @@
 # F05–F07 后继重规划：多格式资产、统一物理语义与多求解器闭环（规划方向已采纳；执行待冻结）
 
-> **状态**：`PLANNING_DIRECTION_ADOPTED / ATTEMPT001_S0_COMPLETE / PENDING_SOL_REVIEW / NO_NATIVE`。规划与合同背景保留其签署时点；2026-10-30首个successor包已按维护者给出的冻结输入完成S0静态执行，tracked诊断与文档/本地提交已产出，当前交Sol复核。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004；本结果不授予S1 native或Qualification。
+> **状态**：`PLANNING_DIRECTION_ADOPTED / ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED / NO_NATIVE`。规划与合同背景保留其签署时点；2026-10-30首个successor包已按维护者给出的冻结输入完成S0静态执行，tracked诊断与文档/本地提交已产出，Sol复核结果为PARTIAL、需补齐原包静态门；来源/原始字段采集事实有效，完整S0 PASS未接收。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004；本结果不授予S1 native或Qualification。
 >
 > 原网页稿SHA-256：`94506530bb4d3751a6abed2c43b0ade32768e144b00b667599221edb65665519`；仓库补充解释见[第9节](#repository-adoption)。F线规划owner为`develop-full`；其他分支同步本文不表示已经集成该分支的实现或native结果。
 
@@ -145,3 +145,15 @@ F06 仍要求受控真实来源、可复现 Expert、至少 20 seeds、四报告
 目标测试为5/5；最终受监督静态child 10.603秒，PG峰值RSS 354033664 bytes，4核亲和/并发上限，tripwire通过；child/进程组已退出，native lock未获取。run001–005的失败/中止回执保留，run006–011记录于ignored输出；所有run均零native、solver、physics、App、GPU或renderer启动。结果不证明solver消费、物理等价或Qualification；S1不得据此启动，F06/F07尚未开始。旧F05三轮、PARTIAL、旧门与Evidence保持不变。
 
 完整报告、命令、资源回执、负例、源/目标inventory、patch计划与输出hash见ignored输出workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/。当前successor窗口计数为1/3，工作窗口已释放，等待Sol独立复核；后续窗口/范围/native预算仍须明确新授权。
+
+<a id="successor-attempt001-sol-review"></a>
+
+## 11. successor attempt001 Sol复核（2026-10-30）
+
+决定 **`F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED`**；Sol inventory_status=PARTIAL，cross_representation_readiness=BLOCKED_BY_FEATURE。上述Luna候选PASS记录及ignored原件保持签署时状态。完整S0审计可在物理差异未解时被接收；此次未接收是冻结包要求的静态检查、报告完整性与缺陷检测未完成，并非要求S0执行native或消除所有真实差异。
+
+Sol核验输出142/142、保护输入5,401/5,401、原包14/14、runtime12/12、provider748/748匹配；实际CLI在独立输出目录复跑exit0（10.611s）、PG结束、tripwire通过，无native。独立反例确认：authored apiSchemas的未注册token在99个prim上未被记录；语义validator仅被negative_cases调用，真实比较路径调用数0；compiler angle缺省被误按radian。当前Panda显式radian源未因此改变，但parser/测试不足。九个Joint存在唯一同名path双射，序列化遍历顺序不同本身不是identity缺失。
+
+返工须在原owner内完成：同时记录authored与registered schema；把10类负例接到实际loader/normalizer/report-validator；补齐单位/axis/frame/惯性与tendon length/Jacobian/两指非对称受力/limit的独立host核验；unknown须区分实际消费缺口与未做的静态映射。当前原始数字对照不能替代这些检查。下一补丁图需覆盖真实MuJoCo/MJCF及Isaac/GeoPhys路线、实际方法/字段/调用者和语义取舍；LeafNativeTendonMapping的身份字符串不代表机械耦合实现。Panda＋cube/support为A/S1 required，不能整体移到F07；复杂mixed资产/Attachment才属后者。
+
+窗口计数仍1/3，剩余2；下包应有界补齐上述原包缺口并形成可实施决策，不重复全量来源采集。此复核不是第二包，也不授权S1 native或F06/F07。旧F05 PARTIAL及接收/失败Evidence不变；不需维护者在泛化unknown上盲选新配方。完整报告与反例在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor_001/`，本次未改诊断实现或Luna输出。
