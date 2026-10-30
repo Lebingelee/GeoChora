@@ -251,3 +251,6 @@ R07a attempt003 Sol复核：有界v2.1成本协议技术修正/S1接收并冻结
 
 
 2026-10-30 Sol接收F05 attempt002的`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，F05总体仍`F05_OVERALL_PARTIAL`。578/578输出、3,197/3,197保护SHA匹配；独立读回33判定通过；Sol直接补上v2 H5不可降级v1合同的producer检查，补丁后完整synthetic S1通过，18行边界/观测、80次synthetic advance及30类tamper拒绝。官方+inf/mimic和真实物理/三provider总门未接收，F02 catalog dirty环境阻塞保留。F06/F07未启动，普通attempt003须先作可行性复评。详见[10 Sol接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance)。
+
+
+2026-10-30，F05普通attempt003前复评完成，选择Menagerie USD × GeoPhys CPU ready cell实施NativeRuntimeIO/既有Core链和有界native验收；原表允许ready cell独立交付，官方+inf/mimic与MuJoCo USD保持HELD、三provider总门不变。新包明确CPU/Forge预算及同Env两轮100interval/1000physics steps、原物理门/独立reader/bundle；不执行F06/F07，也不预批普通第四轮。包已准备未派发/未执行，详见[10 attempt003计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-menagerie-native-plan)。

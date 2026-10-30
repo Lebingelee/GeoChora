@@ -755,3 +755,35 @@ public OpenUSD独立核对官方link0/link2/link7的两项速度cap均为+inf，
 复核与Sol补丁后新S1证据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_002/`，原Luna报告/失败/578项清单均不改写。此次新增Kit/App/solver/GPU/renderer/physics为0，F06/F07未启动；该接收不授予production GeoPhys USD admission、S2/S3、Qualification或three-provider closure。
 
 后续普通attempt003前需先完成实际owner、公开实现/主源资料与原门可行性复评，明确官方+inf/mimic消费及GeoPhys native public I/O、MuJoCo USD表示路线；尚未派发下一包或授权native，不把新的纯字段准备轮当作已解决provider能力。F05总目标及原F00–F07顺序保持。
+
+
+<a id="f05-attempt003-menagerie-native-plan"></a>
+
+## F05 ordinary attempt003复评与Menagerie GeoPhys CPU native工作包（2026-10-30，已准备未执行）
+
+F05 source/control/S1已由Sol有界接收，实施基线`c7dcfaf6`；普通attempt003前已完成实际owner、公开实现及上游资料复评。**下一包选择已host-ready的Menagerie USD单元，实施真实GeoPhys CPU NativeRuntimeIO/Core闭环，F05总体仍PARTIAL。** 原第5节允许ready cell独立交付；官方Panda +inf/typed PhysX-mimic与本机固定MuJoCo USD decoder仍明确HELD，未降低三provider总门。此为普通第三窗口，不重置计数，也不预批第四轮；未解决的后续单元须维护者决定排期/合同，不自动另开诊断对话。
+
+### 复评结论与补丁位置
+
+| Owner / 真实方法 | 可复用依据及本包改动 |
+| --- | --- |
+| `GeoPhysSourceComposer`、public `SceneSource.usd_path/import_scene_source/build_rigid_scene_model` | Menagerie r009原bytes、owned lease、canonical mapping与15 DOF/9 actuator host model已跑通；复用source/模型绑定，不读原MJCF替代 |
+| GeoPhys `assemble_mjcf_articulated_runtime`、`ImportedScene.rigid_solver_options` | 前者实际接受`ImportedScene`与预建model，后者显式支持usd；名称不构成格式限制。复用public assembly与Core bootstrap/boundary，只补当前缺少的GeoPhys USD NativeRuntimeIO adapter |
+| `UsdCoreRuntimeSession`、`leaf_control`、`control_inputs` | 复用typed reset/state/advance/close与affine target→ctrl，公开write_ctrl/read_ctrl后Ack；legacy `_GeoPhysSession`直接写位置到ctrl不能代替该路线，不另造Session/PD |
+| public model / solver host I/O | 用name_to_link/joint/site/actuator及jnt_qposadr/jnt_dofadr映射；receipt九项排列不是整个model地址。公开pose/velocity和body_ipos完成world-origin→world-COM→Core typed转换；缺frame不能填零，手部pose不能由oracle FK合成 |
+| versioned builder、api/control、position profile、SelectedReferenceEnv | 加法扩展精确native输入/profile和bounded admission，保持旧S1/Isaac ABI；通用GeoPhys USD与其他source/backend继续fail closed |
+| Generic H5 v3、tracked reader/worker/bundle | 新native profile下T100/T+1=101、真实控制/advance、typed extension、原物理oracle及parent exit/durability独立核验；旧S1的T8/contract降级拒绝和30类负例保持 |
+
+公开主源对照已记录于完整包`reassessment_and_plan.md`：[Newton固定源码](https://github.com/newton-physics/newton/blob/a91d2e7ee6aa659e2881f9c0b7a9343dad3912b6/newton/_src/utils/import_usd.py)提供PhysX mimic导入参考，但需要Warp/自身builder/solver，不能作为GeoPhys直接替换；[NVIDIA mimic schema](https://docs.omniverse.nvidia.com/kit/docs/omni_usd_schema_physics/latest/physxschema/class_physx_schema_physx_mimic_joint_a_p_i.html)不证明冻结GeoPhys/Isaac6.2消费。没有建立官方+inf的无损消费规则，本包不实现sentinel或mimic。 [MuJoCo3.8.1 CMake](https://github.com/google-deepmind/mujoco/blob/3.8.1/CMakeLists.txt)与[decoder插件](https://github.com/google-deepmind/mujoco/blob/3.8.1/plugin/usd_decoder/CMakeLists.txt)表明同版USD-enabled隔离build是可研究后继，但本机wheel不能据此判支持；[上游注册issue](https://github.com/google-deepmind/mujoco/issues/3389)也只说明已构建插件的注册问题。本包不构建/安装/加载MuJoCo或Newton，不重新转换源资产。
+
+Core解释器为现有geochora Python3.12.14，实际安装taichi-forge0.6.3，由GeoPhys gate提供taichi别名；无名为taichi的distribution不等于缺依赖。OpenUSD在既有Isaac环境中以pxr namespace包提供，包根无__init__.py；已分别冻结实际Usd/Sdf/Gf/UsdGeom/UsdPhysics模块/library hash。仅metadata/文件检查，无engine import/init或软件测试。native前仍须核对实际loaded origins并绑定Forge库，与host producer的provider/src模块身份分栏。
+
+### 出口、资源与分支
+
+复用develop-full和现有provider候选topic/worktree（41f8输入），零新分支/worktree；主仓a53 gitlink不动。仅允许必要的public host-I/O/host metadata候选修复，不改solver算法/碰撞kernel/积分方法/官方parser。实现先local commit，S1、host地址/frame/COM检查通过后，冻结同run源码/来源/模型/控制/解释器/库/oracle和完整plan，再持共享native锁启动。
+
+本包明确允许GeoPhys CPU/row_pgs/implicitfast/n2、best_effort、无renderer、100Hz/5×2ms native；不继承前两包零native范围，也不继承Isaac CUDA预算。一个专用worker、一个Core Env两reset，各100 intervals/101 observations，共1000 public physics steps/202 boundary与observations，沿用F04 accepted Menagerie motion/物理阈值。构造/reset/prewarm预期零步进，所有隐藏/失败步计入账本；异常退出/物理/reader/bundle失败均不得报native通过。仅此cell可候选`F05_MENAGERIE_GEOPHYS_CPU_NATIVE_PASS_PENDING_SOL_REVIEW`，不代表official/three-provider或Qualification，F06/F07不启动。
+
+预计活跃180–300分钟，timebox360分钟（最后45分钟收口）；native worker wall≤900s、累计≤2400s；每worker≤1500steps/3模拟秒，attempt累计≤6000steps/12秒，无任意launch次数限制，余额需覆盖完整run后再启动。native启动MemAvailable≥6GiB、PG采样RSS≤4GiB、低于1GiB中止、≤4CPU计算线程；provider-free≤300s/3GiB、启动≥4GiB。锁等待≤1200s，独占锁覆盖init前到PG结束及资源收尾。证据≤512MiB、native日志≤128MiB、cache增长≤1GiB；网络仅官方资料≤50MiB，无资产/依赖下载或安装。GPU/CUDA/Vulkan/Kit/Isaac/MuJoCo/Newton/renderer启动为0。
+
+完整冻结包位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_003/`，输入真实post-planning HEAD及保护SHA由snapshot绑定；输出为`f05_003/`。维护者转述一个完整prompt，Sol仅只读观察，结束报告释放写入/native窗口后再复核。准备本包未启动任何native或执行软件测试。

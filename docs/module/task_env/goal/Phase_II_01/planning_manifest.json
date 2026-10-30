@@ -1858,10 +1858,10 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "de3c1c1fe85980f71e021ec36fca2abfa81823e0b1e9701e7edc97d9ed9a0531",
+    "07_Execution_Order_and_Acceptance.md": "cfaab6524daa453fcb0d334607dad3af4233c1b3cc878f8034b3df02f23f2b65",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "f111a549f39f95b8f91ff3d86f16e599b4fa715294d5384dd41c97b5d5ae345c",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "3951443d300e57d77c6d8325ad156e12fe54f0fdbaacd2ee9e37a809b16da991",
     "README.md": "c2e67f13c43f3dbb198d82fedcfd9470f7d7c517a355d82d25ece607993c813f"
   },
   "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
@@ -6144,6 +6144,41 @@
       "canonical_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance",
       "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_002",
       "next": "before ordinary attempt003, reassess public owners/primary sources/original-gate feasibility; no next package dispatched"
+    },
+    "f05_attempt003_package_plan": {
+      "date": "2026-10-30",
+      "status": "PREPARED_NOT_DISPATCHED",
+      "ordinary_attempt": 3,
+      "scope": "one ready Menagerie USD/GeoPhys candidate CPU NativeRuntimeIO and existing Core native cell",
+      "overall_F05": "PARTIAL; official+inf/mimic and exact MuJoCo USD held",
+      "input_base_for_reassessment": "c7dcfaf6ee2e5eb92a8837e8c3bf994a4494e723",
+      "input_head": "actual post-planning HEAD pinned in package snapshot",
+      "target_thread": "01a17e04-9fd6-7191-a1e8-26e9438144f6",
+      "branch": "develop-full",
+      "canonical_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-menagerie-native-plan",
+      "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_003/luna1_prompt.md",
+      "reassessment": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_003/reassessment_and_plan.md",
+      "expected_active_minutes": [
+        180,
+        300
+      ],
+      "timebox_minutes": 360,
+      "native_authorized_by_relayed_package": "only exact frozen Menagerie/GeoPhys CPU after implementation/S1/run-plan/lock/resource gates",
+      "engine": "taichi-forge0.6.3 via provider gate; geochora Python3.12.14",
+      "planned_native_steps": 1000,
+      "native_attempt_steps_limit": 6000,
+      "native_worker_wall_s_limit": 900,
+      "native_cumulative_wall_s_limit": 2400,
+      "provider_candidate_input": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_gitlink_update": false,
+      "new_branches_or_worktrees": 0,
+      "ordinary_fourth_attempt_authorized": false,
+      "F06_authorized": false,
+      "source_changes_authorized": false,
+      "preparation_native_starts": 0,
+      "preparation_software_tests": 0,
+      "research": "pinned Newton PhysX-mimic example; NVIDIA schema; MuJoCo3.8.1 optional USD decoder/plugin registration and converter compatibility; public GeoPhys assembly/host I/O reuse",
+      "unknowns_before_launch": "actual full host frame/address/COM bindings, no-hidden-step reset, native physical/contact stability and cleanup; all must be checked, never inferred from S1"
     }
   }
 }
