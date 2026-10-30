@@ -13,6 +13,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 
 import h5py
+import numpy as np
 import yaml
 
 
@@ -57,6 +58,13 @@ def _read_h5(path: Path) -> dict:
             "terminated": h5["terminated"][...].tolist(),
             "truncated": h5["truncated"][...].tolist(),
             "success": h5["success"][...].tolist(),
+            "observations": {
+                name: h5[f"obs/{name}"][...]
+                for name in (
+                    "state/joint_position", "state/ee_pose", "state/hand_pose",
+                    "state/boundary_identity_sha256", "privileged_state/target_body_pose",
+                )
+            },
             "obs_count": int(h5.attrs["observation_count"]),
             "transition_count": int(h5.attrs["transition_count"]),
         }
@@ -81,6 +89,56 @@ def _state_map(row: dict) -> tuple[dict, dict]:
         for item in view["frames"]
     }
     return joints, frames
+
+
+def _verify_observations(data: dict) -> None:
+    """Check actual T+1 storage against its typed publication at storage precision."""
+    observations = data["observations"]
+    layouts = {
+        "state/joint_position": ((301, 9), np.dtype("float32")),
+        "state/ee_pose": ((301, 7), np.dtype("float32")),
+        "state/hand_pose": ((301, 7), np.dtype("float32")),
+        "privileged_state/target_body_pose": ((301, 1, 7), np.dtype("float32")),
+        "state/boundary_identity_sha256": ((301, 32), np.dtype("uint8")),
+    }
+    for name, (shape, dtype) in layouts.items():
+        actual = observations[name]
+        if actual.shape != shape or actual.dtype != dtype or not np.isfinite(actual).all():
+            _fail(f"DG01 observation layout/dtype/finite-value mismatch: {name}")
+    for index, row in enumerate(data["typed"]["rows"]):
+        joints, frames = _state_map(row)
+        expected = {
+            "state/joint_position": [
+                joints[f"panda-main/{name}"]["position"][0]
+                for name in (*[f"joint{j}" for j in range(1, 8)],
+                             "finger_joint1", "finger_joint2")
+            ],
+        }
+        for name in ("state/ee_pose", "state/hand_pose"):
+            hand = frames["panda-main/hand"]
+            expected[name] = [*hand["position"], *hand["quaternion_wxyz"]]
+        cube = frames["free-cube/free_cube"]
+        expected["privileged_state/target_body_pose"] = [
+            [*cube["position"], *cube["quaternion_wxyz"]]
+        ]
+        for name, values in expected.items():
+            source = np.asarray(values, dtype=np.float64)
+            if not np.isfinite(source).all():
+                _fail(f"DG01 typed observation source is not finite: {name}")
+            quantized = source.astype(np.float32)
+            actual = observations[name][index]
+            matches = np.array_equal(actual, quantized)
+            if not matches and name != "state/joint_position":
+                opposite = quantized.copy()
+                opposite[..., 3:] *= -1
+                matches = np.array_equal(actual, opposite)
+            if not matches:
+                _fail(f"DG01 observation differs from typed state at float32 precision: {name}, row {index}")
+        boundary = row["canonical_state_view_v1"]["boundary"]
+        encoded = json.dumps(boundary, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        expected_digest = np.frombuffer(hashlib.sha256(encoded.encode()).digest(), dtype=np.uint8)
+        if not np.array_equal(observations["state/boundary_identity_sha256"][index], expected_digest):
+            _fail(f"DG01 observation boundary digest differs from typed boundary: row {index}")
 
 
 def _qmul(a, b):
@@ -397,6 +455,7 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
         _fail("DG01 H5 native-run witness is stale, cross-run or incomplete")
     if data["typed"].get("observation_count") != 301 or len(data["typed"].get("rows", [])) != 301:
         _fail("DG01 H5 typed-state extension is not T+1")
+    _verify_observations(data)
     if len(data["controls"]) != 300:
         _fail("DG01 H5 structured control evidence is not T")
     outcome = data["outcome"]
@@ -584,8 +643,11 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
                 _fail("DG01 native Core receipt lacks sparse tendon moment/projection values")
             if any(not _near(value, 0.5, atol=1e-9, rtol=0.0) for value in moment):
                 _fail("DG01 native Core tendon Jacobian differs from the original split source law")
-            if any(not _near(projected[i], prediction[i], atol=2e-6, rtol=1e-6)
-                   for i in range(2)):
+            if any(
+                not _near(projected[i], force * moment[i], atol=2e-6, rtol=1e-6)
+                or not _near(prediction[i], force * moment[i], atol=2e-6, rtol=1e-6)
+                for i in range(2)
+            ):
                 _fail("DG01 native Core actuator force does not equal tendon Jacobian projection")
             contact = advance.get("cube_support_contact", {})
             task_geoms = model.get("task_geometries", {})
@@ -660,6 +722,7 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
         "h5_sha256": actual_h5_sha256,
         "transition_count": 300,
         "observation_count": 301,
+        "observation_rows_verified": 301,
         "accepted_physics_steps": 1500,
         "reset_physics_steps": 0,
         "fk_position_error_max_m": max(hand_position_errors),
@@ -679,6 +742,7 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
 def _verify_exit(receipt: dict, plan: dict, run_id: str) -> None:
     if (receipt.get("schema_version") != "f05-dg01-native-supervisor-receipt-v1"
             or receipt.get("run_id") != run_id
+            or receipt.get("run_plan_sha256") != plan.get("plan_sha256")
             or receipt.get("worker_exit_code") != 0
             or receipt.get("resource_violation") is not None
             or receipt.get("child_process_group_remaining_after_cleanup") is not False
@@ -697,6 +761,33 @@ def _verify_exit(receipt: dict, plan: dict, run_id: str) -> None:
 
 def _mutate_h5(path: Path, mutation: str):
     with h5py.File(path, "r+") as h5:
+        observation_mutations = {
+            "obs_joint_position": "obs/state/joint_position",
+            "obs_ee_pose": "obs/state/ee_pose",
+            "obs_hand_pose": "obs/state/hand_pose",
+            "obs_cube_pose": "obs/privileged_state/target_body_pose",
+            "obs_boundary_digest": "obs/state/boundary_identity_sha256",
+        }
+        if mutation in observation_mutations:
+            dataset = h5[observation_mutations[mutation]]
+            value = dataset[1]
+            value.flat[0] += 1
+            dataset[1] = value
+            h5.flush()
+            return
+        if mutation in {"obs_dtype", "obs_length", "obs_nonfinite"}:
+            name = "obs/state/joint_position"
+            values = h5[name][...]
+            del h5[name]
+            if mutation == "obs_dtype":
+                values = values.astype(np.float64)
+            elif mutation == "obs_length":
+                values = values[:-1]
+            else:
+                values[1, 0] = np.nan
+            h5.create_dataset(name, data=values)
+            h5.flush()
+            return
         meta = h5["meta"]
         def replace_json(name, transform):
             value = json.loads(_text(meta[name]))
@@ -825,6 +916,8 @@ def run_reader(plan_path: Path, worker_result_path: Path, supervisor_path: Path,
             "source_closure", "model_shape", "joint_address", "unit", "com",
             "tendon_coefficient", "force_clip", "equality", "reset_write_receipt", "task_predicate",
             "stale_time", "cross_run", "durable_file",
+            "obs_joint_position", "obs_ee_pose", "obs_hand_pose", "obs_cube_pose",
+            "obs_boundary_digest", "obs_dtype", "obs_length", "obs_nonfinite",
         ):
             mutated = negative_root / f"{mutation}.h5"
             shutil.copy2(source, mutated)
@@ -863,7 +956,7 @@ def run_reader(plan_path: Path, worker_result_path: Path, supervisor_path: Path,
             })
         else:
             _fail("DG01 independent reader accepted nonzero worker exit")
-        if len(negative_results) != 14:
+        if len(negative_results) != 22:
             _fail("DG01 H5/control negative mutation matrix is incomplete")
     output.mkdir(parents=True, exist_ok=True)
     result = {
