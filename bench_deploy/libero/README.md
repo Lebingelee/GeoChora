@@ -47,16 +47,19 @@ The fixed controller sends seven named arm torques and two signed finger
 position targets. It updates at 20 Hz, holds each torque target across 25
 2 ms physics steps, and applies the source actuator ranges. The accepted
 R07c native004 evidence used its frozen diagnostic `Kp=100`, `Kd=20` and a
-16 mm aggregate finger target. R07 v2.1.0 task #1 profile v5 uses
-source-closure-bound static gravity feed-forward with `Kp=40` and `Kd=8`
-(joint2 `Kd=16`). It remains explicitly unqualified and follows v4's stable
-but incomplete run010, which entered descend near the end of the 1000-step
-horizon. V5 tests stronger reference tracking with the same 20 Hz loop, 2 ms
-x 25 hold, 2 mm/10 mrad motion caps, and source actuator limits. V4 and v5 are
-separate versioned profiles, neither equivalent to upstream OSC_POSE. Bind
-gains and targets to each frozen run configuration. The existing joint
-planner produces the bounded targets; neither it nor the benchmark worker
-calls `mj_step`.
+16 mm aggregate finger target. R07 v2.1.0 task #1 profile v6 uses
+source-closure-bound static gravity feed-forward with `Kp=20` and `Kd=4`
+(joint2 `Kd=8`). V6 returns to the lower gains after v5's bounded unloaded
+tracking run met the 12 mm endpoint tolerance but showed repeated joint7
+torque saturation and position drift. The earlier v4/run010 task run stayed
+within source limits and had no MuJoCo warnings, but entered descend near the
+end of its 1000-step horizon. V6 remains unqualified pending the repeated
+unloaded tracking evidence. The 20 Hz loop, 2 ms x 25 hold, 2 mm/10 mrad
+motion caps, and source actuator limits remain unchanged. V4, v5, and v6 are
+separate versioned profiles, none equivalent to upstream OSC_POSE. Bind gains
+and targets to each frozen run configuration. The existing joint planner
+produces the bounded targets; neither it nor the benchmark worker calls
+`mj_step`.
 
 Run the native worker only from the frozen D01 package using its bounded
 launcher and shared native lock. The separate readback command accepts both

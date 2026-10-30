@@ -24,28 +24,28 @@ _GAIN_SOURCE = (
     'not copied from or equivalent to upstream OSC_POSE'
 )
 _GAIN_STABILITY_RATIONALE = (
-    'Native R07 task #1 run009 with source gravity feed-forward and Kp=100/Kd=20 (joint2 Kd=40) crossed '
-    'joint3 by 0.004751 rad at boundary25 after several joints began oscillating and saturating. The prior '
-    'v3 run008 without feed-forward reached boundary196 before joint2 crossed its upper source limit by '
-    '0.002073 rad. Run010 with source gravity feed-forward and Kp=20/Kd=4 (joint2 Kd=8) remained within '
-    'source limits and emitted no MuJoCo warnings, but all three episodes entered the descend stage only '
-    'near boundary900 and horizon-truncated before task success. This unqualified follow-up doubles the '
-    'gains to Kp=40/Kd=8 (joint2 Kd=16) while preserving the 20 Hz outer loop, 2 ms x 25 hold, and '
-    '2 mm/10 mrad per-boundary motion caps to test reference tracking. Source motor ctrlranges and joint '
-    'limits remain unchanged; every torque remains clamped to the compiled source ctrlrange. This is an '
-    'experiment, not a stability proof or controller qualification.'
+    'Native task #1 controller_tracking_001 used source gravity feed-forward with Kp=40/Kd=8 (joint2 Kd=16) '
+    'and a four-segment unloaded joint-space setpoint sequence. Public TCP endpoint error stayed below the '
+    'existing 12 mm waypoint tolerance, but independent H5 readback found 26 joint7 torque commands at its '
+    'compiled +/-12 Nm limit and 0.112 rad maximum joint7 position error after the joint3 perturbation. '
+    'Earlier native task1 run010 used Kp=20/Kd=4 (joint2 Kd=8), remained within source limits and emitted no '
+    'MuJoCo warnings, but the task Solution entered descend near boundary900 and horizon-truncated. This '
+    'unqualified v6 restores those lower gains so the same unloaded point-tracking probe can determine '
+    'whether they avoid sustained joint7 saturation while meeting the point tolerance. The 20 Hz outer loop, '
+    '2 ms x 25 hold, source motor ctrlranges, and source joint limits remain unchanged. This experiment is '
+    'not a stability proof or controller qualification.'
 )
 
 
 @dataclass(frozen=True)
 class LiberoMixedControlConfigV1:
-    kp_Nm_per_rad: tuple[float, ...] = (40.0,) * 7
-    kd_Nm_s_per_rad: tuple[float, ...] = (8.0, 16.0, 8.0, 8.0, 8.0, 8.0, 8.0)
+    kp_Nm_per_rad: tuple[float, ...] = (20.0,) * 7
+    kd_Nm_s_per_rad: tuple[float, ...] = (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0)
     control_frequency_hz: int = 20
     physics_dt_s: float = 0.002
     control_substeps: int = 25
     hold_policy: str = 'joint_torque_zero_order_hold_per_outer_step_v1'
-    gain_status: str = 'diagnostic_unqualified_PD_20Hz_kp40_kd8_16_v5'
+    gain_status: str = 'diagnostic_unqualified_PD_20Hz_kp20_kd4_8_v6'
 
     def validate(self):
         if (len(self.kp_Nm_per_rad), len(self.kd_Nm_s_per_rad)) != (7, 7):
@@ -62,7 +62,7 @@ class LiberoMixedControlConfigV1:
 class LiberoMixedControllerV1:
     """Map absolute joint targets to seven torques and two signed finger positions."""
 
-    profile_id = 'libero-spatial-bowl-to-plate-joint-space-pd-v5'
+    profile_id = 'libero-spatial-bowl-to-plate-joint-space-pd-v6'
 
     def __init__(self, config: LiberoMixedControlConfigV1 | None = None):
         self.config = config or LiberoMixedControlConfigV1()
