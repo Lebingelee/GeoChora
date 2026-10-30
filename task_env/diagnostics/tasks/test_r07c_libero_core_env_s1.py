@@ -2127,7 +2127,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         assert not terminated and not truncated
         assert info["selected_solution_action_v1"]["solution_identity"] == solution.identity
         assert info["selected_solution_action_v1"]["stage"] == "approach"
-        assert float(info["external_action"][-1]) == pytest.approx(0.07)
+        assert float(info["external_action"][-1]) == pytest.approx(0.06)
         assert info["control_step"] == 1
         assert env.recorder.transition_count == 1
         assert env.execution_fault is None

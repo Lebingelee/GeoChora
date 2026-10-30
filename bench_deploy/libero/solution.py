@@ -36,16 +36,16 @@ _JOINT_LIMITS = np.asarray((
     (-2.8973, 2.8973),
 ), dtype=np.float64)
 _OPENING_BY_STAGE = {
-    # Leave 5 mm per finger inside the signed source joint limits. The first
-    # native attempt measured about 1.05 mm overshoot at the nominal open stop;
-    # the physical monitor correctly rejects even small source-range crossings.
-    "approach": 0.07,
-    "descend": 0.07,
+    # Leave 10 mm per finger inside the signed source joint limits. Native
+    # attempts measured roughly 5 mm overshoot near the open stop; the physical
+    # monitor correctly rejects even small source-range crossings.
+    "approach": 0.06,
+    "descend": 0.06,
     "grasp": 0.045,
     "lift": 0.045,
     "carry": 0.045,
     "place": 0.045,
-    "release": 0.07,
+    "release": 0.06,
 }
 
 
