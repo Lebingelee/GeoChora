@@ -45,14 +45,14 @@ def test_task_one_solution_identity_binds_bounded_motion_rate():
 
 def test_task_one_controller_identity_binds_unqualified_braking_experiment():
     config = LiberoMixedControlConfigV1()
-    assert config.kp_Nm_per_rad == (200.0,) * 7
-    assert config.kd_Nm_s_per_rad == (40.0,) * 7
-    assert config.gain_status == "diagnostic_unqualified_PD_20Hz_kp200_kd40_v2"
+    assert config.kp_Nm_per_rad == (100.0,) * 7
+    assert config.kd_Nm_s_per_rad == (20.0, 40.0, 20.0, 20.0, 20.0, 20.0, 20.0)
+    assert config.gain_status == "diagnostic_unqualified_PD_20Hz_kp100_kd2_40_v3"
     controller = LiberoMixedControllerV1(config)
     receipt = controller.identity_mapping()
-    assert receipt["profile_id"] == "libero-spatial-bowl-to-plate-joint-space-pd-v2"
-    assert receipt["kp_Nm_per_rad"] == [200.0] * 7
-    assert receipt["kd_Nm_s_per_rad"] == [40.0] * 7
+    assert receipt["profile_id"] == "libero-spatial-bowl-to-plate-joint-space-pd-v3"
+    assert receipt["kp_Nm_per_rad"] == [100.0] * 7
+    assert receipt["kd_Nm_s_per_rad"] == [20.0, 40.0, 20.0, 20.0, 20.0, 20.0, 20.0]
     assert receipt["qualification"] == "diagnostic_only_unqualified_gains"
 
 

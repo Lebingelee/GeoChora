@@ -63,7 +63,7 @@ def solution_identity_v1(
         "schema_version": SOLUTION_SCHEMA,
         "task_uid": TASK_1,
         "source_xml_sha256": source_xml_sha256,
-        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v2",
+        "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v3",
         "tcp_id": TCP_ID,
         "algorithm": "public-observation-damped-jacobian-waypoints-v2",
         "waypoints_m": {

@@ -39,7 +39,7 @@ from .init_state import (
 
 
 PROFILE_ID = 'libero-spatial-bowl-to-plate-mixed-v1'
-CONTROLLER_PROFILE_ID = 'libero-spatial-bowl-to-plate-joint-space-pd-v2'
+CONTROLLER_PROFILE_ID = 'libero-spatial-bowl-to-plate-joint-space-pd-v3'
 ARTIFACT_ID = 'libero-spatial-bowl-to-plate-v1/mixed-v1'
 SCENE_ID = 'libero-spatial-bowl-to-plate-composed-mjcf-v1'
 SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[2] / 'asset/benchmarks/libero/source_manifest.json'
