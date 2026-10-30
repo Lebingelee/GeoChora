@@ -37,3 +37,8 @@
 维护者要求新路线仍设三个attempt；三个窗口跨S0/S1共享。ignored包`sol_f05_successor_001/`冻结输入与预算；attempt001已完成S0静态盘点，两个状态分别为inventory PASS与readiness BLOCKED_BY_FEATURE，native预算实际使用0。r009 authored mimic/tendon存在局部对应，但约束参数与consumer未确立、8个actuator drive均有raw numeric drift，不能进入依赖native。旧F05三轮/PARTIAL保持，不命名004。窗口1/3待Sol复核；后两窗口须重新冻结实现/资源合同，不自动运行F06/F07。细节见11执行结果及ignored输出目录`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/`。
 
 最新Sol复核要求见[11审查记录](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review)：下个窗口先修authored schema、默认语义/归一化、实际报告路径负例及方法级计划；同名Joint必须显式映射，不以遍历顺序变化推定identity缺失。当前Panda＋cube/support属于A/S1 required，不能整体延期到F07。此说明不自动派包或授权native。
+
+
+### F05 successor attempt002 待转述入口（2026-10-30）
+
+001经Sol复核为PARTIAL，当前计数1/3。下一完整包已准备，尚未执行：先修R1–R4真实审计链，再在原owner内实施三路线接线及实际Core S1，满足每cell语义/代码提交/冻结/资源门后才可native。原required集合与物理门不变，三cell均过才可报候选PASS；旧F05 PARTIAL、F06/F07未启动状态保留。完整范围、预算及manual relay入口见[002合同](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract)。

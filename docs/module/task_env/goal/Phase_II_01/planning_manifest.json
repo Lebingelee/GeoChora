@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "88c7ad158f00511031579fb5173f10210192cba20bbbad5eaf94d79ec4e723db",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "dbd72a6821705ed229bb6660b7d649b2dd50110678453ddefb9466cb91392e9f",
+    "07_Execution_Order_and_Acceptance.md": "65d74a98fd80fc6462a18873224b374008b22414bf4e157497b0ac97c26e56aa",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "190a16a9d6daef479b21b782368591ecac3b5ac2850b207ef318d865e025c972",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "87834bd0ff27aefee9784af4a616eb8fbd7b2b398eae70b138b3b5a4e15404ef",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "4100527b1820ffe673ec9aa43ad23b761e561500286c8a7400f85c2c0f1c423e",
-    "12_F05_F07_Execution_Playbook.md": "e6925809c5bd8415b1561815b96842e07cba245603f701e4c3a3e956f6e4a136"
+    "README.md": "82ead7f648c920b0ead09cf5d63d6af066c520596df9d63e73d39f4b82557890",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "c6276e55728f54748402f4034ca0ef31071abf5bf750f361d5548feabdf99970",
+    "12_F05_F07_Execution_Playbook.md": "3c0005099c4c66a6cfda9507360070c4aaca601e8e93a36c7a7e70ce031d724c"
   },
   "revision_kind": "F05_SUCCESSOR_ATTEMPT001_S0_INVENTORY_PASS_READINESS_BLOCKED_BY_FEATURE_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6583,6 +6583,43 @@
       "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor_001/sol_review.md",
       "canonical_decision": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-sol-review"
     },
-    "latest_f05_successor_sol_review": "f05_successor_attempt001_sol_review_20261030"
+    "latest_f05_successor_sol_review": "f05_successor_attempt001_sol_review_20261030",
+    "f05_successor_attempt002_package_preparation_20261030": {
+      "date": "2026-10-30",
+      "status": "PREPARED_FOR_MAINTAINER_RELAY_NOT_SENT_NOT_EXECUTED",
+      "package_id": "F05_SUCCESSOR_ATTEMPT002_SEMANTIC_REPAIR_AND_CORE_CELLS",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_successor_002/",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/",
+      "preparation_input_head": "93894aefeb1e0797358f8ed7e6d084adffb07cc6",
+      "actual_execution_input_head": "frozen in package/input_snapshot.json after preparation commit",
+      "successor_windows_used": 1,
+      "next_window": 2,
+      "successor_window_limit": 3,
+      "legacy_status": "F05_OVERALL_PARTIAL",
+      "required_features_changed": false,
+      "implementation_allowed_after_manual_relay": true,
+      "native_allowed": "conditional per-cell after repaired S0 + full required feature mapping/consumer proof + affected Core S1 + committed code and exact plan/model/reader/runtime freeze + resource/lock gates",
+      "routes": [
+        "MuJoCo/MJCF/CPU",
+        "GeoPhys/USD/CPU",
+        "Isaac6.2.0.0/USD/CUDA_GPU_PhysX"
+      ],
+      "expected_active_minutes": [
+        300,
+        420
+      ],
+      "timebox_minutes": 480,
+      "native_steps_cumulative_max": 24000,
+      "native_wall_s_cumulative_max": 5400,
+      "start_native_mem_available_bytes_min": 6442450944,
+      "new_branch_worktree_count": 0,
+      "F06_F07_started": false,
+      "Qualification": false,
+      "preparation_software_tests": 0,
+      "preparation_native_starts": 0,
+      "canonical_contract": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract",
+      "supersedes": "only static-only prospective next-window suggestion in attempt001 review; historical decision/raw evidence intact"
+    },
+    "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030"
   }
 }

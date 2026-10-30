@@ -157,3 +157,22 @@ Sol核验输出142/142、保护输入5,401/5,401、原包14/14、runtime12/12、
 返工须在原owner内完成：同时记录authored与registered schema；把10类负例接到实际loader/normalizer/report-validator；补齐单位/axis/frame/惯性与tendon length/Jacobian/两指非对称受力/limit的独立host核验；unknown须区分实际消费缺口与未做的静态映射。当前原始数字对照不能替代这些检查。下一补丁图需覆盖真实MuJoCo/MJCF及Isaac/GeoPhys路线、实际方法/字段/调用者和语义取舍；LeafNativeTendonMapping的身份字符串不代表机械耦合实现。Panda＋cube/support为A/S1 required，不能整体移到F07；复杂mixed资产/Attachment才属后者。
 
 窗口计数仍1/3，剩余2；下包应有界补齐上述原包缺口并形成可实施决策，不重复全量来源采集。此复核不是第二包，也不授权S1 native或F06/F07。旧F05 PARTIAL及接收/失败Evidence不变；不需维护者在泛化unknown上盲选新配方。完整报告与反例在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor_001/`，本次未改诊断实现或Luna输出。
+
+
+<a id="successor-attempt002-contract"></a>
+
+## 12. successor attempt002 完整实施包（待维护者转述，尚未执行）
+
+维护者要求准备下一完整prompt，争取在002通过新F05。Sol已复核001并保留PARTIAL决定；本包明确将R1–R4修复、既有owner内的表示/控制/adapter接线、真实Core S1及**有条件三cell native验收**合并到同一窗口，取代复核记录中“下一包仅静态返工”的前瞻建议，不更改历史签署事实。先修复真实S0链，再实施；不重复一轮泛化盘点。successor已用1/3，002执行完成后为2/3；没有重置计数。
+
+包ID `F05_SUCCESSOR_ATTEMPT002_SEMANTIC_REPAIR_AND_CORE_CELLS`，ignored完整包为`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_successor_002/`，新输出为`f05_successor_002/`。准确input HEAD、prompt与保护输入hash由冻结snapshot给出。只有维护者转述完整包后才可执行，本文不声称已派发。主仓复用develop-full，provider修改只在既有隔离GeoPhys候选，均需本地commit；不改gitlink、其他分支或历史资产/Evidence，不创建新branch/worktree。
+
+required集合沿用第10节完整源语义。允许在新derived根生成独立保真表示/recipe并记录所有hash，原MJCF/r009不可改。三cell仍为MuJoCo/MJCF/CPU、GeoPhys/USD/CPU、Isaac6.2.0.0/USD/GPU PhysX，一个Core Runtime；sameUSD三Provider、官方GeoPhys兼容、Attachment/Newton继续延期。不能用9drive齐动、FK/Ack、审计登记了loss或更改源参数代替原equality/tendon/限力语义。
+
+原审计遗漏的authored apiSchemas、真实validator正负例、degree默认、单位/axis/frame/惯性和非对称tendon/Jacobian/clip核验必须完成。对象级source→representation→public model→实际consumer有证据后才有该cell的准入；保留无法表达feature的具体阻塞。关键loss/unknown未解就不启动该cell native，也不通过降低required feature换PASS。完整三cell通过有真实能力风险，尤其源compliance与scalar tendon限力；本包不预判成功，也不要求维护者为未调查的泛化unknown盲选配方。
+
+native前：受影响S1必须走实际Core构造/typed state/control/Recorder，仅底层IO为显式synthetic；先提交implementation及provider候选，再冻结每run source/model/receipt/controller/reader/profile/plan和资源门。正式每cell同Env两轮、300interval/episode、5×2ms；每cell602boundary/observation、600transition、3000advance。环境→空载hold/点位/return→gripper/freebody/contact→真实Task predicate；F05不要求抓取solved或运行F06 Expert/20seed。原物理阈值不变，新增追踪/稳定/非对称耦合门在完整包control_oracles中执行前冻结；合法joint排列接受，错绑拒绝。
+
+预计主动300–420分钟，timebox480分钟、最后45分钟收口；每cell累计≤8000steps，总≤24000steps/native wall≤5400s，含失败/bootstrap/诊断/ablation。具体更小worker/route限制见execution_budget。启动MemAvailable≥6GiB、Isaac GPU free≥5120MiB；CPU PG RSS≤4GiB、Isaac≤10GiB，MemAvailable<1GiB或GPU free<256MiB中止，≤4线程、单重进程且共享native锁独占。不能降低内存门。新Evidence≤768MiB，资产下载/依赖安装为0。修复重跑在同窗口预算内，不默认一次launch。
+
+仅G0–G8与三cell均通过才可报 `F05_SUCCESSOR_A_THREE_CELL_PASS_PENDING_SOL_REVIEW`；只有S0修复通过则报 `F05_SUCCESSOR_S0_REPAIR_PASS_S1_BLOCKED_PENDING_SOL_REVIEW`，其余部分为 `F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。全部等待Sol独立复核，不自动ACCEPTED。旧F05 OVERALL_PARTIAL和旧Evidence不变，F06/F07未启动，Qualification未授予。本轮准备仅文档/包/哈希检查，零software tests、零native。
