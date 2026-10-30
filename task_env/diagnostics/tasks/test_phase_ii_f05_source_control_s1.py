@@ -18,11 +18,9 @@ import yaml
 
 from task_env.recorders import load_structured_control_records_h5
 from task_env.diagnostics.tasks.f04_candidate_s1_support import _action_for
-
-_F05_EVIDENCE = (Path(__file__).resolve().parents[3]
-                 / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_001/evidence")
-if str(_F05_EVIDENCE) not in sys.path:
-    sys.path.insert(0, str(_F05_EVIDENCE))
+from task_env.diagnostics.tasks.f05_source_control_support import (
+    SyntheticGeoPhysNativeIO, build_input, lower_public_model,
+)
 
 
 def _read_meta_json(dataset):
@@ -44,7 +42,7 @@ def _write_meta_yaml(dataset, value):
 
 
 def _run_independent_reader(h5_path, witness_path, contract_path):
-    reader = _F05_EVIDENCE / "f05_independent_h5_reader.py"
+    reader = Path(__file__).with_name("f05_independent_h5_reader.py")
     argv = [sys.executable, str(reader), "--h5", str(h5_path),
             "--witness", str(witness_path), "--contract", str(contract_path)]
     result = subprocess.run(argv, cwd=Path(__file__).resolve().parents[3],
@@ -97,11 +95,33 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
     from task_env.registry import make_env
     from task_env.runtime.sessions import api
     from task_env.runtime.sessions.geophys_source import compile_geophys_usd_position_drive_receipt
-    from f05_s1_support import (
-        SyntheticGeoPhysNativeIO, build_input, lower_public_model,
-    )
 
     input_v1, setup = build_input("menagerie-panda")
+    repo_root = Path(__file__).resolve().parents[3]
+    support_module = sys.modules["task_env.diagnostics.tasks.f05_source_control_support"]
+    support_path = Path(support_module.__file__).resolve()
+    reader_path = Path(__file__).with_name("f05_independent_h5_reader.py").resolve()
+    for owner_path in (Path(__file__).resolve(), support_path, reader_path):
+        owner_path.relative_to(repo_root)
+    setup["f05_tracked_owner_source_proof"] = {
+        "test": {
+            "path": str(Path(__file__).resolve()),
+            "sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        },
+        "support": {
+            "module": support_module.__name__,
+            "path": str(support_path),
+            "sha256": hashlib.sha256(support_path.read_bytes()).hexdigest(),
+        },
+        "independent_reader": {
+            "path": str(reader_path),
+            "sha256": hashlib.sha256(reader_path.read_bytes()).hexdigest(),
+            "invocation": "absolute sibling source path in a fresh subprocess",
+        },
+        "all_sources_under_repo": True,
+        "diagnostic_owner": "task_env/diagnostics/tasks",
+        "ignored_output_python_imports": [],
+    }
     created = []
     def lowest_io_factory(*, artifact, execution, source, drive_receipt, input_v1):
         imported, model, _bridge, _report = lower_public_model(source)
@@ -109,6 +129,7 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
             source, imported, model, execution,
             provider_build_identity=drive_receipt.provider_build_identity,
             provenance_kind="synthetic_fixture",
+            host_model_producer_identity=input_v1.host_model_producer_identity,
         )
         if independently_compiled.identity_sha256 != drive_receipt.identity_sha256:
             raise AssertionError("S1 fixture receipt differs from independently lowered public host model")
@@ -125,7 +146,7 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
     task_scene = runtime_source.scene_source
     delivery = task_scene.loaded_delivery.delivery
     contract = {
-        "schema_version": "f05-s1-independent-input-contract-v1",
+        "schema_version": "f05-s1-independent-input-contract-v2",
         "family": "menagerie-panda",
         "source_id": runtime_source.source_id,
         "source_closure_sha256": runtime_source.source_closure_digest,
@@ -141,7 +162,10 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
             "source_verified": task_scene.source_verified,
             "provenance_kind": delivery.provenance_kind,
             "locally_validated": task_scene.locally_validated,
+            "requested_target_build_identity": task_scene.representation.provider_build_identity,
         },
+        "host_model_producer_identity": input_v1.host_model_producer_identity.to_mapping(),
+        "host_model_producer_identity_sha256": input_v1.host_model_producer_identity.identity_sha256,
         "delivery": {
             "source_reference": delivery.asset_definition.source_reference,
             "asset_identity_sha256": delivery.asset_identity_hash,
@@ -254,6 +278,10 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
         encoding="utf-8",
     )
     independent_results = []
+    reader_source_identity = {
+        "path": str(reader_path),
+        "sha256": hashlib.sha256(reader_path.read_bytes()).hexdigest(),
+    }
     contract_path = output / "input_contract.json"
     witness_paths = [output / "public_boundary_witnesses.json"]
     for episode, path in enumerate(paths):
@@ -267,6 +295,7 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
         assert payload["verified_transitions"] == 8
         assert payload["verified_synthetic_advances"] == 40
         independent_results.append({"kind": "valid", "episode_ordinal": episode,
+                                    "reader_source_identity": reader_source_identity,
                                     "returncode": result.returncode, "reader": payload})
 
     source_h5 = paths[0]
@@ -294,7 +323,8 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
         copied_witness = witness_bound_to_copy(copied, name)
         result, payload = _run_independent_reader(copied, copied_witness, contract_path)
         assert result.returncode == 2 and payload.get("reason") == expected_reason
-        tamper_results.append({"kind": name, "returncode": result.returncode, "reader": payload})
+        tamper_results.append({"kind": name, "reader_source_identity": reader_source_identity,
+                               "returncode": result.returncode, "reader": payload})
 
     for name, expected_reason, dataset_name, mutator in (
         ("episode_identity", "episode_outcome", "meta/episode_outcome_v1_json", lambda data: data.__setitem__("episode_id", "episode-tampered")),
@@ -317,7 +347,370 @@ def test_f05_menagerie_geo_usd_same_core_env_two_episode_synthetic_s1(tmp_path):
         copied_witness = witness_bound_to_copy(copied, name)
         result, payload = _run_independent_reader(copied, copied_witness, contract_path)
         assert result.returncode == 2 and payload.get("reason") == expected_reason
+        tamper_results.append({"kind": name, "reader_source_identity": reader_source_identity,
+                               "returncode": result.returncode, "reader": payload})
+
+    def state_row(mapping, row_index):
+        return mapping["public_boundaries"][row_index]["canonical_state_view_v1"]
+
+    def edit_typed_extension(copied, mutator):
+        with h5py.File(copied, "r+") as root:
+            dataset = root["meta/f05_public_typed_state_witness_v1_json"]
+            extension = _read_meta_json(dataset)
+            mutator(extension["rows"])
+            _write_meta_json(dataset, extension)
+
+    def save_witness_copy(copied, name, altered, mutation=None):
+        altered["h5_path"] = str(copied.resolve())
+        altered["h5_sha256"] = hashlib.sha256(copied.read_bytes()).hexdigest()
+        if mutation is not None:
+            mutation(altered)
+        target = tamper_root / f"{name}.public-boundary-witness.json"
+        target.write_text(json.dumps(altered, sort_keys=True, indent=2, allow_nan=False) + "\n",
+                          encoding="utf-8")
+        return target
+
+    def run_typed_tamper(name, *, h5_mutation=None, witness_mutation=None,
+                         expected_reason, contract_source=None, public_row=8):
+        copied = tamper_root / f"{name}.h5"
+        shutil.copy2(source_h5, copied)
+        if h5_mutation is not None:
+            edit_typed_extension(copied, h5_mutation)
+        altered = json.loads(source_witness.read_text(encoding="utf-8"))
+        if witness_mutation is not None:
+            witness_mutation(altered)
+        copied_witness = save_witness_copy(copied, name, altered)
+        selected_contract = contract_source or contract_path
+        result, payload = _run_independent_reader(copied, copied_witness, selected_contract)
+        assert result.returncode == 2 and payload.get("reason") == expected_reason, (name, payload)
         tamper_results.append({"kind": name, "returncode": result.returncode, "reader": payload})
+
+    def change_joint_position(mapping, row_index, joint_id, delta):
+        row = next(item for item in state_row(mapping, row_index)["joints"]
+                   if item["joint_id"] == joint_id)
+        row["position"][0] += delta
+
+    def change_joint_velocity(rows, row_index, joint_id, delta):
+        state = rows[row_index]["canonical_state_view_v1"]
+        row = next(item for item in state["joints"] if item["joint_id"] == joint_id)
+        row["velocity"][0] += delta
+
+    # Both H5 and public witness must agree on the typed row, then the
+    # independent observation numeric comparison must reject the mismatch.
+    run_typed_tamper(
+        "typed_final_joint_position",
+        h5_mutation=lambda rows: change_joint_position(
+            {"public_boundaries": rows}, 8, "finger_joint1", 0.01),
+        witness_mutation=lambda mapping: change_joint_position(
+            mapping, 8, "finger_joint1", 0.01),
+        expected_reason="typed_joint_observation",
+    )
+    # Velocity is part of the public typed state and persisted in the F05 H5
+    # sidecar. It has no observation leaf, so compare both storage directions
+    # independently against the captured public witness.
+    run_typed_tamper(
+        "typed_joint_velocity_h5",
+        h5_mutation=lambda rows: change_joint_velocity(rows, 8, "finger_joint1", 0.01),
+        expected_reason="typed_state_h5_mismatch",
+    )
+    run_typed_tamper(
+        "typed_joint_velocity_public_witness",
+        witness_mutation=lambda mapping: next(
+            row for row in state_row(mapping, 8)["joints"] if row["joint_id"] == "finger_joint1"
+        )["velocity"].__setitem__(0, state_row(mapping, 8)["joints"][0]["velocity"][0] + 0.01),
+        expected_reason="typed_state_h5_mismatch",
+    )
+
+    def change_free_body_velocity(rows, row_index, delta):
+        state = rows[row_index]["canonical_state_view_v1"]
+        row = next(item for item in state["joints"] if item["joint_id"] == "floating_root")
+        row["velocity"][0] += delta
+
+    run_typed_tamper(
+        "typed_free_body_velocity_h5",
+        h5_mutation=lambda rows: change_free_body_velocity(rows, 8, 0.01),
+        expected_reason="typed_state_h5_mismatch",
+    )
+
+    def change_free_body_unit(container, row_index):
+        state = (container["rows"][row_index]["canonical_state_view_v1"]
+                 if "rows" in container else state_row(container, row_index))
+        row = next(item for item in state["joints"] if item["joint_id"] == "floating_root")
+        row["velocity_representation"] = "meter_per_second"
+
+    run_typed_tamper(
+        "typed_wrong_free_body_velocity_unit",
+        h5_mutation=lambda rows: change_free_body_unit({"rows": rows}, 8),
+        witness_mutation=lambda mapping: change_free_body_unit(mapping, 8),
+        expected_reason="typed_free_body_unit",
+    )
+
+    def mutate_hand_pose(container, row_index, delta):
+        state = (container["rows"][row_index]["canonical_state_view_v1"]
+                 if "rows" in container else state_row(container, row_index))
+        hand = next(row for row in state["frames"]
+                    if row["frame"] == {"entity_id": "panda-main", "frame_id": "hand"})
+        hand["pose_world"]["position"][0] += delta
+
+    run_typed_tamper(
+        "typed_hand_pose_final",
+        h5_mutation=lambda rows: mutate_hand_pose({"rows": rows}, 8, 0.01),
+        witness_mutation=lambda mapping: mutate_hand_pose(mapping, 8, 0.01),
+        expected_reason="typed_hand_pose",
+    )
+
+    def mutate_body_pose(container, row_index, delta):
+        state = (container["rows"][row_index]["canonical_state_view_v1"]
+                 if "rows" in container else state_row(container, row_index))
+        body = next(row for row in state["frames"]
+                    if row["frame"] == {"entity_id": "square-peg-instance", "frame_id": "peg1"})
+        body["pose_world"]["position"][0] += delta
+        free = next(row for row in state["joints"] if row["joint_id"] == "floating_root")
+        free["position"][0] += delta
+
+    run_typed_tamper(
+        "typed_free_body_pose_final",
+        h5_mutation=lambda rows: mutate_body_pose({"rows": rows}, 8, 0.01),
+        witness_mutation=lambda mapping: mutate_body_pose(mapping, 8, 0.01),
+        expected_reason="typed_free_body_pose",
+    )
+
+    def remove_finger(rows):
+        rows[8]["canonical_state_view_v1"]["joints"] = [
+            row for row in rows[8]["canonical_state_view_v1"]["joints"]
+            if row["joint_id"] != "finger_joint1"
+        ]
+
+    run_typed_tamper(
+        "typed_missing_canonical_joint",
+        h5_mutation=remove_finger,
+        witness_mutation=lambda mapping: remove_finger(mapping["public_boundaries"]),
+        expected_reason="typed_joint_resources",
+    )
+
+    def change_joint_unit(container, row_index):
+        state = (container["rows"][row_index]["canonical_state_view_v1"]
+                 if "rows" in container else state_row(container, row_index))
+        row = next(item for item in state["joints"] if item["joint_id"] == "joint1")
+        row["position_representation"] = "meter"
+
+    run_typed_tamper(
+        "typed_wrong_joint_unit",
+        h5_mutation=lambda rows: change_joint_unit({"rows": rows}, 8),
+        witness_mutation=lambda mapping: change_joint_unit(mapping, 8),
+        expected_reason="typed_joint_unit",
+    )
+
+    def swap_observed_arm_order(copied, mapping):
+        with h5py.File(copied, "r+") as root:
+            dataset = root["obs/state/joint_position"]
+            row = np.asarray(dataset[8]).copy()
+            row[[0, 1]] = row[[1, 0]]
+            dataset[8] = row
+            fields = {}
+            def visit(name, item):
+                if isinstance(item, h5py.Dataset):
+                    value = np.asarray(item[8])
+                    fields[name] = {"dtype": value.dtype.str, "shape": list(value.shape),
+                                    "bytes_sha256": hashlib.sha256(value.tobytes(order="C")).hexdigest()}
+            root["obs"].visititems(visit)
+        mapping["public_boundaries"][8]["observation_fields"] = fields
+        mapping["public_boundaries"][8]["observation_identity_sha256"] = hashlib.sha256(
+            json.dumps(fields, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest()
+
+    copied = tamper_root / "typed_wrong_h5_dof_order.h5"
+    shutil.copy2(source_h5, copied)
+    altered = json.loads(source_witness.read_text(encoding="utf-8"))
+    swap_observed_arm_order(copied, altered)
+    copied_witness = save_witness_copy(copied, "typed_wrong_h5_dof_order", altered)
+    result, payload = _run_independent_reader(copied, copied_witness, contract_path)
+    assert result.returncode == 2 and payload.get("reason") == "typed_joint_observation", payload
+    tamper_results.append({"kind": "typed_wrong_h5_dof_order",
+                           "reader_source_identity": reader_source_identity,
+                           "returncode": result.returncode,
+                           "reader": payload})
+
+    # Reset clock and final row coverage are checked directly, before a valid
+    # decoder result can be reported.
+    run_typed_tamper(
+        "typed_reset_clock_error",
+        witness_mutation=lambda mapping: mapping["public_boundaries"][0]["state_sample_clock"].__setitem__(
+            "sample_index", 1),
+        expected_reason="boundary_clock", public_row=0,
+    )
+    def remove_final_public_row(mapping):
+        mapping["public_boundaries"] = mapping["public_boundaries"][:-1]
+        mapping["observation_count"] -= 1
+    run_typed_tamper(
+        "typed_missing_final_public_observation",
+        witness_mutation=remove_final_public_row,
+        expected_reason="witness_count",
+    )
+
+    missing_final = tamper_root / "missing_final_h5_observation.h5"
+    shutil.copy2(source_h5, missing_final)
+    with h5py.File(missing_final, "r+") as root:
+        datasets = []
+        root["obs"].visititems(lambda name, item: datasets.append((name, item[...], dict(item.attrs)))
+                               if isinstance(item, h5py.Dataset) else None)
+        for name, value, attrs in datasets:
+            if value.ndim and value.shape[0] == 9:
+                parent_path, _, leaf = name.rpartition("/")
+                parent = root["obs/" + parent_path] if parent_path else root["obs"]
+                del parent[leaf]
+                replacement = parent.create_dataset(leaf, data=value[:-1])
+                for key, item in attrs.items():
+                    replacement.attrs[key] = item
+        root.attrs["observation_count"] = 8
+    missing_witness = save_witness_copy(
+        missing_final, "missing_final_h5_observation",
+        json.loads(source_witness.read_text(encoding="utf-8")),
+    )
+    result, payload = _run_independent_reader(missing_final, missing_witness, contract_path)
+    assert result.returncode == 2 and payload.get("reason") == "t_plus_one_count", payload
+    tamper_results.append({"kind": "missing_final_h5_observation",
+                           "reader_source_identity": reader_source_identity,
+                           "returncode": result.returncode,
+                           "reader": payload})
+
+    stale_final = tamper_root / "stale_final_h5_observation.h5"
+    shutil.copy2(source_h5, stale_final)
+    with h5py.File(stale_final, "r+") as root:
+        datasets = []
+        root["obs"].visititems(lambda name, item: datasets.append(name)
+                               if isinstance(item, h5py.Dataset) and item.shape and item.shape[0] == 9 else None)
+        for name in datasets:
+            dataset = root["obs/" + name]
+            dataset[-1] = dataset[-2]
+    stale_witness = json.loads(source_witness.read_text(encoding="utf-8"))
+    with h5py.File(stale_final, "r") as root:
+        fields = {}
+        def visit_stale(name, item):
+            if isinstance(item, h5py.Dataset):
+                value = np.asarray(item[8])
+                fields[name] = {"dtype": value.dtype.str, "shape": list(value.shape),
+                                "bytes_sha256": hashlib.sha256(value.tobytes(order="C")).hexdigest()}
+        root["obs"].visititems(visit_stale)
+    stale_witness["public_boundaries"][8]["observation_fields"] = fields
+    stale_witness["public_boundaries"][8]["observation_identity_sha256"] = hashlib.sha256(
+        json.dumps(fields, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
+    stale_witness_path = save_witness_copy(stale_final, "stale_final_h5_observation", stale_witness)
+    result, payload = _run_independent_reader(stale_final, stale_witness_path, contract_path)
+    assert result.returncode == 2 and payload.get("reason") in {
+        "boundary_digest", "typed_joint_observation", "typed_hand_pose", "typed_free_body_pose",
+    }, payload
+    tamper_results.append({"kind": "stale_final_h5_observation",
+                           "reader_source_identity": reader_source_identity,
+                           "returncode": result.returncode,
+                           "reader": payload})
+
+    # Sol's frozen attempt001 counterexample remains a regression oracle: the
+    # old closed H5 is still accepted unchanged, while its witness-only typed
+    # position mutation must now be rejected.
+    repo_root = Path(__file__).resolve().parents[3]
+    handoff_root = repo_root / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001"
+    old_root = handoff_root / "f05_001/evidence/s1/menagerie_run080"
+    old_h5 = old_root / "episode-00.h5"
+    old_witness = old_root / "episode-00.public-boundary-witness.json"
+    old_contract = old_root / "input_contract.json"
+    old_result, old_payload = _run_independent_reader(old_h5, old_witness, old_contract)
+    assert old_result.returncode == 0 and old_payload.get("accepted") is True
+    old_tampered = json.loads(old_witness.read_text(encoding="utf-8"))
+    old_state = old_tampered["public_boundaries"][-1]["canonical_state_view_v1"]
+    old_finger = next(row for row in old_state["joints"] if row["joint_id"] == "finger_joint1")
+    old_finger["position"][0] = 0.028999999105930326
+    old_tampered_path = tamper_root / "sol_old_typed_position_counterexample.public-boundary-witness.json"
+    old_tampered_path.write_text(json.dumps(old_tampered, sort_keys=True, indent=2, allow_nan=False) + "\n",
+                                 encoding="utf-8")
+    old_bad_result, old_bad_payload = _run_independent_reader(old_h5, old_tampered_path, old_contract)
+    assert old_bad_result.returncode == 2 and old_bad_payload.get("reason") == "typed_joint_observation"
+    tamper_results.append({"kind": "sol_old_typed_position_counterexample",
+                           "reader_source_identity": reader_source_identity,
+                           "returncode": old_bad_result.returncode,
+                           "reader": old_bad_payload})
+
+    from task_env.runtime.sessions.leaf_control import GeoPhysHostModelProducerIdentityV1
+
+    def run_contract_tamper(name, mutator, expected_reason):
+        altered = json.loads(contract_path.read_text(encoding="utf-8"))
+        mutator(altered)
+        contract_copy = tamper_root / f"{name}.input-contract.json"
+        contract_copy.write_text(json.dumps(altered, sort_keys=True, indent=2, allow_nan=False) + "\n",
+                                 encoding="utf-8")
+        result, payload = _run_independent_reader(source_h5, source_witness, contract_copy)
+        assert result.returncode == 2 and payload.get("reason") == expected_reason, (name, payload)
+        tamper_results.append({"kind": name, "reader_source_identity": reader_source_identity,
+                               "returncode": result.returncode, "reader": payload})
+
+    def replace_producer_identity(contract, *, commit=None, module_hash=None,
+                                  origin_url=None, requested_target_build_identity=None):
+        old = contract["host_model_producer_identity"]
+        rows = [tuple(row) for row in old["module_sources"]]
+        if module_hash is not None:
+            rows[0] = (rows[0][0], rows[0][1], module_hash)
+        identity = GeoPhysHostModelProducerIdentityV1(
+            old["schema_version"],
+            requested_target_build_identity or old["requested_target_build_identity"],
+            old["repository_root"], origin_url or old["origin_url"],
+            commit or old["commit_sha"], old["worktree_clean"], tuple(rows),
+        )
+        contract["host_model_producer_identity"] = identity.to_mapping()
+        contract["host_model_producer_identity_sha256"] = identity.identity_sha256
+
+    run_contract_tamper(
+        "producer_wrong_head",
+        lambda contract: replace_producer_identity(contract, commit="0" * len(
+            contract["host_model_producer_identity"]["commit_sha"])),
+        "producer_identity",
+    )
+    run_contract_tamper(
+        "producer_wrong_module_bytes",
+        lambda contract: replace_producer_identity(contract, module_hash="0" * 64),
+        "producer_identity",
+    )
+
+    def wrong_declared_import_root(contract):
+        mapping = contract["host_model_producer_identity"]
+        mapping["repository_root"] = "/home/lly/Program_Files/Geochora"
+        payload = {key: value for key, value in mapping.items() if key != "identity_sha256"}
+        mapping["identity_sha256"] = hashlib.sha256(json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        contract["host_model_producer_identity_sha256"] = mapping["identity_sha256"]
+
+    run_contract_tamper("producer_wrong_import_root", wrong_declared_import_root,
+                        "producer_identity")
+    run_contract_tamper(
+        "producer_wrong_origin_url",
+        lambda contract: replace_producer_identity(
+            contract, origin_url="https://example.invalid/unrelated/GeoPhys.git"),
+        "producer_identity",
+    )
+    run_contract_tamper(
+        "producer_wrong_requested_target_build",
+        lambda contract: replace_producer_identity(
+            contract, requested_target_build_identity="geophys-unrelated-target-build"),
+        "producer_identity",
+    )
+    run_contract_tamper(
+        "old_pinned_receipt_graft",
+        lambda contract: contract.__setitem__("receipt_identity_sha256",
+                                                "1253ea4a222e52bc2393bf3afd89b0b8358daf59f16d9c086647a00155bc9289"),
+        "receipt_identity",
+    )
+    run_contract_tamper(
+        "public_model_identity_graft",
+        lambda contract: contract.__setitem__("public_model_identity_sha256", "0" * 64),
+        "public_model_identity",
+    )
+    run_contract_tamper(
+        "representation_options_identity_graft",
+        lambda contract: contract["representation"].__setitem__("identity_sha256", "0" * 64),
+        "source_identity",
+    )
+
     (output / "independent_reader_results.json").write_text(
         json.dumps({"valid": independent_results, "tamper_rejections": tamper_results},
                    sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8",
@@ -342,7 +735,6 @@ def test_f05_s1_core_faults_latch_primary_and_release_low_io_once(failure, fault
     from task_env.registry import make_env
     from task_env.runtime.sessions import api
     from task_env.runtime.sessions.geophys_source import compile_geophys_usd_position_drive_receipt
-    from f05_s1_support import SyntheticGeoPhysNativeIO, build_input, lower_public_model
 
     input_v1, _setup = build_input("menagerie-panda")
     created = []
@@ -353,6 +745,7 @@ def test_f05_s1_core_faults_latch_primary_and_release_low_io_once(failure, fault
             source, imported, model, execution,
             provider_build_identity=drive_receipt.provider_build_identity,
             provenance_kind="synthetic_fixture",
+            host_model_producer_identity=input_v1.host_model_producer_identity,
         )
         if independently_compiled.identity_sha256 != drive_receipt.identity_sha256:
             raise AssertionError("fault S1 receipt differs from independently lowered public host model")
@@ -420,7 +813,7 @@ def test_f05_geophys_drive_numeric_oracle_units_offsets_and_unsupported_law(tmp_
     from task_env.runtime.sessions.leaf_control import (
         GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdPositionDriveV1,
     )
-    from f05_s1_support import build_input, lower_public_model
+    from task_env.diagnostics.tasks.f05_source_control_support import build_input, lower_public_model
 
     input_v1, _setup = build_input("menagerie-panda")
     source = input_v1.runtime_source
@@ -579,7 +972,7 @@ def test_f05_geophys_drive_numeric_oracle_units_offsets_and_unsupported_law(tmp_
 
 def test_f05_geo_usd_production_materialize_remains_fail_closed_outside_s1():
     from task_env.runtime.sessions.api import materialize
-    from f05_s1_support import build_input
+    from task_env.diagnostics.tasks.f05_source_control_support import build_input
 
     input_v1, _setup = build_input("menagerie-panda")
     assert input_v1.runtime_source.scene_source.locally_validated is True

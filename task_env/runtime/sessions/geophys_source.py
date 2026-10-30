@@ -576,6 +576,7 @@ def _usd_ir_semantic_hash_for_snapshot(imported_scene, runtime_source):
 def compile_geophys_usd_position_drive_receipt(
     runtime_source, imported_scene, scene_model, execution, *,
     provider_build_identity: str, provenance_kind: str = 'synthetic_fixture',
+    host_model_producer_identity=None,
     writer_id: str = 'panda-main/position-servo-v1',
 ):
     """Freeze public GeoPhys USD model channels into the existing drive owner.
@@ -585,7 +586,10 @@ def compile_geophys_usd_position_drive_receipt(
     Compiling it does not initialize a solver or admit production execution.
     """
     from ...artifacts import ExecutionSpecV1, JointReference
-    from .leaf_control import GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdPositionDriveV1
+    from .leaf_control import (
+        GeoPhysHostModelProducerIdentityV1,
+        GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdPositionDriveV1,
+    )
 
     if type(execution) is not ExecutionSpecV1:
         raise TypeError('GeoPhys USD drive receipt requires exact ExecutionSpecV1')
@@ -596,6 +600,12 @@ def compile_geophys_usd_position_drive_receipt(
         raise ValueError('GeoPhys USD drive receipt requires an exact provider build identity')
     if provenance_kind not in {'synthetic_fixture', 'native_runtime'}:
         raise ValueError('GeoPhys USD drive receipt provenance must be explicit')
+    if host_model_producer_identity is not None:
+        if type(host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1:
+            raise TypeError('GeoPhys host-model receipt requires its exact producer identity contract')
+        if host_model_producer_identity.requested_target_build_identity != provider_build_identity:
+            raise ValueError('GeoPhys host-model producer differs from the requested target build identity')
+        host_model_producer_identity.validate_current_tree()
     runtime_source.validate()
     if runtime_source.scene_source.representation.provider != 'geophys':
         raise ValueError('GeoPhys USD drive receipt requires a GeoPhys representation')
@@ -611,6 +621,8 @@ def compile_geophys_usd_position_drive_receipt(
         'name_to_joint': sorted((str(name), int(index)) for name, index in joint_by_name.items()),
         'name_to_actuator': sorted((str(name), int(index)) for name, index in actuator_by_name.items()),
     }
+    if host_model_producer_identity is not None:
+        model_payload['host_model_producer_identity_sha256'] = host_model_producer_identity.identity_sha256
     for key in (
         'n_dof', 'n_qpos', 'n_actuators', 'n_bodies', 'n_geoms',
         'qpos0', 'jnt_qposadr', 'jnt_dofadr', 'jnt_type',
@@ -695,6 +707,7 @@ def compile_geophys_usd_position_drive_receipt(
         runtime_source.task_artifact.timebase.physics_dt,
         runtime_source.task_artifact.timebase.control_substeps, writer_id, 9,
         tuple(sorted(drives, key=lambda item: item.native_dof_index)),
+        None if host_model_producer_identity is None else host_model_producer_identity.identity_sha256,
     )
 
 

@@ -877,6 +877,10 @@ def materialize_control(
                     or receipt is not f05_scope.input_v1.native_drive_receipt
                     or receipt.provenance_kind != 'synthetic_fixture'
                     or metadata.provider_build_identity != receipt.provider_build_identity
+                    or metadata.host_model_producer_identity_sha256
+                    != f05_scope.input_v1.host_model_producer_identity.identity_sha256
+                    or receipt.host_model_producer_identity_sha256
+                    != f05_scope.input_v1.host_model_producer_identity.identity_sha256
                     or metadata.physics_provider != 'geophys'
                     or dict(source.joint_targets) != {
                         f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name

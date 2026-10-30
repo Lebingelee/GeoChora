@@ -396,6 +396,10 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             if any(not callable(getattr(native_io, name, None)) for name in required_methods):
                 raise TypeError('F05 S1 factory must implement only the typed NativeRuntimeIOV1 port')
             try:
+                native_metadata = native_io.metadata()
+                expected_producer = f05_scope.input_v1.host_model_producer_identity.identity_sha256
+                if native_metadata.host_model_producer_identity_sha256 != expected_producer:
+                    raise ValueError('F05 NativeRuntimeIO metadata does not bind the actual host-model producer')
                 session = UsdCoreRuntimeSession(
                     artifact, declared_execution, source, native_io, drive_receipt,
                 )

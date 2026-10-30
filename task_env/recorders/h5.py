@@ -382,6 +382,45 @@ def _save_v3(root, trajectory: FrozenTrajectory, config: RecorderConfig) -> None
         _json_dataset(meta, "camera_observation_contract_v1_json", contract)
         _json_dataset(meta, "camera_observations_v1_json", boundaries)
         _json_dataset(meta, "camera_recording_binding_v1_json", recording_binding)
+    f05_typed_state_extension = _f05_typed_state_extension(trajectory)
+    if f05_typed_state_extension is not None:
+        _json_dataset(meta, "f05_public_typed_state_witness_v1_json", f05_typed_state_extension)
+
+
+def _f05_typed_state_extension(trajectory: FrozenTrajectory):
+    """Persist the public T+1 typed-state snapshots for the bounded F05 profile only."""
+    metadata = trajectory.record_metadata.get("env_metadata", {})
+    profile = metadata.get("reference_profile", {}) if isinstance(metadata, Mapping) else {}
+    if not isinstance(profile, Mapping) or profile.get("profile_id") != "f05-geophys-usd-position-synthetic-io-s1-v1":
+        return None
+    if profile.get("typed_state_h5_witness_schema_version") != "f05-public-typed-state-witness-v1":
+        raise ValueError("F05 recording metadata does not declare the typed T+1 H5 witness")
+    public_infos = [trajectory.reset_info, *trajectory.infos]
+    if len(public_infos) != len(trajectory.observations):
+        raise ValueError("F05 typed-state witness requires one public reset/step info per T+1 observation")
+    rows = []
+    for index, info in enumerate(public_infos):
+        if not isinstance(info, Mapping):
+            raise TypeError("F05 public reset/step info must be a mapping")
+        state = info.get("canonical_state_view_v1")
+        boundary = info.get("state_boundary_identity")
+        clock = info.get("state_sample_clock")
+        if not isinstance(state, Mapping) or not isinstance(boundary, Mapping) or not isinstance(clock, Mapping):
+            raise ValueError(f"F05 public reset/step info {index} lacks typed state, boundary or clock")
+        if state.get("boundary") != boundary or state.get("sample_clock") != clock:
+            raise ValueError(f"F05 public typed state {index} differs from its public boundary/clock")
+        rows.append({
+            "boundary_index": index,
+            "state_boundary_identity": dict(boundary),
+            "state_sample_clock": dict(clock),
+            "canonical_state_view_v1": dict(state),
+        })
+    return {
+        "schema_version": "f05-public-typed-state-witness-v1",
+        "source": "SelectedReferenceEnv public reset/step info captured by Generic H5 v3 Recorder",
+        "observation_count": len(trajectory.observations),
+        "rows": rows,
+    }
 
 
 def _camera_observation_extension(trajectory: FrozenTrajectory):

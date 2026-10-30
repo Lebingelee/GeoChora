@@ -22,6 +22,7 @@ from task_env.artifacts import ExecutionSpecV1, TaskArtifactV1
 from task_env.artifacts.execution import EpisodeResetPlanV1
 from task_env.runtime.sessions.source import UsdRuntimeSourceV1
 from task_env.runtime.sessions.leaf_control import (
+    GeoPhysHostModelProducerIdentityV1,
     GeoPhysUsdPositionDriveReceiptV1, IsaacNamedPositionDriveReceiptV1,
 )
 from task_env.runtime.sessions.control import compile_control_binding_plan
@@ -156,6 +157,7 @@ class F05PositionCandidateInputV1:
     reset_plan: EpisodeResetPlanV1
     kinematics_source_xml: str
     kinematics_source_sha256: str
+    host_model_producer_identity: GeoPhysHostModelProducerIdentityV1
     native_drive_receipt: GeoPhysUsdPositionDriveReceiptV1
 
     def validate(self):
@@ -166,6 +168,7 @@ class F05PositionCandidateInputV1:
                 or type(self.runtime_source) is not UsdRuntimeSourceV1
                 or type(self.execution) is not ExecutionSpecV1
                 or type(self.reset_plan) is not EpisodeResetPlanV1
+                or type(self.host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1
                 or type(self.native_drive_receipt) is not GeoPhysUsdPositionDriveReceiptV1):
             raise TypeError('F05 Position input requires exact versioned Core/source/drive contracts')
         self.runtime_source.validate()
@@ -199,20 +202,37 @@ class F05PositionCandidateInputV1:
                 self.runtime_source.scene_source.source_verified,
                 self.runtime_source.scene_source.locally_validated,
                 delivery.provenance_kind) != (
-                'geophys', 'geophys-a53a8cfed7c9d6464274b5c96fca601271dc4ee4',
+                'geophys', self.host_model_producer_identity.requested_target_build_identity,
                 'usd', False, False, True, 'local-validated'):
             raise ValueError('F05 S1 source is outside the frozen locally validated GeoPhys USD input')
+        producer = self.host_model_producer_identity
+        producer.validate_current_tree()
+        from task_env.assembly.usd_delivery import resolve_provider_representation
+        expected_representation = resolve_provider_representation(
+            self.runtime_source.scene_source.loaded_delivery,
+            provider='geophys',
+            provider_build_identity=producer.requested_target_build_identity,
+            options={
+                'f05_attempt': '002',
+                'lowering': 'public-host-model-s1-v1',
+                'host_model_producer_identity_sha256': producer.identity_sha256,
+            },
+        )
+        if expected_representation.identity_hash != representation.identity_hash:
+            raise ValueError('F05 representation options do not bind the actual host-model producer identity')
         receipt = self.native_drive_receipt
         if (receipt.provenance_kind, receipt.scene_identity_sha256,
                 receipt.source_closure_sha256, receipt.execution_identity_sha256,
                 receipt.provider_build_identity, receipt.physics_profile,
                 receipt.backend, receipt.device, receipt.determinism_mode,
+                receipt.host_model_producer_identity_sha256,
                 receipt.writer_id) != (
                 'synthetic_fixture', self.runtime_source.scene_definition.identity_hash,
                 self.runtime_source.source_closure_digest, self.execution.identity_hash,
                 representation.provider_build_identity, self.execution.physics_profile,
                 self.execution.physics_backend, self.execution.physics_device,
-                self.execution.determinism_mode, 'panda-main/position-servo-v1'):
+                self.execution.determinism_mode, producer.identity_sha256,
+                'panda-main/position-servo-v1'):
             raise ValueError('F05 model-bound drive receipt does not bind exact source/execution/control identity')
         if not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str:
             raise ValueError('F05 Position S1 requires source-calibrated kinematics bytes')

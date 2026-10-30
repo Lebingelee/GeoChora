@@ -12,6 +12,8 @@ import hashlib
 import json
 import math
 import re
+import subprocess
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from ...artifacts import (
@@ -421,6 +423,97 @@ class GeoPhysUsdPositionDriveV1:
 
 
 @dataclass(frozen=True)
+class GeoPhysHostModelProducerIdentityV1:
+    """F05-only identity for the source tree that actually lowered a public USD host model."""
+
+    schema_version: str
+    requested_target_build_identity: str
+    repository_root: str
+    origin_url: str
+    commit_sha: str
+    worktree_clean: bool
+    module_sources: tuple[tuple[str, str, str], ...]
+
+    def __post_init__(self):
+        if self.schema_version != 'geophys-host-model-producer-identity-v1':
+            raise ValueError('unsupported GeoPhys host-model producer identity schema')
+        _token(self.requested_target_build_identity, 'requested target build identity')
+        root = Path(self.repository_root)
+        if not root.is_absolute() or str(root.resolve()) != self.repository_root:
+            raise ValueError('host-model producer repository root must be canonical and absolute')
+        _stable_identity(self.origin_url, 'provider origin URL')
+        if (type(self.commit_sha) is not str or not re.fullmatch(r'[0-9a-f]{40,64}', self.commit_sha)):
+            raise ValueError('provider producer commit must be lowercase Git SHA-1/SHA-256 hex')
+        if self.worktree_clean is not True:
+            raise ValueError('F05 producer identity must describe a clean committed provider tree')
+        rows = tuple(self.module_sources)
+        if not rows or any(type(row) is not tuple or len(row) != 3 for row in rows):
+            raise ValueError('host-model producer identity requires module source rows')
+        names = [row[0] for row in rows]
+        if len(names) != len(set(names)) or names != sorted(names):
+            raise ValueError('provider module source rows must be unique and sorted by module name')
+        for module_name, origin, source_sha256 in rows:
+            _stable_identity(module_name, 'provider module name')
+            path = Path(origin)
+            if not path.is_absolute() or str(path.resolve()) != origin:
+                raise ValueError(f'provider module origin must be canonical and absolute: {module_name}')
+            _sha(source_sha256, f'provider module content hash {module_name}')
+            try:
+                path.resolve().relative_to((root / 'src').resolve())
+            except ValueError as exc:
+                raise ValueError(f'provider module origin escapes the declared source root: {module_name}') from exc
+        if not {'scene', 'geometry'} <= set(names):
+            raise ValueError('GeoPhys host producer identity must include public scene and geometry package origins')
+        object.__setattr__(self, 'module_sources', rows)
+
+    def _identity_payload(self) -> dict[str, object]:
+        return {
+            'schema_version': self.schema_version,
+            'requested_target_build_identity': self.requested_target_build_identity,
+            'repository_root': self.repository_root,
+            'origin_url': self.origin_url,
+            'commit_sha': self.commit_sha,
+            'worktree_clean': self.worktree_clean,
+            'module_sources': [list(row) for row in self.module_sources],
+        }
+
+    @property
+    def identity_sha256(self) -> str:
+        return _digest(self._identity_payload())
+
+    def to_mapping(self) -> dict[str, object]:
+        return {**self._identity_payload(), 'identity_sha256': self.identity_sha256}
+
+    def validate_current_tree(self) -> None:
+        """Recheck the actual checkout and bytes rather than trusting supplied strings."""
+        root = Path(self.repository_root)
+        try:
+            commit = subprocess.check_output(
+                ['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True, timeout=5,
+            ).strip()
+            origin = subprocess.check_output(
+                ['git', '-C', str(root), 'remote', 'get-url', 'origin'], text=True, timeout=5,
+            ).strip()
+            status = subprocess.check_output(
+                ['git', '-C', str(root), 'status', '--porcelain=v1', '--untracked-files=all'],
+                text=True, timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ValueError(f'cannot independently read the GeoPhys producer checkout: {exc}') from exc
+        if (commit, origin, status) != (self.commit_sha, self.origin_url, ''):
+            raise ValueError('actual GeoPhys producer HEAD/origin/clean state differs from its identity')
+        for module_name, raw_origin, expected_sha in self.module_sources:
+            path = Path(raw_origin)
+            try:
+                path.resolve().relative_to((root / 'src').resolve())
+                actual_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+            except (OSError, ValueError) as exc:
+                raise ValueError(f'cannot verify actual provider module bytes for {module_name}: {exc}') from exc
+            if actual_sha != expected_sha:
+                raise ValueError(f'actual provider module content changed for {module_name}')
+
+
+@dataclass(frozen=True)
 class GeoPhysUsdPositionDriveReceiptV1:
     """Model-bound USD drive facts; it does not admit GeoPhys production runtime."""
 
@@ -440,6 +533,7 @@ class GeoPhysUsdPositionDriveReceiptV1:
     writer_id: str
     native_dof_count: int
     drives: tuple[GeoPhysUsdPositionDriveV1, ...]
+    host_model_producer_identity_sha256: str | None = None
 
     def __post_init__(self):
         if self.schema_version != 'geophys-usd-position-drive-receipt-v1':
@@ -462,6 +556,8 @@ class GeoPhysUsdPositionDriveReceiptV1:
         ):
             _token(value, label)
         _stable_identity(self.writer_id, 'writer ID')
+        if self.host_model_producer_identity_sha256 is not None:
+            _sha(self.host_model_producer_identity_sha256, 'host-model producer identity')
         if (type(self.physics_dt_s) not in (int, float) or isinstance(self.physics_dt_s, bool)
                 or not math.isfinite(float(self.physics_dt_s)) or float(self.physics_dt_s) != 0.002
                 or type(self.control_substeps) is not int or self.control_substeps != 5):
@@ -489,7 +585,7 @@ class GeoPhysUsdPositionDriveReceiptV1:
 
     @property
     def identity_sha256(self) -> str:
-        return _digest({
+        payload = {
             'schema_version': self.schema_version,
             'provenance_kind': self.provenance_kind,
             'scene_identity_sha256': self.scene_identity_sha256,
@@ -514,7 +610,10 @@ class GeoPhysUsdPositionDriveReceiptV1:
                 row.control_limited, float(row.control_lower), float(row.control_upper),
                 row.force_limited, float(row.force_lower), float(row.force_upper),
             ) for row in self.drives],
-        })
+        }
+        if self.host_model_producer_identity_sha256 is not None:
+            payload['host_model_producer_identity_sha256'] = self.host_model_producer_identity_sha256
+        return _digest(payload)
 
     def commands(self, arm_position: Mapping[str, float], hand_opening_m: float):
         expected_arm = {f'panda-main/joint{index}' for index in range(1, 8)}

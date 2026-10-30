@@ -48,6 +48,7 @@ class NativeRuntimeIOMetadataV1:
     control_substeps: int
     native_dof_names: tuple[str, ...]
     native_position_limits: Mapping[str, tuple[float, float]]
+    host_model_producer_identity_sha256: str | None = None
 
     def __post_init__(self):
         if self.schema_version != 'native-runtime-io-metadata-v1':
@@ -62,6 +63,10 @@ class NativeRuntimeIOMetadataV1:
             value = getattr(self, name)
             if type(value) is not str or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
                 raise ValueError(f'native Runtime I/O metadata {name} must be lowercase SHA-256')
+        if self.host_model_producer_identity_sha256 is not None:
+            value = self.host_model_producer_identity_sha256
+            if type(value) is not str or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
+                raise ValueError('native Runtime I/O host-model producer identity must be lowercase SHA-256')
         if (type(self.physics_dt_s) not in (int, float) or isinstance(self.physics_dt_s, bool)
                 or not math.isfinite(float(self.physics_dt_s)) or float(self.physics_dt_s) <= 0):
             raise ValueError('native Runtime I/O physics dt must be finite and positive')
@@ -99,7 +104,7 @@ class NativeRuntimeIOMetadataV1:
             raise ValueError('native Runtime I/O metadata differs from source/artifact/execution identity')
 
     def to_mapping(self) -> dict[str, object]:
-        return {
+        result = {
             'schema_version': self.schema_version,
             'source_id': self.source_id,
             'source_closure_sha256': self.source_closure_sha256,
@@ -115,6 +120,9 @@ class NativeRuntimeIOMetadataV1:
             'native_dof_names': list(self.native_dof_names),
             'native_position_limits': {key: list(value) for key, value in self.native_position_limits.items()},
         }
+        if self.host_model_producer_identity_sha256 is not None:
+            result['host_model_producer_identity_sha256'] = self.host_model_producer_identity_sha256
+        return result
 
 
 @dataclass(frozen=True)

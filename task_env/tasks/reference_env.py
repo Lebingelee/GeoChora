@@ -2349,6 +2349,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'state_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
             'source_closure_digest': self.value['source'].source_closure_digest,
             **({
+                # Persist the public snapshot used to produce the reset
+                # observation. Generic H5 v3 consumes this only for the
+                # bounded F05 typed-state extension.
+                'canonical_state_view_v1': self.info['canonical_state_view_v1'],
+            } if self.value.get('f05_position_input') is not None else {}),
+            **({
                 'camera_observation_v1': self.info['camera_observation_v1'],
             } if self.camera_observation_config is not None else {}),
         }
@@ -2551,6 +2557,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'identity_sha256': representation.identity_hash,
                     'provider': representation.provider,
                     'provider_build_identity': representation.provider_build_identity,
+                    'requested_target_build_identity': representation.provider_build_identity,
                     'decision': representation.decision,
                     'runtime_admitted': representation.runtime_admitted,
                     'source_verified': representation.source_verified,
@@ -2560,6 +2567,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'device': self.execution.physics_device,
                 'backend': self.execution.physics_backend,
                 'provider_build_identity': native_metadata.provider_build_identity,
+                **({
+                    'requested_target_build_identity': versioned_input.host_model_producer_identity.requested_target_build_identity,
+                    'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256,
+                    'host_model_producer_identity': versioned_input.host_model_producer_identity.to_mapping(),
+                } if f05_route else {}),
                 'timebase': {
                     'physics_dt_s': self.artifact.timebase.physics_dt,
                     'control_substeps': self.artifact.timebase.control_substeps,
@@ -2584,6 +2596,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('source_calibrated_kinematics_source_sha256' if f04_route or f05_route
                  else 'static_kinematics_source_sha256'): versioned_input.kinematics_source_sha256,
                 'reset_sample_clock': self.typed_state.view.sample_clock.to_mapping(),
+                **({'typed_state_h5_witness_schema_version': 'f05-public-typed-state-witness-v1'}
+                   if f05_route else {}),
                 'recording_scope': (
                     'F04 exact Isaac 6.2.0.0 cuda:0 GPU PhysX Position execution'
                     if f04_native else
@@ -2638,6 +2652,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'execution_identity_sha256': self.execution.identity_hash,
                     'controller_identity_sha256': self.controller.identity,
                     'native_position_drive_receipt_identity_sha256': drive_receipt.identity_sha256,
+                    **({'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256}
+                       if f05_route else {}),
                 },
             }
 
