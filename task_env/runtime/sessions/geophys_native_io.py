@@ -91,18 +91,7 @@ class F05GeoPhysUsdNativeIO:
             self._bind_public_model(imported, model)
 
             data = model.joint_data
-            initial_qpos = np.asarray(data['initial_qpos'], dtype=np.float32).copy()
-            initial_qvel = np.asarray(data['initial_qvel'], dtype=np.float32).copy()
-            initial_ctrl = np.asarray(data['initial_ctrl'], dtype=np.float32).copy()
-            initial_act = np.asarray(data.get('initial_act', np.zeros(int(data['n_actuators']))),
-                                     dtype=np.float32).copy()
-            self._initial_state = EpisodePhysicsState(
-                qpos=initial_qpos,
-                qvel=initial_qvel,
-                qacc=np.zeros(int(data['n_dof']), dtype=np.float32),
-                ctrl=initial_ctrl,
-                act=initial_act,
-            )
+            self._initial_state = self._initial_state_from_public_model(data)
             runtime = assemble_mjcf_articulated_runtime(
                 imported,
                 scene_model=model,
@@ -230,6 +219,18 @@ class F05GeoPhysUsdNativeIO:
         if len(self._actuator_indices) != 9:
             raise ValueError('public model does not expose nine unique Panda Actuator channels')
         self._body_com_offsets = np.asarray(data['body_ipos'], dtype=np.float64)
+
+    @staticmethod
+    def _initial_state_from_public_model(data):
+        """Build a reset seed from public model arrays, defaulting absent controls to zero."""
+        n_actuators = int(data['n_actuators'])
+        return EpisodePhysicsState(
+            qpos=np.asarray(data['initial_qpos'], dtype=np.float32).copy(),
+            qvel=np.asarray(data['initial_qvel'], dtype=np.float32).copy(),
+            qacc=np.zeros(int(data['n_dof']), dtype=np.float32),
+            ctrl=np.asarray(data.get('initial_ctrl', np.zeros(n_actuators)), dtype=np.float32).copy(),
+            act=np.asarray(data.get('initial_act', np.zeros(n_actuators)), dtype=np.float32).copy(),
+        )
 
     @staticmethod
     def _is_sha256(value):

@@ -237,6 +237,23 @@ def test_f05_public_com_velocity_reference_point_oracle_uses_rotated_offset():
     np.testing.assert_allclose(actual, (0.8, 2.4, 3.0), rtol=0.0, atol=1e-12)
 
 
+def test_f05_native_initial_state_defaults_absent_public_ctrl_and_act_to_zero():
+    data = {
+        'initial_qpos': np.asarray([0.1, 0.2], dtype=np.float64),
+        'initial_qvel': np.asarray([0.3], dtype=np.float64),
+        'n_dof': 1,
+        'n_actuators': 2,
+    }
+
+    state = F05GeoPhysUsdNativeIO._initial_state_from_public_model(data)
+
+    np.testing.assert_array_equal(state.qpos, np.asarray([0.1, 0.2], dtype=np.float32))
+    np.testing.assert_array_equal(state.qvel, np.asarray([0.3], dtype=np.float32))
+    np.testing.assert_array_equal(state.qacc, np.zeros(1, dtype=np.float32))
+    np.testing.assert_array_equal(state.ctrl, np.zeros(2, dtype=np.float32))
+    np.testing.assert_array_equal(state.act, np.zeros(2, dtype=np.float32))
+
+
 def test_f05_adapter_close_preserves_primary_cleanup_error_and_releases_lease_once():
     adapter = F05GeoPhysUsdNativeIO.__new__(F05GeoPhysUsdNativeIO)
     boundary = _RaisingBoundary()
