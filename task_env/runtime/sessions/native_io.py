@@ -12,6 +12,8 @@ import math
 from types import MappingProxyType
 from typing import Protocol
 
+import numpy as np
+
 from ...artifacts import CanonicalStateView, ExecutionSpecV1, PoseWorld, TaskArtifactV1
 from ...artifacts.execution import RealizedInitialState, ResetSample
 from ...controllers.canonical.contracts import AppliedCanonicalControl
@@ -233,9 +235,12 @@ class NativePositionWriteAckV1:
             raise ValueError('native Position write Ack reports partial apply')
         names = tuple(name for _index, name, _value in expected)
         values = tuple(float(value) for _index, _name, value in expected)
-        if (self.target_identity_sha256, tuple(self.native_names), tuple(self.applied_values)) != (
-                target_identity, names, values):
+        if (self.target_identity_sha256, tuple(self.native_names)) != (target_identity, names):
             raise ValueError('native Position write Ack differs from the exact named Target')
+        for actual, requested in zip(self.applied_values, values, strict=True):
+            quantization = max(1e-12, abs(float(np.spacing(np.float32(requested)))) * 1.5)
+            if abs(float(actual) - requested) > quantization:
+                raise ValueError('native Position write Ack differs beyond float32 control quantization')
         if self.attempted_count is not None and self.attempted_count != len(expected):
             raise ValueError('native Position write Ack attempt count differs from complete Target')
 

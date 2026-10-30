@@ -260,6 +260,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'physx-gpu-f03-s1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f04-position-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
+                ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
             }
             if execution_route not in allowed_versioned_routes:
                 raise ValueError('versioned Position construction has an unsupported provider execution route')
@@ -671,6 +672,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         binding=ControlBinding('panda-main/gripper', .08),
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
+                        f05_native_input=self.value.get('f05_native_position_input'),
                     )
             else:
                 self.position_profile = False
@@ -2479,10 +2481,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         f03_input = self.value.get('f03_position_input')
         f04_input = self.value.get('f04_position_input')
         f05_input = self.value.get('f05_position_input')
-        if f03_input is not None or f04_input is not None or f05_input is not None:
+        f05_native_input = self.value.get('f05_native_position_input')
+        f05_native_route = f05_native_input is not None
+        f05_route = f05_input is not None or f05_native_route
+        if f03_input is not None or f04_input is not None or f05_route:
             f04_route = f04_input is not None
-            f05_route = f05_input is not None
-            versioned_input = f05_input if f05_route else f04_input if f04_route else f03_input
+            versioned_input = (
+                f05_native_input if f05_native_route else
+                f05_input if f05_route else f04_input if f04_route else f03_input
+            )
             source = self.value['source']
             source_scene = source.scene_source
             loaded = source_scene.loaded_delivery
@@ -2496,12 +2503,16 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise RuntimeError('versioned USD recording requires the successful Core reset write receipt')
             f04_native = bool(f04_route and drive_receipt is not None
                               and drive_receipt.provenance_kind == 'native_runtime')
-            expected_provenance = 'native_runtime' if f04_native else 'synthetic_fixture'
+            f05_native = bool(f05_native_route and drive_receipt is not None
+                              and drive_receipt.provenance_kind == 'native_runtime')
+            expected_provenance = 'native_runtime' if f04_native or f05_native else 'synthetic_fixture'
             if (drive_receipt is None or drive_receipt.provenance_kind != expected_provenance):
                 raise RuntimeError('versioned USD recording receipt provenance differs from its execution route')
             if f04_native:
                 if not (source.scene_source.source_verified or source.scene_source.locally_validated):
                     raise RuntimeError('F04 recording requires a loader-verified upstream or fixed local production delivery')
+                bootstrap = self.session._native_io.bootstrap_receipt()
+            elif f05_native:
                 bootstrap = self.session._native_io.bootstrap_receipt()
             else:
                 bootstrap = None
@@ -2509,18 +2520,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             profile = {
                 'schema_version': (
                     'f04-isaac-core-position-recording-profile-v1' if f04_native else
+                    'f05-geophys-core-position-native-profile-v1' if f05_native else
                     'f04-core-position-synthetic-io-s1-profile-v1' if f04_route else
                     'f05-geophys-position-synthetic-io-s1-profile-v1' if f05_route else
                     'f03-core-call-chain-recording-profile-v1'
                 ),
                 'profile_id': (
                     'f04-isaac-panda-position-native-v1' if f04_native else
+                    'geophys-usd-position-f05-native-v1' if f05_native else
                     'f04-local-source-synthetic-io-s1-v1' if f04_route else
                     'f05-geophys-usd-position-synthetic-io-s1-v1' if f05_route else
                     'f03-versioned-usd-position-synthetic-s1-v1'
                 ),
-                'provenance_kind': 'native_runtime' if f04_native else 'synthetic_fixture',
-                'runtime_admitted': bool(f04_native),
+                'provenance_kind': 'native_runtime' if f04_native or f05_native else 'synthetic_fixture',
+                'runtime_admitted': bool(f04_native or f05_native),
                 'source_verified': bool(source_scene.source_verified),
                 'source_validation_provenance_kind': delivery.provenance_kind,
                 'task_source_identity_sha256': versioned_input.task_source.identity_hash,
@@ -2558,6 +2571,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'provider': representation.provider,
                     'provider_build_identity': representation.provider_build_identity,
                     'requested_target_build_identity': representation.provider_build_identity,
+                    **({'actual_execution_build_identity': native_metadata.provider_build_identity}
+                       if f05_native else {}),
                     'decision': representation.decision,
                     'runtime_admitted': representation.runtime_admitted,
                     'source_verified': representation.source_verified,
@@ -2569,6 +2584,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'provider_build_identity': native_metadata.provider_build_identity,
                 **({
                     'requested_target_build_identity': versioned_input.host_model_producer_identity.requested_target_build_identity,
+                    'actual_provider_build_identity': versioned_input.host_model_producer_identity.actual_provider_build_identity,
                     'host_model_producer_identity_sha256': versioned_input.host_model_producer_identity.identity_sha256,
                     'host_model_producer_identity': versioned_input.host_model_producer_identity.to_mapping(),
                 } if f05_route else {}),
@@ -2587,7 +2603,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'native_position_drive_receipt': asdict(drive_receipt),
                 **({'public_model_identity_sha256': drive_receipt.public_model_identity_sha256} if f05_route else {}),
                 'native_runtime_io_metadata': native_metadata.to_mapping(),
-                **({'native_public_bootstrap_receipt': bootstrap} if f04_native else {}),
+                **({'native_public_bootstrap_receipt': bootstrap} if f04_native or f05_native else {}),
                 'native_source_mappings': {
                     'joints': dict(source.joints), 'bodies': dict(source.bodies),
                     'frames': dict(source.frames), 'free_joints': dict(source.free_joints),
@@ -2601,6 +2617,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'recording_scope': (
                     'F04 exact Isaac 6.2.0.0 cuda:0 GPU PhysX Position execution'
                     if f04_native else
+                    'F05 frozen Menagerie USD / GeoPhys CPU native Core Position cell'
+                    if f05_native else
                     'F05 public GeoPhys host-model synthetic S1; no provider solver or physics admission'
                     if f05_route else 'Core synthetic S1 conformance; no provider physics or native admission'
                 ),
@@ -2610,6 +2628,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'env_metadata': {
                     'env_name': (
                         'SelectedReferenceEnv.F04IsaacPandaPosition' if f04_native else
+                        'SelectedReferenceEnv.F05MenagerieGeoPhysCpuNativePosition' if f05_native else
                         'SelectedReferenceEnv.F04LocalSourceSyntheticIOS1' if f04_route else
                         'SelectedReferenceEnv.F05GeoPhysUsdSyntheticIOS1' if f05_route else
                         'SelectedReferenceEnv.F03VersionedPositionS1'
@@ -2633,7 +2652,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 },
                 'universal_action_schema': {
                     'version': ('f04-isaac-core-position-action-v1'
-                                if f04_route else 'f03-core-call-chain-position-action-v1'),
+                                if f04_route else 'f05-geophys-native-position-action-v1'
+                                if f05_native else 'f03-core-call-chain-position-action-v1'),
                     'dimension': len(action_components), 'components': action_components,
                 },
                 'resolved_config': {

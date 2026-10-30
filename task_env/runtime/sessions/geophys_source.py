@@ -603,8 +603,13 @@ def compile_geophys_usd_position_drive_receipt(
     if host_model_producer_identity is not None:
         if type(host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1:
             raise TypeError('GeoPhys host-model receipt requires its exact producer identity contract')
-        if host_model_producer_identity.requested_target_build_identity != provider_build_identity:
-            raise ValueError('GeoPhys host-model producer differs from the requested target build identity')
+        expected_provider_build = (
+            host_model_producer_identity.actual_provider_build_identity
+            if provenance_kind == 'native_runtime'
+            else host_model_producer_identity.requested_target_build_identity
+        )
+        if expected_provider_build != provider_build_identity:
+            raise ValueError('GeoPhys receipt build identity differs from its requested target or actual producer identity')
         host_model_producer_identity.validate_current_tree()
     runtime_source.validate()
     if runtime_source.scene_source.representation.provider != 'geophys':

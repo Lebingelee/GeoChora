@@ -240,11 +240,93 @@ class F05PositionCandidateInputV1:
             raise ValueError('F05 source-calibrated kinematics hash mismatch')
 
 
-def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1, *, horizon=8,
+@dataclass(frozen=True)
+class F05NativePositionCandidateInputV1:
+    """One exact F05 Menagerie/GeoPhys native cell with deferred model receipt."""
+
+    schema_version: str
+    task_source: TaskSourceV1
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: ExecutionSpecV1
+    reset_plan: EpisodeResetPlanV1
+    kinematics_source_xml: str
+    kinematics_source_sha256: str
+    host_model_producer_identity: GeoPhysHostModelProducerIdentityV1
+
+    def validate(self):
+        if self.schema_version != 'f05-native-position-candidate-input-v1':
+            raise ValueError('unsupported F05 native Position candidate input schema')
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1
+                or type(self.host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1):
+            raise TypeError('F05 native input requires exact versioned Core/source/producer contracts')
+        source, artifact, execution = self.runtime_source, self.artifact, self.execution
+        source.validate()
+        artifact.validate()
+        execution.validate()
+        self.reset_plan.validate()
+        if (source.task_artifact.identity_hash != artifact.identity_hash
+                or source.scene_definition.identity_hash != artifact.scene_identity_hash
+                or source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
+                or source.scene_source.scene_identity_sha256 != source.scene_definition.identity_hash
+                or self.task_source.scene_ref != source.scene_definition.scene_id
+                or self.task_source.task_id != artifact.task_id
+                or self.task_source.version != artifact.artifact_version
+                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
+                or self.reset_plan.role_binding.scene_identity_hash != source.scene_definition.identity_hash
+                or self.reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
+            raise ValueError('F05 native source/TaskSource/Artifact/reset identities disagree')
+        if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+                execution.physics_profile, execution.determinism_mode) != (
+                'geophys', 'cpu', 'cpu', 'geophys-usd-position-f05-native-v1', 'best_effort'):
+            raise ValueError('F05 native input requires the exact GeoPhys CPU native execution identity')
+        renderer = execution.render_default
+        if ((renderer.provider, renderer.backend, renderer.profile, renderer.device,
+                execution.camera_overrides) != ('none', 'cpu', 'none', None, ())):
+            raise ValueError('F05 native cell is state-only and does not admit a renderer or camera overrides')
+        representation = source.scene_source.representation
+        delivery = source.scene_source.loaded_delivery.delivery
+        if (representation.provider, representation.provider_build_identity,
+                representation.representation_format, representation.runtime_admitted,
+                source.scene_source.source_verified, source.scene_source.locally_validated,
+                delivery.provenance_kind, delivery.asset_definition.source_reference,
+                delivery.source_revision, delivery.source_closure_sha256) != (
+                'geophys', self.host_model_producer_identity.requested_target_build_identity,
+                'usd', False, False, True, 'local-validated',
+                'mujoco-menagerie://franka_emika_panda/panda.xml',
+                'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7',
+                'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a'):
+            raise ValueError('F05 native input is outside the frozen locally validated Menagerie USD source')
+        if (self.host_model_producer_identity.requested_target_build_identity
+                != representation.provider_build_identity):
+            raise ValueError('F05 requested target representation differs from the producer identity')
+        self.host_model_producer_identity.validate_current_tree()
+        expected_joints = {
+            **{f'panda-main/joint{i}': f'joint{i}' for i in range(1, 8)},
+            'panda-main/finger_joint1': 'finger_joint1',
+            'panda-main/finger_joint2': 'finger_joint2',
+        }
+        if (dict(source.joints) != expected_joints
+                or dict(source.joint_targets) != expected_joints
+                or dict(source.free_joints) != {'square-peg-instance/peg1': '/F04Scene/free_cube/rootJoint'}
+                or source.frames):
+            raise ValueError('F05 native source mapping differs from the frozen Menagerie Panda/free-body binding')
+        if (not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str
+                or hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest()
+                != self.kinematics_source_sha256):
+            raise ValueError('F05 native source-calibrated kinematics bytes/hash mismatch')
+
+
+def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
-    if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1, F05PositionCandidateInputV1):
+    if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1,
+                              F05PositionCandidateInputV1, F05NativePositionCandidateInputV1):
         raise TypeError('versioned Position candidate requires an exact F03/F04/F05 input contract')
     input_v1.validate()
     source = input_v1.runtime_source
@@ -269,7 +351,10 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             'execution_spec_v1': input_v1.execution,
             'f03_position_input': input_v1 if type(input_v1) is F03PositionCandidateInputV1 else None,
             'f04_position_input': input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
-            'f05_position_input': input_v1 if type(input_v1) is F05PositionCandidateInputV1 else None,
+            'f05_position_input': input_v1 if type(input_v1) in (
+                F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
+            ) else None,
+            'f05_native_position_input': input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
             'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
                 'artifact': artifact.identity_hash,
@@ -294,6 +379,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                                 if type(input_v1) is F03PositionCandidateInputV1
                                 else 'F04-versioned-usd-native-candidate-v1'
                                 if type(input_v1) is F04PositionCandidateInputV1
+                                else 'F05-versioned-geophys-usd-native-v1'
+                                if type(input_v1) is F05NativePositionCandidateInputV1
                                 else 'F05-versioned-geophys-usd-synthetic-s1-v1'),
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
@@ -441,7 +528,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
 
 __all__ = [
     'F03PositionCandidateInputV1', 'F04PositionCandidateInputV1',
-    'F05PositionCandidateInputV1', 'POSITION_CANDIDATE_SEED',
+    'F05PositionCandidateInputV1', 'F05NativePositionCandidateInputV1', 'POSITION_CANDIDATE_SEED',
     'POSITION_CANDIDATE_TASK_ID', 'POSITION_CANDIDATE_VERSION',
     'build_position_candidate', 'build_versioned_position_candidate',
 ]

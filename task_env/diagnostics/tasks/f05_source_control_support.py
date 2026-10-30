@@ -127,6 +127,52 @@ def build_input(family='menagerie-panda'):
     return candidate, setup
 
 
+def build_native_input(family='menagerie-panda'):
+    """Build the single frozen F05 native candidate without initializing GeoPhys."""
+    if family != 'menagerie-panda':
+        raise ValueError('F05 native candidate is restricted to the frozen Menagerie USD cell')
+    from dataclasses import replace
+    from task_env.assembly.usd_delivery import resolve_provider_representation
+    from task_env.tasks.position_candidate.builder import F05NativePositionCandidateInputV1
+
+    s1_input, setup = build_input(family)
+    producer = s1_input.host_model_producer_identity
+    execution = replace(
+        s1_input.execution,
+        physics_profile='geophys-usd-position-f05-native-v1',
+    )
+    representation = resolve_provider_representation(
+        s1_input.runtime_source.scene_source.loaded_delivery,
+        provider='geophys',
+        provider_build_identity=producer.requested_target_build_identity,
+        options={
+            'f05_attempt': '003',
+            'lowering': 'public-host-model-native-v1',
+            'host_model_producer_identity_sha256': producer.identity_sha256,
+            'actual_execution_build_identity': producer.actual_provider_build_identity,
+        },
+    )
+    source = replace(
+        s1_input.runtime_source,
+        scene_source=replace(s1_input.runtime_source.scene_source, representation=representation),
+    )
+    native = F05NativePositionCandidateInputV1(
+        'f05-native-position-candidate-input-v1',
+        s1_input.task_source, s1_input.artifact, source, execution,
+        s1_input.reset_plan, s1_input.kinematics_source_xml,
+        s1_input.kinematics_source_sha256, producer,
+    )
+    native.validate()
+    setup.update({
+        'native_profile_id': execution.physics_profile,
+        'requested_target_build_identity': producer.requested_target_build_identity,
+        'actual_execution_build_identity': producer.actual_provider_build_identity,
+        'native_representation_identity_sha256': representation.identity_hash,
+        'native_execution_identity_sha256': execution.identity_hash,
+    })
+    return native, setup
+
+
 def lower_public_model(source):
     from task_env.runtime.sessions.geophys_source import GeoPhysSourceComposer
     from scene import import_scene_source

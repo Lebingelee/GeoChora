@@ -391,7 +391,10 @@ def _f05_typed_state_extension(trajectory: FrozenTrajectory):
     """Persist the public T+1 typed-state snapshots for the bounded F05 profile only."""
     metadata = trajectory.record_metadata.get("env_metadata", {})
     profile = metadata.get("reference_profile", {}) if isinstance(metadata, Mapping) else {}
-    if not isinstance(profile, Mapping) or profile.get("profile_id") != "f05-geophys-usd-position-synthetic-io-s1-v1":
+    if not isinstance(profile, Mapping) or profile.get("profile_id") not in {
+            "f05-geophys-usd-position-synthetic-io-s1-v1",
+            "geophys-usd-position-f05-native-v1",
+    }:
         return None
     if profile.get("typed_state_h5_witness_schema_version") != "f05-public-typed-state-witness-v1":
         raise ValueError("F05 recording metadata does not declare the typed T+1 H5 witness")

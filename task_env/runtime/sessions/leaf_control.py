@@ -481,6 +481,11 @@ class GeoPhysHostModelProducerIdentityV1:
     def identity_sha256(self) -> str:
         return _digest(self._identity_payload())
 
+    @property
+    def actual_provider_build_identity(self) -> str:
+        """Identity of the committed checkout that actually lowered the host model."""
+        return f'geophys-{self.commit_sha}'
+
     def to_mapping(self) -> dict[str, object]:
         return {**self._identity_payload(), 'identity_sha256': self.identity_sha256}
 

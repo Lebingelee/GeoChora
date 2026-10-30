@@ -27,6 +27,7 @@ CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_
                 'joint_state_query', 'body_pose_query', 'frame_pose_query')
 PROFILE = 'p1_2_scalar_cpu_v0'
 F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
+F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
     'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
@@ -311,6 +312,35 @@ def _validate_f04_isaac_position_source(artifact, execution, source) -> None:
         raise ValueError('F04 Isaac profile does not implement every TaskArtifact capability')
 
 
+def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, source) -> None:
+    """Admit only the frozen local Menagerie/GeoPhys CPU Position cell."""
+    from ...tasks.position_candidate.builder import F05NativePositionCandidateInputV1
+
+    if type(input_v1) is not F05NativePositionCandidateInputV1:
+        raise TypeError('F05 GeoPhys native materialization requires the exact versioned native input')
+    input_v1.validate()
+    if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
+            or execution.identity_hash != input_v1.execution.identity_hash):
+        raise ValueError('F05 GeoPhys native materialization differs from its exact candidate identities')
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode) != (
+            'geophys', 'cpu', 'cpu', F05_GEOPHYS_NATIVE_POSITION_PROFILE, 'best_effort'):
+        raise ValueError('unsupported GeoPhys USD native provider/backend/device/profile intersection')
+    if (source.scene_source.representation.provider,
+            source.scene_source.representation.representation_format,
+            source.scene_source.representation.runtime_admitted,
+            source.scene_source.locally_validated,
+            source.scene_source.source_verified) != ('geophys', 'usd', False, True, False):
+        raise ValueError('F05 native production admission requires the exact locally validated USD source')
+    _validate_f04_source_family(source.scene_source.loaded_delivery.delivery)
+    if source.scene_source.loaded_delivery.delivery.asset_definition.source_reference != _F04_MENAGERIE_PANDA_SOURCE_REFERENCE:
+        raise ValueError('F05 native admission is limited to the frozen Menagerie Panda source')
+    if source.scene_source.representation.provider_build_identity != input_v1.host_model_producer_identity.requested_target_build_identity:
+        raise ValueError('F05 requested target build differs from the source Representation')
+    if execution.render_default.provider != 'none' or execution.camera_overrides:
+        raise ValueError('F05 native Position cell is state-only and cannot create a renderer')
+
+
 def _diagnostic_manifest(artifact, execution, source, profile_id):
     """Return a process-local admission view for one non-capability diagnostic.
 
@@ -359,7 +389,8 @@ def _diagnostic_manifest(artifact, execution, source, profile_id):
 
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
-                _materialization_authority=None, _diagnostic_profile=None) -> RuntimeSession:
+                _materialization_authority=None, _diagnostic_profile=None,
+                _f05_native_input=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
@@ -415,6 +446,38 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
             session._declared_execution_spec_v1 = declared_execution
             session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
             return session
+        if _f05_native_input is not None:
+            _validate_f05_geophys_native_position_input(
+                _f05_native_input, artifact, declared_execution, source,
+            )
+            if manifest is not None or _materialization_authority is not None or _diagnostic_profile is not None:
+                raise ValueError('F05 native exact-cell admission cannot combine with caller manifests or diagnostics')
+            from .geophys_native_io import create_f05_geophys_native_io
+            from .native_io import UsdCoreRuntimeSession
+
+            native_io = create_f05_geophys_native_io(
+                artifact=artifact, execution=declared_execution,
+                source=source, input_v1=_f05_native_input,
+            )
+            try:
+                session = UsdCoreRuntimeSession(
+                    artifact, declared_execution, source, native_io,
+                    native_io.drive_receipt,
+                )
+            except BaseException as materialization_error:
+                try:
+                    native_io.close()
+                except BaseException as cleanup_error:
+                    materialization_error.add_note(
+                        'F05 GeoPhys native-I/O cleanup after Core admission failure also failed: '
+                        f'{type(cleanup_error).__name__}: {cleanup_error}'
+                    )
+                raise
+            session._declared_execution_spec_v1 = declared_execution
+            session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+            return session
+        if declared_execution.physics_profile == F05_GEOPHYS_NATIVE_POSITION_PROFILE:
+            raise ValueError('F05 GeoPhys native profile requires its exact versioned source admission input')
         f03_scope = _current_f03_s1_native_io_context()
         if f03_scope is not None:
             from .native_io import F03CoreRuntimeSession

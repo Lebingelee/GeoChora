@@ -295,8 +295,10 @@ class PandaPositionServoProfileV1:
         if native_drive_receipt is None:
             if not (source.scene_source.source_verified or source.scene_source.locally_validated):
                 raise ValueError('deferred native receipt requires a loader-verified upstream or fixed local F04 USD source')
-            if execution.physics_profile != 'isaac-gpu-physx-f04-position-v1':
-                raise ValueError('deferred native receipt requires the exact F04 Isaac profile')
+            if execution.physics_profile not in {
+                    'isaac-gpu-physx-f04-position-v1',
+                    'geophys-usd-position-f05-native-v1'}:
+                raise ValueError('deferred native receipt requires an exact admitted F04 or F05 profile')
         elif (native_drive_receipt.scene_identity_sha256,
               native_drive_receipt.source_closure_sha256,
               native_drive_receipt.execution_identity_sha256,
@@ -316,7 +318,7 @@ class PandaPositionServoProfileV1:
         if native_drive_receipt is None:
             if (len(set(source.joints.values())) != 9
                     or dict(source.joints) != dict(source.joint_targets)):
-                raise ValueError('deferred F04 source must bind canonical Joints to exact native target names')
+                raise ValueError('deferred USD source must bind canonical Joints to exact native target names')
             target_by_joint = dict(source.joint_targets)
         else:
             if any(source.joints.get(name) != native for name, native in expected_joint_bindings.items()):
