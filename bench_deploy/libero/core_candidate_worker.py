@@ -600,23 +600,53 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     final_observation = reset_observation
     action_trace = []
     terminated = truncated = False
-    for _ in range(max_steps):
-        observation, reward, terminated, truncated, info = env.step_with_solution(solution)
-        final_observation, final_info = observation, info
-        action_trace.append({
-            "solution_action": [float(value) for value in info.get("external_action", ())],
-            "solution_stage": info.get("selected_solution_action_v1", {}).get("stage"),
-            "solution_diagnostics": info.get("selected_solution_action_v1", {}).get("diagnostics"),
-            "reward": float(reward),
-            "terminated": bool(terminated),
-            "truncated": bool(truncated),
-            "control_step": int(info.get("control_step", -1)),
-            "simulation_time_s": float(info.get("simulation_time_s", float("nan"))),
-            "mixed_actuator_command_v1": info.get("mixed_actuator_command_v1"),
-            "applied_mixed_actuator_command_v1": info.get("applied_mixed_actuator_command_v1"),
-        })
-        if terminated or truncated or solution.done or solution.failed:
-            break
+    try:
+        for _ in range(max_steps):
+            observation, reward, terminated, truncated, info = env.step_with_solution(solution)
+            final_observation, final_info = observation, info
+            action_trace.append({
+                "solution_action": [float(value) for value in info.get("external_action", ())],
+                "solution_stage": info.get("selected_solution_action_v1", {}).get("stage"),
+                "solution_diagnostics": info.get("selected_solution_action_v1", {}).get("diagnostics"),
+                "reward": float(reward),
+                "terminated": bool(terminated),
+                "truncated": bool(truncated),
+                "control_step": int(info.get("control_step", -1)),
+                "simulation_time_s": float(info.get("simulation_time_s", float("nan"))),
+                "mixed_actuator_command_v1": info.get("mixed_actuator_command_v1"),
+                "applied_mixed_actuator_command_v1": info.get("applied_mixed_actuator_command_v1"),
+            })
+            if terminated or truncated or solution.done or solution.failed:
+                break
+    except BaseException as exc:
+        fault = getattr(env, "execution_fault", None)
+        failure_receipt = {
+            "schema_version": "r07-v210-task-solution-failure-receipt-v1",
+            "episode_index": episode_index, "row_index": row_index, "seed": seed,
+            "task_uid": env.artifact.task_id,
+            "task_artifact_identity_hash": env.artifact.identity_hash,
+            "solution_identity": solution.identity,
+            "episode_id": episode_id,
+            "source_id": reset_info.get("source_id"),
+            "source_xml_sha256": reset_info.get("source_xml_sha256"),
+            "source_closure_digest": reset_info.get("source_closure_digest"),
+            "last_successful_control_step": int(final_info.get("control_step", -1)),
+            "next_control_step_attempted": int(final_info.get("control_step", -1)) + 1,
+            "last_successful_public_state": _state_observation_receipt(final_observation),
+            "last_successful_public_boundary": {
+                key: final_info.get(key) for key in (
+                    "source_id", "source_closure_digest", "provider_materialization_id",
+                    "episode_id", "reset_sample_id", "control_step", "simulation_time_s",
+                    "state_revision",
+                )
+            },
+            "solution": solution.outcome_report(),
+            "completed_action_trace": action_trace,
+            "execution_fault": fault.to_mapping() if hasattr(fault, "to_mapping") else None,
+            "error": {"type": type(exc).__name__, "message": str(exc)},
+        }
+        _write_json(episode_dir / "failure_receipt.json", failure_receipt)
+        raise
     if not action_trace:
         raise RuntimeError("task Solution produced no public action")
     episode_end = final_info.get("episode_end_v1")
@@ -822,6 +852,7 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
                 pass
     solution_route = solution_factory is not None
     attempted_episode_receipts = []
+    failed_episode_receipts = []
     if solution_route:
         for start_path in sorted(output_dir.glob("episode_*_row_*/start_receipt.json")):
             raw_start = start_path.read_bytes()
@@ -830,6 +861,14 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
                 "bytes": len(raw_start),
                 "sha256": hashlib.sha256(raw_start).hexdigest(),
                 "receipt": json.loads(raw_start.decode("utf-8")),
+            })
+        for failure_path in sorted(output_dir.glob("episode_*_row_*/failure_receipt.json")):
+            raw_failure = failure_path.read_bytes()
+            failed_episode_receipts.append({
+                "relative_path": str(failure_path.relative_to(output_dir.resolve())),
+                "bytes": len(raw_failure),
+                "sha256": hashlib.sha256(raw_failure).hexdigest(),
+                "receipt": json.loads(raw_failure.decode("utf-8")),
             })
     payload = {
         "schema_version": (
@@ -845,6 +884,7 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
         "native_step_count": sum(int(item["runtime_progress"]["native_step_count"]) for item in episodes),
         "episodes": episodes,
         "attempted_episode_receipts": attempted_episode_receipts if solution_route else None,
+        "failed_episode_receipts": failed_episode_receipts if solution_route else None,
         "source_bundle": source_bundle,
         "diagnostic_endpoints": diagnostic_endpoints,
         "reset_count": len(episodes) + len(diagnostic_endpoints),
@@ -875,6 +915,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     if hashlib.sha256(_canonical(payload)).hexdigest() != report.get("result_sha256"):
         raise ValueError("task Solution worker result digest mismatch")
     attempted_episode_receipts = report.get("attempted_episode_receipts")
+    failed_episode_receipts = report.get("failed_episode_receipts")
     if (report.get("schema_version") != "r07-v210-task-solution-worker-result-v1"
             or report.get("status") != "complete"
             or report.get("worker_error") is not None
@@ -883,6 +924,8 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             or len(report.get("episodes", ())) != 3
             or not isinstance(attempted_episode_receipts, list)
             or len(attempted_episode_receipts) != 3
+            or not isinstance(failed_episode_receipts, list)
+            or failed_episode_receipts
             or report.get("reset_count") != 3):
         raise ValueError("task Solution worker bundle is incomplete or has an invalid schema/count")
     source_readback = _verify_solution_source_bundle(bundle_path, report.get("source_bundle"))

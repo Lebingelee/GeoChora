@@ -182,6 +182,7 @@ class LiberoPickPlaceSolutionV1:
         self._initial_bowl = None
         self._plate = None
         self._last_observation = None
+        self._last_action_receipt = None
 
     def reset(self, observation, info: Mapping[str, object], metadata, **_kwargs) -> None:
         self._reset_state()
@@ -288,17 +289,25 @@ class LiberoPickPlaceSolutionV1:
         opening = _OPENING_BY_STAGE.get(self.stage)
         if opening is None:
             raise RuntimeError(f"LIBERO Solution has no gripper policy in stage {self.stage!r}")
-        self._pending_action = True
-        self._actions += 1
-        return ExpertAction(
-            action=np.asarray((*desired, opening), dtype=np.float32),
-            stage=self.stage,
-            diagnostics={
+        action = np.asarray((*desired, opening), dtype=np.float32)
+        self._last_action_receipt = {
+            "stage": self.stage,
+            "action": [float(value) for value in action],
+            "target_position_m": [float(value) for value in target],
+            "target_error_m": [float(value) for value in error],
+            "diagnostics": {
                 "waypoint_distance_m": distance,
                 "cartesian_increment_m": float(np.linalg.norm(step)),
                 "stage_step": self._stage_steps,
-                "source_fk_position_m": tuple(float(value) for value in current_position),
+                "source_fk_position_m": [float(value) for value in current_position],
             },
+        }
+        self._pending_action = True
+        self._actions += 1
+        return ExpertAction(
+            action=action,
+            stage=self.stage,
+            diagnostics=dict(self._last_action_receipt["diagnostics"]),
         )
 
     def observe(self, observation, reward: float, terminated: bool, truncated: bool,
@@ -357,6 +366,7 @@ class LiberoPickPlaceSolutionV1:
             "solution_identity": self.identity,
             "solution_stage": self.stage,
             "solution_actions": self._actions,
+            "last_action_receipt": self._last_action_receipt,
             "solution_done": bool(self.done),
             "solution_failed": bool(self.failed),
             "solution_failure_reason": self.failure_reason,

@@ -2224,6 +2224,29 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
             tampered_worker_path, require_mujoco_runtime_identity=True,
         )
 
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    failed_env = build_libero_solution_candidate(
+        xml=xml, composed_mjcf_sha256=xml_sha,
+        install_root=install_root,
+        composition_plan_path=plan_path, horizon=100,
+    )
+    _FAKE_WORLD.fail_step_after = 0
+    failure_result = run_libero_candidate_worker(
+        failed_env, output_dir=tmp_path / "solution_worker_failure_bundle", steps=1,
+        solution_factory=lambda: LiberoPickPlaceSolutionV1(xml),
+        source_closure_files=closure_files,
+        composition_plan_bytes=plan_path.read_bytes(),
+    )
+    assert failure_result["status"] == "failed"
+    assert len(failure_result["attempted_episode_receipts"]) == 1
+    assert len(failure_result["failed_episode_receipts"]) == 1
+    failure = failure_result["failed_episode_receipts"][0]["receipt"]
+    assert failure["last_successful_control_step"] == 0
+    assert failure["next_control_step_attempted"] == 1
+    assert len(failure["solution"]["last_action_receipt"]["action"]) == 8
+    assert failure["execution_fault"]["phase"] == "mixed_physics_step"
+
     parent_dir = tmp_path / "runs/native_synthetic_001"
     parent_dir.mkdir(parents=True)
     stdout_path = parent_dir / "stdout.log"
