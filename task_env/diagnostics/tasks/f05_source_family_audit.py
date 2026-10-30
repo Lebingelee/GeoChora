@@ -2291,7 +2291,6 @@ def _normalization_oracle(mjcf, usd, recipe, source_file_bytes):
         row["collision_enabled_count"] += int(attrs.get("physics:collisionEnabled") is True)
         row["collision_api_count"] += int("PhysicsCollisionAPI" in prim.get("applied_schemas", []))
         authored_api = prim.get("api_schemas", {})
-        authored_tokens = authored_api.get("authored_tokens", []) if isinstance(authored_api, dict) else []
         row["unregistered_collision_api_count"] += int(
             any("CollisionAPI" in token for token in authored_api.get("unregistered_or_unapplied_authored_tokens", []))
             if isinstance(authored_api, dict) else False
@@ -2316,6 +2315,10 @@ def _normalization_oracle(mjcf, usd, recipe, source_file_bytes):
                 target_row.get("collision_api_count", 0) == target_row.get("target_count", 0)
                 if key[1] == "3" else target_row.get("collision_api_count", 0) == 0
             ),
+            "collision_enabled_consistent_with_source_group": (
+                target_row.get("collision_enabled_count", 0) == target_row.get("target_count", 0)
+                if key[1] == "3" else target_row.get("collision_enabled_count", 0) == 0
+            ),
             "static_shape_transform_contact_equivalence": "NOT_ESTABLISHED",
         })
     geometry_inventory = {
@@ -2330,6 +2333,9 @@ def _normalization_oracle(mjcf, usd, recipe, source_file_bytes):
         "all_bucket_counts_match": bool(geometry_buckets) and all(row["count_match"] for row in geometry_buckets),
         "all_collision_schema_counts_match_source_group": bool(geometry_buckets) and all(
             row["collision_schema_consistent_with_source_group"] for row in geometry_buckets
+        ),
+        "all_collision_enabled_values_match_source_group": bool(geometry_buckets) and all(
+            row["collision_enabled_consistent_with_source_group"] for row in geometry_buckets
         ),
         "buckets": geometry_buckets,
         "limits": [

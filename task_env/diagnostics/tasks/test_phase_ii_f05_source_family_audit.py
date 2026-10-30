@@ -176,6 +176,7 @@ def test_geom_inventory_binds_source_body_group_kind_and_collision_schema_counts
     assert comparison["source_geom_count"] == comparison["target_geometry_prim_count"] == 2
     assert comparison["all_bucket_counts_match"] is True
     assert comparison["all_collision_schema_counts_match_source_group"] is True
+    assert comparison["all_collision_enabled_values_match_source_group"] is True
     assert all(row["static_shape_transform_contact_equivalence"] == "NOT_ESTABLISHED" for row in comparison["buckets"])
 
     collision["applied_schemas"] = []
@@ -183,3 +184,4 @@ def test_geom_inventory_binds_source_body_group_kind_and_collision_schema_counts
     broken = AUDIT._normalization_oracle(mjcf, {"prims": [visual, collision], "prim_count": 2}, {}, {})
     assert broken["geometry_inventory_comparison"]["all_bucket_counts_match"] is True
     assert broken["geometry_inventory_comparison"]["all_collision_schema_counts_match_source_group"] is False
+    assert broken["geometry_inventory_comparison"]["all_collision_enabled_values_match_source_group"] is False
