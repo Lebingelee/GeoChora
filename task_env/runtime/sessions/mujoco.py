@@ -1783,7 +1783,8 @@ class _MuJoCoSession(_SessionValues):
                 'gripper': {
                     'semantic_id': target.gripper.semantic_id,
                     'actuator_id': int(index),
-                    'requested_opening_m': float(target.gripper.servo_opening_m),
+                    'requested_opening_m': float(target.gripper.opening_m),
+                    'servo_target_opening_m': float(target.gripper.servo_opening_m),
                     'applied_opening_m': opening,
                     'source_ctrl_range': list(source_gripper_record['control_range']),
                     'readback_ctrl': float(self._data.ctrl[index]),

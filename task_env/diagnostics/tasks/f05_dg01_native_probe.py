@@ -410,8 +410,21 @@ def run_n1(output: Path, *, expected_model_receipt_identity_sha256: str,
         actual_steps += int(getattr(core_session, '_native_steps', 0))
         write_receipt = getattr(core_session, '_last_dg01_position_application', None)
         advances = tuple(getattr(core_session, '_last_dg01_interval_advances', ()))
-        applied = env.last_position_transition[2]
+        canonical_action, position_target, applied = env.last_position_transition
+        raw_gripper_groups = [group for group in request.groups if group.group_id == 'gripper']
+        if len(raw_gripper_groups) != 1:
+            raise RuntimeError('N1 Core request must contain exactly one gripper group')
+        raw_gripper_request = raw_gripper_groups[0].values
+        target_gripper = position_target.target.gripper
         gripper_receipt = write_receipt.get('gripper', {}) if isinstance(write_receipt, dict) else {}
+        source_ctrl_range = gripper_receipt.get('source_ctrl_range', [])
+        expected_readback_ctrl = float('inf')
+        if (isinstance(source_ctrl_range, list) and len(source_ctrl_range) == 2
+                and all(isinstance(value, (int, float)) for value in source_ctrl_range)):
+            ctrl_low, ctrl_high = (float(value) for value in source_ctrl_range)
+            expected_readback_ctrl = ctrl_low + (
+                float(gripper_receipt.get('applied_opening_m', float('inf'))) / 0.08
+            ) * (ctrl_high - ctrl_low)
         core_checks = {
             'control_step_is_one': env.state.control_step == 1,
             'simulation_time_is_0_01_s': abs(env.state.simulation_time - 0.01) <= 1e-12,
@@ -425,8 +438,32 @@ def run_n1(output: Path, *, expected_model_receipt_identity_sha256: str,
             'effective_force_range_is_minus5_plus5_N': (
                 gripper_receipt.get('effective_force_range_N') == [-5.0, 5.0]
             ),
-            'applied_opening_is_0_02_m': (
-                abs(float(gripper_receipt.get('applied_opening_m', float('inf'))) - 0.02) <= 1e-12
+            'request_gripper_group_is_minus0_5': (
+                len(raw_gripper_request) == 1 and abs(float(raw_gripper_request[0]) + 0.5) <= 1e-12
+            ),
+            'canonical_interpreted_gripper_is_minus0_5': (
+                abs(float(canonical_action.interpreted_values[-1]) + 0.5) <= 1e-12
+            ),
+            'canonical_requested_opening_is_0_02_m': abs(float(target_gripper.opening_m) - 0.02) <= 1e-12,
+            'receipt_requested_opening_matches_canonical_target': (
+                abs(float(gripper_receipt.get('requested_opening_m', float('inf')))
+                    - float(target_gripper.opening_m)) <= 1e-12
+            ),
+            'receipt_servo_target_matches_canonical_target': (
+                abs(float(gripper_receipt.get('servo_target_opening_m', float('inf')))
+                    - float(target_gripper.servo_opening_m)) <= 1e-12
+            ),
+            'applied_opening_matches_servo_target': (
+                abs(float(gripper_receipt.get('applied_opening_m', float('inf')))
+                    - float(target_gripper.servo_opening_m)) <= 1e-10
+            ),
+            'applied_control_matches_servo_target': (
+                abs(float(applied.gripper_servo_opening_m)
+                    - float(target_gripper.servo_opening_m)) <= 1e-10
+            ),
+            'actuator_readback_matches_opening_mapping': (
+                abs(float(gripper_receipt.get('readback_ctrl', float('inf')))
+                    - expected_readback_ctrl) <= 1e-8
             ),
             'applied_force_limit_is_5_N': abs(float(applied.gripper_force_limit_N) - 5.0) <= 1e-12,
         }
@@ -439,6 +476,10 @@ def run_n1(output: Path, *, expected_model_receipt_identity_sha256: str,
                 'native_steps': int(getattr(core_session, '_native_steps', 0)),
                 'advance_receipt_count': len(advances),
                 'advance_receipt_types': [type(item).__name__ for item in advances],
+                'raw_gripper_request': list(raw_gripper_request),
+                'canonical_interpreted_gripper': float(canonical_action.interpreted_values[-1]),
+                'canonical_requested_opening_m': float(target_gripper.opening_m),
+                'canonical_servo_target_opening_m': float(target_gripper.servo_opening_m),
                 'position_write_receipt': write_receipt,
                 'applied_control': applied.to_mapping(),
                 'reward': float(reward),
