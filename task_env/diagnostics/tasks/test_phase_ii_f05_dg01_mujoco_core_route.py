@@ -47,6 +47,7 @@ import json
 import sys
 
 import task_env.runtime.sessions.api as session_api
+import task_env.runtime.sessions.control as session_control
 mujoco_manifest = session_api.provider_manifest('mujoco')
 assert 'mujoco' not in sys.modules
 original_provider_manifest = session_api.provider_manifest
@@ -62,9 +63,12 @@ class BlockNative(importlib.abc.MetaPathFinder):
         return None
 sys.meta_path.insert(0, BlockNative())
 from task_env.tasks.position_candidate.builder import build_f05_dg01_mujoco_candidate
+from task_env.controllers.canonical.position_profile import PandaPositionServoProfileV1
 from task_env.runtime.sessions.api import materialize
+from task_env.runtime.sessions.control import ControlBinding, materialize_control
 from task_env.artifacts import ExecutionSpec
 candidate = build_f05_dg01_mujoco_candidate(sys.argv[1], horizon=300)
+profile = PandaPositionServoProfileV1.from_source(candidate.artifact, candidate.source)
 try:
     materialize(candidate.artifact, candidate.execution, source=candidate.source)
 except ValueError as error:
@@ -80,6 +84,7 @@ def observe_admission(required, manifest, execution=None):
     observed_manifest_profiles.append(manifest.physics_profile)
     return original_admit(required, manifest, execution)
 session_api.admit_capabilities = observe_admission
+session_control.admit_capabilities = observe_admission
 class NativeBoundaryReceipt:
     pass
 def stop_at_native_boundary(artifact, execution, source, *, f05_dg01_input=None):
@@ -96,6 +101,25 @@ session = materialize(
 assert observed_execution_types == ['ExecutionSpec']
 assert observed_manifest_profiles == ['mujoco-mjcf-f05-dg01-core-v1']
 assert session._declared_execution_spec_v1_identity_sha256 == candidate.execution.identity_hash
+controlled = materialize_control(
+    candidate.artifact,
+    candidate.execution,
+    source=candidate.source,
+    binding=ControlBinding('panda-main/gripper', .08),
+    controller_binding_plan=candidate.controller_binding_plan,
+    controller_profile=profile,
+    f05_dg01_mujoco_input=candidate.candidate_input,
+)
+assert type(controlled) is NativeBoundaryReceipt
+assert controlled._control_binding == ControlBinding('panda-main/gripper', .08)
+assert controlled._control_binding_plan is candidate.controller_binding_plan
+assert controlled._declared_execution_spec_v1_identity_sha256 == candidate.execution.identity_hash
+assert observed_execution_types == ['ExecutionSpec', 'ExecutionSpec', 'ExecutionSpec']
+assert observed_manifest_profiles == [
+    'mujoco-mjcf-f05-dg01-core-v1',
+    'mujoco-mjcf-f05-dg01-core-v1',
+    'mujoco-mjcf-f05-dg01-core-v1',
+]
 assert candidate.panda_file_count == 68
 assert candidate.panda_closure_digest == 'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a'
 assert len(candidate.candidate_input.runtime_source.joints) == 9
@@ -114,6 +138,7 @@ print(json.dumps({
     'execution_identity_sha256': candidate.execution.identity_hash,
     'exact_core_admission_execution_type': observed_execution_types,
     'exact_core_admission_profile': observed_manifest_profiles,
+    'materialize_control_admitted_exact_candidate': True,
     'materialization_stopped_at_native_boundary': True,
     'native_imports': [],
 }, sort_keys=True))
@@ -129,7 +154,14 @@ candidate.env.close()
     evidence = json.loads(result.stdout.splitlines()[-1])
     assert evidence['panda_file_count'] == 68
     assert evidence['native_imports'] == []
-    assert evidence['exact_core_admission_execution_type'] == ['ExecutionSpec']
-    assert evidence['exact_core_admission_profile'] == ['mujoco-mjcf-f05-dg01-core-v1']
+    assert evidence['exact_core_admission_execution_type'] == [
+        'ExecutionSpec', 'ExecutionSpec', 'ExecutionSpec',
+    ]
+    assert evidence['exact_core_admission_profile'] == [
+        'mujoco-mjcf-f05-dg01-core-v1',
+        'mujoco-mjcf-f05-dg01-core-v1',
+        'mujoco-mjcf-f05-dg01-core-v1',
+    ]
+    assert evidence['materialize_control_admitted_exact_candidate'] is True
     assert evidence['materialization_stopped_at_native_boundary'] is True
     assert len(evidence['derived_scene_sha256']) == 64

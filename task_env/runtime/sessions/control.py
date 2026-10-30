@@ -580,8 +580,11 @@ def materialize_control(
     synthetic_s1 = s1_scope is not None
     f04_native = False
     f05_native = f05_native_input is not None
+    f05_dg01_mujoco = f05_dg01_mujoco_input is not None
     if f05_native and synthetic_s1:
         raise ValueError('F05 native production admission cannot overlap a synthetic S1 scope')
+    if f05_dg01_mujoco and (f05_native or synthetic_s1 or f04_native):
+        raise ValueError('DG01 MuJoCo exact admission cannot overlap another versioned native route')
     if synthetic_s1:
         from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
 
@@ -651,6 +654,29 @@ def materialize_control(
             ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
             'bounded F05 Menagerie GeoPhys CPU cell; no provider-wide qualification',
         )
+    elif f05_dg01_mujoco:
+        from .api import (
+            F05_DG01_MUJOCO_PROFILE,
+            _f05_dg01_mujoco_admission_manifest,
+            _f05_dg01_legacy_execution_projection,
+            _validate_f05_dg01_mujoco_source,
+        )
+        from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
+
+        if (type(f05_dg01_mujoco_input) is not F05Dg01MujocoCandidateInputV1
+                or type(declared_execution) is not ExecutionSpecV1):
+            raise TypeError('DG01 control admission requires the exact versioned candidate and ExecutionSpecV1')
+        f05_dg01_mujoco_input.validate()
+        if (artifact is not f05_dg01_mujoco_input.artifact
+                or source is not f05_dg01_mujoco_input.runtime_source
+                or declared_execution.identity_hash != f05_dg01_mujoco_input.execution.identity_hash
+                or declared_execution.physics_profile != F05_DG01_MUJOCO_PROFILE):
+            raise ValueError('DG01 control admission differs from its exact source-bound candidate identities')
+        if manifest is not None or diagnostic_profile is not None or leaf_plan is not None:
+            raise ValueError('DG01 control admission cannot combine with caller manifests or other routes')
+        _validate_f05_dg01_mujoco_source(artifact, declared_execution, source)
+        execution = _f05_dg01_legacy_execution_projection(declared_execution)
+        actual_manifest = _f05_dg01_mujoco_admission_manifest()
     elif (type(declared_execution) is ExecutionSpecV1
           and getattr(declared_execution, 'physics_provider', None) == 'isaacsim'):
         from .api import F04_ISAAC_POSITION_PROFILE, _validate_f04_isaac_position_source
@@ -734,10 +760,11 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if (not synthetic_s1 and not f04_native and not f05_native
+    if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg01_mujoco
             and diagnostic_profile is None):
         actual_manifest = provider_manifest(execution.physics_provider)
-    elif not synthetic_s1 and not f04_native and not f05_native:
+    elif (not synthetic_s1 and not f04_native and not f05_native
+          and not f05_dg01_mujoco):
         from .api import _diagnostic_manifest
         if manifest is not None:
             raise CapabilityAdmissionError('diagnostic control admission does not accept a custom manifest')
