@@ -2,6 +2,7 @@
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import replace
 from typing import Protocol
 
 from .provenance import provider_build_identity
@@ -406,6 +407,44 @@ def _validate_f05_dg01_mujoco_source(artifact, execution, source) -> None:
         raise ValueError('F05 DG01 TaskArtifact identity is outside its exact candidate')
 
 
+def _f05_dg01_legacy_execution_projection(execution):
+    """Project only the exact DG01 CPU selection into the legacy session view.
+
+    ExecutionSpec has a CPU backend field but no device field. For this one
+    route, the v1 device value is admitted only when it is exactly the same
+    ``cpu`` value as the backend; the original v1 declaration remains attached
+    to the RuntimeSession for provenance.
+    """
+    if type(execution) is not ExecutionSpecV1:
+        raise TypeError('F05 DG01 requires its exact ExecutionSpecV1')
+    renderer = execution.render_default
+    if (
+        execution.physics_provider, execution.physics_backend, execution.physics_device,
+        execution.determinism_mode, renderer.provider, renderer.backend,
+        renderer.profile, renderer.device, execution.camera_overrides,
+    ) != (
+        'mujoco', 'cpu', 'cpu', 'strict', 'none', 'cpu', 'none', None, (),
+    ):
+        raise ValueError('F05 DG01 legacy session projection only supports exact CPU/no-renderer execution')
+    return legacy_execution_projection(replace(execution, physics_device=None))
+
+
+def _f05_dg01_mujoco_admission_manifest():
+    """Bind existing MuJoCo capabilities to DG01's exact source-bound profile."""
+    manifest = provider_manifest('mujoco')
+    if (
+        manifest.provider_name, manifest.backend, manifest.physics_profile,
+        manifest.render_profile, manifest.determinism_mode,
+    ) != ('mujoco', 'cpu', PROFILE, 'none', 'strict'):
+        raise ValueError('F05 DG01 requires the existing MuJoCo CPU capability manifest')
+    return replace(
+        manifest,
+        adapter_version='task-env-f05-dg01-mujoco-core-v1',
+        physics_profile=F05_DG01_MUJOCO_PROFILE,
+        evidence_reference='exact-source-bound-diagnostic-candidate-no-qualification',
+    )
+
+
 def _diagnostic_manifest(artifact, execution, source, profile_id):
     """Return a process-local admission view for one non-capability diagnostic.
 
@@ -476,13 +515,13 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 or declared_execution.identity_hash != _f05_dg01_mujoco_input.execution.identity_hash):
             raise ValueError('F05 DG01 materialization differs from its exact candidate input identities')
         _validate_f05_dg01_mujoco_source(artifact, declared_execution, source)
+        projected_execution = _f05_dg01_legacy_execution_projection(declared_execution)
         if manifest is not None:
-            admit_capabilities(artifact.required_capabilities, manifest, declared_execution)
-        actual = provider_manifest('mujoco')
-        admit_capabilities(artifact.required_capabilities, actual, declared_execution)
+            admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
+        actual = _f05_dg01_mujoco_admission_manifest()
+        admit_capabilities(artifact.required_capabilities, actual, projected_execution)
         if _materialization_authority is not None or _diagnostic_profile is not None:
             raise ValueError('F05 DG01 exact admission cannot combine with other authorities')
-        projected_execution = legacy_execution_projection(declared_execution)
         session = _materialize_admitted(
             artifact, projected_execution, source,
             f05_dg01_input=_f05_dg01_mujoco_input,
