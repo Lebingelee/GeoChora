@@ -541,3 +541,16 @@ independent diff/evidence review.
 `sol_r07_v210_required123_002/` 冻结一个主动150–210分钟、timebox240分钟（末30分钟收口）的单prompt，由维护者转发。新输出 `r07_v210_required123_002/`，旧目录全只读，新证据512MiB、临时512MiB；新增仅MuJoCo CPU ≤150000step/24reset/3600worker秒，资源计旧累计，禁新增GeoPhys/Isaac native或provider修改。任务2/3仅限20分钟来源增量，不放行未解资产、不擅自换题；当前三任务与九格最终门不缩减，task1子门通过不等于R07/P99收尾前置已完成。
 
 复用工作必须有现真实owner的计算路径/数值调用证据，不仅import/实例化三个类；明确原planner夹爪[-1,1]与此source总开度m/双指符号。官方LIBERO/robosuite仍为任务/reset/predicate和原控制语义来源，Geochora scripted Solution不冒称官方模仿学习基线或OSC_POSE等价；无training/demo checkpoint新增门。Luna交完整局部最终报告、原账本延续与新hash/commit/window释放，Sol复核后再决定下一eligible子项，不能自动启动attempt003。
+
+
+## window002 执行结果与本地交接（2026-10-30）
+
+状态为 `R07_V210_WINDOW002_PARTIAL_PENDING_SOL_REVIEW`。执行分支为 `codex/phase-ii-01-camera`，窗口输入 HEAD 为 `fa761dd166e548b0ee537b47b59958d36f36a895`；实现基线 `a6efc3e7`。代码提交 `5a3e6b26` 增加 task1 的显式 world-pose 路径、Cartesian planner 与共享 Canonical arm resolver / mixed Controller 调用；`31569da9` 按 measured public bowl pose 重定位 approach/descend 目标。最后一次 native probe 绑定 `31569da9`。实现后直接调用现 `CanonicalPandaController.resolve_world_pose_target_v1` 的 source/controller-bound arm target，再由现 mixed Controller 分离 `qdesired` 与 source gravity torque feed-forward。
+
+同一 task1 MuJoCo CPU source / seed19 / rows0–2进行了三个有界 probe，独立reader全部返回 `verified_complete`，source archive含90个closure文件且 plan/XML hash匹配。probe001为每行300 transitions、22,500 physics steps，三行均horizon failure；probe002同为每行300步，结束时仍在descend；probe003为每行最多500步，实际463/463/459 transitions、34,625 physics steps，三行均在 grasp 后以 `bowl_not_lifted_after_public_grasp_feedback` 失败。共0/9 task success、0/9 Solution completion。三个probe的H5、physical-state monitor、parent exit与lock-release收据均保留，physical-state monitor无警告；task1成功门未通过。probe001/002的run record汇总字段把reset写为0；最终账本按各自 `worker_result.json`、三行episode与H5回读核正为各3 resets，probe003本身的worker-result账本为3 resets。旧失败未改写。
+
+本窗口新增实际为3 starts、79,625 physics steps、9 resets、93.202057851秒 worker wall；延续旧15 starts、144,132 steps、17 resets、130.819秒后累计18 starts、223,757 steps、26 resets、224.021057851秒。新额度剩余70,375 steps、15 resets和3,506.797942149秒；本次未运行GeoPhys/Isaac或任务2/3，任务2/3 source增量为 `SOURCE_HELD`（0分钟、无新事实）。
+
+最终保护输入复核恢复了 `task_env/controllers/canonical/__init__.py` 的冻结字节；`CanonicalArmTargetV1` 在LIBERO接缝从明确的 `contracts` owner模块导入。包内保护/输入完整性复核通过，修复前出现过的单路径差异收据仍随窗口输出保留。恢复后provider-free选定路径回归为1 passed；相关 Core S1 29 passed、语义S1 12 passed。此处仅记录实现与部分结果，不改变required123九格、task/provider范围或Qualification判断。
+
+完整G0–G6收据、run ledger、archive/reuse核验、成本/资源及失败分行记录见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_002/report.md`。窗口已交回等待Sol独立审查；不自动启动attempt003。

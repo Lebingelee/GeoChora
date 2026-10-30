@@ -76,6 +76,28 @@ the new Solution-success or provider-switching gates. See the
 The existing owner-gap/checklist JSON files remain signed diagnostic records,
 not authority for the revised scope or general admission.
 
+## R07 v2.1.0 window002 task-Solution result
+
+The focused implementation in Core commit `5a3e6b26` adds an explicit world-pose
+task action, persistent Cartesian planning, a shared canonical arm-target
+resolver, and a mixed Controller that keeps `qdesired` separate from source
+gravity torque feed-forward. Commit `31569da9` rebases approach/descent targets
+on the live public bowl pose and freezes that reference when grasp starts.
+These are internal candidate changes, not a registered `make_env()` route or a
+qualification claim.
+
+Three MuJoCo CPU probes on seed 19/rows 0, 1 and 2 were independently read.
+The first retained the stale reset bowl height; the follow-up tracked the
+settled pose but its 300-step horizon ended during descent. The 500-step probe
+reached grasp, then all three rows failed
+`bowl_not_lifted_after_public_grasp_feedback`; the bowl did not satisfy the
+public lift displacement predicate. No episode reached the original On
+predicate or Solution completion. The grasp position/orientation is therefore
+still unverified against the source bowl contact geometry. Preserve the failed
+rows and do not use these probes as task success or provider-switching evidence.
+The full local report and raw readback are under
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_002/`.
+
 ## Task Harness integration boundary
 
 `bench_deploy` owns benchmark recipes, reset/semantic bindings and task-owned

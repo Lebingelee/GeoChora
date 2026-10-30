@@ -1,6 +1,6 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-2026-10-30 R07执行暂停接续：window001在task1环境/空载诊断后由维护者停止，尚无Solution成功，Sol保留partial并准备[window002集中返工](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-v210-required123-window002)，不重发九格13小时窗口。当前三任务/分层成功/可选补充边界保持；旧progress不改签最终报告。
+2026-10-30 R07窗口接续：window001由维护者在task1环境/空载诊断后停止；window002已在同一phase branch提交task1 pose/Controller/archive-reader返工并交回`R07_V210_WINDOW002_PARTIAL_PENDING_SOL_REVIEW`。三次MuJoCo CPU probe共3 starts、79,625实际physics steps、9 resets、9 H5；row0/1/2均未达到task success或Solution completion。最后探针在grasp后由公开bowl位移检查触发`bowl_not_lifted_after_public_grasp_feedback`。见[window002详细结果](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-v210-required123-window002)和 ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07_v210_required123_002/`。当前三任务/九格与分层成功边界保持；旧progress和失败记录不改签。
 
 <a id="f05-successor-replan-20261030"></a>
 

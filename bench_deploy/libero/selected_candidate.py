@@ -524,7 +524,7 @@ def build_libero_selected_candidate(
             if (env.value.get('arm_resolver') is None
                     or not hasattr(env.controller, 'last_control_receipt')):
                 raise RuntimeError('world-pose task route has no shared arm resolver or feed-forward mixed Controller')
-            from task_env.controllers.canonical import CanonicalArmTargetV1
+            from task_env.controllers.canonical.contracts import CanonicalArmTargetV1
             arm_target = env.value['arm_resolver'].resolve_world_pose_target_v1(
                 current_joint_position_rad=tuple(
                     float(state.joint_position[f'joint{index}']) for index in range(1, 8)

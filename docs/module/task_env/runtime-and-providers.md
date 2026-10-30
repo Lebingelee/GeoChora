@@ -170,6 +170,9 @@ ProductionCanonicalPandaController 从 Geochora-owned source chain 计算 FK/Jac
 gripper profile authority 为 resolved source.config.robot.gripper，identity 包含全部字段。
 它在 reset 后每 measured control boundary compute 一次，拥有 commanded opening、rate limit、
 force activation/initialization/deadband state；不是旧 stateless controller 的隐式 alias。
+Advanced stateless callers may use `CanonicalPandaController.resolve_world_pose_target_v1` to resolve a typed
+world pose through the same shared arm calculation and receive a source/controller-bound `CanonicalArmTargetV1`;
+this helper performs no Provider step and does not itself establish task or backend support.
 CanonicalControlFeedback 的 opening、step/time 要与同一 state 对齐；非负 closing-force 为完成的
 native actuation interval measurement，sign/index 转换留 adapter；不宣称通用 force-sensor 支持。任务实际 observation_space/schema 和 metadata
 决定 state/privileged_state/camera 内容，不固定所有任务为 Panda 八维。通用 SB3 flatten 在 learner 边界。
