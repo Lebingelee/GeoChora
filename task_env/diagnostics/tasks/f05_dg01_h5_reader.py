@@ -267,9 +267,12 @@ def _verify_controller_action_config(profile: dict, plan: dict) -> None:
     expected = plan.get("controller_action_config")
     actual = profile.get("controller_action_config")
     expected_identity = plan.get("controller_identity_sha256")
+    expected_binding = plan.get("controller_binding_plan_identity_sha256")
     if (not isinstance(expected, dict) or actual != expected
             or not isinstance(expected_identity, str)
-            or profile.get("controller_identity_sha256") != expected_identity):
+            or profile.get("controller_identity_sha256") != expected_identity
+            or not isinstance(expected_binding, str)
+            or profile.get("control_binding_plan_identity_sha256") != expected_binding):
         _fail("DG01 H5 Position ActionConfig differs from the frozen controller profile")
 
 

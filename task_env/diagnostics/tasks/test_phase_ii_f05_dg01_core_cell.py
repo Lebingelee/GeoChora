@@ -120,10 +120,12 @@ def test_cold_reader_binds_position_action_config_to_the_frozen_plan():
     profile = {
         "controller_action_config": {"joint_position_correction_gain": 1.0},
         "controller_identity_sha256": "controller-identity",
+        "control_binding_plan_identity_sha256": "binding-plan-identity",
     }
     plan = {
         "controller_action_config": {"joint_position_correction_gain": 1.0},
         "controller_identity_sha256": "controller-identity",
+        "controller_binding_plan_identity_sha256": "binding-plan-identity",
     }
     _verify_controller_action_config(profile, plan)
     plan["controller_action_config"]["joint_position_correction_gain"] = 2.5
@@ -131,6 +133,10 @@ def test_cold_reader_binds_position_action_config_to_the_frozen_plan():
         _verify_controller_action_config(profile, plan)
     plan["controller_action_config"]["joint_position_correction_gain"] = 1.0
     plan["controller_identity_sha256"] = "different-controller"
+    with pytest.raises(ValueError, match="ActionConfig"):
+        _verify_controller_action_config(profile, plan)
+    plan["controller_identity_sha256"] = "controller-identity"
+    plan["controller_binding_plan_identity_sha256"] = "different-binding-plan"
     with pytest.raises(ValueError, match="ActionConfig"):
         _verify_controller_action_config(profile, plan)
 

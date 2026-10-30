@@ -187,6 +187,8 @@ def run(plan_path: Path, output: Path) -> dict:
         raise ValueError("DG01 Core candidate Position ActionConfig differs from its frozen plan")
     if env.controller.identity != plan.get("controller_identity_sha256"):
         raise ValueError("DG01 Core candidate controller identity differs from its frozen plan")
+    if env.position_plan.identity_hash != plan.get("controller_binding_plan_identity_sha256"):
+        raise ValueError("DG01 Core control binding plan differs from its frozen plan")
     session_ids = []
     session_handles = []
     episodes = []
