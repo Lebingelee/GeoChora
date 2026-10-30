@@ -1,6 +1,6 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04登记 `ACCEPTED_BOUNDED_F04`；F05 attempt002 source/control/S1登记 `ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，attempt003 Menagerie GeoPhys CPU exact cell候选通过待Sol复核，F05总体仍 `F05_OVERALL_PARTIAL`**。
+更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04登记 `ACCEPTED_BOUNDED_F04`；F05 attempt002 source/control/S1登记 `ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，attempt003 Menagerie GeoPhys CPU exact cell获`ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`，F05总体仍 `F05_OVERALL_PARTIAL`**。
 F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001的Menagerie source/control与synthetic S1成果、以及官方Panda `maxDepenetrationVelocity=inf` 阻塞继续保留。attempt002修复reader数值联验和producer身份，并完成官方USD属性消费边界调查；官方source cell仍在GeoPhys public import被拒，生产USD materialize维持fail closed。详情见[F05 attempt002结果](#f05-attempt002-reader-producer-and-source-boundary)。
 
 ### 当前双Luna分工（2026-10-29）
@@ -799,3 +799,17 @@ The bounded S1 run `061_native_reader_gate_classification_s1` passed 12/12 with 
 After the reader-only commit `1f266310`, fresh independent reader commands `063/064` re-read the exact CPU007 H5/witness files and each passed 101/101 boundaries, 101/101 observations, 100 transitions and 500 advances. Negative run `066_native_negative_cpu007_after061` rejected 36/36 H5 tamper cases with the expected reasons. Bundle run `067_native_bundle_cpu007_final` accepted the parent/worker/plan/source/H5/witness/reader bindings, verified 202 boundaries/observations, 200 transitions and 1,000 advances, and rejected all six parent/bundle tamper cases. The original parent receipt reports worker exit 0, PGID ended, lock released, and sampled native RSS maximum 1,818,021,888 bytes. The earlier `cpu005` reader failure and all startup failures remain unchanged. A first negative-run attempt stopped before cases because its default output directory already existed; its raw exception/log is preserved, and the successful retry used a new output suffix. The `cpu008` plan was also frozen at current HEAD/S1 but was not launched: at launch review, `MemAvailable` remained below the exact 6 GiB gate. No resource threshold was relaxed; the already-completed CPU007 physical run was reused because the subsequent code commit touched only reader rejection classification, and the updated reader independently revalidated the same H5s.
 
 Candidate status: `F05_MENAGERIE_GEOPHYS_CPU_NATIVE_PASS_PENDING_SOL_REVIEW`; overall F05 remains `F05_OVERALL_PARTIAL`. The bounded route uses the isolated candidate, not main gitlink `a53a8cf…`, and does not set general `source_verified` or qualify other USD/provider intersections. Official Panda `maxDepenetrationVelocity=+inf` and PhysX mimic consumption, the pinned MuJoCo 3.8.1 USD decoder, and split Attachment remain HELD. F06, Isaac/Kit, GPU, MuJoCo native, Newton, Expert/Harness, and Qualification were not started. Full commands, receipts, run ledger, protected input checks, output manifest and limits are in ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_003/`.
+
+<a id="f05-attempt003-sol-acceptance"></a>
+
+## F05 attempt003 Sol接收（2026-10-30）
+
+登记 **`ACCEPTED_BOUNDED_F05_MENAGERIE_GEOPHYS_CPU_NATIVE`**。接收限冻结Menagerie Panda r009 USD＋零COM offset free cube/support、隔离GeoPhys candidate `41f8b517c5f92cd6e59907394dc42714b78702a7`、Taichi Forge0.6.3 CPU、`row_pgs`/`implicitfast`、100Hz outer／5×2ms、同一public Env两次reset与两份100/101 H5、自然CPU worker exit0。物理producer仍为CPU007的Core `cdc14993…`；未将后续review HEAD写成新的native执行证据。
+
+Sol独立核验1,212/1,212输出文件、3,884/3,884保护输入、13/13原包文件、464/464 producer module来源及12/12冻结运行库文件；归档1,153个成员逐项hash匹配。原始H5经当前reader新进程复读，202个boundary/observation、200 transitions、1,000 advances通过；复算原始物理oracle、36/36 H5负例及6/6 parent/bundle负例全部通过。Parent/worker/plan/runtime/source/文件hash、实际exit0、PG结束、锁释放、资源/step账本一致。CPU008因6GiB启动门未达而未启动不影响CPU007同run证据；没有补跑native。
+
+复核发现直接RuntimeSession接线入口未在native factory前拒绝异常timebase或未支持capability。Sol在既有versioned input owner补齐拒绝门，提交`d5ac63da714e010a9e895c942890aafbbb94a99b`；两个provider-free反例修复前均触达被拦截的factory，修复后均在启动前拒绝，定向S1 **14/14**。本修正只收紧未支持输入；冻结正例的source、模型、reset、控制/物理参数、native adapter、reader与oracle未改变。S1同时保留原两episode T8／18边界／80 synthetic advances及30类tamper检查；不将synthetic结果标成物理证据。
+
+F05总体仍 **`F05_OVERALL_PARTIAL`**：官方Panda authored `+inf`／PhysX mimic消费、固定MuJoCo3.8.1 USD decoder、split Attachment仍HELD，F02 clean catalog节点仍未补证。三个普通attempt已使用；本决定不授权普通第四包，也不自动启动诊断窗口、F06/F07、Harness、Expert或Qualification。当前接收不是通用USD支持、非零COM新资产或cold-checkout自包含证明；既有F04 fixture的ignored依赖保留原限制。F05完整门未满足，下一执行包需明确处理余项或由维护者明确批准独立行的推进。
+
+原Luna报告和全部失败历史保持签署时状态。复核报告、命令与收据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_003/`；只提交review修正与当前文档/Skill/manifest，两个gitlink及既有无关untracked字节保持。
