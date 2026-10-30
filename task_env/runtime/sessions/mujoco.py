@@ -1039,12 +1039,14 @@ class _MuJoCoSession(_SessionValues):
                     raise ValueError(
                         f'canonical Joint {joint.joint_id!r} type/child binding differs in MuJoCo'
                     )
-                if not np.allclose(
-                    self._model.jnt_axis[joint_id], joint.axis, rtol=0.0, atol=1.0e-9,
-                ):
-                    raise ValueError(
-                        f'canonical Joint {joint.joint_id!r} axis differs in MuJoCo'
-                    )
+                # A floating Joint is xyz+quaternion; its canonical axis is None.
+                if joint.kind != 'floating':
+                    if not np.allclose(
+                        self._model.jnt_axis[joint_id], joint.axis, rtol=0.0, atol=1.0e-9,
+                    ):
+                        raise ValueError(
+                            f'canonical Joint {joint.joint_id!r} axis differs in MuJoCo'
+                        )
 
     def _validate_fixed_attachment_scene_model(self):
         """Bind the exact fixed-pair Scene to the compiled MjSpec model."""
