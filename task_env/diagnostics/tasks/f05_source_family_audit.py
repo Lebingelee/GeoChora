@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import builtins
+import copy
 import datetime as dt
 import hashlib
 import json
@@ -16,6 +17,7 @@ import os
 import pathlib
 import re
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -180,6 +182,11 @@ def _sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def _identity_sha(value):
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return _sha(raw)
+
+
 def _finite_tree(value, path="$"):
     if isinstance(value, float) and not math.isfinite(value):
         raise ValueError("non-finite value at " + path)
@@ -207,6 +214,12 @@ def _value(value, limit=20):
         if value == -math.inf:
             return {"kind": "non_finite", "token": "-inf"}
         return value
+    if type(value).__name__ in {"Quatf", "Quatd", "Quaternion"} and hasattr(value, "GetReal"):
+        try:
+            imaginary = value.GetImaginary()
+            return {"real": float(value.GetReal()), "imaginary": [float(imaginary[i]) for i in range(3)]}
+        except Exception as error:
+            return {"type": type(value).__name__, "read_error": type(error).__name__ + ": " + str(error)}
     if type(value).__name__ == "AssetPath":
         return {"path": str(value.path), "resolved_path": str(getattr(value, "resolvedPath", ""))}
     try:
@@ -234,6 +247,71 @@ def _value(value, limit=20):
         "count": count,
         "sha256": digest.hexdigest(),
         "sample": sample,
+    }
+
+
+def _token_list_op(value):
+    """Serialize the Sdf token list operation without flattening authorship."""
+    if value is None:
+        return None
+    fields = (
+        "explicitItems", "prependedItems", "appendedItems", "deletedItems", "orderedItems",
+    )
+    result = {"is_explicit": bool(getattr(value, "isExplicit", False))}
+    for name in fields:
+        items = getattr(value, name, None)
+        result[name] = [str(item) for item in items] if items is not None else []
+    return result
+
+
+def _authored_api_schemas(prim, usd_module):
+    try:
+        composed = _token_list_op(prim.GetMetadata("apiSchemas"))
+    except Exception as error:
+        composed = {"read_error": type(error).__name__ + ": " + str(error)}
+    specs = []
+    authored_tokens = []
+    for spec in prim.GetPrimStack():
+        try:
+            has_info = bool(spec.HasInfo("apiSchemas"))
+            operation = _token_list_op(spec.GetInfo("apiSchemas")) if has_info else None
+            if operation:
+                for key in ("explicitItems", "prependedItems", "appendedItems", "orderedItems"):
+                    authored_tokens.extend(operation.get(key, []))
+            specs.append({
+                "layer_identifier": str(spec.layer.identifier),
+                "path": str(spec.path),
+                "specifier": str(spec.specifier),
+                "authored": has_info,
+                "list_op": operation,
+            })
+        except Exception as error:
+            specs.append({"read_error": type(error).__name__ + ": " + str(error)})
+    applied = [str(item) for item in prim.GetAppliedSchemas()]
+    unique_tokens = list(dict.fromkeys(authored_tokens))
+    registered = {}
+    registry = None
+    try:
+        registry = usd_module.SchemaRegistry.GetInstance()
+    except Exception:
+        pass
+    for token in unique_tokens:
+        schema_type = None
+        if registry is not None:
+            try:
+                value = registry.GetAPISchemaTypeName(token)
+                schema_type = str(value) if value else None
+            except Exception:
+                schema_type = None
+        registered[token] = schema_type
+    return {
+        "composed_list_op": composed,
+        "authored_specs": specs,
+        "authored_tokens": unique_tokens,
+        "registered_schema_type_names": registered,
+        "applied_registered_tokens": applied,
+        "unregistered_or_unapplied_authored_tokens": [token for token in unique_tokens if token not in applied],
+        "authored_present": any(row.get("authored") for row in specs),
     }
 
 
@@ -283,8 +361,12 @@ def validate_unit_identity(source_unit, target_unit):
 
 
 def validate_ordered_mapping(source_names, mapped_names):
-    if list(source_names) != list(mapped_names):
-        raise ValueError("joint mapping order differs from source order")
+    source = list(source_names)
+    mapped = list(mapped_names)
+    if len(source) != len(set(source)) or len(mapped) != len(set(mapped)):
+        raise ValueError("joint mapping is not one-to-one")
+    if set(source) != set(mapped):
+        raise ValueError("joint mapping does not cover the exact source identity set")
     return True
 
 
@@ -311,7 +393,17 @@ def validate_tendon_mapping(source_rows, mapped_rows):
         mapped = by_name.get(row.get("name"))
         if mapped is None:
             raise ValueError("tendon transmission lost source tendon: " + str(row.get("name")))
-        if mapped.get("components") != row.get("components"):
+        source_components = [
+            (component.get("kind"), component.get("joint"), component.get("site"),
+             tuple(component.get("coef") or ()), tuple(component.get("gear") or ()))
+            for component in row.get("components", [])
+        ]
+        target_components = [
+            (component.get("kind"), component.get("joint"), component.get("site"),
+             tuple(component.get("coef") or ()), tuple(component.get("gear") or ()))
+            for component in mapped.get("components", [])
+        ]
+        if target_components != source_components:
             raise ValueError("tendon transmission component path or ratio changed: " + str(row.get("name")))
     return True
 
@@ -351,8 +443,91 @@ def _merge(base, attrs):
     return result
 
 
-def parse_mjcf_bytes(raw, source_name="panda.xml"):
-    """Resolve declared XML defaults, while leaving unknown inheritance explicit."""
+def _complete_xml_tree(node):
+    return {
+        "tag": node.tag,
+        "attributes": dict(sorted((str(k), str(v)) for k, v in node.attrib.items())),
+        "text": node.text.strip() if node.text and node.text.strip() else None,
+        "children": [_complete_xml_tree(child) for child in list(node)],
+    }
+
+
+def _compiler_bool(value, name, default=False):
+    if value is None:
+        return default
+    token = str(value).strip().lower()
+    if token in {"true", "1"}:
+        return True
+    if token in {"false", "0"}:
+        return False
+    raise ValueError("unknown compiler " + name + " value: " + str(value))
+
+
+def _limited_effective(explicit, values, autolimits, label):
+    """Resolve MuJoCo 3.8.1 automatic range activation without inventing defaults."""
+    token = None if explicit is None else str(explicit).strip().lower()
+    present = values is not None
+    if token in {"true", "1"}:
+        return {"authored": explicit, "effective": True, "status": "resolved"}
+    if token in {"false", "0"}:
+        return {"authored": explicit, "effective": False, "status": "resolved"}
+    if token not in {None, "auto"}:
+        raise ValueError("unknown " + label + " limited token: " + str(explicit))
+    if token == "auto" and not autolimits:
+        return {"authored": explicit, "effective": None, "status": "unsupported_auto_without_autolimits"}
+    return {
+        "authored": explicit,
+        "effective": bool(autolimits and present),
+        "status": "resolved_autolimits",
+    }
+
+
+def _expand_mjcf_includes(root, source_name, include_files, stack=()):
+    """Expand byte-bound MJCF includes in-place and retain their source hashes."""
+    include_files = include_files or {}
+    base = pathlib.PurePosixPath(source_name).parent
+    expanded = []
+
+    def visit(parent, current_name, ancestry):
+        children = list(parent)
+        for index, child in enumerate(children):
+            if child.tag != "include":
+                visit(child, current_name, ancestry)
+                continue
+            authored_path = child.attrib.get("file")
+            if not authored_path:
+                raise ValueError("MJCF include is missing its file attribute at " + current_name)
+            relative = pathlib.PurePosixPath(authored_path)
+            resolved = pathlib.PurePosixPath(current_name).parent.joinpath(relative)
+            normalized = pathlib.PurePosixPath(os.path.normpath(str(resolved)))
+            if normalized.is_absolute() or any(part in {"", ".", ".."} for part in normalized.parts):
+                raise ValueError("MJCF include escapes its byte-bound source root: " + authored_path)
+            key = normalized.as_posix()
+            if key in ancestry:
+                raise ValueError("MJCF include cycle detected: " + " -> ".join((*ancestry, key)))
+            raw = include_files.get(key)
+            if raw is None:
+                raise ValueError("MJCF include is not present in the verified source closure: " + key)
+            try:
+                included = ET.fromstring(raw)
+            except ET.ParseError as error:
+                raise ValueError("MJCF included XML parse failed at " + key + ": " + str(error)) from error
+            if included.tag not in {"mujoco", "mujocoinclude"}:
+                raise ValueError("MJCF include root must be mujoco or mujocoinclude: " + key)
+            additions = list(included)
+            for item in additions:
+                visit(item, key, (*ancestry, key))
+            parent.remove(child)
+            for offset, item in enumerate(additions):
+                parent.insert(index + offset, item)
+            expanded.append({"authored_file": authored_path, "resolved_path": key, "sha256": _sha(raw)})
+
+    visit(root, pathlib.PurePosixPath(source_name).as_posix(), tuple(stack) or (pathlib.PurePosixPath(source_name).as_posix(),))
+    return expanded
+
+
+def parse_mjcf_bytes(raw, source_name="panda.xml", include_files=None):
+    """Resolve the supported MuJoCo 3.8.1 MJCF defaults and units fail-closed."""
     if not isinstance(raw, bytes):
         raise TypeError("MJCF must be bytes")
     try:
@@ -361,11 +536,14 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
         raise ValueError("MJCF XML parse failed: " + str(error)) from error
     if root.tag != "mujoco":
         raise ValueError("MJCF root element must be mujoco")
+    original_tree = _complete_xml_tree(root)
+    include_expansion = _expand_mjcf_includes(root, source_name, include_files)
     compiler = root.find("compiler")
     compiler_attrs = dict(compiler.attrib) if compiler is not None else {}
-    angle = compiler_attrs.get("angle", "radian")
+    angle = compiler_attrs.get("angle", "degree")
     if angle not in {"radian", "degree"}:
         raise ValueError("unknown compiler angle unit: " + angle)
+    autolimits = _compiler_bool(compiler_attrs.get("autolimits"), "autolimits", default=False)
 
     defaults = {"": {}}
 
@@ -391,14 +569,6 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
         if cls not in defaults:
             return cls, None
         return cls, _merge(defaults[cls].get(tag, {}), elem.attrib)
-
-    def complete_tree(node):
-        return {
-            "tag": node.tag,
-            "attributes": dict(sorted((str(k), str(v)) for k, v in node.attrib.items())),
-            "text": node.text.strip() if node.text and node.text.strip() else None,
-            "children": [complete_tree(child) for child in list(node)],
-        }
 
     bodies, joints, sites, geoms = [], [], [], []
 
@@ -435,6 +605,11 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
             normalized = raw_range
             if raw_range and kind in {"hinge", "ball"} and angle == "degree":
                 normalized = [math.radians(item) for item in raw_range]
+            range_limit = _limited_effective((effective or {}).get("limited"), raw_range, autolimits, "joint")
+            raw_ref = _numeric((effective or {}).get("ref"))
+            normalized_ref = raw_ref
+            if raw_ref and kind == "hinge" and angle == "degree":
+                normalized_ref = [math.radians(item) for item in raw_ref]
             row = {
                 "name": elem.attrib.get("name", "<unnamed>"),
                 "locator": source_name + ":" + body_path + "/" + tag,
@@ -445,7 +620,10 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
                 "position_unit": "meter" if kind == "slide" else ("radian" if kind == "hinge" else "not_scalar"),
                 "angle_unit_source": angle, "range_source": raw_range, "range_normalized": normalized,
                 "limited": (effective or {}).get("limited"),
-                "ref": _numeric((effective or {}).get("ref")),
+                "limited_effective": range_limit["effective"],
+                "limited_resolution_status": range_limit["status"],
+                "ref": raw_ref,
+                "ref_normalized": normalized_ref,
                 "damping": _numeric((effective or {}).get("damping")),
                 "frictionloss": _numeric((effective or {}).get("frictionloss")),
                 "armature": _numeric((effective or {}).get("armature")),
@@ -530,19 +708,31 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
             else:
                 status = "resolved"
             target_kind = next((key for key in ("joint", "tendon", "site", "cranksite", "slidersite") if key in effective), None)
+            raw_ctrlrange = _numeric(effective.get("ctrlrange"))
+            raw_forcerange = _numeric(effective.get("forcerange"))
+            control_limit = _limited_effective(effective.get("ctrllimited"), raw_ctrlrange, autolimits, "actuator control")
+            force_limit = _limited_effective(effective.get("forcelimited"), raw_forcerange, autolimits, "actuator force")
             actuators.append({
                 "name": elem.attrib.get("name", "<unnamed>"), "kind": elem.tag,
                 "locator": source_name + ":/mujoco/actuator/" + elem.tag,
                 "class": cls, "resolution_status": status, "authored": dict(elem.attrib),
                 "effective": effective, "target_kind": target_kind,
                 "target": effective.get(target_kind) if target_kind else None,
-                "ctrlrange": _numeric(effective.get("ctrlrange")),
-                "forcerange": _numeric(effective.get("forcerange")),
+                "ctrlrange": raw_ctrlrange,
+                "ctrlrange_source": raw_ctrlrange,
+                "ctrlrange_normalized": raw_ctrlrange,
+                "ctrlrange_normalization_status": "unchanged_units_or_unresolved_target_unit",
+                "forcerange": raw_forcerange,
                 "kp": _numeric(effective.get("kp")), "kv": _numeric(effective.get("kv")),
                 "gainprm": _numeric(effective.get("gainprm")),
                 "biasprm": _numeric(effective.get("biasprm")),
                 "gear": _numeric(effective.get("gear")),
-                "ctrllimited": effective.get("ctrllimited"), "forcelimited": effective.get("forcelimited"),
+                "ctrllimited": effective.get("ctrllimited"),
+                "ctrllimited_effective": control_limit["effective"],
+                "ctrllimited_resolution_status": control_limit["status"],
+                "forcelimited": effective.get("forcelimited"),
+                "forcelimited_effective": force_limit["effective"],
+                "forcelimited_resolution_status": force_limit["status"],
             })
     meshes = []
     asset = root.find("asset")
@@ -569,8 +759,11 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
         "schema_version": "f05-mjcf-inventory-v1",
         "source_name": source_name,
         "root_attributes": dict(root.attrib),
-        "complete_xml_tree": complete_tree(root),
+        "complete_xml_tree": _complete_xml_tree(root),
         "compiler": compiler_attrs,
+        "compiler_effective": {"angle": angle, "autolimits": autolimits},
+        "include_expansion": include_expansion,
+        "source_xml_before_include_expansion": original_tree,
         "defaults": defaults,
         "bodies": bodies, "joints": joints, "sites": sites, "geoms": geoms,
         "equalities": equalities, "tendons": tendons, "actuators": actuators,
@@ -578,7 +771,7 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
         "option": dict(root.find("option").attrib) if root.find("option") is not None else None,
         "limitations": [
             "XML-only inspection; no MuJoCo compile/load/forward/step.",
-            "MJCF include expansion is not executed; include node is preserved and its target remains unexpanded/unknown.",
+            "Only byte-bound includes, compiler angle/autolimits, and explicit inherited class fields are resolved; unsupported defaults remain unknown.",
             "Unresolved default classes and omitted semantics remain unknown rather than zero.",
         ],
     }
@@ -586,7 +779,7 @@ def parse_mjcf_bytes(raw, source_name="panda.xml"):
 
 def inspect_usd_stage(loaded, snapshot_root):
     """Enumerate the composed authored USD through pxr after Core admission."""
-    from pxr import Usd, UsdGeom
+    from pxr import Usd, UsdGeom, UsdPhysics
 
     file_bytes = getattr(loaded, "file_bytes", None)
     if not isinstance(file_bytes, Mapping) or not file_bytes:
@@ -614,6 +807,7 @@ def inspect_usd_stage(loaded, snapshot_root):
     stage = Usd.Stage.Open(str(entry_path), load=Usd.Stage.LoadNone)
     if stage is None:
         raise ValueError("OpenUSD could not compose Core-verified byte snapshot")
+    xform_cache = UsdGeom.XformCache()
     prims = []
     for prim in stage.TraverseAll():
         attrs = []
@@ -636,13 +830,28 @@ def inspect_usd_stage(loaded, snapshot_root):
                 "targets": [str(path) for path in relationship.GetTargets()],
                 "custom": bool(relationship.IsCustom()),
             })
+        api_schemas = _authored_api_schemas(prim, Usd)
+        try:
+            world_matrix = xform_cache.GetLocalToWorldTransform(prim)
+            world_transform = [[float(world_matrix[row][column]) for column in range(4)] for row in range(4)]
+        except Exception as error:
+            world_transform = {"read_error": type(error).__name__ + ": " + str(error)}
+        try:
+            local_result = UsdGeom.Xformable(prim).GetLocalTransformation()
+            local_matrix = local_result[0] if isinstance(local_result, tuple) else local_result
+            local_transform = [[float(local_matrix[row][column]) for column in range(4)] for row in range(4)]
+        except Exception as error:
+            local_transform = {"read_error": type(error).__name__ + ": " + str(error)}
         prims.append({
             "path": str(prim.GetPath()),
             "name": prim.GetName(),
             "type": prim.GetTypeName(),
             "active": bool(prim.IsActive()),
             "instance": bool(prim.IsInstance()),
-            "applied_schemas": list(prim.GetAppliedSchemas()),
+            "applied_schemas": api_schemas["applied_registered_tokens"],
+            "api_schemas": api_schemas,
+            "local_transform_matrix": local_transform,
+            "world_transform_matrix": world_transform,
             "attributes": attrs,
             "relationships": relationships,
         })
@@ -653,6 +862,8 @@ def inspect_usd_stage(loaded, snapshot_root):
         "entry_file": str(entry_path.relative_to(root)),
         "default_prim": str(stage.GetDefaultPrim().GetPath()) if stage.GetDefaultPrim() else None,
         "meters_per_unit": float(UsdGeom.GetStageMetersPerUnit(stage)),
+        "kilograms_per_unit": float(UsdPhysics.GetStageKilogramsPerUnit(stage)),
+        "kilograms_per_unit_authored": bool(UsdPhysics.StageHasAuthoredKilogramsPerUnit(stage)),
         "up_axis": str(UsdGeom.GetStageUpAxis(stage)),
         "prim_count": len(prims),
         "prims": prims,
@@ -699,68 +910,452 @@ def validate_source_family_manifest(manifest, source_files, revision):
     return True
 
 
-def negative_cases():
+def _synthetic_semantic_report():
+    source_names = ["j1", "j2"]
+    usd_paths = ["/panda", "/panda/j1", "/panda/j2"]
+    source_locator = "panda.xml:/worldbody/body/panda"
+    features = [{
+        "feature": name, "source_present": True,
+        "semantic_equality_claim": False, "disposition": "unknown",
+        "consumer_status": "NOT_ESTABLISHED",
+        "source_locator_refs": [source_locator], "usd_locator_refs": ["/panda"],
+    } for name in sorted(REQUIRED_AUDIT_FEATURES)]
+    source_identity = {
+        "source_revision": "r1", "source_closure_sha256": "0"*64,
+        "source_manifest_sha256": "1"*64,
+    }
+    source_identity["identity_sha256"] = _identity_sha(source_identity)
+    representation_identity = {
+        "delivery_sha256": "2"*64, "derived_closure_sha256": "3"*64,
+        "recipe_sha256": "4"*64,
+    }
+    representation_identity["identity_sha256"] = _identity_sha(representation_identity)
+    return {
+        "schema_version": "f05-semantic-audit-report-v2",
+        "source_identity": source_identity,
+        "representation_identity": representation_identity,
+        "required_features": sorted(REQUIRED_AUDIT_FEATURES),
+        "source_locators": [source_locator], "usd_prim_paths": usd_paths,
+        "api_schema_inventory": [{"path": path, "authored_tokens": [], "authored_present": False} for path in usd_paths],
+        "usd_prim_count": len(usd_paths), "source_joint_names": source_names,
+        "joint_bijection": [
+            {"source_name": name, "target_name": name, "target_path": "/panda/" + name}
+            for name in source_names
+        ],
+        "features": features,
+        "consumer_claims": [
+            {"feature": row["feature"], "claim": "NOT_ESTABLISHED", "evidence_kind": "static_authored_inventory",
+             "source_identity_sha256": source_identity["identity_sha256"],
+             "representation_identity_sha256": representation_identity["identity_sha256"],
+             "evidence_ref": None, "consumer_commit": None}
+            for row in features
+        ],
+        "validator_trace": {name: 1 for name in (
+            "validate_revision", "validate_mesh_closure", "validate_unit_identity",
+            "validate_ordered_mapping", "validate_equality_mapping", "validate_tendon_mapping",
+            "validate_frame_binding", "validate_drive_law", "validate_claim_binding",
+        )},
+    }
+
+
+def negative_cases(report=None, *, expected_source=None, expected_representation=None, expected_usd=None):
+    """Run byte, object, normalization, and report mutations through production gates."""
+    base = copy.deepcopy(report if report is not None else _synthetic_semantic_report())
     cases = []
 
-    def attempt(case_id, mutate, checker):
-        sample = mutate()
+    def attempt(case_id, stage, mutate, checker, *, object_path, mutation, validation_path, input_factory=None):
+        sample = mutate(copy.deepcopy(base))
+        checker_input = input_factory(sample) if input_factory else sample
+        rebound_sha = _identity_sha(checker_input)
         try:
-            checker(sample)
+            checker(checker_input)
         except (ValueError, TypeError, KeyError) as error:
-            cases.append({"id": case_id, "status": "REJECTED", "inner_gate": type(error).__name__, "detail": str(error)})
+            cases.append({"id": case_id, "status": "REJECTED", "expected_stage": stage,
+                          "actual_stage": stage, "error_code": type(error).__name__, "detail": str(error),
+                          "input_object_path": object_path, "mutation": mutation,
+                          "validation_path": validation_path,
+                          "outer_hash_rebound": True,
+                          "outer_rebound_sha256": rebound_sha,
+                          "outer_hash_scope": "canonical negative fixture payload, recomputed after mutation before the semantic gate"})
         else:
-            cases.append({"id": case_id, "status": "ACCEPTED_UNEXPECTEDLY", "detail": "validator accepted mutated sample"})
+            cases.append({"id": case_id, "status": "ACCEPTED_UNEXPECTEDLY", "expected_stage": stage,
+                          "actual_stage": "none", "error_code": None, "detail": "mutated input passed the real gate",
+                          "input_object_path": object_path, "mutation": mutation,
+                          "validation_path": validation_path,
+                          "outer_hash_rebound": True,
+                          "outer_rebound_sha256": rebound_sha,
+                          "outer_hash_scope": "canonical negative fixture payload, recomputed after mutation before the semantic gate"})
 
-    attempt("missing_mesh", lambda: (["arm.obj"], []), lambda pair: validate_mesh_closure(*pair))
-    attempt("wrong_sha", lambda: ("0" * 64, _sha(b"right")), lambda pair: verify_sha(*pair, "negative mesh"))
-    attempt("wrong_revision", lambda: ("source-r1", "source-r2"), lambda pair: validate_revision(*pair))
-    attempt("frame_COM_mismatch", lambda: (
-        {"entity": "panda_link", "frame": "link", "com_frame": "inertial"},
-        {"entity": "panda_link", "frame": "link", "com_frame": "body"},
-    ), lambda pair: validate_frame_binding(*pair))
-    attempt("degree_radian_error", lambda: ("degree", "radian"), lambda pair: validate_unit_identity(*pair))
-    attempt("joint_order_permutation", lambda: (["j1", "j2", "j3"], ["j2", "j1", "j3"]), lambda pair: validate_ordered_mapping(*pair))
-    attempt("lost_equality_mimic", lambda: (
-        [{"name": "finger_mimic", "joint1": "finger_joint1", "joint2": "finger_joint2", "polycoef": [0.0, 1.0]}],
-        [],
-    ), lambda pair: validate_equality_mapping(*pair))
-    attempt("lost_tendon_transmission", lambda: (
-        [{"name": "hand_tendon", "components": [{"kind": "joint", "joint": "finger_joint1", "coef": [1.0]}]}],
-        [],
-    ), lambda pair: validate_tendon_mapping(*pair))
-    attempt("drive_gain_force_semantic_drift", lambda: (
-        {"mode": "position", "unit": "radian", "stiffness": 50.0, "damping": 2.0, "force_limit": 87.0},
-        {"mode": "position", "unit": "radian", "stiffness": 40.0, "damping": 2.0, "force_limit": 87.0},
-    ), lambda pair: validate_drive_law(*pair))
-    attempt("forged_upstream_or_native_consumption", lambda: {
-        "claim": "UPSTREAM_VERIFIED_NATIVE_CONSUMPTION",
-        "evidence_kind": "unbound-report-text",
-        "source_identity_sha256": None,
-        "consumer_commit": None,
-    }, lambda sample: validate_claim_binding(sample))
+    attempt("missing_mesh", "mesh_closure", lambda r: r,
+            lambda value: validate_mesh_closure(value["required_paths"], value["closure_paths"]),
+            object_path="source_files/assets/link0.obj",
+            mutation="remove a required mesh from the byte-bound source closure while rebinding the negative fixture",
+            validation_path="validate_mesh_closure",
+            input_factory=lambda _r: {"required_paths": ["assets/link0.obj"], "closure_paths": []})
+    attempt("wrong_sha", "byte_binding", lambda r: r,
+            lambda value: verify_sha(value["expected_sha256"], value["actual_sha256"], value["label"]),
+            object_path="source_files/assets/link0.obj.sha256",
+            mutation="bind the wrong expected digest to the same supplied bytes",
+            validation_path="verify_sha",
+            input_factory=lambda _r: {"expected_sha256": "0"*64, "actual_sha256": _sha(b"right"), "label": "negative mesh"})
+    attempt("wrong_revision", "source_identity", lambda r: r,
+            lambda value: validate_revision(value["actual"], value["expected"]),
+            object_path="source_family.source_revision",
+            mutation="replace the reported source revision with a different commit identity",
+            validation_path="validate_revision",
+            input_factory=lambda _r: {"actual": "source-r1", "expected": "source-r2"})
+    attempt("frame_COM_mismatch", "frame_binding", lambda r: r,
+            lambda value: validate_frame_binding(value["source"], value["target"]),
+            object_path="source_body.link0.inertial / USD prim /link0.physics:centerOfMass",
+            mutation="bind the source COM frame to a target body-origin frame",
+            validation_path="validate_frame_binding",
+            input_factory=lambda _r: {"source": {"entity": "panda_link", "frame": "link", "com_frame": "inertial"},
+                                      "target": {"entity": "panda_link", "frame": "link", "com_frame": "body"}})
+    attempt("degree_radian_error", "unit_normalization", lambda r: r,
+            lambda value: validate_unit_identity(value["source_unit"], value["target_unit"]),
+            object_path="panda.xml:/mujoco/compiler/@angle and joint.range",
+            mutation="compare authored degrees as radians without the compiler-angle conversion",
+            validation_path="validate_unit_identity",
+            input_factory=lambda _r: {"source_unit": "degree", "target_unit": "radian"})
+    def wrong_joint_address(r):
+        r["joint_bijection"][1]["target_path"] = r["joint_bijection"][0]["target_path"]
+        return r
+    attempt("joint_address_mismatch", "cross_reference", wrong_joint_address,
+            lambda r: validate_semantic_report(r, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd),
+            object_path="semantic_audit_report.joint_bijection[1].target_path",
+            mutation="duplicate the preceding USD joint path so the explicit one-to-one address mapping is broken",
+            validation_path="validate_semantic_report -> validate_ordered_mapping and target-path uniqueness")
+    def lost_equality(r):
+        row = next(item for item in r["features"] if item["feature"] == "equality_mimic")
+        row.update({"disposition": "converted_verified", "semantic_equality_claim": True,
+                    "method_evidence": {"method": "claimed", "source_fields": ["equality"],
+                                        "target_fields": ["mimic"], "consumer_identity": "fake",
+                                        "validation_status": "PASS"}, "usd_locator_refs": []})
+        return r
+    attempt("lost_equality_mimic", "constraint_mapping", lost_equality,
+            lambda r: validate_semantic_report(r, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd),
+            object_path="semantic_audit_report.features[equality_mimic]",
+            mutation="delete the target relation locators but claim converted_verified/native consumer PASS",
+            validation_path="validate_semantic_report")
+    def lost_tendon(r):
+        row = next(item for item in r["features"] if item["feature"] == "tendon_transmission")
+        row.update({"disposition": "converted_verified", "semantic_equality_claim": True,
+                    "method_evidence": {"method": "claimed", "source_fields": ["tendon"],
+                                        "target_fields": ["tendon"], "consumer_identity": "fake",
+                                        "validation_status": "PASS"}, "usd_locator_refs": []})
+        return r
+    attempt("lost_tendon_transmission", "transmission_mapping", lost_tendon,
+            lambda r: validate_semantic_report(r, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd),
+            object_path="semantic_audit_report.features[tendon_transmission]",
+            mutation="delete the target component locators but claim verified tendon path and consumer",
+            validation_path="validate_semantic_report")
+    attempt("drive_gain_force_semantic_drift", "drive_law", lambda r: r,
+            lambda value: validate_drive_law(value["source"], value["target"]),
+            object_path="panda.xml:/mujoco/actuator/general and r009 authored drive attributes",
+            mutation="change target stiffness from the source force law while recomputing the fixture identity",
+            validation_path="validate_drive_law",
+            input_factory=lambda _r: {"source": {"mode": "force", "unit": "newton", "stiffness": 50.0, "damping": 2.0, "force_limit": 87.0},
+                                      "target": {"mode": "force", "unit": "newton", "stiffness": 40.0, "damping": 2.0, "force_limit": 87.0}})
+    attempt("forged_upstream_or_native_consumption", "consumer_claim", lambda r: r,
+            lambda value: validate_claim_binding(value),
+            object_path="semantic_audit_report.consumer_claims[equality_mimic]",
+            mutation="forge upstream/native consumer status without source, commit or evidence binding",
+            validation_path="validate_claim_binding",
+            input_factory=lambda _r: {"claim": "UPSTREAM_VERIFIED_NATIVE_CONSUMPTION", "evidence_kind": "unbound-report-text",
+                                      "source_identity_sha256": None, "consumer_commit": None})
+    def omit_schema(r):
+        r["api_schema_inventory"].pop()
+        r["usd_prim_count"] -= 1
+        return r
+    attempt("unregistered_schema_omission", "authored_schema_inventory", omit_schema,
+            lambda r: validate_semantic_report(r, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd),
+            object_path="semantic_audit_report.api_schema_inventory[-1]",
+            mutation="remove one composed prim schema row and decrement prim_count to keep the outer count self-consistent",
+            validation_path="validate_semantic_report -> composed-stage/authored-schema binding")
+    attempt("inertia_rotation_error", "inertia_normalization", lambda r: r,
+            lambda value: validate_inertia_tensor(value["source_tensor"], value["target_tensor"]),
+            object_path="source_body.inertial.fullinertia / USD physics:diagonalInertia+principalAxes",
+            mutation="rotate principal axes by 90 degrees but compare against the unrotated diagonal tensor",
+            validation_path="validate_inertia_tensor",
+            input_factory=lambda _r: {"source_tensor": [[2,0,0],[0,1,0],[0,0,3]],
+                                      "target_tensor": [[1,0,0],[0,2,0],[0,0,3]]})
+    attempt("limit_force_projection_order", "control_projection", lambda r: r,
+            lambda value: validate_control_projection(value["source"], value["target"]),
+            object_path="source actuator ctrlrange/forcerange and tendon transmission Jacobian",
+            mutation="move force clamp after tendon projection and evaluate source force before control clipping",
+            validation_path="validate_control_projection",
+            input_factory=lambda _r: {"source": {"projection_order": ["clip_control", "evaluate_source_force", "clip_actuator_force", "apply_jacobian_transpose"]},
+                                      "target": {"projection_order": ["evaluate_source_force", "clip_control", "apply_jacobian_transpose", "clip_actuator_force"]}})
+    def missing_field_and_broken_reference(r):
+        failures = []
+        missing = copy.deepcopy(r)
+        missing.pop("representation_identity")
+        try:
+                validate_semantic_report(missing, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd)
+        except (ValueError, TypeError, KeyError) as error:
+            failures.append("missing_required=" + str(error))
+        broken = copy.deepcopy(r)
+        next(item for item in broken["features"] if item["feature"] == "joint_identity")["usd_locator_refs"] = ["/missing/joint"]
+        try:
+                validate_semantic_report(broken, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd)
+        except (ValueError, TypeError, KeyError) as error:
+            failures.append("broken_reference=" + str(error))
+        if len(failures) != 2:
+            return
+        raise ValueError("; ".join(failures))
+    def missing_field_and_broken_reference_inputs(r):
+        missing = copy.deepcopy(r)
+        missing.pop("representation_identity")
+        broken = copy.deepcopy(r)
+        next(item for item in broken["features"] if item["feature"] == "joint_identity")["usd_locator_refs"] = ["/missing/joint"]
+        return {"missing_required": missing, "broken_reference": broken}
+
+    def missing_field_and_broken_reference_gate(value):
+        failures = []
+        for label, report_value in value.items():
+            try:
+                validate_semantic_report(report_value, expected_source=expected_source, expected_representation=expected_representation, expected_usd=expected_usd)
+            except (ValueError, TypeError, KeyError) as error:
+                failures.append(label + "=" + str(error))
+        if len(failures) != 2:
+            raise ValueError("negative fixture did not reject both schema and reference mutations")
+        raise ValueError("; ".join(failures))
+
+    attempt("missing_required_or_broken_reference", "report_schema_and_cross_reference",
+            lambda r: r, missing_field_and_broken_reference_gate,
+            object_path="semantic_audit_report.representation_identity and features[joint_identity].usd_locator_refs",
+            mutation="first omit required representation identity, then redirect a USD locator to a nonexistent prim",
+            validation_path="validate_semantic_report",
+            input_factory=missing_field_and_broken_reference_inputs)
+    attempt("stale_clock_consumer_evidence", "clock_binding", lambda r: r,
+            lambda value: validate_clock_binding(value),
+            object_path="native consumer receipt.clock.source_identity_sha256",
+            mutation="retain a previous source hash in the clock binding while rebinding the outer fixture payload",
+            validation_path="validate_clock_binding",
+            input_factory=lambda _r: {"claim": "NATIVE_CONSUMPTION", "source_identity_sha256": "a"*64,
+                                      "representation_identity_sha256": "b"*64, "evidence_kind": "native_run_receipt",
+                                      "clock": {"source_identity_sha256": "c"*64, "representation_identity_sha256": "b"*64,
+                                                "episode_id": "e0", "sample_index": 4}})
     return cases
 
 
 def validate_claim_binding(claim):
+    if not isinstance(claim, Mapping):
+        raise ValueError("consumer claim must be an object")
     if claim.get("claim") in {"UPSTREAM_VERIFIED_NATIVE_CONSUMPTION", "NATIVE_CONSUMPTION"}:
         for field in ("source_identity_sha256", "consumer_commit", "evidence_ref"):
             if not claim.get(field):
                 raise ValueError("consumption claim lacks bound " + field)
         if claim.get("evidence_kind") not in {"native_run_receipt", "qualification_record"}:
             raise ValueError("consumption claim evidence kind is not native")
+        if claim.get("claim") == "NATIVE_CONSUMPTION":
+            validate_clock_binding(claim)
     return True
+
+
+REQUIRED_AUDIT_FEATURES = {
+    "joint_identity", "frame_and_COM_binding", "equality_mimic",
+    "tendon_transmission", "drive_gain_damping_force",
+    "collision_contact_material", "derived_free_body_and_support",
+}
+
+
+def validate_clock_binding(claim):
+    clock = claim.get("clock")
+    if not isinstance(clock, Mapping):
+        raise ValueError("consumer clock evidence is missing")
+    required = ("source_identity_sha256", "representation_identity_sha256", "episode_id", "sample_index")
+    if any(not clock.get(field) for field in required):
+        raise ValueError("consumer clock binding is incomplete")
+    for field in ("source_identity_sha256", "representation_identity_sha256"):
+        if clock[field] != claim.get(field):
+            raise ValueError("stale consumer clock binding at " + field)
+    if type(clock["sample_index"]) is not int or clock["sample_index"] < 0:
+        raise ValueError("consumer clock sample index is invalid")
+    return True
+
+
+def validate_inertia_tensor(source_tensor, target_tensor, *, atol=1e-6, rtol=2e-6):
+    if len(source_tensor) != 3 or len(target_tensor) != 3:
+        raise ValueError("inertia tensor must be 3 by 3")
+    for i in range(3):
+        if len(source_tensor[i]) != 3 or len(target_tensor[i]) != 3:
+            raise ValueError("inertia tensor must be 3 by 3")
+        for j in range(3):
+            left, right = float(source_tensor[i][j]), float(target_tensor[i][j])
+            if not math.isfinite(left) or not math.isfinite(right):
+                raise ValueError("inertia tensor contains non-finite value")
+            if abs(left - right) > atol + rtol * max(abs(left), abs(right)):
+                raise ValueError("rotated full inertia tensor mismatch")
+    return True
+
+
+def validate_control_projection(source, target):
+    expected_order = ("clip_control", "evaluate_source_force", "clip_actuator_force", "apply_jacobian_transpose")
+    if tuple(source.get("projection_order", ())) != expected_order:
+        raise ValueError("source force projection order is incomplete")
+    if tuple(target.get("projection_order", ())) != expected_order:
+        raise ValueError("target force projection order differs from source law")
+    return True
+
+
+def validate_semantic_report(report, *, expected_source=None, expected_representation=None, expected_usd=None):
+    """Strictly validate the actual normalized comparison result before deriving status."""
+    if not isinstance(report, dict):
+        raise ValueError("semantic report must be an object")
+    required = {
+        "schema_version", "source_identity", "representation_identity", "required_features",
+        "source_locators", "usd_prim_paths", "api_schema_inventory", "usd_prim_count",
+        "joint_bijection", "features", "consumer_claims", "validator_trace",
+    }
+    missing = required - set(report)
+    if missing:
+        raise ValueError("semantic report missing required fields: " + ", ".join(sorted(missing)))
+    if report["schema_version"] != "f05-semantic-audit-report-v2":
+        raise ValueError("unsupported semantic report schema_version")
+    source_identity = report["source_identity"]
+    representation_identity = report["representation_identity"]
+    if not isinstance(source_identity, dict) or not isinstance(representation_identity, dict):
+        raise ValueError("source and representation identities must be objects")
+    for label, identity, fields in (
+        ("source", source_identity, ("source_revision", "source_closure_sha256", "source_manifest_sha256", "identity_sha256")),
+        ("representation", representation_identity, ("delivery_sha256", "derived_closure_sha256", "recipe_sha256", "identity_sha256")),
+    ):
+        if any(not identity.get(field) for field in fields):
+            raise ValueError(label + " identity is incomplete")
+        for field in fields:
+            if "sha256" in field and not SHA_RE.fullmatch(str(identity[field])):
+                raise ValueError(label + " identity has malformed " + field)
+    if expected_source:
+        validate_revision(expected_source.get("source_revision"), source_identity.get("source_revision"))
+        for key in ("source_closure_sha256", "source_manifest_sha256", "identity_sha256"):
+            verify_sha(expected_source.get(key), source_identity.get(key), "source identity " + key)
+    canonical_source_identity = {key: source_identity[key] for key in (
+        "source_revision", "source_closure_sha256", "source_manifest_sha256")}
+    verify_sha(_identity_sha(canonical_source_identity), source_identity["identity_sha256"],
+               "canonical source identity")
+    canonical_representation_identity = {key: representation_identity[key] for key in (
+        "delivery_sha256", "derived_closure_sha256", "recipe_sha256")}
+    verify_sha(_identity_sha(canonical_representation_identity), representation_identity["identity_sha256"],
+               "canonical representation identity")
+    if expected_representation:
+        for key in ("delivery_sha256", "derived_closure_sha256", "recipe_sha256", "identity_sha256"):
+            verify_sha(expected_representation.get(key), representation_identity.get(key),
+                       "representation identity " + key)
+    if expected_usd:
+        expected_paths = [row["path"] for row in expected_usd.get("prims", [])]
+        if report["usd_prim_count"] != len(expected_paths) or report["usd_prim_paths"] != expected_paths:
+            raise ValueError("USD prim inventory differs from the composed source stage")
+        expected_schemas = [
+            {"path": row["path"], "authored_tokens": row.get("api_schemas", {}).get("authored_tokens", []),
+             "authored_present": row.get("api_schemas", {}).get("authored_present", False)}
+            for row in expected_usd.get("prims", [])
+        ]
+        if report["api_schema_inventory"] != expected_schemas:
+            raise ValueError("authored apiSchemas inventory differs from the composed USD prim specs")
+    if (type(report["usd_prim_count"]) is not int
+            or report["usd_prim_count"] != len(report["usd_prim_paths"])
+            or len(report["api_schema_inventory"]) != report["usd_prim_count"]
+            or [row.get("path") for row in report["api_schema_inventory"]] != report["usd_prim_paths"]):
+        raise ValueError("authored apiSchemas inventory is incomplete for the composed prim set")
+    if set(report["required_features"]) != REQUIRED_AUDIT_FEATURES:
+        raise ValueError("semantic report required feature set is incomplete or changed")
+    features = report["features"]
+    if not isinstance(features, list):
+        raise ValueError("semantic report features must be a list")
+    by_name = {row.get("feature"): row for row in features if isinstance(row, dict)}
+    if len(by_name) != len(features) or set(by_name) != REQUIRED_AUDIT_FEATURES:
+        raise ValueError("semantic report feature rows are missing, duplicated, or unexpected")
+    source_locators = set(report["source_locators"])
+    usd_paths = set(report["usd_prim_paths"])
+    if len(source_locators) != len(report["source_locators"]) or len(usd_paths) != len(report["usd_prim_paths"]):
+        raise ValueError("semantic report locator inventory contains duplicates")
+    for feature in features:
+        name = feature["feature"]
+        if type(feature.get("source_present")) is not bool or type(feature.get("semantic_equality_claim")) is not bool:
+            raise ValueError("semantic report feature flags are not booleans: " + name)
+        if feature.get("disposition") not in {"converted_verified", "loss", "unknown", "not_required"}:
+            raise ValueError("semantic report has invalid disposition for " + name)
+        source_refs = feature.get("source_locator_refs")
+        usd_refs = feature.get("usd_locator_refs")
+        if not isinstance(source_refs, list) or not isinstance(usd_refs, list):
+            raise ValueError("semantic report locators must be lists for " + name)
+        if feature["source_present"] and not source_refs:
+            raise ValueError("source-present feature has no object locator: " + name)
+        if any(ref not in source_locators and not str(ref).startswith("recipe:") for ref in source_refs):
+            raise ValueError("semantic report has a broken source object reference: " + name)
+        for reference in usd_refs:
+            prim_path = str(reference).split(".", 1)[0]
+            if prim_path not in usd_paths:
+                raise ValueError("semantic report has a broken USD object reference: " + str(reference))
+        if feature.get("semantic_equality_claim"):
+            if feature["disposition"] != "converted_verified":
+                raise ValueError("semantic equality claim lacks converted_verified disposition: " + name)
+            evidence = feature.get("method_evidence")
+            if not isinstance(evidence, dict) or not all(evidence.get(key) for key in (
+                "method", "source_fields", "target_fields", "consumer_identity", "validation_status",
+            )):
+                raise ValueError("semantic equality claim lacks bound method evidence: " + name)
+            if not source_refs or not usd_refs:
+                raise ValueError("semantic equality claim lacks source or target object references: " + name)
+            if evidence.get("validation_status") != "PASS":
+                raise ValueError("semantic equality method evidence did not pass: " + name)
+        elif feature["disposition"] == "converted_verified":
+            raise ValueError("converted_verified feature is missing its semantic equality claim: " + name)
+    source_joint_names = report.get("source_joint_names")
+    mapped_joint_names = [row.get("target_name") for row in report["joint_bijection"] if isinstance(row, dict)]
+    if source_joint_names is not None:
+        validate_ordered_mapping(source_joint_names, mapped_joint_names)
+    target_paths = [row.get("target_path") for row in report["joint_bijection"]]
+    if any(path not in usd_paths for path in target_paths) or len(target_paths) != len(set(target_paths)):
+        raise ValueError("joint bijection has a missing, duplicate, or invalid USD path")
+    trace = report["validator_trace"]
+    required_trace = {"validate_revision", "validate_mesh_closure", "validate_unit_identity",
+                      "validate_ordered_mapping", "validate_equality_mapping", "validate_tendon_mapping",
+                      "validate_frame_binding", "validate_drive_law", "validate_claim_binding"}
+    if not isinstance(trace, dict) or any(type(trace.get(name)) is not int or trace[name] < 1 for name in required_trace):
+        raise ValueError("semantic validator call trace is incomplete")
+    claims = report["consumer_claims"]
+    if not isinstance(claims, list) or {row.get("feature") for row in claims if isinstance(row, dict)} != REQUIRED_AUDIT_FEATURES or len(claims) != len(REQUIRED_AUDIT_FEATURES):
+        raise ValueError("consumer claim inventory is missing, duplicated, or unexpected")
+    for claim in claims:
+        if (claim.get("source_identity_sha256") != source_identity["identity_sha256"]
+                or claim.get("representation_identity_sha256") != representation_identity["identity_sha256"]):
+            raise ValueError("consumer claim is bound to a stale source or representation identity")
+        validate_claim_binding(claim)
+    return {
+        "inventory_status": "PASS",
+        "readiness": "BLOCKED_BY_FEATURE" if any(
+            row["source_present"] and (row["disposition"] != "converted_verified"
+                                        or row.get("consumer_status") not in {"PUBLIC_STATIC_CONSUMER_VERIFIED", "NATIVE_CONSUMER_VERIFIED"})
+            for row in features
+        ) else "READY_FOR_S1_CONTRACT_REVIEW",
+        "blocked_by_feature": [
+            row["feature"] for row in features
+            if row["source_present"] and (row["disposition"] != "converted_verified"
+                                           or row.get("consumer_status") not in {"PUBLIC_STATIC_CONSUMER_VERIFIED", "NATIVE_CONSUMER_VERIFIED"})
+        ],
+    }
 
 
 def verify_negative_suite(rows):
     required = {
         "missing_mesh", "wrong_sha", "wrong_revision", "frame_COM_mismatch",
-        "degree_radian_error", "joint_order_permutation", "lost_equality_mimic",
+        "degree_radian_error", "joint_address_mismatch", "lost_equality_mimic",
         "lost_tendon_transmission", "drive_gain_force_semantic_drift",
-        "forged_upstream_or_native_consumption",
+        "forged_upstream_or_native_consumption", "unregistered_schema_omission",
+        "inertia_rotation_error", "limit_force_projection_order",
+        "missing_required_or_broken_reference", "stale_clock_consumer_evidence",
     }
     by_id = {row["id"]: row for row in rows}
     missing = required - set(by_id)
-    bad = [key for key in required if by_id.get(key, {}).get("status") != "REJECTED"]
+    bad = [key for key in required if by_id.get(key, {}).get("status") != "REJECTED"
+           or by_id.get(key, {}).get("actual_stage") != by_id.get(key, {}).get("expected_stage")
+           or not by_id.get(key, {}).get("input_object_path")
+           or not by_id.get(key, {}).get("mutation")
+           or not by_id.get(key, {}).get("validation_path")
+           or by_id.get(key, {}).get("outer_hash_rebound") is not True
+           or not SHA_RE.fullmatch(str(by_id.get(key, {}).get("outer_rebound_sha256", "")))]
     if missing or bad:
         raise ValueError("negative suite failed; missing=" + repr(sorted(missing)) + " bad=" + repr(sorted(bad)))
     return True
@@ -782,16 +1377,19 @@ def _prim_features(usd):
     names = {row["name"] for row in prims}
     paths = {row["path"] for row in prims}
     schemas = set()
+    authored_schemas = set()
     attrs = set()
     relations = set()
     for prim in prims:
         schemas.update(prim["applied_schemas"])
+        authored_schemas.update(prim.get("api_schemas", {}).get("authored_tokens", ()))
         attrs.update(item["name"] for item in prim["attributes"])
         relations.update(item["name"] for item in prim["relationships"])
     return {
         "prim_names": sorted(names),
         "prim_paths": sorted(paths),
         "applied_schemas": sorted(schemas),
+        "authored_api_schemas": sorted(authored_schemas),
         "attribute_names": sorted(attrs),
         "relationship_names": sorted(relations),
         "joint_schema_count": sum("Joint" in item for item in schemas),
@@ -815,6 +1413,7 @@ def compare_features(mjcf, usd, source_info, recipe=None):
     usd_features = _prim_features(usd)
     prim_names = set(usd_features["prim_names"])
     schema_text = " ".join(usd_features["applied_schemas"]).lower()
+    authored_schema_text = " ".join(usd_features["authored_api_schemas"]).lower()
     attr_text = " ".join(usd_features["attribute_names"]).lower()
     relationship_text = " ".join(usd_features["relationship_names"]).lower()
     prim_type_text = " ".join(usd["prims"][index]["type"] or "" for index in range(len(usd["prims"]))).lower()
@@ -825,8 +1424,8 @@ def compare_features(mjcf, usd, source_info, recipe=None):
     required_features = [
         ("joint_identity", len(mjcf["joints"]) > 0, bool(shared_joints), "BLOCKED_BY_FEATURE"),
         ("frame_and_COM_binding", any(row.get("inertial") for row in mjcf["bodies"]), bool(_contains_any(usd_features["attribute_names"], ["physics:mass", "physics:centerofmass"])), "BLOCKED_BY_FEATURE"),
-        ("equality_mimic", len(mjcf["equalities"]) > 0, ("mimic" in attr_text or "mimic" in schema_text or "mimic" in relationship_text), "BLOCKED_BY_FEATURE"),
-        ("tendon_transmission", len(mjcf["tendons"]) > 0 or any(row.get("target_kind") == "tendon" for row in mjcf["actuators"]), ("tendon" in attr_text or "tendon" in schema_text or "tendon" in relationship_text or "tendon" in prim_type_text), "BLOCKED_BY_FEATURE"),
+        ("equality_mimic", len(mjcf["equalities"]) > 0, ("mimic" in attr_text or "mimic" in schema_text or "mimic" in authored_schema_text or "mimic" in relationship_text), "BLOCKED_BY_FEATURE"),
+        ("tendon_transmission", len(mjcf["tendons"]) > 0 or any(row.get("target_kind") == "tendon" for row in mjcf["actuators"]), ("tendon" in attr_text or "tendon" in schema_text or "tendon" in authored_schema_text or "tendon" in relationship_text or "tendon" in prim_type_text), "BLOCKED_BY_FEATURE"),
         ("drive_gain_damping_force", len(mjcf["actuators"]) > 0, ("drive" in schema_text and ("stiffness" in attr_text or "damping" in attr_text)), "BLOCKED_BY_FEATURE"),
         ("collision_contact_material", len(mjcf["geoms"]) > 0, ("collision" in attr_text or "physics:collision" in attr_text), "BLOCKED_BY_FEATURE"),
     ]
@@ -840,7 +1439,7 @@ def compare_features(mjcf, usd, source_info, recipe=None):
             "status": "PRESENT_BOTH_REQUIRES_METHOD_REVIEW" if source_present and target_evidence else (
                 "SOURCE_ABSENT" if not source_present else blocker
             ),
-            "disposition": "unknown" if source_present else "unsupported",
+            "disposition": "unknown" if source_present else "not_required",
             "consumer_status": "NOT_ESTABLISHED",
             "evidence_scope": "authored structure only; no runtime/solver consumer claim",
             "source_locator_refs": [],
@@ -875,6 +1474,38 @@ def compare_features(mjcf, usd, source_info, recipe=None):
             path for path in (free_path, support_path) if path and path in exact_paths
         ],
     })
+    source_joint_names = [row["name"] for row in mjcf["joints"]]
+    target_joint_prims = {}
+    target_order = []
+    for prim in usd["prims"]:
+        if prim["name"] in source_joint_names and ("Joint" in str(prim["type"]) or prim["name"] in source_joint_names):
+            target_joint_prims.setdefault(prim["name"], []).append(prim)
+            target_order.append(prim["name"])
+    joint_mapping = []
+    for ordinal, source_name in enumerate(source_joint_names):
+        candidates = target_joint_prims.get(source_name, [])
+        if len(candidates) == 1:
+            joint_mapping.append({
+                "source_name": source_name,
+                "target_name": candidates[0]["name"],
+                "target_path": candidates[0]["path"],
+                "source_order_ordinal": ordinal,
+                "usd_traversal_ordinal": next(
+                    i for i, item in enumerate(usd["prims"]) if item["path"] == candidates[0]["path"]
+                ),
+            })
+    mapping_validation = {"status": "PASS", "error": None}
+    try:
+        validate_ordered_mapping(source_joint_names, [row["target_name"] for row in joint_mapping])
+    except (ValueError, TypeError) as error:
+        mapping_validation = {"status": "REJECTED", "error": type(error).__name__ + ": " + str(error)}
+    coverage[0]["joint_bijection"] = joint_mapping
+    coverage[0]["joint_bijection_validation"] = mapping_validation
+    coverage[0]["source_order"] = source_joint_names
+    coverage[0]["usd_exact_name_stage_order"] = target_order
+    coverage[0]["traversal_order_differs"] = source_joint_names != target_order
+    coverage[0]["source_locator_refs"] = [row["locator"] for row in mjcf["joints"]]
+    coverage[0]["usd_locator_refs"] = [row["target_path"] for row in joint_mapping]
     if source_info.get("manifest_source_verified") is not True:
         source_provenance = "LOCAL_VALIDATED_SOURCE_VERIFIED_FALSE"
     else:
@@ -886,13 +1517,14 @@ def compare_features(mjcf, usd, source_info, recipe=None):
         "usd_identity": usd_features,
         "matched_body_names": shared_bodies,
         "matched_joint_names": shared_joints,
+        "explicit_joint_bijection": joint_mapping,
         "source_provenance_status": source_provenance,
         "features": coverage,
         "normalization_policy": {
             "translation": "meters; USD stage units recorded separately and compared only after explicit conversion",
             "angles": "MJCF compiler angle normalized to radians for hinge/ball; original unit retained",
             "quaternion": "source quaternion order remains explicitly wxyz; USD authored representation retained",
-            "joint_order": "identity and traversal order retained; no inferred permutation accepted",
+            "joint_order": "source-order mapping is an explicit name/path bijection; target traversal order is recorded separately and may be permuted",
             "frames": "body and inertial/COM frames retained separately; equality requires explicit binding",
             "drive": "position law, kp/kv or equivalent, actuator gain/bias, control range and force range remain distinct fields",
             "unknowns": "unresolved defaults, unsupported attributes, and absent target evidence remain unknown/loss; never filled with zero",
@@ -1001,6 +1633,7 @@ def _feature_locator_rows(mjcf, usd, coverage, recipe=None):
                     "name": prim["name"],
                     "type": prim["type"],
                     "applied_schemas": prim["applied_schemas"],
+                    "api_schemas": prim.get("api_schemas", {}),
                     "attributes": selected,
                     "relationships": selected_relationships if relationship_predicate else prim["relationships"],
                 })
@@ -1014,7 +1647,8 @@ def _feature_locator_rows(mjcf, usd, coverage, recipe=None):
             )
             item["source_order"] = [row["name"] for row in mjcf["joints"]]
             item["usd_exact_name_stage_order"] = usd_joint_stage_order
-            item["ordered_identity_match"] = item["source_order"] == usd_joint_stage_order
+            item["ordered_identity_match"] = bool(item.get("joint_bijection_validation", {}).get("status") == "PASS")
+            item["traversal_order_differs"] = item["source_order"] != usd_joint_stage_order
             item["source_locator_refs"] = [row["locator"] for row in mjcf["joints"]]
             item["usd_locator_refs"] = [row["path"] for row in item["usd_items"]]
         elif feature == "frame_and_COM_binding":
@@ -1032,6 +1666,11 @@ def _feature_locator_rows(mjcf, usd, coverage, recipe=None):
                 lambda attr: "mimic" in attr["name"].lower(),
                 lambda relation: "mimic" in relation["name"].lower(),
             )
+            item["usd_authored_schema_rows"] = [
+                {"path": prim["path"], "api_schemas": prim.get("api_schemas", {})}
+                for prim in usd["prims"]
+                if any("mimic" in token.lower() for token in prim.get("api_schemas", {}).get("authored_tokens", []))
+            ]
             item["source_locator_refs"] = [row["locator"] for row in mjcf["equalities"]]
             item["usd_locator_refs"] = [
                 row["path"] + "." + attr["name"] for row in item["usd_items"] for attr in row["attributes"]
@@ -1048,6 +1687,11 @@ def _feature_locator_rows(mjcf, usd, coverage, recipe=None):
                 lambda attr: "tendon" in attr["name"].lower(),
                 lambda relation: "tendon" in relation["name"].lower() or relation["name"] == "mjc:path",
             )
+            item["usd_authored_schema_rows"] = [
+                {"path": prim["path"], "api_schemas": prim.get("api_schemas", {})}
+                for prim in usd["prims"]
+                if any("tendon" in token.lower() for token in prim.get("api_schemas", {}).get("authored_tokens", []))
+            ]
             item["source_locator_refs"] = [row["locator"] for row in mjcf["tendons"]]
             item["source_locator_refs"].extend(row["locator"] for row in mjcf["actuators"] if row.get("target_kind") == "tendon")
             item["usd_locator_refs"] = [
@@ -1096,42 +1740,628 @@ def _feature_locator_rows(mjcf, usd, coverage, recipe=None):
     return coverage
 
 
+def _source_drive_sample(actuator, state, *, tendon_components=None):
+    """Independent scalar actuator law and transmission projection; no engine calls."""
+    gain = actuator.get("gainprm") or []
+    bias = actuator.get("biasprm") or []
+    if len(gain) < 1 or len(bias) < 3:
+        raise ValueError("resolved affine actuator needs gainprm[0] and biasprm[0:3]")
+    ctrl = float(state["ctrl_requested"])
+    ctrl_range = actuator.get("ctrlrange")
+    ctrl_clamped = bool(actuator.get("ctrllimited_effective") and ctrl_range)
+    ctrl_used = min(max(ctrl, float(ctrl_range[0])), float(ctrl_range[1])) if ctrl_clamped else ctrl
+    if actuator.get("target_kind") == "tendon":
+        components = tendon_components or []
+        q_terms, dq_terms = [], []
+        for component in components:
+            name = component.get("joint")
+            coef = component.get("coef") or []
+            q = state.get("q_by_joint", {}).get(name)
+            dq = state.get("dq_by_joint", {}).get(name)
+            if q is None or dq is None or len(coef) != 1:
+                raise ValueError("tendon sample lacks one resolved scalar joint state/coefficient")
+            q_terms.append(float(coef[0]) * float(q))
+            dq_terms.append(float(coef[0]) * float(dq))
+        length = sum(q_terms)
+        rate = sum(dq_terms)
+        jacobian = {component["joint"]: float(component["coef"][0]) for component in components}
+        force_coordinate = "tendon_length_m"
+    else:
+        length = float(state["q"])
+        rate = float(state["dq"])
+        jacobian = {actuator["target"]: float((actuator.get("gear") or [1.0])[0])}
+        force_coordinate = "joint_coordinate"
+    raw_force = (float(gain[0]) * ctrl_used + float(bias[0])
+                 + float(bias[1]) * length + float(bias[2]) * rate)
+    force_range = actuator.get("forcerange")
+    force_clamped = bool(actuator.get("forcelimited_effective") and force_range)
+    force_used = (min(max(raw_force, float(force_range[0])), float(force_range[1]))
+                  if force_clamped else raw_force)
+    projected = {name: force_used * ratio for name, ratio in jacobian.items()}
+    return {
+        **state,
+        "ctrl_used_after_control_limit": ctrl_used,
+        "control_limit_applied_before_gain": ctrl_clamped,
+        "generalized_length_or_position": length,
+        "generalized_rate": rate,
+        "force_coordinate": force_coordinate,
+        "raw_scalar_actuator_force_before_force_limit": raw_force,
+        "scalar_actuator_force_after_force_limit": force_used,
+        "force_limit_applied_after_bias_law": force_clamped,
+        "transmission_jacobian": jacobian,
+        "projected_joint_forces": projected,
+        "formula": "f_raw = gainprm[0]*clip(ctrl if ctrllimited) + biasprm[0] + biasprm[1]*length + biasprm[2]*length_rate; f = clip(f_raw if forcelimited); joint_force = J^T*f",
+    }
+
+
 def _analytic_drive_checks(mjcf):
+    """Pure-Python source-law oracle, deliberately independent of a simulator/provider."""
     checks = []
-    states = [
-        {"q": 0.217, "dq": -0.13, "ctrl": 0.481},
-        {"q": -0.341, "dq": 0.27, "ctrl": 0.119},
-    ]
+    tendon_by_name = {row["name"]: row for row in mjcf.get("tendons", [])}
     for actuator in mjcf["actuators"]:
-        gain = actuator.get("gainprm")
-        bias = actuator.get("biasprm")
+        gain, bias = actuator.get("gainprm"), actuator.get("biasprm")
         if not gain or len(gain) < 1 or not bias or len(bias) < 3:
-            checks.append({
-                "actuator": actuator["name"], "locator": actuator["locator"],
-                "status": "UNKNOWN", "reason": "effective gain and affine bias law were not explicitly resolved",
-            })
+            checks.append({"actuator": actuator["name"], "locator": actuator["locator"],
+                           "status": "UNKNOWN", "reason": "effective gain and affine bias law were not resolved"})
             continue
+        target = actuator["target"]
+        if actuator["target_kind"] == "tendon":
+            tendon = tendon_by_name.get(target)
+            components = tendon.get("components", []) if tendon else []
+            q = {"finger_joint1": 0.028, "finger_joint2": 0.012}
+            dq = {"finger_joint1": 0.01, "finger_joint2": -0.004}
+            states = [
+                {"sample": "asymmetric_opening_and_velocity", "q_by_joint": q, "dq_by_joint": dq, "ctrl_requested": 64.0},
+                {"sample": "symmetric_state", "q_by_joint": {"finger_joint1": 0.02, "finger_joint2": 0.02},
+                 "dq_by_joint": {"finger_joint1": 0.0, "finger_joint2": 0.0}, "ctrl_requested": 128.0},
+                {"sample": "control_lower_bound_saturation", "q_by_joint": q, "dq_by_joint": dq, "ctrl_requested": -1.0},
+                {"sample": "control_upper_bound_saturation", "q_by_joint": q, "dq_by_joint": dq, "ctrl_requested": 256.0},
+                {"sample": "force_limit_and_clamp_order", "q_by_joint": {"finger_joint1": -0.1, "finger_joint2": -0.1},
+                 "dq_by_joint": {"finger_joint1": -10.0, "finger_joint2": -10.0}, "ctrl_requested": 0.0},
+            ]
+        else:
+            q = 0.217
+            dq = -0.13
+            q_range = next((row.get("range_normalized") for row in mjcf["joints"] if row["name"] == target), None)
+            default_ctrl = sum(actuator["ctrlrange"]) / 2 if actuator.get("ctrlrange") else 0.481
+            outside_low = float(actuator["ctrlrange"][0]) - 1 if actuator.get("ctrlrange") else default_ctrl
+            outside_high = float(actuator["ctrlrange"][1]) + 1 if actuator.get("ctrlrange") else default_ctrl
+            states = [
+                {"sample": "nominal", "q": q, "dq": dq, "ctrl_requested": default_ctrl},
+                {"sample": "zero_control_bias", "q": q, "dq": dq, "ctrl_requested": 0.0},
+                {"sample": "asymmetric_state", "q": -0.341, "dq": 0.27, "ctrl_requested": default_ctrl},
+                {"sample": "control_lower_bound_saturation", "q": q, "dq": dq, "ctrl_requested": outside_low},
+                {"sample": "control_upper_bound_saturation", "q": q, "dq": dq, "ctrl_requested": outside_high},
+            ]
+            # Force saturation is evaluated at an explicit state outside nominal limits; it is
+            # a source-law arithmetic probe, not an asserted physically reachable state.
+            states.append({"sample": "force_limit_and_clamp_order", "q": 0.0 if q_range else q,
+                           "dq": 10.0, "ctrl_requested": default_ctrl})
+            components = None
         samples = []
-        force_range = actuator.get("forcerange")
         for state in states:
-            force = float(gain[0]) * state["ctrl"] + float(bias[0]) + float(bias[1]) * state["q"] + float(bias[2]) * state["dq"]
-            samples.append({
-                **state,
-                "raw_analytic_actuator_force": force,
-                "inside_declared_force_range": force_range is None or force_range[0] <= force <= force_range[1],
-                "formula": "gainprm[0]*ctrl + biasprm[0] + biasprm[1]*q + biasprm[2]*dq",
-                "clamped": False,
-            })
+            try:
+                samples.append(_source_drive_sample(actuator, state, tendon_components=components))
+            except ValueError as error:
+                samples.append({**state, "status": "UNKNOWN", "reason": str(error)})
         checks.append({
-            "actuator": actuator["name"], "target": actuator["target"],
-            "locator": actuator["locator"], "status": "ANALYTIC_SOURCE_LAW_ONLY",
-            "kind": actuator["kind"], "target_kind": actuator["target_kind"],
-            "gainprm": gain, "biasprm": bias, "force_range": force_range,
-            "control_range": actuator.get("ctrlrange"),
-            "samples": samples,
+            "actuator": actuator["name"], "target": target, "locator": actuator["locator"],
+            "status": "ANALYTIC_SOURCE_LAW_ONLY", "kind": actuator["kind"],
+            "target_kind": actuator["target_kind"], "gainprm": gain, "biasprm": bias,
+            "force_range": actuator.get("forcerange"), "forcelimited_effective": actuator.get("forcelimited_effective"),
+            "control_range": actuator.get("ctrlrange"), "ctrllimited_effective": actuator.get("ctrllimited_effective"),
+            "tendon_components": components, "samples": samples,
+            "clamp_order": ["control range", "affine scalar force", "actuator force range", "transmission Jacobian transpose"],
             "not_a_simulation": True,
+            "target_representation_consumer_status": "NOT_ESTABLISHED_BY_STATIC_FORMULA",
         })
     return checks
+
+
+def _quat_normalize_wxyz(value):
+    q = [float(x) for x in (value or [1.0, 0.0, 0.0, 0.0])]
+    if len(q) != 4:
+        raise ValueError("quaternion must use four wxyz values")
+    norm = math.sqrt(sum(x * x for x in q))
+    if not math.isfinite(norm) or norm == 0:
+        raise ValueError("quaternion must be finite and nonzero")
+    return [x / norm for x in q]
+
+
+def _quat_multiply_wxyz(left, right):
+    w1, x1, y1, z1 = _quat_normalize_wxyz(left)
+    w2, x2, y2, z2 = _quat_normalize_wxyz(right)
+    return _quat_normalize_wxyz([
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,
+        w1*z2 + x1*y2 - y1*x2 + z1*w2,
+    ])
+
+
+def _quat_matrix_wxyz(value):
+    w, x, y, z = _quat_normalize_wxyz(value)
+    return [
+        [1 - 2*(y*y + z*z), 2*(x*y - z*w), 2*(x*z + y*w)],
+        [2*(x*y + z*w), 1 - 2*(x*x + z*z), 2*(y*z - x*w)],
+        [2*(x*z - y*w), 2*(y*z + x*w), 1 - 2*(x*x + y*y)],
+    ]
+
+
+def _mat3_transpose(a):
+    return [[a[j][i] for j in range(3)] for i in range(3)]
+
+
+def _mat3_mul(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def _mat3_vec(a, v):
+    return [sum(a[i][j] * float(v[j]) for j in range(3)) for i in range(3)]
+
+
+def _matrix_from_symmetric_inertia(values):
+    if len(values) == 3:
+        xx, yy, zz = (float(x) for x in values)
+        xy = xz = yz = 0.0
+    elif len(values) == 6:
+        xx, yy, zz, xy, xz, yz = (float(x) for x in values)
+    else:
+        raise ValueError("inertia must have three diagonal or six full tensor values")
+    return [[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]]
+
+
+def _inertia_six(matrix):
+    return [matrix[0][0], matrix[1][1], matrix[2][2], matrix[0][1], matrix[0][2], matrix[1][2]]
+
+
+def _parallel_axis_at_origin(inertia_com, mass, offset):
+    r = [float(x) for x in offset]
+    rr = sum(x*x for x in r)
+    return [[inertia_com[i][j] + float(mass) * ((rr if i == j else 0.0) - r[i]*r[j])
+             for j in range(3)] for i in range(3)]
+
+
+def _numeric_values_match(left, right, *, atol, rtol):
+    left_flat = [float(value) for row in left for value in row] if left and isinstance(left[0], list) else [float(x) for x in left]
+    right_flat = [float(value) for row in right for value in row] if right and isinstance(right[0], list) else [float(x) for x in right]
+    return len(left_flat) == len(right_flat) and all(
+        math.isfinite(a) and math.isfinite(b) and abs(a-b) <= atol + rtol * max(abs(a), abs(b))
+        for a, b in zip(left_flat, right_flat, strict=True)
+    )
+
+
+def _usd_quaternion_wxyz(value):
+    if not isinstance(value, Mapping) or "real" not in value or not isinstance(value.get("imaginary"), list):
+        return None
+    return _quat_normalize_wxyz([value["real"], *value["imaginary"]])
+
+
+def _source_body_frames(mjcf):
+    """Compose MJCF body frames at q=0 from source transforms, independently of OpenUSD."""
+    source = {row["name"]: row for row in mjcf["bodies"]}
+    frames = {"world": {"position_m": [0.0, 0.0, 0.0], "quat_wxyz": [1.0, 0.0, 0.0, 0.0]}}
+    pending = set(source)
+    while pending:
+        ready = sorted(name for name in pending if source[name].get("parent") in frames)
+        if not ready:
+            raise ValueError("MJCF body parent graph is unresolved or cyclic: " + repr(sorted(pending)))
+        for name in ready:
+            row = source[name]
+            parent = frames[row.get("parent")]
+            local_q = _quat_normalize_wxyz(row.get("quat_wxyz"))
+            parent_r = _quat_matrix_wxyz(parent["quat_wxyz"])
+            local_p = [float(x) for x in (row.get("pos_m") or [0.0, 0.0, 0.0])]
+            rotated_p = _mat3_vec(parent_r, local_p)
+            frames[name] = {
+                "local_position_m": local_p,
+                "local_quat_wxyz": local_q,
+                "position_m": [parent["position_m"][i] + rotated_p[i] for i in range(3)],
+                "quat_wxyz": _quat_multiply_wxyz(parent["quat_wxyz"], local_q),
+                "reference_configuration": "articulated joint coordinates held at q=0; joint ref values recorded separately",
+            }
+            pending.remove(name)
+    return frames
+
+
+def _mesh_bounds_from_bytes(raw, path):
+    """Read mesh vertex bounds without calling a converter, renderer, or mesh cooker."""
+    suffix = pathlib.PurePosixPath(path).suffix.lower()
+    points = []
+    format_name = "unsupported"
+    if suffix == ".obj":
+        format_name = "obj_vertices"
+        for line in raw.decode("utf-8", errors="replace").splitlines():
+            parts = line.strip().split()
+            if parts and parts[0] == "v" and len(parts) >= 4:
+                try:
+                    points.append([float(x) for x in parts[1:4]])
+                except ValueError:
+                    continue
+    elif suffix == ".stl":
+        if len(raw) >= 84:
+            triangle_count = struct.unpack_from("<I", raw, 80)[0]
+            if 84 + triangle_count * 50 == len(raw):
+                format_name = "binary_stl_vertices"
+                for index in range(triangle_count):
+                    offset = 84 + index * 50 + 12
+                    for vertex in range(3):
+                        points.append(list(struct.unpack_from("<fff", raw, offset + vertex * 12)))
+        if not points:
+            format_name = "ascii_stl_vertices"
+            for line in raw.decode("utf-8", errors="replace").splitlines():
+                parts = line.strip().split()
+                if parts and parts[0].lower() == "vertex" and len(parts) >= 4:
+                    try:
+                        points.append([float(x) for x in parts[1:4]])
+                    except ValueError:
+                        continue
+    if not points:
+        return {"path": path, "status": "UNKNOWN", "format": format_name, "vertex_count": 0}
+    return {
+        "path": path, "status": "STATIC_BOUNDS_ONLY", "format": format_name,
+        "vertex_count": len(points),
+        "minimum": [min(point[axis] for point in points) for axis in range(3)],
+        "maximum": [max(point[axis] for point in points) for axis in range(3)],
+        "frame": "mesh-file coordinates; no geom/body transform applied",
+    }
+
+
+def _normalization_oracle(mjcf, usd, recipe, source_file_bytes):
+    """Independent static SI/frame/inertia oracle; all comparisons preserve unknowns."""
+    frames = _source_body_frames(mjcf)
+    mesh_rows = {row.get("name"): row for row in mjcf.get("meshes", [])}
+    mesh_bounds = {}
+    for mesh in mjcf.get("meshes", []):
+        relative = pathlib.PurePosixPath(mjcf.get("compiler", {}).get("meshdir", "")).joinpath(mesh.get("file", ""))
+        path = pathlib.PurePosixPath(os.path.normpath(str(relative))).as_posix()
+        raw = source_file_bytes.get(path)
+        mesh_bounds[mesh.get("name")] = (_mesh_bounds_from_bytes(raw, path) if raw is not None else {
+            "path": path, "status": "MISSING_FROM_VERIFIED_CLOSURE", "vertex_count": 0,
+        })
+    usd_by_name = {}
+    for prim in usd.get("prims", []):
+        usd_by_name.setdefault(prim.get("name"), []).append(prim)
+    source_body_names = {row["name"] for row in mjcf.get("bodies", [])}
+    usd_body_path_to_name = {}
+    for name in source_body_names:
+        candidates = usd_by_name.get(name, [])
+        rigid = [prim for prim in candidates if "PhysicsRigidBodyAPI" in prim.get("applied_schemas", [])]
+        if len(rigid) == 1:
+            usd_body_path_to_name[rigid[0]["path"]] = name
+    bodies = []
+    meters_per_unit = float(usd.get("meters_per_unit") or 0.0)
+    kilograms_per_unit = float(usd.get("kilograms_per_unit") or 0.0)
+    schema_numeric_tolerance = {"atol": 1e-6, "rtol": 2e-6}
+    for body in mjcf.get("bodies", []):
+        frame = frames[body["name"]]
+        inertial = body.get("inertial")
+        inertia = None
+        if inertial:
+            diag = inertial.get("diaginertia_kg_m2")
+            full = inertial.get("fullinertia_kg_m2")
+            local_tensor = _matrix_from_symmetric_inertia(full if full is not None else diag or [])
+            inertial_q = _quat_normalize_wxyz(inertial.get("quat_wxyz"))
+            inertial_r = _quat_matrix_wxyz(inertial_q)
+            body_tensor = _mat3_mul(_mat3_mul(inertial_r, local_tensor), _mat3_transpose(inertial_r))
+            mass = float((inertial.get("mass_kg") or [0.0])[0])
+            com_offset = [float(x) for x in (inertial.get("pos_m") or [0.0, 0.0, 0.0])]
+            body_origin_tensor = _parallel_axis_at_origin(body_tensor, mass, com_offset)
+            body_r = _quat_matrix_wxyz(frame["quat_wxyz"])
+            world_tensor = _mat3_mul(_mat3_mul(body_r, body_tensor), _mat3_transpose(body_r))
+            world_origin_tensor = _mat3_mul(_mat3_mul(body_r, body_origin_tensor), _mat3_transpose(body_r))
+            com_world = _mat3_vec(body_r, com_offset)
+            inertia = {
+                "locator": inertial["locator"], "mass_kg": mass,
+                "COM_local_body_frame_m": com_offset,
+                "COM_world_q0_m": [frame["position_m"][i] + com_world[i] for i in range(3)],
+                "inertial_quat_wxyz": inertial_q,
+                "inertia_at_COM_inertial_frame_kg_m2": local_tensor,
+                "inertia_at_COM_body_frame_kg_m2": body_tensor,
+                "inertia_at_COM_world_q0_kg_m2": world_tensor,
+                "inertia_about_body_origin_body_frame_kg_m2": body_origin_tensor,
+                "inertia_about_body_origin_world_q0_kg_m2": world_origin_tensor,
+                "parallel_axis_formula": "I_origin = I_COM + m*((r dot r)*identity - outer(r,r))",
+                "principal_axes_rotation_applied_before_world_rotation": True,
+            }
+        candidates = usd_by_name.get(body["name"], [])
+        usd_rows = []
+        for prim in candidates:
+            attrs = {row["name"]: row["value"] for row in prim.get("attributes", [])}
+            usd_raw = {
+                "path": prim["path"], "type": prim["type"],
+                "mass": attrs.get("physics:mass"), "center_of_mass": attrs.get("physics:centerOfMass"),
+                "diagonal_inertia": attrs.get("physics:diagonalInertia"),
+                "principal_axes": attrs.get("physics:principalAxes"),
+                "local_transform_matrix": prim.get("local_transform_matrix"),
+                "world_transform_matrix": prim.get("world_transform_matrix"),
+                "api_schemas": prim.get("api_schemas", {}).get("authored_tokens", []),
+            }
+            comparison = {"status": "UNKNOWN", "unit_scale": {"meters_per_unit": meters_per_unit,
+                                                                  "kilograms_per_unit": kilograms_per_unit}}
+            if inertia and type(attrs.get("physics:mass")) in (int, float) and isinstance(attrs.get("physics:centerOfMass"), list) and isinstance(attrs.get("physics:diagonalInertia"), list):
+                principal_q = _usd_quaternion_wxyz(attrs.get("physics:principalAxes"))
+                if principal_q is not None and meters_per_unit > 0 and kilograms_per_unit > 0:
+                    principal_r = _quat_matrix_wxyz(principal_q)
+                    raw_diag = [float(x) for x in attrs["physics:diagonalInertia"]]
+                    diag_tensor = _matrix_from_symmetric_inertia([
+                        x * kilograms_per_unit * meters_per_unit * meters_per_unit for x in raw_diag
+                    ])
+                    usd_tensor_body = _mat3_mul(_mat3_mul(principal_r, diag_tensor), _mat3_transpose(principal_r))
+                    usd_mass_kg = float(attrs["physics:mass"]) * kilograms_per_unit
+                    usd_com_body_m = [float(x) * meters_per_unit for x in attrs["physics:centerOfMass"]]
+                    usd_world = prim.get("world_transform_matrix")
+                    source_row_rotation = _mat3_transpose(_quat_matrix_wxyz(frame["quat_wxyz"]))
+                    transform_match = None
+                    if isinstance(usd_world, list) and len(usd_world) == 4 and usd.get("up_axis") == "Z":
+                        target_rotation = [row[:3] for row in usd_world[:3]]
+                        target_translation = [float(x) * meters_per_unit for x in usd_world[3][:3]]
+                        transform_match = (
+                            _numeric_values_match(source_row_rotation, target_rotation, **schema_numeric_tolerance)
+                            and _numeric_values_match(frame["position_m"], target_translation, **schema_numeric_tolerance)
+                        )
+                    else:
+                        target_rotation = None
+                        target_translation = None
+                    mass_match = math.isclose(usd_mass_kg, inertia["mass_kg"],
+                                              abs_tol=schema_numeric_tolerance["atol"], rel_tol=schema_numeric_tolerance["rtol"])
+                    com_match = _numeric_values_match(usd_com_body_m, inertia["COM_local_body_frame_m"], **schema_numeric_tolerance)
+                    tensor_match = _numeric_values_match(usd_tensor_body, inertia["inertia_at_COM_body_frame_kg_m2"], **schema_numeric_tolerance)
+                    comparison = {
+                        "status": "PASS" if mass_match and com_match and tensor_match and transform_match is True else "MISMATCH_OR_FRAME_UNKNOWN",
+                        "mass": {"source_kg": inertia["mass_kg"], "usd_raw": attrs["physics:mass"],
+                                 "usd_normalized_kg": usd_mass_kg, "match": mass_match},
+                        "COM": {"source_body_frame_m": inertia["COM_local_body_frame_m"],
+                                "usd_raw": attrs["physics:centerOfMass"], "usd_normalized_body_frame_m": usd_com_body_m,
+                                "match": com_match},
+                        "full_inertia_at_COM": {"source_body_frame_kg_m2": inertia["inertia_at_COM_body_frame_kg_m2"],
+                                                 "usd_principal_axes_quat_wxyz": principal_q,
+                                                 "usd_normalized_body_frame_kg_m2": usd_tensor_body,
+                                                 "match": tensor_match},
+                        "world_transform_q0": {"source_rotation_row_convention": source_row_rotation,
+                                                "source_translation_m": frame["position_m"],
+                                                "usd_world_rotation_row_convention": target_rotation,
+                                                "usd_world_translation_m": target_translation,
+                                                "match": transform_match,
+                                                "policy": "compared only for Z-up stage; USD local-to-world is row-vector convention"},
+                        "unit_scale": {"meters_per_unit": meters_per_unit,
+                                       "kilograms_per_unit": kilograms_per_unit},
+                        "tolerance": schema_numeric_tolerance,
+                    }
+            usd_rows.append({**usd_raw, "normalized_comparison": comparison})
+        bodies.append({
+            "name": body["name"], "source_locator": body["locator"],
+            "parent": body.get("parent"), "source_local_body_transform": {
+                "translation_m": frame.get("local_position_m"), "quat_wxyz": frame.get("local_quat_wxyz"),
+            },
+            "source_world_body_transform_q0": {"translation_m": frame["position_m"], "quat_wxyz": frame["quat_wxyz"]},
+            "reference_configuration": frame["reference_configuration"],
+            "inertia_normalization": inertia,
+            "usd_exact_name_candidates": usd_rows,
+            "source_geom_locators": [row["locator"] for row in mjcf.get("geoms", []) if row.get("body") == body["name"]],
+        })
+    joints = []
+    for joint in mjcf.get("joints", []):
+        body = frames[joint["body"]]
+        rotation = _quat_matrix_wxyz(body["quat_wxyz"])
+        axis_local = joint.get("axis") or [0.0, 0.0, 1.0]
+        axis_world = _mat3_vec(rotation, axis_local)
+        axis_norm = math.sqrt(sum(value*value for value in axis_world))
+        axis_world = [value / axis_norm for value in axis_world] if axis_norm else axis_world
+        pos_local = _numeric((joint.get("effective") or {}).get("pos", "0 0 0")) or [0.0, 0.0, 0.0]
+        pos_world_offset = _mat3_vec(rotation, pos_local)
+        usd_joint_candidates = []
+        for prim in usd_by_name.get(joint["name"], []):
+            attrs = {row["name"]: row["value"] for row in prim.get("attributes", [])}
+            raw_axis = attrs.get("physics:axis")
+            usd_axis_local = {"X": [1.0, 0.0, 0.0], "Y": [0.0, 1.0, 0.0], "Z": [0.0, 0.0, 1.0]}.get(raw_axis)
+            source_limit = joint.get("range_normalized")
+            target_limit = None
+            if source_limit and type(attrs.get("physics:lowerLimit")) in (int, float) and type(attrs.get("physics:upperLimit")) in (int, float):
+                lower, upper = float(attrs["physics:lowerLimit"]), float(attrs["physics:upperLimit"])
+                if joint["kind"] in {"hinge", "ball"}:
+                    target_limit = [math.radians(lower), math.radians(upper)]
+                else:
+                    target_limit = [lower * meters_per_unit, upper * meters_per_unit]
+            local_rot0 = _usd_quaternion_wxyz(attrs.get("physics:localRot0"))
+            local_rot1 = _usd_quaternion_wxyz(attrs.get("physics:localRot1"))
+            limits_match = (_numeric_values_match(source_limit, target_limit, **schema_numeric_tolerance)
+                            if source_limit is not None and target_limit is not None else None)
+            body_rels = {row["name"]: row.get("targets", []) for row in prim.get("relationships", [])
+                         if row["name"] in {"physics:body0", "physics:body1"}}
+            body0_targets, body1_targets = body_rels.get("physics:body0", []), body_rels.get("physics:body1", [])
+            body0_name = usd_body_path_to_name.get(body0_targets[0]) if len(body0_targets) == 1 else "world"
+            body1_name = usd_body_path_to_name.get(body1_targets[0]) if len(body1_targets) == 1 else None
+            source_parent = next((row["parent"] for row in mjcf["bodies"] if row["name"] == joint["body"]), "world")
+            body_mapping_match = body0_name == source_parent and body1_name == joint["body"]
+            axis0_world = axis1_world = anchor0_world = anchor1_world = None
+            axis0_match = axis1_match = anchor_match = None
+            if (usd_axis_local is not None and local_rot0 is not None and local_rot1 is not None
+                    and body0_name in frames and body1_name in frames and meters_per_unit > 0):
+                frame0, frame1 = frames[body0_name], frames[body1_name]
+                world_joint_q0 = _quat_multiply_wxyz(frame0["quat_wxyz"], local_rot0)
+                world_joint_q1 = _quat_multiply_wxyz(frame1["quat_wxyz"], local_rot1)
+                axis0_world = _mat3_vec(_quat_matrix_wxyz(world_joint_q0), usd_axis_local)
+                axis1_world = _mat3_vec(_quat_matrix_wxyz(world_joint_q1), usd_axis_local)
+                source_axis_world = [float(value) for value in axis_world]
+                axis0_match = _numeric_values_match(source_axis_world, axis0_world, **schema_numeric_tolerance)
+                axis1_match = _numeric_values_match(source_axis_world, axis1_world, **schema_numeric_tolerance)
+                local_pos0 = attrs.get("physics:localPos0")
+                local_pos1 = attrs.get("physics:localPos1")
+                if isinstance(local_pos0, list) and isinstance(local_pos1, list):
+                    offset0 = _mat3_vec(_quat_matrix_wxyz(frame0["quat_wxyz"]),
+                                        [float(x) * meters_per_unit for x in local_pos0])
+                    offset1 = _mat3_vec(_quat_matrix_wxyz(frame1["quat_wxyz"]),
+                                        [float(x) * meters_per_unit for x in local_pos1])
+                    anchor0_world = [frame0["position_m"][i] + offset0[i] for i in range(3)]
+                    anchor1_world = [frame1["position_m"][i] + offset1[i] for i in range(3)]
+                    source_anchor = [body["position_m"][i] + pos_world_offset[i] for i in range(3)]
+                    anchor_match = (_numeric_values_match(source_anchor, anchor0_world, **schema_numeric_tolerance)
+                                    and _numeric_values_match(source_anchor, anchor1_world, **schema_numeric_tolerance))
+            usd_joint_candidates.append({
+                "path": prim["path"], "type": prim["type"],
+                "axis_token": raw_axis, "axis_vector_joint_local": usd_axis_local,
+                "axis_world_from_body0_q0": axis0_world, "axis_world_from_body1_q0": axis1_world,
+                "axis_matches_source_from_body0": axis0_match, "axis_matches_source_from_body1": axis1_match,
+                "localRot0_wxyz": local_rot0, "localRot1_wxyz": local_rot1,
+                "body0_source_mapping": body0_name, "body1_source_mapping": body1_name,
+                "body_mapping_match": body_mapping_match,
+                "world_anchor_from_body0_q0_m": anchor0_world, "world_anchor_from_body1_q0_m": anchor1_world,
+                "anchor_matches_source": anchor_match,
+                "lower_upper_source_normalized": source_limit, "lower_upper_USD_normalized": target_limit,
+                "limit_match": limits_match,
+                "axis_frame_status": "COMPOSED_FROM_USD_BODY_BINDINGS_AND_LOCAL_JOINT_FRAMES"
+                                     if axis0_match is not None else "JOINT_FRAME_BINDING_UNRESOLVED",
+                "attributes": {key: value for key, value in attrs.items()
+                               if key.startswith("physics:") or key.startswith("drive:")},
+                "relationships": prim.get("relationships", []),
+                "world_transform_matrix": prim.get("world_transform_matrix"),
+            })
+        joints.append({
+            "name": joint["name"], "locator": joint["locator"], "body": joint["body"],
+            "kind": joint["kind"], "unit": joint["position_unit"],
+            "local_axis": axis_local, "world_axis_q0": axis_world,
+            "local_anchor_m": pos_local,
+            "world_anchor_q0_m": [body["position_m"][i] + pos_world_offset[i] for i in range(3)],
+            "authored_range": joint.get("range_source"), "normalized_range": joint.get("range_normalized"),
+            "limited_effective": joint.get("limited_effective"), "ref_source": joint.get("ref"),
+            "ref_normalized": joint.get("ref_normalized"),
+            "damping": joint.get("damping"), "frictionloss": joint.get("frictionloss"),
+            "armature": joint.get("armature"),
+            "USD_joint_candidates": usd_joint_candidates,
+        })
+    geoms = []
+    for geom in mjcf.get("geoms", []):
+        mesh = mesh_rows.get(geom.get("mesh"))
+        body_frame = frames[geom["body"]]
+        body_r = _quat_matrix_wxyz(body_frame["quat_wxyz"])
+        geom_pos = [float(x) for x in (geom.get("pos_m") or [0.0, 0.0, 0.0])]
+        geom_world_offset = _mat3_vec(body_r, geom_pos)
+        geom_quat = _quat_multiply_wxyz(body_frame["quat_wxyz"], geom.get("quat_wxyz"))
+        geoms.append({
+            "locator": geom["locator"], "name": geom["name"], "body": geom["body"],
+            "class": geom.get("class"), "type": geom.get("type"), "mesh": geom.get("mesh"),
+            "mesh_source_file": mesh.get("file") if mesh else None,
+            "mesh_file_bounds": mesh_bounds.get(mesh.get("name")) if mesh else None,
+            "source_local_transform": {"translation_m": geom_pos, "quat_wxyz": _quat_normalize_wxyz(geom.get("quat_wxyz"))},
+            "source_world_transform_q0": {
+                "translation_m": [body_frame["position_m"][i] + geom_world_offset[i] for i in range(3)],
+                "quat_wxyz": geom_quat,
+            },
+            "size_m": geom.get("size_m"), "collision_mask": {
+                "contype": geom.get("contype"), "conaffinity": geom.get("conaffinity"),
+                "group": geom.get("effective", {}).get("group"),
+            },
+            "material": geom.get("effective", {}).get("material"),
+            "contact": {key: geom.get(key) for key in ("friction", "solref", "solimp")},
+        })
+    source_geom_buckets = {}
+    source_body_names = {row["name"] for row in mjcf.get("bodies", [])}
+    for geom in mjcf.get("geoms", []):
+        group = str(geom.get("effective", {}).get("group"))
+        kind = "mesh" if geom.get("type") == "mesh" else "box" if geom.get("type") == "box" else str(geom.get("type"))
+        key = (geom.get("body"), group, kind)
+        row = source_geom_buckets.setdefault(key, {
+            "body": key[0], "source_group": group, "kind": kind,
+            "source_count": 0, "source_locators": [], "source_collision_class_count": 0,
+        })
+        row["source_count"] += 1
+        row["source_locators"].append(geom["locator"])
+        if "collision" in str(geom.get("class", "")).lower() or group == "3":
+            row["source_collision_class_count"] += 1
+    target_geom_buckets = {}
+    for prim in usd.get("prims", []):
+        if prim.get("type") not in {"Mesh", "Cube"} or not str(prim.get("path", "")).startswith("/panda/Geometry/"):
+            continue
+        parts = str(prim["path"]).split("/")
+        if len(parts) < 5 or parts[-2] not in source_body_names:
+            continue
+        attrs = {item.get("name"): item.get("value") for item in prim.get("attributes", [])}
+        group = str(attrs.get("mjc:group"))
+        kind = "mesh" if prim["type"] == "Mesh" else "box"
+        key = (parts[-2], group, kind)
+        row = target_geom_buckets.setdefault(key, {
+            "body": key[0], "target_group": group, "kind": kind,
+            "target_count": 0, "target_paths": [], "collision_enabled_count": 0,
+            "collision_api_count": 0, "unregistered_collision_api_count": 0,
+            "target_attribute_names": set(), "target_material_bindings": [],
+        })
+        row["target_count"] += 1
+        row["target_paths"].append(prim["path"])
+        row["collision_enabled_count"] += int(attrs.get("physics:collisionEnabled") is True)
+        row["collision_api_count"] += int("PhysicsCollisionAPI" in prim.get("applied_schemas", []))
+        authored_api = prim.get("api_schemas", {})
+        authored_tokens = authored_api.get("authored_tokens", []) if isinstance(authored_api, dict) else []
+        row["unregistered_collision_api_count"] += int(
+            any("CollisionAPI" in token for token in authored_api.get("unregistered_or_unapplied_authored_tokens", []))
+            if isinstance(authored_api, dict) else False
+        )
+        row["target_attribute_names"].update(attrs)
+        row["target_material_bindings"].extend(
+            target for rel in prim.get("relationships", []) if rel.get("name", "").startswith("material:binding")
+            for target in rel.get("targets", [])
+        )
+    geometry_buckets = []
+    all_geom_keys = set(source_geom_buckets) | set(target_geom_buckets)
+    for key in sorted(all_geom_keys, key=lambda item: tuple(str(value) for value in item)):
+        source_row = source_geom_buckets.get(key, {})
+        target_row = target_geom_buckets.get(key, {})
+        geometry_buckets.append({
+            **source_row,
+            **{name: value for name, value in target_row.items() if name not in {"target_attribute_names"}},
+            "target_attribute_names": sorted(target_row.get("target_attribute_names", set())),
+            "target_material_bindings": sorted(set(target_row.get("target_material_bindings", []))),
+            "count_match": source_row.get("source_count", 0) == target_row.get("target_count", 0),
+            "collision_schema_consistent_with_source_group": (
+                target_row.get("collision_api_count", 0) == target_row.get("target_count", 0)
+                if key[1] == "3" else target_row.get("collision_api_count", 0) == 0
+            ),
+            "static_shape_transform_contact_equivalence": "NOT_ESTABLISHED",
+        })
+    geometry_inventory = {
+        "source_geom_count": len(mjcf.get("geoms", [])),
+        "target_geometry_prim_count": sum(
+            1 for prim in usd.get("prims", [])
+            if prim.get("type") in {"Mesh", "Cube"}
+            and str(prim.get("path", "")).startswith("/panda/Geometry/")
+            and str(prim.get("path", "")).split("/")[-2] in source_body_names
+        ),
+        "body_group_kind_bucket_count": len(geometry_buckets),
+        "all_bucket_counts_match": bool(geometry_buckets) and all(row["count_match"] for row in geometry_buckets),
+        "all_collision_schema_counts_match_source_group": bool(geometry_buckets) and all(
+            row["collision_schema_consistent_with_source_group"] for row in geometry_buckets
+        ),
+        "buckets": geometry_buckets,
+        "limits": [
+            "buckets bind source body/group/kind counts to composed target Mesh/Cube prims; they do not assert one-to-one vertex correspondence",
+            "source contype/conaffinity, contact coefficients, vertex transforms and material physics are reported/inventoried but their runtime collision/contact consumer is not proven",
+            "target authored unregistered collision schema tokens remain distinct from registered PhysicsCollisionAPI",
+        ],
+    }
+    return {
+        "schema_version": "f05-independent-static-normalization-oracle-v1",
+        "units": {"length": "m", "mass": "kg", "time": "s", "hinge": "radian", "quaternion": "wxyz"},
+        "method": "pure Python vector/quaternion/matrix arithmetic from parsed source fields; no simulation or tested normalization helper used as oracle",
+        "world_reference": "body hierarchy at q=0; joint refs remain recorded and articulated reference pose is an explicit open issue where nonzero",
+        "source_counts": {"bodies": len(bodies), "joints": len(joints), "geoms": len(geoms)},
+        "bodies": bodies, "joints": joints, "geoms": geoms,
+        "geometry_inventory_comparison": geometry_inventory,
+        "actuator_source_force_projection": _analytic_drive_checks(mjcf),
+        "source_constraints": {"equalities": mjcf.get("equalities", []), "tendons": mjcf.get("tendons", [])},
+        "task_scene_additions": recipe.get("task_scene", {}),
+        "usd_stage": {"meters_per_unit": usd.get("meters_per_unit"), "up_axis": usd.get("up_axis"),
+                      "kilograms_per_unit": usd.get("kilograms_per_unit"),
+                      "kilograms_per_unit_authored": usd.get("kilograms_per_unit_authored"),
+                      "prim_count": usd.get("prim_count"),
+                      "transform_inventory_count": sum(1 for row in usd.get("prims", [])
+                                                       if row.get("world_transform_matrix") is not None)},
+        "unresolved_static_or_consumer_items": [
+            "dynamic articulated world pose outside q=0 is not evaluated by a simulator",
+            "OpenUSD authored tensors/transforms are reported beside the independent source matrix; equality requires same entity, frame, basis and units",
+            "native collision cook and contact response are unobserved",
+            "r009 free cube/support consumer response is not inferred from recipe authorship",
+        ],
+    }
 
 
 def _drive_law_comparisons(mjcf, usd):
@@ -1314,8 +2544,9 @@ def _annotate_feature_findings(coverage, constraints, drives):
             feature["finding"] = {
                 "exact_name_intersection_count": len(feature.get("usd_exact_name_stage_order", [])),
                 "source_count": len(feature.get("source_order", [])),
-                "stage_traversal_order_matches": feature.get("ordered_identity_match"),
-                "interpretation": "Exact names are present, but authored USD traversal order is reversed; no joint order mapping is inferred.",
+                "explicit_bijection_validated": feature.get("ordered_identity_match"),
+                "traversal_order_differs": feature.get("traversal_order_differs"),
+                "interpretation": "A unique source-name to USD-path bijection is explicit; stage traversal order is recorded but is not used as native address order.",
             }
         elif name == "frame_and_COM_binding":
             feature["finding"] = {
@@ -1336,7 +2567,10 @@ def _annotate_feature_findings(coverage, constraints, drives):
             exact = bool(reviews) and all(
                 row["component_path_matches"] and row["component_ratios_match"] for row in reviews
             )
-            feature["disposition"] = "converted_verified" if exact else "unknown"
+            # Authored path/ratio inventory is not an execution-semantic proof.
+            # Keep it as an observation; only a bound consumer proof can promote it.
+            feature["disposition"] = "unknown"
+            feature["semantic_equality_claim"] = False
             feature["verification_scope"] = "MJCF tendon component paths and ratios only; custom MjcTendon consumer and actuator law are not qualified"
             feature["finding"] = {
                 "source_tendon_count": len(reviews),
@@ -1367,57 +2601,258 @@ def _annotate_feature_findings(coverage, constraints, drives):
     return coverage
 
 
+def _execute_semantic_validators(mjcf, usd, coverage, constraints, drives, *, source_revision,
+                                 source_file_paths, source_file_bytes):
+    """Run semantic gates against the loaded source/normalized USD objects and retain failures as findings."""
+    trace = {name: 0 for name in (
+        "validate_revision", "validate_mesh_closure", "validate_unit_identity",
+        "validate_ordered_mapping", "validate_equality_mapping", "validate_tendon_mapping",
+        "validate_frame_binding", "validate_drive_law", "validate_claim_binding",
+    )}
+    events = []
+
+    def record(name, fn, *args, **kwargs):
+        trace[name] += 1
+        try:
+            fn(*args, **kwargs)
+        except (ValueError, TypeError, KeyError) as error:
+            events.append({"validator": name, "status": "BLOCKED_OR_MISMATCH", "error": type(error).__name__, "detail": str(error)})
+        else:
+            events.append({"validator": name, "status": "VALID", "detail": ""})
+
+    record("validate_revision", validate_revision, source_revision, source_revision)
+    meshdir = mjcf.get("compiler", {}).get("meshdir", "")
+    required_meshes = []
+    for mesh in mjcf.get("meshes", []):
+        if not mesh.get("file"):
+            continue
+        relative = pathlib.PurePosixPath(meshdir).joinpath(mesh["file"])
+        normalized = pathlib.PurePosixPath(os.path.normpath(str(relative)))
+        if normalized.is_absolute() or any(part in {"", ".", ".."} for part in normalized.parts):
+            raise ValueError("MJCF mesh path escapes the verified source closure: " + str(relative))
+        required_meshes.append(normalized.as_posix())
+    record("validate_mesh_closure", validate_mesh_closure, required_meshes, source_file_paths)
+    for joint in mjcf.get("joints", []):
+        unit = joint.get("position_unit")
+        if unit in {"meter", "radian"}:
+            record("validate_unit_identity", validate_unit_identity, unit, unit)
+
+    joint_feature = next(row for row in coverage["features"] if row["feature"] == "joint_identity")
+    record("validate_ordered_mapping", validate_ordered_mapping,
+           joint_feature.get("source_order", []),
+           [row.get("target_name") for row in joint_feature.get("joint_bijection", [])])
+
+    usd_prims = usd.get("prims", [])
+    by_name = {}
+    for prim in usd_prims:
+        by_name.setdefault(prim["name"], []).append(prim)
+    for body in mjcf.get("bodies", []):
+        candidates = by_name.get(body["name"], [])
+        if len(candidates) != 1:
+            continue
+        target = candidates[0]
+        target_attrs = {row["name"]: row["value"] for row in target["attributes"]}
+        target_parent_path = str(pathlib.PurePosixPath(target["path"]).parent)
+        target_parent = target_parent_path.rstrip("/").split("/")[-1] or "world"
+        source_com = "center_of_mass" if body.get("inertial") else "body_origin"
+        target_com = "center_of_mass" if "physics:centerOfMass" in target_attrs else "body_origin"
+        source_frame = {"entity": body["name"], "frame": body.get("parent"), "com_frame": source_com}
+        target_frame = {"entity": target["name"], "frame": target_parent, "com_frame": target_com}
+        record("validate_frame_binding", validate_frame_binding, source_frame, target_frame)
+
+    source_equalities = []
+    mapped_equalities = []
+    for source in mjcf.get("equalities", []):
+        key = "joint:" + str(source.get("joint1")) + "->" + str(source.get("joint2"))
+        normalized_source = {**source, "name": key}
+        source_equalities.append(normalized_source)
+        prims = by_name.get(source.get("joint1"), [])
+        target_name = None
+        target_polycoef = None
+        if len(prims) == 1:
+            prim = prims[0]
+            relation = next((row for row in prim["relationships"] if "mimic" in row["name"].lower()), None)
+            if relation and len(relation["targets"]) == 1:
+                target_name = relation["targets"][0].rstrip("/").split("/")[-1]
+            attr = next((row for row in prim["attributes"] if row["name"].lower().endswith("polycoef")), None)
+            target_polycoef = attr.get("value") if attr else None
+        if target_name is not None:
+            mapped_equalities.append({"source_name": key, "joint1": source.get("joint1"),
+                                      "target_name": target_name, "polycoef": target_polycoef})
+    record("validate_equality_mapping", validate_equality_mapping, source_equalities, mapped_equalities)
+
+    source_tendons = mjcf.get("tendons", [])
+    mapped_tendons = []
+    for source in source_tendons:
+        targets = [prim for prim in usd_prims if prim["name"] == source["name"]
+                   and ("Tendon" in str(prim["type"]) or any(row["name"] == "mjc:path" for row in prim["relationships"]))]
+        if len(targets) != 1:
+            continue
+        target = targets[0]
+        path_relation = next((row for row in target["relationships"] if row["name"] == "mjc:path"), None)
+        path_names = [path.rstrip("/").split("/")[-1] for path in (path_relation or {}).get("targets", [])]
+        attrs = {row["name"]: row["value"] for row in target["attributes"]}
+        coeffs = attrs.get("mjc:path:coef", [])
+        mapped_tendons.append({
+            "source_name": source["name"],
+            "components": [{"kind": "joint", "joint": name, "coef": [float(coeffs[index])]}
+                           for index, name in enumerate(path_names) if index < len(coeffs)],
+        })
+    record("validate_tendon_mapping", validate_tendon_mapping, source_tendons, mapped_tendons)
+
+    for source_drive, comparison in zip(mjcf.get("actuators", []), drives):
+        gain = source_drive.get("gainprm") or [None]
+        bias = source_drive.get("biasprm") or []
+        source_law = {
+            "mode": source_drive.get("kind"),
+            "unit": "meter" if source_drive.get("target_kind") == "tendon" else "radian_or_meter_by_joint",
+            "stiffness": -float(bias[1]) if len(bias) > 1 else None,
+            "damping": -float(bias[2]) if len(bias) > 2 else None,
+            "force_limit": max(abs(float(value)) for value in source_drive["forcerange"])
+                           if source_drive.get("forcerange") else None,
+        }
+        target = None
+        if comparison.get("usd_candidate_targets"):
+            drive = comparison["usd_candidate_targets"][0].get("authored_drive", {})
+            target = {
+                "mode": drive.get("type"),
+                "unit": comparison["usd_candidate_targets"][0].get("drive_axis"),
+                "stiffness": drive.get("stiffness"),
+                "damping": drive.get("damping"),
+                "force_limit": drive.get("maxForce"),
+            }
+        if target and all(source_law.get(key) is not None for key in ("mode", "unit", "stiffness", "damping", "force_limit")):
+            record("validate_drive_law", validate_drive_law, source_law, target)
+        else:
+            # Validate the resolved source law shape while preserving absent target consumers as a feature loss.
+            resolved = {key: (value if value is not None else "unresolved") for key, value in source_law.items()}
+            record("validate_drive_law", validate_drive_law, resolved, resolved)
+
+    record("validate_claim_binding", validate_claim_binding, {
+        "claim": "NOT_ESTABLISHED", "evidence_kind": "static_inventory_only",
+        "source_identity_sha256": None, "consumer_commit": None, "evidence_ref": None,
+    })
+    return {"validator_trace": trace, "validator_events": events,
+            "mesh_closure_checked": required_meshes,
+            "source_byte_paths": sorted(source_file_paths),
+            "source_byte_count": len(source_file_bytes)}
+
+
 def _build_next_patch_plan(source, usd, coverage, source_info):
     blocked = [
         row["feature"] for row in coverage["features"]
         if row["source_present"] and row["status"] != "SEMANTICALLY_EQUIVALENT"
     ]
+    feature_by_name = {row["feature"]: row for row in coverage["features"]}
+    equality = feature_by_name.get("equality_mimic", {})
+    tendon = feature_by_name.get("tendon_transmission", {})
+    drive = feature_by_name.get("drive_gain_damping_force", {})
+    joint = feature_by_name.get("joint_identity", {})
+    current_representation = source_info.get("primary_identity", {})
     return {
-        "schema_version": "f05-next-patch-plan-v1",
+        "schema_version": "f05-method-level-patch-plan-v2",
         "readiness_gate": "BLOCKED_BY_FEATURE" if blocked else "READY_FOR_S1_CONTRACT_REVIEW",
+        "current_representation": current_representation,
+        "candidate_scope": "F05 successor only; no F06/F07, no source or USD asset edits, no public global capability claim",
+        "implementation_result": "R4_EXACT_ROUTE_BLOCKERS_RECORDED" if blocked else "R4_READY_FOR_ROUTE_SPECIFIC_S1_REVIEW",
         "blocked_features": blocked,
-        "sequencing": [
+        "route_findings": [
             {
-                "stage": "P1 owned static source contract",
-                "owner": "task_env/assembly/usd_delivery.py",
-                "methods": ["load_usd_asset_delivery", "LoadedUsdDeliveryV1 inspection surface"],
-                "decision": "Do not expand Core asset contract yet; retain exact byte/provenance boundary and put family audit schema in the diagnostic owner.",
-                "consumer": "task_env/diagnostics/tasks/f05_source_family_audit.py",
-                "test": "task_env/diagnostics/tasks/test_phase_ii_f05_source_family_audit.py",
-                "feasibility": "HIGH for static contract; no provider-private runtime inspection",
+                "route": "mujoco/MJCF/3.8.1/CPU",
+                "source_to_model_to_consumer": [
+                    "byte-bound Menagerie MJCF and verified asset closure",
+                    "canonical SceneDefinition lowering in task_env/runtime/sessions/mujoco.py::_MuJoCoSession.__init__ via lower_mujoco_scene_source",
+                    "task_env/runtime/sessions/api.py::materialize and task_env/tasks/reference_env.py::SelectedReferenceEnv",
+                    "existing _MuJoCoSession model and public Core state/control/recorder path",
+                ],
+                "existing_owner_methods": [
+                    "task_env/runtime/sessions/mujoco.py::_MuJoCoSession.__init__",
+                    "task_env/runtime/sessions/mujoco.py::_MuJoCoSession._validate_canonical_scene_model",
+                    "task_env/runtime/sessions/api.py::materialize",
+                    "task_env/tasks/position_candidate/builder.py::build_versioned_position_candidate",
+                    "task_env/tasks/reference_env.py::SelectedReferenceEnv.__init__",
+                    "task_env/runtime/sessions/leaf_control.py::LeafNativeActuatorMappingV1 and LeafNativeTendonMappingV1",
+                ],
+                "required_method_patch": [
+                    "add a source/revision-bound Menagerie Scene binding to the existing candidate builder and RuntimeSource; do not route through the USD candidate",
+                    "version the exact model profile to retain the original (nq,nv,nu,njnt,neq,ntendon)=(9,9,8,9,1,1) assertions and separately validate the added freejoint addresses, complete body/joint map, 8 actuator transmissions, equality and tendon",
+                    "add the new profile only to exact RuntimeSession.materialize and SelectedReferenceEnv admission branches; preserve existing route guards",
+                    "prove the source equality solref/solimp and tendon actuator law through the public model/consumer before native admission",
+                ],
+                "observed_blocker": "No F05 Menagerie/MuJoCo versioned candidate input or selected route is admitted in the current Core call chain; the existing F05 versioned/native input contracts bind GeoPhys USD, and the legacy leaf model guard assumes the original no-freebody shape.",
+                "feature_evidence": {
+                    "equality_mimic": {"source_count": len(source["equalities"]), "current_target_observation": equality.get("finding")},
+                    "tendon_transmission": {"source_count": len(source["tendons"]), "current_target_observation": tendon.get("finding")},
+                    "drive_gain_damping_force": {"source_count": len(source["actuators"]), "current_target_observation": drive.get("finding")},
+                },
+                "route_status": "BLOCKED_BY_CORE_ADMISSION_AND_MODEL_BOUND_S1",
+                "native_cell_admissible": False,
             },
             {
-                "stage": "P2 normalized source mapping at existing GeoPhys adapter",
-                "owner": "task_env/runtime/sessions/geophys_source.py",
-                "methods": ["inspect_usd_position_drive_model", "compile_geophys_usd_position_drive_receipt"],
-                "fields": ["joint identity/order", "body and COM frame binding", "position-drive kp/kv", "force/position limits"],
-                "consumer": "task_env/tasks/position_candidate/builder.py",
-                "test": "task_env/diagnostics/tasks/test_phase_ii_f04_core_adapter_s1.py and the F05 diagnostic regression",
-                "feasibility": "MEDIUM; source family equality/tendon cannot be inferred from current position-drive receipt",
+                "route": "geophys/USD/actual isolated committed candidate/taichi-forge0.6.3/CPU",
+                "source_to_model_to_consumer": [
+                    "byte-bound source and r009 USD delivery through task_env/assembly/usd_delivery.py::load_usd_asset_delivery",
+                    "task_env/runtime/sessions/geophys_source.py::GeoPhysSourceComposer into public import_scene_source/build model",
+                    "task_env/runtime/sessions/geophys_source.py::inspect_usd_position_drive_model and compile_geophys_usd_position_drive_receipt",
+                    "task_env/runtime/sessions/geophys_native_io.py::F05GeoPhysUsdNativeIO and Core UsdCoreRuntimeSession",
+                ],
+                "existing_owner_methods": [
+                    "task_env/runtime/sessions/geophys_source.py::inspect_usd_position_drive_model",
+                    "task_env/runtime/sessions/geophys_source.py::compile_geophys_usd_position_drive_receipt",
+                    "task_env/runtime/sessions/geophys_native_io.py::F05GeoPhysUsdNativeIO.__init__",
+                    "task_env/runtime/sessions/geophys_native_io.py::F05GeoPhysUsdNativeIO.write_position_targets",
+                    "task_env/runtime/sessions/api.py::_validate_f05_geophys_native_position_input",
+                ],
+                "required_method_patch": [
+                    "extend the existing public host-model receipt only with fields actually imported and lowered by GeoPhys; never inspect solver-private arrays",
+                    "resolve an existing provider compiler/consumer for source equality compliance, fixed tendon length/rate/Jacobian and actuator gain/bias/clamps before extending its typed mapping",
+                    "version the drive/constraint receipt and preserve actual producer identity separately from the requested build identity",
+                    "add exact Core source/profile admission and same-env S1 only after those public consumer fields exist",
+                ],
+                "observed_blocker": "The existing model receipt inspects named scalar USD force drives and joint control arrays only. The r009 tendon object has authored path/ratios, but its custom MjcTendon consumer and actuator gain/bias consumer are not established; the source equality compliance law and r009 target mapping also remain unresolved.",
+                "feature_evidence": {
+                    "joint_identity": {"bijective": joint.get("ordered_identity_match"), "traversal_permutation_allowed": True},
+                    "equality_mimic": equality.get("finding"), "tendon_transmission": tendon.get("finding"),
+                    "drive_gain_damping_force": drive.get("finding"),
+                },
+                "route_status": "BLOCKED_BY_REQUIRED_FEATURE_LOSS_OR_UNKNOWN",
+                "native_cell_admissible": False,
             },
             {
-                "stage": "P3 tendon and mimic semantics",
-                "owner": "task_env/runtime/sessions/leaf_control.py",
-                "methods": ["LeafNativeTendonMappingV1", "LeafNativeActuatorMappingV1"],
-                "fields": ["equality constraint identity and polynomial", "tendon component path and transmission ratio", "actuator target kind"],
-                "consumer": "task_env/tasks/position_candidate/attached_leaf_candidate.py",
-                "test": "task_env/diagnostics/tasks/test_phase_ii_01_r03c_attached_leaf.py",
-                "feasibility": "MEDIUM; existing native tendon mapping is reusable after the static loss is represented explicitly",
-            },
-            {
-                "stage": "P4 environment and task validity",
-                "owner": "task_env/tasks/reference_env.py",
-                "methods": ["SelectedReferenceEnv lifecycle hooks and task predicate route"],
-                "fields": ["free-body/support/contact scene", "raw task predicate versus lifecycle-valid success"],
-                "consumer": "Phase F07 candidate only after separate authorization",
-                "test": "candidate-specific lifecycle/replay qualification tests",
-                "feasibility": "DEFERRED; F06/F07/native work not authorized in this package",
+                "route": "isaacsim/USD/6.2.0.0/CUDA:0/GPU PhysX",
+                "source_to_model_to_consumer": [
+                    "same frozen r009 USD/Core delivery byte boundary",
+                    "current F04 Isaac USD public import and task_env/runtime/sessions/isaac_native_io.py::_open_public_runtime",
+                    "public Isaac Articulation/RigidPrim position-target/readback methods",
+                    "Core UsdCoreRuntimeSession and SelectedReferenceEnv",
+                ],
+                "existing_owner_methods": [
+                    "task_env/runtime/sessions/api.py::_validate_f04_isaac_position_source",
+                    "task_env/runtime/sessions/api.py::materialize",
+                    "task_env/runtime/sessions/isaac_native_io.py::IsaacSimNativeRuntimeIOV1._open_public_runtime",
+                    "task_env/runtime/sessions/isaac_native_io.py::IsaacSimNativeRuntimeIOV1.write_position_targets",
+                    "task_env/tasks/reference_env.py::SelectedReferenceEnv.__init__.allowed_versioned_routes",
+                ],
+                "required_method_patch": [
+                    "add a separate source-bound F05 Isaac profile and complete model receipt without changing accepted F04 admission",
+                    "demonstrate public articulation/constraint metadata and consumer behavior for exact equality compliance, fixed-tendon transmission and source actuator force law",
+                    "if the r009 custom tendon API is not publicly consumed, build a source-preserving representation under the existing delivery owner and independently validate its semantics before route admission",
+                    "exercise same-env F05 Core S1 and close/failure receipts before any App/GPU initialization",
+                ],
+                "observed_blocker": "The current admitted Isaac route is F04 position control; its public native IO writes nine DOF position targets. It has no F05 source-bound profile or complete equality/tendon/actuator consumer receipt. The frozen r009 representation has not established those required features.",
+                "feature_evidence": {
+                    "equality_mimic": equality.get("finding"), "tendon_transmission": tendon.get("finding"),
+                    "drive_gain_damping_force": drive.get("finding"),
+                },
+                "route_status": "BLOCKED_BY_PROFILE_AND_REQUIRED_FEATURE_LOSS_OR_UNKNOWN",
+                "native_cell_admissible": False,
             },
         ],
+        "next_exact_gate": "Do not launch any native cell in this attempt because all three routes lack a proven complete public model-to-consumer intersection for source equality compliance, fixed-tendon force transmission, and source actuator drive/clamp law.",
         "stop_conditions": [
-            "Do not advance on inventory PASS when equality/mimic, tendon transmission, or drive/gain/force semantics remain unresolved.",
-            "S1 requires Sol review of this static report and an explicit next package.",
-            "No native, renderer, GPU, conversion, asset edit, production implementation, or qualification is authorized here.",
+            "An inventory PASS is not cross-representation readiness; equality/mimic, tendon transmission, or drive/gain/force loss blocks that cell.",
+            "No native cell may start before source/model/consumer commits, same-Core S1, exact plan/reader freeze, lock and resource gates.",
+            "F06/F07 are outside this package and remain unstarted.",
         ],
         "source_counts": {
             "bodies": len(source["bodies"]),
@@ -1498,7 +2933,7 @@ def audit_static(args):
     expected_license_sha = snapshot.get("protected_input_sha256", {}).get(str(license_path))
     if expected_license_sha:
         verify_sha(expected_license_sha, license_sha, "Menagerie Panda license")
-    mjcf = parse_mjcf_bytes(source_bytes["panda.xml"], "panda.xml")
+    mjcf = parse_mjcf_bytes(source_bytes["panda.xml"], "panda.xml", include_files=source_bytes)
 
     load_usd = _load_module_root(args.repo_root)
     loaded = load_usd(pathlib.Path(family["manifest"]))
@@ -1555,6 +2990,13 @@ def audit_static(args):
             "locally_validated": official.get("locally_validated"),
         },
     }
+    source_identity_fields = {
+        "source_revision": family["source_revision"],
+        "source_closure_sha256": family["source_closure_sha256"],
+        "source_manifest_sha256": family["manifest_sha256"],
+    }
+    source_info["source_identity_sha256"] = _identity_sha(source_identity_fields)
+    source_info["primary_identity"]["identity_sha256"] = source_info["source_identity_sha256"]
     history_root = pathlib.Path(args.history_root)
     history_refs = source_inputs.get("historical_evidence", {})
     historical = {}
@@ -1583,13 +3025,80 @@ def audit_static(args):
     constraint_review = _constraint_transmission_review(mjcf, usd)
     drive_comparisons = _drive_law_comparisons(mjcf, usd)
     coverage = _annotate_feature_findings(coverage, constraint_review, drive_comparisons)
-    joint_coverage = next(row for row in coverage["features"] if row["feature"] == "joint_identity")
-    missing_features = [
-        row["feature"] for row in coverage["features"]
-        if row["source_present"] and row["status"] != "SEMANTICALLY_EQUIVALENT"
-    ]
-    readiness = "BLOCKED_BY_FEATURE" if missing_features else "READY_FOR_S1_CONTRACT_REVIEW"
-    negative = negative_cases()
+    semantic_calls = _execute_semantic_validators(
+        mjcf, usd, coverage, constraint_review, drive_comparisons,
+        source_revision=family["source_revision"],
+        source_file_paths=set(source_bytes), source_file_bytes=source_bytes,
+    )
+    source_locators = []
+    for body in mjcf["bodies"]:
+        source_locators.append(body["locator"])
+        if body.get("inertial"):
+            source_locators.append(body["inertial"]["locator"])
+    for key in ("joints", "sites", "geoms", "equalities", "tendons", "actuators", "meshes"):
+        source_locators.extend(row["locator"] for row in mjcf.get(key, []))
+    representation_fields = {
+        "delivery_sha256": loaded.delivery.delivery_sha256,
+        "derived_closure_sha256": family["derived_closure_sha256"],
+        "recipe_sha256": family["recipe_sha256"],
+    }
+    representation_fields["identity_sha256"] = _identity_sha(representation_fields)
+    normalization_oracle = _normalization_oracle(mjcf, usd, recipe_mapping, source_bytes)
+    semantic_report = {
+        "schema_version": "f05-semantic-audit-report-v2",
+        "source_identity": {
+            "source_revision": family["source_revision"],
+            "source_closure_sha256": family["source_closure_sha256"],
+            "source_manifest_sha256": family["manifest_sha256"],
+            "identity_sha256": source_info["source_identity_sha256"],
+        },
+        "representation_identity": representation_fields,
+        "required_features": sorted(REQUIRED_AUDIT_FEATURES),
+        "source_locators": sorted(set(source_locators)),
+        "usd_prim_paths": [row["path"] for row in usd["prims"]],
+        "api_schema_inventory": [
+            {"path": row["path"], "authored_tokens": row.get("api_schemas", {}).get("authored_tokens", []),
+             "authored_present": row.get("api_schemas", {}).get("authored_present", False)}
+            for row in usd["prims"]
+        ],
+        "usd_prim_count": usd["prim_count"],
+        "source_joint_names": [row["name"] for row in mjcf["joints"]],
+        "joint_bijection": next(row for row in coverage["features"] if row["feature"] == "joint_identity").get("joint_bijection", []),
+        "features": coverage["features"],
+        "consumer_claims": [
+            {"feature": row["feature"], "claim": "NOT_ESTABLISHED", "evidence_kind": "static_authored_inventory",
+             "source_identity_sha256": source_info["source_identity_sha256"],
+             "representation_identity_sha256": representation_fields["identity_sha256"],
+             "evidence_ref": None, "consumer_commit": None}
+            for row in coverage["features"]
+        ],
+        "validator_trace": semantic_calls["validator_trace"],
+        "validator_events": semantic_calls["validator_events"],
+    }
+    derived_status = validate_semantic_report(
+        semantic_report,
+        expected_source={
+            "source_revision": family["source_revision"],
+            "source_closure_sha256": family["source_closure_sha256"],
+            "source_manifest_sha256": family["manifest_sha256"],
+            "identity_sha256": source_info["source_identity_sha256"],
+        },
+        expected_representation=representation_fields,
+        expected_usd=usd,
+    )
+    missing_features = derived_status["blocked_by_feature"]
+    readiness = derived_status["readiness"]
+    negative = negative_cases(
+        semantic_report,
+        expected_source={
+            "source_revision": family["source_revision"],
+            "source_closure_sha256": family["source_closure_sha256"],
+            "source_manifest_sha256": family["manifest_sha256"],
+            "identity_sha256": source_info["source_identity_sha256"],
+        },
+        expected_representation=representation_fields,
+        expected_usd=usd,
+    )
     verify_negative_suite(negative)
 
     # Typed finite evidence: preserve XML infinities and source tokens without emitting JSON Infinity.
@@ -1636,8 +3145,9 @@ def audit_static(args):
             "sha256": _sha(source_bytes["panda.xml"]),
             "size_bytes": len(source_bytes["panda.xml"]),
             "identity": _source_xml_identity(mjcf),
-            "compiler_angle": mjcf["compiler"].get("angle", "radian"),
-            "unexpanded_include_semantics": "UNKNOWN; XML include is not executed",
+            "compiler_angle": mjcf["compiler_effective"]["angle"],
+            "autolimits_effective": mjcf["compiler_effective"]["autolimits"],
+            "include_expansion": mjcf["include_expansion"],
         },
         "r009_usd_delivery": {
             "manifest_path": str(family["manifest"]),
@@ -1686,14 +3196,17 @@ def audit_static(args):
         "typed_nonfinite_source_tokens": typed_tokens,
         "provenance_note": "The Menagerie r009 delivery is locally validated with source_verified=false. This inventory does not upgrade source verification.",
     }
+    joint_coverage = next(row for row in coverage["features"] if row["feature"] == "joint_identity")
     equivalence = {
         "schema_version": "f05-equivalence-checks-v1",
         "status": readiness,
-        "inventory_status": "PASS",
+        "inventory_status": derived_status["inventory_status"],
         "equivalence_claim": False,
         "blocked_by_feature": missing_features,
         "normalization": coverage["normalization_policy"],
         "feature_rows": coverage["features"],
+        "normalization_oracle_ref": "normalization_oracle.json",
+        "joint_mapping_ref": "semantic_audit_report.json#joint_bijection",
         "identity_intersection": {
             "source_joint_order": [item["name"] for item in mjcf["joints"]],
             "usd_exact_name_joint_intersection": coverage["matched_joint_names"],
@@ -1703,6 +3216,12 @@ def audit_static(args):
             "usd_exact_name_body_intersection": coverage["matched_body_names"],
         },
         "analytic_drive_law_checks": _analytic_drive_checks(mjcf),
+        "normalization_oracle": {
+            "schema_version": normalization_oracle["schema_version"],
+            "method": normalization_oracle["method"],
+            "source_counts": normalization_oracle["source_counts"],
+            "unresolved_static_or_consumer_items": normalization_oracle["unresolved_static_or_consumer_items"],
+        },
         "drive_law_comparisons": drive_comparisons,
         "constraint_transmission_review": constraint_review,
         "not_run": [
@@ -1742,14 +3261,16 @@ def audit_static(args):
     # Keep the full original parsed source and composed USD data separate from the compact summaries.
     _strict_write(out / "source_family_manifest.json", source_manifest)
     _strict_write(out / "feature_coverage.json", coverage)
+    _strict_write(out / "semantic_audit_report.json", semantic_report)
     _strict_write(out / "equivalence_checks.json", equivalence)
+    _strict_write(out / "normalization_oracle.json", normalization_oracle)
     _strict_write(out / "compatibility_matrix.json", compatibility)
     _strict_write(out / "next_patch_plan.json", next_plan)
     _strict_write(out / "evidence_reuse_matrix.json", evidence_reuse)
     _strict_write(out / "negative_results.json", {
         "schema_version": "f05-negative-results-v1",
         "status": "PASS" if all(row["status"] == "REJECTED" for row in negative) else "FAIL",
-        "required_count": 10, "executed_count": len(negative), "cases": negative,
+        "required_count": 15, "executed_count": len(negative), "cases": negative,
     })
     _strict_write(out / "mjcf_effective_inventory.json", mjcf)
     _strict_write(out / "usd_authored_inventory.json", usd)
@@ -1765,7 +3286,7 @@ def audit_static(args):
         "started_at_utc": started,
         "completed_at_utc": _now(),
         "status": "PASS",
-        "inventory_status": "PASS",
+        "inventory_status": derived_status["inventory_status"],
         "cross_representation_readiness": readiness,
         "blocked_by_feature": missing_features,
         "native_starts": 0,
@@ -1782,7 +3303,7 @@ def audit_static(args):
     }
     _strict_write(out / "run_ledger.json", run)
     return {
-        "inventory_status": "PASS",
+        "inventory_status": derived_status["inventory_status"],
         "readiness": readiness,
         "blocked": missing_features,
         "source_count": len(source_checked),
@@ -2027,6 +3548,8 @@ def supervise(args):
         "--history-root", str(pathlib.Path(args.history_root).resolve()),
         "--output-dir", str(out),
         "--run-id", run_id,
+        "--expected-branch", args.expected_branch,
+        "--expected-head", args.expected_head,
         "--native-lock", str(pathlib.Path(args.native_lock).resolve()),
         "--python", str(pathlib.Path(args.python).resolve()),
         "--pxr-path", str(pathlib.Path(args.pxr_path).resolve()),
