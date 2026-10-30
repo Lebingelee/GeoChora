@@ -185,6 +185,8 @@ def run(plan_path: Path, output: Path) -> dict:
     env = candidate.env
     if asdict(env.controller.config) != controller_action_config:
         raise ValueError("DG01 Core candidate Position ActionConfig differs from its frozen plan")
+    if env.controller.identity != plan.get("controller_identity_sha256"):
+        raise ValueError("DG01 Core candidate controller identity differs from its frozen plan")
     session_ids = []
     session_handles = []
     episodes = []

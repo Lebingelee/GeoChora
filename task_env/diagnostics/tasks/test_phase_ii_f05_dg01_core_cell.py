@@ -117,10 +117,20 @@ def test_cold_reader_checks_direct_episode_outcome_mapping():
 
 
 def test_cold_reader_binds_position_action_config_to_the_frozen_plan():
-    profile = {"controller_action_config": {"joint_position_correction_gain": 1.0}}
-    plan = {"controller_action_config": {"joint_position_correction_gain": 1.0}}
+    profile = {
+        "controller_action_config": {"joint_position_correction_gain": 1.0},
+        "controller_identity_sha256": "controller-identity",
+    }
+    plan = {
+        "controller_action_config": {"joint_position_correction_gain": 1.0},
+        "controller_identity_sha256": "controller-identity",
+    }
     _verify_controller_action_config(profile, plan)
     plan["controller_action_config"]["joint_position_correction_gain"] = 2.5
+    with pytest.raises(ValueError, match="ActionConfig"):
+        _verify_controller_action_config(profile, plan)
+    plan["controller_action_config"]["joint_position_correction_gain"] = 1.0
+    plan["controller_identity_sha256"] = "different-controller"
     with pytest.raises(ValueError, match="ActionConfig"):
         _verify_controller_action_config(profile, plan)
 
