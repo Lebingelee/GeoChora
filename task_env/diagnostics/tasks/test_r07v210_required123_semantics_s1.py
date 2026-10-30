@@ -14,6 +14,10 @@ from bench_deploy.libero.evaluation import (
     evaluate_stove_front_region_v1,
 )
 from bench_deploy.libero.task_contracts import TASK_2, TASK_3
+from bench_deploy.libero.solution import (
+    LiberoPickPlaceSolutionConfigV1,
+    solution_identity_v1,
+)
 from task_env.controllers.canonical.kinematics import (
     PandaKinematics,
     derive_panda_tcp_profile_v2,
@@ -22,6 +26,17 @@ from task_env.controllers.canonical.kinematics import (
 
 MANIFEST_SHA = "a" * 64
 CLOSURE_SHA = "b" * 64
+
+
+def test_task_one_solution_identity_binds_bounded_motion_rate():
+    config = LiberoPickPlaceSolutionConfigV1()
+    assert config.max_cartesian_increment_m == pytest.approx(0.002)
+    assert config.max_joint_increment_rad == pytest.approx(0.01)
+    source_sha = "f" * 64
+    default_identity = solution_identity_v1(source_sha)
+    assert default_identity == solution_identity_v1(source_sha, config)
+    slower = replace(config, max_cartesian_increment_m=0.001)
+    assert solution_identity_v1(source_sha, slower) != default_identity
 
 
 def _boundary(task_uid: str = TASK_2) -> LiberoPredicateBoundaryV1:

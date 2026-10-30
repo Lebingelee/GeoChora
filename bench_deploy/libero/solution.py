@@ -49,23 +49,37 @@ _OPENING_BY_STAGE = {
 }
 
 
-def solution_identity_v1(source_xml_sha256: str) -> str:
+def solution_identity_v1(
+    source_xml_sha256: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+) -> str:
     """Return the exact task/profile identity bound to one composed MJCF."""
     if (type(source_xml_sha256) is not str or len(source_xml_sha256) != 64
             or any(character not in "0123456789abcdef" for character in source_xml_sha256)):
         raise ValueError("LIBERO Solution identity requires a lowercase source XML SHA-256")
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
     return digest({
         "schema_version": SOLUTION_SCHEMA,
         "task_uid": TASK_1,
         "source_xml_sha256": source_xml_sha256,
         "controller_profile_id": "libero-spatial-bowl-to-plate-joint-space-pd-v1",
         "tcp_id": TCP_ID,
-        "algorithm": "public-observation-damped-jacobian-waypoints-v1",
+        "algorithm": "public-observation-damped-jacobian-waypoints-v2",
         "waypoints_m": {
             "approach_z": 0.15, "grasp_z": 0.05,
             "lift_z": 0.20, "place_tcp_z_above_plate": 0.085,
         },
         "opening_m": _OPENING_BY_STAGE,
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "max_cartesian_increment_m": selected_config.max_cartesian_increment_m,
+            "max_joint_increment_rad": selected_config.max_joint_increment_rad,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
     })
 
 
@@ -122,8 +136,8 @@ def _boundary_identity(info: Mapping[str, object]) -> tuple[str, str, str, str, 
 @dataclass(frozen=True)
 class LiberoPickPlaceSolutionConfigV1:
     position_tolerance_m: float = 0.012
-    max_cartesian_increment_m: float = 0.008
-    max_joint_increment_rad: float = 0.055
+    max_cartesian_increment_m: float = 0.002
+    max_joint_increment_rad: float = 0.01
     grasp_dwell_steps: int = 8
     release_dwell_steps: int = 12
     release_timeout_steps: int = 50
@@ -166,7 +180,7 @@ class LiberoPickPlaceSolutionV1:
         )
         self.config = config or LiberoPickPlaceSolutionConfigV1()
         self.config.validate()
-        self.identity = solution_identity_v1(self.source_xml_sha256)
+        self.identity = solution_identity_v1(self.source_xml_sha256, self.config)
         self._reset_state()
 
     def _reset_state(self) -> None:

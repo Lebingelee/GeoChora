@@ -615,6 +615,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
                 "simulation_time_s": float(info.get("simulation_time_s", float("nan"))),
                 "mixed_actuator_command_v1": info.get("mixed_actuator_command_v1"),
                 "applied_mixed_actuator_command_v1": info.get("applied_mixed_actuator_command_v1"),
+                "post_step_public_state": _state_observation_receipt(observation),
             })
             if terminated or truncated or solution.done or solution.failed:
                 break
