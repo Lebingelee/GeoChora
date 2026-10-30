@@ -36,13 +36,17 @@ _JOINT_LIMITS = np.asarray((
     (-2.8973, 2.8973),
 ), dtype=np.float64)
 _OPENING_BY_STAGE = {
-    "approach": 0.08,
-    "descend": 0.08,
+    # Keep a small actuator target margin inside the signed source joint
+    # ranges. MuJoCo can overshoot a hard position target by a few micrometers;
+    # the public physical monitor correctly treats any source-range excursion
+    # beyond its numeric tolerance as a failed episode.
+    "approach": 0.078,
+    "descend": 0.078,
     "grasp": 0.045,
     "lift": 0.045,
     "carry": 0.045,
     "place": 0.045,
-    "release": 0.08,
+    "release": 0.078,
 }
 
 
