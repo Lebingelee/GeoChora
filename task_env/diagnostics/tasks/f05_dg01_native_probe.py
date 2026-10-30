@@ -123,7 +123,12 @@ def _actuator_joint_readback(model, data, mujoco, *, variant):
     bias = [float(value) for value in model.actuator_biasprm[actuator_id, :3]]
     unclipped_scalar_force = gain * control + bias[0] + bias[1] * tendon_length + bias[2] * tendon_velocity
     scalar_force = float(data.actuator_force[actuator_id])
-    moment = [float(data.actuator_moment[actuator_id, dof]) for dof in dofs]
+    row_start = int(data.moment_rowadr[actuator_id])
+    row_count = int(data.moment_rownnz[actuator_id])
+    row_columns = [int(value) for value in data.moment_colind[row_start:row_start + row_count]]
+    row_values = [float(value) for value in data.actuator_moment[row_start:row_start + row_count]]
+    sparse_moment = dict(zip(row_columns, row_values, strict=True))
+    moment = [sparse_moment.get(dof, 0.0) for dof in dofs]
     projected_force = [float(data.qfrc_actuator[dof]) for dof in dofs]
     return {
         'variant': variant,
