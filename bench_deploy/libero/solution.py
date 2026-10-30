@@ -237,6 +237,7 @@ def solution_identity_v3(
             "gripper_scalar": "normalized_minus1_to1_to_aggregate_opening_m_0p04_times_u_plus_1",
         },
         "grasp_orientation_source": "reset_public_source_bound_tcp_world_quaternion_wxyz_v1",
+        "bowl_reference": "live_public_bowl_pose_until_grasp_then_frozen_v1",
         "planner": {
             "owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_to_pose",
             "gripper_transition_owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_gripper_transition",
@@ -695,6 +696,19 @@ class LiberoPickPlaceSolutionV3(LiberoPickPlaceSolutionV1):
         self._pose_plan_index = 0
         self._pose_plan_stage = None
 
+    def _refresh_bowl_reference_from_public_pose(self, observation) -> bool:
+        """Track bowl settling while approaching, then freeze its grasp reference."""
+        if self.stage not in {"approach", "descend"}:
+            return False
+        current = _body_position(observation, "bowl_body_pose")
+        if self._initial_bowl is None or np.linalg.norm(current - self._initial_bowl) > 1e-6:
+            self._initial_bowl = current
+            self._pose_plan = None
+            self._pose_plan_index = 0
+            self._pose_plan_stage = None
+            return True
+        return False
+
     def reset(self, observation, info: Mapping[str, object], metadata, **kwargs) -> None:
         super().reset(observation, info, metadata, **kwargs)
         if info.get("source_closure_digest") != self.source_closure_digest:
@@ -794,6 +808,12 @@ class LiberoPickPlaceSolutionV3(LiberoPickPlaceSolutionV1):
                 info: Mapping[str, object], **_kwargs) -> None:
         """Advance only from current public pose, finger and task feedback."""
         joints, ee_position = self._validate_boundary(observation, info, next_step=True)
+        # The source reset row places the bowl above its settled support pose.
+        # Follow its live public pose during approach/descent so the planner
+        # does not close the gripper around the stale reset height. Freeze the
+        # reference once grasp begins, so later object motion remains evidence
+        # for the lift predicate instead of moving the goal with the object.
+        self._refresh_bowl_reference_from_public_pose(observation)
         self._pending_action = False
         identity = _boundary_identity(info)
         self._last_boundary_step = identity[5]

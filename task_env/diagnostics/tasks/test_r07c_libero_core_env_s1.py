@@ -2181,6 +2181,29 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         assert reset_info["reset_sample_v1"]["sample_id"] == reset_info["reset_sample_id"]
         assert reset_obs["state"]["joint_position"].shape == (9,)
 
+        # Source reset row 0 places the bowl above the pose it reaches after
+        # settling. The world-pose Solution follows this public pose until
+        # grasp, then freezes it so object motion remains lift evidence.
+        bowl_reset = np.asarray(
+            reset_obs["privileged_state"]["bowl_body_pose"], dtype=np.float64,
+        ).copy()
+        reference_before = solution._initial_bowl.copy()
+        settled_obs = dict(reset_obs)
+        settled_obs["privileged_state"] = dict(reset_obs["privileged_state"])
+        settled_bowl = bowl_reset.copy()
+        settled_bowl[0, 2] -= 0.072
+        settled_obs["privileged_state"]["bowl_body_pose"] = settled_bowl
+        assert solution._refresh_bowl_reference_from_public_pose(settled_obs) is True
+        assert solution._initial_bowl == pytest.approx(reference_before + (0.0, 0.0, -0.072))
+        solution.stage = "grasp"
+        grasp_reference = solution._initial_bowl.copy()
+        settled_bowl[0, 2] -= 0.01
+        settled_obs["privileged_state"]["bowl_body_pose"] = settled_bowl
+        assert solution._refresh_bowl_reference_from_public_pose(settled_obs) is False
+        assert solution._initial_bowl == pytest.approx(grasp_reference)
+        solution._initial_bowl = reference_before
+        solution.stage = "approach"
+
         # Feed two real CartesianPosePlanner outputs through the selected task
         # binding and the canonical arm resolver at the same state boundary.
         # The changed pose must alter qdesired and the final actuator Target.
