@@ -1,5 +1,11 @@
 # Post-v1.1.0 Phase II Roadmap
 
+## v2.1.0 R00–R07 当前收尾方向（2026-10-30）
+
+维护者将本路线目标明确为 v2.1.0；[R07 当前范围](../module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)要求原 LIBERO #1/#2/#3，三后端部署切换及 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3 的 Solution 成功。原 #4 叠碗、#5 炉子与摩卡壶是 **v2.1.0 可选补充**，不是路线收尾阻塞项。
+
+三个 required tasks 通过后即可进入[路线收尾](../module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout)，汇总既有 P00/R01–R07 验收、完成原 R07d/P99 与实际整合检查，不追加可选任务、F06/F07 或新 Qualification 为该路线必需项。这里记录路线目标和收尾方向，不宣称当前目标完成或已发布；版本 merge/tag/Release 仍单独授权。下文早期 v2.0.1 候选版本及研究提案保留历史时点含义。
+
 更新于 2026-10-18。v1.1.0 已发布，工程整合完成；本页不重开 Phase 2.0 implementation。
 [Release](../releases/v1.1/README.md)和[唯一能力矩阵](../module/task_env/capability_matrix_v1_1_0_candidate.json)
 定义当前实现/证据；下列研究和工程方向不构成已实现或已获资格的能力。
@@ -73,7 +79,7 @@ callers/tests/limitation/extendability 的复用 gate，随后冻结边界和 Or
 
 2026-10-23，维护者已接受 [Phase II 有界工程范围](../maintenance/phase_ii_scope_freeze_20261023/maintainer_scope_decision.yaml)，
 当前入口仍为 [05](../module/task_env/goal/Phase_II/05_Architecture_Review_and_Execution_Order.md)。
-`v2.0.0` 是 Phase II 预期冻结版本，尚须独立 Release Gate；`v2.0.1` 仅为后续 Phase II-01 规划目标。
+该2026-10-23交接时点将 `v2.0.0` 列为 Phase II 预期冻结版本、`v2.0.1` 列为后续 Phase II-01 候选目标；本路线当前版本目标以本页 v2.1.0 收尾方向为准，历史 refs 和实际发布记录不改。
 以下六项是继承既有实现的候选主题，不是最终 Goal 数量、实施切片、DAG、开发承诺或本轮授权；不新建下一阶段 Goal 文件。
 
 | 候选主题 | 后续需另定的范围 | 现有基础/owner 定位 |

@@ -1,6 +1,8 @@
 # Phase II-01 — Composite Robot & Core Integration
 
-2026-10-30范围覆盖说明：R07 当前采用[维护者三任务与分层成功决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)：保留原 #1/#2/#3，#4/#5 延期不阻塞当前出口；九格部署切换必需，Solution 成功为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3。下文五任务/任务成功非必需等旧规划保留历史含义，不能直接作为新执行包；实际包从当前范围和真实 HEAD 冻结。Harness/F06、P99 其他门与正式 Qualification 仍分开。
+v2.1.0 路线收尾方向（维护者2026-10-30补充）：任务 #1/#2/#3 按当前必需验收完成后即可进入 R00–R07 收尾，不等待可选 #4/#5。复用既有接受证据，完成现有 R07d/P99 和整合收尾；路线完成与发布授权分开。详见[收尾边界](09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout)。
+
+2026-10-30范围覆盖说明：R07 当前采用[维护者三任务与分层成功决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充、不阻塞当前出口；九格部署切换必需，Solution 成功为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3。下文五任务/任务成功非必需等旧规划保留历史含义，不能直接作为新执行包；实际包从当前范围和真实 HEAD 冻结。Harness/F06、P99 其他门与正式 Qualification 仍分开。
 
 当前规划状态：**CHECKPOINT_RECOVERY_PLAN_UPDATED**，2026-10-28。R03c attempt002 静态修正已接收，
 检查点 `c30d97e`，S2 不完整、S3 未运行。恢复入口为 [07](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)，

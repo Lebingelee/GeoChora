@@ -4,13 +4,20 @@
 
 ## 当前范围决定：三个任务、部署切换与分层成功验收（2026-10-30）
 
-维护者在本诊断对话明确批准保留原任务 #1/#2/#3，并纠正“三任务×三后端都必须 Solution 成功”的建议。**本节是当前 R07 范围真源，覆盖下文历史“五任务 required”及“任务/Expert 成功非必需”的表述；旧报告、attempt、收据与原始审计不追溯修改。** 原 #4 叠碗、#5 炉子与摩卡壶移为 DEFERRED_OUT_OF_CURRENT_R07_SCOPE；其未实施或未成功不再阻塞当前 R07/P99。它们不是已通过，也不自动进入下一阶段。
+维护者在本诊断对话明确批准保留原任务 #1/#2/#3，并纠正“三任务×三后端都必须 Solution 成功”的建议。**本节是当前 R07 范围真源，覆盖下文历史“五任务 required”及“任务/Expert 成功非必需”的表述；旧报告、attempt、收据与原始审计不追溯修改。** 维护者随后明确：原 #4 叠碗、#5 炉子与摩卡壶列为 **v2.1.0 可选补充任务**，状态 OPTIONAL_V2_1_0_SUPPLEMENT_NOT_STARTED；其未启动、未实施或未成功均不阻塞当前 R07/P99 或 v2.1.0 的 R00–R07 路线收尾，也不自动顺延为下一版本必需项。该可选身份替代本次对话先前的延期归类，不表示已通过或已授权执行。
 
 | 保留编号 | Suite / 精确任务名 | 必须保留的任务成功语义 |
 | --- | --- | --- |
 | 1 | libero_spatial / `pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate` | 原生 On(black bowl, plate)：原接触、XY 与高度条件 |
 | 2 | libero_goal / `open_the_middle_drawer_of_the_cabinet` | 原生 Open(middle drawer)：正确关联 joint，严格 qpos < −0.14 m |
 | 3 | libero_goal / `push_the_plate_to_the_front_of_the_stove` | 原生 On(plate, stove-front region)：原 site/region 分支；不另造 Push 动作历史谓词 |
+
+| 可选编号 | v2.1.0 补充任务 | 当前处置 |
+| --- | --- | --- |
+| 4 | libero_90 / `KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle` | 可按工期选择，非 R07/P99/路线收尾阻塞项 |
+| 5 | libero_10 / `KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it` | 可按工期选择，非 R07/P99/路线收尾阻塞项 |
+
+若选择实施补充任务，另在完整工作包固定其 task/provider/source、成功要求与预算；通过后只登记实际证据覆盖，不扩大为默认五任务必需，也不套用 #1/#2/#3 的全部后端成功要求。可选包的失败与资源开销仍须保留，可修复或停止补充项；其失败不把已完成的 required 路线改回未完成，但若暴露 required 路线的真实回归，仍按受影响 owner 处理。
 
 ### R07c 的三个独立门
 
@@ -51,6 +58,16 @@
 当前仅 #1 的 MuJoCo3.8.1 CPU D01 部署交集有 `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`；原结果 `task_success=false`、`solution_completed=null`。三项 Solution 全成功、九格部署切换、GeoPhys/Isaac 各一任务成功及 LIBERO Harness 接入均尚未证明；本次范围决定不升级旧证据。
 
 R07a/b 对当前三个 required tasks 补齐审计/来源准入；R07c 三门全部经 Sol 独立复核才可记当前范围完成。R07d 的 session-bound 成本和独立 Human code-quality review、R01–R06 既有门及 P99 的其他条件保留，22 slices / 18 accepted 不因缩减任务数自动变化。训练、全初态鲁棒性、九格 Solution 全成功、#4/#5、F06 完成、正式 Qualification 不属于当前 R07c 必需出口，不得据此重开已完成状态。确需增加条件应另记维护者范围决定。
+
+<a id="v210-r00-r07-closeout"></a>
+
+### v2.1.0 的 R00–R07 路线收尾
+
+维护者将本路线收尾目标明确为 **v2.1.0**。任务 #1/#2/#3 按上面的部署切换与分层 Solution 成功门完成并经 Sol 复核后，即可进入 R00–R07 收尾；不等待可选 #4/#5 或九格 Solution 全成功。这里“R00–R07”沿用维护者的路线称呼，现有准入记录仍为 P00、七个目标仍为 R01–R07，不另造 R00 切片或改变 7 Goal / 22 slices 计数。
+
+收尾工作是汇总现有 P00/R01–R07 的接受范围、源码/证据身份、历史限制与未完成项，完成既有 R07d 成本/独立质量审阅和 P99 范围复核，准备 v2.1.0 路线收尾报告与发布候选说明。已经接受且输入未变的证据复用；只对实际集成影响或未解决门补检查。可选任务以各自 NOT_STARTED/PARTIAL/有界通过状态附列，未选择不构成缺件；不得把 F06/F07、更广 Harness/Qualification 或其他新能力静默加入本路线收尾条件。
+
+**进入收尾、路线完成、版本发布分别记账。** 本决定没有把当前单任务 D01 部署结果标为三任务完成，也没有豁免上述既有 required 门。路线收尾报告只覆盖本 R00–R07 声明范围；v2.1.0 全版本如包含另线范围，按其独立已定门报告，不据此自动宣称 F 线完成。merge/push/tag/Release 与正式 Qualification 继续按各自授权和审批执行，本次不创建版本/tag 或发布。
 
 本次只修改文档/机器范围与 Skill 导航，复用 camera 分支，无新分支、实现/native、自动派发、merge/push 或 F 线写入授权。后续工作包按本节冻结具体 scope/资源与 source；F 线主 checkout 继续由其 owner 管理，整合时保留其当前 F 状态和已修复 Harness 合同。
 

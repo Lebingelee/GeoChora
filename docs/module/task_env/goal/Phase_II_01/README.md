@@ -1,6 +1,8 @@
 # Phase II-01 修订规划交付包
 
-2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 延期且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
+v2.1.0 路线收尾方向（维护者2026-10-30补充）：任务 #1/#2/#3 按当前必需验收完成后即可进入 R00–R07 收尾，不等待可选 #4/#5。复用既有接受证据，完成现有 R07d/P99 和整合收尾；路线完成与发布授权分开。详见[收尾边界](09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout)。
+
+2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
 
 当前统筹（2026-10-29）：R01–R06共**18/22** slices已获各自有界接收，R06c attempt002技术修复及历史范围勘误已收口。canonical outer-v0发布原件仍在；generic/execution v1历史bytes验证延期及eb870 JSON来源限制承接既有决定，不删reader、不声称未知原件兼容。R07b pilot attempt001已获单任务source install/recipe S1有界接收；R07c pilot attempt001刚交回PARTIAL待Sol复核，缺compiled composition与Core native construction/admission路线，无native且不计入18/22。详见[07当前入口](07_Execution_Order_and_Acceptance.md)、[R06勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)与[R07c结果](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-execution-result-2026-10-29)。Luna1独立负责F00–F07；原五任务R07/P99/Qualification仍未通过。下文历史记录保持各自时点含义。
 
