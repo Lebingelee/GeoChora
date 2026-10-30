@@ -2901,7 +2901,7 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "e8788e0d43fa50843e04994eac14e7caca942a8b8bfe79748caab2a8a02c9b32",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "b35672720b48992d3f29779fd450c67f9e2c4b64fcd54d40698335b276057d33",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
     "07_Execution_Order_and_Acceptance.md": "c840492e507245eb7ffde49485de0d29652b666f5a3a0868f495f773f02ab9dc"
@@ -6644,6 +6644,12 @@
     "native_budget_origin": "new attempt002 complete manual transfer required, not remaining attempt001 quota",
     "accepted_count_unchanged": "18/22",
     "five_task_r07c_accepted": false,
-    "qualification": false
+    "qualification": false,
+    "maintainer_added_scope": "Remove all D01 LIBERO-specific public Core branches/entrypoints/task names/layout and controller/init/H5 schema allowlists; source-bound typed contracts at existing owners; different-name/channel-count non-LIBERO same-route synthetic fixture; not mere renaming.",
+    "next_timebox_minutes": 420,
+    "next_expected_active_minutes": [
+      240,
+      360
+    ]
   }
 }

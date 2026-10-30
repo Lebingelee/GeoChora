@@ -31,4 +31,12 @@ G0输入/保护身份确认，输出范围事件保留偏差；G1当前source/re
 
 准备 D01 diagnostic attempt002，复用camera分支；Sol本次文档提交后的真实HEAD作为新输入。一个窗口集中完成上述四项、限位/warning与reader正负例、输出根守卫和必要文档/Skill收口；复用原source/采样/许可/编译布局与不受影响证据。不转D02/D03/D04、不合F线、不重做资产平台。
 
-预计主动150–240分钟、timebox300分钟（末30分钟收口）；先S1再新的冻结native run。沿原MuJoCo3.8.1 CPU与共享锁策略，每进程600秒、RSS采样2GiB/终止3GiB、启动MemAvailable≥6GiB/低于2GiB中止；新attempt累计native3600秒/20000 step/30 reset，证据≤1GiB。新预算只有维护者转交完整attempt002包后生效，不继承attempt001余额。本次复核零新增native，无实施返工、无自动派发。
+预计主动240–360分钟、timebox420分钟（末30分钟收口，包含下述维护者追加的Core去特化）；先S1再新的冻结native run。沿原MuJoCo3.8.1 CPU与共享锁策略，每进程600秒、RSS采样2GiB/终止3GiB、启动MemAvailable≥6GiB/低于2GiB中止；新attempt累计native3600秒/20000 step/30 reset，证据≤1GiB。新预算只有维护者转交完整attempt002包后生效，不继承attempt001余额。本次复核零新增native，无实施返工、无自动派发。
+
+### 维护者追加：公共Core去除LIBERO专门处理
+
+维护者在本次复核中明确要求将此项纳入attempt002。范围覆盖整个D01新增公共链路，而不仅是单个反向import：Selected入口/branch、Runtime admission、reset样本约束、MuJoCo layout/control/contact、canonical target和H5 metadata不得包含LIBERO任务名、On/物体名、固定7+2通道/48+43布局、50行init、benchmark controller身份或专用schema白名单。只改函数/变量名而保留同样隐式白名单不满足此门。
+
+benchmark配方自行声明并校验固定source/hash/布局/采样/谓词/增益，Core在既有owner接收版本化、source-bound typed plan，按真实public compiled metadata验证可执行能力、名称/类型/单位/资源唯一性、写入和生命周期。MuJoCo adapter中的provider-specific lowering允许保留；任务知识移出。不能把Core admission整个挪给benchmark，或把任意字符串/manifest当增权令牌；不建立第二Runtime/Recorder/控制框架。
+
+在同一真实公共Core路径增加一个非LIBERO、不同关节名称和通道数量的最小synthetic fixture，验证reset/mixed target/contact query/step/记录和收尾；它只证明公共合同摆脱固定benchmark假设，不授予另一任务/Provider native支持。旧PickCube/NutAssembly/Position/leaf/F线compatibility保留；本包不是全Core既有Panda历史profile重构。输出逐项去特化前后owner矩阵与静态残留分类，最后仍以LIBERO原门的真实native/H5结果验收。
