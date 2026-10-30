@@ -11,6 +11,7 @@ from task_env.diagnostics.tasks.f05_dg01_h5_reader import (
     _mjcf_hand_fk,
     _mutate_h5,
     _verify_exit,
+    _verify_reset_write_receipt,
 )
 
 
@@ -103,3 +104,55 @@ def test_cold_reader_exit_gate_requires_the_frozen_start_sampling_and_wall_limit
         mutated = {**receipt, field: value}
         with pytest.raises(ValueError, match="exit/resource/process/lock"):
             _verify_exit(mutated, plan, "run")
+
+
+def test_dg01_mujoco_reset_receipt_covers_source_joints_free_body_and_actuators():
+    from types import SimpleNamespace
+
+    from task_env.runtime.sessions.mujoco import _dg01_native_reset_write_receipt
+
+    source = SimpleNamespace(
+        joints={"panda-main/joint1": "joint1", "panda-main/finger_joint1": "finger_joint1"},
+        free_joints={"free-cube/free_cube": "cube_freejoint"},
+        joint_targets={"panda-main/joint1": "actuator1"},
+        open_actuators=("actuator8",),
+    )
+    receipt = _dg01_native_reset_write_receipt(
+        SimpleNamespace(sample_id="reset-sample"), source,
+    )
+    assert receipt.schema_version == "native-reset-write-receipt-v1"
+    assert receipt.written_joint_names == ("panda-main/finger_joint1", "panda-main/joint1")
+    assert receipt.written_free_joint_names == ("free-cube/free_cube",)
+    assert receipt.reset_target_names == ("actuator1", "actuator8")
+    assert receipt.velocities_zeroed is True and receipt.partial is False
+
+
+def test_cold_reader_rejects_partial_or_cross_bound_reset_write_receipts():
+    source_mappings = {
+        "joints": {"panda-main/joint1": "joint1"},
+        "free_joints": {"free-cube/free_cube": "cube_freejoint"},
+        "joint_targets": {"panda-main/joint1": "actuator1"},
+        "open_actuators": ["actuator8"],
+    }
+    profile = {
+        "source_mappings": source_mappings,
+        "reset_sample_id": "reset-sample",
+        "reset_write_receipt": {
+            "schema_version": "native-reset-write-receipt-v1",
+            "reset_sample_id": "reset-sample",
+            "written_joint_names": ["panda-main/joint1"],
+            "written_free_joint_names": ["free-cube/free_cube"],
+            "reset_target_names": ["actuator1", "actuator8"],
+            "velocities_zeroed": True,
+            "partial": False,
+        },
+    }
+    _verify_reset_write_receipt(profile)
+    partial = {**profile, "reset_write_receipt": {**profile["reset_write_receipt"], "partial": True}}
+    with pytest.raises(ValueError, match="ResetPlan write receipt"):
+        _verify_reset_write_receipt(partial)
+    cross_bound = {**profile, "reset_write_receipt": {
+        **profile["reset_write_receipt"], "reset_sample_id": "other-reset",
+    }}
+    with pytest.raises(ValueError, match="ResetPlan write receipt"):
+        _verify_reset_write_receipt(cross_bound)

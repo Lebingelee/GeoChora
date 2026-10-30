@@ -9,6 +9,23 @@ from .common import _SessionValues, pose
 from .source import lower_mujoco_scene_source, source_asset_bytes
 
 
+def _dg01_native_reset_write_receipt(sample, source):
+    """Return a validated public receipt for the exact DG01 ResetPlan writes."""
+    from .native_io import NativeResetWriteReceiptV1
+
+    target_names = tuple(sorted({
+        *source.joint_targets.values(),
+        *source.open_actuators,
+    }))
+    receipt = NativeResetWriteReceiptV1(
+        'native-reset-write-receipt-v1', sample.sample_id,
+        tuple(sorted(source.joints)), tuple(sorted(source.free_joints)),
+        target_names, True, False,
+    )
+    receipt.validate(sample, source, target_names)
+    return receipt
+
+
 def _source_asset_bytes(base_dir, source_xml):
     """Backward-compatible private spelling for the shared source owner."""
 
@@ -1449,6 +1466,7 @@ class _MuJoCoSession(_SessionValues):
     def reset(self, sample):
         self._begin_reset()
         self._validate_sample(sample)
+        self._reset_write_receipt = None
         self._last_typed_force_publication = None
         self._mj.mj_resetData(self._model, self._data)
         self._native_steps = 0
@@ -1500,6 +1518,10 @@ class _MuJoCoSession(_SessionValues):
             self._fixed_forward_calls += 1
         realized = self._realized(sample)
         self._cache_completed_actuator_force()
+        if self._f05_dg01_input is not None:
+            self._reset_write_receipt = _dg01_native_reset_write_receipt(
+                sample, self._source,
+            )
         return realized
 
     def _snapshot_with_native_free_joints(self):

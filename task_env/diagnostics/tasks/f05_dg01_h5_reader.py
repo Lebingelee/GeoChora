@@ -225,6 +225,23 @@ def _expected_profile(plan):
     }
 
 
+def _verify_reset_write_receipt(profile: dict) -> None:
+    source = profile.get("source_mappings", {})
+    receipt = profile.get("reset_write_receipt", {})
+    expected_targets = sorted({
+        *source.get("joint_targets", {}).values(),
+        *source.get("open_actuators", ()),
+    })
+    if (receipt.get("schema_version") != "native-reset-write-receipt-v1"
+            or receipt.get("reset_sample_id") != profile.get("reset_sample_id")
+            or sorted(receipt.get("written_joint_names", ())) != sorted(source.get("joints", {}))
+            or sorted(receipt.get("written_free_joint_names", ())) != sorted(source.get("free_joints", {}))
+            or receipt.get("reset_target_names") != expected_targets
+            or receipt.get("velocities_zeroed") is not True
+            or receipt.get("partial") is not False):
+        _fail("DG01 H5 public ResetPlan write receipt is missing, partial or cross-bound")
+
+
 def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
               expected_h5_sha256: str | None = None,
               derived_xml_path: Path | None = None,
@@ -258,6 +275,7 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
             _fail(f"DG01 H5 frozen provenance mismatch at {field}")
     if profile.get("provenance_kind") != "native_runtime" or profile.get("runtime_admitted") is not True:
         _fail("DG01 H5 is not bound to the native Core runtime route")
+    _verify_reset_write_receipt(profile)
     for relative, expected_sha in plan["code_sha256"].items():
         if relative in profile.get("code_sha256", {}) and profile["code_sha256"][relative] != expected_sha:
             _fail(f"DG01 H5 code provenance changed: {relative}")
@@ -650,6 +668,12 @@ def _mutate_h5(path: Path, mutation: str):
             del meta["env_meta"]
             dtype = h5py.string_dtype(encoding="utf-8")
             meta.create_dataset("env_meta", data=yaml.safe_dump(raw, sort_keys=True), dtype=dtype)
+        elif mutation == "reset_write_receipt":
+            raw = yaml.safe_load(_text(meta["env_meta"]))
+            raw["reference_profile"]["reset_write_receipt"]["partial"] = True
+            del meta["env_meta"]
+            dtype = h5py.string_dtype(encoding="utf-8")
+            meta.create_dataset("env_meta", data=yaml.safe_dump(raw, sort_keys=True), dtype=dtype)
         elif mutation == "tendon_coefficient":
             raw = yaml.safe_load(_text(meta["env_meta"]))
             raw["reference_profile"]["model_receipt"]["tendon"]["wraps"][0]["parameter"] = 0.6
@@ -732,7 +756,7 @@ def run_reader(plan_path: Path, worker_result_path: Path, supervisor_path: Path,
         source = Path(worker["episodes"][0]["h5_path"])
         for mutation in (
             "source_closure", "model_shape", "joint_address", "unit", "com",
-            "tendon_coefficient", "force_clip", "equality", "task_predicate",
+            "tendon_coefficient", "force_clip", "equality", "reset_write_receipt", "task_predicate",
             "stale_time", "cross_run", "durable_file",
         ):
             mutated = negative_root / f"{mutation}.h5"
@@ -772,7 +796,7 @@ def run_reader(plan_path: Path, worker_result_path: Path, supervisor_path: Path,
             })
         else:
             _fail("DG01 independent reader accepted nonzero worker exit")
-        if len(negative_results) != 13:
+        if len(negative_results) != 14:
             _fail("DG01 H5/control negative mutation matrix is incomplete")
     output.mkdir(parents=True, exist_ok=True)
     result = {
