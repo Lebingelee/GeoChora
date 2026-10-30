@@ -50,13 +50,13 @@ class _GeoPhysSession(_SessionValues):
         return self._last_actuator_force_measurement
 
     def reset(self, sample):
+        self._validate_sample(sample)
         self._begin_reset()
         # A failed reset must not leave a previous episode's validated sample
         # visible through this adapter's diagnostic property.
         self._reset_force_measurement = None
         self._last_actuator_force_measurement = None
         self._last_typed_force_publication = None
-        self._validate_sample(sample)
         initial = self._initial
         positions = np.array(initial.qpos, copy=True)
         targets = np.array(initial.ctrl, copy=True)

@@ -136,6 +136,7 @@ def _validate_physical_state_monitor(
         raise ValueError("physical-state monitor maximum excursion differs from its recorded extrema")
     warning_counts = monitor.get("warning_counts")
     if (not isinstance(warning_counts, list)
+            or len(warning_counts) != 7
             or any(type(value) is not int or value < 0 for value in warning_counts)
             or any(warning_counts)):
         raise ValueError("physical-state monitor omits warning counters or records a MuJoCo warning")

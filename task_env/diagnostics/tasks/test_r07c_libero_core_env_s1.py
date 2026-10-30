@@ -308,9 +308,10 @@ class _FakeData:
         self.site_xmat = np.tile(np.eye(3, dtype=np.float64).reshape(1, 9), (model.nsite, 1))
         self.contact: list[_Contact] = []
         self.ncon = 0
-        self.warning = [types.SimpleNamespace(number=0) for _ in range(8)]
+        self.warning = [types.SimpleNamespace(number=0) for _ in range(7)]
         self._write_counter = 0
         self._world = model._world
+        self._world.last_data = self
 
 
 _FAKE_WORLD = _World()
@@ -1102,6 +1103,91 @@ def test_reset_schema_and_provider_rejection_precede_runtime_mutation(tmp_path, 
         assert _FAKE_WORLD.calls["reset"] == 0
     finally:
         unsupported.close()
+
+
+@pytest.mark.parametrize('provider, class_name', (
+    ('geophys', '_GeoPhysSession'), ('sapien', '_SapienSession'),
+    ('genesis', '_GenesisSession'),
+))
+def test_other_provider_v1_reset_rejected_before_lifecycle_mutation(provider, class_name, monkeypatch):
+    """A new reset schema must not enter legacy zero-velocity provider paths."""
+    from dataclasses import replace
+    import importlib
+
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    try:
+        env.reset(seed=51)
+        cls = getattr(importlib.import_module('task_env.runtime.sessions.' + provider), class_name)
+        # Initialize only the real shared value owner. Native provider objects
+        # deliberately do not exist: schema rejection must precede touching them.
+        session = cls.__new__(cls)
+        source = replace(env.value['source'], mixed_actuator_plan=None)
+        session._initialize_values(env.artifact, source, provider)
+        session._reset_done = True
+        session._episode_id = 'preserved-episode'
+        session._reset_force_measurement = 'preserved-feedback'
+        before = dict(_FAKE_WORLD.calls)
+        with pytest.raises(TypeError, match='requires an admitted MuJoCo mixed actuator session'):
+            session.reset(env.sample)
+        assert session._reset_done is True
+        assert session._episode_id == 'preserved-episode'
+        assert session._reset_force_measurement == 'preserved-feedback'
+        assert _FAKE_WORLD.calls == before
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('bias_slot, value', ((0, 1.0), (2, 1.0)))
+def test_position_drive_rejects_offset_and_antidamping_before_reset(bias_slot, value, monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=2)
+    fake = sys.modules['mujoco']
+    original = fake.MjModel.from_xml_string
+
+    def unsupported_servo(*args, **kwargs):
+        model = original(*args, **kwargs)
+        for aid in range(model.nu):
+            if model.actuator_biastype[aid] == fake.mjtBias.mjBIAS_AFFINE:
+                model.actuator_biasprm[aid, bias_slot] = value
+        return model
+
+    monkeypatch.setattr(fake.MjModel, 'from_xml_string', unsupported_servo)
+    try:
+        with pytest.raises(ValueError, match='not a fixed-gain affine servo'):
+            env.reset(seed=51)
+        assert _FAKE_WORLD.calls['reset'] == 0
+        assert _FAKE_WORLD.calls['step'] == 0
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize('warning_count', (0, 6, 8))
+def test_monitor_and_reader_reject_incomplete_warning_vector(warning_count, monkeypatch):
+    from copy import deepcopy
+    from bench_deploy.libero.core_candidate_worker import _validate_physical_state_monitor
+
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _candidate(monkeypatch, horizon=2)
+    try:
+        observation, _ = env.reset(seed=19, options={'init_row_index': 0})
+        progress = env.get_runtime_progress_receipt()
+        monitor = deepcopy(progress['physical_state_monitor'])
+        monitor['warning_counts'] = [0] * warning_count
+        progress['physical_state_monitor'] = monitor
+        joints = np.asarray([observation['state']['joint_position']], dtype=np.float64)
+        with pytest.raises(ValueError, match='omits warning counters'):
+            _validate_physical_state_monitor(monitor, progress, env.session.compiled_layout_receipt, joints)
+        _FAKE_WORLD.last_data.warning = [types.SimpleNamespace(number=0) for _ in range(warning_count)]
+        with pytest.raises(RuntimeError, match='all seven warning counters'):
+            env.session._warning_counts()
+    finally:
+        env.close()
 
 
 def test_contact_state_revision_rejected_before_recording_and_latched(tmp_path, monkeypatch):

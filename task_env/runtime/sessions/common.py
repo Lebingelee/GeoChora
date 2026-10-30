@@ -306,6 +306,12 @@ class _SessionValues:
 
     def _validate_sample(self, sample):
         self._require_open()
+        if isinstance(sample, ResetSampleV1) and (
+                self._provider != 'mujoco'
+                or getattr(self._source, 'mixed_actuator_plan', None) is None):
+            raise TypeError('ResetSampleV1 requires an admitted MuJoCo mixed actuator session before reset')
+        if getattr(sample, 'schema_version', None) not in {'reset-sample-v0', 'reset-sample-v1'}:
+            raise TypeError('RuntimeSession reset requires an admitted reset sample schema')
         if sample.task_artifact_hash != self._artifact.identity_hash:
             raise ValueError('reset sample/Artifact mismatch')
         if set(sample.joint_position) != set(self._source.joints) or set(sample.poses_world) != set(self._source.free_joints):

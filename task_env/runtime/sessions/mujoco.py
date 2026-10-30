@@ -267,6 +267,8 @@ class _MuJoCoSession(_SessionValues):
                         or int(self._model.actuator_biastype[aid]) != int(self._mj.mjtBias.mjBIAS_AFFINE)
                         or not math.isfinite(float(self._model.actuator_gainprm[aid, 0]))
                         or float(self._model.actuator_gainprm[aid, 0]) <= 0.0
+                        or float(self._model.actuator_biasprm[aid, 0]) != 0.0
+                        or float(self._model.actuator_biasprm[aid, 2]) > 0.0
                         or not np.isclose(
                             float(self._model.actuator_biasprm[aid, 1]),
                             -float(self._model.actuator_gainprm[aid, 0]),
@@ -2134,7 +2136,11 @@ class _MuJoCoSession(_SessionValues):
 
     def _warning_counts(self):
         warnings = getattr(self._data, 'warning', ())
-        return [int(item.number) for item in warnings]
+        counts = [int(item.number) for item in warnings]
+        # The pinned 3.8.1 mjtWarning enum has seven entries (mjNWARNING).
+        if len(counts) != 7 or any(value < 0 for value in counts):
+            raise RuntimeError('pinned MuJoCo runtime must publish all seven warning counters')
+        return counts
 
     def _initialize_physical_monitor(self):
         ranges = {}
