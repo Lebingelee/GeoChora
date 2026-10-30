@@ -1089,10 +1089,14 @@ route maps seven named torque actuators and two signed finger position
 actuators at 20 Hz, holding torques over 25 × 2 ms steps. The reset is derived
 from pinned BDDL/sampler source using a recorded deterministic fixture
 realization, then restores the complete named `.pruned_init` row; historical
-per-row fixture parity is not claimed. Missing or stale contact remains
-unavailable. The controller is not equivalent to upstream OSC_POSE.
+per-row fixture parity is not claimed. The required contract treats missing
+or stale contact as unavailable; the revision-consumer gap identified below
+still needs repair. The controller is not equivalent to upstream OSC_POSE.
 
-Validated provider-free entry example:
+Runtime entry example (requires a separately authorized native window and the
+frozen launcher/shared lock). Calling reset/step below materializes MuJoCo;
+this code is not a provider-free smoke. The S1 test harness installs only the
+bottom public model/data stand-in before using the same entry:
 
 ```python
 from bench_deploy.libero.selected_candidate import build_libero_selected_candidate
@@ -1116,7 +1120,13 @@ It exercised the same Selected Env/RuntimeSession/worker/Generic H5 v3 reader
 with only bottom MuJoCo model/data IO replaced. The locked MuJoCo 3.8.1 CPU
 run then produced three same-route 64/65 H5 episodes, 4,800 steps and five
 resets; the independent reader validated the H5s and parent lock/exit receipts.
-The bounded label remains pending Sol review. This does not establish broader
+Sol review of attempt001 retained these execution facts but requires rework:
+the production contact consumer omitted state_revision validation, incompatible
+reset schemas could write before rejection, and the reader did not detect a
+measured finger range exceedance. Core's benchmark evidence construction must
+also move through the existing task binding. Current disposition is
+`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`; stale-contact rejection and
+full bounded S2/S3 acceptance are not established. This does not establish broader
 task support or Qualification. The D01 native/H5 status is maintained in the
 [execution record](../../../docs/module/task_env/goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
 Do not promote the route to general task registration, five-task R07c, P99,

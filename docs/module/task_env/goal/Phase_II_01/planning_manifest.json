@@ -2901,10 +2901,10 @@
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "aec7bc98b6ef10a290a0d550c681c516bcc471e8bd99d9ccbf447379c0ccf4f0",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "e8788e0d43fa50843e04994eac14e7caca942a8b8bfe79748caab2a8a02c9b32",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
-    "07_Execution_Order_and_Acceptance.md": "c3b629fbce5f0c73beff1dfc323ae2a979e5e8e726c8aa95666a717eb27aff01"
+    "07_Execution_Order_and_Acceptance.md": "c840492e507245eb7ffde49485de0d29652b666f5a3a0868f495f773f02ab9dc"
   },
   "revision_kind": "PREPARE_R07C_PILOT_ATTEMPT002_REWORK",
   "benchmark_audit": {
@@ -6602,6 +6602,47 @@
     "output_dir": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_diag_d01_001/",
     "timebox_minutes": 420,
     "accepted_slices_unchanged": "18/22",
+    "five_task_r07c_accepted": false,
+    "qualification": false
+  },
+  "r07c_diag_d01_attempt001_sol_review": {
+    "date": "2026-10-30",
+    "input_head": "83f411ba726386fb2830ff2d334e913070d653b6",
+    "status": "R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED",
+    "review_doc": "../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md",
+    "integrity": {
+      "output_files": 1074,
+      "protected_files": 2201,
+      "phase_markdown_files": 12,
+      "all_manifest_entries_match": true
+    },
+    "replayed_s1": {
+      "passed": 129,
+      "native_starts": 0
+    },
+    "replayed_existing_reader": "verified_complete with measured-limit detector missing",
+    "retained_native_facts": {
+      "episodes": 3,
+      "transitions": 192,
+      "observations": 195,
+      "mj_step": 4800,
+      "resets": 5
+    },
+    "required_repairs": [
+      "production contact state_revision validation",
+      "reset schema/profile/provider rejection before lifecycle/native mutation",
+      "measured joint-limit/warning evidence and independent rejection; safe trajectory preserving source physics",
+      "move benchmark evidence construction behind existing task binding"
+    ],
+    "minor_docs_corrected": [
+      "planning_manifest 07/09 hashes",
+      "native example incorrectly marked provider-free",
+      "current status and stale-contact support wording"
+    ],
+    "next_diagnostic_attempt": 2,
+    "next_scope": "one consolidated D01 repair, no D02/D03/D04/F integration",
+    "native_budget_origin": "new attempt002 complete manual transfer required, not remaining attempt001 quota",
+    "accepted_count_unchanged": "18/22",
     "five_task_r07c_accepted": false,
     "qualification": false
   }

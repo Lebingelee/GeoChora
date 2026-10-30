@@ -1,5 +1,7 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
+当前Sol决定（2026-10-30）：D01 attempt001为 **`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`**。统一Selected/RuntimeSession路线、129项S1复跑和三H5/4800 step事实保留；生产contact漏revision校验、reset schema/profile拒绝发生在写入之后、实测手指超出源range而reader未检测，以及Core反向依赖benchmark语义需集中修复。详见[Sol复核与attempt002范围](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。原Luna标签和下方执行记录保留为候选报告，不代表Sol接收。五任务、18/22、P99、Qualification和F线集成不变。
+
 当前诊断接续（2026-10-30）：维护者已授权多个独立记录的 diagnostic attempts，目标仍为原五任务 R07c。首包 [D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md) 已在 camera 分支实现 SelectedReferenceEnv → RuntimeSession → MuJoCo 路线；最终 provider-free S1 为129 passed，冻结计划下的 MuJoCo 3.8.1 CPU native/H5与同run独立reader通过，标签为 `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`，门状态见[D01 execution result](#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30)。正常部署采用上游 reset + init-state 语义，不把每行历史 fixture realization 作为必需外部输入；旧普通 attempt003 的 partial/失败不追溯升级。五任务、18/22、P99 与 Qualification 均不变。下文 2026-10-29 状态和原报告保留历史时点含义。
 
 状态（2026-10-29）：R07a成本协议/S1及来源审计已有有界部分接收；R07b首pilot来源安装、部署配方及provider-free S1已获Sol有界接收；R07c pilot attempt003已交回PARTIAL/BLOCKED待Sol复核。新source composer恢复了上游 movable-object free-joint与命名规则；原`.pruned_init`安全解码成功，但其不含每行fixture pose或采样seed，不能完成原始reset映射。真正MuJoCo RuntimeSession mixed-control/contact consumer与同路线S1未完成，因此G1/G2未过、zero native。公开LIBERO `make_env` admission关闭；真实部署成本完整性仍缺失。原五任务整体仍未完成，首pilot固定spatial bowl→plate；历史记录保持其签署时点含义，原五任务最终目标不缩减。

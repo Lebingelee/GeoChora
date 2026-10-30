@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+2026-10-30 Sol复核：D01 attempt001增量保留但需返工，未接收完整S2/S3；contact revision、reset admission-before-write、实测限位/reader及benchmark语义所有权缺口见[复核记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。下一包仅D01 diagnostic attempt002集中修复，复用camera，维护者转交后执行；不前进D02/R07d或集成F线。
+
 2026-10-30诊断接续：[R07c D01 attempt001](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_plan.md)由维护者转交 Luna2，复用 camera checkout，修复现有 SelectedReferenceEnv → RuntimeSession → MuJoCo 统一路线。最终 provider-free S1 为129 passed；冻结计划绑定的 MuJoCo 3.8.1 CPU native与同run H5独立reader已通过，状态 `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。正常评估不要求恢复某次历史 fixture sample；18/22 与原五任务出口不变。下文旧状态保留历史时点含义。
 
 当前入口（2026-10-30）：**R06c按有界required证据汇总接收；R01–R06仍为18/22 slices。R07c pilot attempt003的PARTIAL/G1-G2 BLOCKED保持其签署时点含义；独立 D01 diagnostic attempt001 已实现统一 SelectedReferenceEnv/RuntimeSession/MuJoCo 路线并通过 provider-free S1，native/H5 结果以本页 D01 execution result 为准。** 各接收等级保持S1/Audit/S2/S3原边界，不等于Qualification。历史B04a延期/eb870来源限制承接原维护者范围决定，canonical outer-v0原件索引已更正，详见[R06当前勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)及[机器记录](r06c_scope_reconciliation.json)。旧17/22及BLOCKED记录保留签署时点含义。

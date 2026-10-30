@@ -730,7 +730,10 @@ source-derived deterministic fixture realization is recorded with the complete
 named `.pruned_init` row restore; it does not claim historical fixture-to-row
 parity. Final provider-free S1 passed 129 focused cases. The bounded MuJoCo
 3.8.1 CPU native/H5 and independent-reader result is
-`R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`; this internal
+the historical Luna candidate label `R07C_DIAG_D01_PILOT_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`.
+Sol review retained the execution facts but requires contact-revision/reset
+admission and measured-limit/reader repairs, plus task-owned evidence construction;
+current disposition is `R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`. This internal
 diagnostic remains unregistered in `make_env()` and does not grant general
 Provider support or Qualification. Details and limits are recorded in the
 [R07c D01 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt001-execution-result-2026-10-30).
