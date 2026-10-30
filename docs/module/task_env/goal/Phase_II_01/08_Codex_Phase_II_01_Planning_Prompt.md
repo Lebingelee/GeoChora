@@ -42,3 +42,10 @@
 ### F05 successor attempt002 待转述入口（2026-10-30）
 
 001经Sol复核为PARTIAL，当前计数1/3。下一完整包已准备，尚未执行：先修R1–R4真实审计链，再在原owner内实施三路线接线及实际Core S1，满足每cell语义/代码提交/冻结/资源门后才可native。原required集合与物理门不变，三cell均过才可报候选PASS；旧F05 PARTIAL、F06/F07未启动状态保留。完整范围、预算及manual relay入口见[002合同](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract)。
+
+
+<a id="f05-early-diagnostic-three-goals"></a>
+
+### 2026-10-30维护者指定提前诊断：三个长期Goal
+
+当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01包准备后由维护者转述；DG02/03为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。

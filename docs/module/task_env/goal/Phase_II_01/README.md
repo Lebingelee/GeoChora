@@ -206,3 +206,10 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 ### F05 successor attempt002 执行结果（2026-10-30）
 
 冻结工作包`F05_SUCCESSOR_ATTEMPT002_SEMANTIC_REPAIR_AND_CORE_CELLS`已完成；静态审计输出位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/`。完整prompt/snapshot/hash、G0–G8、readiness、三route blockers与提交信息见[完整执行记录](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-execution)。本轮没有route生产实现或native证据，因此为PARTIAL交Sol独立复核，不自动接收，不启动下一窗口或F06/F07。
+
+
+<a id="f05-early-diagnostic-three-goals"></a>
+
+### 2026-10-30维护者指定提前诊断：三个长期Goal
+
+当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01包准备后由维护者转述；DG02/03为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。

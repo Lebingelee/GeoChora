@@ -1858,13 +1858,14 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "86755852bbb01426be57906c9454740e28378447e9bf681e9e6583bcd6ac102c",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "9ad21176d3578a2078fbc33e3857a3c50bd2c572ad8d1c3221997f748935cfa9",
+    "07_Execution_Order_and_Acceptance.md": "8060743d170f87d32a482b13ad36ca956a59d4cfe3c7797971434f5646f477fa",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "491e573f62a2ea7050f2a9c5ec7df7dabbcdac05a0c5009ea3594864a4c1ac29",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "6aa9e5fa8dcaa24f9f4d1c95b4fcbb831ac881620bbff901582e53cacfb8eab7",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "327d97be3da2549b28a77fac3b0e4df0f99bc1e24ec985449ea9e155c1de40d8",
-    "12_F05_F07_Execution_Playbook.md": "7aeecbeb8e26e6332f6d71ce9a927a8fd4be448abb3dc4f488d6edda6188f52c"
+    "README.md": "8bdccecc6f138291597f103f7c1539b5602a91ce12ae3dc019f78d61792daad1",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b017eaeb0c13f3d2c93cd2e8a3aa279ccb1cb6c13db1ad93d3e78ae508e3c826",
+    "12_F05_F07_Execution_Playbook.md": "4d880071c8b64ab15ddb611b6d8d67a3e540c4026b21bda73d294203957af21a",
+    "13_F05_Early_Diagnostic_Three_Goals.md": "8ef49450cbe22d9cddb73cff43e98376fefc9c0f131f4c6e9c7fae48a8ce519e"
   },
   "revision_kind": "F05_SUCCESSOR_ATTEMPT001_S0_INVENTORY_PASS_READINESS_BLOCKED_BY_FEATURE_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6675,6 +6676,53 @@
       "isaac62_static_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/isaac62_static_schema_review.json",
       "doc_validation": "exit 1; 216 errors exactly match frozen historical baseline (0 changed, 0 unexpected categories)"
     },
-    "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030"
+    "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030",
+    "f05_early_diagnostic_three_goals_20261030": {
+      "authority": "maintainerexplicitlydesignated earlydiagnosticimplementation and3longgoalprompts, manualrelay, adaptnextafterreport",
+      "status": "DG01_PREPARED_NOT_EXECUTED_DG02_DG03_ADAPTIVE_BASELINES",
+      "preparation_input_head": "e7382adc0f31ca5fbff74c61a5163247d080759e",
+      "ordinary_successor_history": {
+        "completed": 2,
+        "limit": 3,
+        "ordinary003": "NOT_DISPATCHED",
+        "preservation": "no reset/noacceptance; diagnostic windows separate"
+      },
+      "diagnostic_window_limit": "no fixed attemptcap; pergoal/window/run budgets mandatory",
+      "goals": [
+        {
+          "id": "DG01",
+          "scope": "common source/task/Action semantics + MuJoCoMJCF CPU Core nativecell",
+          "status": "PREPARED_FOR_MANUAL_RELAY",
+          "expected_active_hours": [
+            4,
+            10
+          ],
+          "window_timebox_minutes": 720,
+          "native_steps_limit": 48000,
+          "native_wall_s_limit": 7200
+        },
+        {
+          "id": "DG02",
+          "scope": "GeoPhysUSD publicconstraint/tendon/actuatorconsumer + Core nativecell",
+          "status": "BASELINE_REQUIRES_DG01_SOL_REVIEW_AND_NEW_FREEZE"
+        },
+        {
+          "id": "DG03",
+          "scope": "IsaacUSD GPUPhysX Corecell +3route semantic/evidenceclosure",
+          "status": "BASELINE_REQUIRES_DG02_SOL_REVIEW_AND_NEW_FREEZE"
+        }
+      ],
+      "planning_entry": "13_F05_Early_Diagnostic_Three_Goals.md",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic_goals_20261030_001/",
+      "scope": "existing Core implementation andstagednative, notreadonlyonly; effectiveexecutionaftermanualrelay",
+      "N0_N1": "frozen hypothesis/resource lock before modelcompile/probe, fullproductionreadiness notprerequisite",
+      "N2": "actualrouteimplementation/S1, frozenoracles/code/model/reader/plan, formalnativeandindependentreadback",
+      "F06_F07_started": false,
+      "Qualification": false,
+      "new_branch_worktrees": 0,
+      "preparation_tests": 0,
+      "preparation_native": 0
+    },
+    "latest_f05_successor_diagnostic_plan": "f05_early_diagnostic_three_goals_20261030"
   }
 }
