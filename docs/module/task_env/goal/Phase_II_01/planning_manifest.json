@@ -1,6 +1,6 @@
 {
   "kind": "phase-ii-01-revised-planning-manifest-v1",
-  "date": "2026-10-29",
+  "date": "2026-10-30",
   "status": "IN_PROGRESS_18_OF_22_BOUNDED_ACCEPTED",
   "implementation_authorized": false,
   "P00": "AUDIT_ROUND_1_COMPLETE_ADMISSION_PENDING",
@@ -2553,7 +2553,7 @@
       "depends_on": [
         "P00"
       ],
-      "status": "PARTIAL_AUDIT_ACCEPTED_FULL_FIVE_TASK_EXIT_PENDING",
+      "status": "PARTIAL_AUDIT_ACCEPTED_CURRENT_THREE_TASK_EXIT_PENDING",
       "execution": "NOT_STARTED",
       "required_evidence": "source audit / measurement protocol / feasibility",
       "stop_condition": "unresolved required semantic/source/protocol gate blocks deployment",
@@ -2562,14 +2562,15 @@
         "head": "1632a11774d817f2ebe36198bbc40a74e7f36974",
         "review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07a_004/sol_review.md",
         "scope": "Protocol and source-audit partial acceptance; single pilot source eligibility; not full five-task exit or benchmark deployment; no code integration."
-      }
+      },
+      "scope_authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030"
     },
     {
       "id": "R07b",
       "depends_on": [
         "R07a"
       ],
-      "status": "PILOT_S1_ACCEPTED_FULL_FIVE_TASK_EXIT_PENDING",
+      "status": "PILOT_S1_ACCEPTED_CURRENT_THREE_TASK_SOURCE_EXIT_PENDING",
       "execution": "PILOT_ATTEMPT001_SOURCE_RECIPE_S1_ACCEPTED; NATIVE_ADMISSION_FALSE; COST_INVALID",
       "required_evidence": "single-pilot source/license/manifest/install/verify/recipe provider-free S1 and scoped owner gaps",
       "stop_condition": "unverified assets, Core/Provider gaps remain BLOCKED",
@@ -2604,17 +2605,18 @@
         "s1_passed": 50,
         "cost_status": "INVALID_BASELINE_NOT_ANCESTOR",
         "accepted_slice_count_delta": 0
-      }
+      },
+      "scope_authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030"
     },
     {
       "id": "R07c",
       "depends_on": [
         "R07b"
       ],
-      "status": "PILOT_ATTEMPT003_PARTIAL_G1_G2_BLOCKED_PENDING_SOL_REVIEW_FULL_FIVE_TASK_EXIT_PENDING",
-      "execution": "PILOT_ATTEMPT003_PARTIAL; G1_G2_BLOCKED; NATIVE_ADMISSION_FALSE",
-      "required_evidence": "per-task S1/S2/S3 real deployment and native semantic correspondence",
-      "stop_condition": "any required task BLOCKED_CORE/BLOCKED_PROVIDER/NOT_REPRESENTABLE/FAIL/NOT_RUN blocks P99",
+      "status": "D01_PILOT_DEPLOYMENT_ACCEPTED_CURRENT_THREE_TASK_SWITCHING_AND_SOLUTION_GATES_PENDING",
+      "execution": "D01_NATIVE004_BOUNDED_DEPLOYMENT_ACCEPTED; SOLUTION_SUCCESS_AND_OTHER_PROVIDER_CELLS_NOT_PROVEN",
+      "required_evidence": "Nine real task/provider deployment cells; MuJoCo Solution success for all three tasks; at least one successful task each on GeoPhys and Isaac; source/native semantics, valid lifecycle, recording and independent readback; Sol review.",
+      "stop_condition": "Missing required deployment or required Solution coverage blocks closure; remaining stretch Solution failures and deferred original tasks 4/5 do not block current R07c/P99.",
       "pilot_preparation": {
         "status": "ATTEMPT001_DELIVERED_PARTIAL_PENDING_SOL_REVIEW",
         "implementation_plan": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-core-s1-plan",
@@ -2769,7 +2771,8 @@
         "maintainer_decision_required": true,
         "continuation_authorized": false,
         "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r07c_pilot_003/sol_review.md"
-      }
+      },
+      "scope_authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030"
     },
     {
       "id": "R07d",
@@ -2779,7 +2782,8 @@
       "status": "PLANNED",
       "execution": "NOT_STARTED",
       "required_evidence": "real-session cost report + fixed static analysis + independent human quality review",
-      "stop_condition": "missing primary session/source/log provenance or independent review blocks cost gate"
+      "stop_condition": "missing primary session/source/log provenance or independent review blocks cost gate",
+      "scope_authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030"
     }
   ],
   "P99": {
@@ -2787,7 +2791,7 @@
       "R06c",
       "R07d"
     ],
-    "also_requires": "all22 bounded slice contracts; original five source-pinned LIBERO deployments; session-bound Agent cost and independent Human quality; RoboCasa feasibility; historical limitations per r06c_scope_reconciliation.json",
+    "also_requires": "all22 bounded slice contracts; current three-task R07 deployment/Solution/provider scope per r07_current_scope_20261030; session-bound Agent cost and independent Human quality; RoboCasa feasibility; historical limitations per r06c_scope_reconciliation.json",
     "status": "BLOCKED_REMAINING_R07_REQUIRED_GATES"
   },
   "required_envelope": {
@@ -2804,9 +2808,30 @@
     "scope_change_requires_explicit_maintainer_decision": true,
     "automatic_deferral_allowed": false,
     "R07": {
-      "libero_required_tasks": 5,
-      "task_completion_expert_training_required": false,
+      "scope_authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030",
+      "libero_required_tasks": 3,
+      "required_task_ids": [
+        "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+        "libero_goal/open_the_middle_drawer_of_the_cabinet",
+        "libero_goal/push_the_plate_to_the_front_of_the_stove"
+      ],
+      "deferred_task_ids": [
+        "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
+        "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
+      ],
+      "deferred_tasks_block_current_r07_or_p99": false,
+      "task_completion_required": true,
+      "solution_completion_required": true,
+      "policy_training_required": false,
       "real_construction_resets_semantic_comparison_meaningful_motion_recording_required": true,
+      "deployment_provider_cells_required": 9,
+      "solution_success_required_task_counts": {
+        "mujoco": 3,
+        "geophys": 1,
+        "isaac": 1
+      },
+      "all_nine_solution_success_required": false,
+      "harness_20_seed_campaign_required_for_r07c": false,
       "agent_cost_and_independent_human_review_required": true,
       "controlled_native_agent_cost_baseline": "ADDITIONAL_RESEARCH_NOT_REQUIRED_FOR_P99",
       "native_semantic_comparator": "REQUIRED_FOR_R07c",
@@ -2893,20 +2918,20 @@
     }
   },
   "document_sha256": {
-    "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
+    "00_Phase_II_01_Blueprint.md": "8bf92eb5cace8e2fa3c19f55ac6c30821fb8a5b636bc84c4783b998037c145c0",
     "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
     "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
     "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
-    "07_Execution_Order_and_Acceptance.md": "25ec882265d3888fe702d760f48f4fc5b87c6b1384ca3783ee3cb1ba0c643716",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "1949e8cccf431f30e5dbede05aa775d2d21e5c2e36629cdb041ffd60fcf911ba",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
-    "README.md": "14d7db4ab6ee93feed450dd1c2566510739fe7fa6cb1b515cc3bb1737a9a1cb8"
+    "07_Execution_Order_and_Acceptance.md": "bf23a72bed2f20280bdcbc165deb9b89c018c5afe5746428316701b79c329bd8",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "7babec82274eb48e833970a5cd330322d88feb193d435f0565ac0963c612844a",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "7f7b9414909c0d388a046721ac6fe849acb24f5d457b1ae721553dbd3d1a3f0d",
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "1a2daeae49ab47d4e9f04621694a2968a27dc957ed94812fd25dfa7f7bcdcb11",
+    "README.md": "35a495c8eb010ece67bb005aecd5210a855c55f2294845930cd911f80407103d"
   },
-  "revision_kind": "PREPARE_R07C_PILOT_ATTEMPT002_REWORK",
+  "revision_kind": "MAINTAINER_R07_THREE_TASK_LAYERED_SOLUTION_AND_HARNESS_SCOPE",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -4573,9 +4598,7 @@
     "proposed_fixed_task_order": [
       "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
       "libero_goal/open_the_middle_drawer_of_the_cabinet",
-      "libero_goal/push_the_plate_to_the_front_of_the_stove",
-      "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
-      "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
+      "libero_goal/push_the_plate_to_the_front_of_the_stove"
     ],
     "measurement_baseline_accounting": {
       "status": "PROPOSED_TO_FREEZE_IN_R07a",
@@ -4593,11 +4616,20 @@
       "cache": "warm",
       "supersedes_prior_unfrozen_planning_fields_for_pilot": true,
       "five_task_order_unchanged": true
-    }
+    },
+    "previous_five_task_order_20261030": [
+      "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "libero_goal/open_the_middle_drawer_of_the_cabinet",
+      "libero_goal/push_the_plate_to_the_front_of_the_stove",
+      "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
+      "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
+    ],
+    "current_task_scope_authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030",
+    "scope_revision_accounting": "Freeze a new three-task measurement context before execution; preserve all prior session costs and invalid/partial labels; identify excluded/deferred-task work separately, do not retroactively recompute old costs as comparable or accepted."
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "R05c attempt001 normal-profile four-cell full task/H5 S2/S3 evidence and focused S1; pending Sol review. Historical missing raw/phase disposition, P99 and Qualification remain open.",
+  "planning_submission_this_revision": "Documentation-only maintainer scope decision: original tasks 1/2/3; nine deployment cells; MuJoCo 3/3 plus GeoPhys and Isaac each >=1 Solution success; existing Harness composition boundary; no implementation/native/dispatch/integration.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -5639,6 +5671,29 @@
       "full_five_task_exit": false,
       "qualification_granted": false,
       "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/r07c_pilot_001/"
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "MAINTAINER_R07_THREE_TASK_LAYERED_SOLUTION_AND_HARNESS_SCOPE",
+      "authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030",
+      "input_HEAD": "de40a954fa24f090f1fc4ae9cb01ef98aeb5984e",
+      "required_tasks": [
+        "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+        "libero_goal/open_the_middle_drawer_of_the_cabinet",
+        "libero_goal/push_the_plate_to_the_front_of_the_stove"
+      ],
+      "deferred_tasks": [
+        "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
+        "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it"
+      ],
+      "minimum_solution_success_task_counts": {
+        "mujoco": 3,
+        "geophys": 1,
+        "isaac": 1
+      },
+      "accepted_slice_count_delta": 0,
+      "new_native_runs": 0,
+      "qualification_granted": false
     }
   ],
   "P00_audit": {
@@ -6729,5 +6784,125 @@
     "qualification": false,
     "develop_full_integration": false,
     "next": "Evaluate D02/D03 caller migration and alias convergence then D04 affected-intersection integration, manual package transfer."
+  },
+  "r07_current_scope_20261030": {
+    "date": "2026-10-30",
+    "decision": "MAINTAINER_APPROVED_CURRENT_SCOPE_NOT_ACCEPTANCE",
+    "authority": "09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030",
+    "authorization": "Direct maintainer instruction in this conversation: select original tasks 1/2/3; all three Solutions succeed on native MuJoCo; at least one task succeeds on each other simulator; document boundaries and compose with develop-harness Task Harness.",
+    "planning_input_head": "de40a954fa24f090f1fc4ae9cb01ef98aeb5984e",
+    "required_tasks": [
+      "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "libero_goal/open_the_middle_drawer_of_the_cabinet",
+      "libero_goal/push_the_plate_to_the_front_of_the_stove"
+    ],
+    "deferred_tasks": [
+      {
+        "task": "libero_90/KITCHEN_SCENE2_stack_the_black_bowl_at_the_front_on_the_black_bowl_in_the_middle",
+        "disposition": "DEFERRED_OUT_OF_CURRENT_R07_SCOPE",
+        "blocks_current_r07_or_p99": false,
+        "accepted": false
+      },
+      {
+        "task": "libero_10/KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it",
+        "disposition": "DEFERRED_OUT_OF_CURRENT_R07_SCOPE",
+        "blocks_current_r07_or_p99": false,
+        "accepted": false
+      }
+    ],
+    "previous_required_envelope": {
+      "libero_required_tasks": 5,
+      "task_completion_expert_training_required": false,
+      "real_construction_resets_semantic_comparison_meaningful_motion_recording_required": true,
+      "agent_cost_and_independent_human_review_required": true,
+      "controlled_native_agent_cost_baseline": "ADDITIONAL_RESEARCH_NOT_REQUIRED_FOR_P99",
+      "native_semantic_comparator": "REQUIRED_FOR_R07c",
+      "statistical_cost_reduction_claim_without_controlled_experiment": false,
+      "robocasa": "early feasibility/scope recommendation only",
+      "required_task_blocker_auto_deferral_allowed": false
+    },
+    "deployment_switching": {
+      "providers": [
+        "mujoco",
+        "geophys",
+        "isaac"
+      ],
+      "task_provider_cells_required": 9,
+      "requires_all_three_tasks_on_each_provider": true,
+      "checks": [
+        "source_and_admission",
+        "construction",
+        "repeated_reset",
+        "meaningful_public_control_and_step",
+        "state_and_semantics",
+        "recording",
+        "independent_readback",
+        "close"
+      ],
+      "selection": "before run via execution config",
+      "hot_state_migration_required": false,
+      "universal_device_or_renderer_support_required": false,
+      "status": "NOT_PROVEN"
+    },
+    "solution_success": {
+      "required_task_counts": {
+        "mujoco": 3,
+        "geophys": 1,
+        "isaac": 1
+      },
+      "minimum_successful_task_provider_cells": 5,
+      "other_provider_selected_tasks_may_differ": true,
+      "all_nine_success_required": false,
+      "minimum_valid_success_episodes_per_required_success_cell": 1,
+      "sampling_horizon_repeat_tolerance_and_resources": "freeze before each execution package; retain all failures and earlier repeated-reset/physics gates",
+      "universal_initial_state_success_claimed": false,
+      "remaining_solution_success": "STRETCH_NON_BLOCKING",
+      "raw_task_success_and_solution_completion_both_required": true,
+      "lifecycle_fault_and_cleanup_independently_checked": true,
+      "status": "NOT_PROVEN"
+    },
+    "completion_rule": "R07c requires deployment switching plus both Solution coverage gates and independent Sol review; remaining stretch Solution failures do not block; required deployment faults remain blockers.",
+    "native_mujoco_definition": "Actual MuJoCo solver through unified Core route with pinned original LIBERO robot/assets/reset/predicate semantics; upstream-only success or a simplified lift task is insufficient.",
+    "harness_integration": {
+      "branch": "public/develop-harness",
+      "remote_head_verified": "9d0b3e524d67105e67ddb98e6dec903f19eb4255",
+      "remote_readback_date": "2026-10-30",
+      "status": "PLANNED_NOT_IMPLEMENTED_FOR_LIBERO",
+      "bench_deploy_owner": "source/reset/semantic recipe and task-owned Solution",
+      "harness_owner": "existing catalog/spec/compiler/checks/ledger/Oracle/pending Judge workflow",
+      "core_route": "SelectedReferenceEnv -> RuntimeSession -> provider adapter",
+      "no_duplicate_runtime_recorder_factory_or_candidate_stack": true,
+      "current_template": "synthetic pick-lift-v0; not LIBERO On/region/Open",
+      "completion_contract": "harness-feasibility-completion-v1; preserve current camera completion_facts and reader/owner-repair fixes",
+      "r07c_requires_harness_f06_closure": false,
+      "passing_harness_intersection_requires_distinct_solved_seeds": 20,
+      "other_harness_gates": [
+        "four reports",
+        "Oracle and independent H5 checks",
+        "construction ledger",
+        "pending Stage-1 package"
+      ],
+      "formal_human_judge_approval_implied": false,
+      "all_nine_harness_intersections_required": false
+    },
+    "current_evidence": {
+      "decision": "ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3",
+      "task": "libero_spatial/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate",
+      "provider": "mujoco",
+      "scope": "native004 exact deployment/control/semantic/readback only",
+      "task_success": false,
+      "solution_completed": null,
+      "new_scope_complete": false
+    },
+    "unchanged_gates": [
+      "R01-R06 accepted bounds",
+      "R07a/b source eligibility for the three required tasks",
+      "R07d session-bound costs and independent Human code-quality review",
+      "P99 other requirements",
+      "separate Human Judge and Qualification"
+    ],
+    "implementation_native_merge_push_or_dispatch_authorized_by_this_document_change": false,
+    "new_native_runs": 0,
+    "new_branches_or_worktrees": 0
   }
 }

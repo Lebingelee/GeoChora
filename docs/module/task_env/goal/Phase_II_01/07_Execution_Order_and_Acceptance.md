@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 延期且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
+
 2026-10-30最新Sol决定：D01 attempt002为[ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)，限固定LIBERO spatial/MuJoCo3.8.1 CPU/诊断控制与原native004交集；143项受影响S1和更严格离线reader通过，Sol零新增native。后继评估D02/D03迁移及D04集成，不提前改BaseTaskEnv alias或覆盖F线；五任务/18/22/P99/Qualification不变。下文待审标签保留历史签署含义。
 
 2026-10-30 Sol复核：D01 attempt001增量保留但需返工，未接收完整S2/S3；contact revision、reset admission-before-write、实测限位/reader及benchmark语义所有权缺口见[复核记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。该复核后的 attempt002 已按独立冻结包完成实施与 bounded S2/S3，等待 Sol 复核；下文 attempt001 内容保持其签署时点含义。

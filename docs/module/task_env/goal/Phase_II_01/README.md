@@ -1,5 +1,7 @@
 # Phase II-01 修订规划交付包
 
+2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 延期且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
+
 当前统筹（2026-10-29）：R01–R06共**18/22** slices已获各自有界接收，R06c attempt002技术修复及历史范围勘误已收口。canonical outer-v0发布原件仍在；generic/execution v1历史bytes验证延期及eb870 JSON来源限制承接既有决定，不删reader、不声称未知原件兼容。R07b pilot attempt001已获单任务source install/recipe S1有界接收；R07c pilot attempt001刚交回PARTIAL待Sol复核，缺compiled composition与Core native construction/admission路线，无native且不计入18/22。详见[07当前入口](07_Execution_Order_and_Acceptance.md)、[R06勘误](06_R06_Compatibility_and_Regression.md#r06c-scope-reconciliation)与[R07c结果](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-pilot-attempt001-execution-result-2026-10-29)。Luna1独立负责F00–F07；原五任务R07/P99/Qualification仍未通过。下文历史记录保持各自时点含义。
 
 **当前恢复入口（2026-10-28）**：R03c attempt004 已经Sol复核，状态为 `ACCEPTED_BOUNDED_S2_S3`：唯一MuJoCo 3.8.1 CPU启动与同run独立H5读回通过，4个H5各64/65，reader读取256 transitions/260 observations并拒绝48/48 tamper。结果仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置。详情见 [07 检查点恢复](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery) 与 [R03](03_R03_Physical_Attachment.md)；后续方向见 [10](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)。

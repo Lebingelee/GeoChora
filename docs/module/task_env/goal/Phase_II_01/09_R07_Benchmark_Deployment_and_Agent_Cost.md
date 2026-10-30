@@ -1,5 +1,63 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
+<a id="r07-current-scope-20261030"></a>
+
+## 当前范围决定：三个任务、部署切换与分层成功验收（2026-10-30）
+
+维护者在本诊断对话明确批准保留原任务 #1/#2/#3，并纠正“三任务×三后端都必须 Solution 成功”的建议。**本节是当前 R07 范围真源，覆盖下文历史“五任务 required”及“任务/Expert 成功非必需”的表述；旧报告、attempt、收据与原始审计不追溯修改。** 原 #4 叠碗、#5 炉子与摩卡壶移为 DEFERRED_OUT_OF_CURRENT_R07_SCOPE；其未实施或未成功不再阻塞当前 R07/P99。它们不是已通过，也不自动进入下一阶段。
+
+| 保留编号 | Suite / 精确任务名 | 必须保留的任务成功语义 |
+| --- | --- | --- |
+| 1 | libero_spatial / `pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate` | 原生 On(black bowl, plate)：原接触、XY 与高度条件 |
+| 2 | libero_goal / `open_the_middle_drawer_of_the_cabinet` | 原生 Open(middle drawer)：正确关联 joint，严格 qpos < −0.14 m |
+| 3 | libero_goal / `push_the_plate_to_the_front_of_the_stove` | 原生 On(plate, stove-front region)：原 site/region 分支；不另造 Push 动作历史谓词 |
+
+### R07c 的三个独立门
+
+| 门 | 当前必需范围 | 完成条件 |
+| --- | --- | --- |
+| 部署与后端切换 | 三个任务均可在 MuJoCo、GeoPhys、Isaac Sim 配置中选择并实际运行 | 九个 task/provider 组合均完成 source/admission、真实 construction、重复 reset、有意义的 public control/step、状态/语义检查、Recorder、独立读回与 close；仅注册/编译/参数存在不算可切换 |
+| MuJoCo Solution 成功 | #1、#2、#3 全部 | 每任务均有真实有效的完整成功 episode，原任务 predicate 与 Solution 完成同时成立，失败/非法 lifecycle/cleanup 不冒充成功 |
+| 其他后端 Solution 成功 | GeoPhys 至少一个保留任务；Isaac Sim 至少一个保留任务 | 两个后端分别有至少一个任务满足同等完成证据；可以选择相同或不同任务。其余组合的 Solution 成功是 STRETCH，不阻塞本成功门 |
+
+因此最低 Solution 成功覆盖是 **MuJoCo 3/3 + GeoPhys ≥1/3 + Isaac Sim ≥1/3**，不是九格全部成功。某个 optional-success 格出现普通任务失败且可安全运行，不阻塞成功覆盖；但 construction/admission/控制/记录不可用或 runtime fault 仍阻塞该格的部署切换门。报告分别列 deployment、task_success、solution_completed、lifecycle、reader/close 和失败原因，不能用一列 PASS 混合这些含义。
+
+“原生 MuJoCo”指统一 Core 路线实际使用 MuJoCo solver，并保留固定上游 LIBERO/robosuite 任务、机器人、资产、reset 和 predicate 语义；不能拿另一个 Panda/简化 lift 替代。上游独立 native comparator 继续核对语义；只在未修改的上游环境跑成功，不能代替 GeoChora 部署后的 Solution 成功。原始三任务的来源/许可/闭包准入仍须完成。
+
+每个 required-success 格至少交付一份同 run 的完整有效成功 episode 和独立可核查记录。工作包执行前固定 source、build、初始化集合/seed、horizon、重复次数、控制配方、容差和资源预算；旧有重复 reset/物理门不得用单次成功删掉。全量尝试和失败均入账，不事后删失败、换简单初态、放宽谓词或直接写入成功状态。该最低门不声称所有初态成功、统计成功率达标或跨后端轨迹逐值相同；更高成功率/seed 门只能在对应新范围明确约定，不在完成复核时临时追加。
+
+后端切换按运行前 Execution/provider 配置选择理解，保持同一 task identity、逻辑 Solution 和公开 state/control 合同；允许有身份、经审阅的 provider 资源表示、映射与控制参数差异。采用 `SelectedReferenceEnv → RuntimeSession → provider adapter`，不回退 BaseTaskEnv 双路线、不在公共 Core 加 LIBERO 特判、不由 Solution 调 native step 或读取 provider-private state。运行中迁移同一 native 状态、任意 backend/device、render/video、逐值动力学等价均未纳入本次切换门。
+
+### 与 develop-harness / Task Harness 的接入边界
+
+已对照远端 `develop-harness` 提交 `9d0b3e524d67105e67ddb98e6dec903f19eb4255`（2026-10-30 ls-remote 回读一致）及本 camera 分支的后续 Harness 修复。该分支只实现 synthetic `pick-lift-v0` / MuJoCo 候选工作流，尚不表达本三任务的 On/region/Open。以下是接入约束，**不是已实现 LIBERO Harness 的声明**。
+
+| Owner | 保留职责 / 后续接线 |
+| --- | --- |
+| `asset/benchmarks/libero/` | 原始 bytes/revision、逐资产许可、manifest、安装/验证和依赖闭包；Harness 只引用同一来源身份，不复制另一份资产真源 |
+| `bench_deploy/libero/` | 三任务配方、source/reset/语义 binding、task-owned evaluator 与 Solution；输出供既有构造入口消费的声明，不另建 Runtime、Recorder、候选审批或任务工厂 |
+| `task_env` Core / provider adapters | 统一构造、准入、生命周期、公开 state/control/contact、native lowering/step、记录及 close；benchmark 语义不下沉为公共任务白名单 |
+| `task_env/script/agent/` Task Harness | 扩展既有 catalog/spec/compiler/semantic/feasibility/ledger/Oracle/Judge 工具，消费上述相同配方和 Core 路线；不复制 compiler/runtime 体系或把 LIBERO 改成 mock lift |
+| Artifact / Experiment / Evidence / Human Judge | 保持来源、候选、运行事实与批准分离；Judge 包先 pending，技术成功不自动 approve/freeze 或取得 Qualification |
+
+后续接入按 COMPOSE_EXISTING + 必要的 EXTEND_EXISTING 评估现有 owner，保持一个 canonical task/Artifact/reset/semantic/Solution 来源；允许版本化适配到 Harness spec，但不得悄悄改目标、fixture、机器人或初始化分布。真实 LIBERO 资源仍标真实 provenance，不能伪造 `synthetic: true` 以通过旧 mock schema；旧 synthetic fixture 也不得改标为真实。MJCF 与 USD/其他派生表示分别绑定转换 recipe、loss/验证报告和 provider source identity，不要求为了接 Harness 先把所有输入变成 USD，也不降低 F05 自己的 USD 出口。
+
+复用 camera 已有 `completion_facts.py` / `harness-feasibility-completion-v1` 的 task、expert、lifecycle、fault、cleanup 原始事实与独立分类；对旧 develop-harness 必须携带相应完成事实/reader 修复，不能在合并时退回旧 solved 判定。不同 H5 版本保留对应 codec/reader，做显式版本适配，不重标历史 H5。
+
+**R07c 完成不要求 F06/Harness 候选通过。** 实际宣称某个 LIBERO task/provider 已通过 Harness/F06 时，仍须该声明交集的四报告、至少 20 个不同声明 seeds 全部 solved、Oracle/H5、ledger 与 pending Stage-1 包；不能把本次“每 required-success 格至少一个有效 episode”冒称 Harness 20-seed 通过。也不强制将所有九格都声明为 Harness 可行。Harness/F06 完成和 Human Judge 审批单独记账；若对应实现正是 R07 路线必需的依赖，只据实际依赖记录阻塞，不能把整个 F06/F07 静默追加为 R07c 前置。
+
+### 当前事实、结束条件与授权
+
+当前仅 #1 的 MuJoCo3.8.1 CPU D01 部署交集有 `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`；原结果 `task_success=false`、`solution_completed=null`。三项 Solution 全成功、九格部署切换、GeoPhys/Isaac 各一任务成功及 LIBERO Harness 接入均尚未证明；本次范围决定不升级旧证据。
+
+R07a/b 对当前三个 required tasks 补齐审计/来源准入；R07c 三门全部经 Sol 独立复核才可记当前范围完成。R07d 的 session-bound 成本和独立 Human code-quality review、R01–R06 既有门及 P99 的其他条件保留，22 slices / 18 accepted 不因缩减任务数自动变化。训练、全初态鲁棒性、九格 Solution 全成功、#4/#5、F06 完成、正式 Qualification 不属于当前 R07c 必需出口，不得据此重开已完成状态。确需增加条件应另记维护者范围决定。
+
+本次只修改文档/机器范围与 Skill 导航，复用 camera 分支，无新分支、实现/native、自动派发、merge/push 或 F 线写入授权。后续工作包按本节冻结具体 scope/资源与 source；F 线主 checkout 继续由其 owner 管理，整合时保留其当前 F 状态和已修复 Harness 合同。
+
+## 历史决策与原范围记录
+
+以下按原签署时点保留；当前任务范围、Solution 成功要求和后端出口以本页首节为准。
+
 当前Sol决定（2026-10-30）：D01 diagnostic attempt002接收为 **`ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`**。公共Core去LIBERO特化、原三项运行缺陷及native004/H5/每步限位/warning证据已独立复核；Sol直接收紧三个异常输入拒绝门并新增8项检测，最终143项受影响S1通过，零新增native。原生事实仍绑定 `47d38ac4`，修复提交 `d0c89b57` 只有S1/离线验证。详见[Sol接收记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)。下文Luna待审标签保留历史时点含义；五任务、18/22、P99、Qualification及F线集成不变。
 
 当前Sol决定（2026-10-30）：D01 attempt001为 **`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`**。统一Selected/RuntimeSession路线、129项S1复跑和三H5/4800 step事实保留；生产contact漏revision校验、reset schema/profile拒绝发生在写入之后、实测手指超出源range而reader未检测，以及Core反向依赖benchmark语义需集中修复。详见[Sol复核与attempt002范围](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。原Luna标签和下方执行记录保留为候选报告，不代表Sol接收。五任务、18/22、P99、Qualification和F线集成不变。

@@ -1,5 +1,7 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
+2026-10-30维护者范围修订：[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)为当前 R07/P99 的 R07 范围真源：保留原 #1/#2/#3，#4/#5 延期且不阻塞当前出口；三任务×三后端的真实部署切换必需，Solution 成功要求为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3，其余 Solution 成功为 stretch。R07c 不新增 F06/Harness 20-seed 前置；实际 Harness 声明仍遵守其四报告/≥20-seed/Oracle/pending Judge 合同。旧五任务、无需任务成功和待审措辞均保留历史时点含义，不是当前范围或当前 Sol 接收状态。当前仍仅 D01 单任务部署有界接收，未宣称新目标完成。F 线状态以其 owner 当前分支为准，本次不刷新。
+
 更新于 2026-10-28。状态：**F00 attempt002及有限复核修正获Sol `ACCEPTED_BOUNDED_F00`；下一步准备F01，尚未安装/启动**。
 本计划的后续方向仍为计划状态；F00 是维护者本轮单独授权的实现/验证包，不代表其他补丁行已授权或开始。
 F00 attempt001的整合、Harness生命周期修复和S1已由Sol接收，但其20/20 synthetic seeds均为`expert_failed / gripper_readiness_timeout`；该失败原件保持不变。attempt002随后完成受控物理归因、输入修复、20-seed native验收、Oracle/H5独立读回和pending Judge prepare/verify。完整出口仅待Sol复核；F01仍未派发或启动。
@@ -104,7 +106,7 @@ expert_failed 不直接等于 task infeasible；不得缩窄 reset 分布隐藏 
 
 F05 内部按 ready cell 顺序交付，不必为等待某 provider 阻塞其他已就绪行；
 但没有全部要求的 cell Evidence，就不能接受“三 provider 闭环”总出口。
-F06 的 Expert/20-seed 要求不回写为 R07 五任务部署的新增必需项。
+F06 的 ≥20-seed/Oracle/pending Judge 要求不回写为当前 R07c 的新增必需项；2026-10-30 的三任务 Solution 分层成功门来自维护者新决定，并非沿用旧“任务成功非必需”边界。见[当前三任务范围决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)。
 
 ### 原生资产与对应 Provider
 

@@ -747,7 +747,10 @@ controller qualification. The attempt002 result is
 this frozen source/task/controller/seed/reset/provider intersection. Attempt001
 and ordinary pilot history retain their original signed-time dispositions.
 This entry does not grant a general LIBERO Provider route, task success,
-five-task R07 completion, P99, or Qualification. See the
+current-scope R07 completion, P99, or Qualification. The planned three-task
+provider-switching/Solution gates are defined in the
+[current scope decision](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030);
+this documentation change does not widen the admitted API. See the
 [R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
 
 Current Sol disposition is `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3` for exactly
