@@ -1,67 +1,33 @@
-# Codex — Phase II-01 检查点恢复与实施交接入口
+# Codex — Phase II-01 当前规划与后继派包入口
 
-v2.1.0 路线收尾方向（维护者2026-10-30补充）：任务 #1/#2/#3 按当前必需验收完成后即可进入 R00–R07 收尾，不等待可选 #4/#5。复用既有接受证据，完成现有 R07d/P99 和整合收尾；路线完成与发布授权分开。详见[收尾边界](09_R07_Benchmark_Deployment_and_Agent_Cost.md#v210-r00-r07-closeout)。
+更新于2026-10-30。**本轮仅调整文档；F05 successor尚未派包、实施或启动native。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
 
-2026-10-30范围覆盖说明：R07 当前采用[维护者三任务与分层成功决定](09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07-current-scope-20261030)：保留原 #1/#2/#3，#4/#5 为 v2.1.0 可选补充、不阻塞当前出口；九格部署切换必需，Solution 成功为 MuJoCo 3/3、GeoPhys ≥1/3、Isaac Sim ≥1/3。下文五任务/任务成功非必需等旧规划保留历史含义，不能直接作为新执行包；实际包从当前范围和真实 HEAD 冻结。Harness/F06、P99 其他门与正式 Qualification 仍分开。
+## 先读当前入口
 
-更新于 2026-10-28。维护者本轮要求更新规划，后续考虑从 R03c attempt002 检查点恢复。
-**本文提供后续工作包的准备与接收规则，不是现在启动实现或 native 的指令。**
-旧 2026-10-23 审阅 Prompt 的“P00/R01–R07 尚未启动”已不适用于当前进度；原文可从 c30 及其历史恢复。
-具体状态以 [07](07_Execution_Order_and_Acceptance.md)、[manifest](planning_manifest.json) 和各 slice 真实 Evidence 为准。
+读取AGENTS.md及适用的GeoChora/TaskEnv、文档/API/测试Skill，核branch、HEAD、dirty、gitlinks和writer。CodeGraph存在时先定位真实owner，不重建索引。
 
-## 后续会话先读什么
+依次读取[README](README.md)、[07执行表](07_Execution_Order_and_Acceptance.md)、[10历史补丁与结果](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)、[11后继路线](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12执行指南](12_F05_F07_Execution_Playbook.md)和`planning_manifest.json`。原R线事项另读其slice文档，F线本次改向不改变R07三任务当前合同或P99；F06/Harness的20-seed门不能回写成R07新前置。
 
-读取 AGENTS 与 geochora、文档/架构/API/测试相关 Skill；核实际 branch、HEAD、dirty paths、gitlinks，
-遵循单写入、保护 ignored Evidence。CodeGraph 有索引时先用它追踪 owner/caller，不重建索引。
+## 本轮确定的规划方向
 
-依次读取 [README](README.md)、[00](00_Phase_II_01_Blueprint.md)、
-[07 恢复合同](07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery)、
-[R03](03_R03_Physical_Attachment.md)、[10 补丁计划](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)、
-manifest 与当前包涉及的 R01–R07 文档。原 [validation receipt](validation_receipt.json) 是历史签署快照，
-不因其 NOT_STARTED 字段否认后续明确授权，也不把原检查结果当本轮重跑。
+- 同一物理来源、可追溯的多种表示：固定Menagerie Panda共同基线，MuJoCo/MJCF、Isaac/USD、GeoPhys/USD；不要求每个Provider原生解析相同后缀或产生相同数值轨迹。
+- 一个Core Runtime/RuntimeSession、多provider adapter；复用Source/Asset/Scene/Joint/Frame、Controller、Recorder等既有owner，不新增平行Scene IR。
+- r009与原MJCF的equality/tendon/驱动语义尚须盘点，旧native物理门不证明共同source-family全特性等价。关键loss/unknown阻止依赖它的后继native。
+- 原F05同USD三Provider门在后继规划延期，旧F05仍PARTIAL、原门未通过；官方Panda→GeoPhys兼容单列，Isaac资产/USD一等输入策略不取消。split Attachment移交F07候选时保留旧门未通过记录。
+- 旧F00–F05的Evidence/接收/失败和普通attempt001–003保持原样；没有默认F05 attempt004，首个successor窗口仍需新的精确Scope Decision与完整包。
 
-## 已确认的输入
+## 生成实际工作包之前
 
-- 功能审阅检查点：`c30d97efa6ad169c205ea25d7917bc7b9a06e93c`。恢复时使用实际后继 HEAD，
-  复核差异并冻结新输入；不 reset、不覆盖 attempt001/002 的 source/ledger/raw。
-- R03c 静态修正接收、当前模块20项 S1；S2 不完整、S3 未运行。默认下一包为 R03c attempt003，
-  同源四配置/四 H5 的原出口不变；旧启动额度已耗尽，新的执行窗口只来自后续明确合同/授权。
-- 一个 Core Runtime、多 provider adapter；扩展现有 Core 构造入口，ReferenceTaskBinding 保持内部。
-- 上游资产按已验证 USD 输入，不等待资产团队分支，不重做上游验证；实际运行固定 delivery/hash/报告。
-- 首个 Isaac 场景为官方 Panda+刚体，后扩当前 Panda 导入；pip、独立 Python 环境、小显存单场景。
-- 原 7/22、R04/R05/R06 blockers、R07 五任务与 P99 保留；F00–F07 独立记账，不能自动充当原 gate 的替代证据。
+1. 明确选定stage/cell、required/deferred表、共享源和实际representation/build/solver/device/profile。优先处理S0语义门；只因影响实现选择的未知拆准备包，已知owner的实现/验证/收口可合在一个窗口。
+2. 核对source closure/license/revision、recipe/checker/report、原始与派生bytes可恢复性、真实provider候选和gitlink。旧ignored fixture/cold-checkout限制如实保留；缺输入报SOURCE_UNAVAILABLE，不猜路径。
+3. 追踪真实Core public factory→admission→reset/control/step→typed state→Recorder/independent reader→close，列owner/方法及缺口。`ReferenceTaskBinding`保持内部，不用provider-private状态或伪造pose/零速度补洞。
+4. 固定实体/Joint/Frame对应、轴向/单位/COM/四元数/控制模式。不同representation和Artifact的精确hash分别保留；通过对应与语义证据建立逻辑一致性，不强行同hash。
+5. 冻结环境合理性、空载控制器hold/追踪、gripper/free-body、Task各门和oracle/阈值；FK一致、Ack、正常horizon、Task success、Expert completion、storage、Qualification分别判定。
+6. 在一个完整包内给出implementation、受影响S1、必要修复重跑、文档/Skill与本地提交范围。native需新授权且先冻结代码/输入/plan、资源/timebox/累计steps/RAM/VRAM/disk/锁与cleanup；不默认一次launch，也不继承旧额度。
+7. Luna一次一个未完成包，报告/释放writer后Sol独立复核。F06只按新Scope Decision选择的ready intersection推进，保留真实任务四报告、至少20 seeds、Oracle与pending Judge；F07/Newton另定实际交集。当前不发上述任何包。
 
-## Sol 生成一个完整工作包
+## 文档同步与历史
 
-1. 选择一个前置明确、已授权的原 slice 或 F 计划行。默认按 07 顺序；提前选独立安装/GeoPhys/集成行时
-   明确理由与未变的 gates，不自行扩大全阶段范围，不按每个 Prompt 创建分支。
-2. 列输入 HEAD、source/closure/build/profile/seed、保护路径、允许修改与本地提交范围、输出目录、owner/方法、
-   真实调用链与 API/shape/unit/frame/顺序；复用 [10 补丁表](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#3-按层级定位补丁)，
-   不另造 Runtime/Recorder/Controller/工厂或 provider-private bypass。
-3. 将 implementation、受影响 S1、普通接线修正、必要文档/Skill同步与本地提交组织成同一个有界包；
-   只有影响实现选择的实际未知才分准备包。未变的 c30 20 项或更强邻接证据复用，改变的输入才失效重跑。
-4. 分开定义 source/hash/账本 preflight 与真实生产调用链 S1。调真实 admission/reset/runner snapshot/step/
-   publication/record/reader/close，只替 native IO；补 Reference/Definition、requirements、乱序、Ack、fault/close 等负例。
-5. 有 native 时，先冻结准确 case/oracle/tolerance、start/materialization/reset/physics/outer 预算、timeout/资源/关闭、
-   失败保存与允许修复/重试范围，再引用后续维护者的真实执行授权。未明确授权不启动，不填虚构许可。
-6. Luna 在同一窗口完成包后报告 commit、实际命令/Evidence、PASS/FAIL/BLOCKED/NOT_RUN、计数与限制；
-   Sol 只读复核 diff/raw 后再接写入窗口、记录决定和必要摘要提交。不依据 Luna 自报 PASS 自动接收。
+本轮只改规划、入口、manifest/hash与Skill的计划说明，未运行软件测试/native、未安装依赖、未更改source/gitlinks或原始Evidence。历史2026-10-28的R03c/c30恢复说明可从Git历史恢复，不能继续作为默认“下一包attempt003”。当前执行事实见各分支本地slice记录和F线owner记录。
 
-## 新补丁线的关键停止条件
-
-- F00：固定 Harness 的 lifecycle false-positive 必须有实际负例修复；交接方真实 seed/H5 缺失时如实标记，
-  不能把 mock/compiler 可调用当真实资产/Isaac 接收。
-- F02/F03：USD entry/variant/闭包、free-body reset、typed frame/unit、native drive/receipt 不明时先解决 owner 合同；
-  不能填假 MuJoCo slot、删除 guard 或绕过上游资产来源。
-- F04/F05：native baseline 与 Core public Env/记录/读回分别给证据；同一 USD 三 provider 的要求不能用旧 MJCF cell 充数。
-  GeoPhys single-Panda USD、split Attachment、R05 500Hz 是不同交集。
-- F06：按真实 provenance 处理 synthetic/backend/provider；四报告、≥20 seeds、Oracle 与 pending Judge 包各有门。
-  task/Expert/lifecycle/storage/qualification 分开；On/In/region 不替换为 lift。
-- 所有行：独立无法确定项明确交维护者或 provider owner/网页 GPT，见 [10 第7节](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#7-分支接收人与待核实项)。
-  不因难点擅自改预算/范围，不把 diagnostic 升格，不推送/合并/main/tag/Release 或自动授 Qualification。
-
-## 本次文档修订的交接
-
-本轮只做 docs 规划、交叉引用、manifest/hash 与静态文档检查，复用已有源码审阅。
-保持实现、native、安装和 integration 未开始；后续恢复先取得一个明确工作包。
-本次文档提交后的实际 HEAD 是下包的 Git 输入，c30 继续作为历史功能检查点。
+文档同步范围为`develop-full`、`develop`和camera，各分支分别提交。camera已在维护者确认writer释放、HEAD/dirty/补丁复核后落地；同步状态见各分支manifest的`f05_replan_camera_sync_20261030`及收口回执。跨分支操作使用隔离文档checkout，不切换共享根目录，临时checkout提交后清理；零新branch，main、发布分支与历史worktree保持。

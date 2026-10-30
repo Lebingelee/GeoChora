@@ -759,3 +759,9 @@ reset and incomplete-warning-vector rejection, plus position-drive-law
 preflight negatives; 143 affected provider-free checks and original-H5 replay
 passed. Native execution remains bound to `47d38ac4`; the review fixes in
 `d0c89b57` were not rerun natively. See the [Sol decision](../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).
+
+<a id="f05-successor-design-only"></a>
+
+## F05后继：同源多表示规划（2026-10-30；尚无新增API）
+
+后继路线见[11](goal/Phase_II_01/11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)与[12](goal/Phase_II_01/12_F05_F07_Execution_Playbook.md)：按同一物理来源的可追溯表示选择provider，保留精确representation/recipe/build身份，复用既有Core owner。Semantic feature inventory是候选审核报告，不是新公共Scene IR或已实现通用loader；本轮没有扩展当前USD loader、MJCF source或公共构造签名。原同USD门和旧F05 partial不回填PASS，不能把文档中的MJCF/MuJoCo successor cell当作已接收API。各分支已有实现仍依其本地源码和bounded evidence判断。

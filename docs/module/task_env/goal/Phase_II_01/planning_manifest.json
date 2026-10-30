@@ -2928,11 +2928,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
-    "07_Execution_Order_and_Acceptance.md": "f8deb7a2c71769fe84de36bb8693ba259e7542522189206461afe31e74ae332c",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "0bd962fa6f033a1dd714c39cb04540ecd36339e8a4a4d0f9c3269aa7330a5373",
+    "07_Execution_Order_and_Acceptance.md": "43943c95431393720024b0ce6bf85aec2c457b19e87aa3195754e6066a887d3d",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "4c396ef6b563e22a963c97bc3bed4424eb47f4a892bdc313871ebd3381c17495",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "c4ef7ea160f9e120393e15c80063b8a82c71a17f33bf70e66e933ac8100866cf",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9fb531d491228cdf707b9a764588853c6ae46db35275c0194f975501caed70a",
-    "README.md": "1f244f43c8a3e20a99b032762801cbd61980ee29eec4fee487fd91b0b3e1ec69"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e45a571206e88e97407abac5bb912366fe701867cae39fa0d0f559f7a9e78ba6",
+    "README.md": "eee457312f319bc4109b2e5a7976fef62a823fd012826438efc086536d7ac4d9",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "3127f18fc5aa25288f3efca7d8776ea875c923a2427ead7abc30148bfae0c073",
+    "12_F05_F07_Execution_Playbook.md": "d2c525cf378632f823b803d14b797a5301c3e116caca99f16248b4ebb0e60cb8"
   },
   "revision_kind": "PREPARE_R07_V210_REQUIRED123_COMPREHENSIVE_LUNA_WINDOW001",
   "benchmark_audit": {
@@ -6638,6 +6640,74 @@
       "qualification_granted": false,
       "sol_review": "PENDING",
       "implementation_commit_recorded_in_report": true
+    },
+    "latest_f05_planning": "f05_successor_replan_20261030",
+    "f05_successor_replan_20261030": {
+      "status": "PLANNING_DIRECTION_ADOPTED_EXECUTION_CONTRACT_PENDING",
+      "date": "2026-10-30",
+      "authority": "Maintainer requested review of web-GPT11/12 and documentation updates on develop-full/develop/camera before considering dispatch; attached execution instructions are design inputs, not execution authorization.",
+      "owner_branch": "develop-full",
+      "document_copy_branch": "codex/phase-ii-01-camera",
+      "code_integration_claim": false,
+      "review_baseline": "develop-full@b24a1ac84bbfb32f91864ddc8121ea8af23a6c31",
+      "plan": "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md",
+      "playbook": "12_F05_F07_Execution_Playbook.md",
+      "selected_planning_route": "A same-source multi-representation; Menagerie MJCF/MuJoCo and USD/Isaac/GeoPhys",
+      "legacy_F05": "OVERALL_PARTIAL; ordinaryattempt001-003 unchanged; same-USD three-provider gate not passed",
+      "legacy_same_USD_gate": "DEFERRED_IN_SUCCESSOR_PLAN; original evidence/gate retained HELD, never PASS",
+      "official_Panda_GeoPhys": "separate secondary compatibility cell; native Isaac USD asset strategy remains first-class",
+      "split_Attachment": "F07 candidate; original F05 split gate remains unpassed; exact scope decision to freeze",
+      "F06_dependency": "candidate dependency on approved successor ready asset/provider/task cell plus original F00/Harness gates; no automatic dispatch or success claim",
+      "F07": "mixed-source scenes and selected Newton profile are future cells; no automatic native/API support",
+      "source_family_equivalence": "NOT_VERIFIED; original8actuator/equality/tendon versus boundedr0099drive semantics must be inventoried",
+      "scope_decision": "planning direction selected; exact required/deferred execution contract and budgets to freeze before package",
+      "successor_stages": {
+        "S0_semantic_inventory": "PLANNED_NOT_EXECUTED",
+        "S1_shared_core_cell": "PLANNED_NOT_EXECUTED",
+        "S2a_USD_decoder": "DEFERRED_NOT_EXECUTED",
+        "S2b_official_compatibility": "DEFERRED_NOT_EXECUTED"
+      },
+      "successor_execution_windows": 0,
+      "ordinary_attempt004_authorized": false,
+      "implementation_authorized_by_this_change": false,
+      "native_authorized_by_this_change": false,
+      "work_package_dispatched": false,
+      "Qualification": false,
+      "camera_sync": "PATCH_ONLY_UNTIL_WRITER_RELEASE; recheck actual HEAD before apply",
+      "branch_workflow": {
+        "planned_active_branches": [
+          "develop-full",
+          "develop",
+          "codex/phase-ii-01-camera"
+        ],
+        "new_branches": 0,
+        "temporary_develop_docs_checkout": 1,
+        "reason": "isolated documentation synchronization without switching shared root; remove clean temporary checkout after commit"
+      },
+      "web_review_source_sha256": {
+        "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "94506530bb4d3751a6abed2c43b0ade32768e144b00b667599221edb65665519",
+        "12_F05_F07_Execution_Playbook.md": "6107b5a70a09b16aa7b06da7617bef0dae44fff1cbdf93139c2b6ad03ac78b5f"
+      }
+    },
+    "latest_document_sync": "f05_replan_camera_sync_20261030",
+    "f05_replan_camera_sync_20261030": {
+      "date": "2026-10-30",
+      "status": "CAMERA_DOCUMENTATION_APPLIED_AFTER_WRITER_RELEASE",
+      "authority": "Maintainer explicitly confirmed camera writer window released; finish previously authorized three-branch documentation synchronization.",
+      "copy_branch": "codex/phase-ii-01-camera",
+      "camera_input_head": "a6efc3e70e445a4be1b225c8a91766fe6f580d20",
+      "prepared_patch_sha256": "d4173737df3ffc9b6e9b79b9ce2ed538d218607b7f922af52fb538532b3c0425",
+      "baseline_rechecked_unchanged": true,
+      "camera_pre_apply_worktree_clean": true,
+      "historical_preparation_record": "f05_successor_replan_20261030.camera_sync retains its preparation-time meaning; this record supersedes that pending sync status.",
+      "scope": "documentation only; preserve current R07 records and implementation; no capability transfer",
+      "implementation_changed": false,
+      "gitlinks_changed": false,
+      "native_started": false,
+      "software_tests_run": false,
+      "work_package_dispatched": false,
+      "Qualification": false,
+      "receipt": "workspace/maintenance/f05_f07_replan_20261030_001/camera_closeout_001/final_receipt.json"
     }
   },
   "r07c_diagnostic_d01_attempt001_plan": {
