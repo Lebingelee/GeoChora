@@ -1858,13 +1858,13 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "cfaab6524daa453fcb0d334607dad3af4233c1b3cc878f8034b3df02f23f2b65",
+    "07_Execution_Order_and_Acceptance.md": "4179af3c28c01f4cb602e42c1f31aa2b38be5c60bd613d8e0dc5a440e82ebce3",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "3951443d300e57d77c6d8325ad156e12fe54f0fdbaacd2ee9e37a809b16da991",
-    "README.md": "c2e67f13c43f3dbb198d82fedcfd9470f7d7c517a355d82d25ece607993c813f"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "9364b4c8c397522fcf9ad311b0cd5fcfc8f25c3dfff86948b01291ad831e91f9",
+    "README.md": "b3bd3be6c00f70780170a3afd87ff39b3bdc72ee2273d3f4f553bfaca9fe3324"
   },
-  "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
+  "revision_kind": "F05_ATTEMPT003_MENAGERIE_GEOPHYS_CPU_NATIVE_CELL_PASS_PENDING_SOL_REVIEW",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3638,7 +3638,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "F05 attempt002 repaired typed-state/H5 value comparison, bound actual GeoPhys producer identity, moved diagnostics to tracked owners, and completed source-property/mimic-consumption inventory. Candidate source/control/Core synthetic S1 repair gates pass pending Sol review; official Panda remains blocked at GeoPhys import for authored maxDepenetrationVelocity=+inf and the F02 clean-Git provenance node remains unverified because a preserved unrelated untracked file is present. No native/solver/physics, production USD admission, Qualification, or F06. See checkpoint_recovery_plan.f05_attempt002_execution.",
+  "planning_submission_this_revision": "F05 ordinary attempt003 implemented the exact Menagerie USD GeoPhys CPU native adapter/Core route, passed current affected S1, and completed same-run 1,000-step physical H5/readback/tamper/bundle/parent gates. Candidate status is bounded and pending Sol review; F05 overall remains partial; official Panda/mimic, MuJoCo USD and split Attachment remain held. F06 not started. See checkpoint_recovery_plan.f05_attempt003_execution.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4426,6 +4426,17 @@
       "F06_started": false,
       "qualification_granted": false,
       "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/"
+    },
+    {
+      "kind": "F05_ATTEMPT003_MENAGERIE_GEOPHYS_CPU_NATIVE_CELL_PASS_PENDING_SOL_REVIEW",
+      "date": "2026-10-30",
+      "input_head": "703ad9ec5feabeb5de4099289638540d740f5f42",
+      "output_head": "1f266310afe7eb59eb5b3fd3ae32484ef37cf01a",
+      "attempt": "ordinary 3",
+      "native_run_id": "f05_geophys_menagerie_cpu_007",
+      "provider_candidate_head": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_003/",
+      "result": "exact Menagerie GeoPhys CPU cell candidate passed pending Sol review; F05 overall partial; F06 not started"
     }
   ],
   "P00_audit": {
@@ -5336,7 +5347,7 @@
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
     },
-    "latest_authorization": "Maintainer-transferred complete F05 attempt002 package, prompt SHA-256 214449e4a5f205bfa61641a41dca310441f5996e7da3c5c5cf88a4c2b0eca1b8, frozen develop-full input 3c5d59609a975207acecab463c8af56c2d45fd6b and GeoPhys candidate input 41f8b517c5f92cd6e59907394dc42714b78702a7. Authorized R1–R4 bounded repair/investigation, exact provider-free S1, affected F02/F03/F04 regressions, docs/Skill and local commits; zero native, solver initialization or physics; no F06/F07.",
+    "latest_authorization": "Maintainer-transferred complete F05 ordinary attempt003 package, prompt SHA-256 8c45b4df321c9e2f153613ba59b198bd16dfa11c6a515bafb7ec84ff280bba0a, frozen develop-full input 703ad9ec5feabeb5de4099289638540d740f5f42 and GeoPhys candidate input 41f8b517c5f92cd6e59907394dc42714b78702a7. Authorized exact Menagerie GeoPhys CPU native cell, affected S1/readback, docs/Skill and local commits; no Isaac/GPU/Kit/MuJoCo/Newton, no F06.",
     "f01_attempt002_execution": {
       "date": "2026-10-29",
       "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
@@ -6050,7 +6061,7 @@
         "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_002/luna1_prompt.md"
       }
     },
-    "latest_f05_execution": "f05_attempt002_execution",
+    "latest_f05_execution": "f05_attempt003_execution",
     "f05_attempt002_execution": {
       "date": "2026-10-30",
       "attempt": 2,
@@ -6147,7 +6158,7 @@
     },
     "f05_attempt003_package_plan": {
       "date": "2026-10-30",
-      "status": "PREPARED_NOT_DISPATCHED",
+      "status": "DISPATCHED_AND_EXECUTED; see f05_attempt003_execution",
       "ordinary_attempt": 3,
       "scope": "one ready Menagerie USD/GeoPhys candidate CPU NativeRuntimeIO and existing Core native cell",
       "overall_F05": "PARTIAL; official+inf/mimic and exact MuJoCo USD held",
@@ -6179,6 +6190,111 @@
       "preparation_software_tests": 0,
       "research": "pinned Newton PhysX-mimic example; NVIDIA schema; MuJoCo3.8.1 optional USD decoder/plugin registration and converter compatibility; public GeoPhys assembly/host I/O reuse",
       "unknowns_before_launch": "actual full host frame/address/COM bindings, no-hidden-step reset, native physical/contact stability and cleanup; all must be checked, never inferred from S1"
+    },
+    "f05_attempt003_execution": {
+      "date": "2026-10-30",
+      "ordinary_attempt": 3,
+      "status": "F05_MENAGERIE_GEOPHYS_CPU_NATIVE_PASS_PENDING_SOL_REVIEW",
+      "overall_status": "F05_OVERALL_PARTIAL",
+      "input_head": "703ad9ec5feabeb5de4099289638540d740f5f42",
+      "final_core_head": "1f266310afe7eb59eb5b3fd3ae32484ef37cf01a",
+      "prompt_sha256": "8c45b4df321c9e2f153613ba59b198bd16dfa11c6a515bafb7ec84ff280bba0a",
+      "branch": "develop-full",
+      "provider_candidate_input_head": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_candidate_final_head": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_candidate_clean": true,
+      "main_geophys_gitlink_preserved": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+      "menagerie_gitlink_preserved": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+      "core_commits": [
+        "9106574c61c7f7ac808b885b12509b59ddcdea07",
+        "5b653e6ee51372c33f4f772c52bba40be7f9a53c",
+        "6f309a72c8b05d11b1cca1fa3ef3f86b3ca0b397",
+        "cdc14993ee27aec46be7b62193c01a2225d1d206",
+        "1f266310afe7eb59eb5b3fd3ae32484ef37cf01a"
+      ],
+      "selected_cell": "Frozen local-validated Menagerie Panda USD plus free cube/support USD through existing Core Position factory/RuntimeSession/NativeRuntimeIOV1/Env/Recorder/H5 on isolated GeoPhys candidate CPU; this is the only passed source cell.",
+      "S1": {
+        "run_id": "061_native_reader_gate_classification_s1",
+        "result": "12/12 passed",
+        "native_or_physics_steps": 0,
+        "sampled_peak_process_group_rss_bytes": 1071964160
+      },
+      "native_run_id": "f05_geophys_menagerie_cpu_007",
+      "native_plan_sha256": "116e147b2cfcdfcacd090e4fb40aa87d49d27aa71230958f88f9191d02e20285",
+      "native_producer_core_head": "cdc14993ee27aec46be7b62193c01a2225d1d206",
+      "native_provider_candidate_head": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "native_runtime": "taichi-forge 0.6.3 via candidate gate; CPU, row_pgs, implicitfast, 2 ms × five advances, no renderer/prewarm",
+      "native_steps": 1000,
+      "native_worker_wall_s": 365.7555267328862,
+      "native_start_mem_available_bytes": 6497873920,
+      "native_sampled_process_group_rss_max_bytes": 1818021888,
+      "native_worker_exit_code": 0,
+      "native_pgid_ended": true,
+      "native_lock_released": true,
+      "same_env_episode_count": 2,
+      "episode_transitions": [
+        100,
+        100
+      ],
+      "episode_observations": [
+        101,
+        101
+      ],
+      "episodes_truncated_at_horizon": [
+        true,
+        true
+      ],
+      "episodes_terminated": [
+        false,
+        false
+      ],
+      "h5_sha256": [
+        "618d207a4ef34bb07cfa59010f58f49e67675be6eb1be14b7f4d5d8d6a08d958",
+        "be9ae065387a2e27682b4b6a1fec1cb6918f9d50612a52b2b1e02860f7af5ee3"
+      ],
+      "physical_oracle": "both episodes passed all original checks: joint1 excursion 0.0897925963 rad, return error 0.0027699481 rad; gripper opening change 0.027560547 m; FK error ≤1.77474e-7 m / 3.99841e-7 rad; free-body drop 0.396942377 m, downward speed -2.74679494 m/s, late center z mean 0.504899859 m and max deviation 0 m.",
+      "final_independent_reader_runs": [
+        "063_native_reader_cpu007_episode00",
+        "064_native_reader_cpu007_episode01"
+      ],
+      "reader_result": "2/2 accepted; each 101 boundaries, 101 observations, 100 transitions, 500 native advances; same run H5/witness/source/execution/receipt/typed-state/clock identities.",
+      "h5_tamper_result": {
+        "run_id": "066_native_negative_cpu007_after061",
+        "passed": 36,
+        "total": 36,
+        "expected_reason_match": true
+      },
+      "same_run_bundle": {
+        "run_id": "067_native_bundle_cpu007_final",
+        "accepted": true,
+        "verified_boundary_rows": 202,
+        "verified_observation_rows": 202,
+        "verified_transitions": 200,
+        "verified_native_advances": 1000,
+        "bundle_tamper_rejections": 6
+      },
+      "native_run_008_plan": {
+        "plan_sha256": "585a8a1f616e2b8cae838bedbb3d81030bf527ea55880ae86aec49663a37729c",
+        "core_head": "1f266310afe7eb59eb5b3fd3ae32484ef37cf01a",
+        "S1_run": "061_native_reader_gate_classification_s1",
+        "launched": false,
+        "reason": "start MemAvailable sample below exact 6 GiB gate; no backend init or steps; no resource threshold relaxation"
+      },
+      "preserved_failures": [
+        "cpu002/cpu003/cpu004 startup failures",
+        "cpu005 reader failure under then-current reader",
+        "cpu006 runtime identity failure",
+        "cpu007 initial same-run reader attempts/history",
+        "065 negative runner stopped before cases because the default diagnostic directory already existed; output kept, retry used a unique suffix"
+      ],
+      "held": [
+        "Official Panda authored maxDepenetrationVelocity=+inf and PhysX mimic consumption",
+        "MuJoCo 3.8.1 USD decoder",
+        "split Attachment"
+      ],
+      "F06_started": false,
+      "Qualification": false,
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_003/"
     }
   }
 }

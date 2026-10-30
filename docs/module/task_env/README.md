@@ -11,7 +11,7 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 | USD delivery、依赖闭包与 Provider 表示选择（F02 advanced） | [public-api: USD delivery](public-api.md#usd-delivery-and-provider-representation-selection-f02) |
 | F03 版本化 USD Position candidate 与合成 I/O Core S1 边界 | [public-api: F03](public-api.md#f03-versioned-usd-source-typed-free-state-and-bounded-admission) |
 | F04 Isaac Core adapter 与两类 Panda 来源的有界结果 | [public-api: F04 attempt004](public-api.md#f04-isaac-core-adapter-attempt004) |
-| F05 USD source/control 与 synthetic Core S1 的当前边界 | [public-api: F05 attempt002](public-api.md#f05-attempt002-reader-producer-and-source-boundary) |
+| F05 USD source/control、synthetic S1 与 Menagerie GeoPhys CPU cell | [public-api: F05 attempt003](public-api.md#f05-attempt003-menagerie-geophys-cpu-native-cell) |
 | runtime/state/timebase、controller、Expert lifecycle、providers | [runtime-and-providers](runtime-and-providers.md) |
 | recorder/H5/replay、learning、rendering | [recording-and-learning](recording-and-learning.md) |
 | 唯一能力矩阵、测试/验收 gate 与历史审批 | [qualification](qualification.md) |
@@ -20,6 +20,8 @@ controller/observation、录制与学习/渲染接入边界。当前发布基线
 F04 attempt004于2026-10-30完成技术复核与G8收口，登记`ACCEPTED_BOUNDED_F04`。30/30 provider-free S1、一个同run官方Panda+Menagerie Panda CUDA/GPU PhysX worker、四份closed H5、原物理oracle、404/404独立T+1读回、40/40篡改拒绝、同run bundle及父观察exit0通过。接收限于冻结source、Isaac 6.2.0.0、`cuda:0`、GPU PhysX、best_effort、state-only和专用worker受控退出路线；不声称自然Python/Kit析构已修复，也不代表通用provider admission或Qualification。此前无关Skill dirty已独立提交，转述副本按原SHA补齐；历史失败原件保留；截至该F04接收时F05尚未启动。详见[F04最终接收](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-sol-acceptance)。
 
 F05 source/control/S1已由Sol登记`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，总体仍`F05_OVERALL_PARTIAL`。typed/H5数值联验、实际producer身份及新增tracked diagnostics owner获得有界接收；Sol补齐新H5不可套旧v1合同的reader guard，完整synthetic S1验证18行边界/观测、80次synthetic advance与30类tamper拒绝。官方Panda +inf/PhysX mimic消费、GeoPhys native、MuJoCo USD和F02 clean catalog节点尚未接收，production USD继续fail closed，F06未启动。详见[F05 Sol接收](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance)。
+
+F05 attempt003 的 Menagerie USD / GeoPhys candidate / CPU exact cell 已完成候选闭环，状态为`F05_MENAGERIE_GEOPHYS_CPU_NATIVE_PASS_PENDING_SOL_REVIEW`，F05总体仍`F05_OVERALL_PARTIAL`。同一Env两episode共1,000步；两份H5独立reader核验202/202边界和观测、200 transitions、1,000 native advances，36类H5篡改与6类bundle篡改均拒绝，父进程观察worker exit 0、进程组结束和锁释放。仅限冻结Menagerie source、candidate `41f8b517...`、GeoPhys CPU `row_pgs`/`implicitfast`；官方Panda PhysX mimic、MuJoCo USD decoder及split Attachment仍HELD，未启动F06或Qualification。详情见[F05 attempt003记录](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt003-menagerie-geophys-cpu-native-result)。
 
 F03 attempt003 已由 Sol 接收为 `ACCEPTED_BOUNDED_F03_S1`，范围限于 synthetic I/O 下的 Core 调用链与最终 T+1 reader；attempt002 的真实 CPU Pendulum 三步范围偏差仍作为历史原件保留且不计入接收证据。F04 attempt001/002保持历史状态；attempt002与attempt003证据分别见[F04 attempt002](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt002-isaac-core-adapter-two-source-native)和[attempt003](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt003-execution-candidate)。
 
