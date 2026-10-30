@@ -13,6 +13,10 @@ from bench_deploy.libero.evaluation import (
     evaluate_open_middle_drawer_v1,
     evaluate_stove_front_region_v1,
 )
+from bench_deploy.libero.controller import (
+    LiberoMixedControlConfigV1,
+    LiberoMixedControllerV1,
+)
 from bench_deploy.libero.task_contracts import TASK_2, TASK_3
 from bench_deploy.libero.solution import (
     LiberoPickPlaceSolutionConfigV1,
@@ -37,6 +41,19 @@ def test_task_one_solution_identity_binds_bounded_motion_rate():
     assert default_identity == solution_identity_v1(source_sha, config)
     slower = replace(config, max_cartesian_increment_m=0.001)
     assert solution_identity_v1(source_sha, slower) != default_identity
+
+
+def test_task_one_controller_identity_binds_unqualified_braking_experiment():
+    config = LiberoMixedControlConfigV1()
+    assert config.kp_Nm_per_rad == (200.0,) * 7
+    assert config.kd_Nm_s_per_rad == (40.0,) * 7
+    assert config.gain_status == "diagnostic_unqualified_PD_20Hz_kp200_kd40_v2"
+    controller = LiberoMixedControllerV1(config)
+    receipt = controller.identity_mapping()
+    assert receipt["profile_id"] == "libero-spatial-bowl-to-plate-joint-space-pd-v2"
+    assert receipt["kp_Nm_per_rad"] == [200.0] * 7
+    assert receipt["kd_Nm_s_per_rad"] == [40.0] * 7
+    assert receipt["qualification"] == "diagnostic_only_unqualified_gains"
 
 
 def _boundary(task_uid: str = TASK_2) -> LiberoPredicateBoundaryV1:

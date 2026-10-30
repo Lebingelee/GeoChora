@@ -1520,8 +1520,8 @@ def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reade
         and action["selected_public_action"][7] == pytest.approx(0.016)
         for episode in result["episodes"] for action in episode["action_trace"]
     )
-    assert result["episodes"][0]["control_plan"]["kp_Nm_per_rad"] == [100.0] * 7
-    assert result["episodes"][0]["control_plan"]["kd_Nm_s_per_rad"] == [20.0] * 7
+    assert result["episodes"][0]["control_plan"]["kp_Nm_per_rad"] == [200.0] * 7
+    assert result["episodes"][0]["control_plan"]["kd_Nm_s_per_rad"] == [40.0] * 7
     assert [episode["row_index"] for episode in result["episodes"]] == [0, 1, 2]
     assert result["transition_count"] == 36
     assert result["observation_count"] == 39
