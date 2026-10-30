@@ -81,6 +81,7 @@ class _MuJoCoSession(_SessionValues):
         self._last_dg01_position_application = None
         self._last_dg01_interval_advances = ()
         self._last_dg01_interval_advance_attempts = 0
+        self._dg01_interval_control_step = None
         self._fixed_forward_calls = 0
         self._fixed_attachment_close_receipt = None
         self._force_sample_sequence = 0
@@ -1833,6 +1834,67 @@ class _MuJoCoSession(_SessionValues):
             realized, opening, target.gripper.force_limit_N, clipped,
             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
 
+    def _dg01_accepted_advance_receipt(self, substep_index, time_before):
+        """Read back one accepted DG01 native substep through MuJoCo's public data."""
+        cube_geom_id = int(self._model.geom('free_cube_geom').id)
+        support_geom_id = int(self._model.geom('support_geom').id)
+        support_distances = []
+        for contact_index in range(int(self._data.ncon)):
+            contact = self._data.contact[contact_index]
+            if {int(contact.geom1), int(contact.geom2)} == {
+                    cube_geom_id, support_geom_id}:
+                support_distances.append(float(contact.dist))
+        gripper_actuator_id = int(self._open_actuators[0])
+        finger_dof_addresses = {}
+        for finger_name in ('finger_joint1', 'finger_joint2'):
+            finger_joint_id = int(self._mj.mj_name2id(
+                self._model, self._mj.mjtObj.mjOBJ_JOINT, finger_name,
+            ))
+            if finger_joint_id < 0:
+                raise ValueError(f'DG01 interval evidence cannot resolve {finger_name}')
+            finger_dof_addresses[finger_name] = int(self._model.jnt_dofadr[finger_joint_id])
+        moment_row_start = int(self._data.moment_rowadr[gripper_actuator_id])
+        moment_row_count = int(self._data.moment_rownnz[gripper_actuator_id])
+        moment_values = {
+            int(self._data.moment_colind[index]): float(self._data.actuator_moment[index])
+            for index in range(moment_row_start, moment_row_start + moment_row_count)
+        }
+        tendon_moment = [
+            moment_values.get(finger_dof_addresses[name], 0.0)
+            for name in ('finger_joint1', 'finger_joint2')
+        ]
+        finger_actuator_force = [
+            float(self._data.qfrc_actuator[finger_dof_addresses[name]])
+            for name in ('finger_joint1', 'finger_joint2')
+        ]
+        return {
+            'substep_index': int(substep_index),
+            'native_step_index': int(self._native_steps),
+            'time_before_s': float(time_before),
+            'time_after_s': float(self._data.time),
+            'actuator_ctrl': [float(value) for value in self._data.ctrl],
+            'actuator_force': [float(value) for value in self._data.actuator_force],
+            'gripper_tendon_readback': {
+                'actuator_id': gripper_actuator_id,
+                'control': float(self._data.ctrl[gripper_actuator_id]),
+                'length_m': float(self._data.actuator_length[gripper_actuator_id]),
+                'length_rate_m_s': float(self._data.actuator_velocity[gripper_actuator_id]),
+                'scalar_force_N': float(self._data.actuator_force[gripper_actuator_id]),
+                'tendon_generalized_force_moment': tendon_moment,
+                'finger_qfrc_actuator_N': finger_actuator_force,
+                'scalar_force_from_moment_prediction_N': [
+                    value * float(self._data.actuator_force[gripper_actuator_id])
+                    for value in tendon_moment
+                ],
+            },
+            'cube_support_contact': {
+                'cube_geom_id': cube_geom_id,
+                'support_geom_id': support_geom_id,
+                'contact_count': len(support_distances),
+                'minimum_distance_m': min(support_distances) if support_distances else None,
+            },
+        }
+
     def step(self):
         self._require_reset()
         track_dg01 = self._f05_dg01_input is not None
@@ -1851,72 +1913,9 @@ class _MuJoCoSession(_SessionValues):
                 self._native_steps += 1
                 self._cache_completed_actuator_force()
                 if track_dg01:
-                    cube_geom_id = int(self._model.geom('free_cube_geom').id)
-                    support_geom_id = int(self._model.geom('support_geom').id)
-                    support_distances = []
-                    for contact_index in range(int(self._data.ncon)):
-                        contact = self._data.contact[contact_index]
-                        if {int(contact.geom1), int(contact.geom2)} == {
-                                cube_geom_id, support_geom_id}:
-                            support_distances.append(float(contact.dist))
-                    gripper_actuator_id = int(self._open_actuators[0])
-                    finger_dof_addresses = {}
-                    for finger_name in ('finger_joint1', 'finger_joint2'):
-                        finger_joint_id = int(self._mj.mj_name2id(
-                            self._model, self._mj.mjtObj.mjOBJ_JOINT, finger_name,
-                        ))
-                        if finger_joint_id < 0:
-                            raise ValueError(
-                                f'DG01 interval evidence cannot resolve {finger_name}'
-                            )
-                        finger_dof_addresses[finger_name] = int(
-                            self._model.jnt_dofadr[finger_joint_id]
-                        )
-                    moment_row_start = int(self._data.moment_rowadr[gripper_actuator_id])
-                    moment_row_count = int(self._data.moment_rownnz[gripper_actuator_id])
-                    moment_values = {
-                        int(self._data.moment_colind[index]): float(
-                            self._data.actuator_moment[index]
-                        )
-                        for index in range(moment_row_start, moment_row_start + moment_row_count)
-                    }
-                    tendon_moment = [
-                        moment_values.get(finger_dof_addresses[name], 0.0)
-                        for name in ('finger_joint1', 'finger_joint2')
-                    ]
-                    finger_actuator_force = [
-                        float(self._data.qfrc_actuator[finger_dof_addresses[name]])
-                        for name in ('finger_joint1', 'finger_joint2')
-                    ]
-                    accepted_advances.append({
-                        'substep_index': substep_index,
-                        'native_step_index': int(self._native_steps),
-                        'time_before_s': time_before,
-                        'time_after_s': float(self._data.time),
-                        'actuator_ctrl': [float(value) for value in self._data.ctrl],
-                        'actuator_force': [float(value) for value in self._data.actuator_force],
-                        'gripper_tendon_readback': {
-                            'actuator_id': gripper_actuator_id,
-                            'control': float(self._data.ctrl[gripper_actuator_id]),
-                            'length_m': float(self._data.actuator_length[gripper_actuator_id]),
-                            'length_rate_m_s': float(self._data.actuator_velocity[gripper_actuator_id]),
-                            'scalar_force_N': float(self._data.actuator_force[gripper_actuator_id]),
-                            'tendon_generalized_force_moment': tendon_moment,
-                            'finger_qfrc_actuator_N': finger_actuator_force,
-                            'scalar_force_from_moment_prediction_N': [
-                                value * float(self._data.actuator_force[gripper_actuator_id])
-                                for value in tendon_moment
-                            ],
-                        },
-                        'cube_support_contact': {
-                            'cube_geom_id': cube_geom_id,
-                            'support_geom_id': support_geom_id,
-                            'contact_count': len(support_distances),
-                            'minimum_distance_m': (
-                                min(support_distances) if support_distances else None
-                            ),
-                        },
-                    })
+                    accepted_advances.append(
+                        self._dg01_accepted_advance_receipt(substep_index, time_before)
+                    )
                     self._last_dg01_interval_advances = tuple(accepted_advances)
         finally:
             if track_dg01:
@@ -1931,9 +1930,27 @@ class _MuJoCoSession(_SessionValues):
 
     def _step_physics_once(self):
         self._require_reset()
+        dg01_interval = (
+            self._f05_dg01_input is not None
+            and bool(getattr(self, '_inner_interval_active', False))
+        )
+        if dg01_interval:
+            control_step = int(self._control_step)
+            if self._dg01_interval_control_step != control_step:
+                self._dg01_interval_control_step = control_step
+                self._last_dg01_interval_advances = ()
+                self._last_dg01_interval_advance_attempts = 0
+            substep_index = len(self._last_dg01_interval_advances)
+            self._last_dg01_interval_advance_attempts += 1
+        time_before = float(self._data.time)
         self._mj.mj_step(self._model, self._data)
         self._native_steps += 1
         self._cache_completed_actuator_force()
+        if dg01_interval:
+            receipt = self._dg01_accepted_advance_receipt(substep_index, time_before)
+            self._last_dg01_interval_advances = (
+                *self._last_dg01_interval_advances, receipt,
+            )
         self._mj.mj_forward(self._model, self._data)
 
     def close(self):

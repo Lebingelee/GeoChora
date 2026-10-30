@@ -227,3 +227,52 @@ def test_position_control_boundary_is_carried_only_during_session_apply(monkeypa
     assert acknowledgement.target_hash == canonical.identity_hash
     assert session._position_target_in_flight is None
     assert session._position_target_source_boundary_in_flight is None
+
+
+def test_dg01_common_core_interval_collects_five_accepted_native_advances():
+    from types import SimpleNamespace
+
+    from task_env.runtime.sessions.mujoco import _MuJoCoSession
+
+    session = object.__new__(_MuJoCoSession)
+    session._f05_dg01_input = object()
+    session._inner_interval_active = True
+    session._control_step = 0
+    session._dg01_interval_control_step = None
+    session._last_dg01_interval_advances = ({"stale": True},)
+    session._last_dg01_interval_advance_attempts = 9
+    session._native_steps = 0
+    session._model = object()
+    session._data = SimpleNamespace(time=0.0)
+
+    def mj_step(_model, data):
+        data.time += 0.002
+
+    session._mj = SimpleNamespace(
+        mj_step=mj_step,
+        mj_forward=lambda *_args: None,
+    )
+    session._require_reset = lambda: None
+    session._cache_completed_actuator_force = lambda: None
+    session._dg01_accepted_advance_receipt = lambda index, before: {
+        "substep_index": index,
+        "native_step_index": session._native_steps,
+        "time_before_s": before,
+        "time_after_s": session._data.time,
+    }
+
+    for _ in range(5):
+        session._step_physics_once()
+
+    assert session._last_dg01_interval_advance_attempts == 5
+    assert [item["substep_index"] for item in session._last_dg01_interval_advances] == list(range(5))
+    assert [item["native_step_index"] for item in session._last_dg01_interval_advances] == list(range(1, 6))
+    assert session._last_dg01_interval_advances[0]["time_before_s"] == 0.0
+    assert session._last_dg01_interval_advances[-1]["time_after_s"] == pytest.approx(0.01)
+
+    session._control_step = 1
+    for _ in range(5):
+        session._step_physics_once()
+    assert session._last_dg01_interval_advance_attempts == 5
+    assert [item["substep_index"] for item in session._last_dg01_interval_advances] == list(range(5))
+    assert session._last_dg01_interval_advances[0]["native_step_index"] == 6
