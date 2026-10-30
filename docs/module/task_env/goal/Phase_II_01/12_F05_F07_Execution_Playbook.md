@@ -113,4 +113,4 @@ Luna 仅执行一个已授权包，提交包内 local commits 和原始路径/�
 - 一个包冻结累计资源及修复重跑权限，每run记录真实代码/来源；不默认单次launch或沿用旧F04/F05启动预算。
 - 旧native证据必须按[11第9节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#repository-adoption)确认覆盖范围；关键语义差异未解决则BLOCKED_BY_FEATURE，不只比较关节名称或hash。
 - F06不以状态/控制smoke代替真实任务20-seed/Expert/Oracle/四报告/pending Judge；F07与原R07路线分开。
-- 本次仅同步`develop-full`、`develop`的文档；camera的实际落地等待writer明确释放，未落地补丁不能记同步完成。
+- 三条分支的规划文档分别同步；camera已在维护者确认writer释放及实际HEAD/补丁检查后落地，实际提交见manifest同步记录和收口回执。文档同步不等于实现合入，也不授权执行工作包。

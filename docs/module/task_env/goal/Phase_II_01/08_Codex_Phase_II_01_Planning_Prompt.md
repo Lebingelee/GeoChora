@@ -30,4 +30,4 @@
 
 本轮只改规划、入口、manifest/hash与Skill的计划说明，未运行软件测试/native、未安装依赖、未更改source/gitlinks或原始Evidence。历史2026-10-28的R03c/c30恢复说明可从Git历史恢复，不能继续作为默认“下一包attempt003”。当前执行事实见各分支本地slice记录和F线owner记录。
 
-本轮范围：`develop-full`/`develop`各自文档提交；camera仅准备补丁，待其writer释放后重新核HEAD/冲突并同步。主仓不为切换分支打断camera；`develop`使用一个仅文档临时checkout，提交后清理，零新branch。main、发布分支与历史worktree保持。
+文档同步范围为`develop-full`、`develop`和camera，各分支分别提交。camera已在维护者确认writer释放、HEAD/dirty/补丁复核后落地；同步状态见各分支manifest的`f05_replan_camera_sync_20261030`及收口回执。跨分支操作使用隔离文档checkout，不切换共享根目录，临时checkout提交后清理；零新branch，main、发布分支与历史worktree保持。
