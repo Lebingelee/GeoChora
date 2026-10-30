@@ -16,8 +16,18 @@ def _source_asset_bytes(base_dir, source_xml):
 
 
 class _MuJoCoSession(_SessionValues):
-    def __init__(self, artifact, source):
+    def __init__(self, artifact, source, *, f05_dg01_input=None):
         self._initialize_values(artifact, source, 'mujoco')
+        self._f05_dg01_input = f05_dg01_input
+        self._f05_dg01_model_receipt = None
+        if f05_dg01_input is not None:
+            from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
+            if type(f05_dg01_input) is not F05Dg01MujocoCandidateInputV1:
+                raise TypeError('MuJoCo DG01 constructor requires its exact candidate input')
+            f05_dg01_input.validate()
+            if (f05_dg01_input.artifact is not artifact
+                    or f05_dg01_input.runtime_source is not source):
+                raise ValueError('MuJoCo DG01 constructor differs from its exact candidate identities')
         if source.fixed_attachment_plan is not None:
             try:
                 self._initialize_fixed_attachment(artifact, source)
@@ -44,12 +54,16 @@ class _MuJoCoSession(_SessionValues):
             for element in legacy_root.findall('keyframe'):
                 legacy_root.remove(element)
             source_xml = ET.tostring(legacy_root, encoding='unicode')
+        self._lowered_source_xml_sha256 = hashlib.sha256(source_xml.encode('utf-8')).hexdigest()
         root = ET.fromstring(source_xml)
         self._model = mujoco.MjModel.from_xml_string(
             ET.tostring(root, encoding='unicode'), assets=assets,
         )
         self._data = mujoco.MjData(self._model)
         self._native_steps = 0
+        self._last_dg01_position_application = None
+        self._last_dg01_interval_advances = ()
+        self._last_dg01_interval_advance_attempts = 0
         self._fixed_forward_calls = 0
         self._fixed_attachment_close_receipt = None
         self._force_sample_sequence = 0
@@ -80,6 +94,8 @@ class _MuJoCoSession(_SessionValues):
         self._leaf_interval_source_configuration_revision = None
         self._leaf_interval_writers = set()
         self._leaf_consumed_boundaries = set()
+        if self._f05_dg01_input is not None:
+            self._f05_dg01_model_receipt = self._validate_f05_dg01_model()
         self._validate_canonical_scene_model()
 
     @staticmethod
@@ -986,6 +1002,8 @@ class _MuJoCoSession(_SessionValues):
             'continuous': self._mj.mjtJoint.mjJNT_HINGE,
             'prismatic': self._mj.mjtJoint.mjJNT_SLIDE,
         }
+        if self._f05_dg01_input is not None:
+            expected_joint_type['floating'] = self._mj.mjtJoint.mjJNT_FREE
         for articulation in scene.articulations or ():
             for joint in articulation.joints:
                 if joint.kind == 'fixed':
@@ -1169,6 +1187,255 @@ class _MuJoCoSession(_SessionValues):
             int(value) != 0 for value in model.geom_conaffinity
         ):
             raise ValueError("fixed Attachment collision source was globally disabled")
+
+    def _validate_f05_dg01_model(self):
+        """Bind DG01 to public MuJoCo model shape, addresses and source mechanisms."""
+        model, mj, source = self._model, self._mj, self._source
+        expected_dimensions = {
+            'nq': 16, 'nv': 15, 'nu': 8, 'njnt': 10, 'neq': 1, 'ntendon': 1,
+        }
+        dimensions = {name: int(getattr(model, name)) for name in expected_dimensions}
+        if dimensions != expected_dimensions:
+            raise ValueError(f'F05 DG01 compiled MuJoCo shape mismatch: {dimensions}')
+
+        scalar_addresses = {}
+        for semantic, native in sorted(source.joints.items()):
+            joint_id = model.joint(native).id
+            if int(model.jnt_type[joint_id]) not in (mj.mjtJoint.mjJNT_HINGE, mj.mjtJoint.mjJNT_SLIDE):
+                raise ValueError(f'F05 DG01 scalar Joint {native!r} compiled with a non-scalar type')
+            scalar_addresses[semantic] = {
+                'native_name': native,
+                'joint_id': int(joint_id),
+                'qpos_address': int(model.jnt_qposadr[joint_id]),
+                'dof_address': int(model.jnt_dofadr[joint_id]),
+                'type': int(model.jnt_type[joint_id]),
+                'axis': [float(value) for value in model.jnt_axis[joint_id]],
+                'anchor_m': [float(value) for value in model.jnt_pos[joint_id]],
+                'limited': bool(model.jnt_limited[joint_id]),
+                'range': [float(value) for value in model.jnt_range[joint_id]],
+                'damping': float(model.dof_damping[int(model.jnt_dofadr[joint_id])]),
+                'armature': float(model.dof_armature[int(model.jnt_dofadr[joint_id])]),
+                'frictionloss': float(model.dof_frictionloss[int(model.jnt_dofadr[joint_id])]),
+            }
+        free_addresses = {}
+        for semantic, native in sorted(source.free_joints.items()):
+            joint_id = model.joint(native).id
+            if int(model.jnt_type[joint_id]) != mj.mjtJoint.mjJNT_FREE:
+                raise ValueError(f'F05 DG01 free Joint {native!r} did not compile as a 7/6 free Joint')
+            child_body_name = source.bodies.get(semantic)
+            if child_body_name is None:
+                raise ValueError(f'F05 DG01 free Joint {native!r} lacks its bound child Frame body')
+            child_body_id = int(model.body(child_body_name).id)
+            body_id = int(model.jnt_bodyid[joint_id])
+            parent_body_id = int(model.body_parentid[body_id])
+            if body_id != child_body_id or parent_body_id != 0:
+                raise ValueError(
+                    f'F05 DG01 free Joint {native!r} is not attached to its exact world-rooted child body'
+                )
+            free_addresses[semantic] = {
+                'native_name': native,
+                'joint_id': int(joint_id),
+                'qpos_address': int(model.jnt_qposadr[joint_id]),
+                'dof_address': int(model.jnt_dofadr[joint_id]),
+                'body_id': body_id,
+                'parent_body_id': parent_body_id,
+                'qpos_width': 7,
+                'dof_width': 6,
+                'type': int(model.jnt_type[joint_id]),
+                'dof_damping': [
+                    float(value) for value in model.dof_damping[
+                        int(model.jnt_dofadr[joint_id]):int(model.jnt_dofadr[joint_id]) + 6
+                    ]
+                ],
+                'dof_armature': [
+                    float(value) for value in model.dof_armature[
+                        int(model.jnt_dofadr[joint_id]):int(model.jnt_dofadr[joint_id]) + 6
+                    ]
+                ],
+                'dof_frictionloss': [
+                    float(value) for value in model.dof_frictionloss[
+                        int(model.jnt_dofadr[joint_id]):int(model.jnt_dofadr[joint_id]) + 6
+                    ]
+                ],
+            }
+        scalar_qpos = {item['qpos_address'] for item in scalar_addresses.values()}
+        scalar_dofs = {item['dof_address'] for item in scalar_addresses.values()}
+        free_qpos = {
+            address for item in free_addresses.values()
+            for address in range(item['qpos_address'], item['qpos_address'] + item['qpos_width'])
+        }
+        free_dofs = {
+            address for item in free_addresses.values()
+            for address in range(item['dof_address'], item['dof_address'] + item['dof_width'])
+        }
+        if (len(scalar_addresses) != 9 or len(free_addresses) != 1
+                or len(scalar_qpos) != 9 or len(scalar_dofs) != 9
+                or scalar_qpos.intersection(free_qpos) or scalar_dofs.intersection(free_dofs)
+                or len(free_qpos) != 7 or len(free_dofs) != 6):
+            raise ValueError('F05 DG01 compiled Joint addresses do not cover nine scalar plus one free Joint')
+
+        actuator_records = {}
+        for actuator_name in (*source.joint_targets.values(), *source.open_actuators):
+            actuator_id = model.actuator(actuator_name).id
+            actuator_records[actuator_name] = {
+                'actuator_id': int(actuator_id),
+                'transmission_type': int(model.actuator_trntype[actuator_id]),
+                'transmission_ids': [int(value) for value in model.actuator_trnid[actuator_id]],
+                'gain_parameters': [float(value) for value in model.actuator_gainprm[actuator_id]],
+                'bias_parameters': [float(value) for value in model.actuator_biasprm[actuator_id]],
+                'control_range': [float(value) for value in model.actuator_ctrlrange[actuator_id]],
+                'force_range': [float(value) for value in model.actuator_forcerange[actuator_id]],
+                'control_limited': bool(model.actuator_ctrllimited[actuator_id]),
+                'force_limited': bool(model.actuator_forcelimited[actuator_id]),
+                'gear': [float(value) for value in model.actuator_gear[actuator_id]],
+                'dynamics_type': int(model.actuator_dyntype[actuator_id]),
+                'gain_type': int(model.actuator_gaintype[actuator_id]),
+                'bias_type': int(model.actuator_biastype[actuator_id]),
+            }
+        for semantic, actuator_name in source.joint_targets.items():
+            actuator_id = model.actuator(actuator_name).id
+            expected_joint = model.joint(source.joints[semantic]).id
+            if (int(model.actuator_trntype[actuator_id]) != int(mj.mjtTrn.mjTRN_JOINT)
+                    or int(model.actuator_trnid[actuator_id][0]) != int(expected_joint)):
+                raise ValueError(f'F05 DG01 target {actuator_name!r} does not transmit to {semantic!r}')
+        gripper = model.actuator(source.open_actuators[0]).id
+        tendon_id = model.tendon('split').id
+        if (int(model.actuator_trntype[gripper]) != int(mj.mjtTrn.mjTRN_TENDON)
+                or int(model.actuator_trnid[gripper][0]) != int(tendon_id)):
+            raise ValueError('F05 DG01 actuator8 does not transmit through the original split tendon')
+
+        equality_id = 0
+        equality_records = {
+            'equality_id': int(equality_id),
+            'type': int(model.eq_type[equality_id]),
+            'object_ids': [int(model.eq_obj1id[equality_id]), int(model.eq_obj2id[equality_id])],
+            'parameters': [float(value) for value in model.eq_data[equality_id]],
+            'solref': [float(value) for value in model.eq_solref[equality_id]],
+            'solimp': [float(value) for value in model.eq_solimp[equality_id]],
+        }
+        expected_fingers = [
+            int(model.joint('finger_joint1').id), int(model.joint('finger_joint2').id),
+        ]
+        if (int(model.eq_type[equality_id]) != int(mj.mjtEq.mjEQ_JOINT)
+                or [int(model.eq_obj1id[equality_id]), int(model.eq_obj2id[equality_id])] != expected_fingers):
+            raise ValueError('F05 DG01 source equality does not bind the two original finger joints')
+
+        wrap_address = int(model.tendon_adr[tendon_id])
+        wrap_count = int(model.tendon_num[tendon_id])
+        tendon_records = []
+        for index in range(wrap_address, wrap_address + wrap_count):
+            tendon_records.append({
+                'wrap_type': int(model.wrap_type[index]),
+                'object_id': int(model.wrap_objid[index]),
+                'parameter': float(model.wrap_prm[index]),
+            })
+        expected_tendon = [
+            (int(mj.mjtWrap.mjWRAP_JOINT), int(model.joint('finger_joint1').id), 0.5),
+            (int(mj.mjtWrap.mjWRAP_JOINT), int(model.joint('finger_joint2').id), 0.5),
+        ]
+        if (wrap_count != 2 or [
+                (item['wrap_type'], item['object_id']) for item in tendon_records
+            ] != [(item[0], item[1]) for item in expected_tendon]
+                or any(not np.isclose(item['parameter'], expected[2], rtol=0.0, atol=1e-12)
+                       for item, expected in zip(tendon_records, expected_tendon, strict=True))):
+            raise ValueError('F05 DG01 split tendon does not retain the source half/half joint coefficients')
+        tendon_record = {
+            'tendon_id': int(tendon_id), 'wraps': tendon_records,
+            'limited': bool(model.tendon_limited[tendon_id]),
+            'range': [float(value) for value in model.tendon_range[tendon_id]],
+            'stiffness': float(model.tendon_stiffness[tendon_id]),
+            'damping': float(model.tendon_damping[tendon_id]),
+            'frictionloss': float(model.tendon_frictionloss[tendon_id]),
+            'limit_solref': [float(value) for value in model.tendon_solref_lim[tendon_id]],
+            'limit_solimp': [float(value) for value in model.tendon_solimp_lim[tendon_id]],
+        }
+
+        body_names = [mj.mj_id2name(model, mj.mjtObj.mjOBJ_BODY, i) for i in range(model.nbody)]
+        bodies = {}
+        for semantic, native in sorted(source.bodies.items()):
+            body_id = model.body(native).id
+            bodies[semantic] = {
+                'native_name': native,
+                'body_id': int(body_id),
+                'mass_kg': float(model.body_mass[body_id]),
+                'inertia_kg_m2': [float(value) for value in model.body_inertia[body_id]],
+                'com_position_local_m': [float(value) for value in model.body_ipos[body_id]],
+                'inertia_ellipsoid_orientation_wxyz': [float(value) for value in model.body_iquat[body_id]],
+                'parent_body_id': int(model.body_parentid[body_id]),
+                'body_position_local_m': [float(value) for value in model.body_pos[body_id]],
+                'body_orientation_local_wxyz': [float(value) for value in model.body_quat[body_id]],
+            }
+        geoms = {}
+        for geom_name in ('free_cube_geom', 'support_geom'):
+            geom_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_GEOM, geom_name)
+            if geom_id < 0:
+                raise ValueError(f'F05 DG01 task collision geometry {geom_name!r} is missing')
+            geoms[geom_name] = {
+                'geom_id': int(geom_id),
+                'type': int(model.geom_type[geom_id]),
+                'size_m': [float(value) for value in model.geom_size[geom_id]],
+                'position_m': [float(value) for value in model.geom_pos[geom_id]],
+                'friction': [float(value) for value in model.geom_friction[geom_id]],
+                'contype': int(model.geom_contype[geom_id]),
+                'conaffinity': int(model.geom_conaffinity[geom_id]),
+                'condim': int(model.geom_condim[geom_id]),
+                'solver_reference': [float(value) for value in model.geom_solref[geom_id]],
+                'solver_impedance': [float(value) for value in model.geom_solimp[geom_id]],
+                'material_id': int(model.geom_matid[geom_id]),
+                'mesh_or_heightfield_id': int(model.geom_dataid[geom_id]),
+            }
+        if any(value['contype'] == 0 and value['conaffinity'] == 0 for value in geoms.values()):
+            raise ValueError('F05 DG01 task collision geometry is disabled in the compiled MuJoCo model')
+
+        signature = {
+            'schema_version': 'f05-dg01-mujoco-public-model-receipt-v1',
+            'runtime': self._fixed_runtime_identity(mj),
+            'options': {
+                'timestep_s': float(model.opt.timestep),
+                'gravity_m_s2': [float(value) for value in model.opt.gravity],
+            },
+            'task_artifact_sha256': self._artifact.identity_hash,
+            'scene_identity_sha256': source.scene_definition.identity_hash,
+            'source_closure_sha256': source.source_closure_digest,
+            'source_xml_sha256': hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+            'runtime_lowered_xml_sha256': self._lowered_source_xml_sha256,
+            'dimensions': dimensions,
+            'counts': {
+                name: int(getattr(model, name))
+                for name in ('nbody', 'ngeom', 'nsite', 'ncam', 'nmesh', 'nmat')
+            },
+            'body_names': body_names,
+            'scalar_joints': scalar_addresses,
+            'free_joints': free_addresses,
+            'actuators': actuator_records,
+            'equality': equality_records,
+            'tendon': tendon_record,
+            'bodies': bodies,
+            'task_geometries': geoms,
+            'all_geometries': [
+                {
+                    'geom_id': int(geom_id),
+                    'name': mj.mj_id2name(model, mj.mjtObj.mjOBJ_GEOM, geom_id),
+                    'body_id': int(model.geom_bodyid[geom_id]),
+                    'type': int(model.geom_type[geom_id]),
+                    'size_m': [float(value) for value in model.geom_size[geom_id]],
+                    'position_m': [float(value) for value in model.geom_pos[geom_id]],
+                    'orientation_wxyz': [float(value) for value in model.geom_quat[geom_id]],
+                    'friction': [float(value) for value in model.geom_friction[geom_id]],
+                    'contype': int(model.geom_contype[geom_id]),
+                    'conaffinity': int(model.geom_conaffinity[geom_id]),
+                    'condim': int(model.geom_condim[geom_id]),
+                    'solver_reference': [float(value) for value in model.geom_solref[geom_id]],
+                    'solver_impedance': [float(value) for value in model.geom_solimp[geom_id]],
+                    'material_id': int(model.geom_matid[geom_id]),
+                    'mesh_or_heightfield_id': int(model.geom_dataid[geom_id]),
+                    'rgba': [float(value) for value in model.geom_rgba[geom_id]],
+                }
+                for geom_id in range(model.ngeom)
+            ],
+        }
+        signature_bytes = json.dumps(signature, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()
+        return {**signature, 'identity_sha256': hashlib.sha256(signature_bytes).hexdigest()}
 
     def _addresses(self, name, *, free):
         joint = self._model.joint(name).id
@@ -1479,16 +1746,90 @@ class _MuJoCoSession(_SessionValues):
         self._model.actuator_forcelimited[index] = 1
         self._model.actuator_forcerange[index] = (-target.gripper.force_limit_N, target.gripper.force_limit_N)
         self._current_ctrl = self._data.ctrl.copy()
+        self._last_dg01_position_application = None
+        if self._f05_dg01_input is not None:
+            source_gripper_record = self._f05_dg01_model_receipt['actuators']['actuator8']
+            arm_controls = {
+                name: {
+                    'actuator_id': int(self._target_actuators[name]),
+                    'requested_ctrl': float(requested),
+                    'readback_ctrl': float(self._data.ctrl[self._target_actuators[name]]),
+                }
+                for name, requested in target.arm_servo_position.items()
+            }
+            payload = {
+                'schema_version': 'mujoco-position-write-receipt-v1',
+                'task_artifact_identity_sha256': self._artifact.identity_hash,
+                'scene_identity_sha256': self._source.scene_definition.identity_hash,
+                'source_closure_sha256': self._source.source_closure_digest,
+                'model_receipt_identity_sha256': self._f05_dg01_model_receipt['identity_sha256'],
+                'provider_materialization_id': self._provider_materialization_id,
+                'episode_id': self._episode_id,
+                'reset_sample_id': self._reset_sample_id,
+                'target_identity_sha256': target.identity_hash,
+                'source_boundary': target.source_boundary.to_mapping(),
+                'arm_actuator_controls': arm_controls,
+                'gripper': {
+                    'semantic_id': target.gripper.semantic_id,
+                    'actuator_id': int(index),
+                    'requested_opening_m': float(target.gripper.servo_opening_m),
+                    'applied_opening_m': opening,
+                    'source_ctrl_range': list(source_gripper_record['control_range']),
+                    'readback_ctrl': float(self._data.ctrl[index]),
+                    'source_force_limited': bool(source_gripper_record['force_limited']),
+                    'source_force_range_N': list(source_gripper_record['force_range']),
+                    'request_force_limit_N': float(target.gripper.force_limit_N),
+                    'effective_force_limited': bool(self._model.actuator_forcelimited[index]),
+                    'effective_force_range_N': [
+                        float(value) for value in self._model.actuator_forcerange[index]
+                    ],
+                    'source_gain_parameters': list(source_gripper_record['gain_parameters']),
+                    'source_bias_parameters': list(source_gripper_record['bias_parameters']),
+                    'source_tendon_identity': 'split',
+                },
+            }
+            receipt_bytes = json.dumps(
+                payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
+            ).encode('utf-8')
+            self._last_dg01_position_application = {
+                **payload,
+                'identity_sha256': hashlib.sha256(receipt_bytes).hexdigest(),
+            }
         return AppliedCanonicalControl('applied-canonical-control-v0', target.identity_hash, 'mujoco',
             realized, opening, target.gripper.force_limit_N, clipped,
             'named_position_servo_plus_affine_tendon_opening_force_limit_ZOH')
 
     def step(self):
         self._require_reset()
-        for _ in range(self._artifact.timebase.control_substeps):
-            self._mj.mj_step(self._model, self._data)
-            self._native_steps += 1
-            self._cache_completed_actuator_force()
+        track_dg01 = self._f05_dg01_input is not None
+        accepted_advances = []
+        attempts = 0
+        if track_dg01:
+            self._last_dg01_interval_advances = ()
+            self._last_dg01_interval_advance_attempts = 0
+        try:
+            for substep_index in range(self._artifact.timebase.control_substeps):
+                time_before = float(self._data.time)
+                attempts += 1
+                if track_dg01:
+                    self._last_dg01_interval_advance_attempts = attempts
+                self._mj.mj_step(self._model, self._data)
+                self._native_steps += 1
+                self._cache_completed_actuator_force()
+                if track_dg01:
+                    accepted_advances.append({
+                        'substep_index': substep_index,
+                        'native_step_index': int(self._native_steps),
+                        'time_before_s': time_before,
+                        'time_after_s': float(self._data.time),
+                        'actuator_ctrl': [float(value) for value in self._data.ctrl],
+                        'actuator_force': [float(value) for value in self._data.actuator_force],
+                    })
+                    self._last_dg01_interval_advances = tuple(accepted_advances)
+        finally:
+            if track_dg01:
+                self._last_dg01_interval_advances = tuple(accepted_advances)
+                self._last_dg01_interval_advance_attempts = attempts
         self._mj.mj_forward(self._model, self._data)
         if self._source.fixed_attachment_plan is not None:
             self._fixed_forward_calls += 1

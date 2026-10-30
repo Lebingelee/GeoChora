@@ -1,0 +1,92 @@
+{
+  "schema_version": "f05-dg01-task-scene-recipe-v1",
+  "recipe_id": "f05-dg01-menagerie-panda-cube-support",
+  "source": {
+    "family": "menagerie-panda",
+    "revision": "b846dd12bc459d776cccb3dee0b1d02acbf7a9c7",
+    "panda_xml_sha256": "96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273",
+    "panda_closure_sha256": "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a",
+    "r009_recipe_sha256": "3af9f3da9c8b186d8568eb8dc0e82ccba65e020c4d853cca50da8bbc8cd6dede",
+    "r009_composed_stage_sha256": "f1c7a1a62deba337ce2f50100e53b1ebf1d677004b4fff3ecb5bf51d55692608",
+    "usd_physics_schema_sha256": "0cb5d91828fe6a8f042d1e27899c713957162d5545370e2fb8f99cf1a4df60c9",
+    "original_physical_oracle_sha256": "22c29ebdafdb2db64bad0c9ba9b3e1ad9f6ac5de071893f1a6bc6e30106b5e28"
+  },
+  "world": {
+    "convention": "SI_right_handed_z_up_wxyz",
+    "gravity_m_s2": [0.0, 0.0, -9.81],
+    "physics_dt_s": 0.002,
+    "control_substeps": 5
+  },
+  "reset_home_joint_position_rad": {
+    "joint1": 0.012,
+    "joint2": -0.568,
+    "joint3": 0.0,
+    "joint4": -2.811,
+    "joint5": 0.0,
+    "joint6": 3.037,
+    "joint7": 0.741,
+    "finger_joint1": 0.03999999910593033,
+    "finger_joint2": 0.03999999910593033
+  },
+  "free_cube": {
+    "entity_id": "free-cube",
+    "frame_id": "free_cube",
+    "joint_id": "cube_freejoint",
+    "shape": "box",
+    "edge_m": 0.06,
+    "half_extent_m": [0.03, 0.03, 0.03],
+    "mass_kg": 0.1,
+    "reset_pose_world": {
+      "position_m": [1.0, 0.5, 0.9],
+      "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]
+    },
+    "source_stage": {
+      "prim_path": "/F04Scene/free_cube",
+      "applied_schemas": ["PhysicsCollisionAPI", "PhysicsRigidBodyAPI", "PhysicsMassAPI"],
+      "collision_enabled": {
+        "authored": false,
+        "schema_property": "physics:collisionEnabled",
+        "schema_default": true
+      },
+      "mass": {"authored": true, "value_kg": 0.1},
+      "density": {"authored": false, "schema_default_kg_m3": 0.0},
+      "material_binding": null,
+      "filtered_pairs_api": false,
+      "explicit_com_m": null,
+      "explicit_inertia_kg_m2": null
+    },
+    "target_lowering": {
+      "collision": "retain enabled collision geometry; no authored filter or surface material is invented",
+      "mass_properties": "preserve mass and box shape; compiled MuJoCo COM/inertia are captured in the model receipt",
+      "friction_equivalence_claim": false
+    }
+  },
+  "support": {
+    "entity_id": "support",
+    "frame_id": "support",
+    "shape": "box",
+    "center_m": [1.0, 0.5, 0.45],
+    "full_size_m": [0.35, 0.35, 0.05],
+    "top_z_m": 0.475,
+    "cube_rest_center_z_m": 0.505,
+    "rigid_body": false,
+    "source_stage": {
+      "prim_path": "/F04Scene/support",
+      "applied_schemas": ["PhysicsCollisionAPI"],
+      "collision_enabled": {
+        "authored": false,
+        "schema_property": "physics:collisionEnabled",
+        "schema_default": true
+      },
+      "rigid_body_api": false,
+      "material_binding": null,
+      "filtered_pairs_api": false
+    },
+    "target_lowering": {
+      "collision": "retain enabled static collision geometry; no authored filter or surface material is invented",
+      "mass": "static worldbody geometry; no task mass is authored",
+      "friction_equivalence_claim": false
+    }
+  },
+  "provenance_note": "r009 explicitly authors the cube/support transforms, cube mass, shape scale, collision API presence, and gravity. The composed source stage has no physics material binding, no collision-filter API, and no authored COM/inertia. USD Physics schema defaults and native MuJoCo model values are recorded separately; this recipe does not claim cross-engine friction equivalence."
+}

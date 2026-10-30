@@ -28,10 +28,35 @@ def project_scene_definition_v3_to_mjcf(source_xml: str, scene_definition: Scene
         name = node.get('name')
         if name:
             source_joints.setdefault(name, []).append(node)
+    source_floating_joints: dict[str, list[ET.Element]] = {}
+    for node in root.iter('freejoint'):
+        name = node.get('name')
+        if name:
+            source_floating_joints.setdefault(name, []).append(node)
+    for node in root.iter('joint'):
+        name = node.get('name')
+        if name and node.get('type') == 'free':
+            source_floating_joints.setdefault(name, []).append(node)
 
     for articulation in scene_definition.articulations or ():
         for joint in articulation.joints:
             if joint.kind == 'fixed':
+                continue
+            if joint.kind == 'floating':
+                if (joint.position_representation != 'xyz_meter_quaternion_wxyz'
+                        or joint.velocity_representation != (
+                            'linear_xyz_meter_per_second_angular_xyz_radian_per_second'
+                        )
+                        or joint.position_size != 7 or joint.velocity_size != 6):
+                    raise ValueError(
+                        f'unsupported canonical MJCF floating Joint representation: {joint.joint_id!r}'
+                    )
+                matches = source_floating_joints.get(joint.joint_id, ())
+                if len(matches) != 1:
+                    raise ValueError(
+                        f'canonical floating Joint {joint.joint_id!r} must resolve to exactly one '
+                        f'MJCF free Joint; found {len(matches)}'
+                    )
                 continue
             if joint.kind not in {'revolute', 'continuous', 'prismatic'} or joint.axis is None:
                 raise ValueError(f'unsupported canonical MJCF joint representation: {joint.joint_id!r}')
@@ -134,6 +159,11 @@ class RuntimeSource:
     fixed_attachment_plan: object | None = None
     fixed_attachment_assembly: object | None = None
     fixed_attachment_sources: Mapping[str, TaskSceneSource] | None = None
+
+    @property
+    def source_id(self) -> str:
+        """Expose the canonical TaskSceneSource identity used by Core receipts."""
+        return self.scene_source.source_id
 
     def __post_init__(self):
         for field in ('joints', 'bodies', 'frames', 'free_joints', 'joint_targets'):

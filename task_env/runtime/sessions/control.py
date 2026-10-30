@@ -563,6 +563,7 @@ def materialize_control(
     leaf_plan=None,
     diagnostic_profile=None,
     f05_native_input=None,
+    f05_dg01_mujoco_input=None,
 ):
     from ...artifacts import ExecutionSpecV1
     from ...artifacts.execution import legacy_execution_projection
@@ -872,6 +873,7 @@ def materialize_control(
         _materialization_authority=materialization_authority,
         _diagnostic_profile=diagnostic_profile,
         _f05_native_input=f05_native_input,
+        _f05_dg01_mujoco_input=f05_dg01_mujoco_input,
     )
     if f04_native:
         try:

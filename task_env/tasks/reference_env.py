@@ -28,6 +28,7 @@ METADATA = {'action_schema': {'schema_id': 'selected-reference-absolute-pose-v1'
     'schema_version': 1, 'controller_kind': 'absolute_pose', 'reference': 'world',
     'rotation_representation': 'quaternion_wxyz', 'dimension': 8}}
 _RESET_SEED_UNSET = object()
+_INFER_POSITION_TASK_SUCCESS = object()
 
 
 def _boundary_interval_clock_tolerance(start_time_s, end_time_s, expected_dt_s,
@@ -261,6 +262,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f04-position-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
+                ('mujoco', 'cpu', 'cpu', 'strict', 'mujoco-mjcf-f05-dg01-core-v1'),
             }
             if execution_route not in allowed_versioned_routes:
                 raise ValueError('versioned Position construction has an unsupported provider execution route')
@@ -626,29 +628,26 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     for joint in articulation.joints
                     if joint.kind in {'revolute', 'continuous', 'prismatic'}
                 }
-                from ..runtime.sessions.source import UsdRuntimeSourceV1
-                if type(self.value['source']) is UsdRuntimeSourceV1:
-                    # Reset poses are keyed by their canonical Frame semantic
-                    # name. Resolve each such key through the already-bound
-                    # TaskArtifact FrameReference to the unique Scene floating
-                    # Joint whose child frame it names; never infer a Joint ID
-                    # from a provider/native string.
-                    for reset_frame_name in self.value['source'].free_joints:
-                        frame_reference = self.artifact.legacy_frame_bindings.get(reset_frame_name)
-                        if frame_reference is None:
-                            raise ValueError('USD free-body reset key lacks an Artifact Frame binding')
-                        candidates = tuple(
-                            joint
-                            for articulation in self.position_scene.articulations or ()
-                            if articulation.entity_id == frame_reference.entity_id
-                            for joint in articulation.joints
-                            if joint.kind == 'floating' and joint.child_frame == frame_reference
-                        )
-                        if len(candidates) != 1:
-                            raise ValueError('USD reset Frame must resolve to exactly one Scene floating Joint')
-                        if reset_frame_name in self.position_joint_bindings:
-                            raise ValueError('USD free-body reset Joint binding overlaps a scalar binding')
-                        self.position_joint_bindings[reset_frame_name] = candidates[0]
+                # Reset poses are keyed by their canonical Frame semantic name.
+                # Resolve each source free joint through the already-bound
+                # Artifact FrameReference to its unique Scene floating Joint;
+                # never infer a Joint ID from a provider/native string.
+                for reset_frame_name in self.value['source'].free_joints:
+                    frame_reference = self.artifact.legacy_frame_bindings.get(reset_frame_name)
+                    if frame_reference is None:
+                        raise ValueError('free-body reset key lacks an Artifact Frame binding')
+                    candidates = tuple(
+                        joint
+                        for articulation in self.position_scene.articulations or ()
+                        if articulation.entity_id == frame_reference.entity_id
+                        for joint in articulation.joints
+                        if joint.kind == 'floating' and joint.child_frame == frame_reference
+                    )
+                    if len(candidates) != 1:
+                        raise ValueError('reset Frame must resolve to exactly one Scene floating Joint')
+                    if reset_frame_name in self.position_joint_bindings:
+                        raise ValueError('free-body reset Joint binding overlaps a scalar binding')
+                    self.position_joint_bindings[reset_frame_name] = candidates[0]
                 from ..artifacts import FrameReference
                 self.position_frame_bindings = {
                     semantic: FrameReference(entity, frame)
@@ -673,6 +672,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
                         f05_native_input=self.value.get('f05_native_position_input'),
+                        f05_dg01_mujoco_input=self.value.get('f05_dg01_mujoco_input'),
                     )
             else:
                 self.position_profile = False
@@ -1021,12 +1021,21 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'task_metrics': dict(evaluation.metrics), 'control_step': int(state.control_step),
             'simulation_time_s': float(state.simulation_time)}
         if getattr(self, 'position_profile', False):
+            if self.value.get('f05_dg01_mujoco_input') is not None:
+                info.update({
+                    'task_success_semantics': 'raw_predicate_only',
+                    'raw_task_predicate': bool(evaluation.success),
+                    'lifecycle_valid_success': None,
+                    'lifecycle_valid_success_assessed': False,
+                    'lifecycle_terminated': bool(evaluation.failure),
+                })
             boundary = self.typed_state.view.boundary
             info['state_boundary_identity'] = boundary.to_mapping()
             info['state_boundary_id'] = boundary.boundary_id
             info['state_sample_clock'] = self.typed_state.view.sample_clock.to_mapping()
             if (self.value.get('f04_position_input') is not None
-                    or self.value.get('f05_position_input') is not None):
+                    or self.value.get('f05_position_input') is not None
+                    or self.value.get('f05_dg01_mujoco_input') is not None):
                 # Versioned USD state-only routes expose the Core-owned typed
                 # publication used by observations and Position control.
                 info['canonical_state_view_v1'] = self.typed_state.view.to_mapping()
@@ -1586,6 +1595,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     terminated=bool(terminated),
                     truncated=not bool(terminated),
                     bootstrap_allowed=not bool(terminated),
+                    **({'task_success': None} if self.value.get('f05_dg01_mujoco_input') is not None else {}),
                 )
                 self.info['episode_end_v1'] = self._position_episode_end.to_mapping()
             return self.obs, float(self.evaluation.reward), terminated, truncated, self.info
@@ -1992,7 +2002,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def _make_position_episode_end(
         self, end_reason, *, terminated, truncated, bootstrap_allowed,
-        task_success=None, payload=None,
+        task_success=_INFER_POSITION_TASK_SUCCESS, payload=None,
     ):
         from ..trajectory.canonical.episode import make_episode_end_v1
 
@@ -2057,11 +2067,23 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 })
             details['pending_controller_switch_application'] = switch_application
         details.update(dict(payload or {}))
-        success = (
-            bool(self._published_position_evaluation.success)
-            if task_success is None and self._published_position_evaluation is not None
-            else task_success
-        )
+        if self.value.get('f05_dg01_mujoco_input') is not None:
+            evaluation = self._published_position_evaluation
+            metrics = {} if evaluation is None else dict(evaluation.metrics)
+            details['task_predicate_v1'] = {
+                'semantics': self.artifact.semantics.evaluator,
+                'raw_predicate': bool(metrics.get('raw_lift_height_predicate', False)),
+                'raw_predicate_metrics': metrics,
+                'lifecycle_valid_success': None,
+                'lifecycle_valid_success_assessed': False,
+                'terminated': bool(terminated),
+                'termination_source': 'task_failure_only',
+            }
+        if task_success is _INFER_POSITION_TASK_SUCCESS:
+            success = (None if self._published_position_evaluation is None
+                       else bool(self._published_position_evaluation.success))
+        else:
+            success = task_success
         event_sequence = 0
         if self.recorder is not None and getattr(self.recorder, 'active', False):
             event_sequence = self.recorder.next_boundary_event_sequence(int(state.control_step))
@@ -2098,7 +2120,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             fault = self._execution_fault
             self._position_episode_end = self._make_position_episode_end(
                 'execution_fault', terminated=False, truncated=True,
-                bootstrap_allowed=False, task_success=None,
+                bootstrap_allowed=False,
+                task_success=(None if self.value.get('f05_dg01_mujoco_input') is not None
+                              else _INFER_POSITION_TASK_SUCCESS),
                 payload={
                     'requested_reason': reason,
                     'fault': fault.to_mapping(),
@@ -2114,6 +2138,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 terminated=False,
                 truncated=True,
                 bootstrap_allowed=True,
+                **({'task_success': None} if self.value.get('f05_dg01_mujoco_input') is not None else {}),
                 payload={'requested_reason': reason},
             )
         self._stopped = True
@@ -2353,9 +2378,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             **({
                 # Persist the public snapshot used to produce the reset
                 # observation. Generic H5 v3 consumes this only for the
-                # bounded F05 typed-state extension.
+                # bounded versioned typed-state witness extension.
                 'canonical_state_view_v1': self.info['canonical_state_view_v1'],
-            } if self.value.get('f05_position_input') is not None else {}),
+            } if (self.value.get('f05_position_input') is not None
+                  or self.value.get('f05_dg01_mujoco_input') is not None) else {}),
             **({
                 'camera_observation_v1': self.info['camera_observation_v1'],
             } if self.camera_observation_config is not None else {}),
@@ -2477,6 +2503,152 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def _position_record_metadata(self):
         from dataclasses import asdict
+
+        dg01_input = self.value.get('f05_dg01_mujoco_input')
+        if dg01_input is not None:
+            from ..runtime.sessions.source import lower_mujoco_scene_source
+            from ..runtime.sessions.provenance import provider_build_identity
+            from .position_candidate.source import (
+                EXPECTED_PANDA_CLOSURE, MENAGERIE_REVISION,
+                F05_DG01_RECIPE_SHA256,
+            )
+
+            source = self.value['source']
+            model_receipt = getattr(self.session, '_f05_dg01_model_receipt', None)
+            reset_receipt = getattr(self.session, '_reset_write_receipt', None)
+            write_receipt = getattr(self.session, '_last_dg01_position_application', None)
+            if not isinstance(model_receipt, dict) or reset_receipt is None:
+                raise RuntimeError('DG01 recording requires its exact compiled model and reset receipts')
+            lowered_xml, assets = lower_mujoco_scene_source(
+                source.scene_source, source.scene_definition, source.source_closure_digest,
+            )
+            asset_hashes = {
+                name: hashlib.sha256(content).hexdigest()
+                for name, content in sorted(assets.items())
+            }
+            recipe_bytes = (Path(__file__).parent / 'position_candidate' / 'assets'
+                            / 'f05_dg01_task_scene_recipe.json').read_bytes()
+            if hashlib.sha256(recipe_bytes).hexdigest() != F05_DG01_RECIPE_SHA256:
+                raise ValueError('DG01 recording recipe bytes differ from the frozen candidate input')
+            action_schema = self.controller.controller_binding().action_schema
+            code_files = {
+                'task_env/runtime/sessions/source.py': __file__.replace(
+                    'tasks/reference_env.py', 'runtime/sessions/source.py',
+                ),
+                'task_env/runtime/sessions/api.py': str(Path(__file__).parents[1] / 'runtime' / 'sessions' / 'api.py'),
+                'task_env/runtime/sessions/control.py': str(Path(__file__).parents[1] / 'runtime' / 'sessions' / 'control.py'),
+                'task_env/runtime/sessions/mujoco.py': str(Path(__file__).parents[1] / 'runtime' / 'sessions' / 'mujoco.py'),
+                'task_env/tasks/position_candidate/builder.py': str(Path(__file__).parent / 'position_candidate' / 'builder.py'),
+                'task_env/tasks/position_candidate/source.py': str(Path(__file__).parent / 'position_candidate' / 'source.py'),
+                'task_env/tasks/reference_env.py': __file__,
+            }
+            code_hashes = {
+                name: hashlib.sha256(Path(path).read_bytes()).hexdigest()
+                for name, path in code_files.items()
+            }
+            profile = {
+                'schema_version': 'f05-dg01-mujoco-core-recording-profile-v1',
+                'profile_id': 'f05-dg01-mujoco-core-v1',
+                'provenance_kind': 'native_runtime',
+                'runtime_admitted': True,
+                'task_source_identity_sha256': dg01_input.task_source.identity_hash,
+                'task_artifact_identity_sha256': self.artifact.identity_hash,
+                'scene_identity_sha256': source.scene_definition.identity_hash,
+                'source_id': source.source_id,
+                'source_format': 'mjcf',
+                'source_revision': MENAGERIE_REVISION,
+                'panda_xml_sha256': '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273',
+                'panda_source_closure_sha256': EXPECTED_PANDA_CLOSURE,
+                'task_scene_recipe_sha256': dg01_input.recipe_sha256,
+                'derived_scene_xml_sha256': hashlib.sha256(
+                    source.scene_source.xml.encode('utf-8'),
+                ).hexdigest(),
+                'runtime_lowered_xml_sha256': hashlib.sha256(lowered_xml.encode('utf-8')).hexdigest(),
+                'runtime_lowered_asset_sha256': asset_hashes,
+                'source_closure_sha256': source.source_closure_digest,
+                'source_mappings': {
+                    'joints': dict(source.joints), 'free_joints': dict(source.free_joints),
+                    'bodies': dict(source.bodies), 'frames': dict(source.frames),
+                    'joint_targets': dict(source.joint_targets),
+                    'open_actuators': tuple(source.open_actuators),
+                },
+                'execution_spec_v1': self.execution.to_mapping(),
+                'execution_identity_sha256': self.execution.identity_hash,
+                'provider_build_identity': provider_build_identity('mujoco'),
+                'timebase': {
+                    'physics_dt_s': self.artifact.timebase.physics_dt,
+                    'control_substeps': self.artifact.timebase.control_substeps,
+                    'control_dt_s': self.artifact.timebase.control_dt,
+                    'clock_domain': 'evaluation_boundary',
+                },
+                'reset_plan_identity_sha256': self.value['reset_plan'].identity_hash,
+                'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
+                'reset_write_receipt': reset_receipt.to_mapping(),
+                'controller_identity_sha256': self.controller.identity,
+                'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
+                'kinematics_source_sha256': dg01_input.kinematics_source_sha256,
+                'model_receipt': model_receipt,
+                'model_receipt_identity_sha256': model_receipt['identity_sha256'],
+                'control_law': {
+                    'arm_actuators': tuple(f'actuator{index}' for index in range(1, 8)),
+                    'gripper_actuator': 'actuator8',
+                    'gripper_transmission': 'fixed_tendon_split',
+                    'tendon_jacobian_source': 'compiled public MjModel receipt',
+                    'force_limit_application': 'Core MuJoCo RuntimeSession model forcerange updated from Controller request at each outer boundary',
+                    'first_application_receipt_at_episode_start': None if write_receipt is None else write_receipt.get('identity_sha256'),
+                },
+                'typed_state_h5_witness_schema_version': 'f05-public-typed-state-witness-v1',
+                'task_predicate': {
+                    'evaluator': self.artifact.semantics.evaluator,
+                    'parameters_si': dict(self.artifact.semantics.parameters_si),
+                    'raw_predicate_is_lifecycle_success': False,
+                    'lifecycle_valid_success_assessed': False,
+                },
+                'recording_scope': 'DG01 source-bound Menagerie MJCF / MuJoCo 3.8.1 CPU through SelectedReferenceEnv and TaskEnv Core',
+                'code_sha256': code_hashes,
+            }
+            return {
+                'env_metadata': {
+                    'env_name': 'SelectedReferenceEnv.F05Dg01MenagerieMujocoCore',
+                    'task_name': self.artifact.task_id,
+                    'task_version': self.artifact.artifact_version,
+                    'scene_uid': source.scene_definition.scene_id,
+                    'agent_uids': ('panda-main',),
+                    'physics_dt': self.artifact.timebase.physics_dt,
+                    'control_substeps': self.artifact.timebase.control_substeps,
+                    'control_frequency': 1.0 / self.artifact.timebase.control_dt,
+                    'action_schema': asdict(action_schema),
+                    'observation_schema': {'leaf_specs': (
+                        {'path': 'state.joint_position', 'semantic': 'named_arm_then_finger_joint_positions'},
+                        {'path': 'state.hand_pose', 'semantic': 'measured_hand_frame_pose_world'},
+                        {'path': 'state.boundary_identity_sha256', 'semantic': 'state_boundary_identity_sha256'},
+                        {'path': 'privileged_state.target_body_pose', 'semantic': 'free_cube_world_pose'},
+                    )},
+                    'reference_profile': profile,
+                },
+                'universal_action_schema': {
+                    'version': 'f05-dg01-mujoco-core-action-v1',
+                    'dimension': len(action_schema.components),
+                    'components': tuple(action_schema.components),
+                },
+                'resolved_config': {
+                    'provider': self.provider, 'backend': self.backend,
+                    'device': self.execution.physics_device, 'horizon': self.horizon,
+                    'controller_profile': self.controller.profile_id,
+                    'execution_identity_sha256': self.execution.identity_hash,
+                },
+                'candidate_identity': {
+                    'task_artifact_identity_hash': self.artifact.identity_hash,
+                    'task_source_identity_sha256': dg01_input.task_source.identity_hash,
+                    'scene_identity_hash': source.scene_definition.identity_hash,
+                    'source_id': source.source_id,
+                    'source_closure_digest': source.source_closure_digest,
+                    'reset_plan_identity_hash': self.value['reset_plan'].identity_hash,
+                    'execution_identity_sha256': self.execution.identity_hash,
+                    'controller_identity_sha256': self.controller.identity,
+                    'model_receipt_identity_sha256': model_receipt['identity_sha256'],
+                },
+            }
 
         f03_input = self.value.get('f03_position_input')
         f04_input = self.value.get('f04_position_input')
@@ -2911,6 +3083,37 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         f03_input = self.value.get('f03_position_input')
         f04_input = self.value.get('f04_position_input')
         f05_input = self.value.get('f05_position_input')
+        f05_dg01_input = self.value.get('f05_dg01_mujoco_input')
+        if f05_dg01_input is not None:
+            write_receipt = getattr(self.session, '_last_dg01_position_application', None)
+            advances = tuple(getattr(self.session, '_last_dg01_interval_advances', ()))
+            advance_attempts = getattr(self.session, '_last_dg01_interval_advance_attempts', None)
+            model_receipt = getattr(self.session, '_f05_dg01_model_receipt', None)
+            if (not isinstance(write_receipt, dict) or not isinstance(model_receipt, dict)
+                    or write_receipt.get('target_identity_sha256') != target.identity_hash
+                    or write_receipt.get('source_closure_sha256') != self.value['source'].source_closure_digest
+                    or write_receipt.get('model_receipt_identity_sha256') != model_receipt.get('identity_sha256')
+                    or advance_attempts != self.artifact.timebase.control_substeps
+                    or len(advances) != self.artifact.timebase.control_substeps):
+                raise ValueError('DG01 recording requires its exact model-bound control write and five accepted advances')
+            if any(
+                item.get('substep_index') != index
+                or item.get('native_step_index') != (
+                    (self.state.control_step - 1) * self.artifact.timebase.control_substeps + index + 1
+                )
+                or not np.isclose(
+                    item.get('time_after_s'),
+                    self.state.simulation_time - self.artifact.timebase.physics_dt * (
+                        self.artifact.timebase.control_substeps - index - 1
+                    ),
+                    rtol=0.0, atol=1.0e-12,
+                )
+                for index, item in enumerate(advances)
+            ):
+                raise ValueError('DG01 MuJoCo substep receipt has a sequence or clock mismatch')
+            applied_payload['mujoco_position_write_receipt_v1'] = dict(write_receipt)
+            applied_payload['mujoco_interval_advance_receipts_v1'] = [dict(item) for item in advances]
+            applied_payload['mujoco_interval_advance_attempts'] = int(advance_attempts)
         if f03_input is not None or f04_input is not None or f05_input is not None:
             native_ack = getattr(self.session, '_last_native_position_ack', None)
             native_advances = getattr(self.session, '_last_interval_advances', ())

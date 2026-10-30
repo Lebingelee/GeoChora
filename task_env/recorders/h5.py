@@ -394,6 +394,7 @@ def _f05_typed_state_extension(trajectory: FrozenTrajectory):
     if not isinstance(profile, Mapping) or profile.get("profile_id") not in {
             "f05-geophys-usd-position-synthetic-io-s1-v1",
             "geophys-usd-position-f05-native-v1",
+            "f05-dg01-mujoco-core-v1",
     }:
         return None
     if profile.get("typed_state_h5_witness_schema_version") != "f05-public-typed-state-witness-v1":

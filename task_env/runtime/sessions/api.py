@@ -28,6 +28,7 @@ CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_
 PROFILE = 'p1_2_scalar_cpu_v0'
 F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
 F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
+F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
     'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
@@ -341,6 +342,70 @@ def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, s
         raise ValueError('F05 native Position cell is state-only and cannot create a renderer')
 
 
+def _validate_f05_dg01_mujoco_source(artifact, execution, source) -> None:
+    """Admit only the exact source-bound DG01 Menagerie MJCF/Core route."""
+    from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
+
+    if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
+        raise TypeError('F05 DG01 requires exact TaskArtifactV1 and ExecutionSpecV1 contracts')
+    if type(source) is not RuntimeSource:
+        raise TypeError('F05 DG01 requires the existing canonical RuntimeSource')
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode) != (
+            'mujoco', 'cpu', 'cpu', F05_DG01_MUJOCO_PROFILE, 'strict'):
+        raise ValueError('unsupported F05 DG01 provider/backend/device/profile intersection')
+    if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+            artifact.timebase.control_dt) != (0.002, 5, 0.01):
+        raise ValueError('F05 DG01 requires 100 Hz control and five 2 ms native steps')
+    if (source.scene_definition is None
+            or source.scene_definition.scene_id != 'f05-dg01-menagerie-panda-cube-support'
+            or source.scene_source.source_id != (
+                f'scene-definition-v3:{source.scene_definition.identity_hash}'
+            )
+            or artifact.scene_identity_hash != source.scene_definition.identity_hash
+            or artifact.scene_id != source.scene_definition.scene_id):
+        raise ValueError('F05 DG01 RuntimeSource/Artifact does not bind the exact task Scene')
+    artifact.validate_scene(source.scene_definition)
+    if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
+            or source.config.runtime.control_substeps != artifact.timebase.control_substeps
+            or source.config.runtime.backend != execution.physics_backend
+            or source.config.render.camera_obs):
+        raise ValueError('F05 DG01 source execution/timebase/renderer mismatch')
+    expected_joints = {
+        **{f'panda-main/joint{i}': f'joint{i}' for i in range(1, 8)},
+        'panda-main/finger_joint1': 'finger_joint1',
+        'panda-main/finger_joint2': 'finger_joint2',
+    }
+    expected_targets = {f'panda-main/joint{i}': f'actuator{i}' for i in range(1, 8)}
+    expected_free_joints = {'free-cube/free_cube': 'cube_freejoint'}
+    expected_bodies = {
+        f'{frame.entity_id}/{frame.frame_id}': frame.frame_id
+        for frame in source.scene_definition.frames or () if frame.frame_kind == 'runtime'
+    }
+    if (dict(source.joints) != expected_joints
+            or dict(source.joint_targets) != expected_targets
+            or dict(source.free_joints) != expected_free_joints
+            or dict(source.bodies) != expected_bodies
+            or dict(source.frames)
+            or tuple(source.open_actuators) != ('actuator8',)):
+        raise ValueError('F05 DG01 logical-to-native Joint/Frame/Actuator map mismatch')
+    if (source.task_artifact_hash != artifact.identity_hash
+            or not source.source_closure_digest
+            or len(source.source_closure_digest) != 64):
+        raise ValueError('F05 DG01 source closure is not bound to its TaskArtifact')
+    # Run the exact existing compatibility-lowering/closure checker before any
+    # adapter is created. This reads bytes only; it never imports MuJoCo.
+    from .source import lower_mujoco_scene_source
+    lowered_xml, assets = lower_mujoco_scene_source(
+        source.scene_source, source.scene_definition, source.source_closure_digest,
+    )
+    if not lowered_xml or not assets:
+        raise ValueError('F05 DG01 source closure lacks its bounded mesh bytes')
+    if (artifact.task_id, artifact.artifact_version) != (
+            'phase-ii-f05-dg01-panda-cube', 'candidate-v1'):
+        raise ValueError('F05 DG01 TaskArtifact identity is outside its exact candidate')
+
+
 def _diagnostic_manifest(artifact, execution, source, profile_id):
     """Return a process-local admission view for one non-capability diagnostic.
 
@@ -390,12 +455,45 @@ def _diagnostic_manifest(artifact, execution, source, profile_id):
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
-                _f05_native_input=None) -> RuntimeSession:
+                _f05_native_input=None, _f05_dg01_mujoco_input=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    if (_f05_dg01_mujoco_input is not None
+            or (type(execution) is ExecutionSpecV1
+                and execution.physics_profile == F05_DG01_MUJOCO_PROFILE)):
+        if _f05_dg01_mujoco_input is None:
+            raise ValueError('F05 DG01 MuJoCo profile requires its exact versioned candidate input')
+        from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
+        if type(_f05_dg01_mujoco_input) is not F05Dg01MujocoCandidateInputV1:
+            raise TypeError('F05 DG01 materialization requires F05Dg01MujocoCandidateInputV1')
+        _f05_dg01_mujoco_input.validate()
+        if (artifact is not _f05_dg01_mujoco_input.artifact
+                or source is not _f05_dg01_mujoco_input.runtime_source
+                or type(declared_execution) is not ExecutionSpecV1
+                or declared_execution.identity_hash != _f05_dg01_mujoco_input.execution.identity_hash):
+            raise ValueError('F05 DG01 materialization differs from its exact candidate input identities')
+        _validate_f05_dg01_mujoco_source(artifact, declared_execution, source)
+        if manifest is not None:
+            admit_capabilities(artifact.required_capabilities, manifest, declared_execution)
+        actual = provider_manifest('mujoco')
+        admit_capabilities(artifact.required_capabilities, actual, declared_execution)
+        if _materialization_authority is not None or _diagnostic_profile is not None:
+            raise ValueError('F05 DG01 exact admission cannot combine with other authorities')
+        projected_execution = legacy_execution_projection(declared_execution)
+        session = _materialize_admitted(
+            artifact, projected_execution, source,
+            f05_dg01_input=_f05_dg01_mujoco_input,
+        )
+        session._declared_execution_spec_v1 = declared_execution
+        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+        return session
+    if (type(execution) is ExecutionSpecV1
+            and execution.physics_profile == F05_DG01_MUJOCO_PROFILE
+            and _f05_dg01_mujoco_input is None):
+        raise ValueError('F05 DG01 MuJoCo profile cannot use generic v1 admission')
     if type(source) is UsdRuntimeSourceV1:
         if type(declared_execution) is not ExecutionSpecV1:
             raise TypeError('USD RuntimeSource requires an explicit ExecutionSpecV1')
@@ -754,13 +852,13 @@ def _validate_fixed_attachment_materialization_source(artifact, execution, sourc
     if lowered.source_closure_sha256 != source.source_closure_digest:
         raise ValueError('fixed Attachment RuntimeSource closure differs from its measured source closure')
 
-def _materialize_admitted(artifact, execution, source):
+def _materialize_admitted(artifact, execution, source, *, f05_dg01_input=None):
     if execution.physics_provider == 'geophys':
         from .geophys import _GeoPhysSession
         return _GeoPhysSession(artifact, source)
     if execution.physics_provider == 'mujoco':
         from .mujoco import _MuJoCoSession
-        return _MuJoCoSession(artifact, source)
+        return _MuJoCoSession(artifact, source, f05_dg01_input=f05_dg01_input)
     if execution.physics_provider == 'sapien':
         from .sapien import _SapienSession
         return _SapienSession(artifact, source)
