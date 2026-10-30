@@ -195,6 +195,22 @@ This is a static declaration join: it does not lower or attach XML, create
 physical entities/native names/indices, call the legacy Provider compiler, or
 admit Runtime/materialization/Qualification.
 
+## F05 typed-H5 reader and GeoPhys source boundary (attempt002; pending Sol review)
+
+The tracked F05 diagnostics reader compares every public typed state row with
+the stored H5 observation values at the declared float32 storage precision.
+Keep its witness sourced from public reset/step results; the independent reader
+must not trust producer PASS summaries or fixture-private state. The F05
+producer identity distinguishes the requested target build from the actual
+GeoPhys checkout/module origin and source bytes. A candidate provider checkout
+does not prove the main repository gitlink was executed. The attempt002 result
+is partial: official Panda import remains rejected at authored
+`maxDepenetrationVelocity=+inf`, and an authored `PhysxMimicJointAPI` retained
+in generic source inventory is not evidence of a GeoPhys typed host/solver
+consumer. Production USD admission remains fail closed; no physics/native,
+S2/S3, Qualification, or F06 follows. Preserve the exact bounded S1 and the
+source-consumption limitations in the [F05 result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-reader-producer-and-source-boundary).
+
 ## Static Position leaf contracts (R02a)
 
 `task_env.controllers.canonical` exports advanced provider-free values:

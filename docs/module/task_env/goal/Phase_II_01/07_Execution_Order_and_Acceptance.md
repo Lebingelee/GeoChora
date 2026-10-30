@@ -1,8 +1,8 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
-2026-10-30后继包：F04已完成最终接收；F05 attempt001已执行并以`PARTIAL_PENDING_SOL_REVIEW`交回：Menagerie source/control和同路线Core synthetic S1候选完成，官方Panda因GeoPhys public import拒绝非有限`maxDepenetrationVelocity=inf`而未就绪。该包无native/solver/physics，生产GeoPhys USD仍fail closed；F06/F07未启动或授权。详见[10 F05 attempt001计划与执行结果](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt001-execution-result)。
+2026-10-30当前后继状态：F04已完成最终接收；F05 attempt002已完成并以`PARTIAL_PENDING_SOL_REVIEW`交回。reader数值绑定、实际producer身份及tracked诊断owner已修复并通过定向synthetic S1；官方Panda仍在GeoPhys public import因`maxDepenetrationVelocity=+inf`被拒，mimic仍无GeoPhys typed solver consumer。零native/solver/physics，生产GeoPhys USD继续fail closed；F06未启动。详见[10 F05 attempt002结果](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-reader-producer-and-source-boundary)。
 
-当前入口（2026-10-30）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02 attempt002获`ACCEPTED_BOUNDED_F02`；F03 attempt003获Sol接收`ACCEPTED_BOUNDED_F03_S1`；attempt002真实CPU Pendulum三步范围偏差继续保留；F04 attempt004技术复核及G8收口完成，已获`ACCEPTED_BOUNDED_F04`；F05 attempt001为`PARTIAL_PENDING_SOL_REVIEW`；F06/F07未启动；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
+当前入口（2026-10-30）：**F00已获`ACCEPTED_BOUNDED_F00`；F01 attempt003 GPU PhysX native经独立复核后获`ACCEPTED_BOUNDED_F01`；F02 attempt002获`ACCEPTED_BOUNDED_F02`；F03 attempt003获Sol接收`ACCEPTED_BOUNDED_F03_S1`；attempt002真实CPU Pendulum三步范围偏差继续保留；F04 attempt004技术复核及G8收口完成，已获`ACCEPTED_BOUNDED_F04`；F05 attempt002为`PARTIAL_PENDING_SOL_REVIEW`，官方Panda source cell仍blocked；F06/F07未启动；camera分支R04c已接收，Luna1当前职责仅F00–F07**。
 
 2026-10-30最终收口：维护者已转述临时窗口独立技术复核的有界接收决定；主窗口复核原冻结包9/9、输出364/364、保护输入2,134/2,134及native源码27/27全部匹配。通用Skill修改由主窗口独立审阅后提交`875954f101033568a3e1f5e439ed86be3cf29cc2`，该HEAD的tracked tree clean；F04实现及冻结证据不变。执行目录缺失的转述副本已从原包逐字节补齐，输出清单更新为365项并保留更新前清单。G8关闭，登记`ACCEPTED_BOUNDED_F04`；仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及受控worker退出合同，无第五轮native、无软件测试重跑。详见[10最终接收](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-sol-acceptance)。该时点F05尚未开始，须另行冻结工作包。
 

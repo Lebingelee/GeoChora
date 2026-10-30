@@ -1,7 +1,7 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt001经Sol复核为 `PARTIAL_CONFIRMED_REWORK_REQUIRED_F05`**。
-F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001完成Menagerie候选的source/control基础、GeoPhys隔离MJCF importer修复及合成Core S1；官方Panda在GeoPhys public import前因 authored `maxDepenetrationVelocity=inf` 被拒，故真实source cell未就绪。详情见[F05执行结果](#f05-attempt001-execution-result)。
+更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt002已完成，`PARTIAL_PENDING_SOL_REVIEW`**。
+F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001的Menagerie source/control与synthetic S1成果、以及官方Panda `maxDepenetrationVelocity=inf` 阻塞继续保留。attempt002修复reader数值联验和producer身份，并完成官方USD属性消费边界调查；官方source cell仍在GeoPhys public import被拒，生产USD materialize维持fail closed。详情见[F05 attempt002结果](#f05-attempt002-reader-producer-and-source-boundary)。
 
 ### 当前双Luna分工（2026-10-29）
 
@@ -717,6 +717,24 @@ Sol额外尝试一个F02先前未完成的catalog节点，仍因完整Git状态�
 
 ### 窗口、分支与资源
 
-下一包为F05普通attempt002，目标是修复已证实的R1/R2、使S1检查可复用并一次明确官方source能力边界；本包通过只可接收source/control/S1有界范围，不替代F05后续物理与MuJoCo USD出口。沿用`develop-full`和现有provider topic/worktree，零新增Core或provider分支/worktree；主仓gitlink保持a53，候选在41f8上继续本地提交并保留供复核，不push/merge。
+冻结的F05普通attempt002包目标是修复已证实的R1/R2、使S1检查可复用并一次明确官方source能力边界；本包通过只可接收source/control/S1有界范围，不替代F05后续物理与MuJoCo USD出口。该包沿用`develop-full`和现有provider topic/worktree，零新增Core或provider分支/worktree；主仓gitlink保持a53，候选在41f8上继续本地提交并保留供复核，不push/merge。执行结果见下节。
 
 预计活跃120–210分钟，timebox300分钟（最后30分钟收口），子进程wall≤300秒、RSS≤3GiB、threads≤4、单个重检查；启动MemAvailable≥4GiB，低于1GiB中止；新证据≤512MiB、日志≤64MiB、cache增长≤1GiB。官方资料网络≤50MiB、资产下载/依赖变更为0。Kit/App、solver/backend init、kernel JIT、GPU、renderer、MuJoCo native compile、physics steps全部为0。只允许公开USD source/host模型与受控bottom-I/O synthetic Core链；production admission不开放，F06/F07不启动。一个完整prompt由维护者转述；输入HEAD、保护hash和旧反例由post-planning冻结包绑定。若需要改变资产语义、solver实现或native授权，返回具体缺口，不能自行扩大范围。三轮普通attempt计数不因拆包或改名重置。
+
+<a id="f05-attempt002-reader-producer-and-source-boundary"></a>
+
+## F05 attempt002 reader、producer identity与官方属性边界结果（2026-10-30；PARTIAL_PENDING_SOL_REVIEW）
+
+输入为`develop-full@3c5d59609a975207acecab463c8af56c2d45fd6b`，冻结GeoPhys candidate为`41f8b517c5f92cd6e59907394dc42714b78702a7`；Core实现提交`8575f1ebc9e37dfc26a08631c7c619f030c10f4f`。GeoPhys主仓gitlink仍为`a53a8cfed7c9d6464274b5c96fca601271dc4ee4`，候选源码未集成。本节记录Luna候选结果，等待Sol复核。
+
+| 门 | 结果 | 实际范围 |
+| --- | --- | --- |
+| Reader typed/H5 numeric binding | PASS | 两个same-Env synthetic episode，每个T=8/T+1=9；验证18/18边界、18/18 observations、16 transitions、80次synthetic advance；29类篡改拒绝，覆盖typed joint/free-body state、单位、DOF顺序、reset/final row、source、receipt、Target/Ack、producer与Execution/options identity。旧H5 ABI未放宽 |
+| Producer identity | PASS | 分离requested target build与实际GeoPhys producer；锁定candidate checkout root、origin、commit、module origin及source bytes。负例拒绝错误commit、内容、导入origin和旧pin receipt graft；未声称运行主仓gitlink |
+| Tracked test/support owner | PASS | 新reader/helper位于`task_env/diagnostics/tasks/`；绝对tracked路径和hash进入证据，独立子进程从tracked reader owner读实际H5。旧attempt失败文件保留 |
+| Official Panda property inventory/consumer boundary | PARTIAL | 冻结delivery 63/63文件、1,236 authored records/81属性名核验；PhysX mimic关系和本地consumer查明。GeoPhys public import仍在`/panda/panda_link0`的非有限`maxDepenetrationVelocity=+inf`处拒绝，不能判源无效或擅自有限化 |
+| Regression | PARTIAL | F02 provider-free 25/25、F03 25/25、F04 provider-free S1 4/4。F02 catalog clean-provenance节点因保留的无关untracked handoff使完整Git状态dirty，未运行/未通过；不得隐去或暂存该文件来伪造clean-checkout |
+
+官方Panda另在`/panda/panda_link0`、`link2`、`link7` authored `maxLinearVelocity=+inf`；当前GeoPhys generic inventory保留此字段，没有找到字段专属solver consumer。`PhysxMimicJointAPI:rotX`位于`/panda/panda_hand/panda_finger_joint2`，gearing为`-1`、reference为finger1、无authored offset。GeoPhys没有typed USD Physx-mimic host/solver consumer；通用属性保留不是solver支持证据。NVIDIA当前公开schema描述了mimic关系和`maxDepenetrationVelocity`范围，但文档版本未绑定本机冻结Isaac 6.2具体setter；本地Isaac converter对Physx mimic生成Newton overlay也不证明GeoPhys/PhysX消费本资产。完整逐属性处置及限制见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/evidence/physx_consumption_matrix.json`。
+
+因此attempt002交付`PARTIAL_PENDING_SOL_REVIEW`，不报F05完整出口：官方source cell未通过，MuJoCo USD cell未执行，GeoPhys physics/native和生产USD admission未开启；不授予S2/S3、Qualification或F06。运行、负例、失败与复核资料在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/`；attempt001和此前失败原件只读保留。完整报告与交付清单见同目录`report.md`。

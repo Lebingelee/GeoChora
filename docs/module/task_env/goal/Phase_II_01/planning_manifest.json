@@ -1858,11 +1858,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "22843b570e2c738f9aa3111e1c81811efc13d386a629c07cd1e39b2fa77cfbb3",
+    "07_Execution_Order_and_Acceptance.md": "a414de49d09324e5f3e7fd341fa41fae81fce2f9e1d5115a3346af9e5900e3fd",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "649e527cc92e0cedbfd84ad1679121b942dcac5d48db62e51ecc010435ceffbd",
-    "README.md": "0d70d28a4f4966f6fb8d9e5f30ada98f58483b44b315858a0bf96f03606b5911"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "739123f8cd0b4b516e007d3085e01170b11fa8d1caf720894e47cdd2a09a227c",
+    "README.md": "9875420e950665edbd656d0d16e14e9000cdfb4ed38ecf66ed89e4b9ebb9f4d9"
   },
   "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -3638,7 +3638,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "F05 attempt001 source/control implementation and synthetic Core S1 returned PARTIAL_PENDING_SOL_REVIEW. Menagerie source/host lowering and S1 ran with isolated GeoPhys candidate 41f8b517; official Panda was rejected at public import for authored maxDepenetrationVelocity=inf. No provider physics/native, production GeoPhys USD admission, Qualification, or F06. See f05_attempt001_execution.",
+  "planning_submission_this_revision": "F05 attempt002 repaired typed-state/H5 value comparison, bound actual GeoPhys producer identity, moved diagnostics to tracked owners, and completed source-property/mimic-consumption inventory. Candidate source/control/Core synthetic S1 repair gates pass pending Sol review; official Panda remains blocked at GeoPhys import for authored maxDepenetrationVelocity=+inf and the F02 clean-Git provenance node remains unverified because a preserved unrelated untracked file is present. No native/solver/physics, production USD admission, Qualification, or F06. See checkpoint_recovery_plan.f05_attempt002_execution.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4410,6 +4410,22 @@
         ".agents/skills/geochora/SKILL.md",
         ".agents/skills/geochora/references/goal-orchestration.md"
       ]
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "F05_ATTEMPT002_TYPED_READER_PRODUCER_AND_SOURCE_BOUNDARY_REPAIR",
+      "input_head": "3c5d59609a975207acecab463c8af56c2d45fd6b",
+      "implementation_commit": "8575f1ebc9e37dfc26a08631c7c619f030c10f4f",
+      "result": "F05_SOURCE_CONTROL_S1_REPAIR_PASS_PENDING_SOL_REVIEW; F05_OVERALL_PARTIAL",
+      "reader": "two same-Env episodes; 18/18 boundary and observation rows; 16 transitions; 80 synthetic advances; 29 tamper rejections",
+      "source": "63/63 official delivery files and 1236 authored property records inventoried; GeoPhys import remains blocked on authored +inf; PhysxMimic typed consumer unestablished",
+      "regressions": "F02 25/25 excluding known dirty-checkout catalog node; F03 25/25; F04 4/4",
+      "native_starts": 0,
+      "solver_initializations": 0,
+      "physics_steps": 0,
+      "F06_started": false,
+      "qualification_granted": false,
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/"
     }
   ],
   "P00_audit": {
@@ -5028,7 +5044,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol review of F05 attempt001 PARTIAL result; F06 remains unstarted and requires a separate reviewed package.",
+      "selected_next": "Sol review of F05 attempt002 candidate result; overall F05 remains partial and F06 remains unstarted pending a separate reviewed package.",
       "after_that_priority": [
         "F05 ready cells",
         "F06 ready cells",
@@ -5043,8 +5059,8 @@
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
       "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
-      "F05": "PARTIAL_PENDING_SOL_REVIEW; Menagerie source/control foundation and synthetic Core S1 candidate reported; official Panda source cell blocked at public GeoPhys import by authored non-finite maxDepenetrationVelocity; production USD admission remains closed.",
-      "F06": "NOT_STARTED; not authorized by F05 attempt001."
+      "F05": "F05_SOURCE_CONTROL_S1_REPAIR_PASS_PENDING_SOL_REVIEW for attempt002 repair scope; F05_OVERALL_PARTIAL because official Panda source/import is still blocked and F02 clean-provenance node is not verified. Production GeoPhys USD admission remains closed.",
+      "F06": "NOT_STARTED; not authorized by F05 attempt002."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -5320,7 +5336,7 @@
       "automatic_next_substage_execution": false,
       "merge_or_push_authorized": false
     },
-    "latest_authorization": "Maintainer-provided self-contained F04 attempt002 package; input d67b718dbb0ef258d0e9d1e7450d81d4b917af93. Authorized local derived-delivery contracts, existing-Core adapter repair, exact provider-free S1, two-source CUDA/GPU PhysX bounded run, H5 readback, docs/Skill and local commits. No F05 or other slice.",
+    "latest_authorization": "Maintainer-transferred complete F05 attempt002 package, prompt SHA-256 214449e4a5f205bfa61641a41dca310441f5996e7da3c5c5cf88a4c2b0eca1b8, frozen develop-full input 3c5d59609a975207acecab463c8af56c2d45fd6b and GeoPhys candidate input 41f8b517c5f92cd6e59907394dc42714b78702a7. Authorized R1–R4 bounded repair/investigation, exact provider-free S1, affected F02/F03/F04 regressions, docs/Skill and local commits; zero native, solver initialization or physics; no F06/F07.",
     "f01_attempt002_execution": {
       "date": "2026-10-29",
       "input_head": "552c43aab8641608c64781fe5f6e6bfca38481a6",
@@ -6033,6 +6049,68 @@
         "timebox_minutes": 300,
         "prompt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_002/luna1_prompt.md"
       }
+    },
+    "latest_f05_execution": "f05_attempt002_execution",
+    "f05_attempt002_execution": {
+      "date": "2026-10-30",
+      "attempt": 2,
+      "status": "F05_SOURCE_CONTROL_S1_REPAIR_PASS_PENDING_SOL_REVIEW; F05_OVERALL_PARTIAL",
+      "input_head": "3c5d59609a975207acecab463c8af56c2d45fd6b",
+      "branch": "develop-full",
+      "prompt_sha256": "214449e4a5f205bfa61641a41dca310441f5996e7da3c5c5cf88a4c2b0eca1b8",
+      "provider_candidate_input_head": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_candidate_final_head": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_candidate_clean": true,
+      "root_geoPhys_gitlink": "a53a8cfed7c9d6464274b5c96fca601271dc4ee4",
+      "provider_gitlink_changed": false,
+      "R1_typed_H5_numeric_reader": "PASS; final independent reader checked 18/18 public boundaries, 18/18 observation rows, 16 transitions and 80 synthetic advances across two same-Env episodes; 29 tamper cases rejected including the Sol final typed-position counterexample.",
+      "R2_actual_producer_identity": "PASS; requested target build distinguished from actual GeoPhys candidate root/origin/commit/module origins and source bytes; main gitlink not claimed executed.",
+      "R3_tracked_diagnostics_owner": "PASS; new reader and support code live under task_env/diagnostics/tasks; independent subprocess imports no code from ignored attempt output.",
+      "R4_source_property_boundary": "PARTIAL_SOURCE_CELL_BLOCKED; official Panda delivery closure inventory 63/63 files, 1236 authored property records, 81 names. GeoPhys public import rejects authored +infinity maxDepenetrationVelocity at panda_link0; maxLinearVelocity +infinity is retained generically with no field-specific solver consumer established. PhysxMimicJointAPI gearing/reference relationship retained in generic inventory; no typed GeoPhys USD consumer/solver lowering established. No source rewrite/clamp or invalid-asset verdict.",
+      "S1": "PASS; two Menagerie synthetic Core episodes T=8/T+1=9; 18 boundaries and observations; 16 transitions; 80 synthetic advances; 29 tamper rejections. runtime_admitted=false, source_verified=false, physics_steps=0.",
+      "F02_F03_F04_regressions": {
+        "F02_provider_free": "25/25 passed; known catalog provenance node not run because preserved unrelated untracked handoff makes complete git status dirty; no bypass.",
+        "F03_provider_free": "25/25 passed.",
+        "F04_provider_free_S1": "4/4 passed."
+      },
+      "native_starts": 0,
+      "solver_initializations": 0,
+      "physics_steps": 0,
+      "gpu_renderer_starts": 0,
+      "native_lock_acquired": false,
+      "production_GeoPhys_USD_admission": "FAIL_CLOSED",
+      "F06_started": false,
+      "F07_started": false,
+      "qualification_granted": false,
+      "protected_input_verification": "3197/3197 matched; 38 source snapshot files with 13 allowed package changes all within tracked package diff; pre-existing untracked handoff hash unchanged.",
+      "implementation_commit": "8575f1ebc9e37dfc26a08631c7c619f030c10f4f",
+      "documentation_commit": "reported in ignored f05_002/report.md after commit",
+      "output_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/report.md",
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/evidence.json",
+      "documentation_validation": {
+        "phase_ii_01_markdown_files": 12,
+        "phase_markdown_sha256": {
+          "00_Phase_II_01_Blueprint.md": "dcc3a032a9516fe4ebeb62d3be37731503d5175b3d424feca5160e484af341b5",
+          "01_R01_Logical_Robot_Assembly.md": "be0013386e73bb22cc14eb4b51d367aba2f56d54bcba3f4178a0da99ce3f2b25",
+          "02_R02_Composite_Control_Profiles.md": "a0c5cb38ff1c97a975343aa38d4d547b9eaec58e3601fffbf8d97fa243619391",
+          "03_R03_Physical_Attachment.md": "3f0843883b31cd81bab49ec960ead5f163d32267229a5f8e87f9eb917b44e238",
+          "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
+          "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
+          "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
+          "07_Execution_Order_and_Acceptance.md": "a414de49d09324e5f3e7fd341fa41fae81fce2f9e1d5115a3346af9e5900e3fd",
+          "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
+          "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
+          "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "739123f8cd0b4b516e007d3085e01170b11fa8d1caf720894e47cdd2a09a227c",
+          "README.md": "9875420e950665edbd656d0d16e14e9000cdfb4ed38ecf66ed89e4b9ebb9f4d9"
+        },
+        "touched_links_and_anchors": "PASS; 6 touched Markdown files",
+        "task_env_skill_static_check": "PASS using configured Core Python",
+        "planning_manifest_json": "PASS",
+        "git_diff_check": "PASS",
+        "global_docs_validator": "NOT_RUN_PER_PACKAGE"
+      },
+      "next": "Sol review; do not start F06."
     }
   }
 }
