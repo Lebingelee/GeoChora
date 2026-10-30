@@ -195,7 +195,7 @@ This is a static declaration join: it does not lower or attach XML, create
 physical entities/native names/indices, call the legacy Provider compiler, or
 admit Runtime/materialization/Qualification.
 
-## F05 typed-H5 reader and GeoPhys source boundary (attempt002; pending Sol review)
+## F05 typed-H5 reader and GeoPhys source boundary (bounded S1 accepted)
 
 The tracked F05 diagnostics reader compares all T+1 joint-position, hand-pose
 and free-body-pose H5 observation leaves with public typed state at the declared
@@ -205,13 +205,17 @@ reset/step witness. The independent reader must not trust producer PASS
 summaries or fixture-private state. The F05
 producer identity distinguishes the requested target build from the actual
 GeoPhys checkout/module origin and source bytes. A candidate provider checkout
-does not prove the main repository gitlink was executed. The attempt002 result
-is partial: official Panda import remains rejected at authored
+does not prove the main repository gitlink was executed. The source/control/S1 repair is accepted only within its frozen synthetic scope;
+overall F05 remains partial: official Panda import remains rejected at authored
 `maxDepenetrationVelocity=+inf`, and an authored `PhysxMimicJointAPI` retained
 in generic source inventory is not evidence of a GeoPhys typed host/solver
 consumer. Production USD admission remains fail closed; no physics/native,
 S2/S3, Qualification, or F06 follows. Preserve the exact bounded S1 and the
-source-consumption limitations in the [F05 result](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-reader-producer-and-source-boundary).
+source-consumption limitations in the [F05 acceptance](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance).
+New H5 with producer identity or the typed-state marker requires the v2 input
+contract; do not downgrade it through historical v1 compatibility. The new F05
+helper/reader is tracked, while the permitted inherited F04 fixture still needs
+its frozen ignored inputs and support. Do not claim cold-checkout self-containment.
 
 ## Static Position leaf contracts (R02a)
 

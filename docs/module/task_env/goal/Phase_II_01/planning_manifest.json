@@ -1858,11 +1858,11 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "a414de49d09324e5f3e7fd341fa41fae81fce2f9e1d5115a3346af9e5900e3fd",
+    "07_Execution_Order_and_Acceptance.md": "de3c1c1fe85980f71e021ec36fca2abfa81823e0b1e9701e7edc97d9ed9a0531",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
-    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "739123f8cd0b4b516e007d3085e01170b11fa8d1caf720894e47cdd2a09a227c",
-    "README.md": "9875420e950665edbd656d0d16e14e9000cdfb4ed38ecf66ed89e4b9ebb9f4d9"
+    "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "f111a549f39f95b8f91ff3d86f16e599b4fa715294d5384dd41c97b5d5ae345c",
+    "README.md": "c2e67f13c43f3dbb198d82fedcfd9470f7d7c517a355d82d25ece607993c813f"
   },
   "revision_kind": "F04_ATTEMPT004_TECHNICAL_GATES_PASS_TRACKED_CLEAN_HANDOFF_PENDING_SOL_REVIEW",
   "benchmark_audit": {
@@ -6111,6 +6111,39 @@
         "global_docs_validator": "NOT_RUN_PER_PACKAGE"
       },
       "next": "Sol review; do not start F06."
+    },
+    "f05_attempt002_sol_review": {
+      "date": "2026-10-30",
+      "status": "ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1",
+      "overall_status": "F05_OVERALL_PARTIAL",
+      "input_head": "5fdf0e61d39afbe46b2f6845157bfa8c00f45677",
+      "luna_implementation_commit": "8575f1ebc9e37dfc26a08631c7c619f030c10f4f",
+      "sol_fix_commit": "fdf84ef85fcb7490a0e0ace4940efbfbb4eb867e",
+      "output_manifest_verified": 578,
+      "protected_inputs_verified": 3197,
+      "hash_mismatches": 0,
+      "independent_frozen_reader_cases": 33,
+      "case_mismatches": 0,
+      "sol_reader_fix": "reject producer/typed-extension H5 with downgraded legacy v1 contract; historical v1 positive retained",
+      "postfix_core_s1_pytest_nodes_passed": 1,
+      "postfix_boundary_rows": 18,
+      "postfix_observation_rows": 18,
+      "postfix_transitions": 16,
+      "postfix_synthetic_advances": 80,
+      "postfix_tamper_rejections": 30,
+      "typed_velocity_scope": "H5 extension versus external public reset/step witness; no independent velocity observation leaf or dynamics proof",
+      "diagnostic_fixture_scope": "new F05 helper/reader tracked; inherited F04 ignored fixture support and fixed local paths retained, not a cold-checkout proof",
+      "official_source_status": "BLOCKED at authored +inf; PhysX mimic authored, no GeoPhys typed USD consumer established",
+      "provider_candidate_commit": "41f8b517c5f92cd6e59907394dc42714b78702a7",
+      "provider_gitlink_integrated": false,
+      "G6_catalog_node": "environment blocked by preserved unrelated untracked file; no rerun or bypass",
+      "native_starts": 0,
+      "physics_steps": 0,
+      "F06_started": false,
+      "qualification": false,
+      "canonical_anchor": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance",
+      "evidence_root": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_002",
+      "next": "before ordinary attempt003, reassess public owners/primary sources/original-gate feasibility; no next package dispatched"
     }
   }
 }

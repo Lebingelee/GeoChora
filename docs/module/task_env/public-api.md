@@ -901,6 +901,9 @@ The frozen official Panda delivery was rejected at GeoPhys public import because
 
 <a id="f05-attempt002-reader-producer-and-source-boundary"></a>
 
-## F05 attempt002: typed H5 and producer provenance boundary (partial; pending Sol review)
+## F05 attempt002: bounded typed H5 and producer provenance acceptance
 
 The bounded F05 synthetic diagnostic compares all T+1 joint-position, hand-pose and free-body-pose observation leaves against their public typed state at the declared storage precision. Typed velocity and other non-observation fields are checked in the H5 typed-state extension against a separately captured public reset/step witness. The diagnostic also binds the actual GeoPhys host-model producer separately from the requested target build. Its tests and independent reader live under the tracked diagnostics owner. This does not change the public API or admit production USD execution. The synthetic route remains `runtime_admitted=false` and `source_verified=false`; the official Panda source cell and the F02 clean-Git provenance regression remain unresolved. The detailed source-property investigation and exact attempt limits are recorded in the [F05 attempt002 execution result](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-reader-producer-and-source-boundary).
+
+
+Sol accepted only the bounded source/control/S1 repair on 2026-10-30 (`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`); overall F05 remains partial. H5 carrying producer identity or the typed-state extension requires a v2 input contract; the v1 compatibility reader is retained for original historical H5 and cannot bypass the new producer checks. The diagnostics still require the frozen local fixtures, including permitted inherited F04 fixture support. This is not a cold-checkout self-containment or production runtime claim. See the [Sol acceptance](goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance).

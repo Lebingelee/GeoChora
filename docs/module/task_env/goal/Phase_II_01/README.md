@@ -192,3 +192,6 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 2026-10-28，Sol复核R03c attempt004，接收 `ACCEPTED_BOUNDED_S2_S3`。实际启动exit 0、正式receipt及complete progress存在；50项原始文件hash、16项冻结源码hash、1280 step trace、四份H5与独立readback的hash及冻结门一致，48/48 tamper拒绝。接收仅限Panda Arm+Hand 双source、两个Position writer、MuJoCo 3.8.1 CPU、seed31、2ms×5、E1–E4四配置；RSS为边界采样，非interval内硬峰值。复用33项provider-free S1，没有新增native或软件测试。复核报告：ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_r03c_004/sol_review.md`。
 
 2026-10-28 当前并行安排：维护者手动下载Isaac依赖，F01仍安装未完成、无native；Luna1推进R07a的非native审计/S1，Luna2在独立camera工作树完成R04b attempt002返工。R04b attempt001的24项S1可复核，完整S2未通过，旧失败与新修正分开记账。新包冻结具体HEAD/保护输入，原7/22/P99门及F02–F07后继不改。
+
+
+2026-10-30，Sol有界接收F05 source/control/S1修复，状态`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，F05整体仍PARTIAL；reader降级合同遗漏由Sol直接补齐并通过新S1。官方GeoPhys source/mimic、native及MuJoCo USD仍未接收；F06不启动。详见[接收记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f05-attempt002-sol-acceptance)。

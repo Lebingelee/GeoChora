@@ -1,6 +1,6 @@
 # 检查点恢复与 Provider / USD / Task Harness 补丁计划
 
-更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 attempt002已完成，`PARTIAL_PENDING_SOL_REVIEW`**。
+更新于 2026-10-30。状态：**F00为 `ACCEPTED_BOUNDED_F00`；F01为 `ACCEPTED_BOUNDED_F01`；F02为 `ACCEPTED_BOUNDED_F02`；F03为 `ACCEPTED_BOUNDED_F03_S1`；F04完成技术复核及G8收口，登记 `ACCEPTED_BOUNDED_F04`；F05 source/control/S1登记 `ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`，总体仍 `F05_OVERALL_PARTIAL`**。
 F04 attempt001–003历史失败原件保留；attempt004接收仅限冻结双Panda/Isaac6.2.0.0/CUDA GPU PhysX及专用worker受控退出，不声称自然Python/Kit析构修复或Qualification。G8通用Skill独立提交与副本恢复已完成，见[最终接收](#f04-sol-acceptance)。F05 attempt001的Menagerie source/control与synthetic S1成果、以及官方Panda `maxDepenetrationVelocity=inf` 阻塞继续保留。attempt002修复reader数值联验和producer身份，并完成官方USD属性消费边界调查；官方source cell仍在GeoPhys public import被拒，生产USD materialize维持fail closed。详情见[F05 attempt002结果](#f05-attempt002-reader-producer-and-source-boundary)。
 
 ### 当前双Luna分工（2026-10-29）
@@ -738,3 +738,20 @@ Sol额外尝试一个F02先前未完成的catalog节点，仍因完整Git状态�
 官方Panda另在`/panda/panda_link0`、`link2`、`link7` authored `maxLinearVelocity=+inf`；当前GeoPhys generic inventory保留此字段，没有找到字段专属solver consumer。`PhysxMimicJointAPI:rotX`位于`/panda/panda_hand/panda_finger_joint2`，gearing为`-1`、reference为finger1、无authored offset。GeoPhys没有typed USD Physx-mimic host/solver consumer；通用属性保留不是solver支持证据。NVIDIA当前公开schema描述了mimic关系和`maxDepenetrationVelocity`范围，但文档版本未绑定本机冻结Isaac 6.2具体setter；本地Isaac converter对Physx mimic生成Newton overlay也不证明GeoPhys/PhysX消费本资产。完整逐属性处置及限制见ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/evidence/physx_consumption_matrix.json`。
 
 因此attempt002交付`PARTIAL_PENDING_SOL_REVIEW`，不报F05完整出口：官方source cell未通过，MuJoCo USD cell未执行，GeoPhys physics/native和生产USD admission未开启；不授予S2/S3、Qualification或F06。运行、负例、失败与复核资料在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_002/`；attempt001和此前失败原件只读保留。完整报告与交付清单见同目录`report.md`。
+
+
+<a id="f05-attempt002-sol-acceptance"></a>
+
+## F05 attempt002 Sol有界接收（2026-10-30）
+
+**登记`ACCEPTED_BOUNDED_F05_SOURCE_CONTROL_S1`；F05总体继续`F05_OVERALL_PARTIAL`。** 核对Luna输出HEAD`5fdf0e61`、实现`8575f1eb`、578/578输出及3,197/3,197保护SHA；实际GeoPhys producer仍为候选`41f8b517`，主仓gitlink a53未集成。接收R1–R3修复与R4调查/拒绝边界，官方source cell、G6缺失catalog节点和F05三provider总门未接收。
+
+Sol独立重读两份新H5、旧正例、原10mm反例与29类tamper，共33判定均符合预期。另复现v2 H5套用v1合同会绕过producer检查的遗漏，已直接修复reader并向既有S1加入schema降级负例。修复后同一Env两episode的完整S1通过：18 boundary/18 observations、16 transitions、80 synthetic advances、30类tamper拒绝；旧v1原H5仍可读取。带producer或typed扩展marker的新H5必须使用v2合同。Sol小修提交为`fdf84ef85fcb7490a0e0ace4940efbfbb4eb867e`；无须追加Luna窗口。
+
+数值接收限于joint position、hand/free-body pose与float32 observation联验；velocity通过H5 typed extension对外部public witness作存储一致性检查，因无velocity observation leaf，未声称独立物理验证。新F05 helper/reader已tracked，但允许复用的旧F04 fixture仍从ignored evidence导入，且使用冻结本地资产/provider路径；不声称冷checkout自包含或整个transitive import graph无ignored代码。Luna owner-proof的空列表不作为后一种证明。
+
+public OpenUSD独立核对官方link0/link2/link7的两项速度cap均为+inf，finger2确有PhysX mimic声明、gearing=-1、reference finger1、无authored offset；资产保持原字节。source属性保留不代表host/solver消费。F02 catalog因既有无关untracked文件导致完整Git状态dirty仍未覆盖；没有绕过gate。未重复无影响的F02/F03/F04回归或native。
+
+复核与Sol补丁后新S1证据位于ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_002/`，原Luna报告/失败/578项清单均不改写。此次新增Kit/App/solver/GPU/renderer/physics为0，F06/F07未启动；该接收不授予production GeoPhys USD admission、S2/S3、Qualification或three-provider closure。
+
+后续普通attempt003前需先完成实际owner、公开实现/主源资料与原门可行性复评，明确官方+inf/mimic消费及GeoPhys native public I/O、MuJoCo USD表示路线；尚未派发下一包或授权native，不把新的纯字段准备轮当作已解决provider能力。F05总目标及原F00–F07顺序保持。
