@@ -145,8 +145,10 @@ def _append_h5_witness(path: Path, witness: dict) -> None:
 
 
 def run(plan_path: Path, output: Path) -> dict:
+    from dataclasses import asdict
     from task_env.tasks.position_candidate.builder import build_f05_dg01_mujoco_candidate
     from task_env.runtime.sessions.source import lower_mujoco_scene_source
+    from task_env.environment.config import ActionConfig
 
     plan_path = plan_path.resolve()
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
@@ -172,8 +174,17 @@ def run(plan_path: Path, output: Path) -> dict:
     trace_path = output / "core_boundaries.jsonl"
     started = _utc_now()
     started_monotonic = time.monotonic()
-    candidate = build_f05_dg01_mujoco_candidate(output / "candidate-build", horizon=300)
+    controller_action_config = plan.get("controller_action_config")
+    if not isinstance(controller_action_config, dict):
+        raise ValueError("formal DG01 plan must freeze its complete Position ActionConfig")
+    controller_config = ActionConfig(**controller_action_config)
+    candidate = build_f05_dg01_mujoco_candidate(
+        output / "candidate-build", horizon=300,
+        controller_config=controller_config,
+    )
     env = candidate.env
+    if asdict(env.controller.config) != controller_action_config:
+        raise ValueError("DG01 Core candidate Position ActionConfig differs from its frozen plan")
     session_ids = []
     session_handles = []
     episodes = []

@@ -67,8 +67,15 @@ from task_env.controllers.canonical.position_profile import PandaPositionServoPr
 from task_env.runtime.sessions.api import materialize
 from task_env.runtime.sessions.control import ControlBinding, materialize_control
 from task_env.artifacts import ExecutionSpec
-candidate = build_f05_dg01_mujoco_candidate(sys.argv[1], horizon=300)
-profile = PandaPositionServoProfileV1.from_source(candidate.artifact, candidate.source)
+from task_env.environment.config import ActionConfig
+action_config = ActionConfig(joint_position_correction_gain=1.0)
+candidate = build_f05_dg01_mujoco_candidate(
+    sys.argv[1], horizon=300, controller_config=action_config,
+)
+profile = PandaPositionServoProfileV1.from_source(
+    candidate.artifact, candidate.source, config=action_config,
+)
+assert candidate.env.controller.identity == profile.identity
 try:
     materialize(candidate.artifact, candidate.execution, source=candidate.source)
 except ValueError as error:
@@ -133,6 +140,8 @@ print(json.dumps({
     'source_id': candidate.source.source_id,
     'source_closure_sha256': candidate.source_closure_digest,
     'derived_scene_sha256': candidate.derived_source_sha256,
+    'controller_identity_sha256': profile.identity,
+    'controller_action_config': __import__('dataclasses').asdict(profile.config),
     'panda_closure_sha256': candidate.panda_closure_digest,
     'panda_file_count': candidate.panda_file_count,
     'execution_identity_sha256': candidate.execution.identity_hash,
@@ -163,6 +172,7 @@ candidate.env.close()
         'mujoco-mjcf-f05-dg01-core-v1',
     ]
     assert evidence['materialize_control_admitted_exact_candidate'] is True
+    assert evidence['controller_action_config']['joint_position_correction_gain'] == 1.0
     assert evidence['materialization_stopped_at_native_boundary'] is True
     assert len(evidence['derived_scene_sha256']) == 64
 

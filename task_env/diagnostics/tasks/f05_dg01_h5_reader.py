@@ -242,6 +242,34 @@ def _verify_reset_write_receipt(profile: dict) -> None:
         _fail("DG01 H5 public ResetPlan write receipt is missing, partial or cross-bound")
 
 
+def _verify_selected_core_task_timebase(env_meta: dict) -> None:
+    """Verify the task and clock at their Generic H5 v3 metadata locations."""
+    environment = env_meta.get("environment", {})
+    timebase = env_meta.get("timebase", {})
+    if (environment.get("name") != "SelectedReferenceEnv.F05Dg01MenagerieMujocoCore"
+            or environment.get("task_name") != "phase-ii-f05-dg01-panda-cube"
+            or timebase.get("physics_dt") != 0.002
+            or timebase.get("control_substeps") != 5):
+        _fail("DG01 H5 selected Core Task/timebase metadata differs from the frozen route")
+
+
+def _verify_dg01_horizon_outcome(outcome: dict) -> None:
+    """Check the direct EpisodeOutcomeV1 mapping stored by Generic H5 v3."""
+    if (outcome.get("final_boundary") != 300
+            or outcome.get("end_reason") != "horizon_reached"
+            or outcome.get("terminated") is not False
+            or outcome.get("truncated") is not True
+            or outcome.get("task_success") is not None):
+        _fail("DG01 lifecycle outcome must be horizon-truncated with unknown lifecycle success")
+
+
+def _verify_controller_action_config(profile: dict, plan: dict) -> None:
+    expected = plan.get("controller_action_config")
+    actual = profile.get("controller_action_config")
+    if not isinstance(expected, dict) or actual != expected:
+        _fail("DG01 H5 Position ActionConfig differs from the frozen controller profile")
+
+
 def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
               expected_h5_sha256: str | None = None,
               derived_xml_path: Path | None = None,
@@ -262,12 +290,9 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
     profile = data["env_meta"].get("reference_profile", {})
     if profile.get("profile_id") != "f05-dg01-mujoco-core-v1":
         _fail("DG01 H5 reference profile identity mismatch")
+    _verify_controller_action_config(profile, plan)
     env_metadata = data["env_meta"]
-    if (env_metadata.get("env_name") != "SelectedReferenceEnv.F05Dg01MenagerieMujocoCore"
-            or env_metadata.get("physics_dt") != 0.002
-            or env_metadata.get("control_substeps") != 5
-            or env_metadata.get("task_name") != "phase-ii-f05-dg01-panda-cube"):
-        _fail("DG01 H5 selected Core Task/timebase metadata differs from the frozen route")
+    _verify_selected_core_task_timebase(env_metadata)
     for field, expected in _expected_profile(plan).items():
         actual = (profile.get("model_receipt_identity_sha256") if field == "model_receipt_identity_sha256"
                   else profile.get(field))
@@ -330,13 +355,7 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
     if len(data["controls"]) != 300:
         _fail("DG01 H5 structured control evidence is not T")
     outcome = data["outcome"]
-    outcome_value = outcome.get("outcome", {})
-    if (outcome_value.get("final_boundary") != 300
-            or outcome_value.get("end_reason") != "horizon_reached"
-            or outcome_value.get("terminated") is not False
-            or outcome_value.get("truncated") is not True
-            or outcome_value.get("task_success") is not None):
-        _fail("DG01 lifecycle outcome must be horizon-truncated with unknown lifecycle success")
+    _verify_dg01_horizon_outcome(outcome)
     if data["terminated"] != [False] * 300 or data["truncated"] != [False] * 299 + [True]:
         _fail("DG01 T-length lifecycle flags do not represent one complete horizon")
 

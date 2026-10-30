@@ -11,7 +11,10 @@ from task_env.diagnostics.tasks.f05_dg01_h5_reader import (
     _mjcf_hand_fk,
     _mutate_h5,
     _verify_exit,
+    _verify_dg01_horizon_outcome,
+    _verify_controller_action_config,
     _verify_reset_write_receipt,
+    _verify_selected_core_task_timebase,
 )
 from task_env.tasks.reference_env import _dg01_position_recording_receipt_failures
 
@@ -84,6 +87,42 @@ def test_cold_reader_module_has_no_native_or_solver_imports():
     assert "import isaacsim" not in source
     assert "GeoPhys" not in source
     assert "task_env." not in source
+
+
+def test_cold_reader_uses_generic_h5_v3_task_and_timebase_locations():
+    metadata = {
+        "environment": {
+            "name": "SelectedReferenceEnv.F05Dg01MenagerieMujocoCore",
+            "task_name": "phase-ii-f05-dg01-panda-cube",
+        },
+        "timebase": {"physics_dt": 0.002, "control_substeps": 5},
+    }
+    _verify_selected_core_task_timebase(metadata)
+    metadata["timebase"]["control_substeps"] = 4
+    with pytest.raises(ValueError, match="Task/timebase metadata"):
+        _verify_selected_core_task_timebase(metadata)
+
+
+def test_cold_reader_checks_direct_episode_outcome_mapping():
+    outcome = {
+        "final_boundary": 300,
+        "end_reason": "horizon_reached",
+        "terminated": False,
+        "truncated": True,
+        "task_success": None,
+    }
+    _verify_dg01_horizon_outcome(outcome)
+    with pytest.raises(ValueError, match="horizon-truncated"):
+        _verify_dg01_horizon_outcome({"outcome": outcome})
+
+
+def test_cold_reader_binds_position_action_config_to_the_frozen_plan():
+    profile = {"controller_action_config": {"joint_position_correction_gain": 1.0}}
+    plan = {"controller_action_config": {"joint_position_correction_gain": 1.0}}
+    _verify_controller_action_config(profile, plan)
+    plan["controller_action_config"]["joint_position_correction_gain"] = 2.5
+    with pytest.raises(ValueError, match="ActionConfig"):
+        _verify_controller_action_config(profile, plan)
 
 
 def test_cold_reader_stale_time_negative_mutates_the_checked_clock(tmp_path: Path):

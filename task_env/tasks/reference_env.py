@@ -2614,6 +2614,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'reset_sample_id': self.value['reset_plan'].reset_sample.sample_id,
                 'reset_write_receipt': reset_receipt.to_mapping(),
                 'controller_identity_sha256': self.controller.identity,
+                'controller_action_config': asdict(self.controller.config),
                 'control_binding_plan_identity_sha256': self.position_plan.identity_hash,
                 'kinematics_source_sha256': dg01_input.kinematics_source_sha256,
                 'model_receipt': model_receipt,

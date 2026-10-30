@@ -437,13 +437,16 @@ class F05Dg01MujocoCandidateInputV1:
 
 def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
-                                       camera_observation_config=None):
+                                       camera_observation_config=None,
+                                       controller_config=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
     if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1,
                               F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
                               F05Dg01MujocoCandidateInputV1):
         raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01 input contract')
     input_v1.validate()
+    if controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
+        raise ValueError('explicit Position ActionConfig is supported only by the DG01 MJCF candidate')
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
@@ -456,7 +459,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         )
     else:
         profile = PandaPositionServoProfileV1.from_source(
-            artifact, source,
+            artifact, source, config=controller_config,
         )
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     if input_v1.reset_plan.reset_sample.task_seed < 0:
@@ -676,7 +679,8 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
 
 
 def build_f05_dg01_mujoco_candidate(workspace: Path | str, *, horizon: int = 300,
-                                   environment_type=SelectedReferenceEnv):
+                                   environment_type=SelectedReferenceEnv,
+                                   controller_config=None):
     """Construct DG01 from the frozen Menagerie source through the existing Core path."""
     import importlib
 
@@ -731,6 +735,7 @@ def build_f05_dg01_mujoco_candidate(workspace: Path | str, *, horizon: int = 300
     candidate_input.validate()
     built = build_versioned_position_candidate(
         candidate_input, horizon=horizon, environment_type=environment_type,
+        controller_config=controller_config,
     )
     return SimpleNamespace(
         **vars(built),
