@@ -254,6 +254,29 @@ def test_f05_native_initial_state_defaults_absent_public_ctrl_and_act_to_zero():
     np.testing.assert_array_equal(state.act, np.zeros(2, dtype=np.float32))
 
 
+def test_f05_native_reader_reopens_h5_for_each_typed_observation_row(tmp_path, monkeypatch):
+    import h5py
+
+    from task_env.diagnostics.tasks import f05_independent_h5_reader as reader
+
+    path = tmp_path / 'native-observation.h5'
+    expected = np.asarray([[0.25, -0.5]], dtype=np.float32)
+    with h5py.File(path, 'w') as root:
+        root.create_dataset('obs/state/joint_position', data=expected)
+
+    observed = []
+
+    def check_live_handle(root, index, _typed, _contract, _receipt):
+        assert root.id.valid
+        np.testing.assert_array_equal(root['obs/state/joint_position'][index], expected[0])
+        observed.append(index)
+
+    monkeypatch.setattr(reader, '_check_typed_numeric_observation', check_live_handle)
+    reader._check_typed_numeric_observation_path(path, 0, {}, {}, {})
+
+    assert observed == [0]
+
+
 def test_f05_adapter_close_preserves_primary_cleanup_error_and_releases_lease_once():
     adapter = F05GeoPhysUsdNativeIO.__new__(F05GeoPhysUsdNativeIO)
     boundary = _RaisingBoundary()

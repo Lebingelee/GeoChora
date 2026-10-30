@@ -224,6 +224,13 @@ def _check_typed_numeric_observation(root, index, typed_raw, contract, receipt):
         raise ReaderReject('typed_free_body_pose', f'boundary {index} free-body Joint and Frame poses differ')
 
 
+def _check_typed_numeric_observation_path(path, index, typed_raw, contract, receipt):
+    # Native validation reads the T+1 metadata once, then iterates public rows.
+    # Reopen the file for each row instead of retaining the closed setup handle.
+    with h5py.File(path, 'r') as root:
+        _check_typed_numeric_observation(root, index, typed_raw, contract, receipt)
+
+
 def _validate_typed_unit_layout(typed_raw, contract, receipt, index):
     joints = typed_raw.get('joints')
     if not isinstance(joints, list):
@@ -705,7 +712,7 @@ def _native_physical_metrics(boundary_rows, contract, plan):
             velocity_com, omega_world = body_origin_local_twist_to_world_com(
                 position_world_m=p,
                 orientation_world_from_body_wxyz=quat,
-                com_offset_body_m=com_offset,
+                com_offset_body_m=com_offset.tolist(),
                 linear_velocity_body_origin_local_m_s=local_twist[:3],
                 angular_velocity_body_local_rad_s=local_twist[3:],
             )
@@ -1000,7 +1007,7 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
             raise ReaderReject('observation_witness', f'native H5 observation row {index} differs from public return values')
         typed = entry.get('canonical_state_view_v1')
         _validate_typed_unit_layout(typed, contract, receipt, index)
-        _check_typed_numeric_observation(root, index, typed, contract, receipt)
+        _check_typed_numeric_observation_path(path, index, typed, contract, receipt)
         ext = typed_rows[index]
         if (ext.get('boundary_index') != index or ext.get('state_boundary_identity') != boundary.to_mapping()
                 or ext.get('state_sample_clock') != clock
@@ -1017,6 +1024,17 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
     if len({item.episode_id for item in boundaries}) != 1:
         raise ReaderReject('episode_identity', 'native H5 public boundaries span more than one episode')
 
+    from task_env.controllers.canonical.kinematics import (
+        PANDA_HAND_ORIGIN_TCP_V1, PandaKinematics,
+    )
+    kinematics_path = Path(contract['kinematics_source_path']).resolve()
+    if (not kinematics_path.is_file()
+            or hashlib.sha256(kinematics_path.read_bytes()).hexdigest() != contract['kinematics_source_sha256']):
+        raise ReaderReject('kinematics_source', 'source-calibrated Panda kinematics bytes differ from the frozen run contract')
+    kinematics = PandaKinematics(
+        kinematics_path.read_text(encoding='utf-8'),
+        tcp_profile=PANDA_HAND_ORIGIN_TCP_V1,
+    )
     drive_by_name = {row['native_dof_name']: row for row in receipt['drives']}
     expected_names = contract['native_dof_order']
     if list(drive_by_name) != expected_names:
@@ -1051,12 +1069,35 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
                 or not _seconds_match(target_clock.get('simulation_time_s'), index * .01)):
             raise ReaderReject('target_clock', f'native transition {index} Position Target clock mismatch')
         phase = next(item for item in schedule if item['start_interval'] <= index < item['stop_interval_exclusive'])
-        expected_arm = {f'panda-main/joint{j}': float(home[f'joint{j}']) + float(phase['arm_joint_offsets_rad'][j-1])
-                        for j in range(1,8)}
+        scheduled_joints = [float(home[f'joint{j}']) + float(phase['arm_joint_offsets_rad'][j-1])
+                            for j in range(1, 8)]
+        scheduled_pose = kinematics.pose(scheduled_joints)
+        expected_pose = np.asarray(
+            [*scheduled_pose.position, *scheduled_pose.quaternion_wxyz], dtype=np.float64,
+        )
+        arm_group = next((item for item in control.request.groups if item.group_id == 'arm'), None)
+        requested_pose = np.asarray(arm_group.values, dtype=np.float64) if arm_group is not None else np.asarray([])
+        if requested_pose.shape != (7,):
+            raise ReaderReject('physical_target_schedule', f'native transition {index} arm request is not xyz plus quaternion')
+        position_matches = np.all(np.abs(requested_pose[:3] - expected_pose[:3]) <= 2e-7)
+        quaternion_matches = (np.all(np.abs(requested_pose[3:] - expected_pose[3:]) <= 2e-7)
+                              or np.all(np.abs(requested_pose[3:] + expected_pose[3:]) <= 2e-7))
+        if not position_matches or not quaternion_matches:
+            raise ReaderReject('physical_target_schedule', f'native transition {index} arm request differs from frozen task-space schedule')
         arm_target = target['target']['arm_servo_position']
-        if any(not math.isclose(float(arm_target.get(name, float('nan'))), value, rel_tol=0.0, abs_tol=2e-7)
-               for name, value in expected_arm.items()):
-            raise ReaderReject('physical_target_schedule', f'native transition {index} arm Target differs from frozen motion schedule')
+        expected_arm_names = {f'panda-main/joint{j}' for j in range(1, 8)}
+        if (not isinstance(arm_target, dict) or set(arm_target) != expected_arm_names
+                or any(not math.isfinite(float(value)) for value in arm_target.values())):
+            raise ReaderReject('physical_target_schedule', f'native transition {index} arm Target lacks seven finite named joints')
+        for name, value in arm_target.items():
+            drive = next(row for row in receipt['drives']
+                         if row['canonical_joint']['entity_id'] == 'panda-main'
+                         and row['canonical_joint']['joint_id'] == name.rsplit('/', 1)[-1])
+            lower, upper = float(drive['lower_limit']), float(drive['upper_limit'])
+            lower_tol = max(1e-12, abs(float(np.spacing(np.float32(lower)))) * 1.5)
+            upper_tol = max(1e-12, abs(float(np.spacing(np.float32(upper)))) * 1.5)
+            if float(value) < lower - lower_tol or float(value) > upper + upper_tol:
+                raise ReaderReject('physical_target_schedule', f'native transition {index} arm Target exceeds model-bound limits for {name}')
         group = next((item for item in control.request.groups if item.group_id == 'gripper'), None)
         gripper_target = target['target']['gripper']
         expected_opening = float(phase['gripper_opening_m'])
@@ -1078,9 +1119,17 @@ def validate_native_h5(path: Path, witness_path: Path, contract_path: Path, run_
         for name, actual in zip(ack['native_names'], ack['applied_values'], strict=True):
             drive = drive_by_name[name]
             joint = drive['canonical_joint']['joint_id']
-            expected = fingers_each if joint.startswith('finger_joint') else expected_arm[f"{drive['canonical_joint']['entity_id']}/{joint}"]
-            if (not math.isfinite(float(actual)) or not math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=2e-9)
-                    or not float(drive['lower_limit']) <= float(actual) <= float(drive['upper_limit'])):
+            expected = fingers_each if joint.startswith('finger_joint') else arm_target[
+                f"{drive['canonical_joint']['entity_id']}/{joint}"
+            ]
+            storage_tolerance = max(1e-12, abs(float(np.spacing(np.float32(expected)))) * 1.5)
+            lower, upper = float(drive['lower_limit']), float(drive['upper_limit'])
+            lower_tolerance = max(1e-12, abs(float(np.spacing(np.float32(lower)))) * 1.5)
+            upper_tolerance = max(1e-12, abs(float(np.spacing(np.float32(upper)))) * 1.5)
+            if (not math.isfinite(float(actual))
+                    or not math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=storage_tolerance)
+                    or float(actual) < lower - lower_tolerance
+                    or float(actual) > upper + upper_tolerance):
                 raise ReaderReject('ack_values', f'native transition {index} Ack value differs from Target/limits for {name}')
         advances = applied.get('native_interval_advance_receipts_v1')
         if not isinstance(advances, list) or len(advances) != 5:
