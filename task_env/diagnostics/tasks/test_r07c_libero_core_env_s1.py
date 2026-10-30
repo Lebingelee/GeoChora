@@ -2143,7 +2143,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV2
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV3
     from task_env.runtime.sessions.source import source_asset_bytes
     from task_env.recorders import load_structured_control_records_h5
 
@@ -2161,15 +2161,13 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         horizon=100,
     )
     closure_digest = env.metadata["source_closure_digest"]
-    solution = LiberoPickPlaceSolutionV2(
-        xml, source_closure_digest=closure_digest,
-        gravity_bias_model=_GravityBiasDouble(xml_sha, closure_digest),
+    solution = LiberoPickPlaceSolutionV3(xml, source_closure_digest=closure_digest)
+    gravity_model = _GravityBiasDouble(xml_sha, closure_digest)
+    env.controller.set_source_gravity_model(
+        gravity_model, source_xml_sha256=xml_sha, source_closure_digest=closure_digest,
     )
     wrong_xml = xml + b"\n<!-- different immutable source bytes -->\n"
-    wrong_source_solution = LiberoPickPlaceSolutionV2(
-        wrong_xml, source_closure_digest=closure_digest,
-        gravity_bias_model=_GravityBiasDouble(hashlib.sha256(wrong_xml).hexdigest(), closure_digest),
-    )
+    wrong_source_solution = LiberoPickPlaceSolutionV3(wrong_xml, source_closure_digest=closure_digest)
     try:
         assert env.observation_space["state"]["joint_position"].shape == (9,)
         with pytest.raises(ValueError, match="does not match the selected task/source/profile"):
@@ -2182,24 +2180,67 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         )
         assert reset_info["reset_sample_v1"]["sample_id"] == reset_info["reset_sample_id"]
         assert reset_obs["state"]["joint_position"].shape == (9,)
+
+        # Feed two real CartesianPosePlanner outputs through the selected task
+        # binding and the canonical arm resolver at the same state boundary.
+        # The changed pose must alter qdesired and the final actuator Target.
+        current_pose = np.asarray(reset_obs["state"]["ee_pose"], dtype=np.float64)
+        goal_a = current_pose.copy()
+        goal_a[0] += 0.008
+        goal_b = current_pose.copy()
+        goal_b[0] += 0.009
+        planner_action_a = solution.pose_planner.plan_to_pose(
+            current_pose=current_pose, goal_pose=goal_a, gripper=0.5, settle_steps=0,
+        )[0]
+        planner_action_b = solution.pose_planner.plan_to_pose(
+            current_pose=current_pose, goal_pose=goal_b, gripper=0.25, settle_steps=0,
+        )[0]
+        assert not np.array_equal(planner_action_a, planner_action_b)
+        state_boundary = env.state
+        prepared_a = env.binding.prepare_mixed_control(env, planner_action_a, state_boundary)
+        prepared_b = env.binding.prepare_mixed_control(env, planner_action_b, state_boundary)
+        qdesired_a = np.asarray(
+            prepared_a["writer_control"]["canonical_action"]["qdesired_rad"], dtype=np.float64,
+        )
+        qdesired_b = np.asarray(
+            prepared_b["writer_control"]["canonical_action"]["qdesired_rad"], dtype=np.float64,
+        )
+        assert qdesired_a.shape == qdesired_b.shape == (7,)
+        target_a = prepared_a["target"].channel_values
+        target_b = prepared_b["target"].channel_values
+        assert target_a["finger_joint1"] != target_b["finger_joint1"]
+        assert target_a["finger_joint2"] == pytest.approx(-target_a["finger_joint1"])
+        control_receipt_a = prepared_a["writer_control"]["canonical_action"]["controller_receipt"]
+        assert np.allclose(control_receipt_a["qdesired_rad"], qdesired_a, rtol=0.0, atol=1e-10)
+        assert np.allclose(
+            [target_a[f"joint{index}"] for index in range(1, 8)],
+            control_receipt_a["applied_torque_Nm"], rtol=0.0, atol=1e-10,
+        )
+        assert prepared_a["writer_control"]["canonical_action"]["arm_target_schema_version"] == "canonical-arm-target-v1"
+
         env.start_recording(tmp_path / "libero_solution_s1.h5")
         observation, _reward, terminated, truncated, info = env.step_with_solution(solution)
         assert not terminated and not truncated
         assert info["selected_solution_action_v1"]["solution_identity"] == solution.identity
         assert info["selected_solution_action_v1"]["stage"] == "approach"
-        assert float(info["external_action"][-1]) == pytest.approx(0.06)
+        assert float(info["external_action"][-1]) == pytest.approx(0.5)
         diagnostics = info["selected_solution_action_v1"]["diagnostics"]
-        assert diagnostics["gravity_compensation_profile_id"] == "libero-source-mjcf-gravity-bias-v1"
-        from bench_deploy.libero.controller import LiberoMixedControllerV1
-        controller_kp = np.asarray(
-            LiberoMixedControllerV1().identity_mapping()["kp_Nm_per_rad"],
-            dtype=np.float64,
+        assert diagnostics["planner_owner"] == "CartesianPosePlanner.plan_to_pose"
+        assert diagnostics["source_pose_observation_used"] is True
+        control_receipt = env.controller.last_control_receipt
+        kp = np.asarray(env.controller.config.kp_Nm_per_rad, dtype=np.float64)
+        kd = np.asarray(env.controller.config.kd_Nm_s_per_rad, dtype=np.float64)
+        expected_raw = (
+            kp * (np.asarray(control_receipt["qdesired_rad"])
+                  - np.asarray(control_receipt["q_rad"]))
+            - kd * np.asarray(control_receipt["qdot_rad_s"])
+            + np.asarray(control_receipt["gravity_feedforward_Nm"])
         )
+        assert np.allclose(control_receipt["raw_torque_Nm"], expected_raw, rtol=0.0, atol=1e-10)
+        target = info["mixed_actuator_command_v1"]["channel_values"]
         assert np.allclose(
-            diagnostics["gravity_compensated_joint_target_rad"],
-            np.asarray(diagnostics["planner_joint_target_rad"])
-            + np.asarray(diagnostics["gravity_bias_Nm"]) / controller_kp,
-            rtol=0.0, atol=1e-10,
+            [target[f"joint{i}"] for i in range(1, 8)],
+            control_receipt["applied_torque_Nm"], rtol=0.0, atol=1e-10,
         )
         assert info["control_step"] == 1
         assert env.recorder.transition_count == 1
@@ -2214,6 +2255,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         assert readback["outcome"].solution_completed is False
         assert observation["state"]["boundary_identity_sha256"].shape == (32,)
     finally:
+        env.controller.close_resources()
         env.close()
 
 
@@ -2224,7 +2266,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV2
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV3
     from task_env.runtime.sessions.source import source_asset_bytes
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
@@ -2249,14 +2291,23 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     }
     closure_digest = env.metadata["source_closure_digest"]
     gravity_model = _GravityBiasDouble(xml_sha, closure_digest)
+    env.controller.set_source_gravity_model(
+        gravity_model, source_xml_sha256=xml_sha, source_closure_digest=closure_digest,
+    )
+
+    class _SolutionFactory:
+        worker_result_schema_version = "r07-v210-task-solution-worker-result-v3"
+
+        def __call__(self, _bundle_root):
+            env.value["bind_source_gravity_model"](gravity_model)
+            return LiberoPickPlaceSolutionV3(xml, source_closure_digest=closure_digest)
+
     result = run_libero_candidate_worker(
         env, output_dir=bundle, steps=1,
-        solution_factory=lambda _bundle_root: LiberoPickPlaceSolutionV2(
-            xml, source_closure_digest=closure_digest, gravity_bias_model=gravity_model,
-        ),
+        solution_factory=_SolutionFactory(),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
-        solution_resource_closer=gravity_model.close,
+        solution_resource_closer=env.controller.close_resources,
     )
     assert result["status"] == "complete"
     assert result["episode_count"] == 3
@@ -2278,9 +2329,11 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert result["final_session_close_receipt"]["session_closed"] is True
     assert result["solution_resource_close_receipt"]["closed"] is True
     assert result["solution_resource_close_receipt"]["forward_call_count"] == 3
+    assert not (bundle / "source_inputs/closure").exists()
+    assert (bundle / "source_inputs/closure.tar.gz").is_file()
 
     receipt = consume_libero_candidate_bundle(bundle / "worker_result.json")
-    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v2"
+    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v3"
     assert receipt["status"] == "verified_complete"
     assert receipt["episode_count"] == 3
     assert receipt["observation_count"] == 6
@@ -2289,10 +2342,8 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         bundle / "worker_result.json", require_mujoco_runtime_identity=True,
     )
     assert runtime_receipt["mujoco_runtime_identity_required"] is True
-    tampered_runtime_bundle = tmp_path / "tampered_runtime_identity_bundle"
-    shutil.copytree(bundle, tampered_runtime_bundle)
-    tampered_worker_path = tampered_runtime_bundle / "worker_result.json"
-    tampered_worker = json.loads(tampered_worker_path.read_text())
+    tampered_worker_path = bundle / "tampered_runtime_worker_result.json"
+    tampered_worker = json.loads((bundle / "worker_result.json").read_text())
     tampered_worker["episodes"][0]["pre_reset_compiled_validation_v1"][
         "runtime_identity"]["provider_build"]["package_version"] = "3.8.2"
     tampered_payload = {key: value for key, value in tampered_worker.items() if key != "result_sha256"}
@@ -2315,14 +2366,24 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     _FAKE_WORLD.fail_step_after = 0
     failed_closure_digest = failed_env.metadata["source_closure_digest"]
     failed_gravity_model = _GravityBiasDouble(xml_sha, failed_closure_digest)
+    failed_env.controller.set_source_gravity_model(
+        failed_gravity_model, source_xml_sha256=xml_sha,
+        source_closure_digest=failed_closure_digest,
+    )
+
+    class _FailedSolutionFactory:
+        worker_result_schema_version = "r07-v210-task-solution-worker-result-v3"
+
+        def __call__(self, _bundle_root):
+            failed_env.value["bind_source_gravity_model"](failed_gravity_model)
+            return LiberoPickPlaceSolutionV3(xml, source_closure_digest=failed_closure_digest)
+
     failure_result = run_libero_candidate_worker(
         failed_env, output_dir=tmp_path / "solution_worker_failure_bundle", steps=1,
-        solution_factory=lambda _bundle_root: LiberoPickPlaceSolutionV2(
-            xml, source_closure_digest=failed_closure_digest, gravity_bias_model=failed_gravity_model,
-        ),
+        solution_factory=_FailedSolutionFactory(),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
-        solution_resource_closer=failed_gravity_model.close,
+        solution_resource_closer=failed_env.controller.close_resources,
     )
     assert failure_result["status"] == "failed"
     assert len(failure_result["attempted_episode_receipts"]) == 1
@@ -2414,18 +2475,35 @@ raise SystemExit(result)
     )
     assert reader_process.returncode == 0, reader_process.stderr
     assert json.loads(reader_process.stdout)["parent_process"]["lock_released_after_group_exit"] is True
+    tampered_worker_path.unlink()
 
-    tampered = tmp_path / "tampered_solution_bundle"
-    shutil.copytree(bundle, tampered)
-    h5_path = tampered / result["episodes"][0]["h5"]["relative_path"]
-    h5_path.write_bytes(h5_path.read_bytes() + b"tamper")
-    with pytest.raises(ValueError, match="H5 bytes or digest differ"):
-        consume_libero_candidate_bundle(tampered / "worker_result.json")
-    h5_path.write_bytes((bundle / result["episodes"][0]["h5"]["relative_path"]).read_bytes())
-    xml_path = tampered / "source_inputs/closure/canonical-source.xml"
-    xml_path.write_bytes(xml_path.read_bytes() + b"\n<!-- tamper -->\n")
-    with pytest.raises(ValueError, match="source closure bytes differ"):
-        consume_libero_candidate_bundle(tampered / "worker_result.json")
+    h5_path = bundle / result["episodes"][0]["h5"]["relative_path"]
+    with h5_path.open("r+b") as handle:
+        handle.seek(0)
+        original_byte = handle.read(1)
+        handle.seek(0)
+        handle.write(bytes([original_byte[0] ^ 1]))
+    try:
+        with pytest.raises(ValueError, match="H5 bytes or digest differ"):
+            consume_libero_candidate_bundle(bundle / "worker_result.json")
+    finally:
+        with h5_path.open("r+b") as handle:
+            handle.seek(0)
+            handle.write(original_byte)
+
+    archive_path = bundle / "source_inputs/closure.tar.gz"
+    with archive_path.open("r+b") as handle:
+        handle.seek(-1, 2)
+        archive_byte = handle.read(1)
+        handle.seek(-1, 2)
+        handle.write(bytes([archive_byte[0] ^ 1]))
+    try:
+        with pytest.raises(ValueError, match="source archive or manifest bytes differ"):
+            consume_libero_candidate_bundle(bundle / "worker_result.json")
+    finally:
+        with archive_path.open("r+b") as handle:
+            handle.seek(-1, 2)
+            handle.write(archive_byte)
 
 
 def test_reset_plan_preflight_rejects_seed_mismatch_without_closing_live_session(monkeypatch):

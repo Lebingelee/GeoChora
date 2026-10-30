@@ -36,6 +36,96 @@ _GAIN_STABILITY_RATIONALE = (
     'not a stability proof or controller qualification.'
 )
 
+_LEGACY_V2_PROFILE_RECORDS = {
+    'libero-spatial-bowl-to-plate-joint-space-pd-v3': {
+        'kp': (100.0,) * 7,
+        'kd': (20.0, 40.0, 20.0, 20.0, 20.0, 20.0, 20.0),
+        'rationale': (
+            'Native R07 task #1 attempt006 reached 148 successful boundaries before joint2 crossed its source upper limit; '
+            'attempt007 showed uniform Kp=200/Kd=40 saturated all seven torque channels and drove joint4 across its lower '
+            'range within 10 boundaries. This unqualified follow-up restores uniform Kp=100 and Kd=20, raising Kd to 40 '
+            'only for joint2, whose attempt006 public trace retained outward velocity while its target had already reversed. '
+            'The source motor ctrlrange and joint limits remain unchanged; every torque remains clamped to the compiled '
+            'source ctrlrange. This is a bounded control-parameter experiment, not a proof for the coupled 20 Hz '
+            'sample-and-hold system or a controller qualification; native motion and fault gates remain required.'
+        ),
+    },
+    'libero-spatial-bowl-to-plate-joint-space-pd-v4': {
+        'kp': (20.0,) * 7,
+        'kd': (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0),
+        'rationale': (
+            'Native R07 task #1 run009 with source gravity feed-forward and Kp=100/Kd=20 (joint2 Kd=40) crossed '
+            'joint3 by 0.004751 rad at boundary25 after several joints began oscillating and saturating. The prior '
+            'v3 run008 without feed-forward reached boundary196 before joint2 crossed its upper source limit by '
+            '0.002073 rad. This unqualified follow-up scales the gains fivefold down to Kp=20/Kd=4 (joint2 Kd=8) '
+            'to test lower closed-loop bandwidth under the fixed 20 Hz outer loop and 2 ms x 25 hold. Source motor '
+            'ctrlranges and joint limits remain unchanged; every torque remains clamped to the compiled source '
+            'ctrlrange. This is an experiment, not a stability proof or controller qualification.'
+        ),
+    },
+    'libero-spatial-bowl-to-plate-joint-space-pd-v5': {
+        'kp': (40.0,) * 7,
+        'kd': (8.0, 16.0, 8.0, 8.0, 8.0, 8.0, 8.0),
+        'rationale': (
+            'Native R07 task #1 run009 with source gravity feed-forward and Kp=100/Kd=20 (joint2 Kd=40) crossed '
+            'joint3 by 0.004751 rad at boundary25 after several joints began oscillating and saturating. The prior '
+            'v3 run008 without feed-forward reached boundary196 before joint2 crossed its upper source limit by '
+            '0.002073 rad. Run010 with source gravity feed-forward and Kp=20/Kd=4 (joint2 Kd=8) remained within '
+            'source limits and emitted no MuJoCo warnings, but all three episodes entered the descend stage only '
+            'near boundary900 and horizon-truncated before task success. This unqualified follow-up doubles the '
+            'gains to Kp=40/Kd=8 (joint2 Kd=16) while preserving the 20 Hz outer loop, 2 ms x 25 hold, and '
+            '2 mm/10 mrad per-boundary motion caps to test reference tracking. Source motor ctrlranges and joint '
+            'limits remain unchanged; every torque remains clamped to the compiled source ctrlrange. This is an '
+            'experiment, not a stability proof or controller qualification.'
+        ),
+    },
+    'libero-spatial-bowl-to-plate-joint-space-pd-v6': {
+        'kp': (20.0,) * 7,
+        'kd': (4.0, 8.0, 4.0, 4.0, 4.0, 4.0, 4.0),
+        'rationale': _GAIN_STABILITY_RATIONALE,
+    },
+}
+
+
+def legacy_v2_controller_identity_mapping(profile_id: str) -> dict:
+    """Reconstruct only the frozen v2 controller identities emitted by v3-v6."""
+    if type(profile_id) is not str or profile_id not in _LEGACY_V2_PROFILE_RECORDS:
+        raise ValueError('legacy v2 Controller profile is not in the frozen v3-v6 allowlist')
+    row = _LEGACY_V2_PROFILE_RECORDS[profile_id]
+    kp, kd = tuple(row['kp']), tuple(row['kd'])
+    rationale = row['rationale']
+    material = {
+        'schema_version': 'libero-mixed-controller-identity-v1',
+        'profile_id': profile_id,
+        'kp_Nm_per_rad': kp,
+        'kd_Nm_s_per_rad': kd,
+        'limits': {
+            'arm_position_rad': _POSITION_LIMITS,
+            'arm_torque_Nm': _TORQUE_LIMITS,
+            'finger_position_m': {'finger_joint1': [0.0, 0.04],
+                                  'finger_joint2': [-0.04, 0.0]},
+        },
+        'hold_policy': 'joint_torque_zero_order_hold_per_outer_step_v1',
+        'gain_source': _GAIN_SOURCE,
+        'gain_stability_rationale': rationale,
+    }
+    identity = hashlib.sha256(json.dumps(
+        material, sort_keys=True, separators=(',', ':'), allow_nan=False,
+    ).encode()).hexdigest()
+    return {
+        'schema_version': 'libero-mixed-controller-identity-v1',
+        'profile_id': profile_id,
+        'identity_sha256': identity,
+        'kp_Nm_per_rad': list(kp),
+        'kd_Nm_s_per_rad': list(kd),
+        'torque_limits_Nm': dict(_TORQUE_LIMITS),
+        'position_limits_rad': {key: list(value) for key, value in _POSITION_LIMITS.items()},
+        'hold_policy': 'joint_torque_zero_order_hold_per_outer_step_v1',
+        'qualification': 'diagnostic_only_unqualified_gains',
+        'gain_source': _GAIN_SOURCE,
+        'gain_stability_rationale': rationale,
+    }
+
 
 @dataclass(frozen=True)
 class LiberoMixedControlConfigV1:
@@ -104,12 +194,7 @@ class LiberoMixedControllerV1:
             low, high = _POSITION_LIMITS[name]
             if not low <= target <= high:
                 raise ValueError(f'joint target is outside the named source limit: {name}')
-        torques = {}
-        for index, name in enumerate(_JOINTS):
-            error = positions[index] - float(state.joint_position[name])
-            velocity = float(state.joint_velocity[name])
-            raw = self.config.kp_Nm_per_rad[index] * error - self.config.kd_Nm_s_per_rad[index] * velocity
-            torques[name] = float(np.clip(raw, -_TORQUE_LIMITS[name], _TORQUE_LIMITS[name]))
+        torques = self._compute_torques(positions, state)
         return MixedActuatorCommandV1(
             'mixed-actuator-command-v1', self.plan_identity_hash, task_artifact_hash,
             source_id, source_closure_digest, self.identity, provider_materialization_id,
@@ -118,6 +203,16 @@ class LiberoMixedControllerV1:
             {**torques, 'finger_joint1': opening / 2.0, 'finger_joint2': -opening / 2.0},
             {**{name: 'N*m' for name in torques}, 'finger_joint1': 'm', 'finger_joint2': 'm'},
         )
+
+    def _compute_torques(self, positions, state):
+        """Shared task-owned torque hook; v1 retains its frozen PD-only law."""
+        torques = {}
+        for index, name in enumerate(_JOINTS):
+            error = positions[index] - float(state.joint_position[name])
+            velocity = float(state.joint_velocity[name])
+            raw = self.config.kp_Nm_per_rad[index] * error - self.config.kd_Nm_s_per_rad[index] * velocity
+            torques[name] = float(np.clip(raw, -_TORQUE_LIMITS[name], _TORQUE_LIMITS[name]))
+        return torques
 
     def identity_mapping(self):
         return {
@@ -157,4 +252,124 @@ def build_controller(task_input: dict) -> dict:
     }
 
 
-__all__ = ['LiberoMixedControlConfigV1', 'LiberoMixedControllerV1', 'build_controller']
+class LiberoMixedControllerV2(LiberoMixedControllerV1):
+    """Versioned mixed controller with separate source gravity torque feed-forward."""
+
+    profile_id = 'libero-spatial-bowl-to-plate-joint-space-pd-gravity-ff-v7'
+
+    def __init__(self, config: LiberoMixedControlConfigV1 | None = None,
+                 gravity_bias_model=None):
+        super().__init__(config)
+        self.gravity_bias_model = None
+        self.last_control_receipt = None
+        self.source_xml_sha256 = None
+        self.source_closure_digest = None
+        payload = super().identity_mapping()
+        payload.pop('identity_sha256', None)
+        payload.update({
+            'schema_version': 'libero-mixed-controller-identity-v2',
+            'profile_id': self.profile_id,
+            'torque_law': 'kp_times_qdesired_minus_q_minus_kd_times_qdot_plus_source_gravity_ff_v1',
+            'gravity_feedforward_profile_id': 'libero-source-mjcf-gravity-bias-v1',
+            'position_target_encoding': 'absolute_qdesired_only_v1',
+        })
+        self.identity = hashlib.sha256(json.dumps(
+            payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
+        ).encode()).hexdigest()
+        if gravity_bias_model is not None:
+            self.set_source_gravity_model(
+                gravity_bias_model,
+                source_xml_sha256=gravity_bias_model.source_xml_sha256,
+                source_closure_digest=gravity_bias_model.source_closure_digest,
+            )
+
+    def set_source_gravity_model(self, model, *, source_xml_sha256: str,
+                                 source_closure_digest: str):
+        if self.gravity_bias_model is not None:
+            raise RuntimeError('source gravity model may be attached only once')
+        if (getattr(model, 'profile_id', None) != 'libero-source-mjcf-gravity-bias-v1'
+                or not callable(getattr(model, 'gravity_torque', None))):
+            raise TypeError('mixed controller requires the versioned source MJCF gravity primitive')
+        if (getattr(model, 'source_xml_sha256', None) != source_xml_sha256
+                or getattr(model, 'source_closure_digest', None) != source_closure_digest
+                or type(source_xml_sha256) is not str or len(source_xml_sha256) != 64
+                or type(source_closure_digest) is not str or len(source_closure_digest) != 64):
+            raise ValueError('mixed controller source gravity model differs from its selected XML/closure')
+        self.gravity_bias_model = model
+        self.source_xml_sha256 = source_xml_sha256
+        self.source_closure_digest = source_closure_digest
+
+    def _compute_torques(self, positions, state):
+        model = self.gravity_bias_model
+        if model is None:
+            raise RuntimeError('v2 mixed Controller requires its source gravity model before stepping')
+        if (model.source_xml_sha256 != self.source_xml_sha256
+                or model.source_closure_digest != self.source_closure_digest):
+            raise ValueError('v2 mixed Controller source gravity identity changed after attachment')
+        q = np.asarray([float(state.joint_position[name]) for name in _JOINTS], dtype=np.float64)
+        qdot = np.asarray([float(state.joint_velocity[name]) for name in _JOINTS], dtype=np.float64)
+        qdesired = np.asarray(positions, dtype=np.float64)
+        bias = np.asarray(model.gravity_torque(q), dtype=np.float64)
+        if any(value.shape != (7,) or not np.isfinite(value).all()
+               for value in (q, qdot, qdesired, bias)):
+            raise ValueError('v2 mixed Controller requires finite seven-joint q, qdot, qdesired and gravity bias')
+        kp = np.asarray(self.config.kp_Nm_per_rad, dtype=np.float64)
+        kd = np.asarray(self.config.kd_Nm_s_per_rad, dtype=np.float64)
+        raw = kp * (qdesired - q) - kd * qdot + bias
+        applied = np.asarray([
+            np.clip(value, -_TORQUE_LIMITS[name], _TORQUE_LIMITS[name])
+            for name, value in zip(_JOINTS, raw, strict=True)
+        ], dtype=np.float64)
+        clipped = np.abs(raw - applied) > 1e-12
+        self.last_control_receipt = {
+            'schema_version': 'libero-mixed-control-receipt-v2',
+            'controller_identity': self.identity,
+            'gravity_profile_id': model.profile_id,
+            'gravity_model_identity_sha256': model.model_identity_sha256,
+            'source_xml_sha256': self.source_xml_sha256,
+            'source_closure_digest': self.source_closure_digest,
+            'qdesired_rad': qdesired.tolist(),
+            'q_rad': q.tolist(),
+            'qdot_rad_s': qdot.tolist(),
+            'gravity_feedforward_Nm': bias.tolist(),
+            'raw_torque_Nm': raw.tolist(),
+            'applied_torque_Nm': applied.tolist(),
+            'torque_clipped': clipped.tolist(),
+            'torque_clip_any': bool(clipped.any()),
+            'channel_order': list(_JOINTS),
+        }
+        return {name: float(value) for name, value in zip(_JOINTS, applied, strict=True)}
+
+    def identity_mapping(self):
+        payload = super().identity_mapping()
+        payload.pop('identity_sha256', None)
+        payload.update({
+            'schema_version': 'libero-mixed-controller-identity-v2',
+            'profile_id': self.profile_id,
+            'identity_sha256': self.identity,
+            'torque_law': 'kp_times_qdesired_minus_q_minus_kd_times_qdot_plus_source_gravity_ff_v1',
+            'gravity_feedforward_profile_id': 'libero-source-mjcf-gravity-bias-v1',
+            'position_target_encoding': 'absolute_qdesired_only_v1',
+        })
+        return payload
+
+    def close_resources(self):
+        model = self.gravity_bias_model
+        if model is None:
+            return {
+                'schema_version': 'libero-source-gravity-model-close-v1',
+                'profile_id': 'libero-source-mjcf-gravity-bias-v1',
+                'model_created': False, 'forward_call_count': 0,
+                'mj_step_call_count': 0, 'closed': True,
+                'model_released': True, 'data_released': True,
+            }
+        receipt = model.close()
+        self.gravity_bias_model = None
+        self.source_xml_sha256 = None
+        self.source_closure_digest = None
+        return receipt
+
+
+__all__ = ['LiberoMixedControlConfigV1', 'LiberoMixedControllerV1',
+           'LiberoMixedControllerV2', 'legacy_v2_controller_identity_mapping',
+           'build_controller']

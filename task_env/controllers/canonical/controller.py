@@ -1,10 +1,11 @@
 """Shared stateless action interpretation/DLS, no provider inputs/imports."""
 from dataclasses import asdict
+from types import SimpleNamespace
 import numpy as np
 from ...artifacts import PoseWorld
 from ...environment import ActionConfig
 from ...utils.rotation import quat_wxyz_to_matrix,matrix_to_quat_wxyz,rotvec_to_matrix,matrix_to_rotvec,rotation_vector_error
-from .contracts import CanonicalAction,CanonicalControlTarget,GripperControlTarget,digest
+from .contracts import CanonicalAction,CanonicalArmTargetV1,CanonicalControlTarget,GripperControlTarget,RequestedAction,digest
 from .kinematics import ARM,FINGERS
 
 
@@ -56,6 +57,40 @@ class CanonicalPandaController:
         )
         canonical=CanonicalAction('canonical-action-v0',requested,tuple(float(v) for v in values),not np.array_equal(original,values),world_pose)
         return canonical,desired,servo
+
+    def resolve_world_pose_target_v1(self, *, current_joint_position_rad,
+                                    current_pose_world: PoseWorld,
+                                    target_pose_world, gripper_scalar: float) -> CanonicalArmTargetV1:
+        """Resolve one absolute world pose through the shared canonical arm DLS owner.
+
+        This advanced stateless route shares the exact arm calculation used by
+        the legacy Controller. It consumes typed world pose plus named-order
+        arm feedback; it does not advance the environment or touch a Provider.
+        """
+        if not isinstance(current_pose_world, PoseWorld):
+            raise TypeError('world-pose resolution requires a typed PoseWorld current pose')
+        q = np.asarray(current_joint_position_rad, dtype=np.float64)
+        pose = np.asarray(target_pose_world, dtype=np.float64)
+        if (q.shape != (7,) or pose.shape != (7,)
+                or not np.isfinite(q).all() or not np.isfinite(pose).all()
+                or isinstance(gripper_scalar, bool) or not np.isfinite(gripper_scalar)):
+            raise ValueError('world-pose resolution requires seven finite joints, pose values and a finite gripper scalar')
+        requested = RequestedAction(
+            'absolute_pose', 'world', 'quaternion_wxyz',
+            tuple(float(value) for value in (*pose, float(gripper_scalar))),
+        )
+        requested.validate()
+        state = SimpleNamespace(
+            joint_position=dict(zip(ARM, map(float, q), strict=True)),
+            pose_world={'panda-v1/ee': current_pose_world},
+        )
+        canonical, desired, servo = self._compute_arm(state, requested)
+        target = CanonicalArmTargetV1(
+            'canonical-arm-target-v1', self.model.source_sha256, self.identity,
+            canonical, ARM, tuple(map(float, desired)), tuple(map(float, servo)),
+        )
+        target.validate()
+        return target
 
     def compute(self,state,requested):
         # Frozen-v0 compatibility only; production R1 owns its resolved gripper profile.

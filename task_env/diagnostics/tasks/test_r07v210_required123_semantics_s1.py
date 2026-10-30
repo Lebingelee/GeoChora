@@ -55,6 +55,82 @@ def test_task_one_solution_v2_identity_binds_source_gravity_compensation():
     assert solution_identity_v2(source_sha, closure_sha, slower) != identity
 
 
+def test_task_one_solution_v3_identity_binds_world_pose_planner_and_frozen_v2_profiles():
+    from bench_deploy.libero.controller import legacy_v2_controller_identity_mapping
+    from bench_deploy.libero.solution import solution_identity_v2_frozen, solution_identity_v3
+    from task_env.planners.cartesian import CartesianPosePlannerConfig
+
+    source_sha, closure_sha = "f" * 64, "e" * 64
+    default = solution_identity_v3(source_sha, closure_sha)
+    assert solution_identity_v3("d" * 64, closure_sha) != default
+    assert solution_identity_v3(source_sha, "c" * 64) != default
+    slower = CartesianPosePlannerConfig(max_translation_per_step=0.006)
+    assert solution_identity_v3(source_sha, closure_sha, planner_config=slower) != default
+
+    frozen_controller = legacy_v2_controller_identity_mapping(
+        "libero-spatial-bowl-to-plate-joint-space-pd-v4",
+    )
+    frozen = solution_identity_v2_frozen(source_sha, closure_sha, frozen_controller)
+    assert frozen == solution_identity_v2_frozen(source_sha, closure_sha, frozen_controller)
+    tampered_controller = {**frozen_controller, "kp_Nm_per_rad": [999.0] * 7}
+    with pytest.raises(ValueError, match="frozen version manifest"):
+        solution_identity_v2_frozen(source_sha, closure_sha, tampered_controller)
+    with pytest.raises(ValueError, match="allowlist"):
+        legacy_v2_controller_identity_mapping("unreviewed-profile")
+
+
+def test_source_closure_archive_reads_only_manifest_members_and_rejects_tampering(tmp_path):
+    import hashlib
+    import io
+    import tarfile
+
+    from bench_deploy.libero.source_gravity import read_source_closure_archive
+
+    payload = {"canonical-source.xml": b"<mujoco/>", "assets/mesh.bin": b"mesh-bytes"}
+    manifest = [
+        {"path": name, "size_bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        for name, raw in sorted(payload.items())
+    ]
+
+    def write_archive(path, members):
+        with tarfile.open(path, "w:gz") as archive:
+            directory = tarfile.TarInfo("closure/")
+            directory.type = tarfile.DIRTYPE
+            archive.addfile(directory)
+            nested = tarfile.TarInfo("closure/assets/")
+            nested.type = tarfile.DIRTYPE
+            archive.addfile(nested)
+            for name, raw in members:
+                info = tarfile.TarInfo("closure/" + name)
+                info.size = len(raw)
+                archive.addfile(info, io.BytesIO(raw))
+
+    valid_path = tmp_path / "valid.tar.gz"
+    write_archive(valid_path, sorted(payload.items()))
+    assert read_source_closure_archive(valid_path, manifest) == payload
+
+    tampered_path = tmp_path / "tampered-member.tar.gz"
+    tampered = dict(payload)
+    tampered["assets/mesh.bin"] = b"mesh-bitez"
+    write_archive(tampered_path, sorted(tampered.items()))
+    with pytest.raises(ValueError, match="member bytes differ"):
+        read_source_closure_archive(tampered_path, manifest)
+
+    unsafe_path = tmp_path / "unsafe-member.tar.gz"
+    with tarfile.open(unsafe_path, "w:gz") as archive:
+        directory = tarfile.TarInfo("closure/")
+        directory.type = tarfile.DIRTYPE
+        archive.addfile(directory)
+        info = tarfile.TarInfo("closure/../escape.bin")
+        info.size = 1
+        archive.addfile(info, io.BytesIO(b"x"))
+    with pytest.raises(ValueError, match="unsafe member path"):
+        read_source_closure_archive(
+            unsafe_path,
+            [{"path": "escape.bin", "size_bytes": 1, "sha256": hashlib.sha256(b"x").hexdigest()}],
+        )
+
+
 def test_independent_reader_binds_gravity_formula_to_controller_gain_identity():
     from bench_deploy.libero.core_candidate_worker import _validate_source_gravity_action
 
@@ -85,8 +161,10 @@ def test_independent_reader_binds_gravity_formula_to_controller_gain_identity():
 
 def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitive(tmp_path):
     import hashlib
+    import io
     import json
     from pathlib import Path
+    import tarfile
     from types import SimpleNamespace
 
     from bench_deploy.libero.source_gravity import MujocoSourceGravityBiasV1
@@ -158,6 +236,30 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
     assert close["mj_step_call_count"] == 0
     with pytest.raises(RuntimeError, match="closed"):
         model.gravity_torque(np.zeros(7))
+
+    archived_bundle = tmp_path / "archived_bundle"
+    archived_source = archived_bundle / "source_inputs"
+    archived_source.mkdir(parents=True)
+    (archived_source / "composition_plan.json").write_bytes(plan_bytes)
+    with tarfile.open(archived_source / "closure.tar.gz", "w:gz") as archive:
+        for directory_name in ("closure/", "closure/upstream/"):
+            directory = tarfile.TarInfo(directory_name)
+            directory.type = tarfile.DIRTYPE
+            archive.addfile(directory)
+        for logical, raw in sorted(closure.items()):
+            member = tarfile.TarInfo("closure/" + logical)
+            member.size = len(raw)
+            archive.addfile(member, io.BytesIO(raw))
+    assert not (archived_source / "closure").exists()
+    archived_model = MujocoSourceGravityBiasV1(
+        bundle_root=archived_bundle, source_closure_files=closure,
+        source_xml_sha256=source_xml_sha, source_closure_digest=source_closure,
+        composition_plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
+        mujoco_api=fake_mujoco,
+    )
+    assert archived_model.source_model_path.endswith("closure.tar.gz#closure/canonical-source.xml")
+    assert np.array_equal(archived_model.gravity_torque(np.zeros(7)), np.zeros(7))
+    assert archived_model.close()["closed"] is True
 
 
 def test_task_one_controller_identity_binds_unqualified_braking_experiment():
@@ -297,3 +399,28 @@ def test_source_bound_panda_kinematics_includes_mount_and_nested_named_tcp():
     bad_profile = replace(profile, source_xml_sha256="d" * 64)
     with pytest.raises(ValueError, match="different MJCF bytes"):
         PandaKinematics(xml, tcp_profile=bad_profile, native_prefix="robot0_")
+
+    from task_env.artifacts import PoseWorld
+    from task_env.controllers.canonical import CanonicalPandaController
+    from task_env.utils.rotation import matrix_to_quat_wxyz
+
+    controller = CanonicalPandaController(model, artifact_hash="test-artifact")
+    current_quaternion = matrix_to_quat_wxyz(pose[:3, :3])
+    current_pose = PoseWorld(
+        tuple(float(value) for value in pose[:3, 3]),
+        tuple(float(value) for value in current_quaternion),
+    )
+    goal_a = np.concatenate((pose[:3, 3] + np.asarray((0.0, 0.01, 0.0)), current_quaternion))
+    goal_b = np.concatenate((pose[:3, 3] + np.asarray((0.0, 0.02, 0.0)), current_quaternion))
+    arm_a = controller.resolve_world_pose_target_v1(
+        current_joint_position_rad=(0.0,) * 7, current_pose_world=current_pose,
+        target_pose_world=goal_a, gripper_scalar=0.0,
+    )
+    arm_b = controller.resolve_world_pose_target_v1(
+        current_joint_position_rad=(0.0,) * 7, current_pose_world=current_pose,
+        target_pose_world=goal_b, gripper_scalar=0.0,
+    )
+    assert arm_a.schema_version == "canonical-arm-target-v1"
+    assert arm_a.arm_joint_order == arm_b.arm_joint_order
+    assert not np.allclose(arm_a.joint_position_rad, arm_b.joint_position_rad)
+    assert arm_a.canonical_action.resolved_world_pose.position == pytest.approx(goal_a[:3])

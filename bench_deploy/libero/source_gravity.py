@@ -4,20 +4,103 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
+import tarfile
+import tempfile
 from typing import Mapping
 
 import numpy as np
 
-from task_env.assembly.assets import _source_closure_digest
+from task_env.assembly.assets import _source_closure_digest, _source_closure_manifest
 
 from .task_contracts import TASK_1
 
 
 SOURCE_GRAVITY_PROFILE_V1 = "libero-source-mjcf-gravity-bias-v1"
+_MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
+_MAX_EXPANDED_BYTES = 128 * 1024 * 1024
+_MAX_ARCHIVE_MEMBERS = 1024
 
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def read_source_closure_archive(path: Path, expected_manifest) -> dict[str, bytes]:
+    """Read a bounded tar closure and reject aliases, links and special members."""
+    archive_path = Path(path)
+    if archive_path.is_symlink():
+        raise ValueError("source closure archive must not be a symlink")
+    archive_path = archive_path.resolve(strict=True)
+    if not archive_path.is_file() or archive_path.stat().st_size > _MAX_ARCHIVE_BYTES:
+        raise ValueError("source closure archive is not a bounded regular file")
+    expected = {}
+    for row in expected_manifest:
+        if not isinstance(row, Mapping):
+            raise ValueError("source closure archive manifest row is malformed")
+        logical = row.get("path")
+        if (type(logical) is not str or not logical or logical in expected
+                or logical.startswith("/") or "\\" in logical
+                or any(part in {"", ".", ".."} for part in logical.split("/"))):
+            raise ValueError("source closure archive manifest has an unsafe or duplicate path")
+        size = row.get("size_bytes")
+        sha = row.get("sha256")
+        if (type(size) is not int or size < 0 or type(sha) is not str
+                or len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha)):
+            raise ValueError("source closure archive manifest has invalid byte identity")
+        expected[logical] = (size, sha)
+    if not expected:
+        raise ValueError("source closure archive manifest is empty")
+    expected_dirs = {"closure"}
+    for logical in expected:
+        parts = PurePosixPath("closure", logical).parts
+        for i in range(1, len(parts)):
+            expected_dirs.add("/".join(parts[:i]))
+    files: dict[str, bytes] = {}
+    directories: set[str] = set()
+    expanded = 0
+    try:
+        with tarfile.open(archive_path, mode="r:gz") as archive:
+            members = archive.getmembers()
+            if len(members) > _MAX_ARCHIVE_MEMBERS:
+                raise ValueError("source closure archive has too many members")
+            seen = set()
+            for member in members:
+                name = member.name
+                if (type(name) is not str or not name or name.startswith("/")
+                        or "\\" in name or any(part in {"", ".", ".."} for part in name.rstrip("/").split("/"))):
+                    raise ValueError("source closure archive has an unsafe member path")
+                if name in seen:
+                    raise ValueError("source closure archive has duplicate members")
+                seen.add(name)
+                normalized = name.rstrip("/")
+                if member.isdir():
+                    if normalized not in expected_dirs or member.size != 0:
+                        raise ValueError("source closure archive has an unlisted directory")
+                    directories.add(normalized)
+                    continue
+                if not member.isfile() or not name.startswith("closure/"):
+                    raise ValueError("source closure archive contains a link or non-regular member")
+                logical = name[len("closure/"):]
+                if logical not in expected or logical in files:
+                    raise ValueError("source closure archive member set differs from its manifest")
+                expected_size, expected_sha = expected[logical]
+                if member.size != expected_size:
+                    raise ValueError("source closure archive member size differs from its manifest")
+                expanded += member.size
+                if expanded > _MAX_EXPANDED_BYTES:
+                    raise ValueError("source closure archive exceeds the expanded byte limit")
+                stream = archive.extractfile(member)
+                if stream is None:
+                    raise ValueError("source closure archive member could not be read")
+                content = stream.read(expected_size + 1)
+                if len(content) != expected_size or _sha256(content) != expected_sha:
+                    raise ValueError("source closure archive member bytes differ from its manifest")
+                files[logical] = content
+    except (OSError, tarfile.TarError) as exc:
+        raise ValueError("source closure archive is not a valid bounded tar.gz") from exc
+    if set(files) != set(expected):
+        raise ValueError("source closure archive is missing manifest members")
+    return files
 
 
 class MujocoSourceGravityBiasV1:
@@ -37,11 +120,13 @@ class MujocoSourceGravityBiasV1:
         if bundle.is_symlink():
             raise ValueError("gravity-bias bundle root must not be a symlink")
         bundle = bundle.resolve(strict=True)
-        closure_root = bundle / "source_inputs/closure"
-        if closure_root.is_symlink() or closure_root.resolve(strict=True) != closure_root:
-            raise ValueError("gravity-bias source closure root is unsafe")
-        if bundle not in closure_root.parents:
-            raise ValueError("gravity-bias source closure escaped its worker bundle")
+        source_root = bundle / "source_inputs"
+        if source_root.is_symlink() or source_root.resolve(strict=True) != source_root:
+            raise ValueError("gravity-bias source root is unsafe")
+        if bundle not in source_root.parents:
+            raise ValueError("gravity-bias source root escaped its worker bundle")
+        closure_root = source_root / "closure"
+        archive_path = source_root / "closure.tar.gz"
 
         files = dict(source_closure_files)
         if not files or any(type(name) is not str or not name or type(raw) is not bytes
@@ -59,18 +144,27 @@ class MujocoSourceGravityBiasV1:
             raise ValueError("gravity-bias source XML or closure identity does not recompute")
 
         expected_paths = set(files)
-        actual_paths: set[str] = set()
-        for path in closure_root.rglob("*"):
-            if path.is_symlink():
-                raise ValueError("gravity-bias source closure contains a symlink")
-            if path.is_file():
-                actual_paths.add(path.relative_to(closure_root).as_posix())
-        if actual_paths != expected_paths:
-            raise ValueError("gravity-bias source closure has missing or unlisted files")
-        for logical, expected in files.items():
-            source_path = (closure_root / Path(*PurePosixPath(logical).parts)).resolve(strict=True)
-            if closure_root not in source_path.parents or source_path.read_bytes() != expected:
-                raise ValueError(f"gravity-bias source bytes differ from the verified closure: {logical}")
+        if closure_root.exists():
+            if closure_root.is_symlink() or closure_root.resolve(strict=True) != closure_root:
+                raise ValueError("gravity-bias source closure root is unsafe")
+            actual_paths: set[str] = set()
+            for path in closure_root.rglob("*"):
+                if path.is_symlink():
+                    raise ValueError("gravity-bias source closure contains a symlink")
+                if path.is_file():
+                    actual_paths.add(path.relative_to(closure_root).as_posix())
+            if actual_paths != expected_paths:
+                raise ValueError("gravity-bias source closure has missing or unlisted files")
+            for logical, expected in files.items():
+                source_path = (closure_root / Path(*PurePosixPath(logical).parts)).resolve(strict=True)
+                if closure_root not in source_path.parents or source_path.read_bytes() != expected:
+                    raise ValueError(f"gravity-bias source bytes differ from the verified closure: {logical}")
+            source_xml_path = closure_root / "canonical-source.xml"
+        else:
+            archive_files = read_source_closure_archive(archive_path, _source_closure_manifest(files))
+            if archive_files != files:
+                raise ValueError("gravity-bias source archive differs from the verified closure")
+            source_xml_path = None
 
         plan_path = bundle / "source_inputs/composition_plan.json"
         plan_bytes = plan_path.read_bytes()
@@ -84,12 +178,23 @@ class MujocoSourceGravityBiasV1:
         if mujoco_api is None:
             import mujoco as mujoco_api  # noqa: PLC0415 - selected native primitive only
         self._mujoco = mujoco_api
-        self._model = mujoco_api.MjModel.from_xml_path(str(closure_root / "canonical-source.xml"))
+        if source_xml_path is not None:
+            self._model = mujoco_api.MjModel.from_xml_path(str(source_xml_path))
+            self.source_model_path = str(source_xml_path)
+        else:
+            with tempfile.TemporaryDirectory(prefix=".source-gravity-", dir=source_root) as scratch:
+                scratch_root = Path(scratch) / "closure"
+                for logical, content in files.items():
+                    target = scratch_root.joinpath(*PurePosixPath(logical).parts)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(content)
+                model_path = scratch_root / "canonical-source.xml"
+                self._model = mujoco_api.MjModel.from_xml_path(str(model_path))
+                self.source_model_path = f"{archive_path}#closure/canonical-source.xml"
         self._data = mujoco_api.MjData(self._model)
         self.source_xml_sha256 = source_xml_sha256
         self.source_closure_digest = source_closure_digest
         self.composition_plan_sha256 = composition_plan_sha256
-        self.source_model_path = str(closure_root / "canonical-source.xml")
         self._qpos_addresses: list[int] = []
         self._dof_addresses: list[int] = []
         for index in range(1, 8):

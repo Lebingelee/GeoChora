@@ -43,6 +43,42 @@ class CanonicalAction(Contract):
 
 
 @dataclass(frozen=True)
+class CanonicalArmTargetV1(Contract):
+    """Versioned world-pose resolution from the shared Panda arm owner."""
+
+    schema_version: str
+    source_xml_sha256: str
+    controller_identity: str
+    canonical_action: CanonicalAction
+    arm_joint_order: tuple[str, ...]
+    joint_position_rad: tuple[float, ...]
+    servo_position_rad: tuple[float, ...]
+
+    def validate(self):
+        import re
+        if self.schema_version != 'canonical-arm-target-v1':
+            raise ValueError('unsupported canonical arm target schema')
+        if re.fullmatch(r'[0-9a-f]{64}', self.source_xml_sha256) is None:
+            raise ValueError('canonical arm target requires a source XML SHA-256')
+        if type(self.controller_identity) is not str or not self.controller_identity:
+            raise ValueError('canonical arm target requires a Controller identity')
+        if not isinstance(self.canonical_action, CanonicalAction):
+            raise TypeError('canonical arm target requires the existing CanonicalAction')
+        self.canonical_action.validate()
+        requested = self.canonical_action.requested
+        if (requested.mode != 'absolute_pose' or requested.reference != 'world'
+                or requested.rotation_representation != 'quaternion_wxyz'):
+            raise ValueError('canonical arm target requires an absolute world pose in quaternion_wxyz')
+        if (len(self.arm_joint_order) != 7 or len(set(self.arm_joint_order)) != 7
+                or len(self.joint_position_rad) != 7 or len(self.servo_position_rad) != 7):
+            raise ValueError('canonical arm target requires seven ordered joint values')
+        for name in self.arm_joint_order:
+            _name(name)
+        if any(not math.isfinite(float(value)) for value in (*self.joint_position_rad, *self.servo_position_rad)):
+            raise ValueError('canonical arm target values must be finite')
+
+
+@dataclass(frozen=True)
 class GripperControlTarget(Contract):
     semantic_id: str
     opening_m: float

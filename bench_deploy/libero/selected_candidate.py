@@ -28,7 +28,7 @@ from task_env.runtime.sessions.source import (
 )
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
-from .controller import LiberoMixedControllerV1
+from .controller import LiberoMixedControllerV1, LiberoMixedControllerV2
 from .evaluation import (
     PILOT_TASK_UID, evaluate_on_bowl_plate_v1, observe_selected_reference_v1,
 )
@@ -101,11 +101,16 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool = False) -> TaskArtif
 
     artifact = TaskArtifact(
         'task-artifact-v0',
-        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v2',
-        TASK_ID, 'diagnostic-v1' if not solution_profile else 'bounded-solution-v2',
+        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v3',
+        TASK_ID, 'diagnostic-v1' if not solution_profile else 'bounded-solution-v3',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
-            ActionIntent('absolute_joint', None, 'none', 'arm_joint_position_and_gripper'),
+            ActionIntent(
+                'absolute_pose' if solution_profile else 'absolute_joint',
+                'world' if solution_profile else None,
+                'quaternion_wxyz' if solution_profile else 'none',
+                'arm_joint_position_and_gripper',
+            ),
             ('canonical-state-v0', 'task-contact-summary-v2'), (),
         ),
         InitializationContract(
@@ -148,8 +153,11 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         raise ValueError('tracked LIBERO source manifest differs from the frozen pilot identity')
     source_manifest = json.loads(manifest_bytes)
     artifact = _artifact(init_bytes, solution_profile=solution_profile)
-    controller = LiberoMixedControllerV1()
-    if controller.profile_id != CONTROLLER_PROFILE_ID:
+    controller = LiberoMixedControllerV2() if solution_profile else LiberoMixedControllerV1()
+    expected_controller_profile = (
+        LiberoMixedControllerV2.profile_id if solution_profile else CONTROLLER_PROFILE_ID
+    )
+    if controller.profile_id != expected_controller_profile:
         raise ValueError('LIBERO task-local controller profile changed')
 
     importer_xml = xml_bytes
@@ -266,9 +274,23 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     )
     controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
+    arm_resolver = None
     if solution_profile:
-        from .solution import solution_identity_v2
-        solution_identity = solution_identity_v2(
+        from .solution import solution_identity_v3
+        from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
+        from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
+        tcp_profile = derive_panda_tcp_profile_v2(
+            xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
+            hand_frame_id='robot0_right_hand', site_name='gripper0_grip_site',
+        )
+        arm_kinematics = PandaKinematics(
+            xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
+            base_body_id='robot0_link0',
+        )
+        arm_resolver = CanonicalPandaController(
+            arm_kinematics, artifact_hash=artifact.identity_hash, config=config.action,
+        )
+        solution_identity = solution_identity_v3(
             expected_xml_sha, source_receipt.source_closure_digest,
         )
     return {
@@ -292,6 +314,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'controller_identity': controller.identity,
         }),
         'solution_identity': solution_identity,
+        'arm_resolver': arm_resolver,
+        'source_xml_bytes': xml_bytes,
         'solution_profile': bool(solution_profile),
         'resolved_configuration': asdict(config),
         'reset_realizations': {},
@@ -327,6 +351,36 @@ def build_libero_selected_candidate(
         init_path = install_root / INIT_RELATIVE_PATH
     value_cache = {}
     reset_receipts = {}
+    source_gravity_model_ref = {'model': None}
+    env_holder = {}
+
+    def bind_source_gravity_model(model):
+        if not _solution_profile:
+            raise RuntimeError('source gravity feed-forward is available only on the task Solution profile')
+        source = value_cache.get('value')
+        if not isinstance(source, dict):
+            raise RuntimeError('task Solution source identity must be built before binding gravity feed-forward')
+        if (getattr(model, 'profile_id', None) != 'libero-source-mjcf-gravity-bias-v1'
+                or getattr(model, 'source_xml_sha256', None)
+                != source['source_sha256']['composed_candidate_xml']
+                or getattr(model, 'source_closure_digest', None)
+                != source['source_sha256']['source_closure_digest']
+                or not callable(getattr(model, 'gravity_torque', None))):
+            raise ValueError('task Solution gravity model differs from its selected source identity')
+        existing = source_gravity_model_ref['model']
+        if existing is not None and existing is not model:
+            raise RuntimeError('task Solution source gravity model may be bound only once')
+        source_gravity_model_ref['model'] = model
+        live_env = env_holder.get('env')
+        if live_env is not None and live_env.controller.gravity_bias_model is None:
+            live_env.controller.set_source_gravity_model(
+                model,
+                source_xml_sha256=source['source_sha256']['composed_candidate_xml'],
+                source_closure_digest=source['source_sha256']['source_closure_digest'],
+            )
+        elif (live_env is not None
+              and live_env.controller.gravity_bias_model is not model):
+            raise RuntimeError('task Solution mixed Controller already owns another gravity model')
 
     def build_value(provider, backend):
         if (provider, backend) != ('mujoco', 'cpu'):
@@ -346,15 +400,36 @@ def build_libero_selected_candidate(
                 value_cache.clear()
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache['value'])
-        value['controller'] = LiberoMixedControllerV1()
+        value['controller'] = LiberoMixedControllerV2() if _solution_profile else LiberoMixedControllerV1()
         value['controller'].plan_identity_hash = value['source'].mixed_actuator_plan.identity_hash
         value['reset_realizations'] = reset_receipts
-        components = tuple([*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'])
-        value['action_schema'] = {
-            'schema_id': 'libero-joint-space-absolute-v1', 'schema_version': 1,
-            'controller_kind': 'absolute_joint', 'reference': 'joint_coordinates',
-            'dimension': len(components), 'components': components,
-        }
+        if _solution_profile:
+            value['bind_source_gravity_model'] = bind_source_gravity_model
+            model = source_gravity_model_ref['model']
+            if model is not None:
+                value['controller'].set_source_gravity_model(
+                    model,
+                    source_xml_sha256=value['source_sha256']['composed_candidate_xml'],
+                    source_closure_digest=value['source_sha256']['source_closure_digest'],
+                )
+        if _solution_profile:
+            components = (
+                'world_x_m', 'world_y_m', 'world_z_m',
+                'world_qw', 'world_qx', 'world_qy', 'world_qz', 'gripper_normalized',
+            )
+            value['action_schema'] = {
+                'schema_id': 'libero-world-pose-wxyz-absolute-v1', 'schema_version': 1,
+                'controller_kind': 'absolute_pose', 'reference': 'world',
+                'rotation_representation': 'quaternion_wxyz',
+                'dimension': len(components), 'components': components,
+            }
+        else:
+            components = tuple([*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'])
+            value['action_schema'] = {
+                'schema_id': 'libero-joint-space-absolute-v1', 'schema_version': 1,
+                'controller_kind': 'absolute_joint', 'reference': 'joint_coordinates',
+                'dimension': len(components), 'components': components,
+            }
         object_names = ('akita_black_bowl_1', 'plate_1')
         value['action_space'] = Box(-np.inf, np.inf, (len(components),), dtype=np.float64)
         value['observation_space'] = Dict({
@@ -437,8 +512,52 @@ def build_libero_selected_candidate(
             ),),
         )
         request.validate()
+        action_schema_id = env.value['action_schema']['schema_id']
+        controller_values = values_tuple
+        canonical_action = {
+            'schema_version': 'libero-joint-space-canonical-v1',
+            'interpreted_values': values_tuple,
+            'controller_identity': env.controller.identity,
+            'hold_policy': env.controller.config.hold_policy,
+        }
+        if action_schema_id == 'libero-world-pose-wxyz-absolute-v1':
+            if (env.value.get('arm_resolver') is None
+                    or not hasattr(env.controller, 'last_control_receipt')):
+                raise RuntimeError('world-pose task route has no shared arm resolver or feed-forward mixed Controller')
+            from task_env.controllers.canonical import CanonicalArmTargetV1
+            arm_target = env.value['arm_resolver'].resolve_world_pose_target_v1(
+                current_joint_position_rad=tuple(
+                    float(state.joint_position[f'joint{index}']) for index in range(1, 8)
+                ),
+                current_pose_world=state.pose_world['panda-v1/ee'],
+                target_pose_world=values_tuple[:7],
+                gripper_scalar=values_tuple[7],
+            )
+            if type(arm_target) is not CanonicalArmTargetV1:
+                raise TypeError('canonical arm resolver returned an untyped target')
+            normalized_opening = float(values_tuple[7])
+            aggregate_opening_m = 0.04 * (normalized_opening + 1.0)
+            if not 0.0 <= aggregate_opening_m <= 0.08:
+                raise ValueError('normalized planner gripper is outside the aggregate opening range')
+            controller_values = (*arm_target.joint_position_rad, aggregate_opening_m)
+            canonical_action = {
+                'schema_version': 'libero-world-pose-canonical-v1',
+                'interpreted_values': values_tuple,
+                'controller_identity': env.controller.identity,
+                'hold_policy': env.controller.config.hold_policy,
+                'arm_target_schema_version': arm_target.schema_version,
+                'arm_target_source_xml_sha256': arm_target.source_xml_sha256,
+                'arm_target_controller_identity': arm_target.controller_identity,
+                'qdesired_rad': list(arm_target.joint_position_rad),
+                'arm_servo_position_rad': list(arm_target.servo_position_rad),
+                'normalized_gripper_scalar': normalized_opening,
+                'aggregate_opening_m': aggregate_opening_m,
+                'finger_position_mapping_m': [aggregate_opening_m / 2.0, -aggregate_opening_m / 2.0],
+            }
+        elif action_schema_id != 'libero-joint-space-absolute-v1':
+            raise ValueError('unsupported LIBERO selected task action schema')
         target = env.controller.compute_target(
-            values_tuple, state,
+            controller_values, state,
             task_artifact_hash=env.artifact.identity_hash,
             source_id=source.scene_source.source_id,
             source_closure_digest=source.source_closure_digest,
@@ -447,6 +566,8 @@ def build_libero_selected_candidate(
             reset_sample_id=env.sample.sample_id,
             state_revision=env.session.state_revision,
         )
+        if action_schema_id == 'libero-world-pose-wxyz-absolute-v1':
+            canonical_action['controller_receipt'] = env.controller.last_control_receipt
         return {
             'action_values': values_tuple,
             'universal_action': values_tuple,
@@ -463,14 +584,11 @@ def build_libero_selected_candidate(
                 'requested_action': {
                     'schema_version': env.value['action_schema']['schema_id'],
                     'values': values_tuple,
-                    'unit': 'rad_x7_plus_aggregate_opening_m',
+                    'unit': ('world_xyz_m_quaternion_wxyz_plus_normalized_gripper'
+                             if action_schema_id == 'libero-world-pose-wxyz-absolute-v1'
+                             else 'rad_x7_plus_aggregate_opening_m'),
                 },
-                'canonical_action': {
-                    'schema_version': 'libero-joint-space-canonical-v1',
-                    'interpreted_values': values_tuple,
-                    'controller_identity': env.controller.identity,
-                    'hold_policy': env.controller.config.hold_policy,
-                },
+                'canonical_action': canonical_action,
             },
         }
 
@@ -502,7 +620,14 @@ def build_libero_selected_candidate(
                 'action_schema': {
                     'schema_id': env.value['action_schema']['schema_id'],
                     'components': components,
-                    'units': ['radian'] * 7 + ['meter_total_opening'],
+                    'controller_kind': env.value['action_schema']['controller_kind'],
+                    'reference': env.value['action_schema']['reference'],
+                    'rotation_representation': env.value['action_schema'].get('rotation_representation'),
+                    'units': (
+                        ['meter'] * 3 + ['unit_quaternion_wxyz'] * 4 + ['normalized_minus1_to1']
+                        if env.value['action_schema']['schema_id'] == 'libero-world-pose-wxyz-absolute-v1'
+                        else ['radian'] * 7 + ['meter_total_opening']
+                    ),
                 },
                 'observation_schema': {
                     'state.ee_pose': 'world_position_m_quaternion_wxyz',
@@ -618,17 +743,17 @@ def build_libero_selected_candidate(
         }
 
     def validate_external_solution(value, solution):
-        from .solution import LiberoPickPlaceSolutionV2, solution_identity_v2
+        from .solution import LiberoPickPlaceSolutionV3, solution_identity_v3
 
-        if not isinstance(solution, LiberoPickPlaceSolutionV2):
-            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV2')
+        if not isinstance(solution, LiberoPickPlaceSolutionV3):
+            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV3')
         expected_source = value['source_sha256']['composed_candidate_xml']
         expected_closure = value['source_sha256']['source_closure_digest']
         if (solution.task_uid != value['artifact'].task_id
                 or solution.source_xml_sha256 != expected_source
                 or solution.source_closure_digest != expected_closure
                 or solution.identity != value.get('solution_identity')
-                or solution.identity != solution_identity_v2(expected_source, expected_closure)):
+                or solution.identity != solution_identity_v3(expected_source, expected_closure)):
             raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
 
     binding = ReferenceTaskBinding(
@@ -653,6 +778,7 @@ def build_libero_selected_candidate(
     env = SelectedReferenceEnv.from_mixed_control_candidate(
         binding, provider='mujoco', backend='cpu', horizon=horizon,
     )
+    env_holder['env'] = env
     if _solution_profile:
         env.metadata.update({
             'provider': 'mujoco', 'backend': 'cpu',

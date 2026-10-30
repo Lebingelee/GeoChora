@@ -21,6 +21,8 @@ from task_env.controllers.canonical.kinematics import (
     derive_panda_tcp_profile_v2,
 )
 from task_env.planners.contracts import ExpertAction
+from task_env.planners.cartesian import CartesianPosePlanner, CartesianPosePlannerConfig
+from task_env.utils.rotation import normalize_quat_wxyz, quat_angle_wxyz
 
 from .controller import LiberoMixedControlConfigV1
 from .source_gravity import SOURCE_GRAVITY_PROFILE_V1
@@ -29,6 +31,8 @@ from .task_contracts import TASK_1
 
 SOLUTION_SCHEMA = "libero-bowl-to-plate-solution-v1"
 SOLUTION_SCHEMA_V2 = "libero-bowl-to-plate-solution-v2"
+SOLUTION_SCHEMA_V3 = "libero-bowl-to-plate-solution-v3"
+POSE_ACTION_SCHEMA_V1 = "libero-world-pose-wxyz-absolute-v1"
 TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
 SITE_NAME = "gripper0_grip_site"
@@ -141,6 +145,127 @@ def solution_identity_v2(
     })
 
 
+def solution_identity_v2_frozen(
+    source_xml_sha256: str,
+    source_closure_digest: str,
+    recorded_controller: Mapping[str, object],
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+) -> str:
+    """Recompute a historical v2 identity from its frozen controller profile."""
+    from .controller import legacy_v2_controller_identity_mapping
+
+    expected_controller = legacy_v2_controller_identity_mapping(
+        recorded_controller.get("profile_id"),
+    )
+    if dict(recorded_controller) != expected_controller:
+        raise ValueError("historical v2 Controller record differs from its frozen version manifest")
+    for value, label in ((source_xml_sha256, "source XML"),
+                         (source_closure_digest, "source closure")):
+        if (type(value) is not str or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)):
+            raise ValueError(f"LIBERO Solution v2 requires a lowercase {label} SHA-256")
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V2,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "controller_profile_id": expected_controller["profile_id"],
+        "tcp_id": TCP_ID,
+        "algorithm": "public-observation-damped-jacobian-waypoints-v2",
+        "gravity_compensation": {
+            "profile_id": SOURCE_GRAVITY_PROFILE_V1,
+            "model": "same-source-closure-independent-mujoco-static-bias-v1",
+            "torque_formula": "qfrc_bias-minus-qfrc_passive-at-zero-joint-velocity",
+            "position_target_encoding": "planner-target-plus-gravity-torque-over-controller-kp",
+            "controller_kp_Nm_per_rad": expected_controller["kp_Nm_per_rad"],
+            "controller_kd_Nm_s_per_rad": expected_controller["kd_Nm_s_per_rad"],
+            "joint_limits_rad": {key: list(value) for key, value in _POSITION_LIMITS.items()},
+            "no_extra_physics_step": True,
+        },
+        "waypoints_m": {
+            "approach_z": 0.15, "grasp_z": 0.05,
+            "lift_z": 0.20, "place_tcp_z_above_plate": 0.085,
+        },
+        "opening_m": _OPENING_BY_STAGE,
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "max_cartesian_increment_m": selected_config.max_cartesian_increment_m,
+            "max_joint_increment_rad": selected_config.max_joint_increment_rad,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
+def solution_identity_v3(
+    source_xml_sha256: str,
+    source_closure_digest: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+    planner_config: CartesianPosePlannerConfig | None = None,
+) -> str:
+    """Bind task #1's explicit world-pose path, shared resolver and mixed law."""
+    for value, label in ((source_xml_sha256, "source XML"),
+                         (source_closure_digest, "source closure")):
+        if (type(value) is not str or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)):
+            raise ValueError(f"LIBERO Solution v3 requires a lowercase {label} SHA-256")
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        max_translation_per_step=0.012,
+        max_translation_acceleration_per_step=0.004,
+        max_rotation_per_step=0.08,
+        max_rotation_acceleration_per_step=0.04,
+        settle_steps=0,
+        max_steps=200,
+    )
+    from .controller import LiberoMixedControllerV2
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V3,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "tcp_id": TCP_ID,
+        "action_schema_id": POSE_ACTION_SCHEMA_V1,
+        "action_semantics": {
+            "mode": "absolute_pose", "reference": "world",
+            "rotation_representation": "quaternion_wxyz",
+            "gripper_scalar": "normalized_minus1_to1_to_aggregate_opening_m_0p04_times_u_plus_1",
+        },
+        "grasp_orientation_source": "reset_public_source_bound_tcp_world_quaternion_wxyz_v1",
+        "planner": {
+            "owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_to_pose",
+            "gripper_transition_owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_gripper_transition",
+            "config": {
+                "max_translation_per_step": selected_planner.max_translation_per_step,
+                "max_translation_acceleration_per_step": selected_planner.max_translation_acceleration_per_step,
+                "max_rotation_per_step": selected_planner.max_rotation_per_step,
+                "max_rotation_acceleration_per_step": selected_planner.max_rotation_acceleration_per_step,
+                "settle_steps": selected_planner.settle_steps,
+                "max_steps": selected_planner.max_steps,
+            },
+        },
+        "arm_resolution_owner": "CanonicalPandaController.resolve_world_pose_target_v1",
+        "mixed_controller": LiberoMixedControllerV2().identity_mapping(),
+        "waypoints_m": {
+            "approach_z": 0.15, "grasp_z": 0.05,
+            "lift_z": 0.20, "place_tcp_z_above_plate": 0.085,
+        },
+        "opening_m": _OPENING_BY_STAGE,
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
 def _body_position(observation: Mapping[str, object], key: str) -> np.ndarray:
     try:
         value = np.asarray(observation["privileged_state"][key], dtype=np.float64)[0, :3]
@@ -222,6 +347,8 @@ class LiberoPickPlaceSolutionV1:
     """Public-interface-only pick/place expert for the exact task #1 source."""
 
     task_uid = TASK_1
+    action_schema_id = "libero-joint-space-absolute-v1"
+    solution_schema_version = SOLUTION_SCHEMA
 
     def __init__(self, source_xml: bytes | str,
                  config: LiberoPickPlaceSolutionConfigV1 | None = None):
@@ -271,9 +398,14 @@ class LiberoPickPlaceSolutionV1:
             raise ValueError("LIBERO Solution source closure differs from the selected episode")
         action_schema = metadata.get("action_schema")
         if (not isinstance(action_schema, Mapping)
-                or action_schema.get("schema_id") != "libero-joint-space-absolute-v1"
+                or action_schema.get("schema_id") != self.action_schema_id
                 or action_schema.get("dimension") != 8):
             raise ValueError("LIBERO Solution action schema differs from its selected task route")
+        if self.action_schema_id == POSE_ACTION_SCHEMA_V1 and (
+                action_schema.get("controller_kind") != "absolute_pose"
+                or action_schema.get("reference") != "world"
+                or action_schema.get("rotation_representation") != "quaternion_wxyz"):
+            raise ValueError("LIBERO Solution pose action schema must be explicit world/quaternion_wxyz")
         if (metadata.get("provider") != "mujoco" or metadata.get("backend") != "cpu"):
             raise ValueError("LIBERO task #1 Solution is currently enabled only for MuJoCo CPU")
         identity = _boundary_identity(info)
@@ -454,6 +586,8 @@ class LiberoPickPlaceSolutionV1:
 class LiberoPickPlaceSolutionV2(LiberoPickPlaceSolutionV1):
     """Task #1 public-observation Solution with source-bound gravity bias."""
 
+    solution_schema_version = SOLUTION_SCHEMA_V2
+
     def __init__(self, source_xml: bytes | str, *, source_closure_digest: str,
                  gravity_bias_model, config: LiberoPickPlaceSolutionConfigV1 | None = None):
         super().__init__(source_xml, config=config)
@@ -528,8 +662,264 @@ class LiberoPickPlaceSolutionV2(LiberoPickPlaceSolutionV1):
         }
 
 
+class LiberoPickPlaceSolutionV3(LiberoPickPlaceSolutionV1):
+    """Task #1 world-pose Solution using the shared planner and arm resolver."""
+
+    action_schema_id = POSE_ACTION_SCHEMA_V1
+    solution_schema_version = SOLUTION_SCHEMA_V3
+
+    def __init__(self, source_xml: bytes | str,
+                 source_closure_digest: str,
+                 config: LiberoPickPlaceSolutionConfigV1 | None = None,
+                 planner_config: CartesianPosePlannerConfig | None = None):
+        super().__init__(source_xml, config=config)
+        self.source_closure_digest = source_closure_digest
+        if (type(source_closure_digest) is not str or len(source_closure_digest) != 64
+                or any(character not in "0123456789abcdef" for character in source_closure_digest)):
+            raise ValueError("LIBERO Solution v3 requires a lowercase source closure SHA-256")
+        self.planner_config = planner_config or CartesianPosePlannerConfig(
+            max_translation_per_step=0.012,
+            max_translation_acceleration_per_step=0.004,
+            max_rotation_per_step=0.08,
+            max_rotation_acceleration_per_step=0.04,
+            settle_steps=0,
+            max_steps=200,
+        )
+        self.pose_planner = CartesianPosePlanner(self.planner_config)
+        self.identity = solution_identity_v3(
+            self.source_xml_sha256, self.source_closure_digest,
+            self.config, self.planner_config,
+        )
+        self._grasp_quaternion_wxyz = None
+        self._pose_plan = None
+        self._pose_plan_index = 0
+        self._pose_plan_stage = None
+
+    def reset(self, observation, info: Mapping[str, object], metadata, **kwargs) -> None:
+        super().reset(observation, info, metadata, **kwargs)
+        if info.get("source_closure_digest") != self.source_closure_digest:
+            raise ValueError("LIBERO Solution v3 reset closure differs from its selected source")
+        current_pose = np.asarray(observation["state"].get("ee_pose"), dtype=np.float64)
+        if current_pose.shape != (7,) or not np.isfinite(current_pose).all():
+            raise ValueError("LIBERO Solution v3 requires the typed source TCP world pose at reset")
+        self._grasp_quaternion_wxyz = normalize_quat_wxyz(current_pose[3:7])
+        self._pose_plan = None
+        self._pose_plan_index = 0
+        self._pose_plan_stage = None
+
+    def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
+        _joints, current_position = self._validate_boundary(observation, info, next_step=False)
+        if self.done or self.failed:
+            raise RuntimeError("LIBERO Solution has already stopped")
+        if self._grasp_quaternion_wxyz is None:
+            raise RuntimeError("LIBERO Solution v3 has no source-derived grasp orientation")
+        current_pose = np.asarray(observation["state"].get("ee_pose"), dtype=np.float64)
+        if current_pose.shape != (7,) or not np.isfinite(current_pose).all():
+            raise ValueError("LIBERO Solution v3 requires a finite world TCP pose")
+        current_pose = current_pose.copy()
+        current_pose[3:7] = normalize_quat_wxyz(current_pose[3:7])
+        target_position = self._target()
+        target_pose = np.asarray((*target_position, *self._grasp_quaternion_wxyz), dtype=np.float64)
+        opening_m = _OPENING_BY_STAGE.get(self.stage)
+        if opening_m is None:
+            raise RuntimeError(f"LIBERO Solution has no gripper policy in stage {self.stage!r}")
+        gripper_scalar = float(opening_m / 0.04 - 1.0)
+        if not -1.0 <= gripper_scalar <= 1.0:
+            raise ValueError("aggregate finger opening does not map to the normalized planner gripper range")
+        if (self._pose_plan is None or self._pose_plan_stage != self.stage
+                or self._pose_plan_index >= len(self._pose_plan)):
+            if self.stage == "grasp":
+                finger_positions = np.asarray(
+                    observation["state"].get("joint_position"), dtype=np.float64,
+                )
+                if finger_positions.shape != (9,) or not np.isfinite(finger_positions).all():
+                    raise ValueError("LIBERO Solution v3 requires public signed finger positions")
+                actual_opening = float(finger_positions[7] - finger_positions[8])
+                current_gripper = float(np.clip(actual_opening / 0.04 - 1.0, -1.0, 1.0))
+                self._pose_plan = self.pose_planner.plan_gripper_transition(
+                    pose=target_pose,
+                    start_gripper=current_gripper,
+                    goal_gripper=gripper_scalar,
+                    steps=max(4, self.config.grasp_dwell_steps),
+                    settle_steps=0,
+                )
+            else:
+                self._pose_plan = self.pose_planner.plan_to_pose(
+                    current_pose=current_pose,
+                    goal_pose=target_pose,
+                    gripper=gripper_scalar,
+                    settle_steps=0,
+                )
+            self._pose_plan_index = 0
+            self._pose_plan_stage = self.stage
+        action = np.asarray(self._pose_plan[self._pose_plan_index], dtype=np.float32)
+        if action.shape != (8,) or not np.isfinite(action).all():
+            raise ValueError("CartesianPosePlanner returned an invalid absolute world-pose action")
+        action_pose = np.asarray(action[:7], dtype=np.float64)
+        self._last_action_receipt = {
+            "solution_schema_version": SOLUTION_SCHEMA_V3,
+            "action_schema_id": POSE_ACTION_SCHEMA_V1,
+            "stage": self.stage,
+            "action": [float(value) for value in action],
+            "current_world_pose": [float(value) for value in current_pose],
+            "target_world_pose": [float(value) for value in target_pose],
+            "planner_world_pose": [float(value) for value in action_pose],
+            "source_grasp_quaternion_wxyz": [float(value) for value in self._grasp_quaternion_wxyz],
+            "source_tcp_profile_identity_sha256": self.tcp_profile.identity_hash,
+            "aggregate_opening_m": float(opening_m),
+            "normalized_gripper_scalar": float(action[7]),
+            "diagnostics": {
+                "waypoint_distance_m": float(np.linalg.norm(target_position - current_position)),
+            "planner_step_translation_m": float(np.linalg.norm(action_pose[:3] - current_pose[:3])),
+            "planner_step_rotation_rad": float(quat_angle_wxyz(action_pose[3:7], current_pose[3:7])),
+            "planner_path_index": int(self._pose_plan_index),
+            "planner_path_length": int(len(self._pose_plan)),
+            "stage_step": self._stage_steps,
+            "planner_owner": (
+                "CartesianPosePlanner.plan_gripper_transition"
+                if self.stage == "grasp" else "CartesianPosePlanner.plan_to_pose"
+            ),
+            "source_pose_observation_used": True,
+            },
+        }
+        self._pending_action = True
+        self._actions += 1
+        return ExpertAction(
+            action=action,
+            stage=self.stage,
+            diagnostics=dict(self._last_action_receipt["diagnostics"]),
+        )
+
+    def observe(self, observation, reward: float, terminated: bool, truncated: bool,
+                info: Mapping[str, object], **_kwargs) -> None:
+        """Advance only from current public pose, finger and task feedback."""
+        joints, ee_position = self._validate_boundary(observation, info, next_step=True)
+        self._pending_action = False
+        identity = _boundary_identity(info)
+        self._last_boundary_step = identity[5]
+        self._last_observation = observation
+        self._stage_steps += 1
+        if self._pose_plan is not None and self._pose_plan_stage == self.stage:
+            self._pose_plan_index += 1
+        target = self._target()
+        target_error = float(np.linalg.norm(target - ee_position))
+        current_pose = np.asarray(observation["state"].get("ee_pose"), dtype=np.float64)
+        if current_pose.shape != (7,) or not np.isfinite(current_pose).all():
+            raise ValueError("LIBERO Solution v3 post-step observation omits its world TCP pose")
+        orientation_error = float(quat_angle_wxyz(
+            normalize_quat_wxyz(current_pose[3:7]), self._grasp_quaternion_wxyz,
+        ))
+        pose_reached = (
+            target_error <= self.config.position_tolerance_m
+            and orientation_error <= 0.12
+        )
+        stage_before = self.stage
+        planned_pose = np.asarray(
+            (self._last_action_receipt or {}).get("planner_world_pose", current_pose),
+            dtype=np.float64,
+        )
+        tracking_position_error = float(np.linalg.norm(planned_pose[:3] - current_pose[:3]))
+        tracking_orientation_error = float(quat_angle_wxyz(
+            planned_pose[3:7], normalize_quat_wxyz(current_pose[3:7]),
+        ))
+        if tracking_position_error > 0.025 or tracking_orientation_error > 0.25:
+            self._pose_plan = None
+            self._pose_plan_index = 0
+            self._pose_plan_stage = None
+        if stage_before == "approach" and pose_reached:
+            self.stage, self._stage_steps = "descend", 0
+        elif stage_before == "descend" and pose_reached:
+            self.stage, self._stage_steps = "grasp", 0
+        elif stage_before == "grasp":
+            # Confirm the signed fingers actually moved to the requested
+            # aggregate aperture before beginning the lift.
+            finger_positions = np.asarray(
+                observation["state"].get("joint_position"), dtype=np.float64,
+            )
+            if finger_positions.shape != (9,) or not np.isfinite(finger_positions).all():
+                raise ValueError("LIBERO Solution v3 requires public signed finger positions")
+            actual_opening = float(finger_positions[7] - finger_positions[8])
+            requested_opening = _OPENING_BY_STAGE["grasp"]
+            if (self._stage_steps >= 2
+                    and actual_opening <= requested_opening + 0.003):
+                self.stage, self._stage_steps = "lift", 0
+        elif stage_before == "lift" and pose_reached:
+            bowl_now = _body_position(observation, "bowl_body_pose")
+            if bowl_now[2] >= self._initial_bowl[2] + 0.035:
+                self.stage, self._stage_steps = "carry", 0
+            elif self._stage_steps >= 60:
+                self.failed = True
+                self.failure_reason = "bowl_not_lifted_after_public_grasp_feedback"
+        elif stage_before == "carry" and np.linalg.norm(target[:2] - ee_position[:2]) <= self.config.position_tolerance_m:
+            self.stage, self._stage_steps = "place", 0
+        elif stage_before == "place" and pose_reached:
+            self.stage, self._stage_steps = "release", 0
+        elif stage_before == "release":
+            predicate = info.get("predicate_v1", {}).get("on_bowl_plate", {})
+            success = info.get("is_success")
+            if type(success) is not bool or predicate.get("status") not in {"available", "unavailable"}:
+                raise ValueError("LIBERO Solution post-step info omits the typed On predicate result")
+            if predicate.get("status") == "available" and predicate.get("value") is not success:
+                raise ValueError("LIBERO task success and typed On predicate disagree")
+            if (self._stage_steps >= self.config.release_dwell_steps
+                    and success is True and predicate.get("status") == "available"):
+                self.done = True
+                self.stage = "complete"
+            elif self._stage_steps >= self.config.release_timeout_steps:
+                self.failed = True
+                self.failure_reason = "released_bowl_did_not_satisfy_source_on_predicate"
+        if self.stage != stage_before:
+            self._pose_plan = None
+            self._pose_plan_index = 0
+            self._pose_plan_stage = None
+        self._last_action_receipt = {
+            **(self._last_action_receipt or {}),
+            "post_step_feedback": {
+                "stage_before": stage_before,
+                "stage_after": self.stage,
+                "tcp_position_error_m": target_error,
+                "tcp_orientation_error_rad": orientation_error,
+                "planner_tracking_position_error_m": tracking_position_error,
+                "planner_tracking_orientation_error_rad": tracking_orientation_error,
+                "aggregate_finger_opening_m": float(
+                    np.asarray(observation["state"]["joint_position"], dtype=np.float64)[7]
+                    - np.asarray(observation["state"]["joint_position"], dtype=np.float64)[8]
+                ),
+                "bowl_world_z_m": float(_body_position(observation, "bowl_body_pose")[2]),
+                "task_success": info.get("is_success"),
+                "stage_step": self._stage_steps,
+            },
+        }
+        if truncated and not self.done:
+            self.failed = True
+            self.failure_reason = "horizon_truncated_before_source_task_success"
+        if terminated and not self.done:
+            self.failed = True
+            self.failure_reason = "task_terminated_before_solution_completion"
+
+    def outcome_report(self) -> dict[str, object]:
+        return {
+            "solution_schema_version": SOLUTION_SCHEMA_V3,
+            "solution_identity": self.identity,
+            "solution_stage": self.stage,
+            "solution_actions": self._actions,
+            "last_action_receipt": self._last_action_receipt,
+            "solution_done": bool(self.done),
+            "solution_failed": bool(self.failed),
+            "solution_failure_reason": self.failure_reason,
+            "source_closure_digest": self.source_closure_digest,
+            "action_schema_id": POSE_ACTION_SCHEMA_V1,
+            "source_grasp_quaternion_wxyz": (
+                None if self._grasp_quaternion_wxyz is None
+                else [float(value) for value in self._grasp_quaternion_wxyz]
+            ),
+        }
+
+
 __all__ = [
-    "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2",
+    "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2", "SOLUTION_SCHEMA_V3", "POSE_ACTION_SCHEMA_V1",
     "LiberoPickPlaceSolutionConfigV1", "LiberoPickPlaceSolutionV1",
-    "LiberoPickPlaceSolutionV2", "solution_identity_v1", "solution_identity_v2",
+    "LiberoPickPlaceSolutionV2", "LiberoPickPlaceSolutionV3",
+    "solution_identity_v1", "solution_identity_v2", "solution_identity_v2_frozen",
+    "solution_identity_v3",
 ]

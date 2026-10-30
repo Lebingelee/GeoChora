@@ -6,9 +6,11 @@ interfaces.  It owns no reset, control, physics, or recording implementation.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 from collections.abc import Mapping
 from pathlib import Path
+import tarfile
 import sys
 from typing import Any
 
@@ -93,15 +95,41 @@ def _write_solution_source_bundle(output_dir: Path, *,
             or plan.get("output", {}).get("composed_mjcf_sha256") != xml_sha):
         raise ValueError("task #1 source bundle differs from the frozen composition/task manifest")
     source_root = output_dir / "source_inputs"
-    closure_root = source_root / "closure"
+    source_root.mkdir(parents=True, exist_ok=True)
     for logical_path, content in files.items():
         if (type(logical_path) is not str or not logical_path or logical_path.startswith("/")
                 or "\\" in logical_path or any(part in {"", ".", ".."} for part in logical_path.split("/"))
                 or not isinstance(content, bytes)):
             raise ValueError("task #1 source bundle contains an unsafe path or non-byte payload")
-        target = closure_root.joinpath(*logical_path.split("/"))
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
+    archive_path = source_root / "closure.tar.gz"
+    with tarfile.open(archive_path, mode="w:gz", format=tarfile.PAX_FORMAT) as archive:
+        for logical_path, content in sorted(files.items()):
+            member = tarfile.TarInfo(name=f"closure/{logical_path}")
+            member.type = tarfile.REGTYPE
+            member.mode = 0o644
+            member.uid = member.gid = 0
+            member.uname = member.gname = ""
+            member.mtime = 0
+            member.size = len(content)
+            archive.addfile(member, io.BytesIO(content))
+    archive_bytes = archive_path.read_bytes()
+    archive_manifest = {
+        "schema_version": "r07-v210-source-closure-archive-manifest-v1",
+        "archive_path": "closure.tar.gz",
+        "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
+        "archive_size_bytes": len(archive_bytes),
+        "archive_verified": True,
+        "expanded_size_bytes": sum(len(content) for content in files.values()),
+        "file_count": len(files),
+        "entries": [
+            {"kind": "file", "relative_path": f"closure/{row['path']}",
+             "size_bytes": row["size_bytes"], "sha256": row["sha256"], "mode": 0o644}
+            for row in _source_closure_manifest(files)
+        ],
+    }
+    archive_manifest_bytes = _canonical(archive_manifest)
+    archive_manifest_path = source_root / "closure_archive_manifest.json"
+    archive_manifest_path.write_bytes(archive_manifest_bytes)
     plan_path = source_root / "composition_plan.json"
     plan_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path.write_bytes(bytes(composition_plan_bytes))
@@ -112,6 +140,18 @@ def _write_solution_source_bundle(output_dir: Path, *,
         "importer_xml_sha256": hashlib.sha256(files["scene.xml"]).hexdigest(),
         "source_closure_digest": closure_digest,
         "closure_files": list(_source_closure_manifest(files)),
+        "closure_archive": {
+            "relative_path": "source_inputs/closure.tar.gz",
+            "bytes": len(archive_bytes),
+            "sha256": archive_manifest["archive_sha256"],
+            "expanded_bytes": archive_manifest["expanded_size_bytes"],
+            "file_count": archive_manifest["file_count"],
+        },
+        "closure_archive_manifest": {
+            "relative_path": "source_inputs/closure_archive_manifest.json",
+            "bytes": len(archive_manifest_bytes),
+            "sha256": hashlib.sha256(archive_manifest_bytes).hexdigest(),
+        },
         "composition_plan": {
             "relative_path": "source_inputs/composition_plan.json",
             "bytes": len(composition_plan_bytes),
@@ -127,32 +167,143 @@ def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dic
     closure_rows = source_bundle.get("closure_files")
     if not isinstance(closure_rows, list) or not closure_rows:
         raise ValueError("task Solution source bundle closure manifest is empty")
-    closure_root = (bundle_path.parent / "source_inputs/closure").resolve(strict=True)
-    if bundle_path.parent not in closure_root.parents:
-        raise ValueError("task Solution source closure escaped its worker bundle")
-    files: dict[str, bytes] = {}
-    for row in closure_rows:
-        if not isinstance(row, Mapping):
-            raise ValueError("task Solution source closure manifest row is malformed")
-        logical = row.get("path")
-        if (type(logical) is not str or not logical or logical.startswith("/")
-                or "\\" in logical or any(part in {"", ".", ".."} for part in logical.split("/"))
-                or logical in files):
-            raise ValueError("task Solution source closure path is unsafe or duplicated")
-        source_path = (closure_root / logical).resolve(strict=True)
-        if closure_root not in source_path.parents:
-            raise ValueError("task Solution source closure member escaped its root")
-        content = source_path.read_bytes()
-        if (len(content) != row.get("size_bytes")
-                or hashlib.sha256(content).hexdigest() != row.get("sha256")):
-            raise ValueError(f"task Solution source closure bytes differ from their manifest: {logical}")
-        files[logical] = content
-    nodes = list(closure_root.rglob("*"))
-    if any(path.is_symlink() for path in nodes):
-        raise ValueError("task Solution source closure contains a symlink")
-    actual_paths = {path.relative_to(closure_root).as_posix() for path in nodes if path.is_file()}
-    if actual_paths != set(files):
-        raise ValueError("task Solution source closure contains missing or unlisted files")
+    bundle_root = Path(bundle_path).resolve(strict=True)
+    if bundle_root.is_file():
+        bundle_root = bundle_root.parent
+    if not bundle_root.is_dir():
+        raise ValueError("task Solution bundle root is not a directory")
+    source_root = bundle_root / "source_inputs"
+    if source_root.is_symlink() or source_root.resolve(strict=True) != source_root:
+        raise ValueError("task Solution source root is unsafe")
+
+    def safe_file(root: Path, raw_path: str | Path) -> Path:
+        root = root.resolve(strict=True)
+        candidate = Path(raw_path)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        current = candidate
+        while current != root and root in current.parents:
+            if current.is_symlink():
+                raise ValueError("task Solution source archive path contains a symlink")
+            current = current.parent
+        resolved = candidate.resolve(strict=True)
+        if root not in resolved.parents or not resolved.is_file():
+            raise ValueError("task Solution source archive escaped its approved root")
+        return resolved
+
+    def file_rows_from_archive_manifest(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
+        rows = []
+        for row in manifest.get("entries", ()):
+            if not isinstance(row, Mapping) or row.get("kind") != "file":
+                continue
+            relative = row.get("relative_path")
+            if type(relative) is not str:
+                raise ValueError("task Solution archive manifest file path is malformed")
+            logical = relative[len("closure/"):] if relative.startswith("closure/") else relative
+            rows.append({
+                "path": logical,
+                "size_bytes": row.get("size_bytes"),
+                "sha256": row.get("sha256"),
+            })
+        return rows
+
+    from .source_gravity import read_source_closure_archive
+
+    closure_root = source_root / "closure"
+    if closure_root.exists():
+        if closure_root.is_symlink() or closure_root.resolve(strict=True) != closure_root:
+            raise ValueError("task Solution source closure root is unsafe")
+        files: dict[str, bytes] = {}
+        for row in closure_rows:
+            if not isinstance(row, Mapping):
+                raise ValueError("task Solution source closure manifest row is malformed")
+            logical = row.get("path")
+            if (type(logical) is not str or not logical or logical.startswith("/")
+                    or "\\" in logical or any(part in {"", ".", ".."} for part in logical.split("/"))
+                    or logical in files):
+                raise ValueError("task Solution source closure path is unsafe or duplicated")
+            source_path = safe_file(closure_root, logical)
+            content = source_path.read_bytes()
+            if (len(content) != row.get("size_bytes")
+                    or hashlib.sha256(content).hexdigest() != row.get("sha256")
+                    or source_path.stat().st_nlink != 1):
+                raise ValueError(f"task Solution source closure bytes differ from their manifest: {logical}")
+            files[logical] = content
+        nodes = list(closure_root.rglob("*"))
+        if any(path.is_symlink() for path in nodes):
+            raise ValueError("task Solution source closure contains a symlink")
+        actual_paths = {path.relative_to(closure_root).as_posix() for path in nodes if path.is_file()}
+        if actual_paths != set(files):
+            raise ValueError("task Solution source closure contains missing or unlisted files")
+    else:
+        archive_info = source_bundle.get("closure_archive")
+        if isinstance(archive_info, Mapping):
+            archive_rel = archive_info.get("relative_path")
+            manifest_info = source_bundle.get("closure_archive_manifest")
+            if (archive_rel != "source_inputs/closure.tar.gz"
+                    or not isinstance(manifest_info, Mapping)
+                    or manifest_info.get("relative_path") != "source_inputs/closure_archive_manifest.json"):
+                raise ValueError("task Solution archive identity paths are unsupported")
+            archive_path = safe_file(bundle_root, archive_rel)
+            archive_manifest_path = safe_file(bundle_root, manifest_info["relative_path"])
+            archive_bytes = archive_path.read_bytes()
+            manifest_bytes = archive_manifest_path.read_bytes()
+            if (len(archive_bytes) != archive_info.get("bytes")
+                    or hashlib.sha256(archive_bytes).hexdigest() != archive_info.get("sha256")
+                    or len(manifest_bytes) != manifest_info.get("bytes")
+                    or hashlib.sha256(manifest_bytes).hexdigest() != manifest_info.get("sha256")):
+                raise ValueError("task Solution source archive or manifest bytes differ from their identity")
+            archive_manifest = json.loads(manifest_bytes.decode("utf-8"))
+            if (archive_manifest.get("schema_version") != "r07-v210-source-closure-archive-manifest-v1"
+                    or archive_manifest.get("archive_verified") is not True
+                    or archive_manifest.get("archive_sha256") != archive_info.get("sha256")
+                    or archive_manifest.get("archive_size_bytes") != len(archive_bytes)
+                    or archive_manifest.get("expanded_size_bytes") != archive_info.get("expanded_bytes")
+                    or archive_manifest.get("file_count") != archive_info.get("file_count")):
+                raise ValueError("task Solution source archive manifest does not match the archive identity")
+            files = read_source_closure_archive(archive_path, closure_rows)
+            manifest_rows = file_rows_from_archive_manifest(archive_manifest)
+            if sorted(manifest_rows, key=lambda row: row["path"]) != sorted(
+                    [{key: row.get(key) for key in ("path", "size_bytes", "sha256")} for row in closure_rows],
+                    key=lambda row: row["path"]):
+                raise ValueError("task Solution archive member set differs from its manifest")
+        else:
+            reuse_path = source_root / "source_closure_reuse_receipt.json"
+            if not reuse_path.is_file() or reuse_path.is_symlink():
+                raise FileNotFoundError("task Solution bundle has no expanded or archived source closure")
+            reuse = json.loads(reuse_path.read_text(encoding="utf-8"))
+            runs_root = bundle_root.parent.parent.resolve(strict=True)
+            archive_path = safe_file(runs_root, reuse.get("canonical_archive_path", ""))
+            archive_manifest_path = safe_file(runs_root, reuse.get("canonical_archive_manifest_path", ""))
+            report_path = bundle_root / "worker_result.json"
+            report_bytes = report_path.read_bytes()
+            archive_bytes = archive_path.read_bytes()
+            manifest_bytes = archive_manifest_path.read_bytes()
+            if (reuse.get("schema_version") != "r07-v210-native-run-source-closure-reuse-v1"
+                    or reuse.get("status") != "verified_identical_closure_referenced"
+                    or reuse.get("run_id") != bundle_root.parent.name
+                    or reuse.get("worker_result_path") != str(report_path)
+                    or hashlib.sha256(report_bytes).hexdigest() != reuse.get("worker_result_sha256")
+                    or (reuse.get("worker_closure_digest") is not None
+                        and reuse.get("worker_closure_digest") != source_bundle.get("source_closure_digest"))
+                    or reuse.get("raw_closure_matches_worker_result_file_hashes") is not True
+                    or hashlib.sha256(archive_bytes).hexdigest() != reuse.get("canonical_archive_sha256")
+                    or hashlib.sha256(manifest_bytes).hexdigest() != reuse.get("canonical_archive_manifest_sha256")):
+                raise ValueError("task Solution source archive reuse receipt is not bound to this worker bundle")
+            archive_manifest = json.loads(manifest_bytes.decode("utf-8"))
+            if (archive_manifest.get("archive_verified") is not True
+                    or archive_manifest.get("archive_sha256") != reuse.get("canonical_archive_sha256")
+                    or archive_manifest.get("file_count") != reuse.get("canonical_archive_file_count")
+                    or archive_manifest.get("expanded_size_bytes") != reuse.get("canonical_archive_expanded_bytes")
+                    or archive_path.stat().st_size != archive_manifest.get("archive_size_bytes")):
+                raise ValueError("task Solution canonical source archive manifest is inconsistent")
+            files = read_source_closure_archive(archive_path, closure_rows)
+            manifest_rows = file_rows_from_archive_manifest(archive_manifest)
+            if sorted(manifest_rows, key=lambda row: row["path"]) != sorted(
+                    [{key: row.get(key) for key in ("path", "size_bytes", "sha256")} for row in closure_rows],
+                    key=lambda row: row["path"]):
+                raise ValueError("task Solution canonical archive members differ from the worker result")
+
     if (_source_closure_digest(files) != source_bundle.get("source_closure_digest")
             or source_bundle.get("source_closure_digest") != _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256):
         raise ValueError("task Solution source closure digest does not recompute")
@@ -167,8 +318,8 @@ def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dic
     plan_info = source_bundle.get("composition_plan")
     if not isinstance(plan_info, Mapping) or plan_info.get("relative_path") != "source_inputs/composition_plan.json":
         raise ValueError("task Solution bundle omits its source composition plan")
-    plan_path = (bundle_path.parent / plan_info["relative_path"]).resolve(strict=True)
-    if bundle_path.parent not in plan_path.parents:
+    plan_path = (bundle_root / plan_info["relative_path"]).resolve(strict=True)
+    if bundle_root not in plan_path.parents:
         raise ValueError("task Solution composition plan escaped the worker bundle")
     plan_bytes = plan_path.read_bytes()
     if (len(plan_bytes) != plan_info.get("bytes")
@@ -336,6 +487,7 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
     is_solution = result.get("schema_version") in {
         "r07-v210-task-solution-worker-result-v1",
         "r07-v210-task-solution-worker-result-v2",
+        "r07-v210-task-solution-worker-result-v3",
     }
     accepted_schemas = {"r07-v210-required123-run-record-v1"} if is_solution else {"r07c-d01-run-record-v1"}
     if record.get("schema_version") not in accepted_schemas:
@@ -566,6 +718,15 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
                              solution_factory) -> dict[str, Any]:
     """Run one task-owned Solution through the same SelectedReferenceEnv."""
     solution = solution_factory(output_dir)
+    solution_schema = getattr(solution, "solution_schema_version", None)
+    if solution_schema == "libero-bowl-to-plate-solution-v3":
+        version_suffix = "v3"
+    elif solution_schema == "libero-bowl-to-plate-solution-v2":
+        version_suffix = "v2"
+    elif solution_schema == "libero-bowl-to-plate-solution-v1":
+        version_suffix = "v1"
+    else:
+        raise ValueError("task Solution factory returned an unsupported frozen schema version")
     if type(getattr(solution, "identity", None)) is not str or len(solution.identity) != 64:
         raise TypeError("task Solution factory must return a versioned 64-hex identity")
     reset_observation, reset_info = env.reset_for_solution(
@@ -587,7 +748,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     if not isinstance(pre_reset, Mapping):
         raise ValueError("Solution reset omitted its pre-reset compiled/runtime identity receipt")
     start_receipt = {
-        "schema_version": "r07-v210-task-solution-start-receipt-v2",
+        "schema_version": f"r07-v210-task-solution-start-receipt-{version_suffix}",
         "episode_index": episode_index, "row_index": row_index, "seed": seed,
         "task_uid": env.artifact.task_id,
         "task_artifact_identity_hash": env.artifact.identity_hash,
@@ -632,7 +793,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     except BaseException as exc:
         fault = getattr(env, "execution_fault", None)
         failure_receipt = {
-            "schema_version": "r07-v210-task-solution-failure-receipt-v2",
+            "schema_version": f"r07-v210-task-solution-failure-receipt-{version_suffix}",
             "episode_index": episode_index, "row_index": row_index, "seed": seed,
             "task_uid": env.artifact.task_id,
             "task_artifact_identity_hash": env.artifact.identity_hash,
@@ -680,7 +841,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     initial_ee = np.asarray(reset_observation["state"]["ee_pose"], dtype=np.float64)
     final_ee = np.asarray(final_observation["state"]["ee_pose"], dtype=np.float64)
     return {
-        "schema_version": "r07-v210-task-solution-episode-v2",
+        "schema_version": f"r07-v210-task-solution-episode-{version_suffix}",
         "episode_index": episode_index,
         "row_index": row_index,
         "seed": seed,
@@ -711,8 +872,11 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
         "solution_failure_reason": getattr(solution, "failure_reason", None),
         "gravity_compensation": (
             solution.gravity_compensation_receipt()
-            if callable(getattr(solution, "gravity_compensation_receipt", None)) else None
+            if version_suffix == "v2"
+            and callable(getattr(solution, "gravity_compensation_receipt", None)) else None
         ),
+        "solution_schema_version": solution_schema,
+        "action_schema_id": getattr(solution, "action_schema_id", None),
         "episode_end_v1": episode_end,
         "final_info": {
             "is_success": final_info.get("is_success"),
@@ -895,7 +1059,8 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
             })
     payload = {
         "schema_version": (
-            "r07-v210-task-solution-worker-result-v2" if solution_route
+            getattr(solution_factory, "worker_result_schema_version",
+                    "r07-v210-task-solution-worker-result-v2") if solution_route
             else "r07c-d01-libero-worker-result-v1"
         ),
         "status": "complete" if (worker_error is None and close_error is None
@@ -966,10 +1131,15 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                                    require_motion_thresholds: bool,
                                    require_mujoco_runtime_identity: bool) -> dict[str, Any]:
     """Independent provider-free H5/source/outcome readback for the v2.1.0 route."""
-    from .solution import solution_identity_v1, solution_identity_v2
-    from .controller import LiberoMixedControllerV1
+    from .solution import solution_identity_v1, solution_identity_v2_frozen, solution_identity_v3
+    from .controller import (
+        LiberoMixedControllerV1, LiberoMixedControllerV2,
+        legacy_v2_controller_identity_mapping,
+    )
     schema = report.get("schema_version")
     solution_v2 = schema == "r07-v210-task-solution-worker-result-v2"
+    solution_v3 = schema == "r07-v210-task-solution-worker-result-v3"
+    solution_version = "v3" if solution_v3 else "v2" if solution_v2 else "v1"
     payload = {key: value for key, value in report.items() if key != "result_sha256"}
     if hashlib.sha256(_canonical(payload)).hexdigest() != report.get("result_sha256"):
         raise ValueError("task Solution worker result digest mismatch")
@@ -978,11 +1148,12 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     if (schema not in {
                 "r07-v210-task-solution-worker-result-v1",
                 "r07-v210-task-solution-worker-result-v2",
+                "r07-v210-task-solution-worker-result-v3",
             }
             or report.get("status") != "complete"
             or report.get("worker_error") is not None
             or report.get("close_error") is not None
-            or (solution_v2 and report.get("solution_resource_close_error") is not None)
+            or ((solution_v2 or solution_v3) and report.get("solution_resource_close_error") is not None)
             or report.get("episode_count") != 3
             or len(report.get("episodes", ())) != 3
             or not isinstance(attempted_episode_receipts, list)
@@ -992,20 +1163,31 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             or report.get("reset_count") != 3):
         raise ValueError("task Solution worker bundle is incomplete or has an invalid schema/count")
     source_readback = _verify_solution_source_bundle(bundle_path, report.get("source_bundle"))
+    recorded_controller = report["episodes"][0].get("control_plan", {})
+    expected_controller = LiberoMixedControllerV2().identity_mapping() if solution_v3 else (
+        legacy_v2_controller_identity_mapping(recorded_controller.get("profile_id"))
+        if solution_v2 else None
+    )
+    if solution_v2 and dict(recorded_controller) != expected_controller:
+        raise ValueError("historical v2 Controller identity differs from its frozen profile manifest")
     expected_solution_identity = (
-        solution_identity_v2(source_readback["canonical_xml_sha256"],
+        solution_identity_v3(source_readback["canonical_xml_sha256"],
                              source_readback["source_closure_digest"])
+        if solution_v3 else
+        solution_identity_v2_frozen(source_readback["canonical_xml_sha256"],
+                                    source_readback["source_closure_digest"], recorded_controller)
         if solution_v2 else solution_identity_v1(source_readback["canonical_xml_sha256"])
     )
-    expected_controller = LiberoMixedControllerV1().identity_mapping() if solution_v2 else None
     resource_close = report.get("solution_resource_close_receipt")
-    if solution_v2 and (
+    if (solution_v2 or solution_v3) and (
         not isinstance(resource_close, Mapping)
         or resource_close.get("schema_version") != "libero-source-gravity-model-close-v1"
         or resource_close.get("closed") is not True
-        or resource_close.get("model_released") is not True
-        or resource_close.get("data_released") is not True
-        or resource_close.get("mj_step_call_count") != 0
+                or resource_close.get("model_released") is not True
+                or resource_close.get("data_released") is not True
+                or resource_close.get("mj_step_call_count") != 0
+                or resource_close.get("source_xml_sha256") != _TASK1_COMPOSED_XML_SHA256
+                or resource_close.get("source_closure_digest") != _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256
     ):
         raise ValueError("task Solution source gravity model is not explicitly closed")
     total_t = total_obs = total_native = 0
@@ -1013,8 +1195,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     for index, (expected_row, episode, attempted) in enumerate(zip(
             (0, 1, 2), report["episodes"], attempted_episode_receipts, strict=True)):
         expected_episode_schema = (
-            "r07-v210-task-solution-episode-v2" if solution_v2
-            else "r07-v210-task-solution-episode-v1"
+            f"r07-v210-task-solution-episode-{solution_version}"
         )
         if (episode.get("schema_version") != expected_episode_schema
                 or episode.get("episode_index") != index or episode.get("row_index") != expected_row
@@ -1024,6 +1205,10 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 or episode.get("source_xml_sha256") != source_readback.get("canonical_xml_sha256")
                 or episode.get("solution_identity") != expected_solution_identity):
             raise ValueError("task Solution episode task/row/seed/order identity mismatch")
+        if solution_v3 and (
+                episode.get("solution_schema_version") != "libero-bowl-to-plate-solution-v3"
+                or episode.get("action_schema_id") != "libero-world-pose-wxyz-absolute-v1"):
+            raise ValueError("task Solution v3 episode omits its explicit world-pose profile identity")
         prior_close = episode.get("prior_session_close_receipt")
         if ((index == 0 and prior_close is not None)
                 or (index > 0 and (not isinstance(prior_close, Mapping)
@@ -1055,8 +1240,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 or hashlib.sha256(start_raw).hexdigest() != attempted.get("sha256")
                 or start != json.loads(start_raw.decode("utf-8"))
                 or start.get("schema_version") != (
-                    "r07-v210-task-solution-start-receipt-v2" if solution_v2
-                    else "r07-v210-task-solution-start-receipt-v1"
+                    f"r07-v210-task-solution-start-receipt-{solution_version}"
                 )
                 or start.get("episode_index") != index or start.get("row_index") != expected_row
                 or start.get("seed") != 19 or start.get("task_uid") != TASK_1
@@ -1141,7 +1325,12 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             boundary_ids = handle["obs/state/boundary_identity_sha256"][:]
             bowl_poses = handle["obs/privileged_state/bowl_body_pose"][:, 0, :]
             plate_poses = handle["obs/privileged_state/plate_body_pose"][:, 0, :]
-            action_names = [*(f"joint{i}" for i in range(1, 8)), "aggregate_opening_m"]
+            action_names = (
+                ["world_x_m", "world_y_m", "world_z_m", "world_qw", "world_qx",
+                 "world_qy", "world_qz", "gripper_normalized"]
+                if solution_v3 else
+                [*(f"joint{i}" for i in range(1, 8)), "aggregate_opening_m"]
+            )
             if any(f"universal_action/{name}" not in handle for name in action_names):
                 raise ValueError("task Solution H5 omits one or more public action channels")
             actions = np.column_stack([
@@ -1166,7 +1355,9 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 or task_context.get("episode_id") != episode.get("episode_id")
                 or task_context.get("init_row_index") != expected_row
                 or task_context.get("reset_sample_id") != sample.get("sample_id")
-                or task_context.get("provider_materialization_id") != progress.get("provider_materialization_id")):
+                or task_context.get("provider_materialization_id") != progress.get("provider_materialization_id")
+                or (solution_v3 and task_context.get("controller_identity")
+                    != expected_controller.get("identity_sha256"))):
             raise ValueError("task Solution H5 task/source/solution identity differs from worker receipts")
         identity_fields = (
             "source_id", "source_closure_digest", "provider_materialization_id",
@@ -1211,8 +1402,12 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             raise ValueError("task Solution H5 omits a typed mixed-control Target/Ack")
         for transition_index, control in enumerate(semantic["structured_controls"]):
             control.validate()
+            expected_action_schema = (
+                "libero-world-pose-wxyz-absolute-v1" if solution_v3
+                else "libero-joint-space-absolute-v1"
+            )
             if (len(control.request.groups) != 1 or len(control.writer_controls) != 1
-                    or control.request.groups[0].action_schema_id != "libero-joint-space-absolute-v1"
+                    or control.request.groups[0].action_schema_id != expected_action_schema
                     or not np.allclose(np.asarray(control.request.groups[0].values), actions[transition_index],
                                        rtol=0.0, atol=1e-7)):
                 raise ValueError("task Solution typed action differs from its public H5 action row")
@@ -1239,6 +1434,68 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     or target.simulation_time_s != transition_index * 0.05
                     or ack.provider_name != "mujoco"):
                 raise ValueError("task Solution H5 Target/Ack source, control, or boundary identity mismatch")
+            if solution_v3:
+                canonical_action = writer.get("canonical_action")
+                controller_receipt = (
+                    canonical_action.get("controller_receipt")
+                    if isinstance(canonical_action, Mapping) else None
+                )
+                try:
+                    qdesired = np.asarray(canonical_action.get("qdesired_rad"), dtype=np.float64)
+                    servo = np.asarray(canonical_action.get("arm_servo_position_rad"), dtype=np.float64)
+                    q = np.asarray(controller_receipt.get("q_rad"), dtype=np.float64)
+                    qdot = np.asarray(controller_receipt.get("qdot_rad_s"), dtype=np.float64)
+                    bias = np.asarray(controller_receipt.get("gravity_feedforward_Nm"), dtype=np.float64)
+                    raw_torque = np.asarray(controller_receipt.get("raw_torque_Nm"), dtype=np.float64)
+                    applied_torque = np.asarray(controller_receipt.get("applied_torque_Nm"), dtype=np.float64)
+                    torque_clipped = np.asarray(controller_receipt.get("torque_clipped"), dtype=bool)
+                    kp = np.asarray(expected_controller["kp_Nm_per_rad"], dtype=np.float64)
+                    kd = np.asarray(expected_controller["kd_Nm_s_per_rad"], dtype=np.float64)
+                except (AttributeError, KeyError, TypeError, ValueError) as exc:
+                    raise ValueError("task Solution v3 mixed Controller receipt is malformed") from exc
+                if (not isinstance(canonical_action, Mapping)
+                        or not isinstance(controller_receipt, Mapping)
+                        or controller_receipt.get("schema_version") != "libero-mixed-control-receipt-v2"
+                        or controller_receipt.get("controller_identity") != expected_controller["identity_sha256"]
+                        or controller_receipt.get("gravity_profile_id") != "libero-source-mjcf-gravity-bias-v1"
+                        or any(value.shape != (7,) or not np.isfinite(value).all() for value in (
+                            qdesired, servo, q, qdot, bias, raw_torque, applied_torque, kp, kd,
+                        ))
+                        or torque_clipped.shape != (7,)
+                        or not isinstance(canonical_action, Mapping)
+                        or canonical_action.get("arm_target_source_xml_sha256") != _TASK1_COMPOSED_XML_SHA256
+                        or not isinstance(canonical_action.get("arm_target_controller_identity"), str)
+                        or not canonical_action.get("arm_target_controller_identity")
+                        or controller_receipt.get("source_xml_sha256") != _TASK1_COMPOSED_XML_SHA256
+                        or controller_receipt.get("source_closure_digest") != _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256
+                        or controller_receipt.get("gravity_model_identity_sha256") != resource_close.get("model_identity_sha256")
+                        or not np.allclose(q, np.asarray(joints[transition_index, :7], dtype=np.float64),
+                                           rtol=0.0, atol=2e-6)
+                        or not np.allclose(raw_torque, kp * (qdesired - q) - kd * qdot + bias,
+                                           rtol=0.0, atol=2e-8)):
+                    raise ValueError("task Solution v3 pose resolver or feed-forward torque receipt is inconsistent")
+                limits = np.asarray([
+                    expected_controller["torque_limits_Nm"][f"joint{i}"]
+                    for i in range(1, 8)
+                ], dtype=np.float64)
+                expected_applied = np.clip(raw_torque, -limits, limits)
+                if (not np.allclose(applied_torque, expected_applied, rtol=0.0, atol=2e-8)
+                        or not np.array_equal(torque_clipped, np.abs(raw_torque - expected_applied) > 1e-12)
+                        or not np.allclose(
+                            [target.channel_values[f"joint{i}"] for i in range(1, 8)],
+                            applied_torque, rtol=0.0, atol=2e-8,
+                        )):
+                    raise ValueError("task Solution v3 actual mixed Target differs from its recomputed torque law")
+                normalized_gripper = float(actions[transition_index, 7])
+                aggregate_opening = 0.04 * (normalized_gripper + 1.0)
+                expected_fingers = (aggregate_opening / 2.0, -aggregate_opening / 2.0)
+                if (canonical_action.get("schema_version") != "libero-world-pose-canonical-v1"
+                        or canonical_action.get("arm_target_schema_version") != "canonical-arm-target-v1"
+                        or not np.allclose(
+                            [target.channel_values["finger_joint1"], target.channel_values["finger_joint2"]],
+                            expected_fingers, rtol=0.0, atol=1e-8,
+                        )):
+                    raise ValueError("task Solution v3 pose/gripper action differs from the mixed Target mapping")
         action_trace = episode.get("action_trace")
         if not isinstance(action_trace, list) or len(action_trace) != count:
             raise ValueError("task Solution action trace does not cover every H5 transition")
@@ -1258,6 +1515,8 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     or gravity_receipt.get("runtime_identity", {}).get("api_version") != 3008001
                     or resource_close.get("model_identity_sha256") != gravity_receipt.get("model_identity_sha256")):
                 raise ValueError("task Solution source gravity receipt is missing or identity-mismatched")
+        elif solution_v3 and gravity_receipt is not None:
+            raise ValueError("task Solution v3 must keep source gravity outside the Solution outcome")
         for transition_index, action in enumerate(action_trace):
             if (not isinstance(action, Mapping)
                     or type(action.get("control_step")) is not int
@@ -1281,6 +1540,16 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     episode.get("control_plan", {}), diagnostics, public_action,
                     expected_controller,
                 )
+            elif solution_v3:
+                diagnostics = action["solution_diagnostics"]
+                expected_planner_owner = (
+                    "CartesianPosePlanner.plan_gripper_transition"
+                    if action.get("solution_stage") == "grasp"
+                    else "CartesianPosePlanner.plan_to_pose"
+                )
+                if (diagnostics.get("planner_owner") != expected_planner_owner
+                        or diagnostics.get("source_pose_observation_used") is not True):
+                    raise ValueError("task Solution v3 action does not record the shared pose-planner path")
         initial_observation = episode.get("initial_observation")
         final_observation = episode.get("final_observation")
         if not isinstance(initial_observation, Mapping) or not isinstance(final_observation, Mapping):
@@ -1338,7 +1607,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     close = report.get("final_session_close_receipt")
     if not isinstance(close, Mapping) or close.get("session_closed") is not True:
         raise ValueError("task Solution worker omitted a successful final RuntimeSession close receipt")
-    if solution_v2 and resource_close.get("forward_call_count") != total_t:
+    if (solution_v2 or solution_v3) and resource_close.get("forward_call_count") != total_t:
         raise ValueError("task Solution gravity forward-call count differs from the complete H5 transition total")
     if (report.get("transition_count") != total_t
             or report.get("observation_count") != total_obs
@@ -1346,8 +1615,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         raise ValueError("task Solution aggregate worker counters differ from independently read H5s")
     return {
         "schema_version": (
-            "r07-v210-task-solution-independent-reader-v2" if solution_v2
-            else "r07-v210-task-solution-independent-reader-v1"
+            f"r07-v210-task-solution-independent-reader-{solution_version}"
         ),
         "status": "verified_complete",
         "source_bundle": source_readback,
@@ -1373,6 +1641,7 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
     if report.get("schema_version") in {
         "r07-v210-task-solution-worker-result-v1",
         "r07-v210-task-solution-worker-result-v2",
+        "r07-v210-task-solution-worker-result-v3",
     }:
         result = _consume_libero_solution_bundle(
             bundle_path, report, require_motion_thresholds=require_motion_thresholds,
@@ -1907,7 +2176,7 @@ def main(argv: list[str] | None = None) -> int:
         if not all((args.source_xml, args.composition_plan, args.install_root)):
             parser.error("--task-solution-1 requires --source-xml, --composition-plan, and --install-root")
         from .selected_candidate import build_libero_solution_candidate
-        from .solution import LiberoPickPlaceSolutionV2
+        from .solution import LiberoPickPlaceSolutionV3
         from .source_gravity import MujocoSourceGravityBiasV1
         from task_env.runtime.sessions.source import source_asset_bytes
 
@@ -1927,6 +2196,8 @@ def main(argv: list[str] | None = None) -> int:
         }
 
         class _Task1SolutionFactory:
+            worker_result_schema_version = "r07-v210-task-solution-worker-result-v3"
+
             def __init__(self):
                 self.gravity_model = None
                 self.bundle_root = None
@@ -1944,22 +2215,14 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 elif candidate_root != self.bundle_root:
                     raise ValueError("same-Env Solution factory received a different worker source bundle")
-                return LiberoPickPlaceSolutionV2(
+                env.value["bind_source_gravity_model"](self.gravity_model)
+                return LiberoPickPlaceSolutionV3(
                     source_xml,
                     source_closure_digest=env.metadata["source_closure_digest"],
-                    gravity_bias_model=self.gravity_model,
                 )
 
             def close_resources(self):
-                if self.gravity_model is not None:
-                    return self.gravity_model.close()
-                return {
-                    "schema_version": "libero-source-gravity-model-close-v1",
-                    "profile_id": "libero-source-mjcf-gravity-bias-v1",
-                    "model_created": False, "forward_call_count": 0,
-                    "mj_step_call_count": 0, "closed": True,
-                    "model_released": True, "data_released": True,
-                }
+                return env.controller.close_resources()
 
         solution_factory = _Task1SolutionFactory()
         result = run_libero_candidate_worker(
