@@ -19,6 +19,16 @@ def _utc_now():
     return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
+def _sample_period_s(limits):
+    """Return the poll period while preserving the frozen maximum-gap ceiling."""
+    maximum_gap = limits.get('sample_interval_s_max')
+    period = limits.get('sample_period_s', maximum_gap)
+    if (type(maximum_gap) not in (int, float) or maximum_gap <= 0
+            or type(period) not in (int, float) or period <= 0 or period > maximum_gap):
+        raise ValueError('DG01 sample period must be positive and no greater than its frozen maximum gap')
+    return float(period)
+
+
 def _mem_available_bytes():
     for line in Path('/proc/meminfo').read_text().splitlines():
         if line.startswith('MemAvailable:'):
@@ -106,6 +116,7 @@ def run(plan_path: Path, receipt_path: Path):
         value = limits.get(name)
         if type(value) not in (int, float) or value <= 0 or value > maximum:
             raise ValueError(f'DG01 plan violates the frozen {name} ceiling')
+    sample_period_s = _sample_period_s(limits)
 
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     if receipt_path.exists():
@@ -220,7 +231,7 @@ def run(plan_path: Path, receipt_path: Path):
                 break
             if return_code is not None and not _group_exists(process_group_id):
                 break
-            next_sample += limits['sample_interval_s_max']
+            next_sample += sample_period_s
             time.sleep(max(0.0, next_sample - time.monotonic()))
         return_code = process.poll()
         if return_code is None:

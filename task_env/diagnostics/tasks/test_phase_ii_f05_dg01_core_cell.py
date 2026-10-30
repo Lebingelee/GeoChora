@@ -7,6 +7,7 @@ import json
 import pytest
 
 from task_env.diagnostics.tasks.f05_dg01_core_cell import _phase_at
+from task_env.diagnostics.tasks.f05_dg01_native_supervisor import _sample_period_s
 from task_env.diagnostics.tasks.f05_dg01_h5_reader import (
     _mjcf_hand_fk,
     _mutate_h5,
@@ -31,6 +32,13 @@ def test_schedule_lookup_requires_one_phase_and_preserves_boundaries():
         _phase_at(100, schedule)
     with pytest.raises(ValueError, match="no unique frozen schedule row"):
         _phase_at(50, [*schedule, {"start": 50, "stop": 60, "phase": "overlap"}])
+
+
+def test_native_supervisor_uses_a_poll_period_below_the_frozen_gap_ceiling():
+    assert _sample_period_s({"sample_interval_s_max": 0.25, "sample_period_s": 0.2}) == 0.2
+    assert _sample_period_s({"sample_interval_s_max": 0.25}) == 0.25
+    with pytest.raises(ValueError, match="sample period"):
+        _sample_period_s({"sample_interval_s_max": 0.25, "sample_period_s": 0.3})
 
 
 def test_position_recording_binds_write_receipt_to_nested_canonical_target():
