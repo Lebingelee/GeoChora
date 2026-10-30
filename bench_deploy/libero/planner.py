@@ -23,6 +23,9 @@ def plan_episode_actions(observation: dict, *, row_index: int, steps: int) -> np
     The returned final component follows the existing Planner's normalized
     gripper convention.  The worker converts it to the selected Core action's
     aggregate opening in metres before calling ``SelectedReferenceEnv.step``.
+    The 16 mm task-local endpoint keeps both signed finger coordinates 8 mm
+    inside their source limits while still changing aperture by more than the
+    bounded pilot's 5 mm motion gate.
     """
     if type(row_index) is not int or row_index not in (0, 1, 2):
         raise ValueError("D01 pilot planner admits only source rows 0, 1, and 2")
@@ -49,9 +52,11 @@ def plan_episode_actions(observation: dict, *, row_index: int, steps: int) -> np
         settle_steps=0,
         max_steps=64,
     ))
+    safe_aggregate_opening_m = 0.016
+    normalized_gripper_target = safe_aggregate_opening_m / 0.04 - 1.0
     actions = planner.plan_to_joint_positions(
         current_positions=current[:7], target_positions=target,
-        gripper=-1.0, steps=steps, settle_steps=0,
+        gripper=normalized_gripper_target, steps=steps, settle_steps=0,
     )
     if actions.shape != (steps, 8) or not np.isfinite(actions).all():
         raise ValueError("joint planner did not produce the frozen bounded action shape")

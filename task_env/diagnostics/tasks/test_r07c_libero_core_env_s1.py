@@ -1427,6 +1427,11 @@ def test_same_selected_env_three_rows_full_recorder_worker_and_independent_reade
     env = _candidate(monkeypatch, horizon=12)
     result = run_libero_candidate_worker(env, output_dir=tmp_path / "bundle", steps=12)
     assert result["status"] == "complete"
+    assert all(
+        action["planner_action"][7] == pytest.approx(-0.6)
+        and action["selected_public_action"][7] == pytest.approx(0.016)
+        for episode in result["episodes"] for action in episode["action_trace"]
+    )
     assert [episode["row_index"] for episode in result["episodes"]] == [0, 1, 2]
     assert result["transition_count"] == 36
     assert result["observation_count"] == 39
