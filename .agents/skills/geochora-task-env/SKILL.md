@@ -197,10 +197,12 @@ admit Runtime/materialization/Qualification.
 
 ## F05 typed-H5 reader and GeoPhys source boundary (attempt002; pending Sol review)
 
-The tracked F05 diagnostics reader compares every public typed state row with
-the stored H5 observation values at the declared float32 storage precision.
-Keep its witness sourced from public reset/step results; the independent reader
-must not trust producer PASS summaries or fixture-private state. The F05
+The tracked F05 diagnostics reader compares all T+1 joint-position, hand-pose
+and free-body-pose H5 observation leaves with public typed state at the declared
+float32 storage precision. Typed velocity and other non-observation fields are
+checked in the H5 typed-state extension against a separately captured public
+reset/step witness. The independent reader must not trust producer PASS
+summaries or fixture-private state. The F05
 producer identity distinguishes the requested target build from the actual
 GeoPhys checkout/module origin and source bytes. A candidate provider checkout
 does not prove the main repository gitlink was executed. The attempt002 result
