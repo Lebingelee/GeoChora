@@ -1072,6 +1072,18 @@ route and current S1/native status are recorded below.
 
 ## R07c D01 diagnostic route (2026-10-30)
 
+Current Sol disposition: `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3` for native004
+at `47d38ac4`. Core contains no D01 LIBERO identity/layout/schema dispatch.
+Review fixes at `d0c89b57` reject unsupported-provider v1 reset before mutation,
+incomplete seven-counter MuJoCo warning evidence, and offset/anti-damped
+position-drive laws. Eight added negatives plus affected regression total
+143 passing S1 checks; the stricter reader passed the original three H5s.
+These review changes were not run natively; the native/source/control facts
+remain at their frozen implementation. The [Sol review](../../../docs/maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)
+records this distinction. Older pending-review wording below describes the
+Luna handoff, not the current decision. Five-task R07c, legacy caller migration,
+compatibility alias consolidation, integration and Qualification remain separate.
+
 The D01 diagnostic uses the existing
 `bench_deploy.libero.selected_candidate.build_libero_selected_candidate()` →
 `SelectedReferenceEnv` → `RuntimeSession.materialize()` → MuJoCo session path.

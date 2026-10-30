@@ -345,3 +345,12 @@ under the
 [execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
 This bounded result does not establish the original five-task R07 goal, P99,
 Formal Qualification, task success, or a general LIBERO Provider route.
+
+Sol subsequently accepted this exact native004 intersection as
+`ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`. Review repairs reject v1 reset at
+unsupported legacy providers before episode mutation, incomplete pinned
+MuJoCo warning vectors (seven counters), and position servos with a bias
+offset or anti-damping. The source-fixed native facts remain at `47d38ac4`;
+the rejection-only review changes at `d0c89b57` passed 143 affected S1 checks
+and the stricter reader against the original H5s, with zero new native runs.
+See the [Sol review](../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).

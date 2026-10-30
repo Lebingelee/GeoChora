@@ -749,3 +749,10 @@ and ordinary pilot history retain their original signed-time dispositions.
 This entry does not grant a general LIBERO Provider route, task success,
 five-task R07 completion, P99, or Qualification. See the
 [R07c D01 attempt002 execution record](goal/Phase_II_01/09_R07_Benchmark_Deployment_and_Agent_Cost.md#r07c-diagnostic-d01-attempt002-execution-result-2026-10-30).
+
+Current Sol disposition is `ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3` for exactly
+that frozen native004 intersection. Review added strict unsupported-provider
+reset and incomplete-warning-vector rejection, plus position-drive-law
+preflight negatives; 143 affected provider-free checks and original-H5 replay
+passed. Native execution remains bound to `47d38ac4`; the review fixes in
+`d0c89b57` were not rerun natively. See the [Sol decision](../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md).

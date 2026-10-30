@@ -2900,9 +2900,9 @@
     "04_R04_Dynamic_Camera_Consumer.md": "5f245bb380f7d3de0a338e365628f3cc8322011dbfcc19974d50a5c18ee23ad8",
     "05_R05_Native_Rate_Feedback.md": "86c5d4286ae298954a5bc3f74940717dab7cc698b1528fb575a514587a6d657e",
     "06_R06_Compatibility_and_Regression.md": "03844a651db23d9e549b2c22838f750df4be0990d9e6c7d182e6209d51d0af71",
-    "07_Execution_Order_and_Acceptance.md": "36d5011bfc255d2a8d1dbbfc9ea4f4c05b15d26974331a4b67aba0ff54f0c584",
+    "07_Execution_Order_and_Acceptance.md": "25ec882265d3888fe702d760f48f4fc5b87c6b1384ca3783ee3cb1ba0c643716",
     "08_Codex_Phase_II_01_Planning_Prompt.md": "b8d728b230400426e70c84ef182fecd994e6dc4d5853fda1920aace65f67ffa4",
-    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "84279d99359dc558f34ca2e66cb6a55c05b80c80a33a377c8fc5e17067d5c8e9",
+    "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "1949e8cccf431f30e5dbede05aa775d2d21e5c2e36629cdb041ffd60fcf911ba",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "e9c51c5ef21aa6857bb08060771c9c8764f4651af092fe4238c44749821b2a91",
     "README.md": "14d7db4ab6ee93feed450dd1c2566510739fe7fa6cb1b515cc3bb1737a9a1cb8"
   },
@@ -6687,5 +6687,47 @@
     "p99_or_human_judge": false,
     "f05_integration_or_push": false,
     "sol_review": "PENDING"
+  },
+  "r07c_diag_d01_attempt002_sol_review": {
+    "date": "2026-10-30",
+    "status": "ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3",
+    "review_input_head": "bb2ad040848e517a4c2c34a2a948bf2297447883",
+    "native_implementation_head": "47d38ac40a3aa1a54107582cd4db75403dc6e0e5",
+    "review_fix_commit": "d0c89b57f4b908d02fd9548cbad0268645f0c52c",
+    "review_doc": "../../../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md",
+    "hash_checks": {
+      "output": 606,
+      "protected": 3321,
+      "phase_markdown": 12,
+      "native_code_files": 16
+    },
+    "independent_s1": {
+      "pre_fix": 135,
+      "added_rejection_checks": 8,
+      "post_fix_affected_total": 143
+    },
+    "native_evidence": {
+      "run": "native_004",
+      "episodes": 3,
+      "transitions": 192,
+      "observations": 195,
+      "mj_step": 4800,
+      "reset_count": 5,
+      "limited_joints": 13,
+      "max_excursion": 0,
+      "warning_counters": 7,
+      "warning_counts_zero": true
+    },
+    "new_native_runs_by_sol": 0,
+    "review_fix_validation": "provider-free S1 plus stricter independent reader on original H5; not new native validation of current HEAD",
+    "core_benchmark_special_cases_removed": true,
+    "non_libero_fixture": "synthetic two torque plus one position, different names, nq10/nv9/nu3 through same Core/adapter/H5 route",
+    "scope": "fixed LIBERO spatial bowl-to-plate, MuJoCo3.8.1 CPU, seed19/rows0,1,2, Kp100/Kd20, 16mm opening, 20Hz ZOH/2msx25",
+    "accepted_slices_unchanged": "18/22",
+    "five_task_r07c_closed": false,
+    "p99": false,
+    "qualification": false,
+    "develop_full_integration": false,
+    "next": "Evaluate D02/D03 caller migration and alias convergence then D04 affected-intersection integration, manual package transfer."
   }
 }

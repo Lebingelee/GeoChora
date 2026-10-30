@@ -1,5 +1,7 @@
 # Phase II-01 — Execution Order / P99 Required Envelope
 
+2026-10-30最新Sol决定：D01 attempt002为[ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)，限固定LIBERO spatial/MuJoCo3.8.1 CPU/诊断控制与原native004交集；143项受影响S1和更严格离线reader通过，Sol零新增native。后继评估D02/D03迁移及D04集成，不提前改BaseTaskEnv alias或覆盖F线；五任务/18/22/P99/Qualification不变。下文待审标签保留历史签署含义。
+
 2026-10-30 Sol复核：D01 attempt001增量保留但需返工，未接收完整S2/S3；contact revision、reset admission-before-write、实测限位/reader及benchmark语义所有权缺口见[复核记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。该复核后的 attempt002 已按独立冻结包完成实施与 bounded S2/S3，等待 Sol 复核；下文 attempt001 内容保持其签署时点含义。
 
 2026-10-30诊断接续：attempt001复核后，独立 D01 diagnostic attempt002 已清除公共 Core 的 LIBERO 专用分支，完成 contact/reset/monitor/reader 修复与不同模型 same-route fixture。最终 provider-free S1 为19 passed；锁内 MuJoCo 3.8.1/API3008001 CPU run004完成三回合、4,800 native steps、五次 reset 和三份 H5，独立 reader 与五类实际bundle篡改拒绝通过，状态 `R07C_DIAG_D01_ATTEMPT002_BOUNDED_S2_S3_PASS_PENDING_SOL_REVIEW`。diagnostic attempts 与原三次常规窗口分账；本包不批量迁移 BaseTaskEnv 调用方、不改 alias、不集成或覆盖 F05 主 checkout。历史 per-row fixture parity 未宣称；18/22 与原五任务出口不变。下文旧状态保留历史时点含义。

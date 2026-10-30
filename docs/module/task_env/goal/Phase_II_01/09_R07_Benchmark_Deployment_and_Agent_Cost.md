@@ -1,5 +1,7 @@
 # R07 — Benchmark Deployment & Agent Cost Evaluation
 
+当前Sol决定（2026-10-30）：D01 diagnostic attempt002接收为 **`ACCEPTED_BOUNDED_R07C_D01_PILOT_S2_S3`**。公共Core去LIBERO特化、原三项运行缺陷及native004/H5/每步限位/warning证据已独立复核；Sol直接收紧三个异常输入拒绝门并新增8项检测，最终143项受影响S1通过，零新增native。原生事实仍绑定 `47d38ac4`，修复提交 `d0c89b57` 只有S1/离线验证。详见[Sol接收记录](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt002_sol_review.md)。下文Luna待审标签保留历史时点含义；五任务、18/22、P99、Qualification及F线集成不变。
+
 当前Sol决定（2026-10-30）：D01 attempt001为 **`R07C_DIAG_D01_PROGRESS_RETAINED_REWORK_REQUIRED`**。统一Selected/RuntimeSession路线、129项S1复跑和三H5/4800 step事实保留；生产contact漏revision校验、reset schema/profile拒绝发生在写入之后、实测手指超出源range而reader未检测，以及Core反向依赖benchmark语义需集中修复。详见[Sol复核与attempt002范围](../../../../maintenance/20261030_r07c_diagnostic_d01_attempt001_sol_review.md)。原Luna标签和下方执行记录保留为候选报告，不代表Sol接收。五任务、18/22、P99、Qualification和F线集成不变。
 
 维护者追加：attempt002必须清除D01新增公共Core中的LIBERO专用入口、任务/布局/控制/初始化白名单和专用记录schema，沿既有owner转为source-bound typed contract；以非LIBERO、不同命名/通道数量的同链路synthetic fixture验证，不能仅改名。benchmark语义、来源规则与策略仍归bench_deploy。此项与已有返工合为一个完整窗口，未派发前冻结实际HEAD与预算。
