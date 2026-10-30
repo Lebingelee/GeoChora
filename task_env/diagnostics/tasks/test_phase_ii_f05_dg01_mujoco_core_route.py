@@ -68,7 +68,10 @@ from task_env.runtime.sessions.api import materialize
 from task_env.runtime.sessions.control import ControlBinding, materialize_control
 from task_env.artifacts import ExecutionSpec
 from task_env.environment.config import ActionConfig
-action_config = ActionConfig(joint_position_correction_gain=1.0)
+action_config = ActionConfig(
+    joint_position_correction_gain=1.0,
+    gripper_default_force_N=100.0,
+)
 candidate = build_f05_dg01_mujoco_candidate(
     sys.argv[1], horizon=300, controller_config=action_config,
 )
@@ -174,6 +177,7 @@ candidate.env.close()
     ]
     assert evidence['materialize_control_admitted_exact_candidate'] is True
     assert evidence['controller_action_config']['joint_position_correction_gain'] == 1.0
+    assert evidence['controller_action_config']['gripper_default_force_N'] == 100.0
     assert len(evidence['binding_plan_identity_sha256']) == 64
     assert evidence['materialization_stopped_at_native_boundary'] is True
     assert len(evidence['derived_scene_sha256']) == 64

@@ -276,6 +276,23 @@ def _verify_controller_action_config(profile: dict, plan: dict) -> None:
         _fail("DG01 H5 Position ActionConfig differs from the frozen controller profile")
 
 
+def _expected_effective_force_range(model: dict, plan: dict) -> list[float]:
+    actuator = model.get("actuators", {}).get("actuator8", {})
+    source_range = actuator.get("force_range")
+    controller_config = plan.get("controller_action_config", {})
+    request_cap = controller_config.get("gripper_default_force_N")
+    if (actuator.get("force_limited") is not True or not isinstance(source_range, list)
+            or len(source_range) != 2 or not isinstance(request_cap, (int, float))
+            or isinstance(request_cap, bool) or not math.isfinite(float(request_cap))
+            or float(request_cap) <= 0.0):
+        _fail("DG01 source/request gripper force caps are incomplete or invalid")
+    source_low, source_high = (float(value) for value in source_range)
+    if not math.isfinite(source_low) or not math.isfinite(source_high) or source_low > source_high:
+        _fail("DG01 source gripper force range is invalid")
+    cap = float(request_cap)
+    return [max(source_low, -cap), min(source_high, cap)]
+
+
 def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
               expected_h5_sha256: str | None = None,
               derived_xml_path: Path | None = None,
@@ -496,8 +513,11 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
                     or not _near(arm_writes[name].get("requested_ctrl", float("nan")), target_servo[name], atol=1e-10, rtol=0.0)):
                 _fail(f"DG01 interval {interval_index} Core arm request/target/write binding mismatch")
         gripper = write.get("gripper", {})
+        effective_force_range = _expected_effective_force_range(model, plan)
+        requested_force_limit = float(plan["controller_action_config"]["gripper_default_force_N"])
         if (not _near(gripper.get("requested_opening_m", float("nan")), phase["opening_m"])
-                or gripper.get("effective_force_range_N") != [-5.0, 5.0]
+                or not _near(gripper.get("request_force_limit_N", float("nan")), requested_force_limit)
+                or gripper.get("effective_force_range_N") != effective_force_range
                 or write.get("model_receipt_identity_sha256") != model.get("identity_sha256")):
             _fail(f"DG01 interval {interval_index} Core write receipt lost request/cap/model binding")
         session_episode = write.get("episode_id")
@@ -524,9 +544,10 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
                          + float(bias[0]) + float(bias[1]) * float(tendon_readback.get("length_m", float("nan")))
                          + float(bias[2]) * float(tendon_readback.get("length_rate_m_s", float("nan"))))
             force = float(tendon_readback.get("scalar_force_N", float("nan")))
-            clipped = max(-5.0, min(5.0, predicted))
+            clipped = max(effective_force_range[0], min(effective_force_range[1], predicted))
             if (not _near(force, clipped, atol=1e-6, rtol=1e-7)
-                    or abs(force) > 5.0 + 1e-7):
+                    or force < effective_force_range[0] - 1e-7
+                    or force > effective_force_range[1] + 1e-7):
                 _fail("DG01 native tendon scalar law/cap does not match source model and Core request")
             actuator_id = int(tendon_readback.get("actuator_id", -1))
             ctrl_vector = advance.get("actuator_ctrl", [])

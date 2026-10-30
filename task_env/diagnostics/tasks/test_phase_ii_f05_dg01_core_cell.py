@@ -14,6 +14,7 @@ from task_env.diagnostics.tasks.f05_dg01_h5_reader import (
     _verify_exit,
     _verify_dg01_horizon_outcome,
     _verify_controller_action_config,
+    _expected_effective_force_range,
     _verify_reset_write_receipt,
     _verify_selected_core_task_timebase,
 )
@@ -147,6 +148,17 @@ def test_cold_reader_binds_position_action_config_to_the_frozen_plan():
     plan["controller_binding_plan_identity_sha256"] = "different-binding-plan"
     with pytest.raises(ValueError, match="ActionConfig"):
         _verify_controller_action_config(profile, plan)
+
+
+def test_cold_reader_clips_gripper_force_by_request_and_source_caps():
+    model = {"actuators": {"actuator8": {"force_limited": True, "force_range": [-100.0, 100.0]}}}
+    plan = {"controller_action_config": {"gripper_default_force_N": 100.0}}
+    assert _expected_effective_force_range(model, plan) == [-100.0, 100.0]
+    plan["controller_action_config"]["gripper_default_force_N"] = 5.0
+    assert _expected_effective_force_range(model, plan) == [-5.0, 5.0]
+    model["actuators"]["actuator8"]["force_range"] = [-87.0, 87.0]
+    plan["controller_action_config"]["gripper_default_force_N"] = 100.0
+    assert _expected_effective_force_range(model, plan) == [-87.0, 87.0]
 
 
 def test_cold_reader_stale_time_negative_mutates_the_checked_clock(tmp_path: Path):
