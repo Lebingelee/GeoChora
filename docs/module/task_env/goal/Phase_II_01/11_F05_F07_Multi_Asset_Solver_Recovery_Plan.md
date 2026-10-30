@@ -1,6 +1,6 @@
 # F05–F07 后继重规划：多格式资产、统一物理语义与多求解器闭环（规划方向已采纳；执行待冻结）
 
-> **状态**：`PLANNING_DIRECTION_ADOPTED / EXECUTION_CONTRACT_PENDING / NOT_DISPATCHED`。维护者于2026-10-30要求将网页审阅路线纳入当前文档，并在派包前完成跨分支同步。本轮只落地规划；不构成实施、native、安装、发布或Qualification授权。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004。
+> **状态**：`PLANNING_DIRECTION_ADOPTED / ATTEMPT001_S0_COMPLETE / PENDING_SOL_REVIEW / NO_NATIVE`。规划与合同背景保留其签署时点；2026-10-30首个successor包已按维护者给出的冻结输入完成S0静态执行，tracked诊断与文档/本地提交已产出，当前交Sol复核。旧F05 attempt001–003、原同USD门和全部Evidence保留，不命名为attempt004；本结果不授予S1 native或Qualification。
 >
 > 原网页稿SHA-256：`94506530bb4d3751a6abed2c43b0ade32768e144b00b667599221edb65665519`；仓库补充解释见[第9节](#repository-adoption)。F线规划owner为`develop-full`；其他分支同步本文不表示已经集成该分支的实现或native结果。
 
@@ -118,7 +118,7 @@ F06 仍要求受控真实来源、可复现 Expert、至少 20 seeds、四报告
 6. **证据与运行预算**。复用旧证据仅限source/recipe/模型/控制/接口/任务/阈值等受影响输入未变且覆盖新门的交集。每Provider在完整包中冻结累计wall/steps/RAM/VRAM/磁盘/锁预算及允许修复重跑，不默认一次launch，也不要求每次已授权的包内重跑重新问许可。失败原件和每run的新代码/输入freeze保留。
 7. **跨分支与可恢复性**。F线owner为`develop-full`，`develop`只同步规划，camera/R07保持独立scope和writer。ignored r009/fixture、隔离GeoPhys候选及未集成gitlink是复现限制，先核可恢复交付与实际producer；不能用文档同步冒充实现合入。camera窗口未释放时只备补丁，不更改该worktree或HEAD。
 
-本轮所有后继stage为PLANNED/NOT_EXECUTED；旧F05 partial、旧Required门与Evidence原件保持签署时事实。当前路由以本文件与[12执行指南](12_F05_F07_Execution_Playbook.md)为准，[10历史记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)保留旧门与执行历史，[07执行表](07_Execution_Order_and_Acceptance.md)给出后继依赖选择；本轮没有派包。
+2026-10-30早先规划同步阶段的签署状态为后继stage PLANNED/NOT_EXECUTED；旧F05 partial、旧Required门与Evidence原件保持签署时事实。该planning-only状态由后续首包执行记录（第10节）更新。当前路由以本文件与[12执行指南](12_F05_F07_Execution_Playbook.md)为准，[10历史记录](10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md)保留旧门与执行历史，[07执行表](07_Execution_Order_and_Acceptance.md)给出后继依赖选择。
 
 <a id="successor-attempt001-contract"></a>
 
@@ -134,4 +134,14 @@ F06 仍要求受控真实来源、可复现 Expert、至少 20 seeds、四报告
 
 尝试目标：001完成语义审计与可实施修复方案；002依据Sol复核完成已批准的表示/控制接线及环境→空载控制证据；003仅在复评后作有界修复与收口。后两窗口为规划，不预授native。若S0证明关键语义无法等价，先交具体owner/缺失能力及需维护者裁定的来源变更，不能消耗后两轮重复审计或降低门。
 
-复用`develop-full`及现有隔离GeoPhys worktree；零新branch/worktree，不切换或修改develop/camera，不更新gitlink。完整包在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_successor_001/`；输出`f05_successor_001/`。实际输入HEAD及保护hash由首包snapshot绑定。当前仅PREPARED_FOR_MAINTAINER_RELAY；窗口未执行、未发送。后继F06仍按获准ready cell及原20-seed／Expert／Oracle／四报告／pending Judge门另行派包。
+复用`develop-full`及现有隔离GeoPhys worktree；零新branch/worktree，不切换或修改develop/camera，不更新gitlink。完整包在ignored `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_successor_001/`；输出f05_successor_001/。该段是执行前冻结合同。实际输入HEAD及保护hash由首包snapshot绑定。
+
+### attempt001 S0 执行记录（2026-10-30；窗口1/3，待Sol复核）
+
+冻结输入为develop-full@ca5b9bb3c39fc23fc5b7ee69e94600e035c3fb79；Menagerie源修订b846dd12bc459d776cccb3dee0b1d02acbf7a9c7，只读GeoPhys候选41f8b517c5f92cd6e59907394dc42714b78702a7。诊断实现提交9634491a6438f1fcbe3eab367a8070abe678be33。最终run f05_s0_source_family_011退出0：原MJCF来源闭包68文件、r009 USD 130 prim；来源字节闭包核验通过，交付保持local-validated且source_verified=false。结果分层为inventory_status=PASS、cross_representation_readiness=BLOCKED_BY_FEATURE，阻塞joint identity、frame/COM绑定、equality/mimic、tendon传动、drive gain/damping/force、collision/contact material及派生free-body/support。
+
+审计保留有限发现：源MJCF与r009 authored mimic关系和固定split tendon路径/0.5权重存在局部对应，但目标约束参数或消费合同未确立；8个源actuator对应drive的原始数值有漂移，不能由相似字段证明等价；cube/support是派生任务场景，不是源MJCF组成。10类定向负例均在预期校验点被拒绝。后续修补图和证据复用矩阵列在本包JSON结果中。
+
+目标测试为5/5；最终受监督静态child 10.603秒，PG峰值RSS 354033664 bytes，4核亲和/并发上限，tripwire通过；child/进程组已退出，native lock未获取。run001–005的失败/中止回执保留，run006–011记录于ignored输出；所有run均零native、solver、physics、App、GPU或renderer启动。结果不证明solver消费、物理等价或Qualification；S1不得据此启动，F06/F07尚未开始。旧F05三轮、PARTIAL、旧门与Evidence保持不变。
+
+完整报告、命令、资源回执、负例、源/目标inventory、patch计划与输出hash见ignored输出workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/。当前successor窗口计数为1/3，工作窗口已释放，等待Sol独立复核；后续窗口/范围/native预算仍须明确新授权。

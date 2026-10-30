@@ -1,6 +1,6 @@
-# F05–F07 后继执行指南与 Codex 工作包合同（规划方向已采纳；尚未派包）
+# F05–F07 后继执行指南与 Codex 工作包合同（规划方向已采纳；F05 successor attempt001 S0已执行）
 
-> **Status: PLANNING_DIRECTION_ADOPTED / NOT_DISPATCHED / NO_NATIVE / NO_IMPLEMENTATION.** 本文是后续工作包的设计规格，不是本轮执行指令。维护者本轮要求先调整文档；真正派包前冻结具体Scope Decision、输入、writer、acceptance和累计预算。
+> **Status: PLANNING_DIRECTION_ADOPTED / ATTEMPT001_S0_COMPLETE / PENDING_SOL_REVIEW / NO_NATIVE.** 本文的阶段设计规格保留原规划含义；2026-10-30冻结首包已完成静态S0、诊断实现与定向验证。该结果不启动S1/F06/F07，不授权native，也不改写旧F05结果。
 >
 > 原网页稿SHA-256：`6107b5a70a09b16aa7b06da7617bef0dae44fff1cbdf93139c2b6ad03ac78b5f`。本文与[11的仓库约束澄清](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#repository-adoption)共同使用；`develop-full`是F线规划owner。
 

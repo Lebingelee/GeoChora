@@ -1,6 +1,6 @@
 # Phase II-01 修订规划交付包
 
-**新F05 successor首包（2026-10-30）**：维护者要求新路线总计三个attempt；001静态语义诊断工具、10类负例与下一补丁图完整包已准备供转述，未执行/native=0。S0/S1共享三轮；旧F05三轮与PARTIAL保留。见[首包Scope/预算/出口](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)。
+**新F05 successor首包（2026-10-30；attempt001已执行，待Sol复核）**：S0静态盘点、tracked诊断CLI、10类负例与下一补丁图完成；inventory_status=PASS，cross_representation_readiness=BLOCKED_BY_FEATURE。Menagerie equality/tendon authored映射部分存在，drive数值漂移且consumer语义未确立；不报告等价。native/physics/solver/App/GPU/renderer均为0。S0/S1合计三个窗口已用1；旧F05三轮与PARTIAL保留，F06/F07未启动。见[首包合同与执行状态](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)及本地ignored输出workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/。
 
 <a id="f05-successor-replan-20261030"></a>
 

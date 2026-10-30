@@ -1,6 +1,6 @@
 # Codex — Phase II-01 当前规划与后继派包入口
 
-更新于2026-10-30。**新F05 successor三个完整attempt已按维护者后续指令规划；attempt001完整静态包已准备供转述，尚未执行、无native。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
+更新于2026-10-30。**新F05 successor三个完整attempt已按维护者指令规划；attempt001 S0静态包已执行，inventory PASS、readiness BLOCKED_BY_FEATURE、无native，待Sol复核。** 当前F线owner为`develop-full`；`develop`同步规划与已合入checkpoint，camera分支继续其独立R线。文档副本不代表分支具有相同实现。
 
 ## 先读当前入口
 
@@ -34,4 +34,4 @@
 
 ## 最新首包入口
 
-维护者要求新路线仍设三个attempt；按[11首包合同](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt001-contract)执行，三个窗口跨S0/S1共享。ignored完整包`sol_f05_successor_001/`冻结真实HEAD/来源/保护输入/预算/owner；转述后只授权001静态诊断实施与定向验证，本包native预算0。001输出S0 inventory与S1 readiness两个状态；r009的equality/tendon/drive差异未解决时不得进入依赖native。原F05三轮/partial保持，不命名004。后两窗口只规划，待Sol复核再冻结实际实现/资源合同，不自动运行F06/F07。
+维护者要求新路线仍设三个attempt；三个窗口跨S0/S1共享。ignored包`sol_f05_successor_001/`冻结输入与预算；attempt001已完成S0静态盘点，两个状态分别为inventory PASS与readiness BLOCKED_BY_FEATURE，native预算实际使用0。r009 authored mimic/tendon存在局部对应，但约束参数与consumer未确立、8个actuator drive均有raw numeric drift，不能进入依赖native。旧F05三轮/PARTIAL保持，不命名004。窗口1/3待Sol复核；后两窗口须重新冻结实现/资源合同，不自动运行F06/F07。细节见11执行结果及ignored输出目录`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_001/`。
