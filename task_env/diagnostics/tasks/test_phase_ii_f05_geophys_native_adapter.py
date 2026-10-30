@@ -204,6 +204,27 @@ def test_f05_native_candidate_rejects_wrong_device_and_source_family_before_runt
         build_native_input('official-panda')
 
 
+def test_f05_native_versioned_input_reaches_shared_factory_without_native_materialization(monkeypatch):
+    from types import SimpleNamespace
+    from task_env.registry import make_env
+    from task_env.tasks.position_candidate import builder
+
+    candidate, _setup = build_native_input('menagerie-panda')
+    marker = object()
+    captured = []
+
+    def shared_factory(input_v1, *, horizon, environment_type):
+        captured.append((input_v1, horizon, environment_type.__name__))
+        return SimpleNamespace(env=marker)
+
+    monkeypatch.setattr(builder, 'build_versioned_position_candidate', shared_factory)
+    created = make_env('panda-position-servo-candidate-v1',
+                       config={'versioned_input': candidate, 'horizon': 100})
+
+    assert created is marker
+    assert captured == [(candidate, 100, 'PositionCandidateEnv')]
+
+
 def test_f05_public_com_velocity_reference_point_oracle_uses_rotated_offset():
     # Non-identity orientation and nonzero COM offset distinguish body-origin
     # velocity from world-COM velocity and catch a missing/crossed cross product.
