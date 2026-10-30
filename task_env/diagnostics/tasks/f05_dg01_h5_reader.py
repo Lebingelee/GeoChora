@@ -38,6 +38,7 @@ def _read_h5(path: Path) -> dict:
         env_meta = yaml.safe_load(_text(h5["meta/env_meta"]))
         controls = json.loads(_text(h5["meta/structured_controls_v1_json"]))
         outcome = json.loads(_text(h5["meta/episode_outcome_v1_json"]))
+        boundary_events = json.loads(_text(h5["meta/boundary_events_v1_json"]))
         typed = json.loads(_text(h5["meta/f05_public_typed_state_witness_v1_json"]))
         witness = json.loads(_text(h5["meta/dg01_native_run_witness_v1_json"]))
         metrics = {
@@ -49,6 +50,7 @@ def _read_h5(path: Path) -> dict:
             "env_meta": env_meta,
             "controls": controls,
             "outcome": outcome,
+            "boundary_events": boundary_events,
             "typed": typed,
             "witness": witness,
             "metrics": metrics,
@@ -261,6 +263,26 @@ def _verify_dg01_horizon_outcome(outcome: dict) -> None:
             or outcome.get("truncated") is not True
             or outcome.get("task_success") is not None):
         _fail("DG01 lifecycle outcome must be horizon-truncated with unknown lifecycle success")
+
+
+def _verify_final_task_event(events: list, *, episode_id: str, final_boundary: int,
+                             raw_predicate: bool) -> dict:
+    matching = [event for event in events
+                if event.get("event_type") == "episode_ended"
+                and event.get("episode_id") == episode_id
+                and event.get("boundary_index") == final_boundary]
+    if len(matching) != 1:
+        _fail("DG01 H5 must contain one direct episode-ended BoundaryEvent at the final boundary")
+    payload = matching[0].get("payload", {})
+    task_end = payload.get("task_predicate_v1", {})
+    if (task_end.get("raw_predicate") is not raw_predicate
+            or task_end.get("lifecycle_valid_success") is not None
+            or task_end.get("lifecycle_valid_success_assessed") is not False
+            or payload.get("control_step") != final_boundary
+            or payload.get("terminated") is not False
+            or payload.get("truncated") is not True):
+        _fail("DG01 end event conflates raw Task predicate and lifecycle success")
+    return task_end
 
 
 def _verify_controller_action_config(profile: dict, plan: dict) -> None:
@@ -628,11 +650,10 @@ def verify_h5(path: Path, *, plan: dict, run_id: str, episode_index: int,
             _fail(f"DG01 Task predicate does not match measured cube height at transition {index}")
     if data["success"] != [bool(value) for value in raw_pred]:
         _fail("DG01 H5 generic raw evaluator success differs from Task metrics")
-    task_end = outcome.get("boundary_event", {}).get("payload", {}).get("task_predicate_v1", {})
-    if (task_end.get("raw_predicate") != bool(raw_pred[-1])
-            or task_end.get("lifecycle_valid_success") is not None
-            or task_end.get("lifecycle_valid_success_assessed") is not False):
-        _fail("DG01 end event conflates raw Task predicate and lifecycle success")
+    _verify_final_task_event(
+        data["boundary_events"], episode_id=str(outcome["episode_id"]),
+        final_boundary=int(outcome["final_boundary"]), raw_predicate=bool(raw_pred[-1]),
+    )
     return {
         "episode_index": episode_index,
         "episode_id": next(iter(episode_ids)),

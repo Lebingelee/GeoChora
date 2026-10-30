@@ -13,6 +13,7 @@ from task_env.diagnostics.tasks.f05_dg01_h5_reader import (
     _mutate_h5,
     _verify_exit,
     _verify_dg01_horizon_outcome,
+    _verify_final_task_event,
     _verify_controller_action_config,
     _expected_effective_force_range,
     _verify_reset_write_receipt,
@@ -123,6 +124,38 @@ def test_cold_reader_checks_direct_episode_outcome_mapping():
     _verify_dg01_horizon_outcome(outcome)
     with pytest.raises(ValueError, match="horizon-truncated"):
         _verify_dg01_horizon_outcome({"outcome": outcome})
+
+
+def test_cold_reader_resolves_episode_end_task_semantics_from_direct_h5_event():
+    event = {
+        "event_type": "episode_ended",
+        "episode_id": "episode-a",
+        "boundary_index": 300,
+        "payload": {
+            "control_step": 300,
+            "terminated": False,
+            "truncated": True,
+            "task_predicate_v1": {
+                "raw_predicate": False,
+                "lifecycle_valid_success": None,
+                "lifecycle_valid_success_assessed": False,
+            },
+        },
+    }
+    result = _verify_final_task_event(
+        [event], episode_id="episode-a", final_boundary=300, raw_predicate=False,
+    )
+    assert result["raw_predicate"] is False
+    with pytest.raises(ValueError, match="episode-ended BoundaryEvent"):
+        _verify_final_task_event(
+            [], episode_id="episode-a", final_boundary=300, raw_predicate=False,
+        )
+    wrong = json.loads(json.dumps(event))
+    wrong["payload"]["task_predicate_v1"]["lifecycle_valid_success_assessed"] = True
+    with pytest.raises(ValueError, match="conflates raw Task"):
+        _verify_final_task_event(
+            [wrong], episode_id="episode-a", final_boundary=300, raw_predicate=False,
+        )
 
 
 def test_cold_reader_binds_position_action_config_to_the_frozen_plan():
