@@ -1985,7 +1985,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         if len(semantic["structured_controls"]) != count or any(
                 control is None for control in semantic["structured_controls"]):
             raise ValueError("task Solution H5 omits a typed mixed-control Target/Ack")
-        previous_pose_action = None
+        previous_controller_target_pose = None
         for transition_index, control in enumerate(semantic["structured_controls"]):
             control.validate()
             expected_action_schema = (
@@ -2100,22 +2100,43 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 if solution_rim:
                     from task_env.utils.rotation import quat_wxyz_to_matrix, rotation_vector_error
 
-                    current_pose_action = np.asarray(actions[transition_index], dtype=np.float64)
-                    if previous_pose_action is None:
+                    controller_receipt = canonical_action.get("controller_receipt")
+                    target_pose_receipt = (
+                        controller_receipt.get("target_world_pose")
+                        if isinstance(controller_receipt, Mapping) else None
+                    )
+                    if not isinstance(target_pose_receipt, Mapping):
+                        raise ValueError("task Solution v6 controller receipt omits its precise target pose")
+                    current_target_position = np.asarray(
+                        target_pose_receipt.get("position_m"), dtype=np.float64,
+                    )
+                    current_target_quaternion = np.asarray(
+                        target_pose_receipt.get("quaternion_wxyz"), dtype=np.float64,
+                    )
+                    if (current_target_position.shape != (3,)
+                            or current_target_quaternion.shape != (4,)
+                            or not np.isfinite(current_target_position).all()
+                            or not np.isfinite(current_target_quaternion).all()):
+                        raise ValueError("task Solution v6 controller target pose is malformed")
+                    current_target_rotation = quat_wxyz_to_matrix(current_target_quaternion)
+                    if previous_controller_target_pose is None:
                         expected_twist = np.zeros(6, dtype=np.float64)
                     else:
-                        linear = (current_pose_action[:3] - previous_pose_action[:3]) / 0.05
+                        previous_position, previous_rotation = previous_controller_target_pose
+                        linear = (current_target_position - previous_position) / 0.05
                         linear_norm = float(np.linalg.norm(linear))
                         if linear_norm > 0.05:
                             linear *= 0.05 / linear_norm
-                        previous_rotation = quat_wxyz_to_matrix(previous_pose_action[3:7])
-                        current_rotation = quat_wxyz_to_matrix(current_pose_action[3:7])
-                        angular = rotation_vector_error(previous_rotation, current_rotation) / 0.05
+                        angular = rotation_vector_error(
+                            previous_rotation, current_target_rotation,
+                        ) / 0.05
                         angular_norm = float(np.linalg.norm(angular))
                         if angular_norm > 0.5:
                             angular *= 0.5 / angular_norm
                         expected_twist = np.concatenate((linear, angular))
-                    previous_pose_action = current_pose_action.copy()
+                    previous_controller_target_pose = (
+                        current_target_position.copy(), current_target_rotation.copy(),
+                    )
                 _validate_v5_stepwise_osc_receipt(
                     canonical_action, expected_controller, target, actions[transition_index],
                     np.asarray(joints[transition_index], dtype=np.float64),
