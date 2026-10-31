@@ -6,8 +6,10 @@ cannot grant a Core admission, F05 acceptance, or provider qualification.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -29,8 +31,6 @@ def _sha256(value: bytes) -> str:
 
 
 def _jsonable(value):
-    from collections.abc import Mapping
-
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
@@ -40,6 +40,37 @@ def _jsonable(value):
     if isinstance(value, Path):
         return str(value)
     return value
+
+
+def _bootstrap_attempted_steps(bootstrap: Mapping[str, object]) -> int:
+    """Validate the adapter's public bootstrap receipt before charging steps."""
+    if not isinstance(bootstrap, Mapping):
+        raise TypeError("Isaac bootstrap receipt must be a mapping")
+    if bootstrap.get("schema_version") != "isaac-public-physics-bootstrap-v1":
+        raise ValueError("unsupported Isaac public bootstrap receipt schema")
+    counters = tuple(bootstrap.get(key) for key in (
+        "step_index_before", "step_index_after", "physics_steps",
+    ))
+    if any(type(value) is not int or value < 0 for value in counters):
+        raise ValueError("Isaac bootstrap step counters must be nonnegative exact integers")
+    before, after, steps = counters
+    if after < before or after - before != steps:
+        raise ValueError("Isaac bootstrap physics_steps differs from the public counter delta")
+
+    times = tuple(bootstrap.get(key) for key in (
+        "simulation_time_before_s", "simulation_time_after_s", "physics_time_s", "physics_dt_s",
+    ))
+    if any(type(value) not in (int, float) or isinstance(value, bool)
+           or not math.isfinite(float(value)) for value in times):
+        raise ValueError("Isaac bootstrap time facts must be finite non-boolean numbers")
+    time_before, time_after, physics_time, physics_dt = map(float, times)
+    if physics_dt <= 0.0 or time_after < time_before or physics_time < 0.0:
+        raise ValueError("Isaac bootstrap time facts must be nonnegative with a positive physics dt")
+    delta_time = time_after - time_before
+    if (not math.isclose(physics_time, delta_time, rel_tol=0.0, abs_tol=1e-8)
+            or not math.isclose(delta_time, steps * physics_dt, rel_tol=0.0, abs_tol=1e-8)):
+        raise ValueError("Isaac bootstrap physics time differs from its public counter/dt")
+    return steps
 
 
 def _atomic_json(path: Path, payload: dict) -> None:
@@ -303,18 +334,7 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
         validator._artifact = input_v1.artifact
 
         bootstrap = dict(native_io.bootstrap_receipt())
-        bootstrap_steps = int(bootstrap["physics_steps"])
-        bootstrap_counter_delta = (
-            int(bootstrap["step_index_after"]) - int(bootstrap["step_index_before"])
-        )
-        if bootstrap_steps != bootstrap_counter_delta:
-            checkpoint(
-                "native_adapter_open", bootstrap_steps=bootstrap_steps,
-                attempted_steps_exact=True,
-            )
-            raise ValueError(
-                "DG04 native bootstrap receipt physics_steps differs from its public counter delta"
-            )
+        bootstrap_steps = _bootstrap_attempted_steps(bootstrap)
         checkpoint(
             "native_adapter_open", bootstrap_steps=bootstrap_steps,
             attempted_steps_exact=True,
@@ -555,11 +575,7 @@ def run(mode: str, steps: int, output: Path, progress_path: Path,
         if bootstrap_steps is None and native_io is not None:
             try:
                 bootstrap = dict(native_io.bootstrap_receipt())
-                bootstrap_steps = int(bootstrap["physics_steps"])
-                if bootstrap_steps != (
-                    int(bootstrap["step_index_after"]) - int(bootstrap["step_index_before"])
-                ):
-                    raise ValueError("bootstrap receipt counter delta mismatch during failure accounting")
+                bootstrap_steps = _bootstrap_attempted_steps(bootstrap)
                 checkpoint(
                     "native_probe_failed", bootstrap_steps=bootstrap_steps,
                     attempted_steps_exact=True,
