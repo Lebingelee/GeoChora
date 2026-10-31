@@ -258,6 +258,10 @@ def _validate_bundle(bundle: dict) -> list[dict]:
         arrays, witness = episode["arrays"], episode["witness"]
         rows = witness.get("rows", [])
         worker_episode = worker.get("episodes", [{}])[episode_index - 1]
+        contact_reset = worker_episode.get("contact_observation_reset", {})
+        contact_owner = contact_reset.get("owner")
+        contact_episode = contact_reset.get("episode")
+        contact_generation = contact_reset.get("generation")
         _check(episode["identity"]["sha256"] == episode["worker_h5_sha256"],
                "durable_file", f"episode {episode_index} file hash differs from producer receipt", errors)
         _check(episode["identity"]["bytes"] == episode["worker_h5_bytes"]
@@ -287,6 +291,14 @@ def _validate_bundle(bundle: dict) -> list[dict]:
         worker_transitions = worker_episode.get("transitions", [])
         _check(len(controls) == 300, "obs_length", f"episode {episode_index} has not recorded 300 controls", errors)
         _check(len(worker_transitions) == 300, "contact_observation", f"episode {episode_index} has not recorded 300 Core-boundary contact samples", errors)
+        _check(contact_reset.get("schema_version") == "f05-dg02-public-contact-observation-v1"
+               and contact_reset.get("known") is False
+               and isinstance(contact_owner, str) and bool(contact_owner)
+               and type(contact_episode) is int and contact_episode >= 1
+               and type(contact_generation) is int and contact_generation >= 0
+               and contact_reset.get("completed_substeps") == 0
+               and contact_reset.get("delivery_errors") == 0,
+               "contact_observation", f"episode {episode_index} reset did not establish a fresh one-based public contact epoch", errors)
         _check(np.array_equal(arrays["terminated"], np.zeros(300, dtype=np.bool_))
                and np.array_equal(arrays["truncated"], np.r_[np.zeros(299, dtype=np.bool_), True]),
                "exit_code_zero", f"episode {episode_index} lifecycle boundary flags differ from the explicit horizon policy", errors)
@@ -461,7 +473,9 @@ def _validate_bundle(bundle: dict) -> list[dict]:
             _check(sample.get("schema_version") == "f05-dg02-public-contact-observation-v1"
                    and sample.get("known") is True and sample.get("impulses_known") is True,
                    "contact_observation", f"episode {episode_index} contact sample {index} is not known public solver evidence", errors)
-            _check(sample.get("episode") == episode_index
+            _check(sample.get("owner") == contact_owner
+                   and sample.get("episode") == contact_episode
+                   and sample.get("generation") == contact_generation + (index + 1) * int(oracle["control_substeps"])
                    and sample.get("completed_substeps") == (index + 1) * int(oracle["control_substeps"])
                    and sample.get("delivery_errors") == 0,
                    "contact_observation", f"episode {episode_index} contact sample {index} has stale/reset-mismatched provenance", errors)
@@ -520,6 +534,8 @@ def _validate_bundle(bundle: dict) -> list[dict]:
         ), "contact_observation", f"episode {episode_index} free-cube/support contact lacks a nonzero solved normal impulse at the frozen rest height", errors)
         contact_gate_rows.append({
             "episode_index": episode_index,
+            "provider_contact_owner": contact_owner,
+            "provider_contact_episode_index": contact_episode,
             "samples": len(worker_transitions),
             "source_free_cube_support_hits": source_contact_hits,
             "positive_solved_impulse_at_rest": any(
@@ -843,6 +859,7 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
                                  for row in ep["witness"]["rows"]],
                 "episode_id": ep["witness"]["rows"][0]["canonical_state_view_v1"]["boundary"]["episode_id"],
                 "reset_sample_id": ep["witness"]["rows"][0]["canonical_state_view_v1"]["boundary"]["reset_sample_id"],
+                "contact_observation_reset": worker["episodes"][index - 1].get("contact_observation_reset"),
                 "raw_lift_predicate_initial_observed": bool(ep["arrays"]["task_raw_lift_predicate"][0]),
                 "outcome": ep["outcome"],
             }

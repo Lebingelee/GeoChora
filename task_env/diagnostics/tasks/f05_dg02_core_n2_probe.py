@@ -242,6 +242,26 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
         raise ValueError("Core N2 reset did not start at boundary/time zero")
     if info.get("source_closure_digest") != env.value["source"].source_closure_digest:
         raise ValueError("Core N2 reset source closure differs from the actual RuntimeSource")
+    contact_reset = env.session.read_contact_observation()
+    contact_reset_owner = contact_reset.get("owner")
+    contact_reset_episode = contact_reset.get("episode")
+    contact_reset_generation = contact_reset.get("generation")
+    if (
+        contact_reset.get("schema_version") != "f05-dg02-public-contact-observation-v1"
+        or contact_reset.get("known") is not False
+        or not isinstance(contact_reset_owner, str)
+        or not contact_reset_owner
+        or type(contact_reset_episode) is not int
+        or contact_reset_episode < 1
+        or type(contact_reset_generation) is not int
+        or contact_reset_generation < 0
+        or contact_reset.get("completed_substeps") != 0
+        or contact_reset.get("delivery_errors") != 0
+    ):
+        raise RuntimeError(
+            "Core N2 reset did not establish a fresh one-based public contact epoch "
+            f"with zero completed substeps: {contact_reset}"
+        )
     initial = _record_state(env)
     if int(env.sample.task_seed) != int(plan["source"]["task_seed"]):
         raise ValueError("Core N2 reset task seed differs from frozen DG02 source")
@@ -283,16 +303,28 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
             )
         if bool(step_info["task_metrics"]["lifecycle_terminated"]):
             raise RuntimeError("Core N2 actual Task lifecycle marked a terminal state")
-        expected_contact_episode = episode_index
+        expected_contact_episode = contact_reset_episode
         expected_contact_substeps = (index + 1) * substeps
+        expected_contact_generation = contact_reset_generation + expected_contact_substeps
         if (contact_observation.get("known") is not True
                 or contact_observation.get("impulses_known") is not True
+                or contact_observation.get("owner") != contact_reset_owner
                 or contact_observation.get("episode") != expected_contact_episode
+                or contact_observation.get("generation") != expected_contact_generation
                 or contact_observation.get("completed_substeps") != expected_contact_substeps):
+            failed_sample = {
+                key: contact_observation.get(key)
+                for key in (
+                    "known", "reason", "phase", "geometry_substep", "impulses_known",
+                    "owner", "episode", "generation", "completed_substeps", "delivery_errors",
+                )
+            }
             raise RuntimeError(
-                "Core N2 public GeoPhys contact sample is not known at the exact native boundary "
-                f"(episode={contact_observation.get('episode')}, "
-                f"completed_substeps={contact_observation.get('completed_substeps')})"
+                "Core N2 public GeoPhys contact sample is not known and reset-bound "
+                "at the exact native boundary "
+                f"(expected_owner={contact_reset_owner}, expected_episode={expected_contact_episode}, "
+                f"expected_generation={expected_contact_generation}, "
+                f"expected_completed_substeps={expected_contact_substeps}, sample={failed_sample})"
             )
         _record_attempt(counter_path, plan, completed=True)
         transitions.append({
@@ -340,6 +372,13 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
         "run_instance_id": run_instance_id,
         "reset": initial,
         "reset_sample_id": env.sample.sample_id,
+        "contact_observation_reset": {
+            key: contact_reset.get(key)
+            for key in (
+                "schema_version", "known", "reason", "owner", "episode", "generation",
+                "completed_substeps", "delivery_errors",
+            )
+        },
         "task_seed": int(env.sample.task_seed),
         "provider": env.provider,
         "backend": env.backend,
