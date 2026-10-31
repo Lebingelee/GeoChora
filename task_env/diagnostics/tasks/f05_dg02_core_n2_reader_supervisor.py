@@ -99,6 +99,51 @@ def _tracked_plan_inputs(plan: dict) -> list[dict[str, str]]:
     return rows
 
 
+def _git_blob_sha(input_head: str, path: Path) -> str:
+    relative = path.resolve(strict=True).relative_to(CORE)
+    result = subprocess.run(
+        ["git", "-C", str(CORE), "show", f"{input_head}:{relative.as_posix()}"],
+        check=True, capture_output=True,
+    )
+    return hashlib.sha256(result.stdout).hexdigest()
+
+
+def _frozen_reader_source_identity(formal: dict, reader_script: Path) -> dict[str, str]:
+    reader_script = reader_script.resolve(strict=True)
+    rows = [
+        row for row in formal["code"]["tracked_inputs"]
+        if Path(row["path"]).resolve(strict=True) == reader_script
+    ]
+    input_head = formal.get("input_identity", {}).get("core_input_head")
+    if len(rows) != 1 or not isinstance(input_head, str):
+        raise ValueError("formal plan must contain one frozen cold-reader source identity")
+    row = rows[0]
+    blob_sha = _git_blob_sha(input_head, reader_script)
+    if blob_sha != row["sha256"]:
+        raise ValueError("formal cold-reader source identity differs from its input Core HEAD")
+    return {
+        "path": str(reader_script),
+        "sha256": blob_sha,
+        "input_head": input_head,
+        "verification": "git_blob_at_formal_core_head",
+    }
+
+
+def _reader_plan_input_identities(formal: dict, reader_script: Path) -> list[dict[str, str]]:
+    reader_path = reader_script.resolve(strict=True)
+    return [
+        row for row in _tracked_plan_inputs(formal)
+        if Path(row["path"]).resolve(strict=True) != reader_path
+    ]
+
+
+def _verify_frozen_reader_source_identity(formal: dict, identity: dict) -> None:
+    reader_script = CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_cold_reader.py"
+    expected = _frozen_reader_source_identity(formal, reader_script)
+    if identity != expected:
+        raise ValueError("reader supervision plan changed the producer's frozen reader identity")
+
+
 def _verify_identities(rows: list[dict[str, str]]) -> None:
     for row in rows:
         path = Path(row["path"]).resolve(strict=True)
@@ -130,7 +175,10 @@ def build_plan(*, formal_plan_path: Path, formal_sidecar_path: Path,
     formal = json.loads(formal_plan_bytes)
     if formal.get("schema_version") != "f05-dg02-core-n2-plan-v1":
         raise ValueError("unsupported formal N2 plan")
-    _verify_identities(_tracked_plan_inputs(formal))
+    reader_script = CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_cold_reader.py"
+    producer_reader_identity = _frozen_reader_source_identity(formal, reader_script)
+    input_identities = _reader_plan_input_identities(formal, reader_script)
+    _verify_identities(input_identities)
 
     supervisor_path = supervisor_path.resolve(strict=True)
     worker_path = worker_path.resolve(strict=True)
@@ -151,7 +199,6 @@ def build_plan(*, formal_plan_path: Path, formal_sidecar_path: Path,
     output_root.mkdir(parents=True, exist_ok=True)
     receipt_path = reader_receipt_path.resolve()
     python = Path(formal["runtime"]["python"]).resolve(strict=True)
-    reader_script = CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_cold_reader.py"
     runtime_pythonpath = [str(CORE), *formal["runtime"]["pythonpath"]]
     command = [
         str(python), str(reader_script),
@@ -172,6 +219,7 @@ def build_plan(*, formal_plan_path: Path, formal_sidecar_path: Path,
         "formal_worker": _file_identity(worker_path),
         "supervisor_script": _file_identity(Path(__file__)),
         "h5_files": h5_rows,
+        "producer_reader_source_identity": producer_reader_identity,
         "reader": {
             "python": str(python),
             "python_sha256": _sha(python),
@@ -201,7 +249,7 @@ def build_plan(*, formal_plan_path: Path, formal_sidecar_path: Path,
             "physics_steps": 0,
             "shared_native_lock_path": str(LOCK),
         },
-        "input_identities": _tracked_plan_inputs(formal),
+        "input_identities": input_identities,
         "output_root": str(output_root),
         "formal_plan_hash": formal_plan_sha,
     }
@@ -229,6 +277,10 @@ def run(plan_path: Path, sidecar_path: Path) -> dict:
         row = plan[label]
         if _sha(Path(row["path"]).resolve(strict=True)) != row["sha256"]:
             raise ValueError(f"cold-reader supervision {label} identity changed")
+    formal = _json(Path(plan["formal_plan"]["path"]).resolve(strict=True))
+    _verify_frozen_reader_source_identity(
+        formal, plan.get("producer_reader_source_identity", {}),
+    )
     supervisor_script = plan["supervisor_script"]
     if _sha(Path(supervisor_script["path"]).resolve(strict=True)) != supervisor_script["sha256"]:
         raise ValueError("cold-reader supervisor implementation changed after plan freeze")

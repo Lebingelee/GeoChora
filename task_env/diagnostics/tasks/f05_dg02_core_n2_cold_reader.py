@@ -26,6 +26,48 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _git_blob_sha(input_head: str, path: Path) -> str:
+    relative = path.resolve(strict=True).relative_to(CORE)
+    result = subprocess.run(
+        ["git", "-C", str(CORE), "show", f"{input_head}:{relative.as_posix()}"],
+        check=True, capture_output=True,
+    )
+    return hashlib.sha256(result.stdout).hexdigest()
+
+
+def _verify_tracked_code_inputs(plan: dict) -> dict | None:
+    """Verify producer code at its frozen HEAD and current non-reader code bytes.
+
+    The cold reader is an audit consumer, not producer runtime code. Its frozen
+    source identity is therefore checked against the formal run's Core commit;
+    the current reader bytes are separately frozen by the reader supervisor.
+    """
+    reader_path = Path(__file__).resolve(strict=True)
+    input_head = plan.get("input_identity", {}).get("core_input_head")
+    frozen_reader_rows = []
+    for row in plan["code"]["tracked_inputs"]:
+        path = Path(row["path"]).resolve(strict=True)
+        if path == reader_path:
+            frozen_reader_rows.append(row)
+            continue
+        if _sha(path) != row["sha256"]:
+            raise ValueError(f"cold reader code input hash differs: {path}")
+    if not frozen_reader_rows:
+        return None
+    if len(frozen_reader_rows) != 1 or not isinstance(input_head, str):
+        raise ValueError("formal plan has an ambiguous frozen cold-reader source identity")
+    row = frozen_reader_rows[0]
+    frozen_sha = _git_blob_sha(input_head, reader_path)
+    if frozen_sha != row["sha256"]:
+        raise ValueError("formal plan cold-reader source identity differs from its frozen Core HEAD")
+    return {
+        "path": str(reader_path),
+        "sha256": frozen_sha,
+        "input_head": input_head,
+        "verification": "git_blob_at_formal_core_head",
+    }
+
+
 def _json_file(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -190,12 +232,18 @@ def _controller_method_supported(method) -> bool:
     required = {
         "nullspace_reference_gain", "reference_source", "projector",
     }
-    supported_shapes = (
+    legacy_shapes = (
         required,
         required | {"pose_target_method"},
         required | {"pose_target_method", "arm_target_limit_source"},
     )
-    if set(method) not in supported_shapes:
+    r3_shape = required | {
+        "pose_target_method", "arm_target_limit_source",
+        "controller_identity_sha256", "arm_tracking_method",
+        "arm_tracking_profile", "arm_reference_identity_sha256",
+    }
+    method_shape = set(method)
+    if method_shape not in legacy_shapes and method_shape != r3_shape:
         return False
     gain = method.get("nullspace_reference_gain")
     if (isinstance(gain, bool) or not isinstance(gain, (int, float))
@@ -218,8 +266,62 @@ def _controller_method_supported(method) -> bool:
         "kinematics_and_geophys_receipt_intersection_v1",
     }:
         return False
-    return (pose_target_method != "accumulated_dls_target_until_settled_v1"
-            or limit_source == "kinematics_and_geophys_receipt_intersection_v1")
+    if (pose_target_method == "accumulated_dls_target_until_settled_v1"
+            and limit_source != "kinematics_and_geophys_receipt_intersection_v1"):
+        return False
+    if method_shape != r3_shape:
+        return True
+    if (method.get("arm_tracking_method") != "production_r3_continuous_v1"
+            or not _is_sha256(method.get("controller_identity_sha256"))
+            or not _is_sha256(method.get("arm_reference_identity_sha256"))):
+        return False
+    profile = method.get("arm_tracking_profile")
+    if not isinstance(profile, dict) or set(profile) != {
+        "controller", "gripper", "planner", "profile_source_sha256",
+    } or not _is_sha256(profile.get("profile_source_sha256")):
+        return False
+    for section in ("controller", "gripper", "planner"):
+        values = profile.get(section)
+        if (not isinstance(values, dict) or not values
+                or any(isinstance(value, bool) or not isinstance(value, (int, float))
+                       or not math.isfinite(float(value)) for value in values.values())):
+            return False
+    return True
+
+
+def _is_sha256(value) -> bool:
+    return (isinstance(value, str) and len(value) == 64
+            and all(char in "0123456789abcdef" for char in value))
+
+
+def _controller_method_projections_match(expected: dict, core_method: dict,
+                                         candidate_method: dict) -> bool:
+    if "arm_tracking_method" not in expected:
+        return (core_method == expected
+                and (not candidate_method or candidate_method == expected))
+    core_fields = {
+        "nullspace_reference_gain", "reference_source", "projector",
+        "pose_target_method", "arm_target_limit_source",
+    }
+    candidate_fields = {
+        "arm_reference_identity", "arm_target_limit_source",
+        "arm_tracking_method", "arm_tracking_profile",
+        "nullspace_reference_gain", "pose_target_method",
+    }
+    core_projection = {key: expected.get(key) for key in core_fields}
+    candidate_projection = {
+        "arm_reference_identity": expected.get("arm_reference_identity_sha256"),
+        "arm_target_limit_source": expected.get("arm_target_limit_source"),
+        "arm_tracking_method": expected.get("arm_tracking_method"),
+        "arm_tracking_profile": expected.get("arm_tracking_profile"),
+        "nullspace_reference_gain": expected.get("nullspace_reference_gain"),
+        "pose_target_method": expected.get("pose_target_method"),
+    }
+    return (isinstance(core_method, dict) and set(core_method) == core_fields
+            and core_method == core_projection
+            and isinstance(candidate_method, dict)
+            and set(candidate_method) == candidate_fields
+            and candidate_method == candidate_projection)
 
 
 def _validate_bundle(bundle: dict) -> list[dict]:
@@ -298,12 +400,41 @@ def _validate_bundle(bundle: dict) -> list[dict]:
     _check(oracle.get("original_physical_acceptance") == physical["physical_acceptance"],
            "com", "formal physical thresholds/COM reference differ from the unchanged oracle", errors)
     controller_method = oracle.get("controller_method")
-    _check(_controller_method_supported(controller_method)
-           and static.get("controller_method") == controller_method
-           and static.get("controller_identity_sha256") == worker.get("episodes", [{}])[0].get("controller_identity")
-           and len(worker.get("episodes", [])) == 2
-           and all(row.get("controller_identity") == static.get("controller_identity_sha256")
-                   for row in worker.get("episodes", [])),
+    candidate_admission = bundle.get("candidate_admission", {})
+    candidate_method = candidate_admission.get("controller_method", {})
+    method_supported = _controller_method_supported(controller_method)
+    method_projection_matches = _controller_method_projections_match(
+        controller_method, static.get("controller_method"), candidate_method,
+    )
+    if "arm_tracking_method" in (controller_method or {}):
+        expected_controller_identity = controller_method.get("controller_identity_sha256")
+        controller_identity_matches = (
+            static.get("controller_identity_sha256") == expected_controller_identity
+            and candidate_admission.get("controller_identity_sha256") == expected_controller_identity
+            and all(row.get("controller_identity") == expected_controller_identity
+                    for row in worker.get("episodes", []))
+        )
+    else:
+        worker_identity = worker.get("episodes", [{}])[0].get("controller_identity")
+        controller_identity_matches = (
+            static.get("controller_identity_sha256") == worker_identity
+            and all(row.get("controller_identity") == worker_identity
+                    for row in worker.get("episodes", []))
+        )
+    candidate_receipt_ref = plan["source"].get("core_candidate_receipt", {})
+    candidate_worker_ref = plan["source"].get("core_candidate_worker_receipt", {})
+    candidate_admission_bound = (
+        not candidate_admission
+        or (
+            candidate_admission.get("status") == "PASS_STATIC_SOURCE_BOUND_CANDIDATE_ADMISSION"
+            and candidate_admission.get("candidate_receipt_path") == candidate_receipt_ref.get("path")
+            and candidate_admission.get("candidate_receipt_sha256") == candidate_receipt_ref.get("sha256")
+            and candidate_admission.get("candidate_worker_receipt_sha256") == candidate_worker_ref.get("sha256")
+            and candidate_admission.get("public_model_counts") == static.get("public_model_counts")
+        )
+    )
+    _check(method_supported and method_projection_matches and controller_identity_matches
+           and candidate_admission_bound and len(worker.get("episodes", [])) == 2,
            "cross_run", "DG02 reset-posture method or source-bound controller identity differs across plan/producer", errors)
 
     _check(source_actuation.get("tendon_joint_names") == ["finger_joint1", "finger_joint2"]
@@ -927,10 +1058,7 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
     plan = json.loads(plan_raw)
     if plan.get("schema_version") != "f05-dg02-core-n2-plan-v1":
         raise ValueError("cold reader received an unsupported formal plan")
-    for row in plan["code"]["tracked_inputs"]:
-        path = Path(row["path"]).resolve(strict=True)
-        if _sha(path) != row["sha256"]:
-            raise ValueError(f"cold reader code input hash differs: {path}")
+    producer_reader_identity = _verify_tracked_code_inputs(plan)
     for label, row in plan["source"].items():
         if isinstance(row, dict) and {"path", "sha256"}.issubset(row):
             path = Path(row["path"]).resolve(strict=True)
@@ -940,6 +1068,12 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
     supervisor = _json_file(supervisor_path)
     worker = _json_file(worker_path)
     static_receipt = _json_file(Path(plan["source"]["core_candidate_receipt"]["path"]))
+    candidate_admission_ref = plan["source"].get("candidate_static_admission_receipt")
+    candidate_admission = (
+        _json_file(Path(candidate_admission_ref["path"]))
+        if isinstance(candidate_admission_ref, dict)
+        else {}
+    )
     source_geometry_audit = _json_file(Path(plan["source"]["usd_geometry_audit_v2"]["path"]))
     expected_worker_hash = _sha(worker_path)
     if supervisor.get("worker_receipt_sha256") != expected_worker_hash:
@@ -964,6 +1098,7 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
         "supervisor": supervisor,
         "worker": worker,
         "static_receipt": static_receipt,
+        "candidate_admission": candidate_admission,
         "source_geometry_audit": source_geometry_audit,
         "episodes": episodes,
     }
@@ -985,6 +1120,8 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
         "plan_sha256": plan_hash,
         "worker_receipt_path": str(worker_path),
         "worker_receipt_sha256": expected_worker_hash,
+        "producer_reader_source_identity": producer_reader_identity,
+        "reader_code_sha256": _sha(Path(__file__).resolve(strict=True)),
         "supervisor_receipt_sha256": _sha(supervisor_path),
         "episodes": [
             {

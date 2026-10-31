@@ -4,11 +4,32 @@ import h5py
 import numpy as np
 
 from task_env.diagnostics.tasks.f05_dg02_core_n2_cold_reader import (
+    _controller_method_projections_match,
+    _controller_method_supported,
     _load_episode,
     _mutate_negative,
     _novel_errors,
     _stored_cube_pose_matches,
 )
+
+
+def _r3_controller_method():
+    return {
+        "arm_reference_identity_sha256": "1" * 64,
+        "arm_target_limit_source": "kinematics_and_geophys_receipt_intersection_v1",
+        "arm_tracking_method": "production_r3_continuous_v1",
+        "arm_tracking_profile": {
+            "controller": {"ik_damping": 0.02},
+            "gripper": {"opening_rate_m_s": 0.24},
+            "planner": {"translation_speed_m_s": 0.06},
+            "profile_source_sha256": "2" * 64,
+        },
+        "controller_identity_sha256": "3" * 64,
+        "nullspace_reference_gain": 0.5,
+        "pose_target_method": "achieved_state_dls_v1",
+        "projector": "svd_right_nullspace_v1",
+        "reference_source": "reset_typed_arm_joint_position",
+    }
 
 
 def _minimal_episode_h5(path, pose):
@@ -90,3 +111,45 @@ def test_negative_attribution_requires_a_finding_beyond_formal_baseline():
 
     assert unchanged == []
     assert mutated == [{"code": "obs_cube_pose", "detail": "actual H5 cube leaf differs"}]
+
+
+def test_r3_controller_identity_accepts_separately_bound_core_and_admission_methods():
+    expected = _r3_controller_method()
+    core_method = {
+        key: expected[key] for key in (
+            "nullspace_reference_gain", "reference_source", "projector",
+            "pose_target_method", "arm_target_limit_source",
+        )
+    }
+    candidate_method = {
+        "arm_reference_identity": expected["arm_reference_identity_sha256"],
+        "arm_target_limit_source": expected["arm_target_limit_source"],
+        "arm_tracking_method": expected["arm_tracking_method"],
+        "arm_tracking_profile": json.loads(json.dumps(expected["arm_tracking_profile"])),
+        "nullspace_reference_gain": expected["nullspace_reference_gain"],
+        "pose_target_method": expected["pose_target_method"],
+    }
+
+    assert _controller_method_supported(expected)
+    assert _controller_method_projections_match(expected, core_method, candidate_method)
+
+    candidate_method["arm_tracking_profile"]["planner"]["translation_speed_m_s"] = 0.07
+    assert not _controller_method_projections_match(expected, core_method, candidate_method)
+
+
+def test_legacy_controller_identity_shape_remains_supported():
+    legacy = {
+        "nullspace_reference_gain": 0.5,
+        "reference_source": "reset_typed_arm_joint_position",
+        "projector": "svd_right_nullspace_v1",
+    }
+
+    assert _controller_method_supported(legacy)
+    assert _controller_method_projections_match(legacy, legacy.copy(), {})
+
+
+def test_r3_controller_method_rejects_invalid_source_profile_identity():
+    method = _r3_controller_method()
+    method["arm_tracking_profile"]["profile_source_sha256"] = "not-a-hash"
+
+    assert not _controller_method_supported(method)
