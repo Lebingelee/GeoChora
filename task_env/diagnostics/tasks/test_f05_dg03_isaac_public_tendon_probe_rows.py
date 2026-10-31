@@ -8,7 +8,10 @@ from array import array
 
 import pytest
 
-from task_env.diagnostics.tasks.f05_dg03_isaac_public_tendon_probe import _rows
+from task_env.diagnostics.tasks.f05_dg03_isaac_public_tendon_probe import (
+    _remove_source_mimic_for_ablation,
+    _rows,
+)
 
 
 class _ListConvertible:
@@ -55,3 +58,26 @@ def test_rows_rejects_wrong_width_and_nonfinite_values():
 
     with pytest.raises(ValueError, match="nonfinite"):
         _rows([1.0, float("nan"), 3.0], 3)
+
+
+def test_mimic_ablation_removes_only_the_composed_api_and_its_properties():
+    from pxr import Sdf, Usd
+
+    stage = Usd.Stage.CreateInMemory()
+    follower = stage.DefinePrim("/follower")
+    api_schemas = Sdf.TokenListOp()
+    api_schemas.prependedItems = ["PhysxMimicJointAPI:transX"]
+    follower.SetMetadata("apiSchemas", api_schemas)
+    follower.CreateRelationship("physxMimicJoint:transX:referenceJoint")
+    for name in (
+        "gearing", "offset", "naturalFrequency", "dampingRatio",
+    ):
+        follower.CreateAttribute(
+            f"physxMimicJoint:transX:{name}", Sdf.ValueTypeNames.Float,
+        ).Set(1.0)
+
+    removed = _remove_source_mimic_for_ablation(follower)
+
+    assert "PhysxMimicJointAPI:transX" not in follower.GetMetadata("apiSchemas").GetAppliedItems()
+    assert len(removed) == 5
+    assert all(not follower.GetProperty(name).IsValid() for name in removed)
