@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 import hashlib
+import yaml
 
 from task_env.artifacts import Timebase
 from task_env.controllers.canonical.contracts import digest
@@ -44,6 +45,19 @@ POSITION_CANDIDATE_TASK_ID = 'phase-ii-c02b-position-servo'
 POSITION_CANDIDATE_VERSION = 'candidate-v1'
 POSITION_CANDIDATE_SEED = 31
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
+
+
+def _dg02_r3_arm_profile():
+    """Read the existing NutAssembly R3 profile as configuration, not task logic."""
+    path = Path(__file__).resolve().parents[1] / 'nut_assembly' / 'config.yaml'
+    data = yaml.safe_load(path.read_text(encoding='utf-8'))
+    controller = data.get('recipe', {}).get('controller', {})
+    if controller.get('implementation') != 'ProductionCanonicalPandaControllerR3':
+        raise ValueError('DG02 R3 profile source no longer selects the production R3 owner')
+    profile = controller.get('dynamic_profile')
+    if not isinstance(profile, dict):
+        raise ValueError('DG02 requires the existing NutAssembly R3 dynamic profile')
+    return {**profile, 'profile_source_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 def _validate_f05_native_position_action_config(controller_config):
@@ -651,6 +665,16 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
         else 0.0
     )
+    arm_tracking_method = (
+        'production_r3_continuous_v1'
+        if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        else 'canonical_position_v1'
+    )
+    arm_tracking_profile = (
+        _dg02_r3_arm_profile()
+        if arm_tracking_method == 'production_r3_continuous_v1'
+        else None
+    )
     if type(source) is UsdRuntimeSourceV1:
         profile = PandaPositionServoProfileV1.from_usd_source(
             artifact, source, execution=input_v1.execution,
@@ -663,6 +687,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
                 else 'achieved_state_dls_v1'
             ),
+            arm_tracking_method=arm_tracking_method,
+            arm_tracking_profile=arm_tracking_profile,
         )
     else:
         profile = PandaPositionServoProfileV1.from_source(
@@ -707,6 +733,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                 'device': input_v1.execution.physics_device,
                 'profile_id': profile.profile_id,
                 'execution_identity_sha256': input_v1.execution.identity_hash,
+                'arm_tracking_method': arm_tracking_method,
             },
             'source_revision': ('F03-versioned-usd-synthetic-s1-v1'
                                 if type(input_v1) is F03PositionCandidateInputV1
@@ -722,6 +749,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
                 'kinematics_source': input_v1.kinematics_source_sha256,
+                **({'arm_tracking_profile_source': arm_tracking_profile['profile_source_sha256']}
+                   if arm_tracking_profile is not None else {}),
             },
         }
 

@@ -21,6 +21,50 @@ class ProductionCanonicalPandaControllerR2(ProductionCanonicalPandaController):
 
     PROFILE_SCHEMA = "canonical-panda-production-r2-physical-profile-v5"
 
+    @staticmethod
+    def derive_action_config(config: ActionConfig, controller_profile, control_dt: float) -> ActionConfig:
+        """Resolve the shared R2 arm settings without requiring gripper feedback."""
+        if not isinstance(config, ActionConfig):
+            raise TypeError("resolved ActionConfig required")
+        dt = float(control_dt)
+        if not math.isfinite(dt) or dt <= 0.0:
+            raise ValueError("positive finite control_dt required")
+        controller = dict(controller_profile)
+        required = {
+            "max_cartesian_translation_rate_m_s",
+            "max_cartesian_rotation_rate_rad_s",
+            "max_joint_increment_rate_rad_s",
+            "ik_damping",
+            "ik_position_gain",
+            "ik_rotation_gain",
+            "ik_rotation_row_weight",
+            "position_deadband_m",
+            "rotation_deadband_rad",
+            "joint_position_correction_rate_s",
+            "joint_position_correction_max_gain",
+        }
+        if set(controller) != required:
+            raise ValueError("R2 controller profile keys differ from its versioned contract")
+        for name, value in controller.items():
+            if not math.isfinite(float(value)) or float(value) <= 0.0:
+                raise ValueError(f"R2 rate/gain must be finite and positive: {name}")
+        return replace(
+            config,
+            ik_damping=float(controller["ik_damping"]),
+            ik_position_gain=float(controller["ik_position_gain"]),
+            ik_rotation_gain=float(controller["ik_rotation_gain"]),
+            ik_rotation_row_weight=float(controller["ik_rotation_row_weight"]),
+            ik_max_delta_q=float(controller["max_joint_increment_rate_rad_s"]) * dt,
+            ik_position_deadband=float(controller["position_deadband_m"]),
+            ik_rotation_deadband=float(controller["rotation_deadband_rad"]),
+            cartesian_max_position_step=float(controller["max_cartesian_translation_rate_m_s"]) * dt,
+            cartesian_max_rotation_step=float(controller["max_cartesian_rotation_rate_rad_s"]) * dt,
+            joint_position_correction_gain=min(
+                float(controller["joint_position_correction_rate_s"]) * dt,
+                float(controller["joint_position_correction_max_gain"]),
+            ),
+        )
+
     def __init__(
         self,
         model,
@@ -67,25 +111,10 @@ class ProductionCanonicalPandaControllerR2(ProductionCanonicalPandaController):
             if not math.isfinite(float(value)) or float(value) <= 0.0:
                 raise ValueError(f"R2 rate/gain must be finite and positive: {name}")
 
-        derived_action = replace(
-            config,
-            ik_damping=float(controller["ik_damping"]),
-            ik_position_gain=float(controller["ik_position_gain"]),
-            ik_rotation_gain=float(controller["ik_rotation_gain"]),
-            ik_rotation_row_weight=float(controller["ik_rotation_row_weight"]),
-            ik_max_delta_q=float(controller["max_joint_increment_rate_rad_s"]) * dt,
-            ik_position_deadband=float(controller["position_deadband_m"]),
-            ik_rotation_deadband=float(controller["rotation_deadband_rad"]),
-            cartesian_max_position_step=float(controller["max_cartesian_translation_rate_m_s"]) * dt,
-            cartesian_max_rotation_step=float(controller["max_cartesian_rotation_rate_rad_s"]) * dt,
-            # R1's correction is a per-boundary extrapolation factor. In R2,
-            # interpret it as a physical rate so the same elapsed time gives
-            # the same correction at every control frequency.
-            joint_position_correction_gain=min(
-                float(controller["joint_position_correction_rate_s"]) * dt,
-                float(controller["joint_position_correction_max_gain"]),
-            ),
-        )
+        # R1's correction is a per-boundary extrapolation factor. In R2, the
+        # shared helper interprets it as a physical rate so equal elapsed time
+        # yields the same correction at each control frequency.
+        derived_action = self.derive_action_config(config, controller, dt)
         derived_gripper = replace(
             gripper_config,
             opening_step_m=float(gripper["opening_rate_m_s"]) * dt,

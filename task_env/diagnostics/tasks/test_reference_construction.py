@@ -67,6 +67,87 @@ def test_pickcube_minimal_task_preserves_p16_identity_config_readiness_and_reset
     assert pc_build_artifact() == value['artifact']
 
 
+def test_default_shared_panda_controller_keeps_accepted_v0_identity():
+    from task_env.controllers.canonical.controller import CanonicalPandaController
+    from task_env.controllers.canonical.contracts import digest as controller_digest
+    from task_env.controllers.canonical.kinematics import PandaKinematics
+
+    source = pc_build_reference()['source']
+    model = PandaKinematics(source.scene_source.xml)
+    controller = CanonicalPandaController(
+        model, artifact_hash=source.task_artifact_hash, config=source.config.action,
+    )
+    expected = controller_digest({
+        'schema': 'panda-shared-dls-v0',
+        'config': asdict(controller.config),
+        'source_sha256': model.source_sha256,
+        'target_basis': 'achieved_joint_state_one_DLS_increment',
+        'gripper': 'legacy_physical_force_limited_servo_v0',
+    })
+    assert controller.identity == expected
+    opt_in = CanonicalPandaController(
+        model, artifact_hash=source.task_artifact_hash, config=source.config.action,
+        nullspace_reference_gain=0.1,
+    )
+    assert opt_in.identity != controller.identity
+
+
+def test_pickcube_r3_is_explicit_and_shares_the_production_arm_subcontract(monkeypatch):
+    from types import SimpleNamespace
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.feedback import (
+        CanonicalControlFeedback, CanonicalGripperFeedback,
+    )
+    from task_env.controllers.canonical.kinematics import FINGERS
+    from task_env.controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
+    from task_env.tasks.pick_cube.task import PickCubeReferenceEnv
+
+    captured = {}
+
+    def capture_init(self, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(PickCubeReferenceEnv, '__init__', capture_init)
+    configured = PickCubeReferenceEnv.from_reference_config({
+        'provider': 'mujoco', 'backend': 'cpu', 'controller_profile': 'r3_continuous_v1',
+    })
+    assert isinstance(captured['_binding'], type(PickCubeReferenceEnv.binding))
+    r3_value = captured['_binding'].build('mujoco')
+    assert isinstance(r3_value['controller'], ProductionCanonicalPandaControllerR3)
+    assert r3_value['resolved_configuration']['controller_profile'] == 'r3_continuous_v1'
+    assert pc_build_reference()['controller'].identity == BASELINE['pickcube']['controller_identity']
+
+    artifact = r3_value['artifact']
+    sample = pc_sample_reset(artifact, 31)
+    joints = dict(sample.joint_position)
+    q_arm = [joints[f'panda-v1/joint{index}'] for index in range(1, 8)]
+    pose = r3_value['controller']._arm.model.pose(q_arm)
+    state = SimpleNamespace(
+        control_step=0, simulation_time=0.0, joint_position=joints,
+        pose_world={'panda-v1/ee': pose},
+    )
+    feedback = CanonicalControlFeedback(
+        'canonical-control-feedback-v0', 0, 0.0,
+        CanonicalGripperFeedback(
+            'panda-v1/gripper', sum(joints[name] for name in FINGERS), 0.0,
+        ),
+    )
+    request = RequestedAction(
+        'absolute_pose', 'world', 'quaternion_wxyz',
+        (pose.position[0] + 0.001, pose.position[1], pose.position[2],
+         *pose.quaternion_wxyz, 1.0),
+    )
+    full = r3_value['controller']
+    full.reset(state, feedback)
+    _, full_target = full.compute(state, feedback, request)
+
+    arm_only = pc_build_reference(controller_profile='r3_continuous_v1')['controller']
+    arm_only.reset_arm_reference(state)
+    arm_target = arm_only.compute_arm_reference(state, request)
+    assert dict(full_target.arm_position) == dict(arm_target.arm_position)
+    assert arm_target.schema_version == 'canonical-arm-reference-v1'
+
+
 def test_nutassembly_selected_route_preserves_artifact_assets_and_resolved_parameters():
     for provider in ('geophys', 'mujoco'):
         value = na_build_reference(provider=provider)

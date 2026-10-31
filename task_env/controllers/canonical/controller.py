@@ -48,21 +48,38 @@ class CanonicalPandaController:
         self._last_pose_target=None
         self._last_pose_error_norm=None
         self._pose_target_settled=False
-        identity_payload={'schema':'panda-shared-dls-v1','config':asdict(self.config),'source_sha256':model.source_sha256,
-            'target_basis':('achieved_joint_state_one_DLS_increment'
-                            if pose_target_method == 'achieved_state_dls_v1'
-                            else 'accumulated_dls_target_until_settled_v1'),
-            'nullspace_reference':{
-                'gain':self.nullspace_reference_gain,
-                'source':'reset_typed_joint_position' if self.nullspace_reference_gain else 'disabled',
-                'projector':'svd_right_nullspace_v1' if self.nullspace_reference_gain else 'none',
-            },
-            'gripper':'legacy_physical_force_limited_servo_v0'}
-        if arm_target_limits is not None:
-            identity_payload['arm_target_limits']={
-                'source':arm_target_limit_source,
-                'lower_upper':self.arm_target_limits.tolist(),
+        legacy_default = (
+            self.nullspace_reference_gain == 0.0
+            and pose_target_method == 'achieved_state_dls_v1'
+            and arm_target_limits is None
+        )
+        if legacy_default:
+            # Keep every existing default caller on the accepted v0 identity.
+            # Opt-in target semantics, nullspace behavior, or native limit
+            # intersections remain explicitly versioned below.
+            identity_payload = {
+                'schema': 'panda-shared-dls-v0',
+                'config': asdict(self.config),
+                'source_sha256': model.source_sha256,
+                'target_basis': 'achieved_joint_state_one_DLS_increment',
+                'gripper': 'legacy_physical_force_limited_servo_v0',
             }
+        else:
+            identity_payload={'schema':'panda-shared-dls-v1','config':asdict(self.config),'source_sha256':model.source_sha256,
+                'target_basis':('achieved_joint_state_one_DLS_increment'
+                                if pose_target_method == 'achieved_state_dls_v1'
+                                else 'accumulated_dls_target_until_settled_v1'),
+                'nullspace_reference':{
+                    'gain':self.nullspace_reference_gain,
+                    'source':'reset_typed_joint_position' if self.nullspace_reference_gain else 'disabled',
+                    'projector':'svd_right_nullspace_v1' if self.nullspace_reference_gain else 'none',
+                },
+                'gripper':'legacy_physical_force_limited_servo_v0'}
+            if arm_target_limits is not None:
+                identity_payload['arm_target_limits']={
+                    'source':arm_target_limit_source,
+                    'lower_upper':self.arm_target_limits.tolist(),
+                }
         self.identity=digest(identity_payload)
 
     def reset_pose_target_memory(self, joint_position):

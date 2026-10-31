@@ -46,6 +46,7 @@ CONFIG_PATH = Path(__file__).with_name("config.yaml")
 EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
+PICKCUBE_CONTROLLER_PROFILES = {"r1", "r3_continuous_v1"}
 
 
 def _configuration() -> dict:
@@ -354,7 +355,7 @@ def build_runtime_source(artifact: TaskArtifact, *, backend="cpu") -> RuntimeSou
     )
 
 
-def _source_identity_files(controller, solution):
+def _source_identity_files(controller, solution, *, profile_source=None):
     root = Path(__file__).resolve().parents[3]
     files = {Path(__file__).resolve(), CONFIG_PATH.resolve(),
              Path(inspect.getsourcefile(PickCubeSceneComposer)).resolve(),
@@ -364,11 +365,27 @@ def _source_identity_files(controller, solution):
              Path(inspect.getsourcefile(RuntimeSource)).resolve()}
     canonical = root / "task_env" / "controllers" / "canonical"
     files.update(path.resolve() for path in canonical.glob("*.py") if path.is_file())
+    if profile_source is not None:
+        files.add(Path(profile_source).resolve())
     return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in sorted(files)}
 
 
-def build_reference(*, backend="cpu", include_solution=True):
+def _r3_dynamic_profile():
+    """Read the already-owned NutAssembly R3 arm profile without task logic."""
+    path = Path(__file__).resolve().parents[1] / "nut_assembly" / "config.yaml"
+    data = yaml.safe_load(path.read_text())
+    recipe = data.get("recipe", {}) if isinstance(data, dict) else {}
+    controller = recipe.get("controller", {}) if isinstance(recipe, dict) else {}
+    if controller.get("implementation") != "ProductionCanonicalPandaControllerR3":
+        raise ValueError("PickCube R3 profile source no longer selects the production R3 owner")
+    profile = controller.get("dynamic_profile")
+    if not isinstance(profile, dict):
+        raise ValueError("PickCube R3 requires the existing versioned NutAssembly dynamic profile")
+    return profile, path
+
+
+def build_reference(*, backend="cpu", include_solution=True, controller_profile="r1"):
     """Construct the single selected P1.6 route without importing a provider."""
     from ...controllers.canonical import ProductionCanonicalPandaController
     from ...controllers.canonical.contracts import digest
@@ -378,11 +395,21 @@ def build_reference(*, backend="cpu", include_solution=True):
     artifact = build_artifact()
     source = build_runtime_source(artifact, backend=backend)
     readiness = PickCubeReadinessConfig.from_source(artifact, source)
-    controller = ProductionCanonicalPandaController.from_source(artifact, source)
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
+    profile_source = None
+    if controller_profile == "r1":
+        controller = ProductionCanonicalPandaController.from_source(artifact, source)
+    else:
+        from ...controllers.canonical.production_r3 import ProductionCanonicalPandaControllerR3
+        dynamic_profile, profile_source = _r3_dynamic_profile()
+        controller = ProductionCanonicalPandaControllerR3.from_source(
+            artifact, source, profile=dynamic_profile,
+        )
     solution = PickCubeReadinessSolution(config=readiness)
     root = Path(__file__).resolve().parents[3]
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    source_ids = _source_identity_files(controller, solution)
+    source_ids = _source_identity_files(controller, solution, profile_source=profile_source)
     runtime_config = asdict(source.config)
     resolved = {
         "construction_id": recipe["construction_id"], "task_recipe": _configuration(),
@@ -399,6 +426,9 @@ def build_reference(*, backend="cpu", include_solution=True):
         "runtime_open_actuators": list(source.open_actuators),
         "qualification": "NOT_REQUALIFIED",
     }
+    if controller_profile != "r1":
+        resolved["controller_profile"] = controller_profile
+        resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,
         "readiness": readiness, "controller": controller,
@@ -409,9 +439,9 @@ def build_reference(*, backend="cpu", include_solution=True):
     }
 
 
-def build_readiness_solution(*, backend="cpu"):
+def build_readiness_solution(*, backend="cpu", controller_profile="r1"):
     """Build the task-owned PickCube readiness Solution for an external driver."""
-    return build_reference(backend=backend)["solution"]
+    return build_reference(backend=backend, controller_profile=controller_profile)["solution"]
 
 
 def _validate_external_readiness_solution(value, solution):
@@ -425,10 +455,14 @@ def _validate_external_readiness_solution(value, solution):
         raise ValueError("external Solution identity does not match the selected task implementation")
 
 
-def make_reference_binding():
+def make_reference_binding(*, controller_profile="r1"):
+    if controller_profile not in PICKCUBE_CONTROLLER_PROFILES:
+        raise ValueError(f"unsupported PickCube controller_profile: {controller_profile!r}")
     return ReferenceTaskBinding(
-        build=lambda provider: build_reference(backend="cpu"),
-        build_external=lambda provider: build_reference(backend="cpu", include_solution=False),
+        build=lambda provider: build_reference(backend="cpu", controller_profile=controller_profile),
+        build_external=lambda provider: build_reference(
+            backend="cpu", include_solution=False, controller_profile=controller_profile,
+        ),
         validate_external_solution=_validate_external_readiness_solution,
         reset_sample=sample_reset, evaluate=evaluate,
         object_poses=(("cube-v1", "cube_v1"),),
@@ -447,6 +481,17 @@ class PickCubeReferenceEnv(SelectedReferenceEnv):
 
     uid = REFERENCE_ENV_ID
     binding = make_reference_binding()
+
+    @classmethod
+    def from_reference_config(cls, config=None, *, render_mode=None, **kwargs):
+        values = {} if config is None else dict(config)
+        if kwargs or render_mode is not None:
+            raise ValueError('selected reference admits state-only execution without extra kwargs')
+        if set(values) - {'provider', 'backend', 'horizon', 'controller_profile'}:
+            raise ValueError('PickCube selected config admits provider/backend/horizon/controller_profile only')
+        controller_profile = values.pop('controller_profile', 'r1')
+        binding = make_reference_binding(controller_profile=controller_profile)
+        return cls(_binding=binding, **values)
 
 
 __all__ = [

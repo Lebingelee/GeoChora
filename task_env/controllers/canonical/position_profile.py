@@ -110,6 +110,7 @@ class PandaPositionServoProfileV1:
         target_bindings=None, open_actuator=_DEFAULT_OPEN_ACTUATOR, native_drive_receipt=None,
         nullspace_reference_gain=0.0, pose_target_method='achieved_state_dls_v1',
         arm_target_limits=None, arm_target_limit_source='kinematics_model_v1',
+        arm_tracking_method='canonical_position_v1', arm_tracking_profile=None,
     ):
         self.artifact = artifact
         self.source = source
@@ -167,6 +168,26 @@ class PandaPositionServoProfileV1:
             arm_target_limits=arm_target_limits,
             arm_target_limit_source=arm_target_limit_source,
         )
+        if arm_tracking_method not in {
+                'canonical_position_v1', 'production_r3_continuous_v1'}:
+            raise ValueError('unsupported PositionServoV1 arm tracking method')
+        self.arm_tracking_method = arm_tracking_method
+        self.arm_tracking_profile = None
+        self._arm_reference = None
+        if arm_tracking_method == 'production_r3_continuous_v1':
+            if not isinstance(arm_tracking_profile, dict):
+                raise TypeError('R3 Position tracking requires its resolved physical profile mapping')
+            from .production_r3 import ProductionCanonicalPandaControllerR3
+            self.arm_tracking_profile = json.loads(json.dumps(
+                arm_tracking_profile, sort_keys=True, allow_nan=False,
+            ))
+            self._arm_reference = ProductionCanonicalPandaControllerR3.create_arm_reference(
+                model, artifact_hash=artifact.identity_hash, config=config,
+                control_dt=artifact.timebase.control_dt,
+                profile=self.arm_tracking_profile,
+            )
+        elif arm_tracking_profile is not None:
+            raise ValueError('R3 physical profile is only accepted with production_r3_continuous_v1')
         self.nullspace_reference_gain = self._algorithm.nullspace_reference_gain
         self.pose_target_method = self._algorithm.pose_target_method
         self.arm_target_limit_source = self._algorithm.arm_target_limit_source
@@ -192,6 +213,9 @@ class PandaPositionServoProfileV1:
                 'control_dt': artifact.timebase.control_dt,
             },
             'algorithm_identity': self._algorithm.identity,
+            'arm_tracking_method': self.arm_tracking_method,
+            'arm_tracking_profile': self.arm_tracking_profile,
+            'arm_reference_identity': None if self._arm_reference is None else self._arm_reference.identity,
             'gripper_semantic_id': self.gripper_semantic_id,
             'required_state': self.requirements.to_mapping(),
             'force_feedback': 'not-consumed-v1',
@@ -211,6 +235,9 @@ class PandaPositionServoProfileV1:
         self._constructed_identity = self.identity
         self._constructed_config = config
         self._constructed_algorithm_identity = self._algorithm.identity
+        self._constructed_arm_reference_identity = (
+            None if self._arm_reference is None else self._arm_reference.identity
+        )
         self._plan_identity_hash = None
         self._episode_id = None
         self._reset_sample_id = None
@@ -237,7 +264,9 @@ class PandaPositionServoProfileV1:
 
     @classmethod
     def from_source(cls, artifact, source, *, config: ActionConfig | None = None,
-                    nullspace_reference_gain=0.0):
+                    nullspace_reference_gain=0.0,
+                    arm_tracking_method='canonical_position_v1',
+                    arm_tracking_profile=None):
         if not isinstance(artifact, TaskArtifactV1):
             raise TypeError('PositionServoV1 requires TaskArtifactV1')
         if artifact.timebase.physics_dt != 0.002 or artifact.timebase.control_substeps != 5 or artifact.timebase.control_dt != 0.01:
@@ -270,13 +299,17 @@ class PandaPositionServoProfileV1:
         return cls(
             artifact=artifact, source=source, scene=scene, model=model, config=config,
             nullspace_reference_gain=nullspace_reference_gain,
+            arm_tracking_method=arm_tracking_method,
+            arm_tracking_profile=arm_tracking_profile,
         )
 
     @classmethod
     def from_usd_source(cls, artifact, source, *, execution, kinematics_source_xml: str,
                         native_drive_receipt=None, config: ActionConfig | None = None,
                         nullspace_reference_gain=0.0,
-                        pose_target_method='achieved_state_dls_v1'):
+                        pose_target_method='achieved_state_dls_v1',
+                        arm_tracking_method='canonical_position_v1',
+                        arm_tracking_profile=None):
         """Bind the existing Position math to one versioned USD source.
 
         ``kinematics_source_xml`` must be locally calibrated to the selected
@@ -403,6 +436,8 @@ class PandaPositionServoProfileV1:
             pose_target_method=pose_target_method,
             arm_target_limits=arm_target_limits,
             arm_target_limit_source=arm_target_limit_source,
+            arm_tracking_method=arm_tracking_method,
+            arm_tracking_profile=arm_tracking_profile,
         )
 
     @classmethod
@@ -553,6 +588,7 @@ class PandaPositionServoProfileV1:
         # TCP profile v1 is the identity transform hand→TCP; both the typed
         # Controller input and source-bound PandaKinematics tip name this body.
         state = SimpleNamespace(
+            control_step=view.boundary.control_step,
             joint_position=joint_position,
             pose_world={'panda-v1/ee': frame.pose_world},
         )
@@ -577,6 +613,8 @@ class PandaPositionServoProfileV1:
         ]
         self._algorithm.set_nullspace_reference(q_reference)
         self._algorithm.reset_pose_target_memory(q_reference)
+        if self._arm_reference is not None:
+            self._arm_reference.reset(state)
         return boundary.boundary_id
 
     def _prepare_switch_activation(self, publication, plan):
@@ -595,7 +633,9 @@ class PandaPositionServoProfileV1:
         if (self.identity != self._constructed_identity
                 or self.config != self._constructed_config
                 or self._algorithm.identity != self._constructed_algorithm_identity
-                or self._algorithm.config != self._constructed_config):
+                or self._algorithm.config != self._constructed_config
+                or (None if self._arm_reference is None else self._arm_reference.identity)
+                    != self._constructed_arm_reference_identity):
             raise ValueError('PositionServoV1 candidate identity or algorithm parameters changed after construction')
         self._validate_source(self.source)
         plan_identity = self._validate_plan(plan)
@@ -624,6 +664,14 @@ class PandaPositionServoProfileV1:
         self._activation_boundary_id = boundary_id
         self._algorithm.set_nullspace_reference(q_reference)
         self._algorithm.reset_pose_target_memory(q_reference)
+        if self._arm_reference is not None:
+            self._arm_reference.reset(SimpleNamespace(
+                control_step=control_step,
+                joint_position={
+                    f'panda-v1/joint{index}': q_reference[index - 1]
+                    for index in range(1, 8)
+                },
+            ))
 
     def compute(self, publication, requested: RequestedAction, plan):
         self._validate_source(self.source)
@@ -641,6 +689,15 @@ class PandaPositionServoProfileV1:
             raise ValueError('PositionServoV1 target source boundary is stale or out of order')
 
         canonical, base_target = self._algorithm.compute(state, requested)
+        if self._arm_reference is not None:
+            arm_reference = self._arm_reference.compute_reference(state, requested)
+            canonical = arm_reference.canonical_action
+            r3_arm = dict(arm_reference.arm_position)
+            base_target = replace(
+                base_target,
+                arm_position=r3_arm,
+                arm_servo_position=r3_arm,
+            )
         # The shared legacy position algorithm consumes panda-v1 semantic
         # names. The v1 Artifact and RuntimeSource use entity-qualified
         # identities; lower the same seven values to this Entity's Joint keys.

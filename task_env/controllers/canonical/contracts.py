@@ -43,6 +43,33 @@ class CanonicalAction(Contract):
 
 
 @dataclass(frozen=True)
+class CanonicalArmReferenceV1(Contract):
+    """One provider-neutral R3 arm target without a gripper feedback contract."""
+
+    schema_version: str
+    controller_identity: str
+    canonical_action: CanonicalAction
+    arm_joint_order: tuple[str, ...]
+    arm_position: Mapping[str, float]
+
+    def validate(self):
+        if self.schema_version != 'canonical-arm-reference-v1':
+            raise ValueError('unsupported canonical arm-reference schema')
+        if (len(self.controller_identity) != 64
+                or any(character not in '0123456789abcdef' for character in self.controller_identity)):
+            raise ValueError('canonical arm reference requires a controller identity hash')
+        self.canonical_action.validate()
+        if (len(self.arm_joint_order) != 7
+                or len(set(self.arm_joint_order)) != 7
+                or set(self.arm_joint_order) != set(self.arm_position)):
+            raise ValueError('canonical arm reference requires seven ordered Panda joints')
+        for name in self.arm_joint_order:
+            _name(name)
+        if any(not math.isfinite(float(value)) for value in self.arm_position.values()):
+            raise ValueError('canonical arm reference positions must be finite')
+
+
+@dataclass(frozen=True)
 class GripperControlTarget(Contract):
     semantic_id: str
     opening_m: float
