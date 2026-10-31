@@ -186,6 +186,7 @@ def test_canonical_controller_clips_arm_targets_to_bound_native_limit_intersecti
     from task_env.artifacts import PoseWorld
     from task_env.controllers.canonical.contracts import RequestedAction
     from task_env.controllers.canonical.controller import CanonicalPandaController
+    from task_env.environment import ActionConfig
 
     class _Kinematics:
         source_sha256 = "a" * 64
@@ -199,7 +200,7 @@ def test_canonical_controller_clips_arm_targets_to_bound_native_limit_intersecti
     native_limits = _Kinematics.limits.copy()
     native_limits[5, 1] = 3.752499969733032
     controller = CanonicalPandaController(
-        _Kinematics(), artifact_hash="b" * 64,
+        _Kinematics(), artifact_hash="b" * 64, config=ActionConfig(joint_position_correction_gain=1.0),
         arm_target_limits=native_limits,
         arm_target_limit_source="kinematics_and_geophys_receipt_intersection_v1",
     )
@@ -207,8 +208,14 @@ def test_canonical_controller_clips_arm_targets_to_bound_native_limit_intersecti
         "absolute_joint", None, "none",
         (0.0, 0.0, 0.0, 0.0, 0.0, 3.7525, 0.0, 0.0),
     )
-    _canonical, desired, _servo = controller._compute_arm(_State(), request)
+    state = _State()
+    state.joint_position = dict(state.joint_position)
+    state.joint_position["panda-v1/joint6"] = native_limits[5, 1] - 1e-4
+    _canonical, desired, servo = controller._compute_arm(state, request)
     assert desired[5] == native_limits[5, 1]
+    assert servo[5] == native_limits[5, 1]
+    assert np.all(servo >= native_limits[:, 0])
+    assert np.all(servo <= native_limits[:, 1])
 
 
 def test_dg02_cold_reader_accepts_plan_bound_controller_gains_without_hardcoding():

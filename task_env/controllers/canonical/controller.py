@@ -193,7 +193,7 @@ class CanonicalPandaController:
             else:
                 desired=np.clip(q+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.arm_target_limits[:,0],self.arm_target_limits[:,1])
         _resolved, servo = absolute_joint_position_servo(
-            desired, q, self.model.limits, cfg.joint_position_correction_gain,
+            desired, q, self.arm_target_limits, cfg.joint_position_correction_gain,
         )
         canonical=CanonicalAction('canonical-action-v0',requested,tuple(float(v) for v in values),not np.array_equal(original,values),world_pose)
         return canonical,desired,servo
