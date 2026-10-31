@@ -21,7 +21,6 @@ MAINT = Path("/home/lly/Program_Files/Geochora/workspace/maintenance/phase_ii_01
 PACKAGE = MAINT / "sol_f05_dg02_001"
 WINDOW = MAINT / "f05_diagnostic_goal02/window_001"
 OUT = WINDOW / "host_g5_001"
-RUN = OUT / "n2_formal_001"
 PROGRESS = WINDOW / "goal_progress.json"
 BUDGET_PATH = PACKAGE / "execution_budget.json"
 ORACLES_PATH = PACKAGE / "control_oracles.json"
@@ -189,8 +188,16 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
 
 
 def build_plan() -> tuple[dict, dict]:
-    if RUN.exists():
-        raise FileExistsError(f"formal N2 output already exists: {RUN}")
+    attempt_index = 1
+    while True:
+        attempt_tag = f"{attempt_index:03d}"
+        run_dir = OUT / f"n2_formal_{attempt_tag}"
+        candidate_dir = OUT / f"core_candidate_{10 + attempt_index:03d}"
+        plan_path = OUT / f"n2_formal_{attempt_tag}.plan.json"
+        if not any(path.exists() for path in (run_dir, candidate_dir, plan_path)):
+            break
+        attempt_index += 1
+    run_id = f"DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_{attempt_tag}"
     core_head, provider_head = _head(CORE), _head(PROVIDER)
     core_branch, provider_branch = _branch(CORE), _branch(PROVIDER)
     if core_branch != "develop-full" or provider_branch != "codex/phase-ii-01-f05-geophys":
@@ -210,8 +217,6 @@ def build_plan() -> tuple[dict, dict]:
     physical = _json(PHYSICAL_PATH)
     old_s1 = _json(OLD_S1_PLAN)
     candidate_plan = _json(OLD_CANDIDATE_PLAN)
-    run_id = "DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_001"
-    candidate_dir = OUT / "core_candidate_011"
     candidate_plan_path = candidate_dir / "plan.json"
     candidate_sidecar_path = candidate_dir / "plan.sha256"
     candidate_receipt_path = candidate_dir / "core_source_receipt.json"
@@ -302,8 +307,8 @@ def build_plan() -> tuple[dict, dict]:
     ))
     if mem_available < int(budget_limits["start_native_mem_available_bytes_min"]):
         raise RuntimeError("formal N2 frozen native start MemAvailable gate is not satisfied")
-    if RUN.exists():
-        raise FileExistsError(f"formal N2 output appeared during plan generation: {RUN}")
+    if run_dir.exists() or candidate_dir.joinpath("worker_receipt.json").exists():
+        raise FileExistsError("formal N2 output appeared during plan generation")
 
     limits = {
         "native_starts_before": int(progress["native"]["geophys_starts"]),
@@ -337,11 +342,11 @@ def build_plan() -> tuple[dict, dict]:
         "asset_download_bytes_max": int(budget["asset_download_bytes_max"]),
     }
     output = {
-        "run_dir": str(RUN.resolve()),
-        "episode_h5_paths": [str((RUN / f"episode_{index:03d}.h5").resolve()) for index in (1, 2)],
-        "native_receipt": str((RUN / "supervisor_receipt.json").resolve()),
-        "step_counter": str((RUN / "step_counter.json").resolve()),
-        "worker_receipt": str((RUN / "worker_receipt.json").resolve()),
+        "run_dir": str(run_dir.resolve()),
+        "episode_h5_paths": [str((run_dir / f"episode_{index:03d}.h5").resolve()) for index in (1, 2)],
+        "native_receipt": str((run_dir / "supervisor_receipt.json").resolve()),
+        "step_counter": str((run_dir / "step_counter.json").resolve()),
+        "worker_receipt": str((run_dir / "worker_receipt.json").resolve()),
         "worker_script": str((CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_probe.py").resolve()),
         "independent_reader_script": str((CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_cold_reader.py").resolve()),
     }
@@ -393,20 +398,27 @@ def build_plan() -> tuple[dict, dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--plan", type=Path, default=OUT / "n2_formal_001.plan.json")
-    parser.add_argument("--sidecar", type=Path, default=OUT / "n2_formal_001.plan.json.sha256")
-    parser.add_argument("--static-receipt", type=Path, default=OUT / "candidate_plan_build_receipt.json")
+    parser.add_argument("--plan", type=Path)
+    parser.add_argument("--sidecar", type=Path)
+    parser.add_argument("--static-receipt", type=Path)
     args = parser.parse_args()
     plan, candidate_receipt = build_plan()
-    _atomic_json(args.plan, plan)
-    plan_hash = _sha(args.plan)
-    args.sidecar.parent.mkdir(parents=True, exist_ok=True)
-    args.sidecar.write_text(plan_hash + "\n", encoding="ascii")
-    candidate_receipt.update({"formal_plan_path": str(args.plan.resolve()), "formal_plan_sha256": plan_hash})
-    _atomic_json(args.static_receipt, candidate_receipt)
+    attempt_tag = plan["run_id"].rsplit("_", 1)[-1]
+    plan_path = args.plan or (OUT / f"n2_formal_{attempt_tag}.plan.json")
+    sidecar_path = args.sidecar or Path(str(plan_path) + ".sha256")
+    static_receipt_path = args.static_receipt or (OUT / f"candidate_plan_build_{attempt_tag}_receipt.json")
+    existing = [path for path in (plan_path, sidecar_path, static_receipt_path) if path.exists()]
+    if existing:
+        raise FileExistsError(f"refusing to replace frozen N2 plan outputs: {existing}")
+    _atomic_json(plan_path, plan)
+    plan_hash = _sha(plan_path)
+    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+    sidecar_path.write_text(plan_hash + "\n", encoding="ascii")
+    candidate_receipt.update({"formal_plan_path": str(plan_path.resolve()), "formal_plan_sha256": plan_hash})
+    _atomic_json(static_receipt_path, candidate_receipt)
     print(json.dumps({
         "run_id": plan["run_id"],
-        "formal_plan_path": str(args.plan.resolve()),
+        "formal_plan_path": str(plan_path.resolve()),
         "formal_plan_sha256": plan_hash,
         "native_start_reserved": plan["limits"]["planned_native_starts"],
         "physics_steps_reserved": plan["limits"]["physics_steps_reserved"],
