@@ -1,4 +1,4 @@
-"""Freeze the bounded 100-interval DG02 Core tracking diagnostic."""
+"""Freeze a bounded DG02 Core tracking diagnostic."""
 
 from __future__ import annotations
 
@@ -20,6 +20,9 @@ BASE_PLAN = HOST / "n2_formal_019.plan.json"
 OLD_CANDIDATE = HOST / "core_candidate_029/plan.json"
 PROGRESS = WINDOW / "goal_progress.json"
 PACKAGE = MAINT / "sol_f05_dg02_001"
+MICROPROBE_INTERVALS = 12
+MICROPROBE_HOME_INTERVALS = 2
+MICROPROBE_STEPS = MICROPROBE_INTERVALS * 5
 
 
 def _sha(path: Path) -> str:
@@ -88,10 +91,11 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
     ]
     if _sha(protected_doc) != expected_doc_sha256:
         raise RuntimeError("protected untracked maintenance handoff changed before tracking-probe freeze")
-    if _json(PROGRESS)["native"]["geophys_steps"] + 500 > 18000:
-        raise RuntimeError("500-step probe does not fit the frozen cumulative probe budget")
-    if _json(PROGRESS)["native"]["geophys_steps"] + 500 > 66000:
-        raise RuntimeError("500-step probe does not fit the frozen GeoPhys total budget")
+    steps_before = int(_json(PROGRESS)["native"]["probe_steps"])
+    if steps_before + MICROPROBE_STEPS > 18000:
+        raise RuntimeError("60-step diagnostic does not fit the frozen cumulative probe budget")
+    if int(_json(PROGRESS)["native"]["geophys_steps"]) + MICROPROBE_STEPS > 66000:
+        raise RuntimeError("60-step diagnostic does not fit the frozen GeoPhys total budget")
     lock_path = Path(base["limits"]["shared_native_lock_path"]).resolve()
     with lock_path.open("a+") as lock:
         try:
@@ -126,7 +130,7 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
         "provider_input_head": provider_head,
         "provider_worktree": str(PROVIDER.resolve()),
     })
-    candidate["source"]["candidate_horizon"] = 100
+    candidate["source"]["candidate_horizon"] = MICROPROBE_INTERVALS
     candidate["code"]["tracked_inputs"] = _tracked_inputs(
         *candidate["code"]["tracked_inputs"],
         {"path": str(CORE / "task_env/diagnostics/tasks/f05_dg02_core_tracking_probe_plan.py"),
@@ -176,22 +180,30 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
     physical = _json(PACKAGE / "original_physical_oracle.json")
     control = _json(PACKAGE / "control_oracles.json")
     oracle = _build_formal_oracle(built_candidate, physical, control, static_receipt["action_config"])
+    original_phases = {row["phase"]: row for row in oracle["schedule"]}
+    if set(original_phases) < {"unloaded_home_hold", "unloaded_point"}:
+        raise RuntimeError("tracking probe schedule lacks its frozen home and point phase targets")
+    home = dict(original_phases["unloaded_home_hold"])
+    point = dict(original_phases["unloaded_point"])
+    home.update({"start": 0, "stop": MICROPROBE_HOME_INTERVALS})
+    point.update({"start": MICROPROBE_HOME_INTERVALS, "stop": MICROPROBE_INTERVALS})
     oracle.update({
+        "probe_mode": "point_response_micro_12_v1",
         "episode_count": 1,
-        "control_intervals_per_episode": 100,
-        "horizon": 100,
-        "schedule": [row for row in oracle["schedule"] if int(row["stop"]) <= 100],
+        "control_intervals_per_episode": MICROPROBE_INTERVALS,
+        "horizon": MICROPROBE_INTERVALS,
+        "schedule": [home, point],
     })
     if [row["phase"] for row in oracle["schedule"]] != ["unloaded_home_hold", "unloaded_point"]:
-        raise RuntimeError("tracking probe schedule is not the exact first two frozen phases")
+        raise RuntimeError("tracking probe schedule is not the exact frozen home/point microprobe")
 
     progress = _json(PROGRESS)
     if (float(progress["native"]["geophys_wall_s"]) + int(budget["per_probe_worker_wall_s_max"])
             > int(budget["geophys_native_wall_s_cumulative_max"])):
-        raise RuntimeError("500-step probe cannot fit the frozen cumulative GeoPhys wall budget")
+        raise RuntimeError("60-step diagnostic cannot fit the frozen cumulative GeoPhys wall budget")
     if (float(progress["native"]["geophys_wall_s"]) + int(budget["per_probe_worker_wall_s_max"])
             > int(budget["goal_native_wall_s_cumulative_max"])):
-        raise RuntimeError("500-step probe cannot fit the frozen cumulative native wall budget")
+        raise RuntimeError("60-step diagnostic cannot fit the frozen cumulative native wall budget")
     run_dir = output_dir
     tracked_inputs = _tracked_inputs(
         *base["code"]["tracked_inputs"],
@@ -211,9 +223,10 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
             "bounded tracking probe, not a formal cell or qualification"
         ),
         "hypothesis": (
-            "With the unchanged DG01 ActionConfig, source, and tracking thresholds, test whether "
-            "achieved-state DLS without reset-posture nullspace feedback reduces the point-hold "
-            "joint oscillation observed in the preceding bounded Core probe."
+            "With the unchanged DG01 ActionConfig, source, and acceptance thresholds, measure "
+            "the short point-response tradeoff at DG02 nullspace reference gain 0.5, between "
+            "the prior gain-1.0 and gain-0.0 bounded probes. This 12-interval run is diagnostic "
+            "only and cannot establish the formal tracking gate."
         ),
         "input_identity": {
             **base["input_identity"],
@@ -224,7 +237,7 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
         },
         "source": {
             **base["source"],
-            "candidate_horizon": 100,
+            "candidate_horizon": MICROPROBE_INTERVALS,
             "core_candidate_plan": _row(candidate_path),
             "core_candidate_plan_sidecar": _row(candidate_sidecar),
             "core_candidate_receipt": _row(candidate_receipt_path),
@@ -237,7 +250,7 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
             "native_starts_before": int(progress["native"]["geophys_starts"]),
             "planned_native_starts": 1,
             "physics_steps_before": int(progress["native"]["geophys_steps"]),
-            "physics_steps_reserved": 500,
+            "physics_steps_reserved": MICROPROBE_STEPS,
             "physics_steps_completed_before": int(progress["native"]["geophys_steps_completed"]),
             "per_probe_steps_max": int(budget["per_probe_steps_max"]),
             "worker_wall_s_max": int(budget["per_probe_worker_wall_s_max"]),
@@ -249,8 +262,8 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
         "method": {
             **base["method"],
             "entry": "build_versioned_position_candidate -> SelectedReferenceEnv.reset -> RuntimeSession.materialize -> structured Position request -> Generic H5 v3 -> independent tracking-probe cold reader",
-            "episode_lifecycle": "one actual Candidate Env object, one 100-interval episode spanning the exact frozen home and point phases; the planned final horizon truncation is recorded",
-            "native_step_accounting": "charge 5 physics steps before every Core control interval; increment completed only after the public transition returns; 500 total",
+            "episode_lifecycle": "one actual Candidate Env object, one 12-interval diagnostic episode: two unloaded home intervals then ten unloaded point intervals; the planned final horizon truncation is recorded",
+            "native_step_accounting": "charge 5 physics steps before every Core control interval; increment completed only after the public transition returns; 60 total",
         },
         "output": {
             "run_dir": str(run_dir),
@@ -263,7 +276,7 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
             "independent_reader_script": str((CORE / "task_env/diagnostics/tasks/f05_dg02_core_tracking_probe_reader.py").resolve()),
         },
     })
-    if int(plan["limits"]["physics_steps_before"]) + 500 > int(plan["limits"]["probe_physics_steps_max"]):
+    if int(plan["limits"]["physics_steps_before"]) + MICROPROBE_STEPS > int(plan["limits"]["probe_physics_steps_max"]):
         raise RuntimeError("tracking probe exceeds frozen cumulative probe limit")
     if int(plan["limits"]["cumulative_geophys_wall_s_before"]) + int(plan["limits"]["worker_wall_s_max"]) > int(plan["limits"]["geophys_native_wall_s_max"]):
         raise RuntimeError("tracking probe cannot fit the frozen cumulative GeoPhys wall budget")

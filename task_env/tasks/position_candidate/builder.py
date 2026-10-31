@@ -61,12 +61,13 @@ F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
 F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
 # The DG02 Core route tracks source-FK pose targets whose Panda solution is
-# redundant. Keep the achieved-state DLS increment free of a second posture
-# objective: the bounded native probe showed that full reset-posture feedback
-# still produced oscillatory point-hold joint motion. Other Position routes are
-# unchanged. Recompute each increment from achieved state so delayed physical
-# response cannot wind up an accumulated joint target.
-F05_DG02_NULLSPACE_REFERENCE_GAIN = 0.0
+# redundant. The bounded probes found a tradeoff: gain 0.0 reduced target error
+# and speed versus 1.0, while increasing joint jitter. Use the midpoint for a
+# short source-bound response diagnostic; this is not a qualified controller
+# setting. Other Position routes are unchanged. Recompute each increment from
+# achieved state so delayed physical response cannot wind up an accumulated
+# joint target.
+F05_DG02_NULLSPACE_REFERENCE_GAIN = 0.5
 F05_DG02_POSE_TARGET_METHOD = 'achieved_state_dls_v1'
 
 

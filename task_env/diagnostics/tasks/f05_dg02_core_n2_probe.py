@@ -63,23 +63,38 @@ def _verify(plan_path: Path, sidecar: Path) -> tuple[dict, str]:
     if classification == tracking_probe_classification:
         oracle = plan["oracle"]
         limits = plan["limits"]
-        expected_steps = (
+        probe_mode = oracle.get("probe_mode", "bounded_tracking_100_v1")
+        calculated_steps = (
             int(oracle["episode_count"])
             * int(oracle["control_intervals_per_episode"])
             * int(oracle["control_substeps"])
         )
+        if probe_mode == "bounded_tracking_100_v1":
+            expected_intervals, expected_horizon, expected_steps = 100, 100, 500
+        elif probe_mode == "point_response_micro_12_v1":
+            expected_intervals, expected_horizon, expected_steps = 12, 12, 60
+        else:
+            raise ValueError("unsupported DG02 bounded tracking probe mode")
         if (
             int(oracle["episode_count"]) != 1
-            or int(oracle["control_intervals_per_episode"]) != 100
-            or int(oracle["horizon"]) != 100
-            or int(plan["source"]["candidate_horizon"]) != 100
-            or expected_steps != 500
+            or int(oracle["control_intervals_per_episode"]) != expected_intervals
+            or int(oracle["horizon"]) != expected_horizon
+            or int(oracle["control_substeps"]) != 5
+            or int(plan["source"]["candidate_horizon"]) != expected_horizon
+            or calculated_steps != expected_steps
             or int(limits["physics_steps_reserved"]) != expected_steps
             or expected_steps > int(limits["per_probe_steps_max"])
             or int(limits["physics_steps_before"]) + expected_steps
             > int(limits["probe_physics_steps_max"])
         ):
-            raise ValueError("DG02 tracking probe exceeds or changes its frozen 500-step envelope")
+            raise ValueError(f"DG02 tracking probe exceeds or changes its frozen {expected_steps}-step envelope")
+        if probe_mode == "point_response_micro_12_v1":
+            schedule = oracle.get("schedule", [])
+            if [
+                (row.get("phase"), int(row.get("start", -1)), int(row.get("stop", -1)))
+                for row in schedule
+            ] != [("unloaded_home_hold", 0, 2), ("unloaded_point", 2, 12)]:
+                raise ValueError("DG02 short diagnostic schedule differs from its frozen 2+10 intervals")
     for row in plan["code"]["tracked_inputs"]:
         path = Path(row["path"]).resolve(strict=True)
         if _sha(path) != row["sha256"]:
@@ -543,6 +558,9 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
             "PASS_CORE_N2_FORMAL_2X300"
             if primary_error is None and plan["oracle"]["episode_count"] == 2
             and plan["oracle"]["control_intervals_per_episode"] == 300
+            else "PASS_CORE_N2_SHORT_DIAGNOSTIC"
+            if primary_error is None
+            and plan["oracle"].get("probe_mode") == "point_response_micro_12_v1"
             else "PASS_CORE_N2_TRACKING_PROBE"
             if primary_error is None
             else "PARTIAL_CORE_N2"

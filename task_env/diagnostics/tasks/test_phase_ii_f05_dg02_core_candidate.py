@@ -282,12 +282,12 @@ def test_dg02_selected_pose_controller_does_not_integrate_unachieved_targets():
     _canonical, second_desired, second_servo = controller._compute_arm(_State(), request)
 
     assert F05_DG02_POSE_TARGET_METHOD == "achieved_state_dls_v1"
-    assert F05_DG02_NULLSPACE_REFERENCE_GAIN == 0.0
+    assert F05_DG02_NULLSPACE_REFERENCE_GAIN == 0.5
     np.testing.assert_allclose(second_desired, first_desired, atol=1e-12)
     np.testing.assert_allclose(second_servo, first_servo, atol=1e-12)
 
 
-def test_dg02_tracking_probe_worker_fails_closed_outside_500_steps(tmp_path):
+def test_dg02_tracking_probe_worker_fails_closed_outside_frozen_step_modes(tmp_path):
     import hashlib
     import json
     import subprocess
@@ -349,7 +349,37 @@ def test_dg02_tracking_probe_worker_fails_closed_outside_500_steps(tmp_path):
     assert accepted["limits"]["physics_steps_reserved"] == 500
     assert verified_hash == digest
 
+    plan["oracle"].update({
+        "probe_mode": "point_response_micro_12_v1",
+        "control_intervals_per_episode": 12,
+        "horizon": 12,
+        "schedule": [
+            {"phase": "unloaded_home_hold", "start": 0, "stop": 2},
+            {"phase": "unloaded_point", "start": 2, "stop": 12},
+        ],
+    })
+    plan["source"]["candidate_horizon"] = 12
+    plan["limits"]["physics_steps_reserved"] = 60
+    plan["limits"]["physics_steps_before"] = 17940
+    raw = json.dumps(plan, sort_keys=True).encode()
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    sidecar.write_text(digest + "\n", encoding="ascii")
+    accepted, verified_hash = _verify(path, sidecar)
+    assert accepted["limits"]["physics_steps_reserved"] == 60
+    assert verified_hash == digest
+
+    plan["limits"]["physics_steps_reserved"] = 65
+    raw = json.dumps(plan, sort_keys=True).encode()
+    path.write_bytes(raw)
+    sidecar.write_text(hashlib.sha256(raw).hexdigest() + "\n", encoding="ascii")
+    with pytest.raises(ValueError, match="60-step envelope"):
+        _verify(path, sidecar)
+
     plan["oracle"]["control_intervals_per_episode"] = 101
+    plan["oracle"]["probe_mode"] = "bounded_tracking_100_v1"
+    plan["oracle"]["horizon"] = 100
+    plan["source"]["candidate_horizon"] = 100
     plan["limits"]["physics_steps_reserved"] = 505
     raw = json.dumps(plan, sort_keys=True).encode()
     path.write_bytes(raw)

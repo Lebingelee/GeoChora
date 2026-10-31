@@ -49,10 +49,28 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
     if len(frozen_reader_rows) != 1:
         raise ValueError("tracking probe plan does not bind exactly one cold-reader source")
     frozen_reader_sha256 = frozen_reader_rows[0]["sha256"]
-    if (plan["oracle"]["episode_count"] != 1
-            or plan["oracle"]["control_intervals_per_episode"] != 100
-            or plan["limits"]["physics_steps_reserved"] != 500):
-        raise ValueError("tracking probe plan differs from the frozen one-episode 500-step envelope")
+    oracle = plan["oracle"]
+    probe_mode = oracle.get("probe_mode", "bounded_tracking_100_v1")
+    if probe_mode == "bounded_tracking_100_v1":
+        expected_intervals, expected_steps = 100, 500
+    elif probe_mode == "point_response_micro_12_v1":
+        expected_intervals, expected_steps = 12, 60
+    else:
+        raise ValueError("tracking probe reader received an unsupported diagnostic mode")
+    if (oracle["episode_count"] != 1
+            or oracle["control_intervals_per_episode"] != expected_intervals
+            or oracle["control_substeps"] != 5
+            or oracle["horizon"] != expected_intervals
+            or plan["source"]["candidate_horizon"] != expected_intervals
+            or plan["limits"]["physics_steps_reserved"] != expected_steps):
+        raise ValueError(f"tracking probe plan differs from its frozen {expected_steps}-step envelope")
+    if probe_mode == "point_response_micro_12_v1":
+        schedule = oracle.get("schedule", [])
+        if [
+            (row.get("phase"), int(row.get("start", -1)), int(row.get("stop", -1)))
+            for row in schedule
+        ] != [("unloaded_home_hold", 0, 2), ("unloaded_point", 2, 12)]:
+            raise ValueError("short diagnostic schedule differs from its frozen 2+10 intervals")
 
     normalization_ref = plan["source"].get("control_oracles")
     if not isinstance(normalization_ref, dict):
@@ -86,7 +104,12 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
             or worker.get("physics_steps_attempted") != expected_steps
             or worker.get("physics_steps_completed") != expected_steps):
         raise ValueError("tracking probe did not complete its exact frozen step reservation")
-    if worker.get("status") != "PASS_CORE_N2_TRACKING_PROBE":
+    expected_worker_status = (
+        "PASS_CORE_N2_SHORT_DIAGNOSTIC"
+        if probe_mode == "point_response_micro_12_v1"
+        else "PASS_CORE_N2_TRACKING_PROBE"
+    )
+    if worker.get("status") != expected_worker_status:
         raise ValueError(f"tracking probe worker failed: {worker.get('failure')}")
     if worker.get("episode_count") != 1 or len(worker.get("episodes", [])) != 1:
         raise ValueError("tracking probe worker did not produce exactly one episode")
@@ -96,7 +119,6 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
     episode = worker["episodes"][0]
     if episode.get("h5_sha256") != h5_sha256:
         raise ValueError("tracking probe H5 hash differs from the worker receipt")
-    oracle = plan["oracle"]
     interval_count = int(oracle["control_intervals_per_episode"])
     joint_order = [str(value) for value in oracle["joint_order"]]
     arm_names = [f"joint{index}" for index in range(1, 8)]
@@ -180,14 +202,23 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
     required_phases = ("unloaded_home_hold", "unloaded_point")
     if set(phase_index) != set(required_phases):
         raise ValueError("tracking probe does not bind exactly the planned home and point phases")
+    microprobe_metrics = []
     for phase_name in required_phases:
         phase = phase_index[phase_name]
-        first, stop = int(phase["stop"]) - 9, int(phase["stop"]) + 1
+        if probe_mode == "point_response_micro_12_v1":
+            first = max(int(phase["start"]), int(phase["stop"]) - 4)
+            stop = int(phase["stop"]) + 1
+        else:
+            first, stop = int(phase["stop"]) - 9, int(phase["stop"]) + 1
         target = np.asarray([float(phase["arm_target_position_rad"][name]) for name in arm_names])
         q = typed_positions[first:stop, :7]
         dq = typed_velocities[first:stop, :]
-        if q.shape != (10, 7) or dq.shape != (10, 7):
-            raise ValueError(f"late-window selection for {phase_name} did not yield ten boundaries")
+        expected_boundaries = (stop - first)
+        minimum_boundaries = 2 if phase_name == "unloaded_home_hold" else 5
+        if q.shape != (expected_boundaries, 7) or dq.shape != (expected_boundaries, 7):
+            raise ValueError(f"late-window selection for {phase_name} yielded an invalid boundary shape")
+        if probe_mode == "point_response_micro_12_v1" and expected_boundaries < minimum_boundaries:
+            raise ValueError(f"short diagnostic has too few {phase_name} boundaries")
         target_error = float(np.max(np.abs(q - target[None, :])))
         jitter = float(np.max(np.ptp(q, axis=0)))
         velocity = float(np.max(np.abs(dq)))
@@ -199,6 +230,7 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
         row = {
             "phase": phase_name,
             "boundary_indices_inclusive": [first, stop - 1],
+            "sampled_boundaries": expected_boundaries,
             "late_max_abs_target_error_rad": target_error,
             "late_max_joint_p2p_rad": jitter,
             "late_max_abs_velocity_rad_s": velocity,
@@ -206,6 +238,12 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
             "frozen_jitter_limit_rad": float(oracle["tracking"]["late_hold_peak_to_peak_rad"]),
             "frozen_velocity_limit_rad_s": float(oracle["tracking"]["late_hold_max_abs_velocity_rad_s"]),
         }
+        if probe_mode == "point_response_micro_12_v1":
+            row["acceptance_evaluated"] = False
+            row["interpretation"] = "descriptive short-window measurement; not an acceptance gate"
+            microprobe_metrics.append(row)
+            gates.append(row)
+            continue
         row["pass"] = (
             target_error <= row["frozen_target_error_limit_rad"]
             and jitter <= row["frozen_jitter_limit_rad"]
@@ -219,7 +257,12 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
         "schema_version": "f05-dg02-core-tracking-probe-reader-v2",
         "run_id": plan["run_id"],
         "classification": plan["classification"],
-        "status": "PASS_BOUNDED_TRACKING_PROBE" if not failed else "FAIL_BOUNDED_TRACKING_PROBE",
+        "status": (
+            "DIAGNOSTIC_ONLY_SHORT_PROBE"
+            if probe_mode == "point_response_micro_12_v1"
+            else "PASS_BOUNDED_TRACKING_PROBE" if not failed else "FAIL_BOUNDED_TRACKING_PROBE"
+        ),
+        "probe_mode": probe_mode,
         "formal_cell_pass": False,
         "qualification_granted": False,
         "plan_path": str(plan_path),
@@ -242,6 +285,7 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
         "controller_method": oracle["controller_method"],
         "controller_action_config": oracle["controller_action_config"],
         "tracking_gates": gates,
+        "short_probe_metrics": microprobe_metrics,
         "failed_phases": failed,
     }
     result_path = Path(plan["output"]["tracking_probe_reader_receipt"]).resolve()
@@ -256,7 +300,9 @@ def main() -> int:
     args = parser.parse_args()
     result = read_probe(args.plan, args.plan_sha256)
     print(json.dumps(result, sort_keys=True, indent=2, allow_nan=False))
-    return 0 if result["status"] == "PASS_BOUNDED_TRACKING_PROBE" else 1
+    return 0 if result["status"] in {
+        "PASS_BOUNDED_TRACKING_PROBE", "DIAGNOSTIC_ONLY_SHORT_PROBE",
+    } else 1
 
 
 if __name__ == "__main__":
