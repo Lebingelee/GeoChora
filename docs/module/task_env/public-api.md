@@ -970,6 +970,28 @@ not establish a passing Core cell. The cold reader itself completed under a
 600-second host supervisor, which recorded its process-group resources and
 exit; the reader's tracking failure remains the acceptance result.
 
+Two additional 500-step bounded probes used the same source-bound public Core
+route and the unchanged ActionConfig, source, schedule and thresholds. Probe
+001 (`achieved_state_dls_v1`, nullspace reference gain 1.0) passed home hold
+but failed point hold at 0.10227 rad target error, 5.48838 rad/s peak velocity
+and 0.05219 rad peak-to-peak jitter. Probe 002 changed only the DG02-specific
+nullspace reference gain to 0.0: home hold again passed; point hold still
+failed at 0.06816 rad, 4.30769 rad/s and 0.10461 rad respectively. Target
+error and speed improved while jitter worsened; neither probe is a formal N2
+cell or passing candidate. The independent readers verified 101 observations,
+100 transitions and 500 public advances per probe. Probe 001's reader was
+corrected after its worker to use the SHA-bound frozen control-oracles source
+for USD float32 normalization; its receipt preserves both the frozen and
+read-time reader hashes. Probe 002 used that corrected reader at the hash bound
+by its plan.
+
+The frozen cumulative probe budget is now 17,940 attempted / 17,920 completed
+of 18,000 steps, leaving 60. The unchanged formal N2 acceptance rerun requires
+3,000 steps and does not fit. DG02 therefore remains `PARTIAL`; continue only
+under a new frozen rework budget. The latest bounded candidate is committed at
+Core `78ea8cdb`; the isolated provider remains `f4d3b3bb`. No source,
+ActionConfig, or acceptance threshold was relaxed.
+
 Keep the source `local-validated` with `source_verified=false`; do not infer
 cross-solver geometry/material equivalence, source-independent GeoPhys/USD
 support, Isaac/USD readiness, task success, or Qualification. The earlier F05

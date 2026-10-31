@@ -103,4 +103,4 @@ USD delivery loader 是独立的 advanced source intake：它绑定精确交付 
 MJCF-only `RuntimeSource`，也不自动授予任一 Provider 的 runtime admission。
 
 
-**DG01 Sol接收 / DG02下一包（2026-10-30）：** 精确DG01单元已接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`。Sol修复实际obs核验后，原H5冷读通过602obs、600transitions、3000steps和22类负例；原producer/H5未改，无新native。DG02已准备保真USD→GeoPhys公开约束/传动消费者→既有Core的长期Goal包，等待维护者转述；尚未获得该路线通过结论。旧F05 overall partial不变，DG03/F06/F07仍未启动，详见[当前编排](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md)。
+**F05 successor DG01/DG02 状态（2026-10-31）：** 精确DG01单元已由Sol接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`。DG02已实施单一GeoPhys/USD public-provider route并完成源绑定、语义探针、Core S1和正式N2运行；正式N2的source/contact/storage/负例冷读通过，但Core point/后续阶段tracking门失败。两次500步定向Core probe仍未通过point-hold；当前DG02为`PARTIAL`，累计probe预算17,940/18,000步，正式3,000步复验需维护者冻结追加预算。旧F05三轮/PARTIAL保持不变，DG03/F06/F07未启动，详见[当前编排与证据](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window001-geophys-usd-in-progress)。

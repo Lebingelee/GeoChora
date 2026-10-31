@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001 已完成一次Core N2正式运行和独立冷读，但控制tracking门失败，整体保留PARTIAL并等待复核/续窗。DG03仍为待适配基线。**
+> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001 已完成正式Core N2及两次有界修复probe，point-hold tracking仍失败，整体保留PARTIAL。probe累计预算仅余60步，正式复验需要维护者重新冻结预算。DG03仍为待适配基线。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -105,4 +105,6 @@ N2正式run `DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_019`使用已提�
 
 为补齐G7，reader后来在独立host supervisor下重跑：parent记录600秒上限、0.25秒采样、约603 MB峰值RSS、15.85 CPU秒、单进程、exit 1、process group清空、共享锁前后空闲；reader结果仍为tracking gate失败。这是有界reader完成证据，不改变G6失败结论。此前无OpenUSD路径的冷读尝试在导入期因缺少`pxr`失败、未生成receipt；按冻结runtime路径重跑后得到上述结果。
 
-DG02目标/阈值未放宽。剩余probe预算不足以重跑要求的3,000-step正式cell，不能在本冻结预算内宣称修复或完整PASS；需要先定位并修复实际Core position tracking，再由维护者冻结足够的续窗预算与正式复验。source仍是`local-validated`且`source_verified=false`；不推断通用GeoPhys/USD、Isaac/USD或跨solver接触/材料等价。不启动DG03、F06/F07或Qualification。旧F05三轮/PARTIAL、接受的DG01、r009及历史输出均不改。
+DG02目标/阈值未放宽。N2_019失败后，在同一source-bound Core/GeoPhys/USD route上执行了两个500-step定向probe。probe001使用`achieved_state_dls_v1`、reset-posture nullspace gain 1.0，home hold通过、point hold失败：晚段目标误差`0.10227 rad`、峰值速度`5.48838 rad/s`、峰峰值抖动`0.05219 rad`。probe002只将DG02专属nullspace gain改为0.0，home hold通过、point hold仍失败：`0.06816 rad`、`4.30769 rad/s`、`0.10461 rad`；前两项改善但抖动恶化。两个worker均完成500/500，但都不是formal N2或通过的Core cell。probe001 reader发现阈值schema读取缺陷后作了冷读修复，receipt同时记录冻结reader hash和read-time hash；probe002计划绑定修正后的reader hash并通过独立冷读。
+
+累计probe计数现为`17,940 attempted / 17,920 completed / 18,000 max`，只剩60步。原正式两集N2仍需3,000步，因此本冻结预算不能完成正式复验，也不能把bounded probe写成PASS。下一步必须先以新的冻结预算继续定位/修复实际Core point tracking，再按原阈值完成正式N2与冷读。当前Core实现commit为`78ea8cdb06d17792f2c774fbcca52bfd373cbff0`；GeoPhys隔离provider仍为`f4d3b3bb21882bac5ca007e657f5d6709a6189b8`。source仍为`local-validated`且`source_verified=false`；不推断通用GeoPhys/USD、Isaac/USD或跨solver接触/材料等价。不启动DG03、F06/F07或Qualification。旧F05三轮/PARTIAL、接受的DG01、r009及历史输出均不改。

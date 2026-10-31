@@ -247,9 +247,14 @@ Keep this as an internal, source-specific diagnostic route. The source remains
 `local-validated` with `source_verified=false`; do not infer generic GeoPhys/USD
 admission, cross-solver material/contact equivalence, Isaac/USD support, task
 success or Qualification. Do not start DG03, F06 or F07 from this checkpoint.
-For a request to continue, first repair the measured Core position tracking and
-obtain a new frozen budget large enough for the unchanged two-episode formal
-rerun. See the [current DG02 result](../../../docs/module/task_env/public-api.md#f05-dg02-window001-geophys-usd-in-progress)
+Two bounded follow-up probes still failed point-hold gates: nullspace gain 1.0
+gave 0.10227 rad error / 5.48838 rad/s velocity / 0.05219 rad jitter;
+nullspace gain 0.0 improved error and speed to 0.06816 rad / 4.30769 rad/s,
+but worsened jitter to 0.10461 rad. Both passed home hold and preserved the
+frozen ActionConfig, source, schedule and thresholds. Cumulative probe budget
+is 17,940/18,000 attempted steps; a 3,000-step formal rerun requires a new
+frozen budget. For a request to continue, repair the measured Core point
+tracking and obtain that budget before any formal rerun. See the [current DG02 result](../../../docs/module/task_env/public-api.md#f05-dg02-window001-geophys-usd-in-progress)
 and [three-Goal record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window001-geophys-usd-in-progress).
 
 **TaskEnv Skill refresh receipt — DG02 window001 (2026-10-31; PARTIAL):** trigger
@@ -272,6 +277,19 @@ in the execution record. Link/metadata checks, cold-start routing walkthrough,
 and the supervisor-bound G7 receipt are retained in the ignored Goal output
 package. This update grants no capability or Qualification; Sol review and a
 newly frozen rework budget are required before the route can pass.
+
+**Bounded tracking probe continuation (2026-10-31):** Two actual
+SelectedReferenceEnv/PositionServoV1 → GeoPhys/USD probes used 500 steps each.
+The first cold reader encountered a reader implementation schema mismatch;
+the follow-up reader fixed it by resolving USD float32 tolerance from the
+SHA-bound frozen `control_oracles.json`, recorded frozen/read-time reader
+hashes, and independently verified 101 observations, 100 transitions and 500
+advances. Probe 001 failed point-hold tracking. Probe 002 was frozen against
+Core `78ea8cdb`, used nullspace gain 0.0, and its plan-bound reader also
+returned `FAIL_BOUNDED_TRACKING_PROBE`; it is a bounded diagnostic, not a
+formal N2 pass. The current implementation and evidence remain at Core
+`78ea8cdb06d17792f2c774fbcca52bfd373cbff0`; do not advertise a passing
+controller or Qualification.
 
 ## Static Position leaf contracts (R02a)
 
