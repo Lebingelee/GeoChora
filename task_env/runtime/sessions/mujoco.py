@@ -1459,8 +1459,10 @@ class _MuJoCoSession(_SessionValues):
 
     def _addresses(self, name, *, free):
         joint = self._model.joint(name).id
-        allowed = (self._mj.mjtJoint.mjJNT_FREE,) if free else (self._mj.mjtJoint.mjJNT_HINGE, self._mj.mjtJoint.mjJNT_SLIDE)
-        if self._model.jnt_type[joint] not in allowed:
+        joint_type = int(self._model.jnt_type[joint])
+        allowed = ((int(self._mj.mjtJoint.mjJNT_FREE),) if free else
+                   (int(self._mj.mjtJoint.mjJNT_HINGE), int(self._mj.mjtJoint.mjJNT_SLIDE)))
+        if joint_type not in allowed:
             raise ValueError('unsupported source joint representation')
         return int(self._model.jnt_qposadr[joint]), int(self._model.jnt_dofadr[joint])
 
