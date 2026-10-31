@@ -273,9 +273,12 @@ def _mixed_actuator_manifest(artifact, execution, source):
     if (source.config.runtime.physics_dt != artifact.timebase.physics_dt
             or source.config.runtime.control_substeps != artifact.timebase.control_substeps
             or source.config.runtime.backend != 'cpu'
-            or source.config.runtime.integrator != 'implicitfast'
+            or source.config.runtime.integrator not in ('implicitfast', 'euler')
             or source.config.render.camera_obs):
-        raise ValueError('mixed actuator source requires the supported strict scalar CPU envelope')
+        raise ValueError(
+            'mixed actuator source requires the supported strict scalar CPU envelope '
+            'with an implicitfast or euler integrator'
+        )
     receipt = getattr(source, 'execution_source_receipt', None)
     if (receipt is None or source.scene_definition is not None
             or source.scene_source.source_id != receipt.source_id

@@ -609,7 +609,7 @@ def _candidate(monkeypatch, *, horizon=4):
     return env
 
 
-def _synthetic_mixed_candidate(monkeypatch, *, horizon=4):
+def _synthetic_mixed_candidate(monkeypatch, *, horizon=4, integrator="implicitfast"):
     """Build a different-name, different-dimension candidate through production owners."""
     import hashlib
     from gymnasium.spaces import Box, Dict
@@ -634,9 +634,9 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4):
     _FAKE_WORLD.contact_pair = lambda model, data: (
         model._geom_ids["anchor_collision"], model._geom_ids["payload_collision"],
     )
-    xml = b'''<mujoco model="synthetic_three_channel_fixture">
+    xml = f'''<mujoco model="synthetic_three_channel_fixture">
       <compiler angle="radian"/>
-      <option timestep="0.002" integrator="implicitfast"/>
+      <option timestep="0.002" integrator="{integrator}"/>
       <worldbody>
         <body name="anchor_body" pos="0 0 0">
           <joint name="hinge_orchid" type="hinge" range="-2 2" limited="true"/>
@@ -657,7 +657,7 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4):
         <motor name="motor_cobalt" joint="hinge_cobalt" ctrllimited="true" ctrlrange="-1 1"/>
         <position name="servo_fern" joint="slide_fern" kp="25" kv="1" ctrllimited="true" ctrlrange="0 0.2"/>
       </actuator>
-    </mujoco>'''
+    </mujoco>'''.encode("utf-8")
     artifact = TaskArtifact(
         "task-artifact-v0", "synthetic-three-channel-v1", "synthetic-contact-motion-v1", "fixture-v1",
         WorldDefinition(
@@ -698,7 +698,7 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4):
         task_uid=artifact.task_id, scene_uid="synthetic-scene-v1",
         runtime={
             "backend": "cpu", "physics_dt": 0.002, "control_substeps": 2,
-            "integrator": "implicitfast", "prewarm": False,
+            "integrator": integrator, "prewarm": False,
         },
         render={"camera_obs": False}, episode={"horizon": horizon, "ignore_done": False},
         success_definition="synthetic_bounded_motion",
@@ -996,6 +996,41 @@ def _synthetic_mixed_candidate(monkeypatch, *, horizon=4):
         binding, provider="mujoco", backend="cpu", horizon=horizon,
     )
     return env
+
+
+@pytest.mark.parametrize("integrator", ("implicitfast", "euler"))
+def test_generic_mixed_actuator_admits_source_bound_cpu_integrators(
+        monkeypatch, integrator):
+    """Both admitted source integrators materialize through the shared Core Runtime."""
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=1, integrator=integrator)
+    try:
+        observation, info = env.reset(seed=51)
+        assert env.value["source"].config.runtime.integrator == integrator
+        assert info["control_step"] == 0
+        assert env.session is not None
+        assert observation["state"]["joint_position"].shape == (3,)
+        _, _, _, _, step_info = env.step(np.asarray([0.0, 0.0, 0.03]))
+        assert step_info["mixed_actuator_command_v1"]["channel_values"]["slide_fern"] == pytest.approx(0.03)
+    finally:
+        env.close()
+    assert env.close_receipt["session_closed"] is True
+
+
+def test_generic_mixed_actuator_rejects_unadmitted_source_integrator(monkeypatch):
+    """An arbitrary MJCF integrator stays outside the generic strict CPU envelope."""
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _synthetic_mixed_candidate(monkeypatch, horizon=1, integrator="rk4")
+    try:
+        with pytest.raises(ValueError, match="implicitfast or euler integrator"):
+            env.reset(seed=52)
+        assert env.session is None
+    finally:
+        env.close()
 
 
 def _read_synthetic_mixed_h5(path: Path):

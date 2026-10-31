@@ -40,6 +40,7 @@ from .init_state import (
     INIT_SHA256, PILOT_SOURCE_MANIFEST_SHA256, decode_pruned_init_bytes,
     init_layout_v1, sample_libero_normal_reset_v1,
 )
+from .model_profile import normalize_libero_robosuite_model_xml_v2
 
 
 PROFILE_ID = 'libero-spatial-bowl-to-plate-mixed-v1'
@@ -146,14 +147,28 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool = False) -> TaskArtif
 def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         install_root: Path, composition_plan_path: Path,
                         init_path: Path, horizon: int, solution_profile: bool = False):
-    xml_bytes = Path(xml_path).read_bytes() if xml_bytes_override is None else bytes(xml_bytes_override)
+    raw_xml_bytes = Path(xml_path).read_bytes() if xml_bytes_override is None else bytes(xml_bytes_override)
     plan_bytes = Path(composition_plan_path).read_bytes()
     plan = json.loads(plan_bytes)
     if plan.get('output', {}).get('status') != 'SOURCE_MJCF_COMPOSED_NOT_NATIVE_COMPILED':
         raise ValueError('R07c source plan must remain explicitly source-composed and not precompiled')
     expected_xml_sha = plan['output']['composed_mjcf_sha256']
-    if hashlib.sha256(xml_bytes).hexdigest() != expected_xml_sha:
+    if hashlib.sha256(raw_xml_bytes).hexdigest() != expected_xml_sha:
         raise ValueError('candidate MJCF differs from its frozen composition plan')
+    runtime_model_xml_bytes = raw_xml_bytes
+    model_profile_receipt = None
+    model_profile_bytes = None
+    if solution_profile:
+        runtime_model_xml_bytes, model_profile_receipt = normalize_libero_robosuite_model_xml_v2(
+            raw_xml_bytes,
+        )
+        model_profile_bytes = json.dumps(
+            model_profile_receipt, sort_keys=True, separators=(',', ':'), allow_nan=False,
+        ).encode('utf-8')
+    runtime_model_xml_sha = hashlib.sha256(runtime_model_xml_bytes).hexdigest()
+    model_profile_sha = (
+        None if model_profile_bytes is None else hashlib.sha256(model_profile_bytes).hexdigest()
+    )
     install_root = Path(install_root).resolve(strict=True)
     init_path = Path(init_path).resolve(strict=True)
     init_bytes = init_path.read_bytes()
@@ -165,13 +180,17 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     source_manifest = json.loads(manifest_bytes)
     artifact = _artifact(init_bytes, solution_profile=solution_profile)
 
-    importer_xml = xml_bytes
+    importer_xml = runtime_model_xml_bytes
     external_assets = source_asset_bytes(install_root, importer_xml.decode('utf-8'))
-    closure = {'canonical-source.xml': xml_bytes, **external_assets}
+    closure = {'canonical-source.xml': runtime_model_xml_bytes, **external_assets}
+    source_id = (
+        f'libero-spatial-pilot-model-profile-v2:{expected_xml_sha}:{model_profile_sha}:{runtime_model_xml_sha}'
+        if solution_profile else f'libero-spatial-pilot-v1:{expected_xml_sha}'
+    )
     source_receipt = ExecutionSourceReceiptV1.create(
-        source_id=f'libero-spatial-pilot-v1:{expected_xml_sha}',
-        canonical_xml=xml_bytes, importer_xml=importer_xml, closure_files=closure,
-        expected_canonical_xml_sha256=expected_xml_sha,
+        source_id=source_id,
+        canonical_xml=runtime_model_xml_bytes, importer_xml=importer_xml, closure_files=closure,
+        expected_canonical_xml_sha256=runtime_model_xml_sha,
     )
     scene_source = TaskSceneSource(
         xml=importer_xml.decode('utf-8'), base_dir=source_receipt.snapshot_root,
@@ -223,7 +242,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         task_uid=TASK_ID, scene_uid=SCENE_ID,
         runtime={
             'backend': 'cpu', 'physics_dt': 0.002, 'control_substeps': 25,
-            'integrator': 'implicitfast', 'prewarm': False,
+            'integrator': 'euler', 'prewarm': False,
         },
         render={'camera_obs': False}, episode={'horizon': horizon, 'ignore_done': False},
         success_definition=(
@@ -237,11 +256,11 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
         from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
         tcp_profile = derive_panda_tcp_profile_v2(
-            xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
+            runtime_model_xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
             hand_frame_id='robot0_right_hand', site_name='gripper0_grip_site',
         )
         arm_kinematics = PandaKinematics(
-            xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
+            runtime_model_xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
             base_body_id='robot0_link0',
         )
         arm_resolver = CanonicalPandaController(
@@ -326,7 +345,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     if solution_profile:
         from .solution import solution_identity_v5
         solution_identity = solution_identity_v5(
-            expected_xml_sha, source_receipt.source_closure_digest,
+            runtime_model_xml_sha, source_receipt.source_closure_digest,
             arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
         )
     return {
@@ -337,6 +356,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                            'robosuite:fbee5844ff5632f5b5698e204ec5357ca50be0df',
         'source_sha256': {
             'composed_candidate_xml': expected_xml_sha,
+            'runtime_model_xml': runtime_model_xml_sha,
+            'model_profile_receipt': model_profile_sha,
             'composition_plan': hashlib.sha256(plan_bytes).hexdigest(),
             'source_manifest': hashlib.sha256(manifest_bytes).hexdigest(),
             'pruned_init': hashlib.sha256(init_bytes).hexdigest(),
@@ -351,7 +372,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         }),
         'solution_identity': solution_identity,
         'arm_resolver': arm_resolver,
-        'source_xml_bytes': xml_bytes,
+        'source_xml_bytes': raw_xml_bytes,
+        'runtime_model_xml_bytes': runtime_model_xml_bytes,
+        'model_profile_bytes': model_profile_bytes,
+        'model_profile_receipt': model_profile_receipt,
         'solution_profile': bool(solution_profile),
         'resolved_configuration': asdict(config),
         'reset_realizations': {},
@@ -412,9 +436,12 @@ def build_libero_selected_candidate(
             raise RuntimeError('task Solution source identity must be built before binding gravity feed-forward')
         if (getattr(model, 'profile_id', None) != 'libero-source-mjcf-gravity-bias-v1'
                 or getattr(model, 'source_xml_sha256', None)
-                != source['source_sha256']['composed_candidate_xml']
+                != source['source_sha256']['runtime_model_xml']
                 or getattr(model, 'source_closure_digest', None)
                 != source['source_sha256']['source_closure_digest']
+                or getattr(model, 'model_profile_id', None) != 'libero-robosuite-panda-layout-seed19-v2'
+                or getattr(model, 'model_profile_receipt_sha256', None)
+                != source['source_sha256']['model_profile_receipt']
                 or not callable(getattr(model, 'gravity_torque', None))
                 or (_solution_profile
                     and not callable(getattr(model, 'operational_space_state_v1', None)))):
@@ -423,7 +450,7 @@ def build_libero_selected_candidate(
         if live_env is not None and live_env.controller.gravity_bias_model is None:
             live_env.controller.set_source_gravity_model(
                 model,
-                source_xml_sha256=source['source_sha256']['composed_candidate_xml'],
+                source_xml_sha256=source['source_sha256']['runtime_model_xml'],
                 source_closure_digest=source['source_sha256']['source_closure_digest'],
             )
         elif (live_env is not None
@@ -455,6 +482,13 @@ def build_libero_selected_candidate(
                         'model_identity_sha256': getattr(model, 'model_identity_sha256', None),
                         'source_xml_sha256': getattr(model, 'source_xml_sha256', None),
                         'source_closure_digest': getattr(model, 'source_closure_digest', None),
+                        **({
+                            'raw_source_xml_sha256': getattr(model, 'raw_source_xml_sha256', None),
+                            'model_profile_id': getattr(model, 'model_profile_id', None),
+                            'model_profile_receipt_sha256': getattr(
+                                model, 'model_profile_receipt_sha256', None,
+                            ),
+                        } if getattr(model, 'model_profile_id', None) is not None else {}),
                         'model_created': True, 'closed': True,
                         'model_released': True, 'data_released': True,
                         'close_receipt_recovered': False,
@@ -516,7 +550,7 @@ def build_libero_selected_candidate(
             if model is not None:
                 value['controller'].set_source_gravity_model(
                     model,
-                    source_xml_sha256=value['source_sha256']['composed_candidate_xml'],
+                    source_xml_sha256=value['source_sha256']['runtime_model_xml'],
                     source_closure_digest=value['source_sha256']['source_closure_digest'],
                 )
         if _solution_profile:
@@ -912,7 +946,7 @@ def build_libero_selected_candidate(
 
         if not isinstance(solution, LiberoPickPlaceSolutionV5):
             raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV5')
-        expected_source = value['source_sha256']['composed_candidate_xml']
+        expected_source = value['source_sha256']['runtime_model_xml']
         expected_closure = value['source_sha256']['source_closure_digest']
         if (solution.task_uid != value['artifact'].task_id
                 or solution.source_xml_sha256 != expected_source
@@ -957,7 +991,7 @@ def build_libero_selected_candidate(
         env.metadata.update({
             'provider': 'mujoco', 'backend': 'cpu',
             'solution_identity': env.value['solution_identity'],
-            'source_xml_sha256': env.value['source_sha256']['composed_candidate_xml'],
+            'source_xml_sha256': env.value['source_sha256']['runtime_model_xml'],
             'source_closure_digest': env.value['source_sha256']['source_closure_digest'],
         })
     # The shared sample owner retains reset and source facts for the public

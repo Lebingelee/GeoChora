@@ -432,10 +432,20 @@ def sample_libero_normal_reset_v1(
         raise ValueError("LIBERO init row must be in [0,49]")
     decoded = decode_pruned_init_bytes(init_bytes)
     regions, ordered_states = _task_regions_and_initial_state(install_root, source_manifest)
-    source_digest = source_id.split(":", 1)[1] if isinstance(source_id, str) and ":" in source_id else ""
-    if (not isinstance(source_id, str) or not source_id.startswith("libero-spatial-pilot-v1:")
-            or not re.fullmatch(r"[0-9a-f]{64}", source_digest)
-            or not isinstance(source_closure_digest, str) or len(source_closure_digest) != 64):
+    source_parts = source_id.split(":") if isinstance(source_id, str) else []
+    legacy_source_identity = (
+        len(source_parts) == 2
+        and source_parts[0] == "libero-spatial-pilot-v1"
+        and bool(re.fullmatch(r"[0-9a-f]{64}", source_parts[1]))
+    )
+    profiled_source_identity = (
+        len(source_parts) == 4
+        and source_parts[0] == "libero-spatial-pilot-model-profile-v2"
+        and all(re.fullmatch(r"[0-9a-f]{64}", value) for value in source_parts[1:])
+    )
+    if (not (legacy_source_identity or profiled_source_identity)
+            or not isinstance(source_closure_digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", source_closure_digest)):
         raise ValueError("LIBERO candidate source/closure identity is malformed")
     import numpy as np
     rng = np.random.RandomState(task_seed)

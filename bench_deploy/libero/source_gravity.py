@@ -117,7 +117,9 @@ class MujocoSourceGravityBiasV1:
 
     def __init__(self, *, bundle_root: Path, source_closure_files: Mapping[str, bytes],
                  source_xml_sha256: str, source_closure_digest: str,
-                 composition_plan_sha256: str, mujoco_api=None):
+                 composition_plan_sha256: str, mujoco_api=None,
+                 raw_source_xml_bytes: bytes | None = None,
+                 model_profile_bytes: bytes | None = None):
         bundle = Path(bundle_root)
         if bundle.is_symlink():
             raise ValueError("gravity-bias bundle root must not be a symlink")
@@ -144,6 +146,44 @@ class MujocoSourceGravityBiasV1:
                 or _sha256(xml) != source_xml_sha256
                 or _source_closure_digest(files) != source_closure_digest):
             raise ValueError("gravity-bias source XML or closure identity does not recompute")
+        profiled_source = raw_source_xml_bytes is not None or model_profile_bytes is not None
+        if profiled_source:
+            if type(raw_source_xml_bytes) is not bytes or type(model_profile_bytes) is not bytes:
+                raise ValueError("profiled gravity model requires raw MJCF and profile receipt bytes")
+            try:
+                profile_receipt = json.loads(model_profile_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError("model profile receipt is not valid UTF-8 JSON") from exc
+            canonical_profile = json.dumps(
+                profile_receipt, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+            if canonical_profile != model_profile_bytes:
+                raise ValueError("model profile receipt is not canonically serialized")
+            from .model_profile import normalize_libero_robosuite_model_xml_v2
+            transformed, expected_profile = normalize_libero_robosuite_model_xml_v2(raw_source_xml_bytes)
+            if (transformed != xml or canonical_profile != json.dumps(
+                    expected_profile, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")):
+                raise ValueError("profiled source XML differs from the deterministic task model transform")
+            raw_sha = _sha256(raw_source_xml_bytes)
+            if (profile_receipt.get("raw_source_xml_sha256") != raw_sha
+                    or profile_receipt.get("runtime_model_xml_sha256") != source_xml_sha256
+                    or profile_receipt.get("profile_id") != "libero-robosuite-panda-layout-seed19-v2"):
+                raise ValueError("model profile receipt does not bind the selected raw/runtime XML bytes")
+            raw_profile_path = source_root / "raw-composed-source.xml"
+            receipt_profile_path = source_root / "model-profile.json"
+            if (not raw_profile_path.is_file() or raw_profile_path.is_symlink()
+                    or raw_profile_path.read_bytes() != raw_source_xml_bytes
+                    or not receipt_profile_path.is_file() or receipt_profile_path.is_symlink()
+                    or receipt_profile_path.read_bytes() != model_profile_bytes):
+                raise ValueError("worker source bundle omits or changes the profiled raw source metadata")
+            model_profile_id = profile_receipt["profile_id"]
+            model_profile_receipt_sha256 = _sha256(model_profile_bytes)
+        else:
+            profile_receipt = None
+            raw_sha = None
+            model_profile_id = None
+            model_profile_receipt_sha256 = None
 
         expected_paths = set(files)
         if closure_root.exists():
@@ -173,8 +213,9 @@ class MujocoSourceGravityBiasV1:
         if _sha256(plan_bytes) != composition_plan_sha256:
             raise ValueError("gravity-bias composition plan hash differs from the selected source")
         plan = json.loads(plan_bytes.decode("utf-8"))
+        plan_xml_sha = raw_sha if profiled_source else source_xml_sha256
         if (plan.get("identity", {}).get("task_uid") != TASK_1
-                or plan.get("output", {}).get("composed_mjcf_sha256") != source_xml_sha256):
+                or plan.get("output", {}).get("composed_mjcf_sha256") != plan_xml_sha):
             raise ValueError("gravity-bias composition plan names a different task or XML")
 
         if mujoco_api is None:
@@ -197,6 +238,9 @@ class MujocoSourceGravityBiasV1:
         self.source_xml_sha256 = source_xml_sha256
         self.source_closure_digest = source_closure_digest
         self.composition_plan_sha256 = composition_plan_sha256
+        self.raw_source_xml_sha256 = raw_sha
+        self.model_profile_id = model_profile_id
+        self.model_profile_receipt_sha256 = model_profile_receipt_sha256
         self._qpos_addresses: list[int] = []
         self._dof_addresses: list[int] = []
         for index in range(1, 8):
@@ -221,7 +265,10 @@ class MujocoSourceGravityBiasV1:
             "api_version": int(mujoco_api.mj_version()),
         }
         identity_payload = {
-            "schema_version": "libero-source-gravity-model-identity-v1",
+            "schema_version": (
+                "libero-source-gravity-model-identity-v2" if profiled_source
+                else "libero-source-gravity-model-identity-v1"
+            ),
             "profile_id": self.profile_id,
             "task_uid": TASK_1,
             "source_xml_sha256": source_xml_sha256,
@@ -234,6 +281,13 @@ class MujocoSourceGravityBiasV1:
             "runtime": runtime,
             "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
         }
+        if profiled_source:
+            identity_payload.update({
+                "raw_source_xml_sha256": raw_sha,
+                "model_profile_id": model_profile_id,
+                "model_profile_receipt_sha256": model_profile_receipt_sha256,
+                "runtime_model_xml_sha256": source_xml_sha256,
+            })
         self.model_identity_sha256 = hashlib.sha256(json.dumps(
             identity_payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
         ).encode("utf-8")).hexdigest()
@@ -328,7 +382,7 @@ class MujocoSourceGravityBiasV1:
         }
 
     def identity_mapping(self) -> dict[str, object]:
-        return {
+        identity = {
             "profile_id": self.profile_id,
             "model_identity_sha256": self.model_identity_sha256,
             "source_xml_sha256": self.source_xml_sha256,
@@ -356,6 +410,13 @@ class MujocoSourceGravityBiasV1:
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": self.mj_step_calls,
         }
+        if self.model_profile_id is not None:
+            identity.update({
+                "raw_source_xml_sha256": self.raw_source_xml_sha256,
+                "model_profile_id": self.model_profile_id,
+                "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
+            })
+        return identity
 
     def close(self) -> dict[str, object]:
         if self.closed:
@@ -364,7 +425,7 @@ class MujocoSourceGravityBiasV1:
         self._model = None
         self._mujoco = None
         self.closed = True
-        return {
+        receipt = {
             "schema_version": "libero-source-gravity-model-close-v1",
             "profile_id": self.profile_id,
             "model_identity_sha256": self.model_identity_sha256,
@@ -377,6 +438,13 @@ class MujocoSourceGravityBiasV1:
             "model_released": self._model is None,
             "data_released": self._data is None,
         }
+        if self.model_profile_id is not None:
+            receipt.update({
+                "raw_source_xml_sha256": self.raw_source_xml_sha256,
+                "model_profile_id": self.model_profile_id,
+                "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
+            })
+        return receipt
 
 
 __all__ = ["MujocoSourceGravityBiasV1", "SOURCE_GRAVITY_PROFILE_V1",

@@ -31,7 +31,7 @@ episode
 | physics_dt | 0.002 | 物理时间步 |
 | control_substeps | 1 | 一个 control tick 的物理子步数 |
 | backend | cpu | cpu、vulkan 或 cuda |
-| integrator | implicitfast | GeoPhys runtime 积分器 |
+| integrator | implicitfast | GeoPhys runtime 积分器；MuJoCo strict CPU mixed-actuator source 可用其源 MJCF 声明的 `implicitfast` 或 `euler` |
 | broadphase | n2 | 场景 broadphase |
 | prewarm | true | 是否预热运行 kernel |
 | batch_physics_layout | merged_scene | 当前只支持 merged_scene |
