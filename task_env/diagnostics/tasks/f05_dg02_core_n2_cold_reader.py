@@ -44,6 +44,12 @@ def _json_dataset(file: h5py.File, name: str):
     return json.loads(_decode(file[name][()]))
 
 
+def _yaml_dataset(file: h5py.File, name: str):
+    from task_env.trajectory.metadata import load_metadata
+
+    return load_metadata(_decode(file[name][()]))
+
+
 def _h5_identity(path: Path) -> dict:
     stat = path.stat()
     with path.open("rb") as stream:
@@ -102,8 +108,8 @@ def _load_episode(path: Path) -> dict:
         events = _json_dataset(file, "meta/boundary_events_v1_json")
         outcome = _json_dataset(file, "meta/episode_outcome_v1_json")
         metadata = {
-            "env_meta": _json_dataset(file, "meta/env_meta"),
-            "env_cfg": _json_dataset(file, "meta/env_cfg"),
+            "env_meta": _yaml_dataset(file, "meta/env_meta"),
+            "env_cfg": _yaml_dataset(file, "meta/env_cfg"),
             "root_attrs": {str(key): _decode(value) for key, value in file.attrs.items()},
         }
         action = {}
