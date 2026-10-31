@@ -95,6 +95,17 @@ def _verify(plan_path: Path, sidecar: Path) -> tuple[dict, str]:
                 for row in schedule
             ] != [("unloaded_home_hold", 0, 2), ("unloaded_point", 2, 12)]:
                 raise ValueError("DG02 short diagnostic schedule differs from its frozen 2+10 intervals")
+    else:
+        oracle = plan["oracle"]
+        formal_horizon = int(oracle["control_intervals_per_episode"])
+        if (
+            int(oracle["horizon"]) != formal_horizon
+            or int(plan["source"]["candidate_horizon"]) != formal_horizon
+            or int(plan["source"].get("candidate_static_horizon", 0)) <= 0
+        ):
+            raise ValueError(
+                "formal N2 Candidate and its source oracle must share the full per-episode horizon"
+            )
     for row in plan["code"]["tracked_inputs"]:
         path = Path(row["path"]).resolve(strict=True)
         if _sha(path) != row["sha256"]:

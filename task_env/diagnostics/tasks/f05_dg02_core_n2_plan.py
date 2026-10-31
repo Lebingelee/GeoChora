@@ -400,6 +400,16 @@ def build_plan(*, output_root: Path, progress_path: Path,
         candidate_worker["candidate_controller_method"],
         candidate_worker["candidate_controller_identity_sha256"],
     )
+    formal_horizon = int(schedule_oracle["horizon"])
+    static_horizon = int(candidate_plan["source"]["candidate_horizon"])
+    if formal_horizon != int(schedule_oracle["control_intervals_per_episode"]):
+        raise ValueError("formal N2 horizon must match its frozen control-interval count")
+    # The zero-step candidate admission uses a short static horizon.  The
+    # formal run must rebuild the exact same candidate with its full oracle
+    # horizon; inheriting this field from the prior short S1 plan truncates
+    # the actual SelectedReferenceEnv before the formal interval-300 boundary.
+    original_source["candidate_static_horizon"] = static_horizon
+    original_source["candidate_horizon"] = formal_horizon
     budget_limits = budget["resource_envelope"]
     lock_path = Path(budget_limits["shared_native_lock_path"]).resolve()
     _assert_lock_free(lock_path)
