@@ -128,13 +128,18 @@ def _rotate_vector_wxyz(quaternion, vector) -> np.ndarray:
 def _stored_cube_pose_matches(stored, cube_pose) -> bool:
     """Compare the persisted privileged leaf with the typed public cube Frame."""
     try:
-        actual = np.asarray(stored)
+        actual = np.asarray(stored, dtype=np.float64)
         position = np.asarray(cube_pose["position"], dtype=np.float32)
-        quaternion = np.asarray(cube_pose["quaternion_wxyz"], dtype=np.float32)
+        quaternion = np.asarray(cube_pose["quaternion_wxyz"], dtype=np.float64)
+        if (actual.shape != (7,) or position.shape != (3,) or quaternion.shape != (4,)
+                or not np.isfinite(actual).all() or not np.isfinite(position).all()
+                or not np.isfinite(quaternion).all()):
+            return False
+        stored_quaternion_norm = float(np.linalg.norm(actual[3:]))
+        typed_quaternion_norm = float(np.linalg.norm(quaternion))
         return bool(
-            actual.shape == (7,)
-            and position.shape == (3,)
-            and quaternion.shape == (4,)
+            abs(stored_quaternion_norm - 1.0) <= 2e-5
+            and abs(typed_quaternion_norm - 1.0) <= 2e-5
             and np.array_equal(actual[:3], position)
             and _quat_error_rad(actual[3:], quaternion) <= 2e-5
         )
@@ -987,6 +992,34 @@ def _negative_suite(bundle: dict) -> dict:
             row["novel_error_details"].extend(
                 item["detail"] for item in geom_new_errors
                 if item["code"] == "model_shape"
+            )
+        elif name == "obs_cube_pose":
+            quaternion_mutated = copy.deepcopy(bundle)
+            quaternion_episode = quaternion_mutated["episodes"][0]
+            quaternion_episode["arrays"]["target_body_pose"][100, 0, 3:] *= np.float32(0.5)
+            # Rebind the in-memory outer file receipt so this subcheck reaches
+            # the persisted quaternion validator instead of durable-file hashing.
+            quaternion_episode["identity"]["sha256"] = "f" * 64
+            quaternion_episode["worker_h5_sha256"] = "f" * 64
+            quaternion_errors = _validate_bundle(quaternion_mutated)
+            quaternion_new_errors = _novel_errors(quaternion_errors, baseline_errors)
+            quaternion_rejected = any(
+                item["code"] == "obs_cube_pose" for item in quaternion_new_errors
+            )
+            row["subchecks"] = {
+                "position_leaf_mutation_rejected": caught,
+                "non_unit_quaternion_leaf_mutation_rejected": quaternion_rejected,
+            }
+            row["rejected"] = caught and quaternion_rejected
+            row["error_codes"] = sorted({
+                item["code"] for item in (*errors, *quaternion_errors)
+            })
+            row["novel_error_codes"] = sorted({
+                item["code"] for item in (*new_errors, *quaternion_new_errors)
+            })
+            row["novel_error_details"].extend(
+                item["detail"] for item in quaternion_new_errors
+                if item["code"] == "obs_cube_pose"
             )
         results.append(row)
     return {

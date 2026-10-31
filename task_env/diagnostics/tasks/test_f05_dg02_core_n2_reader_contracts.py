@@ -98,6 +98,23 @@ def test_cold_episode_reader_loads_actual_privileged_cube_pose_leaf(tmp_path):
     assert mutated["worker_h5_sha256"] == "f" * 64
 
 
+def test_stored_cube_pose_rejects_non_unit_or_nonfinite_quaternion():
+    cube = {
+        "position": np.asarray((0.1, -0.2, 0.3), dtype=np.float32),
+        "quaternion_wxyz": np.asarray((1.0, 0.0, 0.0, 0.0), dtype=np.float32),
+    }
+    stored = np.asarray((*cube["position"], *cube["quaternion_wxyz"]), dtype=np.float32)
+
+    assert _stored_cube_pose_matches(stored, cube)
+    scaled = stored.copy()
+    scaled[3:] *= np.float32(0.5)
+    assert not _stored_cube_pose_matches(scaled, cube)
+
+    nonfinite = stored.copy()
+    nonfinite[3] = np.nan
+    assert not _stored_cube_pose_matches(nonfinite, cube)
+
+
 def test_negative_attribution_requires_a_finding_beyond_formal_baseline():
     baseline = [
         {"code": "task_predicate", "detail": f"preexisting tracking finding {index}"}
