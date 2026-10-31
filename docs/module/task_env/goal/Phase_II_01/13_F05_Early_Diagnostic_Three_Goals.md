@@ -125,3 +125,6 @@ DG02目标/阈值未放宽。N2_019失败后，在同一source-bound Core/GeoPhy
 原Goal总native资源上限不增加；新window从剩余额度划出GeoPhys≤18000steps（probe≤12000、formal≤6000）/3600s；可选受影响DG01 MuJoCo回归≤3000steps/300s；合计≤21000steps/3900s，与原各bucket剩余额度取较小值。未知旧wall已先保守预扣1800s。每probe≤500steps，至少预留完整3000step formal；短对照稳定、受影响S1与reader修复通过、implementation提交并准确冻结plan后才formal。预计主动4–8h，window上限8h、末45min收口；MemAvailable≥6GiB/PG RSS≤4GiB/低于1GiB中止/.25s采样/4CPUthreads/单重进程与共享锁保持。新Evidence≤1GiB，无依赖/资产下载，不启动Isaac/GPU/Newton。
 
 N2仍须原同Env两轮300interval×5×2ms、全部物理/control/Task/storage/退出门，不改变source gain/物性/Task Action配置/阈值换PASS。成功只报待Sol复核候选；DG03需本Goal完整接收后再冻结。无法在原语义下实现时给最小反例和外部决定，不扩大solver算法范围。
+
+
+本轮Sol收口静态检查：Module Skill元数据/本地链接/源码路径、规划15份文档hash与局部链接、diff检查通过。全局docs validator实际退出1、247条（246个non-documentation scope诊断＋1个count limit）；相较Luna收口245条，增加的是其随后已提交的两个tracking-probe plan/reader源码路径，未新增本轮文档链接/内容诊断。全局仍不记PASS；原245签署输出保留。完整差分见Sol复核目录。

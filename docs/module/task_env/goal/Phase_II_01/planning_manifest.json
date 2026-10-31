@@ -1865,7 +1865,7 @@
     "README.md": "11553804d8f6955a0886e36ed2de836919cbbf096b2fdf2a6d66740073d4b5bd",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
     "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "e765d9a5b0081e912b12b3f13c105ba51893045dfec3ab8e4ab5ef73a14f8eef"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "55e9bd3f6a42da15772da623f1973c14bf2185e8afb1272bc4e211bf1c16f86d"
   },
   "revision_kind": "DG02_WINDOW001_SOL_PARTIAL_REVIEW_AND_WINDOW002_REWORK_PREPARATION",
   "benchmark_audit": {
@@ -6838,7 +6838,21 @@
       ],
       "Sol_pytest": "NOT_RUN",
       "Sol_native": 0,
-      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_001/"
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_001/",
+      "documentation_validation": {
+        "errors": 247,
+        "global_pass": false,
+        "exit_code": 1,
+        "added": [
+          "non-documentation change: task_env/diagnostics/tasks/f05_dg02_core_tracking_probe_plan.py",
+          "non-documentation change: task_env/diagnostics/tasks/f05_dg02_core_tracking_probe_reader.py"
+        ],
+        "removed": [],
+        "baseline": 245,
+        "non_scope": [
+          "count limit exceeded"
+        ]
+      }
     },
     "f05_dg02_window002_preparation_20261031": {
       "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_002/",
