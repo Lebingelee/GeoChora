@@ -9,7 +9,7 @@ from array import array
 import pytest
 
 from task_env.diagnostics.tasks.f05_dg03_isaac_public_tendon_probe import (
-    _remove_source_mimic_for_ablation,
+    _remove_source_equality_for_ablation,
     _rows,
 )
 
@@ -88,7 +88,7 @@ def test_mimic_ablation_removes_all_encodings_of_one_equality_only():
     )
     leader.CreateAttribute("mjc:damping", Sdf.ValueTypeNames.Double).Set(1.0)
 
-    removed = _remove_source_mimic_for_ablation(leader, follower)
+    removed = _remove_source_equality_for_ablation(leader, follower)
 
     assert "PhysxMimicJointAPI:transX" not in follower.GetMetadata("apiSchemas").GetAppliedItems()
     assert not ({"NewtonMimicAPI", "MjcEqualityJointAPI"}

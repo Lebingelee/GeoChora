@@ -123,7 +123,7 @@ def _terminate_worker(exit_code: int) -> None:
     os._exit(int(exit_code))
 
 
-def _remove_source_mimic_for_ablation(leader, follower) -> dict[str, tuple[str, ...]]:
+def _remove_source_equality_for_ablation(leader, follower) -> dict[str, tuple[str, ...]]:
     """Remove every delivered encoding of this one source equality in memory."""
     follower_schema = "PhysxMimicJointAPI:transX"
     follower_properties = (
@@ -190,12 +190,12 @@ def _has_applied_schema(prim, schema_token: str) -> bool:
 
 def run_probe(
     manifest_path: Path, expected_manifest_sha256: str, receipt_path: Path,
-    *, ablate_source_mimic: bool = False,
+    *, ablate_source_equality: bool = False,
 ) -> int:
     started = time.monotonic()
     result: dict[str, object] = {
-        "schema_version": "f05-dg03-n1-source-mimic-probe-v2",
-        "probe_mode": "source_mimic_ablation" if ablate_source_mimic else "source_mimic_positive",
+        "schema_version": "f05-dg03-n1-source-mimic-probe-v3",
+        "probe_mode": "source_equality_ablation" if ablate_source_equality else "source_mimic_positive",
         "manifest_path": str(manifest_path),
         "manifest_sha256_expected": expected_manifest_sha256,
         "source_closure_sha256_expected": SOURCE_CLOSURE_SHA256,
@@ -205,7 +205,7 @@ def run_probe(
         "public_apis_used": [],
         "mimic_schema_authored": False,
         "mimic_relation_active_in_runtime_stage": False,
-        "mimic_api_removed_for_ablation": False,
+        "source_equality_removed_for_ablation": False,
         "runtime_stage_mutated": False,
         "counterfactual_identity_sha256": None,
         "mimic_leader_motion_m": None,
@@ -351,11 +351,11 @@ def run_probe(
         result["source_mimic_mapping"] = source_mimic
         result["mimic_reference_joint"] = str(joints["finger_joint1"].GetPath())
         result["mimic_applied_schema"] = list(joints["finger_joint2"].GetAppliedSchemas())
-        if ablate_source_mimic:
-            ablated = _remove_source_mimic_for_ablation(
+        if ablate_source_equality:
+            ablated = _remove_source_equality_for_ablation(
                 joints["finger_joint1"], joints["finger_joint2"],
             )
-            result["mimic_api_removed_for_ablation"] = True
+            result["source_equality_removed_for_ablation"] = True
             result["runtime_stage_mutated"] = True
             result["ablation_removed_schema_tokens"] = list(ablated["removed_schema_tokens"])
             result["ablation_removed_properties"] = list(ablated["removed_properties"])
@@ -444,7 +444,7 @@ def run_probe(
             and result["mimic_q_difference_max_m"] <= 2e-3
         )
 
-        if ablate_source_mimic:
+        if ablate_source_equality:
             result["ablation_no_coupling_detected"] = bool(
                 result["mimic_leader_motion_m"] >= 1e-4
                 and result["mimic_follower_motion_m"] < 1e-4
@@ -514,9 +514,9 @@ def run_probe(
         result["physics_dt_s"] = 0.002
         result["physics_device"] = str(SimulationManager.get_device())
         result["gpu_dynamics"] = scenes[0].get_enabled_gpu_dynamics()
-        if ablate_source_mimic:
+        if ablate_source_equality:
             result["passed"] = bool(
-                result["mimic_api_removed_for_ablation"]
+                result["source_equality_removed_for_ablation"]
                 and result["ablation_no_coupling_detected"]
                 and result["physics_device"] == "cuda:0"
                 and result["gpu_dynamics"] is True
@@ -597,10 +597,10 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--manifest-sha256", required=True)
     parser.add_argument("--receipt", type=Path, required=True)
-    parser.add_argument("--ablate-source-mimic", action="store_true")
+    parser.add_argument("--ablate-source-equality", action="store_true")
     args = parser.parse_args()
     run_probe(args.manifest, args.manifest_sha256, args.receipt,
-              ablate_source_mimic=args.ablate_source_mimic)
+              ablate_source_equality=args.ablate_source_equality)
 
 
 if __name__ == "__main__":
