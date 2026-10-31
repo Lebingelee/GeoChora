@@ -217,7 +217,7 @@ contract; do not downgrade it through historical v1 compatibility. The new F05
 helper/reader is tracked, while the permitted inherited F04 fixture still needs
 its frozen ignored inputs and support. Do not claim cold-checkout self-containment.
 
-## F05 DG02 GeoPhys/USD route (in progress; not accepted)
+## F05 DG02 GeoPhys/USD route (PARTIAL; control cell not accepted)
 
 DG02 is a separate, source-bound diagnostic Goal reusing the same Core candidate,
 Position Controller, `UsdCoreRuntimeSession`, `F05GeoPhysUsdNativeIO`,
@@ -233,14 +233,45 @@ IR and public model. The legacy V1 receipt guard remains intact.
 The F05 native candidate builder requires an explicit `ActionConfig` matching
 the accepted DG01 semantics (joint correction gain 1.0 and default gripper force
 100 N; remaining defaults frozen). Bind that config in the run plan and verify
-the constructed Controller identity. Synthetic receipt unit tests and public
-model compilation do not establish runtime admission or a Core S1/N2 result.
-At the current DG02 checkpoint, the provider parser/public-model route and a
-two-step tendon/actuator probe ran, but equality comparison/negative evidence
-is incomplete and the Core V2 production receipt/adapter path has not been
-validated on that model. No full Core S1, N2 episodes, independent H5 cold read,
-Sol acceptance, F06/F07 or Qualification follows. See the [current DG02
-checkpoint](../../../docs/module/task_env/public-api.md#f05-dg02-window001-geophys-usd-in-progress).
+the constructed Controller identity. DG02 window001 has now exercised source
+USD import/lowering, the versioned source/model-bound receipt, Core S1 and the
+two-episode Core N2 route for its exact local-validated Menagerie source and
+isolated GeoPhys CPU provider. The formal worker completed 3,000 advances and
+closed both H5 files. The independent reader verified source FK, contact,
+storage/identity and all 23 negative classes, but failed the unchanged
+position-target/jitter/velocity gates in both episodes across point, return,
+gripper-close/open and final-hold phases. This is a real control-cell failure;
+worker exit 0 and H5 durability do not make it a pass.
+
+Keep this as an internal, source-specific diagnostic route. The source remains
+`local-validated` with `source_verified=false`; do not infer generic GeoPhys/USD
+admission, cross-solver material/contact equivalence, Isaac/USD support, task
+success or Qualification. Do not start DG03, F06 or F07 from this checkpoint.
+For a request to continue, first repair the measured Core position tracking and
+obtain a new frozen budget large enough for the unchanged two-episode formal
+rerun. See the [current DG02 result](../../../docs/module/task_env/public-api.md#f05-dg02-window001-geophys-usd-in-progress)
+and [three-Goal record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window001-geophys-usd-in-progress).
+
+**TaskEnv Skill refresh receipt — DG02 window001 (2026-10-31; PARTIAL):** trigger
+was the completed source-bound Core N2 attempt and its independent reader failure.
+Inspected the TaskEnv facade/admission owners, Position candidate builder and
+source composer, `SelectedReferenceEnv`, Core `RuntimeSession`/native-I/O and
+Controller route, Recorder/H5, the DG02 source receipt/plan/worker/supervisor/
+cold reader, current public API, three-Goal record, focused tests and frozen
+acceptance. CodeGraph traced the affected public/model/control callers before
+reading targeted source. Reuse classification: `EXTEND_EXISTING`; DG02 adds no
+second provider route, Runtime, Controller, task factory, Recorder or reader.
+The verified drift was the stale “N2 not run” checkpoint; this section now
+records worker completion separately from the cold reader's failed tracking
+gates. The new host reader supervisor is a tracked DG02 diagnostic owner and
+classifies the expected reader gate failure without converting it to PASS.
+Provider-free supervisor tests passed 3/3; existing Core candidate/source
+checks passed 27 with 7 skipped; provider parser tests passed 3/3. Native N2
+evidence is bounded to the exact source/model/provider/controller/plan listed
+in the execution record. Link/metadata checks, cold-start routing walkthrough,
+and the supervisor-bound G7 receipt are retained in the ignored Goal output
+package. This update grants no capability or Qualification; Sol review and a
+newly frozen rework budget are required before the route can pass.
 
 ## Static Position leaf contracts (R02a)
 

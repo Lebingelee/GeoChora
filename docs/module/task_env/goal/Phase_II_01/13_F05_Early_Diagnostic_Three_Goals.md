@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001 正在实施，当前为 partial checkpoint，GeoPhys/USD N1 探针已启动，Core S1/N2 尚未完成。DG03仍为待适配基线。**
+> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001 已完成一次Core N2正式运行和独立冷读，但控制tracking门失败，整体保留PARTIAL并等待复核/续窗。DG03仍为待适配基线。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -93,10 +93,16 @@ DG02只有完成G0–G8、真实public USD/consumer与Core cell、独立reader/�
 
 本轮收口：Module Skill静态检查、规划文档hash与局部链接、diff检查通过。全局docs validator仍失败：223项＝原216项＋DG01既有七个新增源码/recipe路径的scope诊断；没有把该失败报告为PASS。Sol本轮没有pytest/native，reader修复由原H5冷读与内层负例直接验证。完整validator输出及差分保留在独立复核目录。
 
-## 9. DG02 window001 当前checkpoint（2026-10-31）
+<a id="f05-dg02-window001-geophys-usd-in-progress"></a>
 
-当前Goal仍为 `F05_EARLY_DIAGNOSTIC_DG02_GEOPHYS_USD_WINDOW001`，复用 `develop-full` 与既有隔离 GeoPhys worktree。DG01与原r009证据未改；主GeoPhys gitlink、F06/F07和Qualification未启动。GeoPhys现有 public USD route 增加了 `GeoChora.F05SourceSemantics` v1 的F05专用语义解析，映射进入既有IR/Articulation/RigidModel消费者；N0公开模型读取到13 bodies、83 shapes、12 joints、8 actuators、8 transmissions、3 constraints、1 tendon、1 equality。N1_002以两步CPU探针看到 actuator8标量force/限幅及tendon `Jᵀf`；equality仅有参数与反向非零力readback，缺独立力律比较和禁用负例。
+## 9. DG02 window001 当前结果（2026-10-31）
 
-Core增加了 `GeoPhysUsdSourceActuationReceiptV2`、实际模型receipt编译与既有 `F05GeoPhysUsdNativeIO`/`UsdCoreRuntimeSession`/Position admission接线。纯数据receipt及Position sentinel定向检查通过；receipt/adapter尚未以DG02实际public model验证。Native候选构建现在要求明确提供匹配DG01 ActionConfig（`joint_position_correction_gain=1.0`、`gripper_default_force_N=100.0`、其余固定默认），并将它纳入Controller identity。Core S1与N2尚未运行；不得将两步probe、模型compile或静态测试表述成Core route通过。
+本Goal仍为 `F05_EARLY_DIAGNOSTIC_DG02_GEOPHYS_USD_WINDOW001`，Core分支为`develop-full`，provider使用隔离分支`codex/phase-ii-01-f05-geophys`。GeoPhys保真USD表示已通过source closure、几何/frame/mass/contact审计及public USD→既有IR→public model消费；模型为13 bodies、83 shapes、12 joints、8 actuators、8 transmissions、3 constraints、1 tendon、1 equality。N1标量drive/tendon/equality探针及G4耦合正负对照通过。Core已有source/model-bound V2 receipt、admission、Controller、RuntimeSession、Recorder与close路径；同一`SelectedReferenceEnv`的S1通过两轮短流程。
 
-该窗口已记录两次未经过shared native supervisor的旧S1 pytest进程，合计31次public RigidSceneModel compile、0 physics step；已计入GeoPhys启动和compile台账，均为失败，不是pass证据。后续model compile/native仅可在新冻结计划、共享锁、资源门和supervisor下进行。当前工作树仍需Core/provider本地提交、公开文档/Skill同步、receipt/model定向验证、阶段G4–G7以及保护/退出/独立reader收口；若窗口耗尽，保留PARTIAL checkpoint并由Sol复核后冻结续窗。
+N2正式run `DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_019`使用已提交Core HEAD `e865834f4c0519e23b37f6100959b5a82ade0f2d` 与provider HEAD `f4d3b3bb21882bac5ca007e657f5d6709a6189b8`。worker exit 0，1次native启动，2集共3,000/3,000 advance，process group先于锁释放退出；每集有301 obs/300 transition，H5已持久化。独立reader冷读两份H5共602实际obs、600 transitions和3,000 advances；source-FK最大残差为`1.66e-7 m`/`4.12e-7 rad`，接触/readback通过，DG01继承22类加DG02负例共23/23拒绝。
+
+冷读同时发现真实控制门失败：home hold通过，但point、return、gripper-close、gripper-open和final-hold在两集都超过冻结tracking阈值。五阶段晚段joint target误差最大值依次为`0.107`、`0.236`、`0.320`、`0.209`、`0.400 rad`；峰值速度为`6.31`、`6.49`、`6.73`、`3.87`、`6.73 rad/s`，明显高于冻结的`0.025 rad` target误差、`0.005 rad`峰峰值和`0.1 rad/s`速度门。两集数值完全重复；因此N2 worker完成不等于控制cell通过，DG02整体保持PARTIAL，不能赋予DG02候选PASS。
+
+为补齐G7，reader后来在独立host supervisor下重跑：parent记录600秒上限、0.25秒采样、约603 MB峰值RSS、15.85 CPU秒、单进程、exit 1、process group清空、共享锁前后空闲；reader结果仍为tracking gate失败。这是有界reader完成证据，不改变G6失败结论。此前无OpenUSD路径的冷读尝试在导入期因缺少`pxr`失败、未生成receipt；按冻结runtime路径重跑后得到上述结果。
+
+DG02目标/阈值未放宽。剩余probe预算不足以重跑要求的3,000-step正式cell，不能在本冻结预算内宣称修复或完整PASS；需要先定位并修复实际Core position tracking，再由维护者冻结足够的续窗预算与正式复验。source仍是`local-validated`且`source_verified=false`；不推断通用GeoPhys/USD、Isaac/USD或跨solver接触/材料等价。不启动DG03、F06/F07或Qualification。旧F05三轮/PARTIAL、接受的DG01、r009及历史输出均不改。
