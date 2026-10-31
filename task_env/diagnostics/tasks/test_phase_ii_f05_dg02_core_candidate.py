@@ -282,7 +282,7 @@ def test_dg02_selected_pose_controller_does_not_integrate_unachieved_targets():
     _canonical, second_desired, second_servo = controller._compute_arm(_State(), request)
 
     assert F05_DG02_POSE_TARGET_METHOD == "achieved_state_dls_v1"
-    assert F05_DG02_NULLSPACE_REFERENCE_GAIN == 1.0
+    assert F05_DG02_NULLSPACE_REFERENCE_GAIN == 0.0
     np.testing.assert_allclose(second_desired, first_desired, atol=1e-12)
     np.testing.assert_allclose(second_servo, first_servo, atol=1e-12)
 

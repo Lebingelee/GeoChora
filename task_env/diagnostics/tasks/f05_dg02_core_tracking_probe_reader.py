@@ -41,10 +41,33 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
     )
     if plan.get("classification") != expected_class:
         raise ValueError("reader refuses to treat a non-probe plan as a tracking probe")
+    reader_path = Path(__file__).resolve(strict=True)
+    frozen_reader_rows = [
+        row for row in plan["code"]["tracked_inputs"]
+        if Path(row["path"]).resolve() == reader_path
+    ]
+    if len(frozen_reader_rows) != 1:
+        raise ValueError("tracking probe plan does not bind exactly one cold-reader source")
+    frozen_reader_sha256 = frozen_reader_rows[0]["sha256"]
     if (plan["oracle"]["episode_count"] != 1
             or plan["oracle"]["control_intervals_per_episode"] != 100
             or plan["limits"]["physics_steps_reserved"] != 500):
         raise ValueError("tracking probe plan differs from the frozen one-episode 500-step envelope")
+
+    normalization_ref = plan["source"].get("control_oracles")
+    if not isinstance(normalization_ref, dict):
+        raise ValueError("tracking probe plan does not bind the frozen control-oracles source")
+    normalization_path = Path(normalization_ref["path"]).resolve(strict=True)
+    normalization_sha256 = _sha(normalization_path)
+    if normalization_sha256 != normalization_ref["sha256"]:
+        raise ValueError("tracking probe control-oracles source hash differs from its frozen plan")
+    control_oracles = json.loads(normalization_path.read_text(encoding="utf-8"))
+    normalization = control_oracles.get("normalization")
+    if not isinstance(normalization, dict) or "usd_f32_abs_tolerance" not in normalization:
+        raise ValueError("frozen control-oracles source lacks the USD float32 normalization tolerance")
+    usd_f32_abs_tolerance = float(normalization["usd_f32_abs_tolerance"])
+    if not np.isfinite(usd_f32_abs_tolerance) or usd_f32_abs_tolerance <= 0:
+        raise ValueError("frozen USD float32 normalization tolerance is invalid")
 
     run_dir = Path(plan["output"]["run_dir"]).resolve(strict=True)
     worker_path = Path(plan["output"]["worker_receipt"]).resolve(strict=True)
@@ -148,7 +171,7 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
     if not np.isfinite(typed_positions).all() or not np.isfinite(typed_velocities).all():
         raise ValueError("tracking probe typed states contain non-finite joint values")
     max_storage_error = float(np.max(np.abs(positions - typed_positions)))
-    if max_storage_error > float(oracle["normalization"]["usd_f32_abs_tolerance"]):
+    if max_storage_error > usd_f32_abs_tolerance:
         raise ValueError("float32 H5 observations disagree with their typed public-state witness")
 
     gates = []
@@ -193,7 +216,7 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
             failed.append(phase_name)
 
     result = {
-        "schema_version": "f05-dg02-core-tracking-probe-reader-v1",
+        "schema_version": "f05-dg02-core-tracking-probe-reader-v2",
         "run_id": plan["run_id"],
         "classification": plan["classification"],
         "status": "PASS_BOUNDED_TRACKING_PROBE" if not failed else "FAIL_BOUNDED_TRACKING_PROBE",
@@ -201,6 +224,12 @@ def read_probe(plan_path: Path, sidecar_path: Path) -> dict:
         "qualification_granted": False,
         "plan_path": str(plan_path),
         "plan_sha256": plan_sha256,
+        "reader_code_sha256_at_plan_freeze": frozen_reader_sha256,
+        "reader_code_sha256_at_read_time": _sha(reader_path),
+        "reader_code_changed_after_native_worker": frozen_reader_sha256 != _sha(reader_path),
+        "normalization_source_path": str(normalization_path),
+        "normalization_source_sha256": normalization_sha256,
+        "usd_f32_abs_tolerance": usd_f32_abs_tolerance,
         "worker_receipt_sha256": _sha(worker_path),
         "supervisor_receipt_sha256": _sha(supervisor_path),
         "h5_path": str(h5_path),

@@ -113,7 +113,10 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
         if resolved not in sys.path:
             sys.path.insert(0, resolved)
 
-    candidate["run_id"] = "DG02_G5_CORE_TRACKING_PROBE_CANDIDATE_ADMISSION_001"
+    probe_suffix = output_dir.name.rsplit("_", 1)[-1]
+    if not probe_suffix.isdigit():
+        raise ValueError("tracking-probe output directory must end in a numeric attempt suffix")
+    candidate["run_id"] = f"DG02_G5_CORE_TRACKING_PROBE_CANDIDATE_ADMISSION_{probe_suffix}"
     candidate["created_utc"] = datetime.now(timezone.utc).isoformat()
     candidate["input_identity"].update({
         "core_branch": core_branch,
@@ -201,16 +204,16 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
     )
     plan = dict(base)
     plan.update({
-        "run_id": "DG02_G5_CORE_TRACKING_PROBE_001",
+        "run_id": f"DG02_G5_CORE_TRACKING_PROBE_{probe_suffix}",
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "classification": (
             "actual Core SelectedReferenceEnv PositionServoV1; source-bound GeoPhys/USD; "
             "bounded tracking probe, not a formal cell or qualification"
         ),
         "hypothesis": (
-            "With the unchanged DG01 ActionConfig, source, and tracking thresholds, the existing "
-            "achieved-state DLS method avoids accumulated unachieved joint-target windup through "
-            "the actual Core Position route for the frozen home-hold and point-hold phases."
+            "With the unchanged DG01 ActionConfig, source, and tracking thresholds, test whether "
+            "achieved-state DLS without reset-posture nullspace feedback reduces the point-hold "
+            "joint oscillation observed in the preceding bounded Core probe."
         ),
         "input_identity": {
             **base["input_identity"],
