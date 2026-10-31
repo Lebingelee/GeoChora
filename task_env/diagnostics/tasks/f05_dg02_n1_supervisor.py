@@ -84,6 +84,7 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
     supported_plan_schemas = {
         "f05-dg02-n1-public-consumer-plan-v1",
         "f05-dg02-equality-coupling-plan-v1",
+        "f05-dg02-core-n2-plan-v1",
     }
     if plan.get("schema_version") not in supported_plan_schemas:
         raise ValueError("unsupported DG02 source-consumer native plan schema")

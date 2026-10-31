@@ -59,6 +59,8 @@ class F05GeoPhysUsdNativeIO:
         self._native_step_count = 0
         self._last_control_values = None
         self._metadata = None
+        self._dg02_contact_observation = type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        self._contact_body_names = {}
         try:
             import os
             self.native_run_id = os.environ.get('F05_NATIVE_RUN_ID')
@@ -140,6 +142,16 @@ class F05GeoPhysUsdNativeIO:
             self._native_step_counter_baseline = self._public_step_index()
             if self._native_step_counter_baseline != 0:
                 raise RuntimeError('GeoPhys public native-step counter shows hidden bootstrap physics')
+            if self._dg02_contact_observation:
+                solver = self._runtime.solver
+                enable = getattr(solver, 'enable_contact_observation', None)
+                if not callable(enable):
+                    raise RuntimeError('DG02 requires the existing public GeoPhys contact-observation API')
+                enable()
+                self._contact_body_names = {
+                    int(body_id): str(semantic)
+                    for semantic, body_id in self._body_addresses.items()
+                }
         except BaseException as primary:
             if self._boundary is not None:
                 try:
@@ -358,6 +370,12 @@ class F05GeoPhysUsdNativeIO:
         self._boundary.apply_reset_state(EpisodePhysicsState(
             qpos=qpos, qvel=qvel, qacc=qacc, ctrl=ctrl, act=act,
         ))
+        if self._dg02_contact_observation:
+            # Re-establish the observation epoch only after the public Runtime
+            # reset has completed all of its state writes.
+            self._runtime.solver.invalidate_contact_observation(
+                'DG02 public Runtime reset completed', reset_episode=True,
+            )
         actual_ctrl = np.asarray(self._runtime.solver.read_ctrl(), dtype=np.float32)
         if (actual_ctrl.shape != ctrl.shape or not np.isfinite(actual_ctrl).all()
                 or not np.array_equal(actual_ctrl, ctrl)):
@@ -370,6 +388,80 @@ class F05GeoPhysUsdNativeIO:
             tuple(sorted(self.source.joints)), tuple(sorted(self.source.free_joints)),
             tuple(name for _index, name, _value in position_targets), True, False,
         )
+
+    def read_contact_observation(self):
+        """Return a bounded JSON-safe summary of the latest public contact sample."""
+        if not self._dg02_contact_observation or self._runtime is None:
+            raise RuntimeError('public contact observation is available only for the exact DG02 route')
+        raw = self._runtime.solver.read_contact_observation()
+        identity = {
+            key: raw.get(key)
+            for key in ('owner', 'episode', 'generation', 'completed_substeps', 'delivery_errors')
+        }
+        result = {
+            'schema_version': 'f05-dg02-public-contact-observation-v1',
+            'known': raw.get('known') is True,
+            'reason': raw.get('reason'),
+            'phase': raw.get('phase'),
+            'geometry_substep': raw.get('geometry_substep'),
+            'impulses_known': raw.get('impulses_known') is True,
+            **identity,
+        }
+        if not result['known']:
+            return result
+        manifold = raw.get('manifold')
+        if not isinstance(manifold, dict):
+            raise RuntimeError('public contact sample omitted its manifold readback')
+
+        count = int(manifold.get('count', -1))
+        point_count = int(manifold.get('point_count', -1))
+        if count < 0 or point_count < 0:
+            raise RuntimeError('public contact sample has invalid manifold counts')
+
+        def array_values(name, dtype, expected_first=None):
+            value = np.asarray(manifold[name], dtype=dtype)
+            if expected_first is not None and (value.ndim == 0 or value.shape[0] != expected_first):
+                raise RuntimeError(f'public contact manifold {name} shape differs from its count')
+            if np.issubdtype(value.dtype, np.floating) and not np.isfinite(value).all():
+                raise RuntimeError(f'public contact manifold {name} contains non-finite values')
+            return value.tolist()
+
+        body_a = np.asarray(manifold['body_a'], dtype=np.int64)
+        body_b = np.asarray(manifold['body_b'], dtype=np.int64)
+        geom_a = np.asarray(manifold['geom_a'], dtype=np.int64)
+        geom_b = np.asarray(manifold['geom_b'], dtype=np.int64)
+        if any(value.shape != (count,) for value in (body_a, body_b, geom_a, geom_b)):
+            raise RuntimeError('public contact manifold pair addresses differ from its count')
+        pairs = []
+        for index in range(count):
+            first, second = int(body_a[index]), int(body_b[index])
+            pairs.append({
+                'body_a_id': first,
+                'body_b_id': second,
+                'body_a_semantic': self._contact_body_names.get(first, 'world' if first < 0 else None),
+                'body_b_semantic': self._contact_body_names.get(second, 'world' if second < 0 else None),
+                'geom_a_id': int(geom_a[index]),
+                'geom_b_id': int(geom_b[index]),
+            })
+        result.update({
+            'contact_count': count,
+            'point_count': point_count,
+            'capacity_overflow': int(manifold.get('overflow', 0)),
+            'narrowphase_failure_count': int(manifold.get('narrowphase_failure_count', 0)),
+            'stream_stopped': int(manifold.get('stream_stopped', 0)),
+            'reservation_invariant_violation': int(manifold.get('reservation_invariant_violation', 0)),
+            'pairs': pairs,
+            'ncon': array_values('ncon', np.int64, count),
+            'distance_m': array_values('distance', np.float64, point_count),
+            'penetration_m': array_values('penetration', np.float64, point_count),
+            'point_world_m': array_values('point', np.float64, point_count),
+            'normal_world': array_values('normal', np.float64, count),
+            'normal_impulse_ns': array_values('normal_impulse', np.float64, point_count),
+            'dynamic_normal_impulse_ns': array_values('dynamic_normal_impulse', np.float64, point_count),
+            'friction': array_values('friction', np.float64, count),
+            'condim': array_values('condim', np.int64, count),
+        })
+        return result
 
     @staticmethod
     def _rotation_wxyz(q):

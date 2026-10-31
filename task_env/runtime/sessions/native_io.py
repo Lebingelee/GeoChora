@@ -424,6 +424,19 @@ class UsdCoreRuntimeSession(_SessionValues):
     def snapshot(self) -> CanonicalStateView:
         return self._snapshot_with_native_free_joints()[0]
 
+    def read_contact_observation(self) -> dict[str, object]:
+        """Read the provider's last DG02 diagnostic contact sample without advancing time."""
+        self._assert_native_identity()
+        reader = getattr(self._native_io, 'read_contact_observation', None)
+        if not callable(reader):
+            raise RuntimeError('the admitted native Runtime I/O does not expose contact observations')
+        observation = reader()
+        if (not isinstance(observation, Mapping)
+                or observation.get('schema_version') != 'f05-dg02-public-contact-observation-v1'
+                or type(observation.get('known')) is not bool):
+            raise TypeError('native contact observation must use the exact DG02 public schema')
+        return dict(observation)
+
     def apply_control(self, target):
         from .control import validate_target
         validate_target(self, target)
