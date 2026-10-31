@@ -1192,6 +1192,24 @@ def _validate_source_gravity_action(control_plan: Mapping[str, Any], diagnostics
         raise ValueError("task Solution action does not preserve the source gravity compensation formula")
 
 
+def _equivalent_wxyz_quaternions(left: Any, right: Any, *, tolerance: float = 1e-7) -> bool:
+    """Compare unit quaternions by orientation, allowing the equivalent q/-q signs."""
+    try:
+        left_value = np.asarray(left, dtype=np.float64).reshape(-1)
+        right_value = np.asarray(right, dtype=np.float64).reshape(-1)
+    except (TypeError, ValueError):
+        return False
+    if (left_value.shape != (4,) or right_value.shape != (4,)
+            or not np.isfinite(left_value).all() or not np.isfinite(right_value).all()
+            or abs(float(np.linalg.norm(left_value)) - 1.0) > tolerance
+            or abs(float(np.linalg.norm(right_value)) - 1.0) > tolerance):
+        return False
+    return min(
+        float(np.linalg.norm(left_value - right_value)),
+        float(np.linalg.norm(left_value + right_value)),
+    ) <= tolerance
+
+
 def _validate_v4_osc_receipt(canonical_action: Mapping[str, Any], expected_controller: Mapping[str, Any],
                              target: MixedActuatorCommandV1, public_action: np.ndarray,
                              h5_joint_position: np.ndarray | None, h5_ee_pose: np.ndarray | None,
@@ -1327,7 +1345,7 @@ def _validate_v4_osc_receipt(canonical_action: Mapping[str, Any], expected_contr
             or not np.allclose(position_error, target_position - current_position,
                                rtol=0.0, atol=2e-8)
             or not np.allclose(target_position, np.asarray(public_action[:3]), rtol=0.0, atol=1e-7)
-            or not np.allclose(target_quaternion, public_action[3:7], rtol=0.0, atol=1e-7)):
+            or not _equivalent_wxyz_quaternions(target_quaternion, public_action[3:7])):
         raise ValueError("task Solution v4 OSC source-state pose differs from H5 or requested action")
     target_rotation = quat_wxyz_to_matrix(target_quaternion)
     recomputed_orientation = 0.5 * sum(

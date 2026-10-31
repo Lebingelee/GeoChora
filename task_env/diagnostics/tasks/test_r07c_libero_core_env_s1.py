@@ -27,7 +27,8 @@ import numpy as np
 import pytest
 
 from bench_deploy.libero.core_candidate_worker import (
-    consume_libero_candidate_bundle, run_libero_candidate_worker,
+    _equivalent_wxyz_quaternions, consume_libero_candidate_bundle,
+    run_libero_candidate_worker,
 )
 from bench_deploy.libero.evaluation import (
     PILOT_TASK_UID, OnBowlPlateEvidenceV1, evaluate_on_bowl_plate_v1,
@@ -36,6 +37,15 @@ from task_env.recorders import load_structured_control_records_h5
 
 
 _FORBIDDEN_ROOTS = {"geophys", "taichi", "isaacsim", "omni", "robosuite", "libero", "torch", "genesis"}
+
+
+def test_solution_reader_accepts_only_unit_quaternion_sign_equivalence():
+    quaternion = (0.02003903, -0.72548007, -0.68784862, 0.01188998)
+    antipodal = tuple(-value for value in quaternion)
+    different = (0.02003903, 0.72548007, -0.68784862, 0.01188998)
+    assert _equivalent_wxyz_quaternions(quaternion, antipodal)
+    assert not _equivalent_wxyz_quaternions(quaternion, different)
+    assert not _equivalent_wxyz_quaternions(quaternion, (2.0, 0.0, 0.0, 0.0))
 
 
 class _GravityBiasDouble:
