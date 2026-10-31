@@ -303,6 +303,25 @@ def validate_usd_runtime_source_import(runtime_source, imported_scene) -> dict[s
         raise ValueError('USD scalar Joint map does not cover exact canonical joints')
     if len(set(runtime_source.joints.values())) != len(runtime_source.joints):
         raise ValueError('USD scalar Joint map aliases native names')
+    source_actuated_joint_names = set()
+    joint_by_id = {joint.joint_id: joint for joint in imported_scene.ir.joints}
+    transmissions_by_actuator = {}
+    for transmission in imported_scene.ir.transmissions:
+        for actuator_id in transmission.actuator_ids:
+            transmissions_by_actuator.setdefault(actuator_id, []).append(transmission)
+    for actuator in imported_scene.ir.actuators:
+        parameters = actuator.parameters.to_dict()
+        source_target = parameters.get('source_target')
+        if actuator.target_kind == 'joint' and source_target in joints_by_name:
+            source_actuated_joint_names.add(str(source_target))
+        elif actuator.target_kind == 'tendon':
+            for transmission in transmissions_by_actuator.get(actuator.actuator_id, ()):
+                for joint_id in transmission.joint_ids:
+                    joint = joint_by_id.get(joint_id)
+                    source_name = None if joint is None else joint.dynamics.get('source_name')
+                    if source_name:
+                        source_actuated_joint_names.add(str(source_name))
+
     body_by_id = {body.body_id: body for body in imported_scene.ir.bodies}
     joint_rows = []
     for canonical, definition in sorted(scalar.items()):
@@ -327,10 +346,12 @@ def validate_usd_runtime_source_import(runtime_source, imported_scene) -> dict[s
                     imported.frame_b, _pose_matrix(definition.pose_child_from_joint))):
             raise ValueError(f'USD Joint frame transforms differ from canonical Scene: {canonical!r}')
         drives = tuple(imported.dynamics.to_dict().get('usd_drives', ()))
-        if not drives:
+        source_actuated_without_drive = not drives and native in source_actuated_joint_names
+        if not drives and not source_actuated_without_drive:
             raise ValueError(f'USD Joint has no retained authored DriveAPI facts: {canonical!r}')
         joint_rows.append({'canonical_joint': canonical, 'native_joint': native,
-                           'drive_facts': tuple(dict(drive) for drive in drives)})
+                           'drive_facts': tuple(dict(drive) for drive in drives),
+                           'source_actuated_without_drive_api': source_actuated_without_drive})
 
     if set(runtime_source.free_joints) != set(floating):
         raise ValueError('USD free Joint map does not cover exact floating Scene roots')
@@ -784,7 +805,7 @@ def compile_geophys_usd_source_actuation_receipt_v2(
         raise ValueError('DG02 public IR must expose exactly source actuator1 through actuator8')
     source_extensions = [row for row in imported_scene.ir.extensions
                          if row.namespace == 'GeoChora.F05SourceSemantics'
-                         and row.schema_version == '1']
+                         and row.schema_version == '2']
     if len(source_extensions) != 1:
         raise ValueError('DG02 public IR must expose exactly one versioned F05 source-identity block')
     source_identity = source_extensions[0].payload.to_dict().get('source_identity', {})

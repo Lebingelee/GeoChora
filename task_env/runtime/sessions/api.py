@@ -29,6 +29,7 @@ CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_
 PROFILE = 'p1_2_scalar_cpu_v0'
 F04_ISAAC_POSITION_PROFILE = 'isaac-gpu-physx-f04-position-v1'
 F05_GEOPHYS_NATIVE_POSITION_PROFILE = 'geophys-usd-position-f05-native-v1'
+F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
@@ -343,6 +344,32 @@ def _validate_f05_geophys_native_position_input(input_v1, artifact, execution, s
         raise ValueError('F05 native Position cell is state-only and cannot create a renderer')
 
 
+def _validate_f05_dg02_geophys_usd_input(input_v1, artifact, execution, source) -> None:
+    """Admit only the exact DG02 source-preserving USD/Core input contract."""
+    from ...tasks.position_candidate.builder import F05Dg02GeoPhysUsdCandidateInputV1
+
+    if type(input_v1) is not F05Dg02GeoPhysUsdCandidateInputV1:
+        raise TypeError('DG02 GeoPhys/USD materialization requires the exact candidate input')
+    input_v1.validate()
+    if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
+            or type(execution) is not ExecutionSpecV1
+            or execution.identity_hash != input_v1.execution.identity_hash):
+        raise ValueError('DG02 materialization differs from its exact Task/Scene/Execution identities')
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode) != (
+            'geophys', 'cpu', 'cpu', F05_DG02_GEOPHYS_USD_PROFILE, 'best_effort'):
+        raise ValueError('unsupported DG02 GeoPhys CPU/USD source intersection')
+    if (source.scene_source.representation.provider,
+            source.scene_source.representation.representation_format,
+            source.scene_source.representation.runtime_admitted,
+            source.scene_source.locally_validated,
+            source.scene_source.source_verified) != ('geophys', 'usd', False, True, False):
+        raise ValueError('DG02 production admission requires its exact locally validated source-preserving USD')
+    if (source.scene_source.loaded_delivery.delivery.recipe_sha256
+            != input_v1.runtime_source.scene_source.loaded_delivery.delivery.recipe_sha256):
+        raise ValueError('DG02 delivery recipe identity changed after candidate validation')
+
+
 def _validate_f05_dg01_mujoco_source(artifact, execution, source) -> None:
     """Admit only the exact source-bound DG01 Menagerie MJCF/Core route."""
     from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
@@ -494,12 +521,58 @@ def _diagnostic_manifest(artifact, execution, source, profile_id):
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
-                _f05_native_input=None, _f05_dg01_mujoco_input=None) -> RuntimeSession:
+                _f05_native_input=None, _f05_dg02_geophys_input=None,
+                _f05_dg01_mujoco_input=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    if (_f05_dg02_geophys_input is not None
+            or (type(execution) is ExecutionSpecV1
+                and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE)):
+        if _f05_dg02_geophys_input is None:
+            raise ValueError('DG02 GeoPhys/USD profile requires its exact versioned candidate input')
+        _validate_f05_dg02_geophys_usd_input(
+            _f05_dg02_geophys_input, artifact, declared_execution, source,
+        )
+        if manifest is None or _materialization_authority is not None or _diagnostic_profile is not None:
+            raise ValueError('DG02 exact admission requires its Core-generated capability manifest only')
+        projected_execution = ExecutionSpec(
+            'geophys', F05_DG02_GEOPHYS_USD_PROFILE, 'none', 'cpu',
+            declared_execution.provider_seed, 'best_effort',
+        )
+        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
+        from .geophys_native_io import create_f05_geophys_native_io
+        from .native_io import UsdCoreRuntimeSession
+
+        native_io = create_f05_geophys_native_io(
+            artifact=artifact, execution=declared_execution,
+            source=source, input_v1=_f05_dg02_geophys_input,
+        )
+        try:
+            receipt = native_io.drive_receipt
+            if receipt.identity_sha256 != _f05_dg02_geophys_input.native_drive_receipt.identity_sha256:
+                raise ValueError('DG02 runtime model receipt differs from the frozen public-model receipt')
+            session = UsdCoreRuntimeSession(
+                artifact, declared_execution, source, native_io, receipt,
+            )
+        except BaseException as materialization_error:
+            try:
+                native_io.close()
+            except BaseException as cleanup_error:
+                materialization_error.add_note(
+                    'DG02 native-I/O cleanup after Core admission failure also failed: '
+                    f'{type(cleanup_error).__name__}: {cleanup_error}'
+                )
+            raise
+        session._declared_execution_spec_v1 = declared_execution
+        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+        return session
+    if (type(execution) is ExecutionSpecV1
+            and execution.physics_profile == F05_DG02_GEOPHYS_USD_PROFILE
+            and _f05_dg02_geophys_input is None):
+        raise ValueError('DG02 GeoPhys/USD profile cannot use generic v1 admission')
     if (_f05_dg01_mujoco_input is not None
             or (type(execution) is ExecutionSpecV1
                 and execution.physics_profile == F05_DG01_MUJOCO_PROFILE)):

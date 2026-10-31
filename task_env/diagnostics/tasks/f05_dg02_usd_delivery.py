@@ -20,7 +20,8 @@ from task_env.artifacts import AssetDefinition
 from task_env.assembly.usd_delivery import load_usd_asset_delivery, variant_selection_hash
 
 
-SCHEMA = "geochora.f05-source-semantics.v1"
+SCHEMA_V1 = "geochora.f05-source-semantics.v1"
+SCHEMA_V2 = "geochora.f05-source-semantics.v2"
 R009_STAGE_SHA256 = "f1c7a1a62deba337ce2f50100e53b1ebf1d677004b4fff3ecb5bf51d55692608"
 SOURCE_CLOSURE_SHA256 = "a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a"
 SOURCE_XML_SHA256 = "96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273"
@@ -51,7 +52,7 @@ def _mjcf_parameters(value: str, *, width: int, label: str) -> list[float]:
     return items + [0.0] * (width - len(items))
 
 
-def _source_semantics(xml_bytes: bytes, source_closure: str) -> dict:
+def _source_semantics(xml_bytes: bytes, source_closure: str, *, version: int = 1) -> dict:
     """Resolve the Panda MJCF actuator defaults without loading MuJoCo."""
     root = ET.fromstring(xml_bytes)
     compiler = root.find("compiler")
@@ -140,8 +141,8 @@ def _source_semantics(xml_bytes: bytes, source_closure: str) -> dict:
         "solimp": _numbers(equality.attrib["solimp"], width=3, label="equality.solimp"),
         "active": equality.get("active", "true") == "true",
     }]
-    return {
-        "schema_version": SCHEMA,
+    semantics = {
+        "schema_version": SCHEMA_V2 if version == 2 else SCHEMA_V1,
         "source_identity": {
             "family": "menagerie-panda",
             "revision": SOURCE_REVISION,
@@ -153,9 +154,37 @@ def _source_semantics(xml_bytes: bytes, source_closure: str) -> dict:
         "tendons": tendons,
         "equalities": equalities,
     }
+    if version == 2:
+        geom_nodes = [node for body in root.findall("worldbody") for node in body.iter("geom")]
+        authored_friction = [node.attrib.get("friction") for node in geom_nodes if "friction" in node.attrib]
+        collision_defaults = [node.attrib.get("friction") for node in root.findall(".//default/geom")
+                              if "friction" in node.attrib]
+        if authored_friction or collision_defaults:
+            raise ValueError("DG02 v2 source friction defaults changed; do not substitute an unreviewed value")
+        source_materials = {
+            node.attrib["name"]: _numbers(node.attrib["rgba"], width=4, label=f"{node.attrib['name']}.rgba")
+            for node in root.findall("asset/material") if node.get("name") and node.get("rgba")
+        }
+        if not source_materials:
+            raise ValueError("DG02 v2 source visual materials are missing")
+        semantics["visual_materials"] = source_materials
+        semantics["collision_material"] = {
+            "source_effective_mjcf_geom_friction": [1.0, 0.005, 0.0001],
+            "source_mjcf_restitution_parameter": None,
+            "usd_physics_material_api": {
+                "static_friction": 1.0,
+                "dynamic_friction": 1.0,
+                "restitution": 0.0,
+            },
+            "geophys_geom_config_friction_expected": [1.0, 0.005, 0.0001],
+            "mapping": "USD dynamic_friction supplies GeoPhys sliding component 0; GeoPhys public USD lowering retains tail defaults 0.005 and 0.0001, matching the source MJCF effective defaults for this build identity. MJCF has no scalar geom restitution parameter; USD restitution 0 is target configuration only and not a source-equivalence claim.",
+            "cross_solver_friction_law_equivalence_claim": False,
+            "cross_solver_contact_law_equivalence_claim": False,
+        }
+    return semantics
 
 
-def _patch_stage(stage_path: Path, semantics: dict) -> list[str]:
+def _patch_stage(stage_path: Path, semantics: dict, *, version: int = 1, source_root: Path | None = None) -> list[str]:
     try:
         from pxr import Sdf, Usd
     except Exception as exc:  # pragma: no cover - runtime supplied by the frozen package
@@ -177,11 +206,80 @@ def _patch_stage(stage_path: Path, semantics: dict) -> list[str]:
         raise ValueError("base stage already has F05 source semantics; refusing to overwrite")
     attr = root.CreateAttribute("geochora:f05SourceSemantics", Sdf.ValueTypeNames.String, custom=True)
     attr.Set(json.dumps(semantics, sort_keys=True, separators=(",", ":"), allow_nan=False))
+    if version == 2:
+        from pxr import Gf, UsdGeom, UsdPhysics, UsdShade
+
+        if source_root is None:
+            raise ValueError("DG02 v2 stage authoring requires its frozen source root")
+        xml_root = ET.parse(source_root / "panda.xml").getroot()
+        body_paths = {}
+
+        def visit(parent, parent_path="/panda/Geometry"):
+            for body in parent.findall("body"):
+                path = f"{parent_path}/{body.attrib['name']}"
+                body_paths[body.attrib["name"]] = path
+                visit(body, path)
+
+        worldbody = xml_root.find("worldbody")
+        if worldbody is None:
+            raise ValueError("source MJCF has no worldbody")
+        visit(worldbody)
+        source_visual_materials = semantics["visual_materials"]
+        visual_count = collision_count = 0
+        for body in xml_root.iter("body"):
+            body_name = body.attrib["name"]
+            body_path = body_paths[body_name]
+            for geom in body.findall("geom"):
+                mesh_name = geom.get("mesh")
+                role = geom.get("class", "")
+                if not mesh_name:
+                    continue
+                collision = role == "collision"
+                candidates = [
+                    prim for prim in stage.GetPrimAtPath(body_path).GetChildren()
+                    if prim.IsA(UsdGeom.Mesh)
+                    and (str(prim.GetName()) == mesh_name or str(prim.GetName()).startswith(mesh_name + "_"))
+                    and prim.HasAPI(UsdPhysics.CollisionAPI) == collision
+                ]
+                if len(candidates) != 1:
+                    raise ValueError(f"cannot map v2 Panda source mesh {body_name}/{mesh_name}")
+                prim = candidates[0]
+                if collision:
+                    collision_count += 1
+                    continue
+                material_name = geom.get("material")
+                if material_name not in source_visual_materials:
+                    raise ValueError(f"visual mesh {body_name}/{mesh_name} has no source RGBA material")
+                rgba = source_visual_materials[material_name]
+                mesh = UsdGeom.Mesh(prim)
+                mesh.CreateDisplayColorAttr().Set([Gf.Vec3f(*rgba[:3])])
+                mesh.CreateDisplayOpacityAttr().Set([float(rgba[3])])
+                visual_count += 1
+        material = UsdShade.Material.Define(stage, "/panda/Materials/F05SourceCollision")
+        physics = UsdPhysics.MaterialAPI.Apply(material.GetPrim())
+        physics.CreateStaticFrictionAttr().Set(1.0)
+        physics.CreateDynamicFrictionAttr().Set(1.0)
+        physics.CreateRestitutionAttr().Set(0.0)
+        panda_shapes = [
+            prim for prim in stage.Traverse()
+            if str(prim.GetPath()).startswith("/panda/Geometry/")
+            and prim.HasAPI(UsdPhysics.CollisionAPI)
+        ]
+        for prim in panda_shapes:
+            UsdShade.MaterialBindingAPI.Apply(prim).Bind(
+                material, materialPurpose="physics",
+            )
+        semantics["authored_shape_counts"] = {
+            "visual_meshes_with_source_color": visual_count,
+            "source_collision_meshes": collision_count,
+            "panda_collision_shapes_with_source_material": len(panda_shapes),
+        }
+        attr.Set(json.dumps(semantics, sort_keys=True, separators=(",", ":"), allow_nan=False))
     stage.GetRootLayer().Save()
     return sorted(removed)
 
 
-def _validate_output(root: Path, delivery: dict, semantics: dict, source_files: dict[str, bytes]) -> dict:
+def _validate_output(root: Path, delivery: dict, semantics: dict, source_files: dict[str, bytes], *, version: int = 1) -> dict:
     try:
         from pxr import Usd, UsdGeom, UsdPhysics
     except Exception as exc:  # pragma: no cover
@@ -239,13 +337,26 @@ def _validate_output(root: Path, delivery: dict, semantics: dict, source_files: 
             "fixed_tendon": "source joint wraps and coefficients retained in the versioned semantic block",
             "compliant_joint_equality": "source solref(2) and solimp(3) retained with source-authored arity",
             "task_cube_support": "retained from accepted source-derived local stage and checked by prim path",
-            "visual_collision_geometry": "byte-identical to accepted stage base; geometric vertex/frame comparison remains a separate G1 audit item",
-            "contact_material_equivalence": "not claimed; no source material binding exists in the frozen recipe",
+            "visual_collision_geometry": (
+                "source mesh surfaces, local frames, Panda body frames, boxes, joints and full body inertias are checked by the bound source audit"
+                if version == 2 else
+                "byte-identical to accepted stage base; geometric vertex/frame comparison remains a separate G1 audit item"
+            ),
+            "visual_colors": (
+                "source MJCF RGBA values are authored as USD displayColor/displayOpacity on all visual Panda meshes"
+                if version == 2 else "not source-bound in v1"
+            ),
+            "contact_material": (
+                "the source-effective friction vector is represented on all Panda collision shapes; MJCF/GeoPhys contact-law equivalence and USD restitution equivalence are not claimed"
+                if version == 2 else "not source-bound in v1"
+            ),
         },
     }
 
 
-def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dict:
+def build(source_root: Path, base_delivery_path: Path, output_root: Path, *, version: int = 1) -> dict:
+    if version not in (1, 2):
+        raise ValueError("DG02 local delivery version must be 1 or 2")
     source_root = source_root.resolve(strict=True)
     base_root = base_delivery_path.resolve(strict=True).parent
     output_root = output_root.resolve()
@@ -297,13 +408,13 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
     xml_bytes = files["panda.xml"]
     if _sha(xml_bytes) != SOURCE_XML_SHA256:
         raise ValueError("original Panda MJCF source identity changed")
-    semantics = _source_semantics(xml_bytes, SOURCE_CLOSURE_SHA256)
+    semantics = _source_semantics(xml_bytes, SOURCE_CLOSURE_SHA256, version=version)
 
     entry_file = "derived/panda.usda"
     stage_path = output_root / entry_file
     stage_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(base_stage, stage_path)
-    removed = _patch_stage(stage_path, semantics)
+    removed = _patch_stage(stage_path, semantics, version=version, source_root=source_root)
 
     checker_path = "metadata/f05_dg02_usd_delivery_checker.py"
     recipe_path = "metadata/f05_dg02_usd_recipe.json"
@@ -324,9 +435,9 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
     (output_root / source_manifest_path).write_bytes(source_manifest_bytes)
 
     recipe = {
-        "schema_version": "f05-dg02-usd-recipe-v1",
+        "schema_version": f"f05-dg02-usd-recipe-v{version}",
         "recipe_id": "f05-dg02-menagerie-panda-source-preserving-usd",
-        "recipe_version": "1",
+        "recipe_version": str(version),
         "source": {
             "family": "menagerie-panda",
             "revision": SOURCE_REVISION,
@@ -338,8 +449,8 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
             "base_delivery_sha256": _sha(base_delivery_path.read_bytes()),
         },
         "derivation": {
-            "operation": "copy accepted composed stage; remove standard DriveAPI overlays; author source-derived versioned F05 semantics on /panda",
-            "semantics_schema": SCHEMA,
+            "operation": "copy accepted composed stage; remove standard DriveAPI overlays; author source-derived versioned F05 semantics on /panda; DG02 v2 also preserves source visual RGBA and binds Panda collision defaults",
+            "semantics_schema": SCHEMA_V2 if version == 2 else SCHEMA_V1,
             "removed_standard_drive_schemas": removed,
             "units": "SI meters-kilograms-seconds-radians; stage metersPerUnit=1 and upAxis=Z",
             "controller_values": "parsed from original MJCF actuator class defaults plus per-actuator overrides",
@@ -347,11 +458,17 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
             "equality_values": "parsed from original MJCF joint equality; authored 3-value solimp arity retained",
         },
         "feature_semantics": semantics,
-        "known_audit_limits": [
-            "The base stage bytes are retained for meshes and task-scene geometry; vertex-level source-to-USD frame comparison is still required for G1.",
-            "The source recipe has no authored contact material or collision filter and makes no friction-equivalence claim.",
-            "Local delivery validation is not provider admission or native physics evidence.",
-        ],
+        "known_audit_limits": (
+            [
+                "The source MJCF and GeoPhys contact laws are distinct; identical resolved friction coefficients do not claim cross-solver contact-law equivalence. USD restitution 0 is target configuration because MJCF has no scalar geom restitution parameter.",
+                "The free cube and support retain the accepted DG01 recipe's unbound material values.",
+                "Local delivery validation is not provider admission or native physics evidence.",
+            ] if version == 2 else [
+                "The base stage bytes are retained for meshes and task-scene geometry; vertex-level source-to-USD frame comparison is still required for G1.",
+                "The source recipe has no authored contact material or collision filter and makes no friction-equivalence claim.",
+                "Local delivery validation is not provider admission or native physics evidence.",
+            ]
+        ),
     }
     recipe_bytes = (json.dumps(recipe, sort_keys=True, indent=2, allow_nan=False) + "\n").encode()
     (output_root / recipe_path).write_bytes(recipe_bytes)
@@ -360,15 +477,17 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
     options = {
         "base_stage_sha256": R009_STAGE_SHA256,
         "source_closure_sha256": SOURCE_CLOSURE_SHA256,
-        "semantic_schema": SCHEMA,
+        "semantic_schema": SCHEMA_V2 if version == 2 else SCHEMA_V1,
         "drive_api_policy": "remove_standard_usd_drives_and_use_source_actuator_bundle",
+        "source_visual_color_policy": "preserve_mjcf_material_rgba_as_usd_displayColor" if version == 2 else "base_stage",
+        "source_contact_material_policy": "bind_MuJoCo_effective_default_coefficients_to_Panda_collision_shapes" if version == 2 else "base_stage_unbound",
     }
     options_sha = _canonical_hash(options)
     source_variant_sha = variant_selection_hash({})
     asset_definition = {
         "schema_version": "asset-definition-v1",
         "asset_id": "f05-dg02-menagerie-panda-source-preserving-usd",
-        "asset_version": "f05-dg02-usd-v1",
+        "asset_version": f"f05-dg02-usd-v{version}",
         "license_id": "bsd-3-clause",
         "source_content_sha256": SOURCE_CLOSURE_SHA256,
         "source_reference": "mujoco-menagerie://franka_emika_panda/panda.xml",
@@ -388,7 +507,7 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
         "source_variant_selections": {},
         "source_variant_selection_sha256": source_variant_sha,
         "representation_format": "usd",
-        "representation_id": "geophys-0.6.3-source-preserving-f05-dg02-v1",
+        "representation_id": f"geophys-0.6.3-source-preserving-f05-dg02-v{version}",
         "closure_policy": "f04-selected-derived-scene-v1",
         "entry_file": entry_file,
         "entry_prim": "/panda",
@@ -405,16 +524,42 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
         "source_files": [{**item} for item in source_bindings],
         "variant_selections": {},
     }
-    validation = _validate_output(output_root, delivery, semantics, files)
+    validation = _validate_output(output_root, delivery, semantics, files, version=version)
     validation["removed_standard_drive_schemas"] = removed
+    audit_receipt = None
+    audit_code_sha256 = None
+    if version == 2:
+        from task_env.diagnostics.tasks.f05_dg02_usd_source_audit import audit
+
+        audit_receipt = audit(source_root, stage_path, require_v2=True)
+        audit_path = output_root / "metadata" / "source_audit.json"
+        audit_path.write_text(json.dumps(audit_receipt, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        audit_code_path = output_root / "metadata" / "f05_dg02_usd_source_audit.py"
+        audit_code_path.write_bytes(Path(__file__).with_name("f05_dg02_usd_source_audit.py").read_bytes())
+        validation["source_audit_sha256"] = _sha(audit_path.read_bytes())
+        validation["source_audit_code_sha256"] = _sha(audit_code_path.read_bytes())
+        validation["source_audit_summary"] = {
+            key: audit_receipt["panda"][key] for key in (
+                "source_mesh_geometry_count", "matched_mesh_geometry_count", "source_box_geometry_count",
+                "matched_box_geometry_count", "body_frame_count", "inertial_body_count",
+                "source_scalar_joint_count", "panda_joint_count", "collision_shape_count",
+                "collision_shapes_with_physics_material_binding", "panda_joint_count",
+            )
+        }
     required_checks = [
         "source-bytes", "derived-output-bytes", "usd-composition", "dependency-closure",
         "selected-scene-structure", "panda-dof-units-limits", "physx-drive-profile",
         "free-body-and-support", "source-losses-recorded",
     ]
+    if version == 2:
+        required_checks.extend((
+            "source-bound-triangle-geometry", "body-frames-and-full-inertia",
+            "visual-color-source-values", "Panda-collision-material-binding",
+            "source-contact-filter",
+        ))
     report = {
         "schema_version": "usd-local-validation-report-v1",
-        "report_id": "f05-dg02-local-usd-report-v1",
+        "report_id": f"f05-dg02-local-usd-report-v{version}",
         "provenance_kind": "local-validated",
         "source_asset_identity_hash": asset_identity_hash,
         "source_revision": SOURCE_REVISION,
@@ -431,7 +576,7 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
         "recipe_version": recipe["recipe_version"],
         "recipe_sha256": delivery["recipe_sha256"],
         "options_sha256": options_sha,
-        "checker_id": "geochora-f05-dg02-usd-delivery-checker-v1",
+        "checker_id": f"geochora-f05-dg02-usd-delivery-checker-v{version}",
         "checker_sha256": delivery["checker_sha256"],
         "author": "GeoChora DG02 local source-preserving USD delivery",
         "checks": required_checks,
@@ -439,10 +584,13 @@ def build(source_root: Path, base_delivery_path: Path, output_root: Path) -> dic
             "r009 standard USD drive channels are removed from this derived representation and replaced by source-authored eight-actuator IR data.",
             "r009 representation did not expose the source tendon/equality to the GeoPhys importer; the versioned F05 semantic block records them for existing consumers.",
         ],
-        "unconsumed": [
-            "vertex-level source-to-USD mesh transform comparison remains a G1 audit item",
-            "contact material and collision-filter semantics are absent from the accepted task recipe; no cross-engine friction equivalence is claimed",
-        ],
+        "unconsumed": (
+            ["the source contact law and GeoPhys contact law are not asserted equivalent beyond the mapped friction-parameter intersection; MJCF has no scalar geom restitution parameter"]
+            if version == 2 else [
+                "vertex-level source-to-USD mesh transform comparison remains a G1 audit item",
+                "contact material and collision-filter semantics are absent from the accepted task recipe; no cross-engine friction equivalence is claimed",
+            ]
+        ),
         "passed": True,
     }
     report_bytes = (json.dumps(report, sort_keys=True, indent=2, allow_nan=False) + "\n").encode()
@@ -467,8 +615,9 @@ def main() -> None:
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--base-delivery", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--version", type=int, choices=(1, 2), default=1)
     args = parser.parse_args()
-    result = build(args.source_root, args.base_delivery, args.output_root)
+    result = build(args.source_root, args.base_delivery, args.output_root, version=args.version)
     print(json.dumps(result, sort_keys=True, indent=2))
 
 

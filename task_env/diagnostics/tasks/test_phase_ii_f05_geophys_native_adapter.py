@@ -248,7 +248,8 @@ def test_f05_native_versioned_input_reaches_shared_factory_without_native_materi
     marker = object()
     captured = []
 
-    def shared_factory(input_v1, *, horizon, environment_type):
+    def shared_factory(input_v1, *, horizon, environment_type, controller_config=None):
+        assert controller_config is None
         captured.append((input_v1, horizon, environment_type.__name__))
         return SimpleNamespace(env=marker)
 

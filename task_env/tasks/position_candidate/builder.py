@@ -33,7 +33,8 @@ from task_env.artifacts.execution import EpisodeResetPlanV1
 from task_env.runtime.sessions.source import RuntimeSource, UsdRuntimeSourceV1
 from task_env.runtime.sessions.leaf_control import (
     GeoPhysHostModelProducerIdentityV1,
-    GeoPhysUsdPositionDriveReceiptV1, IsaacNamedPositionDriveReceiptV1,
+    GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
+    IsaacNamedPositionDriveReceiptV1,
 )
 from task_env.runtime.sessions.control import compile_control_binding_plan
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
@@ -54,6 +55,35 @@ def _validate_f05_native_position_action_config(controller_config):
             joint_position_correction_gain=1.0,
             gripper_default_force_N=100.0):
         raise ValueError('F05 native ActionConfig differs from the accepted DG01 control semantics')
+
+
+F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
+F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
+F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
+
+
+def _f05_dg02_usd_source_bindings():
+    """Return the exact canonical-to-prim map authored by the DG02 USD stage."""
+    body_paths = {}
+    path = '/panda/Geometry'
+    for index in range(8):
+        path = f'{path}/link{index}'
+        body_paths[f'panda-main/link{index}'] = path
+    hand = f'{path}/hand'
+    body_paths.update({
+        'panda-main/hand': hand,
+        'panda-main/left_finger': f'{hand}/left_finger',
+        'panda-main/right_finger': f'{hand}/right_finger',
+        'free-cube/free_cube': '/F04Scene/free_cube',
+        'free-cube/world': '/F04Scene/free_cube',
+        'support/support': '/F04Scene/support',
+    })
+    joints = {
+        **{f'panda-main/joint{index}': f'joint{index}' for index in range(1, 8)},
+        'panda-main/finger_joint1': 'finger_joint1',
+        'panda-main/finger_joint2': 'finger_joint2',
+    }
+    return body_paths, joints
 
 
 @dataclass(frozen=True)
@@ -350,6 +380,140 @@ class F05NativePositionCandidateInputV1:
 
 
 @dataclass(frozen=True)
+class F05Dg02GeoPhysUsdCandidateInputV1:
+    """Exact DG02 Menagerie USD/Core route with its model-bound V2 receipt."""
+
+    schema_version: str
+    task_source: TaskSourceV1
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: ExecutionSpecV1
+    reset_plan: EpisodeResetPlanV1
+    kinematics_source_xml: str
+    kinematics_source_sha256: str
+    host_model_producer_identity: GeoPhysHostModelProducerIdentityV1
+    native_drive_receipt: GeoPhysUsdSourceActuationReceiptV2
+    action_config: object
+
+    def validate(self):
+        if self.schema_version != 'f05-dg02-geophys-usd-candidate-input-v1':
+            raise ValueError('unsupported F05 DG02 GeoPhys/USD candidate input schema')
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1
+                or type(self.host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1
+                or type(self.native_drive_receipt) is not GeoPhysUsdSourceActuationReceiptV2):
+            raise TypeError('DG02 requires exact TaskSource/Artifact/USD/Execution/reset/producer/V2 receipt contracts')
+        from task_env.environment.config import ActionConfig
+
+        expected_action = ActionConfig(
+            joint_position_correction_gain=1.0,
+            gripper_default_force_N=100.0,
+        )
+        if type(self.action_config) is not ActionConfig or self.action_config != expected_action:
+            raise ValueError('DG02 ActionConfig differs from the accepted DG01 Position semantics')
+        source, artifact, execution = self.runtime_source, self.artifact, self.execution
+        source.validate()
+        artifact.validate()
+        execution.validate()
+        self.reset_plan.validate()
+        scene = source.scene_definition
+        if (self.task_source.task_id, self.task_source.version, self.task_source.scene_ref,
+                artifact.task_id, artifact.artifact_version, scene.scene_id) != (
+                F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID,
+                F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID):
+            raise ValueError('DG02 TaskSource/Artifact identity differs from accepted DG01 task semantics')
+        if (source.task_artifact.identity_hash != artifact.identity_hash
+                or artifact.scene_identity_hash != scene.identity_hash
+                or source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
+                or source.scene_source.scene_identity_sha256 != scene.identity_hash
+                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
+                or self.reset_plan.role_binding.scene_identity_hash != scene.identity_hash
+                or self.reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
+            raise ValueError('DG02 Task/Scene/Artifact/reset identities disagree')
+        if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+                execution.physics_profile, execution.determinism_mode) != (
+                'geophys', 'cpu', 'cpu', F05_DG02_GEOPHYS_PROFILE, 'best_effort'):
+            raise ValueError('DG02 requires its exact GeoPhys CPU USD execution profile')
+        if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+                artifact.timebase.control_dt) != (0.002, 5, 0.01):
+            raise ValueError('DG02 requires 100 Hz control with five 2 ms physics steps')
+        if (execution.render_default.provider, execution.render_default.backend,
+                execution.render_default.profile, execution.render_default.device,
+                execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
+            raise ValueError('DG02 state-only cell does not admit renderer or camera overrides')
+        delivery = source.scene_source.loaded_delivery.delivery
+        representation = source.scene_source.representation
+        if (delivery.provenance_kind, delivery.recipe_path, delivery.recipe_sha256,
+                delivery.entry_prim, delivery.entry_file,
+                delivery.asset_definition.asset_id, delivery.asset_definition.asset_version,
+                delivery.asset_definition.source_reference, delivery.source_revision,
+                delivery.source_closure_sha256,
+                representation.provider, representation.provider_build_identity,
+                representation.representation_format, representation.runtime_admitted,
+                source.scene_source.source_verified, source.scene_source.locally_validated) != (
+                'local-validated', 'metadata/f05_dg02_usd_recipe.json', F05_DG02_USD_RECIPE_SHA256,
+                '/panda', 'derived/panda.usda',
+                'f05-dg02-menagerie-panda-source-preserving-usd', F05_DG02_USD_ASSET_VERSION,
+                'mujoco-menagerie://franka_emika_panda/panda.xml',
+                'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7',
+                'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a',
+                'geophys', self.host_model_producer_identity.requested_target_build_identity,
+                'usd', False, False, True):
+            raise ValueError('DG02 candidate is outside the frozen source-preserving local USD delivery')
+        self.host_model_producer_identity.validate_current_tree()
+        expected_bodies, expected_joints = _f05_dg02_usd_source_bindings()
+        if (dict(source.joints) != expected_joints
+                or dict(source.joint_targets) != expected_joints
+                or dict(source.bodies) != expected_bodies
+                or dict(source.frames)
+                or dict(source.free_joints) != {
+                    'free-cube/free_cube': '/F04Scene/free_cube/rootJoint',
+                }):
+            raise ValueError('DG02 USD mappings differ from the exact nine-DOF/free-cube source contract')
+        expected_runtime_frames = {
+            f'{frame.entity_id}/{frame.frame_id}'
+            for frame in scene.frames or () if frame.frame_kind == 'runtime'
+        }
+        if set(expected_bodies) != expected_runtime_frames:
+            raise ValueError('DG02 USD body bindings do not cover the exact canonical runtime Frames')
+        if (artifact.initialization.poses_world != self.reset_plan.reset_sample.poses_world
+                or set(artifact.initialization.poses_world) != {'free-cube/free_cube'}
+                or artifact.initialization.poses_world['free-cube/free_cube'].position != (1.0, 0.5, 0.9)
+                or artifact.initialization.poses_world['free-cube/free_cube'].quaternion_wxyz
+                    != (1.0, 0.0, 0.0, 0.0)
+                or dict(artifact.initialization.joint_position)
+                    != dict(self.reset_plan.reset_sample.joint_position)):
+            raise ValueError('DG02 reset differs from the frozen DG01 home/free-cube reset')
+        if (self.native_drive_receipt.provenance_kind != 'native_runtime'
+                or self.native_drive_receipt.scene_identity_sha256 != scene.identity_hash
+                or self.native_drive_receipt.source_closure_sha256 != source.source_closure_digest
+                or self.native_drive_receipt.execution_identity_sha256 != execution.identity_hash
+                or self.native_drive_receipt.provider_build_identity
+                    != self.host_model_producer_identity.actual_provider_build_identity
+                or self.native_drive_receipt.host_model_producer_identity_sha256
+                    != self.host_model_producer_identity.identity_sha256
+                or self.native_drive_receipt.physics_profile != F05_DG02_GEOPHYS_PROFILE
+                or self.native_drive_receipt.tendon_name != 'split'
+                or self.native_drive_receipt.equality_name != 'finger_joint1_finger_joint2'
+                or self.native_drive_receipt.equality_solref != (0.005, 1.0)
+                or self.native_drive_receipt.equality_solimp != (0.95, 0.99, 0.001)):
+            raise ValueError('DG02 model receipt does not bind the actual source/Scene/Execution/producer')
+        receipt_targets = {
+            f'{row.canonical_joint.entity_id}/{row.canonical_joint.joint_id}': row.native_dof_name
+            for row in self.native_drive_receipt.drives
+        }
+        if receipt_targets != expected_joints:
+            raise ValueError('DG02 model receipt does not cover all nine exact scalar DOF targets')
+        if (not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str
+                or hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest()
+                != self.kinematics_source_sha256):
+            raise ValueError('DG02 source-calibrated kinematics bytes/hash mismatch')
+
+
+@dataclass(frozen=True)
 class F05Dg01MujocoCandidateInputV1:
     """Exact source-bound Menagerie MJCF → MuJoCo Core candidate for DG01."""
 
@@ -446,25 +610,33 @@ class F05Dg01MujocoCandidateInputV1:
             raise ValueError('F05 DG01 source-calibrated kinematics bytes/hash mismatch')
 
 
-def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
+def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
                                        controller_config=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
     if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1,
                               F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
+                              F05Dg02GeoPhysUsdCandidateInputV1,
                               F05Dg01MujocoCandidateInputV1):
-        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01 input contract')
+        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01/DG02 input contract')
     input_v1.validate()
     if type(input_v1) is F05NativePositionCandidateInputV1:
         _validate_f05_native_position_action_config(controller_config)
+    elif type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1:
+        if controller_config is not None and controller_config != input_v1.action_config:
+            raise ValueError('DG02 controller override differs from its frozen ActionConfig')
     elif controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
-        raise ValueError('explicit Position ActionConfig is supported only by exact F05 native or DG01 candidates')
+        raise ValueError('explicit Position ActionConfig is supported only by exact F05 native, DG01, or DG02 candidates')
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
     native_drive_receipt = getattr(input_v1, 'native_drive_receipt', None)
-    position_config = controller_config
+    position_config = (
+        input_v1.action_config
+        if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        else controller_config
+    )
     if type(source) is UsdRuntimeSourceV1:
         profile = PandaPositionServoProfileV1.from_usd_source(
             artifact, source, execution=input_v1.execution,
@@ -493,6 +665,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                 F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
             ) else None,
             'f05_native_position_input': input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
+            'f05_dg02_geophys_input': input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
             'f05_dg01_mujoco_input': input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
             'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
@@ -522,6 +695,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                                 if type(input_v1) is F05NativePositionCandidateInputV1
                                 else 'F05-DG01-versioned-menagerie-mjcf-mujoco-core-v1'
                                 if type(input_v1) is F05Dg01MujocoCandidateInputV1
+                                else 'F05-DG02-source-preserving-geophys-usd-core-v1'
+                                if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
                                 else 'F05-versioned-geophys-usd-synthetic-s1-v1'),
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
@@ -535,12 +710,13 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         return seed
 
     def evaluate(state, semantics):
-        if type(input_v1) is not F05Dg01MujocoCandidateInputV1:
+        if type(input_v1) not in (
+                F05Dg01MujocoCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1):
             return SimpleNamespace(reward=0.0, success=False, failure=False, metrics={})
         pose_name = 'free-cube/free_cube'
         cube_pose = state.pose_world.get(pose_name)
         if cube_pose is None:
-            raise ValueError('F05 DG01 Task evaluator requires the measured free-cube Frame')
+            raise ValueError('F05 Task evaluator requires the measured free-cube Frame')
         threshold_m = float(semantics.parameters_si['lift_threshold_z_m'])
         center_z_m = float(cube_pose.position[2])
         raw_lift_predicate = center_z_m >= threshold_m
@@ -585,6 +761,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         f03_position_input=input_v1 if type(input_v1) is F03PositionCandidateInputV1 else None,
         f04_position_input=input_v1 if type(input_v1) is F04PositionCandidateInputV1 else None,
         f05_position_input=input_v1 if type(input_v1) is F05PositionCandidateInputV1 else None,
+        f05_native_position_input=input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
+        f05_dg02_geophys_input=input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
         f05_dg01_mujoco_input=input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
     )
 

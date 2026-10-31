@@ -9,7 +9,7 @@ from task_env.runtime.sessions.leaf_control import (
 )
 
 
-def _receipt():
+def _receipt(*, finger_upper=0.04):
     rows = []
     arm = (
         (-2.8973, 2.8973, 4500.0, 450.0, (-2.8973, 2.8973), (-87.0, 87.0)),
@@ -30,7 +30,7 @@ def _receipt():
     for index, name in enumerate(('finger_joint1', 'finger_joint2'), 7):
         rows.append(GeoPhysUsdPositionDriveV1(
             'geophys-usd-position-drive-v1', JointReference('panda-main', name),
-            name, index, 'actuator8', 7, 'meter', 0.0, 0.04, 0.01568627451,
+            name, index, 'actuator8', 7, 'meter', 0.0, finger_upper, 0.01568627451,
             0.0, 100.0, 10.0, 0.0, 0.0, 0.0,
             True, 0.0, 255.0, True, -100.0, 100.0,
         ))
@@ -65,6 +65,24 @@ def test_source_actuation_receipt_maps_nine_targets_to_eight_public_actuators():
     assert by_name['actuator4'] == pytest.approx(-2.811)
     assert receipt.equality_solref == (0.005, 1.0)
     assert receipt.equality_solimp == (0.95, 0.99, 0.001)
+
+
+def test_source_actuation_receipt_accepts_float32_encoding_of_full_opening():
+    receipt = _receipt(finger_upper=0.03999999910593033)
+    targets = receipt.commands({
+        f'panda-main/joint{index}': value for index, value in enumerate(
+            (0.012, -0.568, 0.0, -2.811, 0.0, 3.037, 0.741), 1,
+        )
+    }, 0.08)
+    finger_values = [value for _index, name, value in targets
+                     if name in {'finger_joint1', 'finger_joint2'}]
+    assert finger_values == [0.03999999910593033, 0.03999999910593033]
+    with pytest.raises(ValueError, match='source finger-joint limit'):
+        _receipt(finger_upper=0.03999).commands({
+            f'panda-main/joint{index}': value for index, value in enumerate(
+                (0.012, -0.568, 0.0, -2.811, 0.0, 3.037, 0.741), 1,
+            )
+        }, 0.08)
 
 
 def test_source_actuation_receipt_rejects_independent_finger_targets():

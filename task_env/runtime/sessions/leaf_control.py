@@ -821,9 +821,18 @@ class GeoPhysUsdSourceActuationReceiptV2:
             raise ValueError('Hand opening target must be a finite value in [0, 0.08] metres')
         finger_rows = {row.canonical_joint.joint_id: row for row in self.drives
                        if row.canonical_joint.joint_id in self.tendon_joint_names}
-        half = float(hand_opening_m) / 2.0
-        if any(not row.lower_limit <= half <= row.upper_limit for row in finger_rows.values()):
+        if set(finger_rows) != set(self.tendon_joint_names):
+            raise ValueError('source-actuation receipt must bind both tendon finger joints')
+        finger_upper = tuple(float(row.upper_limit) for row in finger_rows.values())
+        max_common_opening = 2.0 * min(finger_upper)
+        requested_opening = float(hand_opening_m)
+        # USD-authored 0.04 m limits are read through the provider's float32
+        # model. Preserve the canonical 0.08 m opening endpoint when its only
+        # excess is that sub-2 nm encoding difference, then issue the exact
+        # source-bounded per-finger target. Larger requests remain rejected.
+        if requested_opening > max_common_opening + 2e-9:
             raise ValueError('Hand opening target exceeds a source finger-joint limit')
+        half = min(requested_opening / 2.0, min(finger_upper))
         positions = {JointReference('panda-main', name.split('/', 1)[1]): float(value)
                      for name, value in arm_position.items()}
         positions[JointReference('panda-main', 'finger_joint1')] = half

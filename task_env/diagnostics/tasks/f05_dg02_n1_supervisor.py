@@ -84,14 +84,35 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
     if plan.get("schema_version") != "f05-dg02-n1-public-consumer-plan-v1":
         raise ValueError("unsupported N1 native plan schema")
     inputs = {row["path"]: row["sha256"] for row in plan["code"]["tracked_inputs"]}
-    worker = Path(__file__).with_name("f05_dg02_n1_public_consumer_probe.py").resolve(strict=True)
+    worker = Path(
+        plan.get("output", {}).get(
+            "worker_script",
+            Path(__file__).with_name("f05_dg02_n1_public_consumer_probe.py"),
+        )
+    ).resolve(strict=True)
     if inputs.get(str(worker)) != _sha(worker) or inputs.get(str(Path(__file__).resolve())) != _sha(Path(__file__).resolve()):
         raise ValueError("N1 worker/supervisor code changed after plan freeze")
     for row in plan["code"]["tracked_inputs"]:
         path = Path(row["path"]).resolve(strict=True)
         if _sha(path) != row["sha256"]:
             raise ValueError(f"N1 code hash mismatch: {path}")
-    for key in ("usd_stage", "delivery_manifest", "recipe", "source_inventory", "mjcf_source", "parent_model_compile_plan", "parent_model_compile_receipt"):
+    for key in (
+        "usd_stage",
+        "delivery_manifest",
+        "recipe",
+        "source_inventory",
+        "source_audit",
+        "mjcf_source",
+        "parent_model_compile_plan",
+        "parent_model_compile_receipt",
+        "parent_model_compile_worker_receipt",
+        "diagnostic_variants_manifest",
+        "equality_positive_variant_stage",
+        "equality_negative_variant_stage",
+        "equality_removed_variant_stage",
+    ):
+        if key not in plan["source"]:
+            continue
         row = plan["source"][key]
         if _sha(Path(row["path"]).resolve(strict=True)) != row["sha256"]:
             raise ValueError(f"N1 source hash mismatch: {key}")
@@ -132,6 +153,13 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
                 raise ValueError(f"N1 runtime file hash mismatch: {raw_path}")
         cwd = Path(runtime["working_directory"]).resolve(strict=True)
         pythonpath = [str(Path(item).resolve(strict=True)) for item in runtime["pythonpath"]]
+        runtime_environment_sha256 = hashlib.sha256(json.dumps(
+            runtime, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        expected_runtime_environment_sha256 = plan.get("runtime_environment_sha256")
+        if (expected_runtime_environment_sha256 is not None
+                and expected_runtime_environment_sha256 != runtime_environment_sha256):
+            raise ValueError("frozen runtime environment identity differs from the plan")
         output_dir.mkdir(parents=True, exist_ok=False)
         counter_path = output_dir / "step_counter.json"
         counter_path.write_text(json.dumps({"schema_version": "f05-dg02-step-counter-v1", "run_id": plan["run_id"], "attempted_physics_steps": 0, "completed_physics_steps": 0, "physics_dt_s": 0.002}, sort_keys=True) + "\n")
@@ -147,6 +175,9 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
             "OPENBLAS_NUM_THREADS": "4",
             "MKL_NUM_THREADS": "4",
             "NUMEXPR_NUM_THREADS": "4",
+            "F05_NATIVE_RUN_ID": plan["run_id"],
+            "F05_NATIVE_RUN_PLAN_SHA256": plan_hash,
+            "F05_NATIVE_RUNTIME_ENVIRONMENT_SHA256": runtime_environment_sha256,
         })
         command = [str(python), str(worker), "--plan", str(plan_path), "--plan-sha256", str(sidecar), "--receipt", str(Path(plan["output"]["worker_receipt"])), "--counter", str(counter_path)]
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
@@ -197,6 +228,7 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
             "run_id": plan["run_id"],
             "plan_path": str(plan_path),
             "plan_sha256": plan_hash,
+            "runtime_environment_sha256": runtime_environment_sha256,
             "command": command if "command" in locals() else None,
             "native_starts": native_start,
             "physics_steps_attempted": attempted,

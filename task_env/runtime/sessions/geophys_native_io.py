@@ -36,10 +36,14 @@ class F05GeoPhysUsdNativeIO:
     execution_provenance_kind = 'native_runtime'
 
     def __init__(self, *, artifact, execution, source, input_v1):
-        from ...tasks.position_candidate.builder import F05NativePositionCandidateInputV1
+        from ...tasks.position_candidate.builder import (
+            F05NativePositionCandidateInputV1,
+            F05Dg02GeoPhysUsdCandidateInputV1,
+        )
 
-        if type(input_v1) is not F05NativePositionCandidateInputV1:
-            raise TypeError('F05 GeoPhys adapter requires the exact native candidate input')
+        if type(input_v1) not in (
+                F05NativePositionCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1):
+            raise TypeError('F05 GeoPhys adapter requires an exact versioned native candidate input')
         input_v1.validate()
         if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
                 or execution.identity_hash != input_v1.execution.identity_hash):

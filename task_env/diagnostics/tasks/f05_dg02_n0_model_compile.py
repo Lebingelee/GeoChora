@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
+
 
 class _ForbiddenImportFinder(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
@@ -45,7 +47,7 @@ def _verify_plan(plan_path: Path, sidecar_path: Path) -> tuple[dict, str]:
         path = Path(row["path"]).resolve(strict=True)
         if _sha(path) != row["sha256"]:
             raise ValueError(f"N0 source code changed after plan freeze: {path}")
-    for label in ("usd_stage", "delivery_manifest", "recipe", "source_inventory"):
+    for label in ("usd_stage", "delivery_manifest", "recipe", "source_inventory", "source_audit"):
         row = plan["source"][label]
         if _sha(Path(row["path"]).resolve(strict=True)) != row["sha256"]:
             raise ValueError(f"N0 frozen source changed: {label}")
@@ -153,6 +155,136 @@ def audit(plan_path: Path, sidecar_path: Path) -> dict:
         finally:
             RigidSolver.__init__ = original_solver_init
 
+        source_audit = json.loads(
+            Path(plan["source"]["source_audit"]["path"]).read_text(encoding="utf-8")
+        )
+        recipe = json.loads(
+            Path(plan["source"]["recipe"]["path"]).read_text(encoding="utf-8")
+        )
+        if source_audit["usd_stage_sha256"] != _sha(stage_path):
+            raise ValueError("source geometry/material audit is not bound to the frozen USD stage")
+        if source_audit["source_xml_sha256"] != plan["source"]["source_mjcf_sha256"]:
+            raise ValueError("source geometry/material audit is not bound to the frozen MJCF source")
+        recipe_material = recipe["feature_semantics"]["collision_material"]
+        expected_collision_paths = tuple(
+            sorted(
+                str(row["shape"])
+                for row in source_audit["panda"]["collision_material_bindings"]
+            )
+        )
+        shape_by_source_path = {
+            str(shape.source_ref.element_path): shape
+            for shape in imported.ir.shapes
+            if shape.source_ref is not None
+        }
+        missing_source_paths = sorted(set(expected_collision_paths) - set(shape_by_source_path))
+        if missing_source_paths:
+            raise ValueError(
+                "USD semantic IR does not retain source-audited Panda collision paths: "
+                f"{missing_source_paths}"
+            )
+        source_path_by_shape_id = {
+            str(shape_by_source_path[path].shape_id): path
+            for path in expected_collision_paths
+        }
+        expected_collision_names = tuple(sorted(source_path_by_shape_id))
+        panda_collision_materials = []
+        for link in articulation.links:
+            for geom in link.geoms:
+                role = str(getattr(geom.role, "value", geom.role))
+                name = str(geom.name)
+                if name not in expected_collision_names or role not in ("collision", "both"):
+                    continue
+                panda_collision_materials.append({
+                    "link": str(link.name),
+                    "name": name,
+                    "source_path": source_path_by_shape_id[name],
+                    "role": role,
+                    "friction": _finite(geom.friction),
+                    "sliding_friction_authored": bool(geom.sliding_friction_authored),
+                    "static_friction": None if geom.static_friction is None else float(geom.static_friction),
+                    "restitution": None if geom.restitution is None else float(geom.restitution),
+                    "friction_combine_mode": geom.friction_combine_mode,
+                    "restitution_combine_mode": geom.restitution_combine_mode,
+                })
+        observed_collision_names = tuple(sorted(row["name"] for row in panda_collision_materials))
+        if observed_collision_names != expected_collision_names:
+            raise ValueError(
+                "public ArticulationConfig collision materials do not cover the source-audited Panda shapes: "
+                f"expected={expected_collision_names}; observed={observed_collision_names}; "
+                f"config_geoms={[(str(link.name), str(geom.name), str(getattr(geom.role, 'value', geom.role))) for link in articulation.links for geom in link.geoms]}"
+            )
+        if len({row["name"] for row in panda_collision_materials}) != len(panda_collision_materials):
+            raise ValueError("public ArticulationConfig contains duplicate Panda collision shape names")
+
+        contact_oracle = plan["oracle"]["panda_collision_material"]
+        for key in (
+            "source_effective_mjcf_geom_friction",
+            "geophys_geom_config_friction",
+            "usd_static_friction",
+            "usd_restitution_target_only",
+            "source_mjcf_restitution_parameter",
+            "cross_solver_friction_law_equivalence_claim",
+        ):
+            recipe_key = {
+                "source_effective_mjcf_geom_friction": "source_effective_mjcf_geom_friction",
+                "geophys_geom_config_friction": "geophys_geom_config_friction_expected",
+                "usd_static_friction": "usd_physics_material_api",
+                "usd_restitution_target_only": "usd_physics_material_api",
+                "source_mjcf_restitution_parameter": "source_mjcf_restitution_parameter",
+                "cross_solver_friction_law_equivalence_claim": "cross_solver_friction_law_equivalence_claim",
+            }[key]
+            expected_recipe_value = recipe_material[recipe_key]
+            if key in ("usd_static_friction", "usd_restitution_target_only"):
+                expected_recipe_value = expected_recipe_value[
+                    "static_friction" if key == "usd_static_friction" else "restitution"
+                ]
+            if contact_oracle[key] != expected_recipe_value:
+                raise ValueError(f"N0 frozen material oracle differs from the v2 recipe at {key}")
+        if contact_oracle["collision_shape_count"] != len(expected_collision_paths):
+            raise ValueError("N0 frozen collision count differs from the source audit")
+        expected_friction = contact_oracle["geophys_geom_config_friction"]
+        expected_compiled_friction = _finite(np.asarray(expected_friction, dtype=np.float32))
+        if expected_compiled_friction != contact_oracle["geophys_geom_config_friction_f32"]:
+            raise ValueError("N0 frozen compiled-material oracle differs from the binary32 conversion")
+        for row in panda_collision_materials:
+            if row["friction"] != expected_friction:
+                raise ValueError(f"public ArticulationConfig friction mismatch for {row['name']}")
+            if not row["sliding_friction_authored"]:
+                raise ValueError(f"public ArticulationConfig lost authored sliding friction for {row['name']}")
+            if row["static_friction"] != contact_oracle["usd_static_friction"]:
+                raise ValueError(f"public ArticulationConfig static friction mismatch for {row['name']}")
+            if row["restitution"] != contact_oracle["usd_restitution_target_only"]:
+                raise ValueError(f"public ArticulationConfig restitution target mismatch for {row['name']}")
+
+        joint_data = model.joint_data or {}
+        compiled_names = tuple(str(value) for value in joint_data.get("geom_names", ()))
+        compiled_friction = np.asarray(joint_data.get("geom_friction", ()), dtype=np.float64)
+        compiled_static_friction = np.asarray(joint_data.get("geom_static_friction", ()), dtype=np.float64).reshape(-1)
+        compiled_restitution = np.asarray(joint_data.get("geom_restitution", ()), dtype=np.float64).reshape(-1)
+        compiled_collision_materials = []
+        for index, name in enumerate(compiled_names):
+            if name not in expected_collision_names:
+                continue
+            if index >= len(compiled_friction) or index >= len(compiled_static_friction) or index >= len(compiled_restitution):
+                raise ValueError("compiled public model contact arrays do not cover Panda collision shapes")
+            compiled_collision_materials.append({
+                "name": name,
+                "friction": _finite(compiled_friction[index]),
+                "static_friction": float(compiled_static_friction[index]),
+                "restitution": float(compiled_restitution[index]),
+            })
+        compiled_collision_materials.sort(key=lambda row: row["name"])
+        if tuple(row["name"] for row in compiled_collision_materials) != expected_collision_names:
+            raise ValueError("compiled public rigid model does not preserve all source-audited Panda collision materials")
+        for row in compiled_collision_materials:
+            if row["friction"] != expected_compiled_friction:
+                raise ValueError(f"compiled public model friction mismatch for {row['name']}")
+            if row["static_friction"] != contact_oracle["usd_static_friction"]:
+                raise ValueError(f"compiled public model static friction mismatch for {row['name']}")
+            if row["restitution"] != contact_oracle["usd_restitution_target_only"]:
+                raise ValueError(f"compiled public model restitution target mismatch for {row['name']}")
+
         actuators = [
             {
                 "name": item.name,
@@ -243,6 +375,14 @@ def audit(plan_path: Path, sidecar_path: Path) -> dict:
             "actuators": actuators,
             "tendons": tendons,
             "equalities": equalities,
+            "panda_collision_materials": panda_collision_materials,
+            "compiled_panda_collision_materials": compiled_collision_materials,
+            "contact_material_scope": {
+                "source_effective_mjcf_geom_friction": contact_oracle["source_effective_mjcf_geom_friction"],
+                "usd_friction_law_equivalence_claim": contact_oracle["cross_solver_friction_law_equivalence_claim"],
+                "source_mjcf_restitution_parameter": contact_oracle["source_mjcf_restitution_parameter"],
+                "usd_restitution_equivalence_claim": contact_oracle["usd_restitution_equivalence_claim"],
+            },
             "gravity": _finite(solver_scene.physics.gravity),
             "source_identity": plan["source"]["source_identity"],
             "backend_module_imported": "taichi_forge" in sys.modules,

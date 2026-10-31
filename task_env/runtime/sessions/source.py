@@ -295,8 +295,13 @@ class UsdRuntimeSourceV1:
                     floating_entity_ids.add(articulation.entity_id)
                 elif joint.kind != 'fixed':
                     raise ValueError(f'USD RuntimeSource has unsupported joint kind: {joint.kind!r}')
-        if set(self.joints) != set(self.task_artifact.legacy_joint_bindings):
-            raise ValueError('USD RuntimeSource scalar Joint keys must match TaskArtifact v1 bindings')
+        task_joint_names = set(self.task_artifact.legacy_joint_bindings)
+        missing_task_scalar_bindings = scalar_names - task_joint_names
+        if missing_task_scalar_bindings:
+            raise ValueError(
+                'USD RuntimeSource scalar Joint map is missing TaskArtifact v1 bindings: '
+                f'{sorted(missing_task_scalar_bindings)}'
+            )
         if set(self.joints) != scalar_names:
             raise ValueError('USD RuntimeSource scalar Joint map must exactly cover the Scene scalar Joints')
         reset_pose_names = set(self.task_artifact.initialization.poses_world)

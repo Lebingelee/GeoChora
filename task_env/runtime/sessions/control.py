@@ -563,6 +563,7 @@ def materialize_control(
     leaf_plan=None,
     diagnostic_profile=None,
     f05_native_input=None,
+    f05_dg02_geophys_input=None,
     f05_dg01_mujoco_input=None,
 ):
     from ...artifacts import ExecutionSpecV1
@@ -580,10 +581,13 @@ def materialize_control(
     synthetic_s1 = s1_scope is not None
     f04_native = False
     f05_native = f05_native_input is not None
+    f05_dg02_native = f05_dg02_geophys_input is not None
     f05_dg01_mujoco = f05_dg01_mujoco_input is not None
-    if f05_native and synthetic_s1:
+    if f05_native and f05_dg02_native:
+        raise ValueError('legacy F05 and DG02 exact native admissions cannot overlap')
+    if (f05_native or f05_dg02_native) and synthetic_s1:
         raise ValueError('F05 native production admission cannot overlap a synthetic S1 scope')
-    if f05_dg01_mujoco and (f05_native or synthetic_s1 or f04_native):
+    if f05_dg01_mujoco and (f05_native or f05_dg02_native or synthetic_s1 or f04_native):
         raise ValueError('DG01 MuJoCo exact admission cannot overlap another versioned native route')
     if synthetic_s1:
         from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
@@ -653,6 +657,33 @@ def materialize_control(
                   for capability in f05_capabilities),
             ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
             'bounded F05 Menagerie GeoPhys CPU cell; no provider-wide qualification',
+        )
+    elif f05_dg02_native:
+        from .api import F05_DG02_GEOPHYS_USD_PROFILE, _validate_f05_dg02_geophys_usd_input
+        from ...artifacts import ExecutionSpec, ProviderCapabilityManifest, CapabilityClaim
+
+        _validate_f05_dg02_geophys_usd_input(
+            f05_dg02_geophys_input, artifact, declared_execution, source,
+        )
+        if (manifest is not None or diagnostic_profile is not None or leaf_plan is not None
+                or type(declared_execution) is not ExecutionSpecV1):
+            raise ValueError('DG02 exact-cell admission cannot combine with caller manifests or diagnostics')
+        if declared_execution.physics_profile != F05_DG02_GEOPHYS_USD_PROFILE:
+            raise ValueError('DG02 input requires its exact GeoPhys/USD execution profile')
+        execution = ExecutionSpec(
+            'geophys', F05_DG02_GEOPHYS_USD_PROFILE, 'none', 'cpu',
+            declared_execution.provider_seed, 'best_effort',
+        )
+        dg02_capabilities = sorted(set(CONTROL_REQUIRED.names) | set(artifact.required_capabilities.names))
+        actual_manifest = ProviderCapabilityManifest(
+            'provider-capability-v0', 'geophys',
+            f05_dg02_geophys_input.host_model_producer_identity.actual_provider_build_identity,
+            'f05-dg02-source-preserving-usd-core-native-v1', 'cpu',
+            F05_DG02_GEOPHYS_USD_PROFILE, 'none', 'best_effort',
+            tuple(CapabilityClaim(capability, 'tested', 'f05-dg02-exact-source-bound-core-cell')
+                  for capability in dg02_capabilities),
+            ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
+            'bounded DG02 source-preserving USD/Core CPU cell; no provider-wide qualification',
         )
     elif f05_dg01_mujoco:
         from .api import (
@@ -760,10 +791,10 @@ def materialize_control(
             'arm_position', 'hand_position',
         }:
             raise ValueError('R02c requires exactly one Arm and one Position Hand leaf')
-    if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg01_mujoco
-            and diagnostic_profile is None):
+    if (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
+            and not f05_dg01_mujoco and diagnostic_profile is None):
         actual_manifest = provider_manifest(execution.physics_provider)
-    elif (not synthetic_s1 and not f04_native and not f05_native
+    elif (not synthetic_s1 and not f04_native and not f05_native and not f05_dg02_native
           and not f05_dg01_mujoco):
         from .api import _diagnostic_manifest
         if manifest is not None:
@@ -772,7 +803,10 @@ def materialize_control(
     if manifest is not None and not synthetic_s1:
         admit_capabilities(CONTROL_REQUIRED, manifest, execution)
     admit_capabilities(CONTROL_REQUIRED, actual_manifest, execution)
-    admission_manifest = manifest
+    # DG02 materialize() admits the Core-generated, source-bound manifest
+    # alongside its exact candidate input. Keep it on the same public path
+    # after the controller-level capability check.
+    admission_manifest = actual_manifest if f05_dg02_native else manifest
     profiles = ()
     r1_controller = None
     r1_manifest = None
@@ -840,6 +874,16 @@ def materialize_control(
                         or dict(source.joint_targets) != dict(source.joints)
                         or len(set(source.joint_targets.values())) != 9):
                     raise ValueError('F05 Position requires one deferred model-bound receipt and exact nine-name source bindings')
+            elif f05_dg02_native:
+                receipt = f05_dg02_geophys_input.native_drive_receipt
+                expected_named_targets = {
+                    f'{row.canonical_joint.entity_id}/{row.canonical_joint.joint_id}': row.native_dof_name
+                    for row in receipt.drives
+                }
+                if (len(profiles) != 1 or profiles[0].open_actuator is not None
+                        or profiles[0].native_drive_receipt is not receipt
+                        or dict(source.joint_targets) != expected_named_targets):
+                    raise ValueError('DG02 Position requires its exact nine-DOF/eight-actuator source receipt')
             elif dict(source.joint_targets) != expected_targets or set(source.open_actuators) != set(expected_open):
                 raise ValueError('PositionServoV1 source actuator mapping differs from its bound plan')
             if binding.gripper_semantic_id != profiles[0].gripper_semantic_id:
@@ -900,6 +944,7 @@ def materialize_control(
         _materialization_authority=materialization_authority,
         _diagnostic_profile=diagnostic_profile,
         _f05_native_input=f05_native_input,
+        _f05_dg02_geophys_input=f05_dg02_geophys_input,
         _f05_dg01_mujoco_input=f05_dg01_mujoco_input,
     )
     if f04_native:
@@ -965,6 +1010,35 @@ def materialize_control(
             except BaseException as cleanup_error:
                 admission_error.add_note(
                     f'F05 native RuntimeSession cleanup after receipt admission failure also failed: '
+                    f'{type(cleanup_error).__name__}: {cleanup_error}'
+                )
+            raise
+    elif f05_dg02_native:
+        try:
+            from .leaf_control import GeoPhysUsdSourceActuationReceiptV2
+            receipt = getattr(session, '_drive_receipt', None)
+            metadata = getattr(session, '_native_io_metadata', None)
+            producer = f05_dg02_geophys_input.host_model_producer_identity
+            expected_targets = {
+                f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
+                for item in receipt.drives
+            } if type(receipt) is GeoPhysUsdSourceActuationReceiptV2 else {}
+            if (type(receipt) is not GeoPhysUsdSourceActuationReceiptV2
+                    or receipt.provenance_kind != 'native_runtime'
+                    or receipt.identity_sha256 != f05_dg02_geophys_input.native_drive_receipt.identity_sha256
+                    or receipt.provider_build_identity != producer.actual_provider_build_identity
+                    or receipt.host_model_producer_identity_sha256 != producer.identity_sha256
+                    or metadata.host_model_producer_identity_sha256 != producer.identity_sha256
+                    or metadata.provider_build_identity != producer.actual_provider_build_identity
+                    or metadata.physics_provider != 'geophys'
+                    or dict(source.joint_targets) != expected_targets):
+                raise ValueError('DG02 native receipt/metadata does not bind the exact public model producer/DOF map')
+        except BaseException as admission_error:
+            try:
+                session.close()
+            except BaseException as cleanup_error:
+                admission_error.add_note(
+                    f'DG02 RuntimeSession cleanup after receipt admission failure also failed: '
                     f'{type(cleanup_error).__name__}: {cleanup_error}'
                 )
             raise
