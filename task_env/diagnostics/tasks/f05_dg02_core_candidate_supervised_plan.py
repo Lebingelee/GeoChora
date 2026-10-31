@@ -74,6 +74,9 @@ def _tracked_paths(candidate: dict) -> list[Path]:
         CORE / "task_env/runtime/sessions/control.py",
         CORE / "task_env/runtime/sessions/geophys_source.py",
         CORE / "task_env/runtime/sessions/source.py",
+        PROVIDER / "src/scene/_rigid_usd_joint.py",
+        PROVIDER / "src/scene/usd_scene_ir.py",
+        PROVIDER / "test/verification/scene/test_usd_joint_lowering.py",
     })
     return sorted((path.resolve(strict=True) for path in paths), key=str)
 
@@ -101,10 +104,14 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
         ["git", "-C", str(CORE), "merge-base", "--is-ancestor", PACKAGE_HEAD, core_head],
         check=False,
     ).returncode == 0
+    provider_input_is_ancestor = subprocess.run(
+        ["git", "-C", str(PROVIDER), "merge-base", "--is-ancestor", PACKAGE_PROVIDER_HEAD, provider_head],
+        check=False,
+    ).returncode == 0
     if (not core_input_is_ancestor or core_branch != "develop-full"
-            or provider_head != PACKAGE_PROVIDER_HEAD
+            or not provider_input_is_ancestor
             or provider_branch != "codex/phase-ii-01-f05-geophys"):
-        raise RuntimeError("Core/provider checkout is not the frozen package input or its local-commit descendant")
+        raise RuntimeError("Core/provider checkout is not the frozen package input or an authorized local-commit descendant")
     if _git(PROVIDER, "status", "--porcelain=v1", "--untracked-files=all"):
         raise RuntimeError("isolated GeoPhys provider checkout is not clean")
 

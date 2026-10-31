@@ -25,7 +25,7 @@ PROGRESS = WINDOW / "goal_progress.json"
 BUDGET_PATH = PACKAGE / "execution_budget.json"
 ORACLES_PATH = PACKAGE / "control_oracles.json"
 PHYSICAL_PATH = PACKAGE / "original_physical_oracle.json"
-OLD_S1_PLAN = WINDOW / "host_g3_001/core_s1_007.plan.json"
+OLD_S1_PLAN = MAINT / "f05_diagnostic_goal02/window_002/core_s1_003.plan.json"
 OLD_CANDIDATE_PLAN = WINDOW / "host_g3_001/core_candidate_010/plan.json"
 
 
@@ -70,6 +70,9 @@ def _tracked_inputs(*rows: dict) -> list[dict]:
         CORE / "task_env/controllers/canonical/controller.py",
         CORE / "task_env/controllers/canonical/position_profile.py",
         CORE / "task_env/tasks/position_candidate/builder.py",
+        PROVIDER / "src/scene/_rigid_usd_joint.py",
+        PROVIDER / "src/scene/usd_scene_ir.py",
+        PROVIDER / "test/verification/scene/test_usd_joint_lowering.py",
     })
     return [
         {"path": str(path.resolve(strict=True)), "sha256": _sha(path.resolve(strict=True))}
@@ -349,6 +352,12 @@ def build_plan(*, output_root: Path, progress_path: Path,
     _atomic_json(candidate_admission_path, candidate_static_receipt)
 
     original_source = dict(old_s1["source"])
+    current_s1_dir = Path(old_s1["output"]["run_dir"]).resolve(strict=True)
+    original_source.update({
+        "core_s1_post_provider_repair_plan": _row(OLD_S1_PLAN),
+        "core_s1_post_provider_repair_worker_receipt": _row(current_s1_dir / "worker_receipt.json"),
+        "core_s1_post_provider_repair_supervisor_receipt": _row(current_s1_dir / "supervisor_receipt.json"),
+    })
     prior_candidate_supervisor = original_source.pop("core_candidate_supervisor_receipt", None)
     original_source.update({
         "core_candidate_plan": _row(candidate_plan_path.resolve(strict=True)),
