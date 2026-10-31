@@ -1865,9 +1865,9 @@
     "README.md": "11553804d8f6955a0886e36ed2de836919cbbf096b2fdf2a6d66740073d4b5bd",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
     "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "5e6297acb928c16277752da36a33187080401cd068f8595383505c2d55276550"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "e765d9a5b0081e912b12b3f13c105ba51893045dfec3ab8e4ab5ef73a14f8eef"
   },
-  "revision_kind": "F05_DG01_SOL_BOUNDED_ACCEPTANCE_AND_DG02_WINDOW001_PREPARATION",
+  "revision_kind": "DG02_WINDOW001_SOL_PARTIAL_REVIEW_AND_WINDOW002_REWORK_PREPARATION",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3641,7 +3641,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "Sol accepted the exact DG01 Core/MuJoCo cell after independently fixing actual-observation verification and cold-reading unchanged RUN009 H5 with 22 negatives. DG02 is prepared for manual relay on the post-review/docs HEAD; faithful USD/public GeoPhys consumers/Core integration and staged native are its scope. No DG02 native or Qualification was started. Historical ordinary F05 partial and candidate records remain unchanged.",
+  "planning_submission_this_revision": "Sol independently confirmed DG02 tracking failure, found reader/negative attribution and sharedController compatibility gaps, corrected formal-versus-probe budget classification and prepared a sameGoal window002 within original cumulative limits. No native or pytest ran in Sol review/preparation; old evidence is immutable and DG03 remains held.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4641,7 +4641,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-30",
-    "status": "F05_OVERALL_PARTIAL_UNCHANGED; DG01_ACCEPTED_BOUNDED; DG02_WINDOW001_PREPARED_FOR_MANUAL_RELAY; DG03_F06_F07_NOT_STARTED",
+    "status": "F05_OVERALL_PARTIAL_UNCHANGED; DG01_ACCEPTED; DG02_WINDOW001_REVIEWED_PARTIAL_REWORK_REQUIRED; WINDOW002_PREPARED_FOR_MANUAL_RELAY; DG03_F06_F07_NOT_STARTED",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -6742,7 +6742,7 @@
       "preparation_tests": 0,
       "preparation_native": 0
     },
-    "latest_f05_successor_diagnostic_plan": "f05_dg02_window001_preparation_20261030",
+    "latest_f05_successor_diagnostic_plan": "f05_dg02_window002_preparation_20261031",
     "dg01_goal01_window_001": {
       "input_head": "6d4e222866474b0ce4399183a35c337f58303349",
       "implementation_commit": "e410f97d90e1e88806318d11c47dc54d013dad5c",
@@ -6811,6 +6811,52 @@
       "N2_requires_implementation_S1_and_frozen_plan": true,
       "native_in_preparation": 0,
       "DG03_F06_F07_started": false
+    },
+    "f05_dg02_window001_sol_review_20261031": {
+      "decision": "DG02_WINDOW001_REVIEWED_PARTIAL_REWORK_REQUIRED",
+      "input_core_head": "e0dc6506036e171be6e886e72677b545e55cdf1d",
+      "provider_head": "f4d3b3bb21882bac5ca007e657f5d6709a6189b8",
+      "output_files_checked": 820,
+      "protected_files_checked": 6475,
+      "runtime_files_checked": 12,
+      "json_files_parsed": 277,
+      "tracking_failures": 22,
+      "independent_original_h5_recompute": true,
+      "formal_attempted_steps": 16325,
+      "nonformal_probe_attempted_upper_bound": 1675,
+      "total_attempted": 18000,
+      "total_completed": 17980,
+      "reader_remaining": [
+        "actualstoredcubeleaf",
+        "negativeattributiononfailingbaseline"
+      ],
+      "other_rework": [
+        "controlledlayerisolation",
+        "defaultControlleridentitycompatibility",
+        "CPUfailclosed/supervisor",
+        "unknownwall/timeboxreconciliation"
+      ],
+      "Sol_pytest": "NOT_RUN",
+      "Sol_native": 0,
+      "evidence": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_001/"
+    },
+    "f05_dg02_window002_preparation_20261031": {
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_002/",
+      "package_id": "F05_DG02_WINDOW002_CONTROL_ISOLATION_REPAIR_AND_ACCEPTANCE",
+      "status": "PREPARED_FOR_MANUAL_RELAY_NOT_STARTED",
+      "same_goal": "DG02",
+      "input_head": "actual post-review/docs commit in package input_snapshot.json",
+      "provider_input_head": "f4d3b3bb21882bac5ca007e657f5d6709a6189b8",
+      "goal_total_caps_increased": false,
+      "window_geophys_steps_max": 18000,
+      "window_probe_steps_max": 12000,
+      "window_formal_steps_max": 6000,
+      "window_mujoco_affected_regression_steps_max": 3000,
+      "window_minutes_max": 480,
+      "new_branches_worktrees": 0,
+      "preparation_native": 0,
+      "preparation_pytest": "NOT_RUN",
+      "DG03_started": false
     }
   }
 }

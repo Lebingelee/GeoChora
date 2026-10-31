@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001 已完成正式Core N2及两次有界修复probe，point-hold tracking仍失败，整体保留PARTIAL。probe累计预算仅余60步，正式复验需要维护者重新冻结预算。DG03仍为待适配基线。**
+> **状态：DG01精确单元已接收；DG02 window001经Sol独立复核为 `DG02_WINDOW001_REVIEWED_PARTIAL_REWORK_REQUIRED`，tracking失败与reader缺口待修复。原账误将formal计入probe；总native额度未耗尽。window002续包已准备，待维护者转述冻结包执行。DG03仍待DG02接收。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -108,3 +108,20 @@ N2正式run `DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_019`使用已提�
 DG02目标/阈值未放宽。N2_019失败后，在同一source-bound Core/GeoPhys/USD route上执行了两个500-step定向probe。probe001使用`achieved_state_dls_v1`、reset-posture nullspace gain 1.0，home hold通过、point hold失败：晚段目标误差`0.10227 rad`、峰值速度`5.48838 rad/s`、峰峰值抖动`0.05219 rad`。probe002只将DG02专属nullspace gain改为0.0，home hold通过、point hold仍失败：`0.06816 rad`、`4.30769 rad/s`、`0.10461 rad`；前两项改善但抖动恶化。两个worker均完成500/500，但都不是formal N2或通过的Core cell。probe001 reader发现阈值schema读取缺陷后作了冷读修复，receipt同时记录冻结reader hash和read-time hash；probe002计划绑定修正后的reader hash并通过独立冷读。
 
 累计probe计数现为`17,940 attempted / 17,920 completed / 18,000 max`，只剩60步。原正式两集N2仍需3,000步，因此本冻结预算不能完成正式复验，也不能把bounded probe写成PASS。下一步必须先以新的冻结预算继续定位/修复实际Core point tracking，再按原阈值完成正式N2与冷读。当前Core实现commit为`78ea8cdb06d17792f2c774fbcca52bfd373cbff0`；GeoPhys隔离provider仍为`f4d3b3bb21882bac5ca007e657f5d6709a6189b8`。source仍为`local-validated`且`source_verified=false`；不推断通用GeoPhys/USD、Isaac/USD或跨solver接触/材料等价。不启动DG03、F06/F07或Qualification。旧F05三轮/PARTIAL、接受的DG01、r009及历史输出均不改。
+
+
+## 10. DG02 window001 Sol复核与window002（2026-10-31）
+
+**决定：`DG02_WINDOW001_REVIEWED_PARTIAL_REWORK_REQUIRED`。** 已核820/820输出、277份JSON、6475/6475保护输入和12/12 runtime。独立直接读取原N2_019 H5重算12行phase tracking，与签署reader一致：最大target error0.400356rad、p2p0.364800rad、速度6.730178rad/s，22项失败真实存在。现有生产USD/public consumer/Core接线和source语义探针是工程增量，不接收完整DG02，不推进DG03/F06/F07/Qualification。
+
+复核返工点：R1同source/dt/hold窗口下以公开固定native目标→Core absolute_joint→Core absolute_pose三层受控对照定位首个失稳层，停止以nullspace gain扫参/重复整轮替代归因；R2现有reader漏读实际H5 cube target_body_pose叶，负例仅改typedframe，须补真实存储叶校验；R3原bundle已有task_predicate错误，negative仅以同错误码存在计PASS不能证明Task变异检测，须有独立检查ID/差分；R4共享默认Controller identity由v0变v1，须核旧默认兼容及实际caller/回归；R5保留两次无监督compile和一次默认CUDA初始化事件，后续所有会触发compile/init的检查必须正确CPU failclosed且受既有supervisor约束。
+
+**预算纠正：** 原Goal冻结probe18000、GeoPhys总66000steps分别约束；逐run实际formal16325＋其余所有步骤保守算probe1675＝18000attempted（17980completed）。原账把formal也写入probe，不能据此称全部native余额0。所有失败/formal仍计入GeoPhys/总native，不退款、不抹历史。两条native test wall缺失先各保守预扣900s，待原日志核实。startedUTC至最后更新约15h11m，与原active230min/externalwait0须对账，不能伪造暂停区间。原window释放后仍须新冻结，不直接沿旧文件续跑。
+
+完整复核：`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_001/`。旧report/manifest/H5/plan原件保留签署含义；本次Sol只做diff/哈希/原H5独立数值核验，零pytest/native/GPU。
+
+**window002续同DG02 Goal：** 完整包`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_002/`，以input_snapshot的post-review/docs HEAD为准；provider输入f4d3b3bb21882bac5ca007e657f5d6709a6189b8。复用原phase分支/隔离worktree，零新branch/worktree，人工转述后执行。不能重建Goal或清零计数；工具blocked与JSONactive字段须诚实说明并按宿主规则恢复。
+
+原Goal总native资源上限不增加；新window从剩余额度划出GeoPhys≤18000steps（probe≤12000、formal≤6000）/3600s；可选受影响DG01 MuJoCo回归≤3000steps/300s；合计≤21000steps/3900s，与原各bucket剩余额度取较小值。未知旧wall已先保守预扣1800s。每probe≤500steps，至少预留完整3000step formal；短对照稳定、受影响S1与reader修复通过、implementation提交并准确冻结plan后才formal。预计主动4–8h，window上限8h、末45min收口；MemAvailable≥6GiB/PG RSS≤4GiB/低于1GiB中止/.25s采样/4CPUthreads/单重进程与共享锁保持。新Evidence≤1GiB，无依赖/资产下载，不启动Isaac/GPU/Newton。
+
+N2仍须原同Env两轮300interval×5×2ms、全部物理/control/Task/storage/退出门，不改变source gain/物性/Task Action配置/阈值换PASS。成功只报待Sol复核候选；DG03需本Goal完整接收后再冻结。无法在原语义下实现时给最小反例和外部决定，不扩大solver算法范围。

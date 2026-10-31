@@ -998,3 +998,10 @@ support, Isaac/USD readiness, task success, or Qualification. The earlier F05
 three-round PARTIAL, accepted bounded DG01 decision, and frozen r009 evidence
 remain unchanged. DG03, F06 and F07 have not started. See the current
 [three-Goal execution record](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window001-geophys-usd-in-progress).
+
+
+### DG02 window001 Sol review (2026-10-31)
+
+The exact source-preserving USD/public GeoPhys/Core route has implementation and bounded native progress, but **DG02 remains PARTIAL**. Independent saved-H5 recomputation confirms the 22 tracking failures. The current cold reader also omits the actual cube observation leaf, and its Task negative needs mutation-specific attribution beyond existing `task_predicate` failures. Source/model/consumer metadata, complete writes and storage checks do not establish closed-loop control acceptance. The shared default Controller identity change requires compatibility review; no general API/capability promotion follows.
+
+The original 18,000-step probe bucket was conflated with formal runs: 16,325 attempted steps were formal and at most 1,675 were nonformal probes. All 18,000 remain charged to the original GeoPhys/total budget. Continuation requires the new window002 freeze and corrected separate accounting, not an automatic resume or larger Goal total budget. See [the Sol decision and rework scope](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md). DG03/F06/F07 and Qualification remain held; original evidence is immutable.
