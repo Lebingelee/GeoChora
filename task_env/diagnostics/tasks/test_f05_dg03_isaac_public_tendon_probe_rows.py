@@ -10,6 +10,7 @@ import pytest
 
 from task_env.diagnostics.tasks.f05_dg03_isaac_public_tendon_probe import (
     _remove_source_equality_for_ablation,
+    _source_equality_probe_outcome,
     _rows,
 )
 
@@ -58,6 +59,39 @@ def test_rows_rejects_wrong_width_and_nonfinite_values():
 
     with pytest.raises(ValueError, match="nonfinite"):
         _rows([1.0, float("nan"), 3.0], 3)
+
+
+def test_source_equality_probe_uses_asymmetric_relation_error_for_positive_and_ablation():
+    assert _source_equality_probe_outcome(
+        equality_removed=False,
+        initial_difference_m=0.016,
+        final_difference_m=0.001,
+        leader_motion_m=0.004,
+    )
+    assert _source_equality_probe_outcome(
+        equality_removed=True,
+        initial_difference_m=0.016,
+        final_difference_m=0.015,
+        leader_motion_m=0.004,
+    )
+    assert not _source_equality_probe_outcome(
+        equality_removed=True,
+        initial_difference_m=0.016,
+        final_difference_m=0.001,
+        leader_motion_m=0.004,
+    )
+    assert not _source_equality_probe_outcome(
+        equality_removed=False,
+        initial_difference_m=0.016,
+        final_difference_m=0.015,
+        leader_motion_m=0.004,
+    )
+    assert not _source_equality_probe_outcome(
+        equality_removed=True,
+        initial_difference_m=0.0,
+        final_difference_m=0.015,
+        leader_motion_m=0.004,
+    )
 
 
 def test_mimic_ablation_removes_all_encodings_of_one_equality_only():

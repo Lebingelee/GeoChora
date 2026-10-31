@@ -188,6 +188,23 @@ def _has_applied_schema(prim, schema_token: str) -> bool:
     return bool(api_schemas and schema_token in api_schemas.GetAppliedItems())
 
 
+def _source_equality_probe_outcome(
+    *, equality_removed: bool, initial_difference_m: float,
+    final_difference_m: float, leader_motion_m: float,
+) -> bool:
+    """Apply the defect-sensitive asymmetric-finger oracle to one trace."""
+    values = (initial_difference_m, final_difference_m, leader_motion_m)
+    if any(not math.isfinite(float(value)) for value in values):
+        return False
+    if abs(abs(float(initial_difference_m)) - 0.016) > 1e-4:
+        return False
+    if float(leader_motion_m) < 1e-4:
+        return False
+    if equality_removed:
+        return abs(float(final_difference_m)) > 0.002
+    return abs(float(final_difference_m)) <= 0.002
+
+
 def run_probe(
     manifest_path: Path, expected_manifest_sha256: str, receipt_path: Path,
     *, ablate_source_equality: bool = False,
@@ -405,6 +422,11 @@ def run_probe(
         zero = [0.0] * len(names)
         positions = list(zero)
         positions[index["joint4"]] = -1.57
+        # The frozen control oracle deliberately starts from a 16 mm finger
+        # mismatch.  Equal finger positions cannot distinguish a consumed
+        # equality from two independently moving joints.
+        positions[index["finger_joint1"]] = 0.028
+        positions[index["finger_joint2"]] = 0.012
         articulation.set_dof_positions(positions)
         articulation.set_dof_velocities(zero)
         torch.cuda.synchronize(0)
@@ -419,6 +441,13 @@ def run_probe(
         baseline = _rows(baseline_readback, len(names))
         q1_initial = baseline[index["finger_joint1"]]
         q2_initial = baseline[index["finger_joint2"]]
+        initial_difference = q1_initial - q2_initial
+        result["mimic_initial_finger_positions_m"] = [q1_initial, q2_initial]
+        result["mimic_initial_difference_m"] = initial_difference
+        if abs(abs(initial_difference) - 0.016) > 1e-4:
+            raise ValueError(
+                "public articulation reset did not retain the frozen 16 mm asymmetric finger seed"
+            )
         mimic_diffs = []
         follower_deltas = []
         attempted = 0
@@ -438,6 +467,8 @@ def run_probe(
         result["mimic_q_difference_max_m"] = max(mimic_diffs, default=math.inf)
         result["mimic_follower_motion_m"] = max(follower_deltas, default=0.0)
         result["mimic_leader_motion_m"] = abs(q1 - q1_initial)
+        result["mimic_final_finger_positions_m"] = [q1, q2]
+        result["mimic_final_difference_m"] = q1 - q2
         result["mimic_schema_supported"] = bool(
             result["mimic_relation_active_in_runtime_stage"]
             and result["mimic_follower_motion_m"] >= 1e-4
@@ -445,13 +476,23 @@ def run_probe(
         )
 
         if ablate_source_equality:
-            result["ablation_no_coupling_detected"] = bool(
-                result["mimic_leader_motion_m"] >= 1e-4
-                and result["mimic_follower_motion_m"] < 1e-4
-                and result["mimic_q_difference_max_m"] > 2e-3
-                and not result["mimic_schema_supported"]
+            result["ablation_no_coupling_detected"] = _source_equality_probe_outcome(
+                equality_removed=True,
+                initial_difference_m=initial_difference,
+                final_difference_m=q1 - q2,
+                leader_motion_m=result["mimic_leader_motion_m"],
             )
         else:
+            result["mimic_schema_supported"] = bool(
+                result["mimic_relation_active_in_runtime_stage"]
+                and result["mimic_follower_motion_m"] >= 1e-4
+                and _source_equality_probe_outcome(
+                    equality_removed=False,
+                    initial_difference_m=initial_difference,
+                    final_difference_m=q1 - q2,
+                    leader_motion_m=result["mimic_leader_motion_m"],
+                )
+            )
             source_efforts = []
             source_forces = []
             source_ctrls = []
