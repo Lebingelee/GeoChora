@@ -19,7 +19,7 @@ from .free_joint_state import PublicRigidBodyReadbackV1
 from .native_io import (
     NativeAdvanceReceiptV1, NativePositionWriteAckV1,
     NativeResetWriteReceiptV1, NativeRuntimeIOMetadataV1, NativeSourceTendonWriteAckV1,
-    NativeRuntimeReadbackV1,
+    NativeRuntimeReadbackV1, _is_sha256_identity,
 )
 from .source import UsdRuntimeSourceV1
 
@@ -1213,6 +1213,15 @@ class IsaacSimNativeRuntimeIOV1:
     ) -> NativeSourceTendonWriteAckV1:
         if not self._dg03 or self._closed:
             raise RuntimeError('source tendon targets are admitted only by an open DG03 native adapter')
+        if (not _is_sha256_identity(target_identity_sha256)
+                or not _is_sha256_identity(receipt_identity_sha256)):
+            raise ValueError('source tendon target and receipt identities must be lowercase SHA-256 digests')
+        if type(actuator_name) is not str or not actuator_name.strip():
+            raise ValueError('source tendon actuator name must be a nonempty string')
+        if any(type(value) not in (int, float) or isinstance(value, bool)
+               or not math.isfinite(float(value))
+               for value in (control_value, scalar_force_limit_N)):
+            raise ValueError('source tendon control and force limit must be finite non-boolean numbers')
         receipt = self.drive_receipt
         if (receipt is None or receipt.identity_sha256 != receipt_identity_sha256
                 or actuator_name != receipt.actuator_name):

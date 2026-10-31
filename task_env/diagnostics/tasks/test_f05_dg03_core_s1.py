@@ -116,6 +116,51 @@ def test_dg03_scene_filter_guard_preserves_robot_source_filters():
     assert len(witness['task_scene_filtered_pairs']) == 1
 
 
+def test_dg03_native_tendon_writer_rejects_noncanonical_identity_and_boolean_scalars():
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimNativeRuntimeIOV1
+    from task_env.runtime.sessions.native_io import NativeSourceTendonWriteAckV1
+
+    digest = "a" * 64
+
+    class Receipt:
+        identity_sha256 = digest
+        actuator_name = "actuator8"
+        canonical_opening_range_m = 0.08
+        actuator_control_range = (0.0, 255.0)
+
+        @staticmethod
+        def tendon_control(opening_m, force_limit_N):
+            return (255.0 * opening_m / 0.08, force_limit_N)
+
+    native_io = object.__new__(IsaacSimNativeRuntimeIOV1)
+    native_io._dg03 = True
+    native_io._closed = False
+    native_io.drive_receipt = Receipt()
+    native_io._source_tendon_target = None
+    native_io._sync = lambda: None
+
+    invalid_targets = (
+        (digest, digest, "actuator8", True, 100.0),
+        (digest, digest, "actuator8", 127.5, True),
+        ("", digest, "actuator8", 127.5, 100.0),
+        (digest, "not-a-digest", "actuator8", 127.5, 100.0),
+    )
+    for args in invalid_targets:
+        with pytest.raises((TypeError, ValueError)):
+            native_io.write_source_tendon_target(*args)
+        assert native_io._source_tendon_target is None
+
+    malformed_ack = NativeSourceTendonWriteAckV1(
+        "native-source-tendon-write-ack-v1", "", digest,
+        "actuator8", 127.5, 100.0, False,
+    )
+    with pytest.raises(ValueError):
+        malformed_ack.validate(
+            target_identity_sha256="", receipt_identity_sha256=digest,
+            actuator_name="actuator8", control_value=127.5, scalar_force_limit_N=100.0,
+        )
+
+
 class _SyntheticDg03NativeIO:
     """Replace only the native I/O port; intentionally performs no physics."""
 

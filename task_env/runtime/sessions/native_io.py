@@ -31,6 +31,11 @@ def _finite_tuple(value, width: int, label: str) -> tuple[float, ...]:
     return tuple(float(item) for item in value)
 
 
+def _is_sha256_identity(value: object) -> bool:
+    return (type(value) is str and len(value) == 64
+            and all(char in '0123456789abcdef' for char in value))
+
+
 @dataclass(frozen=True)
 class NativeRuntimeIOMetadataV1:
     """Immutable resource and execution facts read from a native adapter."""
@@ -221,9 +226,7 @@ class NativePositionWriteAckV1:
     def validate(self, target_identity: str, expected: tuple[tuple[int, str, float], ...]):
         if self.schema_version != 'native-position-write-ack-v1':
             raise ValueError('unsupported native Position write Ack schema')
-        if (type(self.target_identity_sha256) is not str
-                or len(self.target_identity_sha256) != 64
-                or any(char not in '0123456789abcdef' for char in self.target_identity_sha256)
+        if (not _is_sha256_identity(self.target_identity_sha256)
                 or type(self.native_names) is not tuple
                 or any(type(name) is not str or not name.strip() for name in self.native_names)
                 or type(self.applied_values) is not tuple
@@ -272,6 +275,12 @@ class NativeSourceTendonWriteAckV1:
                  actuator_name: str, control_value: float, scalar_force_limit_N: float) -> None:
         values = (self.control_value, self.scalar_force_limit_N)
         if (self.schema_version != 'native-source-tendon-write-ack-v1'
+                or not _is_sha256_identity(self.target_identity_sha256)
+                or not _is_sha256_identity(self.receipt_identity_sha256)
+                or not _is_sha256_identity(target_identity_sha256)
+                or not _is_sha256_identity(receipt_identity_sha256)
+                or type(self.actuator_name) is not str or not self.actuator_name.strip()
+                or type(actuator_name) is not str or not actuator_name.strip()
                 or self.target_identity_sha256 != target_identity_sha256
                 or self.receipt_identity_sha256 != receipt_identity_sha256
                 or self.actuator_name != actuator_name
