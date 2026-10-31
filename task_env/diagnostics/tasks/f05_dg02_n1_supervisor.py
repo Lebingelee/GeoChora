@@ -1,4 +1,4 @@
-"""Exclusive native supervisor for the frozen, two-step DG02 N1 probe."""
+"""Exclusive native supervisor for frozen DG02 source-consumer probes."""
 
 from __future__ import annotations
 
@@ -81,8 +81,12 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
     if plan_hash != sidecar.read_text(encoding="ascii").split()[0]:
         raise ValueError("N1 plan hash mismatch")
     plan = json.loads(plan_raw)
-    if plan.get("schema_version") != "f05-dg02-n1-public-consumer-plan-v1":
-        raise ValueError("unsupported N1 native plan schema")
+    supported_plan_schemas = {
+        "f05-dg02-n1-public-consumer-plan-v1",
+        "f05-dg02-equality-coupling-plan-v1",
+    }
+    if plan.get("schema_version") not in supported_plan_schemas:
+        raise ValueError("unsupported DG02 source-consumer native plan schema")
     inputs = {row["path"]: row["sha256"] for row in plan["code"]["tracked_inputs"]}
     worker = Path(
         plan.get("output", {}).get(
@@ -110,6 +114,9 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path) -> dict:
         "equality_positive_variant_stage",
         "equality_negative_variant_stage",
         "equality_removed_variant_stage",
+        "coupling_active_variant_stage",
+        "coupling_inactive_variant_stage",
+        "coupling_variants_manifest",
     ):
         if key not in plan["source"]:
             continue
