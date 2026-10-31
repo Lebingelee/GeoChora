@@ -1812,6 +1812,9 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 raise ValueError("task Solution structured control lacks target/ack payload")
             target = MixedActuatorCommandV1.from_mapping(dict(target_mapping))
             ack = AppliedMixedActuatorCommandV1.from_mapping(dict(ack_mapping))
+            expected_target_revision = transition_index * (
+                int(expected_controller["control_substeps"]) if solution_v5 else 1
+            )
             if (ack.target_hash != target.identity_hash
                     or ack.clipped is not False
                     or dict(ack.channel_values) != dict(target.channel_values)
@@ -1824,7 +1827,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     or target.episode_id != task_context.get("episode_id")
                     or target.reset_sample_id != task_context.get("reset_sample_id")
                     or target.control_step != transition_index
-                    or target.state_revision != transition_index
+                    or target.state_revision != expected_target_revision
                     or target.simulation_time_s != transition_index * 0.05
                     or ack.provider_name != "mujoco"):
                 raise ValueError("task Solution H5 Target/Ack source, control, or boundary identity mismatch")

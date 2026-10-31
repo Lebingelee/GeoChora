@@ -1732,9 +1732,22 @@ class _MuJoCoSession(_SessionValues):
                 raise ValueError('mixed actuator native/reset-origin clock or integration count mismatch')
             if self._inner_interval_active:
                 # The physics-rate mixed seam publishes fresh owned snapshots
-                # between outer evaluation boundaries.  Keep the public clock
-                # reset-relative, matching ordinary evaluation snapshots.
-                time = elapsed
+                # between outer evaluation boundaries.  At the interval's
+                # first and final substep boundaries, use the canonical outer
+                # clock so a prepared outer target and its first native apply
+                # share the exact same timestamp.  MuJoCo accumulates dt (for
+                # example, 25 * 0.002 may be 0.05000000000000003), while the
+                # ordinary public boundary is control_step * control_dt.
+                substeps = int(self._artifact.timebase.control_substeps)
+                completed_in_interval = self._native_steps - self._control_step * substeps
+                if not 0 <= completed_in_interval <= substeps:
+                    raise ValueError('mixed actuator substep clock escaped its active outer interval')
+                if completed_in_interval == 0:
+                    time = self._control_step * self._artifact.timebase.control_dt
+                elif completed_in_interval == substeps:
+                    time = (self._control_step + 1) * self._artifact.timebase.control_dt
+                else:
+                    time = elapsed
             else:
                 if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
                     raise ValueError('mixed actuator native/canonical step-count mismatch')

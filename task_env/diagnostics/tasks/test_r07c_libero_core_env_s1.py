@@ -2427,7 +2427,9 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
             )
 
     result = run_libero_candidate_worker(
-        env, output_dir=bundle, steps=1,
+        # A second outer interval exercises the fresh substep command path
+        # after MuJoCo's native clock has accumulated one interval of dt.
+        env, output_dir=bundle, steps=2,
         solution_factory=_SolutionFactory(),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
@@ -2436,7 +2438,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert result["status"] == "complete"
     assert result["episode_count"] == 3
     assert result["reset_count"] == 3
-    assert result["native_step_count"] == 75
+    assert result["native_step_count"] == 150
     assert len(result["attempted_episode_receipts"]) == 3
     assert all(
         item["receipt"]["pre_reset_compiled_validation_v1"]["reset_not_yet_applied"] is True
@@ -2452,7 +2454,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert result["close_error"] is None
     assert result["final_session_close_receipt"]["session_closed"] is True
     assert result["solution_resource_close_receipt"]["closed"] is True
-    assert result["solution_resource_close_receipt"]["forward_call_count"] == 75
+    assert result["solution_resource_close_receipt"]["forward_call_count"] == 150
     assert gravity_model.close_calls == 1
     assert env.close_receipt["task_resource_close_receipt"]["closed"] is True
     assert not (bundle / "source_inputs/closure").exists()
@@ -2462,7 +2464,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v5"
     assert receipt["status"] == "verified_complete"
     assert receipt["episode_count"] == 3
-    assert receipt["observation_count"] == 6
+    assert receipt["observation_count"] == 9
     assert receipt["solution_completed_episodes"] == 0
     runtime_receipt = consume_libero_candidate_bundle(
         bundle / "worker_result.json", require_mujoco_runtime_identity=True,
@@ -2565,7 +2567,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     )
     argv = [
         sys.executable, "-m", "bench_deploy.libero.core_candidate_worker",
-        "--run-worker", str(bundle), "--steps", "1", "--task-solution-1",
+        "--run-worker", str(bundle), "--steps", "2", "--task-solution-1",
         "--source-xml", str(xml_path), "--composition-plan", str(plan_path),
         "--install-root", str(install_root),
     ]
