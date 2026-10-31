@@ -131,19 +131,44 @@ def _write_solution_source_bundle(output_dir: Path, *,
             raise ValueError("task model profile receipt is not valid UTF-8 JSON") from exc
         if _canonical(profile_receipt) != model_profile_bytes:
             raise ValueError("task model profile receipt must use canonical JSON bytes")
-        from .model_profile import normalize_libero_robosuite_model_xml_v2
-        expected_xml, expected_profile = normalize_libero_robosuite_model_xml_v2(raw_source_xml_bytes)
+        from .model_profile import (
+            LIBERO_OFFICIAL_SOURCE_PLAN_SHA256, ROBOT_MODEL_PROFILE_V3_ID,
+            normalize_libero_robosuite_model_xml_v2,
+            normalize_libero_robosuite_model_xml_v3,
+            validate_libero_official_source_plan_v1,
+        )
+        profile_id = profile_receipt.get("profile_id")
+        official_model_profile = profile_id == ROBOT_MODEL_PROFILE_V3_ID
+        if profile_id == "libero-robosuite-panda-layout-seed19-v2":
+            expected_xml, expected_profile = normalize_libero_robosuite_model_xml_v2(
+                raw_source_xml_bytes,
+            )
+            expected_source_id_prefix = "libero-spatial-pilot-model-profile-v2"
+            expected_bundle_schema = "r07-v210-task-source-bundle-v2"
+            expected_raw_sha = _TASK1_COMPOSED_XML_SHA256
+        elif official_model_profile:
+            expected_xml, expected_profile = normalize_libero_robosuite_model_xml_v3(
+                raw_source_xml_bytes,
+            )
+            validate_libero_official_source_plan_v1(
+                bytes(composition_plan_bytes), raw_source_xml_bytes,
+            )
+            expected_source_id_prefix = "libero-spatial-official-model-profile-v3"
+            expected_bundle_schema = "r07-v210-task-source-bundle-v3"
+            expected_raw_sha = "9faeed9185d08b2b3d26d45e950ef7eebeec7866b76edf8e8c390fc19ed8cd12"
+        else:
+            raise ValueError("task Solution model profile id is not an admitted pinned profile")
         expected_profile_bytes = _canonical(expected_profile)
         raw_sha = hashlib.sha256(raw_source_xml_bytes).hexdigest()
         profile_sha = hashlib.sha256(model_profile_bytes).hexdigest()
         source_id = (
-            f"libero-spatial-pilot-model-profile-v2:{raw_sha}:{profile_sha}:{xml_sha}"
+            f"{expected_source_id_prefix}:{raw_sha}:{profile_sha}:{xml_sha}"
         )
         if (expected_xml != source_xml or expected_profile_bytes != model_profile_bytes
-                or raw_sha != _TASK1_COMPOSED_XML_SHA256
+                or raw_sha != expected_raw_sha
                 or profile_receipt.get("raw_source_xml_sha256") != raw_sha
                 or profile_receipt.get("runtime_model_xml_sha256") != xml_sha
-                or profile_receipt.get("profile_id") != "libero-robosuite-panda-layout-seed19-v2"):
+                or profile_receipt.get("profile_id") != expected_profile.get("profile_id")):
             raise ValueError("profiled task source differs from the deterministic model transform")
     else:
         if (xml_sha != _TASK1_COMPOSED_XML_SHA256
@@ -152,7 +177,11 @@ def _write_solution_source_bundle(output_dir: Path, *,
         raw_sha = profile_sha = None
         profile_receipt = None
         source_id = f"libero-spatial-pilot-v1:{xml_sha}"
-    if (plan_sha != _TASK1_COMPOSITION_PLAN_SHA256
+        expected_bundle_schema = "r07-v210-task-source-bundle-v1"
+    if profiled and profile_receipt.get("profile_id") == ROBOT_MODEL_PROFILE_V3_ID:
+        if plan_sha != LIBERO_OFFICIAL_SOURCE_PLAN_SHA256:
+            raise ValueError("official task source bundle differs from its pinned composition plan")
+    elif (plan_sha != _TASK1_COMPOSITION_PLAN_SHA256
             or plan.get("schema_version") != "libero-source-composition-mjcf-v4"
             or plan.get("identity", {}).get("task_uid") != TASK_1
             or plan.get("identity", {}).get("manifest_sha256") != _TASK1_SOURCE_MANIFEST_SHA256
@@ -206,10 +235,7 @@ def _write_solution_source_bundle(output_dir: Path, *,
         (source_root / "raw-composed-source.xml").write_bytes(raw_source_xml_bytes)
         (source_root / "model-profile.json").write_bytes(model_profile_bytes)
     result = {
-        "schema_version": (
-            "r07-v210-task-source-bundle-v2" if profiled
-            else "r07-v210-task-source-bundle-v1"
-        ),
+        "schema_version": expected_bundle_schema,
         "source_id": source_id,
         "canonical_xml_sha256": xml_sha,
         "importer_xml_sha256": hashlib.sha256(files["scene.xml"]).hexdigest(),
@@ -252,11 +278,17 @@ def _write_solution_source_bundle(output_dir: Path, *,
 
 def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dict[str, Any]:
     """Independently reread and recompute the task #1 immutable source closure."""
-    profiled = (isinstance(source_bundle, Mapping)
-                and source_bundle.get("schema_version") == "r07-v210-task-source-bundle-v2")
+    source_bundle_schema = (
+        source_bundle.get("schema_version") if isinstance(source_bundle, Mapping) else None
+    )
+    profiled = source_bundle_schema in {
+        "r07-v210-task-source-bundle-v2", "r07-v210-task-source-bundle-v3",
+    }
+    official_profiled = source_bundle_schema == "r07-v210-task-source-bundle-v3"
     if (not isinstance(source_bundle, Mapping)
             or source_bundle.get("schema_version") not in {
                 "r07-v210-task-source-bundle-v1", "r07-v210-task-source-bundle-v2",
+                "r07-v210-task-source-bundle-v3",
             }):
         raise ValueError("task Solution bundle omits its versioned immutable source inputs")
     closure_rows = source_bundle.get("closure_files")
@@ -420,12 +452,31 @@ def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dic
         raise ValueError("task Solution composition plan escaped the worker bundle")
     plan_bytes = plan_path.read_bytes()
     if (len(plan_bytes) != plan_info.get("bytes")
-            or hashlib.sha256(plan_bytes).hexdigest() != plan_info.get("sha256")
-            or plan_info.get("sha256") != _TASK1_COMPOSITION_PLAN_SHA256):
+            or hashlib.sha256(plan_bytes).hexdigest() != plan_info.get("sha256")):
+        raise ValueError("task Solution composition plan bytes differ from the pinned plan")
+    if official_profiled:
+        from .model_profile import LIBERO_OFFICIAL_SOURCE_PLAN_SHA256
+        if plan_info.get("sha256") != LIBERO_OFFICIAL_SOURCE_PLAN_SHA256:
+            raise ValueError("official task Solution composition plan differs from pinned bytes")
+    elif plan_info.get("sha256") != _TASK1_COMPOSITION_PLAN_SHA256:
         raise ValueError("task Solution composition plan bytes differ from the pinned plan")
     plan = json.loads(plan_bytes.decode("utf-8"))
     identity = plan.get("identity", {})
-    if (plan.get("schema_version") != "libero-source-composition-mjcf-v4"
+    if official_profiled:
+        valid_official_plan_shell = (
+            plan.get("schema_version") == "libero-official-source-composition-plan-v1"
+            and identity.get("task_uid") == TASK_1
+            and identity.get("libero_revision") == LIBERO_REVISION
+            and identity.get("robosuite_revision") == ROBOSUITE_REVISION
+            and identity.get("source_model_id") == "libero-official-model-builder-v1"
+            and identity.get("seed") == 19
+            and plan.get("output", {}).get("composed_mjcf_sha256")
+                == source_bundle.get("raw_source_xml_sha256")
+            and plan.get("output", {}).get("status") == "SOURCE_MJCF_COMPOSED_NOT_NATIVE_COMPILED"
+        )
+        if not valid_official_plan_shell:
+            raise ValueError("official task Solution composition plan is not the pinned source plan")
+    elif (plan.get("schema_version") != "libero-source-composition-mjcf-v4"
             or identity.get("task_uid") != TASK_1
             or identity.get("manifest_sha256") != _TASK1_SOURCE_MANIFEST_SHA256
             or identity.get("asset_closure_sha256") != _TASK1_ASSET_CLOSURE_SHA256
@@ -469,14 +520,32 @@ def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dic
             profile = json.loads(profile_bytes.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError("profiled task model receipt is not valid UTF-8 JSON") from exc
-        from .model_profile import normalize_libero_robosuite_model_xml_v2
-        expected_xml, expected_profile = normalize_libero_robosuite_model_xml_v2(raw_xml)
+        from .model_profile import (
+            LIBERO_OFFICIAL_REBASED_MODEL_SHA256, ROBOT_MODEL_PROFILE_V3_ID,
+            normalize_libero_robosuite_model_xml_v2,
+            normalize_libero_robosuite_model_xml_v3,
+            validate_libero_official_source_plan_v1,
+        )
+        profile_id = profile.get("profile_id")
+        if profile_id == "libero-robosuite-panda-layout-seed19-v2":
+            expected_xml, expected_profile = normalize_libero_robosuite_model_xml_v2(raw_xml)
+            source_id_prefix = "libero-spatial-pilot-model-profile-v2"
+            expected_raw_sha = _TASK1_COMPOSED_XML_SHA256
+        elif profile_id == ROBOT_MODEL_PROFILE_V3_ID:
+            expected_xml, expected_profile = normalize_libero_robosuite_model_xml_v3(raw_xml)
+            validate_libero_official_source_plan_v1(plan_bytes, raw_xml)
+            source_id_prefix = "libero-spatial-official-model-profile-v3"
+            expected_raw_sha = LIBERO_OFFICIAL_REBASED_MODEL_SHA256
+        else:
+            raise ValueError("task Solution bundle uses an unsupported model profile")
         profile_sha = hashlib.sha256(profile_bytes).hexdigest()
         source_id = (
-            f"libero-spatial-pilot-model-profile-v2:{raw_info['sha256']}:{profile_sha}:"
+            f"{source_id_prefix}:{raw_info['sha256']}:{profile_sha}:"
             f"{source_bundle['canonical_xml_sha256']}"
         )
-        if (profile_bytes != _canonical(profile)
+        if (official_profiled != (profile_id == ROBOT_MODEL_PROFILE_V3_ID)
+                or raw_info["sha256"] != expected_raw_sha
+                or profile_bytes != _canonical(profile)
                 or profile_bytes != _canonical(expected_profile)
                 or expected_xml != canonical_xml
                 or profile.get("profile_id") != source_bundle.get("model_profile_id")
@@ -494,7 +563,8 @@ def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dic
 
 
 def _task1_iterative_resolver_identity(source_xml_bytes: bytes, task_artifact_identity: str,
-                                       diagnostics: Mapping[str, Any]) -> str:
+                                       diagnostics: Mapping[str, Any], *,
+                                       high_precision_profile: bool = False) -> str:
     """Rebuild the public provider-free resolver profile from verified source bytes."""
     from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
     from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
@@ -514,8 +584,16 @@ def _task1_iterative_resolver_identity(source_xml_bytes: bytes, task_artifact_id
         source_xml_bytes, tcp_profile=profile, native_prefix="robot0_",
         base_body_id="robot0_link0",
     )
+    resolver_config = ActionConfig()
+    if high_precision_profile:
+        from dataclasses import replace
+        resolver_config = replace(
+            resolver_config,
+            ik_position_deadband=0.0005,
+            ik_rotation_deadband=0.0025,
+        )
     resolver = CanonicalPandaController(
-        kinematics, artifact_hash=task_artifact_identity, config=ActionConfig(),
+        kinematics, artifact_hash=task_artifact_identity, config=resolver_config,
     )
     return resolver.iterative_resolution_identity_v1(
         max_iterations=diagnostics["max_iterations"],
@@ -670,6 +748,7 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
         "r07-v210-task-solution-worker-result-v5",
         "r07-v210-task-solution-worker-result-v6",
         "r07-v210-task-solution-worker-result-v7",
+        "r07-v210-task-solution-worker-result-v8",
     }
     accepted_schemas = {"r07-v210-required123-run-record-v1"} if is_solution else {"r07c-d01-run-record-v1"}
     if record.get("schema_version") not in accepted_schemas:
@@ -687,9 +766,9 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
     if (not isinstance(argv, list) or "-m" not in argv
             or "bench_deploy.libero.core_candidate_worker" not in argv):
         raise ValueError("parent run record does not identify the D01 native worker module")
-    if (is_solution and "--task-solution-1" not in argv
-            and "--task-solution-v6" not in argv
-            and "--task-solution-v7" not in argv):
+    if (is_solution and all(flag not in argv for flag in (
+            "--task-solution-1", "--task-solution-v6", "--task-solution-v7",
+            "--task-solution-v8"))):
         raise ValueError("parent run record does not identify the task #1 Solution route")
     if not argv or Path(argv[0]).resolve() != Path(sys.executable).resolve():
         raise ValueError("parent run record used an unpinned Python interpreter or camera checkout")
@@ -924,6 +1003,8 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
         version_suffix = "v6"
     elif solution_schema == "libero-bowl-to-plate-solution-v7":
         version_suffix = "v7"
+    elif solution_schema == "libero-bowl-to-plate-solution-v8":
+        version_suffix = "v8"
     elif solution_schema == "libero-bowl-to-plate-solution-v3":
         version_suffix = "v3"
     elif solution_schema == "libero-bowl-to-plate-solution-v2":
@@ -1665,7 +1746,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     from .solution import (
         solution_identity_v1, solution_identity_v2_frozen,
         solution_identity_v3, solution_identity_v4, solution_identity_v5,
-        solution_identity_v6, solution_identity_v7,
+        solution_identity_v6, solution_identity_v7, solution_identity_v8,
     )
     from .controller import (
         LiberoMixedControllerV1, LiberoMixedControllerV2, LiberoMixedControllerV3,
@@ -1679,9 +1760,10 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     solution_v5 = schema == "r07-v210-task-solution-worker-result-v5"
     solution_v6 = schema == "r07-v210-task-solution-worker-result-v6"
     solution_v7 = schema == "r07-v210-task-solution-worker-result-v7"
-    solution_rim = solution_v6 or solution_v7
-    solution_pose = solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7
-    solution_version = "v7" if solution_v7 else "v6" if solution_v6 else "v5" if solution_v5 else "v4" if solution_v4 else "v3" if solution_v3 else "v2" if solution_v2 else "v1"
+    solution_v8 = schema == "r07-v210-task-solution-worker-result-v8"
+    solution_rim = solution_v6 or solution_v7 or solution_v8
+    solution_pose = solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8
+    solution_version = "v8" if solution_v8 else "v7" if solution_v7 else "v6" if solution_v6 else "v5" if solution_v5 else "v4" if solution_v4 else "v3" if solution_v3 else "v2" if solution_v2 else "v1"
     payload = {key: value for key, value in report.items() if key != "result_sha256"}
     if hashlib.sha256(_canonical(payload)).hexdigest() != report.get("result_sha256"):
         raise ValueError("task Solution worker result digest mismatch")
@@ -1702,11 +1784,12 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 "r07-v210-task-solution-worker-result-v5",
                 "r07-v210-task-solution-worker-result-v6",
                 "r07-v210-task-solution-worker-result-v7",
+                "r07-v210-task-solution-worker-result-v8",
             }
             or report.get("status") != "complete"
             or report.get("worker_error") is not None
             or report.get("close_error") is not None
-            or ((solution_v2 or solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7)
+            or ((solution_v2 or solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8)
                 and report.get("solution_resource_close_error") is not None)
             or expected_scope is None
             or report.get("run_scope") != expected_scope
@@ -1725,11 +1808,11 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     expected_source_xml_sha256 = source_readback["canonical_xml_sha256"]
     expected_source_closure_digest = source_readback["source_closure_digest"]
     recorded_controller = report["episodes"][0].get("control_plan", {})
-    if solution_v4 or solution_v5 or solution_v6 or solution_v7:
+    if solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8:
         resolver_policy = {
-            "max_iterations": 12,
-            "position_tolerance_m": 0.006,
-            "orientation_tolerance_rad": 0.03,
+            "max_iterations": 64 if solution_v8 else 12,
+            "position_tolerance_m": 0.001 if solution_v8 else 0.006,
+            "orientation_tolerance_rad": 0.005 if solution_v8 else 0.03,
             "model_position_tolerance_m": 0.003,
             "model_orientation_tolerance_rad": 0.03,
         }
@@ -1737,12 +1820,13 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             source_xml_bytes,
             report["episodes"][0]["task_artifact_identity_hash"],
             resolver_policy,
+            high_precision_profile=solution_v8,
         )
     else:
         resolver_identity = None
     expected_controller = (
         LiberoMixedControllerV5(arm_resolver_identity=resolver_identity).identity_mapping()
-        if solution_v6 or solution_v7 else
+        if solution_v6 or solution_v7 or solution_v8 else
         LiberoMixedControllerV4(arm_resolver_identity=resolver_identity).identity_mapping()
         if solution_v5 else
         LiberoMixedControllerV3(arm_resolver_identity=resolver_identity).identity_mapping()
@@ -1753,9 +1837,14 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     )
     if solution_v2 and dict(recorded_controller) != expected_controller:
         raise ValueError("historical v2 Controller identity differs from its frozen profile manifest")
-    if (solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7) and dict(recorded_controller) != expected_controller:
+    if (solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8) and dict(recorded_controller) != expected_controller:
         raise ValueError("task Solution pose Controller identity differs from its frozen profile")
     expected_solution_identity = (
+        solution_identity_v8(
+            source_readback["canonical_xml_sha256"],
+            source_readback["source_closure_digest"],
+            arm_resolver_identity=resolver_identity,
+        ) if solution_v8 else
         solution_identity_v3(source_readback["canonical_xml_sha256"],
                              source_readback["source_closure_digest"])
         if solution_v3 else
@@ -1782,7 +1871,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         if solution_v2 else solution_identity_v1(source_readback["canonical_xml_sha256"])
     )
     resource_close = report.get("solution_resource_close_receipt")
-    if (solution_v2 or solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7) and (
+    if (solution_v2 or solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8) and (
         not isinstance(resource_close, Mapping)
         or resource_close.get("schema_version") != "libero-source-gravity-model-close-v1"
         or resource_close.get("closed") is not True
@@ -1976,7 +2065,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             "source_id", "source_closure_digest", "provider_materialization_id",
             "episode_id", "reset_sample_id", "control_step", "state_revision", "simulation_time_s",
         )
-        stepwise_solution = solution_v5 or solution_v6 or solution_v7
+        stepwise_solution = solution_v5 or solution_v6 or solution_v7 or solution_v8
         for boundary_index, boundary in enumerate(boundaries):
             expected_revision = boundary_index * (
                 int(expected_controller["control_substeps"]) if stepwise_solution else 1
@@ -1999,7 +2088,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 [["akita_black_bowl_1", "panda-v1/finger-left"],
                  ["akita_black_bowl_1", "panda-v1/finger-right"],
                  ["akita_black_bowl_1", "plate_1"]]
-                if solution_v4 or solution_v5 or solution_v6 or solution_v7 else [["akita_black_bowl_1", "plate_1"]]
+                if solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8 else [["akita_black_bowl_1", "plate_1"]]
             )
             if (not isinstance(contact, Mapping)
                     or contact.get("schema_version") != "task-contact-summary-v2"
@@ -2131,7 +2220,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     np.asarray(joints[transition_index], dtype=np.float64),
                     np.asarray(ee_poses[transition_index], dtype=np.float64), resource_close,
                 )
-            elif solution_v5 or solution_v6 or solution_v7:
+            elif solution_v5 or solution_v6 or solution_v7 or solution_v8:
                 writer = control.writer_controls[0]
                 canonical_action = writer.get("canonical_action")
                 expected_twist = None
@@ -2204,7 +2293,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     or gravity_receipt.get("runtime_identity", {}).get("api_version") != 3008001
                     or resource_close.get("model_identity_sha256") != gravity_receipt.get("model_identity_sha256")):
                 raise ValueError("task Solution source gravity receipt is missing or identity-mismatched")
-        elif (solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7) and gravity_receipt is not None:
+        elif (solution_v3 or solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8) and gravity_receipt is not None:
             raise ValueError("task Solution pose profiles must keep source gravity outside the Solution outcome")
         frozen_v6_references = None
         for transition_index, action in enumerate(action_trace):
@@ -2240,7 +2329,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 if (diagnostics.get("planner_owner") != expected_planner_owner
                         or diagnostics.get("source_pose_observation_used") is not True):
                     raise ValueError("task Solution v3 action does not record the shared pose-planner path")
-            elif solution_v4 or solution_v5 or solution_v6 or solution_v7:
+            elif solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8:
                 diagnostics = action["solution_diagnostics"]
                 receipt = action.get("solution_action_receipt")
                 expected_planner_owner = (
@@ -2315,6 +2404,8 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                             ))
                             or not np.allclose(
                                 local_offset,
+                                (-0.044920013921162995, 0.00462166895747628,
+                                 0.024593639582228065) if solution_v8 else
                                 (-0.04490935541611755, 0.004212145868712052,
                                  0.0312549937079468) if solution_v7 else
                                 (-0.04555440076829924, 0.002120461738427656,
@@ -2322,9 +2413,23 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                                 rtol=0.0, atol=1e-12,
                             )
                             or frame.get("offset_source") != (
+                                "demo40 source-model FK at first bilateral contact state 51"
+                                if solution_v8 else
                                 "LIBERO task-0 reconstructed first-bilateral-contact median"
                                 if solution_v7 else "LIBERO task-0 demonstrated pre-lift median"
-                            )):
+                            )
+                            or (solution_v8 and (
+                                frame.get("orientation_source") != "demo40_state51_source_fk_v1"
+                                or frame.get("jaw_opening_source")
+                                   != "demo40_state51_first_bilateral_contact_v1"
+                                or frame.get("sample_index") != 51
+                                or not np.allclose(
+                                    local_tcp_quaternion,
+                                    (0.03300342281417691, -0.996740012700174,
+                                     0.04855030219620138, -0.05534427993626179),
+                                    rtol=0.0, atol=1e-12,
+                                )
+                            ))):
                         raise ValueError("task Solution v6 rim-grasp frame differs from the frozen demo profile")
                     stage_name = action["solution_stage"]
                     if stage_name in {"approach", "descend"} or (
@@ -2373,6 +2478,14 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     }
                     if solution_v7:
                         stage_openings["grasp"] = 0.008
+                    elif solution_v8:
+                        stage_openings.update({
+                            "descend": 0.01344940828870882,
+                            "grasp": 0.006517432981670807,
+                            "lift": 0.006517432981670807,
+                            "carry": 0.006517432981670807,
+                            "place": 0.006517432981670807,
+                        })
                     if (stage_name not in stage_openings
                             or not np.allclose(recorded_target[:3], expected_position,
                                                rtol=0.0, atol=2e-6)
@@ -2382,7 +2495,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                                 stage_openings[stage_name], rtol=0.0, atol=1e-12,
                             )):
                         raise ValueError("task Solution v6 rim target or stage opening differs from its frozen geometry")
-        if solution_v4 or solution_v5 or solution_v6 or solution_v7:
+        if solution_v4 or solution_v5 or solution_v6 or solution_v7 or solution_v8:
             for previous, current in zip(action_trace, action_trace[1:]):
                 previous_receipt = previous["solution_action_receipt"]
                 feedback = previous_receipt["post_step_feedback"]
@@ -2460,7 +2573,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     close = report.get("final_session_close_receipt")
     if not isinstance(close, Mapping) or close.get("session_closed") is not True:
         raise ValueError("task Solution worker omitted a successful final RuntimeSession close receipt")
-    if solution_v5 or solution_v6 or solution_v7:
+    if solution_v5 or solution_v6 or solution_v7 or solution_v8:
         if resource_close.get("forward_call_count") != total_native:
             raise ValueError(f"task Solution {solution_version} source OSC call count differs from physics-rate substeps")
     elif (solution_v2 or solution_v3 or solution_v4) and resource_close.get("forward_call_count") != total_t:
@@ -2504,6 +2617,7 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
         "r07-v210-task-solution-worker-result-v5",
         "r07-v210-task-solution-worker-result-v6",
         "r07-v210-task-solution-worker-result-v7",
+        "r07-v210-task-solution-worker-result-v8",
     }:
         result = _consume_libero_solution_bundle(
             bundle_path, report, require_motion_thresholds=require_motion_thresholds,
@@ -2686,7 +2800,9 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
                 or readback.get("joint_velocity") != sample.get("joint_velocity")
                 or readback.get("poses_world") != sample.get("poses_world")
                 or readback.get("free_joint_velocity") != sample.get("free_joint_velocity")
-                or readback.get("fixture_pose_world") != sample.get("fixture_pose_world")
+                or not _pose_world_mapping_matches(
+                    readback.get("fixture_pose_world"), sample.get("fixture_pose_world"),
+                )
                 or realization.get("init_row_index") != expected_row
                 or realization.get("init_row_sha256") != sample.get("init_row_sha256")
                 or progress.get("episode_id") != episode.get("episode_id")
@@ -3022,6 +3138,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--task-solution-1", action="store_true")
     parser.add_argument("--task-solution-v6", action="store_true")
     parser.add_argument("--task-solution-v7", action="store_true")
+    parser.add_argument("--task-solution-v8", action="store_true")
     parser.add_argument("--source-xml", type=Path)
     parser.add_argument("--composition-plan", type=Path)
     parser.add_argument("--install-root", type=Path)
@@ -3037,12 +3154,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False))
         return 0
-    if args.task_solution_1 or args.task_solution_v6 or args.task_solution_v7:
+    if args.task_solution_1 or args.task_solution_v6 or args.task_solution_v7 or args.task_solution_v8:
         if not all((args.source_xml, args.composition_plan, args.install_root)):
             parser.error("--task-solution-1 requires --source-xml, --composition-plan, and --install-root")
         from .selected_candidate import build_libero_solution_candidate
         from .solution import (
-            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
+            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6,
+            LiberoPickPlaceSolutionV7, LiberoPickPlaceSolutionV8,
         )
         from .source_gravity import MujocoSourceGravityBiasV1
 
@@ -3051,6 +3169,7 @@ def main(argv: list[str] | None = None) -> int:
         plan_bytes = composition_plan_path.read_bytes()
         install_root = args.install_root.resolve(strict=True)
         selected_solution_version = (
+            "v8" if args.task_solution_v8 else
             "v7" if args.task_solution_v7 else "v6" if args.task_solution_v6 else "v5"
         )
         env = build_libero_solution_candidate(
@@ -3089,6 +3208,8 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("same-Env Solution factory received a different worker source bundle")
                 env.value["bind_source_gravity_model"](self.gravity_model)
                 solution_type = (
+                    LiberoPickPlaceSolutionV8
+                    if selected_solution_version == "v8" else
                     LiberoPickPlaceSolutionV7
                     if selected_solution_version == "v7" else
                     LiberoPickPlaceSolutionV6
@@ -3098,9 +3219,7 @@ def main(argv: list[str] | None = None) -> int:
                 return solution_type(
                     env.value["runtime_model_xml_bytes"],
                     source_closure_digest=env.metadata["source_closure_digest"],
-                    arm_resolver_identity=(
-                        env.value["arm_resolver"].iterative_resolution_identity_v1()
-                    ),
+                    arm_resolver_identity=env.value["arm_resolver_identity"],
                 )
 
             def close_resources(self):

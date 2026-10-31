@@ -442,7 +442,10 @@ def sample_libero_normal_reset_v1(
     )
     profiled_source_identity = (
         len(source_parts) == 4
-        and source_parts[0] == "libero-spatial-pilot-model-profile-v2"
+        and source_parts[0] in {
+            "libero-spatial-pilot-model-profile-v2",
+            "libero-spatial-official-model-profile-v3",
+        }
         and all(re.fullmatch(r"[0-9a-f]{64}", value) for value in source_parts[1:])
     )
     if (not (legacy_source_identity or profiled_source_identity)

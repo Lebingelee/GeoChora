@@ -6,7 +6,7 @@ control, observation, and recording ownership.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from collections.abc import Mapping
 import hashlib
 import json
@@ -40,11 +40,18 @@ from .init_state import (
     INIT_SHA256, PILOT_SOURCE_MANIFEST_SHA256, decode_pruned_init_bytes,
     init_layout_v1, sample_libero_normal_reset_v1,
 )
-from .model_profile import normalize_libero_robosuite_model_xml_v2
+from .model_profile import (
+    normalize_libero_robosuite_model_xml_v2,
+    normalize_libero_robosuite_model_xml_v3,
+    validate_libero_official_source_plan_v1,
+)
 
 
 PROFILE_ID = 'libero-spatial-bowl-to-plate-mixed-v1'
 CONTROLLER_PROFILE_ID = 'libero-spatial-bowl-to-plate-joint-space-pd-v6'
+PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID = 'robosuite-panda-gripper-delta-v1'
+PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID = 'libero-world-pose-wxyz-panda-gripper-delta-v1'
+_PANDA_GRIPPER_DELTA_PER_SUBSTEP = 0.01
 
 
 def _controller_hold_policy(controller):
@@ -52,6 +59,86 @@ def _controller_hold_policy(controller):
     if operational is not None:
         return operational.hold_policy
     return controller.config.hold_policy
+
+
+def _panda_gripper_action_after_substep(current_action: float, action: float) -> float:
+    """Mirror pinned robosuite PandaGripper.format_action for one physics substep."""
+    current_action = float(current_action)
+    action = float(action)
+    if (not np.isfinite(current_action) or not -1.0 <= current_action <= 1.0
+            or not np.isfinite(action) or not -1.0 <= action <= 1.0):
+        raise ValueError('PandaGripper replay state and normalized action must lie in [-1,1]')
+    return float(np.clip(
+        current_action - _PANDA_GRIPPER_DELTA_PER_SUBSTEP * np.sign(action), -1.0, 1.0,
+    ))
+
+
+def _panda_gripper_aggregate_opening_m(current_action: float) -> float:
+    """Map symmetric PandaGripper current_action to the two-finger total opening."""
+    current_action = float(current_action)
+    if not np.isfinite(current_action) or not -1.0 <= current_action <= 1.0:
+        raise ValueError('PandaGripper current_action must lie in [-1,1]')
+    return 0.04 * (1.0 + current_action)
+
+
+def _compiled_physics_fingerprint_diff_v1(actual, expected):
+    """Return compact, name-aware diagnostics for a failed pinned-model readback."""
+    differences = {}
+    for field in ('model_dimensions',):
+        actual_values = actual.get(field, {})
+        expected_values = expected.get(field, {})
+        differences[field] = {
+            key: {'actual': actual_values.get(key), 'expected': expected_values.get(key)}
+            for key in sorted(set(actual_values) | set(expected_values))
+            if actual_values.get(key) != expected_values.get(key)
+        }
+    actual_names = actual.get('object_names', {})
+    expected_names = expected.get('object_names', {})
+    name_differences = {}
+    for category in sorted(set(actual_names) | set(expected_names)):
+        actual_rows = actual_names.get(category, ())
+        expected_rows = expected_names.get(category, ())
+        if actual_rows == expected_rows:
+            continue
+        mismatched_indices = [
+            index for index in range(max(len(actual_rows), len(expected_rows)))
+            if (actual_rows[index] if index < len(actual_rows) else None)
+            != (expected_rows[index] if index < len(expected_rows) else None)
+        ]
+        name_differences[category] = {
+            'actual_count': len(actual_rows),
+            'expected_count': len(expected_rows),
+            'first_mismatches': [
+                {
+                    'index': index,
+                    'actual': actual_rows[index] if index < len(actual_rows) else None,
+                    'expected': expected_rows[index] if index < len(expected_rows) else None,
+                }
+                for index in mismatched_indices[:12]
+            ],
+            'mismatch_count': len(mismatched_indices),
+        }
+    differences['object_names'] = name_differences
+    actual_fields = actual.get('numeric_array_fields', {})
+    expected_fields = expected.get('numeric_array_fields', {})
+    field_differences = []
+    for name in sorted(set(actual_fields) | set(expected_fields)):
+        actual_field = actual_fields.get(name)
+        expected_field = expected_fields.get(name)
+        if actual_field == expected_field:
+            continue
+        field_differences.append({
+            'field': name,
+            'actual': actual_field,
+            'expected': expected_field,
+        })
+    differences['numeric_array_fields'] = {
+        'mismatch_count': len(field_differences),
+        'first_mismatches': field_differences[:32],
+    }
+    return differences
+
+
 ARTIFACT_ID = 'libero-spatial-bowl-to-plate-v1/mixed-v1'
 SCENE_ID = 'libero-spatial-bowl-to-plate-composed-mjcf-v1'
 SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[2] / 'asset/benchmarks/libero/source_manifest.json'
@@ -73,7 +160,10 @@ TASK_ID = PILOT_TASK_UID
 def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False) -> TaskArtifact:
     solution_v6 = solution_profile == 'v6'
     solution_v7 = solution_profile == 'v7'
-    solution_profile_name = 'v7' if solution_v7 else 'v6' if solution_v6 else 'v4'
+    solution_v8 = solution_profile == 'v8'
+    solution_profile_name = (
+        'v8' if solution_v8 else 'v7' if solution_v7 else 'v6' if solution_v6 else 'v4'
+    )
     solution_profile = bool(solution_profile)
     decoded = decode_pruned_init_bytes(init_bytes)
     layout = init_layout_v1()
@@ -150,26 +240,61 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False) -> Tas
 
 def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         install_root: Path, composition_plan_path: Path,
-                        init_path: Path, horizon: int, solution_profile: bool | str = False):
+                        init_path: Path, horizon: int, solution_profile: bool | str = False,
+                        panda_gripper_delta_replay: bool = False,
+                        official_nullspace_reference_joint_position_rad=None,
+                        official_compiled_mujoco_profile_v1=None):
     solution_v6 = solution_profile == 'v6'
     solution_v7 = solution_profile == 'v7'
-    solution_rim_profile = solution_v6 or solution_v7
+    solution_v8 = solution_profile == 'v8'
+    solution_rim_profile = solution_v6 or solution_v7 or solution_v8
     solution_profile = bool(solution_profile)
+    official_nullspace_reference = None
+    if official_nullspace_reference_joint_position_rad is not None:
+        if not panda_gripper_delta_replay:
+            raise ValueError('official robosuite nullspace reference is restricted to the frozen PandaGripper replay profile')
+        official_nullspace_reference = np.asarray(
+            official_nullspace_reference_joint_position_rad, dtype=np.float64,
+        )
+        if (official_nullspace_reference.shape != (7,)
+                or not np.isfinite(official_nullspace_reference).all()):
+            raise ValueError('official robosuite nullspace reference must contain seven finite joint values')
+        official_nullspace_reference = tuple(float(x) for x in official_nullspace_reference)
+    official_compiled_mujoco_profile = None
+    if official_compiled_mujoco_profile_v1 is not None:
+        if not panda_gripper_delta_replay or not isinstance(
+                official_compiled_mujoco_profile_v1, Mapping):
+            raise ValueError('official compiled MuJoCo options are restricted to the frozen PandaGripper replay profile')
+        official_compiled_mujoco_profile = json.loads(json.dumps(
+            official_compiled_mujoco_profile_v1, allow_nan=False,
+        ))
+        if set(official_compiled_mujoco_profile) != {
+                'mujoco_runtime', 'options', 'model_sizes',
+                'compiled_model_binary_sha256',
+                'compiled_model_physics_fingerprint_v1'}:
+            raise ValueError('official compiled MuJoCo profile has an unsupported shape')
     raw_xml_bytes = Path(xml_path).read_bytes() if xml_bytes_override is None else bytes(xml_bytes_override)
     plan_bytes = Path(composition_plan_path).read_bytes()
     plan = json.loads(plan_bytes)
     if plan.get('output', {}).get('status') != 'SOURCE_MJCF_COMPOSED_NOT_NATIVE_COMPILED':
         raise ValueError('R07c source plan must remain explicitly source-composed and not precompiled')
     expected_xml_sha = plan['output']['composed_mjcf_sha256']
+    source_model_id = plan.get('identity', {}).get('source_model_id')
+    compile_first_official_model = source_model_id == 'libero-official-model-builder-v1'
+    if compile_first_official_model:
+        validate_libero_official_source_plan_v1(plan_bytes, raw_xml_bytes)
     if hashlib.sha256(raw_xml_bytes).hexdigest() != expected_xml_sha:
         raise ValueError('candidate MJCF differs from its frozen composition plan')
     runtime_model_xml_bytes = raw_xml_bytes
     model_profile_receipt = None
     model_profile_bytes = None
     if solution_profile:
-        runtime_model_xml_bytes, model_profile_receipt = normalize_libero_robosuite_model_xml_v2(
-            raw_xml_bytes,
+        profile_transform = (
+            normalize_libero_robosuite_model_xml_v3
+            if compile_first_official_model
+            else normalize_libero_robosuite_model_xml_v2
         )
+        runtime_model_xml_bytes, model_profile_receipt = profile_transform(raw_xml_bytes)
         model_profile_bytes = json.dumps(
             model_profile_receipt, sort_keys=True, separators=(',', ':'), allow_nan=False,
         ).encode('utf-8')
@@ -187,14 +312,22 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         raise ValueError('tracked LIBERO source manifest differs from the frozen pilot identity')
     source_manifest = json.loads(manifest_bytes)
     artifact = _artifact(
-        init_bytes, solution_profile='v7' if solution_v7 else 'v6' if solution_v6 else solution_profile,
+        init_bytes, solution_profile=(
+            'v8' if solution_v8 else 'v7' if solution_v7 else
+            'v6' if solution_v6 else solution_profile
+        ),
     )
 
     importer_xml = runtime_model_xml_bytes
     external_assets = source_asset_bytes(install_root, importer_xml.decode('utf-8'))
     closure = {'canonical-source.xml': runtime_model_xml_bytes, **external_assets}
+    profile_source_tag = (
+        'libero-spatial-official-model-profile-v3'
+        if compile_first_official_model
+        else 'libero-spatial-pilot-model-profile-v2'
+    )
     source_id = (
-        f'libero-spatial-pilot-model-profile-v2:{expected_xml_sha}:{model_profile_sha}:{runtime_model_xml_sha}'
+        f'{profile_source_tag}:{expected_xml_sha}:{model_profile_sha}:{runtime_model_xml_sha}'
         if solution_profile else f'libero-spatial-pilot-v1:{expected_xml_sha}'
     )
     source_receipt = ExecutionSourceReceiptV1.create(
@@ -213,7 +346,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     )
     semantic_bodies = dict(plan['semantic_to_compiled_body_names'])
     expected_bodies = {
-        'main_table': 'main_table',
+        'main_table': 'table' if compile_first_official_model else 'main_table',
         'akita_black_bowl_1': 'akita_black_bowl_1_main',
         'akita_black_bowl_2': 'akita_black_bowl_2_main',
         'cookies_1': 'cookies_1_main',
@@ -273,22 +406,47 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             runtime_model_xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
             base_body_id='robot0_link0',
         )
-        arm_resolver = CanonicalPandaController(
-            arm_kinematics, artifact_hash=artifact.identity_hash, config=config.action,
+        resolver_action_config = (
+            replace(
+                config.action,
+                ik_position_deadband=0.0005,
+                ik_rotation_deadband=0.0025,
+            ) if solution_v8 else config.action
         )
+        arm_resolver = CanonicalPandaController(
+            arm_kinematics, artifact_hash=artifact.identity_hash,
+            config=resolver_action_config,
+        )
+    arm_resolver_position_tolerance_m = 0.001 if solution_v8 else 0.006
+    arm_resolver_max_iterations = 64 if solution_v8 else 12
+    arm_resolver_orientation_tolerance_rad = (
+        0.04 if panda_gripper_delta_replay else 0.005 if solution_v8 else 0.03
+    )
+    arm_resolver_identity = (
+        None if arm_resolver is None else arm_resolver.iterative_resolution_identity_v1(
+            max_iterations=arm_resolver_max_iterations,
+            position_tolerance_m=arm_resolver_position_tolerance_m,
+            orientation_tolerance_rad=arm_resolver_orientation_tolerance_rad,
+        )
+    )
     if solution_rim_profile:
         controller = LiberoMixedControllerV5(
-            arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
+            arm_resolver_identity=arm_resolver_identity,
         )
     elif solution_profile:
         controller = LiberoMixedControllerV4(
-            arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
+            arm_resolver_identity=arm_resolver_identity,
+            nullspace_reference_joint_position_rad=official_nullspace_reference,
         )
     else:
         controller = LiberoMixedControllerV1()
     expected_controller_profile = (
         (LiberoMixedControllerV5.profile_id if solution_rim_profile
-         else LiberoMixedControllerV4.profile_id) if solution_profile else CONTROLLER_PROFILE_ID
+         else (
+             'libero-spatial-bowl-to-plate-robosuite-osc-pose-official-reference-v1'
+             if official_nullspace_reference is not None
+             else LiberoMixedControllerV4.profile_id
+         )) if solution_profile else CONTROLLER_PROFILE_ID
     )
     if controller.profile_id != expected_controller_profile:
         raise ValueError('LIBERO task-local controller profile changed')
@@ -358,7 +516,13 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
     if solution_profile:
-        if solution_v7:
+        if solution_v8:
+            from .solution import solution_identity_v8
+            solution_identity = solution_identity_v8(
+                runtime_model_xml_sha, source_receipt.source_closure_digest,
+                arm_resolver_identity=arm_resolver_identity,
+            )
+        elif solution_v7:
             from .solution import solution_identity_v7
             solution_identity = solution_identity_v7(
                 runtime_model_xml_sha, source_receipt.source_closure_digest,
@@ -376,6 +540,11 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                 runtime_model_xml_sha, source_receipt.source_closure_digest,
                 arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
             )
+    reference_solution_identity = solution_identity
+    if panda_gripper_delta_replay:
+        # This opt-in profile replays frozen upstream actions directly; it is
+        # not the V5 task Solution lifecycle or identity.
+        solution_identity = None
     return {
         'artifact': artifact, 'source': source, 'controller': controller,
         'selected_controller_kind': 'mixed_actuator_v1', 'solution': None,
@@ -386,6 +555,10 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'composed_candidate_xml': expected_xml_sha,
             'runtime_model_xml': runtime_model_xml_sha,
             'model_profile_receipt': model_profile_sha,
+            'model_profile_id': (
+                None if model_profile_receipt is None else model_profile_receipt['profile_id']
+            ),
+            'source_model_id': source_model_id,
             'composition_plan': hashlib.sha256(plan_bytes).hexdigest(),
             'source_manifest': hashlib.sha256(manifest_bytes).hexdigest(),
             'pruned_init': hashlib.sha256(init_bytes).hexdigest(),
@@ -399,7 +572,14 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'controller_identity': controller.identity,
         }),
         'solution_identity': solution_identity,
+        'reference_solution_identity': reference_solution_identity,
         'arm_resolver': arm_resolver,
+        'arm_resolver_identity': arm_resolver_identity,
+        'arm_resolver_max_iterations': arm_resolver_max_iterations,
+        'arm_resolver_position_tolerance_m': arm_resolver_position_tolerance_m,
+        'arm_resolver_orientation_tolerance_rad': arm_resolver_orientation_tolerance_rad,
+        'official_nullspace_reference_joint_position_rad': official_nullspace_reference,
+        'official_compiled_mujoco_profile_v1': official_compiled_mujoco_profile,
         'source_xml_bytes': raw_xml_bytes,
         'runtime_model_xml_bytes': runtime_model_xml_bytes,
         'model_profile_bytes': model_profile_bytes,
@@ -422,6 +602,9 @@ def build_libero_selected_candidate(
     init_path: Path | None = None,
     horizon: int = 64,
     _solution_profile: bool = False,
+    _panda_gripper_delta_replay: bool = False,
+    _official_nullspace_reference_joint_position_rad=None,
+    _official_compiled_mujoco_profile_v1=None,
 ):
     """Construct the fixed LIBERO candidate through the existing Core route.
 
@@ -429,8 +612,18 @@ def build_libero_selected_candidate(
     solution wrapper below selects the separately versioned full Solution
     profile and its bounded horizon.
     """
-    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v6', 'v7'):
-        raise TypeError('internal LIBERO Solution profile selector must be bool, v6 or v7')
+    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v6', 'v7', 'v8'):
+        raise TypeError('internal LIBERO Solution profile selector must be bool or v6, v7, v8')
+    if type(_panda_gripper_delta_replay) is not bool:
+        raise TypeError('PandaGripper delta replay selector must be bool')
+    if _panda_gripper_delta_replay and not _solution_profile:
+        raise ValueError('PandaGripper delta replay requires the task-local pose Solution route')
+    if (_official_nullspace_reference_joint_position_rad is not None
+            and not _panda_gripper_delta_replay):
+        raise ValueError('official robosuite nullspace reference is restricted to the frozen PandaGripper replay profile')
+    if (_official_compiled_mujoco_profile_v1 is not None
+            and not _panda_gripper_delta_replay):
+        raise ValueError('official compiled MuJoCo options are restricted to the frozen PandaGripper replay profile')
     maximum_horizon = 1000 if _solution_profile else 64
     if type(horizon) is not int or not 1 <= horizon <= maximum_horizon:
         raise ValueError(f'LIBERO candidate horizon must be in [1,{maximum_horizon}]')
@@ -467,7 +660,8 @@ def build_libero_selected_candidate(
                 != source['source_sha256']['runtime_model_xml']
                 or getattr(model, 'source_closure_digest', None)
                 != source['source_sha256']['source_closure_digest']
-                or getattr(model, 'model_profile_id', None) != 'libero-robosuite-panda-layout-seed19-v2'
+                or getattr(model, 'model_profile_id', None)
+                != source.get('model_profile_receipt', {}).get('profile_id')
                 or getattr(model, 'model_profile_receipt_sha256', None)
                 != source['source_sha256']['model_profile_receipt']
                 or not callable(getattr(model, 'gravity_torque', None))
@@ -557,6 +751,13 @@ def build_libero_selected_candidate(
                 composition_plan_path=Path(composition_plan_path),
                 init_path=Path(init_path), horizon=horizon,
                 solution_profile=_solution_profile,
+                panda_gripper_delta_replay=_panda_gripper_delta_replay,
+                official_nullspace_reference_joint_position_rad=(
+                    _official_nullspace_reference_joint_position_rad
+                ),
+                official_compiled_mujoco_profile_v1=(
+                    _official_compiled_mujoco_profile_v1
+                ),
             )
             if (composed_mjcf_sha256 is not None
                     and value_cache['value']['source_sha256']['composed_candidate_xml'] != composed_mjcf_sha256):
@@ -564,13 +765,16 @@ def build_libero_selected_candidate(
                 value_cache.clear()
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache['value'])
-        if _solution_profile in ('v6', 'v7'):
+        if _solution_profile in ('v6', 'v7', 'v8'):
             value['controller'] = LiberoMixedControllerV5(
-                arm_resolver_identity=value['arm_resolver'].iterative_resolution_identity_v1(),
+                arm_resolver_identity=value['arm_resolver_identity'],
             )
         elif _solution_profile:
             value['controller'] = LiberoMixedControllerV4(
-                arm_resolver_identity=value['arm_resolver'].iterative_resolution_identity_v1(),
+                arm_resolver_identity=value['arm_resolver_identity'],
+                nullspace_reference_joint_position_rad=(
+                    value['official_nullspace_reference_joint_position_rad']
+                ),
             )
         else:
             value['controller'] = LiberoMixedControllerV1()
@@ -587,15 +791,36 @@ def build_libero_selected_candidate(
                     source_closure_digest=value['source_sha256']['source_closure_digest'],
                 )
         if _solution_profile:
+            value['panda_gripper_delta_replay_profile_id'] = (
+                PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+                if _panda_gripper_delta_replay else None
+            )
+            if _panda_gripper_delta_replay:
+                value['panda_gripper_delta_replay_state'] = {
+                    'current_action': 0.0,
+                    'committed_control_step': 0,
+                    'pending': None,
+                }
             components = (
                 'world_x_m', 'world_y_m', 'world_z_m',
-                'world_qw', 'world_qx', 'world_qy', 'world_qz', 'gripper_normalized',
+                'world_qw', 'world_qx', 'world_qy', 'world_qz',
+                ('gripper_action_normalized_delta' if _panda_gripper_delta_replay
+                 else 'gripper_normalized'),
             )
             value['action_schema'] = {
-                'schema_id': 'libero-world-pose-wxyz-absolute-v1', 'schema_version': 1,
-                'controller_kind': 'absolute_pose', 'reference': 'world',
+                'schema_id': (PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID
+                              if _panda_gripper_delta_replay
+                              else 'libero-world-pose-wxyz-absolute-v1'),
+                'schema_version': 1,
+                'controller_kind': ('absolute_pose_with_robosuite_panda_gripper_delta'
+                                    if _panda_gripper_delta_replay else 'absolute_pose'),
+                'reference': 'world',
                 'rotation_representation': 'quaternion_wxyz',
                 'dimension': len(components), 'components': components,
+                'gripper_profile_id': value['panda_gripper_delta_replay_profile_id'],
+                'arm_resolver_orientation_tolerance_rad': (
+                    value['arm_resolver_orientation_tolerance_rad']
+                ),
             }
         else:
             components = tuple([*(f'joint{i}' for i in range(1, 8)), 'aggregate_opening_m'])
@@ -697,7 +922,14 @@ def build_libero_selected_candidate(
             'controller_identity': env.controller.identity,
             'hold_policy': _controller_hold_policy(env.controller),
         }
-        if action_schema_id == 'libero-world-pose-wxyz-absolute-v1':
+        pose_action_schema_ids = {
+            'libero-world-pose-wxyz-absolute-v1',
+            PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID,
+        }
+        panda_gripper_delta_replay = (
+            action_schema_id == PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID
+        )
+        if action_schema_id in pose_action_schema_ids:
             if (env.value.get('arm_resolver') is None
                     or not hasattr(env.controller, 'last_control_receipt')):
                 raise RuntimeError('world-pose task route has no shared arm resolver or feed-forward mixed Controller')
@@ -709,7 +941,10 @@ def build_libero_selected_candidate(
                 current_pose_world=state.pose_world['panda-v1/ee'],
                 target_pose_world=values_tuple[:7],
                 gripper_scalar=values_tuple[7],
+                max_iterations=env.value['arm_resolver_max_iterations'],
+                position_tolerance_m=env.value['arm_resolver_position_tolerance_m'],
                 model_position_tolerance_m=0.003,
+                orientation_tolerance_rad=env.value['arm_resolver_orientation_tolerance_rad'],
                 model_orientation_tolerance_rad=0.03,
             )
             if type(arm_resolution) is not CanonicalArmResolutionV1:
@@ -718,9 +953,57 @@ def build_libero_selected_candidate(
                 raise ValueError('shared canonical arm resolver did not meet its FK residual gates')
             arm_target = arm_resolution.target
             normalized_opening = float(values_tuple[7])
-            aggregate_opening_m = 0.04 * (normalized_opening + 1.0)
-            if not 0.0 <= aggregate_opening_m <= 0.08:
-                raise ValueError('normalized planner gripper is outside the aggregate opening range')
+            if panda_gripper_delta_replay:
+                if env.value.get('panda_gripper_delta_replay_profile_id') != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+                    raise RuntimeError('PandaGripper delta action schema has no matching task adapter')
+                gripper_state = env.value.get('panda_gripper_delta_replay_state')
+                if (not isinstance(gripper_state, dict)
+                        or gripper_state.get('committed_control_step') != state.control_step
+                        or gripper_state.get('pending') is not None):
+                    raise RuntimeError('PandaGripper replay state is stale or has an uncommitted action')
+                current_gripper_action = float(gripper_state['current_action'])
+                first_gripper_action = _panda_gripper_action_after_substep(
+                    current_gripper_action, normalized_opening,
+                )
+                final_gripper_action = current_gripper_action
+                action_trace = [current_gripper_action]
+                opening_trace = []
+                for _ in range(env.artifact.timebase.control_substeps):
+                    final_gripper_action = _panda_gripper_action_after_substep(
+                        final_gripper_action, normalized_opening,
+                    )
+                    action_trace.append(final_gripper_action)
+                    opening_trace.append(
+                        _panda_gripper_aggregate_opening_m(final_gripper_action)
+                    )
+                aggregate_opening_m = opening_trace[0]
+                panda_gripper_context = {
+                    'action_scalar': normalized_opening,
+                    'current_action_before': current_gripper_action,
+                    'action_trace_after_substeps': tuple(action_trace[1:]),
+                    'opening_trace_m': tuple(opening_trace),
+                    'current_action_after': final_gripper_action,
+                }
+                canonical_gripper_fields = {
+                    'gripper_profile_id': PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+                    'gripper_action_scalar': normalized_opening,
+                    'gripper_current_action_before': current_gripper_action,
+                    'gripper_current_action_after_first_substep': first_gripper_action,
+                    'gripper_current_action_after_outer_step': final_gripper_action,
+                    'gripper_current_action_trace_after_each_substep': list(action_trace[1:]),
+                    'gripper_aggregate_opening_trace_m': opening_trace,
+                    'gripper_format_calls_per_outer_step': env.artifact.timebase.control_substeps,
+                }
+            else:
+                aggregate_opening_m = 0.04 * (normalized_opening + 1.0)
+                if not 0.0 <= aggregate_opening_m <= 0.08:
+                    raise ValueError('normalized planner gripper is outside the aggregate opening range')
+                panda_gripper_context = None
+                canonical_gripper_fields = {
+                    'normalized_gripper_scalar': normalized_opening,
+                    'aggregate_opening_m': aggregate_opening_m,
+                    'finger_position_mapping_m': [aggregate_opening_m / 2.0, -aggregate_opening_m / 2.0],
+                }
             ordered_q = env.controller.map_arm_target_to_control_order(arm_target)
             named_servo = dict(zip(arm_target.arm_joint_order, arm_target.servo_position_rad, strict=True))
             ordered_servo = tuple(
@@ -730,6 +1013,7 @@ def build_libero_selected_candidate(
             substep_context = {
                 'arm_resolution': arm_resolution,
                 'aggregate_opening_m': aggregate_opening_m,
+                'panda_gripper_delta_replay': panda_gripper_context,
             }
             canonical_action = {
                 'schema_version': 'libero-world-pose-canonical-v1',
@@ -744,9 +1028,7 @@ def build_libero_selected_candidate(
                 'qdesired_joint_order': list(env.controller.control_joint_order),
                 'arm_joint_order': list(arm_target.arm_joint_order),
                 'arm_servo_position_rad': list(ordered_servo),
-                'normalized_gripper_scalar': normalized_opening,
-                'aggregate_opening_m': aggregate_opening_m,
-                'finger_position_mapping_m': [aggregate_opening_m / 2.0, -aggregate_opening_m / 2.0],
+                **canonical_gripper_fields,
             }
         elif action_schema_id != 'libero-joint-space-absolute-v1':
             raise ValueError('unsupported LIBERO selected task action schema')
@@ -765,8 +1047,19 @@ def build_libero_selected_candidate(
             target = env.controller.compute_pose_target(
                 arm_resolution, aggregate_opening_m, state, **target_kwargs,
             )
-        if action_schema_id == 'libero-world-pose-wxyz-absolute-v1':
+        if action_schema_id in pose_action_schema_ids:
             canonical_action['controller_receipt'] = env.controller.last_control_receipt
+            if panda_gripper_delta_replay:
+                first_action = panda_gripper_context['action_trace_after_substeps'][0]
+                canonical_action['controller_receipt'] = {
+                    **dict(canonical_action['controller_receipt']),
+                    'panda_gripper_action_v1': {
+                        'profile_id': PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+                        'substep_index': 0,
+                        'current_action': first_action,
+                        'aggregate_opening_m': aggregate_opening_m,
+                    },
+                }
         prepared = {
             'action_values': values_tuple,
             'universal_action': values_tuple,
@@ -783,8 +1076,10 @@ def build_libero_selected_candidate(
                 'requested_action': {
                     'schema_version': env.value['action_schema']['schema_id'],
                     'values': values_tuple,
-                    'unit': ('world_xyz_m_quaternion_wxyz_plus_normalized_gripper'
-                             if action_schema_id == 'libero-world-pose-wxyz-absolute-v1'
+                    'unit': ('world_xyz_m_quaternion_wxyz_plus_panda_gripper_delta'
+                             if panda_gripper_delta_replay else
+                             'world_xyz_m_quaternion_wxyz_plus_absolute_normalized_gripper'
+                             if action_schema_id in pose_action_schema_ids
                              else 'rad_x7_plus_aggregate_opening_m'),
                 },
                 'canonical_action': canonical_action,
@@ -792,6 +1087,11 @@ def build_libero_selected_candidate(
         }
         if _solution_profile:
             prepared['substep_context'] = substep_context
+        if panda_gripper_delta_replay:
+            env.value['panda_gripper_delta_replay_state']['pending'] = {
+                'control_step': int(state.control_step) + 1,
+                'current_action': final_gripper_action,
+            }
         return prepared
 
     def prepare_mixed_control_substep(env, prepared, state, substep_index,
@@ -805,13 +1105,20 @@ def build_libero_selected_candidate(
         context = prepared.get('substep_context')
         if not isinstance(context, Mapping):
             raise TypeError('physics-rate OSC callback requires its typed outer pose-resolution context')
+        panda_gripper_context = context.get('panda_gripper_delta_replay')
+        if panda_gripper_context is not None:
+            current_action = panda_gripper_context['action_trace_after_substeps'][substep_index]
+            opening_m = panda_gripper_context['opening_trace_m'][substep_index]
+        else:
+            current_action = None
+            opening_m = context['aggregate_opening_m']
         if substep_index == 0:
             target = prepared['target']
             receipt = prepared['writer_control']['canonical_action'].get('controller_receipt')
         else:
             source = env.value['source']
             target = env.controller.compute_pose_target(
-                context['arm_resolution'], context['aggregate_opening_m'], state,
+                context['arm_resolution'], opening_m, state,
                 task_artifact_hash=env.artifact.identity_hash,
                 source_id=source.scene_source.source_id,
                 source_closure_digest=source.source_closure_digest,
@@ -821,12 +1128,41 @@ def build_libero_selected_candidate(
                 state_revision=state_revision,
             )
             receipt = env.controller.last_control_receipt
+        if panda_gripper_context is not None:
+            receipt = {
+                **dict(receipt),
+                'panda_gripper_action_v1': {
+                    'profile_id': PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+                    'substep_index': substep_index,
+                    'current_action': current_action,
+                    'aggregate_opening_m': opening_m,
+                },
+            }
         if not isinstance(receipt, Mapping):
             raise TypeError('physics-rate OSC callback omitted its recomputation receipt')
         return {'target': target, 'controller_receipt': dict(receipt)}
 
     def observe_mixed_control(env, state):
-        return observe_selected_reference_v1(env, state)
+        result = observe_selected_reference_v1(env, state)
+        if env.value.get('panda_gripper_delta_replay_profile_id') == PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+            gripper_state = env.value['panda_gripper_delta_replay_state']
+            if state.control_step == 0:
+                gripper_state.update({
+                    'current_action': 0.0,
+                    'committed_control_step': 0,
+                    'pending': None,
+                })
+            else:
+                pending = gripper_state.get('pending')
+                if (not isinstance(pending, Mapping)
+                        or pending.get('control_step') != state.control_step):
+                    raise RuntimeError('PandaGripper replay action did not complete at its outer boundary')
+                gripper_state.update({
+                    'current_action': float(pending['current_action']),
+                    'committed_control_step': int(state.control_step),
+                    'pending': None,
+                })
+        return result
 
     def mixed_record_metadata(env):
         source = env.value['source']
@@ -857,8 +1193,13 @@ def build_libero_selected_candidate(
                     'reference': env.value['action_schema']['reference'],
                     'rotation_representation': env.value['action_schema'].get('rotation_representation'),
                     'units': (
-                        ['meter'] * 3 + ['unit_quaternion_wxyz'] * 4 + ['normalized_minus1_to1']
-                        if env.value['action_schema']['schema_id'] == 'libero-world-pose-wxyz-absolute-v1'
+                        ['meter'] * 3 + ['unit_quaternion_wxyz'] * 4 + [
+                            'normalized_panda_gripper_increment' if env.value['action_schema']['schema_id']
+                            == PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID else 'normalized_absolute_gripper_target'
+                        ]
+                        if env.value['action_schema']['schema_id'] in {
+                            'libero-world-pose-wxyz-absolute-v1', PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID,
+                        }
                         else ['radian'] * 7 + ['meter_total_opening']
                     ),
                 },
@@ -886,6 +1227,7 @@ def build_libero_selected_candidate(
                     'hold_policy': _controller_hold_policy(env.controller),
             },
             'control_plan': env.controller.identity_mapping(),
+            'panda_gripper_action_profile': env.value.get('panda_gripper_delta_replay_profile_id'),
             'task_context': {
                 'schema_version': 'libero-episode-context-v1',
                 'task_artifact_identity_hash': env.artifact.identity_hash,
@@ -967,20 +1309,148 @@ def build_libero_selected_candidate(
         if (receipt['source_id'] != value['source'].scene_source.source_id
                 or receipt['source_closure_digest'] != value['source'].source_closure_digest):
             raise ValueError('compiled LIBERO layout receipt is not source-bound')
+        compiled_options = getattr(session, 'compiled_model_options_receipt_v1', None)
+        expected_profile = value.get('official_compiled_mujoco_profile_v1')
+        if value.get('panda_gripper_delta_replay_profile_id') == PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+            if not isinstance(compiled_options, Mapping):
+                raise ValueError('PandaGripper replay requires the public compiled MuJoCo options receipt')
+            if (compiled_options.get('schema_version') != 'compiled-model-options-v1'
+                    or compiled_options.get('provider') != 'mujoco'
+                    or compiled_options.get('backend') != 'cpu'
+                    or compiled_options.get('source_id') != receipt['source_id']
+                    or compiled_options.get('source_closure_digest') != receipt['source_closure_digest']
+                    or compiled_options.get('canonical_xml_sha256') != receipt['canonical_xml_sha256']):
+                raise ValueError('compiled MuJoCo options receipt is not bound to the admitted runtime source')
+            if not isinstance(expected_profile, Mapping):
+                raise ValueError('PandaGripper replay requires the frozen official compiled-model comparison profile')
+            actual_runtime = compiled_options.get('mujoco_runtime')
+            actual_options = compiled_options.get('options')
+            actual_sizes = compiled_options.get('model_sizes')
+            if not all(isinstance(row, Mapping) for row in (
+                    actual_runtime, actual_options, actual_sizes,
+                    expected_profile.get('mujoco_runtime'),
+                    expected_profile.get('options'), expected_profile.get('model_sizes'))):
+                raise ValueError('compiled MuJoCo options receipt or expected profile is incomplete')
+            for section, actual, expected in (
+                    ('mujoco_runtime', actual_runtime, expected_profile['mujoco_runtime']),
+                    ('model_sizes', actual_sizes, expected_profile['model_sizes'])):
+                for key, expected_value in expected.items():
+                    if actual.get(key) != expected_value:
+                        raise ValueError(
+                            f'compiled MuJoCo {section}.{key} differs from the pinned official model'
+                        )
+            for key, expected_value in expected_profile['options'].items():
+                actual_value = actual_options.get(key)
+                equal = (
+                    tuple(actual_value) == tuple(expected_value)
+                    if isinstance(expected_value, list)
+                    else actual_value == expected_value
+                )
+                if not equal:
+                    raise ValueError(
+                        f'compiled MuJoCo option {key} differs from the pinned official model'
+                    )
+            if (actual_options.get('integrator_name') != 'euler'
+                    or actual_options.get('solver_name') != 'newton'
+                    or actual_options.get('cone_name') != 'elliptic'):
+                raise ValueError('compiled MuJoCo option enum names differ from the pinned LIBERO profile')
         return {
             'schema_version': 'r07c-d01-pre-reset-compiled-validation-v1',
             'runtime_identity': session.runtime_identity,
             'compiled_layout': receipt,
+            'compiled_model_options_v1': compiled_options,
+            'compiled_model_physics_fingerprint_stage': 'post_reset_before_first_physics_step',
             'reset_not_yet_applied': True,
+        }
+
+    def validate_post_reset_compiled_session(session, value):
+        if value.get('panda_gripper_delta_replay_profile_id') != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+            return None
+        expected_profile = value.get('official_compiled_mujoco_profile_v1')
+        expected = (
+            None if not isinstance(expected_profile, Mapping)
+            else expected_profile.get('compiled_model_physics_fingerprint_v1')
+        )
+        actual = getattr(session, 'compiled_model_physics_fingerprint_v1', None)
+        if (not isinstance(actual, Mapping) or not isinstance(expected, Mapping)
+                or actual.get('schema_version') != 'compiled-model-physics-fingerprint-v1'
+                or expected.get('schema_version') != 'compiled-model-physics-fingerprint-v1'):
+            raise ValueError('post-reset LIBERO replay requires source-bound physical-model fingerprints')
+
+        bookkeeping_dimensions = {'nbuffer', 'npaths'}
+        render_only_arrays = {'site_rgba', 'geom_rgba'}
+        actual_dimensions = actual.get('model_dimensions')
+        expected_dimensions = expected.get('model_dimensions')
+        actual_names = actual.get('object_names')
+        expected_names = expected.get('object_names')
+        actual_arrays = actual.get('numeric_array_fields')
+        expected_arrays = expected.get('numeric_array_fields')
+        if not all(isinstance(row, Mapping) for row in (
+                actual_dimensions, expected_dimensions, actual_names, expected_names,
+                actual_arrays, expected_arrays)):
+            raise ValueError('post-reset LIBERO model fingerprint omitted dimensions, names or arrays')
+
+        physical_dimensions_actual = {
+            key: val for key, val in actual_dimensions.items()
+            if key not in bookkeeping_dimensions
+        }
+        physical_dimensions_expected = {
+            key: val for key, val in expected_dimensions.items()
+            if key not in bookkeeping_dimensions
+        }
+        if physical_dimensions_actual != physical_dimensions_expected:
+            raise ValueError('post-reset LIBERO physical model dimensions differ from the official compile')
+        if actual_names != expected_names:
+            raise ValueError(
+                'post-reset LIBERO object names/order differ from the official compile: '
+                + json.dumps(_compiled_physics_fingerprint_diff_v1(actual, expected),
+                             sort_keys=True, separators=(',', ':'))
+            )
+        physical_array_differences = {
+            key: {'actual': actual_arrays.get(key), 'expected': expected_arrays.get(key)}
+            for key in sorted(set(actual_arrays) | set(expected_arrays))
+            if key not in render_only_arrays and actual_arrays.get(key) != expected_arrays.get(key)
+        }
+        if physical_array_differences:
+            raise ValueError(
+                'post-reset LIBERO physical model arrays differ from the official compile: '
+                + json.dumps(physical_array_differences, sort_keys=True, separators=(',', ':'))
+            )
+        return {
+            'schema_version': 'r07c-d01-post-reset-compiled-validation-v1',
+            'boundary': 'after_nonintegrating_reset_before_first_physics_step',
+            'native_physics_steps_at_validation': 0,
+            'runtime_identity': session.runtime_identity,
+            'compiled_model_physics_fingerprint_v1': actual,
+            'official_compiled_model_binary_sha256': expected.get('compiled_model_binary_sha256'),
+            'candidate_compiled_model_binary_sha256': actual.get('compiled_model_binary_sha256'),
+            'bookkeeping_dimension_differences': {
+                key: {'actual': actual_dimensions.get(key), 'expected': expected_dimensions.get(key)}
+                for key in sorted(bookkeeping_dimensions)
+                if actual_dimensions.get(key) != expected_dimensions.get(key)
+            },
+            'render_only_array_differences': {
+                key: {'actual': actual_arrays.get(key), 'expected': expected_arrays.get(key)}
+                for key in sorted(render_only_arrays)
+                if actual_arrays.get(key) != expected_arrays.get(key)
+            },
+            'physical_dimensions_equal': True,
+            'object_names_and_order_equal': True,
+            'physical_array_fields_equal': True,
+            'reset_not_integrated': True,
         }
 
     def validate_external_solution(value, solution):
         from .solution import (
-            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
+            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6,
+            LiberoPickPlaceSolutionV7, LiberoPickPlaceSolutionV8,
             solution_identity_v5, solution_identity_v6, solution_identity_v7,
+            solution_identity_v8,
         )
 
         expected_type, expected_identity = (
+            (LiberoPickPlaceSolutionV8, solution_identity_v8)
+            if _solution_profile == 'v8' else
             (LiberoPickPlaceSolutionV7, solution_identity_v7)
             if _solution_profile == 'v7' else
             (LiberoPickPlaceSolutionV6, solution_identity_v6)
@@ -991,15 +1461,16 @@ def build_libero_selected_candidate(
             raise TypeError(f'LIBERO task #1 external lifecycle requires {expected_type.__name__}')
         expected_source = value['source_sha256']['runtime_model_xml']
         expected_closure = value['source_sha256']['source_closure_digest']
+        expected_resolver_identity = value['arm_resolver_identity']
         if (solution.task_uid != value['artifact'].task_id
                 or solution.source_xml_sha256 != expected_source
                 or solution.source_closure_digest != expected_closure
                 or solution.identity != value.get('solution_identity')
                 or solution.arm_resolver_identity
-                   != value['arm_resolver'].iterative_resolution_identity_v1()
+                   != expected_resolver_identity
                 or solution.identity != expected_identity(
                     expected_source, expected_closure,
-                    arm_resolver_identity=value['arm_resolver'].iterative_resolution_identity_v1(),
+                    arm_resolver_identity=expected_resolver_identity,
                 )):
             raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
 
@@ -1014,8 +1485,10 @@ def build_libero_selected_candidate(
         reset_seed=lambda seed: seed,
         runtime_episode_identity=True,
         build_mixed_control_profile=build_value,
-        build_external=(lambda provider: build_value(provider, 'cpu')) if _solution_profile else None,
-        validate_external_solution=validate_external_solution if _solution_profile else None,
+        build_external=(lambda provider: build_value(provider, 'cpu'))
+        if _solution_profile and not _panda_gripper_delta_replay else None,
+        validate_external_solution=validate_external_solution
+        if _solution_profile and not _panda_gripper_delta_replay else None,
         reset_sample_with_options=reset_with_options,
         prepare_mixed_control=prepare_mixed_control,
         prepare_mixed_control_substep=(
@@ -1024,6 +1497,7 @@ def build_libero_selected_candidate(
         observe_mixed_control=observe_mixed_control,
         mixed_record_metadata=mixed_record_metadata,
         pre_reset_session_validator=validate_compiled_session,
+        post_reset_session_validator=validate_post_reset_compiled_session,
         close_task_resources=close_task_resources if _solution_profile else None,
     )
     env = SelectedReferenceEnv.from_mixed_control_candidate(
@@ -1034,6 +1508,7 @@ def build_libero_selected_candidate(
         env.metadata.update({
             'provider': 'mujoco', 'backend': 'cpu',
             'solution_identity': env.value['solution_identity'],
+            'reference_solution_identity': env.value['reference_solution_identity'],
             'source_xml_sha256': env.value['source_sha256']['runtime_model_xml'],
             'source_closure_digest': env.value['source_sha256']['source_closure_digest'],
         })
@@ -1052,17 +1527,35 @@ def build_libero_solution_candidate(
     init_path: Path | None = None,
     horizon: int = 1000,
     solution_version: str = 'v5',
+    gripper_action_profile: str | None = None,
+    official_controller_initial_joint_reference_rad=None,
+    official_compiled_mujoco_profile_v1=None,
 ):
     """Construct the versioned task #1 Solution through existing Core owners."""
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('LIBERO task Solution horizon must be in [1,1000]')
-    if solution_version not in {'v5', 'v6', 'v7'}:
-        raise ValueError('LIBERO task Solution version must be v5, v6 or v7')
+    if solution_version not in {'v5', 'v6', 'v7', 'v8'}:
+        raise ValueError('LIBERO task Solution version must be v5, v6, v7 or v8')
+    if gripper_action_profile not in (None, PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID):
+        raise ValueError('unsupported LIBERO task gripper action profile')
+    if (official_controller_initial_joint_reference_rad is not None
+            and (gripper_action_profile != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+                 or solution_version != 'v5')):
+        raise ValueError('official robosuite nullspace reference is available only for the V5 PandaGripper replay profile')
+    if (official_compiled_mujoco_profile_v1 is not None
+            and (gripper_action_profile != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+                 or solution_version != 'v5')):
+        raise ValueError('official compiled MuJoCo profile is available only for the V5 PandaGripper replay profile')
     return build_libero_selected_candidate(
         xml_path=xml_path, xml=xml, composed_mjcf_sha256=composed_mjcf_sha256,
         composition_plan_path=composition_plan_path, install_root=install_root,
         init_path=init_path, horizon=horizon,
-        _solution_profile=solution_version if solution_version in {'v6', 'v7'} else True,
+        _solution_profile=solution_version if solution_version in {'v6', 'v7', 'v8'} else True,
+        _panda_gripper_delta_replay=(gripper_action_profile == PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID),
+        _official_nullspace_reference_joint_position_rad=(
+            official_controller_initial_joint_reference_rad
+        ),
+        _official_compiled_mujoco_profile_v1=official_compiled_mujoco_profile_v1,
     )
 
 

@@ -88,6 +88,7 @@ class ReferenceTaskBinding:
     observe_mixed_control: Callable | None = None
     mixed_record_metadata: Callable | None = None
     pre_reset_session_validator: Callable | None = None
+    post_reset_session_validator: Callable | None = None
     close_task_resources: Callable | None = None
 
     def __post_init__(self):
@@ -117,6 +118,9 @@ class ReferenceTaskBinding:
         if (self.prepare_mixed_control_substep is not None
                 and not callable(self.prepare_mixed_control_substep)):
             raise ValueError('mixed-control substep preparation hook must be callable when supplied')
+        if (self.post_reset_session_validator is not None
+                and not callable(self.post_reset_session_validator)):
+            raise ValueError('post-reset session validator must be callable when supplied')
 
 
 class SelectedReferenceEnv(TaskEnvironmentComponent):
@@ -498,6 +502,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         self._mixed_reset_context = None
         self._mixed_record_metadata = None
         self._mixed_reset_plan = None
+        self._compiled_layout_pre_reset = None
+        self._compiled_layout_post_reset = None
         self._published_position_state = None
         self._published_position_typed_state = None
         self._published_position_obs = None
@@ -841,6 +847,11 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 self.realized = self.session.reset_plan(self._mixed_reset_plan)
             else:
                 self.realized = self.session.reset(self.sample)
+            self._compiled_layout_post_reset = None
+            if self.binding.post_reset_session_validator is not None:
+                self._compiled_layout_post_reset = self.binding.post_reset_session_validator(
+                    self.session, self.value,
+                )
             if self.binding.runtime_episode_identity:
                 # Native task samples and the published Solution boundary
                 # must share the RuntimeSession's actual episode identity.
@@ -884,6 +895,13 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'compiled_model_layout_v1': self.session.compiled_layout_receipt,
                     'pre_reset_compiled_validation_v1': self._compiled_layout_pre_reset,
                 })
+                if self._compiled_layout_post_reset is not None:
+                    self.info['post_reset_compiled_validation_v1'] = self._compiled_layout_post_reset
+                compiled_model_options = getattr(
+                    self.session, 'compiled_model_options_receipt_v1', None,
+                )
+                if compiled_model_options is not None:
+                    self.info['compiled_model_options_v1'] = compiled_model_options
                 if self._mixed_reset_plan is not None:
                     plan_receipt = {
                         'reset_plan_v1': self._mixed_reset_plan.to_mapping(),

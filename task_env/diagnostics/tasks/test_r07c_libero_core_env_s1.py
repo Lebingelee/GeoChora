@@ -208,9 +208,56 @@ class _FakeModel:
         worldbody = root.find("worldbody")
         if worldbody is None:
             raise ValueError("synthetic source omitted worldbody")
+        size = root.find("size")
+        self.njmax = int(size.get("njmax", "5000")) if size is not None else 5000
+        self.nconmax = int(size.get("nconmax", "5000")) if size is not None else 5000
         option = root.find("option")
+        def scalar(name: str, default: float) -> float:
+            return float(option.get(name, str(default))) if option is not None else default
+
+        def vector(name: str, default: tuple[float, ...]) -> np.ndarray:
+            return np.asarray(
+                tuple(float(value) for value in option.get(name, " ".join(map(str, default))).split())
+                if option is not None else default,
+                dtype=np.float64,
+            )
+
+        integrators = {"euler": 0, "rk4": 1, "implicit": 2, "implicitfast": 3}
+        solvers = {"pgs": 0, "cg": 1, "newton": 2}
+        cones = {"pyramidal": 0, "elliptic": 1}
         self.opt = types.SimpleNamespace(
             timestep=float(option.get("timestep", "0.002")) if option is not None else 0.002,
+            impratio=scalar("impratio", 20.0),
+            tolerance=scalar("tolerance", 1.0e-8),
+            ls_tolerance=scalar("ls_tolerance", 1.0e-2),
+            noslip_tolerance=scalar("noslip_tolerance", 1.0e-6),
+            ccd_tolerance=scalar("ccd_tolerance", 1.0e-6),
+            density=scalar("density", 1.2),
+            viscosity=scalar("viscosity", 2.0e-5),
+            o_margin=scalar("o_margin", 0.0),
+            sleep_tolerance=scalar("sleep_tolerance", 1.0e-4),
+            integrator=integrators.get(option.get("integrator", "implicitfast").casefold(), 3)
+                if option is not None else 3,
+            solver=solvers.get(option.get("solver", "newton").casefold(), 2)
+                if option is not None else 2,
+            cone=cones.get(option.get("cone", "pyramidal").casefold(), 0)
+                if option is not None else 0,
+            jacobian=2,
+            iterations=int(option.get("iterations", "100")) if option is not None else 100,
+            ls_iterations=int(option.get("ls_iterations", "50")) if option is not None else 50,
+            noslip_iterations=int(option.get("noslip_iterations", "0")) if option is not None else 0,
+            ccd_iterations=int(option.get("ccd_iterations", "35")) if option is not None else 35,
+            sdf_initpoints=int(option.get("sdf_initpoints", "40")) if option is not None else 40,
+            sdf_iterations=int(option.get("sdf_iterations", "10")) if option is not None else 10,
+            disableflags=int(option.get("disableflags", "0")) if option is not None else 0,
+            enableflags=int(option.get("enableflags", "0")) if option is not None else 0,
+            gravity=vector("gravity", (0.0, 0.0, -9.81)),
+            wind=vector("wind", (0.0, 0.0, 0.0)),
+            magnetic=vector("magnetic", (0.0, -0.5, 0.0)),
+            o_friction=vector("o_friction", (1.0, 1.0, 0.005, 0.0001, 0.0001)),
+            o_solref=vector("o_solref", (0.02, 1.0)),
+            o_solimp=vector("o_solimp", (0.9, 0.95, 0.001, 0.5, 2.0)),
+            disableactuator=0,
         )
         self._world = world
         joint_defaults = {}
@@ -457,6 +504,11 @@ def _fake_api(monkeypatch):
     fake.MjModel = types.SimpleNamespace(from_xml_string=_FakeModel.from_xml_string)
     fake.MjData = _FakeData
     fake.mjtJoint = types.SimpleNamespace(mjJNT_FREE=0, mjJNT_HINGE=1, mjJNT_SLIDE=2)
+    fake.mjtIntegrator = types.SimpleNamespace(
+        mjINT_EULER=0, mjINT_RK4=1, mjINT_IMPLICIT=2, mjINT_IMPLICITFAST=3,
+    )
+    fake.mjtSolver = types.SimpleNamespace(mjSOL_PGS=0, mjSOL_CG=1, mjSOL_NEWTON=2)
+    fake.mjtCone = types.SimpleNamespace(mjCONE_PYRAMIDAL=0, mjCONE_ELLIPTIC=1)
     fake.mjtTrn = types.SimpleNamespace(mjTRN_JOINT=0)
     fake.mjtGain = types.SimpleNamespace(mjGAIN_FIXED=0)
     fake.mjtBias = types.SimpleNamespace(mjBIAS_NONE=0, mjBIAS_AFFINE=1)
@@ -2265,7 +2317,7 @@ def test_r07v210_solution_finger_contact_groups_cover_source_collision_shapes_wi
 
 @pytest.mark.parametrize(
     ("solution_version", "expected_approach_opening_scalar"),
-    (("v5", 0.125), ("v6", 0.05)),
+    (("v5", 0.125), ("v6", 0.05), ("v8", 0.05)),
 )
 def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(
         tmp_path, monkeypatch, solution_version, expected_approach_opening_scalar):
@@ -2278,8 +2330,14 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6
-    solution_type = LiberoPickPlaceSolutionV6 if solution_version == "v6" else LiberoPickPlaceSolutionV5
+    from bench_deploy.libero.solution import (
+        LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV8,
+    )
+    solution_type = (
+        LiberoPickPlaceSolutionV8 if solution_version == "v8" else
+        LiberoPickPlaceSolutionV6 if solution_version == "v6" else
+        LiberoPickPlaceSolutionV5
+    )
     from task_env.runtime.sessions.source import source_asset_bytes
     from task_env.recorders import load_structured_control_records_h5
 
@@ -2306,7 +2364,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(
     closure_digest = env.metadata["source_closure_digest"]
     runtime_xml = env.value["runtime_model_xml_bytes"]
     runtime_xml_sha = env.value["source_sha256"]["runtime_model_xml"]
-    resolver_identity = env.value['arm_resolver'].iterative_resolution_identity_v1()
+    resolver_identity = env.value['arm_resolver_identity']
     solution = solution_type(
         runtime_xml, source_closure_digest=closure_digest,
         arm_resolver_identity=resolver_identity,
@@ -2488,7 +2546,7 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     assert failed_binding.close_receipt["task_resource_close_receipt"]["closed"] is True
 
 
-@pytest.mark.parametrize("solution_version", ("v5", "v6", "v7"))
+@pytest.mark.parametrize("solution_version", ("v5", "v6", "v7", "v8"))
 def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
         tmp_path, monkeypatch, solution_version):
     global _FAKE_WORLD
@@ -2499,9 +2557,11 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
     from bench_deploy.libero.solution import (
-        LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
+        LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6,
+        LiberoPickPlaceSolutionV7, LiberoPickPlaceSolutionV8,
     )
     solution_type = (
+        LiberoPickPlaceSolutionV8 if solution_version == "v8" else
         LiberoPickPlaceSolutionV7 if solution_version == "v7" else
         LiberoPickPlaceSolutionV6 if solution_version == "v6" else
         LiberoPickPlaceSolutionV5
@@ -2549,7 +2609,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
             env.value["bind_source_gravity_model"](gravity_model)
             return solution_type(
                 runtime_xml, source_closure_digest=closure_digest,
-                arm_resolver_identity=env.value['arm_resolver'].iterative_resolution_identity_v1(),
+                    arm_resolver_identity=env.value['arm_resolver_identity'],
             )
 
     result = run_libero_candidate_worker(
@@ -2663,7 +2723,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
             failed_env.value["bind_source_gravity_model"](failed_gravity_model)
             return solution_type(
                 failed_runtime_xml, source_closure_digest=failed_closure_digest,
-                arm_resolver_identity=failed_env.value['arm_resolver'].iterative_resolution_identity_v1(),
+                arm_resolver_identity=failed_env.value['arm_resolver_identity'],
             )
 
     failure_result = run_libero_candidate_worker(

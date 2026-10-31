@@ -702,22 +702,43 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
     profile_id = 'libero-spatial-bowl-to-plate-robosuite-osc-pose-source-v2'
 
     def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
-                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None):
+                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None,
+                 nullspace_reference_joint_position_rad=None):
         super().__init__(
             operational_config=operational_config or LiberoOperationalSpaceConfigV2(),
             gravity_bias_model=gravity_bias_model,
             arm_resolver_identity=arm_resolver_identity,
         )
+        configured_reference = None
+        if nullspace_reference_joint_position_rad is not None:
+            configured_reference = np.asarray(
+                nullspace_reference_joint_position_rad, dtype=np.float64,
+            )
+            if configured_reference.shape != (7,) or not np.isfinite(configured_reference).all():
+                raise ValueError('configured robosuite nullspace reference must contain seven finite joint values')
+            configured_reference = configured_reference.copy()
+            self.profile_id = 'libero-spatial-bowl-to-plate-robosuite-osc-pose-official-reference-v1'
+        self._configured_nullspace_reference = configured_reference
         self._initial_joint_reference = None
         payload = self.identity_mapping()
         payload.pop('identity_sha256', None)
-        payload.update({
-            'schema_version': 'libero-mixed-controller-identity-v4',
-            'profile_id': self.profile_id,
-            'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2',
-            'nullspace_reference_policy': 'initial_joint_position_captured_at_reset_v1',
-            'hold_policy': self.operational_config.hold_policy,
-        })
+        if self._configured_nullspace_reference is None:
+            payload.update({
+                'schema_version': 'libero-mixed-controller-identity-v4',
+                'profile_id': self.profile_id,
+                'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2',
+                'nullspace_reference_policy': 'initial_joint_position_captured_at_reset_v1',
+                'hold_policy': self.operational_config.hold_policy,
+            })
+        else:
+            payload.update({
+                'schema_version': 'libero-mixed-controller-identity-v5',
+                'profile_id': self.profile_id,
+                'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_official_initial_joint_reference_v1',
+                'nullspace_reference_policy': 'robosuite_controller_initial_joint_after_set_init_state_v1',
+                'nullspace_reference_joint_position_rad': self._configured_nullspace_reference.tolist(),
+                'hold_policy': self.operational_config.hold_policy,
+            })
         self.identity = hashlib.sha256(json.dumps(
             payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
         ).encode()).hexdigest()
@@ -727,35 +748,69 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
         initial = np.asarray([float(state.joint_position[name]) for name in _JOINTS], dtype=np.float64)
         if initial.shape != (7,) or not np.isfinite(initial).all():
             raise ValueError('physics-rate OSC reset requires finite named initial arm feedback')
-        self._initial_joint_reference = initial.copy()
+        self._initial_joint_reference = (
+            initial.copy() if self._configured_nullspace_reference is None
+            else self._configured_nullspace_reference.copy()
+        )
 
     def _nullspace_reference(self, current_q, resolved_target_q):
         if self._initial_joint_reference is None:
             raise RuntimeError('physics-rate OSC requires reset-captured initial_joint before stepping')
         if self._initial_joint_reference.shape != (7,):
             raise RuntimeError('physics-rate OSC initial_joint reference has an invalid shape')
-        return self._initial_joint_reference.copy(), 'reset_initial_joint_v1'
+        reference_profile = (
+            'reset_initial_joint_v1' if self._configured_nullspace_reference is None
+            else 'robosuite_controller_initial_joint_after_set_init_state_v1'
+        )
+        return self._initial_joint_reference.copy(), reference_profile
 
     def compute_pose_target(self, *args, **kwargs):
         target = super().compute_pose_target(*args, **kwargs)
         self.last_control_receipt.update({
-            'schema_version': 'libero-mixed-control-receipt-v4',
-            'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2',
-            'nullspace_reference_policy': 'initial_joint_position_captured_at_reset_v1',
+            'schema_version': (
+                'libero-mixed-control-receipt-v4'
+                if self._configured_nullspace_reference is None
+                else 'libero-mixed-control-receipt-v5'
+            ),
+            'algorithm': (
+                'robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2'
+                if self._configured_nullspace_reference is None else
+                'robosuite_osc_pose_uncoupled_lambda_and_official_initial_joint_reference_v1'
+            ),
+            'nullspace_reference_policy': (
+                'initial_joint_position_captured_at_reset_v1'
+                if self._configured_nullspace_reference is None else
+                'robosuite_controller_initial_joint_after_set_init_state_v1'
+            ),
+            'nullspace_reference_joint_position_rad': (
+                None if self._configured_nullspace_reference is None
+                else self._configured_nullspace_reference.tolist()
+            ),
             'hold_policy': self.operational_config.hold_policy,
         })
         return target
 
     def identity_mapping(self):
         payload = super().identity_mapping()
-        payload.update({
-            'schema_version': 'libero-mixed-controller-identity-v4',
-            'profile_id': self.profile_id,
-            'identity_sha256': self.identity,
-            'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2',
-            'nullspace_reference_policy': 'initial_joint_position_captured_at_reset_v1',
-            'hold_policy': self.operational_config.hold_policy,
-        })
+        if self._configured_nullspace_reference is None:
+            payload.update({
+                'schema_version': 'libero-mixed-controller-identity-v4',
+                'profile_id': self.profile_id,
+                'identity_sha256': self.identity,
+                'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2',
+                'nullspace_reference_policy': 'initial_joint_position_captured_at_reset_v1',
+                'hold_policy': self.operational_config.hold_policy,
+            })
+        else:
+            payload.update({
+                'schema_version': 'libero-mixed-controller-identity-v5',
+                'profile_id': self.profile_id,
+                'identity_sha256': self.identity,
+                'algorithm': 'robosuite_osc_pose_uncoupled_lambda_and_official_initial_joint_reference_v1',
+                'nullspace_reference_policy': 'robosuite_controller_initial_joint_after_set_init_state_v1',
+                'nullspace_reference_joint_position_rad': self._configured_nullspace_reference.tolist(),
+                'hold_policy': self.operational_config.hold_policy,
+            })
         return payload
 
 

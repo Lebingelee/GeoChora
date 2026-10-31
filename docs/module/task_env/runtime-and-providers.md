@@ -336,6 +336,20 @@ Versioned public readback binds named robot/object/fixture state, compiled
 layout and entity-pair contact coverage/freshness. The task-owned On predicate
 requires current positive bowl/plate contact, bowl height at least the plate,
 and XY distance below 0.03 m; missing or stale contact remains unavailable.
+An optional `CompiledModelOptionsReadbackV1` receipt now reports the effective
+MuJoCo `mjModel.opt` values, model capacities, loaded MuJoCo/API version, and
+SHA-256 of the exact compiled MJB model bytes, bound to the compiled source
+identity. It is exposed in reset info as
+`compiled_model_options_v1` when the adapter supports it; the base
+`RuntimeSession` protocol does not require it. This is diagnostic model
+configuration evidence and does not prove dynamic trajectory agreement.
+The separate optional `CompiledModelPhysicsFingerprintReadbackV1` reports
+source-bound object-name/dimension inventory and hashes for numeric body,
+joint, dof, geom, site, actuator, tendon, constraint, mesh, height-field, flex,
+and wrap arrays. It is intended for explicit model audits; ordinary reset info
+does not attach this larger fingerprint automatically. MJB byte identity may
+also differ because serialized metadata differs, so compare this fingerprint
+before concluding that physical arrays differ.
 
 Attempt002's final provider-free same-route S1 passed 19 focused cases. Its
 locked MuJoCo 3.8.1/API3008001 CPU run completed three 64-transition episodes

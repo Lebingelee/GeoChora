@@ -44,6 +44,7 @@ SOLUTION_SCHEMA_V4 = "libero-bowl-to-plate-solution-v4"
 SOLUTION_SCHEMA_V5 = "libero-bowl-to-plate-solution-v5"
 SOLUTION_SCHEMA_V6 = "libero-bowl-to-plate-solution-v6"
 SOLUTION_SCHEMA_V7 = "libero-bowl-to-plate-solution-v7"
+SOLUTION_SCHEMA_V8 = "libero-bowl-to-plate-solution-v8"
 POSE_ACTION_SCHEMA_V1 = "libero-world-pose-wxyz-absolute-v1"
 TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
@@ -325,6 +326,16 @@ _DEMO_FIRST_BILATERAL_TCP_BOWL_LOCAL_M = np.asarray(
     (-0.04490935541611755, 0.004212145868712052, 0.0312549937079468),
     dtype=np.float64,
 )
+_DEMO_FRAME51_TCP_BOWL_LOCAL_M = np.asarray(
+    (-0.044920013921162995, 0.00462166895747628, 0.024593639582228065),
+    dtype=np.float64,
+)
+_DEMO_FRAME51_TCP_BOWL_LOCAL_QUAT_WXYZ = np.asarray(
+    (0.03300342281417691, -0.996740012700174, 0.04855030219620138, -0.05534427993626179),
+    dtype=np.float64,
+)
+_DEMO_FRAME51_JAW_OPENING_M = 0.006517432981670807
+_DEMO_FRAME50_JAW_OPENING_M = 0.01344940828870882
 _DEMO_DATASET_SHA256 = "ff6f26121653c77280eb40a38773a74141c11a8509f3466058cb56dd2cc60ead"
 _DEMO_DATASET_REVISION = "e434c228d52f21e37c6f45046a6476a8fa362b8d"
 _STAGE_TIMEOUTS_V4 = {
@@ -598,6 +609,73 @@ def solution_identity_v7(
         },
         "opening_m": _OPENING_BY_STAGE_V7,
         "contact_policy": "bilateral_source_finger_contact_two_boundaries_then_retain_pinch_v2",
+        "planner": {
+            "owner": "task_env.planners.cartesian.CartesianPosePlanner",
+            "max_translation_per_step_m": selected_planner.max_translation_per_step,
+            "max_translation_acceleration_per_step_m": selected_planner.max_translation_acceleration_per_step,
+            "max_rotation_per_step_rad": selected_planner.max_rotation_per_step,
+            "max_rotation_acceleration_per_step_rad": selected_planner.max_rotation_acceleration_per_step,
+            "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
+            "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
+        },
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
+def solution_identity_v8(
+    source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+    planner_config: CartesianPosePlannerConfig | None = None,
+) -> str:
+    """Bind the reconstructed demo frame-51 contact pose and measured aperture."""
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        max_translation_per_step=0.0025,
+        max_translation_acceleration_per_step=0.001,
+        max_rotation_per_step=0.04,
+        max_rotation_acceleration_per_step=0.02,
+        settle_steps=0,
+        max_steps=200,
+    )
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V8,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "arm_resolver_identity": arm_resolver_identity,
+        "parent_profile_identity": solution_identity_v7(
+            source_xml_sha256, source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=selected_config, planner_config=selected_planner,
+        ),
+        "grasp_frame": {
+            "reference": "public_bowl_pose_world_wxyz_with_demo_frame51_tcp_pose_v1",
+            "tcp_offset_bowl_local_m": _DEMO_FRAME51_TCP_BOWL_LOCAL_M.tolist(),
+            "tcp_quaternion_bowl_local_wxyz": _DEMO_FRAME51_TCP_BOWL_LOCAL_QUAT_WXYZ.tolist(),
+            "jaw_axis_source": "demo40_state51_source_fk_v1",
+            "sample_source": "task1_demo_contact_tcp_frame_reconstruction_20261031_001",
+            "sample_index": 51,
+            "dataset_revision": _DEMO_DATASET_REVISION,
+            "dataset_file_sha256": _DEMO_DATASET_SHA256,
+            "observation_state_alignment": "source_tcp_fk_state_row_not_one_row_lagged_obs_v1",
+        },
+        "opening_m": {
+            "approach": 0.042,
+            "descend": _DEMO_FRAME50_JAW_OPENING_M,
+            "grasp": _DEMO_FRAME51_JAW_OPENING_M,
+            "lift": _DEMO_FRAME51_JAW_OPENING_M,
+            "carry": _DEMO_FRAME51_JAW_OPENING_M,
+            "place": _DEMO_FRAME51_JAW_OPENING_M,
+            "release": 0.042,
+        },
+        "contact_policy": "require_bilateral_public_finger_bowl_contacts_for_two_boundaries_before_lift_v2",
         "planner": {
             "owner": "task_env.planners.cartesian.CartesianPosePlanner",
             "max_translation_per_step_m": selected_planner.max_translation_per_step,
@@ -1853,14 +1931,101 @@ class LiberoPickPlaceSolutionV7(LiberoPickPlaceSolutionV6):
         return _DEMO_FIRST_BILATERAL_TCP_BOWL_LOCAL_M
 
 
+_OPENING_BY_STAGE_V8 = {
+    "approach": 0.042,
+    "descend": _DEMO_FRAME50_JAW_OPENING_M,
+    "grasp": _DEMO_FRAME51_JAW_OPENING_M,
+    "lift": _DEMO_FRAME51_JAW_OPENING_M,
+    "carry": _DEMO_FRAME51_JAW_OPENING_M,
+    "place": _DEMO_FRAME51_JAW_OPENING_M,
+    "release": 0.042,
+}
+
+
+class LiberoPickPlaceSolutionV8(LiberoPickPlaceSolutionV7):
+    """Demo frame-51 radial pinch using reconstructed source TCP pose and aperture."""
+
+    solution_schema_version = SOLUTION_SCHEMA_V8
+    grasp_strategy_id = "demo_frame51_source_fk_pose_and_bilateral_aperture_rim_pinch_v1"
+    grasp_offset_source = "demo40 source-model FK at first bilateral contact state 51"
+
+    def __init__(self, source_xml: bytes | str, source_closure_digest: str, *,
+                 arm_resolver_identity: str,
+                 config: LiberoPickPlaceSolutionConfigV1 | None = None,
+                 planner_config: CartesianPosePlannerConfig | None = None):
+        super().__init__(
+            source_xml, source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=config, planner_config=planner_config,
+        )
+        self.identity = solution_identity_v8(
+            self.source_xml_sha256, self.source_closure_digest,
+            arm_resolver_identity=self.arm_resolver_identity,
+            config=self.config, planner_config=self.planner_config,
+        )
+
+    def reset(self, observation, info: Mapping[str, object], metadata, **kwargs) -> None:
+        super().reset(observation, info, metadata, **kwargs)
+        self._tcp_quaternion_in_bowl = normalize_quat_wxyz(
+            _DEMO_FRAME51_TCP_BOWL_LOCAL_QUAT_WXYZ,
+        )
+
+    def _opening_profile(self):
+        return _OPENING_BY_STAGE_V8
+
+    def _bowl_local_grasp_offset_m(self):
+        return _DEMO_FRAME51_TCP_BOWL_LOCAL_M
+
+    def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
+        proposal = super().act(observation, info)
+        self._last_action_receipt.update({
+            "solution_schema_version": SOLUTION_SCHEMA_V8,
+            "grasp_strategy": self.grasp_strategy_id,
+            "grasp_frame": {
+                "bowl_local_tcp_offset_m": self._bowl_local_grasp_offset_m().tolist(),
+                "bowl_local_tcp_quaternion_wxyz": _DEMO_FRAME51_TCP_BOWL_LOCAL_QUAT_WXYZ.tolist(),
+                "tcp_quaternion_in_bowl_wxyz": _DEMO_FRAME51_TCP_BOWL_LOCAL_QUAT_WXYZ.tolist(),
+                "offset_source": self.grasp_offset_source,
+                "orientation_source": "demo40_state51_source_fk_v1",
+                "jaw_opening_source": "demo40_state51_first_bilateral_contact_v1",
+                "bowl_reference_pose_world_wxyz": self._bowl_reference_pose.tolist(),
+                "plate_reference_pose_world_wxyz": self._plate_reference_pose.tolist(),
+                "dataset_revision": _DEMO_DATASET_REVISION,
+                "dataset_file_sha256": _DEMO_DATASET_SHA256,
+                "sample_index": 51,
+            },
+            "opening_target_m": float(self._opening_for_stage()),
+        })
+        return ExpertAction(
+            action=proposal.action, stage=proposal.stage,
+            diagnostics=dict(self._last_action_receipt["diagnostics"]),
+        )
+
+    def outcome_report(self) -> dict[str, object]:
+        report = super().outcome_report()
+        report["solution_schema_version"] = SOLUTION_SCHEMA_V8
+        report["solution_profile"] = {
+            "grasp_strategy": self.grasp_strategy_id,
+            "grasp_offset_source": self.grasp_offset_source,
+            "bowl_local_tcp_offset_m": self._bowl_local_grasp_offset_m().tolist(),
+            "bowl_local_tcp_quaternion_wxyz": _DEMO_FRAME51_TCP_BOWL_LOCAL_QUAT_WXYZ.tolist(),
+            "opening_by_stage_m": _OPENING_BY_STAGE_V8,
+            "dataset_revision": _DEMO_DATASET_REVISION,
+            "dataset_file_sha256": _DEMO_DATASET_SHA256,
+            "sample_index": 51,
+        }
+        return report
+
+
 __all__ = [
     "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2", "SOLUTION_SCHEMA_V3", "SOLUTION_SCHEMA_V4",
-    "SOLUTION_SCHEMA_V5", "SOLUTION_SCHEMA_V6", "SOLUTION_SCHEMA_V7",
+    "SOLUTION_SCHEMA_V5", "SOLUTION_SCHEMA_V6", "SOLUTION_SCHEMA_V7", "SOLUTION_SCHEMA_V8",
     "POSE_ACTION_SCHEMA_V1",
     "LiberoPickPlaceSolutionConfigV1", "LiberoPickPlaceSolutionV1",
     "LiberoPickPlaceSolutionV2", "LiberoPickPlaceSolutionV3", "LiberoPickPlaceSolutionV4",
     "LiberoPickPlaceSolutionV5", "LiberoPickPlaceSolutionV6", "LiberoPickPlaceSolutionV7",
+    "LiberoPickPlaceSolutionV8",
     "solution_identity_v1", "solution_identity_v2", "solution_identity_v2_frozen",
     "solution_identity_v3", "solution_identity_v4", "solution_identity_v5", "solution_identity_v6",
-    "solution_identity_v7",
+    "solution_identity_v7", "solution_identity_v8",
 ]

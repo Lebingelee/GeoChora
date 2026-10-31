@@ -750,7 +750,25 @@ CPU. Its task binding owns LIBERO source/reset/controller/evaluation semantics;
 the shared Core route consumes the generic, source-bound
 `MixedActuatorPlanV1` and named mixed commands through the existing selected
 environment, runtime session, provider adapter, and H5 v3 recorder. The Core
-contract does not whitelist LIBERO names, layout sizes, or task identifiers.
+
+### Compiled-model readback
+
+The optional advanced `CompiledModelOptionsReadbackV1` interface is separate
+from the required `RuntimeSession` protocol. Where an adapter can bind
+effective settings to the compiled model and immutable source receipt, reset
+info may include `compiled_model_options_v1`. The MuJoCo mixed-actuator CPU
+session reports MuJoCo/API identity, `mjModel.opt` solver/integrator/contact
+settings, contact/joint capacity limits, and SHA-256 of the compiled MJB model
+bytes. Consumers should validate the receipt's source identity before
+comparing it. Other providers may omit this readback.
+
+The separate optional advanced `CompiledModelPhysicsFingerprintReadbackV1`
+interface provides source-bound object-name/dimension inventory plus hashes
+for numeric physical-model arrays, without returning provider-owned model
+objects or making the protocol required of other providers. Compare this
+fingerprint alongside the MJB hash: serialized MJB bytes can differ because of
+metadata while the physical-model arrays still match. Neither readback alone
+establishes task success or cross-provider physics equivalence.
 
 The deterministic fixture realization is derived from pinned task source and
 recorded with the complete named `.pruned_init` row restore; it does not claim

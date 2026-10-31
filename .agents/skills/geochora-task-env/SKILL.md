@@ -19,9 +19,24 @@ dispatch. This remains a provider-free bounded composition of the existing
 arm resolver and does not admit a task/provider/backend. The optional
 `MixedActuatorSubstepSession` hook in `task_env.runtime.sessions.api` is an
 internal implementation extension, not a requirement on `RuntimeSession` and
-not a provider capability. The current LIBERO v5 path is still unverified on
-native MuJoCo and has no task-success evidence. See the matching boundary in
+not a provider capability. A selected LIBERO task-Solution path remains
+separate task-local evidence; a successful resolver result alone is not native
+trajectory or task-success evidence. See the matching boundary in
 [Public API](../../../docs/module/task_env/public-api.md#source-bound-absolute-pose-control).
+
+## Optional compiled-model audit readbacks
+
+Use `CompiledModelOptionsReadbackV1` only when a source-bound audit needs the
+effective compiled-model options, and
+`CompiledModelPhysicsFingerprintReadbackV1` when comparing physical model
+inventory and numeric arrays. These are separate optional diagnostic protocols
+in `task_env.runtime.sessions.api`, not requirements on every RuntimeSession
+or provider. Validate source ID, closure digest, and canonical XML identity
+before comparing receipts; serialized MJB byte differences alone do not prove
+physical model differences. A task-owned `post_reset_session_validator` may
+check post-reset model transforms before first physics integration. That hook
+does not alter generic provider admission or establish trajectory equivalence.
+See the [compiled-model readback contract](../../../docs/module/task_env/public-api.md#compiled-model-readback).
 
 ## Static Logical Assembly values
 

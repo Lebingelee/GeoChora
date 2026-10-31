@@ -159,8 +159,17 @@ class MujocoSourceGravityBiasV1:
             ).encode("utf-8")
             if canonical_profile != model_profile_bytes:
                 raise ValueError("model profile receipt is not canonically serialized")
-            from .model_profile import normalize_libero_robosuite_model_xml_v2
-            transformed, expected_profile = normalize_libero_robosuite_model_xml_v2(raw_source_xml_bytes)
+            from .model_profile import (
+                ROBOT_MODEL_PROFILE_V3_ID,
+                normalize_libero_robosuite_model_xml_v2,
+                normalize_libero_robosuite_model_xml_v3,
+            )
+            normalize = (
+                normalize_libero_robosuite_model_xml_v3
+                if profile_receipt.get("profile_id") == ROBOT_MODEL_PROFILE_V3_ID
+                else normalize_libero_robosuite_model_xml_v2
+            )
+            transformed, expected_profile = normalize(raw_source_xml_bytes)
             if (transformed != xml or canonical_profile != json.dumps(
                     expected_profile, sort_keys=True, separators=(",", ":"), allow_nan=False,
             ).encode("utf-8")):
@@ -168,7 +177,7 @@ class MujocoSourceGravityBiasV1:
             raw_sha = _sha256(raw_source_xml_bytes)
             if (profile_receipt.get("raw_source_xml_sha256") != raw_sha
                     or profile_receipt.get("runtime_model_xml_sha256") != source_xml_sha256
-                    or profile_receipt.get("profile_id") != "libero-robosuite-panda-layout-seed19-v2"):
+                    or profile_receipt.get("profile_id") != expected_profile.get("profile_id")):
                 raise ValueError("model profile receipt does not bind the selected raw/runtime XML bytes")
             raw_profile_path = source_root / "raw-composed-source.xml"
             receipt_profile_path = source_root / "model-profile.json"

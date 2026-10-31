@@ -60,6 +60,29 @@ class RuntimeSession(Protocol):
     def close(self) -> None: ...
 
 
+class CompiledModelOptionsReadbackV1(Protocol):
+    """Optional provider-bound readback of effective compiled model settings.
+
+    This diagnostic interface is separate from ``RuntimeSession`` so a
+    provider does not claim model-option readback unless its adapter can bind
+    the values to the exact compiled model and source receipt.
+    """
+
+    @property
+    def compiled_model_options_receipt_v1(self) -> Mapping[str, object]: ...
+
+
+class CompiledModelPhysicsFingerprintReadbackV1(Protocol):
+    """Optional source-bound hashes of compiled physical-model arrays.
+
+    This diagnostic is separate from ``RuntimeSession`` and returns only
+    versioned inventory plus hashes, not provider-owned model objects.
+    """
+
+    @property
+    def compiled_model_physics_fingerprint_v1(self) -> Mapping[str, object]: ...
+
+
 class MixedActuatorSubstepSession(Protocol):
     """Optional profile capability for state-bound commands at every physics step."""
 

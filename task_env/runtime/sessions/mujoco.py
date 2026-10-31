@@ -342,12 +342,178 @@ class _MuJoCoSession(_SessionValues):
                 for semantic, names in source.contact_geom_groups.items()
             },
         }
+        integrator_names = {
+            int(self._mj.mjtIntegrator.mjINT_EULER): 'euler',
+            int(self._mj.mjtIntegrator.mjINT_RK4): 'rk4',
+            int(self._mj.mjtIntegrator.mjINT_IMPLICIT): 'implicit',
+            int(self._mj.mjtIntegrator.mjINT_IMPLICITFAST): 'implicitfast',
+        }
+        solver_names = {
+            int(self._mj.mjtSolver.mjSOL_PGS): 'pgs',
+            int(self._mj.mjtSolver.mjSOL_CG): 'cg',
+            int(self._mj.mjtSolver.mjSOL_NEWTON): 'newton',
+        }
+        cone_names = {
+            int(self._mj.mjtCone.mjCONE_PYRAMIDAL): 'pyramidal',
+            int(self._mj.mjtCone.mjCONE_ELLIPTIC): 'elliptic',
+        }
+        option = self._model.opt
+        option_scalars = {
+            'timestep': float(option.timestep),
+            'impratio': float(option.impratio),
+            'tolerance': float(option.tolerance),
+            'ls_tolerance': float(option.ls_tolerance),
+            'noslip_tolerance': float(option.noslip_tolerance),
+            'ccd_tolerance': float(option.ccd_tolerance),
+            'density': float(option.density),
+            'viscosity': float(option.viscosity),
+            'o_margin': float(option.o_margin),
+            'sleep_tolerance': float(option.sleep_tolerance),
+            'integrator': int(option.integrator),
+            'cone': int(option.cone),
+            'solver': int(option.solver),
+            'jacobian': int(option.jacobian),
+            'iterations': int(option.iterations),
+            'ls_iterations': int(option.ls_iterations),
+            'noslip_iterations': int(option.noslip_iterations),
+            'ccd_iterations': int(option.ccd_iterations),
+            'sdf_initpoints': int(option.sdf_initpoints),
+            'sdf_iterations': int(option.sdf_iterations),
+            'disableflags': int(option.disableflags),
+            'enableflags': int(option.enableflags),
+        }
+        option_arrays = {
+            'gravity': [float(value) for value in option.gravity],
+            'wind': [float(value) for value in option.wind],
+            'magnetic': [float(value) for value in option.magnetic],
+            'o_friction': [float(value) for value in option.o_friction],
+            'o_solref': [float(value) for value in option.o_solref],
+            'o_solimp': [float(value) for value in option.o_solimp],
+            'disableactuator': int(option.disableactuator),
+        }
+        compiled_model_binary_sha256 = None
+        size_model = getattr(self._mj, 'mj_sizeModel', None)
+        save_model = getattr(self._mj, 'mj_saveModel', None)
+        if callable(size_model) and callable(save_model):
+            try:
+                model_binary = np.zeros(int(size_model(self._model)), dtype=np.uint8)
+                save_model(self._model, buffer=model_binary)
+                compiled_model_binary_sha256 = hashlib.sha256(
+                    model_binary.tobytes(),
+                ).hexdigest()
+            except (AttributeError, TypeError, ValueError, RuntimeError):
+                # Binary identity is optional diagnostic data. Keep model
+                # materialization available when a MuJoCo build cannot export MJB.
+                compiled_model_binary_sha256 = None
+        self._compiled_model_options_receipt_v1 = {
+            'schema_version': 'compiled-model-options-v1',
+            'provider': 'mujoco',
+            'backend': 'cpu',
+            'source_id': source.scene_source.source_id,
+            'source_closure_digest': source.source_closure_digest,
+            'canonical_xml_sha256': receipt.canonical_xml_sha256,
+            'plan_identity_hash': self._mixed_actuator_plan.identity_hash,
+            'compiled_model_binary_sha256': compiled_model_binary_sha256,
+            'mujoco_runtime': {
+                'package_version': self._runtime_identity['package_version'],
+                'runtime_version': self._runtime_identity['runtime_version'],
+                'api_version': self._runtime_identity['api_version'],
+            },
+            'options': {
+                **option_scalars,
+                **option_arrays,
+                'integrator_name': integrator_names.get(int(option.integrator), 'unknown'),
+                'solver_name': solver_names.get(int(option.solver), 'unknown'),
+                'cone_name': cone_names.get(int(option.cone), 'unknown'),
+            },
+            'model_sizes': {
+                'njmax': int(self._model.njmax),
+                'nconmax': int(self._model.nconmax),
+            },
+        }
 
     @property
     def compiled_layout_receipt(self):
         if self._mixed_actuator_plan is None:
             raise RuntimeError('compiled mixed actuator layout is unavailable for this session')
         return json.loads(json.dumps(self._compiled_layout_receipt, sort_keys=True))
+
+    @property
+    def compiled_model_options_receipt_v1(self):
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('compiled model options are unavailable for this session')
+        return json.loads(json.dumps(
+            self._compiled_model_options_receipt_v1, sort_keys=True,
+        ))
+
+    @property
+    def compiled_model_physics_fingerprint_v1(self):
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('compiled model physics fingerprint is unavailable for this session')
+        cached = getattr(self, '_compiled_model_physics_fingerprint_v1_cache', None)
+        if cached is None:
+            model = self._model
+            object_specs = {
+                'bodies': ('nbody', self._mj.mjtObj.mjOBJ_BODY),
+                'joints': ('njnt', self._mj.mjtObj.mjOBJ_JOINT),
+                'geoms': ('ngeom', self._mj.mjtObj.mjOBJ_GEOM),
+                'sites': ('nsite', self._mj.mjtObj.mjOBJ_SITE),
+                'actuators': ('nu', self._mj.mjtObj.mjOBJ_ACTUATOR),
+            }
+            object_names = {
+                kind: [
+                    self._mj.mj_id2name(model, object_type, index)
+                    for index in range(int(getattr(model, count_name)))
+                ]
+                for kind, (count_name, object_type) in object_specs.items()
+            }
+            dimensions = {}
+            for name in dir(model):
+                if not name.startswith('n'):
+                    continue
+                try:
+                    value = getattr(model, name)
+                except (AttributeError, RuntimeError):
+                    continue
+                if type(value) is int:
+                    dimensions[name] = value
+            prefixes = (
+                'body_', 'jnt_', 'dof_', 'geom_', 'site_', 'actuator_',
+                'tendon_', 'pair_', 'exclude_', 'eq_', 'mesh_', 'hfield_',
+                'flex_', 'wrap_',
+            )
+            numeric_arrays = {}
+            for name in sorted(dir(model)):
+                if not name.startswith(prefixes) or name.endswith(('_pathadr', '_nameadr')):
+                    continue
+                try:
+                    value = getattr(model, name)
+                except (AttributeError, RuntimeError):
+                    continue
+                if not isinstance(value, np.ndarray) or value.dtype.kind not in 'biufc':
+                    continue
+                array = np.ascontiguousarray(value)
+                numeric_arrays[name] = {
+                    'dtype': array.dtype.str,
+                    'shape': [int(size) for size in array.shape],
+                    'sha256': hashlib.sha256(array.tobytes()).hexdigest(),
+                }
+            cached = {
+                'schema_version': 'compiled-model-physics-fingerprint-v1',
+                'provider': 'mujoco',
+                'backend': 'cpu',
+                'source_id': self._source.scene_source.source_id,
+                'source_closure_digest': self._source.source_closure_digest,
+                'canonical_xml_sha256': self._compiled_layout_receipt['canonical_xml_sha256'],
+                'compiled_model_binary_sha256': self._compiled_model_options_receipt_v1[
+                    'compiled_model_binary_sha256'
+                ],
+                'model_dimensions': dimensions,
+                'object_names': object_names,
+                'numeric_array_fields': numeric_arrays,
+            }
+            self._compiled_model_physics_fingerprint_v1_cache = cached
+        return json.loads(json.dumps(cached, sort_keys=True))
 
     @property
     def runtime_identity(self):
@@ -1634,6 +1800,21 @@ class _MuJoCoSession(_SessionValues):
                 body_id = self._bodies[semantic]
                 model.body_pos[body_id, :] = fixture_pose.position
                 model.body_quat[body_id, :] = fixture_pose.quaternion_wxyz
+            # ResetSampleV1 fixture roots are applied after MJCF compilation.
+            # Refresh the optional model fingerprints so post-reset admission
+            # observes the same transforms LIBERO writes onto its compiled model.
+            self._compiled_model_physics_fingerprint_v1_cache = None
+            size_model = getattr(mj, 'mj_sizeModel', None)
+            save_model = getattr(mj, 'mj_saveModel', None)
+            if callable(size_model) and callable(save_model):
+                try:
+                    model_binary = np.zeros(int(size_model(model)), dtype=np.uint8)
+                    save_model(model, buffer=model_binary)
+                    self._compiled_model_options_receipt_v1['compiled_model_binary_sha256'] = (
+                        hashlib.sha256(model_binary.tobytes()).hexdigest()
+                    )
+                except (AttributeError, TypeError, ValueError, RuntimeError):
+                    self._compiled_model_options_receipt_v1['compiled_model_binary_sha256'] = None
             for semantic, sampled_pose in sample.sampled_poses_world.items():
                 qpos, dof = self._free_addresses[semantic]
                 data.qpos[qpos:qpos + 7] = (*sampled_pose.position, *sampled_pose.quaternion_wxyz)
