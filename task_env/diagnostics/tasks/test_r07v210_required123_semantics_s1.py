@@ -222,6 +222,48 @@ def test_task_one_solution_v6_tracks_radial_demo_grasp_and_settled_plate_frame()
     )
 
 
+def test_task_one_solution_v7_targets_demonstrated_first_bilateral_contact_and_pinch():
+    from bench_deploy.libero.solution import (
+        LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
+        solution_identity_v6, solution_identity_v7,
+    )
+    from task_env.utils.rotation import rotate_vector_wxyz
+
+    solution = object.__new__(LiberoPickPlaceSolutionV7)
+    yaw_90 = np.asarray((np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)))
+    solution._bowl_reference_pose = np.asarray((0.5, 0.2, 0.1, *yaw_90))
+    solution._plate_reference_pose = np.asarray((0.7, 0.3, 0.9, 1.0, 0.0, 0.0, 0.0))
+    solution._tcp_quaternion_in_bowl = np.asarray((1.0, 0.0, 0.0, 0.0))
+    offset = np.asarray((-0.04490935541611755, 0.004212145868712052, 0.0312549937079468))
+    offset_world = rotate_vector_wxyz(yaw_90, offset)
+
+    solution.stage = "approach"
+    approach_offset = offset.copy()
+    approach_offset[2] = 0.15
+    assert solution._target() == pytest.approx(
+        solution._bowl_reference_pose[:3] + rotate_vector_wxyz(yaw_90, approach_offset),
+    )
+    solution.stage = "descend"
+    assert solution._target() == pytest.approx(solution._bowl_reference_pose[:3] + offset_world)
+    solution.stage = "grasp"
+    assert solution._target() == pytest.approx(solution._bowl_reference_pose[:3] + offset_world)
+    assert solution._opening_for_stage() == pytest.approx(0.008)
+    solution.stage = "lift"
+    assert solution._opening_for_stage() == pytest.approx(0.008)
+    assert solution.grasp_offset_source == "LIBERO task-0 reconstructed first-bilateral-contact median"
+    assert LiberoPickPlaceSolutionV6.grasp_offset_source != solution.grasp_offset_source
+    assert solution_identity_v7(
+        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
+    ) != solution_identity_v6(
+        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
+    )
+    assert solution_identity_v7(
+        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
+    ) != solution_identity_v7(
+        "f" * 64, "e" * 64, arm_resolver_identity="c" * 64,
+    )
+
+
 def test_task_one_solution_v6_controller_bounds_velocity_feedforward():
     from bench_deploy.libero.controller import LiberoMixedControllerV5
 

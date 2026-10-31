@@ -72,6 +72,8 @@ TASK_ID = PILOT_TASK_UID
 
 def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False) -> TaskArtifact:
     solution_v6 = solution_profile == 'v6'
+    solution_v7 = solution_profile == 'v7'
+    solution_profile_name = 'v7' if solution_v7 else 'v6' if solution_v6 else 'v4'
     solution_profile = bool(solution_profile)
     decoded = decode_pruned_init_bytes(init_bytes)
     layout = init_layout_v1()
@@ -115,8 +117,8 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool | str = False) -> Tas
 
     artifact = TaskArtifact(
         'task-artifact-v0',
-        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + f'/solution-{"v6" if solution_v6 else "v4"}',
-        TASK_ID, 'diagnostic-v1' if not solution_profile else f'diagnostic-solution-{"v6" if solution_v6 else "v4"}',
+        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + f'/solution-{solution_profile_name}',
+        TASK_ID, 'diagnostic-v1' if not solution_profile else f'diagnostic-solution-{solution_profile_name}',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
             ActionIntent(
@@ -150,6 +152,8 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         install_root: Path, composition_plan_path: Path,
                         init_path: Path, horizon: int, solution_profile: bool | str = False):
     solution_v6 = solution_profile == 'v6'
+    solution_v7 = solution_profile == 'v7'
+    solution_rim_profile = solution_v6 or solution_v7
     solution_profile = bool(solution_profile)
     raw_xml_bytes = Path(xml_path).read_bytes() if xml_bytes_override is None else bytes(xml_bytes_override)
     plan_bytes = Path(composition_plan_path).read_bytes()
@@ -183,7 +187,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         raise ValueError('tracked LIBERO source manifest differs from the frozen pilot identity')
     source_manifest = json.loads(manifest_bytes)
     artifact = _artifact(
-        init_bytes, solution_profile='v6' if solution_v6 else solution_profile,
+        init_bytes, solution_profile='v7' if solution_v7 else 'v6' if solution_v6 else solution_profile,
     )
 
     importer_xml = runtime_model_xml_bytes
@@ -272,7 +276,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         arm_resolver = CanonicalPandaController(
             arm_kinematics, artifact_hash=artifact.identity_hash, config=config.action,
         )
-    if solution_v6:
+    if solution_rim_profile:
         controller = LiberoMixedControllerV5(
             arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
         )
@@ -283,7 +287,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     else:
         controller = LiberoMixedControllerV1()
     expected_controller_profile = (
-        (LiberoMixedControllerV5.profile_id if solution_v6
+        (LiberoMixedControllerV5.profile_id if solution_rim_profile
          else LiberoMixedControllerV4.profile_id) if solution_profile else CONTROLLER_PROFILE_ID
     )
     if controller.profile_id != expected_controller_profile:
@@ -354,7 +358,13 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
     if solution_profile:
-        if solution_v6:
+        if solution_v7:
+            from .solution import solution_identity_v7
+            solution_identity = solution_identity_v7(
+                runtime_model_xml_sha, source_receipt.source_closure_digest,
+                arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
+            )
+        elif solution_v6:
             from .solution import solution_identity_v6
             solution_identity = solution_identity_v6(
                 runtime_model_xml_sha, source_receipt.source_closure_digest,
@@ -419,8 +429,8 @@ def build_libero_selected_candidate(
     solution wrapper below selects the separately versioned full Solution
     profile and its bounded horizon.
     """
-    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v6'):
-        raise TypeError('internal LIBERO Solution profile selector must be bool or v6')
+    if type(_solution_profile) not in (bool, str) or _solution_profile not in (False, True, 'v6', 'v7'):
+        raise TypeError('internal LIBERO Solution profile selector must be bool, v6 or v7')
     maximum_horizon = 1000 if _solution_profile else 64
     if type(horizon) is not int or not 1 <= horizon <= maximum_horizon:
         raise ValueError(f'LIBERO candidate horizon must be in [1,{maximum_horizon}]')
@@ -554,7 +564,7 @@ def build_libero_selected_candidate(
                 value_cache.clear()
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache['value'])
-        if _solution_profile == 'v6':
+        if _solution_profile in ('v6', 'v7'):
             value['controller'] = LiberoMixedControllerV5(
                 arm_resolver_identity=value['arm_resolver'].iterative_resolution_identity_v1(),
             )
@@ -966,12 +976,17 @@ def build_libero_selected_candidate(
 
     def validate_external_solution(value, solution):
         from .solution import (
-            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6,
-            solution_identity_v5, solution_identity_v6,
+            LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
+            solution_identity_v5, solution_identity_v6, solution_identity_v7,
         )
 
-        expected_type = LiberoPickPlaceSolutionV6 if _solution_profile == 'v6' else LiberoPickPlaceSolutionV5
-        expected_identity = solution_identity_v6 if _solution_profile == 'v6' else solution_identity_v5
+        expected_type, expected_identity = (
+            (LiberoPickPlaceSolutionV7, solution_identity_v7)
+            if _solution_profile == 'v7' else
+            (LiberoPickPlaceSolutionV6, solution_identity_v6)
+            if _solution_profile == 'v6' else
+            (LiberoPickPlaceSolutionV5, solution_identity_v5)
+        )
         if not isinstance(solution, expected_type):
             raise TypeError(f'LIBERO task #1 external lifecycle requires {expected_type.__name__}')
         expected_source = value['source_sha256']['runtime_model_xml']
@@ -1041,13 +1056,13 @@ def build_libero_solution_candidate(
     """Construct the versioned task #1 Solution through existing Core owners."""
     if type(horizon) is not int or not 1 <= horizon <= 1000:
         raise ValueError('LIBERO task Solution horizon must be in [1,1000]')
-    if solution_version not in {'v5', 'v6'}:
-        raise ValueError('LIBERO task Solution version must be v5 or v6')
+    if solution_version not in {'v5', 'v6', 'v7'}:
+        raise ValueError('LIBERO task Solution version must be v5, v6 or v7')
     return build_libero_selected_candidate(
         xml_path=xml_path, xml=xml, composed_mjcf_sha256=composed_mjcf_sha256,
         composition_plan_path=composition_plan_path, install_root=install_root,
         init_path=init_path, horizon=horizon,
-        _solution_profile='v6' if solution_version == 'v6' else True,
+        _solution_profile=solution_version if solution_version in {'v6', 'v7'} else True,
     )
 
 

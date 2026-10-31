@@ -2488,7 +2488,7 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     assert failed_binding.close_receipt["task_resource_close_receipt"]["closed"] is True
 
 
-@pytest.mark.parametrize("solution_version", ("v5", "v6"))
+@pytest.mark.parametrize("solution_version", ("v5", "v6", "v7"))
 def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
         tmp_path, monkeypatch, solution_version):
     global _FAKE_WORLD
@@ -2498,8 +2498,14 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6
-    solution_type = LiberoPickPlaceSolutionV6 if solution_version == "v6" else LiberoPickPlaceSolutionV5
+    from bench_deploy.libero.solution import (
+        LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6, LiberoPickPlaceSolutionV7,
+    )
+    solution_type = (
+        LiberoPickPlaceSolutionV7 if solution_version == "v7" else
+        LiberoPickPlaceSolutionV6 if solution_version == "v6" else
+        LiberoPickPlaceSolutionV5
+    )
     from task_env.runtime.sessions.source import source_asset_bytes
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])

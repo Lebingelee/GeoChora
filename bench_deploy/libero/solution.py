@@ -43,6 +43,7 @@ SOLUTION_SCHEMA_V3 = "libero-bowl-to-plate-solution-v3"
 SOLUTION_SCHEMA_V4 = "libero-bowl-to-plate-solution-v4"
 SOLUTION_SCHEMA_V5 = "libero-bowl-to-plate-solution-v5"
 SOLUTION_SCHEMA_V6 = "libero-bowl-to-plate-solution-v6"
+SOLUTION_SCHEMA_V7 = "libero-bowl-to-plate-solution-v7"
 POSE_ACTION_SCHEMA_V1 = "libero-world-pose-wxyz-absolute-v1"
 TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
@@ -310,8 +311,18 @@ _OPENING_BY_STAGE_V6 = {
     "place": 0.008,
     "release": 0.042,
 }
+_OPENING_BY_STAGE_V7 = {
+    # Use the demonstrated pre-lift pinch aperture from the same replay
+    # analysis that supplies the first-bilateral-contact pose.
+    **_OPENING_BY_STAGE_V6,
+    "grasp": 0.008,
+}
 _DEMO_TCP_BOWL_LOCAL_M = np.asarray(
     (-0.04555440076829924, 0.002120461738427656, 0.03321187804063996),
+    dtype=np.float64,
+)
+_DEMO_FIRST_BILATERAL_TCP_BOWL_LOCAL_M = np.asarray(
+    (-0.04490935541611755, 0.004212145868712052, 0.0312549937079468),
     dtype=np.float64,
 )
 _DEMO_DATASET_SHA256 = "ff6f26121653c77280eb40a38773a74141c11a8509f3466058cb56dd2cc60ead"
@@ -528,6 +539,64 @@ def solution_identity_v6(
             "approach_height_above_bowl_origin_m": 0.15,
         },
         "opening_m": _OPENING_BY_STAGE_V6,
+        "contact_policy": "bilateral_source_finger_contact_two_boundaries_then_retain_pinch_v2",
+        "planner": {
+            "owner": "task_env.planners.cartesian.CartesianPosePlanner",
+            "max_translation_per_step_m": selected_planner.max_translation_per_step,
+            "max_translation_acceleration_per_step_m": selected_planner.max_translation_acceleration_per_step,
+            "max_rotation_per_step_rad": selected_planner.max_rotation_per_step,
+            "max_rotation_acceleration_per_step_rad": selected_planner.max_rotation_acceleration_per_step,
+            "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
+            "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
+        },
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
+def solution_identity_v7(
+    source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+    planner_config: CartesianPosePlannerConfig | None = None,
+) -> str:
+    """Bind the demonstrated first-bilateral-contact rim pose and pinch aperture."""
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        max_translation_per_step=0.0025,
+        max_translation_acceleration_per_step=0.001,
+        max_rotation_per_step=0.04,
+        max_rotation_acceleration_per_step=0.02,
+        settle_steps=0,
+        max_steps=200,
+    )
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V7,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "arm_resolver_identity": arm_resolver_identity,
+        "parent_profile_identity": solution_identity_v6(
+            source_xml_sha256, source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=selected_config, planner_config=selected_planner,
+        ),
+        "grasp_frame": {
+            "reference": "public_bowl_and_plate_body_pose_world_wxyz_live_until_grasp_v1",
+            "tcp_offset_bowl_local_m": _DEMO_FIRST_BILATERAL_TCP_BOWL_LOCAL_M.tolist(),
+            "offset_source": "LIBERO task-0 reconstructed first-bilateral-contact median",
+            "dataset_revision": _DEMO_DATASET_REVISION,
+            "dataset_file_sha256": _DEMO_DATASET_SHA256,
+            "jaw_orientation": "reset_tcp_orientation_relative_to_bowl_v1",
+            "plate_reference": "follow_public_plate_pose_until_grasp_then_freeze_v1",
+            "approach_height_above_bowl_origin_m": 0.15,
+        },
+        "opening_m": _OPENING_BY_STAGE_V7,
         "contact_policy": "bilateral_source_finger_contact_two_boundaries_then_retain_pinch_v2",
         "planner": {
             "owner": "task_env.planners.cartesian.CartesianPosePlanner",
@@ -1619,6 +1688,8 @@ class LiberoPickPlaceSolutionV6(LiberoPickPlaceSolutionV5):
     """Demonstration-grounded radial rim pinch using the public bowl pose."""
 
     solution_schema_version = SOLUTION_SCHEMA_V6
+    grasp_strategy_id = "demonstration_grounded_bowl_local_radial_rim_pinch_v1"
+    grasp_offset_source = "LIBERO task-0 demonstrated pre-lift median"
 
     def __init__(self, source_xml: bytes | str, source_closure_digest: str, *,
                  arm_resolver_identity: str,
@@ -1661,7 +1732,13 @@ class LiberoPickPlaceSolutionV6(LiberoPickPlaceSolutionV5):
         )
 
     def _opening_for_stage(self):
-        return _OPENING_BY_STAGE_V6.get(self.stage)
+        return self._opening_profile().get(self.stage)
+
+    def _opening_profile(self):
+        return _OPENING_BY_STAGE_V6
+
+    def _bowl_local_grasp_offset_m(self):
+        return _DEMO_TCP_BOWL_LOCAL_M
 
     def _refresh_bowl_reference_from_public_pose(self, observation) -> bool:
         if self.stage not in {"approach", "descend"}:
@@ -1693,12 +1770,13 @@ class LiberoPickPlaceSolutionV6(LiberoPickPlaceSolutionV5):
         bowl = self._bowl_reference_pose
         plate = self._plate_reference_pose
         bowl_quaternion = normalize_quat_wxyz(bowl[3:7])
-        offset_world = rotate_vector_wxyz(bowl_quaternion, _DEMO_TCP_BOWL_LOCAL_M)
+        local_offset = self._bowl_local_grasp_offset_m()
+        offset_world = rotate_vector_wxyz(bowl_quaternion, local_offset)
         self._grasp_quaternion_wxyz = quat_multiply_wxyz(
             bowl_quaternion, self._tcp_quaternion_in_bowl,
         )
         if self.stage == "approach":
-            local_approach = _DEMO_TCP_BOWL_LOCAL_M.copy()
+            local_approach = local_offset.copy()
             local_approach[2] = 0.15
             return bowl[:3] + rotate_vector_wxyz(bowl_quaternion, local_approach)
         if self.stage in {"descend", "grasp"}:
@@ -1714,10 +1792,11 @@ class LiberoPickPlaceSolutionV6(LiberoPickPlaceSolutionV5):
     def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
         proposal = super().act(observation, info)
         self._last_action_receipt.update({
-            "solution_schema_version": SOLUTION_SCHEMA_V6,
-            "grasp_strategy": "demonstration_grounded_bowl_local_radial_rim_pinch_v1",
+            "solution_schema_version": self.solution_schema_version,
+            "grasp_strategy": self.grasp_strategy_id,
             "grasp_frame": {
-                "bowl_local_tcp_offset_m": _DEMO_TCP_BOWL_LOCAL_M.tolist(),
+                "bowl_local_tcp_offset_m": self._bowl_local_grasp_offset_m().tolist(),
+                "offset_source": self.grasp_offset_source,
                 "bowl_reference_pose_world_wxyz": self._bowl_reference_pose.tolist(),
                 "plate_reference_pose_world_wxyz": self._plate_reference_pose.tolist(),
                 "tcp_quaternion_in_bowl_wxyz": self._tcp_quaternion_in_bowl.tolist(),
@@ -1733,24 +1812,55 @@ class LiberoPickPlaceSolutionV6(LiberoPickPlaceSolutionV5):
 
     def outcome_report(self) -> dict[str, object]:
         report = super().outcome_report()
-        report["solution_schema_version"] = SOLUTION_SCHEMA_V6
+        report["solution_schema_version"] = self.solution_schema_version
         report["solution_profile"] = {
-            "grasp_strategy": "demonstration_grounded_bowl_local_radial_rim_pinch_v1",
-            "bowl_local_tcp_offset_m": _DEMO_TCP_BOWL_LOCAL_M.tolist(),
-            "opening_by_stage_m": _OPENING_BY_STAGE_V6,
+            "grasp_strategy": self.grasp_strategy_id,
+            "grasp_offset_source": self.grasp_offset_source,
+            "bowl_local_tcp_offset_m": self._bowl_local_grasp_offset_m().tolist(),
+            "opening_by_stage_m": self._opening_profile(),
             "dataset_revision": _DEMO_DATASET_REVISION,
             "dataset_file_sha256": _DEMO_DATASET_SHA256,
         }
         return report
 
 
+class LiberoPickPlaceSolutionV7(LiberoPickPlaceSolutionV6):
+    """First-contact median rim pose with demo-scale closing aperture."""
+
+    solution_schema_version = SOLUTION_SCHEMA_V7
+    grasp_strategy_id = "demonstration_first_bilateral_contact_radial_rim_pinch_v1"
+    grasp_offset_source = "LIBERO task-0 reconstructed first-bilateral-contact median"
+
+    def __init__(self, source_xml: bytes | str, source_closure_digest: str, *,
+                 arm_resolver_identity: str,
+                 config: LiberoPickPlaceSolutionConfigV1 | None = None,
+                 planner_config: CartesianPosePlannerConfig | None = None):
+        super().__init__(
+            source_xml, source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=config, planner_config=planner_config,
+        )
+        self.identity = solution_identity_v7(
+            self.source_xml_sha256, self.source_closure_digest,
+            arm_resolver_identity=self.arm_resolver_identity,
+            config=self.config, planner_config=self.planner_config,
+        )
+
+    def _opening_profile(self):
+        return _OPENING_BY_STAGE_V7
+
+    def _bowl_local_grasp_offset_m(self):
+        return _DEMO_FIRST_BILATERAL_TCP_BOWL_LOCAL_M
+
+
 __all__ = [
     "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2", "SOLUTION_SCHEMA_V3", "SOLUTION_SCHEMA_V4",
-    "SOLUTION_SCHEMA_V5", "SOLUTION_SCHEMA_V6",
+    "SOLUTION_SCHEMA_V5", "SOLUTION_SCHEMA_V6", "SOLUTION_SCHEMA_V7",
     "POSE_ACTION_SCHEMA_V1",
     "LiberoPickPlaceSolutionConfigV1", "LiberoPickPlaceSolutionV1",
     "LiberoPickPlaceSolutionV2", "LiberoPickPlaceSolutionV3", "LiberoPickPlaceSolutionV4",
-    "LiberoPickPlaceSolutionV5", "LiberoPickPlaceSolutionV6",
+    "LiberoPickPlaceSolutionV5", "LiberoPickPlaceSolutionV6", "LiberoPickPlaceSolutionV7",
     "solution_identity_v1", "solution_identity_v2", "solution_identity_v2_frozen",
     "solution_identity_v3", "solution_identity_v4", "solution_identity_v5", "solution_identity_v6",
+    "solution_identity_v7",
 ]
