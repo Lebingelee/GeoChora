@@ -1865,7 +1865,7 @@
     "README.md": "11553804d8f6955a0886e36ed2de836919cbbf096b2fdf2a6d66740073d4b5bd",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
     "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "8a2a775cacf81932e047d1d5f681d4a15cf6746bc5af2d6c82a00a431c36c555"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "da2336b8daf49fd2f00adb00bc21051ffa72747843904f0a5a09706b811f8f51"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -6887,6 +6887,32 @@
       "secondary_mujoco_scope_change": "PickCubeR3positivecontrol andaffectedregression withinoriginaltotalcaps",
       "native_in_preparation": 0,
       "pytest_in_preparation": "NOT_RUN",
+      "DG03_F06_F07": false
+    },
+    "f05_dg02_window002_review_window003_preparation_20261031": {
+      "status": "REVIEWED_PARTIAL_CURRENT_IDENTITY_N2_REQUIRED",
+      "input_core_reviewed": "f9198d4fdb2e1a28c341d8934caec4c3020fe09b",
+      "provider_head": "a9e4c4850bd225f5929e74831ac282b18ff517ce",
+      "review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_002/",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_003_formal_closeout_001/",
+      "exact_input_head": "post-review commit in package input_snapshot.json",
+      "goal": "same unfinished DG02",
+      "diagnostic_window": 3,
+      "manual_relay": true,
+      "expected_active_hours": [
+        1,
+        3
+      ],
+      "window_minutes": 240,
+      "cleanup_minutes": 30,
+      "new_geophys_steps_max": 6500,
+      "new_formal_steps_max": 6000,
+      "new_nonformal_steps_max": 500,
+      "new_native_wall_s_max": 1800,
+      "original_goal_limits_increased": false,
+      "native_in_preparation": 0,
+      "pytest_in_preparation": "NOT_RUN",
+      "new_branches_worktrees": 0,
       "DG03_F06_F07": false
     }
   }

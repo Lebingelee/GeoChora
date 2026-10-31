@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01精确单元已接收；DG02仍为REWORK_REQUIRED。维护者批准PickCube显式复用NutAssembly R3持续笛卡尔反馈作为对照；新window002整合包已准备待人工转述，取代原window002 prompt。DG03等待DG02接收。**
+> **状态：DG01精确单元已接收；DG02 window002经Sol复核仍为PARTIAL，当前身份完整N2未完成。window003收口包准备待人工转述，继续同一Goal；DG03等待DG02接收。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -141,3 +141,19 @@ N2仍须原同Env两轮300interval×5×2ms、全部物理/control/Task/storage/�
 原Goal总step/wall上限不增加；MuJoCo本window授权由旧DG01回归限定明确扩为PickCube R3对照及受影响回归≤3000steps/300s。GeoPhys新增≤18000steps（nonformal≤12000/formal≤6000）/3600s，总新增≤21000steps/3900s；所有nonformal（含baseline/MuJoCo）保守记原probe桶，旧1675＋新≤15000仍≤18000。baseline regression可≤3000steps/run以保留完整轨迹/hold；feature microprobe≤500steps，不能截短协议冒充同门。8h窗口/末45min收口，原资源门/锁/零GPU/下载保持。所有额度与原累计剩余取较小值。
 
 成功仍只交DG02待Sol复核候选；DG03/F06/F07/Qualification不启动。原source/recipe/oracles、旧窗口/失败/H5/plan及原partial均保留。
+
+## 12. DG02 window002复核及window003（2026-10-31）
+
+**决定：`REVIEWED_PARTIAL_CURRENT_IDENTITY_N2_REQUIRED`。** Core输出`f9198d4fdb2e1a28c341d8934caec4c3020fe09b`，隔离GeoPhys输出`a9e4c4850bd225f5929e74831ac282b18ff517ce`。PickCube已显式接入既有R3共享臂控制；GeoPhys USD importer已补源关节damping/armature。Sol逐项核对7,367保护输入、12 runtime，离线复算旧通过run的H5观测及12行tracking稳定性；零pytest/native。
+
+window002 N2 #002的3,000步及reader通过绑定旧provider f4d3b3bb；window001 N2 #019的22项失败仍是不同证据。补passive后的S1 #003通过80步，完整N2 #008却因短S1 horizon12被传入而仅完成55/attempted60步。当前Core已修formal horizon300，但未有当前完整结果。不能用旧H5接收，也不能把passive遗漏称为原tracking失败唯一根因：R3在旧provider下已通过，passive修复解决的是另一个由counterfactual确认的源消费差异。
+
+window002 formal已用3,060/6,000步，余额2,940不足完整3,000，释放并停下正确。Sol复算Goal累计GeoPhys25,745 attempted、MuJoCo3,000；全部nonformal保守probe9,360，累计native wall含旧未知项1,800秒reserve为7,426.902秒。原总72,000步/10,800秒等Goal上限未耗尽，不能称总预算为零。
+
+唯一下一包为`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_003_formal_closeout_001/`。复用原phase分支/隔离provider及同一DG02，window另计，不重建Goal或重置历史；post-review HEAD以新snapshot为准。预计主动1–3小时、窗口最多4小时含末30分钟收口。从原Goal剩余划出GeoPhys最多6,500步（formal6,000、必要nonformal500）/1,800秒，零新增MuJoCo。单正式run仍同Env两轮各300interval×5×2ms＝3,000步；不缩短、不放宽门。允许预算内必要修复重跑，完整3000步预留是每次formal启动条件。新增Evidence最多512MiB且受原Goal累计上限约束；原6GiB启动、4GiB PG RSS、1GiB中止、CPU4线程、共享锁及零GPU/下载保持。
+
+收口前须按真实消费者解释50个host descriptor差异（材料fallback/有效geom材料、网格顶点/几何、惯性数值/场景表示），不能由短probe名称宣称等价。PickCube strict f64对照未过的原结果保留；按已冻结normalization核每值dtype/量化，不一律套f32或另改阈值。formal预检明确实际candidate/Env horizon300、timebase、两轮、run/output/sidecar和完整源码闭包，避免继续消耗native在接线错误上。复用未变S1/模型/reader证据；受影响部分才重验，所有model compile/init仍受native监督。G8补当前公开选择的文档、Skill及受影响回归记录，保留旧时间账本未决项。
+
+完整复核及离线审计在`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_002/`。成功只交`F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`，DG02是否接收由Sol复核全部原门；本次不推进DG03/F06/F07或Qualification，不push/merge。
+
+本轮Sol静态收口：TaskEnv Skill checker、规划15份文档hash及diff检查通过。全局docs validator退出1：258条（257条non-documentation scope＋1条count limit），相较上次247条增加11条既有实现路径scope诊断；无新增具体文档内容/链接错误。全局仍为失败，原输出保留于Sol复核目录。
