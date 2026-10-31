@@ -147,6 +147,7 @@ def _validate_bundle(bundle: dict) -> list[dict]:
     worker = bundle["worker"]
     supervisor = bundle["supervisor"]
     static = bundle["static_receipt"]
+    geometry_audit = bundle["source_geometry_audit"]
     oracle = plan["oracle"]
     physical = _json_file(Path(plan["source"]["original_physical_oracle"]["path"]))
     source_actuation = static.get("source_actuation_receipt", {})
@@ -184,8 +185,33 @@ def _validate_bundle(bundle: dict) -> list[dict]:
            and static.get("checks", {}).get("physics_steps") == 0,
            "model_shape", "static receipt is not a zero-step source-bound admission", errors)
     expected_counts = oracle["required_public_model_counts"]
-    _check(static.get("public_model_counts") == expected_counts,
+    public_model_counts = static.get("public_model_counts", {})
+    actual_geom_count = (
+        public_model_counts.get("n_geoms")
+        if isinstance(public_model_counts, dict)
+        else None
+    )
+    _check(isinstance(public_model_counts, dict) and all(
+        public_model_counts.get(name) == count for name, count in expected_counts.items()
+    ),
            "model_shape", "public source model counts differ from the required Panda model", errors)
+    panda_geometry_count = geometry_audit.get("panda", {}).get("collision_shape_count")
+    task_scene = geometry_audit.get("task_scene", {})
+    task_geom_count = sum(bool(task_scene.get(key)) for key in (
+        "free_cube_prim_exists", "support_prim_exists",
+    ))
+    expected_geom_count = (
+        int(panda_geometry_count) + task_geom_count
+        if isinstance(panda_geometry_count, int) and task_geom_count == 2
+        else None
+    )
+    _check(geometry_audit.get("passed") is True
+           and geometry_audit.get("usd_stage_sha256") == plan["source"]["usd_stage"]["sha256"]
+           and expected_geom_count is not None
+           and actual_geom_count == expected_geom_count,
+           "model_shape",
+           "public geom count differs from the hashed USD collision-shape audit plus the two task collision prims",
+           errors)
     _check(oracle.get("joint_order") == [*(f"joint{i}" for i in range(1, 8)), "finger_joint1", "finger_joint2"],
            "joint_address", "frozen observation joint address map/order changed", errors)
     _check(oracle.get("original_physical_acceptance") == physical["physical_acceptance"],
@@ -667,7 +693,21 @@ def _negative_suite(bundle: dict) -> dict:
         _mutate_negative(mutated, name)
         errors = _validate_bundle(mutated)
         caught = any(row["code"] == name for row in errors)
-        results.append({"class": name, "rejected": caught, "error_codes": sorted({row["code"] for row in errors})})
+        row = {"class": name, "rejected": caught, "error_codes": sorted({row["code"] for row in errors})}
+        if name == "model_shape":
+            geom_mutated = copy.deepcopy(bundle)
+            geom_mutated["static_receipt"]["public_model_counts"]["n_geoms"] += 1
+            geom_errors = _validate_bundle(geom_mutated)
+            geom_rejected = any(item["code"] == "model_shape" for item in geom_errors)
+            row["subchecks"] = {
+                "required_dof_count_mutation_rejected": caught,
+                "source_geom_count_mutation_rejected": geom_rejected,
+            }
+            row["rejected"] = caught and geom_rejected
+            row["error_codes"] = sorted({
+                item["code"] for item in (*errors, *geom_errors)
+            })
+        results.append(row)
     return {
         "schema_version": "f05-dg02-core-n2-negative-suite-v1",
         "required_classes": len(classes),
@@ -745,6 +785,7 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
     supervisor = _json_file(supervisor_path)
     worker = _json_file(worker_path)
     static_receipt = _json_file(Path(plan["source"]["core_candidate_receipt"]["path"]))
+    source_geometry_audit = _json_file(Path(plan["source"]["usd_geometry_audit_v2"]["path"]))
     expected_worker_hash = _sha(worker_path)
     if supervisor.get("worker_receipt_sha256") != expected_worker_hash:
         raise ValueError("supervisor receipt does not bind the cold-read worker receipt bytes")
@@ -768,6 +809,7 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
         "supervisor": supervisor,
         "worker": worker,
         "static_receipt": static_receipt,
+        "source_geometry_audit": source_geometry_audit,
         "episodes": episodes,
     }
     errors = _validate_bundle(bundle)
