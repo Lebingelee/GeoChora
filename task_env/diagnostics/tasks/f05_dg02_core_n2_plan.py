@@ -139,9 +139,13 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
             for semantic, path in source_bodies.items()
             if str(path).rstrip("/").rsplit("/", 1)[-1] == prim_name
         ]
-        if len(matches) != 1:
-            raise RuntimeError(f"formal N2 source must bind exactly one {role} body, found {matches}")
-        contact_body_roles[role] = matches[0]
+        paths = sorted({row["usd_prim_path"] for row in matches})
+        if len(paths) != 1 or not matches:
+            raise RuntimeError(f"formal N2 source must bind exactly one {role} prim, found {matches}")
+        contact_body_roles[role] = {
+            "semantic_ids": sorted({row["semantic_id"] for row in matches}),
+            "usd_prim_path": paths[0],
+        }
     return {
         "control_intervals_per_episode": int(control["control_intervals_per_episode"]),
         "episode_count": int(control["episodes_per_env"]),

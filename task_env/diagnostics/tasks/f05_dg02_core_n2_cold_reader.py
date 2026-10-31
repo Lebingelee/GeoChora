@@ -400,8 +400,8 @@ def _validate_bundle(bundle: dict) -> list[dict]:
                            "task_predicate", f"episode {episode_index} stored action/{field} differs at interval {index}", errors)
 
         contact_roles = oracle.get("contact_body_roles", {})
-        free_cube_semantic = contact_roles.get("free_cube", {}).get("semantic_id")
-        support_semantic = contact_roles.get("support", {}).get("semantic_id")
+        free_cube_semantics = set(contact_roles.get("free_cube", {}).get("semantic_ids", []))
+        support_semantics = set(contact_roles.get("support", {}).get("semantic_ids", []))
         source_contact_hits = []
         for index, transition in enumerate(worker_transitions[:300]):
             sample = transition.get("contact_observation", {})
@@ -440,8 +440,14 @@ def _validate_bundle(bundle: dict) -> list[dict]:
                    and sample.get("reservation_invariant_violation") == 0,
                    "contact_observation", f"episode {episode_index} contact sample {index} is incomplete or overflowed", errors)
             for pair in pairs if isinstance(pairs, list) else []:
-                names = {pair.get("body_a_semantic"), pair.get("body_b_semantic")}
-                if free_cube_semantic in names and support_semantic in names:
+                names_a = set(pair.get("body_a_semantics", []))
+                names_b = set(pair.get("body_b_semantics", []))
+                source_pair = (
+                    bool(names_a & free_cube_semantics) and bool(names_b & support_semantics)
+                ) or (
+                    bool(names_b & free_cube_semantics) and bool(names_a & support_semantics)
+                )
+                if source_pair:
                     cube_pose = _frame(rows[index + 1]["canonical_state_view_v1"], "free-cube", "free_cube")
                     cube_z = math.nan if cube_pose is None else float(cube_pose["position"][2])
                     impulses = np.asarray(sample.get("normal_impulse_ns", []), dtype=np.float64)

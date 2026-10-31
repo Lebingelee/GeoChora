@@ -148,10 +148,9 @@ class F05GeoPhysUsdNativeIO:
                 if not callable(enable):
                     raise RuntimeError('DG02 requires the existing public GeoPhys contact-observation API')
                 enable()
-                self._contact_body_names = {
-                    int(body_id): str(semantic)
-                    for semantic, body_id in self._body_addresses.items()
-                }
+                self._contact_body_names = {}
+                for semantic, body_id in self._body_addresses.items():
+                    self._contact_body_names.setdefault(int(body_id), []).append(str(semantic))
         except BaseException as primary:
             if self._boundary is not None:
                 try:
@@ -438,8 +437,8 @@ class F05GeoPhysUsdNativeIO:
             pairs.append({
                 'body_a_id': first,
                 'body_b_id': second,
-                'body_a_semantic': self._contact_body_names.get(first, 'world' if first < 0 else None),
-                'body_b_semantic': self._contact_body_names.get(second, 'world' if second < 0 else None),
+                'body_a_semantics': self._contact_body_names.get(first, ['world'] if first < 0 else []),
+                'body_b_semantics': self._contact_body_names.get(second, ['world'] if second < 0 else []),
                 'geom_a_id': int(geom_a[index]),
                 'geom_b_id': int(geom_b[index]),
             })
