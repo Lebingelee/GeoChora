@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；DG03 window001已通过 bounded N1 与 synthetic Core S1，但source consumer gate仍阻断正式N2。**
+> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；Sol已复核DG03 window001为partial，synthetic Core S1与bounded N1诊断已记录，但source consumer gate仍阻断正式N2，DG03继续active。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -195,7 +195,7 @@ DG03此前保存的N0 worker通过公开GPU PhysX model compile（18 bootstrap s
 
 <a id="f05-successor-attempt002-continuation-2026-11-01-partial-pending-sol"></a>
 
-## 15. F05 successor attempt002 continuation (2026-11-01; PARTIAL pending Sol)
+## 15. F05 successor attempt002 continuation (2026-11-01; PARTIAL; Sol reviewed)
 
 本节记录维护者在 attempt002 执行后继续推进同一 goal 的有界续行；原 attempt002 的 `report.md`、freeze、失败原件和时间点不回写。续行基于 `develop-full@681a3361f33d52799a61ac5d43edbf6caabfe33e`，完整事实与 raw receipt 索引见 ignored 输出 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/continuation_closeout_20261101.md`。Prompt 和 snapshot 仍分别绑定 `3343335567569fc88201a95975131cf8e94369fcb806ede690fb4b79e1e5b90e` 与 `a45d44fd5937c0db12a42d93dab8a43f83794f0feb0f803aae0b28c470188270`。
 
@@ -204,3 +204,9 @@ DG01 原 MJCF/MuJoCo CPU 和 DG02 USD/GeoPhys CPU 各自已有精确有界 Sol �
 DG03 另有两个有界 N1 Isaac 6.2 GPU PhysX 诊断探针：source-bound mimic positive 78步，非对称手指差从约0.016m降至约1.85e-6m；完整移除三种 equality/mimic schema 与八项关系属性的 counterfactual 48步，差异由约0.016m增至约0.040m。两者 reader 均为 `PASS_DIAGNOSTIC_ONLY`，只说明该诊断舞台上的关系消费对照有缺陷敏感性，不证明 production importer/Core 对 source `solimp` 或固定 tendon 的消费，也不证明drive/contact/材料等价。维护者明确接受并授权本包所需的 `OMNI_KIT_ACCEPT_EULA=YES`；该授权不放宽 feature 门。
 
 DG03 的正式 Core N2 cell 未启动，状态 `BLOCKED_BY_FEATURE`：源 equality authored compliance（`solimp=0.95 0.99 0.001`）没有已证明的 PhysX/Core 等义消费者；source fixed-tendon actuator law 与 public consumer 的完整接线及 source-to-PhysX drive/contact 映射也未闭合。不得以显式 authoring 的 mimic 探针或 synthetic S1 填补这些缺口。当前 attempt002 的三cell候选仍为 `F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`；旧 F05 `F05_OVERALL_PARTIAL`、r009 和历史 Evidence不变，F06/F07及Qualification未启动/授予。此前 attempt002 原收口所述“native starts=0”针对当时三个正式cell；续行之后确实启动了单独账本中的 DG03 N1 诊断，不应把诊断运行混称为正式cell。
+
+### Sol复核决定（2026-11-01）
+
+**决定：`F05_SUCCESSOR_PARTIAL_REVIEWED_DG03_CONTINUE_REQUIRED`。** Sol核验36/36输出manifest，并检查当前Core代码差异、synthetic S1/H5冷读收据及两个N1计划、worker收据与独立读回。N1正例和完整关系消融构成exact derived USD/PhysX诊断舞台上的缺陷敏感对照；它们不是生产Core materialization、原source `solimp`柔顺等价、完整source fixed-tendon consumer、drive/contact等价或正式N2证据。DG03生产`materialize()`保持fail closed，正式N2仍`NOT_STARTED_BLOCKED_BY_FEATURE`。protected/runtime/provider/gitlink、受控退出和锁释放按continuation收据核验；本次Sol review未运行pytest或native。
+
+DG01/DG02此前有界接收保持不变，R3对照仍`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`。DG03长期Goal继续active，必须以复核输出HEAD新冻执行窗口，完成剩余source-to-consumer实现和验证后才运行未降低的正式N2及三路线矩阵。旧`F05_OVERALL_PARTIAL`、ordinary successor计数2/3、F06/F07和Qualification状态均不改变。Sol审阅记录见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor002_continuation_20261101/`。

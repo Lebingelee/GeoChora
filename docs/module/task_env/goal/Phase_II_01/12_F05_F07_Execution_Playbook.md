@@ -126,16 +126,16 @@ Luna 仅执行一个已授权包，提交包内 local commits 和原始路径/�
 
 ## 9. attempt002：返工与实施合并、按cell条件native
 
-当前冻结方案以[11第12节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract)及sol_f05_successor_002完整包为准；attempt002现已完成并有2026-11-01续行收口记录。R1–R4真实S0修复及DG03 current-HEAD synthetic Core S1已完成；DG01/DG02各自有界结果保留其独立profile范围。DG03 mimic positive/完整关系ablation仅为N1诊断，source `solimp`、fixed tendon consumer及drive/contact语义仍阻止正式Isaac N2。required物理语义与旧门保持，不把源8actuator误作8DOF，也不把合法joint遍历排列当身份错误。详见[attempt002 continuation](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-continuation-20261101)。
+当前冻结方案以[11第12节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-contract)及sol_f05_successor_002完整包为准；attempt002现已完成且2026-11-01续行已经Sol复核为`F05_SUCCESSOR_PARTIAL_REVIEWED_DG03_CONTINUE_REQUIRED`。R1–R4真实S0修复及DG03 current-HEAD synthetic Core S1已完成；DG01/DG02各自有界结果保留其独立profile范围。DG03 mimic positive/完整关系ablation仅为N1诊断，source `solimp`、fixed tendon consumer及drive/contact语义仍阻止正式Isaac N2。required物理语义与旧门保持，不把源8actuator误作8DOF，也不把合法joint遍历排列当身份错误。详见[attempt002 continuation](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-continuation-20261101)。
 
-每cell关键source→public model→consumer语义已解决才可native；002中三个cell均因该前置缺口未启动，native调用/step为0。静态 inventory PASS不提升为cross-representation readiness。完整Gate和最小阻断证据见[11第13节](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-execution)及ignored输出报告。旧F05 PARTIAL不改，F06/F07不启动，Sol复核仍待进行。
+正式cell必须先闭合关键source→public model→consumer语义。2026-10-30初次检查时三个formal cell均未启动；随后DG01/DG02分别完成独立有界cell，DG03完成synthetic S1及一对N1诊断。DG03正式N2仍因source-compliance、fixed-tendon与drive/contact consumer gap阻断。静态inventory PASS不提升为cross-representation readiness。Sol于2026-11-01复核接受本轮partial证据，不接收DG03 Goal或新F05整体。完整Gate和阻断证据见[11 attempt002 continuation](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md#successor-attempt002-continuation-20261101)及[Sol review](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor002_continuation_20261101/sol_review.md)。旧F05 PARTIAL不改，F06/F07不启动。
 
 
 <a id="f05-early-diagnostic-three-goals"></a>
 
 ### 2026-10-30维护者指定提前诊断：三个长期Goal
 
-当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01完整包已由维护者转述并执行，实际候选状态见[13第7节](13_F05_Early_Diagnostic_Three_Goals.md)；DG02/03仍为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。
+当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01与DG02均有其精确有界Sol接收；DG03为partial且仍active，后续窗口须依据Sol复核后的HEAD/证据和预算重新冻结。F06/F07未启动，旧F05partial及required物理语义不变。
 
 ### DG01 Goal01 执行结果（2026-10-30；候选通过，待Sol复核）
 

@@ -212,4 +212,4 @@ R07a中protocol、functional motion/semantic oracle/tolerance、预算与任务�
 
 ### 2026-10-30维护者指定提前诊断：三个长期Goal
 
-当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01包准备后由维护者转述；DG02/03为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。
+当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01/DG02已分别获有界Sol接收；DG03已有synthetic S1与N1诊断但仍partial、长期Goal active，后续窗口须按Sol复核后的HEAD与剩余语义缺口重新冻结。F06/F07未启动，旧F05partial及required物理语义不变。

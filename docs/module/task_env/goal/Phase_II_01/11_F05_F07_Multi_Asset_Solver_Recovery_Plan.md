@@ -205,7 +205,7 @@ G3提供了已有GeoPhys USD Core Position synthetic route的实际Core/S1证据
 
 <a id="successor-attempt002-continuation-20261101"></a>
 
-## successor attempt002 continuation (2026-11-01; PARTIAL pending Sol)
+## successor attempt002 continuation (2026-11-01; PARTIAL; Sol reviewed)
 
 这段记录 attempt002 在维护者继续执行授权后的增量结果；上面的2026-10-30报告和哈希快照保持原样。最新状态及run-level receipts见 ignored [continuation closeout](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/continuation_closeout_20261101.md)。本地共享分支为`develop-full`，续行实施输入HEAD `681a3361f33d52799a61ac5d43edbf6caabfe33e`；prompt/snapshot仍按该attempt冻结值绑定。
 
@@ -217,7 +217,7 @@ provider边界未改变：GeoPhys只有一条既有public USD import/lowering ro
 
 DG03正式Isaac N2仍`BLOCKED_BY_FEATURE`。静态输入中原equality `solimp=0.95 0.99 0.001`尚无精确PhysX/Core consumer映射；固定tendon源标量law和consumer、drive/contact消费也未全部证明。`materialize()`保持fail closed。维护者已明确接受并授权本包需要的`OMNI_KIT_ACCEPT_EULA=YES`，但此接受不改变source/consumer gate。本续行不授F05整体接收或Qualification；旧`F05_OVERALL_PARTIAL`、r009和历史attempt均保留，F06/F07不启动。此前报告中三个cell native starts为0是2026-10-30时点的正式cell计数；DG03 N1诊断之后在另一run ledger中执行，应分开记账。
 
-最终状态 `F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。文档/Skill提交、保护hash、process/lock核验和窗口释放由同目录continuation closeout与final readback绑定。
+续行候选最初为`F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。2026-11-01 Sol复核后状态为`F05_SUCCESSOR_PARTIAL_REVIEWED_DG03_CONTINUE_REQUIRED`：接受DG03 synthetic S1/H5冷读与两个N1正反诊断作为各自有限范围的证据，但DG03仍active，正式N2因source `solimp`、fixed-tendon consumer及drive/contact映射未闭合而blocked。36/36 continuation manifest项、protected/runtime/provider/gitlink及释放收据已核；Sol review未运行pytest/native。详见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor002_continuation_20261101/`。DG01/DG02有界接收与R3 partial诊断维持原状，旧F05 overall partial和ordinary successor 2/3计数不变。
 
 ## 14. DG01 提前诊断 Goal01 结果（2026-10-30；候选通过，待Sol复核）
 
@@ -230,4 +230,4 @@ DG03正式Isaac N2仍`BLOCKED_BY_FEATURE`。静态输入中原equality `solimp=0
 
 ### 2026-10-30维护者指定提前诊断：三个长期Goal
 
-当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。允许完整route未就绪前的有界N0/N1模型/特性探针，最终N2生产门不降低。DG01包准备后由维护者转述；DG02/03为基线，前Goal经Sol接收后适配真实HEAD/输入和预算再冻结，禁止直接执行旧模板。F06/F07未启动，旧F05partial及required物理语义不变。
+当前执行入口改为[13提前诊断Goal编排](13_F05_Early_Diagnostic_Three_Goals.md)：DG01共同基线＋MuJoCo/MJCF、DG02 GeoPhys/USD、DG03 Isaac/USD＋三路线收口。普通successor001/002与2/3历史保留，普通003不派发；明确指定的诊断窗口另记，无固定attempt上限，资源预算仍严格。DG01与DG02已分别获有界Sol接收；DG03目前完成synthetic Core S1和bounded N1诊断，但正式N2仍因required source-to-consumer特性未闭合而blocked，长期Goal继续active。每Goal必须持续实现和取得真实Core/native/reader证据；缺profile/receipt是工作项，不自行结束为BLOCKED。后续DG03窗口须基于Sol复核后的实际HEAD、证据与剩余预算重新冻结。F06/F07未启动，旧F05partial及required物理语义不变。
