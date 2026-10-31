@@ -113,12 +113,12 @@ def test_canonical_dls_reset_posture_correction_is_limited_to_the_task_nullspace
 
     corrected = CanonicalPandaController(
         _Kinematics(), artifact_hash="b" * 64, config=config,
-        nullspace_reference_gain=0.2,
+        nullspace_reference_gain=1.0,
     )
     corrected.set_nullspace_reference((0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05))
     _canonical, desired, _servo = corrected._compute_arm(_State(), request)
     np.testing.assert_allclose(desired[:6], np.zeros(6), atol=1e-12)
-    assert desired[6] == pytest.approx(0.009)
+    assert desired[6] == pytest.approx(0.045)
 
     joint_request = RequestedAction(
         "absolute_joint", None, "none", (0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, 0.0),

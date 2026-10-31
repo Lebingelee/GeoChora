@@ -61,9 +61,10 @@ F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
 F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
 # The DG02 Core route tracks source-FK pose targets whose Panda solution is
-# redundant. Keep its reset posture in the Jacobian right-nullspace; other
-# versioned Position routes retain the frozen DLS-only behavior by default.
-F05_DG02_NULLSPACE_REFERENCE_GAIN = 0.2
+# redundant. Restore the reset posture fully in the Jacobian right-nullspace on
+# each position update; other versioned Position routes retain the frozen
+# DLS-only behavior by default.
+F05_DG02_NULLSPACE_REFERENCE_GAIN = 1.0
 
 
 def _f05_dg02_usd_source_bindings():
