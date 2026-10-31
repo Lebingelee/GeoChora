@@ -285,6 +285,16 @@ _OPENING_BY_STAGE_V4 = {
     "place": 0.08,
     "release": 0.045,
 }
+_OPENING_BY_STAGE_V5 = {
+    **_OPENING_BY_STAGE_V4,
+    # The native row-0 contact trace confirmed the rim at an aggregate opening
+    # near 0.056 m. Retain a small outward preload after contact; asking for
+    # 0.08 m leaves a 20+ mm gripper tracking error and freezes the Cartesian
+    # lift waypoints behind the public convergence gate.
+    "lift": 0.06,
+    "carry": 0.06,
+    "place": 0.06,
+}
 _STAGE_TIMEOUTS_V4 = {
     "approach": 180, "descend": 120, "grasp": 60,
     "lift": 180, "carry": 180, "place": 120,
@@ -432,17 +442,18 @@ def solution_identity_v5(
         "arm_resolver_identity": arm_resolver_identity,
         "mixed_controller": osc.identity_mapping(),
         "grasp": {
-            "strategy": "insert_narrow_fingers_below_rim_then_open_outward_v1",
+            "strategy": "insert_narrow_fingers_below_rim_then_hold_contact_aperture_v2",
             "tcp_height_above_bowl_center_m": _GRASP_TCP_HEIGHT_V4_M,
             "approach_opening_m": _OPENING_BY_STAGE_V4["approach"],
             "grasp_opening_target_m": _OPENING_BY_STAGE_V4["grasp"],
+            "grasp_hold_opening_m": _OPENING_BY_STAGE_V5["lift"],
             "required_contact_groups": [
                 "panda-v1/finger-left", "panda-v1/finger-right",
                 "akita_black_bowl_1",
             ],
             "contact_dwell_boundaries": _GRASP_CONTACT_DWELL_V4,
         },
-        "opening_m": _OPENING_BY_STAGE_V4,
+        "opening_m": _OPENING_BY_STAGE_V5,
         "stage_timeouts": _STAGE_TIMEOUTS_V4,
         "motion_config": {
             "position_tolerance_m": selected_config.position_tolerance_m,
@@ -1157,6 +1168,9 @@ class LiberoPickPlaceSolutionV4(LiberoPickPlaceSolutionV3):
         self._lift_contact_loss_streak = 0
         self._grasp_confirmed = False
 
+    def _opening_for_stage(self):
+        return _OPENING_BY_STAGE_V4.get(self.stage)
+
     def _target(self) -> np.ndarray:
         if self._initial_bowl is None or self._plate is None:
             raise RuntimeError("LIBERO Solution reset geometry is unavailable")
@@ -1226,7 +1240,7 @@ class LiberoPickPlaceSolutionV4(LiberoPickPlaceSolutionV3):
         current_pose[3:7] = normalize_quat_wxyz(current_pose[3:7])
         target_position = self._target()
         target_pose = np.asarray((*target_position, *self._grasp_quaternion_wxyz), dtype=np.float64)
-        opening_m = _OPENING_BY_STAGE_V4.get(self.stage)
+        opening_m = self._opening_for_stage()
         if opening_m is None:
             raise RuntimeError(f"LIBERO Solution v4 has no gripper policy in stage {self.stage!r}")
         gripper_scalar = float(opening_m / 0.04 - 1.0)
@@ -1273,7 +1287,11 @@ class LiberoPickPlaceSolutionV4(LiberoPickPlaceSolutionV3):
             "source_tcp_profile_identity_sha256": self.tcp_profile.identity_hash,
             "aggregate_opening_m": float(opening_m),
             "normalized_gripper_scalar": float(action[7]),
-            "grasp_strategy": "insert_narrow_fingers_below_rim_then_open_outward_v1",
+            "grasp_strategy": (
+                "insert_narrow_fingers_below_rim_then_hold_contact_aperture_v2"
+                if self.solution_schema_version == SOLUTION_SCHEMA_V5
+                else "insert_narrow_fingers_below_rim_then_open_outward_v1"
+            ),
             "diagnostics": {
                 "waypoint_distance_m": float(np.linalg.norm(target_position - current_pose[:3])),
                 "planner_step_translation_m": float(np.linalg.norm(action[:3] - current_pose[:3])),
@@ -1467,6 +1485,9 @@ class LiberoPickPlaceSolutionV5(LiberoPickPlaceSolutionV4):
     """V4 task behavior bound to the physics-rate, reset-reference OSC profile."""
 
     solution_schema_version = SOLUTION_SCHEMA_V5
+
+    def _opening_for_stage(self):
+        return _OPENING_BY_STAGE_V5.get(self.stage)
 
     def __init__(self, source_xml: bytes | str, source_closure_digest: str, *,
                  arm_resolver_identity: str,

@@ -139,6 +139,28 @@ def test_task_one_solution_v5_controller_freezes_reset_nullspace_reference_and_p
     assert reference == pytest.approx(second)
 
 
+def test_task_one_solution_v5_holds_measured_contact_aperture_after_grasp():
+    from bench_deploy.libero.solution import (
+        LiberoPickPlaceSolutionV4,
+        LiberoPickPlaceSolutionV5,
+        solution_identity_v5,
+    )
+
+    legacy = object.__new__(LiberoPickPlaceSolutionV4)
+    current = object.__new__(LiberoPickPlaceSolutionV5)
+    for stage in ("lift", "carry", "place"):
+        legacy.stage = current.stage = stage
+        assert legacy._opening_for_stage() == pytest.approx(0.08)
+        assert current._opening_for_stage() == pytest.approx(0.06)
+    current.stage = "grasp"
+    assert current._opening_for_stage() == pytest.approx(0.08)
+    assert solution_identity_v5(
+        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
+    ) != solution_identity_v5(
+        "d" * 64, "e" * 64, arm_resolver_identity="d" * 64,
+    )
+
+
 def test_task_one_v4_bilateral_contact_requires_fresh_covered_left_and_right_pairs():
     from bench_deploy.libero.solution import LiberoPickPlaceSolutionV4
 
