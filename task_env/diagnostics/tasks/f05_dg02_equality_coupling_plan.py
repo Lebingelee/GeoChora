@@ -18,9 +18,9 @@ from pxr import Usd
 CORE = Path("/home/lly/Program_Files/Geochora").resolve()
 WINDOW = CORE / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal02/window_001"
 PROVIDER = CORE / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_geophys_provider/GeoPhys"
-BASE_PLAN = WINDOW / "host_g2_001/n1_public_consumer_003.plan.json"
-BASE_RECEIPT = WINDOW / "host_g2_001/n1_public_consumer_003/supervisor_receipt.json"
-BASE_WORKER_RECEIPT = WINDOW / "host_g2_001/n1_public_consumer_003/worker_receipt.json"
+BASE_PLAN = WINDOW / "host_g2_001/n1_public_consumer_004.plan.json"
+BASE_RECEIPT = WINDOW / "host_g2_001/n1_public_consumer_004/supervisor_receipt.json"
+BASE_WORKER_RECEIPT = WINDOW / "host_g2_001/n1_public_consumer_004/worker_receipt.json"
 LOCK = CORE / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock"
 RUNS_DIR = WINDOW / "host_g4_001"
 WORKER = CORE / "task_env/diagnostics/tasks/f05_dg02_equality_coupling_probe.py"
@@ -116,7 +116,7 @@ def build(suffix: str) -> Path:
     base = json.loads(BASE_PLAN.read_text())
     parent = json.loads(BASE_RECEIPT.read_text())
     parent_worker = json.loads(BASE_WORKER_RECEIPT.read_text())
-    if parent.get("exit_code") != 0 or parent.get("physics_steps") != 4 or not parent.get("lock_released_after_process_group_exit"):
+    if parent.get("exit_code") != 0 or parent.get("physics_steps_attempted") != 4 or parent.get("physics_steps_completed") != 4 or not parent.get("lock_released_after_process_group_exit"):
         raise ValueError("successful source-consumer N1 run is required before coupling probe")
     if parent_worker.get("result") != "PASS_V2_PUBLIC_CONSUMERS" or parent_worker.get("physics_steps_completed") != 4:
         raise ValueError("N1 source consumer receipt is not a complete pass")
