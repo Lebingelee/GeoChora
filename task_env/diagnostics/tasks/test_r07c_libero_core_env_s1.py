@@ -2184,6 +2184,44 @@ def test_contact_query_and_semantic_oracle_use_same_real_core_path(tmp_path, mon
     ).value is False
 
 
+def test_r07v210_solution_finger_contact_groups_cover_source_collision_shapes_without_materializing(
+    tmp_path, monkeypatch,
+):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _FAKE_WORLD.enable_panda_kinematics = True
+    fake = _fake_api(monkeypatch)
+    assert getattr(fake, "__r07c_s1_synthetic_fixture__", False) is True
+    import hashlib
+    from bench_deploy.libero.selected_candidate import (
+        DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
+    )
+
+    xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
+    xml = xml_path.read_bytes()
+    env = build_libero_solution_candidate(
+        xml=xml, composed_mjcf_sha256=hashlib.sha256(xml).hexdigest(),
+        install_root=Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
+        composition_plan_path=Path(os.environ.get(
+            "R07_V210_COMPOSITION_PLAN",
+            str(DEFAULT_OUTPUT_ROOT / "source/composition_plan.json"),
+        )),
+        horizon=2,
+    )
+    try:
+        groups = env.value["source"].contact_geom_groups
+        assert groups["panda-v1/finger-left"] == (
+            "gripper0_finger1_collision", "gripper0_finger1_pad_collision",
+        )
+        assert groups["panda-v1/finger-right"] == (
+            "gripper0_finger2_collision", "gripper0_finger2_pad_collision",
+        )
+        assert env.session is None
+        assert _FAKE_WORLD.calls["reset"] == 0
+    finally:
+        env.close()
+
+
 def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tmp_path, monkeypatch):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
@@ -2210,6 +2248,12 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         install_root=Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
         composition_plan_path=plan_path,
         horizon=100,
+    )
+    assert env.value["source"].contact_geom_groups["panda-v1/finger-left"] == (
+        "gripper0_finger1_collision", "gripper0_finger1_pad_collision",
+    )
+    assert env.value["source"].contact_geom_groups["panda-v1/finger-right"] == (
+        "gripper0_finger2_collision", "gripper0_finger2_pad_collision",
     )
     closure_digest = env.metadata["source_closure_digest"]
     resolver_identity = env.value['arm_resolver'].iterative_resolution_identity_v1()

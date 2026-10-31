@@ -200,16 +200,20 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     groups = plan['composition_receipt']['contact_geom_name_transform']['groups']
     contact_geom_groups = {key: tuple(value) for key, value in groups.items()}
     if solution_profile:
-        # These source-authored child bodies and pad geoms let the task observe
-        # left/right finger contacts separately through the existing public
-        # ContactSummaryV2 route. They remain subcomponent aliases of panda-v1.
+        # Keep the public finger groups aligned with all source-authored
+        # collidable parts of each finger. Counting only the pads misses valid
+        # rim contacts made by the Panda finger collision meshes.
         bound_bodies.update({
             'panda-v1/finger-left': 'gripper0_leftfinger',
             'panda-v1/finger-right': 'gripper0_rightfinger',
         })
         contact_geom_groups.update({
-            'panda-v1/finger-left': ('gripper0_finger1_pad_collision',),
-            'panda-v1/finger-right': ('gripper0_finger2_pad_collision',),
+            'panda-v1/finger-left': (
+                'gripper0_finger1_collision', 'gripper0_finger1_pad_collision',
+            ),
+            'panda-v1/finger-right': (
+                'gripper0_finger2_collision', 'gripper0_finger2_pad_collision',
+            ),
         })
     expected_group_names = set(expected_bodies) - {'main_table'}
     if set(groups) != expected_group_names:
