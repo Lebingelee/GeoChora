@@ -480,6 +480,7 @@ class LiberoMixedControllerV3(LiberoMixedControllerV2):
         self, resolution: CanonicalArmResolutionV1, opening_m: float, state, *,
         task_artifact_hash, source_id, source_closure_digest,
         provider_materialization_id, episode_id, reset_sample_id, state_revision,
+        desired_tcp_twist_world=None,
     ):
         if not isinstance(resolution, CanonicalArmResolutionV1):
             raise TypeError('OSC Controller requires a typed iterative canonical arm resolution')
@@ -544,6 +545,10 @@ class LiberoMixedControllerV3(LiberoMixedControllerV2):
         if (jacobian.shape != (6, 7) or mass.shape != (7, 7) or bias.shape != (7,)
                 or any(not np.isfinite(value).all() for value in (jacobian, mass, bias))):
             raise ValueError('source OSC dynamics have invalid dimensions or non-finite values')
+        desired_twist = (np.zeros(6, dtype=np.float64) if desired_tcp_twist_world is None
+                         else np.asarray(desired_tcp_twist_world, dtype=np.float64))
+        if desired_twist.shape != (6,) or not np.isfinite(desired_twist).all():
+            raise ValueError('OSC desired TCP twist must contain six finite world-frame values')
         mass_inv = np.linalg.inv(mass)
         j_pos, j_ori = jacobian[:3], jacobian[3:]
         lambda_full_inv = jacobian @ mass_inv @ jacobian.T
@@ -561,8 +566,8 @@ class LiberoMixedControllerV3(LiberoMixedControllerV2):
         kd_pos = 2.0 * math.sqrt(kp_pos) * config.damping_ratio
         kd_ori = 2.0 * math.sqrt(kp_ori) * config.damping_ratio
         ee_velocity = jacobian @ qdot
-        desired_force = kp_pos * position_error - kd_pos * ee_velocity[:3]
-        desired_moment = kp_ori * orientation_error - kd_ori * ee_velocity[3:]
+        desired_force = kp_pos * position_error + kd_pos * (desired_twist[:3] - ee_velocity[:3])
+        desired_moment = kp_ori * orientation_error + kd_ori * (desired_twist[3:] - ee_velocity[3:])
         decoupled_wrench = np.concatenate((lambda_pos @ desired_force, lambda_ori @ desired_moment))
         task_torque = jacobian.T @ decoupled_wrench
 
@@ -604,6 +609,7 @@ class LiberoMixedControllerV3(LiberoMixedControllerV2):
             'position_error_m': position_error.tolist(),
             'orientation_error_rad_vector': orientation_error.tolist(),
             'ee_velocity': ee_velocity.tolist(),
+            'desired_tcp_twist_world': desired_twist.tolist(),
             'mass_matrix_arm': mass.tolist(),
             'jacobian_world': jacobian.tolist(),
             'task_torque_Nm': task_torque.tolist(),
@@ -753,8 +759,105 @@ class LiberoMixedControllerV4(LiberoMixedControllerV3):
         return payload
 
 
+class LiberoMixedControllerV5(LiberoMixedControllerV4):
+    """V4 OSC with bounded planner-velocity feed-forward per outer boundary."""
+
+    profile_id = 'libero-spatial-bowl-to-plate-osc-pose-velocity-feedforward-v1'
+
+    def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
+                 gravity_bias_model=None, *, arm_resolver_identity: str | None = None):
+        super().__init__(
+            operational_config=operational_config,
+            gravity_bias_model=gravity_bias_model,
+            arm_resolver_identity=arm_resolver_identity,
+        )
+        self._last_target_control_step = None
+        self._last_target_position = None
+        self._last_target_rotation = None
+        self._desired_tcp_twist_world = np.zeros(6, dtype=np.float64)
+        payload = self.identity_mapping()
+        payload.pop('identity_sha256', None)
+        payload.update({
+            'schema_version': 'libero-mixed-controller-identity-v5',
+            'profile_id': self.profile_id,
+            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
+            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
+            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
+            'hold_policy': self.operational_config.hold_policy,
+        })
+        self.identity = hashlib.sha256(json.dumps(
+            payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
+        ).encode()).hexdigest()
+
+    def reset(self, state):
+        super().reset(state)
+        self._last_target_control_step = None
+        self._last_target_position = None
+        self._last_target_rotation = None
+        self._desired_tcp_twist_world = np.zeros(6, dtype=np.float64)
+
+    @staticmethod
+    def _bound_vector(value, maximum):
+        magnitude = float(np.linalg.norm(value))
+        return value if magnitude <= maximum or magnitude == 0.0 else value * (maximum / magnitude)
+
+    def compute_pose_target(self, resolution, opening_m, state, **kwargs):
+        if not isinstance(resolution, CanonicalArmResolutionV1):
+            raise TypeError('velocity-feedforward OSC requires a typed canonical arm resolution')
+        target_pose = resolution.target.canonical_action.resolved_world_pose
+        if not isinstance(target_pose, PoseWorld):
+            raise TypeError('velocity-feedforward OSC requires an absolute world pose target')
+        step = int(state.control_step)
+        position = np.asarray(target_pose.position, dtype=np.float64)
+        rotation = quat_wxyz_to_matrix(np.asarray(target_pose.quaternion_wxyz, dtype=np.float64))
+        if self._last_target_control_step is None:
+            self._last_target_control_step = step
+            self._last_target_position = position.copy()
+            self._last_target_rotation = rotation.copy()
+        elif step > self._last_target_control_step:
+            elapsed = (step - self._last_target_control_step) / self.operational_config.control_frequency_hz
+            linear = self._bound_vector(
+                (position - self._last_target_position) / elapsed, 0.05,
+            )
+            angular = self._bound_vector(
+                rotation_vector_error(self._last_target_rotation, rotation) / elapsed, 0.5,
+            )
+            self._desired_tcp_twist_world = np.concatenate((linear, angular))
+            self._last_target_control_step = step
+            self._last_target_position = position.copy()
+            self._last_target_rotation = rotation.copy()
+        elif step < self._last_target_control_step:
+            raise ValueError('velocity-feedforward OSC observed a stale control boundary')
+        target = super().compute_pose_target(
+            resolution, opening_m, state,
+            desired_tcp_twist_world=self._desired_tcp_twist_world,
+            **kwargs,
+        )
+        self.last_control_receipt.update({
+            'schema_version': 'libero-mixed-control-receipt-v5',
+            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
+            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
+            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
+            'desired_tcp_twist_world': self._desired_tcp_twist_world.tolist(),
+        })
+        return target
+
+    def identity_mapping(self):
+        payload = super().identity_mapping()
+        payload.update({
+            'schema_version': 'libero-mixed-controller-identity-v5',
+            'profile_id': self.profile_id,
+            'identity_sha256': self.identity,
+            'algorithm': 'source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1',
+            'desired_twist_source': 'successive_absolute_planner_targets_at_20hz_v1',
+            'desired_twist_limits': {'linear_m_s': 0.05, 'angular_rad_s': 0.5},
+        })
+        return payload
+
+
 __all__ = ['LiberoMixedControlConfigV1', 'LiberoMixedControllerV1',
            'LiberoMixedControllerV2', 'LiberoMixedControllerV3', 'LiberoMixedControllerV4',
+           'LiberoMixedControllerV5',
            'LiberoOperationalSpaceConfigV1', 'LiberoOperationalSpaceConfigV2',
            'legacy_v2_controller_identity_mapping',
            'build_controller']

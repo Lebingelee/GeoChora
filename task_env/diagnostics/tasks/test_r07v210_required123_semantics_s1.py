@@ -161,6 +161,81 @@ def test_task_one_solution_v5_holds_measured_contact_aperture_after_grasp():
     )
 
 
+def test_task_one_solution_v6_tracks_radial_demo_grasp_and_settled_plate_frame():
+    from bench_deploy.libero.solution import (
+        LiberoPickPlaceSolutionV6, solution_identity_v6,
+    )
+    from task_env.utils.rotation import rotate_vector_wxyz
+
+    solution = object.__new__(LiberoPickPlaceSolutionV6)
+    yaw_90 = np.asarray((np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)))
+    solution._bowl_reference_pose = np.asarray((0.5, 0.2, 0.1, *yaw_90))
+    solution._plate_reference_pose = np.asarray((0.7, 0.3, 0.9, 1.0, 0.0, 0.0, 0.0))
+    solution._plate = solution._plate_reference_pose[:3].copy()
+    solution._tcp_quaternion_in_bowl = np.asarray((1.0, 0.0, 0.0, 0.0))
+    offset = np.asarray((-0.04555440076829924, 0.002120461738427656, 0.03321187804063996))
+    offset_world = rotate_vector_wxyz(yaw_90, offset)
+
+    solution.stage = "approach"
+    approach_offset = offset.copy()
+    approach_offset[2] = 0.15
+    assert solution._target() == pytest.approx(
+        solution._bowl_reference_pose[:3] + rotate_vector_wxyz(yaw_90, approach_offset),
+    )
+    solution.stage = "descend"
+    assert solution._target() == pytest.approx(solution._bowl_reference_pose[:3] + offset_world)
+    solution.stage = "lift"
+    assert solution._target() == pytest.approx(
+        solution._bowl_reference_pose[:3] + offset_world + (0.0, 0.0, 0.20),
+    )
+    solution.stage = "carry"
+    assert solution._target() == pytest.approx(
+        np.asarray((0.7, 0.3, 0.3)) + offset_world,
+    )
+    solution.stage = "place"
+    assert solution._target() == pytest.approx(
+        np.asarray((0.7, 0.3, 0.985)) + offset_world,
+    )
+    solution.stage = "lift"
+    assert solution._opening_for_stage() == pytest.approx(0.008)
+    solution.stage = "grasp"
+    assert solution._opening_for_stage() == pytest.approx(0.010)
+
+    solution.stage = "approach"
+    solution._pose_plan = object()
+    bowl_now = np.asarray((0.51, 0.2, 0.09, *yaw_90))
+    plate_now = np.asarray((0.7, 0.3, 0.84, 1.0, 0.0, 0.0, 0.0))
+    observation = {"privileged_state": {
+        "bowl_body_pose": bowl_now[None, :],
+        "plate_body_pose": plate_now[None, :],
+    }}
+    assert solution._refresh_bowl_reference_from_public_pose(observation) is True
+    assert solution._bowl_reference_pose == pytest.approx(bowl_now)
+    assert solution._plate_reference_pose == pytest.approx(plate_now)
+    assert solution._pose_plan is None
+    solution.stage = "grasp"
+    assert solution._refresh_bowl_reference_from_public_pose(observation) is False
+    assert solution_identity_v6(
+        "f" * 64, "e" * 64, arm_resolver_identity="d" * 64,
+    ) != solution_identity_v6(
+        "f" * 64, "e" * 64, arm_resolver_identity="c" * 64,
+    )
+
+
+def test_task_one_solution_v6_controller_bounds_velocity_feedforward():
+    from bench_deploy.libero.controller import LiberoMixedControllerV5
+
+    controller = LiberoMixedControllerV5(arm_resolver_identity="d" * 64)
+    clipped = controller._bound_vector(np.asarray((0.0, 0.0, 0.2)), 0.05)
+    assert np.linalg.norm(clipped) == pytest.approx(0.05)
+    assert clipped / np.linalg.norm(clipped) == pytest.approx((0.0, 0.0, 1.0))
+    identity = controller.identity_mapping()
+    assert identity["schema_version"] == "libero-mixed-controller-identity-v5"
+    assert identity["desired_twist_limits"] == {
+        "linear_m_s": 0.05, "angular_rad_s": 0.5,
+    }
+
+
 def test_task_one_v4_bilateral_contact_requires_fresh_covered_left_and_right_pairs():
     from bench_deploy.libero.solution import LiberoPickPlaceSolutionV4
 
@@ -258,6 +333,7 @@ def test_task_one_v4_independent_reader_recomputes_source_osc_torque_and_gripper
         "position_error_m": position_error.tolist(),
         "orientation_error_rad_vector": orientation_error.tolist(),
         "ee_velocity": ee_velocity.tolist(),
+        "desired_tcp_twist_world": [0.0] * 6,
         "task_torque_Nm": task_torque.tolist(),
         "nullspace_torque_Nm": null_torque.tolist(),
         "raw_torque_Nm": raw_torque.tolist(), "applied_torque_Nm": applied_torque.tolist(),

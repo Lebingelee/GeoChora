@@ -111,6 +111,11 @@ class _GravityBiasDouble:
         assert not self.closed
         self.close_calls += 1
         self.closed = True
+        profile_receipt = ({
+            "raw_source_xml_sha256": self.raw_source_xml_sha256,
+            "model_profile_id": self.model_profile_id,
+            "model_profile_receipt_sha256": self.model_profile_receipt_sha256,
+        } if getattr(self, "model_profile_id", None) is not None else {})
         return {
             "schema_version": "libero-source-gravity-model-close-v1",
             "profile_id": self.profile_id,
@@ -123,6 +128,7 @@ class _GravityBiasDouble:
             "closed": True,
             "model_released": True,
             "data_released": True,
+            **profile_receipt,
         }
 
 
@@ -2257,7 +2263,12 @@ def test_r07v210_solution_finger_contact_groups_cover_source_collision_shapes_wi
         env.close()
 
 
-def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("solution_version", "expected_approach_opening_scalar"),
+    (("v5", 0.125), ("v6", 0.05)),
+)
+def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(
+        tmp_path, monkeypatch, solution_version, expected_approach_opening_scalar):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
     _FAKE_WORLD.enable_panda_kinematics = True
@@ -2267,7 +2278,8 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV5
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6
+    solution_type = LiberoPickPlaceSolutionV6 if solution_version == "v6" else LiberoPickPlaceSolutionV5
     from task_env.runtime.sessions.source import source_asset_bytes
     from task_env.recorders import load_structured_control_records_h5
 
@@ -2283,6 +2295,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         install_root=Path(os.environ.get("R07_V210_INSTALL_ROOT") or DEFAULT_INSTALL_ROOT),
         composition_plan_path=plan_path,
         horizon=100,
+        solution_version=solution_version,
     )
     assert env.value["source"].contact_geom_groups["panda-v1/finger-left"] == (
         "gripper0_finger1_collision", "gripper0_finger1_pad_collision",
@@ -2291,19 +2304,21 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         "gripper0_finger2_collision", "gripper0_finger2_pad_collision",
     )
     closure_digest = env.metadata["source_closure_digest"]
+    runtime_xml = env.value["runtime_model_xml_bytes"]
+    runtime_xml_sha = env.value["source_sha256"]["runtime_model_xml"]
     resolver_identity = env.value['arm_resolver'].iterative_resolution_identity_v1()
-    solution = LiberoPickPlaceSolutionV5(
-        xml, source_closure_digest=closure_digest,
+    solution = solution_type(
+        runtime_xml, source_closure_digest=closure_digest,
         arm_resolver_identity=resolver_identity,
     )
     gravity_model = _GravityBiasDouble(
-        xml_sha, closure_digest, kinematics=env.value["arm_resolver"].model,
+        runtime_xml_sha, closure_digest, kinematics=env.value["arm_resolver"].model,
     )
     env.controller.set_source_gravity_model(
-        gravity_model, source_xml_sha256=xml_sha, source_closure_digest=closure_digest,
+        gravity_model, source_xml_sha256=runtime_xml_sha, source_closure_digest=closure_digest,
     )
-    wrong_xml = xml + b"\n<!-- different immutable source bytes -->\n"
-    wrong_source_solution = LiberoPickPlaceSolutionV5(
+    wrong_xml = runtime_xml + b"\n<!-- different immutable source bytes -->\n"
+    wrong_source_solution = solution_type(
         wrong_xml, source_closure_digest=closure_digest,
         arm_resolver_identity=resolver_identity,
     )
@@ -2386,7 +2401,7 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         assert not terminated and not truncated
         assert info["selected_solution_action_v1"]["solution_identity"] == solution.identity
         assert info["selected_solution_action_v1"]["stage"] == "approach"
-        assert float(info["external_action"][-1]) == pytest.approx(0.125)
+        assert float(info["external_action"][-1]) == pytest.approx(expected_approach_opening_scalar)
         diagnostics = info["selected_solution_action_v1"]["diagnostics"]
         assert diagnostics["planner_owner"] == "CartesianPosePlanner.plan_to_pose"
         assert diagnostics["source_pose_observation_used"] is True
@@ -2398,10 +2413,10 @@ def test_r07v210_external_solution_uses_same_selected_mixed_core_and_recorder(tm
         )
         assert np.allclose(control_receipt["raw_torque_Nm"], expected_raw, rtol=0.0, atol=1e-10)
         target = info["mixed_actuator_command_v1"]["channel_values"]
-        assert np.allclose(
-            [target[f"joint{i}"] for i in range(1, 8)],
-            control_receipt["applied_torque_Nm"], rtol=0.0, atol=1e-10,
-        )
+        stepwise = info["physics_rate_control_v1"]["substeps"]
+        assert len(stepwise) == 25
+        assert stepwise[0]["target"]["channel_values"] == target
+        assert stepwise[-1]["controller_receipt"] == control_receipt
         assert info["control_step"] == 1
         assert env.recorder.transition_count == 1
         assert env.execution_fault is None
@@ -2440,10 +2455,14 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
         xml=xml, composed_mjcf_sha256=xml_sha, install_root=install_root,
         composition_plan_path=plan_path, horizon=2,
     )
+    ordinary_runtime_sha = ordinary.value["source_sha256"]["runtime_model_xml"]
     ordinary_model = _GravityBiasDouble(
-        xml_sha, ordinary.metadata["source_closure_digest"],
+        ordinary_runtime_sha, ordinary.metadata["source_closure_digest"],
         kinematics=ordinary.value["arm_resolver"].model,
     )
+    ordinary_model.model_profile_id = ordinary.value["model_profile_receipt"]["profile_id"]
+    ordinary_model.model_profile_receipt_sha256 = ordinary.value["source_sha256"]["model_profile_receipt"]
+    ordinary_model.raw_source_xml_sha256 = xml_sha
     ordinary.value["bind_source_gravity_model"](ordinary_model)
     ordinary.close()
     ordinary.close()
@@ -2458,6 +2477,9 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
         "0" * 64, failed_binding.metadata["source_closure_digest"],
         kinematics=failed_binding.value["arm_resolver"].model,
     )
+    wrong_model.model_profile_id = failed_binding.value["model_profile_receipt"]["profile_id"]
+    wrong_model.model_profile_receipt_sha256 = failed_binding.value["source_sha256"]["model_profile_receipt"]
+    wrong_model.raw_source_xml_sha256 = xml_sha
     with pytest.raises(ValueError, match="differs from its selected source identity"):
         failed_binding.value["bind_source_gravity_model"](wrong_model)
     failed_binding.close()
@@ -2466,7 +2488,9 @@ def test_r07v210_task_resource_cleanup_belongs_to_env_lifecycle(tmp_path, monkey
     assert failed_binding.close_receipt["task_resource_close_receipt"]["closed"] is True
 
 
-def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path, monkeypatch):
+@pytest.mark.parametrize("solution_version", ("v5", "v6"))
+def test_r07v210_solution_worker_and_independent_reader_close_all_rows(
+        tmp_path, monkeypatch, solution_version):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
     _FAKE_WORLD.enable_panda_kinematics = True
@@ -2474,7 +2498,8 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     from bench_deploy.libero.selected_candidate import (
         DEFAULT_INSTALL_ROOT, DEFAULT_OUTPUT_ROOT, build_libero_solution_candidate,
     )
-    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV5
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV5, LiberoPickPlaceSolutionV6
+    solution_type = LiberoPickPlaceSolutionV6 if solution_version == "v6" else LiberoPickPlaceSolutionV5
     from task_env.runtime.sessions.source import source_asset_bytes
 
     xml_path = Path(os.environ.get("R07_V210_COMPOSED_MJCF") or os.environ["R07C_COMPOSED_MJCF"])
@@ -2488,30 +2513,36 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     env = build_libero_solution_candidate(
         xml=xml, composed_mjcf_sha256=xml_sha,
         install_root=install_root,
-        composition_plan_path=plan_path, horizon=100,
+        composition_plan_path=plan_path, horizon=100, solution_version=solution_version,
     )
     parent_dir = tmp_path / "runs" / "native_synthetic_001"
     bundle = parent_dir / "bundle"
+    runtime_xml = env.value["runtime_model_xml_bytes"]
+    runtime_xml_sha = env.value["source_sha256"]["runtime_model_xml"]
+    profile_bytes = env.value["model_profile_bytes"]
     closure_files = {
-        "canonical-source.xml": xml,
-        "scene.xml": xml,
-        **source_asset_bytes(install_root, xml.decode("utf-8")),
+        "canonical-source.xml": runtime_xml,
+        "scene.xml": runtime_xml,
+        **source_asset_bytes(install_root, runtime_xml.decode("utf-8")),
     }
     closure_digest = env.metadata["source_closure_digest"]
     gravity_model = _GravityBiasDouble(
-        xml_sha, closure_digest, kinematics=env.value["arm_resolver"].model,
+        runtime_xml_sha, closure_digest, kinematics=env.value["arm_resolver"].model,
     )
+    gravity_model.model_profile_id = env.value["model_profile_receipt"]["profile_id"]
+    gravity_model.model_profile_receipt_sha256 = env.value["source_sha256"]["model_profile_receipt"]
+    gravity_model.raw_source_xml_sha256 = xml_sha
     env.controller.set_source_gravity_model(
-        gravity_model, source_xml_sha256=xml_sha, source_closure_digest=closure_digest,
+        gravity_model, source_xml_sha256=runtime_xml_sha, source_closure_digest=closure_digest,
     )
 
     class _SolutionFactory:
-        worker_result_schema_version = "r07-v210-task-solution-worker-result-v5"
+        worker_result_schema_version = f"r07-v210-task-solution-worker-result-{solution_version}"
 
         def __call__(self, _bundle_root):
             env.value["bind_source_gravity_model"](gravity_model)
-            return LiberoPickPlaceSolutionV5(
-                xml, source_closure_digest=closure_digest,
+            return solution_type(
+                runtime_xml, source_closure_digest=closure_digest,
                 arm_resolver_identity=env.value['arm_resolver'].iterative_resolution_identity_v1(),
             )
 
@@ -2522,6 +2553,8 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         solution_factory=_SolutionFactory(),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
+        source_raw_xml_bytes=xml,
+        source_model_profile_bytes=profile_bytes,
         solution_resource_closer=env.value["close_task_resources"],
     )
     assert result["status"] == "complete"
@@ -2550,7 +2583,7 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     assert (bundle / "source_inputs/closure.tar.gz").is_file()
 
     receipt = consume_libero_candidate_bundle(bundle / "worker_result.json")
-    assert receipt["schema_version"] == "r07-v210-task-solution-independent-reader-v5"
+    assert receipt["schema_version"] == f"r07-v210-task-solution-independent-reader-{solution_version}"
     assert receipt["status"] == "verified_complete"
     assert receipt["episode_count"] == 3
     assert receipt["observation_count"] == 9
@@ -2599,25 +2632,31 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
     failed_env = build_libero_solution_candidate(
         xml=xml, composed_mjcf_sha256=xml_sha,
         install_root=install_root,
-        composition_plan_path=plan_path, horizon=100,
+        composition_plan_path=plan_path, horizon=100, solution_version=solution_version,
     )
     _FAKE_WORLD.fail_step_after = 0
     failed_closure_digest = failed_env.metadata["source_closure_digest"]
+    failed_runtime_xml = failed_env.value["runtime_model_xml_bytes"]
+    failed_runtime_xml_sha = failed_env.value["source_sha256"]["runtime_model_xml"]
     failed_gravity_model = _GravityBiasDouble(
-        xml_sha, failed_closure_digest, kinematics=failed_env.value["arm_resolver"].model,
+        failed_runtime_xml_sha, failed_closure_digest,
+        kinematics=failed_env.value["arm_resolver"].model,
     )
+    failed_gravity_model.model_profile_id = failed_env.value["model_profile_receipt"]["profile_id"]
+    failed_gravity_model.model_profile_receipt_sha256 = failed_env.value["source_sha256"]["model_profile_receipt"]
+    failed_gravity_model.raw_source_xml_sha256 = xml_sha
     failed_env.controller.set_source_gravity_model(
-        failed_gravity_model, source_xml_sha256=xml_sha,
+        failed_gravity_model, source_xml_sha256=failed_runtime_xml_sha,
         source_closure_digest=failed_closure_digest,
     )
 
     class _FailedSolutionFactory:
-        worker_result_schema_version = "r07-v210-task-solution-worker-result-v5"
+        worker_result_schema_version = f"r07-v210-task-solution-worker-result-{solution_version}"
 
         def __call__(self, _bundle_root):
             failed_env.value["bind_source_gravity_model"](failed_gravity_model)
-            return LiberoPickPlaceSolutionV5(
-                xml, source_closure_digest=failed_closure_digest,
+            return solution_type(
+                failed_runtime_xml, source_closure_digest=failed_closure_digest,
                 arm_resolver_identity=failed_env.value['arm_resolver'].iterative_resolution_identity_v1(),
             )
 
@@ -2626,6 +2665,8 @@ def test_r07v210_solution_worker_and_independent_reader_close_all_rows(tmp_path,
         solution_factory=_FailedSolutionFactory(),
         source_closure_files=closure_files,
         composition_plan_bytes=plan_path.read_bytes(),
+        source_raw_xml_bytes=xml,
+        source_model_profile_bytes=failed_env.value["model_profile_bytes"],
         solution_resource_closer=failed_env.value["close_task_resources"],
     )
     assert failure_result["status"] == "failed"

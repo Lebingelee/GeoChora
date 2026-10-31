@@ -23,11 +23,14 @@ from task_env.controllers.canonical.kinematics import (
 )
 from task_env.planners.contracts import ExpertAction
 from task_env.planners.cartesian import CartesianPosePlanner, CartesianPosePlannerConfig
-from task_env.utils.rotation import normalize_quat_wxyz, quat_angle_wxyz
+from task_env.utils.rotation import (
+    normalize_quat_wxyz, quat_angle_wxyz, quat_multiply_wxyz,
+    rotate_vector_wxyz,
+)
 
 from .controller import (
     LiberoMixedControlConfigV1, LiberoMixedControllerV3,
-    LiberoMixedControllerV4, LiberoOperationalSpaceConfigV1,
+    LiberoMixedControllerV4, LiberoMixedControllerV5, LiberoOperationalSpaceConfigV1,
     LiberoOperationalSpaceConfigV2,
 )
 from .source_gravity import SOURCE_GRAVITY_PROFILE_V1
@@ -39,6 +42,7 @@ SOLUTION_SCHEMA_V2 = "libero-bowl-to-plate-solution-v2"
 SOLUTION_SCHEMA_V3 = "libero-bowl-to-plate-solution-v3"
 SOLUTION_SCHEMA_V4 = "libero-bowl-to-plate-solution-v4"
 SOLUTION_SCHEMA_V5 = "libero-bowl-to-plate-solution-v5"
+SOLUTION_SCHEMA_V6 = "libero-bowl-to-plate-solution-v6"
 POSE_ACTION_SCHEMA_V1 = "libero-world-pose-wxyz-absolute-v1"
 TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
@@ -295,6 +299,23 @@ _OPENING_BY_STAGE_V5 = {
     "carry": 0.055,
     "place": 0.055,
 }
+_OPENING_BY_STAGE_V6 = {
+    # Match the measured LIBERO demonstration pinch: enter with an open jaw,
+    # close across the rim wall, and preserve that aperture through lift/carry.
+    "approach": 0.042,
+    "descend": 0.042,
+    "grasp": 0.010,
+    "lift": 0.008,
+    "carry": 0.008,
+    "place": 0.008,
+    "release": 0.042,
+}
+_DEMO_TCP_BOWL_LOCAL_M = np.asarray(
+    (-0.04555440076829924, 0.002120461738427656, 0.03321187804063996),
+    dtype=np.float64,
+)
+_DEMO_DATASET_SHA256 = "ff6f26121653c77280eb40a38773a74141c11a8509f3466058cb56dd2cc60ead"
+_DEMO_DATASET_REVISION = "e434c228d52f21e37c6f45046a6476a8fa362b8d"
 _STAGE_TIMEOUTS_V4 = {
     "approach": 180, "descend": 120, "grasp": 60,
     "lift": 180, "carry": 180, "place": 120,
@@ -465,6 +486,68 @@ def solution_identity_v5(
     })
 
 
+def solution_identity_v6(
+    source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+    planner_config: CartesianPosePlannerConfig | None = None,
+) -> str:
+    """Bind a demonstration-grounded rim grasp and conservative pose path."""
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        max_translation_per_step=0.0025,
+        max_translation_acceleration_per_step=0.001,
+        max_rotation_per_step=0.04,
+        max_rotation_acceleration_per_step=0.02,
+        settle_steps=0,
+        max_steps=200,
+    )
+    controller_identity = LiberoMixedControllerV5(
+        arm_resolver_identity=arm_resolver_identity,
+    ).identity
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V6,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "arm_resolver_identity": arm_resolver_identity,
+        "controller_identity": controller_identity,
+        "parent_profile_identity": solution_identity_v5(
+            source_xml_sha256, source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=selected_config, planner_config=selected_planner,
+        ),
+        "grasp_frame": {
+            "reference": "public_bowl_and_plate_body_pose_world_wxyz_live_until_grasp_v1",
+            "tcp_offset_bowl_local_m": _DEMO_TCP_BOWL_LOCAL_M.tolist(),
+            "offset_source": "LIBERO task-0 demonstrated pre-lift median",
+            "dataset_revision": _DEMO_DATASET_REVISION,
+            "dataset_file_sha256": _DEMO_DATASET_SHA256,
+            "jaw_orientation": "reset_tcp_orientation_relative_to_bowl_v1",
+            "plate_reference": "follow_public_plate_pose_until_grasp_then_freeze_v1",
+            "approach_height_above_bowl_origin_m": 0.15,
+        },
+        "opening_m": _OPENING_BY_STAGE_V6,
+        "contact_policy": "bilateral_source_finger_contact_two_boundaries_then_retain_pinch_v2",
+        "planner": {
+            "owner": "task_env.planners.cartesian.CartesianPosePlanner",
+            "max_translation_per_step_m": selected_planner.max_translation_per_step,
+            "max_translation_acceleration_per_step_m": selected_planner.max_translation_acceleration_per_step,
+            "max_rotation_per_step_rad": selected_planner.max_rotation_per_step,
+            "max_rotation_acceleration_per_step_rad": selected_planner.max_rotation_acceleration_per_step,
+            "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
+            "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
+        },
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
 def _body_position(observation: Mapping[str, object], key: str) -> np.ndarray:
     try:
         value = np.asarray(observation["privileged_state"][key], dtype=np.float64)[0, :3]
@@ -473,6 +556,17 @@ def _body_position(observation: Mapping[str, object], key: str) -> np.ndarray:
     if value.shape != (3,) or not np.isfinite(value).all():
         raise ValueError(f"public LIBERO body pose {key} must contain a finite world position")
     return value.copy()
+
+
+def _body_pose(observation: Mapping[str, object], key: str) -> np.ndarray:
+    """Return a validated public world position/quaternion body pose."""
+    try:
+        value = np.asarray(observation["privileged_state"][key], dtype=np.float64)[0]
+    except (KeyError, TypeError, IndexError) as exc:
+        raise ValueError(f"public LIBERO observation is missing {key}") from exc
+    if value.shape != (7,) or not np.isfinite(value).all():
+        raise ValueError(f"public LIBERO body pose {key} must contain a finite world pose")
+    return np.concatenate((value[:3], normalize_quat_wxyz(value[3:7])))
 
 
 def _state_vector(observation: Mapping[str, object]) -> tuple[np.ndarray, np.ndarray]:
@@ -1521,13 +1615,142 @@ class LiberoPickPlaceSolutionV5(LiberoPickPlaceSolutionV4):
         return report
 
 
+class LiberoPickPlaceSolutionV6(LiberoPickPlaceSolutionV5):
+    """Demonstration-grounded radial rim pinch using the public bowl pose."""
+
+    solution_schema_version = SOLUTION_SCHEMA_V6
+
+    def __init__(self, source_xml: bytes | str, source_closure_digest: str, *,
+                 arm_resolver_identity: str,
+                 config: LiberoPickPlaceSolutionConfigV1 | None = None,
+                 planner_config: CartesianPosePlannerConfig | None = None):
+        selected_planner = planner_config or CartesianPosePlannerConfig(
+            max_translation_per_step=0.0025,
+            max_translation_acceleration_per_step=0.001,
+            max_rotation_per_step=0.04,
+            max_rotation_acceleration_per_step=0.02,
+            settle_steps=0,
+            max_steps=200,
+        )
+        super().__init__(
+            source_xml, source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=config, planner_config=selected_planner,
+        )
+        self._bowl_reference_pose = None
+        self._plate_reference_pose = None
+        self._tcp_quaternion_in_bowl = None
+        self.identity = solution_identity_v6(
+            self.source_xml_sha256, self.source_closure_digest,
+            arm_resolver_identity=self.arm_resolver_identity,
+            config=self.config, planner_config=self.planner_config,
+        )
+
+    def reset(self, observation, info: Mapping[str, object], metadata, **kwargs) -> None:
+        super().reset(observation, info, metadata, **kwargs)
+        self._bowl_reference_pose = _body_pose(observation, "bowl_body_pose")
+        self._plate_reference_pose = _body_pose(observation, "plate_body_pose")
+        self._plate = self._plate_reference_pose[:3].copy()
+        current_pose = np.asarray(observation["state"].get("ee_pose"), dtype=np.float64)
+        if current_pose.shape != (7,) or not np.isfinite(current_pose).all():
+            raise ValueError("LIBERO Solution v6 requires the public TCP world pose at reset")
+        bowl_inverse = self._bowl_reference_pose[3:7].copy()
+        bowl_inverse[1:] *= -1.0
+        self._tcp_quaternion_in_bowl = quat_multiply_wxyz(
+            bowl_inverse, normalize_quat_wxyz(current_pose[3:7]),
+        )
+
+    def _opening_for_stage(self):
+        return _OPENING_BY_STAGE_V6.get(self.stage)
+
+    def _refresh_bowl_reference_from_public_pose(self, observation) -> bool:
+        if self.stage not in {"approach", "descend"}:
+            return False
+        current_bowl = _body_pose(observation, "bowl_body_pose")
+        current_plate = _body_pose(observation, "plate_body_pose")
+        previous_bowl = self._bowl_reference_pose
+        previous_plate = self._plate_reference_pose
+        changed = any((
+            previous is None
+            or float(np.linalg.norm(current[:3] - previous[:3])) > 1e-6
+            or quat_angle_wxyz(current[3:7], previous[3:7]) > 1e-6
+        ) for current, previous in (
+            (current_bowl, previous_bowl), (current_plate, previous_plate),
+        ))
+        if changed:
+            self._bowl_reference_pose = current_bowl
+            self._plate_reference_pose = current_plate
+            self._initial_bowl = current_bowl[:3].copy()
+            self._plate = current_plate[:3].copy()
+            self._pose_plan = None
+            self._pose_plan_index = 0
+            self._pose_plan_stage = None
+        return changed
+
+    def _target(self) -> np.ndarray:
+        if self._bowl_reference_pose is None or self._plate_reference_pose is None:
+            raise RuntimeError("LIBERO Solution v6 reset geometry is unavailable")
+        bowl = self._bowl_reference_pose
+        plate = self._plate_reference_pose
+        bowl_quaternion = normalize_quat_wxyz(bowl[3:7])
+        offset_world = rotate_vector_wxyz(bowl_quaternion, _DEMO_TCP_BOWL_LOCAL_M)
+        self._grasp_quaternion_wxyz = quat_multiply_wxyz(
+            bowl_quaternion, self._tcp_quaternion_in_bowl,
+        )
+        if self.stage == "approach":
+            local_approach = _DEMO_TCP_BOWL_LOCAL_M.copy()
+            local_approach[2] = 0.15
+            return bowl[:3] + rotate_vector_wxyz(bowl_quaternion, local_approach)
+        if self.stage in {"descend", "grasp"}:
+            return bowl[:3] + offset_world
+        if self.stage == "lift":
+            return bowl[:3] + offset_world + np.asarray((0.0, 0.0, 0.20))
+        if self.stage == "carry":
+            return np.asarray((plate[0], plate[1], bowl[2] + 0.20)) + offset_world
+        if self.stage in {"place", "release"}:
+            return plate[:3] + np.asarray((0.0, 0.0, 0.085)) + offset_world
+        raise RuntimeError(f"LIBERO Solution v6 has no target in stage {self.stage!r}")
+
+    def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
+        proposal = super().act(observation, info)
+        self._last_action_receipt.update({
+            "solution_schema_version": SOLUTION_SCHEMA_V6,
+            "grasp_strategy": "demonstration_grounded_bowl_local_radial_rim_pinch_v1",
+            "grasp_frame": {
+                "bowl_local_tcp_offset_m": _DEMO_TCP_BOWL_LOCAL_M.tolist(),
+                "bowl_reference_pose_world_wxyz": self._bowl_reference_pose.tolist(),
+                "plate_reference_pose_world_wxyz": self._plate_reference_pose.tolist(),
+                "tcp_quaternion_in_bowl_wxyz": self._tcp_quaternion_in_bowl.tolist(),
+                "dataset_revision": _DEMO_DATASET_REVISION,
+                "dataset_file_sha256": _DEMO_DATASET_SHA256,
+            },
+            "opening_target_m": float(self._opening_for_stage()),
+        })
+        return ExpertAction(
+            action=proposal.action, stage=proposal.stage,
+            diagnostics=dict(self._last_action_receipt["diagnostics"]),
+        )
+
+    def outcome_report(self) -> dict[str, object]:
+        report = super().outcome_report()
+        report["solution_schema_version"] = SOLUTION_SCHEMA_V6
+        report["solution_profile"] = {
+            "grasp_strategy": "demonstration_grounded_bowl_local_radial_rim_pinch_v1",
+            "bowl_local_tcp_offset_m": _DEMO_TCP_BOWL_LOCAL_M.tolist(),
+            "opening_by_stage_m": _OPENING_BY_STAGE_V6,
+            "dataset_revision": _DEMO_DATASET_REVISION,
+            "dataset_file_sha256": _DEMO_DATASET_SHA256,
+        }
+        return report
+
+
 __all__ = [
     "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2", "SOLUTION_SCHEMA_V3", "SOLUTION_SCHEMA_V4",
-    "SOLUTION_SCHEMA_V5",
+    "SOLUTION_SCHEMA_V5", "SOLUTION_SCHEMA_V6",
     "POSE_ACTION_SCHEMA_V1",
     "LiberoPickPlaceSolutionConfigV1", "LiberoPickPlaceSolutionV1",
     "LiberoPickPlaceSolutionV2", "LiberoPickPlaceSolutionV3", "LiberoPickPlaceSolutionV4",
-    "LiberoPickPlaceSolutionV5",
+    "LiberoPickPlaceSolutionV5", "LiberoPickPlaceSolutionV6",
     "solution_identity_v1", "solution_identity_v2", "solution_identity_v2_frozen",
-    "solution_identity_v3", "solution_identity_v4", "solution_identity_v5",
+    "solution_identity_v3", "solution_identity_v4", "solution_identity_v5", "solution_identity_v6",
 ]
