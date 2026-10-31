@@ -60,6 +60,23 @@ def _quat_error_rad(actual, expected) -> float:
     return float(2.0 * math.acos(dot))
 
 
+def _rotate_vector_wxyz(quaternion, vector) -> np.ndarray:
+    q = np.asarray(quaternion, dtype=np.float64)
+    v = np.asarray(vector, dtype=np.float64)
+    if q.shape != (4,) or v.shape != (3,) or not np.isfinite(q).all() or not np.isfinite(v).all():
+        raise ValueError("free-body frame rotation requires finite wxyz quaternion and xyz vector")
+    norm = float(np.linalg.norm(q))
+    if norm <= 1e-15:
+        raise ValueError("free-body orientation quaternion has zero norm")
+    w, x, y, z = q / norm
+    rotation = np.asarray((
+        (1 - 2 * (y*y + z*z), 2 * (x*y - z*w), 2 * (x*z + y*w)),
+        (2 * (x*y + z*w), 1 - 2 * (x*x + z*z), 2 * (y*z - x*w)),
+        (2 * (x*z - y*w), 2 * (y*z + x*w), 1 - 2 * (x*x + y*y)),
+    ), dtype=np.float64)
+    return rotation @ v
+
+
 def _load_episode(path: Path) -> dict:
     identity = _h5_identity(path)
     with h5py.File(path, "r") as file:
@@ -263,6 +280,7 @@ def _validate_bundle(bundle: dict) -> list[dict]:
         dq_rows: list[dict[str, float]] = []
         z_rows: list[float] = []
         vz_rows: list[float] = []
+        twist_rows: list[list[float]] = []
         for index, row in enumerate(rows):
             _check(row.get("boundary_index") == index, "stale_time", f"episode {episode_index} witness row index is stale", errors)
             view = row.get("canonical_state_view_v1", {})
@@ -334,18 +352,27 @@ def _validate_bundle(bundle: dict) -> list[dict]:
             if cube is None or free_joint is None:
                 z_rows.append(math.nan)
                 vz_rows.append(math.nan)
+                twist_rows.append([math.nan] * 6)
                 continue
             z = float(cube["position"][2])
             z_rows.append(z)
             q_cube = free_joint.get("position", [])
             v_cube = free_joint.get("velocity", [])
             _check(len(q_cube) == 7 and len(v_cube) == 6
-                   and free_joint.get("position_representation") == "xyz_meter_quaternion_wxyz",
+                   and free_joint.get("position_representation") == "xyz_meter_quaternion_wxyz"
+                   and free_joint.get("velocity_representation") == "linear_xyz_meter_per_second_angular_xyz_radian_per_second"
+                   and free_joint.get("velocity_expressed_in") == {"entity_id": "free-cube", "frame_id": "free_cube"}
+                   and free_joint.get("velocity_reference_point") == {"entity_id": "free-cube", "frame_id": "free_cube"},
                    "obs_cube_pose", f"episode {episode_index} cube free-joint contract is malformed", errors)
             if len(q_cube) == 7:
                 _check(np.allclose(np.asarray(q_cube[:3], dtype=np.float64), cube["position"], atol=2e-7, rtol=0),
                        "obs_cube_pose", f"episode {episode_index} cube COM/free-joint position differs at {index}", errors)
-            vz = float(v_cube[2]) if len(v_cube) == 6 else math.nan
+            try:
+                world_linear_velocity = _rotate_vector_wxyz(cube["quaternion_wxyz"], v_cube[:3])
+                vz = float(world_linear_velocity[2])
+            except (TypeError, ValueError, IndexError):
+                vz = math.nan
+            twist_rows.append([float(value) for value in v_cube] if len(v_cube) == 6 else [math.nan] * 6)
             vz_rows.append(vz)
             if hand is not None:
                 expected_hand_position = np.asarray(hand["position"], dtype=np.float32)
@@ -547,7 +574,7 @@ def _validate_bundle(bundle: dict) -> list[dict]:
             _check(abs(z_rows[0] - float(physical["physical_acceptance"]["reset_pose_world_m"][2]))
                    <= float(original_thresholds["reset_position_tolerance_m"]),
                    "obs_cube_pose", f"episode {episode_index} reset free-cube height differs from frozen source", errors)
-            _check(max(abs(value) for value in vz_rows[:1]) <= float(original_thresholds["reset_twist_max_abs"]),
+            _check(max(abs(value) for value in twist_rows[0]) <= float(original_thresholds["reset_twist_max_abs"]),
                    "obs_cube_pose", f"episode {episode_index} reset free-cube twist exceeds frozen bound", errors)
             _check(drop >= float(original_thresholds["free_body_drop_min_m"]),
                    "task_predicate", f"episode {episode_index} free cube did not fall the frozen minimum distance", errors)
