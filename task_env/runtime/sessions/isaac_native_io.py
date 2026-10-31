@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from importlib import metadata as importlib_metadata
+import math
 from threading import RLock
 from typing import Any
 
@@ -305,7 +306,7 @@ class IsaacSimNativeRuntimeIOV1:
 
             if self._dg03:
                 self._dg03_input.validate()
-                self._author_dg03_mimic(PhysxSchema, Sdf, UsdPhysics)
+                self._verify_dg03_mimic(PhysxSchema, UsdPhysics)
 
             authored_scenes = [p for p in self._stage.Traverse() if p.IsA(UsdPhysics.Scene)]
             if len(authored_scenes) != 1:
@@ -458,15 +459,25 @@ class IsaacSimNativeRuntimeIOV1:
                     execution=self._execution, source=self._source,
                     native_metadata=self._metadata, writer_id='panda-main/position-servo-v1',
                 )
+                mimic = self._dg03_mimic_receipt
                 expected_mimic = {
-                    'schema_version': 'physx-public-mimic-authoring-v1',
+                    'schema_version': 'physx-public-source-mimic-verification-v1',
                     'follower_joint': 'finger_joint2', 'reference_joint': 'finger_joint1',
-                    'gearing': 1.0, 'offset_m': 0.0,
-                    'natural_frequency_hz': 100.0, 'damping_ratio': 1.0,
+                    'source_polycoef': (0.0, 1.0, 0.0, 0.0, 0.0),
+                    'source_solref': (0.005, 1.0), 'source_solimp': (0.95, 0.99, 0.001),
+                    'schema_authored_in_delivery': True, 'runtime_stage_mutated': False,
                 }
-                if any(self._dg03_mimic_receipt.get(name) != value
-                       for name, value in expected_mimic.items()):
-                    raise ValueError('DG03 public mimic authoring differs from its exact receipt contract')
+                if (mimic is None or any(mimic.get(name) != value
+                                         for name, value in expected_mimic.items())
+                        or not math.isclose(
+                            float(mimic['physx_attributes']['naturalFrequency']),
+                            self.drive_receipt.mimic_natural_frequency_hz,
+                            rel_tol=0.0, abs_tol=1e-6)
+                        or not math.isclose(
+                            float(mimic['physx_attributes']['dampingRatio']),
+                            self.drive_receipt.mimic_damping_ratio,
+                            rel_tol=0.0, abs_tol=1e-6)):
+                    raise ValueError('DG03 public mimic source mapping differs from its source-bound drive receipt')
             self._manager = SimulationManager
         except BaseException as primary:
             for label, cleanup in (
@@ -481,13 +492,40 @@ class IsaacSimNativeRuntimeIOV1:
                                      f"{type(cleanup_error).__name__}: {cleanup_error}")
             raise
 
-    def _author_dg03_mimic(self, PhysxSchema, Sdf, UsdPhysics) -> None:
-        """Author the source finger equality through the installed public PhysX schema."""
+    def _verify_dg03_mimic(self, PhysxSchema, UsdPhysics) -> None:
+        """Read the source-derived mimic from the verified delivery without mutation."""
         if not self._dg03 or self._stage is None:
-            raise RuntimeError('DG03 mimic authoring requires its exact composed USD stage')
-        expected_native = {'finger_joint1', 'finger_joint2'}
-        if {self._source.joints.get(f'panda-main/{name}') for name in expected_native} != expected_native:
+            raise RuntimeError('DG03 mimic verification requires its exact composed USD stage')
+        import math
+        import xml.etree.ElementTree as ET
+
+        expected_native = ('finger_joint1', 'finger_joint2')
+        if {self._source.joints.get(f'panda-main/{name}') for name in expected_native} != set(expected_native):
             raise ValueError('DG03 RuntimeSource does not bind the exact finger Joint pair')
+        loaded = self._source.scene_source.loaded_delivery
+        source_xml = loaded.source_input_bytes.get('panda.xml')
+        if type(source_xml) is not bytes:
+            raise ValueError('DG03 delivery does not retain the exact source MJCF bytes')
+        root = ET.fromstring(source_xml)
+        equalities = root.findall('./equality/joint')
+        if len(equalities) != 1:
+            raise ValueError('DG03 source must contain exactly one joint equality')
+        equality = equalities[0]
+        if (equality.get('joint1'), equality.get('joint2'), equality.get('active', 'true')) != (
+                'finger_joint1', 'finger_joint2', 'true'):
+            raise ValueError('DG03 source equality differs from its exact active finger pair')
+        polycoef = tuple(float(x) for x in equality.get('polycoef', '0 1 0 0 0').split())
+        solref = tuple(float(x) for x in equality.get('solref', '0.02 1').split())
+        solimp = tuple(float(x) for x in equality.get('solimp', '0.9 0.95 0.001').split())
+        home = root.find("./keyframe/key[@name='home']")
+        qpos = () if home is None else tuple(float(x) for x in home.get('qpos', '').split())
+        if (polycoef != (0.0, 1.0, 0.0, 0.0, 0.0) or len(solref) != 2
+                or len(solimp) != 3 or solref[0] <= 0.0 or len(qpos) != 9
+                or qpos[7] != qpos[8]):
+            raise ValueError('DG03 source equality is outside the exact affine/home mapping subset')
+        expected_gearing = 1.0 / polycoef[1]
+        expected_offset = qpos[8] - qpos[7] - polycoef[0] / polycoef[1]
+        expected_frequency = 1.0 / (2.0 * math.pi * solref[0])
         matches = {name: [] for name in expected_native}
         for prim in self._stage.Traverse():
             if prim.GetName() in matches and prim.IsA(UsdPhysics.PrismaticJoint):
@@ -495,30 +533,37 @@ class IsaacSimNativeRuntimeIOV1:
         if any(len(rows) != 1 for rows in matches.values()):
             raise ValueError('DG03 source must compose exactly one public prismatic prim per finger Joint')
         reference, follower = matches['finger_joint1'][0], matches['finger_joint2'][0]
-        mimic = PhysxSchema.PhysxMimicJointAPI.Apply(follower, 'transX')
-        if not mimic:
-            raise RuntimeError('installed PhysxMimicJointAPI.Apply did not return a valid public API')
-        follower.CreateRelationship('physxMimicJoint:transX:referenceJoint').SetTargets(
-            [reference.GetPath()],
-        )
-        follower.CreateAttribute(
-            'physxMimicJoint:transX:gearing', Sdf.ValueTypeNames.Float,
-        ).Set(1.0)
-        follower.CreateAttribute(
-            'physxMimicJoint:transX:offset', Sdf.ValueTypeNames.Float,
-        ).Set(0.0)
-        follower.CreateAttribute(
-            'physxMimicJoint:transX:naturalFrequency', Sdf.ValueTypeNames.Float,
-        ).Set(100.0)
-        follower.CreateAttribute(
-            'physxMimicJoint:transX:dampingRatio', Sdf.ValueTypeNames.Float,
-        ).Set(1.0)
+        if not follower.HasAPI(PhysxSchema.PhysxMimicJointAPI, 'transX'):
+            raise ValueError('DG03 source-derived PhysxMimicJointAPI is absent from the composed delivery')
+        relationship = follower.GetRelationship('physxMimicJoint:transX:referenceJoint')
+        if not relationship or relationship.GetTargets() != [reference.GetPath()]:
+            raise ValueError('DG03 source-derived mimic reference differs from the source equality')
+        expected_attrs = {
+            'gearing': expected_gearing,
+            'offset': expected_offset,
+            'naturalFrequency': expected_frequency,
+            'dampingRatio': solref[1],
+        }
+        actual_attrs = {}
+        for name, expected in expected_attrs.items():
+            attr = follower.GetAttribute(f'physxMimicJoint:transX:{name}')
+            if not attr or not attr.IsValid():
+                raise ValueError(f'DG03 source-derived mimic omits PhysX field {name}')
+            actual = float(attr.Get())
+            if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-6):
+                raise ValueError(f'DG03 source-derived mimic {name} differs from source mapping')
+            actual_attrs[name] = actual
         self._dg03_mimic_receipt = {
-            'schema_version': 'physx-public-mimic-authoring-v1',
+            'schema_version': 'physx-public-source-mimic-verification-v1',
             'follower_joint': 'finger_joint2', 'follower_path': str(follower.GetPath()),
             'reference_joint': 'finger_joint1', 'reference_path': str(reference.GetPath()),
-            'gearing': 1.0, 'offset_m': 0.0,
-            'natural_frequency_hz': 100.0, 'damping_ratio': 1.0,
+            'source_polycoef': polycoef,
+            'source_home_qpos_m': (qpos[7], qpos[8]),
+            'source_solref': solref, 'source_solimp': solimp,
+            'physx_attributes': actual_attrs,
+            'solimp_native_mapping': 'none; source metadata retained, no PhysX mimic equivalent',
+            'schema_authored_in_delivery': True,
+            'runtime_stage_mutated': False,
             'applied_schemas': list(follower.GetAppliedSchemas()),
         }
 

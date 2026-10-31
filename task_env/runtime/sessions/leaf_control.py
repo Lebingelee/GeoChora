@@ -1019,8 +1019,10 @@ class IsaacSourceTendonDriveReceiptV1:
     mimic_reference_joint: str = 'finger_joint1'
     mimic_gearing: float = 1.0
     mimic_offset_m: float = 0.0
-    mimic_natural_frequency_hz: float = 100.0
+    mimic_natural_frequency_hz: float = 31.830988618379067
     mimic_damping_ratio: float = 1.0
+    mimic_source_solref: tuple[float, float] = (0.005, 1.0)
+    mimic_source_solimp: tuple[float, float, float] = (0.95, 0.99, 0.001)
     tendon_name: str = 'split'
     tendon_joint_names: tuple[str, str] = (
         'panda-main/finger_joint1', 'panda-main/finger_joint2',
@@ -1083,18 +1085,25 @@ class IsaacSourceTendonDriveReceiptV1:
             raise ValueError('DG03 Arm native indices must be unique')
         if (self.mimic_follower_joint, self.mimic_reference_joint,
                 float(self.mimic_gearing), float(self.mimic_offset_m),
-                float(self.mimic_natural_frequency_hz), float(self.mimic_damping_ratio),
-                self.tendon_name, tuple(self.tendon_joint_names),
+                float(self.mimic_damping_ratio), tuple(self.mimic_source_solref),
+                tuple(self.mimic_source_solimp), self.tendon_name, tuple(self.tendon_joint_names),
                 tuple(self.tendon_native_joint_names), tuple(self.tendon_coefficients),
                 self.actuator_name, float(self.actuator_gain),
                 float(self.actuator_length_bias), float(self.actuator_rate_bias),
                 tuple(self.actuator_control_range), tuple(self.actuator_force_range),
                 float(self.canonical_opening_range_m)) != (
-                'finger_joint2', 'finger_joint1', 1.0, 0.0, 100.0, 1.0,
+                'finger_joint2', 'finger_joint1', 1.0, 0.0, 1.0, (0.005, 1.0),
+                (0.95, 0.99, 0.001),
                 'split', ('panda-main/finger_joint1', 'panda-main/finger_joint2'),
                 ('finger_joint1', 'finger_joint2'), (0.5, 0.5), 'actuator8',
                 0.01568627451, -100.0, -10.0, (0.0, 255.0), (-100.0, 100.0), 0.08):
             raise ValueError('DG03 receipt does not encode the exact source tendon/actuator law')
+        if (type(self.mimic_natural_frequency_hz) not in (int, float)
+                or isinstance(self.mimic_natural_frequency_hz, bool)
+                or not math.isclose(float(self.mimic_natural_frequency_hz),
+                                    1.0 / (2.0 * math.pi * self.mimic_source_solref[0]),
+                                    rel_tol=0.0, abs_tol=1e-12)):
+            raise ValueError('DG03 mimic frequency must be derived from the exact MJCF solref time constant')
         if any(names.index(name) in {row.native_dof_index for row in drives}
                for name in self.tendon_native_joint_names):
             raise ValueError('DG03 tendon finger DOFs must remain state-only, outside Arm drives')
@@ -1137,6 +1146,8 @@ class IsaacSourceTendonDriveReceiptV1:
             'mimic_offset_m': float(self.mimic_offset_m),
             'mimic_natural_frequency_hz': float(self.mimic_natural_frequency_hz),
             'mimic_damping_ratio': float(self.mimic_damping_ratio),
+            'mimic_source_solref': list(self.mimic_source_solref),
+            'mimic_source_solimp': list(self.mimic_source_solimp),
             'tendon_name': self.tendon_name, 'tendon_joint_names': list(self.tendon_joint_names),
             'tendon_native_joint_names': list(self.tendon_native_joint_names),
             'tendon_coefficients': list(self.tendon_coefficients),
@@ -1224,6 +1235,24 @@ def compile_isaac_source_tendon_receipt_v1(
             JointReference('panda-main', canonical.split('/', 1)[1]),
             native_name, index, 'radian', float(lower), float(upper),
         ))
+    source_xml = source.scene_source.loaded_delivery.source_input_bytes.get('panda.xml')
+    if type(source_xml) is not bytes:
+        raise ValueError('DG03 source tendon receipt requires the exact source MJCF bytes')
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(source_xml)
+    equality_rows = root.findall('./equality/joint')
+    if len(equality_rows) != 1:
+        raise ValueError('DG03 source tendon receipt requires its exact one joint equality')
+    equality = equality_rows[0]
+    if (equality.get('joint1'), equality.get('joint2'), equality.get('active', 'true')) != (
+            'finger_joint1', 'finger_joint2', 'true'):
+        raise ValueError('DG03 source tendon receipt equality differs from its source finger pair')
+    polycoef = tuple(float(x) for x in equality.get('polycoef', '0 1 0 0 0').split())
+    solref = tuple(float(x) for x in equality.get('solref', '0.02 1').split())
+    solimp = tuple(float(x) for x in equality.get('solimp', '0.9 0.95 0.001').split())
+    if (polycoef != (0.0, 1.0, 0.0, 0.0, 0.0)
+            or solref != (0.005, 1.0) or solimp != (0.95, 0.99, 0.001)):
+        raise ValueError('DG03 source equality is outside its exact affine/compliance profile')
     return IsaacSourceTendonDriveReceiptV1(
         'isaac-source-tendon-drive-receipt-v1', provenance_kind,
         source.scene_definition.identity_hash, source.source_closure_digest,
@@ -1233,6 +1262,9 @@ def compile_isaac_source_tendon_receipt_v1(
         int(source.task_artifact.timebase.control_substeps), writer_id,
         tuple(native_metadata.native_dof_names), native_metadata.native_position_limits,
         tuple(drives),
+        mimic_natural_frequency_hz=1.0 / (2.0 * math.pi * solref[0]),
+        mimic_damping_ratio=solref[1], mimic_source_solref=solref,
+        mimic_source_solimp=solimp,
     )
 
 

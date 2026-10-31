@@ -1,9 +1,9 @@
 """N1 bounded public Isaac/PhysX probe for Panda prismatic coupling and tendon effort.
 
 This is a diagnostic harness, not the source-bound Core RuntimeSession route.
-It opens one exact locally validated DG03 USD delivery, uses public Isaac
-Articulation/SimulationManager APIs, and records whether a PhysX mimic schema
-actually couples the two source prismatic finger joints.
+It opens one exact locally validated DG03 USD delivery, reads the source-derived
+PhysX mimic from that composed USD without authoring it, uses public Isaac
+Articulation/SimulationManager APIs, and records whether PhysX consumes it.
 """
 
 from __future__ import annotations
@@ -97,6 +97,8 @@ def _verify_frozen_delivery(manifest_path: Path, expected_manifest_sha256: str) 
         raw = root.joinpath(*Path(mapping[path_key]).parts).read_bytes()
         if hashlib.sha256(raw).hexdigest() != mapping[sha_key]:
             raise ValueError(f"N1 bound local metadata hash mismatch: {path_key}")
+        if path_key == "recipe_path":
+            recipe = json.loads(raw)
     for row in mapping.get("support_files", ()):
         raw = root.joinpath(*Path(row["path"]).parts).read_bytes()
         if len(raw) != row["size_bytes"] or hashlib.sha256(raw).hexdigest() != row["sha256"]:
@@ -108,6 +110,7 @@ def _verify_frozen_delivery(manifest_path: Path, expected_manifest_sha256: str) 
         "entry_sha256": hashlib.sha256(entry).hexdigest(),
         "source_verified": False,
         "locally_validated": True,
+        "source_equality_mapping": recipe["derivation"]["overlay_receipt"]["source_equality_mapping"],
     }
 
 
@@ -171,12 +174,12 @@ def run_probe(manifest_path: Path, expected_manifest_sha256: str, receipt_path: 
         from isaacsim.core.experimental.prims import Articulation
         from isaacsim.core.experimental.utils import app as app_utils
         from isaacsim.core.simulation_manager import SimulationManager
-        from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics
+        from pxr import PhysxSchema, UsdGeom, UsdPhysics
 
         result["public_apis_used"] = [
             "SimulationManager.setup_simulation/step/get_num_physics_steps/get_simulation_time",
             "Articulation.dof_names/get_dof_positions/get_dof_velocities/set_dof_positions/set_dof_velocities/set_dof_efforts",
-            "PhysxSchema.PhysxMimicJointAPI.Apply",
+            "composed PhysxMimicJointAPI HasAPI/referenceJoint/attributes (read-only)",
         ]
         task_threads = int(carb.settings.get_settings().get_as_int("/plugins/carb.tasking.plugin/threadCount"))
         result["kit_task_threads"] = task_threads
@@ -210,25 +213,32 @@ def run_probe(manifest_path: Path, expected_manifest_sha256: str, receipt_path: 
             raise ValueError("N1 did not locate exactly the source pair of prismatic finger joints")
         result["finger_joint_paths"] = {name: str(prim.GetPath()) for name, prim in joints.items()}
 
-        mimic = PhysxSchema.PhysxMimicJointAPI.Apply(joints["finger_joint2"], "transX")
-        if not mimic:
-            raise RuntimeError("PhysxMimicJointAPI.Apply did not return a valid follower API")
-        joints["finger_joint2"].CreateRelationship(
+        source_mimic = delivery_facts["source_equality_mapping"]
+        if not joints["finger_joint2"].HasAPI(PhysxSchema.PhysxMimicJointAPI, "transX"):
+            raise ValueError("source-derived PhysxMimicJointAPI is absent from the composed delivery")
+        mimic_relationship = joints["finger_joint2"].GetRelationship(
             "physxMimicJoint:transX:referenceJoint"
-        ).SetTargets([joints["finger_joint1"].GetPath()])
-        joints["finger_joint2"].CreateAttribute(
-            "physxMimicJoint:transX:gearing", Sdf.ValueTypeNames.Float,
-        ).Set(1.0)
-        joints["finger_joint2"].CreateAttribute(
-            "physxMimicJoint:transX:offset", Sdf.ValueTypeNames.Float,
-        ).Set(0.0)
-        joints["finger_joint2"].CreateAttribute(
-            "physxMimicJoint:transX:naturalFrequency", Sdf.ValueTypeNames.Float,
-        ).Set(100.0)
-        joints["finger_joint2"].CreateAttribute(
-            "physxMimicJoint:transX:dampingRatio", Sdf.ValueTypeNames.Float,
-        ).Set(1.0)
-        result["mimic_schema_authored"] = True
+        )
+        if (not mimic_relationship
+                or mimic_relationship.GetTargets() != [joints["finger_joint1"].GetPath()]):
+            raise ValueError("composed source-derived mimic reference differs from exact MJCF equality")
+        source_to_physx_attributes = {
+            "gearing": "physx_gearing",
+            "offset": "physx_offset_m",
+            "naturalFrequency": "physx_natural_frequency_hz",
+            "dampingRatio": "physx_damping_ratio",
+        }
+        result["mimic_physx_attributes"] = {}
+        for attr_name, source_key in source_to_physx_attributes.items():
+            attr = joints["finger_joint2"].GetAttribute(f"physxMimicJoint:transX:{attr_name}")
+            expected = float(source_mimic[source_key])
+            if (not attr or not attr.IsValid()
+                    or not math.isclose(float(attr.Get()), expected, rel_tol=0.0, abs_tol=1e-6)):
+                raise ValueError(f"composed source-derived mimic field differs from source: {attr_name}")
+            result["mimic_physx_attributes"][attr_name] = float(attr.Get())
+        result["mimic_schema_authored"] = False
+        result["mimic_schema_from_source_delivery"] = True
+        result["source_mimic_mapping"] = source_mimic
         result["mimic_reference_joint"] = str(joints["finger_joint1"].GetPath())
         result["mimic_applied_schema"] = list(joints["finger_joint2"].GetAppliedSchemas())
 
@@ -295,7 +305,7 @@ def run_probe(manifest_path: Path, expected_manifest_sha256: str, receipt_path: 
         result["mimic_q_difference_max_m"] = max(mimic_diffs, default=math.inf)
         result["mimic_follower_motion_m"] = max(follower_deltas, default=0.0)
         result["mimic_schema_supported"] = bool(
-            result["mimic_schema_authored"]
+            result["mimic_schema_from_source_delivery"]
             and result["mimic_follower_motion_m"] >= 1e-4
             and result["mimic_q_difference_max_m"] <= 2e-3
         )

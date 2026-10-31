@@ -76,12 +76,12 @@ F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
 F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
 F05_DG03_USD_ASSET_ID = 'f05-dg03-menagerie-panda-source-preserving-isaac-usd'
-F05_DG03_USD_ASSET_VERSION = 'f05-dg03-isaac-usd-v1'
-F05_DG03_USD_DELIVERY_IDENTITY_SHA256 = '4d30cdb6867acab7a96bd1a8bc92d95cad9d539bec9eec5865023bb79076c215'
-F05_DG03_USD_DELIVERY_CLOSURE_SHA256 = 'd64528cabcac9a40a070bd0720974d0a0282504812e1aebf0f09b4f774eb181a'
-F05_DG03_USD_DELIVERY_MANIFEST_SHA256 = '5f64dfd0058e97352b27ce17f28de912e9160d5be93ae3997a513f296a4273b0'
-F05_DG03_USD_RECIPE_SHA256 = '2f85b5632c99bbbda14057850b2b80f0db27c58a079d638b14323ab865d89ddc'
-F05_DG03_USD_REPORT_SHA256 = '392790c1bafabd6fbd67f2210ffbff5531202874e4bc3303199762779f0d57db'
+F05_DG03_USD_ASSET_VERSION = 'f05-dg03-isaac-usd-v2'
+F05_DG03_USD_DELIVERY_IDENTITY_SHA256 = '8c9ba5d52f3891dc84801f048049a2bf6fe49b2a302f92f44ef62e9a442596e5'
+F05_DG03_USD_DELIVERY_CLOSURE_SHA256 = '6ab12e93543897f4ae1eedf3169fa58c12b9b5acde7b99fa5c14356e56c479f4'
+F05_DG03_USD_DELIVERY_MANIFEST_SHA256 = 'd40752401b3e71a62fc7a763ef49782e7bf2bd5e548c1a5375cb274a80a4b243'
+F05_DG03_USD_RECIPE_SHA256 = 'aab6a0e18f9d51776f0146b07b900127bc798fa8f960481d69d2ebc90f4e5d85'
+F05_DG03_USD_REPORT_SHA256 = '24a7efbf361be85ab10e3bb68acd4f1dad5763670211de09f6cbc4503dca5535'
 # The DG02 Core route tracks source-FK pose targets whose Panda solution is
 # redundant. The bounded probes found a tradeoff: gain 0.0 reduced target error
 # and speed versus 1.0, while increasing joint jitter. Use the midpoint for a
@@ -631,7 +631,7 @@ class F05Dg03IsaacUsdCandidateInputV1:
             raise ValueError('DG03 delivery recipe/report bytes differ from its frozen local package')
         expected_options = {
             'f05_goal': 'DG03',
-            'lowering': 'public-isaac-physx-mimic-and-source-tendon-v1',
+            'lowering': 'public-isaac-source-mimic-and-tendon-v2',
             'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
             'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
         }
@@ -644,8 +644,12 @@ class F05Dg03IsaacUsdCandidateInputV1:
             raise ValueError('DG03 representation options do not bind the frozen Core lowering')
         if delivery.manifest_bytes_sha256 != F05_DG03_USD_DELIVERY_MANIFEST_SHA256:
             raise ValueError('DG03 manifest bytes differ from the frozen delivery manifest')
-        if not delivery.report.passed:
-            raise ValueError('DG03 local delivery report did not pass')
+        if (not delivery.report.passed
+                or 'source-equality-mimic-mapping' not in delivery.report.checks
+                or not any('solimp' in item.lower() for item in delivery.report.losses)
+                or not any('source-tendon effort behavior' in item
+                            for item in delivery.report.unconsumed)):
+            raise ValueError('DG03 v2 local report omits exact source-mimic mapping or unresolved tendon limits')
         expected_bodies, expected_joints = _f05_dg02_usd_source_bindings()
         if (dict(source.joints) != expected_joints
                 or dict(source.joint_targets) != expected_joints
@@ -725,7 +729,7 @@ def build_f05_dg03_isaac_usd_candidate(delivery_manifest, *, task_seed=POSITION_
     bodies, joints = _f05_dg02_usd_source_bindings()
     options = {
         'f05_goal': 'DG03',
-        'lowering': 'public-isaac-physx-mimic-and-source-tendon-v1',
+        'lowering': 'public-isaac-source-mimic-and-tendon-v2',
         'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
         'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
     }

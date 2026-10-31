@@ -15,7 +15,7 @@ from task_env.diagnostics.tasks.f04_candidate_s1_support import _action_for
 
 DELIVERY_MANIFEST = (
     "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/"
-    "f05_diagnostic_goal03/window_001/isaac_usd_v1/delivery_v1_005/delivery_manifest.json"
+    "f05_diagnostic_goal03/window_001/isaac_usd_v1/delivery_v1_007/delivery_manifest.json"
 )
 
 

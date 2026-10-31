@@ -1,7 +1,7 @@
-"""Package and cold-validate the bounded DG03 source-preserving Isaac USD.
+"""Package and cold-validate the bounded DG03 source-derived Isaac USD v2.
 
-The report is a local representation check. It records unresolved public
-PhysX consumers explicitly and does not qualify the model or a runtime route.
+The report proves local source-to-USD mapping only. Public PhysX consumption
+and the end-to-end Core route require their separate native receipts.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path, PurePosixPath
 import shutil
 from typing import Mapping
@@ -30,7 +31,7 @@ TASK_RECIPE_SHA256 = "6a705816e619681e948a1b243e0588dd1db2f667ecfb085bd2e55b1c3f
 LOCAL_CHECKS = (
     "source-bytes", "derived-output-bytes", "usd-composition", "dependency-closure",
     "selected-scene-structure", "panda-dof-units-limits", "physx-drive-profile",
-    "free-body-and-support", "source-losses-recorded",
+    "source-equality-mimic-mapping", "free-body-and-support", "source-losses-recorded",
 )
 
 
@@ -98,12 +99,12 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
     report_rel = "metadata/f05_dg03_local_validation_report.json"
     manifest_rel = "delivery_manifest.json"
 
-    overlay_receipt_path = window / "isaac_usd_v1/derived_v1/overlay_receipt.json"
+    overlay_receipt_path = window / "isaac_usd_v1/derived_v2/overlay_receipt.json"
     overlay_receipt_raw = overlay_receipt_path.read_bytes()
     overlay_receipt = json.loads(overlay_receipt_raw)
-    entry_rel = "derived_v1/panda.usda"
+    entry_rel = "derived_v2/panda.usda"
     entry_raw = _copy_exact(
-        window / "isaac_usd_v1/derived_v1/panda.usda", output / entry_rel,
+        window / "isaac_usd_v1/derived_v2/panda.usda", output / entry_rel,
     )
     converter_root = window / "isaac_usd_v1/converter_output"
     if not converter_root.is_dir():
@@ -159,6 +160,35 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
         raise ValueError("DG03 support lacks collision geometry")
     if not any(prim.GetTypeName() == "MjcTendon" for prim in stage.Traverse()):
         raise ValueError("DG03 source tendon declaration is absent from composed USD")
+    equality_mapping = overlay_receipt.get("source_equality_mapping")
+    if (type(equality_mapping) is not dict
+            or equality_mapping.get("source_polycoef") != [0.0, 1.0, 0.0, 0.0, 0.0]
+            or equality_mapping.get("source_solref") != [0.005, 1.0]
+            or equality_mapping.get("source_solimp") != [0.95, 0.99, 0.001]
+            or equality_mapping.get("physx_gearing") != 1.0
+            or equality_mapping.get("physx_offset_m") != 0.0):
+        raise ValueError("DG03 USD v2 does not bind the exact source-derived affine equality mapping")
+    follower_rows = [prim for prim in stage.Traverse()
+                     if prim.GetName() == "finger_joint2" and prim.IsA(UsdPhysics.PrismaticJoint)]
+    reference_rows = [prim for prim in stage.Traverse()
+                      if prim.GetName() == "finger_joint1" and prim.IsA(UsdPhysics.PrismaticJoint)]
+    if len(follower_rows) != 1 or len(reference_rows) != 1:
+        raise ValueError("DG03 USD v2 must contain one exact source finger pair")
+    follower = follower_rows[0]
+    schemas = follower.GetMetadata("apiSchemas")
+    if schemas is None or "PhysxMimicJointAPI:transX" not in schemas.GetAppliedItems():
+        raise ValueError("DG03 USD v2 does not compose its source-derived PhysxMimicJointAPI")
+    relation = follower.GetRelationship("physxMimicJoint:transX:referenceJoint")
+    if relation is None or relation.GetTargets() != [reference_rows[0].GetPath()]:
+        raise ValueError("DG03 USD v2 mimic relationship differs from the frozen source finger pair")
+    for suffix, key in (("gearing", "physx_gearing"), ("offset", "physx_offset_m"),
+                        ("naturalFrequency", "physx_natural_frequency_hz"),
+                        ("dampingRatio", "physx_damping_ratio")):
+        attr = follower.GetAttribute(f"physxMimicJoint:transX:{suffix}")
+        if (not attr or not attr.IsValid()
+                or not math.isclose(float(attr.Get()), float(equality_mapping[key]),
+                                    rel_tol=0.0, abs_tol=1e-6)):
+            raise ValueError(f"DG03 USD v2 mimic attribute differs from source mapping: {suffix}")
     source_root_xml = ET.fromstring(source_files["panda.xml"])
     equality = source_root_xml.find("./equality")
     if equality is None or not list(equality):
@@ -183,8 +213,10 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
         "composed_mjc_schema_counts": dict(sorted(mjc_type_counts.items())),
         "source_tendon_preserved_as_mjc_metadata": True,
         "source_equality_preserved_as_mjc_metadata": False,
-        "equality_loss": "MuJoCo USD Converter 0.6.1 output contains no MjcEquality prim; source XML bytes remain bound separately.",
-        "consumer_claim": "No PhysX equality consumer is established by this local USD audit.",
+        "source_equality_lowered_to_physx_mimic": True,
+        "source_equality_mapping": equality_mapping,
+        "equality_loss": "The affine identity equality is source-derived into PhysxMimicJointAPI; MuJoCo solimp impedance shaping remains bound metadata because PhysX mimic has no solimp field.",
+        "consumer_claim": "The exact source-derived mimic API is present in the composed delivery; native PhysX consumption awaits the separate N1 receipt.",
     }
     correction_rel = "metadata/overlay_audit_correction.json"
     correction_raw = (json.dumps(correction, sort_keys=True, indent=2, allow_nan=False) + "\n").encode()
@@ -198,7 +230,7 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
     source_asset = AssetDefinition(
         schema_version="asset-definition-v1",
         asset_id="f05-dg03-menagerie-panda-source-preserving-isaac-usd",
-        asset_version="f05-dg03-isaac-usd-v1",
+        asset_version="f05-dg03-isaac-usd-v2",
         source_reference="mujoco-menagerie://franka_emika_panda/panda.xml",
         source_revision=SOURCE_REVISION,
         source_content_sha256=SOURCE_CLOSURE_SHA256,
@@ -211,16 +243,16 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
         "source_closure_sha256": SOURCE_CLOSURE_SHA256,
         "base_converter_output_sha256": _sha((window / "isaac_usd_v1/converter_output/panda.usda").read_bytes()),
         "overlay_source_sha256": overlay_receipt["derived_entry_sha256"],
-        "actuator_policy": "seven-source-derived-arm-UsdPhysics-DriveAPI-plus-Core-tendon-effort",
-        "equality_policy": "MJCF joint equality is not emitted by converter 0.6.1; public PhysX mapping remains unresolved",
+        "actuator_policy": "seven-source-derived-arm-UsdPhysics-DriveAPI-plus-Core-fixed-tendon-law-v1",
+        "equality_policy": "source-affine-joint-equality-to-PhysxMimicJointAPI-with-timeconstant-derived-compliance",
         "task_scene_recipe_sha256": TASK_RECIPE_SHA256,
     }
     options_sha = _canonical_sha(options)
-    representation_id = "isaacsim-6.2.0.0-f05-dg03-source-preserving-usd-v1"
+    representation_id = "isaacsim-6.2.0.0-f05-dg03-source-derived-usd-v2"
     recipe = {
         "schema_version": "f05-dg03-isaac-usd-recipe-v1",
         "recipe_id": "f05-dg03-menagerie-panda-source-preserving-isaac-usd",
-        "recipe_version": "1",
+        "recipe_version": "2",
         "source": {
             "family": "menagerie-panda", "revision": SOURCE_REVISION,
             "entry_file": "panda.xml", "entry_sha256": SOURCE_XML_SHA256,
@@ -229,14 +261,15 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
         },
         "derivation": {
             "converter": "mujoco-usd-converter 0.6.1 from installed Isaac Sim 6.2.0.0",
-            "overlay": "DG03 separate source-preserving layer, not DG02 USD or r009 source",
+            "overlay": "DG03 v2 separate source-derived layer, not DG02 USD or r009 source",
             "overlay_receipt": overlay_receipt,
             "overlay_audit_correction": correction,
             "options": options,
             "validation": "local OpenUSD byte/structure/dependency audit",
         },
         "known_limits": [
-            "local validation does not prove PhysX consumption of MJCF equality/tendon",
+            "local validation does not prove native PhysX consumption of the source-derived equality or Core tendon efforts",
+            "MuJoCo solimp impedance shaping has no PhysX mimic field and is retained as source-bound metadata",
             "arm DriveAPI settings are derived source representation; native force/limit behavior requires a public consumer probe",
             "free cube/support have no authored surface material, collision filters, COM or inertia",
             "USD contact law is not claimed equivalent to MuJoCo or GeoPhys",
@@ -284,17 +317,17 @@ def package_delivery(*, repo: Path, window: Path, output: Path) -> dict[str, obj
         "local-validated", source_asset.identity_hash, SOURCE_REVISION,
         SOURCE_CLOSURE_SHA256, _sha(source_manifest_raw), SOURCE_XML_SHA256,
         source_variant_sha, _sha(entry_raw), output_closure_sha, "/panda", "usd",
-        representation_id, recipe["recipe_id"], "1", _sha(recipe_raw), options_sha,
+        representation_id, recipe["recipe_id"], "2", _sha(recipe_raw), options_sha,
         "f05-dg03-local-usd-checker-v1", _sha(checker_raw), "Luna1",
         LOCAL_CHECKS,
         (
-            "source MJCF equality is not emitted by converter 0.6.1; the original source bytes remain separately bound and a PhysX mapping is unresolved",
-            "native arm drive force/limit behavior is not established by schema authoring",
+            "MuJoCo solimp impedance shaping remains source-bound metadata because PhysX mimic has no equivalent impedance field",
+            "native source-derived mimic and arm-drive behavior require their separate public PhysX consumer receipts",
             "free cube/support contact material, COM, inertia and collision filtering are not source-bound",
         ),
         (
-            "PhysX equality/mimic representation and consumer",
-            "PhysX fixed tendon consumer",
+            "native PhysX consumption of the exact source-derived mimic API",
+            "native Core source-tendon effort behavior through public Articulation.set_dof_efforts; no native PhysX tendon object is authored",
             "cross-provider contact-material equivalence",
         ),
         True,
