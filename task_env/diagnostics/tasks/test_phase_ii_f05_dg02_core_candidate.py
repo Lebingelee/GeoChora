@@ -285,3 +285,74 @@ def test_dg02_selected_pose_controller_does_not_integrate_unachieved_targets():
     assert F05_DG02_NULLSPACE_REFERENCE_GAIN == 1.0
     np.testing.assert_allclose(second_desired, first_desired, atol=1e-12)
     np.testing.assert_allclose(second_servo, first_servo, atol=1e-12)
+
+
+def test_dg02_tracking_probe_worker_fails_closed_outside_500_steps(tmp_path):
+    import hashlib
+    import json
+    import subprocess
+    from pathlib import Path
+    import pytest
+
+    from task_env.diagnostics.tasks.f05_dg02_core_n2_probe import _verify
+
+    core = Path(__file__).resolve().parents[3]
+    provider = core / "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_geophys_provider/GeoPhys"
+    plan = {
+        "schema_version": "f05-dg02-core-n2-plan-v1",
+        "classification": (
+            "actual Core SelectedReferenceEnv PositionServoV1; source-bound GeoPhys/USD; "
+            "bounded tracking probe, not a formal cell or qualification"
+        ),
+        "oracle": {
+            "episode_count": 1,
+            "control_intervals_per_episode": 100,
+            "control_substeps": 5,
+            "horizon": 100,
+        },
+        "limits": {
+            "physics_steps_reserved": 500,
+            "per_probe_steps_max": 500,
+            "physics_steps_before": 16940,
+            "probe_physics_steps_max": 18000,
+        },
+        "source": {"candidate_horizon": 100},
+        "code": {"tracked_inputs": []},
+        "input_identity": {
+            "core_worktree": str(core),
+            "core_input_head": subprocess.run(
+                ["git", "-C", str(core), "rev-parse", "HEAD"], check=True,
+                capture_output=True, text=True,
+            ).stdout.strip(),
+            "core_branch": subprocess.run(
+                ["git", "-C", str(core), "branch", "--show-current"], check=True,
+                capture_output=True, text=True,
+            ).stdout.strip(),
+            "provider_worktree": str(provider),
+            "provider_input_head": subprocess.run(
+                ["git", "-C", str(provider), "rev-parse", "HEAD"], check=True,
+                capture_output=True, text=True,
+            ).stdout.strip(),
+            "provider_branch": subprocess.run(
+                ["git", "-C", str(provider), "branch", "--show-current"], check=True,
+                capture_output=True, text=True,
+            ).stdout.strip(),
+        },
+    }
+    path = tmp_path / "tracking_probe.plan.json"
+    sidecar = tmp_path / "tracking_probe.plan.json.sha256"
+    raw = json.dumps(plan, sort_keys=True).encode()
+    path.write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    sidecar.write_text(digest + "\n", encoding="ascii")
+    accepted, verified_hash = _verify(path, sidecar)
+    assert accepted["limits"]["physics_steps_reserved"] == 500
+    assert verified_hash == digest
+
+    plan["oracle"]["control_intervals_per_episode"] = 101
+    plan["limits"]["physics_steps_reserved"] = 505
+    raw = json.dumps(plan, sort_keys=True).encode()
+    path.write_bytes(raw)
+    sidecar.write_text(hashlib.sha256(raw).hexdigest() + "\n", encoding="ascii")
+    with pytest.raises(ValueError, match="500-step envelope"):
+        _verify(path, sidecar)

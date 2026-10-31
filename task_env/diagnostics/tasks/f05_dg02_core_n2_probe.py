@@ -49,11 +49,37 @@ def _verify(plan_path: Path, sidecar: Path) -> tuple[dict, str]:
     plan = json.loads(raw)
     if plan.get("schema_version") != "f05-dg02-core-n2-plan-v1":
         raise ValueError("unsupported DG02 formal Core N2 plan schema")
-    if plan.get("classification") != (
+    formal_classification = (
         "actual Core SelectedReferenceEnv PositionServoV1; source-bound GeoPhys/USD; "
         "formal bounded diagnostic, not qualification"
-    ):
-        raise ValueError("formal Core N2 classification changed after freeze")
+    )
+    tracking_probe_classification = (
+        "actual Core SelectedReferenceEnv PositionServoV1; source-bound GeoPhys/USD; "
+        "bounded tracking probe, not a formal cell or qualification"
+    )
+    classification = plan.get("classification")
+    if classification not in {formal_classification, tracking_probe_classification}:
+        raise ValueError("unsupported Core N2 plan classification")
+    if classification == tracking_probe_classification:
+        oracle = plan["oracle"]
+        limits = plan["limits"]
+        expected_steps = (
+            int(oracle["episode_count"])
+            * int(oracle["control_intervals_per_episode"])
+            * int(oracle["control_substeps"])
+        )
+        if (
+            int(oracle["episode_count"]) != 1
+            or int(oracle["control_intervals_per_episode"]) != 100
+            or int(oracle["horizon"]) != 100
+            or int(plan["source"]["candidate_horizon"]) != 100
+            or expected_steps != 500
+            or int(limits["physics_steps_reserved"]) != expected_steps
+            or expected_steps > int(limits["per_probe_steps_max"])
+            or int(limits["physics_steps_before"]) + expected_steps
+            > int(limits["probe_physics_steps_max"])
+        ):
+            raise ValueError("DG02 tracking probe exceeds or changes its frozen 500-step envelope")
     for row in plan["code"]["tracked_inputs"]:
         path = Path(row["path"]).resolve(strict=True)
         if _sha(path) != row["sha256"]:
@@ -270,11 +296,12 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
     expected_dt = float(plan["oracle"]["outer_control_dt_s"])
     substeps = int(plan["oracle"]["control_substeps"])
     phases = plan["oracle"]["schedule"]
+    interval_count = int(plan["oracle"]["control_intervals_per_episode"])
     phase_poses = {phase["phase"]: _target_pose(env, phase) for phase in phases}
     boundaries = [initial]
     transitions = []
     run_instance_id = id(env)
-    for index in range(int(plan["oracle"]["control_intervals_per_episode"])):
+    for index in range(interval_count):
         phase = next(row for row in phases if row["start"] <= index < row["stop"])
         before = _record_state(env)
         opening_m = float(phase["opening_m"])
@@ -343,8 +370,8 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
             "contact_observation": contact_observation,
         })
         boundaries.append(after)
-    if len(boundaries) != 301 or len(transitions) != 300:
-        raise ValueError("Core N2 did not publish the frozen T=300/T+1=301 episode shape")
+    if len(boundaries) != interval_count + 1 or len(transitions) != interval_count:
+        raise ValueError("Core N2 did not publish the frozen T/T+1 episode shape")
     episode_end = env.stop(f"dg02_core_n2_episode_{episode_index}")
     outcome = episode_end.outcome
     if (outcome.end_reason != "horizon_reached" or outcome.terminated
@@ -362,9 +389,10 @@ def _run_episode(env, *, plan: dict, episode_index: int, counter_path: Path) -> 
     finally:
         os.close(directory_fd)
     cold_metadata = load_structured_control_records_h5(h5_path)
-    if (recording["transition_count"] != 300 or recording["observation_count"] != 301
-            or cold_metadata["transition_count"] != 300
-            or cold_metadata["observation_count"] != 301):
+    if (recording["transition_count"] != interval_count
+            or recording["observation_count"] != interval_count + 1
+            or cold_metadata["transition_count"] != interval_count
+            or cold_metadata["observation_count"] != interval_count + 1):
         raise ValueError("Core N2 Generic H5 finalizer/readback rejected T/T+1 counts")
     counter = json.loads(counter_path.read_text(encoding="utf-8"))
     return {
@@ -465,9 +493,10 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
     primary_error = None
     close_returned = False
     try:
-        for episode_index in (1, 2):
+        episode_count = int(plan["oracle"]["episode_count"])
+        for episode_index in range(1, episode_count + 1):
             episodes.append(_run_episode(env, plan=plan, episode_index=episode_index, counter_path=counter_path))
-        if episodes[0]["run_instance_id"] != episodes[1]["run_instance_id"]:
+        if len({row["run_instance_id"] for row in episodes}) != 1:
             raise ValueError("Core N2 episodes did not use the same SelectedReferenceEnv instance")
     except BaseException as error:
         primary_error = error
@@ -489,7 +518,7 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         and counter.get("completed_physics_steps") == expected_steps
     )
     if primary_error is None and not counts_complete:
-        primary_error = RuntimeError("Core N2 physics-step counter differs from exact 3000-step reservation")
+        primary_error = RuntimeError("Core N2 physics-step counter differs from exact frozen reservation")
     result = {
         "schema_version": "f05-dg02-core-n2-worker-receipt-v1",
         "run_id": plan["run_id"],
@@ -507,10 +536,17 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         "episode_count": len(episodes),
         "episodes": episodes,
         "same_selected_env_instance": (
-            len(episodes) == 2 and episodes[0]["run_instance_id"] == episodes[1]["run_instance_id"]
+            bool(episodes) and len({row["run_instance_id"] for row in episodes}) == 1
         ),
         "selected_env_close_returned": close_returned,
-        "status": "PASS_CORE_N2_FORMAL_2X300" if primary_error is None else "PARTIAL_CORE_N2",
+        "status": (
+            "PASS_CORE_N2_FORMAL_2X300"
+            if primary_error is None and plan["oracle"]["episode_count"] == 2
+            and plan["oracle"]["control_intervals_per_episode"] == 300
+            else "PASS_CORE_N2_TRACKING_PROBE"
+            if primary_error is None
+            else "PARTIAL_CORE_N2"
+        ),
     }
     if primary_error is not None:
         result["failure"] = f"{type(primary_error).__name__}: {primary_error}"
