@@ -241,6 +241,12 @@ def build_candidate_receipt(plan: dict, *, include_candidate: bool = False):
         "dg02_scene_identity_sha256": scene.identity_hash,
         "execution_identity_sha256": execution.identity_hash,
         "controller_binding_plan_identity_sha256": candidate.controller_binding_plan.identity_hash,
+        "controller_identity_sha256": candidate.env.controller.identity,
+        "controller_method": {
+            "nullspace_reference_gain": candidate.env.controller.nullspace_reference_gain,
+            "reference_source": "reset_typed_arm_joint_position",
+            "projector": "svd_right_nullspace_v1",
+        },
         "action_config": {
             "joint_position_correction_gain": candidate_input.action_config.joint_position_correction_gain,
             "gripper_default_force_N": candidate_input.action_config.gripper_default_force_N,

@@ -428,6 +428,8 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         "dg02_task_artifact_identity_sha256",
         "dg02_scene_identity_sha256",
         "controller_binding_plan_identity_sha256",
+        "controller_identity_sha256",
+        "controller_method",
         "public_model_counts",
     ):
         if rebuilt.get(key) != static_receipt.get(key):

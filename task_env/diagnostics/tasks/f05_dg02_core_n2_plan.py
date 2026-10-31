@@ -67,6 +67,9 @@ def _tracked_inputs(*rows: dict) -> list[dict]:
         CORE / "task_env/diagnostics/tasks/f05_dg02_core_s1_probe.py",
         CORE / "task_env/diagnostics/tasks/f05_dg02_core_source_receipt.py",
         CORE / "task_env/diagnostics/tasks/f05_dg02_n1_supervisor.py",
+        CORE / "task_env/controllers/canonical/controller.py",
+        CORE / "task_env/controllers/canonical/position_profile.py",
+        CORE / "task_env/tasks/position_candidate/builder.py",
     })
     return [
         {"path": str(path.resolve(strict=True)), "sha256": _sha(path.resolve(strict=True))}
@@ -163,6 +166,11 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
         "tracking": control["tracking"],
         "original_physical_acceptance": physical["physical_acceptance"],
         "controller_action_config": action_config,
+        "controller_method": {
+            "nullspace_reference_gain": candidate.env.controller.nullspace_reference_gain,
+            "reference_source": "reset_typed_arm_joint_position",
+            "projector": "svd_right_nullspace_v1",
+        },
         "required_public_model_counts": {
             "n_actuators": 8, "n_dof": 15, "n_equalities": 1,
             "n_qpos": 16, "n_tendons": 1,

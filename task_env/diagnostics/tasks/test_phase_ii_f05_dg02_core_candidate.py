@@ -75,3 +75,53 @@ def test_dg02_candidate_input_rejects_unversioned_or_legacy_f05_input_before_nat
     )
     with pytest.raises(ValueError, match="unsupported F05 DG02"):
         invalid.validate()
+
+
+def test_canonical_dls_reset_posture_correction_is_limited_to_the_task_nullspace():
+    import numpy as np
+    import pytest
+
+    from task_env.artifacts import PoseWorld
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.controller import CanonicalPandaController
+    from task_env.environment import ActionConfig
+
+    class _Kinematics:
+        source_sha256 = "a" * 64
+        limits = np.tile(np.asarray((-2.0, 2.0)), (7, 1))
+        base_transform = np.eye(4)
+
+        @staticmethod
+        def fk_jacobian(_q):
+            transform = np.eye(4)
+            jacobian = np.zeros((6, 7), dtype=np.float64)
+            jacobian[:, :6] = np.eye(6)
+            return transform, jacobian
+
+    class _State:
+        joint_position = {f"panda-v1/joint{index}": 0.0 for index in range(1, 8)}
+        pose_world = {"panda-v1/ee": PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))}
+
+    request = RequestedAction(
+        "absolute_pose", "world", "quaternion_wxyz",
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+    )
+    config = ActionConfig(joint_position_correction_gain=1.0)
+    legacy = CanonicalPandaController(_Kinematics(), artifact_hash="b" * 64, config=config)
+    _canonical, legacy_desired, _legacy_servo = legacy._compute_arm(_State(), request)
+    np.testing.assert_allclose(legacy_desired, np.zeros(7), atol=1e-12)
+
+    corrected = CanonicalPandaController(
+        _Kinematics(), artifact_hash="b" * 64, config=config,
+        nullspace_reference_gain=0.2,
+    )
+    corrected.set_nullspace_reference((0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.05))
+    _canonical, desired, _servo = corrected._compute_arm(_State(), request)
+    np.testing.assert_allclose(desired[:6], np.zeros(6), atol=1e-12)
+    assert desired[6] == pytest.approx(0.009)
+
+    joint_request = RequestedAction(
+        "absolute_joint", None, "none", (0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, 0.0),
+    )
+    _canonical, joint_desired, _joint_servo = corrected._compute_arm(_State(), joint_request)
+    np.testing.assert_allclose(joint_desired, joint_request.values[:7], atol=1e-12)

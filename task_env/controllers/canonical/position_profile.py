@@ -108,6 +108,7 @@ class PandaPositionServoProfileV1:
         entity_id='panda-main', joint_ids=None, finger_joint_ids=None,
         hand_frame_id='hand', native_prefix='', actuator_prefix='', tcp_profile=None,
         target_bindings=None, open_actuator=_DEFAULT_OPEN_ACTUATOR, native_drive_receipt=None,
+        nullspace_reference_gain=0.0,
     ):
         self.artifact = artifact
         self.source = source
@@ -160,7 +161,9 @@ class PandaPositionServoProfileV1:
         self.gripper_semantic_id = f'{entity_id}/gripper'
         self._algorithm = CanonicalPandaController(
             model, artifact_hash=artifact.identity_hash, config=config,
+            nullspace_reference_gain=nullspace_reference_gain,
         )
+        self.nullspace_reference_gain = self._algorithm.nullspace_reference_gain
         self.requirements = position_state_requirements(
             self.writer_id, entity_id=self.entity_id,
             joint_ids=self._source_joint_ids, hand_frame_id=self.hand_frame_id,
@@ -227,7 +230,8 @@ class PandaPositionServoProfileV1:
             raise ValueError('PositionServoV1 RuntimeSource identity or bindings changed after construction')
 
     @classmethod
-    def from_source(cls, artifact, source, *, config: ActionConfig | None = None):
+    def from_source(cls, artifact, source, *, config: ActionConfig | None = None,
+                    nullspace_reference_gain=0.0):
         if not isinstance(artifact, TaskArtifactV1):
             raise TypeError('PositionServoV1 requires TaskArtifactV1')
         if artifact.timebase.physics_dt != 0.002 or artifact.timebase.control_substeps != 5 or artifact.timebase.control_dt != 0.01:
@@ -257,11 +261,15 @@ class PandaPositionServoProfileV1:
             source.scene_source.xml, scene,
         )
         model = PandaKinematics(materialized_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
-        return cls(artifact=artifact, source=source, scene=scene, model=model, config=config)
+        return cls(
+            artifact=artifact, source=source, scene=scene, model=model, config=config,
+            nullspace_reference_gain=nullspace_reference_gain,
+        )
 
     @classmethod
     def from_usd_source(cls, artifact, source, *, execution, kinematics_source_xml: str,
-                        native_drive_receipt=None, config: ActionConfig | None = None):
+                        native_drive_receipt=None, config: ActionConfig | None = None,
+                        nullspace_reference_gain=0.0):
         """Bind the existing Position math to one versioned USD source.
 
         ``kinematics_source_xml`` must be locally calibrated to the selected
@@ -357,12 +365,14 @@ class PandaPositionServoProfileV1:
             artifact=artifact, source=source, scene=scene, model=model, config=config,
             target_bindings=arm_targets, open_actuator=None,
             native_drive_receipt=native_drive_receipt,
+            nullspace_reference_gain=nullspace_reference_gain,
         )
 
     @classmethod
     def for_entity(
         cls, artifact, source, *, entity_id, joint_ids, finger_joint_ids,
         hand_frame_id, native_prefix, actuator_prefix, config: ActionConfig | None = None,
+        nullspace_reference_gain=0.0,
     ):
         """Bind the same audited Panda algorithm to one independent Scene Entity."""
         if not isinstance(artifact, TaskArtifactV1):
@@ -410,6 +420,7 @@ class PandaPositionServoProfileV1:
             entity_id=entity_id, joint_ids=joint_ids, finger_joint_ids=finger_joint_ids,
             hand_frame_id=hand_frame_id, native_prefix=native_prefix,
             actuator_prefix=actuator_prefix, tcp_profile=tcp_profile,
+            nullspace_reference_gain=nullspace_reference_gain,
         )
 
     def controller_binding(self):
@@ -513,7 +524,7 @@ class PandaPositionServoProfileV1:
     def reset(self, publication, plan):
         self._validate_source(self.source)
         plan_identity = self._validate_plan(plan)
-        self._adapt_publication(publication)
+        state = self._adapt_publication(publication)
         boundary = publication.view.boundary
         clock = publication.view.sample_clock
         if boundary.control_step != 0 or clock.sample_index != 0 or clock.simulation_time_s != 0.0:
@@ -523,6 +534,10 @@ class PandaPositionServoProfileV1:
         self._reset_sample_id = boundary.reset_sample_id
         self._next_control_step = 0
         self._activation_boundary_id = boundary.boundary_id
+        self._algorithm.set_nullspace_reference([
+            state.joint_position[f'panda-v1/joint{index}']
+            for index in range(1, 8)
+        ])
         return boundary.boundary_id
 
     def _prepare_switch_activation(self, publication, plan):
@@ -545,7 +560,7 @@ class PandaPositionServoProfileV1:
             raise ValueError('PositionServoV1 candidate identity or algorithm parameters changed after construction')
         self._validate_source(self.source)
         plan_identity = self._validate_plan(plan)
-        self._adapt_publication(publication)
+        state = self._adapt_publication(publication)
         boundary = publication.view.boundary
         clock = publication.view.sample_clock
         if (clock.clock_domain != 'evaluation_boundary'
@@ -555,11 +570,12 @@ class PandaPositionServoProfileV1:
         return (
             self.identity, plan_identity, boundary.episode_id,
             boundary.reset_sample_id, boundary.control_step, boundary.boundary_id,
+            [state.joint_position[f'panda-v1/joint{index}'] for index in range(1, 8)],
         )
 
     def _activate_switch_memory(self, prepared):
         """Install prevalidated mid-episode cursor state on this fresh instance."""
-        identity, plan_identity, episode_id, reset_sample_id, control_step, boundary_id = prepared
+        identity, plan_identity, episode_id, reset_sample_id, control_step, boundary_id, q_reference = prepared
         if identity != self.identity or self._next_control_step is not None:
             raise ValueError('PositionServoV1 prepared switch activation no longer matches this instance')
         self._plan_identity_hash, self._episode_id, self._reset_sample_id = (
@@ -567,6 +583,7 @@ class PandaPositionServoProfileV1:
         )
         self._next_control_step = control_step
         self._activation_boundary_id = boundary_id
+        self._algorithm.set_nullspace_reference(q_reference)
 
     def compute(self, publication, requested: RequestedAction, plan):
         self._validate_source(self.source)

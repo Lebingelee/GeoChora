@@ -60,6 +60,10 @@ def _validate_f05_native_position_action_config(controller_config):
 F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
 F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
+# The DG02 Core route tracks source-FK pose targets whose Panda solution is
+# redundant. Keep its reset posture in the Jacobian right-nullspace; other
+# versioned Position routes retain the frozen DLS-only behavior by default.
+F05_DG02_NULLSPACE_REFERENCE_GAIN = 0.2
 
 
 def _f05_dg02_usd_source_bindings():
@@ -637,16 +641,23 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
         else controller_config
     )
+    nullspace_reference_gain = (
+        F05_DG02_NULLSPACE_REFERENCE_GAIN
+        if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        else 0.0
+    )
     if type(source) is UsdRuntimeSourceV1:
         profile = PandaPositionServoProfileV1.from_usd_source(
             artifact, source, execution=input_v1.execution,
             kinematics_source_xml=input_v1.kinematics_source_xml,
             native_drive_receipt=native_drive_receipt,
             config=position_config,
+            nullspace_reference_gain=nullspace_reference_gain,
         )
     else:
         profile = PandaPositionServoProfileV1.from_source(
             artifact, source, config=controller_config,
+            nullspace_reference_gain=nullspace_reference_gain,
         )
     plan = compile_control_binding_plan(scene, (profile.controller_binding(),))
     if input_v1.reset_plan.reset_sample.task_seed < 0:

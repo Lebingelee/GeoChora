@@ -222,6 +222,18 @@ def _validate_bundle(bundle: dict) -> list[dict]:
            "joint_address", "frozen observation joint address map/order changed", errors)
     _check(oracle.get("original_physical_acceptance") == physical["physical_acceptance"],
            "com", "formal physical thresholds/COM reference differ from the unchanged oracle", errors)
+    expected_controller_method = {
+        "nullspace_reference_gain": 0.2,
+        "reference_source": "reset_typed_arm_joint_position",
+        "projector": "svd_right_nullspace_v1",
+    }
+    _check(oracle.get("controller_method") == expected_controller_method
+           and static.get("controller_method") == expected_controller_method
+           and static.get("controller_identity_sha256") == worker.get("episodes", [{}])[0].get("controller_identity")
+           and len(worker.get("episodes", [])) == 2
+           and all(row.get("controller_identity") == static.get("controller_identity_sha256")
+                   for row in worker.get("episodes", [])),
+           "cross_run", "DG02 reset-posture method or source-bound controller identity differs across plan/producer", errors)
 
     _check(source_actuation.get("tendon_joint_names") == ["finger_joint1", "finger_joint2"]
            and source_actuation.get("tendon_coefficients") == [0.5, 0.5],
@@ -340,6 +352,8 @@ def _validate_bundle(bundle: dict) -> list[dict]:
                        "reset_write_receipt", f"episode {episode_index} did not begin at a true reset boundary", errors)
                 _check(reset_id == episode["worker_reset_sample_id"],
                        "reset_write_receipt", f"episode {episode_index} reset write receipt identity differs", errors)
+                _check(boundary.get("episode_id") == episode.get("worker_episode_id"),
+                       "cross_run", f"episode {episode_index} boundary differs from its producer episode identity", errors)
             episode_ids.append(boundary.get("episode_id"))
             expected_time = index * float(oracle["outer_control_dt_s"])
             _check(boundary.get("control_step") == index
@@ -634,8 +648,10 @@ def _validate_bundle(bundle: dict) -> list[dict]:
                    and settled_speed <= float(original_thresholds["settled_vertical_speed_max_m_s"]),
                    "task_predicate", f"episode {episode_index} free cube did not satisfy the frozen settled-height/speed gates", errors)
 
-        _check(len(set(episode_ids)) == 2, "cross_run", "episode boundary identities are duplicated across resets", errors)
-    _check(len(set(reset_ids)) == 2, "cross_run", "reset-sample identities are duplicated across episodes", errors)
+    _check(len(set(episode_ids)) == 2, "cross_run", "episode boundary identities are duplicated across resets", errors)
+    _check(len(set(reset_ids)) == 1
+           and reset_ids[0] == episodes[0]["worker_reset_sample_id"] == episodes[1]["worker_reset_sample_id"],
+           "cross_run", "episodes do not reuse the one frozen content-addressed ResetSample", errors)
     bundle["tracking_gate_rows"] = gate_rows
     bundle["contact_gate_rows"] = contact_gate_rows
     return errors
@@ -667,8 +683,19 @@ def _mutate_negative(bundle: dict, name: str) -> None:
     elif name == "stale_time":
         episode["witness"]["rows"][10]["canonical_state_view_v1"]["sample_clock"]["simulation_time_s"] += 0.02
     elif name == "cross_run":
-        episode["witness"]["rows"][0]["canonical_state_view_v1"]["boundary"]["episode_id"] = "episode-duplicate"
-        episode["witness"]["rows"][0]["state_boundary_identity"]["episode_id"] = "episode-duplicate"
+        episode = bundle["episodes"][1]
+        first_episode_id = bundle["episodes"][0]["witness"]["rows"][0][
+            "canonical_state_view_v1"]["boundary"]["episode_id"]
+        for index, row in enumerate(episode["witness"]["rows"]):
+            boundary = row["canonical_state_view_v1"]["boundary"]
+            boundary["episode_id"] = first_episode_id
+            row["state_boundary_identity"] = copy.deepcopy(boundary)
+            encoded = json.dumps(
+                boundary, sort_keys=True, separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+            episode["arrays"]["boundary_digest"][index] = np.frombuffer(
+                hashlib.sha256(encoded).digest(), dtype=np.uint8,
+            )
     elif name == "durable_file":
         episode["worker_h5_sha256"] = "0" * 64
     elif name == "obs_joint_position":
@@ -861,8 +888,8 @@ def run(plan_path: Path, sidecar_path: Path, supervisor_path: Path, worker_path:
                 "h5_sha256": ep["identity"]["sha256"],
                 "observation_count": len(ep["witness"]["rows"]),
                 "transition_count": len(ep["controls"]),
-                "boundary_ids": [row["canonical_state_view_v1"]["boundary"]["boundary_id"]
-                                 for row in ep["witness"]["rows"]],
+                "boundary_identity_sha256s": [bytes(row.tolist()).hex()
+                                               for row in ep["arrays"]["boundary_digest"]],
                 "episode_id": ep["witness"]["rows"][0]["canonical_state_view_v1"]["boundary"]["episode_id"],
                 "reset_sample_id": ep["witness"]["rows"][0]["canonical_state_view_v1"]["boundary"]["reset_sample_id"],
                 "contact_observation_reset": worker["episodes"][index - 1].get("contact_observation_reset"),

@@ -9,10 +9,41 @@ from .kinematics import ARM,FINGERS
 
 
 class CanonicalPandaController:
-    def __init__(self,model,*,artifact_hash,config=None):
+    def __init__(self,model,*,artifact_hash,config=None,nullspace_reference_gain=0.0):
+        if (isinstance(nullspace_reference_gain, bool)
+                or not np.isfinite(nullspace_reference_gain)
+                or nullspace_reference_gain < 0.0
+                or nullspace_reference_gain > 1.0):
+            raise ValueError('nullspace reference gain must be finite and in [0, 1]')
         self.model=model;self.artifact_hash=artifact_hash;self.config=config or ActionConfig()
-        self.identity=digest({'schema':'panda-shared-dls-v0','config':asdict(self.config),'source_sha256':model.source_sha256,
-            'target_basis':'achieved_joint_state_one_DLS_increment','gripper':'legacy_physical_force_limited_servo_v0'})
+        self.nullspace_reference_gain=float(nullspace_reference_gain)
+        self._nullspace_reference=None
+        self.identity=digest({'schema':'panda-shared-dls-v1','config':asdict(self.config),'source_sha256':model.source_sha256,
+            'target_basis':'achieved_joint_state_one_DLS_increment',
+            'nullspace_reference':{
+                'gain':self.nullspace_reference_gain,
+                'source':'reset_typed_joint_position' if self.nullspace_reference_gain else 'disabled',
+                'projector':'svd_right_nullspace_v1' if self.nullspace_reference_gain else 'none',
+            },
+            'gripper':'legacy_physical_force_limited_servo_v0'})
+
+    def set_nullspace_reference(self, joint_position):
+        reference=np.asarray(joint_position,dtype=np.float64)
+        if reference.shape!=(7,) or not np.isfinite(reference).all():
+            raise ValueError('nullspace reference requires seven finite arm joint positions')
+        self._nullspace_reference=reference.copy()
+
+    @staticmethod
+    def _right_nullspace_projector(jacobian):
+        jacobian=np.asarray(jacobian,dtype=np.float64)
+        if jacobian.ndim!=2 or jacobian.shape[1]!=7 or not np.isfinite(jacobian).all():
+            raise ValueError('Panda task Jacobian must be a finite matrix with seven columns')
+        _u,singular_values,vh=np.linalg.svd(jacobian,full_matrices=True)
+        if singular_values.size==0 or singular_values[0]<=0.0:
+            return np.eye(7,dtype=np.float64)
+        rank=int(np.count_nonzero(singular_values>singular_values[0]*1e-8))
+        basis=vh[rank:].T
+        return basis@basis.T if basis.size else np.zeros((7,7),dtype=np.float64)
 
     def _compute_arm(self,state,requested):
         cfg=self.config;values=np.array(requested.values,dtype=float);original=values.copy()
@@ -42,15 +73,23 @@ class CanonicalPandaController:
             world_pose=PoseWorld(tuple(float(v) for v in position),tuple(float(v) for v in matrix_to_quat_wxyz(rotation)))
             position_error=position-np.array(current.position);rotation_error=rotation_vector_error(quat_wxyz_to_matrix(current.quaternion_wxyz),rotation)
             _,J=self.model.fk_jacobian(q)
-            if np.linalg.norm(position_error)<=cfg.ik_position_deadband and np.linalg.norm(rotation_error)<=cfg.ik_rotation_deadband:desired=q.copy()
-            else:
+            task_dq=np.zeros(7,dtype=np.float64)
+            if not (np.linalg.norm(position_error)<=cfg.ik_position_deadband
+                    and np.linalg.norm(rotation_error)<=cfg.ik_rotation_deadband):
                 for error,bound in ((position_error,cfg.cartesian_max_position_step),(rotation_error,cfg.cartesian_max_rotation_step)):
                     length=np.linalg.norm(error)
                     if length>bound:error*=bound/length
                 J=J.copy();J[3:]*=cfg.ik_rotation_row_weight
                 error=np.r_[position_error,cfg.ik_rotation_row_weight*cfg.ik_rotation_gain*rotation_error]
-                dq=J.T@np.linalg.solve(J@J.T+cfg.ik_damping**2*np.eye(6),error)
-                desired=np.clip(q+cfg.ik_position_gain*np.clip(dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
+                task_dq=J.T@np.linalg.solve(J@J.T+cfg.ik_damping**2*np.eye(6),error)
+            if self.nullspace_reference_gain:
+                if self._nullspace_reference is None:
+                    raise RuntimeError('Panda nullspace reference was not initialized at reset')
+                task_dq += self.nullspace_reference_gain * (
+                    self._right_nullspace_projector(J)
+                    @ (self._nullspace_reference-q)
+                )
+            desired=np.clip(q+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
         _resolved, servo = absolute_joint_position_servo(
             desired, q, self.model.limits, cfg.joint_position_correction_gain,
         )
