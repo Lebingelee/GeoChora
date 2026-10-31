@@ -224,3 +224,15 @@ DG01/DG02此前有界接收保持不变，R3对照仍`PARTIAL_REALIZED_STATE_OR_
 每阶段或run后维护一页`RESUME.md`和`goal_progress.json`，记录当前门、证据、身份、预算、worker/锁及下一动作；压缩后先读原prompt/短进度/ledger/Git状态，确认监督进程再续，不重跑全量历史。约30–45分钟没有新证据就换最小复现或独立判别方式，同类失败两次先修接口/detector；这要求改变方法，不授权弱化必需语义。报告/计数文字和已有全局docs scope错误不应挤占物理实现主线。
 
 候选通过标签为`F05_DIAGNOSTIC04_CLOSURE_PASS_PENDING_SOL_REVIEW`；未完成则保留PARTIAL并交具体阻断/证据/下一步。新F05 `ACCEPTED_BOUNDED_F05_SUCCESSOR_A_THREE_CELL`仍需Sol独立复核，不授Formal Qualification。本包准备仅文档、Git和hash检查，不运行native或软件测试，不向Luna或其他线程发送消息。
+
+### 16.1 执行续行与预算停点（2026-11-01；PARTIAL_PENDING_SOL_REVIEW）
+
+DG04在冻结输入`develop-full@9af66009cd0634aec583f96db51ef88e13a824bc`上继续实现了既有Isaac Native-I/O/Core owners：USD v3 angular DriveAPI单位换算；源`solimp`残差曲线到公开mimic属性的候选映射及读回；source fixed-tendon `J^T` effort的公开写入/读回见证；Arm drive/schema/力限/关节类型和手指重复drive检查；F05 cube/support的公开质量、COM、惯性、碰撞和source-scoped滤波见证；以及公开raw contact actor-path到精确support collider的映射。S1增加float32场景值、保留Panda原有`physics:filteredPairs`、拒绝F05 task-scene过滤、compliance及contact收据缺陷的synthetic检查。`materialize()`仍fail closed。
+
+这些实现没有通过DG04所需的完整source-consumer native门。Core S1 attempt013为10/10 PASS_SYNTHETIC_CORE_S1_ONLY（两段synthetic H5、12 tendon/4 equality/3 contact变异拒绝、native starts/physics steps为0、`runtime_admitted=false`）。最后一次N1 attempt007使用单Isaac App；worker返回于Core native adapter construction之后，却在读取bootstrap收据时错误索引不存在的`physics_steps_after`字段，未到达fixed-tendon/equality paired rollout或contact probe，且没有稳定worker receipt。supervisor progress停留在早期App阶段，无法提供可靠精确计数；因此ledger按冻结run最大值保守计32 attempted steps，而不采用supervisor原始0。process group已退出、shared lock已释放。worker字段映射、supervisor stale-stage exactness判断和关闭顺序已离线修复，但这些修复尚未经过新的native run验证。
+
+DG04 formal Isaac N2仍`NOT_STARTED_BLOCKED_BY_REQUIRED_N1`. 当前非正式Isaac headroom已耗尽；完整6,400 attempted-step/2,400秒正式N2预留保持未动。新的N1所需预算需维护者重新授权，不能借用N2预留。当前改动通过`py_compile`和`git diff --check`；S1 attempt014因本地默认/Isaac解释器缺少所需pytest、NumPy、gymnasium、h5py依赖而未能导入测试模块，本轮未安装依赖。attempt013是最新完整S1收据。独立正式H5冷读未运行。
+
+当前三路线状态见ignored [three_route_matrix.md](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_001/three_route_matrix.md)：DG01 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`及DG02 `ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`仅限各自精确source/Task/Action/Core/build交集；DG03是`F05_DIAGNOSTIC04_PARTIAL_PENDING_SOL_REVIEW`，不授三路线整体接收或Qualification。DG02 PickCube R3跨provider差异保留`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`及原逐值计数，冻结oracle的`not_trajectory_equivalence=true`不变。
+
+F06只准备了ignored [f06_entry_readiness.md](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_001/f06_entry_readiness.md)。它把PickCube/MuJoCo 3.8.1 CPU作为首选scope候选，明确了现有Harness mock/proxy、固定CPU profile和source-bound Core构造缺口，建议新版本的桌面reachable reset/predicate；F05空中cube不复用为抓取初态。DG04未运行F06 Expert、20 seeds、Oracle、四报告、Judge或Qualification。完整run/budget/hash/保护文件状态见窗口`goal_progress.json`、`run_ledger.json`、`RESUME.md`与`source_consumer_decision.md`；未向其他线程发送消息。

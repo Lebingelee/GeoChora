@@ -616,7 +616,7 @@ class UsdCoreRuntimeSession(_SessionValues):
 
     def _validate_source_tendon_application(self, application, ack, expected_index):
         """Recompute the exact DG03 affine tendon law from each public readback row."""
-        from .leaf_control import IsaacSourceTendonDriveReceiptV1
+        from .leaf_control import IsaacSourceEqualityComplianceV1, IsaacSourceTendonDriveReceiptV1
 
         receipt = self._drive_receipt
         if type(receipt) is not IsaacSourceTendonDriveReceiptV1:
@@ -657,6 +657,17 @@ class UsdCoreRuntimeSession(_SessionValues):
         expected_efforts = tuple(
             coefficient * expected_force for coefficient in receipt.tendon_coefficients
         )
+        applied_efforts = _finite_tuple(
+            application.get('public_applied_efforts_N'), 2,
+            'DG03 public applied tendon effort readback',
+        )
+        equality_residual = positions[1] - positions[0]
+        compliance = receipt.equality_compliance
+        if type(compliance) is not IsaacSourceEqualityComplianceV1:
+            raise TypeError('DG03 receipt lacks the exact source-bound equality compliance mapping')
+        expected_impedance = compliance.impedance(equality_residual)
+        expected_frequency = compliance.natural_frequency_hz(equality_residual)
+        expected_damping_ratio = compliance.damping_ratio_for_residual(equality_residual)
         def agrees(actual, expected):
             return math.isclose(float(actual), float(expected), rel_tol=1e-10, abs_tol=1e-10)
 
@@ -665,14 +676,74 @@ class UsdCoreRuntimeSession(_SessionValues):
                 or not agrees(application.get('unclipped_scalar_force_N'), expected_raw)
                 or not agrees(application.get('scalar_force_N'), expected_force)
                 or any(not agrees(actual, expected)
-                       for actual, expected in zip(efforts, expected_efforts, strict=True))):
+                       for actual, expected in zip(efforts, expected_efforts, strict=True))
+                or any(not agrees(actual, expected)
+                       for actual, expected in zip(applied_efforts, expected_efforts, strict=True))
+                or not agrees(application.get('source_equality_residual_m'), equality_residual)
+                or not agrees(application.get('source_equality_impedance'), expected_impedance)
+                or not agrees(application.get('source_mimic_natural_frequency_hz'), expected_frequency)
+                or not agrees(application.get('public_mimic_frequency_readback_hz'), expected_frequency)
+                or not agrees(application.get('source_mimic_damping_ratio'), expected_damping_ratio)
+                or not agrees(application.get('public_mimic_damping_ratio_readback'),
+                              expected_damping_ratio)):
             raise ValueError('DG03 substep tendon length/rate, source force law, clamp or J-transpose effort differs')
         expected_effort_api = (
             'Articulation.set_dof_efforts'
             if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
         )
-        if application.get('public_effort_api') != expected_effort_api:
-            raise ValueError('DG03 substep effort provenance does not match its native/synthetic receipt')
+        expected_readback_api = (
+            'Articulation.get_dof_efforts'
+            if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
+        )
+        expected_mimic_api = (
+            'Usd.Prim.GetAttribute(...).Set/Get'
+            if receipt.provenance_kind == 'native_runtime' else 'synthetic-no-physics'
+        )
+        contact_witness = application.get('public_contact_witness')
+        if not isinstance(contact_witness, Mapping):
+            raise TypeError('DG03 substep requires a typed public contact witness')
+        if receipt.provenance_kind == 'native_runtime':
+            contact_count = contact_witness.get('contact_count')
+            contact_force = contact_witness.get('normal_force_sum_N')
+            raw_contact_count = contact_witness.get('raw_contact_count')
+            actor_paths = contact_witness.get('raw_contact_actor_paths')
+            support_forces = contact_witness.get('support_contact_normal_forces_N')
+            support_path = '/F05Scene/support/collision'
+            if (contact_witness.get('schema_version') != 'f05-dg03-public-contact-witness-v2'
+                    or contact_witness.get('provenance_kind') != 'native_runtime'
+                    or contact_witness.get('api') != 'RigidPrim.get_raw_contact_data'
+                    or contact_witness.get('sensor_path') != '/F05Scene/free_cube'
+                    or contact_witness.get('support_path') != support_path
+                    or type(raw_contact_count) is not int or raw_contact_count < 0 or raw_contact_count > 32
+                    or type(actor_paths) is not list or len(actor_paths) != raw_contact_count
+                    or any(type(path) is not str or not path.startswith('/') for path in actor_paths)
+                    or type(contact_count) is not int or contact_count < 0 or contact_count > raw_contact_count
+                    or type(support_forces) is not list or len(support_forces) != contact_count
+                    or any(type(value) not in (int, float) or isinstance(value, bool)
+                           or not math.isfinite(float(value)) or float(value) < 0.0
+                           for value in support_forces)
+                    or type(contact_force) not in (int, float) or isinstance(contact_force, bool)
+                    or not math.isfinite(float(contact_force)) or float(contact_force) < 0.0
+                    or not math.isclose(math.fsum(float(value) for value in support_forces),
+                                        float(contact_force), rel_tol=1e-7, abs_tol=1e-7)
+                    or sum(path == '/F05Scene/support' or path == support_path
+                           or path.startswith(support_path + '/') for path in actor_paths) != contact_count
+                    or contact_witness.get('contact_present') is not (contact_count > 0)):
+                raise ValueError('DG03 public cube/support contact witness is malformed or mismapped')
+        elif (contact_witness.get('schema_version') != 'f05-dg03-public-contact-witness-v2'
+              or contact_witness.get('provenance_kind') != 'synthetic_fixture'
+              or contact_witness.get('api') != 'synthetic-no-physics'
+              or contact_witness.get('contact_count') != 0
+              or contact_witness.get('raw_contact_count') != 0
+              or contact_witness.get('raw_contact_actor_paths') != []
+              or contact_witness.get('support_contact_normal_forces_N') != []
+              or contact_witness.get('normal_force_sum_N') != 0.0
+              or contact_witness.get('physical_contact_checked') is not False):
+            raise ValueError('DG03 synthetic S1 cannot claim a physical contact measurement')
+        if (application.get('public_effort_api') != expected_effort_api
+                or application.get('public_effort_readback_api') != expected_readback_api
+                or application.get('public_mimic_frequency_api') != expected_mimic_api):
+            raise ValueError('DG03 substep effort/mimic provenance does not match its native/synthetic receipt')
 
     def close(self) -> None:
         if not self._closed:

@@ -996,6 +996,87 @@ def compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
 
 
 @dataclass(frozen=True)
+class IsaacSourceEqualityComplianceV1:
+    """Source-bound MuJoCo solimp/solref mapping for a PhysX mimic joint.
+
+    The MJCF three-value solimp form is expanded with MuJoCo's documented
+    midpoint/power defaults.  The supported source is deliberately the exact
+    Menagerie Panda affine finger equality; this does not implement a general
+    constraint solver.
+    """
+
+    schema_version: str
+    reference_joint: str
+    follower_joint: str
+    source_solref: tuple[float, float]
+    source_solimp_raw: tuple[float, float, float]
+    source_solimp_effective: tuple[float, float, float, float, float]
+    mapping_algorithm: str = 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v3'
+
+    def __post_init__(self):
+        if self.schema_version != 'isaac-source-equality-compliance-v1':
+            raise ValueError('unsupported Isaac source equality-compliance schema')
+        if (self.reference_joint, self.follower_joint) != ('finger_joint1', 'finger_joint2'):
+            raise ValueError('DG03 compliance must bind the exact source finger equality pair')
+        if self.mapping_algorithm != 'mujoco-3.8.1-solimp-reference-to-physx-mimic-v3':
+            raise ValueError('DG03 compliance mapping must identify the pinned MuJoCo algorithm')
+        if (tuple(self.source_solref) != (0.005, 1.0)
+                or tuple(self.source_solimp_raw) != (0.95, 0.99, 0.001)
+                or tuple(self.source_solimp_effective) != (0.95, 0.99, 0.001, 0.5, 2.0)):
+            raise ValueError('DG03 equality-compliance values differ from the exact pinned MJCF profile')
+
+    def impedance(self, residual_m: float) -> float:
+        """Return MuJoCo 3.8.1 getimpedance(solimp, residual, margin=0)."""
+        if (type(residual_m) not in (int, float) or isinstance(residual_m, bool)
+                or not math.isfinite(float(residual_m))):
+            raise ValueError('DG03 equality residual must be a finite non-boolean scalar')
+        d0, dwidth, width, midpoint, power = self.source_solimp_effective
+        x = abs(float(residual_m)) / width
+        if x >= 1.0:
+            return dwidth
+        if x <= 0.0:
+            return d0
+        if power == 1.0:
+            y = x
+        elif x <= midpoint:
+            y = x ** power / midpoint ** (power - 1.0)
+        else:
+            y = 1.0 - (1.0 - x) ** power / (1.0 - midpoint) ** (power - 1.0)
+        return d0 + y * (dwidth - d0)
+
+    def natural_frequency_hz(self, residual_m: float) -> float:
+        """Map MuJoCo's impedance-scaled stiffness to a PhysX spring frequency."""
+        d = self.impedance(residual_m)
+        _d0, dwidth, _width, _midpoint, _power = self.source_solimp_effective
+        timeconst, dampratio = self.source_solref
+        stiffness = d / (dwidth * dwidth * timeconst * timeconst * dampratio * dampratio)
+        return math.sqrt(stiffness) / (2.0 * math.pi)
+
+    def damping_ratio_for_residual(self, residual_m: float) -> float:
+        """Map impedance-scaled MuJoCo B/K to the PhysX spring damping ratio."""
+        impedance = self.impedance(residual_m)
+        _d0, dwidth, _width, _midpoint, _power = self.source_solimp_effective
+        timeconst, dampratio = self.source_solref
+        stiffness = impedance / (dwidth * dwidth * timeconst * timeconst * dampratio * dampratio)
+        damping = impedance * 2.0 / (dwidth * timeconst)
+        return damping / (2.0 * math.sqrt(stiffness))
+
+    def to_mapping(self) -> dict[str, object]:
+        return {
+            'schema_version': self.schema_version,
+            'reference_joint': self.reference_joint,
+            'follower_joint': self.follower_joint,
+            'source_solref': list(self.source_solref),
+            'source_solimp_raw': list(self.source_solimp_raw),
+            'source_solimp_effective': list(self.source_solimp_effective),
+            'mapping_algorithm': self.mapping_algorithm,
+            'physx_natural_frequency_rule':
+                'sqrt(d(abs(follower_q-reference_q)))/(2*pi*dwidth*timeconst*dampratio)',
+            'physx_damping_ratio_rule': 'solref_dampratio*sqrt(d(residual))',
+        }
+
+
+@dataclass(frozen=True)
 class IsaacSourceTendonDriveReceiptV1:
     """Model-bound Isaac receipt for seven arm drives and a source tendon."""
 
@@ -1019,8 +1100,8 @@ class IsaacSourceTendonDriveReceiptV1:
     mimic_reference_joint: str = 'finger_joint1'
     mimic_gearing: float = 1.0
     mimic_offset_m: float = 0.0
-    mimic_natural_frequency_hz: float = 31.830988618379067
-    mimic_damping_ratio: float = 1.0
+    mimic_natural_frequency_hz: float = 31.991347258556544
+    mimic_damping_ratio: float = 0.99498743710662
     mimic_source_solref: tuple[float, float] = (0.005, 1.0)
     mimic_source_solimp: tuple[float, float, float] = (0.95, 0.99, 0.001)
     tendon_name: str = 'split'
@@ -1036,6 +1117,11 @@ class IsaacSourceTendonDriveReceiptV1:
     actuator_control_range: tuple[float, float] = (0.0, 255.0)
     actuator_force_range: tuple[float, float] = (-100.0, 100.0)
     canonical_opening_range_m: float = 0.08
+    equality_compliance: IsaacSourceEqualityComplianceV1 | None = None
+    arm_control_ranges: Mapping[str, tuple[float, float]] | None = None
+    arm_stiffnesses: Mapping[str, float] | None = None
+    arm_dampings: Mapping[str, float] | None = None
+    arm_max_efforts: Mapping[str, float] | None = None
 
     def __post_init__(self):
         if self.schema_version != 'isaac-source-tendon-drive-receipt-v1':
@@ -1092,7 +1178,7 @@ class IsaacSourceTendonDriveReceiptV1:
                 float(self.actuator_length_bias), float(self.actuator_rate_bias),
                 tuple(self.actuator_control_range), tuple(self.actuator_force_range),
                 float(self.canonical_opening_range_m)) != (
-                'finger_joint2', 'finger_joint1', 1.0, 0.0, 1.0, (0.005, 1.0),
+                'finger_joint2', 'finger_joint1', 1.0, 0.0, math.sqrt(0.99), (0.005, 1.0),
                 (0.95, 0.99, 0.001),
                 'split', ('panda-main/finger_joint1', 'panda-main/finger_joint2'),
                 ('finger_joint1', 'finger_joint2'), (0.5, 0.5), 'actuator8',
@@ -1101,12 +1187,57 @@ class IsaacSourceTendonDriveReceiptV1:
         if (type(self.mimic_natural_frequency_hz) not in (int, float)
                 or isinstance(self.mimic_natural_frequency_hz, bool)
                 or not math.isclose(float(self.mimic_natural_frequency_hz),
-                                    1.0 / (2.0 * math.pi * self.mimic_source_solref[0]),
+                                    math.sqrt(1.0 / (self.mimic_source_solimp[1]
+                                                     * self.mimic_source_solref[0] ** 2
+                                                     * self.mimic_source_solref[1] ** 2))
+                                    / (2.0 * math.pi),
                                     rel_tol=0.0, abs_tol=1e-12)):
-            raise ValueError('DG03 mimic frequency must be derived from the exact MJCF solref time constant')
+            raise ValueError('DG03 mimic frequency must be derived from the exact MJCF solref/solimp')
         if any(names.index(name) in {row.native_dof_index for row in drives}
                for name in self.tendon_native_joint_names):
             raise ValueError('DG03 tendon finger DOFs must remain state-only, outside Arm drives')
+        if (self.equality_compliance is not None
+                and (type(self.equality_compliance) is not IsaacSourceEqualityComplianceV1
+                     or self.equality_compliance.source_solref != tuple(self.mimic_source_solref)
+                     or self.equality_compliance.source_solimp_raw != tuple(self.mimic_source_solimp))):
+            raise ValueError('DG03 equality-compliance component differs from the tendon receipt source identity')
+        arm_names = {f'joint{index}' for index in range(1, 8)}
+        if any(value is not None for value in (
+                self.arm_control_ranges, self.arm_stiffnesses,
+                self.arm_dampings, self.arm_max_efforts)):
+            if any(value is None for value in (
+                    self.arm_control_ranges, self.arm_stiffnesses,
+                    self.arm_dampings, self.arm_max_efforts)):
+                raise ValueError('DG03 Arm source law must bind controls, gains, damping and force limits together')
+            ranges = {name: tuple(values) for name, values in dict(self.arm_control_ranges).items()}
+            stiffnesses = {name: float(value) for name, value in dict(self.arm_stiffnesses).items()}
+            dampings = {name: float(value) for name, value in dict(self.arm_dampings).items()}
+            efforts = {name: float(value) for name, value in dict(self.arm_max_efforts).items()}
+            if any(set(value) != arm_names for value in (ranges, stiffnesses, dampings, efforts)):
+                raise ValueError('DG03 source Arm law must cover exactly joints1 through joint7')
+            expected_source = {
+                'joint1': ((-2.8973, 2.8973), 4500.0, 450.0, 87.0),
+                'joint2': ((-1.7628, 1.7628), 4500.0, 450.0, 87.0),
+                'joint3': ((-2.8973, 2.8973), 3500.0, 350.0, 87.0),
+                'joint4': ((-3.0718, -0.0698), 3500.0, 350.0, 87.0),
+                'joint5': ((-2.8973, 2.8973), 2000.0, 200.0, 12.0),
+                'joint6': ((-0.0175, 3.7525), 2000.0, 200.0, 12.0),
+                'joint7': ((-2.8973, 2.8973), 2000.0, 200.0, 12.0),
+            }
+            for name, (control_range, kp, kd, max_effort) in expected_source.items():
+                values = ranges[name]
+                if (len(values) != 2 or any(not math.isfinite(float(x)) for x in values)
+                        or tuple(float(x) for x in values) != control_range
+                        or stiffnesses[name] != kp or dampings[name] != kd
+                        or efforts[name] != max_effort):
+                    raise ValueError(f'DG03 source Arm drive law differs from pinned actuator {name}')
+                ranges[name] = control_range
+            object.__setattr__(self, 'arm_control_ranges', MappingProxyType(ranges))
+            object.__setattr__(self, 'arm_stiffnesses', MappingProxyType(stiffnesses))
+            object.__setattr__(self, 'arm_dampings', MappingProxyType(dampings))
+            object.__setattr__(self, 'arm_max_efforts', MappingProxyType(efforts))
+        elif self.equality_compliance is not None:
+            raise ValueError('DG03 source-bound receipt requires the exact source Arm actuator law')
         object.__setattr__(self, 'arm_drives', drives)
 
     @property
@@ -1157,7 +1288,27 @@ class IsaacSourceTendonDriveReceiptV1:
             'actuator_control_range': list(self.actuator_control_range),
             'actuator_force_range': list(self.actuator_force_range),
             'canonical_opening_range_m': float(self.canonical_opening_range_m),
+            'equality_compliance': (
+                None if self.equality_compliance is None else self.equality_compliance.to_mapping()
+            ),
+            'arm_control_ranges': (
+                None if self.arm_control_ranges is None else
+                {name: list(self.arm_control_ranges[name]) for name in sorted(self.arm_control_ranges)}
+            ),
+            'arm_stiffnesses': None if self.arm_stiffnesses is None else dict(self.arm_stiffnesses),
+            'arm_dampings': None if self.arm_dampings is None else dict(self.arm_dampings),
+            'arm_max_efforts': None if self.arm_max_efforts is None else dict(self.arm_max_efforts),
         })
+
+    def mimic_frequency_for_residual(self, residual_m: float) -> float:
+        if type(self.equality_compliance) is not IsaacSourceEqualityComplianceV1:
+            raise RuntimeError('DG03 source equality compliance was not bound to this model receipt')
+        return self.equality_compliance.natural_frequency_hz(residual_m)
+
+    def mimic_damping_ratio_for_residual(self, residual_m: float) -> float:
+        if type(self.equality_compliance) is not IsaacSourceEqualityComplianceV1:
+            raise RuntimeError('DG03 source equality compliance was not bound to this model receipt')
+        return self.equality_compliance.damping_ratio_for_residual(residual_m)
 
     def arm_commands(self, arm_position: Mapping[str, float]):
         expected = {f'panda-main/joint{index}' for index in range(1, 8)}
@@ -1174,6 +1325,9 @@ class IsaacSourceTendonDriveReceiptV1:
             value = float(raw)
             if not row.lower_limit <= value <= row.upper_limit:
                 raise ValueError(f'DG03 Arm target is outside public limits for {key}')
+            if self.arm_control_ranges is not None:
+                control_low, control_high = self.arm_control_ranges[row.native_dof_name]
+                value = min(control_high, max(control_low, value))
             rows.append((row.native_dof_index, row.native_dof_name, value))
         return tuple(sorted(rows))
 
@@ -1253,6 +1407,49 @@ def compile_isaac_source_tendon_receipt_v1(
     if (polycoef != (0.0, 1.0, 0.0, 0.0, 0.0)
             or solref != (0.005, 1.0) or solimp != (0.95, 0.99, 0.001)):
         raise ValueError('DG03 source equality is outside its exact affine/compliance profile')
+    default_actuator = root.find("./default/default[@class='panda']/general")
+    if default_actuator is None:
+        raise ValueError('DG03 source omits exact Panda default actuator ranges')
+    default_ctrlrange = tuple(float(x) for x in default_actuator.get('ctrlrange', '').split())
+    default_forcerange = tuple(float(x) for x in default_actuator.get('forcerange', '').split())
+    if len(default_ctrlrange) != 2 or len(default_forcerange) != 2:
+        raise ValueError('DG03 source default actuator ranges must contain two values')
+    actuator_by_joint = {}
+    for actuator in root.findall('./actuator/general'):
+        joint = actuator.get('joint')
+        if joint is None:
+            continue
+        gain = tuple(float(x) for x in actuator.get('gainprm', '').split())
+        bias = tuple(float(x) for x in actuator.get('biasprm', '').split())
+        ctrlrange = tuple(float(x) for x in actuator.get('ctrlrange', '').split()) or default_ctrlrange
+        forcerange = tuple(float(x) for x in actuator.get('forcerange', '').split()) or default_forcerange
+        if (len(gain) != 1 or len(bias) != 3 or len(ctrlrange) != 2 or len(forcerange) != 2
+                or bias[0] != 0.0 or gain[0] != -bias[1]):
+            raise ValueError(f'DG03 source actuator law is outside the exact affine PD subset: {joint}')
+        if joint in actuator_by_joint:
+            raise ValueError(f'DG03 source has duplicate Arm actuator for {joint}')
+        actuator_by_joint[joint] = {
+            'control_range': ctrlrange,
+            'stiffness': gain[0],
+            'damping': -bias[2],
+            'max_effort': max(abs(forcerange[0]), abs(forcerange[1])),
+        }
+    expected_joint_names = {f'joint{index}' for index in range(1, 8)}
+    if set(actuator_by_joint) != expected_joint_names:
+        raise ValueError('DG03 source actuator set differs from exact Arm joints1 through joint7')
+    native_by_joint = {row.canonical_joint.joint_id: row.native_dof_name for row in drives}
+    arm_control_ranges = {
+        native_by_joint[joint]: actuator_by_joint[joint]['control_range'] for joint in expected_joint_names
+    }
+    arm_stiffnesses = {
+        native_by_joint[joint]: actuator_by_joint[joint]['stiffness'] for joint in expected_joint_names
+    }
+    arm_dampings = {
+        native_by_joint[joint]: actuator_by_joint[joint]['damping'] for joint in expected_joint_names
+    }
+    arm_max_efforts = {
+        native_by_joint[joint]: actuator_by_joint[joint]['max_effort'] for joint in expected_joint_names
+    }
     return IsaacSourceTendonDriveReceiptV1(
         'isaac-source-tendon-drive-receipt-v1', provenance_kind,
         source.scene_definition.identity_hash, source.source_closure_digest,
@@ -1262,9 +1459,19 @@ def compile_isaac_source_tendon_receipt_v1(
         int(source.task_artifact.timebase.control_substeps), writer_id,
         tuple(native_metadata.native_dof_names), native_metadata.native_position_limits,
         tuple(drives),
-        mimic_natural_frequency_hz=1.0 / (2.0 * math.pi * solref[0]),
-        mimic_damping_ratio=solref[1], mimic_source_solref=solref,
+        mimic_natural_frequency_hz=math.sqrt(
+            1.0 / (solimp[1] * solref[0] * solref[0] * solref[1] * solref[1])
+        ) / (2.0 * math.pi),
+        mimic_damping_ratio=solref[1] * math.sqrt(solimp[1]), mimic_source_solref=solref,
         mimic_source_solimp=solimp,
+        equality_compliance=IsaacSourceEqualityComplianceV1(
+            'isaac-source-equality-compliance-v1', 'finger_joint1', 'finger_joint2',
+            solref, solimp, (*solimp, 0.5, 2.0),
+        ),
+        arm_control_ranges=arm_control_ranges,
+        arm_stiffnesses=arm_stiffnesses,
+        arm_dampings=arm_dampings,
+        arm_max_efforts=arm_max_efforts,
     )
 
 

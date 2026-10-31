@@ -76,12 +76,12 @@ F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
 F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
 F05_DG03_USD_ASSET_ID = 'f05-dg03-menagerie-panda-source-preserving-isaac-usd'
-F05_DG03_USD_ASSET_VERSION = 'f05-dg03-isaac-usd-v2'
-F05_DG03_USD_DELIVERY_IDENTITY_SHA256 = '8c9ba5d52f3891dc84801f048049a2bf6fe49b2a302f92f44ef62e9a442596e5'
-F05_DG03_USD_DELIVERY_CLOSURE_SHA256 = '6ab12e93543897f4ae1eedf3169fa58c12b9b5acde7b99fa5c14356e56c479f4'
-F05_DG03_USD_DELIVERY_MANIFEST_SHA256 = 'd40752401b3e71a62fc7a763ef49782e7bf2bd5e548c1a5375cb274a80a4b243'
-F05_DG03_USD_RECIPE_SHA256 = 'aab6a0e18f9d51776f0146b07b900127bc798fa8f960481d69d2ebc90f4e5d85'
-F05_DG03_USD_REPORT_SHA256 = '24a7efbf361be85ab10e3bb68acd4f1dad5763670211de09f6cbc4503dca5535'
+F05_DG03_USD_ASSET_VERSION = 'f05-dg03-isaac-usd-v3'
+F05_DG03_USD_DELIVERY_IDENTITY_SHA256 = 'ea1531d03d11da26017e88d51f372387d2d25bbdebd5e41bf2c1fca454a04e8d'
+F05_DG03_USD_DELIVERY_CLOSURE_SHA256 = '5c694ba4d66ea519dc7e8a5e3566420f63725300bebb56a446827ea9c4548e2e'
+F05_DG03_USD_DELIVERY_MANIFEST_SHA256 = '92950b5317a1ee1180b1385503b0c9635278000330a7fd15199b179744c841f1'
+F05_DG03_USD_RECIPE_SHA256 = '69a7fd8bbc9301e98246a5d8f57293ab6679be2d4e4a6486f64bc0aea54c203f'
+F05_DG03_USD_REPORT_SHA256 = 'ceb02959a684287190dc0b4b7aaddba52c505a3271db1085204b6c7159fcd3cb'
 # The DG02 Core route tracks source-FK pose targets whose Panda solution is
 # redundant. The bounded probes found a tradeoff: gain 0.0 reduced target error
 # and speed versus 1.0, while increasing joint jitter. Use the midpoint for a
@@ -115,6 +115,20 @@ def _f05_dg02_usd_source_bindings():
         'panda-main/finger_joint2': 'finger_joint2',
     }
     return body_paths, joints
+
+
+def _f05_dg03_usd_source_bindings():
+    """Return DG03's source-to-USD body and static-frame maps."""
+    body_paths, joints = _f05_dg02_usd_source_bindings()
+    body_paths = dict(body_paths)
+    body_paths['free-cube/free_cube'] = '/F05Scene/free_cube'
+    body_paths['free-cube/world'] = '/F05Scene/free_cube'
+    # The local F05 overlay authors a static collision Xform for the support.
+    # Preserve it as a RuntimeSource Frame so Isaac's existing public XformPrim
+    # route reads it without claiming that it is a dynamic rigid body.
+    body_paths.pop('support/support')
+    frame_paths = {'support/support': '/F05Scene/support'}
+    return body_paths, frame_paths, joints
 
 
 @dataclass(frozen=True)
@@ -625,13 +639,13 @@ class F05Dg03IsaacUsdCandidateInputV1:
                 'isaacsim', 'isaacsim-6.2.0.0', 'usd', False):
             raise ValueError('DG03 source is outside its exact local Isaac/USD Menagerie delivery')
         if (d.recipe_path, d.validation_report_path, d.validation_report_sha256) != (
-                'metadata/f05_dg03_isaac_usd_recipe.json',
-                'metadata/f05_dg03_local_validation_report.json',
+                'metadata/f05_dg03_isaac_usd_recipe_v3.json',
+                'metadata/f05_dg03_local_validation_report_v3.json',
                 F05_DG03_USD_REPORT_SHA256):
             raise ValueError('DG03 delivery recipe/report bytes differ from its frozen local package')
         expected_options = {
             'f05_goal': 'DG03',
-            'lowering': 'public-isaac-source-mimic-and-tendon-v2',
+            'lowering': 'public-isaac-source-mimic-and-tendon-v3-unit-correct-angular-drive',
             'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
             'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
         }
@@ -650,21 +664,21 @@ class F05Dg03IsaacUsdCandidateInputV1:
                 or not any('source-tendon effort behavior' in item
                             for item in delivery.report.unconsumed)):
             raise ValueError('DG03 v2 local report omits exact source-mimic mapping or unresolved tendon limits')
-        expected_bodies, expected_joints = _f05_dg02_usd_source_bindings()
+        expected_bodies, expected_frames, expected_joints = _f05_dg03_usd_source_bindings()
         if (dict(source.joints) != expected_joints
                 or dict(source.joint_targets) != expected_joints
                 or dict(source.bodies) != expected_bodies
-                or dict(source.frames)
+                or dict(source.frames) != expected_frames
                 or dict(source.free_joints) != {
-                    'free-cube/free_cube': '/F04Scene/free_cube/rootJoint',
+                    'free-cube/free_cube': '/F05Scene/free_cube/rootJoint',
                 }):
             raise ValueError('DG03 USD mappings differ from exact nine-DOF/free-cube source contract')
         expected_runtime_frames = {
             f'{frame.entity_id}/{frame.frame_id}'
             for frame in scene.frames or () if frame.frame_kind == 'runtime'
         }
-        if set(expected_bodies) != expected_runtime_frames:
-            raise ValueError('DG03 USD body bindings do not cover exact canonical runtime Frames')
+        if set(expected_bodies) | set(expected_frames) != expected_runtime_frames:
+            raise ValueError('DG03 USD body/frame bindings do not cover exact canonical runtime Frames')
         if (artifact.initialization.poses_world != self.reset_plan.reset_sample.poses_world
                 or set(artifact.initialization.poses_world) != {'free-cube/free_cube'}
                 or artifact.initialization.poses_world['free-cube/free_cube'].position != (1.0, 0.5, 0.9)
@@ -726,10 +740,10 @@ def build_f05_dg03_isaac_usd_candidate(delivery_manifest, *, task_seed=POSITION_
     legacy_artifact = TaskArtifact.from_mapping(legacy_mapping)
     artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact)
     reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=int(task_seed))
-    bodies, joints = _f05_dg02_usd_source_bindings()
+    bodies, frames, joints = _f05_dg03_usd_source_bindings()
     options = {
         'f05_goal': 'DG03',
-        'lowering': 'public-isaac-source-mimic-and-tendon-v2',
+        'lowering': 'public-isaac-source-mimic-and-tendon-v3-unit-correct-angular-drive',
         'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
         'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
     }
@@ -745,7 +759,7 @@ def build_f05_dg03_isaac_usd_candidate(delivery_manifest, *, task_seed=POSITION_
     )
     source = UsdRuntimeSourceV1(
         'usd-runtime-source-v1', artifact, scene, task_scene_source,
-        joints, bodies, {}, {'free-cube/free_cube': '/F04Scene/free_cube/rootJoint'}, joints,
+        joints, bodies, frames, {'free-cube/free_cube': '/F05Scene/free_cube/rootJoint'}, joints,
     )
     execution = ExecutionSpecV1(
         'execution-spec-v1', 'isaacsim', 'cuda', F05_DG03_ISAAC_USD_PROFILE,

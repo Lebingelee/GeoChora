@@ -34,6 +34,60 @@ def _validate_isaac_task_thread_count(actual: int) -> int:
     return actual
 
 
+def _numeric_value_matches(actual, expected, *, abs_tol: float) -> bool:
+    """Compare public USD numeric readback without requiring float64 equality."""
+    return math.isclose(float(actual), float(expected), rel_tol=0.0, abs_tol=abs_tol)
+
+
+def _numeric_tuple_matches(actual, expected, *, abs_tol: float) -> bool:
+    """Compare public USD numeric tuples without rejecting float32 readback."""
+    if len(actual) != len(expected):
+        return False
+    return all(
+        _numeric_value_matches(value, target, abs_tol=abs_tol)
+        for value, target in zip(actual, expected, strict=True)
+    )
+
+
+def _dg03_collision_filter_witness(stage, UsdPhysics) -> dict[str, list[dict[str, object]]]:
+    """Preserve source-robot filters while detecting filters that touch F05Scene."""
+    def in_task_scene(path: str) -> bool:
+        return path == '/F05Scene' or path.startswith('/F05Scene/')
+
+    filter_relationships = []
+    task_scene_filter_relationships = []
+    collision_groups = []
+    task_scene_collision_groups = []
+    for prim in stage.Traverse():
+        prim_path = str(prim.GetPath())
+        is_group = prim.IsA(UsdPhysics.CollisionGroup)
+        if is_group:
+            collision_groups.append(prim_path)
+            if in_task_scene(prim_path):
+                task_scene_collision_groups.append(prim_path)
+        for relationship in prim.GetRelationships():
+            relationship_name = str(relationship.GetName())
+            targets = [str(value) for value in relationship.GetTargets()]
+            if relationship_name.startswith('physics:filteredPairs') and targets:
+                row = {
+                    'prim_path': prim_path,
+                    'relationship': relationship_name,
+                    'targets': targets,
+                }
+                filter_relationships.append(row)
+                if in_task_scene(prim_path) or any(in_task_scene(path) for path in targets):
+                    task_scene_filter_relationships.append(row)
+            if is_group and any(token in relationship_name for token in ('includes', 'excludes')):
+                if any(in_task_scene(path) for path in targets):
+                    task_scene_collision_groups.append(prim_path)
+    return {
+        'collision_groups': sorted(set(collision_groups)),
+        'filtered_pairs': filter_relationships,
+        'task_scene_collision_groups': sorted(set(task_scene_collision_groups)),
+        'task_scene_filtered_pairs': task_scene_filter_relationships,
+    }
+
+
 class IsaacSimAppOwnerV1:
     """One headless Isaac App per worker process, separate from Env sessions."""
 
@@ -251,6 +305,8 @@ class IsaacSimNativeRuntimeIOV1:
         self._metadata: NativeRuntimeIOMetadataV1 | None = None
         self.drive_receipt = None
         self._dg03_mimic_receipt = None
+        self._dg03_mimic_frequency_attribute = None
+        self._dg03_mimic_damping_attribute = None
         self._source_tendon_target = None
         self._open_public_runtime()
 
@@ -345,7 +401,11 @@ class IsaacSimNativeRuntimeIOV1:
                         raise ValueError(f"USD RuntimeSource frame binding is not a composed prim: {path}")
                     if not prim.HasAPI(UsdPhysics.RigidBodyAPI):
                         raise ValueError(f"USD RuntimeSource body lacks authored RigidBodyAPI: {path}")
-                    self._body_views[path] = RigidPrim(path)
+                    if self._dg03 and semantic == 'free-cube/free_cube':
+                        self._body_views[path] = RigidPrim(path, max_contact_count=32)
+                        self._body_views[path].set_enabled_contact_tracking(True, threshold=0.0)
+                    else:
+                        self._body_views[path] = RigidPrim(path)
                 self._frame_views[semantic] = self._body_views[path]
             for semantic, native in self._source.frames.items():
                 path = _native_prim_path(native, entry_prim)
@@ -465,21 +525,48 @@ class IsaacSimNativeRuntimeIOV1:
                     'follower_joint': 'finger_joint2', 'reference_joint': 'finger_joint1',
                     'source_polycoef': (0.0, 1.0, 0.0, 0.0, 0.0),
                     'source_solref': (0.005, 1.0), 'source_solimp': (0.95, 0.99, 0.001),
-                    'schema_authored_in_delivery': True, 'runtime_stage_mutated': False,
+                    'schema_authored_in_delivery': True, 'runtime_stage_mutated': True,
                 }
                 if (mimic is None or any(mimic.get(name) != value
                                          for name, value in expected_mimic.items())
+                        or mimic.get('source_solimp_effective') != (0.95, 0.99, 0.001, 0.5, 2.0)
                         or not math.isclose(
                             float(mimic['physx_attributes']['naturalFrequency']),
-                            self.drive_receipt.mimic_natural_frequency_hz,
+                            self.drive_receipt.mimic_frequency_for_residual(0.0),
                             rel_tol=0.0, abs_tol=1e-6)
                         or not math.isclose(
                             float(mimic['physx_attributes']['dampingRatio']),
-                            self.drive_receipt.mimic_damping_ratio,
+                            self.drive_receipt.mimic_damping_ratio_for_residual(0.0),
                             rel_tol=0.0, abs_tol=1e-6)):
                     raise ValueError('DG03 public mimic source mapping differs from its source-bound drive receipt')
+                self._bootstrap_receipt['source_arm_drive_witness'] = (
+                    self._verify_dg03_public_drives(UsdPhysics)
+                )
+                self._bootstrap_receipt['source_scene_witness'] = (
+                    self._verify_dg03_public_scene(UsdGeom, UsdPhysics)
+                )
             self._manager = SimulationManager
         except BaseException as primary:
+            import gc
+            import traceback
+
+            original_traceback = "".join(traceback.format_exception(
+                type(primary), primary, primary.__traceback__,
+            ))
+            # Failed construction can keep CUDA/Warp views alive through the
+            # traceback. Detach it and release views before closing Kit.
+            primary.__traceback__ = None
+            self._free_views.clear()
+            self._frame_views.clear()
+            self._body_views.clear()
+            self._articulation = None
+            self._physics_scene = None
+            self._manager = None
+            self._torch = None
+            self._stage = None
+            gc.collect()
+            if original_traceback:
+                primary.add_note("Original Isaac adapter startup traceback:\n" + original_traceback)
             for label, cleanup in (
                 ("USD stage close", lambda: self._context.close_stage() if self._context is not None else None),
                 ("USD snapshot lease close", self._lease.close),
@@ -490,10 +577,287 @@ class IsaacSimNativeRuntimeIOV1:
                 except BaseException as cleanup_error:
                     primary.add_note(f"{label} after adapter startup failure also failed: "
                                      f"{type(cleanup_error).__name__}: {cleanup_error}")
-            raise
+            raise primary.with_traceback(None)
+
+    def _verify_dg03_public_drives(self, UsdPhysics) -> dict[str, object]:
+        """Compare exact MJCF Arm actuators with public Stage and Articulation views."""
+        receipt = self.drive_receipt
+        if receipt is None or receipt.arm_control_ranges is None:
+            raise RuntimeError('DG03 source Arm drive receipt is not bound to the compiled source')
+        authored = []
+        for prim in self._stage.Traverse():
+            for schema in prim.GetAppliedSchemas():
+                if str(schema).startswith('PhysicsDriveAPI:'):
+                    authored.append((str(prim.GetPath()), str(prim.GetName()), str(schema)))
+        expected_prim_names = {f'joint{index}' for index in range(1, 8)}
+        if (len(authored) != 7 or {name for _path, name, _schema in authored} != expected_prim_names
+                or any(schema != 'PhysicsDriveAPI:angular' for _path, _name, schema in authored)):
+            raise ValueError('DG03 composed stage must contain exactly seven angular Arm DriveAPI consumers')
+
+        stiffness_tensor, damping_tensor = self._articulation.get_dof_gains()
+        stiffness = _tensor_rows(stiffness_tensor, width=len(self._dof_names),
+                                 label='DG03 public DOF stiffness')[0]
+        damping = _tensor_rows(damping_tensor, width=len(self._dof_names),
+                               label='DG03 public DOF damping')[0]
+        effort_tensor = self._articulation.get_dof_max_efforts()
+        effort_rows = effort_tensor.numpy().tolist()
+        if effort_rows and not isinstance(effort_rows[0], (tuple, list)):
+            effort_rows = [effort_rows]
+        if not effort_rows or len(effort_rows[0]) != len(self._dof_names):
+            raise ValueError('DG03 public maximum-effort view has unexpected shape')
+        max_effort = tuple(float(value) for value in effort_rows[0])
+        drive_types_rows = self._articulation.get_dof_drive_types()
+        if (not drive_types_rows or len(drive_types_rows[0]) != len(self._dof_names)):
+            raise ValueError('DG03 public drive-type view has unexpected shape')
+        drive_types = tuple(
+            None if value is None else str(value).lower()
+            for value in drive_types_rows[0]
+        )
+        if any(not math.isfinite(value) for value in max_effort[:len(self._dof_names)]):
+            raise ValueError('DG03 public maximum-effort values must be finite in the pinned profile')
+
+        values = {}
+        for index, native_name in enumerate(self._dof_names):
+            if native_name in receipt.arm_stiffnesses:
+                expected = (
+                    receipt.arm_stiffnesses[native_name],
+                    receipt.arm_dampings[native_name],
+                    receipt.arm_max_efforts[native_name],
+                    'force',
+                )
+                actual = (stiffness[index], damping[index], max_effort[index], drive_types[index])
+                if (any(not math.isclose(float(actual[i]), float(expected[i]),
+                                         rel_tol=0.0, abs_tol=1e-4) for i in range(3))
+                        or actual[3] != expected[3]):
+                    raise ValueError(
+                        f'DG03 public Arm consumer differs from source actuator {native_name}: '
+                        f'actual={actual!r}, expected={expected!r}'
+                    )
+                control_range = receipt.arm_control_ranges[native_name]
+                position_range = self._position_limits[native_name]
+                if (control_range[0] < position_range[0] - 1e-6
+                        or control_range[1] > position_range[1] + 1e-6):
+                    raise ValueError(f'DG03 source control range escapes public position limits: {native_name}')
+                values[native_name] = {
+                    'control_range': list(control_range),
+                    'position_range': list(position_range),
+                    'stiffness': stiffness[index], 'damping': damping[index],
+                    'max_effort': max_effort[index], 'drive_type': drive_types[index],
+                    'source_actuator': f'actuator{native_name.removeprefix("joint")}',
+                    'readback_api': 'Articulation.get_dof_gains/get_dof_max_efforts/get_dof_drive_types',
+                }
+            else:
+                actual = (stiffness[index], damping[index], drive_types[index])
+                if (not math.isclose(stiffness[index], 0.0, rel_tol=0.0, abs_tol=1e-8)
+                        or not math.isclose(damping[index], 0.0, rel_tol=0.0, abs_tol=1e-8)
+                        or drive_types[index] not in (None, 'none')):
+                    raise ValueError(
+                        f'DG03 fingers must be free of duplicate public position drives: '
+                        f'{native_name}={actual!r}'
+                    )
+                values[native_name] = {
+                    'stiffness': stiffness[index], 'damping': damping[index],
+                    'max_effort': max_effort[index], 'drive_type': drive_types[index],
+                    'position_drive_api_absent': True,
+                }
+        return {
+            'schema_version': 'f05-dg03-public-arm-drive-witness-v1',
+            'authored_drive_apis': [
+                {'prim_path': path, 'joint': name, 'api': schema}
+                for path, name, schema in sorted(authored)
+            ],
+            'native_dof_order': list(self._dof_names),
+            'consumers': values,
+        }
+
+    def _verify_dg03_public_scene(self, UsdGeom, UsdPhysics) -> dict[str, object]:
+        """Bind the F05 task geometry and effective public body properties."""
+        support_path = '/F05Scene/support'
+        cube_path = '/F05Scene/free_cube'
+        support = self._stage.GetPrimAtPath(support_path)
+        cube = self._stage.GetPrimAtPath(cube_path)
+        support_collision_path = f'{support_path}/collision'
+        cube_collision_path = f'{cube_path}/collision'
+        support_collision = self._stage.GetPrimAtPath(support_collision_path)
+        cube_collision = self._stage.GetPrimAtPath(cube_collision_path)
+        if any(not prim or not prim.IsValid() for prim in (
+                support, cube, support_collision, cube_collision)):
+            raise ValueError('DG03 F05 support/cube task scene prims are incomplete')
+        if (not support_collision.HasAPI(UsdPhysics.CollisionAPI)
+                or not cube_collision.HasAPI(UsdPhysics.CollisionAPI)
+                or not cube.HasAPI(UsdPhysics.RigidBodyAPI)
+                or not cube.HasAPI(UsdPhysics.MassAPI)):
+            raise ValueError('DG03 F05 task scene physics schemas differ from its exact recipe')
+        scene_prims = [prim for prim in self._stage.Traverse() if prim.IsA(UsdPhysics.Scene)]
+        if len(scene_prims) != 1:
+            raise ValueError('DG03 F05 task scene must bind exactly one PhysicsScene')
+        gravity_direction = tuple(float(x) for x in scene_prims[0].GetAttribute(
+            'physics:gravityDirection').Get())
+        gravity_magnitude = float(scene_prims[0].GetAttribute('physics:gravityMagnitude').Get())
+        if (not _numeric_tuple_matches(
+                gravity_direction, (0.0, 0.0, -1.0), abs_tol=1e-7)
+                or not _numeric_value_matches(gravity_magnitude, 9.81, abs_tol=1e-6)):
+            raise ValueError('DG03 F05 gravity differs from the frozen task-scene recipe')
+
+        def box_geometry(prim, path, expected_center, expected_size):
+            geom = UsdGeom.Cube(prim)
+            size = float(geom.GetSizeAttr().Get())
+            scale = tuple(float(x) for x in prim.GetAttribute('xformOp:scale').Get())
+            root = self._stage.GetPrimAtPath(path)
+            center = tuple(float(x) for x in root.GetAttribute('xformOp:translate').Get())
+            dimensions = tuple(size * value for value in scale)
+            if (not _numeric_tuple_matches(center, expected_center, abs_tol=1e-6)
+                    or not _numeric_tuple_matches(dimensions, expected_size, abs_tol=1e-6)):
+                raise ValueError(f'DG03 task-scene box differs from the frozen recipe: {path}')
+            return {'center_m': list(center), 'dimensions_m': list(dimensions),
+                    'usd_cube_size': size, 'usd_scale': list(scale)}
+
+        cube_geometry_receipt = box_geometry(
+            cube_collision, cube_path, (1.0, 0.5, 0.9), (0.06, 0.06, 0.06),
+        )
+        support_geometry_receipt = box_geometry(
+            support_collision, support_path, (1.0, 0.5, 0.45), (0.35, 0.35, 0.05),
+        )
+        mass_attr = cube.GetAttribute('physics:mass')
+        if (not mass_attr or not mass_attr.IsValid()
+                or not _numeric_value_matches(float(mass_attr.Get()), 0.1, abs_tol=1e-7)):
+            raise ValueError('DG03 task cube authored mass differs from the frozen 0.1 kg recipe')
+        collision_enabled = {
+            path: bool(self._stage.GetPrimAtPath(path).GetAttribute(
+                'physics:collisionEnabled').Get())
+            for path in (support_collision_path, cube_collision_path)
+        }
+        if collision_enabled != {support_collision_path: True, cube_collision_path: True}:
+            raise ValueError('DG03 task collision geometry is not enabled on both recipe shapes')
+
+        material_bindings = {}
+        for path in (support_collision_path, cube_collision_path):
+            prim = self._stage.GetPrimAtPath(path)
+            rows = []
+            while prim and prim.IsValid():
+                relationship = prim.GetRelationship('material:binding')
+                if relationship and relationship.IsValid():
+                    targets = tuple(str(target) for target in relationship.GetTargets())
+                    if targets:
+                        rows.append({'prim_path': str(prim.GetPath()), 'targets': list(targets)})
+                prim = prim.GetParent()
+            material_bindings[path] = rows
+        if any(material_bindings.values()):
+            raise ValueError('DG03 cube/support source profile must remain without authored material bindings')
+
+        filter_witness = _dg03_collision_filter_witness(self._stage, UsdPhysics)
+        filter_relationships = filter_witness['filtered_pairs']
+        collision_groups = filter_witness['collision_groups']
+        task_scene_filter_relationships = filter_witness['task_scene_filtered_pairs']
+        task_scene_collision_groups = filter_witness['task_scene_collision_groups']
+        if task_scene_collision_groups or task_scene_filter_relationships:
+            raise ValueError('DG03 task scene unexpectedly adds collision filtering')
+
+        if len(self._free_views) != 1:
+            raise ValueError('DG03 source scene requires exactly one floating free-cube body')
+        view = next(iter(self._free_views.values()))
+        masses = _tensor_rows(view.get_masses(), width=1, label='DG03 public cube mass')[0]
+        com_positions, com_orientations = view.get_coms()
+        com_position = _tensor_rows(com_positions, width=3,
+                                    label='DG03 public cube COM position')[0]
+        com_orientation = _tensor_rows(com_orientations, width=4,
+                                       label='DG03 public cube COM orientation')[0]
+        inertias = _tensor_rows(view.get_inertias(), width=9,
+                                label='DG03 public cube inertia tensor')[0]
+        expected_inertia = 0.1 * 0.06 * 0.06 / 6.0
+        diagonal = (inertias[0], inertias[4], inertias[8])
+        if (not math.isclose(masses[0], 0.1, rel_tol=0.0, abs_tol=1e-6)
+                or any(not math.isclose(value, 0.0, rel_tol=0.0, abs_tol=1e-6)
+                       for value in com_position)
+                or any(not math.isclose(actual, expected_inertia, rel_tol=0.05, abs_tol=1e-7)
+                       for actual in diagonal)
+                or any(not math.isclose(inertias[index], 0.0, rel_tol=0.0, abs_tol=1e-7)
+                       for index in (1, 2, 3, 5, 6, 7))):
+            raise ValueError('DG03 public cube mass/COM/inertia differ from the 0.1 kg uniform cube profile')
+        return {
+            'schema_version': 'f05-dg03-public-scene-witness-v2',
+            'gravity_direction': list(gravity_direction),
+            'gravity_magnitude_m_s2': gravity_magnitude,
+            'support_geometry': support_geometry_receipt,
+            'free_cube_geometry': cube_geometry_receipt,
+            'authored_mass_kg': float(mass_attr.Get()),
+            'public_mass_kg': masses[0],
+            'public_com_position_body_m': list(com_position),
+            'public_com_orientation_body_wxyz': list(com_orientation),
+            'public_inertia_tensor_kg_m2_row_major': list(inertias),
+            'uniform_cube_inertia_reference_kg_m2': expected_inertia,
+            'collision_enabled': collision_enabled,
+            'material_binding_targets': material_bindings,
+            'collision_groups': collision_groups,
+            'filtered_pairs': filter_relationships,
+            'task_scene_collision_groups': task_scene_collision_groups,
+            'task_scene_filtered_pairs': task_scene_filter_relationships,
+            'contact_query': {
+                'public_api': 'RigidPrim.get_raw_contact_data',
+                'sensor_path': cube_path,
+                'matched_actor_path': support_collision_path,
+                'contact_report_api_enabled_via': 'RigidPrim.set_enabled_contact_tracking',
+                'physics_collision_filter_authored': bool(
+                    task_scene_collision_groups or task_scene_filter_relationships
+                ),
+            },
+            'cross_engine_material_equivalence_claimed': False,
+        }
+
+    def _read_dg03_contact_witness(self) -> dict[str, object]:
+        """Read public raw contacts and select only the frozen support collider."""
+        if not self._dg03 or not self._free_views:
+            raise RuntimeError('DG03 contact readback requires the exact free-cube view')
+        view = next(iter(self._free_views.values()))
+        result = view.get_raw_contact_data(dt=float(self._artifact.timebase.physics_dt))
+        if type(result) is not tuple or len(result) != 7:
+            raise ValueError('DG03 public raw contact API returned an unexpected seven-array result')
+        normal_forces, _points, _normals, _distances, counts, starts, actor_ids = result
+        count_rows = counts.numpy().tolist()
+        start_rows = starts.numpy().tolist()
+        if len(count_rows) != 1 or len(start_rows) != 1:
+            raise ValueError('DG03 public raw contact view must return one free-cube sensor row')
+        raw_contact_count = int(count_rows[0])
+        contact_start = int(start_rows[0])
+        if raw_contact_count < 0 or raw_contact_count > 32 or contact_start < 0:
+            raise ValueError('DG03 public contact count/start index is outside the bounded view')
+        force_rows = normal_forces.numpy().tolist()
+        actor_paths = (
+            view.get_actor_paths_from_ids(
+                actor_ids.to('cpu')[contact_start:contact_start + raw_contact_count],
+            )
+            if raw_contact_count else []
+        )
+        selected = force_rows[contact_start:contact_start + raw_contact_count]
+        if len(selected) != raw_contact_count or len(actor_paths) != raw_contact_count:
+            raise ValueError('DG03 public contact force slice exceeds the returned contact buffer')
+        force_values = tuple(float(row[0]) for row in selected)
+        if any(not math.isfinite(value) or value < 0.0 for value in force_values):
+            raise ValueError('DG03 public normal contact forces must be finite nonnegative SI values')
+        support_path = '/F05Scene/support/collision'
+        support_indices = tuple(
+            index for index, path in enumerate(actor_paths)
+            if path == '/F05Scene/support' or path == support_path
+            or path.startswith(support_path + '/')
+        )
+        support_forces = tuple(force_values[index] for index in support_indices)
+        return {
+            'schema_version': 'f05-dg03-public-contact-witness-v2',
+            'provenance_kind': 'native_runtime',
+            'api': 'RigidPrim.get_raw_contact_data',
+            'sensor_path': '/F05Scene/free_cube',
+            'support_path': support_path,
+            'physics_dt_s': float(self._artifact.timebase.physics_dt),
+            'raw_contact_count': raw_contact_count,
+            'raw_contact_actor_paths': list(actor_paths),
+            'contact_count': len(support_indices),
+            'support_contact_normal_forces_N': list(support_forces),
+            'normal_force_sum_N': math.fsum(support_forces),
+            'contact_present': bool(support_indices),
+        }
 
     def _verify_dg03_mimic(self, PhysxSchema, UsdPhysics) -> None:
-        """Read the source-derived mimic from the verified delivery without mutation."""
+        """Bind and initialize the public mimic properties from the exact source equality."""
         if not self._dg03 or self._stage is None:
             raise RuntimeError('DG03 mimic verification requires its exact composed USD stage')
         import math
@@ -541,9 +905,13 @@ class IsaacSimNativeRuntimeIOV1:
         expected_attrs = {
             'gearing': expected_gearing,
             'offset': expected_offset,
+            # The delivered static value is the saturated solimp endpoint.
+            # It is changed on the live stage to d(0)'s source-derived value
+            # before PhysX setup, then updated from public q before each step.
             'naturalFrequency': expected_frequency,
             'dampingRatio': solref[1],
         }
+        authored_attrs = {}
         actual_attrs = {}
         for name, expected in expected_attrs.items():
             attr = follower.GetAttribute(f'physxMimicJoint:transX:{name}')
@@ -552,7 +920,31 @@ class IsaacSimNativeRuntimeIOV1:
             actual = float(attr.Get())
             if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-6):
                 raise ValueError(f'DG03 source-derived mimic {name} differs from source mapping')
-            actual_attrs[name] = actual
+            authored_attrs[name] = actual
+            if name != 'naturalFrequency':
+                actual_attrs[name] = actual
+        from .leaf_control import IsaacSourceEqualityComplianceV1
+        compliance = IsaacSourceEqualityComplianceV1(
+            'isaac-source-equality-compliance-v1', 'finger_joint1', 'finger_joint2',
+            solref, solimp, (*solimp, 0.5, 2.0),
+        )
+        initial_frequency = compliance.natural_frequency_hz(0.0)
+        initial_damping_ratio = compliance.damping_ratio_for_residual(0.0)
+        frequency_attr = follower.GetAttribute('physxMimicJoint:transX:naturalFrequency')
+        damping_attr = follower.GetAttribute('physxMimicJoint:transX:dampingRatio')
+        if frequency_attr.Set(initial_frequency) is False:
+            raise RuntimeError('DG03 could not set the source-compliant live PhysX mimic frequency')
+        if damping_attr.Set(initial_damping_ratio) is False:
+            raise RuntimeError('DG03 could not set the source-compliant live PhysX mimic damping ratio')
+        runtime_frequency = float(frequency_attr.Get())
+        runtime_damping_ratio = float(damping_attr.Get())
+        if not math.isclose(runtime_frequency, initial_frequency, rel_tol=0.0, abs_tol=1e-6):
+            raise ValueError('DG03 live PhysX mimic frequency did not read back the source-compliant d(0) value')
+        if not math.isclose(runtime_damping_ratio, initial_damping_ratio,
+                            rel_tol=0.0, abs_tol=1e-6):
+            raise ValueError('DG03 live PhysX mimic damping ratio did not read back the source-compliant d(0) value')
+        self._dg03_mimic_frequency_attribute = frequency_attr
+        self._dg03_mimic_damping_attribute = damping_attr
         self._dg03_mimic_receipt = {
             'schema_version': 'physx-public-source-mimic-verification-v1',
             'follower_joint': 'finger_joint2', 'follower_path': str(follower.GetPath()),
@@ -560,10 +952,22 @@ class IsaacSimNativeRuntimeIOV1:
             'source_polycoef': polycoef,
             'source_home_qpos_m': (qpos[7], qpos[8]),
             'source_solref': solref, 'source_solimp': solimp,
-            'physx_attributes': actual_attrs,
-            'solimp_native_mapping': 'none; source metadata retained, no PhysX mimic equivalent',
+            'source_solimp_effective': (*solimp, 0.5, 2.0),
+            'mapping_algorithm': compliance.mapping_algorithm,
+            'initial_equality_residual_m': 0.0,
+            'initial_impedance': compliance.impedance(0.0),
+            'initial_runtime_frequency_hz': runtime_frequency,
+            'initial_runtime_damping_ratio': runtime_damping_ratio,
+            'authored_physx_attributes': authored_attrs,
+            'physx_attributes': {
+                **actual_attrs,
+                'naturalFrequency': runtime_frequency,
+                'dampingRatio': runtime_damping_ratio,
+            },
+            'solimp_native_mapping': 'live public PhysX mimic naturalFrequency/dampingRatio follow the MuJoCo 3.8.1 source reference coefficients',
             'schema_authored_in_delivery': True,
-            'runtime_stage_mutated': False,
+            'runtime_stage_mutated': True,
+            'runtime_property_api': 'Usd.Prim.GetAttribute(...).Set/Get',
             'applied_schemas': list(follower.GetAppliedSchemas()),
         }
 
@@ -635,6 +1039,16 @@ class IsaacSimNativeRuntimeIOV1:
                     [item[2] for item in expected_targets],
                     dof_indices=[int(item[0]) for item in expected_targets],
                 )
+                if dg03:
+                    target_readback = _tensor_rows(
+                        self._articulation.get_dof_position_targets(
+                            dof_indices=[int(item[0]) for item in expected_targets],
+                        ),
+                        width=7, label='DG03 reset position-target readback',
+                    )[0]
+                    if any(not math.isclose(actual, item[2], rel_tol=0.0, abs_tol=1e-6)
+                           for actual, item in zip(target_readback, expected_targets, strict=True)):
+                        raise ValueError('DG03 public reset target readback differs from source-bound target')
                 finger_indices = [self._dof_index[name] for name in ('finger_joint1', 'finger_joint2')]
                 self._articulation.set_dof_efforts([0.0, 0.0], dof_indices=finger_indices)
                 opening = sum(float(sample.joint_position[f'panda-main/finger_joint{index}'])
@@ -769,9 +1183,21 @@ class IsaacSimNativeRuntimeIOV1:
                 dof_indices=[int(item[0]) for item in ordered],
             )
             self._sync()
+            applied_values = tuple(float(item[2]) for item in ordered)
+            if self._dg03:
+                target_readback = _tensor_rows(
+                    self._articulation.get_dof_position_targets(
+                        dof_indices=[int(item[0]) for item in ordered],
+                    ),
+                    width=7, label='DG03 public position-target readback',
+                )[0]
+                if any(not math.isclose(actual, item[2], rel_tol=0.0, abs_tol=1e-6)
+                       for actual, item in zip(target_readback, ordered, strict=True)):
+                    raise ValueError('DG03 public Articulation position-target readback differs from source law')
+                applied_values = tuple(float(value) for value in target_readback)
             return NativePositionWriteAckV1(
                 "native-position-write-ack-v1", target_identity_sha256,
-                tuple(item[1] for item in ordered), tuple(float(item[2]) for item in ordered),
+                tuple(item[1] for item in ordered), applied_values,
                 False, attempted,
             )
         except BaseException as error:
@@ -850,9 +1276,39 @@ class IsaacSimNativeRuntimeIOV1:
                 force = min(scalar_limit, max(-scalar_limit, min(source_high, max(source_low, raw_force))))
                 dof_efforts = tuple(coef * force for coef in receipt.tendon_coefficients)
                 finger_indices = [self._dof_index[name] for name in finger_names]
+                compliance = receipt.equality_compliance
+                if (compliance is None or self._dg03_mimic_frequency_attribute is None
+                        or self._dg03_mimic_damping_attribute is None):
+                    raise RuntimeError('DG03 native substep has no source-bound live equality consumer')
+                equality_residual = q_fingers[1] - q_fingers[0]
+                source_impedance = compliance.impedance(equality_residual)
+                mimic_frequency = compliance.natural_frequency_hz(equality_residual)
+                mimic_damping_ratio = compliance.damping_ratio_for_residual(equality_residual)
+                frequency_attribute = self._dg03_mimic_frequency_attribute
+                damping_attribute = self._dg03_mimic_damping_attribute
+                if frequency_attribute.Set(mimic_frequency) is False:
+                    raise RuntimeError('DG03 public USD property setter rejected source solimp frequency')
+                if damping_attribute.Set(mimic_damping_ratio) is False:
+                    raise RuntimeError('DG03 public USD property setter rejected source solimp damping ratio')
+                applied_frequency = float(frequency_attribute.Get())
+                applied_damping_ratio = float(damping_attribute.Get())
+                if not math.isclose(applied_frequency, mimic_frequency, rel_tol=0.0, abs_tol=1e-6):
+                    raise ValueError('DG03 live PhysX mimic frequency readback differs from source solimp')
+                if not math.isclose(applied_damping_ratio, mimic_damping_ratio,
+                                    rel_tol=0.0, abs_tol=1e-6):
+                    raise ValueError('DG03 live PhysX mimic damping readback differs from source solimp')
                 self._articulation.set_dof_efforts(
                     [float(value) for value in dof_efforts], dof_indices=finger_indices,
                 )
+                applied_efforts = _tensor_rows(
+                    self._articulation.get_dof_efforts(dof_indices=finger_indices),
+                    width=2, label='DG03 public applied DOF effort',
+                )[0]
+                if any(not math.isclose(actual, expected, rel_tol=1e-7, abs_tol=1e-7)
+                       for actual, expected in zip(applied_efforts, dof_efforts, strict=True)):
+                    raise ValueError(
+                        'DG03 public Articulation.get_dof_efforts readback differs from independent J^T force'
+                    )
                 tendon_application = {
                     'schema_version': 'native-source-tendon-substep-v1',
                     'target_identity_sha256': target['target_identity_sha256'],
@@ -874,10 +1330,23 @@ class IsaacSimNativeRuntimeIOV1:
                     'unclipped_scalar_force_N': float(raw_force),
                     'scalar_force_N': float(force),
                     'dof_efforts_N': tuple(float(value) for value in dof_efforts),
+                    'public_applied_efforts_N': tuple(float(value) for value in applied_efforts),
+                    'public_effort_readback_api': 'Articulation.get_dof_efforts',
+                    'source_equality_residual_m': float(equality_residual),
+                    'source_equality_impedance': float(source_impedance),
+                    'source_mimic_natural_frequency_hz': float(mimic_frequency),
+                    'source_mimic_damping_ratio': float(mimic_damping_ratio),
+                    'public_mimic_frequency_api': 'Usd.Prim.GetAttribute(...).Set/Get',
+                    'public_mimic_frequency_readback_hz': applied_frequency,
+                    'public_mimic_damping_ratio_readback': applied_damping_ratio,
                 }
                 self._sync()
             self._manager.step(steps=1, update_fabric=False)
             self._sync()
+            if self._dg03:
+                contact_witness = self._read_dg03_contact_witness()
+                if tendon_application is not None:
+                    tendon_application['public_contact_witness'] = contact_witness
         except BaseException as error:
             error.add_note(
                 f"one native physics step was attempted; pre-step counter={before!r}; "
@@ -904,6 +1373,8 @@ class IsaacSimNativeRuntimeIOV1:
         if self._closed:
             return
         self._closed = True
+        import gc
+
         primary = None
         try:
             from isaacsim.core.experimental.utils import app as app_utils
@@ -916,9 +1387,13 @@ class IsaacSimNativeRuntimeIOV1:
         self._articulation = None
         self._physics_scene = None
         self._manager = None
+        gc.collect()
+        context = self._context
+        self._context = None
+        self._stage = None
         try:
-            if self._context is not None:
-                self._context.close_stage()
+            if context is not None:
+                context.close_stage()
         except BaseException as error:
             if primary is None:
                 primary = error

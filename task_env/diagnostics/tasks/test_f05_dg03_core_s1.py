@@ -15,8 +15,105 @@ from task_env.diagnostics.tasks.f04_candidate_s1_support import _action_for
 
 DELIVERY_MANIFEST = (
     "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/"
-    "f05_diagnostic_goal03/window_001/isaac_usd_v1/delivery_v1_007/delivery_manifest.json"
+    "f05_diagnostic04/window_001/isaac_usd_v3/delivery_manifest.json"
 )
+
+
+def test_dg03_public_usd_float32_readback_matches_frozen_scene_values():
+    from task_env.runtime.sessions.isaac_native_io import (
+        _numeric_tuple_matches, _numeric_value_matches,
+    )
+
+    # USD physics:gravityMagnitude and cube size are float32-backed public
+    # attributes; their exact readback is not the Python float64 literal.
+    assert _numeric_value_matches(9.8100004196167, 9.81, abs_tol=1e-6)
+    assert _numeric_value_matches(0.10000000149011612, 0.1, abs_tol=1e-7)
+    assert _numeric_tuple_matches(
+        (1.0, 0.5, 0.8999999761581421),
+        (1.0, 0.5, 0.9),
+        abs_tol=1e-6,
+    )
+    assert _numeric_tuple_matches(
+        (0.05999999865889549, 0.06, 0.06),
+        (0.06, 0.06, 0.06),
+        abs_tol=1e-6,
+    )
+    assert not _numeric_value_matches(9.810002, 9.81, abs_tol=1e-6)
+    assert not _numeric_tuple_matches((1.0, 0.5, 0.900002), (1.0, 0.5, 0.9), abs_tol=1e-6)
+
+
+def test_dg03_scene_filter_guard_preserves_robot_source_filters():
+    from task_env.runtime.sessions.isaac_native_io import _dg03_collision_filter_witness
+
+    class FakeCollisionGroup:
+        pass
+
+    class FakeUsdPhysics:
+        CollisionGroup = FakeCollisionGroup
+
+    class FakeRelationship:
+        def __init__(self, name, targets):
+            self.name, self.targets = name, targets
+
+        def GetName(self):
+            return self.name
+
+        def GetTargets(self):
+            return self.targets
+
+    class FakePrim:
+        def __init__(self, path, relationships=(), collision_group=False):
+            self.path = path
+            self.relationships = relationships
+            self.collision_group = collision_group
+
+        def GetPath(self):
+            return self.path
+
+        def IsA(self, schema):
+            return schema is FakeCollisionGroup and self.collision_group
+
+        def GetRelationships(self):
+            return self.relationships
+
+    class FakeStage:
+        def __init__(self, prims):
+            self.prims = prims
+
+        def Traverse(self):
+            return iter(self.prims)
+
+    panda_filter = FakeRelationship(
+        'physics:filteredPairs', ['/panda/Geometry/link0/link1'],
+    )
+    robot_group = FakePrim('/panda/CollisionGroup', collision_group=True)
+    f05_group = FakePrim(
+        '/Physics/Groups/f05',
+        [FakeRelationship('collection:colliders:includes', ['/F05Scene/free_cube'])],
+        collision_group=True,
+    )
+    witness = _dg03_collision_filter_witness(
+        FakeStage([
+            FakePrim('/panda/Geometry/link0', [panda_filter]),
+            robot_group,
+            f05_group,
+        ]),
+        FakeUsdPhysics,
+    )
+    assert witness['filtered_pairs'] == [{
+        'prim_path': '/panda/Geometry/link0',
+        'relationship': 'physics:filteredPairs',
+        'targets': ['/panda/Geometry/link0/link1'],
+    }]
+    assert witness['collision_groups'] == ['/Physics/Groups/f05', '/panda/CollisionGroup']
+    assert witness['task_scene_filtered_pairs'] == []
+    assert witness['task_scene_collision_groups'] == ['/Physics/Groups/f05']
+    task_filter = FakePrim(
+        '/F05Scene/free_cube',
+        [FakeRelationship('physics:filteredPairs', ['/F05Scene/support/collision'])],
+    )
+    witness = _dg03_collision_filter_witness(FakeStage([task_filter]), FakeUsdPhysics)
+    assert len(witness['task_scene_filtered_pairs']) == 1
 
 
 class _SyntheticDg03NativeIO:
@@ -173,6 +270,10 @@ class _SyntheticDg03NativeIO:
         limit = min(target["scalar_force_limit_N"], receipt.actuator_force_range[1])
         force = min(limit, max(-limit, min(receipt.actuator_force_range[1],
                                            max(receipt.actuator_force_range[0], raw))))
+        equality_residual = q[1] - q[0]
+        equality_impedance = receipt.equality_compliance.impedance(equality_residual)
+        mimic_frequency = receipt.mimic_frequency_for_residual(equality_residual)
+        mimic_damping_ratio = receipt.mimic_damping_ratio_for_residual(equality_residual)
         application = {
             "schema_version": "native-source-tendon-substep-v1",
             "target_identity_sha256": target["target_identity_sha256"],
@@ -197,6 +298,30 @@ class _SyntheticDg03NativeIO:
             "unclipped_scalar_force_N": raw,
             "scalar_force_N": force,
             "dof_efforts_N": tuple(a * force for a in receipt.tendon_coefficients),
+            "public_applied_efforts_N": tuple(a * force for a in receipt.tendon_coefficients),
+            "public_effort_readback_api": "synthetic-no-physics",
+            "source_equality_residual_m": equality_residual,
+            "source_equality_impedance": equality_impedance,
+            "source_mimic_natural_frequency_hz": mimic_frequency,
+            "source_mimic_damping_ratio": mimic_damping_ratio,
+            "public_mimic_frequency_api": "synthetic-no-physics",
+            "public_mimic_frequency_readback_hz": mimic_frequency,
+            "public_mimic_damping_ratio_readback": mimic_damping_ratio,
+            "public_contact_witness": {
+                "schema_version": "f05-dg03-public-contact-witness-v2",
+                "provenance_kind": "synthetic_fixture",
+                "api": "synthetic-no-physics",
+                "sensor_path": "/F05Scene/free_cube",
+                "support_path": "/F05Scene/support/collision",
+                "physics_dt_s": float(self.artifact.timebase.physics_dt),
+                "raw_contact_count": 0,
+                "raw_contact_actor_paths": [],
+                "contact_count": 0,
+                "support_contact_normal_forces_N": [],
+                "normal_force_sum_N": 0.0,
+                "contact_present": False,
+                "physical_contact_checked": False,
+            },
         }
         self.operations.append({"op": "advance", **application})
         return NativeAdvanceReceiptV1(
@@ -306,6 +431,29 @@ def test_f05_dg03_selected_reference_core_s1_two_episodes(tmp_path):
                 "effort_api": lambda row: row.__setitem__("public_effort_api", "private-solver-state"),
                 "write_count": lambda row: row.__setitem__("effort_write_completed_count", 1),
                 "tendon_coefficients": lambda row: row.__setitem__("tendon_coefficients", (1.0, 0.0)),
+                "source_equality_residual": lambda row: row.__setitem__(
+                    "source_equality_residual_m", row["source_equality_residual_m"] + 0.01,
+                ),
+                "source_equality_compliance": lambda row: row.__setitem__(
+                    "source_equality_impedance", row["source_equality_impedance"] + 0.01,
+                ),
+                "source_mimic_frequency": lambda row: row.__setitem__(
+                    "public_mimic_frequency_readback_hz",
+                    row["public_mimic_frequency_readback_hz"] + 1.0,
+                ),
+                "source_mimic_damping_ratio": lambda row: row.__setitem__(
+                    "public_mimic_damping_ratio_readback",
+                    row["public_mimic_damping_ratio_readback"] + 0.1,
+                ),
+                "contact_count": lambda row: row["public_contact_witness"].__setitem__(
+                    "contact_count", 2,
+                ),
+                "contact_actor_path": lambda row: row["public_contact_witness"].__setitem__(
+                    "raw_contact_actor_paths", ["/F05Scene/support/collision"],
+                ),
+                "contact_force": lambda row: row["public_contact_witness"].__setitem__(
+                    "normal_force_sum_N", 1.0,
+                ),
             }
             for mutation in tamper_cases.values():
                 changed = dict(good)
@@ -335,12 +483,48 @@ def test_f05_dg03_selected_reference_core_s1_two_episodes(tmp_path):
         "physics_steps": 0,
         "episodes": episode_receipts,
         "source_tendon_mutation_cases_rejected": 12,
+        "source_equality_compliance_mutation_cases_rejected": 4,
+        "source_contact_mutation_cases_rejected": 3,
         "native_io_close_counts": [io.close_count for io in created],
     }
     (evidence_root / "core_s1_receipt.json").write_text(
         json.dumps(receipt, sort_keys=True, indent=2, allow_nan=False) + "\n",
         encoding="utf-8",
     )
+
+
+@pytest.mark.parametrize(
+    ("residual", "expected_impedance"),
+    [
+        (0.0, 0.95),
+        (0.00025, 0.955),
+        (0.0005, 0.97),
+        (0.00075, 0.985),
+        (0.001, 0.99),
+        (-0.0005, 0.97),
+    ],
+)
+def test_f05_dg03_mujoco_solimp_mapping_is_residual_sensitive(residual, expected_impedance):
+    """The source compliance oracle follows the pinned MuJoCo 3.8.1 sigmoid."""
+    from task_env.runtime.sessions.leaf_control import IsaacSourceEqualityComplianceV1
+
+    mapping = IsaacSourceEqualityComplianceV1(
+        "isaac-source-equality-compliance-v1", "finger_joint1", "finger_joint2",
+        (0.005, 1.0), (0.95, 0.99, 0.001), (0.95, 0.99, 0.001, 0.5, 2.0),
+        'mujoco-3.8.1-solimp-reference-to-physx-mimic-v3',
+    )
+    assert mapping.impedance(residual) == pytest.approx(expected_impedance, abs=1e-12)
+    expected_frequency = (
+        expected_impedance / (0.99 * 0.99 * 0.005 * 0.005)
+    ) ** 0.5 / (2.0 * 3.141592653589793)
+    assert mapping.natural_frequency_hz(residual) == pytest.approx(expected_frequency, abs=1e-12)
+    assert mapping.damping_ratio_for_residual(residual) == pytest.approx(
+        expected_impedance ** 0.5, abs=1e-12,
+    )
+    if residual == 0.0:
+        assert mapping.natural_frequency_hz(residual) != pytest.approx(
+            1.0 / (2.0 * 3.141592653589793 * 0.005), abs=1e-6,
+        )
 
 
 def test_f05_dg03_native_route_fails_closed_before_isaac_app(monkeypatch):
