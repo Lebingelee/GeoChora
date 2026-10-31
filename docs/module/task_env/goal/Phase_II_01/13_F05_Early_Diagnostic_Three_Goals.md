@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；Sol已复核DG03 window001为partial，synthetic Core S1与bounded N1诊断已记录，但source consumer gate仍阻断正式N2，DG03继续active。**
+> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；DG03 window001经Sol复核为partial。维护者要求的“诊断04”承接其剩余实现、正式N2与新F05联合收口，完整包准备后由维护者转述；本次准备不启动执行。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -210,3 +210,17 @@ DG03 的正式 Core N2 cell 未启动，状态 `BLOCKED_BY_FEATURE`：源 equali
 **决定：`F05_SUCCESSOR_PARTIAL_REVIEWED_DG03_CONTINUE_REQUIRED`。** Sol核验36/36输出manifest，并检查当前Core代码差异、synthetic S1/H5冷读收据及两个N1计划、worker收据与独立读回。N1正例和完整关系消融构成exact derived USD/PhysX诊断舞台上的缺陷敏感对照；它们不是生产Core materialization、原source `solimp`柔顺等价、完整source fixed-tendon consumer、drive/contact等价或正式N2证据。DG03生产`materialize()`保持fail closed，正式N2仍`NOT_STARTED_BLOCKED_BY_FEATURE`。protected/runtime/provider/gitlink、受控退出和锁释放按continuation收据核验；本次Sol review未运行pytest或native。
 
 DG01/DG02此前有界接收保持不变，R3对照仍`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`。DG03长期Goal继续active，必须以复核输出HEAD新冻执行窗口，完成剩余source-to-consumer实现和验证后才运行未降低的正式N2及三路线矩阵。旧`F05_OVERALL_PARTIAL`、ordinary successor计数2/3、F06/F07和Qualification状态均不改变。Sol审阅记录见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_successor002_continuation_20261101/`。
+
+<a id="f05-diagnostic04-dg03-repair-and-closure"></a>
+
+## 16. 诊断04：DG03返工、新F05收口及F06入口（2026-11-01；准备供维护者转述）
+
+维护者要求构建新的持续Goal，明确主要目标、当前状态、分阶段方案和压缩上下文后的恢复方法，并避免在细枝末节上长期停留。诊断04是承接DG03未完成项与联合收口的执行名称；原三个provider目标、普通successor 2/3历史、DG01/DG02有界接收和DG03既有消耗均保留，不增加第四条provider路线。包为`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_001/`，ID `F05_DIAGNOSTIC04_WINDOW001_DG03_REPAIR_AND_F05_CLOSURE`。实际执行HEAD、prompt/保护字节hash和允许修改范围见该包冻结snapshot/manifest，Luna人工接包后才认领writer。
+
+按A源参数到公开consumer的最小可实施决策→B既有Core owner的实际修复与S1/有界探针→C未降低的3,000步正式Isaac N2与独立冷读→D三路线矩阵及F06入口清单实施。equality柔顺、fixed-tendon law/分力、drive/contact映射是剩余实现主线；没有同版公开能力证明时保留精确阻断与最小反例，不以普通字段错误或静态表格结束持续Goal。F06只列正式交付、Harness真实资产/CPU profile接线、新桌面场景/reset/谓词和Expert对接owner；20-seed/Oracle/Judge留在F06，不新增为F05完成门。
+
+复用`develop-full`与现有只读隔离GeoPhys，零新branch/worktree。原DG03累计上限24,000步/5,400秒，已用486步/1,063.598855582秒；诊断04新增最多23,514步/4,336秒，其中Isaac17,514步/3,436秒，CPU回归6,000步/900秒，各限同时适用。保守取整后native wall总量仍不超过旧上限，非正式Isaac probe剩余8,514步。正式N2前预留6,400 attempted步/2,400秒，覆盖两次完整3,000正式步及每run最多200 bootstrap步；实际bootstrap更大时先重算内部预留。原内存/显存/共享锁/受控worker退出门保持。单窗口主动最多12小时，最后至少60分钟收口；native资源不随压缩/新turn/别名清零。
+
+每阶段或run后维护一页`RESUME.md`和`goal_progress.json`，记录当前门、证据、身份、预算、worker/锁及下一动作；压缩后先读原prompt/短进度/ledger/Git状态，确认监督进程再续，不重跑全量历史。约30–45分钟没有新证据就换最小复现或独立判别方式，同类失败两次先修接口/detector；这要求改变方法，不授权弱化必需语义。报告/计数文字和已有全局docs scope错误不应挤占物理实现主线。
+
+候选通过标签为`F05_DIAGNOSTIC04_CLOSURE_PASS_PENDING_SOL_REVIEW`；未完成则保留PARTIAL并交具体阻断/证据/下一步。新F05 `ACCEPTED_BOUNDED_F05_SUCCESSOR_A_THREE_CELL`仍需Sol独立复核，不授Formal Qualification。本包准备仅文档、Git和hash检查，不运行native或软件测试，不向Luna或其他线程发送消息。

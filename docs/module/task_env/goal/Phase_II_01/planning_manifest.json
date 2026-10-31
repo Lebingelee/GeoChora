@@ -1865,7 +1865,7 @@
     "README.md": "446e275d74cbad788e17613ef87356ff45a963d344b7d5da382a3c03998caf76",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "6ad8307650d41b229940491e22933fb8cc6bf03ffb8ba3030b035adb3448ae29",
     "12_F05_F07_Execution_Playbook.md": "f73cfe82c683e64cf5793ed73a0b35c4f466d4a599dcb5f242b871f6ba2b9e90",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "eaf73a16fe1fc9ca922eab8befa860bce539bb7463a2feaa619ce595aae908d6"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "73e0f003cd09107aad13adfe4992b42610f0db6088ffe0432979576e631d5243"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -5091,11 +5091,11 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Prepare a fresh DG03 package against reviewed Core develop-full@e13a02acef64642bd8f3ce3b3735303c80c671a7 and isolated GeoPhys@a9e4c4850bd225f5929e74831ac282b18ff517ce; do not dispatch the adaptive baseline or start native until the maintainer relays the new package.",
+      "selected_next": "Maintainer relay of diagnostic04 continuation package; execute only against its frozen snapshot HEAD after writer/resource/protected-input readback.",
       "after_that_priority": [
-        "Freeze DG03 source/consumer/owner/resource gates from the accepted DG01/DG02 contracts and actual reviewed HEADs.",
-        "Keep F06 and F07 separate and unstarted.",
-        "Do not convert DG01/DG02 bounded cell acceptance into overall F05 acceptance or Qualification."
+        "Implement source equality compliance, fixed-tendon and drive/contact consumers in the existing DG03/Core owners.",
+        "Complete unchanged formal Isaac N2 and cold reader, then three-route bounded F05 review.",
+        "Prepare F06 entry and method-level Harness gaps only; no F06/F07 execution."
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
@@ -5106,9 +5106,9 @@
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
       "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
-      "F05": "Ordinary F05 remains F05_OVERALL_PARTIAL. Diagnostic DG01 and DG02 are accepted only for their bounded source/task/action/Core/provider CPU cells; DG03 is unstarted and requires a fresh freeze.",
-      "F06": "NOT_STARTED; no authorization from DG01.",
-      "DG01_goal01": "F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW; run_plan_sha256=e48dae904bf757f9b864eebf129619990638f174d00fe4f1fbdc53e701c60c32; 3000 Core accepted steps; two H5 episodes; 14/14 independent-reader negative mutations."
+      "F05": "Original F05_OVERALL_PARTIAL preserved. DG01/DG02 accepted bounded; DG03 partial and continues as diagnostic04, same semantic goals and cumulative budget.",
+      "F06": "NOT_STARTED; diagnostic04 prepares an entry checklist only.",
+      "DG01_goal01": "ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE; frozen source/task/controller/provider scope only."
     },
     "f01_preparation": {
       "version_candidate": "6.2.0.0",
@@ -6734,7 +6734,7 @@
     "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030",
     "f05_early_diagnostic_three_goals_20261030": {
       "authority": "maintainerexplicitlydesignated earlydiagnosticimplementation and3longgoalprompts, manualrelay, adaptnextafterreport",
-      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_ACTIVE_PARTIAL_REVIEWED_CONTINUE_REQUIRED",
+      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_PARTIAL_DIAGNOSTIC04_CONTINUATION_PREPARED",
       "preparation_input_head": "e7382adc0f31ca5fbff74c61a5163247d080759e",
       "ordinary_successor_history": {
         "completed": 2,
@@ -6778,7 +6778,8 @@
       "Qualification": false,
       "new_branch_worktrees": 0,
       "preparation_tests": 0,
-      "preparation_native": 0
+      "preparation_native": 0,
+      "diagnostic04_alias": "f05_diagnostic04_package_preparation_20261101; original three Goals unchanged"
     },
     "latest_f05_successor_diagnostic_plan": "f05_dg02_pickcube_r3_window002_preparation_20261031",
     "dg01_goal01_window_001": {
@@ -7008,6 +7009,42 @@
       "decision_sha256": "aa0e99ddc0f2dc934044ef1f2b4719f900518f5969fdd6b4fc68df0330bcb33a",
       "verified_continuation_manifest_sha256": "2d779febb8f7ccb78fa1036d40272814be924079a8eb51b2b271d37e3bee09cf",
       "doc_validation_log_sha256": "2dd5ab972278f3a4f153643c614a334258c3a75901f73c7e0b5bb204005a4179"
+    },
+    "latest_f05_diagnostic_package_preparation": "f05_diagnostic04_package_preparation_20261101",
+    "f05_diagnostic04_package_preparation_20261101": {
+      "date": "2026-11-01",
+      "status": "PREPARED_FOR_MAINTAINER_MANUAL_RELAY_NOT_EXECUTED",
+      "package_id": "F05_DIAGNOSTIC04_WINDOW001_DG03_REPAIR_AND_F05_CLOSURE",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_001/",
+      "planning_entry": "13_F05_Early_Diagnostic_Three_Goals.md#f05-diagnostic04-dg03-repair-and-closure",
+      "reviewed_input_head_before_this_planning_commit": "0c15a41bbf9e1118f8a0c74556afe5d3ba4a69d7",
+      "actual_execution_head": "Frozen post-planning-commit HEAD in package input_snapshot.json; no self-referential HEAD in this record.",
+      "assigned_executor": "Luna via maintainer manual relay; no message sent",
+      "goal_relation": "Continuation of unfinished DG03 plus F05 closure, alias diagnostic04; retains original three-Goal/provider objectives and ordinary successor 2/3 history.",
+      "stages": [
+        "A minimal implementable source-to-consumer decisions",
+        "B existing Core owner implementation, actual Core S1 and diagnostic probes",
+        "C unchanged 3000-step Isaac Core N2 and independent cold H5 read",
+        "D three-route matrix and F06 entry checklist"
+      ],
+      "budget": "execution_budget.json carries 486 steps / 1063.598855582s; new native caps 23514 steps / 4336s; Isaac 17514 / 3436s; CPU 6000 / 900s.",
+      "expected_active_hours": [
+        6,
+        10
+      ],
+      "active_hours_max": 12,
+      "cleanup_minutes_min": 60,
+      "context_recovery": "Read frozen prompt + RESUME.md + goal_progress.json + run_ledger + current Git and supervisor status after compaction; preserve next action and remaining cumulative budgets.",
+      "anti_stall": "Change diagnostic method after 30-45min without new evidence; same-class failure twice requires interface/detector correction before relaunch; do not repeat unchanged audit/native.",
+      "provider": "codex/phase-ii-01-f05-geophys@a9e4c4850bd225f5929e74831ac282b18ff517ce read-only",
+      "branch": "develop-full",
+      "new_branch_worktrees": 0,
+      "F06_F07_execution_authorized": false,
+      "Qualification": false,
+      "preparation_native_starts": 0,
+      "preparation_software_tests": 0,
+      "candidate_pass": "F05_DIAGNOSTIC04_CLOSURE_PASS_PENDING_SOL_REVIEW",
+      "overall_acceptance_requires": "Sol independent three-route review; legacy F05 partial retained"
     }
   }
 }
