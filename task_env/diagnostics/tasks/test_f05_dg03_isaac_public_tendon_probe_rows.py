@@ -60,10 +60,11 @@ def test_rows_rejects_wrong_width_and_nonfinite_values():
         _rows([1.0, float("nan"), 3.0], 3)
 
 
-def test_mimic_ablation_removes_only_the_composed_api_and_its_properties():
+def test_mimic_ablation_removes_all_encodings_of_one_equality_only():
     from pxr import Sdf, Usd
 
     stage = Usd.Stage.CreateInMemory()
+    leader = stage.DefinePrim("/leader")
     follower = stage.DefinePrim("/follower")
     api_schemas = Sdf.TokenListOp()
     api_schemas.prependedItems = ["PhysxMimicJointAPI:transX"]
@@ -75,9 +76,32 @@ def test_mimic_ablation_removes_only_the_composed_api_and_its_properties():
         follower.CreateAttribute(
             f"physxMimicJoint:transX:{name}", Sdf.ValueTypeNames.Float,
         ).Set(1.0)
+    leader_schemas = Sdf.TokenListOp()
+    leader_schemas.prependedItems = [
+        "NewtonJointAPI", "MjcJointAPI", "NewtonMimicAPI", "MjcEqualityJointAPI",
+    ]
+    leader.SetMetadata("apiSchemas", leader_schemas)
+    leader.CreateRelationship("newton:mimicJoint").SetTargets([follower.GetPath()])
+    leader.CreateAttribute("mjc:solref", Sdf.ValueTypeNames.DoubleArray).Set([0.005, 1.0])
+    leader.CreateAttribute("mjc:solimp", Sdf.ValueTypeNames.DoubleArray).Set(
+        [0.95, 0.99, 0.001, 0.5, 2.0],
+    )
+    leader.CreateAttribute("mjc:damping", Sdf.ValueTypeNames.Double).Set(1.0)
 
-    removed = _remove_source_mimic_for_ablation(follower)
+    removed = _remove_source_mimic_for_ablation(leader, follower)
 
     assert "PhysxMimicJointAPI:transX" not in follower.GetMetadata("apiSchemas").GetAppliedItems()
-    assert len(removed) == 5
-    assert all(not follower.GetProperty(name).IsValid() for name in removed)
+    assert not ({"NewtonMimicAPI", "MjcEqualityJointAPI"}
+                & set(leader.GetMetadata("apiSchemas").GetAppliedItems()))
+    assert {"NewtonJointAPI", "MjcJointAPI"}.issubset(
+        set(leader.GetMetadata("apiSchemas").GetAppliedItems()),
+    )
+    assert len(removed["removed_schema_tokens"]) == 3
+    assert len(removed["removed_properties"]) == 8
+    assert follower.GetRelationship("physxMimicJoint:transX:referenceJoint").GetTargets() == []
+    for name in removed["removed_properties"][1:5]:
+        assert follower.GetAttribute(name).Get() is None
+    assert leader.GetRelationship("newton:mimicJoint").GetTargets() == []
+    for name in removed["removed_properties"][6:]:
+        assert leader.GetAttribute(name).Get() is None
+    assert leader.GetAttribute("mjc:damping").Get() == 1.0

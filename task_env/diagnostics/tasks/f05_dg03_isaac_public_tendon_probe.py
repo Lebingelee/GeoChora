@@ -123,26 +123,69 @@ def _terminate_worker(exit_code: int) -> None:
     os._exit(int(exit_code))
 
 
-def _remove_source_mimic_for_ablation(follower) -> tuple[str, ...]:
-    """Remove only the composed source mimic relation from this in-memory stage."""
-    schema_token = "PhysxMimicJointAPI:transX"
-    properties = (
+def _remove_source_mimic_for_ablation(leader, follower) -> dict[str, tuple[str, ...]]:
+    """Remove every delivered encoding of this one source equality in memory."""
+    follower_schema = "PhysxMimicJointAPI:transX"
+    follower_properties = (
         "physxMimicJoint:transX:referenceJoint",
         "physxMimicJoint:transX:gearing",
         "physxMimicJoint:transX:offset",
         "physxMimicJoint:transX:naturalFrequency",
         "physxMimicJoint:transX:dampingRatio",
     )
-    if not follower.RemoveAppliedSchema(schema_token):
+    leader_schemas = ("NewtonMimicAPI", "MjcEqualityJointAPI")
+    leader_properties = ("newton:mimicJoint", "mjc:solref", "mjc:solimp")
+    if not follower.RemoveAppliedSchema(follower_schema):
         raise ValueError("mimic ablation could not remove the exact applied API token")
-    for property_name in properties:
-        prop = follower.GetProperty(property_name)
-        if not prop or not prop.IsValid() or not follower.RemoveProperty(property_name):
-            raise ValueError(f"mimic ablation could not remove the exact relation property: {property_name}")
-    api_schemas = follower.GetMetadata("apiSchemas")
-    if api_schemas and schema_token in api_schemas.GetAppliedItems():
+    for schema_token in leader_schemas:
+        if not leader.RemoveAppliedSchema(schema_token):
+            raise ValueError(f"mimic ablation could not remove source equality API token: {schema_token}")
+    property_actions = []
+    for prim, properties in ((follower, follower_properties), (leader, leader_properties)):
+        for property_name in properties:
+            prop = prim.GetProperty(property_name)
+            if not prop or not prop.IsValid():
+                raise ValueError(f"mimic ablation could not find source equality property: {property_name}")
+            # Some source equality properties live in referenced payload layers,
+            # which are not locally editable. Author a stronger in-memory
+            # neutral opinion instead of touching frozen delivery bytes.
+            if hasattr(prop, "SetTargets"):
+                prop.SetTargets([])
+                if prop.GetTargets():
+                    raise ValueError(f"mimic ablation could not clear relation targets: {property_name}")
+                operation = "relationship_targets_cleared"
+            elif hasattr(prop, "Block"):
+                prop.Block()
+                if prop.Get() is not None:
+                    raise ValueError(f"mimic ablation could not block source equality attribute: {property_name}")
+                operation = "attribute_value_blocked"
+            else:
+                raise ValueError(f"mimic ablation found an unsupported property type: {property_name}")
+            property_actions.append(f"{prim.GetPath()}:{property_name}:{operation}")
+    if _has_applied_schema(follower, follower_schema):
         raise ValueError("mimic ablation left the PhysX API token on the runtime stage")
-    return properties
+    for schema_token in leader_schemas:
+        if _has_applied_schema(leader, schema_token):
+            raise ValueError(f"mimic ablation left source equality API token on runtime stage: {schema_token}")
+    for prim, properties in ((follower, follower_properties), (leader, leader_properties)):
+        for property_name in properties:
+            prop = prim.GetProperty(property_name)
+            if not prop or not prop.IsValid():
+                raise ValueError(f"mimic ablation invalidated a source equality property handle: {property_name}")
+            if hasattr(prop, "GetTargets") and prop.GetTargets():
+                raise ValueError(f"mimic ablation left source equality property on runtime stage: {property_name}")
+            if hasattr(prop, "Get") and prop.Get() is not None:
+                raise ValueError(f"mimic ablation left a source equality attribute value: {property_name}")
+    return {
+        "removed_schema_tokens": (follower_schema, *leader_schemas),
+        "removed_properties": (*follower_properties, *leader_properties),
+        "property_actions": tuple(property_actions),
+    }
+
+
+def _has_applied_schema(prim, schema_token: str) -> bool:
+    api_schemas = prim.GetMetadata("apiSchemas")
+    return bool(api_schemas and schema_token in api_schemas.GetAppliedItems())
 
 
 def run_probe(
@@ -254,6 +297,41 @@ def run_probe(
         if (not mimic_relationship
                 or mimic_relationship.GetTargets() != [joints["finger_joint1"].GetPath()]):
             raise ValueError("composed source-derived mimic reference differs from exact MJCF equality")
+        source_equality_relationship = joints["finger_joint1"].GetRelationship("newton:mimicJoint")
+        if (not source_equality_relationship
+                or source_equality_relationship.GetTargets() != [joints["finger_joint2"].GetPath()]):
+            raise ValueError("composed source equality relation metadata differs from the exact MJCF joint pair")
+        leader_api_schemas = joints["finger_joint1"].GetMetadata("apiSchemas")
+        leader_applied_schemas = (
+            set(leader_api_schemas.GetAppliedItems()) if leader_api_schemas else set()
+        )
+        required_source_equality_schemas = {"NewtonMimicAPI", "MjcEqualityJointAPI"}
+        if not required_source_equality_schemas.issubset(leader_applied_schemas):
+            raise ValueError("composed source equality API metadata is incomplete")
+        for property_name, source_values in (
+            ("mjc:solref", source_mimic["source_solref"]),
+            ("mjc:solimp", source_mimic["source_solimp"]),
+        ):
+            attribute = joints["finger_joint1"].GetAttribute(property_name)
+            values = list(attribute.Get()) if attribute and attribute.IsValid() else []
+            if len(values) < len(source_values) or any(
+                not math.isclose(float(actual), float(expected), rel_tol=0.0, abs_tol=1e-12)
+                for actual, expected in zip(values, source_values)
+            ):
+                raise ValueError(f"composed source equality field differs from exact MJCF source: {property_name}")
+        result["source_equality_runtime_encodings"] = {
+            "physx_follower_schema": "PhysxMimicJointAPI:transX",
+            "physx_follower_properties": [
+                "physxMimicJoint:transX:referenceJoint",
+                "physxMimicJoint:transX:gearing",
+                "physxMimicJoint:transX:offset",
+                "physxMimicJoint:transX:naturalFrequency",
+                "physxMimicJoint:transX:dampingRatio",
+            ],
+            "source_leader_schemas": sorted(required_source_equality_schemas),
+            "source_leader_properties": ["newton:mimicJoint", "mjc:solref", "mjc:solimp"],
+            "source_relation_target": str(joints["finger_joint2"].GetPath()),
+        }
         source_to_physx_attributes = {
             "gearing": "physx_gearing",
             "offset": "physx_offset_m",
@@ -274,15 +352,19 @@ def run_probe(
         result["mimic_reference_joint"] = str(joints["finger_joint1"].GetPath())
         result["mimic_applied_schema"] = list(joints["finger_joint2"].GetAppliedSchemas())
         if ablate_source_mimic:
-            removed_properties = _remove_source_mimic_for_ablation(joints["finger_joint2"])
+            ablated = _remove_source_mimic_for_ablation(
+                joints["finger_joint1"], joints["finger_joint2"],
+            )
             result["mimic_api_removed_for_ablation"] = True
             result["runtime_stage_mutated"] = True
-            result["ablation_removed_properties"] = list(removed_properties)
+            result["ablation_removed_schema_tokens"] = list(ablated["removed_schema_tokens"])
+            result["ablation_removed_properties"] = list(ablated["removed_properties"])
+            result["ablation_property_actions"] = list(ablated["property_actions"])
             counterfactual = {
                 "base_delivery_sha256": delivery_facts["delivery_sha256"],
                 "base_entry_sha256": delivery_facts["entry_sha256"],
-                "removed_schema": "PhysxMimicJointAPI:transX",
-                "removed_properties": list(removed_properties),
+                "removed_schema_tokens": list(ablated["removed_schema_tokens"]),
+                "removed_properties": list(ablated["removed_properties"]),
             }
             result["counterfactual_identity_sha256"] = hashlib.sha256(
                 json.dumps(counterfactual, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
