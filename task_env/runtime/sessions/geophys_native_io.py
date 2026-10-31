@@ -73,6 +73,7 @@ class F05GeoPhysUsdNativeIO:
             from ...runtime.sessions.geophys_source import (
                 GeoPhysSourceComposer,
                 compile_geophys_usd_position_drive_receipt,
+                compile_geophys_usd_source_actuation_receipt_v2,
             )
 
             self._composer = GeoPhysSourceComposer(source)
@@ -81,12 +82,21 @@ class F05GeoPhysUsdNativeIO:
             model = self._composer.build_scene_model(imported, None)
             self.import_mapping_report = self._composer.usd_mapping_report
             provider_build = input_v1.host_model_producer_identity.actual_provider_build_identity
-            receipt = compile_geophys_usd_position_drive_receipt(
-                source, imported, model, execution,
-                provider_build_identity=provider_build,
-                provenance_kind='native_runtime',
-                host_model_producer_identity=input_v1.host_model_producer_identity,
-            )
+            if (int(model.joint_data.get('n_actuators', -1)) == 8
+                    and int(model.joint_data.get('n_tendons', -1)) == 1):
+                receipt = compile_geophys_usd_source_actuation_receipt_v2(
+                    source, imported, model, execution,
+                    provider_build_identity=provider_build,
+                    provenance_kind='native_runtime',
+                    host_model_producer_identity=input_v1.host_model_producer_identity,
+                )
+            else:
+                receipt = compile_geophys_usd_position_drive_receipt(
+                    source, imported, model, execution,
+                    provider_build_identity=provider_build,
+                    provenance_kind='native_runtime',
+                    host_model_producer_identity=input_v1.host_model_producer_identity,
+                )
             self.drive_receipt = receipt
             self._bind_public_model(imported, model)
 
@@ -216,8 +226,9 @@ class F05GeoPhysUsdNativeIO:
             if actual_index != drive.native_actuator_index:
                 raise ValueError('public model Actuator order changed after receipt compilation')
             self._actuator_indices[drive.native_actuator_name] = actual_index
-        if len(self._actuator_indices) != 9:
-            raise ValueError('public model does not expose nine unique Panda Actuator channels')
+        expected_actuator_count = 8 if self.drive_receipt.schema_version == 'geophys-usd-source-actuation-receipt-v2' else 9
+        if len(self._actuator_indices) != expected_actuator_count:
+            raise ValueError('public model Actuator channel count differs from its source-bound receipt')
         self._body_com_offsets = np.asarray(data['body_ipos'], dtype=np.float64)
 
     @staticmethod

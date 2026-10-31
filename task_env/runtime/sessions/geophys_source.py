@@ -716,6 +716,259 @@ def compile_geophys_usd_position_drive_receipt(
     )
 
 
+def compile_geophys_usd_source_actuation_receipt_v2(
+    runtime_source, imported_scene, scene_model, execution, *,
+    provider_build_identity: str, provenance_kind: str = 'synthetic_fixture',
+    host_model_producer_identity=None,
+    writer_id: str = 'panda-main/source-actuation-v2',
+):
+    """Compile the source-authored seven-joint/one-tendon Panda channel map.
+
+    This additive receipt keeps nine canonical scalar Position targets while
+    binding the two fingers to one shared tendon actuator. It does not change
+    the legacy one-actuator-per-DOF receipt contract.
+    """
+    from ...artifacts import ExecutionSpecV1, JointReference
+    from .leaf_control import (
+        GeoPhysHostModelProducerIdentityV1,
+        GeoPhysUsdPositionDriveV1,
+        GeoPhysUsdSourceActuationReceiptV2,
+    )
+    from .source import UsdRuntimeSourceV1
+
+    if type(execution) is not ExecutionSpecV1 or type(runtime_source) is not UsdRuntimeSourceV1:
+        raise TypeError('source-actuation receipt requires exact ExecutionSpecV1 and UsdRuntimeSourceV1')
+    execution.validate(); runtime_source.validate()
+    if execution.physics_provider != 'geophys' or imported_scene.format != 'usd':
+        raise ValueError('source-actuation receipt requires the public GeoPhys USD route')
+    if (type(provider_build_identity) is not str or not provider_build_identity.startswith('geophys-')
+            or provenance_kind not in {'synthetic_fixture', 'native_runtime'}):
+        raise ValueError('source-actuation receipt requires explicit provider/provenance identities')
+    if host_model_producer_identity is not None:
+        if type(host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1:
+            raise TypeError('source-actuation producer identity has the wrong versioned type')
+        expected_build = (host_model_producer_identity.actual_provider_build_identity
+                          if provenance_kind == 'native_runtime'
+                          else host_model_producer_identity.requested_target_build_identity)
+        if expected_build != provider_build_identity:
+            raise ValueError('source-actuation receipt differs from requested/actual provider build identity')
+        host_model_producer_identity.validate_current_tree()
+
+    data = scene_model.joint_data
+    names_to_joint = data.get('name_to_joint')
+    names_to_actuator = data.get('name_to_actuator')
+    if (not isinstance(names_to_joint, dict) or not isinstance(names_to_actuator, dict)
+            or int(data.get('n_dof', -1)) != 15 or int(data.get('n_actuators', -1)) != 8
+            or int(data.get('n_tendons', -1)) != 1):
+        raise ValueError('DG02 public model must expose the exact 15-DOF/8-actuator/1-tendon source counts')
+    expected_joints = {
+        **{f'panda-main/joint{i}': f'joint{i}' for i in range(1, 8)},
+        'panda-main/finger_joint1': 'finger_joint1',
+        'panda-main/finger_joint2': 'finger_joint2',
+    }
+    if dict(runtime_source.joints) != expected_joints or dict(runtime_source.joint_targets) != expected_joints:
+        raise ValueError('DG02 source must bind all seven arm and two finger target joints by source name')
+
+    joint_by_name = {
+        str(row.dynamics.get('source_name')): row for row in imported_scene.ir.joints
+        if row.dynamics.get('source_name')
+    }
+    actuator_by_source = {}
+    for row in imported_scene.ir.actuators:
+        parameters = row.parameters.to_dict()
+        source_name = parameters.get('source_name')
+        if type(source_name) is not str or source_name in actuator_by_source:
+            raise ValueError('DG02 public IR has missing or ambiguous actuator source names')
+        actuator_by_source[source_name] = (row, parameters, row.limits.to_dict())
+    if set(actuator_by_source) != {f'actuator{i}' for i in range(1, 9)}:
+        raise ValueError('DG02 public IR must expose exactly source actuator1 through actuator8')
+    source_extensions = [row for row in imported_scene.ir.extensions
+                         if row.namespace == 'GeoChora.F05SourceSemantics'
+                         and row.schema_version == '1']
+    if len(source_extensions) != 1:
+        raise ValueError('DG02 public IR must expose exactly one versioned F05 source-identity block')
+    source_identity = source_extensions[0].payload.to_dict().get('source_identity', {})
+    if source_identity != {
+            'family': 'menagerie-panda',
+            'revision': 'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7',
+            'source_closure_sha256': 'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a',
+            'original_mjcf_sha256': '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273',
+    }:
+        raise ValueError('DG02 USD semantics do not bind the frozen original Menagerie source identity')
+
+    gain = np.asarray(data['actuator_gainprm'], dtype=np.float64)
+    bias = np.asarray(data['actuator_biasprm'], dtype=np.float64)
+    force_range = np.asarray(data['actuator_forcerange'], dtype=np.float64).reshape(-1, 2)
+    force_limited = np.asarray(data['actuator_forcelimited'], dtype=np.bool_).reshape(-1)
+    ctrl_range = np.asarray(data['actuator_ctrlrange'], dtype=np.float64).reshape(-1, 2)
+    ctrl_limited = np.asarray(data['actuator_ctrllimited'], dtype=np.bool_).reshape(-1)
+    trnid = np.asarray(data['actuator_trnid'], dtype=np.int64)
+    if trnid.ndim == 1:
+        trnid = trnid.reshape(-1, 1)
+    qadr = np.asarray(data['jnt_qposadr'], dtype=np.int64).reshape(-1)
+    qpos0 = np.asarray(data['qpos0'], dtype=np.float64).reshape(-1)
+    dof_order = tuple(sorted(runtime_source.joints.values(), key=lambda name: int(names_to_joint[name])))
+    dof_index = {name: index for index, name in enumerate(dof_order)}
+    rows = []
+
+    def compiled_row(source_actuator_name, target_joint_name, canonical):
+        desc, params, limits = actuator_by_source[source_actuator_name]
+        if desc.target_kind != 'joint' or params.get('source_target') != target_joint_name:
+            raise ValueError(f'{source_actuator_name} does not source-bind {target_joint_name}')
+        if (params.get('gain_type') != 'fixed' or params.get('bias_type') != 'affine'
+                or params.get('dyn_type') != 'none'):
+            raise ValueError(f'{source_actuator_name} uses an unsupported source actuator law')
+        if target_joint_name not in names_to_joint or source_actuator_name not in names_to_actuator:
+            raise ValueError(f'public model misses source Joint/Actuator {target_joint_name}/{source_actuator_name}')
+        ji, ai = int(names_to_joint[target_joint_name]), int(names_to_actuator[source_actuator_name])
+        if int(trnid[ai, 0]) != ji:
+            raise ValueError(f'{source_actuator_name} transmission does not target its source Joint')
+        expected_gain = np.asarray(params['gain_prm'], dtype=np.float64)
+        expected_bias = np.asarray(params['bias_prm'], dtype=np.float64)
+        if (not np.allclose(gain[ai, :len(expected_gain)], expected_gain, rtol=0, atol=1e-7)
+                or not np.allclose(bias[ai, :len(expected_bias)], expected_bias, rtol=0, atol=1e-7)):
+            raise ValueError(f'{source_actuator_name} compiled affine law differs from public IR source parameters')
+        fr = tuple(float(value) for value in force_range[ai])
+        cr = tuple(float(value) for value in ctrl_range[ai])
+        if (bool(force_limited[ai]) != bool(limits['force_limited'])
+                or bool(ctrl_limited[ai]) != bool(limits['ctrl_limited'])
+                or not np.allclose(fr, limits['force_range'], rtol=0, atol=1e-7)
+                or not np.allclose(cr, limits['ctrl_range'], rtol=0, atol=1e-7)):
+            raise ValueError(f'{source_actuator_name} compiled control/force limits differ from public IR')
+        joint = joint_by_name[target_joint_name]
+        joint_limits = joint.limits.to_dict()
+        if not joint_limits.get('enabled') or joint_limits.get('unit') not in {'radian', 'meter'}:
+            raise ValueError(f'{target_joint_name} lacks finite source-coordinate limits')
+        lo, hi = float(joint_limits['lower']), float(joint_limits['upper'])
+        q0 = float(qpos0[int(qadr[ji])])
+        if not np.isfinite((lo, hi, q0)).all() or lo >= hi or abs(q0) > 1e-9:
+            raise ValueError(f'{target_joint_name} source limits or q0 are not representable')
+        compiled_gain = gain[ai]
+        compiled_bias = bias[ai]
+        if len(compiled_gain) < 1 or abs(float(compiled_gain[0])) < 1e-12:
+            raise ValueError(f'{source_actuator_name} has no invertible compiled affine gain')
+        return GeoPhysUsdPositionDriveV1(
+            'geophys-usd-position-drive-v1',
+            JointReference('panda-main', canonical.split('/', 1)[1]),
+            target_joint_name, dof_index[target_joint_name], source_actuator_name, ai,
+            str(joint_limits['unit']), lo, hi, float(compiled_gain[0]), float(compiled_bias[0]),
+            float(-compiled_bias[1]), float(-compiled_bias[2]), 0.0, 0.0, q0,
+            bool(ctrl_limited[ai]), *cr, bool(force_limited[ai]), *fr,
+        )
+
+    for index in range(1, 8):
+        canonical = f'panda-main/joint{index}'
+        rows.append(compiled_row(f'actuator{index}', f'joint{index}', canonical))
+
+    tendon_desc, tendon_params, tendon_limits = actuator_by_source['actuator8']
+    if tendon_desc.target_kind != 'tendon' or tendon_params.get('source_target') != 'split':
+        raise ValueError('actuator8 must target the authored split fixed tendon')
+    if (tendon_params.get('gain_type') != 'fixed' or tendon_params.get('bias_type') != 'affine'
+            or tendon_params.get('dyn_type') != 'none'):
+        raise ValueError('actuator8 uses an unsupported source tendon-actuator law')
+    tendon_constraints = [row for row in imported_scene.ir.constraints
+                          if row.kind == 'tendon' and row.parameters.get('source_name') == 'split']
+    if len(tendon_constraints) != 1:
+        raise ValueError('public IR must expose exactly one source split fixed tendon')
+    wraps = tendon_constraints[0].parameters.to_dict().get('wraps', ())
+    wrap_map = {str(row['target']): float(row.get('divisor', row.get('coefficient'))) for row in wraps}
+    tendon_parameters = tendon_constraints[0].parameters.to_dict()
+    if (len(wraps) != 2 or wrap_map != {'finger_joint1': 0.5, 'finger_joint2': 0.5}
+            or tendon_parameters.get('stiffness') != 0.0
+            or tendon_parameters.get('damping') != 0.0
+            or tendon_parameters.get('friction_loss') != 0.0
+            or tendon_parameters.get('limited') is not False
+            or tuple(tendon_parameters.get('range', ())) != (0.0, 0.0)
+            or tendon_parameters.get('margin') != 0.0):
+        raise ValueError('public split tendon Jacobian differs from the source 0.5/0.5 wrap coefficients')
+    transmissions = [row for row in imported_scene.ir.transmissions
+                     if tendon_desc.actuator_id in row.actuator_ids]
+    if (len(transmissions) != 1
+            or len(transmissions[0].joint_ids) != 2
+            or transmissions[0].mapping.get('target_kind') != 'tendon'
+            or transmissions[0].mapping.get('source_target') != 'split'):
+        raise ValueError('public source tendon Actuator must map through one two-joint fixed-tendon transmission')
+    actuator8_index = int(names_to_actuator['actuator8'])
+    if not 0 <= actuator8_index < len(trnid) or not 0 <= int(trnid[actuator8_index, 0]) < 1:
+        raise ValueError('public model actuator8 does not target the exact compiled source tendon')
+    params = tendon_params
+    expected_gain = np.asarray(params['gain_prm'], dtype=np.float64)
+    expected_bias = np.asarray(params['bias_prm'], dtype=np.float64)
+    if (not np.allclose(gain[actuator8_index, :len(expected_gain)], expected_gain, rtol=0, atol=1e-7)
+            or not np.allclose(bias[actuator8_index, :len(expected_bias)], expected_bias, rtol=0, atol=1e-7)
+            or bool(force_limited[actuator8_index]) != bool(tendon_limits['force_limited'])
+            or bool(ctrl_limited[actuator8_index]) != bool(tendon_limits['ctrl_limited'])
+            or not np.allclose(force_range[actuator8_index], tendon_limits['force_range'], rtol=0, atol=1e-7)
+            or not np.allclose(ctrl_range[actuator8_index], tendon_limits['ctrl_range'], rtol=0, atol=1e-7)):
+        raise ValueError('actuator8 compiled affine law or force/ctrl caps differ from source IR')
+    for target_joint, canonical in (
+        ('finger_joint1', 'panda-main/finger_joint1'),
+        ('finger_joint2', 'panda-main/finger_joint2'),
+    ):
+        joint = joint_by_name[target_joint]
+        limits = joint.limits.to_dict()
+        ji = int(names_to_joint[target_joint]); q0 = float(qpos0[int(qadr[ji])])
+        if not limits.get('enabled') or limits.get('unit') != 'meter' or abs(q0) > 1e-9:
+            raise ValueError(f'{target_joint} source limits/q0 differ from the Panda meter-coordinate contract')
+        rows.append(GeoPhysUsdPositionDriveV1(
+            'geophys-usd-position-drive-v1', JointReference('panda-main', canonical.split('/', 1)[1]),
+            target_joint, dof_index[target_joint], 'actuator8', actuator8_index, 'meter',
+            float(limits['lower']), float(limits['upper']), float(gain[actuator8_index, 0]),
+            float(bias[actuator8_index, 0]), float(-bias[actuator8_index, 1]),
+            float(-bias[actuator8_index, 2]), 0.0, 0.0, q0,
+            bool(ctrl_limited[actuator8_index]), *tuple(float(x) for x in ctrl_range[actuator8_index]),
+            bool(force_limited[actuator8_index]), *tuple(float(x) for x in force_range[actuator8_index]),
+        ))
+
+    equality = [row for row in imported_scene.ir.constraints
+                if row.kind == 'joint' and row.parameters.get('constraint_role') == 'equality'
+                and row.parameters.get('source_name') == 'finger_joint1_finger_joint2']
+    if len(equality) != 1:
+        raise ValueError('public IR must expose the active source finger equality')
+    equality_params = equality[0].parameters.to_dict()
+    if (equality_params.get('active') is not True
+            or equality_params.get('source_target1') != 'finger_joint1'
+            or equality_params.get('source_target2') != 'finger_joint2'
+            or tuple(equality_params.get('poly_coef', ())) != (0.0, 1.0, 0.0, 0.0, 0.0)
+            or tuple(equality_params.get('solref', ())) != (0.005, 1.0)
+            or tuple(equality_params.get('solimp', ())) != (0.95, 0.99, 0.001)):
+        raise ValueError('public source finger equality targets or active state differ')
+
+    model_payload = {
+        'semantic_hash': _usd_ir_semantic_hash_for_snapshot(imported_scene, runtime_source),
+        'source_graph_hash': imported_scene.source_graph_hash,
+        'provider_build_identity': provider_build_identity,
+        'name_to_joint': sorted((str(name), int(index)) for name, index in names_to_joint.items()),
+        'name_to_actuator': sorted((str(name), int(index)) for name, index in names_to_actuator.items()),
+    }
+    for key in ('n_dof', 'n_qpos', 'n_actuators', 'n_bodies', 'n_geoms', 'n_tendons',
+                'qpos0', 'jnt_qposadr', 'jnt_dofadr', 'jnt_type', 'actuator_trnid',
+                'actuator_gainprm', 'actuator_biasprm', 'actuator_forcerange',
+                'actuator_forcelimited', 'actuator_ctrlrange', 'actuator_ctrllimited'):
+        value = data.get(key)
+        if value is not None:
+            model_payload[key] = np.asarray(value).tolist()
+    if host_model_producer_identity is not None:
+        model_payload['host_model_producer_identity_sha256'] = host_model_producer_identity.identity_sha256
+    model_identity = hashlib.sha256(json.dumps(
+        model_payload, sort_keys=True, separators=(',', ':'), allow_nan=False,
+    ).encode()).hexdigest()
+    return GeoPhysUsdSourceActuationReceiptV2(
+        'geophys-usd-source-actuation-receipt-v2', provenance_kind,
+        runtime_source.scene_definition.identity_hash, runtime_source.source_closure_digest,
+        model_identity, execution.identity_hash, provider_build_identity,
+        execution.physics_profile, execution.physics_backend,
+        str(execution.physics_device or execution.physics_backend), execution.determinism_mode,
+        runtime_source.task_artifact.timebase.physics_dt,
+        runtime_source.task_artifact.timebase.control_substeps, writer_id, 9,
+        tuple(sorted(rows, key=lambda row: row.native_dof_index)), 'split',
+        ('finger_joint1', 'finger_joint2'), (0.5, 0.5),
+        'finger_joint1_finger_joint2', tuple(float(x) for x in equality_params['solref']),
+        tuple(float(x) for x in equality_params['solimp']),
+        None if host_model_producer_identity is None else host_model_producer_identity.identity_sha256,
+    )
+
+
 class GeoPhysSourceComposer:
     adapter_name = 'task_env_neutral_mjcf_bridge_v0'
 

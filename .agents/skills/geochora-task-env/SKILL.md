@@ -217,6 +217,31 @@ contract; do not downgrade it through historical v1 compatibility. The new F05
 helper/reader is tracked, while the permitted inherited F04 fixture still needs
 its frozen ignored inputs and support. Do not claim cold-checkout self-containment.
 
+## F05 DG02 GeoPhys/USD route (in progress; not accepted)
+
+DG02 is a separate, source-bound diagnostic Goal reusing the same Core candidate,
+Position Controller, `UsdCoreRuntimeSession`, `F05GeoPhysUsdNativeIO`,
+`SelectedReferenceEnv` and Recorder owners. There is one GeoPhys public USD
+provider route (`scene.import_scene_source` → SceneSemanticIR → existing rigid
+model/runtime consumers); the Core receipt/admission/control code is its
+consumer integration path, not a second provider route. The additive
+`GeoPhysUsdSourceActuationReceiptV2` binds nine named Panda DOFs to seven arm
+actuators and one shared fixed-tendon actuator, including authored tendon and
+equality facts. Production receipt compilation must use the actual imported USD
+IR and public model. The legacy V1 receipt guard remains intact.
+
+The F05 native candidate builder requires an explicit `ActionConfig` matching
+the accepted DG01 semantics (joint correction gain 1.0 and default gripper force
+100 N; remaining defaults frozen). Bind that config in the run plan and verify
+the constructed Controller identity. Synthetic receipt unit tests and public
+model compilation do not establish runtime admission or a Core S1/N2 result.
+At the current DG02 checkpoint, the provider parser/public-model route and a
+two-step tendon/actuator probe ran, but equality comparison/negative evidence
+is incomplete and the Core V2 production receipt/adapter path has not been
+validated on that model. No full Core S1, N2 episodes, independent H5 cold read,
+Sol acceptance, F06/F07 or Qualification follows. See the [current DG02
+checkpoint](../../../docs/module/task_env/public-api.md#f05-dg02-window001-geophys-usd-in-progress).
+
 ## Static Position leaf contracts (R02a)
 
 `task_env.controllers.canonical` exports advanced provider-free values:

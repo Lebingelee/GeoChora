@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001已按复核结果准备完整实施包，等待维护者转述。DG03仍为待适配基线。**
+> **状态：Sol已接收精确DG01单元为 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`；DG02 window001 正在实施，当前为 partial checkpoint，GeoPhys/USD N1 探针已启动，Core S1/N2 尚未完成。DG03仍为待适配基线。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -92,3 +92,11 @@ DG02只有完成G0–G8、真实public USD/consumer与Core cell、独立reader/�
 
 
 本轮收口：Module Skill静态检查、规划文档hash与局部链接、diff检查通过。全局docs validator仍失败：223项＝原216项＋DG01既有七个新增源码/recipe路径的scope诊断；没有把该失败报告为PASS。Sol本轮没有pytest/native，reader修复由原H5冷读与内层负例直接验证。完整validator输出及差分保留在独立复核目录。
+
+## 9. DG02 window001 当前checkpoint（2026-10-31）
+
+当前Goal仍为 `F05_EARLY_DIAGNOSTIC_DG02_GEOPHYS_USD_WINDOW001`，复用 `develop-full` 与既有隔离 GeoPhys worktree。DG01与原r009证据未改；主GeoPhys gitlink、F06/F07和Qualification未启动。GeoPhys现有 public USD route 增加了 `GeoChora.F05SourceSemantics` v1 的F05专用语义解析，映射进入既有IR/Articulation/RigidModel消费者；N0公开模型读取到13 bodies、83 shapes、12 joints、8 actuators、8 transmissions、3 constraints、1 tendon、1 equality。N1_002以两步CPU探针看到 actuator8标量force/限幅及tendon `Jᵀf`；equality仅有参数与反向非零力readback，缺独立力律比较和禁用负例。
+
+Core增加了 `GeoPhysUsdSourceActuationReceiptV2`、实际模型receipt编译与既有 `F05GeoPhysUsdNativeIO`/`UsdCoreRuntimeSession`/Position admission接线。纯数据receipt及Position sentinel定向检查通过；receipt/adapter尚未以DG02实际public model验证。Native候选构建现在要求明确提供匹配DG01 ActionConfig（`joint_position_correction_gain=1.0`、`gripper_default_force_N=100.0`、其余固定默认），并将它纳入Controller identity。Core S1与N2尚未运行；不得将两步probe、模型compile或静态测试表述成Core route通过。
+
+该窗口已记录两次未经过shared native supervisor的旧S1 pytest进程，合计31次public RigidSceneModel compile、0 physics step；已计入GeoPhys启动和compile台账，均为失败，不是pass证据。后续model compile/native仅可在新冻结计划、共享锁、资源门和supervisor下进行。当前工作树仍需Core/provider本地提交、公开文档/Skill同步、receipt/model定向验证、阶段G4–G7以及保护/退出/独立reader收口；若窗口耗尽，保留PARTIAL checkpoint并由Sol复核后冻结续窗。

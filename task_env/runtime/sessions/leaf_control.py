@@ -673,6 +673,207 @@ class GeoPhysUsdPositionDriveReceiptV1:
         return tuple(sorted(controls))
 
 
+@dataclass(frozen=True)
+class GeoPhysUsdSourceActuationReceiptV2:
+    """Model-bound 9-DOF/8-actuator receipt with one shared fixed-tendon drive.
+
+    The seven arm joints have independent actuators.  The two finger DOFs share
+    one tendon actuator and one source equality; callers still speak in the
+    existing nine named Position coordinates.
+    """
+
+    schema_version: str
+    provenance_kind: str
+    scene_identity_sha256: str
+    source_closure_sha256: str
+    public_model_identity_sha256: str
+    execution_identity_sha256: str
+    provider_build_identity: str
+    physics_profile: str
+    backend: str
+    device: str
+    determinism_mode: str
+    physics_dt_s: float
+    control_substeps: int
+    writer_id: str
+    native_dof_count: int
+    drives: tuple[GeoPhysUsdPositionDriveV1, ...]
+    tendon_name: str
+    tendon_joint_names: tuple[str, str]
+    tendon_coefficients: tuple[float, float]
+    equality_name: str
+    equality_solref: tuple[float, ...]
+    equality_solimp: tuple[float, ...]
+    host_model_producer_identity_sha256: str | None = None
+
+    def __post_init__(self):
+        if self.schema_version != 'geophys-usd-source-actuation-receipt-v2':
+            raise ValueError('unsupported GeoPhys USD source-actuation receipt schema')
+        if self.provenance_kind not in {'synthetic_fixture', 'native_runtime'}:
+            raise ValueError('GeoPhys source-actuation provenance must be explicit')
+        for value, label in (
+            (self.scene_identity_sha256, 'Scene'),
+            (self.source_closure_sha256, 'source closure'),
+            (self.public_model_identity_sha256, 'public model'),
+            (self.execution_identity_sha256, 'ExecutionSpec'),
+        ):
+            _sha(value, label)
+        for value, label in (
+            (self.provider_build_identity, 'provider build'),
+            (self.physics_profile, 'physics profile'),
+            (self.backend, 'backend'),
+            (self.device, 'device'),
+            (self.determinism_mode, 'determinism mode'),
+            (self.tendon_name, 'tendon name'),
+            (self.equality_name, 'equality name'),
+        ):
+            _token(value, label)
+        _stable_identity(self.writer_id, 'writer ID')
+        if self.host_model_producer_identity_sha256 is not None:
+            _sha(self.host_model_producer_identity_sha256, 'host-model producer identity')
+        if (type(self.physics_dt_s) not in (int, float) or isinstance(self.physics_dt_s, bool)
+                or not math.isfinite(float(self.physics_dt_s)) or float(self.physics_dt_s) != 0.002
+                or type(self.control_substeps) is not int or self.control_substeps != 5
+                or type(self.native_dof_count) is not int or self.native_dof_count != 9):
+            raise ValueError('GeoPhys source-actuation receipt requires nine scalar DOFs at five 2 ms steps')
+        if type(self.drives) is not tuple or len(self.drives) != 9 or any(
+                type(item) is not GeoPhysUsdPositionDriveV1 for item in self.drives):
+            raise TypeError('GeoPhys source-actuation receipt requires nine immutable named DOF rows')
+        expected = {
+            JointReference('panda-main', f'joint{index}') for index in range(1, 8)
+        } | {
+            JointReference('panda-main', 'finger_joint1'),
+            JointReference('panda-main', 'finger_joint2'),
+        }
+        if ({row.canonical_joint for row in self.drives} != expected
+                or len({row.native_dof_name for row in self.drives}) != 9
+                or sorted(row.native_dof_index for row in self.drives) != list(range(9))):
+            raise ValueError('GeoPhys source-actuation receipt must bind all nine unique Panda DOFs')
+        fingers = [row for row in self.drives if row.canonical_joint.joint_id.startswith('finger_joint')]
+        arm = [row for row in self.drives if not row.canonical_joint.joint_id.startswith('finger_joint')]
+        if (len(fingers) != 2 or len(arm) != 7
+                or fingers[0].native_actuator_name != fingers[1].native_actuator_name
+                or fingers[0].native_actuator_index != fingers[1].native_actuator_index
+                or len({row.native_actuator_name for row in arm}) != 7
+                or {row.native_actuator_name for row in arm} & {fingers[0].native_actuator_name}
+                or len({row.native_actuator_index for row in (*arm, fingers[0])}) != 8):
+            raise ValueError('GeoPhys source actuation must bind seven arm actuators and one shared tendon actuator')
+        if (type(self.tendon_joint_names) is not tuple or self.tendon_joint_names != ('finger_joint1', 'finger_joint2')
+                or type(self.tendon_coefficients) is not tuple or len(self.tendon_coefficients) != 2
+                or any(type(value) not in (int, float) or isinstance(value, bool)
+                       or not math.isfinite(float(value)) for value in self.tendon_coefficients)
+                or tuple(float(value) for value in self.tendon_coefficients) != (0.5, 0.5)):
+            raise ValueError('GeoPhys source tendon must bind both fingers with the authored 0.5/0.5 coefficients')
+        if (type(self.equality_solref) is not tuple or len(self.equality_solref) != 2
+                or type(self.equality_solimp) is not tuple or len(self.equality_solimp) != 3
+                or any(type(value) not in (int, float) or isinstance(value, bool)
+                       or not math.isfinite(float(value)) for value in (*self.equality_solref, *self.equality_solimp))):
+            raise ValueError('GeoPhys source equality receipt requires finite solref(2) and solimp(3) values')
+
+    @property
+    def identity_sha256(self) -> str:
+        payload = {
+            'schema_version': self.schema_version,
+            'provenance_kind': self.provenance_kind,
+            'scene_identity_sha256': self.scene_identity_sha256,
+            'source_closure_sha256': self.source_closure_sha256,
+            'public_model_identity_sha256': self.public_model_identity_sha256,
+            'execution_identity_sha256': self.execution_identity_sha256,
+            'provider_build_identity': self.provider_build_identity,
+            'physics_profile': self.physics_profile,
+            'backend': self.backend, 'device': self.device,
+            'determinism_mode': self.determinism_mode,
+            'physics_dt_s': float(self.physics_dt_s),
+            'control_substeps': self.control_substeps,
+            'writer_id': self.writer_id,
+            'drives': [(
+                row.canonical_joint.entity_id, row.canonical_joint.joint_id,
+                row.native_dof_name, row.native_dof_index,
+                row.native_actuator_name, row.native_actuator_index,
+                row.position_unit, float(row.lower_limit), float(row.upper_limit),
+                float(row.gain), float(row.bias0), float(row.stiffness),
+                float(row.damping), float(row.desired_velocity),
+                float(row.coordinate_offset), float(row.joint_q0),
+                row.control_limited, float(row.control_lower), float(row.control_upper),
+                row.force_limited, float(row.force_lower), float(row.force_upper),
+            ) for row in self.drives],
+            'tendon_name': self.tendon_name,
+            'tendon_joint_names': self.tendon_joint_names,
+            'tendon_coefficients': self.tendon_coefficients,
+            'equality_name': self.equality_name,
+            'equality_solref': self.equality_solref,
+            'equality_solimp': self.equality_solimp,
+        }
+        if self.host_model_producer_identity_sha256 is not None:
+            payload['host_model_producer_identity_sha256'] = self.host_model_producer_identity_sha256
+        return _digest(payload)
+
+    def commands(self, arm_position: Mapping[str, float], hand_opening_m: float):
+        expected_arm = {f'panda-main/joint{index}' for index in range(1, 8)}
+        if not isinstance(arm_position, Mapping) or set(arm_position) != expected_arm:
+            raise ValueError('Arm Position request must exactly cover canonical joint1 through joint7')
+        if any(type(name) is not str or type(value) not in (int, float)
+               or isinstance(value, bool) or not math.isfinite(float(value))
+               for name, value in arm_position.items()):
+            raise ValueError('Arm Position targets must be finite non-boolean numbers')
+        if (type(hand_opening_m) not in (int, float) or isinstance(hand_opening_m, bool)
+                or not math.isfinite(float(hand_opening_m)) or not 0.0 <= float(hand_opening_m) <= 0.08):
+            raise ValueError('Hand opening target must be a finite value in [0, 0.08] metres')
+        finger_rows = {row.canonical_joint.joint_id: row for row in self.drives
+                       if row.canonical_joint.joint_id in self.tendon_joint_names}
+        half = float(hand_opening_m) / 2.0
+        if any(not row.lower_limit <= half <= row.upper_limit for row in finger_rows.values()):
+            raise ValueError('Hand opening target exceeds a source finger-joint limit')
+        positions = {JointReference('panda-main', name.split('/', 1)[1]): float(value)
+                     for name, value in arm_position.items()}
+        positions[JointReference('panda-main', 'finger_joint1')] = half
+        positions[JointReference('panda-main', 'finger_joint2')] = half
+        result = []
+        for row in self.drives:
+            target = positions[row.canonical_joint]
+            if not row.lower_limit <= target <= row.upper_limit:
+                raise ValueError(f'Position target exceeds native limit for {row.native_dof_name}')
+            result.append((row.native_dof_index, row.native_dof_name, target))
+        return tuple(sorted(result))
+
+    def control_inputs(self, targets: tuple[tuple[int, str, float], ...]):
+        by_name = {row.native_dof_name: row for row in self.drives}
+        if (type(targets) is not tuple or len(targets) != 9
+                or {name for _index, name, _value in targets} != set(by_name)):
+            raise ValueError('GeoPhys control mapping requires the exact nine named Position targets')
+        target_by_name = {}
+        for index, name, target in targets:
+            row = by_name.get(name)
+            if (row is None or type(index) is not int or index != row.native_dof_index
+                    or type(target) not in (int, float) or isinstance(target, bool)
+                    or not math.isfinite(float(target))
+                    or not row.lower_limit <= float(target) <= row.upper_limit):
+                raise ValueError('GeoPhys Position target differs from its source-bound DOF receipt')
+            target_by_name[name] = float(target)
+        controls = []
+        for row in self.drives:
+            if row.canonical_joint.joint_id in self.tendon_joint_names:
+                continue
+            target = target_by_name[row.native_dof_name] + row.coordinate_offset
+            value = (row.stiffness * target + row.damping * row.desired_velocity - row.bias0) / row.gain
+            if not math.isfinite(value) or (row.control_limited and not row.control_lower <= value <= row.control_upper):
+                raise ValueError(f'GeoPhys Position control exceeds source limits for {row.native_dof_name}')
+            controls.append((row.native_actuator_index, row.native_actuator_name, value))
+        fingers = [by_name[name] for name in ('finger_joint1', 'finger_joint2')]
+        q1, q2 = (target_by_name[row.native_dof_name] for row in fingers)
+        if abs(q1 - q2) > 1e-9:
+            raise ValueError('shared tendon Position control requires equal source finger targets')
+        tendon_length = sum(float(c) * q for c, q in zip(self.tendon_coefficients, (q1, q2)))
+        row = fingers[0]
+        value = (row.stiffness * tendon_length + row.damping * row.desired_velocity - row.bias0) / row.gain
+        if not math.isfinite(value) or (row.control_limited and not row.control_lower <= value <= row.control_upper):
+            raise ValueError('GeoPhys tendon Position control exceeds the source actuator ctrl range')
+        controls.append((row.native_actuator_index, row.native_actuator_name, value))
+        if len({index for index, _name, _value in controls}) != 8:
+            raise ValueError('GeoPhys source control mapping did not produce eight unique actuator channels')
+        return tuple(sorted(controls))
+
+
 def compile_isaac_named_position_drive_receipt_v1(
     *, execution: ExecutionSpecV1, scene_identity_sha256: str,
     source_closure_sha256: str, provider_build_identity: str,

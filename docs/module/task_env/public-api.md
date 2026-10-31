@@ -942,3 +942,28 @@ The result is `F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`. It is limited
 Sol accepted `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE` for the exact source/task/profile above. Review repaired the existing diagnostic reader to verify actual observation leaves, storage dtype/shape/finite values and their typed-state/boundary correspondence, rather than counts alone. The two unchanged RUN009 H5 files passed 602 actual observations, 600 transitions, 3,000 advances and 22 negative classes with the strengthened reader. Original producer, H5 and plan identities remain frozen; this review launched no native and reran no pytest. The original 14-class candidate record remains historical.
 
 This is bounded Core/MuJoCo environment/control/Task-readout/storage acceptance, not a solved grasp task, Expert, general API or Qualification. A new DG02 package targets source-faithful USD/public GeoPhys consumers through these existing Core owners; it is prepared for manual relay, with no GeoPhys capability granted by preparation. DG03 remains pending. See [the current decision and DG02 scope](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md).
+
+<a id="f05-dg02-window001-geophys-usd-in-progress"></a>
+
+## F05 DG02 window001: GeoPhys/USD in progress
+
+The active DG02 implementation reuses the single GeoPhys public USD route and
+the existing Core candidate/admission/Position/RuntimeSession/Recorder owners.
+Its additive `GeoPhysUsdSourceActuationReceiptV2` describes nine named Panda
+DOFs, seven arm actuator channels, one fixed-tendon actuator shared by the two
+finger targets, and the source equality parameters. The F05 native candidate
+builder now requires the frozen DG01 `ActionConfig` (joint correction gain
+1.0, default gripper force 100 N); that configuration must also be bound to the
+run plan and constructed Controller identity. The change adds no second provider
+route or generic TaskEnv constructor.
+
+Current evidence is bounded: the isolated GeoPhys parser unit test passed
+3/3; public USD import, IR, articulation and rigid-model lowering passed with
+8 actuators, one tendon and one equality; a two-step native consumer probe read
+actuator8 force and tendon `Jᵀf` values. That probe did not independently compare
+the equality law or run its disabled negative. The new Core V2 receipt compiler
+and adapter have not yet been exercised against the public model, and no Core
+S1 candidate, two-episode N2 cell, H5 cold read or Sol review has completed.
+Therefore this is implementation progress, not an admitted/qualified runtime
+route. The prior F05 three-round PARTIAL, DG01 acceptance and frozen r009
+evidence remain unchanged; F06/F07 are not started.

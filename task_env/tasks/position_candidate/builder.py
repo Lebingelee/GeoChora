@@ -45,6 +45,17 @@ POSITION_CANDIDATE_SEED = 31
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 
 
+def _validate_f05_native_position_action_config(controller_config):
+    from task_env.environment.config import ActionConfig
+
+    if type(controller_config) is not ActionConfig:
+        raise TypeError('F05 native candidate requires its frozen Position ActionConfig')
+    if controller_config != ActionConfig(
+            joint_position_correction_gain=1.0,
+            gripper_default_force_N=100.0):
+        raise ValueError('F05 native ActionConfig differs from the accepted DG01 control semantics')
+
+
 @dataclass(frozen=True)
 class F03PositionCandidateInputV1:
     """Explicit versioned construction input for the F03 Core call-chain route."""
@@ -445,17 +456,21 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                               F05Dg01MujocoCandidateInputV1):
         raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01 input contract')
     input_v1.validate()
-    if controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
-        raise ValueError('explicit Position ActionConfig is supported only by the DG01 MJCF candidate')
+    if type(input_v1) is F05NativePositionCandidateInputV1:
+        _validate_f05_native_position_action_config(controller_config)
+    elif controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
+        raise ValueError('explicit Position ActionConfig is supported only by exact F05 native or DG01 candidates')
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
     native_drive_receipt = getattr(input_v1, 'native_drive_receipt', None)
+    position_config = controller_config
     if type(source) is UsdRuntimeSourceV1:
         profile = PandaPositionServoProfileV1.from_usd_source(
             artifact, source, execution=input_v1.execution,
             kinematics_source_xml=input_v1.kinematics_source_xml,
             native_drive_receipt=native_drive_receipt,
+            config=position_config,
         )
     else:
         profile = PandaPositionServoProfileV1.from_source(

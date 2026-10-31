@@ -270,7 +270,8 @@ class PandaPositionServoProfileV1:
         """
         from ...runtime.sessions.source import UsdRuntimeSourceV1
         from ...runtime.sessions.leaf_control import (
-            GeoPhysUsdPositionDriveReceiptV1, IsaacNamedPositionDriveReceiptV1,
+            GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
+            IsaacNamedPositionDriveReceiptV1,
         )
         from ...artifacts import ExecutionSpecV1
 
@@ -280,6 +281,7 @@ class PandaPositionServoProfileV1:
         if (native_drive_receipt is not None
                 and type(native_drive_receipt) not in (
                     IsaacNamedPositionDriveReceiptV1, GeoPhysUsdPositionDriveReceiptV1,
+                    GeoPhysUsdSourceActuationReceiptV2,
                 )):
             raise TypeError('versioned Position profile requires a supported named drive receipt when supplied')
         source.validate()
@@ -328,7 +330,9 @@ class PandaPositionServoProfileV1:
                 f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
                 for item in native_drive_receipt.drives
             }
-            if type(native_drive_receipt) is GeoPhysUsdPositionDriveReceiptV1 and dict(source.joints) != target_by_joint:
+            if type(native_drive_receipt) in (
+                    GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2,
+            ) and dict(source.joints) != target_by_joint:
                 raise ValueError('GeoPhys source Joint names differ from its model-bound drive receipt')
             if dict(source.joint_targets) != target_by_joint:
                 raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')

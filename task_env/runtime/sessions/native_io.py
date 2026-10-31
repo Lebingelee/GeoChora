@@ -295,6 +295,7 @@ class UsdCoreRuntimeSession(_SessionValues):
             raise TypeError('F03 Core RuntimeSession requires the exact UsdRuntimeSourceV1')
         from .leaf_control import (
             GeoPhysUsdPositionDriveReceiptV1,
+            GeoPhysUsdSourceActuationReceiptV2,
             IsaacNamedPositionDriveReceiptV1,
             compile_isaac_named_position_drive_receipt_from_native_metadata_v1,
         )
@@ -331,10 +332,14 @@ class UsdCoreRuntimeSession(_SessionValues):
             if execution_provenance == 'synthetic_fixture':
                 from dataclasses import replace
                 drive_receipt = replace(drive_receipt, provenance_kind='synthetic_fixture')
-        if type(drive_receipt) not in (IsaacNamedPositionDriveReceiptV1, GeoPhysUsdPositionDriveReceiptV1):
+        if type(drive_receipt) not in (
+                IsaacNamedPositionDriveReceiptV1,
+                GeoPhysUsdPositionDriveReceiptV1,
+                GeoPhysUsdSourceActuationReceiptV2):
             raise TypeError('Core RuntimeSession requires a supported named-drive receipt owner')
         if ((type(drive_receipt) is IsaacNamedPositionDriveReceiptV1 and execution.physics_provider != 'isaacsim')
-                or (type(drive_receipt) is GeoPhysUsdPositionDriveReceiptV1 and execution.physics_provider != 'geophys')):
+                or (type(drive_receipt) in (GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2)
+                    and execution.physics_provider != 'geophys')):
             raise ValueError('named-drive receipt provider differs from the declared ExecutionSpec')
         if drive_receipt.provenance_kind != execution_provenance:
             raise ValueError('named-drive receipt provenance does not match the loaded USD source')

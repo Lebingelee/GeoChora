@@ -19,8 +19,8 @@ class PositionCandidateEnv(SelectedReferenceEnv):
         if kwargs or render_mode is not None:
             raise ValueError('Position candidate rejects render_mode and extra keyword arguments')
         if 'versioned_input' in values:
-            if set(values) - {'versioned_input', 'horizon'}:
-                raise ValueError('versioned Position candidate admits only versioned_input and horizon')
+            if set(values) - {'versioned_input', 'horizon', 'controller_config'}:
+                raise ValueError('versioned Position candidate admits only versioned_input, horizon and controller_config')
             from .builder import (
                 F03PositionCandidateInputV1, F04PositionCandidateInputV1,
                 F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
@@ -34,8 +34,16 @@ class PositionCandidateEnv(SelectedReferenceEnv):
             horizon = values.get('horizon', 8)
             if type(horizon) is not int or not 1 <= horizon <= 6000:
                 raise ValueError('Position candidate horizon must be an integer in [1, 6000]')
+            controller_config = values.get('controller_config')
+            if controller_config is not None:
+                from ...environment.config import ActionConfig
+                if isinstance(controller_config, dict):
+                    controller_config = ActionConfig(**controller_config)
+                if type(controller_config) is not ActionConfig:
+                    raise TypeError('controller_config must be the exact ActionConfig contract')
             return build_versioned_position_candidate(
                 versioned_input, horizon=horizon, environment_type=cls,
+                controller_config=controller_config,
             ).env
         if set(values) - {'provider', 'backend', 'horizon', 'source_workspace', 'camera_observation'}:
             raise ValueError('Position candidate config admits provider/backend/horizon/source_workspace and opt-in camera_observation only')

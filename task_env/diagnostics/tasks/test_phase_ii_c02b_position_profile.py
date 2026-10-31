@@ -430,18 +430,20 @@ def test_mujoco_position_policy_skips_force_copy_and_geo_feedback_query(monkeypa
     mujoco._model = object()
     mujoco._data = SimpleNamespace(
         qpos=np.zeros(0), qvel=np.zeros(0), act=np.zeros(0), ctrl=np.zeros(1),
-        actuator_force=sentinel,
+        actuator_force=sentinel, time=0.0,
     )
     mj_steps = []
     mj_forward_calls = []
     mujoco._mj = SimpleNamespace(
         mj_resetData=lambda *_args: None,
         mj_forward=lambda *_args: mj_forward_calls.append(True),
-        mj_step=lambda *_args: mj_steps.append(True),
+        mj_step=lambda *_args: (mj_steps.append(True),
+                                setattr(mujoco._data, 'time', mujoco._data.time + 0.002)),
     )
     mujoco._target_actuators = {}
     mujoco._open_actuators = ()
     mujoco._source = SimpleNamespace(open_actuators=('actuator8',), fixed_attachment_plan=None)
+    mujoco._f05_dg01_input = None
     mujoco._episode_id = 'episode-position-sentinel'
     mujoco._reset_sample_id = 'reset-position-sentinel'
     mujoco._native_steps = 0

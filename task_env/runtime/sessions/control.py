@@ -938,15 +938,19 @@ def materialize_control(
             raise
     elif f05_native:
         try:
-            from .leaf_control import GeoPhysUsdPositionDriveReceiptV1
+            from .leaf_control import (
+                GeoPhysUsdPositionDriveReceiptV1,
+                GeoPhysUsdSourceActuationReceiptV2,
+            )
             receipt = getattr(session, '_drive_receipt', None)
             metadata = getattr(session, '_native_io_metadata', None)
             producer = f05_native_input.host_model_producer_identity
+            supported_receipts = (GeoPhysUsdPositionDriveReceiptV1, GeoPhysUsdSourceActuationReceiptV2)
             expected_targets = {
                 f'{item.canonical_joint.entity_id}/{item.canonical_joint.joint_id}': item.native_dof_name
                 for item in receipt.drives
-            } if type(receipt) is GeoPhysUsdPositionDriveReceiptV1 else {}
-            if (type(receipt) is not GeoPhysUsdPositionDriveReceiptV1
+            } if type(receipt) in supported_receipts else {}
+            if (type(receipt) not in supported_receipts
                     or receipt.provenance_kind != 'native_runtime'
                     or receipt.provider_build_identity != producer.actual_provider_build_identity
                     or receipt.host_model_producer_identity_sha256 != producer.identity_sha256
