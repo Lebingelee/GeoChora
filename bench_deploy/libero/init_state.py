@@ -29,7 +29,8 @@ MAX_ARCHIVE_BYTES = 2 * 1024 * 1024
 PILOT_SOURCE_MANIFEST_SHA256 = "4ad168e4710f3153d0f1f470389a506df27588e4d5ce1eaec450289807d30a75"
 PILOT_BDDL_SHA256 = "9b59eb1287802868ad9bc78d58e6d36d4ba31134e679cfdbdf4b0feb660c959b"
 PILOT_RESET_SAMPLER_ID = "libero-bddl-normal-placement-v1"
-PILOT_RESET_SAMPLER_VERSION = "libero-8f1084e3-robosuite-fbee5844-tabletop-table-region-v1"
+PILOT_RESET_SAMPLER_VERSION = "libero-8f1084e3-robosuite-fbee5844-tabletop-table-region-v2"
+PILOT_PANDA_ARM_RESET_NOISE_DRAWS = 7
 PILOT_TABLE_TOP_Z_M = 0.90
 PILOT_MOVABLE_Z_OFFSET_M = 0.01
 PILOT_TABLE_FULL_THICKNESS_M = 0.05
@@ -421,8 +422,9 @@ def sample_libero_normal_reset_v1(
     """Return the pinned normal BDDL placement plus source-bound ResetSampleV1.
 
     This is a narrow pure-Python translation of LIBERO's fixed normal reset
-    sampler. It uses RandomState to match upstream ``np.random.seed`` and
-    restores the selected safe-decoded .pruned_init row after sampling.
+    sampler. It uses a task-seeded RandomState and mirrors the upstream Panda
+    ``Robot.reset`` RNG advance before placement sampling, then restores the
+    selected safe-decoded .pruned_init row.
     """
     from task_env.artifacts import PoseWorld, ResetSampleV1
 
@@ -449,6 +451,13 @@ def sample_libero_normal_reset_v1(
         raise ValueError("LIBERO candidate source/closure identity is malformed")
     import numpy as np
     rng = np.random.RandomState(task_seed)
+    # robosuite Robot.reset calls np.random.randn(len(init_qpos)) whenever
+    # deterministic_reset=False. Panda has seven arm joints and this task
+    # passes zero-magnitude Gaussian initialization noise, so the sampled
+    # values do not perturb qpos but still advance the global placement RNG.
+    # Preserve that stream position in the isolated deterministic candidate
+    # RNG; the selected .pruned_init row later restores all robot qpos/qvel.
+    rng.randn(PILOT_PANDA_ARM_RESET_NOISE_DRAWS)
     placed: dict[str, dict[str, Any]] = {}
     asset_properties: dict[str, dict[str, Any]] = {}
     draw_rows = []
@@ -593,11 +602,23 @@ def sample_libero_normal_reset_v1(
         "rng": {
             "generator": "numpy.random.RandomState / legacy np.random.seed compatible MT19937",
             "seed": task_seed,
-            "scope": "dedicated candidate placement stream; not the upstream process-global RNG state",
+            "scope": (
+                "dedicated task-seeded candidate stream; mirrors upstream placement draws when the same seed is "
+                "set immediately before reset, including Panda's zero-magnitude Robot.reset RNG advance"
+            ),
+            "upstream_preplacement_draws": {
+                "source": "robosuite.robots.robot.Robot.reset",
+                "panda_arm_joint_count": PILOT_PANDA_ARM_RESET_NOISE_DRAWS,
+                "noise_type": "gaussian",
+                "noise_magnitude": 0.0,
+                "rng_call": "np.random.randn(7)",
+                "qpos_effect": "none; sampled noise is multiplied by zero",
+            },
             "sampler_draw_order": [item[0] for item in (*PILOT_MOVABLES, *PILOT_FIXTURES)],
         },
         "reset_order_source": [
             "RobotEnv._reset_internal calls robot.reset before BDDLBaseDomain._reset_internal",
+            "Panda Robot.reset consumes np.random.randn(7) for zero-magnitude Gaussian arm noise before placement sampling",
             "BDDL property initializers run before mj_step1; this task has none",
             "mj_step1 runs before BDDL placement sampler values are applied",
             "movable free-joint poses and fixture model root poses are applied in BDDL initial-state order",
@@ -610,8 +631,8 @@ def sample_libero_normal_reset_v1(
             "restore_source_simulation_time", "mj_forward",
         ],
         "robot_initial_state_handling": (
-            "candidate does not reproduce upstream Robot.reset noise; the complete selected row restores all "
-            "named robot joint positions and velocities after placement"
+            "candidate mirrors the upstream seven zero-magnitude Gaussian RNG draws; no sampled noise changes "
+            "robot qpos, and the complete selected row restores all named robot joint positions and velocities"
         ),
         "placement_sampler": {
             "bddl_problem_name": "libero_tabletop_manipulation",

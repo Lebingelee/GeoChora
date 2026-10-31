@@ -2832,6 +2832,46 @@ def test_reset_plan_preflight_rejects_seed_mismatch_without_closing_live_session
         env.close()
 
 
+def test_libero_reset_sampler_mirrors_seeded_upstream_robot_rng_advance(monkeypatch):
+    global _FAKE_WORLD
+    _FAKE_WORLD = _World()
+    _fake_api(monkeypatch)
+    env = _candidate(monkeypatch)
+    try:
+        _, info = env.reset(seed=19, options={"init_row_index": 0})
+        from task_env.artifacts import ResetSampleV1
+
+        sample = ResetSampleV1.from_mapping(info["reset_sample_v1"])
+        assert sample.sampler_version == (
+            "libero-8f1084e3-robosuite-fbee5844-tabletop-table-region-v2"
+        )
+        receipt = env.value["reset_realizations"][sample.sample_id]
+        assert receipt["rng"]["upstream_preplacement_draws"] == {
+            "source": "robosuite.robots.robot.Robot.reset",
+            "panda_arm_joint_count": 7,
+            "noise_type": "gaussian",
+            "noise_magnitude": 0.0,
+            "rng_call": "np.random.randn(7)",
+            "qpos_effect": "none; sampled noise is multiplied by zero",
+        }
+        expected = {
+            "flat_stove_1": (
+                [-0.4146303298573933, -0.13499687702793547, 0.905],
+                [1.0, 0.0, 0.0, 0.0],
+            ),
+            "wooden_cabinet_1": (
+                [0.032160686061349086, -0.26769535926827864, 0.905],
+                [0.21813924162729167, 0.0, 0.0, 0.9759176559844944],
+            ),
+        }
+        for name, (position, quaternion) in expected.items():
+            actual = receipt["fixture_pose_world"][name]
+            assert actual["position"] == pytest.approx(position, abs=1e-12)
+            assert actual["quaternion_wxyz"] == pytest.approx(quaternion, abs=1e-12)
+    finally:
+        env.close()
+
+
 def test_reset_plan_source_layout_and_range_preflight_preserve_live_session(monkeypatch):
     global _FAKE_WORLD
     _FAKE_WORLD = _World()
