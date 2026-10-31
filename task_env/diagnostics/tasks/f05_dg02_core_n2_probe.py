@@ -394,8 +394,31 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         if rebuilt.get(key) != static_receipt.get(key):
             raise ValueError(f"Core N2 source candidate rebuild differs from frozen static receipt: {key}")
     expected_counts = plan["oracle"]["required_public_model_counts"]
-    if rebuilt["public_model_counts"] != expected_counts:
-        raise ValueError("Core N2 actual source model counts differ from the frozen 9DOF/8-actuator model")
+    actual_counts = rebuilt.get("public_model_counts", {})
+    if not isinstance(actual_counts, dict) or any(
+        actual_counts.get(name) != count for name, count in expected_counts.items()
+    ):
+        raise ValueError("Core N2 actual source model counts differ from the frozen public model requirements")
+    geometry_audit = json.loads(
+        Path(plan["source"]["usd_geometry_audit_v2"]["path"]).read_text(encoding="utf-8")
+    )
+    panda_geometry_count = geometry_audit.get("panda", {}).get("collision_shape_count")
+    task_scene = geometry_audit.get("task_scene", {})
+    task_geom_count = sum(bool(task_scene.get(key)) for key in (
+        "free_cube_prim_exists", "support_prim_exists",
+    ))
+    expected_geom_count = (
+        int(panda_geometry_count) + task_geom_count
+        if isinstance(panda_geometry_count, int) and task_geom_count == 2
+        else None
+    )
+    if (
+        geometry_audit.get("passed") is not True
+        or geometry_audit.get("usd_stage_sha256") != plan["source"]["usd_stage"]["sha256"]
+        or expected_geom_count is None
+        or actual_counts.get("n_geoms") != expected_geom_count
+    ):
+        raise ValueError("Core N2 actual source geom count differs from the hashed USD collision-shape audit")
     env = candidate.env
     episodes = []
     primary_error = None
@@ -431,6 +454,7 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
         "run_id": plan["run_id"],
         "plan_sha256": plan_hash,
         "static_candidate_receipt_sha256": static_row["sha256"],
+        "public_model_counts": actual_counts,
         "source_delivery_identity_sha256": plan["source"]["delivery_identity_sha256"],
         "usd_stage_sha256": plan["source"]["usd_stage"]["sha256"],
         "provider_head": plan["input_identity"]["provider_input_head"],
