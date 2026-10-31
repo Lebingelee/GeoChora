@@ -1865,9 +1865,9 @@
     "README.md": "11553804d8f6955a0886e36ed2de836919cbbf096b2fdf2a6d66740073d4b5bd",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
     "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "55e9bd3f6a42da15772da623f1973c14bf2185e8afb1272bc4e211bf1c16f86d"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "8a2a775cacf81932e047d1d5f681d4a15cf6746bc5af2d6c82a00a431c36c555"
   },
-  "revision_kind": "DG02_WINDOW001_SOL_PARTIAL_REVIEW_AND_WINDOW002_REWORK_PREPARATION",
+  "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
     "libero": {
       "repository": "https://github.com/Lifelong-Robot-Learning/LIBERO",
@@ -3641,7 +3641,7 @@
   },
   "advisory_review": "REVISE_PLAN",
   "maintainer_formal_acceptance": null,
-  "planning_submission_this_revision": "Sol independently confirmed DG02 tracking failure, found reader/negative attribution and sharedController compatibility gaps, corrected formal-versus-probe budget classification and prepared a sameGoal window002 within original cumulative limits. No native or pytest ran in Sol review/preparation; old evidence is immutable and DG03 remains held.",
+  "planning_submission_this_revision": "Maintainer approved PickCube explicit reuse of the existing NutAssembly R3 continuous Cartesian tracker. Prepared one concise same-DG02 window002 prompt and bounded attachments replacing the unused prior prompt; no implementation/native/testing or capability promotion by Sol. DG02 original formal gates and cumulative Goal caps remain.",
   "revision_history": [
     {
       "source_commit": "535ce2516e61ecd538d5ff6dccf7493a1cfe2cac",
@@ -4641,7 +4641,7 @@
   },
   "checkpoint_recovery_plan": {
     "updated": "2026-10-30",
-    "status": "F05_OVERALL_PARTIAL_UNCHANGED; DG01_ACCEPTED; DG02_WINDOW001_REVIEWED_PARTIAL_REWORK_REQUIRED; WINDOW002_PREPARED_FOR_MANUAL_RELAY; DG03_F06_F07_NOT_STARTED",
+    "status": "DG01_ACCEPTED; DG02_PARTIAL_REWORK_REQUIRED; PICKCUBE_R3_MATCHED_CONTROL_WINDOW002_PREPARED_NOT_EXECUTED; DG03_F06_F07_HELD",
     "authorization": "Maintainer explicitly authorized F00 attempt001 on 2026-10-28: develop-full integration, existing Harness lifecycle repair, targeted checks, one bounded MuJoCo 3.8.1 CPU synthetic campaign, conditional Oracle seed0 and pending Judge prepare/verify, documentation and local commits. The earlier R03c attempt003 authorization is historical and remains recorded in revision_history.",
     "canonical_recovery": "07_Execution_Order_and_Acceptance.md#r03c-checkpoint-recovery",
     "canonical_patch_plan": "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md",
@@ -6742,7 +6742,7 @@
       "preparation_tests": 0,
       "preparation_native": 0
     },
-    "latest_f05_successor_diagnostic_plan": "f05_dg02_window002_preparation_20261031",
+    "latest_f05_successor_diagnostic_plan": "f05_dg02_pickcube_r3_window002_preparation_20261031",
     "dg01_goal01_window_001": {
       "input_head": "6d4e222866474b0ce4399183a35c337f58303349",
       "implementation_commit": "e410f97d90e1e88806318d11c47dc54d013dad5c",
@@ -6871,6 +6871,23 @@
       "preparation_native": 0,
       "preparation_pytest": "NOT_RUN",
       "DG03_started": false
+    },
+    "f05_dg02_pickcube_r3_window002_preparation_20261031": {
+      "authority": "maintainer explicitlyapprovedPickCube reuseexistingNutAssembly continuousCartesiancontroller ascontrol; requestedoneconciseGoalprompt",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_002_pickcube_r3_001/",
+      "status": "PREPARED_FOR_MANUAL_RELAY_NOT_STARTED",
+      "supersedes": "sol_f05_dg02_002 prompt/scope only; notanewexecutedwindow",
+      "goal": "same unfinishedDG02",
+      "window": 2,
+      "exact_head": "post-doc commit in package input_snapshot.json",
+      "provider_input_head": "f4d3b3bb21882bac5ca007e657f5d6709a6189b8",
+      "implementation": "PickCubeR3 explicitoptin, matchedreference/initialstate/trajectory/dwell/metrics, sameGeoPhys sameDG02physicalsourceMJCFvsUSD, existingownerrepair andoriginalformal",
+      "new_branches_worktrees": 0,
+      "original_goal_budget_increase": false,
+      "secondary_mujoco_scope_change": "PickCubeR3positivecontrol andaffectedregression withinoriginaltotalcaps",
+      "native_in_preparation": 0,
+      "pytest_in_preparation": "NOT_RUN",
+      "DG03_F06_F07": false
     }
   }
 }

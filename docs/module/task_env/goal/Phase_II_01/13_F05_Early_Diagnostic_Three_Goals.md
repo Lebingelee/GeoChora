@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01精确单元已接收；DG02 window001经Sol独立复核为 `DG02_WINDOW001_REVIEWED_PARTIAL_REWORK_REQUIRED`，tracking失败与reader缺口待修复。原账误将formal计入probe；总native额度未耗尽。window002续包已准备，待维护者转述冻结包执行。DG03仍待DG02接收。**
+> **状态：DG01精确单元已接收；DG02仍为REWORK_REQUIRED。维护者批准PickCube显式复用NutAssembly R3持续笛卡尔反馈作为对照；新window002整合包已准备待人工转述，取代原window002 prompt。DG03等待DG02接收。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -128,3 +128,16 @@ N2仍须原同Env两轮300interval×5×2ms、全部物理/control/Task/storage/�
 
 
 本轮Sol收口静态检查：Module Skill元数据/本地链接/源码路径、规划15份文档hash与局部链接、diff检查通过。全局docs validator实际退出1、247条（246个non-documentation scope诊断＋1个count limit）；相较Luna收口245条，增加的是其随后已提交的两个tracking-probe plan/reader源码路径，未新增本轮文档链接/内容诊断。全局仍不记PASS；原245签署输出保留。完整差分见Sol复核目录。
+
+
+## 11. DG02返工方向修订：PickCube R3对照（2026-10-31）
+
+维护者明确批准PickCube通过既有公共构造/配置显式使用NutAssembly的R3持续笛卡尔反馈，作为DG02对照。原R1默认、冻结历史身份/证据保留；复用已有`ProductionCanonicalPandaControllerR3`及必要共享臂/Position适配，不复制控制器，不搬NutAssembly任务补偿、10N抓手配方、Expert或Outcome。此前PickCube R1任务成功是功能证据；NutAssembly2026-10-20局部continuous/locked精度报告是独立诊断参考，均不自动证明当前PickCube R3或USD精度。
+
+新的唯一待转述执行包为`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_dg02_002_pickcube_r3_001/`，继续同DG02/window002，不增加已执行窗口计数。它替代未执行的`sol_f05_dg02_002` prompt/scope，不叠加派发。准确post-preparation HEAD与保护hash由新input_snapshot给出；复用develop-full与既有隔离GeoPhys@f4d3b3bb，不新开branch/worktree。Sol准备阶段仅文档/包/静态哈希核对，零implementation、pytest/native。
+
+实施顺序：PickCube/MJCF/R3在MuJoCo和GeoPhys的当前连续反馈对照→对齐physical TCP、q0/dq0、目标轨迹、限速/加速度、reset记忆/保持/度量窗口→同一GeoPhys中对DG02同物理配方的MJCF/R3与USD/R3作可归因比较→修复既有Core/provider消费/控制适配并完成原3000step formal。PickCube加强配方（含臂限力±250）与DG02原source限力/物性差异必须记录，不把它们当只换文件格式；handorigin与offset TCP正确变换，不当作已证实误差。R3新方法/实际派生参数以独立profile和真实identity冻结，Canonical请求含义、source gains/caps/物性/Task及原验收门不改。reader实际cube叶、负例归因、旧默认identity兼容、CPU监督及预算分桶修复一并收口。
+
+原Goal总step/wall上限不增加；MuJoCo本window授权由旧DG01回归限定明确扩为PickCube R3对照及受影响回归≤3000steps/300s。GeoPhys新增≤18000steps（nonformal≤12000/formal≤6000）/3600s，总新增≤21000steps/3900s；所有nonformal（含baseline/MuJoCo）保守记原probe桶，旧1675＋新≤15000仍≤18000。baseline regression可≤3000steps/run以保留完整轨迹/hold；feature microprobe≤500steps，不能截短协议冒充同门。8h窗口/末45min收口，原资源门/锁/零GPU/下载保持。所有额度与原累计剩余取较小值。
+
+成功仍只交DG02待Sol复核候选；DG03/F06/F07/Qualification不启动。原source/recipe/oracles、旧窗口/失败/H5/plan及原partial均保留。
