@@ -97,11 +97,14 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
 
     core_head, provider_head = _git(CORE, "rev-parse", "HEAD"), _git(PROVIDER, "rev-parse", "HEAD")
     core_branch, provider_branch = _git(CORE, "branch", "--show-current"), _git(PROVIDER, "branch", "--show-current")
-    if (core_head, core_branch, provider_head, provider_branch) != (
-        PACKAGE_HEAD, "develop-full", PACKAGE_PROVIDER_HEAD,
-        "codex/phase-ii-01-f05-geophys",
-    ):
-        raise RuntimeError("Core/provider checkout differs from the frozen package input")
+    core_input_is_ancestor = subprocess.run(
+        ["git", "-C", str(CORE), "merge-base", "--is-ancestor", PACKAGE_HEAD, core_head],
+        check=False,
+    ).returncode == 0
+    if (not core_input_is_ancestor or core_branch != "develop-full"
+            or provider_head != PACKAGE_PROVIDER_HEAD
+            or provider_branch != "codex/phase-ii-01-f05-geophys"):
+        raise RuntimeError("Core/provider checkout is not the frozen package input or its local-commit descendant")
     if _git(PROVIDER, "status", "--porcelain=v1", "--untracked-files=all"):
         raise RuntimeError("isolated GeoPhys provider checkout is not clean")
 

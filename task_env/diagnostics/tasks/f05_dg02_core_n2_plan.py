@@ -112,7 +112,9 @@ def _model_pose_mapping(pose) -> dict:
     }
 
 
-def _build_formal_oracle(candidate, physical: dict, control: dict, action_config: dict) -> dict:
+def _build_formal_oracle(model, source_bodies: dict, physical: dict, control: dict,
+                         action_config: dict, controller_method: dict,
+                         controller_identity: str) -> dict:
     home_all = physical["physical_acceptance"]["home_joint_position_rad"]
     arm_order = [f"joint{index}" for index in range(1, 8)]
     home = {name: float(home_all[name]) for name in arm_order}
@@ -122,7 +124,7 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
             name: home[name] + float(phase["arm_offsets_rad"][index])
             for index, name in enumerate(arm_order)
         }
-        pose = candidate.env.controller.model.pose([target[name] for name in arm_order])
+        pose = model.pose([target[name] for name in arm_order])
         schedule.append({
             "start": int(phase["start"]),
             "stop": int(phase["stop"]),
@@ -130,11 +132,9 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
             "arm_offsets_rad": [float(value) for value in phase["arm_offsets_rad"]],
             "arm_target_position_rad": target,
             "opening_m": float(phase["opening_m"]),
-            "source_fk_method": "PandaPositionServoProfileV1.model.pose(source MJCF Menagerie kinematics)",
+            "source_fk_method": "PandaKinematics(source MJCF Menagerie bytes; PositionServoV1 owner)",
             "source_fk_hand_pose_world": _model_pose_mapping(pose),
         })
-    runtime_source = candidate.env.value["source"]
-    source_bodies = dict(runtime_source.bodies)
     contact_body_roles = {}
     for role, prim_name in (("free_cube", "free_cube"), ("support", "support")):
         matches = [
@@ -167,11 +167,15 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
         "original_physical_acceptance": physical["physical_acceptance"],
         "controller_action_config": action_config,
         "controller_method": {
-            "nullspace_reference_gain": candidate.env.controller.nullspace_reference_gain,
+            "controller_identity_sha256": controller_identity,
+            "arm_tracking_method": controller_method["arm_tracking_method"],
+            "arm_tracking_profile": controller_method["arm_tracking_profile"],
+            "arm_reference_identity_sha256": controller_method["arm_reference_identity"],
+            "nullspace_reference_gain": controller_method["nullspace_reference_gain"],
             "reference_source": "reset_typed_arm_joint_position",
             "projector": "svd_right_nullspace_v1",
-            "pose_target_method": candidate.env.controller.pose_target_method,
-            "arm_target_limit_source": candidate.env.controller.arm_target_limit_source,
+            "pose_target_method": controller_method["pose_target_method"],
+            "arm_target_limit_source": controller_method["arm_target_limit_source"],
         },
         "required_public_model_counts": {
             "n_actuators": 8, "n_dof": 15, "n_equalities": 1,
@@ -201,14 +205,88 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
     }
 
 
-def build_plan() -> tuple[dict, dict]:
+def _verified_supervised_candidate(*, plan_path: Path, sidecar_path: Path,
+                                   receipt_path: Path, worker_path: Path,
+                                   supervisor_path: Path, core_head: str,
+                                   provider_head: str) -> tuple[dict, dict, dict, dict, dict]:
+    plan_path = plan_path.resolve(strict=True)
+    sidecar_path = sidecar_path.resolve(strict=True)
+    receipt_path = receipt_path.resolve(strict=True)
+    worker_path = worker_path.resolve(strict=True)
+    supervisor_path = supervisor_path.resolve(strict=True)
+    plan_hash = _sha(plan_path)
+    if sidecar_path.read_text(encoding="ascii").split()[0] != plan_hash:
+        raise ValueError("supervised static candidate plan SHA-256 mismatch")
+    plan = _json(plan_path)
+    if plan.get("schema_version") != "f05-dg02-n1-public-consumer-plan-v1":
+        raise ValueError("unsupported supervised static candidate plan")
+    identity = plan["input_identity"]
+    if (identity.get("core_input_head") != core_head
+            or identity.get("core_branch") != "develop-full"
+            or identity.get("provider_input_head") != provider_head
+            or identity.get("provider_branch") != "codex/phase-ii-01-f05-geophys"):
+        raise ValueError("supervised static candidate was not frozen for the current Core/provider identity")
+    if plan["output"].get("candidate_receipt") != str(receipt_path):
+        raise ValueError("supervised candidate plan points at a different candidate receipt")
+    for row in plan["code"]["tracked_inputs"]:
+        path = Path(row["path"]).resolve(strict=True)
+        if _sha(path) != row["sha256"]:
+            raise ValueError(f"supervised static candidate input changed: {path}")
+    receipt = _json(receipt_path)
+    worker = _json(worker_path)
+    supervisor = _json(supervisor_path)
+    if (worker.get("status") != "PASS_SUPERVISED_STATIC_CORE_CANDIDATE"
+            or worker.get("run_id") != plan.get("run_id")
+            or worker.get("plan_sha256") != plan_hash
+            or worker.get("candidate_receipt_sha256") != _sha(receipt_path)
+            or supervisor.get("run_id") != plan.get("run_id")
+            or supervisor.get("plan_sha256") != plan_hash
+            or supervisor.get("worker_receipt_sha256") != _sha(worker_path)
+            or supervisor.get("exit_code") != 0
+            or supervisor.get("lock_released_after_process_group_exit") is not True
+            or supervisor.get("process_group_gone_before_release") is not True
+            or supervisor.get("physics_steps_attempted") != 0
+            or supervisor.get("physics_steps_completed") != 0):
+        raise ValueError("supervised static candidate receipts do not prove a clean zero-step pass")
+    if (receipt.get("run_id") != plan.get("run_id")
+            or receipt.get("plan_sha256") != plan_hash
+            or receipt.get("checks", {}).get("solver_initialized") is not False
+            or receipt.get("checks", {}).get("solver_constructed") is not False
+            or receipt.get("checks", {}).get("physics_steps") != 0
+            or receipt.get("public_model_counts") != worker.get("public_model_counts")):
+        raise ValueError("supervised candidate receipt does not match its plan/worker")
+    expected_counts = {"n_qpos": 16, "n_dof": 15, "n_actuators": 8,
+                       "n_tendons": 1, "n_equalities": 1}
+    actual_counts = receipt.get("public_model_counts", {})
+    if any(actual_counts.get(key) != value for key, value in expected_counts.items()):
+        raise ValueError("supervised static candidate changed the required source-bound model counts")
+    counter_path = Path(supervisor["step_counter_path"]).resolve(strict=True)
+    counter = _json(counter_path)
+    if (counter.get("attempted_physics_steps") != 0
+            or counter.get("completed_physics_steps") != 0):
+        raise ValueError("supervised static candidate step counter is not zero")
+    candidate_method = worker.get("candidate_controller_method", {})
+    if (candidate_method.get("arm_tracking_method") != "production_r3_continuous_v1"
+            or not isinstance(candidate_method.get("arm_tracking_profile"), dict)
+            or len(str(worker.get("candidate_controller_identity_sha256", ""))) != 64
+            or len(str(candidate_method.get("arm_reference_identity", ""))) != 64):
+        raise ValueError("supervised static candidate is not bound to the DG02 Production R3 arm method")
+    return plan, receipt, worker, supervisor, counter
+
+
+def build_plan(*, output_root: Path, progress_path: Path,
+               candidate_plan_path: Path, candidate_sidecar_path: Path,
+               candidate_receipt_path: Path, candidate_worker_path: Path,
+               candidate_supervisor_path: Path) -> tuple[dict, dict]:
+    output_root = output_root.resolve()
+    progress_path = progress_path.resolve(strict=True)
     attempt_index = 1
     while True:
         attempt_tag = f"{attempt_index:03d}"
-        run_dir = OUT / f"n2_formal_{attempt_tag}"
-        candidate_dir = OUT / f"core_candidate_{10 + attempt_index:03d}"
-        plan_path = OUT / f"n2_formal_{attempt_tag}.plan.json"
-        if not any(path.exists() for path in (run_dir, candidate_dir, plan_path)):
+        run_dir = output_root / f"n2_formal_{attempt_tag}"
+        plan_path = output_root / f"n2_formal_{attempt_tag}.plan.json"
+        candidate_admission_path = output_root / f"candidate_static_admission_{attempt_tag}.json"
+        if not any(path.exists() for path in (run_dir, plan_path, candidate_admission_path)):
             break
         attempt_index += 1
     run_id = f"DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_{attempt_tag}"
@@ -225,63 +303,45 @@ def build_plan() -> tuple[dict, dict]:
     if not CORE.joinpath("docs/maintenance/20261030_runtime_route_diagnostic_handoff.md").is_file():
         raise RuntimeError("protected maintenance handoff document is missing")
 
-    progress = _json(PROGRESS)
+    progress = _json(progress_path)
     budget = _json(BUDGET_PATH)
     control = _json(ORACLES_PATH)
     physical = _json(PHYSICAL_PATH)
     old_s1 = _json(OLD_S1_PLAN)
-    candidate_plan = _json(OLD_CANDIDATE_PLAN)
-    candidate_plan_path = candidate_dir / "plan.json"
-    candidate_sidecar_path = candidate_dir / "plan.sha256"
-    candidate_receipt_path = candidate_dir / "core_source_receipt.json"
-    candidate_admission_path = candidate_dir / "static_admission_receipt.json"
+    (candidate_plan, static_receipt, candidate_worker, candidate_supervisor,
+     _candidate_counter) = _verified_supervised_candidate(
+        plan_path=candidate_plan_path,
+        sidecar_path=candidate_sidecar_path,
+        receipt_path=candidate_receipt_path,
+        worker_path=candidate_worker_path,
+        supervisor_path=candidate_supervisor_path,
+        core_head=core_head,
+        provider_head=provider_head,
+    )
+    if not CORE.joinpath("docs/maintenance/20261030_runtime_route_diagnostic_handoff.md").is_file():
+        raise RuntimeError("protected maintenance handoff document is missing")
 
-    # Freeze a current static admission plan against the already accepted USD source.
-    candidate_plan["run_id"] = "DG02_G5_CORE_SOURCE_BOUND_CANDIDATE_ADMISSION_011"
-    candidate_plan["created_utc"] = datetime.now(timezone.utc).isoformat()
-    candidate_plan["input_identity"].update({
-        "core_branch": core_branch,
-        "core_input_head": core_head,
-        "core_worktree": str(CORE.resolve()),
-        "provider_branch": provider_branch,
-        "provider_input_head": provider_head,
-        "provider_worktree": str(PROVIDER.resolve()),
-    })
-    candidate_plan["code"]["tracked_inputs"] = _tracked_inputs(*candidate_plan["code"]["tracked_inputs"])
-    candidate_plan["output"] = {
-        "run_dir": str(candidate_dir.resolve()),
-        "candidate_receipt": str(candidate_receipt_path.resolve()),
-        "native_operations_forbidden": True,
-    }
-    _atomic_json(candidate_plan_path, candidate_plan)
-    candidate_plan_hash = _sha(candidate_plan_path)
-    candidate_sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-    candidate_sidecar_path.write_text(candidate_plan_hash + "\n", encoding="ascii")
-
-    from task_env.diagnostics.tasks.f05_dg02_core_source_receipt import build_candidate_receipt
-
-    static_receipt, candidate = build_candidate_receipt(candidate_plan, include_candidate=True)
-    static_receipt["plan_path"] = str(candidate_plan_path.resolve())
-    static_receipt["plan_sha256"] = candidate_plan_hash
-    if (static_receipt["checks"]["solver_initialized"]
-            or static_receipt["checks"]["solver_constructed"]
-            or static_receipt["checks"]["physics_steps"] != 0):
-        raise RuntimeError("static Core candidate admission unexpectedly initialized or stepped a solver")
-    if static_receipt["public_model_counts"] != {
-            "n_qpos": 16, "n_dof": 15, "n_actuators": 8, "n_tendons": 1,
-            "n_equalities": 1, "n_geoms": static_receipt["public_model_counts"]["n_geoms"]}:
-        raise RuntimeError("source-bound static candidate changed required 9DOF/8-actuator model counts")
-    _atomic_json(candidate_receipt_path, static_receipt)
+    candidate_plan_hash = _sha(candidate_plan_path.resolve(strict=True))
     candidate_static_receipt = {
         "schema_version": "f05-dg02-static-candidate-admission-v1",
         "run_id": candidate_plan["run_id"],
         "candidate_plan_sha256": candidate_plan_hash,
+        "candidate_plan_path": str(candidate_plan_path.resolve()),
+        "candidate_plan_sidecar_path": str(candidate_sidecar_path.resolve()),
         "candidate_receipt_path": str(candidate_receipt_path.resolve()),
-        "candidate_receipt_sha256": _sha(candidate_receipt_path),
+        "candidate_receipt_sha256": _sha(candidate_receipt_path.resolve()),
+        "candidate_worker_receipt_path": str(candidate_worker_path.resolve()),
+        "candidate_worker_receipt_sha256": _sha(candidate_worker_path.resolve()),
+        "candidate_supervisor_receipt_path": str(candidate_supervisor_path.resolve()),
+        "candidate_supervisor_receipt_sha256": _sha(candidate_supervisor_path.resolve()),
+        "step_counter_path": str(Path(candidate_supervisor["step_counter_path"]).resolve()),
+        "step_counter_sha256": _sha(Path(candidate_supervisor["step_counter_path"]).resolve()),
         "solver_initialized": False,
         "solver_constructed": False,
         "physics_steps": 0,
         "public_model_counts": static_receipt["public_model_counts"],
+        "controller_identity_sha256": candidate_worker["candidate_controller_identity_sha256"],
+        "controller_method": candidate_worker["candidate_controller_method"],
         "provider_head": provider_head,
         "core_head": core_head,
         "status": "PASS_STATIC_SOURCE_BOUND_CANDIDATE_ADMISSION",
@@ -291,9 +351,12 @@ def build_plan() -> tuple[dict, dict]:
     original_source = dict(old_s1["source"])
     prior_candidate_supervisor = original_source.pop("core_candidate_supervisor_receipt", None)
     original_source.update({
-        "core_candidate_plan": _row(candidate_plan_path),
-        "core_candidate_plan_sidecar": _row(candidate_sidecar_path),
-        "core_candidate_receipt": _row(candidate_receipt_path),
+        "core_candidate_plan": _row(candidate_plan_path.resolve(strict=True)),
+        "core_candidate_plan_sidecar": _row(candidate_sidecar_path.resolve(strict=True)),
+        "core_candidate_receipt": _row(candidate_receipt_path.resolve(strict=True)),
+        "core_candidate_worker_receipt": _row(candidate_worker_path.resolve(strict=True)),
+        "core_candidate_supervisor_receipt": _row(candidate_supervisor_path.resolve(strict=True)),
+        "core_candidate_step_counter": _row(Path(candidate_supervisor["step_counter_path"]).resolve(strict=True)),
         "candidate_static_admission_receipt": _row(candidate_admission_path),
     })
     if prior_candidate_supervisor is not None:
@@ -308,9 +371,25 @@ def build_plan() -> tuple[dict, dict]:
         {"path": str(CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_plan.py"), "sha256": _sha(CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_plan.py")},
         {"path": str(CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_probe.py"), "sha256": _sha(CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_probe.py")},
         {"path": str(CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_cold_reader.py"), "sha256": _sha(CORE / "task_env/diagnostics/tasks/f05_dg02_core_n2_cold_reader.py")},
+        {"path": str(CORE / "task_env/controllers/canonical/kinematics.py"), "sha256": _sha(CORE / "task_env/controllers/canonical/kinematics.py")},
+        {"path": str(CORE / "task_env/tasks/nut_assembly/config.yaml"), "sha256": _sha(CORE / "task_env/tasks/nut_assembly/config.yaml")},
+        {"path": str(CORE / "task_env/diagnostics/tasks/f05_dg02_core_candidate_supervised_plan.py"), "sha256": _sha(CORE / "task_env/diagnostics/tasks/f05_dg02_core_candidate_supervised_plan.py")},
+        {"path": str(CORE / "task_env/diagnostics/tasks/f05_dg02_core_candidate_supervised_worker.py"), "sha256": _sha(CORE / "task_env/diagnostics/tasks/f05_dg02_core_candidate_supervised_worker.py")},
+    )
+    source_xml_path = Path(old_s1["source"]["mjcf_source"]["path"]).resolve(strict=True)
+    if _sha(source_xml_path) != old_s1["source"]["mjcf_source"]["sha256"]:
+        raise ValueError("formal N2 source MJCF changed before oracle construction")
+    from task_env.controllers.canonical.kinematics import PandaKinematics, PANDA_HAND_ORIGIN_TCP_V1
+    from task_env.tasks.position_candidate.builder import _f05_dg02_usd_source_bindings
+    source_bodies, _source_joints = _f05_dg02_usd_source_bindings()
+    model = PandaKinematics(
+        source_xml_path.read_text(encoding="utf-8"),
+        tcp_profile=PANDA_HAND_ORIGIN_TCP_V1,
     )
     schedule_oracle = _build_formal_oracle(
-        candidate, physical, control, static_receipt["action_config"],
+        model, source_bodies, physical, control, static_receipt["action_config"],
+        candidate_worker["candidate_controller_method"],
+        candidate_worker["candidate_controller_identity_sha256"],
     )
     budget_limits = budget["resource_envelope"]
     lock_path = Path(budget_limits["shared_native_lock_path"]).resolve()
@@ -321,7 +400,7 @@ def build_plan() -> tuple[dict, dict]:
     ))
     if mem_available < int(budget_limits["start_native_mem_available_bytes_min"]):
         raise RuntimeError("formal N2 frozen native start MemAvailable gate is not satisfied")
-    if run_dir.exists() or candidate_dir.joinpath("worker_receipt.json").exists():
+    if run_dir.exists():
         raise FileExistsError("formal N2 output appeared during plan generation")
 
     limits = {
@@ -412,15 +491,32 @@ def build_plan() -> tuple[dict, dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--plan", type=Path)
-    parser.add_argument("--sidecar", type=Path)
-    parser.add_argument("--static-receipt", type=Path)
+    parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--progress", type=Path, required=True)
+    parser.add_argument("--candidate-plan", type=Path, required=True)
+    parser.add_argument("--candidate-plan-sha256", type=Path, required=True)
+    parser.add_argument("--candidate-receipt", type=Path, required=True)
+    parser.add_argument("--candidate-worker", type=Path, required=True)
+    parser.add_argument("--candidate-supervisor", type=Path, required=True)
+    parser.add_argument("--plan", type=Path, required=True)
+    parser.add_argument("--sidecar", type=Path, required=True)
+    parser.add_argument("--static-receipt", type=Path, required=True)
     args = parser.parse_args()
-    plan, candidate_receipt = build_plan()
-    attempt_tag = plan["run_id"].rsplit("_", 1)[-1]
-    plan_path = args.plan or (OUT / f"n2_formal_{attempt_tag}.plan.json")
-    sidecar_path = args.sidecar or Path(str(plan_path) + ".sha256")
-    static_receipt_path = args.static_receipt or (OUT / f"candidate_plan_build_{attempt_tag}_receipt.json")
+    output_root = args.output_root.resolve()
+    plan_path = args.plan.resolve()
+    sidecar_path = args.sidecar.resolve()
+    static_receipt_path = args.static_receipt.resolve()
+    if any(output_root not in path.parents for path in (plan_path, sidecar_path, static_receipt_path)):
+        raise ValueError("all formal plan outputs must be contained under the explicit output root")
+    plan, candidate_receipt = build_plan(
+        output_root=args.output_root,
+        progress_path=args.progress,
+        candidate_plan_path=args.candidate_plan,
+        candidate_sidecar_path=args.candidate_plan_sha256,
+        candidate_receipt_path=args.candidate_receipt,
+        candidate_worker_path=args.candidate_worker,
+        candidate_supervisor_path=args.candidate_supervisor,
+    )
     existing = [path for path in (plan_path, sidecar_path, static_receipt_path) if path.exists()]
     if existing:
         raise FileExistsError(f"refusing to replace frozen N2 plan outputs: {existing}")
