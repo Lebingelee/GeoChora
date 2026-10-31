@@ -180,6 +180,37 @@ def test_accumulated_pose_target_tracks_repeated_targets_and_holds_when_settled(
     np.testing.assert_allclose(stateful._arm_target, np.full(7, 0.125), atol=1e-12)
 
 
+def test_canonical_controller_clips_arm_targets_to_bound_native_limit_intersection():
+    import numpy as np
+
+    from task_env.artifacts import PoseWorld
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.controller import CanonicalPandaController
+
+    class _Kinematics:
+        source_sha256 = "a" * 64
+        limits = np.tile(np.asarray((-2.0, 4.0)), (7, 1))
+        base_transform = np.eye(4)
+
+    class _State:
+        joint_position = {f"panda-v1/joint{index}": 0.0 for index in range(1, 8)}
+        pose_world = {"panda-v1/ee": PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))}
+
+    native_limits = _Kinematics.limits.copy()
+    native_limits[5, 1] = 3.752499969733032
+    controller = CanonicalPandaController(
+        _Kinematics(), artifact_hash="b" * 64,
+        arm_target_limits=native_limits,
+        arm_target_limit_source="kinematics_and_geophys_receipt_intersection_v1",
+    )
+    request = RequestedAction(
+        "absolute_joint", None, "none",
+        (0.0, 0.0, 0.0, 0.0, 0.0, 3.7525, 0.0, 0.0),
+    )
+    _canonical, desired, _servo = controller._compute_arm(_State(), request)
+    assert desired[5] == native_limits[5, 1]
+
+
 def test_dg02_cold_reader_accepts_plan_bound_controller_gains_without_hardcoding():
     from task_env.diagnostics.tasks.f05_dg02_core_n2_cold_reader import (
         _controller_method_supported,
@@ -190,6 +221,7 @@ def test_dg02_cold_reader_accepts_plan_bound_controller_gains_without_hardcoding
         "reference_source": "reset_typed_arm_joint_position",
         "projector": "svd_right_nullspace_v1",
         "pose_target_method": "accumulated_dls_target_until_settled_v1",
+        "arm_target_limit_source": "kinematics_and_geophys_receipt_intersection_v1",
     }
     assert _controller_method_supported(method)
     assert _controller_method_supported({**method, "nullspace_reference_gain": 0.2})

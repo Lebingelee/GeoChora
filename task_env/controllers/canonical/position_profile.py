@@ -109,6 +109,7 @@ class PandaPositionServoProfileV1:
         hand_frame_id='hand', native_prefix='', actuator_prefix='', tcp_profile=None,
         target_bindings=None, open_actuator=_DEFAULT_OPEN_ACTUATOR, native_drive_receipt=None,
         nullspace_reference_gain=0.0, pose_target_method='achieved_state_dls_v1',
+        arm_target_limits=None, arm_target_limit_source='kinematics_model_v1',
     ):
         self.artifact = artifact
         self.source = source
@@ -163,9 +164,12 @@ class PandaPositionServoProfileV1:
             model, artifact_hash=artifact.identity_hash, config=config,
             nullspace_reference_gain=nullspace_reference_gain,
             pose_target_method=pose_target_method,
+            arm_target_limits=arm_target_limits,
+            arm_target_limit_source=arm_target_limit_source,
         )
         self.nullspace_reference_gain = self._algorithm.nullspace_reference_gain
         self.pose_target_method = self._algorithm.pose_target_method
+        self.arm_target_limit_source = self._algorithm.arm_target_limit_source
         self.requirements = position_state_requirements(
             self.writer_id, entity_id=self.entity_id,
             joint_ids=self._source_joint_ids, hand_frame_id=self.hand_frame_id,
@@ -364,12 +368,41 @@ class PandaPositionServoProfileV1:
             f'panda-main/joint{index}': target_by_joint[f'panda-main/joint{index}']
             for index in range(1, 8)
         }
+        arm_target_limits = None
+        arm_target_limit_source = 'kinematics_model_v1'
+        if type(native_drive_receipt) is GeoPhysUsdSourceActuationReceiptV2:
+            # The calibrated MJCF reference and float32-derived public GeoPhys
+            # receipt can differ by an ULP. Bind the intersection so a canonical
+            # target can never be rejected by the actual native drive writer.
+            drive_by_joint = {
+                row.canonical_joint.joint_id: row
+                for row in native_drive_receipt.drives
+            }
+            if set(drive_by_joint) != {
+                    *(f'joint{index}' for index in range(1, 8)),
+                    'finger_joint1', 'finger_joint2',
+            }:
+                raise ValueError('DG02 source-actuation receipt has an incomplete canonical joint limit map')
+            limits = []
+            for index in range(1, 8):
+                row = drive_by_joint[f'joint{index}']
+                if row.native_dof_name != arm_targets[f'panda-main/joint{index}']:
+                    raise ValueError('DG02 native arm target mapping differs from its bound drive receipt')
+                lower = max(float(model.limits[index - 1, 0]), float(row.lower_limit))
+                upper = min(float(model.limits[index - 1, 1]), float(row.upper_limit))
+                if lower >= upper:
+                    raise ValueError(f'DG02 model and native drive limits do not intersect for joint{index}')
+                limits.append((lower, upper))
+            arm_target_limits = tuple(limits)
+            arm_target_limit_source = 'kinematics_and_geophys_receipt_intersection_v1'
         return cls(
             artifact=artifact, source=source, scene=scene, model=model, config=config,
             target_bindings=arm_targets, open_actuator=None,
             native_drive_receipt=native_drive_receipt,
             nullspace_reference_gain=nullspace_reference_gain,
             pose_target_method=pose_target_method,
+            arm_target_limits=arm_target_limits,
+            arm_target_limit_source=arm_target_limit_source,
         )
 
     @classmethod

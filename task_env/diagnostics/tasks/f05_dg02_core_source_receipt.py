@@ -247,6 +247,7 @@ def build_candidate_receipt(plan: dict, *, include_candidate: bool = False):
             "reference_source": "reset_typed_arm_joint_position",
             "projector": "svd_right_nullspace_v1",
             "pose_target_method": candidate.env.controller.pose_target_method,
+            "arm_target_limit_source": candidate.env.controller.arm_target_limit_source,
         },
         "action_config": {
             "joint_position_correction_gain": candidate_input.action_config.joint_position_correction_gain,

@@ -153,7 +153,12 @@ def _controller_method_supported(method) -> bool:
     required = {
         "nullspace_reference_gain", "reference_source", "projector",
     }
-    if set(method) not in (required, required | {"pose_target_method"}):
+    supported_shapes = (
+        required,
+        required | {"pose_target_method"},
+        required | {"pose_target_method", "arm_target_limit_source"},
+    )
+    if set(method) not in supported_shapes:
         return False
     gain = method.get("nullspace_reference_gain")
     if (isinstance(gain, bool) or not isinstance(gain, (int, float))
@@ -164,10 +169,20 @@ def _controller_method_supported(method) -> bool:
         return False
     # The missing field is the frozen legacy v1 method. New methods bind their
     # stateful target behavior explicitly through the plan and static receipt.
-    return method.get("pose_target_method", "achieved_state_dls_v1") in {
+    pose_target_method = method.get("pose_target_method", "achieved_state_dls_v1")
+    if pose_target_method not in {
         "achieved_state_dls_v1",
         "accumulated_dls_target_until_settled_v1",
-    }
+    }:
+        return False
+    limit_source = method.get("arm_target_limit_source", "kinematics_model_v1")
+    if limit_source not in {
+        "kinematics_model_v1",
+        "kinematics_and_geophys_receipt_intersection_v1",
+    }:
+        return False
+    return (pose_target_method != "accumulated_dls_target_until_settled_v1"
+            or limit_source == "kinematics_and_geophys_receipt_intersection_v1")
 
 
 def _validate_bundle(bundle: dict) -> list[dict]:

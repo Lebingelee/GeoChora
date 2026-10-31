@@ -171,6 +171,7 @@ def _build_formal_oracle(candidate, physical: dict, control: dict, action_config
             "reference_source": "reset_typed_arm_joint_position",
             "projector": "svd_right_nullspace_v1",
             "pose_target_method": candidate.env.controller.pose_target_method,
+            "arm_target_limit_source": candidate.env.controller.arm_target_limit_source,
         },
         "required_public_model_counts": {
             "n_actuators": 8, "n_dof": 15, "n_equalities": 1,

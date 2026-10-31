@@ -10,7 +10,8 @@ from .kinematics import ARM,FINGERS
 
 class CanonicalPandaController:
     def __init__(self,model,*,artifact_hash,config=None,nullspace_reference_gain=0.0,
-                 pose_target_method='achieved_state_dls_v1'):
+                 pose_target_method='achieved_state_dls_v1',arm_target_limits=None,
+                 arm_target_limit_source='kinematics_model_v1'):
         if (isinstance(nullspace_reference_gain, bool)
                 or not np.isfinite(nullspace_reference_gain)
                 or nullspace_reference_gain < 0.0
@@ -21,15 +22,33 @@ class CanonicalPandaController:
                 'accumulated_dls_target_until_settled_v1',
         }:
             raise ValueError('unsupported Panda pose target method')
+        if not isinstance(arm_target_limit_source, str) or arm_target_limit_source not in {
+                'kinematics_model_v1',
+                'kinematics_and_geophys_receipt_intersection_v1',
+        }:
+            raise ValueError('unsupported Panda arm target limit source')
         self.model=model;self.artifact_hash=artifact_hash;self.config=config or ActionConfig()
         self.nullspace_reference_gain=float(nullspace_reference_gain)
         self.pose_target_method=pose_target_method
+        self.arm_target_limit_source=arm_target_limit_source
+        self.arm_target_limits=np.asarray(
+            model.limits if arm_target_limits is None else arm_target_limits,
+            dtype=np.float64,
+        )
+        if (self.arm_target_limits.shape!=(7,2)
+                or not np.isfinite(self.arm_target_limits).all()
+                or np.any(self.arm_target_limits[:,0]>=self.arm_target_limits[:,1])
+                or np.any(self.arm_target_limits[:,0]<np.asarray(model.limits)[:,0]-1e-12)
+                or np.any(self.arm_target_limits[:,1]>np.asarray(model.limits)[:,1]+1e-12)):
+            raise ValueError('Panda arm target limits must be a valid subset of its kinematic limits')
+        if ((arm_target_limits is None) != (arm_target_limit_source=='kinematics_model_v1')):
+            raise ValueError('Panda arm target limit source must match its bound limits')
         self._nullspace_reference=None
         self._arm_target=None
         self._last_pose_target=None
         self._last_pose_error_norm=None
         self._pose_target_settled=False
-        self.identity=digest({'schema':'panda-shared-dls-v1','config':asdict(self.config),'source_sha256':model.source_sha256,
+        identity_payload={'schema':'panda-shared-dls-v1','config':asdict(self.config),'source_sha256':model.source_sha256,
             'target_basis':('achieved_joint_state_one_DLS_increment'
                             if pose_target_method == 'achieved_state_dls_v1'
                             else 'accumulated_dls_target_until_settled_v1'),
@@ -38,7 +57,13 @@ class CanonicalPandaController:
                 'source':'reset_typed_joint_position' if self.nullspace_reference_gain else 'disabled',
                 'projector':'svd_right_nullspace_v1' if self.nullspace_reference_gain else 'none',
             },
-            'gripper':'legacy_physical_force_limited_servo_v0'})
+            'gripper':'legacy_physical_force_limited_servo_v0'}
+        if arm_target_limits is not None:
+            identity_payload['arm_target_limits']={
+                'source':arm_target_limit_source,
+                'lower_upper':self.arm_target_limits.tolist(),
+            }
+        self.identity=digest(identity_payload)
 
     def reset_pose_target_memory(self, joint_position):
         """Seed opt-in pose target memory from a complete reset/switch boundary."""
@@ -81,7 +106,7 @@ class CanonicalPandaController:
         if (self.pose_target_method == 'accumulated_dls_target_until_settled_v1'
                 and not accumulated_pose_target):
             self.reset_pose_target_memory(q)
-        if requested.mode=='absolute_joint':desired=np.clip(values[:7],self.model.limits[:,0],self.model.limits[:,1]);values[:7]=desired
+        if requested.mode=='absolute_joint':desired=np.clip(values[:7],self.arm_target_limits[:,0],self.arm_target_limits[:,1]);values[:7]=desired
         else:
             if requested.rotation_representation=='quaternion_wxyz':
                 norm=np.linalg.norm(values[3:7])
@@ -162,11 +187,11 @@ class CanonicalPandaController:
             if accumulated_pose_target:
                 self._arm_target=np.clip(
                     self._arm_target+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),
-                    self.model.limits[:,0],self.model.limits[:,1],
+                    self.arm_target_limits[:,0],self.arm_target_limits[:,1],
                 )
                 desired=self._arm_target.copy()
             else:
-                desired=np.clip(q+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
+                desired=np.clip(q+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.arm_target_limits[:,0],self.arm_target_limits[:,1])
         _resolved, servo = absolute_joint_position_servo(
             desired, q, self.model.limits, cfg.joint_position_correction_gain,
         )
