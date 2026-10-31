@@ -65,6 +65,42 @@ def _canonical(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
+def _pose_world_mapping_matches(actual: Any, expected: Any) -> bool:
+    """Compare serialized world poses using the Runtime reset pose tolerance.
+
+    MuJoCo may normalize a compiled body quaternion by a few floating-point
+    ulps during ``mj_forward``. Position/orientation equality is therefore
+    numerical at 1e-12, matching the public Runtime reset contract; quaternion
+    sign-equivalent representations are accepted.
+    """
+    if not isinstance(actual, Mapping) or not isinstance(expected, Mapping):
+        return False
+    if set(actual) != set(expected):
+        return False
+    for name in actual:
+        actual_pose = actual[name]
+        expected_pose = expected[name]
+        if not isinstance(actual_pose, Mapping) or not isinstance(expected_pose, Mapping):
+            return False
+        try:
+            actual_position = np.asarray(actual_pose.get("position"), dtype=np.float64)
+            expected_position = np.asarray(expected_pose.get("position"), dtype=np.float64)
+            actual_quaternion = np.asarray(actual_pose.get("quaternion_wxyz"), dtype=np.float64)
+            expected_quaternion = np.asarray(expected_pose.get("quaternion_wxyz"), dtype=np.float64)
+        except (TypeError, ValueError):
+            return False
+        if (actual_position.shape != (3,) or expected_position.shape != (3,)
+                or actual_quaternion.shape != (4,) or expected_quaternion.shape != (4,)
+                or not np.isfinite(actual_position).all() or not np.isfinite(expected_position).all()
+                or not np.isfinite(actual_quaternion).all() or not np.isfinite(expected_quaternion).all()
+                or not np.allclose(actual_position, expected_position, rtol=0.0, atol=1e-12)
+                or not (np.allclose(actual_quaternion, expected_quaternion, rtol=0.0, atol=1e-12)
+                        or np.allclose(actual_quaternion, -expected_quaternion,
+                                       rtol=0.0, atol=1e-12))):
+            return False
+    return True
+
+
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n", encoding="utf-8")
@@ -1833,7 +1869,9 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 or readback.get("joint_velocity") != sample.get("joint_velocity")
                 or readback.get("poses_world") != sample.get("poses_world")
                 or readback.get("free_joint_velocity") != sample.get("free_joint_velocity")
-                or readback.get("fixture_pose_world") != sample.get("fixture_pose_world")
+                or not _pose_world_mapping_matches(
+                    readback.get("fixture_pose_world"), sample.get("fixture_pose_world"),
+                )
                 or realization.get("init_row_index") != expected_row
                 or realization.get("init_row_sha256") != sample.get("init_row_sha256")
                 or progress.get("episode_id") != episode.get("episode_id")

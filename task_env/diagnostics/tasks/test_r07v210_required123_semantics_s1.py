@@ -264,6 +264,40 @@ def test_task_one_solution_v7_targets_demonstrated_first_bilateral_contact_and_p
     )
 
 
+def test_independent_reader_reset_pose_match_uses_runtime_numeric_tolerance():
+    from bench_deploy.libero.core_candidate_worker import _pose_world_mapping_matches
+
+    expected = {
+        "fixture": {
+            "position": [0.032160686061349086, -0.26769535926827864, 0.905],
+            "quaternion_wxyz": [0.21813924162729167, 0.0, 0.0, 0.9759176559844944],
+        },
+    }
+    mujoco_forward = {
+        "fixture": {
+            "position": [0.032160686061349086, -0.26769535926827864, 0.905],
+            "quaternion_wxyz": [0.2181392416272917, 0.0, 0.0, 0.9759176559844945],
+        },
+    }
+    assert _pose_world_mapping_matches(mujoco_forward, expected)
+    sign_equivalent = {
+        "fixture": {
+            "position": expected["fixture"]["position"],
+            "quaternion_wxyz": [-value for value in expected["fixture"]["quaternion_wxyz"]],
+        },
+    }
+    assert _pose_world_mapping_matches(sign_equivalent, expected)
+    outside_tolerance = {
+        "fixture": {
+            "position": [expected["fixture"]["position"][0] + 1.1e-12,
+                         *expected["fixture"]["position"][1:]],
+            "quaternion_wxyz": expected["fixture"]["quaternion_wxyz"],
+        },
+    }
+    assert not _pose_world_mapping_matches(outside_tolerance, expected)
+    assert not _pose_world_mapping_matches({}, expected)
+
+
 def test_task_one_solution_v6_controller_bounds_velocity_feedforward():
     from bench_deploy.libero.controller import LiberoMixedControllerV5
 
