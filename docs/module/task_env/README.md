@@ -103,4 +103,4 @@ USD delivery loader 是独立的 advanced source intake：它绑定精确交付 
 MJCF-only `RuntimeSource`，也不自动授予任一 Provider 的 runtime admission。
 
 
-**F05 successor DG01/DG02 状态（2026-10-31）：** 精确DG01单元已由Sol接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`。DG02已实施单一GeoPhys/USD public-provider route并完成源绑定、语义探针、Core S1和正式N2运行；正式N2的source/contact/storage/负例冷读通过，但Core point/后续阶段tracking门失败。两次500步定向Core probe仍未通过point-hold；当前DG02为`PARTIAL`，累计probe预算17,940/18,000步，正式3,000步复验需维护者冻结追加预算。旧F05三轮/PARTIAL保持不变，DG03/F06/F07未启动，详见[当前编排与证据](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window001-geophys-usd-in-progress)。
+**F05 successor DG01/DG02 状态（2026-10-31）：** 精确DG01单元已由Sol接收为`ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`。DG02 window003在当前Core/provider身份上完成受监督的静态候选构建、真实Core N2两集/3,000步和独立H5冷读；source-FK、contact、tracking、storage及23类负例门通过，候选为`F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`，尚待Sol复核。此前R3跨provider严格对照经逐值dtype/量化核验后仍为`PARTIAL`：float32解释了部分值，不足以解释状态/目标差异。此候选不表示R3跨路线等价、通用USD admission、抓取成功或Qualification。旧F05三轮/PARTIAL及r009历史保持不变；DG03/F06/F07未启动，详见[DG02当前结果与窗口记录](goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window003-current-identity-candidate)。

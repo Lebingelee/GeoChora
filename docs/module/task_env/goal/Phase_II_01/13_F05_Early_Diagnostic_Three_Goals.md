@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01精确单元已接收；DG02 window002经Sol复核仍为PARTIAL，当前身份完整N2未完成。window003收口包准备待人工转述，继续同一Goal；DG03等待DG02接收。**
+> **状态：DG01精确单元已接收；DG02 window003当前身份Core N2候选通过，待Sol复核；PickCube R3跨provider逐值对照仍为PARTIAL。DG03等待DG02接收。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -157,3 +157,22 @@ window002 formal已用3,060/6,000步，余额2,940不足完整3,000，释放并�
 完整复核及离线审计在`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_002/`。成功只交`F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`，DG02是否接收由Sol复核全部原门；本次不推进DG03/F06/F07或Qualification，不push/merge。
 
 本轮Sol静态收口：TaskEnv Skill checker、规划15份文档hash及diff检查通过。全局docs validator退出1：258条（257条non-documentation scope＋1条count limit），相较上次247条增加11条既有实现路径scope诊断；无新增具体文档内容/链接错误。全局仍为失败，原输出保留于Sol复核目录。
+
+
+<a id="f05-dg02-window003-current-identity-candidate"></a>
+
+## 13. DG02 window003当前身份正式Core N2与收口（2026-10-31；候选待Sol复核）
+
+窗口003使用冻结包`DG02_WINDOW003_CURRENT_IDENTITY_FORMAL_AND_CLOSEOUT`，输入Core `develop-full@491f89a28e98badd3147fec968854e70717571a7`、隔离GeoPhys分支`codex/phase-ii-01-f05-geophys@a9e4c4850bd225f5929e74831ac282b18ff517ce`。冻结prompt、snapshot、manifest SHA分别为`53651b07b024b9adbb080359e319a025d89ce761b644f011db6bce8213655e8c`、`1be83ca3b7356dcccd07817670fd1034bfabef025079093b495a5c699c23b22c`、`b7f7f86d3932751d1a5d8fa22760c6489c1bc1e43cfb4afed7db7da114d2bf23`。当前Core实现HEAD为`589fb956cd691460d93a77db8ff7475e9431940c`；window003新增Reader修复已由`589fb956`提交。唯一无关未跟踪文件`docs/maintenance/20261030_runtime_route_diagnostic_handoff.md`受保护且未纳入提交。
+
+此前已授权的窄MuJoCo enum→`int`规范化及回归位于祖先提交`bc1bc170`，本窗口未再改production MuJoCo代码。当前窗口Reader修复确保H5实际cube pose quaternion为有限且单位范数，非单位变异由既有`obs_cube_pose`负例拒绝；相关reader测试与MuJoCo enum回归共11项通过。窗口003代码改动仅限TaskEnv诊断reader和窄回归。
+
+当前Core身份的静态候选用受监督零步public model build通过，模型包含16 qpos、15 dof、8 actuators、1 tendon、1 equality和25 geoms。正式N2使用计划SHA `5f0d098c40ba99fc0c025717975e2f3b8514523baf19f5a85f72840b3b83412d`，run `DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_001`：同一`SelectedReferenceEnv`两集、每集300 intervals×5×2 ms，合计3,000/3,000 physics advances；602 observations、600 transitions，两份H5均关闭持久化。受监督worker exit 0、峰值process-group RSS 1,682,337,792 bytes，进程组在共享native锁释放前退出。独立冷读计划SHA `4286dbffbec159f058ebd030be8bc4f0e75a84656d96ebb137cab15d34ee0bc6`，reader与supervisor exit 0，baseline error 0，source-FK最大位置/方向残差`1.864644006e-7 m` / `4.887944301e-7 rad`；所有tracking phase、rest contact与实际cube pose校验通过。structured negative suite为23/23（DG01继承22类＋DG02新增1类）。冷读顶层历史status文字仍写“22 negatives”，这里保留原件并按嵌套结构化的23 required/23 passed计数；未篡改冻结receipt。
+
+源几何审计记录11个Panda body frames、23个绑定USD PhysicsMaterial的collision shapes、10个匹配box及71个匹配mesh geometry；13个collision mesh的匹配坐标最大差约`1.49e-8 m`。USD authored材料值均为static/dynamic friction 1.0、restitution 0.0，宿主descriptor和有效contact/friction law仍有表示差异，不声明跨solver接触/摩擦等价。逐值R3 normalization审计也没有解除原strict f64 comparison：arm position 1,064/4,214、velocity 2,482/4,214、target position 4,048/4,200仍超适用逐值容差；float32只解释部分差异，R3跨provider结果继续为PARTIAL。阈值、源、Task或required feature均未放宽。
+
+本窗口native仅有1次零步GeoPhys public model build与1次3,000步formal GeoPhys N2；没有新增MuJoCo启动。窗口003 GeoPhys共3,000 attempted/completed正式步，累计GeoPhys为28,745 attempted / 28,720 completed；累计正式步22,385 / 22,365，保守nonformal probe仍9,360，MuJoCo历史3,000步保持不变。窗口新增native wall约570.607秒；Goal累计GeoPhys native wall保守7,973.055秒，all-native wall含window001未知项1,800秒reserve为7,997.509秒。所有值仍在冻结Goal/window限额内。未启动DG03、F06/F07，未授Qualification，也未改变旧F05三轮/PARTIAL、旧r009或历史输出。
+
+R3逐值审计与source/material审计、formal计划/worker/H5/cold reader、supervisor和全量账本保存在忽略目录`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal02/window_003/`。当前Core N2候选标签为`F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`；该标签只覆盖冻结的Menagerie source、Task/Action、Core route与隔离GeoPhys CPU profile。Core checkout / provider 写入窗口和native窗口须在本包提交、保护/资源/进程/锁审计后释放；Sol复核完成前不据此推进DG03。
+
+G8文档与静态收口：Module Skill checker通过；4份受影响文档的本地链接/锚点检查通过；`git diff --check`通过。系统quick-validate脚本不可用。staged consolidation docs validator退出1，258项错误＝257条non-documentation scope路径＋1条count limit；没有报告本次编辑文档的链接或内容错误。不得将全局validator写为PASS。完整checker/validator结果与输出hash清单留在忽略window003目录。

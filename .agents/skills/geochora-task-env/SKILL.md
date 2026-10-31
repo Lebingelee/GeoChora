@@ -217,7 +217,7 @@ contract; do not downgrade it through historical v1 compatibility. The new F05
 helper/reader is tracked, while the permitted inherited F04 fixture still needs
 its frozen ignored inputs and support. Do not claim cold-checkout self-containment.
 
-## F05 DG02 GeoPhys/USD route (PARTIAL; control cell not accepted)
+## F05 DG02 GeoPhys/USD route (window001 historical PARTIAL)
 
 DG02 is a separate, source-bound diagnostic Goal reusing the same Core candidate,
 Position Controller, `UsdCoreRuntimeSession`, `F05GeoPhysUsdNativeIO`,
@@ -240,8 +240,9 @@ isolated GeoPhys CPU provider. The formal worker completed 3,000 advances and
 closed both H5 files. The independent reader verified source FK, contact,
 storage/identity and all 23 negative classes, but failed the unchanged
 position-target/jitter/velocity gates in both episodes across point, return,
-gripper-close/open and final-hold phases. This is a real control-cell failure;
-worker exit 0 and H5 durability do not make it a pass.
+gripper-close/open and final-hold phases. This was a real control-cell failure
+for window001; it is retained as historical evidence and does not describe the
+later current-identity window003 result.
 
 Keep this as an internal, source-specific diagnostic route. The source remains
 `local-validated` with `source_verified=false`; do not infer generic GeoPhys/USD
@@ -252,10 +253,10 @@ gave 0.10227 rad error / 5.48838 rad/s velocity / 0.05219 rad jitter;
 nullspace gain 0.0 improved error and speed to 0.06816 rad / 4.30769 rad/s,
 but worsened jitter to 0.10461 rad. Both passed home hold and preserved the
 frozen ActionConfig, source, schedule and thresholds. Cumulative probe budget
-is 17,940/18,000 attempted steps; a 3,000-step formal rerun requires a new
-frozen budget. For a request to continue, repair the measured Core point
-tracking and obtain that budget before any formal rerun. See the [current DG02 result](../../../docs/module/task_env/public-api.md#f05-dg02-window001-geophys-usd-in-progress)
-and [three-Goal record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window001-geophys-usd-in-progress).
+is 17,940/18,000 attempted steps within the historical window001 ledger. The
+current-identity formal rerun and its separate budget are recorded below. See
+the [current DG02 result](../../../docs/module/task_env/public-api.md#f05-dg02-window003-current-identity-candidate)
+and [three-Goal record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window003-current-identity-candidate).
 
 **TaskEnv Skill refresh receipt — DG02 window001 (2026-10-31; PARTIAL):** trigger
 was the completed source-bound Core N2 attempt and its independent reader failure.
@@ -290,6 +291,33 @@ returned `FAIL_BOUNDED_TRACKING_PROBE`; it is a bounded diagnostic, not a
 formal N2 pass. The current implementation and evidence remain at Core
 `78ea8cdb06d17792f2c774fbcca52bfd373cbff0`; do not advertise a passing
 controller or Qualification.
+
+## F05 DG02 window003 current-identity result (Core candidate pending Sol review)
+
+Core `589fb956cd691460d93a77db8ff7475e9431940c` passed the supervised
+zero-step public model build and the unchanged formal N2 route for the pinned
+Menagerie USD / isolated GeoPhys CPU intersection. Run
+`DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_001` completed two episodes
+in one `SelectedReferenceEnv`, each 300 intervals × five 2 ms substeps
+(3,000 advances total). The cold reader passed source FK, contact/rest,
+tracking, stored cube pose, H5 identity/storage and all 23 structured negative
+classes. The legacy top-level reader status says “22 negatives”; the nested
+suite records 23 required / 23 passed and the frozen receipt is unchanged.
+This supports only `F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`.
+
+The separate PickCube R3 cross-provider comparison remains
+`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`. Frozen per-value f64/f32
+normalization explains some values but leaves state/target differences above
+the existing tolerances. Keep the original strict comparison, source and
+thresholds unchanged. Source geometry matches within the recorded coordinate
+tolerance, while host descriptors and material/contact laws are not proven
+equivalent across solvers. This exact-source diagnostic is not general USD
+admission, Task success, Expert completion, cross-route equivalence or
+Qualification. Do not start DG03/F06/F07 before Sol review. See the [current
+execution record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window003-current-identity-candidate)
+and [public API status](../../../docs/module/task_env/public-api.md#f05-dg02-window003-current-identity-candidate).
+
+**TaskEnv Skill refresh receipt — DG02 window003 (2026-10-31; Core candidate pending Sol):** trigger was the stored cube-pose quaternion reader gap and completion of the current-identity formal Core route. Rechecked the existing `scene.import_scene_source` → SceneSemanticIR → GeoPhys model consumers and the Core source-bound receipt/admission, candidate, Position control, `UsdCoreRuntimeSession`, `SelectedReferenceEnv`, native-I/O, Task and H5 Recorder/reader callers; also reviewed public TaskEnv selection docs, DG02 plans, frozen oracles, current formal/cold-reader receipts, R3 dtype audits and focused regressions. The provider route remains one public GeoPhys USD import/lowering route; Core candidate/admission/runtime is its consumer path. Reuse is `FIX_EXISTING` for the actual stored cube-pose/unit-quaternion reader check and `EXTEND_EXISTING` for the exact-source Core candidate composition; no new provider route, Runtime, Controller, factory, Recorder or reader was introduced. Targeted MuJoCo enum and reader regressions passed 11/11; the actual N2 cold read passed 602 observations, 600 transitions, 3,000 advances and structured 23/23 negatives. Cold-start routing confirmed that `make_env()` remains the public task constructor, USD delivery intake alone does not admit a runtime, and the DG02 source-bound candidate is an internal, plan-bound diagnostic route. The Module Skill checker and edited-document local-link checks passed; `git diff --check` passed. The repository quick-validate helper is not installed. The staged consolidation docs validator exited 1 with 258 errors (257 non-documentation-scope paths and one count-limit error); it reported no specific edited-document link/content error. Full validator result and evidence are retained in the ignored window003 output. No Qualification or general API claim follows. Sol review remains required; no other-thread message was sent.
 
 ## Static Position leaf contracts (R02a)
 
