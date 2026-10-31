@@ -287,13 +287,13 @@ _OPENING_BY_STAGE_V4 = {
 }
 _OPENING_BY_STAGE_V5 = {
     **_OPENING_BY_STAGE_V4,
-    # The native row-0 contact trace confirmed the rim at an aggregate opening
-    # near 0.056 m. Retain a small outward preload after contact; asking for
-    # 0.08 m leaves a 20+ mm gripper tracking error and freezes the Cartesian
-    # lift waypoints behind the public convergence gate.
-    "lift": 0.06,
-    "carry": 0.06,
-    "place": 0.06,
+    # Native rows 0/1/2 confirm bilateral rim contact near 0.0555 m, but
+    # opening to 0.060 m loses both contacts within 5-7 lift boundaries.
+    # Hold just below the measured contact aperture to keep a slight closing
+    # preload while the shared Cartesian planner advances the lift path.
+    "lift": 0.055,
+    "carry": 0.055,
+    "place": 0.055,
 }
 _STAGE_TIMEOUTS_V4 = {
     "approach": 180, "descend": 120, "grasp": 60,

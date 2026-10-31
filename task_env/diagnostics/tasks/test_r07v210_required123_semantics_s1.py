@@ -151,7 +151,7 @@ def test_task_one_solution_v5_holds_measured_contact_aperture_after_grasp():
     for stage in ("lift", "carry", "place"):
         legacy.stage = current.stage = stage
         assert legacy._opening_for_stage() == pytest.approx(0.08)
-        assert current._opening_for_stage() == pytest.approx(0.06)
+        assert current._opening_for_stage() == pytest.approx(0.055)
     current.stage = "grasp"
     assert current._opening_for_stage() == pytest.approx(0.08)
     assert solution_identity_v5(
