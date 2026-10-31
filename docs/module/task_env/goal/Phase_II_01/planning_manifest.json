@@ -1865,7 +1865,7 @@
     "README.md": "446e275d74cbad788e17613ef87356ff45a963d344b7d5da382a3c03998caf76",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "6ad8307650d41b229940491e22933fb8cc6bf03ffb8ba3030b035adb3448ae29",
     "12_F05_F07_Execution_Playbook.md": "f73cfe82c683e64cf5793ed73a0b35c4f466d4a599dcb5f242b871f6ba2b9e90",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "73e0f003cd09107aad13adfe4992b42610f0db6088ffe0432979576e631d5243"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "dcff3b6a2d2c51db924c0ff515c956c243c280c1d7e56b652269a5a0cfd11af9"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -5091,7 +5091,7 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Maintainer relay of diagnostic04 continuation package; execute only against its frozen snapshot HEAD after writer/resource/protected-input readback.",
+      "selected_next": "Manual relay of diagnostic04 window002: repair source formula and physical consumer detector, use already-authorized N1 headroom, protect formal N2 reserve; execution uses fresh package snapshot HEAD.",
       "after_that_priority": [
         "Implement source equality compliance, fixed-tendon and drive/contact consumers in the existing DG03/Core owners.",
         "Complete unchanged formal Isaac N2 and cold reader, then three-route bounded F05 review.",
@@ -5106,7 +5106,7 @@
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
       "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
-      "F05": "Original F05_OVERALL_PARTIAL preserved. DG01/DG02 accepted bounded; DG03 partial and continues as diagnostic04, same semantic goals and cumulative budget.",
+      "F05": "PARTIAL. DG01/DG02 bounded acceptances retained; DG03 live/formal still incomplete. DG04 window001 reviewed with source-law/detector and budget-arithmetic findings; next window uses original limits.",
       "F06": "NOT_STARTED; diagnostic04 prepares an entry checklist only.",
       "DG01_goal01": "ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE; frozen source/task/controller/provider scope only."
     },
@@ -6734,7 +6734,7 @@
     "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030",
     "f05_early_diagnostic_three_goals_20261030": {
       "authority": "maintainerexplicitlydesignated earlydiagnosticimplementation and3longgoalprompts, manualrelay, adaptnextafterreport",
-      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_PARTIAL_DIAGNOSTIC04_CONTINUATION_PREPARED",
+      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_PARTIAL_DIAGNOSTIC04_WINDOW002_REWORK_PREPARED",
       "preparation_input_head": "e7382adc0f31ca5fbff74c61a5163247d080759e",
       "ordinary_successor_history": {
         "completed": 2,
@@ -6779,7 +6779,7 @@
       "new_branch_worktrees": 0,
       "preparation_tests": 0,
       "preparation_native": 0,
-      "diagnostic04_alias": "f05_diagnostic04_package_preparation_20261101; original three Goals unchanged"
+      "diagnostic04_alias": "f05_diagnostic04_window002_package_preparation_20261101; original three Goals unchanged"
     },
     "latest_f05_successor_diagnostic_plan": "f05_dg02_pickcube_r3_window002_preparation_20261031",
     "dg01_goal01_window_001": {
@@ -7010,10 +7010,10 @@
       "verified_continuation_manifest_sha256": "2d779febb8f7ccb78fa1036d40272814be924079a8eb51b2b271d37e3bee09cf",
       "doc_validation_log_sha256": "2dd5ab972278f3a4f153643c614a334258c3a75901f73c7e0b5bb204005a4179"
     },
-    "latest_f05_diagnostic_package_preparation": "f05_diagnostic04_package_preparation_20261101",
+    "latest_f05_diagnostic_package_preparation": "f05_diagnostic04_window002_package_preparation_20261101",
     "f05_diagnostic04_package_preparation_20261101": {
       "date": "2026-11-01",
-      "status": "PREPARED_FOR_MAINTAINER_MANUAL_RELAY_NOT_EXECUTED",
+      "status": "EXECUTED_PARTIAL_REVIEWED_REWORK_REQUIRED",
       "package_id": "F05_DIAGNOSTIC04_WINDOW001_DG03_REPAIR_AND_F05_CLOSURE",
       "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_001/",
       "planning_entry": "13_F05_Early_Diagnostic_Three_Goals.md#f05-diagnostic04-dg03-repair-and-closure",
@@ -7044,7 +7044,75 @@
       "preparation_native_starts": 0,
       "preparation_software_tests": 0,
       "candidate_pass": "F05_DIAGNOSTIC04_CLOSURE_PASS_PENDING_SOL_REVIEW",
-      "overall_acceptance_requires": "Sol independent three-route review; legacy F05 partial retained"
+      "overall_acceptance_requires": "Sol independent three-route review; legacy F05 partial retained",
+      "execution_output_head": "ebeeea572880f783541e9b88b9ecf22c35f577c4"
+    },
+    "f05_diagnostic04_window001_sol_review_20261101": {
+      "decision": "F05_DIAGNOSTIC04_PARTIAL_REVIEWED_REWORK_REQUIRED",
+      "reviewed_head": "ebeeea572880f783541e9b88b9ecf22c35f577c4",
+      "review_directory": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_diagnostic04_001",
+      "finding_summary": [
+        "budget-exhaustion claim contradicted by frozen total/sub-budget arithmetic",
+        "claimed homogeneous equality mapping misses second d(r) stiffness factor",
+        "paired detector does not assert distinct actual physics response"
+      ],
+      "protection_verified": {
+        "prior_inputs": 8324,
+        "runtime": 12,
+        "provider_source": 2854,
+        "mismatches": 0
+      },
+      "Sol_test_or_native_runs": 0,
+      "original_budget_increase": false,
+      "N1_available_steps_without_borrowing_N2": 6400,
+      "N1_available_wall_s_approximately": 565.775918465,
+      "formal_N2_reserve": {
+        "steps": 6400,
+        "wall_s": 2400
+      },
+      "next_package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_002"
+    },
+    "f05_diagnostic04_window002_package_preparation_20261101": {
+      "date": "2026-11-01",
+      "status": "PREPARED_FOR_MAINTAINER_MANUAL_RELAY_NOT_EXECUTED",
+      "package_id": "F05_DIAGNOSTIC04_WINDOW002_REPAIR_SOURCE_ORACLE_AND_LIVE_CONSUMER",
+      "package": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_f05_diagnostic04_002",
+      "planning_anchor": "13_F05_Early_Diagnostic_Three_Goals.md#f05-diagnostic04-window001-sol-review-and-window002",
+      "reviewed_base_before_planning_commit": "ebeeea572880f783541e9b88b9ecf22c35f577c4",
+      "execution_head": "Post-review/docs commit in package input_snapshot.json",
+      "branch": "develop-full",
+      "provider": "a9e4c4850bd225f5929e74831ac282b18ff517ce read-only",
+      "new_branches_worktrees": 0,
+      "new_window_caps": {
+        "all_native_steps": 13800,
+        "all_native_wall_s": 3500,
+        "isaac_steps": 7800,
+        "isaac_wall_s": 2900,
+        "nonformal_isaac_steps": 1400,
+        "nonformal_isaac_wall_s": 500,
+        "formal_attempted_steps": 6400,
+        "formal_wall_s": 2400,
+        "affected_cpu_steps": 6000,
+        "affected_cpu_wall_s": 600
+      },
+      "original_cumulative_caps": {
+        "all_native_steps": 24000,
+        "all_native_wall_s": 5400,
+        "isaac_steps": 18000,
+        "isaac_wall_s": 4500,
+        "nonformal_isaac_steps": 9000,
+        "affected_cpu_steps": 6000,
+        "affected_cpu_wall_s": 900
+      },
+      "formal_reserve": {
+        "isaac_steps": 6400,
+        "isaac_wall_s": 2400,
+        "reason": "Two complete 3000-formal-step N2 runs plus up to 200 bootstrap steps per run, at most 1200s each. If measured/planned bootstrap exceeds that bound, increase the internal reserve before probes. Overall frozen caps do not increase."
+      },
+      "active_hours_max": 8,
+      "scope": "Source formula/oracle, defect-sensitive physical response detector, source-bound S1/live N1, then unchanged formal N2/reader and matrix; F06 entry only",
+      "preparation_native_starts": 0,
+      "preparation_software_tests": 0
     }
   }
 }

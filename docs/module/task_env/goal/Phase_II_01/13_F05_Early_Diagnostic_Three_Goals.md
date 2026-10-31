@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；DG03 window001经Sol复核为partial。维护者要求的“诊断04”承接其剩余实现、正式N2与新F05联合收口，完整包准备后由维护者转述；本次准备不启动执行。**
+> **状态：DG01/DG02精确Core cell有界接收、R3对照PARTIAL保持。诊断04 window001经Sol复核仍PARTIAL：预算耗尽判断不成立，源柔顺公式与实际consumer判别需返工。window002准备供维护者转述，继续原Goal和原预算；正式N2尚未启动。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -227,6 +227,8 @@ DG01/DG02此前有界接收保持不变，R3对照仍`PARTIAL_REALIZED_STATE_OR_
 
 ### 16.1 执行续行与预算停点（2026-11-01；PARTIAL_PENDING_SOL_REVIEW）
 
+以下保留执行者当时的停点与判断；其中“非正式预算耗尽/需新增额度”的判断已由16.2的独立复核更正，不能作为当前执行裁定。
+
 DG04在冻结输入`develop-full@9af66009cd0634aec583f96db51ef88e13a824bc`上继续实现了既有Isaac Native-I/O/Core owners：USD v3 angular DriveAPI单位换算；源`solimp`残差曲线到公开mimic属性的候选映射及读回；source fixed-tendon `J^T` effort的公开写入/读回见证；Arm drive/schema/力限/关节类型和手指重复drive检查；F05 cube/support的公开质量、COM、惯性、碰撞和source-scoped滤波见证；以及公开raw contact actor-path到精确support collider的映射。S1增加float32场景值、保留Panda原有`physics:filteredPairs`、拒绝F05 task-scene过滤、compliance及contact收据缺陷的synthetic检查。`materialize()`仍fail closed。
 
 这些实现没有通过DG04所需的完整source-consumer native门。Core S1 attempt013为10/10 PASS_SYNTHETIC_CORE_S1_ONLY（两段synthetic H5、12 tendon/4 equality/3 contact变异拒绝、native starts/physics steps为0、`runtime_admitted=false`）。最后一次N1 attempt007使用单Isaac App；worker返回于Core native adapter construction之后，却在读取bootstrap收据时错误索引不存在的`physics_steps_after`字段，未到达fixed-tendon/equality paired rollout或contact probe，且没有稳定worker receipt。supervisor progress停留在早期App阶段，无法提供可靠精确计数；因此ledger按冻结run最大值保守计32 attempted steps，而不采用supervisor原始0。process group已退出、shared lock已释放。worker字段映射、supervisor stale-stage exactness判断和关闭顺序已离线修复，但这些修复尚未经过新的native run验证。
@@ -236,3 +238,15 @@ DG04 formal Isaac N2仍`NOT_STARTED_BLOCKED_BY_REQUIRED_N1`. 当前非正式Isaa
 当前三路线状态见ignored [three_route_matrix.md](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_001/three_route_matrix.md)：DG01 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE`及DG02 `ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`仅限各自精确source/Task/Action/Core/build交集；DG03是`F05_DIAGNOSTIC04_PARTIAL_PENDING_SOL_REVIEW`，不授三路线整体接收或Qualification。DG02 PickCube R3跨provider差异保留`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`及原逐值计数，冻结oracle的`not_trajectory_equivalence=true`不变。
 
 F06只准备了ignored [f06_entry_readiness.md](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_001/f06_entry_readiness.md)。它把PickCube/MuJoCo 3.8.1 CPU作为首选scope候选，明确了现有Harness mock/proxy、固定CPU profile和source-bound Core构造缺口，建议新版本的桌面reachable reset/predicate；F05空中cube不复用为抓取初态。DG04未运行F06 Expert、20 seeds、Oracle、四报告、Judge或Qualification。完整run/budget/hash/保护文件状态见窗口`goal_progress.json`、`run_ledger.json`、`RESUME.md`与`source_consumer_decision.md`；未向其他线程发送消息。
+
+<a id="f05-diagnostic04-window001-sol-review-and-window002"></a>
+
+### 16.2 Sol复核与window002纠错续包（2026-11-01）
+
+决定`F05_DIAGNOSTIC04_PARTIAL_REVIEWED_REWORK_REQUIRED`，复核实现/文档HEAD `ebeeea572880f783541e9b88b9ecf22c35f577c4`。保存的22/22是synthetic S1/worker合同证据；Sol未重跑pytest或native。原保护输入8,324/8,324、runtime12/12、隔离provider源2,854/2,854复算均匹配。DG03正式N2和source live门仍未通过，DG01/DG02有界接收和R3未决项保持。
+
+三项返工：其一，Isaac总余额15,400步/约2,965.8秒与非正式子余额6,400步同时适用，保护正式6,400步/2,400秒后仍有N1的6,400步/约565.8秒；不能从非正式子余额再扣正式预留，故无需追加总预算。旧最坏扣账和失败原件保留。其二，当前柔顺齐次映射漏掉源reference里的第二层`d(r)`，应先按固定MuJoCo3.8.1源码和独立oracle核实并修复；这仍不证明完整PhysX等义。其三，paired探针只比较属性读回而没有物理响应的正反判别，不能拒绝“USD属性变化但solver忽略”的坏consumer。具体推导、数值点、代码位置和账本见ignored `sol_review_f05_diagnostic04_001/sol_review.md`及`offline_audit.json`。
+
+新包`sol_f05_diagnostic04_002/`，ID `F05_DIAGNOSTIC04_WINDOW002_REPAIR_SOURCE_ORACLE_AND_LIVE_CONSUMER`。执行HEAD由Sol本次planning/Skill提交后的snapshot冻结，不复用旧输入。先离线修公式/oracle、独立版本USD、实际consumer detector与预算计算，再用原额度内N1最多1,400步/500秒验证；正式预留6,400 attempted步/2,400秒保持。live门成立后才运行完整3,000步正式N2、独立冷读及三路线矩阵。新窗口Isaac总计≤7,800步/2,900秒、必要CPU回归≤6,000步/600秒，全部新增native≤13,800步/3,500秒，且旧累计上限同时生效；不是增加总额度。主动最多8小时，旧window001至少2小时带入原12小时时间盒；压缩、换名和新turn不清账。
+
+F06只准备入口；不执行F06/F07或授Qualification。保持同阶段分支、原只读provider和单writer，维护者人工转述后Luna才继续；本次Sol只进行离线复核和冻结准备，没有发送其他线程消息。
