@@ -192,3 +192,15 @@ DG03 S1 provider-free Core回归通过：同一source-bound candidate录制两�
 DG03此前保存的N0 worker通过公开GPU PhysX model compile（18 bootstrap steps）；随后N1 attempt006在exact locally validated USD上启动一次Isaac Sim 6.2、worker exit 0、78 physics steps、进程组退出及shared lock释放。N1以代码显式author的`PhysxMimicJointAPI`验证了finger coupling，并通过公开`Articulation.set_dof_efforts`人工计算`J^T` source-like effort，观测到有限运动及+100 N clamp。它**没有**证明转换USD中的source `MjcEquality`/`MjcTendon`被PhysX消费者读取，也没有证明Core生产materialization、安全驱动映射或材料/接触等价；这些feature仍属于G4阻断项。EULA启动授权记在窗口ledger；此处无追加/重放native。
 
 因此DG03正式N2/Core native cell尚未启动；这次状态是`DG03_PARTIAL_SYNTHETIC_S1_AND_N1_DIAGNOSTIC_PENDING_SOURCE_CONSUMER_PROOF`，不是三路线F05通过。source-specific补丁/代码、收据与当前回归由Sol独立复核；在feature gate闭合、正式runplan与独立reader冻结之前，不启动DG03 formal N2、F06/F07或Qualification。`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal03/window_001/`保留N0/N1计划、worker/supervisor原收据和失败attempt；不覆盖旧结果。
+
+<a id="f05-successor-attempt002-continuation-2026-11-01-partial-pending-sol"></a>
+
+## 15. F05 successor attempt002 continuation (2026-11-01; PARTIAL pending Sol)
+
+本节记录维护者在 attempt002 执行后继续推进同一 goal 的有界续行；原 attempt002 的 `report.md`、freeze、失败原件和时间点不回写。续行基于 `develop-full@681a3361f33d52799a61ac5d43edbf6caabfe33e`，完整事实与 raw receipt 索引见 ignored 输出 `workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/continuation_closeout_20261101.md`。Prompt 和 snapshot 仍分别绑定 `3343335567569fc88201a95975131cf8e94369fcb806ede690fb4b79e1e5b90e` 与 `a45d44fd5937c0db12a42d93dab8a43f83794f0feb0f803aae0b28c470188270`。
+
+DG01 原 MJCF/MuJoCo CPU 和 DG02 USD/GeoPhys CPU 各自已有精确有界 Sol 接收；这些结果保留各自 source/Task/Action/profile 范围，不单独构成 successor 三路线整体通过。DG02 的 PickCube R3 跨路线状态/目标结果仍为 `PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`。attempt002 当前 HEAD 上另完成 DG03 source-bound synthetic Core S1：两段 synthetic H5 各 8 transitions/9 observations，native/physics/renderer starts 均为0；直接 HDF5 独立冷读通过，`source_verified=false`、`runtime_admitted=false`。
+
+DG03 另有两个有界 N1 Isaac 6.2 GPU PhysX 诊断探针：source-bound mimic positive 78步，非对称手指差从约0.016m降至约1.85e-6m；完整移除三种 equality/mimic schema 与八项关系属性的 counterfactual 48步，差异由约0.016m增至约0.040m。两者 reader 均为 `PASS_DIAGNOSTIC_ONLY`，只说明该诊断舞台上的关系消费对照有缺陷敏感性，不证明 production importer/Core 对 source `solimp` 或固定 tendon 的消费，也不证明drive/contact/材料等价。维护者明确接受并授权本包所需的 `OMNI_KIT_ACCEPT_EULA=YES`；该授权不放宽 feature 门。
+
+DG03 的正式 Core N2 cell 未启动，状态 `BLOCKED_BY_FEATURE`：源 equality authored compliance（`solimp=0.95 0.99 0.001`）没有已证明的 PhysX/Core 等义消费者；source fixed-tendon actuator law 与 public consumer 的完整接线及 source-to-PhysX drive/contact 映射也未闭合。不得以显式 authoring 的 mimic 探针或 synthetic S1 填补这些缺口。当前 attempt002 的三cell候选仍为 `F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`；旧 F05 `F05_OVERALL_PARTIAL`、r009 和历史 Evidence不变，F06/F07及Qualification未启动/授予。此前 attempt002 原收口所述“native starts=0”针对当时三个正式cell；续行之后确实启动了单独账本中的 DG03 N1 诊断，不应把诊断运行混称为正式cell。

@@ -1858,14 +1858,14 @@
     "04_R04_Dynamic_Camera_Consumer.md": "eeeed39b5ce70eec07de4fa62e6019ee9969386eaf9eb7d0411b45e056fe5d29",
     "05_R05_Native_Rate_Feedback.md": "76fdc82550b56f9c44d64094aff67ad9d926f9f2558e55a29613b622a6ed07ad",
     "06_R06_Compatibility_and_Regression.md": "35b1d8729b8b779f120b37199a87eac69d7fb5ca6c1050a8bbc5e91ae6ff58d8",
-    "07_Execution_Order_and_Acceptance.md": "8060743d170f87d32a482b13ad36ca956a59d4cfe3c7797971434f5646f477fa",
-    "08_Codex_Phase_II_01_Planning_Prompt.md": "a9aa3bfd66f8b5fe2200d8d7d8fc91fedeb0144d7abc8cc398d041e75fce7916",
+    "07_Execution_Order_and_Acceptance.md": "a33c1037d0ca0a38fc2a13e1d50ff4c23bf953c63325f2e31040255bac85cff6",
+    "08_Codex_Phase_II_01_Planning_Prompt.md": "2735f29bbd567ad39579084541aaf6105053ab25ed472a269acb294a651bc0f6",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "8bdccecc6f138291597f103f7c1539b5602a91ce12ae3dc019f78d61792daad1",
-    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
-    "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "b9cc913edda757961fedeb4d8e2e9d008d8eb8ab80b84262285d4121d1aa21ff"
+    "README.md": "8360894a3d4b05d03e87343b37cf4dc8ca3a363b2f14b2ccd1b09dbc55970cda",
+    "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "f064b76fdbc583f8a0b981f556bd57c37ad1e6b318f659d6e6d12dcc247609c1",
+    "12_F05_F07_Execution_Playbook.md": "c82d23c08de007b72b4be014df693ee1c6aaf7a59d70ca97ca4861874354b205",
+    "13_F05_Early_Diagnostic_Three_Goals.md": "949cfc8d7d08e13ebdd453d5ea7624660aa28950d45855763b5a74c15105d466"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -6565,7 +6565,7 @@
       "child_process_group_gone": true,
       "task_env_skill_sha256": "6dc2e22af14e9c6e9084a35fb7ecc7caf6c33a9a6a88003baea201c3acccf1b7"
     },
-    "latest_f05_successor_execution": "f05_successor_attempt002_execution_20261030",
+    "latest_f05_successor_execution": "f05_successor_attempt002_continuation_20261101",
     "f05_successor_attempt001_sol_review_20261030": {
       "date": "2026-10-30",
       "status": "F05_SUCCESSOR_ATTEMPT001_REVIEWED_PARTIAL_REWORK_REQUIRED",
@@ -6694,6 +6694,39 @@
       "task_env_skill_sha256": "acb3ee15421bc6dcd214193c487dddf7ced65bc83227d0f87241bf86e1472c5d",
       "isaac62_static_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/isaac62_static_schema_review.json",
       "doc_validation": "exit 1; 216 errors exactly match frozen historical baseline (0 changed, 0 unexpected categories)"
+    },
+    "f05_successor_attempt002_continuation_20261101": {
+      "date": "2026-11-01",
+      "status": "F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW",
+      "package_id": "F05_SUCCESSOR_ATTEMPT002_SEMANTIC_REPAIR_AND_CORE_CELLS",
+      "attempt": 2,
+      "continuation_input_head": "681a3361f33d52799a61ac5d43edbf6caabfe33e",
+      "prompt_sha256": "3343335567569fc88201a95975131cf8e94369fcb806ede690fb4b79e1e5b90e",
+      "snapshot_sha256": "a45d44fd5937c0db12a42d93dab8a43f83794f0feb0f803aae0b28c470188270",
+      "output": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/continuation_closeout_20261101.md",
+      "DG01": "ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE; retain exact frozen source/task/profile scope",
+      "DG02": "ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE; retain exact frozen source/task/profile scope; PickCube R3 remains PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH",
+      "DG03_current_core_s1": "PASS_SYNTHETIC_CORE_S1_ONLY; two 8-transition episodes; native_starts=0; physics_steps=0",
+      "DG03_s1_cold_reader": "PASS_SYNTHETIC_H5_COLD_READ; direct HDF5 reader, two files",
+      "DG03_n1_source_mimic_positive": "PASS_DIAGNOSTIC_ONLY; 78 steps; final relation error 1.847743988e-6 m",
+      "DG03_n1_complete_relation_ablation": "PASS_DIAGNOSTIC_ONLY; 48 steps; final asymmetric difference 0.04000951577302203 m",
+      "DG03_formal_isaac_n2": "NOT_STARTED_BLOCKED_BY_FEATURE: source solimp, fixed-tendon consumer and source-to-PhysX drive/contact semantics not established",
+      "user_eula_authorization": "OMNI_KIT_ACCEPT_EULA=YES accepted for this package; does not waive semantic admission",
+      "legacy_F05": "F05_OVERALL_PARTIAL unchanged",
+      "F06_F07_started": false,
+      "Qualification": false,
+      "Sol_review": "PENDING",
+      "continuation_document_hashes": {
+        "07_Execution_Order_and_Acceptance.md": "a33c1037d0ca0a38fc2a13e1d50ff4c23bf953c63325f2e31040255bac85cff6",
+        "08_Codex_Phase_II_01_Planning_Prompt.md": "2735f29bbd567ad39579084541aaf6105053ab25ed472a269acb294a651bc0f6",
+        "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "f064b76fdbc583f8a0b981f556bd57c37ad1e6b318f659d6e6d12dcc247609c1",
+        "12_F05_F07_Execution_Playbook.md": "c82d23c08de007b72b4be014df693ee1c6aaf7a59d70ca97ca4861874354b205",
+        "13_F05_Early_Diagnostic_Three_Goals.md": "949cfc8d7d08e13ebdd453d5ea7624660aa28950d45855763b5a74c15105d466",
+        "README.md": "8360894a3d4b05d03e87343b37cf4dc8ca3a363b2f14b2ccd1b09dbc55970cda",
+        "TaskEnv_README.md": "96989d0fc9625e01a7801cf5f9f36f7cbb72feb3d3bbd22478ae3391bcef819a",
+        "TaskEnv_public-api.md": "edf317746f5ceb7394512545fce7b87a6acadcf4f534aadc19dbefae101bef5d",
+        "TaskEnv_SKILL.md": "2d21ce67dfae41fd79f544d472b51f8616c4e9be4558c9c5ecbcc3ae4a900f67"
+      }
     },
     "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030",
     "f05_early_diagnostic_three_goals_20261030": {

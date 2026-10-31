@@ -203,6 +203,22 @@ G3提供了已有GeoPhys USD Core Position synthetic route的实际Core/S1证据
 
 结果标签为`F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。旧F05状态仍`F05_OVERALL_PARTIAL`，attempt001 evidence与r009/历史输出字节保留；successor窗口计数2/3；F06/F07和Qualification均未启动。完整命令、原始证据和最终readback见`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/report.md`。
 
+<a id="successor-attempt002-continuation-20261101"></a>
+
+## successor attempt002 continuation (2026-11-01; PARTIAL pending Sol)
+
+这段记录 attempt002 在维护者继续执行授权后的增量结果；上面的2026-10-30报告和哈希快照保持原样。最新状态及run-level receipts见 ignored [continuation closeout](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/continuation_closeout_20261101.md)。本地共享分支为`develop-full`，续行实施输入HEAD `681a3361f33d52799a61ac5d43edbf6caabfe33e`；prompt/snapshot仍按该attempt冻结值绑定。
+
+DG01 `ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE` 与DG02 `ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE` 是各自source/Task/Action/Core/provider profile的有界接收，可作为其交集证据，不合并成三路线整体通过。DG02 PickCube R3仍`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`。
+
+provider边界未改变：GeoPhys只有一条既有public USD import/lowering route；DG02的Core candidate/admission/runtime是它的消费者链。DG01 MuJoCo与DG03 Isaac也复用各自现有adapter和同一Core lifecycle，不新增第二套Provider API或独立Core。
+
+当前HEAD上的DG03 synthetic Core S1 run `F05_DG03_CORE_S1_009`由supervisor验收为`PASS_SYNTHETIC_CORE_S1_ONLY`，两个episode各8 transitions/9 observations；独立直接HDF5冷读为`PASS_SYNTHETIC_H5_COLD_READ`。二者皆`native_starts=0, physics_steps=0`，synthetic source仍`source_verified=false/runtime_admitted=false`。两个随后记录在DG03独立账本中的Isaac N1诊断probe分别完成78与48步：source-bound mimic positive的手指关系残差约`1.85e-6 m`；移除所有三类关系schema与八项关系属性后的asymmetric negative残差约`0.0400 m`。两份独立reader均仅判`PASS_DIAGNOSTIC_ONLY`。这些diagnostic启动不是正式Core cell。
+
+DG03正式Isaac N2仍`BLOCKED_BY_FEATURE`。静态输入中原equality `solimp=0.95 0.99 0.001`尚无精确PhysX/Core consumer映射；固定tendon源标量law和consumer、drive/contact消费也未全部证明。`materialize()`保持fail closed。维护者已明确接受并授权本包需要的`OMNI_KIT_ACCEPT_EULA=YES`，但此接受不改变source/consumer gate。本续行不授F05整体接收或Qualification；旧`F05_OVERALL_PARTIAL`、r009和历史attempt均保留，F06/F07不启动。此前报告中三个cell native starts为0是2026-10-30时点的正式cell计数；DG03 N1诊断之后在另一run ledger中执行，应分开记账。
+
+最终状态 `F05_SUCCESSOR_PARTIAL_PENDING_SOL_REVIEW`。文档/Skill提交、保护hash、process/lock核验和窗口释放由同目录continuation closeout与final readback绑定。
+
 ## 14. DG01 提前诊断 Goal01 结果（2026-10-30；候选通过，待Sol复核）
 
 维护者随后单独授权DG01共同基线与原Menagerie MJCF→Task scene→现有Core→MuJoCo CPU路线。该诊断Goal不是普通successor attempt004，也不改写上方successor001/002的历史结论。DG01 N0/N1及实际Core N2 cell通过冻结的模型、语义、物理、Recorder/H5、独立reader、负例和资源门，候选标签为`F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW`。它只覆盖固定Menagerie revision/build/profile和本任务scene，不证明r009 USD等价、GeoPhys/USD ready、三路线闭合或Qualification。
