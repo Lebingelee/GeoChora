@@ -63,9 +63,10 @@ F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02
 # The DG02 Core route tracks source-FK pose targets whose Panda solution is
 # redundant. Restore the reset posture fully in the Jacobian right-nullspace on
 # each position update; other versioned Position routes retain the frozen
-# DLS-only behavior by default.
+# DLS-only behavior by default. Recompute each bounded increment from achieved
+# state so delayed physical response cannot wind up an accumulated joint target.
 F05_DG02_NULLSPACE_REFERENCE_GAIN = 1.0
-F05_DG02_POSE_TARGET_METHOD = 'accumulated_dls_target_until_settled_v1'
+F05_DG02_POSE_TARGET_METHOD = 'achieved_state_dls_v1'
 
 
 def _f05_dg02_usd_source_bindings():

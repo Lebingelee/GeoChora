@@ -235,3 +235,53 @@ def test_dg02_cold_reader_accepts_plan_bound_controller_gains_without_hardcoding
     assert not _controller_method_supported({**method, "nullspace_reference_gain": True})
     assert not _controller_method_supported({**method, "nullspace_reference_gain": float("inf")})
     assert not _controller_method_supported({**method, "pose_target_method": "unbound_method"})
+
+
+def test_dg02_selected_pose_controller_does_not_integrate_unachieved_targets():
+    import numpy as np
+
+    from task_env.artifacts import PoseWorld
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.controller import CanonicalPandaController
+    from task_env.environment.config import ActionConfig
+    from task_env.tasks.position_candidate.builder import (
+        F05_DG02_NULLSPACE_REFERENCE_GAIN,
+        F05_DG02_POSE_TARGET_METHOD,
+    )
+
+    class _Kinematics:
+        source_sha256 = "a" * 64
+        limits = np.tile(np.asarray((-2.0, 2.0)), (7, 1))
+        base_transform = np.eye(4)
+
+        @staticmethod
+        def fk_jacobian(_q):
+            transform = np.eye(4)
+            jacobian = np.zeros((6, 7), dtype=np.float64)
+            jacobian[:, :6] = np.eye(6)
+            return transform, jacobian
+
+    class _State:
+        joint_position = {f"panda-v1/joint{index}": 0.0 for index in range(1, 8)}
+        pose_world = {"panda-v1/ee": PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))}
+
+    controller = CanonicalPandaController(
+        _Kinematics(), artifact_hash="b" * 64,
+        config=ActionConfig(joint_position_correction_gain=1.0),
+        nullspace_reference_gain=F05_DG02_NULLSPACE_REFERENCE_GAIN,
+        pose_target_method=F05_DG02_POSE_TARGET_METHOD,
+    )
+    controller.set_nullspace_reference(np.zeros(7))
+    request = RequestedAction(
+        "absolute_pose", "world", "quaternion_wxyz",
+        (0.01, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+    )
+
+    _canonical, first_desired, first_servo = controller._compute_arm(_State(), request)
+    # Keep achieved q and pose unchanged to model delayed physical response.
+    _canonical, second_desired, second_servo = controller._compute_arm(_State(), request)
+
+    assert F05_DG02_POSE_TARGET_METHOD == "achieved_state_dls_v1"
+    assert F05_DG02_NULLSPACE_REFERENCE_GAIN == 1.0
+    np.testing.assert_allclose(second_desired, first_desired, atol=1e-12)
+    np.testing.assert_allclose(second_servo, first_servo, atol=1e-12)
