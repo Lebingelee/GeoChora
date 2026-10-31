@@ -69,6 +69,25 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
     core_branch, provider_branch = _branch(CORE), _branch(PROVIDER)
     if core_branch != "develop-full" or provider_branch != "codex/phase-ii-01-f05-geophys":
         raise RuntimeError("tracking-probe checkout branches differ from the frozen owner map")
+    core_status = subprocess.run(
+        ["git", "-C", str(CORE), "status", "--porcelain=v1", "--untracked-files=all"],
+        check=True, capture_output=True, text=True,
+    ).stdout.splitlines()
+    protected_doc_status = "?? docs/maintenance/20261030_runtime_route_diagnostic_handoff.md"
+    if sorted(core_status) != [protected_doc_status]:
+        raise RuntimeError(f"unexpected Core dirty paths at tracking-probe freeze: {core_status}")
+    provider_status = subprocess.run(
+        ["git", "-C", str(PROVIDER), "status", "--porcelain=v1", "--untracked-files=all"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    if provider_status:
+        raise RuntimeError("provider checkout is not clean at tracking-probe freeze")
+    protected_doc = CORE / "docs/maintenance/20261030_runtime_route_diagnostic_handoff.md"
+    expected_doc_sha256 = _json(WINDOW / "final_release_audit.json")["protected_inputs"][
+        "protected_untracked_handoff_doc_sha256"
+    ]
+    if _sha(protected_doc) != expected_doc_sha256:
+        raise RuntimeError("protected untracked maintenance handoff changed before tracking-probe freeze")
     if _json(PROGRESS)["native"]["geophys_steps"] + 500 > 18000:
         raise RuntimeError("500-step probe does not fit the frozen cumulative probe budget")
     if _json(PROGRESS)["native"]["geophys_steps"] + 500 > 66000:
@@ -164,6 +183,12 @@ def build_plan(output_dir: Path) -> tuple[dict, Path, Path]:
         raise RuntimeError("tracking probe schedule is not the exact first two frozen phases")
 
     progress = _json(PROGRESS)
+    if (float(progress["native"]["geophys_wall_s"]) + int(budget["per_probe_worker_wall_s_max"])
+            > int(budget["geophys_native_wall_s_cumulative_max"])):
+        raise RuntimeError("500-step probe cannot fit the frozen cumulative GeoPhys wall budget")
+    if (float(progress["native"]["geophys_wall_s"]) + int(budget["per_probe_worker_wall_s_max"])
+            > int(budget["goal_native_wall_s_cumulative_max"])):
+        raise RuntimeError("500-step probe cannot fit the frozen cumulative native wall budget")
     run_dir = output_dir
     tracked_inputs = _tracked_inputs(
         *base["code"]["tracked_inputs"],
