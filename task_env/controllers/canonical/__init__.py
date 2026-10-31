@@ -1,11 +1,13 @@
 """Advanced provider-free canonical manipulation control."""
 from .contracts import (RequestedAction,CanonicalAction,GripperControlTarget,CanonicalControlTarget,
+                        CanonicalArmResolutionDiagnosticsV1,CanonicalArmResolutionV1,
                         AppliedCanonicalControl,MixedActuatorTargetV1,AppliedMixedActuatorV1,
                         MixedActuatorChannelV1,MixedActuatorPlanV1,MixedActuatorCommandV1,
                         AppliedMixedActuatorCommandV1)
 from .controller import CanonicalPandaController
 from .kinematics import PandaKinematics
 __all__=['RequestedAction','CanonicalAction','GripperControlTarget','CanonicalControlTarget','AppliedCanonicalControl',
+         'CanonicalArmResolutionDiagnosticsV1','CanonicalArmResolutionV1',
          'MixedActuatorTargetV1','AppliedMixedActuatorV1','MixedActuatorChannelV1',
          'MixedActuatorPlanV1','MixedActuatorCommandV1','AppliedMixedActuatorCommandV1',
          'CanonicalPandaController','PandaKinematics']

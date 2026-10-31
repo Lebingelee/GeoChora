@@ -1,5 +1,5 @@
 """Admission precedes every native materialization. No task-ID dispatch."""
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from .provenance import provider_build_identity
@@ -14,6 +14,7 @@ from ...artifacts.execution import EpisodeResetPlanV1, RealizedInitialState, Res
 from ...controllers.canonical.feedback import (
     CanonicalControlFeedback, NativeControlFeedbackSampleV1,
 )
+from ...controllers.canonical.contracts import MixedActuatorCommandV1
 from .source import RuntimeSource
 
 CAPABILITIES = ('rigid_body', 'free_body', 'articulated_robot', 'joint_position_actuation',
@@ -57,6 +58,15 @@ class RuntimeSession(Protocol):
     ) -> NativeControlFeedbackSampleV1: ...
     def step(self) -> CanonicalStateView: ...
     def close(self) -> None: ...
+
+
+class MixedActuatorSubstepSession(Protocol):
+    """Optional profile capability for state-bound commands at every physics step."""
+
+    def step_mixed_actuator_interval(
+        self,
+        command_factory: Callable[[CanonicalStateView, int, int, int], MixedActuatorCommandV1],
+    ) -> tuple[CanonicalStateView, Mapping[str, object]]: ...
 
 
 def provider_manifest(provider: str) -> ProviderCapabilityManifest:

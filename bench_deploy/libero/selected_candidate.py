@@ -7,6 +7,7 @@ control, observation, and recording ownership.
 from __future__ import annotations
 
 from dataclasses import asdict
+from collections.abc import Mapping
 import hashlib
 import json
 from pathlib import Path
@@ -28,7 +29,10 @@ from task_env.runtime.sessions.source import (
 )
 from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReferenceEnv
 
-from .controller import LiberoMixedControllerV1, LiberoMixedControllerV2
+from .controller import (
+    LiberoMixedControllerV1, LiberoMixedControllerV2, LiberoMixedControllerV3,
+    LiberoMixedControllerV4,
+)
 from .evaluation import (
     PILOT_TASK_UID, evaluate_on_bowl_plate_v1, observe_selected_reference_v1,
 )
@@ -40,6 +44,13 @@ from .init_state import (
 
 PROFILE_ID = 'libero-spatial-bowl-to-plate-mixed-v1'
 CONTROLLER_PROFILE_ID = 'libero-spatial-bowl-to-plate-joint-space-pd-v6'
+
+
+def _controller_hold_policy(controller):
+    operational = getattr(controller, 'operational_config', None)
+    if operational is not None:
+        return operational.hold_policy
+    return controller.config.hold_policy
 ARTIFACT_ID = 'libero-spatial-bowl-to-plate-v1/mixed-v1'
 SCENE_ID = 'libero-spatial-bowl-to-plate-composed-mjcf-v1'
 SOURCE_MANIFEST_PATH = Path(__file__).resolve().parents[2] / 'asset/benchmarks/libero/source_manifest.json'
@@ -101,8 +112,8 @@ def _artifact(init_bytes: bytes, *, solution_profile: bool = False) -> TaskArtif
 
     artifact = TaskArtifact(
         'task-artifact-v0',
-        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v3',
-        TASK_ID, 'diagnostic-v1' if not solution_profile else 'bounded-solution-v3',
+        ARTIFACT_ID if not solution_profile else ARTIFACT_ID + '/solution-v4',
+        TASK_ID, 'diagnostic-v1' if not solution_profile else 'diagnostic-solution-v4',
         WorldDefinition(
             'world-v0', 'SI_right_handed_z_up_wxyz', entities,
             ActionIntent(
@@ -153,12 +164,6 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         raise ValueError('tracked LIBERO source manifest differs from the frozen pilot identity')
     source_manifest = json.loads(manifest_bytes)
     artifact = _artifact(init_bytes, solution_profile=solution_profile)
-    controller = LiberoMixedControllerV2() if solution_profile else LiberoMixedControllerV1()
-    expected_controller_profile = (
-        LiberoMixedControllerV2.profile_id if solution_profile else CONTROLLER_PROFILE_ID
-    )
-    if controller.profile_id != expected_controller_profile:
-        raise ValueError('LIBERO task-local controller profile changed')
 
     importer_xml = xml_bytes
     external_assets = source_asset_bytes(install_root, importer_xml.decode('utf-8'))
@@ -191,7 +196,21 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
     if semantic_bodies != expected_bodies:
         source_receipt.close()
         raise ValueError('composition plan semantic body map differs from the fixed pilot allowlist')
+    bound_bodies = dict(semantic_bodies)
     groups = plan['composition_receipt']['contact_geom_name_transform']['groups']
+    contact_geom_groups = {key: tuple(value) for key, value in groups.items()}
+    if solution_profile:
+        # These source-authored child bodies and pad geoms let the task observe
+        # left/right finger contacts separately through the existing public
+        # ContactSummaryV2 route. They remain subcomponent aliases of panda-v1.
+        bound_bodies.update({
+            'panda-v1/finger-left': 'gripper0_leftfinger',
+            'panda-v1/finger-right': 'gripper0_rightfinger',
+        })
+        contact_geom_groups.update({
+            'panda-v1/finger-left': ('gripper0_finger1_pad_collision',),
+            'panda-v1/finger-right': ('gripper0_finger2_pad_collision',),
+        })
     expected_group_names = set(expected_bodies) - {'main_table'}
     if set(groups) != expected_group_names:
         source_receipt.close()
@@ -209,6 +228,32 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'pinned LIBERO On(akita_black_bowl_1,plate_1) task success and caller-owned Solution completion'
         ),
     )
+    arm_resolver = None
+    if solution_profile:
+        from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
+        from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
+        tcp_profile = derive_panda_tcp_profile_v2(
+            xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
+            hand_frame_id='robot0_right_hand', site_name='gripper0_grip_site',
+        )
+        arm_kinematics = PandaKinematics(
+            xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
+            base_body_id='robot0_link0',
+        )
+        arm_resolver = CanonicalPandaController(
+            arm_kinematics, artifact_hash=artifact.identity_hash, config=config.action,
+        )
+    controller = (
+        LiberoMixedControllerV4(
+            arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
+        )
+        if solution_profile else LiberoMixedControllerV1()
+    )
+    expected_controller_profile = (
+        LiberoMixedControllerV4.profile_id if solution_profile else CONTROLLER_PROFILE_ID
+    )
+    if controller.profile_id != expected_controller_profile:
+        raise ValueError('LIBERO task-local controller profile changed')
     joints = {
         **{f'joint{i}': f'robot0_joint{i}' for i in range(1, 8)},
         'finger_joint1': 'gripper0_finger_joint1',
@@ -253,7 +298,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         task_artifact_hash=artifact.identity_hash,
         scene_source=scene_source,
         joints=joints,
-        bodies=semantic_bodies,
+        bodies=bound_bodies,
         frames={'panda-v1/ee': 'gripper0_grip_site'},
         free_joints=free_joints,
         joint_targets={}, open_actuators=(),
@@ -269,29 +314,16 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             'gripper0_gripper_finger_joint2': 'm',
         },
         fixture_bodies=('wooden_cabinet_1', 'flat_stove_1'),
-        contact_geom_groups={key: tuple(value) for key, value in groups.items()},
+        contact_geom_groups=contact_geom_groups,
         mixed_actuator_plan=mixed_plan,
     )
     controller.plan_identity_hash = mixed_plan.identity_hash
     solution_identity = None
-    arm_resolver = None
     if solution_profile:
-        from .solution import solution_identity_v3
-        from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
-        from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
-        tcp_profile = derive_panda_tcp_profile_v2(
-            xml_bytes, tcp_id='libero-mounted-panda-v1/gripper0-grip-site-v1',
-            hand_frame_id='robot0_right_hand', site_name='gripper0_grip_site',
-        )
-        arm_kinematics = PandaKinematics(
-            xml_bytes, tcp_profile=tcp_profile, native_prefix='robot0_',
-            base_body_id='robot0_link0',
-        )
-        arm_resolver = CanonicalPandaController(
-            arm_kinematics, artifact_hash=artifact.identity_hash, config=config.action,
-        )
-        solution_identity = solution_identity_v3(
+        from .solution import solution_identity_v5
+        solution_identity = solution_identity_v5(
             expected_xml_sha, source_receipt.source_closure_digest,
+            arm_resolver_identity=arm_resolver.iterative_resolution_identity_v1(),
         )
     return {
         'artifact': artifact, 'source': source, 'controller': controller,
@@ -352,11 +384,25 @@ def build_libero_selected_candidate(
     value_cache = {}
     reset_receipts = {}
     source_gravity_model_ref = {'model': None}
+    source_gravity_model_resources = []
+    source_resource_close_state = {'attempted': False, 'receipt': None, 'error': None}
     env_holder = {}
 
     def bind_source_gravity_model(model):
         if not _solution_profile:
             raise RuntimeError('source gravity feed-forward is available only on the task Solution profile')
+        # Register ownership before validating/binding. If a caller supplies a
+        # source-mismatched model, the binding error remains primary while the
+        # ordinary Env.close() path can still release the newly created helper.
+        if not callable(getattr(model, 'close', None)):
+            raise TypeError('task Solution source model must expose a close operation')
+        if all(existing is not model for existing in source_gravity_model_resources):
+            source_gravity_model_resources.append(model)
+        existing = source_gravity_model_ref['model']
+        if existing is None:
+            source_gravity_model_ref['model'] = model
+        elif existing is not model:
+            raise RuntimeError('task Solution source gravity model may be bound only once')
         source = value_cache.get('value')
         if not isinstance(source, dict):
             raise RuntimeError('task Solution source identity must be built before binding gravity feed-forward')
@@ -365,12 +411,10 @@ def build_libero_selected_candidate(
                 != source['source_sha256']['composed_candidate_xml']
                 or getattr(model, 'source_closure_digest', None)
                 != source['source_sha256']['source_closure_digest']
-                or not callable(getattr(model, 'gravity_torque', None))):
+                or not callable(getattr(model, 'gravity_torque', None))
+                or (_solution_profile
+                    and not callable(getattr(model, 'operational_space_state_v1', None)))):
             raise ValueError('task Solution gravity model differs from its selected source identity')
-        existing = source_gravity_model_ref['model']
-        if existing is not None and existing is not model:
-            raise RuntimeError('task Solution source gravity model may be bound only once')
-        source_gravity_model_ref['model'] = model
         live_env = env_holder.get('env')
         if live_env is not None and live_env.controller.gravity_bias_model is None:
             live_env.controller.set_source_gravity_model(
@@ -381,6 +425,60 @@ def build_libero_selected_candidate(
         elif (live_env is not None
               and live_env.controller.gravity_bias_model is not model):
             raise RuntimeError('task Solution mixed Controller already owns another gravity model')
+
+    def close_task_resources():
+        """Release candidate-owned source helpers once through the Env lifecycle."""
+        state = source_resource_close_state
+        if state['attempted']:
+            if state['error'] is not None:
+                raise state['error']
+            return dict(state['receipt'])
+        state['attempted'] = True
+        live_env = env_holder.get('env')
+        controller = None if live_env is None else live_env.controller
+        receipts = []
+        first_error = None
+        for model in source_gravity_model_resources:
+            try:
+                if controller is not None and getattr(controller, 'gravity_bias_model', None) is model:
+                    receipt = controller.close_resources()
+                elif getattr(model, 'closed', False):
+                    # A task-local caller may have explicitly closed the
+                    # helper already; do not invoke its single-use close twice.
+                    receipt = {
+                        'schema_version': 'libero-source-gravity-model-close-v1',
+                        'profile_id': getattr(model, 'profile_id', None),
+                        'model_identity_sha256': getattr(model, 'model_identity_sha256', None),
+                        'source_xml_sha256': getattr(model, 'source_xml_sha256', None),
+                        'source_closure_digest': getattr(model, 'source_closure_digest', None),
+                        'model_created': True, 'closed': True,
+                        'model_released': True, 'data_released': True,
+                        'close_receipt_recovered': False,
+                    }
+                else:
+                    receipt = model.close()
+                receipts.append(receipt)
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(
+                        f'another task source helper close failed: {type(error).__name__}: {error}'
+                    )
+        source_gravity_model_ref['model'] = None
+        if first_error is not None:
+            state['error'] = first_error
+            raise first_error
+        if len(receipts) == 1:
+            state['receipt'] = receipts[0]
+        else:
+            state['receipt'] = {
+                'schema_version': 'selected-task-resources-close-v1',
+                'closed': True,
+                'resource_count': len(receipts),
+                'resources': receipts,
+            }
+        return dict(state['receipt'])
 
     def build_value(provider, backend):
         if (provider, backend) != ('mujoco', 'cpu'):
@@ -400,11 +498,16 @@ def build_libero_selected_candidate(
                 value_cache.clear()
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache['value'])
-        value['controller'] = LiberoMixedControllerV2() if _solution_profile else LiberoMixedControllerV1()
+        value['controller'] = (
+            LiberoMixedControllerV4(
+                arm_resolver_identity=value['arm_resolver'].iterative_resolution_identity_v1(),
+            ) if _solution_profile else LiberoMixedControllerV1()
+        )
         value['controller'].plan_identity_hash = value['source'].mixed_actuator_plan.identity_hash
         value['reset_realizations'] = reset_receipts
         if _solution_profile:
             value['bind_source_gravity_model'] = bind_source_gravity_model
+            value['close_task_resources'] = close_task_resources
             model = source_gravity_model_ref['model']
             if model is not None:
                 value['controller'].set_source_gravity_model(
@@ -514,61 +617,86 @@ def build_libero_selected_candidate(
         request.validate()
         action_schema_id = env.value['action_schema']['schema_id']
         controller_values = values_tuple
+        arm_resolution = None
+        aggregate_opening_m = None
+        substep_context = None
         canonical_action = {
             'schema_version': 'libero-joint-space-canonical-v1',
             'interpreted_values': values_tuple,
             'controller_identity': env.controller.identity,
-            'hold_policy': env.controller.config.hold_policy,
+            'hold_policy': _controller_hold_policy(env.controller),
         }
         if action_schema_id == 'libero-world-pose-wxyz-absolute-v1':
             if (env.value.get('arm_resolver') is None
                     or not hasattr(env.controller, 'last_control_receipt')):
                 raise RuntimeError('world-pose task route has no shared arm resolver or feed-forward mixed Controller')
-            from task_env.controllers.canonical.contracts import CanonicalArmTargetV1
-            arm_target = env.value['arm_resolver'].resolve_world_pose_target_v1(
+            from task_env.controllers.canonical.contracts import CanonicalArmResolutionV1
+            arm_resolution = env.value['arm_resolver'].resolve_world_pose_target_iterative_v1(
                 current_joint_position_rad=tuple(
                     float(state.joint_position[f'joint{index}']) for index in range(1, 8)
                 ),
                 current_pose_world=state.pose_world['panda-v1/ee'],
                 target_pose_world=values_tuple[:7],
                 gripper_scalar=values_tuple[7],
+                model_position_tolerance_m=0.003,
+                model_orientation_tolerance_rad=0.03,
             )
-            if type(arm_target) is not CanonicalArmTargetV1:
-                raise TypeError('canonical arm resolver returned an untyped target')
+            if type(arm_resolution) is not CanonicalArmResolutionV1:
+                raise TypeError('canonical arm resolver returned an untyped iterative result')
+            if not arm_resolution.diagnostics.converged:
+                raise ValueError('shared canonical arm resolver did not meet its FK residual gates')
+            arm_target = arm_resolution.target
             normalized_opening = float(values_tuple[7])
             aggregate_opening_m = 0.04 * (normalized_opening + 1.0)
             if not 0.0 <= aggregate_opening_m <= 0.08:
                 raise ValueError('normalized planner gripper is outside the aggregate opening range')
-            controller_values = (*arm_target.joint_position_rad, aggregate_opening_m)
+            ordered_q = env.controller.map_arm_target_to_control_order(arm_target)
+            named_servo = dict(zip(arm_target.arm_joint_order, arm_target.servo_position_rad, strict=True))
+            ordered_servo = tuple(
+                float(named_servo[f'panda-v1/{name}']) for name in env.controller.control_joint_order
+            )
+            controller_values = (*ordered_q, aggregate_opening_m)
+            substep_context = {
+                'arm_resolution': arm_resolution,
+                'aggregate_opening_m': aggregate_opening_m,
+            }
             canonical_action = {
                 'schema_version': 'libero-world-pose-canonical-v1',
                 'interpreted_values': values_tuple,
                 'controller_identity': env.controller.identity,
-                'hold_policy': env.controller.config.hold_policy,
+                'hold_policy': _controller_hold_policy(env.controller),
                 'arm_target_schema_version': arm_target.schema_version,
                 'arm_target_source_xml_sha256': arm_target.source_xml_sha256,
                 'arm_target_controller_identity': arm_target.controller_identity,
-                'qdesired_rad': list(arm_target.joint_position_rad),
-                'arm_servo_position_rad': list(arm_target.servo_position_rad),
+                'arm_resolution_diagnostics': arm_resolution.diagnostics.to_mapping(),
+                'qdesired_rad': list(ordered_q),
+                'qdesired_joint_order': list(env.controller.control_joint_order),
+                'arm_joint_order': list(arm_target.arm_joint_order),
+                'arm_servo_position_rad': list(ordered_servo),
                 'normalized_gripper_scalar': normalized_opening,
                 'aggregate_opening_m': aggregate_opening_m,
                 'finger_position_mapping_m': [aggregate_opening_m / 2.0, -aggregate_opening_m / 2.0],
             }
         elif action_schema_id != 'libero-joint-space-absolute-v1':
             raise ValueError('unsupported LIBERO selected task action schema')
-        target = env.controller.compute_target(
-            controller_values, state,
-            task_artifact_hash=env.artifact.identity_hash,
-            source_id=source.scene_source.source_id,
-            source_closure_digest=source.source_closure_digest,
-            provider_materialization_id=env.session.provider_materialization_id,
-            episode_id=env.session.episode_id,
-            reset_sample_id=env.sample.sample_id,
-            state_revision=env.session.state_revision,
-        )
+        target_kwargs = {
+            'task_artifact_hash': env.artifact.identity_hash,
+            'source_id': source.scene_source.source_id,
+            'source_closure_digest': source.source_closure_digest,
+            'provider_materialization_id': env.session.provider_materialization_id,
+            'episode_id': env.session.episode_id,
+            'reset_sample_id': env.sample.sample_id,
+            'state_revision': env.session.state_revision,
+        }
+        if arm_resolution is None:
+            target = env.controller.compute_target(controller_values, state, **target_kwargs)
+        else:
+            target = env.controller.compute_pose_target(
+                arm_resolution, aggregate_opening_m, state, **target_kwargs,
+            )
         if action_schema_id == 'libero-world-pose-wxyz-absolute-v1':
             canonical_action['controller_receipt'] = env.controller.last_control_receipt
-        return {
+        prepared = {
             'action_values': values_tuple,
             'universal_action': values_tuple,
             'request': request,
@@ -591,6 +719,40 @@ def build_libero_selected_candidate(
                 'canonical_action': canonical_action,
             },
         }
+        if _solution_profile:
+            prepared['substep_context'] = substep_context
+        return prepared
+
+    def prepare_mixed_control_substep(env, prepared, state, substep_index,
+                                      substep_count, state_revision):
+        """Recompute task OSC from each fresh native state and the same pose goal."""
+        if (type(substep_index) is not int or type(substep_count) is not int
+                or not 0 <= substep_index < substep_count
+                or substep_count != env.artifact.timebase.control_substeps
+                or type(state_revision) is not int or state_revision < 0):
+            raise ValueError('physics-rate OSC callback received an invalid substep boundary')
+        context = prepared.get('substep_context')
+        if not isinstance(context, Mapping):
+            raise TypeError('physics-rate OSC callback requires its typed outer pose-resolution context')
+        if substep_index == 0:
+            target = prepared['target']
+            receipt = prepared['writer_control']['canonical_action'].get('controller_receipt')
+        else:
+            source = env.value['source']
+            target = env.controller.compute_pose_target(
+                context['arm_resolution'], context['aggregate_opening_m'], state,
+                task_artifact_hash=env.artifact.identity_hash,
+                source_id=source.scene_source.source_id,
+                source_closure_digest=source.source_closure_digest,
+                provider_materialization_id=env.session.provider_materialization_id,
+                episode_id=env.session.episode_id,
+                reset_sample_id=env.sample.sample_id,
+                state_revision=state_revision,
+            )
+            receipt = env.controller.last_control_receipt
+        if not isinstance(receipt, Mapping):
+            raise TypeError('physics-rate OSC callback omitted its recomputation receipt')
+        return {'target': target, 'controller_receipt': dict(receipt)}
 
     def observe_mixed_control(env, state):
         return observe_selected_reference_v1(env, state)
@@ -611,7 +773,7 @@ def build_libero_selected_candidate(
             'env_metadata': {
                 'env_name': ('SelectedReferenceEnv.LiberoMixedDiagnosticV1'
                              if not _solution_profile else
-                             'SelectedReferenceEnv.LiberoMixedSolutionV1'),
+                'SelectedReferenceEnv.LiberoMixedSolutionV4'),
                 'task_name': env.artifact.task_id,
                 'task_version': env.artifact.artifact_version,
                 'physics_dt': env.artifact.timebase.physics_dt,
@@ -636,8 +798,7 @@ def build_libero_selected_candidate(
                     'privileged_state.*_body_pose': 'world_body_center_m_quaternion_wxyz',
                 },
                 'provider': env.provider, 'backend': env.backend,
-                'evidence_class': ('diagnostic_candidate' if not _solution_profile
-                                   else 'bounded_solution_candidate'),
+                'evidence_class': 'diagnostic_candidate',
             },
             'universal_action_schema': {
                 'version': env.value['action_schema']['schema_id'],
@@ -651,7 +812,7 @@ def build_libero_selected_candidate(
                 'integrator': source.config.runtime.integrator,
                 'controller_profile_id': env.controller.profile_id,
                 'controller_identity': env.controller.identity,
-                'hold_policy': env.controller.config.hold_policy,
+                    'hold_policy': _controller_hold_policy(env.controller),
             },
             'control_plan': env.controller.identity_mapping(),
             'task_context': {
@@ -743,17 +904,22 @@ def build_libero_selected_candidate(
         }
 
     def validate_external_solution(value, solution):
-        from .solution import LiberoPickPlaceSolutionV3, solution_identity_v3
+        from .solution import LiberoPickPlaceSolutionV5, solution_identity_v5
 
-        if not isinstance(solution, LiberoPickPlaceSolutionV3):
-            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV3')
+        if not isinstance(solution, LiberoPickPlaceSolutionV5):
+            raise TypeError('LIBERO task #1 external lifecycle requires LiberoPickPlaceSolutionV5')
         expected_source = value['source_sha256']['composed_candidate_xml']
         expected_closure = value['source_sha256']['source_closure_digest']
         if (solution.task_uid != value['artifact'].task_id
                 or solution.source_xml_sha256 != expected_source
                 or solution.source_closure_digest != expected_closure
                 or solution.identity != value.get('solution_identity')
-                or solution.identity != solution_identity_v3(expected_source, expected_closure)):
+                or solution.arm_resolver_identity
+                   != value['arm_resolver'].iterative_resolution_identity_v1()
+                or solution.identity != solution_identity_v5(
+                    expected_source, expected_closure,
+                    arm_resolver_identity=value['arm_resolver'].iterative_resolution_identity_v1(),
+                )):
             raise ValueError('external LIBERO Solution does not match the selected task/source/profile')
 
     binding = ReferenceTaskBinding(
@@ -771,9 +937,13 @@ def build_libero_selected_candidate(
         validate_external_solution=validate_external_solution if _solution_profile else None,
         reset_sample_with_options=reset_with_options,
         prepare_mixed_control=prepare_mixed_control,
+        prepare_mixed_control_substep=(
+            prepare_mixed_control_substep if _solution_profile else None
+        ),
         observe_mixed_control=observe_mixed_control,
         mixed_record_metadata=mixed_record_metadata,
         pre_reset_session_validator=validate_compiled_session,
+        close_task_resources=close_task_resources if _solution_profile else None,
     )
     env = SelectedReferenceEnv.from_mixed_control_candidate(
         binding, provider='mujoco', backend='cpu', horizon=horizon,

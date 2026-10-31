@@ -84,9 +84,11 @@ class ReferenceTaskBinding:
     build_mixed_control_profile: Callable | None = None
     reset_sample_with_options: Callable | None = None
     prepare_mixed_control: Callable | None = None
+    prepare_mixed_control_substep: Callable | None = None
     observe_mixed_control: Callable | None = None
     mixed_record_metadata: Callable | None = None
     pre_reset_session_validator: Callable | None = None
+    close_task_resources: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -99,6 +101,8 @@ class ReferenceTaskBinding:
             raise ValueError('external Solution construction and validation must be supplied together')
         if (self.native_sample_factory is None) != (self.native_interval_receipt_factory is None):
             raise ValueError('native sample and interval receipt factories must be supplied together')
+        if self.close_task_resources is not None and not callable(self.close_task_resources):
+            raise ValueError('task resource cleanup hook must be callable when supplied')
         if self.control_request_required and self.native_sample_factory is None:
             raise ValueError('native controller requests require the selected native sample contract')
         mixed_hooks = (
@@ -110,6 +114,9 @@ class ReferenceTaskBinding:
             not callable(value) for value in mixed_hooks
         ):
             raise ValueError('mixed-control binding requires its complete task-owned hook set')
+        if (self.prepare_mixed_control_substep is not None
+                and not callable(self.prepare_mixed_control_substep)):
+            raise ValueError('mixed-control substep preparation hook must be callable when supplied')
 
 
 class SelectedReferenceEnv(TaskEnvironmentComponent):
@@ -1327,9 +1334,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 raise ValueError('mixed-control Solution proposal action was changed before preparation')
         before = self.state
         prepared = self.binding.prepare_mixed_control(self, action, before)
-        if not isinstance(prepared, Mapping) or set(prepared) != {
+        base_prepared_fields = {
             'action_values', 'universal_action', 'request', 'target', 'writer_control',
-        }:
+        }
+        stepwise = self.binding.prepare_mixed_control_substep is not None
+        expected_prepared_fields = base_prepared_fields | ({'substep_context'} if stepwise else set())
+        if not isinstance(prepared, Mapping) or set(prepared) != expected_prepared_fields:
             raise TypeError('mixed-control preparation must return the exact typed preparation fields')
         action_values = tuple(float(value) for value in prepared['action_values'])
         universal_action = tuple(float(value) for value in prepared['universal_action'])
@@ -1361,17 +1371,68 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 or target.simulation_time_s != before.simulation_time):
             raise ValueError('mixed-control target differs from the live source boundary')
         applied = None
+        applied_payload = None
+        stepwise_receipt = None
         interval_attempted = False
         interval_completed = False
         phase = 'mixed_control_application'
         try:
-            applied = self.session.apply_mixed_actuator_command(target)
-            if type(applied) is not AppliedMixedActuatorCommandV1:
-                raise TypeError('RuntimeSession returned an untyped mixed-control acknowledgement')
             interval_attempted = True
-            phase = 'mixed_physics_step'
-            self.state = self.session.step()
-            interval_completed = True
+            if stepwise:
+                phase = 'mixed_physics_substep_interval'
+                stepwise_session = getattr(self.session, 'step_mixed_actuator_interval', None)
+                if not callable(stepwise_session):
+                    raise StageUnavailableError(
+                        'selected RuntimeSession does not support physics-rate mixed actuator control'
+                    )
+                controller_receipts = []
+
+                def make_substep_command(state, substep_index, substep_count, state_revision):
+                    control = self.binding.prepare_mixed_control_substep(
+                        self, prepared, state, substep_index, substep_count,
+                        state_revision,
+                    )
+                    if not isinstance(control, Mapping) or set(control) != {
+                        'target', 'controller_receipt',
+                    }:
+                        raise TypeError('mixed substep Controller hook returned unknown or missing fields')
+                    substep_target = control['target']
+                    if type(substep_target) is not MixedActuatorCommandV1:
+                        raise TypeError('mixed substep Controller hook must return MixedActuatorCommandV1')
+                    substep_target.validate()
+                    receipt = control['controller_receipt']
+                    if not isinstance(receipt, Mapping):
+                        raise TypeError('mixed substep Controller receipt must be a mapping')
+                    controller_receipts.append(dict(receipt))
+                    return substep_target
+
+                self.state, stepwise_receipt = stepwise_session(
+                    make_substep_command,
+                )
+                if (not isinstance(stepwise_receipt, Mapping)
+                        or not isinstance(stepwise_receipt.get('substeps'), list)
+                        or len(stepwise_receipt['substeps']) != self.artifact.timebase.control_substeps
+                        or len(controller_receipts) != self.artifact.timebase.control_substeps):
+                    raise ValueError('RuntimeSession stepwise receipt differs from the admitted substep count')
+                rows = []
+                for row, receipt in zip(stepwise_receipt['substeps'], controller_receipts, strict=True):
+                    rows.append({**dict(row), 'controller_receipt': receipt})
+                stepwise_receipt = {**dict(stepwise_receipt), 'substeps': rows}
+                first_row = rows[0]
+                applied_payload = first_row.get('applied')
+                if (not isinstance(applied_payload, Mapping)
+                        or first_row.get('target_identity_sha256') != target.identity_hash
+                        or first_row.get('target') != target.to_mapping()):
+                    raise ValueError('stepwise RuntimeSession first command differs from prepared outer target')
+                interval_completed = True
+            else:
+                applied = self.session.apply_mixed_actuator_command(target)
+                if type(applied) is not AppliedMixedActuatorCommandV1:
+                    raise TypeError('RuntimeSession returned an untyped mixed-control acknowledgement')
+                applied_payload = applied.to_mapping()
+                phase = 'mixed_physics_step'
+                self.state = self.session.step()
+                interval_completed = True
             phase = 'mixed_observation'
             self.obs, self.info, self.evaluation = self.observation(self.state)
             self.info.update({
@@ -1379,8 +1440,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'external_action': action_values,
                 'universal_action': universal_action,
                 'mixed_actuator_command_v1': target.to_mapping(),
-                'applied_mixed_actuator_command_v1': applied.to_mapping(),
+                'applied_mixed_actuator_command_v1': applied_payload,
             })
+            if stepwise_receipt is not None:
+                self.info['physics_rate_control_v1'] = stepwise_receipt
             if proposal is not None:
                 phase = 'mixed_solution_observation'
                 extra = self.binding.observe_expert_kwargs(self, ())
@@ -1416,12 +1479,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         'identity_hash': target.identity_hash,
                     },
                     'applied_control': {
-                        'schema_version': applied.schema_version,
-                        'payload': applied.to_mapping(),
-                        'target_hash': applied.target_hash,
+                        'schema_version': applied_payload['schema_version'],
+                        'payload': dict(applied_payload),
+                        'target_hash': applied_payload['target_hash'],
                     },
                 },),
             )
+            if stepwise_receipt is not None:
+                writer_row = dict(transition.writer_controls[0])
+                canonical_action = dict(writer_row['canonical_action'])
+                canonical_action['physics_rate_control_v1'] = stepwise_receipt
+                writer_row['canonical_action'] = canonical_action
+                transition = StructuredControlTransitionV1(
+                    'structured-control-transition-v1', request, (writer_row,),
+                )
             transition.validate()
             terminated = bool(self.evaluation.failure) if proposal is not None else False
             truncated = self.state.control_step >= self.horizon
@@ -2345,6 +2416,19 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     first_error = error
                 else:
                     first_error.add_note(f'mixed-control source receipt cleanup also failed: {type(error).__name__}: {error}')
+            task_resource_receipt = None
+            task_resource_error = None
+            try:
+                if self.binding.close_task_resources is not None:
+                    task_resource_receipt = self.binding.close_task_resources()
+            except BaseException as error:
+                task_resource_error = error
+                if first_error is None:
+                    first_error = error
+                else:
+                    first_error.add_note(
+                        f'mixed-control task resource cleanup also failed: {type(error).__name__}: {error}'
+                    )
             if self.session is None and self._mixed_close_receipt is None:
                 source = self.value.get('source')
                 fault = self._execution_fault
@@ -2371,6 +2455,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'execution_fault_phase': None if fault is None else fault.phase,
                     'execution_fault_message': None if fault is None else fault.message,
                 }
+            if self._mixed_close_receipt is not None:
+                self._mixed_close_receipt = dict(self._mixed_close_receipt)
+                if task_resource_receipt is not None:
+                    self._mixed_close_receipt['task_resource_close_receipt'] = task_resource_receipt
+                if task_resource_error is not None:
+                    self._mixed_close_receipt['task_resource_close_error'] = {
+                        'type': type(task_resource_error).__name__,
+                        'message': str(task_resource_error),
+                    }
             self._closed, self._stopped = True, True
             if first_error is not None:
                 raise first_error

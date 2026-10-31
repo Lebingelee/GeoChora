@@ -1730,9 +1730,15 @@ class _MuJoCoSession(_SessionValues):
             )
             if not math.isfinite(elapsed) or abs(elapsed - expected) > bound:
                 raise ValueError('mixed actuator native/reset-origin clock or integration count mismatch')
-            if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
-                raise ValueError('mixed actuator native/canonical step-count mismatch')
-            time = self._control_step * self._artifact.timebase.control_dt
+            if self._inner_interval_active:
+                # The physics-rate mixed seam publishes fresh owned snapshots
+                # between outer evaluation boundaries.  Keep the public clock
+                # reset-relative, matching ordinary evaluation snapshots.
+                time = elapsed
+            else:
+                if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
+                    raise ValueError('mixed actuator native/canonical step-count mismatch')
+                time = self._control_step * self._artifact.timebase.control_dt
         elif self._artifact.timebase.control_substeps > 1 and not self._inner_interval_active:
             if self._native_steps != self._control_step * self._artifact.timebase.control_substeps:
                 raise ValueError('MuJoCo native/canonical step-count mismatch')
@@ -2087,6 +2093,103 @@ class _MuJoCoSession(_SessionValues):
             requested, requested, counts,
             {name: tuple(values) for name, values in groups.items()},
         )
+
+    def step_mixed_actuator_interval(self, command_factory):
+        """Apply a fresh public-state mixed command for every native substep.
+
+        The outer Evaluation/Recorder boundary remains one control interval.
+        Each command is still checked by the normal named MixedActuatorCommand
+        path; this method only owns its admitted MuJoCo 2 ms integration loop.
+        """
+        from ...controllers.canonical.contracts import (
+            AppliedMixedActuatorCommandV1, MixedActuatorCommandV1,
+        )
+
+        self._require_reset()
+        if self._mixed_actuator_plan is None:
+            raise RuntimeError('stepwise mixed commands require the admitted mixed actuator profile')
+        if self._mixed_fault is not None:
+            raise RuntimeError('mixed actuator MuJoCo session is fault-latched')
+        if not callable(command_factory):
+            raise TypeError('mixed actuator interval requires a state-to-command factory')
+        if self._mixed_pending_target is not None:
+            raise RuntimeError('mixed actuator interval cannot start with a pending target')
+        if self._inner_interval_active:
+            raise RuntimeError('mixed actuator intervals cannot be nested')
+        count = int(self._artifact.timebase.control_substeps)
+        start_state = self.snapshot()
+        start_revision = self._state_revision
+        rows = []
+        self._inner_interval_active = True
+        try:
+            for substep_index in range(count):
+                before = self.snapshot()
+                before_revision = self._state_revision
+                target = command_factory(before, substep_index, count, before_revision)
+                if type(target) is not MixedActuatorCommandV1:
+                    raise TypeError('stepwise mixed Controller must return MixedActuatorCommandV1')
+                applied = self.apply_mixed_actuator_command(target)
+                if type(applied) is not AppliedMixedActuatorCommandV1:
+                    raise TypeError('RuntimeSession returned an untyped mixed-control acknowledgement')
+                pending = self._mixed_pending_target
+                if pending is not target:
+                    raise RuntimeError('mixed actuator substep lost its consumed target identity')
+                self._mj.mj_step(self._model, self._data)
+                self._native_steps += 1
+                # mj_step integrates qpos after its forward pass, so named
+                # transforms/contact geometry can still describe the previous
+                # position until mj_forward refreshes derived state.
+                self._mj.mj_forward(self._model, self._data)
+                self._forward_calls += 1
+                self._observe_physical_state(
+                    phase='native_step', control_boundary=self._control_step + 1,
+                    native_step=self._native_steps,
+                )
+                self._state_revision += 1
+                self._mixed_pending_target = None
+                after = self.snapshot()
+                rows.append({
+                    'substep_index': substep_index,
+                    'target': target.to_mapping(),
+                    'target_identity_sha256': target.identity_hash,
+                    'applied': applied.to_mapping(),
+                    'state_revision_before': before_revision,
+                    'state_revision_after': self._state_revision,
+                    'simulation_time_before_s': float(before.simulation_time),
+                    'simulation_time_after_s': float(after.simulation_time),
+                })
+            self._mj.mj_forward(self._model, self._data)
+            self._forward_calls += 1
+            self._control_step += 1
+            self._inner_interval_active = False
+            result_state = self.snapshot()
+            if (result_state.control_step != start_state.control_step + 1
+                    or self._state_revision != start_revision + count
+                    or self._native_steps != self._control_step * count):
+                raise ValueError('stepwise mixed interval did not close on its declared outer/native boundary')
+            return result_state, {
+                'schema_version': 'mixed-actuator-stepwise-interval-receipt-v1',
+                'provider_name': 'mujoco',
+                'provider_materialization_id': self._provider_materialization_id,
+                'episode_id': self._episode_id,
+                'reset_sample_id': self._reset_sample_id,
+                'start_control_step': int(start_state.control_step),
+                'end_control_step': int(result_state.control_step),
+                'start_state_revision': int(start_revision),
+                'end_state_revision': int(self._state_revision),
+                'native_substep_count': count,
+                'physics_dt_s': float(self._artifact.timebase.physics_dt),
+                'substeps': rows,
+            }
+        except BaseException as error:
+            self._mixed_fault = {
+                'phase': 'stepwise_interval',
+                'error': f'{type(error).__name__}: {error}',
+                'native_steps_completed': int(self._native_steps),
+                'control_boundary': int(self._control_step),
+                'substeps_completed': len(rows),
+            }
+            raise
 
     def step(self):
         self._require_reset()

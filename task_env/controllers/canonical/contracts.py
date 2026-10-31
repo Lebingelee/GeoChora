@@ -11,6 +11,9 @@ def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest()
 
 
+CANONICAL_PANDA_ARM_ORDER_V1 = tuple(f'panda-v1/joint{i}' for i in range(1, 8))
+
+
 @dataclass(frozen=True)
 class RequestedAction(Contract):
     mode: str
@@ -69,13 +72,79 @@ class CanonicalArmTargetV1(Contract):
         if (requested.mode != 'absolute_pose' or requested.reference != 'world'
                 or requested.rotation_representation != 'quaternion_wxyz'):
             raise ValueError('canonical arm target requires an absolute world pose in quaternion_wxyz')
-        if (len(self.arm_joint_order) != 7 or len(set(self.arm_joint_order)) != 7
+        if (type(self.arm_joint_order) is not tuple
+                or self.arm_joint_order != CANONICAL_PANDA_ARM_ORDER_V1
                 or len(self.joint_position_rad) != 7 or len(self.servo_position_rad) != 7):
-            raise ValueError('canonical arm target requires seven ordered joint values')
+            raise ValueError('canonical arm target requires the canonical named Panda joint order and seven values')
         for name in self.arm_joint_order:
             _name(name)
         if any(not math.isfinite(float(value)) for value in (*self.joint_position_rad, *self.servo_position_rad)):
             raise ValueError('canonical arm target values must be finite')
+
+
+@dataclass(frozen=True)
+class CanonicalArmResolutionDiagnosticsV1(Contract):
+    """Measured residual and bounded-work receipt for iterative IK resolution."""
+
+    schema_version: str
+    method_id: str
+    iteration_count: int
+    max_iterations: int
+    position_residual_m: float
+    orientation_residual_rad: float
+    position_tolerance_m: float
+    orientation_tolerance_rad: float
+    converged: bool
+    initial_position_gap_m: float
+    initial_orientation_gap_rad: float
+    model_position_tolerance_m: float
+    model_orientation_tolerance_rad: float
+
+    def validate(self):
+        if (self.schema_version != 'canonical-arm-resolution-diagnostics-v1'
+                or self.method_id != 'shared_canonical_dls_iterative_v1'):
+            raise ValueError('unsupported canonical arm resolution diagnostics')
+        if (type(self.iteration_count) is not int or self.iteration_count < 1
+                or type(self.max_iterations) is not int
+                or self.max_iterations < self.iteration_count):
+            raise ValueError('canonical arm resolution iteration count must fit its positive bound')
+        numbers = (self.position_residual_m, self.orientation_residual_rad,
+                   self.position_tolerance_m, self.orientation_tolerance_rad,
+                   self.initial_position_gap_m, self.initial_orientation_gap_rad,
+                   self.model_position_tolerance_m, self.model_orientation_tolerance_rad)
+        if (any(isinstance(value, bool) or not math.isfinite(float(value)) for value in numbers)
+                or self.position_residual_m < 0.0 or self.orientation_residual_rad < 0.0
+                or self.initial_position_gap_m < 0.0 or self.initial_orientation_gap_rad < 0.0
+                or self.position_tolerance_m <= 0.0 or self.orientation_tolerance_rad <= 0.0
+                or self.model_position_tolerance_m <= 0.0
+                or self.model_orientation_tolerance_rad <= 0.0
+                or type(self.converged) is not bool):
+            raise ValueError('canonical arm resolution diagnostics contain invalid values')
+        if self.converged and (self.position_residual_m > self.position_tolerance_m
+                               or self.orientation_residual_rad > self.orientation_tolerance_rad):
+            raise ValueError('converged canonical arm resolution exceeds its declared tolerance')
+        if (self.initial_position_gap_m > self.model_position_tolerance_m
+                or self.initial_orientation_gap_rad > self.model_orientation_tolerance_rad):
+            raise ValueError('initial public pose differs from the pinned model beyond its declared gate')
+
+
+@dataclass(frozen=True)
+class CanonicalArmResolutionV1(Contract):
+    """Advanced result combining the existing arm target with FK residual evidence."""
+
+    schema_version: str
+    target: CanonicalArmTargetV1
+    diagnostics: CanonicalArmResolutionDiagnosticsV1
+
+    def validate(self):
+        if self.schema_version != 'canonical-arm-resolution-v1':
+            raise ValueError('unsupported canonical arm resolution schema')
+        if not isinstance(self.target, CanonicalArmTargetV1):
+            raise TypeError('canonical arm resolution requires the existing typed arm target')
+        if not isinstance(self.diagnostics, CanonicalArmResolutionDiagnosticsV1):
+            raise TypeError('canonical arm resolution requires typed convergence diagnostics')
+        self.target.validate()
+        self.diagnostics.validate()
 
 
 @dataclass(frozen=True)

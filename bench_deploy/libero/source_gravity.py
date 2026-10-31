@@ -1,4 +1,4 @@
-"""Source-bound gravity-bias primitive for the bounded LIBERO task route."""
+"""Source-bound gravity-bias and operational-space dynamics for LIBERO."""
 from __future__ import annotations
 
 import hashlib
@@ -16,9 +16,11 @@ from .task_contracts import TASK_1
 
 
 SOURCE_GRAVITY_PROFILE_V1 = "libero-source-mjcf-gravity-bias-v1"
+SOURCE_OPERATIONAL_SPACE_PROFILE_V1 = "libero-source-operational-space-state-v1"
 _MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 _MAX_EXPANDED_BYTES = 128 * 1024 * 1024
 _MAX_ARCHIVE_MEMBERS = 1024
+_TCP_SITE_NAME = "gripper0_grip_site"
 
 
 def _sha256(data: bytes) -> str:
@@ -207,6 +209,13 @@ class MujocoSourceGravityBiasV1:
                 raise ValueError(f"source gravity model omitted robot0_joint{index}")
             self._qpos_addresses.append(int(self._model.jnt_qposadr[joint_id]))
             self._dof_addresses.append(int(self._model.jnt_dofadr[joint_id]))
+        self._tcp_site_id = int(mujoco_api.mj_name2id(
+            self._model, mujoco_api.mjtObj.mjOBJ_SITE, _TCP_SITE_NAME,
+        ))
+        if self._tcp_site_id < 0:
+            self._model = None
+            self._data = None
+            raise ValueError(f"source dynamics model omitted the bound TCP site: {_TCP_SITE_NAME}")
         runtime = {
             "mujoco_version": str(getattr(mujoco_api, "__version__", "unknown")),
             "api_version": int(mujoco_api.mj_version()),
@@ -254,6 +263,70 @@ class MujocoSourceGravityBiasV1:
             raise ValueError("source gravity model produced invalid arm force terms")
         return torque
 
+    def operational_space_state_v1(self, joint_position_rad, joint_velocity_rad_s):
+        """Return copied source-model M/J/TCP/bias values for one public boundary.
+
+        This task-local calculation uses only the pinned source model and named
+        Panda coordinates. It never reads a live RuntimeSession or Provider
+        model/data object and never advances physics.
+        """
+        if self.closed or self._model is None or self._data is None:
+            raise RuntimeError("source dynamics model is closed")
+        q = np.asarray(joint_position_rad, dtype=np.float64)
+        qdot = np.asarray(joint_velocity_rad_s, dtype=np.float64)
+        if (q.shape != (7,) or qdot.shape != (7,)
+                or not np.isfinite(q).all() or not np.isfinite(qdot).all()):
+            raise ValueError("source OSC state requires seven finite named arm positions and velocities")
+        self._data.qpos[:] = self._model.qpos0
+        self._data.qvel[:] = 0.0
+        for qpos_address, dof_address, position, velocity in zip(
+                self._qpos_addresses, self._dof_addresses, q, qdot, strict=True):
+            self._data.qpos[qpos_address] = float(position)
+            self._data.qvel[dof_address] = float(velocity)
+        self._mujoco.mj_forward(self._model, self._data)
+        self.forward_calls += 1
+
+        nv = int(self._model.nv)
+        mass_full = np.zeros((nv, nv), dtype=np.float64)
+        self._mujoco.mj_fullM(self._model, mass_full, self._data.qM)
+        jacp = np.zeros((3, nv), dtype=np.float64)
+        jacr = np.zeros((3, nv), dtype=np.float64)
+        self._mujoco.mj_jacSite(
+            self._model, self._data, jacp, jacr, self._tcp_site_id,
+        )
+        dofs = np.asarray(self._dof_addresses, dtype=np.int64)
+        mass = mass_full[np.ix_(dofs, dofs)].copy()
+        jacobian = np.vstack((jacp[:, dofs], jacr[:, dofs])).copy()
+        site_position = np.asarray(self._data.site_xpos[self._tcp_site_id], dtype=np.float64).copy()
+        site_rotation = np.asarray(
+            self._data.site_xmat[self._tcp_site_id], dtype=np.float64,
+        ).reshape(3, 3).copy()
+        bias = np.asarray([
+            self._data.qfrc_bias[address] - self._data.qfrc_passive[address]
+            for address in self._dof_addresses
+        ], dtype=np.float64)
+        if (mass.shape != (7, 7) or jacobian.shape != (6, 7)
+                or site_position.shape != (3,) or site_rotation.shape != (3, 3)
+                or bias.shape != (7,)
+                or any(not np.isfinite(value).all()
+                       for value in (mass, jacobian, site_position, site_rotation, bias))):
+            raise ValueError("source OSC model produced non-finite or incomplete dynamics")
+        return {
+            "schema_version": "libero-source-operational-space-state-v1",
+            "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
+            "model_identity_sha256": self.model_identity_sha256,
+            "source_xml_sha256": self.source_xml_sha256,
+            "source_closure_digest": self.source_closure_digest,
+            "tcp_site_name": _TCP_SITE_NAME,
+            "site_position_world_m": site_position,
+            "site_rotation_world": site_rotation,
+            "jacobian_world": jacobian,
+            "mass_matrix_arm": mass,
+            "bias_minus_passive_arm_Nm": bias,
+            "forward_call_count": self.forward_calls,
+            "mj_step_call_count": self.mj_step_calls,
+        }
+
     def identity_mapping(self) -> dict[str, object]:
         return {
             "profile_id": self.profile_id,
@@ -264,6 +337,22 @@ class MujocoSourceGravityBiasV1:
             "model_dimensions": dict(self.model_dimensions),
             "runtime_identity": dict(self.runtime_identity),
             "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
+            "operations": {
+                "gravity_torque": {
+                    "profile_id": SOURCE_GRAVITY_PROFILE_V1,
+                    "calculation": "zero_velocity_qfrc_bias_minus_qfrc_passive_v1",
+                },
+                "operational_space_state": {
+                    "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
+                    "inputs": ["named_arm_joint_position_rad", "named_arm_joint_velocity_rad_s"],
+                    "outputs": [
+                        "arm_mass_matrix", "world_tcp_jacobian", "world_tcp_pose",
+                        "bias_minus_passive_arm_torque",
+                    ],
+                    "physics_steps": 0,
+                    "runtime_identity": dict(self.runtime_identity),
+                },
+            },
             "forward_call_count": self.forward_calls,
             "mj_step_call_count": self.mj_step_calls,
         }
@@ -290,4 +379,5 @@ class MujocoSourceGravityBiasV1:
         }
 
 
-__all__ = ["MujocoSourceGravityBiasV1", "SOURCE_GRAVITY_PROFILE_V1"]
+__all__ = ["MujocoSourceGravityBiasV1", "SOURCE_GRAVITY_PROFILE_V1",
+           "SOURCE_OPERATIONAL_SPACE_PROFILE_V1"]

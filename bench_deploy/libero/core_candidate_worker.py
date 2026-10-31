@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 from collections.abc import Mapping
 from pathlib import Path
 import tarfile
@@ -345,7 +346,41 @@ def _verify_solution_source_bundle(bundle_path: Path, source_bundle: Any) -> dic
         "canonical_xml_sha256": source_bundle["canonical_xml_sha256"],
         "composition_plan_sha256": plan_info["sha256"],
         "closure_file_count": len(files),
+        "_canonical_xml_bytes": canonical_xml,
     }
+
+
+def _task1_iterative_resolver_identity(source_xml_bytes: bytes, task_artifact_identity: str,
+                                       diagnostics: Mapping[str, Any]) -> str:
+    """Rebuild the public provider-free resolver profile from verified source bytes."""
+    from task_env.controllers.canonical import CanonicalPandaController, PandaKinematics
+    from task_env.controllers.canonical.kinematics import derive_panda_tcp_profile_v2
+    from task_env.environment import ActionConfig
+
+    required = (
+        "max_iterations", "position_tolerance_m", "orientation_tolerance_rad",
+        "model_position_tolerance_m", "model_orientation_tolerance_rad",
+    )
+    if not isinstance(diagnostics, Mapping) or any(key not in diagnostics for key in required):
+        raise ValueError("task Solution v4 omits the iterative resolver configuration receipt")
+    profile = derive_panda_tcp_profile_v2(
+        source_xml_bytes, tcp_id="libero-mounted-panda-v1/gripper0-grip-site-v1",
+        hand_frame_id="robot0_right_hand", site_name="gripper0_grip_site",
+    )
+    kinematics = PandaKinematics(
+        source_xml_bytes, tcp_profile=profile, native_prefix="robot0_",
+        base_body_id="robot0_link0",
+    )
+    resolver = CanonicalPandaController(
+        kinematics, artifact_hash=task_artifact_identity, config=ActionConfig(),
+    )
+    return resolver.iterative_resolution_identity_v1(
+        max_iterations=diagnostics["max_iterations"],
+        position_tolerance_m=diagnostics["position_tolerance_m"],
+        orientation_tolerance_rad=diagnostics["orientation_tolerance_rad"],
+        model_position_tolerance_m=diagnostics["model_position_tolerance_m"],
+        model_orientation_tolerance_rad=diagnostics["model_orientation_tolerance_rad"],
+    )
 
 
 def _public_motion_metrics(initial_joints: np.ndarray, final_joints: np.ndarray,
@@ -488,6 +523,8 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
         "r07-v210-task-solution-worker-result-v1",
         "r07-v210-task-solution-worker-result-v2",
         "r07-v210-task-solution-worker-result-v3",
+        "r07-v210-task-solution-worker-result-v4",
+        "r07-v210-task-solution-worker-result-v5",
     }
     accepted_schemas = {"r07-v210-required123-run-record-v1"} if is_solution else {"r07c-d01-run-record-v1"}
     if record.get("schema_version") not in accepted_schemas:
@@ -530,8 +567,21 @@ def _validate_parent_run_record(bundle_path: Path, result: Mapping[str, Any],
     except (ValueError, IndexError, TypeError) as exc:
         raise ValueError("parent run record omits the bounded D01 step limit") from exc
     counts = [episode.get("h5", {}).get("transition_count") for episode in result.get("episodes", ())]
+    recorded_rows = tuple(result.get("episode_rows", ()))
+    try:
+        row_arg_index = argv.index("--rows")
+        argv_rows = []
+        for token in argv[row_arg_index + 1:]:
+            if token.startswith("--"):
+                break
+            argv_rows.append(int(token))
+        recorded_argv_rows = tuple(argv_rows)
+    except (ValueError, TypeError):
+        recorded_argv_rows = (0, 1, 2)
     if (any(type(value) is not int or value < 1 or value > recorded_steps for value in counts)
-            or (not is_solution and any(value != recorded_steps for value in counts))):
+            or (not is_solution and any(value != recorded_steps for value in counts))
+            or recorded_rows != tuple(episode.get("row_index") for episode in result.get("episodes", ()))
+            or recorded_argv_rows != recorded_rows):
         raise ValueError("parent worker step limit differs from one or more episode records")
     environment = record.get("environment")
     expected_pythonpath = (
@@ -719,7 +769,11 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
     """Run one task-owned Solution through the same SelectedReferenceEnv."""
     solution = solution_factory(output_dir)
     solution_schema = getattr(solution, "solution_schema_version", None)
-    if solution_schema == "libero-bowl-to-plate-solution-v3":
+    if solution_schema == "libero-bowl-to-plate-solution-v4":
+        version_suffix = "v4"
+    elif solution_schema == "libero-bowl-to-plate-solution-v5":
+        version_suffix = "v5"
+    elif solution_schema == "libero-bowl-to-plate-solution-v3":
         version_suffix = "v3"
     elif solution_schema == "libero-bowl-to-plate-solution-v2":
         version_suffix = "v2"
@@ -779,6 +833,7 @@ def _episode_solution_record(env, *, output_dir: Path, episode_index: int,
                 "solution_action": [float(value) for value in info.get("external_action", ())],
                 "solution_stage": info.get("selected_solution_action_v1", {}).get("stage"),
                 "solution_diagnostics": info.get("selected_solution_action_v1", {}).get("diagnostics"),
+                "solution_action_receipt": info.get("last_action_receipt"),
                 "reward": float(reward),
                 "terminated": bool(terminated),
                 "truncated": bool(truncated),
@@ -981,8 +1036,12 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
                                 solution_resource_closer=None) -> dict[str, Any]:
     """Run same-instance public resets, action route, H5 closure and receipts."""
     output_dir = Path(output_dir).resolve()
-    if tuple(rows) != (0, 1, 2) or type(seed) is not int or seed != 19:
-        raise ValueError("D01 worker freezes seed 19 and source rows (0,1,2)")
+    rows = tuple(rows)
+    if (not rows or len(set(rows)) != len(rows)
+            or any(type(row) is not int or row not in (0, 1, 2) for row in rows)
+            or (solution_factory is None and rows != (0, 1, 2))
+            or type(seed) is not int or seed != 19):
+        raise ValueError("LIBERO worker freezes seed 19 and ordered unique source rows from (0,1,2)")
     maximum_steps = 1000 if solution_factory is not None else 64
     if type(steps) is not int or not 1 <= steps <= maximum_steps:
         raise ValueError(f"LIBERO worker supports 1..{maximum_steps} public outer steps per episode")
@@ -1068,6 +1127,12 @@ def run_libero_candidate_worker(env, *, output_dir: Path, seed: int = 19,
                                   and len(episodes) == len(rows)
                                   and (solution_route or len(diagnostic_endpoints) == 2)) else "failed",
         "episode_count": len(episodes),
+        "episode_rows": [int(item["row_index"]) for item in episodes],
+        "run_scope": (
+            "task1_final_rows_0_1_2" if solution_route and rows == (0, 1, 2)
+            else "task1_bounded_probe" if solution_route
+            else "diagnostic_full_rows_0_1_2"
+        ),
         "transition_count": sum(int(item["h5"]["transition_count"] or 0) for item in episodes),
         "observation_count": sum(int(item["h5"]["observation_count"] or 0) for item in episodes),
         "native_step_count": sum(int(item["runtime_progress"]["native_step_count"]) for item in episodes),
@@ -1127,59 +1192,379 @@ def _validate_source_gravity_action(control_plan: Mapping[str, Any], diagnostics
         raise ValueError("task Solution action does not preserve the source gravity compensation formula")
 
 
+def _validate_v4_osc_receipt(canonical_action: Mapping[str, Any], expected_controller: Mapping[str, Any],
+                             target: MixedActuatorCommandV1, public_action: np.ndarray,
+                             h5_joint_position: np.ndarray | None, h5_ee_pose: np.ndarray | None,
+                             resource_close: Mapping[str, Any], *,
+                             receipt_override: Mapping[str, Any] | None = None,
+                             initial_joint_reference: np.ndarray | None = None) -> None:
+    """Independently recompute the bounded V4 OSC law from recorded source-state values."""
+    from task_env.utils.rotation import quat_wxyz_to_matrix
+
+    receipt = receipt_override or canonical_action.get("controller_receipt")
+    physics_rate_profile = expected_controller.get("schema_version") == "libero-mixed-controller-identity-v4"
+    expected_receipt_schema = (
+        "libero-mixed-control-receipt-v4" if physics_rate_profile
+        else "libero-mixed-control-receipt-v3"
+    )
+    expected_algorithm = (
+        "robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2" if physics_rate_profile
+        else "robosuite_osc_pose_uncoupled_lambda_and_nullspace_v1"
+    )
+    if (not isinstance(receipt, Mapping)
+            or canonical_action.get("schema_version") != "libero-world-pose-canonical-v1"
+            or canonical_action.get("arm_target_schema_version") != "canonical-arm-target-v1"
+            or canonical_action.get("arm_target_source_xml_sha256") != _TASK1_COMPOSED_XML_SHA256
+            or not isinstance(expected_controller.get("arm_resolver_identity"), str)
+            or len(expected_controller.get("arm_resolver_identity", "")) != 64
+            or canonical_action.get("arm_target_controller_identity")
+               != expected_controller.get("arm_resolver_identity")
+                or tuple(canonical_action.get("arm_joint_order", ()))
+                   != tuple(expected_controller.get("arm_joint_order", ()))
+                or tuple(canonical_action.get("qdesired_joint_order", ()))
+                   != tuple(f"joint{i}" for i in range(1, 8))
+            or canonical_action.get("controller_identity") != expected_controller.get("identity_sha256")
+            or receipt.get("schema_version") != expected_receipt_schema
+            or receipt.get("controller_identity") != expected_controller.get("identity_sha256")
+            or receipt.get("algorithm") != expected_algorithm
+            or receipt.get("source_state_profile_id") != expected_controller.get("source_state_profile_id")
+            or receipt.get("source_xml_sha256") != _TASK1_COMPOSED_XML_SHA256
+            or receipt.get("source_closure_digest") != _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256
+            or receipt.get("source_model_identity_sha256") != resource_close.get("model_identity_sha256")
+            or receipt.get("tcp_site_name") != "gripper0_grip_site"
+            or receipt.get("hold_policy") != expected_controller.get("hold_policy")
+            or (physics_rate_profile
+                and receipt.get("nullspace_reference_policy")
+                    != "initial_joint_position_captured_at_reset_v1")
+            or (physics_rate_profile
+                and receipt.get("q_reference_source") != "reset_initial_joint_v1")
+            or canonical_action.get("arm_resolution_diagnostics") != receipt.get("canonical_arm_resolution")):
+        raise ValueError("task Solution v4 OSC receipt is missing or differs from the frozen task/source identity")
+    resolution_diagnostics = canonical_action.get("arm_resolution_diagnostics")
+    if (not isinstance(resolution_diagnostics, Mapping)
+            or resolution_diagnostics.get("schema_version") != "canonical-arm-resolution-diagnostics-v1"
+            or resolution_diagnostics.get("method_id") != "shared_canonical_dls_iterative_v1"
+            or type(resolution_diagnostics.get("iteration_count")) is not int
+            or resolution_diagnostics.get("iteration_count") < 1
+            or resolution_diagnostics.get("converged") is not True
+            or float(resolution_diagnostics.get("position_residual_m", float("inf")))
+               > float(resolution_diagnostics.get("position_tolerance_m", -1.0))
+            or float(resolution_diagnostics.get("orientation_residual_rad", float("inf")))
+               > float(resolution_diagnostics.get("orientation_tolerance_rad", -1.0))
+            or any(name not in resolution_diagnostics for name in (
+                "initial_position_gap_m", "initial_orientation_gap_rad",
+                "model_position_tolerance_m", "model_orientation_tolerance_rad",
+            ))):
+        raise ValueError("task Solution v4 canonical arm resolution did not report converged FK residuals")
+    try:
+        model_position_gap = float(resolution_diagnostics["initial_position_gap_m"])
+        model_orientation_gap = float(resolution_diagnostics["initial_orientation_gap_rad"])
+        model_position_tolerance = float(resolution_diagnostics["model_position_tolerance_m"])
+        model_orientation_tolerance = float(resolution_diagnostics["model_orientation_tolerance_rad"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("task Solution v4 source-model agreement receipt is malformed") from exc
+    if (not all(math.isfinite(value) for value in (
+            model_position_gap, model_orientation_gap,
+            model_position_tolerance, model_orientation_tolerance,
+        ))
+            or min(model_position_gap, model_orientation_gap) < 0.0
+            or min(model_position_tolerance, model_orientation_tolerance) <= 0.0
+            or model_position_gap > model_position_tolerance
+            or model_orientation_gap > model_orientation_tolerance):
+        raise ValueError("task Solution v4 public TCP and source FK agreement exceeds its recorded gate")
+    try:
+        q_ref = np.asarray(
+            receipt.get("q_reference_rad") if physics_rate_profile
+            else canonical_action.get("qdesired_rad"), dtype=np.float64,
+        )
+        q = np.asarray(receipt.get("q_rad"), dtype=np.float64)
+        qdot = np.asarray(receipt.get("qdot_rad_s"), dtype=np.float64)
+        mass = np.asarray(receipt.get("mass_matrix_arm"), dtype=np.float64)
+        jacobian = np.asarray(receipt.get("jacobian_world"), dtype=np.float64)
+        bias = np.asarray(receipt.get("bias_minus_passive_Nm"), dtype=np.float64)
+        current_position = np.asarray(receipt.get("current_world_pose", {}).get("position_m"), dtype=np.float64)
+        current_rotation = np.asarray(receipt.get("current_world_pose", {}).get("rotation_matrix"), dtype=np.float64)
+        target_position = np.asarray(receipt.get("target_world_pose", {}).get("position_m"), dtype=np.float64)
+        target_quaternion = np.asarray(receipt.get("target_world_pose", {}).get("quaternion_wxyz"), dtype=np.float64)
+        position_error = np.asarray(receipt.get("position_error_m"), dtype=np.float64)
+        orientation_error = np.asarray(receipt.get("orientation_error_rad_vector"), dtype=np.float64)
+        ee_velocity = np.asarray(receipt.get("ee_velocity"), dtype=np.float64)
+        task_torque = np.asarray(receipt.get("task_torque_Nm"), dtype=np.float64)
+        null_torque = np.asarray(receipt.get("nullspace_torque_Nm"), dtype=np.float64)
+        raw_torque = np.asarray(receipt.get("raw_torque_Nm"), dtype=np.float64)
+        applied_torque = np.asarray(receipt.get("applied_torque_Nm"), dtype=np.float64)
+        clipped = np.asarray(receipt.get("torque_clipped"), dtype=bool)
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ValueError("task Solution v4 OSC arrays are malformed") from exc
+    vectors7 = (q_ref, q, qdot, bias, task_torque, null_torque, raw_torque, applied_torque)
+    if (any(value.shape != (7,) or not np.isfinite(value).all() for value in vectors7)
+            or mass.shape != (7, 7) or not np.isfinite(mass).all()
+            or jacobian.shape != (6, 7) or not np.isfinite(jacobian).all()
+            or current_position.shape != (3,) or not np.isfinite(current_position).all()
+            or current_rotation.shape != (3, 3) or not np.isfinite(current_rotation).all()
+            or target_position.shape != (3,) or not np.isfinite(target_position).all()
+            or target_quaternion.shape != (4,) or not np.isfinite(target_quaternion).all()
+            or position_error.shape != (3,) or not np.isfinite(position_error).all()
+            or orientation_error.shape != (3,) or not np.isfinite(orientation_error).all()
+            or ee_velocity.shape != (6,) or not np.isfinite(ee_velocity).all()
+            or clipped.shape != (7,)
+            or public_action.shape != (8,) or not np.isfinite(public_action).all()
+            or (h5_joint_position is not None and (
+                h5_joint_position.shape != (9,) or not np.isfinite(h5_joint_position).all()))
+            or (h5_ee_pose is not None and (
+                h5_ee_pose.shape != (7,) or not np.isfinite(h5_ee_pose).all()))):
+        raise ValueError("task Solution v4 OSC receipt contains invalid dimensions or non-finite values")
+    if ((h5_joint_position is not None and not np.allclose(
+                q, h5_joint_position[:7], rtol=0.0, atol=2e-6))
+            or (h5_ee_pose is not None and not np.allclose(
+                current_position, h5_ee_pose[:3], rtol=0.0, atol=0.003))
+            or (h5_ee_pose is not None and not np.allclose(
+                current_rotation,
+                quat_wxyz_to_matrix(np.asarray(h5_ee_pose[3:7], dtype=np.float64)),
+                rtol=0.0, atol=0.03))
+            or (initial_joint_reference is not None and not np.allclose(
+                q_ref, initial_joint_reference, rtol=0.0, atol=2e-7))
+            or not np.allclose(position_error, target_position - current_position,
+                               rtol=0.0, atol=2e-8)
+            or not np.allclose(target_position, np.asarray(public_action[:3]), rtol=0.0, atol=1e-7)
+            or not np.allclose(target_quaternion, public_action[3:7], rtol=0.0, atol=1e-7)):
+        raise ValueError("task Solution v4 OSC source-state pose differs from H5 or requested action")
+    target_rotation = quat_wxyz_to_matrix(target_quaternion)
+    recomputed_orientation = 0.5 * sum(
+        (np.cross(current_rotation[:, axis], target_rotation[:, axis]) for axis in range(3)),
+        start=np.zeros(3, dtype=np.float64),
+    )
+    recomputed_velocity = jacobian @ qdot
+    kp_pos = float(expected_controller["position_kp_N_per_m"])
+    kp_ori = float(expected_controller["orientation_kp_Nm_per_rad"])
+    damping = float(expected_controller["damping_ratio"])
+    if (not np.allclose(orientation_error, recomputed_orientation, rtol=0.0, atol=2e-8)
+            or not np.allclose(ee_velocity, recomputed_velocity, rtol=0.0, atol=2e-8)):
+        raise ValueError("task Solution v4 OSC pose error or end-effector velocity is inconsistent")
+    mass_inv = np.linalg.inv(mass)
+    j_pos, j_ori = jacobian[:3], jacobian[3:]
+    lambda_full = np.linalg.pinv(jacobian @ mass_inv @ jacobian.T)
+    lambda_pos = np.linalg.pinv(j_pos @ mass_inv @ j_pos.T)
+    lambda_ori = np.linalg.pinv(j_ori @ mass_inv @ j_ori.T)
+    j_bar = mass_inv @ jacobian.T @ lambda_full
+    nullspace = np.eye(7, dtype=np.float64) - j_bar @ jacobian
+    desired_force = kp_pos * position_error - 2.0 * math.sqrt(kp_pos) * damping * recomputed_velocity[:3]
+    desired_moment = kp_ori * orientation_error - 2.0 * math.sqrt(kp_ori) * damping * recomputed_velocity[3:]
+    expected_task = jacobian.T @ np.concatenate((lambda_pos @ desired_force,
+                                                 lambda_ori @ desired_moment))
+    kp_null = float(expected_controller["nullspace_kp_per_s2"])
+    expected_null = nullspace.T @ (
+        mass @ (kp_null * (q_ref - q) - 2.0 * math.sqrt(kp_null) * qdot)
+    )
+    expected_raw = expected_task + expected_null + bias
+    limits = np.asarray([expected_controller["torque_limits_Nm"][f"joint{i}"]
+                         for i in range(1, 8)], dtype=np.float64)
+    expected_applied = np.clip(expected_raw, -limits, limits)
+    expected_clipped = np.abs(expected_raw - expected_applied) > 1e-12
+    if (not np.allclose(task_torque, expected_task, rtol=0.0, atol=2e-7)
+            or not np.allclose(null_torque, expected_null, rtol=0.0, atol=2e-7)
+            or not np.allclose(raw_torque, expected_raw, rtol=0.0, atol=2e-7)
+            or not np.allclose(applied_torque, expected_applied, rtol=0.0, atol=2e-7)
+            or not np.array_equal(clipped, expected_clipped)
+            or not np.allclose([target.channel_values[f"joint{i}"] for i in range(1, 8)],
+                               expected_applied, rtol=0.0, atol=2e-7)):
+        raise ValueError("task Solution v4 mixed Target differs from independently recomputed OSC torque law")
+    aggregate_opening = 0.04 * (float(public_action[7]) + 1.0)
+    if (not 0.0 <= aggregate_opening <= 0.08
+            or abs(float(receipt.get("opening_m", float("nan"))) - aggregate_opening) > 1e-8
+            or not np.allclose(
+                [target.channel_values["finger_joint1"], target.channel_values["finger_joint2"]],
+                (aggregate_opening / 2.0, -aggregate_opening / 2.0), rtol=0.0, atol=1e-8)):
+        raise ValueError("task Solution v4 gripper action differs from its mixed Target mapping")
+
+
+def _validate_v5_stepwise_osc_receipt(
+    canonical_action: Mapping[str, Any], expected_controller: Mapping[str, Any],
+    first_target: MixedActuatorCommandV1, public_action: np.ndarray,
+    h5_joint_position: np.ndarray, h5_ee_pose: np.ndarray,
+    resource_close: Mapping[str, Any], initial_joint_reference: np.ndarray,
+    *, outer_transition_index: int,
+) -> int:
+    """Read back every physics-rate OSC command in one recorded outer action."""
+    from task_env.controllers.canonical.contracts import MixedActuatorCommandV1
+
+    interval = canonical_action.get("physics_rate_control_v1")
+    count = expected_controller.get("control_substeps")
+    expected_revision = outer_transition_index * count
+    if (not isinstance(interval, Mapping)
+            or interval.get("schema_version") != "mixed-actuator-stepwise-interval-receipt-v1"
+            or interval.get("provider_name") != "mujoco"
+            or interval.get("native_substep_count") != count
+            or interval.get("physics_dt_s") != expected_controller.get("physics_dt_s")
+            or interval.get("start_control_step") != outer_transition_index
+            or interval.get("end_control_step") != outer_transition_index + 1
+            or interval.get("start_state_revision") != expected_revision
+            or interval.get("end_state_revision") != expected_revision + count
+            or not isinstance(interval.get("substeps"), (list, tuple))
+            or len(interval["substeps"]) != count):
+        raise ValueError("task Solution v5 stepwise OSC interval receipt has an invalid outer/native boundary")
+    root_receipt = canonical_action.get("controller_receipt")
+    rows = interval["substeps"]
+    if root_receipt != rows[0].get("controller_receipt"):
+        raise ValueError("task Solution v5 outer OSC receipt differs from its first physics substep")
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise ValueError("task Solution v5 physics substep receipt is malformed")
+        try:
+            target = MixedActuatorCommandV1(**dict(row["target"]))
+            target.validate()
+            receipt = row["controller_receipt"]
+            applied = row["applied"]
+            before_revision = expected_revision + index
+            before_time = outer_transition_index * float(expected_controller["physics_dt_s"]) * count + index * float(expected_controller["physics_dt_s"])
+            after_time = before_time + float(expected_controller["physics_dt_s"])
+            simulation_before = float(row["simulation_time_before_s"])
+            simulation_after = float(row["simulation_time_after_s"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("task Solution v5 physics substep fields are incomplete") from exc
+        if (row.get("substep_index") != index
+                or row.get("state_revision_before") != before_revision
+                or row.get("state_revision_after") != before_revision + 1
+                or not np.isclose(simulation_before, before_time, rtol=0.0, atol=2e-8)
+                or not np.isclose(simulation_after, after_time, rtol=0.0, atol=2e-8)
+                or target.control_step != outer_transition_index
+                or target.state_revision != before_revision
+                or not np.isclose(target.simulation_time_s, simulation_before, rtol=0.0, atol=2e-8)
+                or row.get("target_identity_sha256") != target.identity_hash
+                or target.plan_identity_hash != first_target.plan_identity_hash
+                or target.task_artifact_hash != first_target.task_artifact_hash
+                or target.source_id != first_target.source_id
+                or target.source_closure_digest != first_target.source_closure_digest
+                or target.controller_identity != expected_controller.get("identity_sha256")
+                or target.provider_materialization_id != first_target.provider_materialization_id
+                or target.episode_id != first_target.episode_id
+                or target.reset_sample_id != first_target.reset_sample_id
+                or not isinstance(applied, Mapping)
+                or applied.get("schema_version") != "applied-mixed-actuator-command-v1"
+                or applied.get("target_hash") != target.identity_hash
+                or applied.get("provider_name") != "mujoco"
+                or applied.get("clipped") is not False
+                or applied.get("channel_values") != dict(target.channel_values)
+                or applied.get("channel_units") != dict(target.channel_units)):
+            raise ValueError("task Solution v5 substep target/Ack differs from its frozen Runtime boundary")
+        nested_action = dict(canonical_action)
+        nested_action.pop("physics_rate_control_v1", None)
+        _validate_v4_osc_receipt(
+            nested_action, expected_controller, target, public_action,
+            h5_joint_position if index == 0 else None,
+            h5_ee_pose if index == 0 else None,
+            resource_close, receipt_override=receipt,
+            initial_joint_reference=initial_joint_reference,
+        )
+    if (first_target.identity_hash != rows[0].get("target_identity_sha256")
+            or int(resource_close.get("forward_call_count", -1)) < count):
+        raise ValueError("task Solution v5 first Target or source OSC operation receipt is inconsistent")
+    return count
+
+
 def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any], *,
                                    require_motion_thresholds: bool,
                                    require_mujoco_runtime_identity: bool) -> dict[str, Any]:
     """Independent provider-free H5/source/outcome readback for the v2.1.0 route."""
-    from .solution import solution_identity_v1, solution_identity_v2_frozen, solution_identity_v3
+    from .solution import (
+        solution_identity_v1, solution_identity_v2_frozen,
+        solution_identity_v3, solution_identity_v4, solution_identity_v5,
+    )
     from .controller import (
-        LiberoMixedControllerV1, LiberoMixedControllerV2,
+        LiberoMixedControllerV1, LiberoMixedControllerV2, LiberoMixedControllerV3,
+        LiberoMixedControllerV4,
         legacy_v2_controller_identity_mapping,
     )
     schema = report.get("schema_version")
     solution_v2 = schema == "r07-v210-task-solution-worker-result-v2"
     solution_v3 = schema == "r07-v210-task-solution-worker-result-v3"
-    solution_version = "v3" if solution_v3 else "v2" if solution_v2 else "v1"
+    solution_v4 = schema == "r07-v210-task-solution-worker-result-v4"
+    solution_v5 = schema == "r07-v210-task-solution-worker-result-v5"
+    solution_pose = solution_v3 or solution_v4 or solution_v5
+    solution_version = "v5" if solution_v5 else "v4" if solution_v4 else "v3" if solution_v3 else "v2" if solution_v2 else "v1"
     payload = {key: value for key, value in report.items() if key != "result_sha256"}
     if hashlib.sha256(_canonical(payload)).hexdigest() != report.get("result_sha256"):
         raise ValueError("task Solution worker result digest mismatch")
     attempted_episode_receipts = report.get("attempted_episode_receipts")
     failed_episode_receipts = report.get("failed_episode_receipts")
+    raw_rows = report.get("episode_rows")
+    expected_rows = tuple(raw_rows) if isinstance(raw_rows, list) else ()
+    expected_scope = (
+        "task1_final_rows_0_1_2" if expected_rows == (0, 1, 2)
+        else "task1_bounded_probe" if expected_rows == (0,)
+        else None
+    )
     if (schema not in {
                 "r07-v210-task-solution-worker-result-v1",
                 "r07-v210-task-solution-worker-result-v2",
                 "r07-v210-task-solution-worker-result-v3",
+                "r07-v210-task-solution-worker-result-v4",
+                "r07-v210-task-solution-worker-result-v5",
             }
             or report.get("status") != "complete"
             or report.get("worker_error") is not None
             or report.get("close_error") is not None
-            or ((solution_v2 or solution_v3) and report.get("solution_resource_close_error") is not None)
-            or report.get("episode_count") != 3
-            or len(report.get("episodes", ())) != 3
+            or ((solution_v2 or solution_v3 or solution_v4 or solution_v5)
+                and report.get("solution_resource_close_error") is not None)
+            or expected_scope is None
+            or report.get("run_scope") != expected_scope
+            or report.get("episode_count") != len(expected_rows)
+            or len(report.get("episodes", ())) != len(expected_rows)
             or not isinstance(attempted_episode_receipts, list)
-            or len(attempted_episode_receipts) != 3
+            or len(attempted_episode_receipts) != len(expected_rows)
             or not isinstance(failed_episode_receipts, list)
             or failed_episode_receipts
-            or report.get("reset_count") != 3):
+            or report.get("reset_count") != len(expected_rows)):
         raise ValueError("task Solution worker bundle is incomplete or has an invalid schema/count")
     source_readback = _verify_solution_source_bundle(bundle_path, report.get("source_bundle"))
+    source_xml_bytes = source_readback.pop("_canonical_xml_bytes")
     recorded_controller = report["episodes"][0].get("control_plan", {})
-    expected_controller = LiberoMixedControllerV2().identity_mapping() if solution_v3 else (
+    if solution_v4 or solution_v5:
+        resolver_policy = {
+            "max_iterations": 12,
+            "position_tolerance_m": 0.006,
+            "orientation_tolerance_rad": 0.03,
+            "model_position_tolerance_m": 0.003,
+            "model_orientation_tolerance_rad": 0.03,
+        }
+        resolver_identity = _task1_iterative_resolver_identity(
+            source_xml_bytes,
+            report["episodes"][0]["task_artifact_identity_hash"],
+            resolver_policy,
+        )
+    else:
+        resolver_identity = None
+    expected_controller = (
+        LiberoMixedControllerV4(arm_resolver_identity=resolver_identity).identity_mapping()
+        if solution_v5 else
+        LiberoMixedControllerV3(arm_resolver_identity=resolver_identity).identity_mapping()
+        if solution_v4 else
+        LiberoMixedControllerV2().identity_mapping() if solution_v3 else
         legacy_v2_controller_identity_mapping(recorded_controller.get("profile_id"))
         if solution_v2 else None
     )
     if solution_v2 and dict(recorded_controller) != expected_controller:
         raise ValueError("historical v2 Controller identity differs from its frozen profile manifest")
+    if (solution_v3 or solution_v4 or solution_v5) and dict(recorded_controller) != expected_controller:
+        raise ValueError("task Solution pose Controller identity differs from its frozen profile")
     expected_solution_identity = (
         solution_identity_v3(source_readback["canonical_xml_sha256"],
                              source_readback["source_closure_digest"])
         if solution_v3 else
+        solution_identity_v5(
+            source_readback["canonical_xml_sha256"],
+            source_readback["source_closure_digest"],
+            arm_resolver_identity=resolver_identity,
+        ) if solution_v5 else
+        solution_identity_v4(source_readback["canonical_xml_sha256"],
+                             source_readback["source_closure_digest"])
+        if solution_v4 else
         solution_identity_v2_frozen(source_readback["canonical_xml_sha256"],
                                     source_readback["source_closure_digest"], recorded_controller)
         if solution_v2 else solution_identity_v1(source_readback["canonical_xml_sha256"])
     )
     resource_close = report.get("solution_resource_close_receipt")
-    if (solution_v2 or solution_v3) and (
+    if (solution_v2 or solution_v3 or solution_v4 or solution_v5) and (
         not isinstance(resource_close, Mapping)
         or resource_close.get("schema_version") != "libero-source-gravity-model-close-v1"
         or resource_close.get("closed") is not True
@@ -1193,7 +1578,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     total_t = total_obs = total_native = 0
     episodes = []
     for index, (expected_row, episode, attempted) in enumerate(zip(
-            (0, 1, 2), report["episodes"], attempted_episode_receipts, strict=True)):
+            expected_rows, report["episodes"], attempted_episode_receipts, strict=True)):
         expected_episode_schema = (
             f"r07-v210-task-solution-episode-{solution_version}"
         )
@@ -1205,10 +1590,10 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 or episode.get("source_xml_sha256") != source_readback.get("canonical_xml_sha256")
                 or episode.get("solution_identity") != expected_solution_identity):
             raise ValueError("task Solution episode task/row/seed/order identity mismatch")
-        if solution_v3 and (
-                episode.get("solution_schema_version") != "libero-bowl-to-plate-solution-v3"
+        if solution_pose and (
+                episode.get("solution_schema_version") != f"libero-bowl-to-plate-solution-{solution_version}"
                 or episode.get("action_schema_id") != "libero-world-pose-wxyz-absolute-v1"):
-            raise ValueError("task Solution v3 episode omits its explicit world-pose profile identity")
+            raise ValueError("task Solution pose episode omits its explicit world-pose profile identity")
         prior_close = episode.get("prior_session_close_receipt")
         if ((index == 0 and prior_close is not None)
                 or (index > 0 and (not isinstance(prior_close, Mapping)
@@ -1328,7 +1713,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             action_names = (
                 ["world_x_m", "world_y_m", "world_z_m", "world_qw", "world_qx",
                  "world_qy", "world_qz", "gripper_normalized"]
-                if solution_v3 else
+                if solution_pose else
                 [*(f"joint{i}" for i in range(1, 8)), "aggregate_opening_m"]
             )
             if any(f"universal_action/{name}" not in handle for name in action_names):
@@ -1356,7 +1741,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 or task_context.get("init_row_index") != expected_row
                 or task_context.get("reset_sample_id") != sample.get("sample_id")
                 or task_context.get("provider_materialization_id") != progress.get("provider_materialization_id")
-                or (solution_v3 and task_context.get("controller_identity")
+                or (solution_pose and task_context.get("controller_identity")
                     != expected_controller.get("identity_sha256"))):
             raise ValueError("task Solution H5 task/source/solution identity differs from worker receipts")
         identity_fields = (
@@ -1364,11 +1749,14 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
             "episode_id", "reset_sample_id", "control_step", "state_revision", "simulation_time_s",
         )
         for boundary_index, boundary in enumerate(boundaries):
+            expected_revision = boundary_index * (
+                int(expected_controller["control_substeps"]) if solution_v5 else 1
+            )
             if (not isinstance(boundary, Mapping)
                     or boundary.get("schema_version") != "task-observation-context-v1"
                     or any(boundary.get(name) != task_context.get(name) for name in identity_fields[:5])
                     or boundary.get("control_step") != boundary_index
-                    or boundary.get("state_revision") != boundary_index
+                    or boundary.get("state_revision") != expected_revision
                     or boundary.get("simulation_time_s") != boundary_index * 0.05):
                 raise ValueError("task Solution H5 boundary identity/order/clock is invalid")
             digest_payload = {name: boundary[name] for name in identity_fields}
@@ -1378,9 +1766,15 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 raise ValueError("task Solution H5 observation boundary digest is invalid")
             contact = boundary.get("contact_summary_v2")
             predicate = boundary.get("predicate_v1")
+            expected_contact_pairs = (
+                [["akita_black_bowl_1", "panda-v1/finger-left"],
+                 ["akita_black_bowl_1", "panda-v1/finger-right"],
+                 ["akita_black_bowl_1", "plate_1"]]
+                if solution_v4 or solution_v5 else [["akita_black_bowl_1", "plate_1"]]
+            )
             if (not isinstance(contact, Mapping)
                     or contact.get("schema_version") != "task-contact-summary-v2"
-                    or contact.get("requested_pairs") != [["akita_black_bowl_1", "plate_1"]]
+                    or contact.get("requested_pairs") != expected_contact_pairs
                     or contact.get("covered_pairs") != contact.get("requested_pairs")
                     or any(contact.get(name) != boundary.get(name) for name in identity_fields)
                     or contact.get("state_revision") != boundary.get("state_revision")):
@@ -1403,7 +1797,7 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         for transition_index, control in enumerate(semantic["structured_controls"]):
             control.validate()
             expected_action_schema = (
-                "libero-world-pose-wxyz-absolute-v1" if solution_v3
+                "libero-world-pose-wxyz-absolute-v1" if solution_pose
                 else "libero-joint-space-absolute-v1"
             )
             if (len(control.request.groups) != 1 or len(control.writer_controls) != 1
@@ -1496,6 +1890,24 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                             expected_fingers, rtol=0.0, atol=1e-8,
                         )):
                     raise ValueError("task Solution v3 pose/gripper action differs from the mixed Target mapping")
+            elif solution_v4:
+                writer = control.writer_controls[0]
+                canonical_action = writer.get("canonical_action")
+                _validate_v4_osc_receipt(
+                    canonical_action, expected_controller, target, actions[transition_index],
+                    np.asarray(joints[transition_index], dtype=np.float64),
+                    np.asarray(ee_poses[transition_index], dtype=np.float64), resource_close,
+                )
+            elif solution_v5:
+                writer = control.writer_controls[0]
+                canonical_action = writer.get("canonical_action")
+                _validate_v5_stepwise_osc_receipt(
+                    canonical_action, expected_controller, target, actions[transition_index],
+                    np.asarray(joints[transition_index], dtype=np.float64),
+                    np.asarray(ee_poses[transition_index], dtype=np.float64), resource_close,
+                    np.asarray(joints[0, :7], dtype=np.float64),
+                    outer_transition_index=transition_index,
+                )
         action_trace = episode.get("action_trace")
         if not isinstance(action_trace, list) or len(action_trace) != count:
             raise ValueError("task Solution action trace does not cover every H5 transition")
@@ -1515,8 +1927,8 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                     or gravity_receipt.get("runtime_identity", {}).get("api_version") != 3008001
                     or resource_close.get("model_identity_sha256") != gravity_receipt.get("model_identity_sha256")):
                 raise ValueError("task Solution source gravity receipt is missing or identity-mismatched")
-        elif solution_v3 and gravity_receipt is not None:
-            raise ValueError("task Solution v3 must keep source gravity outside the Solution outcome")
+        elif (solution_v3 or solution_v4 or solution_v5) and gravity_receipt is not None:
+            raise ValueError("task Solution pose profiles must keep source gravity outside the Solution outcome")
         for transition_index, action in enumerate(action_trace):
             if (not isinstance(action, Mapping)
                     or type(action.get("control_step")) is not int
@@ -1550,6 +1962,66 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
                 if (diagnostics.get("planner_owner") != expected_planner_owner
                         or diagnostics.get("source_pose_observation_used") is not True):
                     raise ValueError("task Solution v3 action does not record the shared pose-planner path")
+            elif solution_v4 or solution_v5:
+                diagnostics = action["solution_diagnostics"]
+                receipt = action.get("solution_action_receipt")
+                expected_planner_owner = (
+                    "CartesianPosePlanner.plan_gripper_transition"
+                    if action.get("solution_stage") in {"grasp", "release"}
+                    else "CartesianPosePlanner.plan_to_pose"
+                )
+                feedback = receipt.get("post_step_feedback") if isinstance(receipt, Mapping) else None
+                try:
+                    position_error = float(feedback.get("planner_tracking_position_error_m"))
+                    orientation_error = float(feedback.get("planner_tracking_orientation_error_rad"))
+                    path_index = diagnostics.get("planner_path_index")
+                    path_length = diagnostics.get("planner_path_length")
+                except (AttributeError, TypeError, ValueError) as exc:
+                    raise ValueError("task Solution v4 action omits convergence-gate feedback") from exc
+                if (not isinstance(receipt, Mapping)
+                        or receipt.get("solution_schema_version")
+                           != f"libero-bowl-to-plate-solution-{solution_version}"
+                        or receipt.get("solution_identity") != expected_solution_identity
+                        or receipt.get("stage") != action.get("solution_stage")
+                        or not np.allclose(np.asarray(receipt.get("action"), dtype=np.float64),
+                                           np.asarray(action.get("solution_action"), dtype=np.float64),
+                                           rtol=0.0, atol=1e-7)
+                        or not isinstance(feedback, Mapping)
+                        or feedback.get("stage_before") != action.get("solution_stage")
+                        or type(feedback.get("waypoint_advanced")) is not bool
+                        or not math.isfinite(position_error) or position_error < 0.0
+                        or not math.isfinite(orientation_error) or orientation_error < 0.0
+                        or type(path_index) is not int or path_index < 0
+                        or type(path_length) is not int or path_length <= path_index
+                        or diagnostics.get("planner_owner") != expected_planner_owner
+                        or diagnostics.get("advancement_policy") != "public_TCP_waypoint_convergence_gated_v1"
+                        or diagnostics.get("source_pose_observation_used") is not True
+                        or (position_error > 0.025 or orientation_error > 0.25)
+                           and feedback.get("waypoint_advanced") is True
+                        or feedback.get("waypoint_advanced") is True
+                           and (position_error > 0.006 or orientation_error > 0.03)):
+                    raise ValueError("task Solution v4 action does not record its shared convergence-gated planner")
+        if solution_v4 or solution_v5:
+            for previous, current in zip(action_trace, action_trace[1:]):
+                previous_receipt = previous["solution_action_receipt"]
+                feedback = previous_receipt["post_step_feedback"]
+                next_diagnostics = current["solution_diagnostics"]
+                if feedback.get("stage_after") != current.get("solution_stage"):
+                    raise ValueError("task Solution v4 stage transition does not match the next planned action")
+                previous_diagnostics = previous["solution_diagnostics"]
+                old_index = previous_diagnostics["planner_path_index"]
+                old_length = previous_diagnostics["planner_path_length"]
+                if feedback.get("stage_after") != previous.get("solution_stage"):
+                    expected_index = 0
+                elif (feedback["planner_tracking_position_error_m"] > 0.025
+                      or feedback["planner_tracking_orientation_error_rad"] > 0.25):
+                    expected_index = 0
+                elif feedback["waypoint_advanced"]:
+                    expected_index = old_index + 1 if old_index + 1 < old_length else 0
+                else:
+                    expected_index = old_index
+                if next_diagnostics.get("planner_path_index") != expected_index:
+                    raise ValueError("task Solution v4 path index advanced without public waypoint convergence")
         initial_observation = episode.get("initial_observation")
         final_observation = episode.get("final_observation")
         if not isinstance(initial_observation, Mapping) or not isinstance(final_observation, Mapping):
@@ -1607,7 +2079,10 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     close = report.get("final_session_close_receipt")
     if not isinstance(close, Mapping) or close.get("session_closed") is not True:
         raise ValueError("task Solution worker omitted a successful final RuntimeSession close receipt")
-    if (solution_v2 or solution_v3) and resource_close.get("forward_call_count") != total_t:
+    if solution_v5:
+        if resource_close.get("forward_call_count") != total_native:
+            raise ValueError("task Solution v5 source OSC call count differs from physics-rate substeps")
+    elif (solution_v2 or solution_v3 or solution_v4) and resource_close.get("forward_call_count") != total_t:
         raise ValueError("task Solution gravity forward-call count differs from the complete H5 transition total")
     if (report.get("transition_count") != total_t
             or report.get("observation_count") != total_obs
@@ -1622,6 +2097,8 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
         "motion_thresholds_required": bool(require_motion_thresholds),
         "mujoco_runtime_identity_required": bool(require_mujoco_runtime_identity),
         "episode_count": len(episodes),
+        "episode_rows": list(expected_rows),
+        "run_scope": expected_scope,
         "transition_count": total_t,
         "observation_count": total_obs,
         "native_step_count": total_native,
@@ -1642,6 +2119,8 @@ def consume_libero_candidate_bundle(bundle_path: Path, *, parent_run_record_path
         "r07-v210-task-solution-worker-result-v1",
         "r07-v210-task-solution-worker-result-v2",
         "r07-v210-task-solution-worker-result-v3",
+        "r07-v210-task-solution-worker-result-v4",
+        "r07-v210-task-solution-worker-result-v5",
     }:
         result = _consume_libero_solution_bundle(
             bundle_path, report, require_motion_thresholds=require_motion_thresholds,
@@ -2156,6 +2635,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--parent-run-record", type=Path)
     parser.add_argument("--expected-lock-path", type=Path)
     parser.add_argument("--steps", type=int, default=64)
+    parser.add_argument("--rows", type=int, nargs="+", default=(0, 1, 2))
     parser.add_argument("--task-solution-1", action="store_true")
     parser.add_argument("--source-xml", type=Path)
     parser.add_argument("--composition-plan", type=Path)
@@ -2176,7 +2656,7 @@ def main(argv: list[str] | None = None) -> int:
         if not all((args.source_xml, args.composition_plan, args.install_root)):
             parser.error("--task-solution-1 requires --source-xml, --composition-plan, and --install-root")
         from .selected_candidate import build_libero_solution_candidate
-        from .solution import LiberoPickPlaceSolutionV3
+        from .solution import LiberoPickPlaceSolutionV5
         from .source_gravity import MujocoSourceGravityBiasV1
         from task_env.runtime.sessions.source import source_asset_bytes
 
@@ -2196,7 +2676,7 @@ def main(argv: list[str] | None = None) -> int:
         }
 
         class _Task1SolutionFactory:
-            worker_result_schema_version = "r07-v210-task-solution-worker-result-v3"
+            worker_result_schema_version = "r07-v210-task-solution-worker-result-v5"
 
             def __init__(self):
                 self.gravity_model = None
@@ -2216,17 +2696,20 @@ def main(argv: list[str] | None = None) -> int:
                 elif candidate_root != self.bundle_root:
                     raise ValueError("same-Env Solution factory received a different worker source bundle")
                 env.value["bind_source_gravity_model"](self.gravity_model)
-                return LiberoPickPlaceSolutionV3(
+                return LiberoPickPlaceSolutionV5(
                     source_xml,
                     source_closure_digest=env.metadata["source_closure_digest"],
+                    arm_resolver_identity=(
+                        env.value["arm_resolver"].iterative_resolution_identity_v1()
+                    ),
                 )
 
             def close_resources(self):
-                return env.controller.close_resources()
+                return env.value['close_task_resources']()
 
         solution_factory = _Task1SolutionFactory()
         result = run_libero_candidate_worker(
-            env, output_dir=Path(args.run_worker), steps=args.steps,
+            env, output_dir=Path(args.run_worker), rows=tuple(args.rows), steps=args.steps,
             solution_factory=solution_factory,
             source_closure_files=source_files,
             composition_plan_bytes=plan_bytes,
@@ -2236,7 +2719,9 @@ def main(argv: list[str] | None = None) -> int:
         from .selected_candidate import build_libero_selected_candidate
 
         env = build_libero_selected_candidate(horizon=args.steps)
-        result = run_libero_candidate_worker(env, output_dir=Path(args.run_worker), steps=args.steps)
+        result = run_libero_candidate_worker(
+            env, output_dir=Path(args.run_worker), rows=tuple(args.rows), steps=args.steps,
+        )
     print(json.dumps({
         "status": result["status"], "episode_count": result["episode_count"],
         "transition_count": result["transition_count"],

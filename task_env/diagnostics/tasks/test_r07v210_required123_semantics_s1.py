@@ -20,7 +20,7 @@ from bench_deploy.libero.controller import (
 from bench_deploy.libero.task_contracts import TASK_2, TASK_3
 from bench_deploy.libero.solution import (
     LiberoPickPlaceSolutionConfigV1,
-    solution_identity_v1, solution_identity_v2,
+    solution_identity_v1, solution_identity_v2, solution_identity_v4,
 )
 from task_env.controllers.canonical.kinematics import (
     PandaKinematics,
@@ -77,6 +77,198 @@ def test_task_one_solution_v3_identity_binds_world_pose_planner_and_frozen_v2_pr
         solution_identity_v2_frozen(source_sha, closure_sha, tampered_controller)
     with pytest.raises(ValueError, match="allowlist"):
         legacy_v2_controller_identity_mapping("unreviewed-profile")
+
+
+def test_task_one_solution_v4_identity_binds_osc_grasp_and_convergence_policy():
+    from bench_deploy.libero.controller import LiberoMixedControllerV3
+    from task_env.planners.cartesian import CartesianPosePlannerConfig
+
+    source_sha, closure_sha = "f" * 64, "e" * 64
+    default = solution_identity_v4(source_sha, closure_sha)
+    assert solution_identity_v4(source_sha, closure_sha) == default
+    assert solution_identity_v4("d" * 64, closure_sha) != default
+    assert solution_identity_v4(source_sha, "c" * 64) != default
+    slower = CartesianPosePlannerConfig(max_translation_per_step=0.006)
+    assert solution_identity_v4(source_sha, closure_sha, planner_config=slower) != default
+    resolver_identity = "d" * 64
+    from task_env.controllers.canonical import CanonicalPandaController
+    from bench_deploy.libero.controller import LiberoMixedControllerV3
+    controller = LiberoMixedControllerV3(arm_resolver_identity=resolver_identity)
+    assert controller.identity_mapping()["algorithm"] == (
+        "robosuite_osc_pose_uncoupled_lambda_and_nullspace_v1"
+    )
+    assert controller.identity_mapping()["qualification"] == "diagnostic_only_source_bound_20hz_OSC"
+
+
+def test_task_one_solution_v5_controller_freezes_reset_nullspace_reference_and_physics_rate_policy():
+    from types import SimpleNamespace
+
+    from bench_deploy.libero.controller import LiberoMixedControllerV4
+    from bench_deploy.libero.solution import solution_identity_v5
+
+    resolver_identity = "d" * 64
+    controller = LiberoMixedControllerV4(arm_resolver_identity=resolver_identity)
+    first = np.asarray((0.1, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7), dtype=np.float64)
+    state = SimpleNamespace(
+        joint_position={f"joint{index + 1}": float(value) for index, value in enumerate(first)},
+        joint_velocity={f"joint{index + 1}": 0.0 for index in range(7)},
+        control_step=0, simulation_time=0.0,
+    )
+    controller.reset(state)
+    reference, source = controller._nullspace_reference(first + 1.0, np.zeros(7))
+    assert source == "reset_initial_joint_v1"
+    assert reference == pytest.approx(first)
+    policy = controller.identity_mapping()
+    assert policy["schema_version"] == "libero-mixed-controller-identity-v4"
+    assert policy["hold_policy"] == "torque_recomputed_each_physics_substep_v1"
+    assert policy["nullspace_reference_policy"] == "initial_joint_position_captured_at_reset_v1"
+    assert policy["arm_resolver_identity"] == resolver_identity
+    assert solution_identity_v5(
+        "f" * 64, "e" * 64, arm_resolver_identity=resolver_identity,
+    ) != solution_identity_v5(
+        "f" * 64, "e" * 64, arm_resolver_identity="c" * 64,
+    )
+    second = first - 0.25
+    reset_state = SimpleNamespace(
+        joint_position={f"joint{index + 1}": float(value) for index, value in enumerate(second)},
+        joint_velocity={f"joint{index + 1}": 0.0 for index in range(7)},
+        control_step=0, simulation_time=0.0,
+    )
+    controller.reset(reset_state)
+    reference, _ = controller._nullspace_reference(second + 2.0, np.zeros(7))
+    assert reference == pytest.approx(second)
+
+
+def test_task_one_v4_bilateral_contact_requires_fresh_covered_left_and_right_pairs():
+    from bench_deploy.libero.solution import LiberoPickPlaceSolutionV4
+
+    boundary = {
+        "source_id": "source-v1", "source_closure_digest": "a" * 64,
+        "provider_materialization_id": "materialization-v1", "episode_id": "episode-v1",
+        "reset_sample_id": "sample-v1", "control_step": 3,
+        "state_revision": 3, "simulation_time_s": 0.15,
+    }
+    left = ("akita_black_bowl_1", "panda-v1/finger-left")
+    right = ("akita_black_bowl_1", "panda-v1/finger-right")
+    contact = {
+        "schema_version": "task-contact-summary-v2", "status": "available",
+        **boundary,
+        "requested_pairs": [list(left), list(right)],
+        "covered_pairs": [list(left), list(right)],
+        "pair_counts": {"/".join(left): 1, "/".join(right): 2},
+    }
+    info = {
+        **boundary, "boundary_context_v1": dict(boundary),
+        "contact_summary_v2": contact,
+    }
+    assert LiberoPickPlaceSolutionV4._bilateral_finger_contact(info) == (
+        True, (1, 2), "available",
+    )
+    one_sided = {**contact, "pair_counts": {"/".join(left): 1, "/".join(right): 0}}
+    assert LiberoPickPlaceSolutionV4._bilateral_finger_contact(
+        {**info, "contact_summary_v2": one_sided},
+    )[:2] == (False, (1, 0))
+    stale = {**contact, "state_revision": 2}
+    assert LiberoPickPlaceSolutionV4._bilateral_finger_contact(
+        {**info, "contact_summary_v2": stale},
+    )[2] == "contact_summary_stale_or_wrong_boundary"
+
+
+def test_task_one_v4_independent_reader_recomputes_source_osc_torque_and_gripper_mapping():
+    from types import SimpleNamespace
+
+    from bench_deploy.libero.controller import LiberoMixedControllerV3
+    from bench_deploy.libero.core_candidate_worker import (
+        _TASK1_COMPOSED_XML_SHA256, _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256,
+        _validate_v4_osc_receipt,
+    )
+
+    resolver_identity = "d" * 64
+    controller = LiberoMixedControllerV3(arm_resolver_identity=resolver_identity)
+    identity = controller.identity_mapping()
+    q = np.zeros(7)
+    mass = np.eye(7)
+    jacobian = np.zeros((6, 7))
+    jacobian[:3, :3] = np.eye(3)
+    jacobian[3:, 3:6] = np.eye(3)
+    bias = np.zeros(7)
+    target_position = np.asarray((0.01, 0.0, 0.0))
+    target_rotation = np.eye(3)
+    position_error = target_position.copy()
+    orientation_error = np.zeros(3)
+    ee_velocity = np.zeros(6)
+    task_torque = np.asarray((1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    null_torque = np.zeros(7)
+    raw_torque = task_torque.copy()
+    applied_torque = raw_torque.copy()
+    resolution_diagnostics = {
+        "schema_version": "canonical-arm-resolution-diagnostics-v1",
+        "method_id": "shared_canonical_dls_iterative_v1", "iteration_count": 1,
+        "max_iterations": 12,
+        "position_residual_m": 0.001, "orientation_residual_rad": 0.001,
+        "position_tolerance_m": 0.006, "orientation_tolerance_rad": 0.03,
+        "initial_position_gap_m": 0.001, "initial_orientation_gap_rad": 0.002,
+        "model_position_tolerance_m": 0.003, "model_orientation_tolerance_rad": 0.03,
+        "converged": True,
+    }
+    source_model_identity = "c" * 64
+    receipt = {
+        "schema_version": "libero-mixed-control-receipt-v3",
+        "controller_identity": controller.identity,
+        "algorithm": "robosuite_osc_pose_uncoupled_lambda_and_nullspace_v1",
+        "source_state_profile_id": identity["source_state_profile_id"],
+        "source_model_identity_sha256": source_model_identity,
+        "source_xml_sha256": _TASK1_COMPOSED_XML_SHA256,
+        "source_closure_digest": _TASK1_EXECUTION_SOURCE_CLOSURE_SHA256,
+        "tcp_site_name": "gripper0_grip_site",
+        "canonical_arm_resolution": resolution_diagnostics,
+        "target_world_pose": {
+            "position_m": target_position.tolist(),
+            "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0],
+        },
+        "current_world_pose": {
+            "position_m": [0.0, 0.0, 0.0],
+            "rotation_matrix": target_rotation.tolist(),
+        },
+        "q_rad": q.tolist(), "qdot_rad_s": q.tolist(),
+        "mass_matrix_arm": mass.tolist(), "jacobian_world": jacobian.tolist(),
+        "bias_minus_passive_Nm": bias.tolist(),
+        "position_error_m": position_error.tolist(),
+        "orientation_error_rad_vector": orientation_error.tolist(),
+        "ee_velocity": ee_velocity.tolist(),
+        "task_torque_Nm": task_torque.tolist(),
+        "nullspace_torque_Nm": null_torque.tolist(),
+        "raw_torque_Nm": raw_torque.tolist(), "applied_torque_Nm": applied_torque.tolist(),
+        "torque_clipped": [False] * 7,
+        "opening_m": 0.08, "hold_policy": "torque_zero_order_hold_per_outer_step_v1",
+    }
+    canonical_action = {
+        "schema_version": "libero-world-pose-canonical-v1",
+        "arm_target_schema_version": "canonical-arm-target-v1",
+        "arm_target_source_xml_sha256": _TASK1_COMPOSED_XML_SHA256,
+        "arm_target_controller_identity": resolver_identity,
+        "controller_identity": controller.identity,
+        "arm_resolution_diagnostics": resolution_diagnostics,
+        "qdesired_rad": q.tolist(), "controller_receipt": receipt,
+        "arm_joint_order": [f"panda-v1/joint{i}" for i in range(1, 8)],
+        "qdesired_joint_order": [f"joint{i}" for i in range(1, 8)],
+    }
+    target = SimpleNamespace(channel_values={
+        **{f"joint{i+1}": float(value) for i, value in enumerate(applied_torque)},
+        "finger_joint1": 0.04, "finger_joint2": -0.04,
+    })
+    action = np.asarray((*target_position, 1.0, 0.0, 0.0, 0.0, 1.0))
+    close = {"model_identity_sha256": source_model_identity}
+    _validate_v4_osc_receipt(
+        canonical_action, identity, target, action, np.zeros(9),
+        np.asarray((0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)), close,
+    )
+    broken_target = SimpleNamespace(channel_values={**target.channel_values, "joint1": 2.0})
+    with pytest.raises(ValueError, match="independently recomputed OSC torque law"):
+        _validate_v4_osc_receipt(
+            canonical_action, identity, broken_target, action, np.zeros(9),
+            np.asarray((0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)), close,
+        )
 
 
 def test_source_closure_archive_reads_only_manifest_members_and_rejects_tampering(tmp_path):
@@ -209,6 +401,9 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
             self.qfrc_passive = np.zeros(model.nv)
 
     def fake_name2id(model, obj_type, name):
+        if obj_type == 1:
+            assert name == "gripper0_grip_site"
+            return 0
         assert obj_type == 0
         return int(name[-1]) - 1
 
@@ -218,7 +413,7 @@ def test_source_gravity_model_uses_verified_closure_and_releases_lowest_primitiv
     fake_mujoco = SimpleNamespace(
         __version__="3.8.1", mj_version=lambda: 3008001,
         MjModel=FakeModel, MjData=FakeData,
-        mjtObj=SimpleNamespace(mjOBJ_JOINT=0),
+        mjtObj=SimpleNamespace(mjOBJ_JOINT=0, mjOBJ_SITE=1),
         mj_name2id=fake_name2id, mj_forward=fake_forward,
     )
     source_xml_sha = hashlib.sha256(xml).hexdigest()
@@ -424,3 +619,63 @@ def test_source_bound_panda_kinematics_includes_mount_and_nested_named_tcp():
     assert arm_a.arm_joint_order == arm_b.arm_joint_order
     assert not np.allclose(arm_a.joint_position_rad, arm_b.joint_position_rad)
     assert arm_a.canonical_action.resolved_world_pose.position == pytest.approx(goal_a[:3])
+    iterative = controller.resolve_world_pose_target_iterative_v1(
+        current_joint_position_rad=(0.0,) * 7, current_pose_world=current_pose,
+        target_pose_world=goal_a, gripper_scalar=0.0,
+    )
+    assert iterative.diagnostics.schema_version == "canonical-arm-resolution-diagnostics-v1"
+    assert iterative.diagnostics.converged is True
+    assert iterative.diagnostics.position_residual_m <= iterative.diagnostics.position_tolerance_m
+    assert iterative.diagnostics.orientation_residual_rad <= iterative.diagnostics.orientation_tolerance_rad
+    far_goal = np.concatenate((pose[:3, 3] + np.asarray((0.0, 0.30, 0.0)), current_quaternion))
+    bounded = controller.resolve_world_pose_target_iterative_v1(
+        current_joint_position_rad=(0.0,) * 7, current_pose_world=current_pose,
+        target_pose_world=far_goal, gripper_scalar=0.0, max_iterations=1,
+    )
+    assert bounded.diagnostics.iteration_count == 1
+    assert bounded.diagnostics.converged is False
+    assert arm_a.schema_version == "canonical-arm-target-v1"  # frozen one-step route remains available
+
+    from task_env.controllers.canonical.controller import absolute_joint_position_servo
+    from bench_deploy.libero.controller import LiberoMixedControllerV3
+
+    with pytest.raises(ValueError, match="canonical named Panda joint order"):
+        replace(arm_a, arm_joint_order=tuple(reversed(arm_a.arm_joint_order))).validate()
+    nonzero_q = np.asarray((0.025, -0.035, 0.045, -0.055, 0.065, -0.075, 0.085))
+    nonzero_transform, _ = model.fk_jacobian(nonzero_q)
+    nonzero_pose = PoseWorld(
+        tuple(float(value) for value in nonzero_transform[:3, 3]),
+        tuple(float(value) for value in matrix_to_quat_wxyz(nonzero_transform[:3, :3])),
+    )
+    multi_goal = np.concatenate((
+        np.asarray(nonzero_pose.position) + np.asarray((0.0, 0.025, 0.0)),
+        np.asarray(nonzero_pose.quaternion_wxyz),
+    ))
+    iterative_multi = controller.resolve_world_pose_target_iterative_v1(
+        current_joint_position_rad=tuple(map(float, nonzero_q)),
+        current_pose_world=nonzero_pose, target_pose_world=multi_goal,
+        gripper_scalar=0.0, max_iterations=6,
+        position_tolerance_m=1e-8, orientation_tolerance_rad=1e-8,
+    )
+    iterative_profile_identity = controller.iterative_resolution_identity_v1(
+        max_iterations=6, position_tolerance_m=1e-8,
+        orientation_tolerance_rad=1e-8,
+    )
+    matching_consumer = LiberoMixedControllerV3(
+        arm_resolver_identity=iterative_profile_identity,
+    )
+    assert matching_consumer.map_arm_target_to_control_order(
+        iterative_multi.target,
+    ) == pytest.approx(iterative_multi.target.joint_position_rad)
+    wrong_consumer = LiberoMixedControllerV3(arm_resolver_identity="a" * 64)
+    with pytest.raises(ValueError, match="resolver identity or named joint order"):
+        wrong_consumer.map_arm_target_to_control_order(iterative_multi.target)
+    assert iterative_multi.diagnostics.iteration_count > 1
+    expected_desired, expected_servo = absolute_joint_position_servo(
+        iterative_multi.target.joint_position_rad, nonzero_q, model.limits,
+        controller.config.joint_position_correction_gain,
+    )
+    assert iterative_multi.target.joint_position_rad == pytest.approx(expected_desired)
+    assert iterative_multi.target.servo_position_rad == pytest.approx(expected_servo)
+    assert iterative_multi.diagnostics.initial_position_gap_m == pytest.approx(0.0, abs=1e-12)
+    assert iterative_multi.diagnostics.model_position_tolerance_m == pytest.approx(0.003)

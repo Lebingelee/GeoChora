@@ -1,9 +1,10 @@
 """Source-bound task Solution for the pinned LIBERO bowl-to-plate task.
 
 The policy consumes only the public SelectedReferenceEnv observation, info and
-episode metadata. It issues incremental arm-joint targets and aggregate finger
-opening through the existing mixed-control owner; it never steps physics or
-reads a RuntimeSession/provider object.
+episode metadata. Historical profiles issue arm-joint targets; the current
+pose profile issues absolute world-pose and aggregate-finger intents through
+the existing mixed-control owner. It never steps physics or reads a
+RuntimeSession/provider object.
 """
 from __future__ import annotations
 
@@ -24,7 +25,11 @@ from task_env.planners.contracts import ExpertAction
 from task_env.planners.cartesian import CartesianPosePlanner, CartesianPosePlannerConfig
 from task_env.utils.rotation import normalize_quat_wxyz, quat_angle_wxyz
 
-from .controller import LiberoMixedControlConfigV1
+from .controller import (
+    LiberoMixedControlConfigV1, LiberoMixedControllerV3,
+    LiberoMixedControllerV4, LiberoOperationalSpaceConfigV1,
+    LiberoOperationalSpaceConfigV2,
+)
 from .source_gravity import SOURCE_GRAVITY_PROFILE_V1
 from .task_contracts import TASK_1
 
@@ -32,6 +37,8 @@ from .task_contracts import TASK_1
 SOLUTION_SCHEMA = "libero-bowl-to-plate-solution-v1"
 SOLUTION_SCHEMA_V2 = "libero-bowl-to-plate-solution-v2"
 SOLUTION_SCHEMA_V3 = "libero-bowl-to-plate-solution-v3"
+SOLUTION_SCHEMA_V4 = "libero-bowl-to-plate-solution-v4"
+SOLUTION_SCHEMA_V5 = "libero-bowl-to-plate-solution-v5"
 POSE_ACTION_SCHEMA_V1 = "libero-world-pose-wxyz-absolute-v1"
 TCP_ID = "libero-mounted-panda-v1/gripper0-grip-site-v1"
 HAND_FRAME_ID = "robot0_right_hand"
@@ -257,6 +264,186 @@ def solution_identity_v3(
             "lift_z": 0.20, "place_tcp_z_above_plate": 0.085,
         },
         "opening_m": _OPENING_BY_STAGE,
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
+_OPENING_BY_STAGE_V4 = {
+    # Insert narrow fingers inside the bowl, then spread outward against both
+    # inner walls. Keep the spread command during lift/carry/place.
+    "approach": 0.045,
+    "descend": 0.045,
+    "grasp": 0.08,
+    "lift": 0.08,
+    "carry": 0.08,
+    "place": 0.08,
+    "release": 0.045,
+}
+_STAGE_TIMEOUTS_V4 = {
+    "approach": 180, "descend": 120, "grasp": 60,
+    "lift": 180, "carry": 180, "place": 120,
+}
+_WAYPOINT_POSITION_TOLERANCE_V4_M = 0.006
+_WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD = 0.03
+_GRASP_TCP_HEIGHT_V4_M = 0.035
+_GRASP_CONTACT_DWELL_V4 = 2
+
+
+def solution_identity_v4(
+    source_xml_sha256: str, source_closure_digest: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+    planner_config: CartesianPosePlannerConfig | None = None,
+) -> str:
+    """Bind the OSC, convergence-gated planner and bilateral inner-wall grasp."""
+    for value, label in ((source_xml_sha256, "source XML"),
+                         (source_closure_digest, "source closure")):
+        if (type(value) is not str or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)):
+            raise ValueError(f"LIBERO Solution v4 requires a lowercase {label} SHA-256")
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        max_translation_per_step=0.0055,
+        max_translation_acceleration_per_step=0.002,
+        max_rotation_per_step=0.08,
+        max_rotation_acceleration_per_step=0.04,
+        settle_steps=0,
+        max_steps=200,
+    )
+    osc = LiberoMixedControllerV3(
+        operational_config=LiberoOperationalSpaceConfigV1(),
+    )
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V4,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "tcp_id": TCP_ID,
+        "action_schema_id": POSE_ACTION_SCHEMA_V1,
+        "action_semantics": {
+            "mode": "absolute_pose", "reference": "world",
+            "rotation_representation": "quaternion_wxyz",
+            "gripper_scalar": "normalized_minus1_to1_to_aggregate_opening_m_0p04_times_u_plus_1",
+        },
+        "grasp_orientation_source": "reset_public_source_bound_tcp_world_quaternion_wxyz_v1",
+        "bowl_reference": "live_public_bowl_pose_until_grasp_then_frozen_v1",
+        "planner": {
+            "owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_to_pose",
+            "gripper_transition_owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_gripper_transition",
+            "advancement": "current_public_TCP_waypoint_convergence_gated_v1",
+            "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
+            "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
+            "config": {
+                "max_translation_per_step": selected_planner.max_translation_per_step,
+                "max_translation_acceleration_per_step": selected_planner.max_translation_acceleration_per_step,
+                "max_rotation_per_step": selected_planner.max_rotation_per_step,
+                "max_rotation_acceleration_per_step": selected_planner.max_rotation_acceleration_per_step,
+                "settle_steps": selected_planner.settle_steps,
+                "max_steps": selected_planner.max_steps,
+            },
+        },
+        "arm_resolution_owner": "CanonicalPandaController.resolve_world_pose_target_iterative_v1",
+        "mixed_controller": osc.identity_mapping(),
+        "grasp": {
+            "strategy": "insert_narrow_fingers_below_rim_then_open_outward_v1",
+            "tcp_height_above_bowl_center_m": _GRASP_TCP_HEIGHT_V4_M,
+            "approach_opening_m": _OPENING_BY_STAGE_V4["approach"],
+            "grasp_opening_target_m": _OPENING_BY_STAGE_V4["grasp"],
+            "required_contact_groups": [
+                "panda-v1/finger-left", "panda-v1/finger-right",
+                "akita_black_bowl_1",
+            ],
+            "contact_dwell_boundaries": _GRASP_CONTACT_DWELL_V4,
+        },
+        "opening_m": _OPENING_BY_STAGE_V4,
+        "stage_timeouts": _STAGE_TIMEOUTS_V4,
+        "motion_config": {
+            "position_tolerance_m": selected_config.position_tolerance_m,
+            "grasp_dwell_steps": selected_config.grasp_dwell_steps,
+            "release_dwell_steps": selected_config.release_dwell_steps,
+            "release_timeout_steps": selected_config.release_timeout_steps,
+            "max_episode_steps": selected_config.max_episode_steps,
+        },
+    })
+
+
+def solution_identity_v5(
+    source_xml_sha256: str, source_closure_digest: str, *, arm_resolver_identity: str,
+    config: "LiberoPickPlaceSolutionConfigV1 | None" = None,
+    planner_config: CartesianPosePlannerConfig | None = None,
+) -> str:
+    """Bind the physics-rate OSC posture policy to the source and shared resolver."""
+    for value, label in ((source_xml_sha256, "source XML"),
+                         (source_closure_digest, "source closure"),
+                         (arm_resolver_identity, "arm resolver")):
+        if (type(value) is not str or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)):
+            raise ValueError(f"LIBERO Solution v5 requires a lowercase {label} SHA-256")
+    selected_config = config or LiberoPickPlaceSolutionConfigV1()
+    selected_config.validate()
+    selected_planner = planner_config or CartesianPosePlannerConfig(
+        max_translation_per_step=0.0055,
+        max_translation_acceleration_per_step=0.002,
+        max_rotation_per_step=0.08,
+        max_rotation_acceleration_per_step=0.04,
+        settle_steps=0,
+        max_steps=200,
+    )
+    osc = LiberoMixedControllerV4(
+        operational_config=LiberoOperationalSpaceConfigV2(),
+        arm_resolver_identity=arm_resolver_identity,
+    )
+    return digest({
+        "schema_version": SOLUTION_SCHEMA_V5,
+        "task_uid": TASK_1,
+        "source_xml_sha256": source_xml_sha256,
+        "source_closure_digest": source_closure_digest,
+        "tcp_id": TCP_ID,
+        "action_schema_id": POSE_ACTION_SCHEMA_V1,
+        "action_semantics": {
+            "mode": "absolute_pose", "reference": "world",
+            "rotation_representation": "quaternion_wxyz",
+            "gripper_scalar": "normalized_minus1_to1_to_aggregate_opening_m_0p04_times_u_plus_1",
+        },
+        "grasp_orientation_source": "reset_public_source_bound_tcp_world_quaternion_wxyz_v1",
+        "bowl_reference": "live_public_bowl_pose_until_grasp_then_frozen_v1",
+        "planner": {
+            "owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_to_pose",
+            "gripper_transition_owner": "task_env.planners.cartesian.CartesianPosePlanner.plan_gripper_transition",
+            "advancement": "current_public_TCP_waypoint_convergence_gated_v1",
+            "position_tolerance_m": _WAYPOINT_POSITION_TOLERANCE_V4_M,
+            "orientation_tolerance_rad": _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD,
+            "config": {
+                "max_translation_per_step": selected_planner.max_translation_per_step,
+                "max_translation_acceleration_per_step": selected_planner.max_translation_acceleration_per_step,
+                "max_rotation_per_step": selected_planner.max_rotation_per_step,
+                "max_rotation_acceleration_per_step": selected_planner.max_rotation_acceleration_per_step,
+                "settle_steps": selected_planner.settle_steps,
+                "max_steps": selected_planner.max_steps,
+            },
+        },
+        "arm_resolution_owner": "CanonicalPandaController.resolve_world_pose_target_iterative_v1",
+        "arm_resolver_identity": arm_resolver_identity,
+        "mixed_controller": osc.identity_mapping(),
+        "grasp": {
+            "strategy": "insert_narrow_fingers_below_rim_then_open_outward_v1",
+            "tcp_height_above_bowl_center_m": _GRASP_TCP_HEIGHT_V4_M,
+            "approach_opening_m": _OPENING_BY_STAGE_V4["approach"],
+            "grasp_opening_target_m": _OPENING_BY_STAGE_V4["grasp"],
+            "required_contact_groups": [
+                "panda-v1/finger-left", "panda-v1/finger-right",
+                "akita_black_bowl_1",
+            ],
+            "contact_dwell_boundaries": _GRASP_CONTACT_DWELL_V4,
+        },
+        "opening_m": _OPENING_BY_STAGE_V4,
+        "stage_timeouts": _STAGE_TIMEOUTS_V4,
         "motion_config": {
             "position_tolerance_m": selected_config.position_tolerance_m,
             "grasp_dwell_steps": selected_config.grasp_dwell_steps,
@@ -936,10 +1123,390 @@ class LiberoPickPlaceSolutionV3(LiberoPickPlaceSolutionV1):
         }
 
 
+class LiberoPickPlaceSolutionV4(LiberoPickPlaceSolutionV3):
+    """Convergence-gated OSC task plan with public bilateral finger feedback."""
+
+    solution_schema_version = SOLUTION_SCHEMA_V4
+
+    def __init__(self, source_xml: bytes | str, source_closure_digest: str,
+                 config: LiberoPickPlaceSolutionConfigV1 | None = None,
+                 planner_config: CartesianPosePlannerConfig | None = None):
+        selected_planner = planner_config or CartesianPosePlannerConfig(
+            max_translation_per_step=0.0055,
+            max_translation_acceleration_per_step=0.002,
+            max_rotation_per_step=0.08,
+            max_rotation_acceleration_per_step=0.04,
+            settle_steps=0,
+            max_steps=200,
+        )
+        super().__init__(
+            source_xml, source_closure_digest, config=config,
+            planner_config=selected_planner,
+        )
+        self.identity = solution_identity_v4(
+            self.source_xml_sha256, self.source_closure_digest,
+            self.config, self.planner_config,
+        )
+        self._grasp_contact_streak = 0
+        self._lift_contact_loss_streak = 0
+        self._grasp_confirmed = False
+
+    def reset(self, observation, info: Mapping[str, object], metadata, **kwargs) -> None:
+        super().reset(observation, info, metadata, **kwargs)
+        self._grasp_contact_streak = 0
+        self._lift_contact_loss_streak = 0
+        self._grasp_confirmed = False
+
+    def _target(self) -> np.ndarray:
+        if self._initial_bowl is None or self._plate is None:
+            raise RuntimeError("LIBERO Solution reset geometry is unavailable")
+        bowl = self._initial_bowl
+        plate = self._plate
+        if self.stage == "approach":
+            return bowl + np.asarray((0.0, 0.0, 0.15))
+        if self.stage in {"descend", "grasp"}:
+            return bowl + np.asarray((0.0, 0.0, _GRASP_TCP_HEIGHT_V4_M))
+        if self.stage == "lift":
+            return bowl + np.asarray((0.0, 0.0, 0.20))
+        if self.stage == "carry":
+            return np.asarray((plate[0], plate[1], bowl[2] + 0.20))
+        if self.stage in {"place", "release"}:
+            return plate + np.asarray((0.0, 0.0, 0.085))
+        raise RuntimeError(f"LIBERO Solution v4 has no target in stage {self.stage!r}")
+
+    @staticmethod
+    def _bilateral_finger_contact(info: Mapping[str, object]):
+        contact = info.get("contact_summary_v2")
+        if not isinstance(contact, Mapping):
+            return None, None, "contact_summary_missing"
+        context = info.get("boundary_context_v1")
+        if not isinstance(context, Mapping):
+            return None, None, "boundary_context_missing"
+        identity_fields = (
+            "source_id", "source_closure_digest", "provider_materialization_id",
+            "episode_id", "reset_sample_id", "control_step", "state_revision",
+            "simulation_time_s",
+        )
+        for name in identity_fields:
+            expected = context.get(name)
+            if name != "state_revision" and info.get(name) != expected:
+                return None, None, "boundary_context_mismatch"
+            if contact.get(name) != expected:
+                return None, None, "contact_summary_stale_or_wrong_boundary"
+        if contact.get("schema_version") != "task-contact-summary-v2":
+            return None, None, "contact_summary_schema_mismatch"
+        required_pairs = tuple(sorted((
+            tuple(sorted(("panda-v1/finger-left", "akita_black_bowl_1"))),
+            tuple(sorted(("panda-v1/finger-right", "akita_black_bowl_1"))),
+        )))
+        requested = tuple(tuple(pair) for pair in contact.get("requested_pairs", ()))
+        covered = tuple(tuple(pair) for pair in contact.get("covered_pairs", ()))
+        if contact.get("status") != "available":
+            return None, None, str(contact.get("reason") or "contact_summary_unavailable")
+        if not set(required_pairs) <= set(requested) or not set(required_pairs) <= set(covered):
+            return None, None, "bilateral_finger_contact_query_not_covered"
+        counts = contact.get("pair_counts")
+        if not isinstance(counts, Mapping):
+            return None, None, "contact_pair_counts_missing"
+        keys = tuple("/".join(pair) for pair in required_pairs)
+        values = tuple(counts.get(key) for key in keys)
+        if any(type(value) is not int or value < 0 for value in values):
+            return None, None, "bilateral_finger_pair_count_invalid"
+        return values[0] > 0 and values[1] > 0, values, "available"
+
+    def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
+        joints, _ = self._validate_boundary(observation, info, next_step=False)
+        if self.done or self.failed:
+            raise RuntimeError("LIBERO Solution has already stopped")
+        if self._grasp_quaternion_wxyz is None:
+            raise RuntimeError("LIBERO Solution v4 has no source-derived grasp orientation")
+        current_pose = np.asarray(observation["state"].get("ee_pose"), dtype=np.float64)
+        if current_pose.shape != (7,) or not np.isfinite(current_pose).all():
+            raise ValueError("LIBERO Solution v4 requires a finite world TCP pose")
+        current_pose[3:7] = normalize_quat_wxyz(current_pose[3:7])
+        target_position = self._target()
+        target_pose = np.asarray((*target_position, *self._grasp_quaternion_wxyz), dtype=np.float64)
+        opening_m = _OPENING_BY_STAGE_V4.get(self.stage)
+        if opening_m is None:
+            raise RuntimeError(f"LIBERO Solution v4 has no gripper policy in stage {self.stage!r}")
+        gripper_scalar = float(opening_m / 0.04 - 1.0)
+        if not -1.0 <= gripper_scalar <= 1.0:
+            raise ValueError("stage opening does not map to the normalized planner range")
+
+        if (self._pose_plan is None or self._pose_plan_stage != self.stage
+                or self._pose_plan_index >= len(self._pose_plan)):
+            if self.stage in {"grasp", "release"}:
+                finger_positions = np.asarray(
+                    observation["state"].get("joint_position"), dtype=np.float64,
+                )
+                if finger_positions.shape != (9,) or not np.isfinite(finger_positions).all():
+                    raise ValueError("LIBERO Solution v4 requires public signed finger positions")
+                actual_opening = float(finger_positions[7] - finger_positions[8])
+                current_gripper = float(np.clip(actual_opening / 0.04 - 1.0, -1.0, 1.0))
+                steps = (max(4, self.config.grasp_dwell_steps) if self.stage == "grasp"
+                         else max(4, self.config.release_dwell_steps))
+                self._pose_plan = self.pose_planner.plan_gripper_transition(
+                    pose=target_pose, start_gripper=current_gripper,
+                    goal_gripper=gripper_scalar, steps=steps, settle_steps=0,
+                )
+            else:
+                self._pose_plan = self.pose_planner.plan_to_pose(
+                    current_pose=current_pose, goal_pose=target_pose,
+                    gripper=gripper_scalar, settle_steps=0,
+                )
+            self._pose_plan_index = 0
+            self._pose_plan_stage = self.stage
+
+        action = np.asarray(self._pose_plan[self._pose_plan_index], dtype=np.float32)
+        if action.shape != (8,) or not np.isfinite(action).all():
+            raise ValueError("CartesianPosePlanner returned an invalid v4 world-pose action")
+        self._last_action_receipt = {
+            "solution_schema_version": SOLUTION_SCHEMA_V4,
+            "solution_identity": self.identity,
+            "action_schema_id": POSE_ACTION_SCHEMA_V1,
+            "stage": self.stage,
+            "action": [float(value) for value in action],
+            "current_world_pose": [float(value) for value in current_pose],
+            "target_world_pose": [float(value) for value in target_pose],
+            "planner_world_pose": [float(value) for value in action[:7]],
+            "source_grasp_quaternion_wxyz": [float(value) for value in self._grasp_quaternion_wxyz],
+            "source_tcp_profile_identity_sha256": self.tcp_profile.identity_hash,
+            "aggregate_opening_m": float(opening_m),
+            "normalized_gripper_scalar": float(action[7]),
+            "grasp_strategy": "insert_narrow_fingers_below_rim_then_open_outward_v1",
+            "diagnostics": {
+                "waypoint_distance_m": float(np.linalg.norm(target_position - current_pose[:3])),
+                "planner_step_translation_m": float(np.linalg.norm(action[:3] - current_pose[:3])),
+                "planner_step_rotation_rad": float(quat_angle_wxyz(action[3:7], current_pose[3:7])),
+                "planner_path_index": int(self._pose_plan_index),
+                "planner_path_length": int(len(self._pose_plan)),
+                "stage_step": self._stage_steps,
+                "planner_owner": (
+                    "CartesianPosePlanner.plan_gripper_transition"
+                    if self.stage in {"grasp", "release"}
+                    else "CartesianPosePlanner.plan_to_pose"
+                ),
+                "advancement_policy": "public_TCP_waypoint_convergence_gated_v1",
+                "source_pose_observation_used": True,
+            },
+        }
+        self._pending_action = True
+        self._actions += 1
+        return ExpertAction(action=action, stage=self.stage,
+                            diagnostics=dict(self._last_action_receipt["diagnostics"]))
+
+    def observe(self, observation, reward: float, terminated: bool, truncated: bool,
+                info: Mapping[str, object], **_kwargs) -> None:
+        joints, ee_position = self._validate_boundary(observation, info, next_step=True)
+        self._refresh_bowl_reference_from_public_pose(observation)
+        self._pending_action = False
+        identity = _boundary_identity(info)
+        self._last_boundary_step = identity[5]
+        self._last_observation = observation
+        self._stage_steps += 1
+        current_pose = np.asarray(observation["state"].get("ee_pose"), dtype=np.float64)
+        if current_pose.shape != (7,) or not np.isfinite(current_pose).all():
+            raise ValueError("LIBERO Solution v4 post-step observation omits its TCP world pose")
+        current_pose[3:7] = normalize_quat_wxyz(current_pose[3:7])
+        bilateral, contact_counts, contact_status = self._bilateral_finger_contact(info)
+        planned_pose = np.asarray(
+            (self._last_action_receipt or {}).get("planner_world_pose", current_pose),
+            dtype=np.float64,
+        )
+        tracking_position_error = float(np.linalg.norm(planned_pose[:3] - current_pose[:3]))
+        tracking_orientation_error = float(quat_angle_wxyz(planned_pose[3:7], current_pose[3:7]))
+        planned_action = np.asarray((self._last_action_receipt or {}).get("action", ()), dtype=np.float64)
+        finger_positions = np.asarray(observation["state"].get("joint_position"), dtype=np.float64)
+        if planned_action.shape != (8,) or finger_positions.shape != (9,):
+            raise ValueError("LIBERO Solution v4 lost its planned action or signed gripper feedback")
+        actual_opening = float(finger_positions[7] - finger_positions[8])
+        planned_opening = 0.04 * (float(planned_action[7]) + 1.0)
+        gripper_tracking_error = abs(actual_opening - planned_opening)
+        stage_before = self.stage
+        target = self._target()
+        target_error = float(np.linalg.norm(target - ee_position))
+        orientation_error = float(quat_angle_wxyz(current_pose[3:7], self._grasp_quaternion_wxyz))
+        pose_reached = target_error <= self.config.position_tolerance_m and orientation_error <= 0.12
+
+        if tracking_position_error > 0.025 or tracking_orientation_error > 0.25:
+            self._pose_plan = None
+            self._pose_plan_index = 0
+            self._pose_plan_stage = None
+            waypoint_advanced = False
+        else:
+            position_converged = tracking_position_error <= _WAYPOINT_POSITION_TOLERANCE_V4_M
+            orientation_converged = tracking_orientation_error <= _WAYPOINT_ORIENTATION_TOLERANCE_V4_RAD
+            gripper_converged = gripper_tracking_error <= 0.006
+            waypoint_advanced = False
+            if (self._pose_plan is not None and self._pose_plan_stage == self.stage
+                    and position_converged and orientation_converged and gripper_converged):
+                self._pose_plan_index += 1
+                waypoint_advanced = True
+
+        if stage_before == "approach" and pose_reached:
+            self.stage, self._stage_steps = "descend", 0
+        elif stage_before == "descend" and pose_reached:
+            self.stage, self._stage_steps = "grasp", 0
+            self._grasp_contact_streak = 0
+        elif stage_before == "grasp":
+            self._grasp_contact_streak = self._grasp_contact_streak + 1 if bilateral is True else 0
+            if self._grasp_contact_streak >= _GRASP_CONTACT_DWELL_V4:
+                self._grasp_confirmed = True
+                self.stage, self._stage_steps = "lift", 0
+                self._lift_contact_loss_streak = 0
+            elif self._stage_steps >= _STAGE_TIMEOUTS_V4["grasp"]:
+                self.failed = True
+                self.failure_reason = (
+                    "bilateral_finger_contact_unavailable" if bilateral is None
+                    else "bowl_rim_not_bilaterally_contacted"
+                )
+        elif stage_before == "lift":
+            self._lift_contact_loss_streak = (
+                self._lift_contact_loss_streak + 1 if bilateral is False else 0
+            )
+            bowl_now = _body_position(observation, "bowl_body_pose")
+            if bowl_now[2] >= self._initial_bowl[2] + 0.035:
+                self.stage, self._stage_steps = "carry", 0
+            elif (self._lift_contact_loss_streak >= 3
+                  and self._stage_steps >= self._lift_contact_loss_streak):
+                self.failed = True
+                self.failure_reason = "bilateral_grasp_lost_during_lift"
+            elif self._stage_steps >= _STAGE_TIMEOUTS_V4["lift"]:
+                self.failed = True
+                self.failure_reason = "bowl_not_lifted_after_bilateral_grasp"
+        elif stage_before == "carry":
+            bowl_now = _body_position(observation, "bowl_body_pose")
+            if bowl_now[2] < self._initial_bowl[2] + 0.025:
+                self.failed = True
+                self.failure_reason = "bowl_dropped_during_carry"
+            elif np.linalg.norm(target[:2] - ee_position[:2]) <= self.config.position_tolerance_m:
+                self.stage, self._stage_steps = "place", 0
+            elif self._stage_steps >= _STAGE_TIMEOUTS_V4["carry"]:
+                self.failed = True
+                self.failure_reason = "plate_transfer_stage_timeout"
+        elif stage_before == "place" and pose_reached:
+            self.stage, self._stage_steps = "release", 0
+        elif stage_before == "release":
+            predicate = info.get("predicate_v1", {}).get("on_bowl_plate", {})
+            success = info.get("is_success")
+            if type(success) is not bool or predicate.get("status") not in {"available", "unavailable"}:
+                raise ValueError("LIBERO Solution post-step info omits its typed On predicate")
+            if predicate.get("status") == "available" and predicate.get("value") is not success:
+                raise ValueError("LIBERO task success and typed On predicate disagree")
+            released = bilateral is False and actual_opening <= _OPENING_BY_STAGE_V4["release"] + 0.008
+            if (self._stage_steps >= self.config.release_dwell_steps and success is True
+                    and predicate.get("status") == "available" and released):
+                self.done = True
+                self.stage = "complete"
+            elif self._stage_steps >= self.config.release_timeout_steps:
+                self.failed = True
+                self.failure_reason = (
+                    "finger_contact_remained_after_release" if bilateral is True
+                    else "released_bowl_did_not_satisfy_source_on_predicate"
+                )
+
+        if (self.stage == stage_before and not self.done and not self.failed
+                and stage_before in _STAGE_TIMEOUTS_V4
+                and self._stage_steps >= _STAGE_TIMEOUTS_V4[stage_before]):
+            self.failed = True
+            self.failure_reason = f"stage_timeout:{stage_before}"
+        if self.stage != stage_before:
+            self._pose_plan = None
+            self._pose_plan_index = 0
+            self._pose_plan_stage = None
+        self._last_action_receipt = {
+            **(self._last_action_receipt or {}),
+            "post_step_feedback": {
+                "stage_before": stage_before,
+                "stage_after": self.stage,
+                "tcp_target_position_error_m": target_error,
+                "tcp_target_orientation_error_rad": orientation_error,
+                "planner_tracking_position_error_m": tracking_position_error,
+                "planner_tracking_orientation_error_rad": tracking_orientation_error,
+                "waypoint_advanced": waypoint_advanced,
+                "actual_opening_m": actual_opening,
+                "planned_opening_m": planned_opening,
+                "gripper_tracking_error_m": gripper_tracking_error,
+                "bilateral_finger_contact": bilateral,
+                "bilateral_contact_counts": contact_counts,
+                "contact_feedback_status": contact_status,
+                "grasp_confirmed": self._grasp_confirmed,
+                "bowl_world_z_m": float(_body_position(observation, "bowl_body_pose")[2]),
+                "task_success": info.get("is_success"),
+                "stage_step": self._stage_steps,
+            },
+        }
+        if truncated and not self.done:
+            self.failed = True
+            self.failure_reason = "horizon_truncated_before_source_task_success"
+        if terminated and not self.done:
+            self.failed = True
+            self.failure_reason = "task_terminated_before_solution_completion"
+
+    def outcome_report(self) -> dict[str, object]:
+        return {
+            "solution_schema_version": SOLUTION_SCHEMA_V4,
+            "solution_identity": self.identity,
+            "solution_stage": self.stage,
+            "solution_actions": self._actions,
+            "last_action_receipt": self._last_action_receipt,
+            "solution_done": bool(self.done),
+            "solution_failed": bool(self.failed),
+            "solution_failure_reason": self.failure_reason,
+            "source_closure_digest": self.source_closure_digest,
+            "action_schema_id": POSE_ACTION_SCHEMA_V1,
+            "source_grasp_quaternion_wxyz": (
+                None if self._grasp_quaternion_wxyz is None
+                else [float(value) for value in self._grasp_quaternion_wxyz]
+            ),
+            "grasp_confirmed_by_bilateral_contact": self._grasp_confirmed,
+        }
+
+
+class LiberoPickPlaceSolutionV5(LiberoPickPlaceSolutionV4):
+    """V4 task behavior bound to the physics-rate, reset-reference OSC profile."""
+
+    solution_schema_version = SOLUTION_SCHEMA_V5
+
+    def __init__(self, source_xml: bytes | str, source_closure_digest: str, *,
+                 arm_resolver_identity: str,
+                 config: LiberoPickPlaceSolutionConfigV1 | None = None,
+                 planner_config: CartesianPosePlannerConfig | None = None):
+        super().__init__(
+            source_xml, source_closure_digest, config=config,
+            planner_config=planner_config,
+        )
+        self.arm_resolver_identity = arm_resolver_identity
+        self.identity = solution_identity_v5(
+            self.source_xml_sha256, self.source_closure_digest,
+            arm_resolver_identity=arm_resolver_identity,
+            config=self.config, planner_config=self.planner_config,
+        )
+
+    def act(self, observation, info: Mapping[str, object]) -> ExpertAction:
+        proposal = super().act(observation, info)
+        self._last_action_receipt = {
+            **(self._last_action_receipt or {}),
+            'solution_schema_version': SOLUTION_SCHEMA_V5,
+        }
+        return ExpertAction(
+            action=proposal.action, stage=proposal.stage,
+            diagnostics=dict(proposal.diagnostics),
+        )
+
+    def outcome_report(self) -> dict[str, object]:
+        report = super().outcome_report()
+        report['solution_schema_version'] = SOLUTION_SCHEMA_V5
+        return report
+
+
 __all__ = [
-    "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2", "SOLUTION_SCHEMA_V3", "POSE_ACTION_SCHEMA_V1",
+    "SOLUTION_SCHEMA", "SOLUTION_SCHEMA_V2", "SOLUTION_SCHEMA_V3", "SOLUTION_SCHEMA_V4",
+    "SOLUTION_SCHEMA_V5",
+    "POSE_ACTION_SCHEMA_V1",
     "LiberoPickPlaceSolutionConfigV1", "LiberoPickPlaceSolutionV1",
-    "LiberoPickPlaceSolutionV2", "LiberoPickPlaceSolutionV3",
+    "LiberoPickPlaceSolutionV2", "LiberoPickPlaceSolutionV3", "LiberoPickPlaceSolutionV4",
+    "LiberoPickPlaceSolutionV5",
     "solution_identity_v1", "solution_identity_v2", "solution_identity_v2_frozen",
-    "solution_identity_v3",
+    "solution_identity_v3", "solution_identity_v4", "solution_identity_v5",
 ]

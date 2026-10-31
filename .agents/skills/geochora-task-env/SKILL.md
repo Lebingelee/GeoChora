@@ -9,6 +9,20 @@ Read repository `AGENTS.md` and [module README](../../../docs/module/task_env/RE
 `task_env/` is the sole Core owner; use its public APIs. No historical chat context is required.
 For the source/contract/test map read [routes](references/routes.md) when implementing a workflow or diagnosing a gap.
 
+## Source-bound absolute pose control
+
+For a task that needs an absolute world pose, reuse the advanced
+`CanonicalPandaController.resolve_world_pose_target_iterative_v1()` owner and
+its typed `CanonicalArmResolutionV1`; keep task stage/goal semantics in the
+Task Artifact or task-local binding. Check `diagnostics.converged` before
+dispatch. This remains a provider-free bounded composition of the existing
+arm resolver and does not admit a task/provider/backend. The optional
+`MixedActuatorSubstepSession` hook in `task_env.runtime.sessions.api` is an
+internal implementation extension, not a requirement on `RuntimeSession` and
+not a provider capability. The current LIBERO v5 path is still unverified on
+native MuJoCo and has no task-success evidence. See the matching boundary in
+[Public API](../../../docs/module/task_env/public-api.md#source-bound-absolute-pose-control).
+
 ## Static Logical Assembly values
 
 R01a exposes `LogicalAssemblyV1`, `LogicalAssemblyEntityMemberV1`,

@@ -243,8 +243,14 @@ def observe_selected_reference_v1(env, state):
     """Build this task's observation and predicate from public runtime values."""
     source = env.value['source']
     pair = ('akita_black_bowl_1', 'plate_1')
-    contact = env.session.read_contact_summary_v2((pair,))
-    requested = (pair,)
+    requested_pairs = [pair]
+    if env.value.get('solution_profile') is True:
+        requested_pairs.extend((
+            ('panda-v1/finger-left', 'akita_black_bowl_1'),
+            ('panda-v1/finger-right', 'akita_black_bowl_1'),
+        ))
+    requested = tuple(sorted(tuple(sorted(item)) for item in requested_pairs))
+    contact = env.session.read_contact_summary_v2(requested)
     expected_contact_identity = (
         source.scene_source.source_id,
         source.source_closure_digest,
