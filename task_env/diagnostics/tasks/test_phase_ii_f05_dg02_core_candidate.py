@@ -125,3 +125,74 @@ def test_canonical_dls_reset_posture_correction_is_limited_to_the_task_nullspace
     )
     _canonical, joint_desired, _joint_servo = corrected._compute_arm(_State(), joint_request)
     np.testing.assert_allclose(joint_desired, joint_request.values[:7], atol=1e-12)
+
+
+def test_accumulated_pose_target_tracks_repeated_targets_and_holds_when_settled():
+    import numpy as np
+
+    from task_env.artifacts import PoseWorld
+    from task_env.controllers.canonical.contracts import RequestedAction
+    from task_env.controllers.canonical.controller import CanonicalPandaController
+
+    class _Kinematics:
+        source_sha256 = "a" * 64
+        limits = np.tile(np.asarray((-2.0, 2.0)), (7, 1))
+        base_transform = np.eye(4)
+
+        @staticmethod
+        def fk_jacobian(_q):
+            transform = np.eye(4)
+            jacobian = np.zeros((6, 7), dtype=np.float64)
+            jacobian[:, :6] = np.eye(6)
+            return transform, jacobian
+
+    class _State:
+        joint_position = {f"panda-v1/joint{index}": 0.0 for index in range(1, 8)}
+        pose_world = {"panda-v1/ee": PoseWorld((0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))}
+
+    request = RequestedAction(
+        "absolute_pose", "world", "quaternion_wxyz",
+        (0.01, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+    )
+    stateless = CanonicalPandaController(_Kinematics(), artifact_hash="b" * 64)
+    stateful = CanonicalPandaController(
+        _Kinematics(), artifact_hash="b" * 64,
+        pose_target_method="accumulated_dls_target_until_settled_v1",
+    )
+    stateful.reset_pose_target_memory(np.zeros(7))
+
+    _canonical, stateless_first, _servo = stateless._compute_arm(_State(), request)
+    _canonical, stateless_second, _servo = stateless._compute_arm(_State(), request)
+    _canonical, stateful_first, _servo = stateful._compute_arm(_State(), request)
+    _canonical, stateful_second, _servo = stateful._compute_arm(_State(), request)
+    np.testing.assert_allclose(stateless_second, stateless_first, atol=1e-12)
+    assert stateful_second[0] > stateful_first[0] > 0.0
+
+    settled_state = _State()
+    settled_state.pose_world = {
+        "panda-v1/ee": PoseWorld((0.01, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0))
+    }
+    held_target = stateful._arm_target.copy()
+    _canonical, settled_target, _servo = stateful._compute_arm(settled_state, request)
+    np.testing.assert_allclose(settled_target, held_target, atol=1e-12)
+
+    stateful.reset_pose_target_memory(np.full(7, 0.125))
+    np.testing.assert_allclose(stateful._arm_target, np.full(7, 0.125), atol=1e-12)
+
+
+def test_dg02_cold_reader_accepts_plan_bound_controller_gains_without_hardcoding():
+    from task_env.diagnostics.tasks.f05_dg02_core_n2_cold_reader import (
+        _controller_method_supported,
+    )
+
+    method = {
+        "nullspace_reference_gain": 1.0,
+        "reference_source": "reset_typed_arm_joint_position",
+        "projector": "svd_right_nullspace_v1",
+        "pose_target_method": "accumulated_dls_target_until_settled_v1",
+    }
+    assert _controller_method_supported(method)
+    assert _controller_method_supported({**method, "nullspace_reference_gain": 0.2})
+    assert not _controller_method_supported({**method, "nullspace_reference_gain": True})
+    assert not _controller_method_supported({**method, "nullspace_reference_gain": float("inf")})
+    assert not _controller_method_supported({**method, "pose_target_method": "unbound_method"})

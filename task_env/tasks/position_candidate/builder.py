@@ -65,6 +65,7 @@ F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02
 # each position update; other versioned Position routes retain the frozen
 # DLS-only behavior by default.
 F05_DG02_NULLSPACE_REFERENCE_GAIN = 1.0
+F05_DG02_POSE_TARGET_METHOD = 'accumulated_dls_target_until_settled_v1'
 
 
 def _f05_dg02_usd_source_bindings():
@@ -654,6 +655,11 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             native_drive_receipt=native_drive_receipt,
             config=position_config,
             nullspace_reference_gain=nullspace_reference_gain,
+            pose_target_method=(
+                F05_DG02_POSE_TARGET_METHOD
+                if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+                else 'achieved_state_dls_v1'
+            ),
         )
     else:
         profile = PandaPositionServoProfileV1.from_source(

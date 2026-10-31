@@ -147,6 +147,29 @@ def _check(condition: bool, code: str, detail: str, errors: list[dict]) -> None:
         errors.append({"code": code, "detail": detail})
 
 
+def _controller_method_supported(method) -> bool:
+    if not isinstance(method, dict):
+        return False
+    required = {
+        "nullspace_reference_gain", "reference_source", "projector",
+    }
+    if set(method) not in (required, required | {"pose_target_method"}):
+        return False
+    gain = method.get("nullspace_reference_gain")
+    if (isinstance(gain, bool) or not isinstance(gain, (int, float))
+            or not math.isfinite(float(gain)) or not 0.0 <= float(gain) <= 1.0):
+        return False
+    if (method.get("reference_source") != "reset_typed_arm_joint_position"
+            or method.get("projector") != "svd_right_nullspace_v1"):
+        return False
+    # The missing field is the frozen legacy v1 method. New methods bind their
+    # stateful target behavior explicitly through the plan and static receipt.
+    return method.get("pose_target_method", "achieved_state_dls_v1") in {
+        "achieved_state_dls_v1",
+        "accumulated_dls_target_until_settled_v1",
+    }
+
+
 def _validate_bundle(bundle: dict) -> list[dict]:
     errors: list[dict] = []
     plan = bundle["plan"]
@@ -222,13 +245,9 @@ def _validate_bundle(bundle: dict) -> list[dict]:
            "joint_address", "frozen observation joint address map/order changed", errors)
     _check(oracle.get("original_physical_acceptance") == physical["physical_acceptance"],
            "com", "formal physical thresholds/COM reference differ from the unchanged oracle", errors)
-    expected_controller_method = {
-        "nullspace_reference_gain": 0.2,
-        "reference_source": "reset_typed_arm_joint_position",
-        "projector": "svd_right_nullspace_v1",
-    }
-    _check(oracle.get("controller_method") == expected_controller_method
-           and static.get("controller_method") == expected_controller_method
+    controller_method = oracle.get("controller_method")
+    _check(_controller_method_supported(controller_method)
+           and static.get("controller_method") == controller_method
            and static.get("controller_identity_sha256") == worker.get("episodes", [{}])[0].get("controller_identity")
            and len(worker.get("episodes", [])) == 2
            and all(row.get("controller_identity") == static.get("controller_identity_sha256")

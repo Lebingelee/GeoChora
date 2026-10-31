@@ -108,7 +108,7 @@ class PandaPositionServoProfileV1:
         entity_id='panda-main', joint_ids=None, finger_joint_ids=None,
         hand_frame_id='hand', native_prefix='', actuator_prefix='', tcp_profile=None,
         target_bindings=None, open_actuator=_DEFAULT_OPEN_ACTUATOR, native_drive_receipt=None,
-        nullspace_reference_gain=0.0,
+        nullspace_reference_gain=0.0, pose_target_method='achieved_state_dls_v1',
     ):
         self.artifact = artifact
         self.source = source
@@ -162,8 +162,10 @@ class PandaPositionServoProfileV1:
         self._algorithm = CanonicalPandaController(
             model, artifact_hash=artifact.identity_hash, config=config,
             nullspace_reference_gain=nullspace_reference_gain,
+            pose_target_method=pose_target_method,
         )
         self.nullspace_reference_gain = self._algorithm.nullspace_reference_gain
+        self.pose_target_method = self._algorithm.pose_target_method
         self.requirements = position_state_requirements(
             self.writer_id, entity_id=self.entity_id,
             joint_ids=self._source_joint_ids, hand_frame_id=self.hand_frame_id,
@@ -269,7 +271,8 @@ class PandaPositionServoProfileV1:
     @classmethod
     def from_usd_source(cls, artifact, source, *, execution, kinematics_source_xml: str,
                         native_drive_receipt=None, config: ActionConfig | None = None,
-                        nullspace_reference_gain=0.0):
+                        nullspace_reference_gain=0.0,
+                        pose_target_method='achieved_state_dls_v1'):
         """Bind the existing Position math to one versioned USD source.
 
         ``kinematics_source_xml`` must be locally calibrated to the selected
@@ -366,6 +369,7 @@ class PandaPositionServoProfileV1:
             target_bindings=arm_targets, open_actuator=None,
             native_drive_receipt=native_drive_receipt,
             nullspace_reference_gain=nullspace_reference_gain,
+            pose_target_method=pose_target_method,
         )
 
     @classmethod
@@ -534,10 +538,12 @@ class PandaPositionServoProfileV1:
         self._reset_sample_id = boundary.reset_sample_id
         self._next_control_step = 0
         self._activation_boundary_id = boundary.boundary_id
-        self._algorithm.set_nullspace_reference([
+        q_reference = [
             state.joint_position[f'panda-v1/joint{index}']
             for index in range(1, 8)
-        ])
+        ]
+        self._algorithm.set_nullspace_reference(q_reference)
+        self._algorithm.reset_pose_target_memory(q_reference)
         return boundary.boundary_id
 
     def _prepare_switch_activation(self, publication, plan):
@@ -584,6 +590,7 @@ class PandaPositionServoProfileV1:
         self._next_control_step = control_step
         self._activation_boundary_id = boundary_id
         self._algorithm.set_nullspace_reference(q_reference)
+        self._algorithm.reset_pose_target_memory(q_reference)
 
     def compute(self, publication, requested: RequestedAction, plan):
         self._validate_source(self.source)

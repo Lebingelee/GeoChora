@@ -9,23 +9,48 @@ from .kinematics import ARM,FINGERS
 
 
 class CanonicalPandaController:
-    def __init__(self,model,*,artifact_hash,config=None,nullspace_reference_gain=0.0):
+    def __init__(self,model,*,artifact_hash,config=None,nullspace_reference_gain=0.0,
+                 pose_target_method='achieved_state_dls_v1'):
         if (isinstance(nullspace_reference_gain, bool)
                 or not np.isfinite(nullspace_reference_gain)
                 or nullspace_reference_gain < 0.0
                 or nullspace_reference_gain > 1.0):
             raise ValueError('nullspace reference gain must be finite and in [0, 1]')
+        if not isinstance(pose_target_method, str) or pose_target_method not in {
+                'achieved_state_dls_v1',
+                'accumulated_dls_target_until_settled_v1',
+        }:
+            raise ValueError('unsupported Panda pose target method')
         self.model=model;self.artifact_hash=artifact_hash;self.config=config or ActionConfig()
         self.nullspace_reference_gain=float(nullspace_reference_gain)
+        self.pose_target_method=pose_target_method
         self._nullspace_reference=None
+        self._arm_target=None
+        self._last_pose_target=None
+        self._last_pose_error_norm=None
+        self._pose_target_settled=False
         self.identity=digest({'schema':'panda-shared-dls-v1','config':asdict(self.config),'source_sha256':model.source_sha256,
-            'target_basis':'achieved_joint_state_one_DLS_increment',
+            'target_basis':('achieved_joint_state_one_DLS_increment'
+                            if pose_target_method == 'achieved_state_dls_v1'
+                            else 'accumulated_dls_target_until_settled_v1'),
             'nullspace_reference':{
                 'gain':self.nullspace_reference_gain,
                 'source':'reset_typed_joint_position' if self.nullspace_reference_gain else 'disabled',
                 'projector':'svd_right_nullspace_v1' if self.nullspace_reference_gain else 'none',
             },
             'gripper':'legacy_physical_force_limited_servo_v0'})
+
+    def reset_pose_target_memory(self, joint_position):
+        """Seed opt-in pose target memory from a complete reset/switch boundary."""
+        if self.pose_target_method != 'accumulated_dls_target_until_settled_v1':
+            return
+        target=np.asarray(joint_position,dtype=np.float64)
+        if target.shape!=(7,) or not np.isfinite(target).all():
+            raise ValueError('pose target memory requires seven finite arm joint positions')
+        self._arm_target=target.copy()
+        self._last_pose_target=None
+        self._last_pose_error_norm=None
+        self._pose_target_settled=False
 
     def set_nullspace_reference(self, joint_position):
         reference=np.asarray(joint_position,dtype=np.float64)
@@ -49,6 +74,13 @@ class CanonicalPandaController:
         cfg=self.config;values=np.array(requested.values,dtype=float);original=values.copy()
         values[-1]=np.clip(values[-1],-1,1);q=np.array([state.joint_position[n] for n in ARM])
         current=state.pose_world['panda-v1/ee'];world_pose=None
+        accumulated_pose_target=(
+            self.pose_target_method == 'accumulated_dls_target_until_settled_v1'
+            and requested.mode == 'absolute_pose'
+        )
+        if (self.pose_target_method == 'accumulated_dls_target_until_settled_v1'
+                and not accumulated_pose_target):
+            self.reset_pose_target_memory(q)
         if requested.mode=='absolute_joint':desired=np.clip(values[:7],self.model.limits[:,0],self.model.limits[:,1]);values[:7]=desired
         else:
             if requested.rotation_representation=='quaternion_wxyz':
@@ -74,8 +106,46 @@ class CanonicalPandaController:
             position_error=position-np.array(current.position);rotation_error=rotation_vector_error(quat_wxyz_to_matrix(current.quaternion_wxyz),rotation)
             _,J=self.model.fk_jacobian(q)
             task_dq=np.zeros(7,dtype=np.float64)
-            if not (np.linalg.norm(position_error)<=cfg.ik_position_deadband
-                    and np.linalg.norm(rotation_error)<=cfg.ik_rotation_deadband):
+            position_error_norm=float(np.linalg.norm(position_error))
+            rotation_error_norm=float(np.linalg.norm(rotation_error))
+            if accumulated_pose_target:
+                if self._arm_target is None:
+                    self.reset_pose_target_memory(q)
+                target_position=np.asarray(world_pose.position,dtype=np.float64)
+                target_quaternion=np.asarray(world_pose.quaternion_wxyz,dtype=np.float64)
+                previous_position,previous_quaternion=(
+                    (None,None) if self._last_pose_target is None
+                    else self._last_pose_target
+                )
+                same_target=(
+                    previous_position is not None
+                    and np.allclose(target_position,previous_position,atol=1e-8,rtol=0.0)
+                    and abs(float(np.dot(target_quaternion,previous_quaternion))) >= 1.0-1e-8
+                )
+                settled=(position_error_norm<=cfg.ik_position_deadband
+                         and rotation_error_norm<=cfg.ik_rotation_deadband)
+                error_grew=(
+                    same_target and self._last_pose_error_norm is not None
+                    and position_error_norm > self._last_pose_error_norm + cfg.cartesian_error_growth_margin
+                )
+                if not same_target:
+                    self._pose_target_settled=False
+                elif settled and not error_grew:
+                    self._pose_target_settled=True
+                elif not settled:
+                    self._pose_target_settled=False
+                if not self._pose_target_settled and not error_grew:
+                    for error,bound in ((position_error,cfg.cartesian_max_position_step),
+                                        (rotation_error,cfg.cartesian_max_rotation_step)):
+                        length=np.linalg.norm(error)
+                        if length>bound:error*=bound/length
+                    J=J.copy();J[3:]*=cfg.ik_rotation_row_weight
+                    error=np.r_[position_error,cfg.ik_rotation_row_weight*cfg.ik_rotation_gain*rotation_error]
+                    task_dq=J.T@np.linalg.solve(J@J.T+cfg.ik_damping**2*np.eye(6),error)
+                self._last_pose_target=(target_position.copy(),target_quaternion.copy())
+                self._last_pose_error_norm=position_error_norm
+            elif not (position_error_norm<=cfg.ik_position_deadband
+                      and rotation_error_norm<=cfg.ik_rotation_deadband):
                 for error,bound in ((position_error,cfg.cartesian_max_position_step),(rotation_error,cfg.cartesian_max_rotation_step)):
                     length=np.linalg.norm(error)
                     if length>bound:error*=bound/length
@@ -89,7 +159,14 @@ class CanonicalPandaController:
                     self._right_nullspace_projector(J)
                     @ (self._nullspace_reference-q)
                 )
-            desired=np.clip(q+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
+            if accumulated_pose_target:
+                self._arm_target=np.clip(
+                    self._arm_target+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),
+                    self.model.limits[:,0],self.model.limits[:,1],
+                )
+                desired=self._arm_target.copy()
+            else:
+                desired=np.clip(q+cfg.ik_position_gain*np.clip(task_dq,-cfg.ik_max_delta_q,cfg.ik_max_delta_q),self.model.limits[:,0],self.model.limits[:,1])
         _resolved, servo = absolute_joint_position_servo(
             desired, q, self.model.limits, cfg.joint_position_correction_gain,
         )
