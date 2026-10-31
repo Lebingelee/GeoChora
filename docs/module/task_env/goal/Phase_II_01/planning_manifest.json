@@ -1862,10 +1862,10 @@
     "08_Codex_Phase_II_01_Planning_Prompt.md": "a9aa3bfd66f8b5fe2200d8d7d8fc91fedeb0144d7abc8cc398d041e75fce7916",
     "09_R07_Benchmark_Deployment_and_Agent_Cost.md": "64eea5c59b18aaf35838d24bfb4f61bb22afe901615cc0591c2cdfa63d8b3ebc",
     "10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md": "061d781964725adfc1213f1bf5af1b8b54f661c99905418948f48605b5911634",
-    "README.md": "11553804d8f6955a0886e36ed2de836919cbbf096b2fdf2a6d66740073d4b5bd",
+    "README.md": "8bdccecc6f138291597f103f7c1539b5602a91ce12ae3dc019f78d61792daad1",
     "11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md": "b6827008267d1e003e4ef31b459acaf84184438cdcdaba8163f2b7c589aa16d5",
     "12_F05_F07_Execution_Playbook.md": "4896d428c1a97c6c85f692b3e54efc488ee3b685f136b38aebfd4808de2c641e",
-    "13_F05_Early_Diagnostic_Three_Goals.md": "da2336b8daf49fd2f00adb00bc21051ffa72747843904f0a5a09706b811f8f51"
+    "13_F05_Early_Diagnostic_Three_Goals.md": "b9cc913edda757961fedeb4d8e2e9d008d8eb8ab80b84262285d4121d1aa21ff"
   },
   "revision_kind": "DG02_PICKCUBE_R3_MATCHED_CONTROL_REWORK_PROMPT_PREPARATION",
   "benchmark_audit": {
@@ -5091,11 +5091,11 @@
       }
     },
     "current_execution_order": {
-      "selected_next": "Sol independent review of the DG01 Goal01 source diff and complete N0/N1/N2 evidence; do not start DG02 until DG01 is accepted and the next package is refrozen.",
+      "selected_next": "Prepare a fresh DG03 package against reviewed Core develop-full@e13a02acef64642bd8f3ce3b3735303c80c671a7 and isolated GeoPhys@a9e4c4850bd225f5929e74831ac282b18ff517ce; do not dispatch the adaptive baseline or start native until the maintainer relays the new package.",
       "after_that_priority": [
-        "After Sol accepts DG01, freeze DG02 against the actual reviewed HEAD and updated common semantic contract.",
-        "Keep DG03 pending DG02 review and a new package.",
-        "F06 and F07 remain separate and unstarted."
+        "Freeze DG03 source/consumer/owner/resource gates from the accepted DG01/DG02 contracts and actual reviewed HEADs.",
+        "Keep F06 and F07 separate and unstarted.",
+        "Do not convert DG01/DG02 bounded cell acceptance into overall F05 acceptance or Qualification."
       ],
       "R04b_R04c": "independent ready camera route remains; not dependent on all F rows",
       "F00_status": "ACCEPTED_BOUNDED_F00",
@@ -5106,7 +5106,7 @@
       "F07": "later extension; not required before camera",
       "F03": "ACCEPTED_BOUNDED_F03_S1; synthetic-I/O Core call chain and T+1 final-boundary reader only; attempt002 CPU Pendulum three-step scope deviation retained.",
       "F04": "ACCEPTED_BOUNDED_F04; exact two local-validated Panda deliveries/Isaac6.2.0.0/CUDA GPU PhysX/controlled worker route only.",
-      "F05": "Ordinary F05 remains F05_OVERALL_PARTIAL. Separate DG01 Goal01 candidate passes its scoped MuJoCo/MJCF/CPU Core cell and awaits Sol review; no GeoPhys/USD or Isaac/USD conclusion follows.",
+      "F05": "Ordinary F05 remains F05_OVERALL_PARTIAL. Diagnostic DG01 and DG02 are accepted only for their bounded source/task/action/Core/provider CPU cells; DG03 is unstarted and requires a fresh freeze.",
       "F06": "NOT_STARTED; no authorization from DG01.",
       "DG01_goal01": "F05_DG01_MUJOCO_CORE_CELL_PASS_PENDING_SOL_REVIEW; run_plan_sha256=e48dae904bf757f9b864eebf129619990638f174d00fe4f1fbdc53e701c60c32; 3000 Core accepted steps; two H5 episodes; 14/14 independent-reader negative mutations."
     },
@@ -6698,7 +6698,7 @@
     "latest_f05_successor_package_preparation": "f05_successor_attempt002_package_preparation_20261030",
     "f05_early_diagnostic_three_goals_20261030": {
       "authority": "maintainerexplicitlydesignated earlydiagnosticimplementation and3longgoalprompts, manualrelay, adaptnextafterreport",
-      "status": "DG01_PREPARED_NOT_EXECUTED_DG02_DG03_ADAPTIVE_BASELINES",
+      "status": "DG01_ACCEPTED_BOUNDED; DG02_ACCEPTED_BOUNDED; DG03_REQUIRES_FRESH_FREEZE",
       "preparation_input_head": "e7382adc0f31ca5fbff74c61a5163247d080759e",
       "ordinary_successor_history": {
         "completed": 2,
@@ -6711,7 +6711,7 @@
         {
           "id": "DG01",
           "scope": "common source/task/Action semantics + MuJoCoMJCF CPU Core nativecell",
-          "status": "PREPARED_FOR_MANUAL_RELAY",
+          "status": "ACCEPTED_BOUNDED_F05_DG01_MUJOCO_CORE",
           "expected_active_hours": [
             4,
             10
@@ -6723,12 +6723,12 @@
         {
           "id": "DG02",
           "scope": "GeoPhysUSD publicconstraint/tendon/actuatorconsumer + Core nativecell",
-          "status": "BASELINE_REQUIRES_DG01_SOL_REVIEW_AND_NEW_FREEZE"
+          "status": "ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE"
         },
         {
           "id": "DG03",
           "scope": "IsaacUSD GPUPhysX Corecell +3route semantic/evidenceclosure",
-          "status": "BASELINE_REQUIRES_DG02_SOL_REVIEW_AND_NEW_FREEZE"
+          "status": "BASELINE_TO_REFREEZE_AFTER_DG02_SOL_ACCEPTANCE"
         }
       ],
       "planning_entry": "13_F05_Early_Diagnostic_Three_Goals.md",
@@ -6914,6 +6914,34 @@
       "pytest_in_preparation": "NOT_RUN",
       "new_branches_worktrees": 0,
       "DG03_F06_F07": false
+    },
+    "f05_dg02_window003_sol_review_20261031": {
+      "decision": "ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE",
+      "date": "2026-10-31",
+      "core_input_head": "491f89a28e98badd3147fec968854e70717571a7",
+      "core_reviewed_head": "e13a02acef64642bd8f3ce3b3735303c80c671a7",
+      "implementation_commit": "589fb956cd691460d93a77db8ff7475e9431940c",
+      "documentation_commit": "e13a02acef64642bd8f3ce3b3735303c80c671a7",
+      "provider_head": "a9e4c4850bd225f5929e74831ac282b18ff517ce",
+      "source_task_action_provider_scope": "Pinned Menagerie source, Task/Action contract, source-bound Core route and isolated GeoPhys CPU profile only.",
+      "h5_sha256": [
+        "5e19442d46195d9a48f91bc1d9f9b755df907578d4983f41b5d4ee9cbd10ac40",
+        "26c6edaa8244041207fa906d80cbcd1b1f4640b224e161fceead5bef53c332ce"
+      ],
+      "independent_offline_review": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal02/window_003/sol_independent_review.json",
+      "review_receipt": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_003/",
+      "output_manifest_entries_verified": 39,
+      "protected_inputs_verified": 7626,
+      "runtime_files_verified": 12,
+      "provider_source_files_verified": 2859,
+      "n2": "Two episodes in one SelectedReferenceEnv; 300 intervals x 5 x 2 ms each; 3000/3000 advances, 602 observations, 600 transitions; all frozen per-route FK/contact/tracking/storage/close gates reported pass.",
+      "negative_suite": "Saved structured receipt reports 23/23; legacy top-level text says 22 and was preserved. Sol did not rerun the negative suite.",
+      "r3_cross_provider": "PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH; retain as diagnostic, do not call pass. Frozen oracle explicitly does not require trajectory equivalence; carry into DG03 final matrix.",
+      "source_material_limit": "Geometry correlation is bounded; cross-solver effective material/contact equivalence is not established.",
+      "sol_validation": "Offline H5/hash/ledger audit only; no pytest, native, solver, App, GPU, Isaac, F06/F07, or Qualification.",
+      "original_f05_status": "F05_OVERALL_PARTIAL unchanged; historical ordinary successor results unchanged.",
+      "next": "Prepare DG03 with a new freeze against reviewed HEADs; no direct execution of adaptive baseline.",
+      "report": "workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal02/window_003/execution_report.md"
     }
   }
 }

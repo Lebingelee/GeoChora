@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01精确单元已接收；DG02 window003当前身份Core N2候选通过，待Sol复核；PickCube R3跨provider逐值对照仍为PARTIAL。DG03等待DG02接收。**
+> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；DG03尚未启动，需基于当前复核HEAD重新冻结。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -161,18 +161,22 @@ window002 formal已用3,060/6,000步，余额2,940不足完整3,000，释放并�
 
 <a id="f05-dg02-window003-current-identity-candidate"></a>
 
-## 13. DG02 window003当前身份正式Core N2与收口（2026-10-31；候选待Sol复核）
+## 13. DG02 window003当前身份正式Core N2与收口（2026-10-31；Sol有界接收）
+
+**Sol决定：`ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`。** 接收范围是本次冻结的Menagerie source、Task/Action合同、Core source-bound候选及runtime路径、隔离GeoPhys CPU profile和下述N2证据；不扩展为任意USD、全部GeoPhys资产或跨solver等价声明。
 
 窗口003使用冻结包`DG02_WINDOW003_CURRENT_IDENTITY_FORMAL_AND_CLOSEOUT`，输入Core `develop-full@491f89a28e98badd3147fec968854e70717571a7`、隔离GeoPhys分支`codex/phase-ii-01-f05-geophys@a9e4c4850bd225f5929e74831ac282b18ff517ce`。冻结prompt、snapshot、manifest SHA分别为`53651b07b024b9adbb080359e319a025d89ce761b644f011db6bce8213655e8c`、`1be83ca3b7356dcccd07817670fd1034bfabef025079093b495a5c699c23b22c`、`b7f7f86d3932751d1a5d8fa22760c6489c1bc1e43cfb4afed7db7da114d2bf23`。当前Core实现HEAD为`589fb956cd691460d93a77db8ff7475e9431940c`；window003新增Reader修复已由`589fb956`提交。唯一无关未跟踪文件`docs/maintenance/20261030_runtime_route_diagnostic_handoff.md`受保护且未纳入提交。
 
 此前已授权的窄MuJoCo enum→`int`规范化及回归位于祖先提交`bc1bc170`，本窗口未再改production MuJoCo代码。当前窗口Reader修复确保H5实际cube pose quaternion为有限且单位范数，非单位变异由既有`obs_cube_pose`负例拒绝；相关reader测试与MuJoCo enum回归共11项通过。窗口003代码改动仅限TaskEnv诊断reader和窄回归。
 
-当前Core身份的静态候选用受监督零步public model build通过，模型包含16 qpos、15 dof、8 actuators、1 tendon、1 equality和25 geoms。正式N2使用计划SHA `5f0d098c40ba99fc0c025717975e2f3b8514523baf19f5a85f72840b3b83412d`，run `DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_001`：同一`SelectedReferenceEnv`两集、每集300 intervals×5×2 ms，合计3,000/3,000 physics advances；602 observations、600 transitions，两份H5均关闭持久化。受监督worker exit 0、峰值process-group RSS 1,682,337,792 bytes，进程组在共享native锁释放前退出。独立冷读计划SHA `4286dbffbec159f058ebd030be8bc4f0e75a84656d96ebb137cab15d34ee0bc6`，reader与supervisor exit 0，baseline error 0，source-FK最大位置/方向残差`1.864644006e-7 m` / `4.887944301e-7 rad`；所有tracking phase、rest contact与实际cube pose校验通过。structured negative suite为23/23（DG01继承22类＋DG02新增1类）。冷读顶层历史status文字仍写“22 negatives”，这里保留原件并按嵌套结构化的23 required/23 passed计数；未篡改冻结receipt。
+当前Core身份的静态候选用受监督零步public model build通过，模型包含16 qpos、15 dof、8 actuators、1 tendon、1 equality和25 geoms。正式N2使用计划SHA `5f0d098c40ba99fc0c025717975e2f3b8514523baf19f5a85f72840b3b83412d`，run `DG02_G5_FORMAL_ACTUAL_CORE_SELECTED_REFERENCE_N2_001`：同一`SelectedReferenceEnv`两集、每集300 intervals×5×2 ms，合计3,000/3,000 physics advances；602 observations、600 transitions，两份H5均关闭持久化。受监督worker exit 0、峰值process-group RSS 1,682,337,792 bytes，进程组在共享native锁释放前退出。独立冷读计划SHA `4286dbffbec159f058ebd030be8bc4f0e75a84656d96ebb137cab15d34ee0bc6`，reader与supervisor exit 0，baseline error 0，source-FK最大位置/方向残差`1.864644006e-7 m` / `4.887944301e-7 rad`；所有tracking phase、rest contact与实际cube pose校验通过。保存的structured negative suite报告23/23（DG01继承22类＋DG02新增1类）。冷读顶层历史status文字仍写“22 negatives”，这里保留原件并按嵌套结构化的23 required/23 passed计数；未篡改冻结receipt。
 
-源几何审计记录11个Panda body frames、23个绑定USD PhysicsMaterial的collision shapes、10个匹配box及71个匹配mesh geometry；13个collision mesh的匹配坐标最大差约`1.49e-8 m`。USD authored材料值均为static/dynamic friction 1.0、restitution 0.0，宿主descriptor和有效contact/friction law仍有表示差异，不声明跨solver接触/摩擦等价。逐值R3 normalization审计也没有解除原strict f64 comparison：arm position 1,064/4,214、velocity 2,482/4,214、target position 4,048/4,200仍超适用逐值容差；float32只解释部分差异，R3跨provider结果继续为PARTIAL。阈值、源、Task或required feature均未放宽。
+源几何审计记录11个Panda body frames、23个绑定USD PhysicsMaterial的collision shapes、10个匹配box及71个匹配mesh geometry；13个collision mesh的匹配坐标最大差约`1.49e-8 m`。USD authored材料值均为static/dynamic friction 1.0、restitution 0.0，宿主descriptor和有效contact/friction law仍有表示差异，不声明跨solver接触/摩擦等价。逐值R3 normalization审计也没有解除原strict f64 comparison：arm position 1,064/4,214、velocity 2,482/4,214、target position 4,048/4,200仍超适用逐值容差；float32只解释部分差异，R3跨provider结果继续为`PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`，不得称其通过。DG02被冻结的control oracle明确声明`not_trajectory_equivalence=true`，DG02的本路线验收要求实际源语义消费、Core tracking/物理门及其独立记录，不要求不同solver逐点重现轨迹。因此该R3差异作为最终三路线矩阵中的未决诊断保留，不阻止本次有界GeoPhys/USD cell接收，也不被掩盖。
 
 本窗口native仅有1次零步GeoPhys public model build与1次3,000步formal GeoPhys N2；没有新增MuJoCo启动。窗口003 GeoPhys共3,000 attempted/completed正式步，累计GeoPhys为28,745 attempted / 28,720 completed；累计正式步22,385 / 22,365，保守nonformal probe仍9,360，MuJoCo历史3,000步保持不变。窗口新增native wall约570.607秒；Goal累计GeoPhys native wall保守7,973.055秒，all-native wall含window001未知项1,800秒reserve为7,997.509秒。所有值仍在冻结Goal/window限额内。未启动DG03、F06/F07，未授Qualification，也未改变旧F05三轮/PARTIAL、旧r009或历史输出。
 
-R3逐值审计与source/material审计、formal计划/worker/H5/cold reader、supervisor和全量账本保存在忽略目录`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal02/window_003/`。当前Core N2候选标签为`F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`；该标签只覆盖冻结的Menagerie source、Task/Action、Core route与隔离GeoPhys CPU profile。Core checkout / provider 写入窗口和native窗口须在本包提交、保护/资源/进程/锁审计后释放；Sol复核完成前不据此推进DG03。
+Sol的离线复核重新计算两份H5的观测值和12个tracking行，H5 SHA与worker witness一致；验证输出清单39/39、冻结保护输入7,626/7,626、runtime 12/12和provider source 2,859/2,859。复核未运行pytest或native。复核报告及机器可读审计位于`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/sol_review_f05_dg02_003/`。Luna报告的tracked tree clean，Core在`e13a02acef64642bd8f3ce3b3735303c80c671a7`，隔离GeoPhys在`a9e4c4850bd225f5929e74831ac282b18ff517ce`；原有无关untracked文档保持未改。当前有界接收标签为`ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`。
+
+DG03现在可以进入新包准备，但不得重用今日的baseline直接执行；须以当前已复核HEAD重冻实际Isaac/PhysX消费者、DG01/DG02合同输入、保护哈希、资源与验证范围。DG03、F06、F07仍未启动，本次没有授予F05整体接收或Qualification。
 
 G8文档与静态收口：Module Skill checker通过；4份受影响文档的本地链接/锚点检查通过；`git diff --check`通过。系统quick-validate脚本不可用。staged consolidation docs validator退出1，258项错误＝257条non-documentation scope路径＋1条count limit；没有报告本次编辑文档的链接或内容错误。不得将全局validator写为PASS。完整checker/validator结果与输出hash清单留在忽略window003目录。

@@ -292,7 +292,7 @@ formal N2 pass. The current implementation and evidence remain at Core
 `78ea8cdb06d17792f2c774fbcca52bfd373cbff0`; do not advertise a passing
 controller or Qualification.
 
-## F05 DG02 window003 current-identity result (Core candidate pending Sol review)
+## F05 DG02 window003 current-identity result (bounded Core cell accepted by Sol)
 
 Core `589fb956cd691460d93a77db8ff7475e9431940c` passed the supervised
 zero-step public model build and the unchanged formal N2 route for the pinned
@@ -303,21 +303,27 @@ in one `SelectedReferenceEnv`, each 300 intervals × five 2 ms substeps
 tracking, stored cube pose, H5 identity/storage and all 23 structured negative
 classes. The legacy top-level reader status says “22 negatives”; the nested
 suite records 23 required / 23 passed and the frozen receipt is unchanged.
-This supports only `F05_DG02_GEOPHYS_USD_CORE_CELL_PASS_PENDING_SOL_REVIEW`.
+Sol accepted only `ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`, bound to the frozen Menagerie source, Task/Action, Core route and isolated GeoPhys CPU profile.
 
 The separate PickCube R3 cross-provider comparison remains
 `PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH`. Frozen per-value f64/f32
 normalization explains some values but leaves state/target differences above
 the existing tolerances. Keep the original strict comparison, source and
-thresholds unchanged. Source geometry matches within the recorded coordinate
-tolerance, while host descriptors and material/contact laws are not proven
-equivalent across solvers. This exact-source diagnostic is not general USD
-admission, Task success, Expert completion, cross-route equivalence or
-Qualification. Do not start DG03/F06/F07 before Sol review. See the [current
+thresholds unchanged. The frozen control oracle does not require trajectory
+equivalence; carry this unresolved diagnostic into DG03's final semantic
+matrix. Source geometry matches within the recorded coordinate tolerance,
+while host descriptors and material/contact laws are not proven equivalent
+across solvers. This exact-source diagnostic is not general USD admission,
+Task success, Expert completion, cross-route equivalence or Qualification.
+DG03 remains unstarted and requires a fresh package against the reviewed HEAD;
+F06/F07 remain unstarted. See the [current
 execution record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#f05-dg02-window003-current-identity-candidate)
 and [public API status](../../../docs/module/task_env/public-api.md#f05-dg02-window003-current-identity-candidate).
 
-**TaskEnv Skill refresh receipt — DG02 window003 (2026-10-31; Core candidate pending Sol):** trigger was the stored cube-pose quaternion reader gap and completion of the current-identity formal Core route. Rechecked the existing `scene.import_scene_source` → SceneSemanticIR → GeoPhys model consumers and the Core source-bound receipt/admission, candidate, Position control, `UsdCoreRuntimeSession`, `SelectedReferenceEnv`, native-I/O, Task and H5 Recorder/reader callers; also reviewed public TaskEnv selection docs, DG02 plans, frozen oracles, current formal/cold-reader receipts, R3 dtype audits and focused regressions. The provider route remains one public GeoPhys USD import/lowering route; Core candidate/admission/runtime is its consumer path. Reuse is `FIX_EXISTING` for the actual stored cube-pose/unit-quaternion reader check and `EXTEND_EXISTING` for the exact-source Core candidate composition; no new provider route, Runtime, Controller, factory, Recorder or reader was introduced. Targeted MuJoCo enum and reader regressions passed 11/11; the actual N2 cold read passed 602 observations, 600 transitions, 3,000 advances and structured 23/23 negatives. Cold-start routing confirmed that `make_env()` remains the public task constructor, USD delivery intake alone does not admit a runtime, and the DG02 source-bound candidate is an internal, plan-bound diagnostic route. The Module Skill checker and edited-document local-link checks passed; `git diff --check` passed. The repository quick-validate helper is not installed. The staged consolidation docs validator exited 1 with 258 errors (257 non-documentation-scope paths and one count-limit error); it reported no specific edited-document link/content error. Full validator result and evidence are retained in the ignored window003 output. No Qualification or general API claim follows. Sol review remains required; no other-thread message was sent.
+**TaskEnv Skill refresh receipt — DG02 window003 (2026-10-31; bounded cell accepted):** trigger was the stored cube-pose quaternion reader gap and completion of the current-identity formal Core route. Rechecked the existing `scene.import_scene_source` → SceneSemanticIR → GeoPhys model consumers and the Core source-bound receipt/admission, candidate, Position control, `UsdCoreRuntimeSession`, `SelectedReferenceEnv`, native-I/O, Task and H5 Recorder/reader callers; also reviewed public TaskEnv selection docs, DG02 plans, frozen oracles, current formal/cold-reader receipts, R3 dtype audits and focused regressions. The provider route remains one public GeoPhys USD import/lowering route; Core candidate/admission/runtime is its consumer path. Reuse is `FIX_EXISTING` for the actual stored cube-pose/unit-quaternion reader check and `EXTEND_EXISTING` for the exact-source Core candidate composition; no new provider route, Runtime, Controller, factory, Recorder or reader was introduced. Targeted MuJoCo enum and reader regressions passed 11/11; the actual N2 cold read passed 602 observations, 600 transitions, 3,000 advances and structured 23/23 negatives. Cold-start routing confirmed that `make_env()` remains the public task constructor, USD delivery intake alone does not admit a runtime, and the DG02 source-bound candidate is an internal, plan-bound diagnostic route. The Module Skill checker and edited-document local-link checks passed; `git diff --check` passed. The repository quick-validate helper is not installed. The staged consolidation docs validator exited 1 with 258 errors (257 non-documentation-scope paths and one count-limit error); it reported no specific edited-document link/content error. Full validator result and evidence are retained in the ignored window003 output. No Qualification or general API claim follows. DG02 received bounded Sol acceptance; DG03 needs a new frozen package; no other-thread message was sent.
+
+
+**Sol review — DG02 window003:** offline h5py/numpy recomputation confirmed both H5 hashes and typed witnesses, all 12 tracking rows, 602 observations, 600 transitions and 3,000 advances; 39 output-manifest entries and 7,626 protected inputs, 12 runtime files and 2,859 provider source files matched. The saved reader receipt's structured negative suite says 23/23; its legacy top-level “22 negatives” wording remains disclosed and unchanged. Sol did not rerun tests or native. Decision: `ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`; the R3 cross-provider comparison remains `PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH` and is carried to DG03 without claiming trajectory equivalence.
 
 ## Static Position leaf contracts (R02a)
 
