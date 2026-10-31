@@ -17,7 +17,7 @@ from ...assembly.source import UsdSnapshotLeaseV1
 from .free_joint_state import PublicRigidBodyReadbackV1
 from .native_io import (
     NativeAdvanceReceiptV1, NativePositionWriteAckV1,
-    NativeResetWriteReceiptV1, NativeRuntimeIOMetadataV1,
+    NativeResetWriteReceiptV1, NativeRuntimeIOMetadataV1, NativeSourceTendonWriteAckV1,
     NativeRuntimeReadbackV1,
 )
 from .source import UsdRuntimeSourceV1
@@ -219,13 +219,17 @@ class IsaacSimNativeRuntimeIOV1:
 
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
-                 app_owner: IsaacSimAppOwnerV1):
+                 app_owner: IsaacSimAppOwnerV1, *, dg03_input=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError("Isaac native I/O requires exact TaskArtifactV1 and ExecutionSpecV1")
         if type(source) is not UsdRuntimeSourceV1 or type(lease) is not UsdSnapshotLeaseV1:
             raise TypeError("Isaac native I/O requires verified USD RuntimeSource and owned snapshot lease")
         self._artifact, self._execution, self._source = artifact, execution, source
         self._lease, self._app_owner = lease, app_owner
+        self._dg03_input = dg03_input
+        self._dg03 = execution.physics_profile == 'isaac-gpu-physx-f05-dg03-usd-v1'
+        if self._dg03 != (dg03_input is not None):
+            raise ValueError('DG03 Isaac I/O requires its exact candidate input and profile together')
         self._closed = False
         self._runtime_owner_closed = False
         self._context = None
@@ -244,6 +248,9 @@ class IsaacSimNativeRuntimeIOV1:
         self._episode_origin_time: float | None = None
         self._native_step_count = 0
         self._metadata: NativeRuntimeIOMetadataV1 | None = None
+        self.drive_receipt = None
+        self._dg03_mimic_receipt = None
+        self._source_tendon_target = None
         self._open_public_runtime()
 
     def _open_public_runtime(self) -> None:
@@ -251,19 +258,22 @@ class IsaacSimNativeRuntimeIOV1:
             self._app_owner.open()
             import omni.usd
             import torch
-            from pxr import UsdGeom, UsdPhysics
+            from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics
             from isaacsim.core.experimental.prims import Articulation, RigidPrim, XformPrim
             from isaacsim.core.simulation_manager import SimulationManager
             from isaacsim.core.experimental.utils import app as app_utils
 
             if not torch.cuda.is_available() or torch.cuda.current_device() != 0:
                 raise RuntimeError("F04 requires CUDA device 0; CPU fallback is not admitted")
+            expected_profile = (
+                'isaac-gpu-physx-f05-dg03-usd-v1' if self._dg03
+                else 'isaac-gpu-physx-f04-position-v1'
+            )
             if (self._execution.physics_provider, self._execution.physics_backend,
                     self._execution.physics_device, self._execution.determinism_mode,
                     self._execution.physics_profile) != (
-                    "isaacsim", "cuda", "cuda:0", "best_effort",
-                    "isaac-gpu-physx-f04-position-v1"):
-                raise ValueError("unsupported F04 Isaac execution identity")
+                    "isaacsim", "cuda", "cuda:0", "best_effort", expected_profile):
+                raise ValueError("unsupported exact F04/DG03 Isaac execution identity")
             if SimulationManager.get_active_physics_engine() != "physx":
                 raise RuntimeError("F04 requires the public PhysX simulation engine")
 
@@ -292,6 +302,10 @@ class IsaacSimNativeRuntimeIOV1:
                 if (not variant_set.IsValid() or selection not in variant_set.GetVariantNames()
                         or not variant_set.SetVariantSelection(selection)):
                     raise ValueError(f"delivery variant is not available: {key}={selection}")
+
+            if self._dg03:
+                self._dg03_input.validate()
+                self._author_dg03_mimic(PhysxSchema, Sdf, UsdPhysics)
 
             authored_scenes = [p for p in self._stage.Traverse() if p.IsA(UsdPhysics.Scene)]
             if len(authored_scenes) != 1:
@@ -437,6 +451,22 @@ class IsaacSimNativeRuntimeIOV1:
                 int(self._artifact.timebase.control_substeps), self._dof_names,
                 self._position_limits,
             )
+            if self._dg03:
+                from .leaf_control import compile_isaac_source_tendon_receipt_v1
+
+                self.drive_receipt = compile_isaac_source_tendon_receipt_v1(
+                    execution=self._execution, source=self._source,
+                    native_metadata=self._metadata, writer_id='panda-main/position-servo-v1',
+                )
+                expected_mimic = {
+                    'schema_version': 'physx-public-mimic-authoring-v1',
+                    'follower_joint': 'finger_joint2', 'reference_joint': 'finger_joint1',
+                    'gearing': 1.0, 'offset_m': 0.0,
+                    'natural_frequency_hz': 100.0, 'damping_ratio': 1.0,
+                }
+                if any(self._dg03_mimic_receipt.get(name) != value
+                       for name, value in expected_mimic.items()):
+                    raise ValueError('DG03 public mimic authoring differs from its exact receipt contract')
             self._manager = SimulationManager
         except BaseException as primary:
             for label, cleanup in (
@@ -450,6 +480,47 @@ class IsaacSimNativeRuntimeIOV1:
                     primary.add_note(f"{label} after adapter startup failure also failed: "
                                      f"{type(cleanup_error).__name__}: {cleanup_error}")
             raise
+
+    def _author_dg03_mimic(self, PhysxSchema, Sdf, UsdPhysics) -> None:
+        """Author the source finger equality through the installed public PhysX schema."""
+        if not self._dg03 or self._stage is None:
+            raise RuntimeError('DG03 mimic authoring requires its exact composed USD stage')
+        expected_native = {'finger_joint1', 'finger_joint2'}
+        if {self._source.joints.get(f'panda-main/{name}') for name in expected_native} != expected_native:
+            raise ValueError('DG03 RuntimeSource does not bind the exact finger Joint pair')
+        matches = {name: [] for name in expected_native}
+        for prim in self._stage.Traverse():
+            if prim.GetName() in matches and prim.IsA(UsdPhysics.PrismaticJoint):
+                matches[prim.GetName()].append(prim)
+        if any(len(rows) != 1 for rows in matches.values()):
+            raise ValueError('DG03 source must compose exactly one public prismatic prim per finger Joint')
+        reference, follower = matches['finger_joint1'][0], matches['finger_joint2'][0]
+        mimic = PhysxSchema.PhysxMimicJointAPI.Apply(follower, 'transX')
+        if not mimic:
+            raise RuntimeError('installed PhysxMimicJointAPI.Apply did not return a valid public API')
+        follower.CreateRelationship('physxMimicJoint:transX:referenceJoint').SetTargets(
+            [reference.GetPath()],
+        )
+        follower.CreateAttribute(
+            'physxMimicJoint:transX:gearing', Sdf.ValueTypeNames.Float,
+        ).Set(1.0)
+        follower.CreateAttribute(
+            'physxMimicJoint:transX:offset', Sdf.ValueTypeNames.Float,
+        ).Set(0.0)
+        follower.CreateAttribute(
+            'physxMimicJoint:transX:naturalFrequency', Sdf.ValueTypeNames.Float,
+        ).Set(100.0)
+        follower.CreateAttribute(
+            'physxMimicJoint:transX:dampingRatio', Sdf.ValueTypeNames.Float,
+        ).Set(1.0)
+        self._dg03_mimic_receipt = {
+            'schema_version': 'physx-public-mimic-authoring-v1',
+            'follower_joint': 'finger_joint2', 'follower_path': str(follower.GetPath()),
+            'reference_joint': 'finger_joint1', 'reference_path': str(reference.GetPath()),
+            'gearing': 1.0, 'offset_m': 0.0,
+            'natural_frequency_hz': 100.0, 'damping_ratio': 1.0,
+            'applied_schemas': list(follower.GetAppliedSchemas()),
+        }
 
     def metadata(self) -> NativeRuntimeIOMetadataV1:
         if self._closed or self._metadata is None:
@@ -478,9 +549,27 @@ class IsaacSimNativeRuntimeIOV1:
         if set(sample.joint_position) != set(self._source.joints):
             raise ValueError("reset joint sample differs from exact USD RuntimeSource mapping")
         expected_targets = tuple(sorted(position_targets))
-        if (len(expected_targets) != 9 or tuple(item[1] for item in expected_targets)
-                != tuple(self._dof_names[index] for index, _name, _value in expected_targets)
-                or tuple(item[0] for item in expected_targets) != tuple(range(9))):
+        # A few provider-free F04 boundary tests construct this adapter with
+        # ``__new__`` to exercise reset behavior without opening Isaac. Keep
+        # those legacy-shaped instances on the F04 path when __init__ has not
+        # established the DG03 profile flag.
+        dg03 = getattr(self, "_dg03", False)
+        if dg03:
+            expected_arm_names = {f'joint{index}' for index in range(1, 8)}
+            valid_targets = (
+                len(expected_targets) == 7
+                and {item[1] for item in expected_targets} == expected_arm_names
+                and len({item[0] for item in expected_targets}) == 7
+                and all(item[0] == self._dof_index.get(item[1]) for item in expected_targets)
+            )
+        else:
+            valid_targets = (
+                len(expected_targets) == 9
+                and tuple(item[1] for item in expected_targets)
+                == tuple(self._dof_names[index] for index, _name, _value in expected_targets)
+                and tuple(item[0] for item in expected_targets) == tuple(range(9))
+            )
+        if not valid_targets:
             raise ValueError("reset targets differ from actual post-materialization DOF metadata")
         written_joints: list[str] = []
         written_free: list[str] = []
@@ -496,7 +585,24 @@ class IsaacSimNativeRuntimeIOV1:
             self._articulation.set_dof_positions(positions)
             written_joints.extend(self._source.joints)
             self._articulation.set_dof_velocities([0.0] * len(self._dof_names))
-            self._articulation.set_dof_position_targets([item[2] for item in expected_targets])
+            if dg03:
+                self._articulation.set_dof_position_targets(
+                    [item[2] for item in expected_targets],
+                    dof_indices=[int(item[0]) for item in expected_targets],
+                )
+                finger_indices = [self._dof_index[name] for name in ('finger_joint1', 'finger_joint2')]
+                self._articulation.set_dof_efforts([0.0, 0.0], dof_indices=finger_indices)
+                opening = sum(float(sample.joint_position[f'panda-main/finger_joint{index}'])
+                              for index in (1, 2))
+                ctrl = 255.0 * opening / 0.08
+                self._source_tendon_target = {
+                    'target_identity_sha256': None,
+                    'receipt_identity_sha256': self.drive_receipt.identity_sha256,
+                    'actuator_name': 'actuator8', 'control_value': float(min(255.0, max(0.0, ctrl))),
+                    'scalar_force_limit_N': 100.0,
+                }
+            else:
+                self._articulation.set_dof_position_targets([item[2] for item in expected_targets])
             for semantic, pose in sample.poses_world.items():
                 view = self._free_views.get(semantic)
                 if view is None:
@@ -540,7 +646,7 @@ class IsaacSimNativeRuntimeIOV1:
             error.add_note(
                 "Isaac reset may have partially applied; no physical rollback is claimed. "
                 f"joint writes={written_joints!r}, free-body writes={written_free!r}, "
-                f"target channels attempted={attempted}/9."
+                f"target channels attempted={attempted}/{len(self._dof_names)}."
             )
             raise
 
@@ -596,8 +702,19 @@ class IsaacSimNativeRuntimeIOV1:
         if self._closed:
             raise RuntimeError("Isaac native I/O is closed")
         ordered = tuple(sorted(targets))
-        if (len(ordered) != 9 or tuple(item[0] for item in ordered) != tuple(range(9))
-                or tuple(item[1] for item in ordered) != self._dof_names):
+        if self._dg03:
+            valid_targets = (
+                len(ordered) == 7
+                and {item[1] for item in ordered} == {f'joint{index}' for index in range(1, 8)}
+                and len({item[0] for item in ordered}) == 7
+                and all(item[0] == self._dof_index.get(item[1]) for item in ordered)
+            )
+        else:
+            valid_targets = (
+                len(ordered) == 9 and tuple(item[0] for item in ordered) == tuple(range(9))
+                and tuple(item[1] for item in ordered) == self._dof_names
+            )
+        if not valid_targets:
             raise ValueError("Position Target names/index order differ from actual Isaac metadata")
         attempted = 0
         try:
@@ -619,16 +736,108 @@ class IsaacSimNativeRuntimeIOV1:
             )
             raise
 
+    def write_source_tendon_target(
+        self, target_identity_sha256: str, receipt_identity_sha256: str,
+        actuator_name: str, control_value: float, scalar_force_limit_N: float,
+    ) -> NativeSourceTendonWriteAckV1:
+        if not self._dg03 or self._closed:
+            raise RuntimeError('source tendon targets are admitted only by an open DG03 native adapter')
+        receipt = self.drive_receipt
+        if (receipt is None or receipt.identity_sha256 != receipt_identity_sha256
+                or actuator_name != receipt.actuator_name):
+            raise ValueError('source tendon target does not bind the model-bound DG03 receipt')
+        expected_control, expected_limit = receipt.tendon_control(
+            float(control_value) * receipt.canonical_opening_range_m / receipt.actuator_control_range[1],
+            float(scalar_force_limit_N),
+        )
+        if expected_control != float(control_value) or expected_limit != float(scalar_force_limit_N):
+            raise ValueError('source tendon target differs from canonical opening/force mapping')
+        self._source_tendon_target = {
+            'target_identity_sha256': target_identity_sha256,
+            'receipt_identity_sha256': receipt_identity_sha256,
+            'actuator_name': actuator_name,
+            'control_value': float(control_value),
+            'scalar_force_limit_N': float(scalar_force_limit_N),
+        }
+        self._sync()
+        return NativeSourceTendonWriteAckV1(
+            'native-source-tendon-write-ack-v1', target_identity_sha256,
+            receipt_identity_sha256, actuator_name, float(control_value),
+            float(scalar_force_limit_N), False,
+        )
+
     def advance(self) -> NativeAdvanceReceiptV1:
         if self._closed or self._episode_origin_step is None:
             raise RuntimeError("Isaac advance requires an active reset episode")
         before = self._counter()
         attempted_index = self._native_step_count + 1
+        tendon_application = None
         try:
+            if self._dg03:
+                if self._source_tendon_target is None:
+                    raise RuntimeError('DG03 physics substep has no validated source tendon target')
+                receipt = self.drive_receipt
+                target = dict(self._source_tendon_target)
+                if (target.get('receipt_identity_sha256') != receipt.identity_sha256
+                        or not target.get('target_identity_sha256')):
+                    raise ValueError('DG03 source tendon target identity is stale or incomplete')
+                self._sync()
+                q = _tensor_rows(self._articulation.get_dof_positions(), width=len(self._dof_names),
+                                 label='DG03 pre-effort DOF position')[0]
+                qd = _tensor_rows(self._articulation.get_dof_velocities(), width=len(self._dof_names),
+                                  label='DG03 pre-effort DOF velocity')[0]
+                finger_names = receipt.tendon_native_joint_names
+                q_fingers = tuple(float(q[self._dof_index[name]]) for name in finger_names)
+                qd_fingers = tuple(float(qd[self._dof_index[name]]) for name in finger_names)
+                tendon_length = sum(coef * value for coef, value in zip(
+                    receipt.tendon_coefficients, q_fingers, strict=True,
+                ))
+                tendon_rate = sum(coef * value for coef, value in zip(
+                    receipt.tendon_coefficients, qd_fingers, strict=True,
+                ))
+                raw_force = (
+                    receipt.actuator_gain * float(target['control_value'])
+                    + receipt.actuator_length_bias * tendon_length
+                    + receipt.actuator_rate_bias * tendon_rate
+                )
+                source_low, source_high = receipt.actuator_force_range
+                scalar_limit = min(float(target['scalar_force_limit_N']), source_high)
+                force = min(scalar_limit, max(-scalar_limit, min(source_high, max(source_low, raw_force))))
+                dof_efforts = tuple(coef * force for coef in receipt.tendon_coefficients)
+                finger_indices = [self._dof_index[name] for name in finger_names]
+                self._articulation.set_dof_efforts(
+                    [float(value) for value in dof_efforts], dof_indices=finger_indices,
+                )
+                tendon_application = {
+                    'schema_version': 'native-source-tendon-substep-v1',
+                    'target_identity_sha256': target['target_identity_sha256'],
+                    'receipt_identity_sha256': target['receipt_identity_sha256'],
+                    'actuator_name': target['actuator_name'],
+                    'control_value': float(target['control_value']),
+                    'scalar_force_limit_N': float(target['scalar_force_limit_N']),
+                    'native_step_index': attempted_index,
+                    'public_effort_api': 'Articulation.set_dof_efforts',
+                    'effort_write_attempted_count': 2,
+                    'effort_write_completed_count': 2,
+                    'native_finger_joint_names': finger_names,
+                    'native_finger_dof_indices': tuple(finger_indices),
+                    'finger_positions_m': q_fingers,
+                    'finger_velocities_m_s': qd_fingers,
+                    'tendon_coefficients': receipt.tendon_coefficients,
+                    'tendon_length_m': float(tendon_length),
+                    'tendon_rate_m_s': float(tendon_rate),
+                    'unclipped_scalar_force_N': float(raw_force),
+                    'scalar_force_N': float(force),
+                    'dof_efforts_N': tuple(float(value) for value in dof_efforts),
+                }
+                self._sync()
             self._manager.step(steps=1, update_fabric=False)
             self._sync()
         except BaseException as error:
-            error.add_note(f"one native physics step was attempted; pre-step counter={before!r}")
+            error.add_note(
+                f"one native physics step was attempted; pre-step counter={before!r}; "
+                f"DG03 source tendon effort receipt={tendon_application!r}"
+            )
             raise
         after = self._counter()
         delta_steps = after[0] - before[0]
@@ -643,6 +852,7 @@ class IsaacSimNativeRuntimeIOV1:
         episode_time = after[1] - self._episode_origin_time
         return NativeAdvanceReceiptV1(
             "native-advance-receipt-v1", 1, attempted_index, episode_time,
+            tendon_application,
         )
 
     def close(self) -> None:
@@ -688,17 +898,31 @@ class IsaacSimNativeRuntimeIOV1:
 
 
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
-                                  source: UsdRuntimeSourceV1):
+                                  source: UsdRuntimeSourceV1, *, dg03_input=None):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
+    dg03 = execution.physics_profile == 'isaac-gpu-physx-f05-dg03-usd-v1'
+    if dg03 != (dg03_input is not None):
+        raise ValueError('DG03 Isaac native adapter requires its exact candidate input and profile together')
     if not (source.scene_source.source_verified or source.scene_source.locally_validated):
-        raise ValueError("Isaac Core adapter requires an upstream-validated or exact local F04 USD delivery")
+        raise ValueError("Isaac Core adapter requires an upstream-validated or exact locally validated USD delivery")
     if source.scene_source.representation.provider != "isaacsim":
         raise ValueError("Isaac Core adapter requires an Isaac Sim representation selection")
+    if dg03:
+        from ...tasks.position_candidate.builder import F05Dg03IsaacUsdCandidateInputV1
+
+        if type(dg03_input) is not F05Dg03IsaacUsdCandidateInputV1:
+            raise TypeError('DG03 Isaac adapter requires exact F05Dg03IsaacUsdCandidateInputV1')
+        dg03_input.validate()
+        if (dg03_input.artifact is not artifact or dg03_input.execution.identity_hash != execution.identity_hash
+                or dg03_input.runtime_source is not source):
+            raise ValueError('DG03 Isaac adapter candidate differs from the exact artifact/execution/source')
     owner = _process_app_owner()
     lease = source.scene_source.acquire_snapshot()
     try:
-        return IsaacSimNativeRuntimeIOV1(artifact, execution, source, lease, owner)
+        return IsaacSimNativeRuntimeIOV1(
+            artifact, execution, source, lease, owner, dg03_input=dg03_input,
+        )
     except BaseException as primary:
         # Constructor cleanup owns the lease/App when startup begins; this is
         # idempotent and protects failures before its first import as well.

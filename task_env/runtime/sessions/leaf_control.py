@@ -14,6 +14,7 @@ import math
 import re
 import subprocess
 from pathlib import Path
+from types import MappingProxyType
 from typing import Protocol, runtime_checkable
 
 from ...artifacts import (
@@ -992,6 +993,247 @@ def compile_isaac_named_position_drive_receipt_from_native_metadata_v1(
     if dict(source.joint_targets) != expected_targets:
         raise ValueError('verified USD RuntimeSource targets do not bind actual native DOF names')
     return replace(base, provenance_kind='native_runtime')
+
+
+@dataclass(frozen=True)
+class IsaacSourceTendonDriveReceiptV1:
+    """Model-bound Isaac receipt for seven arm drives and a source tendon."""
+
+    schema_version: str
+    provenance_kind: str
+    scene_identity_sha256: str
+    source_closure_sha256: str
+    execution_identity_sha256: str
+    provider_build_identity: str
+    physics_profile: str
+    backend: str
+    device: str
+    determinism_mode: str
+    physics_dt_s: float
+    control_substeps: int
+    writer_id: str
+    native_dof_names: tuple[str, ...]
+    native_position_limits: Mapping[str, tuple[float, float]]
+    arm_drives: tuple[IsaacNamedPositionDriveV1, ...]
+    mimic_follower_joint: str = 'finger_joint2'
+    mimic_reference_joint: str = 'finger_joint1'
+    mimic_gearing: float = 1.0
+    mimic_offset_m: float = 0.0
+    mimic_natural_frequency_hz: float = 100.0
+    mimic_damping_ratio: float = 1.0
+    tendon_name: str = 'split'
+    tendon_joint_names: tuple[str, str] = (
+        'panda-main/finger_joint1', 'panda-main/finger_joint2',
+    )
+    tendon_native_joint_names: tuple[str, str] = ('finger_joint1', 'finger_joint2')
+    tendon_coefficients: tuple[float, float] = (0.5, 0.5)
+    actuator_name: str = 'actuator8'
+    actuator_gain: float = 0.01568627451
+    actuator_length_bias: float = -100.0
+    actuator_rate_bias: float = -10.0
+    actuator_control_range: tuple[float, float] = (0.0, 255.0)
+    actuator_force_range: tuple[float, float] = (-100.0, 100.0)
+    canonical_opening_range_m: float = 0.08
+
+    def __post_init__(self):
+        if self.schema_version != 'isaac-source-tendon-drive-receipt-v1':
+            raise ValueError('unsupported Isaac source tendon receipt schema')
+        if self.provenance_kind not in {'synthetic_fixture', 'native_runtime'}:
+            raise ValueError('Isaac tendon receipt provenance must be explicit')
+        for value, label in (
+            (self.scene_identity_sha256, 'Scene'),
+            (self.source_closure_sha256, 'source closure'),
+            (self.execution_identity_sha256, 'ExecutionSpec'),
+        ):
+            _sha(value, label)
+        if (self.provider_build_identity, self.physics_profile, self.backend,
+                self.device, self.determinism_mode, self.physics_dt_s,
+                self.control_substeps) != (
+                'isaacsim-6.2.0.0', 'isaac-gpu-physx-f05-dg03-usd-v1',
+                'cuda', 'cuda:0', 'best_effort', 0.002, 5):
+            raise ValueError('DG03 tendon receipt differs from the frozen Isaac execution profile')
+        _stable_identity(self.writer_id, 'writer ID')
+        names = tuple(self.native_dof_names)
+        expected_names = {f'joint{index}' for index in range(1, 8)} | {
+            'finger_joint1', 'finger_joint2',
+        }
+        if len(names) != 9 or len(set(names)) != 9 or set(names) != expected_names:
+            raise ValueError('DG03 receipt requires the exact nine named Menagerie Panda DOFs')
+        limits = {name: tuple(value) for name, value in dict(self.native_position_limits).items()}
+        if set(limits) != set(names):
+            raise ValueError('DG03 public DOF limits must cover all nine mapped DOFs')
+        for name, value in limits.items():
+            if (len(value) != 2 or any(type(x) not in (int, float) or isinstance(x, bool)
+                                       or not math.isfinite(float(x)) for x in value)
+                    or float(value[0]) >= float(value[1])):
+                raise ValueError(f'DG03 position limits for {name} are invalid')
+            limits[name] = (float(value[0]), float(value[1]))
+        object.__setattr__(self, 'native_dof_names', names)
+        object.__setattr__(self, 'native_position_limits', MappingProxyType(limits))
+        drives = tuple(self.arm_drives)
+        expected_arm = {JointReference('panda-main', f'joint{index}') for index in range(1, 8)}
+        if (len(drives) != 7 or any(type(row) is not IsaacNamedPositionDriveV1 for row in drives)
+                or {row.canonical_joint for row in drives} != expected_arm):
+            raise ValueError('DG03 requires exactly seven typed canonical Arm position drives')
+        if any(row.position_unit != 'radian' or names[row.native_dof_index] != row.native_dof_name
+               or (float(row.lower_limit), float(row.upper_limit)) != limits[row.native_dof_name]
+               for row in drives):
+            raise ValueError('DG03 Arm drive name/index/unit/limits differ from public DOF metadata')
+        if len({row.native_dof_index for row in drives}) != 7:
+            raise ValueError('DG03 Arm native indices must be unique')
+        if (self.mimic_follower_joint, self.mimic_reference_joint,
+                float(self.mimic_gearing), float(self.mimic_offset_m),
+                float(self.mimic_natural_frequency_hz), float(self.mimic_damping_ratio),
+                self.tendon_name, tuple(self.tendon_joint_names),
+                tuple(self.tendon_native_joint_names), tuple(self.tendon_coefficients),
+                self.actuator_name, float(self.actuator_gain),
+                float(self.actuator_length_bias), float(self.actuator_rate_bias),
+                tuple(self.actuator_control_range), tuple(self.actuator_force_range),
+                float(self.canonical_opening_range_m)) != (
+                'finger_joint2', 'finger_joint1', 1.0, 0.0, 100.0, 1.0,
+                'split', ('panda-main/finger_joint1', 'panda-main/finger_joint2'),
+                ('finger_joint1', 'finger_joint2'), (0.5, 0.5), 'actuator8',
+                0.01568627451, -100.0, -10.0, (0.0, 255.0), (-100.0, 100.0), 0.08):
+            raise ValueError('DG03 receipt does not encode the exact source tendon/actuator law')
+        if any(names.index(name) in {row.native_dof_index for row in drives}
+               for name in self.tendon_native_joint_names):
+            raise ValueError('DG03 tendon finger DOFs must remain state-only, outside Arm drives')
+        object.__setattr__(self, 'arm_drives', drives)
+
+    @property
+    def drives(self):
+        """The seven position-driven Arm joints; finger joints are state-only."""
+        return self.arm_drives
+
+    @property
+    def joint_targets(self) -> dict[str, str]:
+        result = {
+            f'{row.canonical_joint.entity_id}/{row.canonical_joint.joint_id}': row.native_dof_name
+            for row in self.arm_drives
+        }
+        result.update(dict(zip(self.tendon_joint_names, self.tendon_native_joint_names, strict=True)))
+        return result
+
+    @property
+    def identity_sha256(self) -> str:
+        return _digest({
+            'schema_version': self.schema_version, 'provenance_kind': self.provenance_kind,
+            'scene_identity_sha256': self.scene_identity_sha256,
+            'source_closure_sha256': self.source_closure_sha256,
+            'execution_identity_sha256': self.execution_identity_sha256,
+            'provider_build_identity': self.provider_build_identity,
+            'physics_profile': self.physics_profile, 'backend': self.backend,
+            'device': self.device, 'determinism_mode': self.determinism_mode,
+            'physics_dt_s': float(self.physics_dt_s), 'control_substeps': self.control_substeps,
+            'writer_id': self.writer_id, 'native_dof_names': list(self.native_dof_names),
+            'native_position_limits': {name: list(self.native_position_limits[name])
+                                       for name in self.native_dof_names},
+            'arm_drives': [(row.canonical_joint.entity_id, row.canonical_joint.joint_id,
+                            row.native_dof_name, row.native_dof_index, row.position_unit,
+                            float(row.lower_limit), float(row.upper_limit)) for row in self.arm_drives],
+            'mimic_follower_joint': self.mimic_follower_joint,
+            'mimic_reference_joint': self.mimic_reference_joint,
+            'mimic_gearing': float(self.mimic_gearing),
+            'mimic_offset_m': float(self.mimic_offset_m),
+            'mimic_natural_frequency_hz': float(self.mimic_natural_frequency_hz),
+            'mimic_damping_ratio': float(self.mimic_damping_ratio),
+            'tendon_name': self.tendon_name, 'tendon_joint_names': list(self.tendon_joint_names),
+            'tendon_native_joint_names': list(self.tendon_native_joint_names),
+            'tendon_coefficients': list(self.tendon_coefficients),
+            'actuator_name': self.actuator_name, 'actuator_gain': float(self.actuator_gain),
+            'actuator_length_bias': float(self.actuator_length_bias),
+            'actuator_rate_bias': float(self.actuator_rate_bias),
+            'actuator_control_range': list(self.actuator_control_range),
+            'actuator_force_range': list(self.actuator_force_range),
+            'canonical_opening_range_m': float(self.canonical_opening_range_m),
+        })
+
+    def arm_commands(self, arm_position: Mapping[str, float]):
+        expected = {f'panda-main/joint{index}' for index in range(1, 8)}
+        if not isinstance(arm_position, Mapping) or set(arm_position) != expected:
+            raise ValueError('DG03 Arm command must cover exactly canonical joint1 through joint7')
+        by_joint = {f'{row.canonical_joint.entity_id}/{row.canonical_joint.joint_id}': row
+                    for row in self.arm_drives}
+        rows = []
+        for key, raw in arm_position.items():
+            if (type(raw) not in (int, float) or isinstance(raw, bool)
+                    or not math.isfinite(float(raw))):
+                raise ValueError('DG03 Arm target must be a finite non-boolean scalar')
+            row = by_joint[key]
+            value = float(raw)
+            if not row.lower_limit <= value <= row.upper_limit:
+                raise ValueError(f'DG03 Arm target is outside public limits for {key}')
+            rows.append((row.native_dof_index, row.native_dof_name, value))
+        return tuple(sorted(rows))
+
+    def tendon_control(self, opening_m: float, force_limit_N: float) -> tuple[float, float]:
+        for value, label in ((opening_m, 'opening'), (force_limit_N, 'force limit')):
+            if (type(value) not in (int, float) or isinstance(value, bool)
+                    or not math.isfinite(float(value))):
+                raise ValueError(f'DG03 tendon {label} must be finite')
+        opening, force_limit = float(opening_m), float(force_limit_N)
+        if not 0.0 <= opening <= self.canonical_opening_range_m:
+            raise ValueError('DG03 tendon opening is outside the canonical 0..0.08 m range')
+        if not 0.0 <= force_limit <= self.actuator_force_range[1]:
+            raise ValueError('DG03 requested scalar force limit is outside the source actuator range')
+        ctrl = self.actuator_control_range[1] * opening / self.canonical_opening_range_m
+        return (float(min(self.actuator_control_range[1], max(self.actuator_control_range[0], ctrl))),
+                force_limit)
+
+
+def compile_isaac_source_tendon_receipt_v1(
+    *, execution: ExecutionSpecV1, source, native_metadata, writer_id: str,
+    provenance_kind: str = 'native_runtime',
+) -> IsaacSourceTendonDriveReceiptV1:
+    """Bind the exact DG03 source law to public Isaac Articulation metadata."""
+    from .native_io import NativeRuntimeIOMetadataV1
+    from .source import UsdRuntimeSourceV1
+
+    if type(execution) is not ExecutionSpecV1 or type(source) is not UsdRuntimeSourceV1:
+        raise TypeError('DG03 receipt compiler requires exact versioned Execution/RuntimeSource contracts')
+    if type(native_metadata) is not NativeRuntimeIOMetadataV1:
+        raise TypeError('DG03 receipt compiler requires public NativeRuntimeIOMetadataV1')
+    source.validate()
+    execution.validate()
+    native_metadata.validate_binding(source.task_artifact, execution, source)
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.determinism_mode, execution.physics_profile) != (
+            'isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg03-usd-v1'):
+        raise ValueError('DG03 receipt compiler refuses a different Isaac execution profile')
+    if (native_metadata.provider_build_identity, native_metadata.physics_provider,
+            native_metadata.backend, native_metadata.device, native_metadata.determinism_mode) != (
+            'isaacsim-6.2.0.0', 'isaacsim', 'cuda', 'cuda:0', 'best_effort'):
+        raise ValueError('DG03 receipt compiler refuses a different public Isaac build/device')
+    expected_targets = {
+        **{f'panda-main/joint{index}': f'joint{index}' for index in range(1, 8)},
+        'panda-main/finger_joint1': 'finger_joint1',
+        'panda-main/finger_joint2': 'finger_joint2',
+    }
+    if dict(source.joint_targets) != expected_targets or dict(source.joints) != expected_targets:
+        raise ValueError('DG03 source joint map differs from its exact nine-DOF Menagerie map')
+    if set(native_metadata.native_dof_names) != set(expected_targets.values()):
+        raise ValueError('DG03 public articulation names differ from the exact source map')
+    drives = []
+    for index, native_name in enumerate(native_metadata.native_dof_names):
+        canonical = next(key for key, value in expected_targets.items() if value == native_name)
+        if '/joint' not in canonical:
+            continue
+        lower, upper = native_metadata.native_position_limits[native_name]
+        drives.append(IsaacNamedPositionDriveV1(
+            'isaac-named-position-drive-v1',
+            JointReference('panda-main', canonical.split('/', 1)[1]),
+            native_name, index, 'radian', float(lower), float(upper),
+        ))
+    return IsaacSourceTendonDriveReceiptV1(
+        'isaac-source-tendon-drive-receipt-v1', provenance_kind,
+        source.scene_definition.identity_hash, source.source_closure_digest,
+        execution.identity_hash, native_metadata.provider_build_identity,
+        execution.physics_profile, execution.physics_backend, execution.physics_device,
+        execution.determinism_mode, float(source.task_artifact.timebase.physics_dt),
+        int(source.task_artifact.timebase.control_substeps), writer_id,
+        tuple(native_metadata.native_dof_names), native_metadata.native_position_limits,
+        tuple(drives),
+    )
 
 
 @dataclass(frozen=True)

@@ -292,6 +292,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-s1-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-native-v1'),
                 ('geophys', 'cpu', 'cpu', 'best_effort', 'geophys-usd-position-f05-dg02-core-v1'),
+                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg03-usd-v1'),
                 ('mujoco', 'cpu', 'cpu', 'strict', 'mujoco-mjcf-f05-dg01-core-v1'),
             }
             if execution_route not in allowed_versioned_routes:
@@ -703,6 +704,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         controller_profile=self.position_profiles,
                         f05_native_input=self.value.get('f05_native_position_input'),
                         f05_dg02_geophys_input=self.value.get('f05_dg02_geophys_input'),
+                        f05_dg03_isaac_input=self.value.get('f05_dg03_isaac_input'),
                         f05_dg01_mujoco_input=self.value.get('f05_dg01_mujoco_input'),
                     )
             else:

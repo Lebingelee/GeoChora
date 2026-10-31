@@ -45,6 +45,7 @@ POSITION_CANDIDATE_TASK_ID = 'phase-ii-c02b-position-servo'
 POSITION_CANDIDATE_VERSION = 'candidate-v1'
 POSITION_CANDIDATE_SEED = 31
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
+F05_DG03_ISAAC_USD_PROFILE = 'isaac-gpu-physx-f05-dg03-usd-v1'
 
 
 def _dg02_r3_arm_profile():
@@ -74,6 +75,13 @@ def _validate_f05_native_position_action_config(controller_config):
 F05_DG02_GEOPHYS_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG02_USD_ASSET_VERSION = 'f05-dg02-usd-v2'
 F05_DG02_USD_RECIPE_SHA256 = '003238fb99d5b2574e5550918b6902518d7bc09cd0d6f4ad02049ccc408bb0fd'
+F05_DG03_USD_ASSET_ID = 'f05-dg03-menagerie-panda-source-preserving-isaac-usd'
+F05_DG03_USD_ASSET_VERSION = 'f05-dg03-isaac-usd-v1'
+F05_DG03_USD_DELIVERY_IDENTITY_SHA256 = '4d30cdb6867acab7a96bd1a8bc92d95cad9d539bec9eec5865023bb79076c215'
+F05_DG03_USD_DELIVERY_CLOSURE_SHA256 = 'd64528cabcac9a40a070bd0720974d0a0282504812e1aebf0f09b4f774eb181a'
+F05_DG03_USD_DELIVERY_MANIFEST_SHA256 = '5f64dfd0058e97352b27ce17f28de912e9160d5be93ae3997a513f296a4273b0'
+F05_DG03_USD_RECIPE_SHA256 = '2f85b5632c99bbbda14057850b2b80f0db27c58a079d638b14323ab865d89ddc'
+F05_DG03_USD_REPORT_SHA256 = '392790c1bafabd6fbd67f2210ffbff5531202874e4bc3303199762779f0d57db'
 # The DG02 Core route tracks source-FK pose targets whose Panda solution is
 # redundant. The bounded probes found a tradeoff: gain 0.0 reduced target error
 # and speed versus 1.0, while increasing joint jitter. Use the midpoint for a
@@ -537,6 +545,228 @@ class F05Dg02GeoPhysUsdCandidateInputV1:
 
 
 @dataclass(frozen=True)
+class F05Dg03IsaacUsdCandidateInputV1:
+    """Exact DG03 Menagerie USD/Core route with one source tendon actuator."""
+
+    schema_version: str
+    task_source: TaskSourceV1
+    artifact: TaskArtifactV1
+    runtime_source: UsdRuntimeSourceV1
+    execution: ExecutionSpecV1
+    reset_plan: EpisodeResetPlanV1
+    kinematics_source_xml: str
+    kinematics_source_sha256: str
+    task_scene_recipe_sha256: str
+    action_config: object
+
+    def validate(self):
+        if self.schema_version != 'f05-dg03-isaac-usd-candidate-input-v1':
+            raise ValueError('unsupported F05 DG03 Isaac/USD candidate input schema')
+        if (type(self.task_source) is not TaskSourceV1
+                or type(self.artifact) is not TaskArtifactV1
+                or type(self.runtime_source) is not UsdRuntimeSourceV1
+                or type(self.execution) is not ExecutionSpecV1
+                or type(self.reset_plan) is not EpisodeResetPlanV1):
+            raise TypeError('DG03 requires exact TaskSource/Artifact/USD/Execution/reset contracts')
+        from task_env.environment.config import ActionConfig
+
+        if type(self.action_config) is not ActionConfig or self.action_config != ActionConfig(
+                joint_position_correction_gain=1.0,
+                gripper_default_force_N=100.0):
+            raise ValueError('DG03 ActionConfig differs from accepted DG01 Position semantics')
+        source, artifact, execution = self.runtime_source, self.artifact, self.execution
+        source.validate()
+        artifact.validate()
+        execution.validate()
+        self.reset_plan.validate()
+        scene = source.scene_definition
+        if (self.task_source.task_id, self.task_source.version, self.task_source.scene_ref,
+                artifact.task_id, artifact.artifact_version, scene.scene_id) != (
+                F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID,
+                F05_DG01_TASK_ID, F05_DG01_TASK_VERSION, F05_DG01_SCENE_ID):
+            raise ValueError('DG03 TaskSource/Artifact differs from accepted DG01 task semantics')
+        if (source.task_artifact.identity_hash != artifact.identity_hash
+                or artifact.scene_identity_hash != scene.identity_hash
+                or source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
+                or source.scene_source.scene_identity_sha256 != scene.identity_hash
+                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
+                or self.reset_plan.role_binding.scene_identity_hash != scene.identity_hash
+                or self.reset_plan.reset_sample.task_artifact_hash != artifact.identity_hash):
+            raise ValueError('DG03 Task/Scene/Artifact/reset identities disagree')
+        if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+                execution.physics_profile, execution.determinism_mode) != (
+                'isaacsim', 'cuda', 'cuda:0', F05_DG03_ISAAC_USD_PROFILE, 'best_effort'):
+            raise ValueError('DG03 requires its exact Isaac CUDA/cuda:0 source profile')
+        if (artifact.timebase.physics_dt, artifact.timebase.control_substeps,
+                artifact.timebase.control_dt) != (0.002, 5, 0.01):
+            raise ValueError('DG03 requires 100 Hz control with five 2 ms physics steps')
+        if (execution.render_default.provider, execution.render_default.backend,
+                execution.render_default.profile, execution.render_default.device,
+                execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
+            raise ValueError('DG03 state-only cell does not admit renderer or camera overrides')
+        delivery = source.scene_source.loaded_delivery
+        representation = source.scene_source.representation
+        d = delivery.delivery
+        if (delivery.source_verified, delivery.locally_validated,
+                d.provenance_kind, delivery.delivery_sha256, delivery.closure_sha256,
+                d.recipe_sha256, d.asset_definition.asset_id,
+                d.asset_definition.asset_version, d.asset_definition.source_reference,
+                d.asset_definition.source_revision, d.source_closure_sha256,
+                d.source_entry_sha256, representation.provider,
+                representation.provider_build_identity, representation.representation_format,
+                representation.runtime_admitted) != (
+                False, True, 'local-validated', F05_DG03_USD_DELIVERY_IDENTITY_SHA256,
+                F05_DG03_USD_DELIVERY_CLOSURE_SHA256, F05_DG03_USD_RECIPE_SHA256,
+                F05_DG03_USD_ASSET_ID, F05_DG03_USD_ASSET_VERSION,
+                'mujoco-menagerie://franka_emika_panda/panda.xml',
+                'b846dd12bc459d776cccb3dee0b1d02acbf7a9c7',
+                'a59a66d0b176cb6b2634d54cd20744752742b425e5524db1b865dda0eb3adf2a',
+                '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273',
+                'isaacsim', 'isaacsim-6.2.0.0', 'usd', False):
+            raise ValueError('DG03 source is outside its exact local Isaac/USD Menagerie delivery')
+        if (d.recipe_path, d.validation_report_path, d.validation_report_sha256) != (
+                'metadata/f05_dg03_isaac_usd_recipe.json',
+                'metadata/f05_dg03_local_validation_report.json',
+                F05_DG03_USD_REPORT_SHA256):
+            raise ValueError('DG03 delivery recipe/report bytes differ from its frozen local package')
+        expected_options = {
+            'f05_goal': 'DG03',
+            'lowering': 'public-isaac-physx-mimic-and-source-tendon-v1',
+            'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
+            'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
+        }
+        from task_env.assembly.usd_delivery import _canonical_hash
+        if (representation.options_sha256 != _canonical_hash(expected_options)
+                or representation.source_verified is not False
+                or representation.provider != 'isaacsim'
+                or representation.provider_build_identity != 'isaacsim-6.2.0.0'
+                or representation.runtime_admitted is not False):
+            raise ValueError('DG03 representation options do not bind the frozen Core lowering')
+        if delivery.manifest_bytes_sha256 != F05_DG03_USD_DELIVERY_MANIFEST_SHA256:
+            raise ValueError('DG03 manifest bytes differ from the frozen delivery manifest')
+        if not delivery.report.passed:
+            raise ValueError('DG03 local delivery report did not pass')
+        expected_bodies, expected_joints = _f05_dg02_usd_source_bindings()
+        if (dict(source.joints) != expected_joints
+                or dict(source.joint_targets) != expected_joints
+                or dict(source.bodies) != expected_bodies
+                or dict(source.frames)
+                or dict(source.free_joints) != {
+                    'free-cube/free_cube': '/F04Scene/free_cube/rootJoint',
+                }):
+            raise ValueError('DG03 USD mappings differ from exact nine-DOF/free-cube source contract')
+        expected_runtime_frames = {
+            f'{frame.entity_id}/{frame.frame_id}'
+            for frame in scene.frames or () if frame.frame_kind == 'runtime'
+        }
+        if set(expected_bodies) != expected_runtime_frames:
+            raise ValueError('DG03 USD body bindings do not cover exact canonical runtime Frames')
+        if (artifact.initialization.poses_world != self.reset_plan.reset_sample.poses_world
+                or set(artifact.initialization.poses_world) != {'free-cube/free_cube'}
+                or artifact.initialization.poses_world['free-cube/free_cube'].position != (1.0, 0.5, 0.9)
+                or artifact.initialization.poses_world['free-cube/free_cube'].quaternion_wxyz
+                    != (1.0, 0.0, 0.0, 0.0)
+                or dict(artifact.initialization.joint_position)
+                    != dict(self.reset_plan.reset_sample.joint_position)):
+            raise ValueError('DG03 reset differs from the frozen DG01 home/free-cube reset')
+        if self.task_scene_recipe_sha256 != F05_DG01_RECIPE_SHA256:
+            raise ValueError('DG03 task scene recipe differs from frozen DG01 recipe')
+        if (not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str
+                or hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest()
+                    != self.kinematics_source_sha256
+                or self.kinematics_source_sha256
+                    != '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'):
+            raise ValueError('DG03 source-calibrated kinematics bytes/hash mismatch')
+
+
+def build_f05_dg03_isaac_usd_candidate(delivery_manifest, *, task_seed=POSITION_CANDIDATE_SEED,
+                                       horizon=300, environment_type=SelectedReferenceEnv):
+    """Build the exact source-bound DG03 candidate through existing Core owners."""
+    from dataclasses import replace as dataclass_replace
+    from task_env.assembly.source import UsdTaskSceneSourceV1
+    from task_env.assembly.usd_delivery import (
+        _canonical_hash, load_usd_asset_delivery, resolve_provider_representation,
+    )
+    from task_env.artifacts import TaskArtifact, ExecutionSpecV1, RendererSelectionV1
+    from task_env.environment import compile_task_artifact_v1, sample_episode_reset_plan
+    from task_env.environment.config import ActionConfig
+
+    loaded = load_usd_asset_delivery(Path(delivery_manifest).resolve(strict=True))
+    if (not loaded.locally_validated or loaded.source_verified
+            or loaded.manifest_bytes_sha256 != F05_DG03_USD_DELIVERY_MANIFEST_SHA256
+            or loaded.delivery_sha256 != F05_DG03_USD_DELIVERY_IDENTITY_SHA256
+            or loaded.closure_sha256 != F05_DG03_USD_DELIVERY_CLOSURE_SHA256):
+        raise ValueError('DG03 candidate requires its exact locally validated delivery bytes')
+    scene = _f05_dg01_scene()
+    legacy_artifact, _ = _f05_dg01_artifact_and_sample(scene)
+    task_source = _f05_dg01_task_source(scene)
+    panda_asset = loaded.delivery.asset_definition
+    old_assets = [asset for asset in scene.assets if asset.asset_id == 'panda-v1']
+    if len(old_assets) != 1:
+        raise ValueError('DG03 could not locate the exact DG01 Panda asset owner')
+    scene = dataclass_replace(
+        scene,
+        assets=tuple(panda_asset if asset == old_assets[0] else asset for asset in scene.assets),
+        entities=tuple(
+            dataclass_replace(entity, asset_id=panda_asset.asset_id,
+                              asset_version=panda_asset.asset_version)
+            if entity.entity_id == 'panda-main' else entity
+            for entity in scene.entities
+        ),
+    )
+    scene.validate()
+    legacy_mapping = legacy_artifact.to_mapping()
+    for entity in legacy_mapping['world']['entities']:
+        if entity['semantic_id'] == 'panda-main':
+            entity['asset_reference'] = f'{panda_asset.source_reference}@{panda_asset.asset_version}'
+    legacy_artifact = TaskArtifact.from_mapping(legacy_mapping)
+    artifact = compile_task_artifact_v1(task_source, scene, legacy_artifact)
+    reset_plan = sample_episode_reset_plan(task_source, scene, artifact, task_seed=int(task_seed))
+    bodies, joints = _f05_dg02_usd_source_bindings()
+    options = {
+        'f05_goal': 'DG03',
+        'lowering': 'public-isaac-physx-mimic-and-source-tendon-v1',
+        'delivery_manifest_sha256': F05_DG03_USD_DELIVERY_MANIFEST_SHA256,
+        'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
+    }
+    representation = resolve_provider_representation(
+        loaded, provider='isaacsim', provider_build_identity='isaacsim-6.2.0.0',
+        options=options,
+    )
+    if representation.options_sha256 != _canonical_hash(options):
+        raise ValueError('DG03 provider selection did not bind its exact source-lowering options')
+    task_scene_source = UsdTaskSceneSourceV1(
+        'usd-task-scene-source-v1', loaded, representation,
+        task_source.identity_hash, scene.identity_hash,
+    )
+    source = UsdRuntimeSourceV1(
+        'usd-runtime-source-v1', artifact, scene, task_scene_source,
+        joints, bodies, {}, {'free-cube/free_cube': '/F04Scene/free_cube/rootJoint'}, joints,
+    )
+    execution = ExecutionSpecV1(
+        'execution-spec-v1', 'isaacsim', 'cuda', F05_DG03_ISAAC_USD_PROFILE,
+        0, 'best_effort', RendererSelectionV1(
+            'renderer-selection-v1', 'none', 'cpu', 'none', None,
+        ), 'cuda:0', (),
+    )
+    original_xml = loaded.source_input_bytes.get(loaded.delivery.source_entry_file)
+    if type(original_xml) is not bytes:
+        raise ValueError('DG03 loader snapshot does not retain the exact Menagerie source XML bytes')
+    source_xml = original_xml.decode('utf-8')
+    candidate_input = F05Dg03IsaacUsdCandidateInputV1(
+        'f05-dg03-isaac-usd-candidate-input-v1', task_source, artifact, source,
+        execution, reset_plan, source_xml, hashlib.sha256(original_xml).hexdigest(),
+        F05_DG01_RECIPE_SHA256,
+        ActionConfig(joint_position_correction_gain=1.0, gripper_default_force_N=100.0),
+    )
+    candidate_input.validate()
+    candidate = build_versioned_position_candidate(
+        candidate_input, horizon=horizon, environment_type=environment_type,
+    )
+    return candidate_input, candidate
+
+
+@dataclass(frozen=True)
 class F05Dg01MujocoCandidateInputV1:
     """Exact source-bound Menagerie MJCF → MuJoCo Core candidate for DG01."""
 
@@ -633,7 +863,7 @@ class F05Dg01MujocoCandidateInputV1:
             raise ValueError('F05 DG01 source-calibrated kinematics bytes/hash mismatch')
 
 
-def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
+def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg03IsaacUsdCandidateInputV1 | F05Dg01MujocoCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
                                        controller_config=None):
@@ -641,33 +871,35 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
     if type(input_v1) not in (F03PositionCandidateInputV1, F04PositionCandidateInputV1,
                               F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
                               F05Dg02GeoPhysUsdCandidateInputV1,
+                              F05Dg03IsaacUsdCandidateInputV1,
                               F05Dg01MujocoCandidateInputV1):
-        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01/DG02 input contract')
+        raise TypeError('versioned Position candidate requires an exact F03/F04/F05/DG01/DG02/DG03 input contract')
     input_v1.validate()
     if type(input_v1) is F05NativePositionCandidateInputV1:
         _validate_f05_native_position_action_config(controller_config)
     elif type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1:
         if controller_config is not None and controller_config != input_v1.action_config:
             raise ValueError('DG02 controller override differs from its frozen ActionConfig')
+    elif type(input_v1) is F05Dg03IsaacUsdCandidateInputV1:
+        if controller_config is not None and controller_config != input_v1.action_config:
+            raise ValueError('DG03 controller override differs from its frozen ActionConfig')
     elif controller_config is not None and type(input_v1) is not F05Dg01MujocoCandidateInputV1:
         raise ValueError('explicit Position ActionConfig is supported only by exact F05 native, DG01, or DG02 candidates')
     source = input_v1.runtime_source
     artifact = input_v1.artifact
     scene = source.scene_definition
     native_drive_receipt = getattr(input_v1, 'native_drive_receipt', None)
-    position_config = (
-        input_v1.action_config
-        if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
-        else controller_config
-    )
+    position_config = input_v1.action_config if type(input_v1) in (
+        F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1,
+    ) else controller_config
     nullspace_reference_gain = (
         F05_DG02_NULLSPACE_REFERENCE_GAIN
-        if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1)
         else 0.0
     )
     arm_tracking_method = (
         'production_r3_continuous_v1'
-        if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+        if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1)
         else 'canonical_position_v1'
     )
     arm_tracking_profile = (
@@ -684,7 +916,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             nullspace_reference_gain=nullspace_reference_gain,
             pose_target_method=(
                 F05_DG02_POSE_TARGET_METHOD
-                if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+                if type(input_v1) in (F05Dg02GeoPhysUsdCandidateInputV1, F05Dg03IsaacUsdCandidateInputV1)
                 else 'achieved_state_dls_v1'
             ),
             arm_tracking_method=arm_tracking_method,
@@ -713,6 +945,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
             ) else None,
             'f05_native_position_input': input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
             'f05_dg02_geophys_input': input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
+            'f05_dg03_isaac_input': input_v1 if type(input_v1) is F05Dg03IsaacUsdCandidateInputV1 else None,
             'f05_dg01_mujoco_input': input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
             'native_drive_receipt': native_drive_receipt,
             'construction_id': digest({
@@ -745,6 +978,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
                                 if type(input_v1) is F05Dg01MujocoCandidateInputV1
                                 else 'F05-DG02-source-preserving-geophys-usd-core-v1'
                                 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
+                                else 'F05-DG03-source-preserving-isaac-usd-core-v1'
+                                if type(input_v1) is F05Dg03IsaacUsdCandidateInputV1
                                 else 'F05-versioned-geophys-usd-synthetic-s1-v1'),
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
@@ -761,7 +996,8 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
 
     def evaluate(state, semantics):
         if type(input_v1) not in (
-                F05Dg01MujocoCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1):
+                F05Dg01MujocoCandidateInputV1, F05Dg02GeoPhysUsdCandidateInputV1,
+                F05Dg03IsaacUsdCandidateInputV1):
             return SimpleNamespace(reward=0.0, success=False, failure=False, metrics={})
         pose_name = 'free-cube/free_cube'
         cube_pose = state.pose_world.get(pose_name)
@@ -813,6 +1049,7 @@ def build_versioned_position_candidate(input_v1: F03PositionCandidateInputV1 | F
         f05_position_input=input_v1 if type(input_v1) is F05PositionCandidateInputV1 else None,
         f05_native_position_input=input_v1 if type(input_v1) is F05NativePositionCandidateInputV1 else None,
         f05_dg02_geophys_input=input_v1 if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1 else None,
+        f05_dg03_isaac_input=input_v1 if type(input_v1) is F05Dg03IsaacUsdCandidateInputV1 else None,
         f05_dg01_mujoco_input=input_v1 if type(input_v1) is F05Dg01MujocoCandidateInputV1 else None,
     )
 

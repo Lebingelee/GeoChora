@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；DG03尚未启动，需基于当前复核HEAD重新冻结。**
+> **状态：DG01与DG02的精确Core cell均已由Sol有界接收；PickCube R3跨provider逐值对照仍为PARTIAL，作为未决诊断保留；DG03 window001已通过 bounded N1 与 synthetic Core S1，但source consumer gate仍阻断正式N2。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | DG01 共同基线＋MuJoCo/MJCF/CPU | 完整源物理参数/任务cube-support/逻辑Joint-Frame-Action-Task基线；真实Core candidate/admission/control/state/record/close；公开native模型与传动力证据；同Env两轮及独立H5 | Sol接收DG01后，重新冻结DG02 |
 | DG02 GeoPhys/USD/CPU | 保真USD表示；provider既有scene/constraint/tendon/actuator模型消费；model-bound Core receipt/admission；真实native与独立reader，对照DG01语义 | Sol接收DG02后，重新冻结DG03 |
-| DG03 Isaac/USD/GPU PhysX＋联合收口 | 查同版真实schema消费者并实施；原nativeIO/Appowner/control/state与退出收据；真实cell及三路线requiredfeature/Action/Task矩阵、受影响回归 | Sol独立复核三Goal和矩阵，登记新F05有界技术接收 |
+| DG03 Isaac/USD/GPU PhysX＋联合收口 | 同版Isaac/PhysX公开诊断与现有Core owner接线；当前bounded N1和synthetic S1已完成，正式N2仍要求闭合source equality、fixed-tendon consumer、drive/contact语义 | 闭合required features后按冻结门运行真实Core cell；Sol复核三Goal和矩阵 |
 
 三个Goal均须有implementation及真实route证据；inventoryPASS、固定nextpatchplan或旧syntheticS1不完成Goal。所需code/字段/profile不存在是实施任务，不自动是外部阻塞。无外部约束且scope内可修复时继续工作；阶段检查失败后在同Goal诊断、修复、重跑。真正无法表达的物理语义仍BLOCKED，给原参数、目标API/消费者、最小反例和具体维护者决定，不偷改required/源/阈值。
 
@@ -180,3 +180,15 @@ Sol的离线复核重新计算两份H5的观测值和12个tracking行，H5 SHA�
 DG03现在可以进入新包准备，但不得重用今日的baseline直接执行；须以当前已复核HEAD重冻实际Isaac/PhysX消费者、DG01/DG02合同输入、保护哈希、资源与验证范围。DG03、F06、F07仍未启动，本次没有授予F05整体接收或Qualification。
 
 G8文档与静态收口：Module Skill checker通过；4份受影响文档的本地链接/锚点检查通过；`git diff --check`通过。系统quick-validate脚本不可用。staged consolidation docs validator退出1，258项错误＝257条non-documentation scope路径＋1条count limit；没有报告本次编辑文档的链接或内容错误。不得将全局validator写为PASS。完整checker/validator结果与输出hash清单留在忽略window003目录。
+
+<a id="dg03-window001-current-implementation-status"></a>
+
+## 14. DG03 window001 当前实施状态（2026-10-31；formal N2 blocked）
+
+本窗口基于`develop-full@ea5611eb06cb22648c43b1656ba3353e7983a805`实施；包输入HEAD由DG03冻结plan绑定，旧F05 successor002历史报告及其`03ec5ef`输入要求不回写。DG03代码增量扩展既有Position candidate、SelectedReferenceEnv、Core RuntimeSession/native-I/O与Recorder链，增加版本化source-tendon receipt和每substep公开状态/力投影核验。`materialize()`对生产DG03明确fail closed：来源只有局部验证，且原source equality compliance、PhysX fixed-tendon消费者、drive/contact映射尚未证明；仅私有synthetic S1 context可替换Native I/O，不会启动Isaac App。
+
+DG03 S1 provider-free Core回归通过：同一source-bound candidate录制两段synthetic episode，每段8 transitions、9 observations、40条synthetic advance；独立Core Python进程用现有typed-H5 reader cold-read两份v3 H5。12种source-tendon receipt tamper被拒绝。证据`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_successor_002/s1_isaac_core_s1_003/`将`source_verified=false`、`runtime_admitted=false`、`native_starts=0`和`physics_steps=0`明确记为synthetic；H5 cold-read只证明持久化可读，不是PhysX消费、独立native reader或物理通过证据。
+
+DG03此前保存的N0 worker通过公开GPU PhysX model compile（18 bootstrap steps）；随后N1 attempt006在exact locally validated USD上启动一次Isaac Sim 6.2、worker exit 0、78 physics steps、进程组退出及shared lock释放。N1以代码显式author的`PhysxMimicJointAPI`验证了finger coupling，并通过公开`Articulation.set_dof_efforts`人工计算`J^T` source-like effort，观测到有限运动及+100 N clamp。它**没有**证明转换USD中的source `MjcEquality`/`MjcTendon`被PhysX消费者读取，也没有证明Core生产materialization、安全驱动映射或材料/接触等价；这些feature仍属于G4阻断项。EULA启动授权记在窗口ledger；此处无追加/重放native。
+
+因此DG03正式N2/Core native cell尚未启动；这次状态是`DG03_PARTIAL_SYNTHETIC_S1_AND_N1_DIAGNOSTIC_PENDING_SOURCE_CONSUMER_PROOF`，不是三路线F05通过。source-specific补丁/代码、收据与当前回归由Sol独立复核；在feature gate闭合、正式runplan与独立reader冻结之前，不启动DG03 formal N2、F06/F07或Qualification。`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic_goal03/window_001/`保留N0/N1计划、worker/supervisor原收据和失败attempt；不覆盖旧结果。

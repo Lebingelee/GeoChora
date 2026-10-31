@@ -325,6 +325,53 @@ and [public API status](../../../docs/module/task_env/public-api.md#f05-dg02-win
 
 **Sol review — DG02 window003:** offline h5py/numpy recomputation confirmed both H5 hashes and typed witnesses, all 12 tracking rows, 602 observations, 600 transitions and 3,000 advances; 39 output-manifest entries and 7,626 protected inputs, 12 runtime files and 2,859 provider source files matched. The saved reader receipt's structured negative suite says 23/23; its legacy top-level “22 negatives” wording remains disclosed and unchanged. Sol did not rerun tests or native. Decision: `ACCEPTED_BOUNDED_F05_DG02_GEOPHYS_USD_CORE`; the R3 cross-provider comparison remains `PARTIAL_REALIZED_STATE_OR_TARGET_MISMATCH` and is carried to DG03 without claiming trajectory equivalence.
 
+## F05 DG03 Isaac/USD boundary (2026-10-31; formal N2 blocked)
+
+DG03 extends the existing source-bound Position candidate, `SelectedReferenceEnv`,
+`UsdCoreRuntimeSession`, Isaac native-I/O and H5 owners. Its versioned tendon
+receipt records the exact source scalar control/clamp and checks each public
+substep readback and generalized effort projection. Synthetic Core S1 and the
+bounded N1 PhysX feature probe are separate evidence: N1 manually authored a
+public `PhysxMimicJointAPI` and used public `Articulation.set_dof_efforts`; it
+does not prove that PhysX consumed the converted source `MjcEquality` or
+`MjcTendon`, or that drive/contact mappings are equivalent.
+
+Production `materialize()` therefore fails closed for the exact DG03 profile
+until source equality compliance, fixed-tendon consumer behavior and
+source-to-PhysX drive/contact mapping are demonstrated. The private S1 context
+permits only synthetic Native-I/O replacement and cannot promote the locally
+validated delivery to runtime admission. DG03 is currently partial; no formal
+N2/Core native cell or Qualification passed. Preserve the N0/N1 original
+receipts and the synthetic S1 evidence in the ignored window outputs. See the
+[DG03 window001 record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#dg03-window001-current-implementation-status).
+
+**TaskEnv Skill refresh receipt — DG03 window001 current implementation:** trigger
+was an exact Isaac/USD candidate, added source-tendon Core receipt/failure
+behavior and a synthetic S1 test, with public PhysX N1 evidence that remains
+diagnostic. Inspected `build_f05_dg03_isaac_usd_candidate` and its validation,
+the existing SelectedReferenceEnv → RuntimeSession → Position Controller →
+native-I/O → H5 Recorder chain, public admission guard, DG03 source inventory,
+N0/N1 worker/supervisor receipts and the synthetic S1 regression. Reuse is
+`EXTEND_EXISTING`; no additional Runtime, provider route, controller, task
+factory or recorder was introduced. The verified documentation gap was the
+stale “DG03 unstarted” status after implementation began; this entry records
+synthetic S1, N1 and the unresolved production consumer gate separately. The
+refresh used repository `develop-full@ea5611eb06cb22648c43b1656ba3353e7983a805`
+as its starting commit; the working tree contained the DG03 candidate/runtime/
+adapter/test changes plus a protected untracked handoff file that remains
+unstaged. The focused DG03/F04/DG02 regression set passed 51 tests with 6
+skips; Module Skill metadata/source-link checks and `quick_validate.py` passed.
+An additional Core Python process cold-read both H5 v3 files (8 transitions and
+9 observations per episode); this confirms storage readability only. The
+synthetic S1 evidence and N1/N0 receipts are under the ignored
+`workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/` outputs.
+A separate new-agent cold-start walkthrough was NOT_RUN because this execution
+must not message other threads. No general Isaac admission, source-equivalence,
+formal-cell or Qualification claim follows; API/qualification-sensitive Sol
+review remains required.
+
+See the [DG03 window001 record](../../../docs/module/task_env/goal/Phase_II_01/13_F05_Early_Diagnostic_Three_Goals.md#dg03-window001-current-implementation-status).
+
 ## Static Position leaf contracts (R02a)
 
 `task_env.controllers.canonical` exports advanced provider-free values:
