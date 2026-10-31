@@ -17,6 +17,7 @@ from .task_contracts import TASK_1
 
 SOURCE_GRAVITY_PROFILE_V1 = "libero-source-mjcf-gravity-bias-v1"
 SOURCE_OPERATIONAL_SPACE_PROFILE_V1 = "libero-source-operational-space-state-v1"
+SOURCE_OPERATIONAL_SPACE_PROFILE_V2 = "libero-source-operational-space-state-v2"
 _MAX_ARCHIVE_BYTES = 128 * 1024 * 1024
 _MAX_EXPANDED_BYTES = 128 * 1024 * 1024
 _MAX_ARCHIVE_MEMBERS = 1024
@@ -390,6 +391,21 @@ class MujocoSourceGravityBiasV1:
             "mj_step_call_count": self.mj_step_calls,
         }
 
+    def operational_space_state_v2(self, joint_position_rad, joint_velocity_rad_s):
+        """Return the V1 source state plus robosuite's unmodified qfrc_bias vector."""
+        state = self.operational_space_state_v1(joint_position_rad, joint_velocity_rad_s)
+        qfrc_bias = np.asarray([
+            self._data.qfrc_bias[address] for address in self._dof_addresses
+        ], dtype=np.float64)
+        if qfrc_bias.shape != (7,) or not np.isfinite(qfrc_bias).all():
+            raise ValueError("source OSC model produced invalid arm qfrc_bias values")
+        state.update({
+            "schema_version": "libero-source-operational-space-state-v2",
+            "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
+            "qfrc_bias_arm_Nm": qfrc_bias.copy(),
+        })
+        return state
+
     def identity_mapping(self) -> dict[str, object]:
         identity = {
             "profile_id": self.profile_id,
@@ -411,6 +427,16 @@ class MujocoSourceGravityBiasV1:
                     "outputs": [
                         "arm_mass_matrix", "world_tcp_jacobian", "world_tcp_pose",
                         "bias_minus_passive_arm_torque",
+                    ],
+                    "physics_steps": 0,
+                    "runtime_identity": dict(self.runtime_identity),
+                },
+                "operational_space_state_v2": {
+                    "profile_id": SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
+                    "inputs": ["named_arm_joint_position_rad", "named_arm_joint_velocity_rad_s"],
+                    "outputs": [
+                        "arm_mass_matrix", "world_tcp_jacobian", "world_tcp_pose",
+                        "bias_minus_passive_arm_torque", "qfrc_bias_arm_torque",
                     ],
                     "physics_steps": 0,
                     "runtime_identity": dict(self.runtime_identity),
@@ -457,4 +483,4 @@ class MujocoSourceGravityBiasV1:
 
 
 __all__ = ["MujocoSourceGravityBiasV1", "SOURCE_GRAVITY_PROFILE_V1",
-           "SOURCE_OPERATIONAL_SPACE_PROFILE_V1"]
+           "SOURCE_OPERATIONAL_SPACE_PROFILE_V1", "SOURCE_OPERATIONAL_SPACE_PROFILE_V2"]

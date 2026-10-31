@@ -31,7 +31,8 @@ from task_env.tasks.reference_env import ReferenceTaskBinding, SelectedReference
 
 from .controller import (
     LiberoMixedControllerV1, LiberoMixedControllerV2, LiberoMixedControllerV3,
-    LiberoMixedControllerV4, LiberoMixedControllerV5,
+    LiberoMixedControllerV4, LiberoMixedControllerV6,
+    LiberoMixedControllerV7,
 )
 from .evaluation import (
     PILOT_TASK_UID, evaluate_on_bowl_plate_v1, observe_selected_reference_v1,
@@ -430,22 +431,22 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         )
     )
     if solution_rim_profile:
-        controller = LiberoMixedControllerV5(
+        controller = LiberoMixedControllerV7(
             arm_resolver_identity=arm_resolver_identity,
         )
     elif solution_profile:
-        controller = LiberoMixedControllerV4(
+        controller = LiberoMixedControllerV6(
             arm_resolver_identity=arm_resolver_identity,
             nullspace_reference_joint_position_rad=official_nullspace_reference,
         )
     else:
         controller = LiberoMixedControllerV1()
     expected_controller_profile = (
-        (LiberoMixedControllerV5.profile_id if solution_rim_profile
+        (LiberoMixedControllerV7.profile_id if solution_rim_profile
          else (
-             'libero-spatial-bowl-to-plate-robosuite-osc-pose-official-reference-v1'
+             LiberoMixedControllerV6.OFFICIAL_REFERENCE_PROFILE_ID
              if official_nullspace_reference is not None
-             else LiberoMixedControllerV4.profile_id
+             else LiberoMixedControllerV6.profile_id
          )) if solution_profile else CONTROLLER_PROFILE_ID
     )
     if controller.profile_id != expected_controller_profile:
@@ -666,7 +667,9 @@ def build_libero_selected_candidate(
                 != source['source_sha256']['model_profile_receipt']
                 or not callable(getattr(model, 'gravity_torque', None))
                 or (_solution_profile
-                    and not callable(getattr(model, 'operational_space_state_v1', None)))):
+                    and not callable(getattr(model, 'operational_space_state_v1', None)))
+                or (_solution_profile
+                    and not callable(getattr(model, 'operational_space_state_v2', None)))):
             raise ValueError('task Solution gravity model differs from its selected source identity')
         live_env = env_holder.get('env')
         if live_env is not None and live_env.controller.gravity_bias_model is None:
@@ -766,11 +769,11 @@ def build_libero_selected_candidate(
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache['value'])
         if _solution_profile in ('v6', 'v7', 'v8'):
-            value['controller'] = LiberoMixedControllerV5(
+            value['controller'] = LiberoMixedControllerV7(
                 arm_resolver_identity=value['arm_resolver_identity'],
             )
         elif _solution_profile:
-            value['controller'] = LiberoMixedControllerV4(
+            value['controller'] = LiberoMixedControllerV6(
                 arm_resolver_identity=value['arm_resolver_identity'],
                 nullspace_reference_joint_position_rad=(
                     value['official_nullspace_reference_joint_position_rad']

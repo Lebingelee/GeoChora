@@ -30,8 +30,8 @@ from task_env.utils.rotation import (
 
 from .controller import (
     LiberoMixedControlConfigV1, LiberoMixedControllerV3,
-    LiberoMixedControllerV4, LiberoMixedControllerV5, LiberoOperationalSpaceConfigV1,
-    LiberoOperationalSpaceConfigV2,
+    LiberoMixedControllerV4, LiberoMixedControllerV6,
+    LiberoMixedControllerV7, LiberoOperationalSpaceConfigV1, LiberoOperationalSpaceConfigV2,
 )
 from .source_gravity import SOURCE_GRAVITY_PROFILE_V1
 from .task_contracts import TASK_1
@@ -448,7 +448,7 @@ def solution_identity_v5(
         settle_steps=0,
         max_steps=200,
     )
-    osc = LiberoMixedControllerV4(
+    osc = LiberoMixedControllerV6(
         operational_config=LiberoOperationalSpaceConfigV2(),
         arm_resolver_identity=arm_resolver_identity,
     )
@@ -524,7 +524,7 @@ def solution_identity_v6(
         settle_steps=0,
         max_steps=200,
     )
-    controller_identity = LiberoMixedControllerV5(
+    controller_identity = LiberoMixedControllerV7(
         arm_resolver_identity=arm_resolver_identity,
     ).identity
     return digest({

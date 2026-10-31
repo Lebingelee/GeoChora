@@ -1462,14 +1462,23 @@ def _validate_v4_osc_receipt(canonical_action: Mapping[str, Any], expected_contr
     controller_schema = expected_controller.get("schema_version")
     physics_rate_profile = controller_schema in {
         "libero-mixed-controller-identity-v4", "libero-mixed-controller-identity-v5",
+        "libero-mixed-controller-identity-v6", "libero-mixed-controller-identity-v7",
     }
-    velocity_feedforward_profile = controller_schema == "libero-mixed-controller-identity-v5"
+    velocity_feedforward_profile = controller_schema in {
+        "libero-mixed-controller-identity-v5", "libero-mixed-controller-identity-v7",
+    }
     expected_receipt_schema = (
+        "libero-mixed-control-receipt-v7" if controller_schema == "libero-mixed-controller-identity-v7" else
+        "libero-mixed-control-receipt-v6" if controller_schema == "libero-mixed-controller-identity-v6" else
         "libero-mixed-control-receipt-v5" if velocity_feedforward_profile else
         "libero-mixed-control-receipt-v4" if physics_rate_profile
         else "libero-mixed-control-receipt-v3"
     )
     expected_algorithm = (
+        "source_osc_pose_pd_with_bounded_planner_twist_feedforward_qfrc_bias_v1"
+        if controller_schema == "libero-mixed-controller-identity-v7" else
+        "robosuite_osc_pose_uncoupled_lambda_and_qfrc_bias_v1"
+        if controller_schema == "libero-mixed-controller-identity-v6" else
         "source_osc_pose_pd_with_bounded_planner_twist_feedforward_v1" if velocity_feedforward_profile else
         "robosuite_osc_pose_uncoupled_lambda_and_reset_nullspace_v2" if physics_rate_profile
         else "robosuite_osc_pose_uncoupled_lambda_and_nullspace_v1"
@@ -1496,9 +1505,12 @@ def _validate_v4_osc_receipt(canonical_action: Mapping[str, Any], expected_contr
             or receipt.get("source_model_identity_sha256") != resource_close.get("model_identity_sha256")
             or receipt.get("tcp_site_name") != "gripper0_grip_site"
             or receipt.get("hold_policy") != expected_controller.get("hold_policy")
+            or (expected_controller.get("gravity_feedforward_source") is not None
+                and receipt.get("gravity_feedforward_source")
+                    != expected_controller.get("gravity_feedforward_source"))
             or (physics_rate_profile
                 and receipt.get("nullspace_reference_policy")
-                    != "initial_joint_position_captured_at_reset_v1")
+                    != expected_controller.get("nullspace_reference_policy"))
             or (physics_rate_profile
                 and receipt.get("q_reference_source") != "reset_initial_joint_v1")
             or canonical_action.get("arm_resolution_diagnostics") != receipt.get("canonical_arm_resolution")):
@@ -1544,7 +1556,10 @@ def _validate_v4_osc_receipt(canonical_action: Mapping[str, Any], expected_contr
         qdot = np.asarray(receipt.get("qdot_rad_s"), dtype=np.float64)
         mass = np.asarray(receipt.get("mass_matrix_arm"), dtype=np.float64)
         jacobian = np.asarray(receipt.get("jacobian_world"), dtype=np.float64)
-        bias = np.asarray(receipt.get("bias_minus_passive_Nm"), dtype=np.float64)
+        feedforward_receipt_field = expected_controller.get(
+            "gravity_feedforward_receipt_field", "bias_minus_passive_Nm",
+        )
+        bias = np.asarray(receipt.get(feedforward_receipt_field), dtype=np.float64)
         current_position = np.asarray(receipt.get("current_world_pose", {}).get("position_m"), dtype=np.float64)
         current_rotation = np.asarray(receipt.get("current_world_pose", {}).get("rotation_matrix"), dtype=np.float64)
         target_position = np.asarray(receipt.get("target_world_pose", {}).get("position_m"), dtype=np.float64)
@@ -1750,7 +1765,8 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     )
     from .controller import (
         LiberoMixedControllerV1, LiberoMixedControllerV2, LiberoMixedControllerV3,
-        LiberoMixedControllerV4, LiberoMixedControllerV5,
+        LiberoMixedControllerV4, LiberoMixedControllerV6,
+        LiberoMixedControllerV7,
         legacy_v2_controller_identity_mapping,
     )
     schema = report.get("schema_version")
@@ -1825,9 +1841,9 @@ def _consume_libero_solution_bundle(bundle_path: Path, report: Mapping[str, Any]
     else:
         resolver_identity = None
     expected_controller = (
-        LiberoMixedControllerV5(arm_resolver_identity=resolver_identity).identity_mapping()
+        LiberoMixedControllerV7(arm_resolver_identity=resolver_identity).identity_mapping()
         if solution_v6 or solution_v7 or solution_v8 else
-        LiberoMixedControllerV4(arm_resolver_identity=resolver_identity).identity_mapping()
+        LiberoMixedControllerV6(arm_resolver_identity=resolver_identity).identity_mapping()
         if solution_v5 else
         LiberoMixedControllerV3(arm_resolver_identity=resolver_identity).identity_mapping()
         if solution_v4 else
