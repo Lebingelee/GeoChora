@@ -83,6 +83,42 @@ def _rotate_vector_wxyz(quaternion, vector) -> np.ndarray:
     return rotation @ v
 
 
+def _stored_cube_pose_matches(stored, cube_pose) -> bool:
+    """Compare the persisted privileged leaf with the typed public cube Frame."""
+    try:
+        actual = np.asarray(stored)
+        position = np.asarray(cube_pose["position"], dtype=np.float32)
+        quaternion = np.asarray(cube_pose["quaternion_wxyz"], dtype=np.float32)
+        return bool(
+            actual.shape == (7,)
+            and position.shape == (3,)
+            and quaternion.shape == (4,)
+            and np.array_equal(actual[:3], position)
+            and _quat_error_rad(actual[3:], quaternion) <= 2e-5
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _novel_errors(errors, baseline):
+    """Return only findings added by a mutation, preserving duplicate counts."""
+    def signature(row):
+        return (str(row.get("code", "")), str(row.get("detail", "")))
+
+    remaining = {}
+    for row in baseline:
+        key = signature(row)
+        remaining[key] = remaining.get(key, 0) + 1
+    novel = []
+    for row in errors:
+        key = signature(row)
+        if remaining.get(key, 0):
+            remaining[key] -= 1
+        else:
+            novel.append(row)
+    return novel
+
+
 def _load_episode(path: Path) -> dict:
     identity = _h5_identity(path)
     with h5py.File(path, "r") as file:
@@ -90,6 +126,7 @@ def _load_episode(path: Path) -> dict:
             "joint_position": np.asarray(file["obs/state/joint_position"]),
             "ee_pose": np.asarray(file["obs/state/ee_pose"]),
             "hand_pose": np.asarray(file["obs/state/hand_pose"]),
+            "target_body_pose": np.asarray(file["obs/privileged_state/target_body_pose"]),
             "boundary_digest": np.asarray(file["obs/state/boundary_identity_sha256"]),
             "terminated": np.asarray(file["terminated"]),
             "truncated": np.asarray(file["truncated"]),
@@ -325,6 +362,7 @@ def _validate_bundle(bundle: dict) -> list[dict]:
             "joint_position": ((301, 9), np.dtype("float32")),
             "ee_pose": ((301, 7), np.dtype("float32")),
             "hand_pose": ((301, 7), np.dtype("float32")),
+            "target_body_pose": ((301, 1, 7), np.dtype("float32")),
             "boundary_digest": ((301, 32), np.dtype("uint8")),
             "terminated": ((300,), np.dtype("bool")),
             "truncated": ((300,), np.dtype("bool")),
@@ -447,6 +485,14 @@ def _validate_bundle(bundle: dict) -> list[dict]:
                 twist_rows.append([math.nan] * 6)
                 continue
             z = float(cube["position"][2])
+            if arrays["target_body_pose"].shape[0] > index:
+                stored_cube = arrays["target_body_pose"][index, 0]
+                _check(
+                    _stored_cube_pose_matches(stored_cube, cube),
+                    "obs_cube_pose",
+                    f"episode {episode_index} actual privileged cube-pose leaf differs from typed state at {index}",
+                    errors,
+                )
             z_rows.append(z)
             q_cube = free_joint.get("position", [])
             v_cube = free_joint.get("velocity", [])
@@ -739,8 +785,11 @@ def _mutate_negative(bundle: dict, name: str) -> None:
     elif name == "obs_hand_pose":
         episode["arrays"]["hand_pose"][100, 0] += np.float32(0.1)
     elif name == "obs_cube_pose":
-        view = episode["witness"]["rows"][100]["canonical_state_view_v1"]
-        next(row for row in view["frames"] if row["frame"]["entity_id"] == "free-cube" and row["frame"]["frame_id"] == "free_cube")["pose_world"]["position"][2] += 0.1
+        episode["arrays"]["target_body_pose"][100, 0, 0] += np.float32(0.1)
+        # Rebind the in-memory outer file receipt so this negative exercises
+        # the actual stored leaf validator rather than durable-file hashing.
+        episode["identity"]["sha256"] = "f" * 64
+        episode["worker_h5_sha256"] = "f" * 64
     elif name == "obs_boundary_digest":
         episode["arrays"]["boundary_digest"][100, 0] ^= np.uint8(1)
     elif name == "obs_dtype":
@@ -770,18 +819,29 @@ def _negative_suite(bundle: dict) -> dict:
         "obs_boundary_digest", "obs_dtype", "obs_length", "obs_nonfinite",
         "exit_code_zero", "contact_observation",
     )
+    baseline_errors = _validate_bundle(bundle)
+
     results = []
     for name in classes:
         mutated = copy.deepcopy(bundle)
         _mutate_negative(mutated, name)
         errors = _validate_bundle(mutated)
-        caught = any(row["code"] == name for row in errors)
-        row = {"class": name, "rejected": caught, "error_codes": sorted({row["code"] for row in errors})}
+        new_errors = _novel_errors(errors, baseline_errors)
+        caught = any(item["code"] == name for item in new_errors)
+        row = {
+            "class": name,
+            "rejected": caught,
+            "error_codes": sorted({item["code"] for item in errors}),
+            "novel_error_codes": sorted({item["code"] for item in new_errors}),
+            "novel_error_details": [item["detail"] for item in new_errors
+                                    if item["code"] == name],
+        }
         if name == "model_shape":
             geom_mutated = copy.deepcopy(bundle)
             geom_mutated["static_receipt"]["public_model_counts"]["n_geoms"] += 1
             geom_errors = _validate_bundle(geom_mutated)
-            geom_rejected = any(item["code"] == "model_shape" for item in geom_errors)
+            geom_new_errors = _novel_errors(geom_errors, baseline_errors)
+            geom_rejected = any(item["code"] == "model_shape" for item in geom_new_errors)
             row["subchecks"] = {
                 "required_dof_count_mutation_rejected": caught,
                 "source_geom_count_mutation_rejected": geom_rejected,
@@ -790,11 +850,23 @@ def _negative_suite(bundle: dict) -> dict:
             row["error_codes"] = sorted({
                 item["code"] for item in (*errors, *geom_errors)
             })
+            row["novel_error_codes"] = sorted({
+                item["code"] for item in (*new_errors, *geom_new_errors)
+            })
+            row["novel_error_details"].extend(
+                item["detail"] for item in geom_new_errors
+                if item["code"] == "model_shape"
+            )
         results.append(row)
     return {
         "schema_version": "f05-dg02-core-n2-negative-suite-v1",
         "required_classes": len(classes),
         "passed_classes": sum(bool(row["rejected"]) for row in results),
+        "baseline_error_count": len(baseline_errors),
+        "baseline_task_predicate_error_count": sum(
+            item["code"] == "task_predicate" for item in baseline_errors
+        ),
+        "attribution_policy": "each mutation must add a specific finding beyond the unchanged formal baseline",
         "results": results,
         "inherited_dg01_required_classes": 22,
         "dg02_additional_required_classes": len(classes) - 22,
