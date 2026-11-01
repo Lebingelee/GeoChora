@@ -133,7 +133,9 @@ Reach/grasp values are diagnostics; lift is the sole success predicate.
 
 The built-in mode accepts only the public UID
 `pick-cube-p16-reference-v1`, existing `r3_continuous_v1`, seeds 31/32/33,
-1000 control ticks, and the task recipe's 0.002 s × 5 timebase. The compiler
+and the task recipe's 0.002 s × 5 timebase. The checked-in example defaults to
+1000 control ticks; a versioned run spec may choose a horizon from 1 through
+1000 for a bounded smoke without changing that default. The compiler
 delegates construction, reset sampling, evaluation, solution, controller and
 recording to the existing Core PickCube owners. The current CPU routes are
 MuJoCo and GeoPhys. Catalog entries for Isaac Sim, Genesis and SAPIEN are

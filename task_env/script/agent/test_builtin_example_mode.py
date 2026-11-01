@@ -46,6 +46,7 @@ def test_builtin_example_schema_pins_uid_profile_seed_set_and_timebase():
         {'provider': 'mujoco', 'backend': 'cuda', 'device': 'cuda:0'},
         {'controller_profile': 'r1'},
         {'seeds': [31, 32]},
+        {'horizon_control_ticks': 0},
         {'horizon_control_ticks': 1001},
         {'control_substeps': 4},
     ):
@@ -58,6 +59,7 @@ def test_builtin_example_schema_pins_uid_profile_seed_set_and_timebase():
         source_delivery_manifest='/frozen/pickcube/delivery_manifest.json',
     )
     assert isaac.provider == 'isaacsim'
+    assert _spec(horizon_control_ticks=40).horizon_control_ticks == 40
 
 
 def test_repository_harness_spec_is_complete_for_versioned_builtin_schema():

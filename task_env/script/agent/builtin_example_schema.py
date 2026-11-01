@@ -58,8 +58,9 @@ class BuiltinPickCubeExampleV1:
             raise ValueError("source_delivery_manifest is admitted only for the exact Isaac route")
         if (not isinstance(self.seeds, (tuple, list)) or tuple(self.seeds) != (31, 32, 33)):
             raise ValueError("F06 example runs the fixed seed set 31/32/33")
-        if type(self.horizon_control_ticks) is not int or self.horizon_control_ticks != 1000:
-            raise ValueError("F06 example horizon is exactly 1000 control ticks")
+        if (type(self.horizon_control_ticks) is not int
+                or not 1 <= self.horizon_control_ticks <= 1000):
+            raise ValueError("F06 example horizon must be between 1 and 1000 control ticks")
         if (isinstance(self.physics_dt_s, bool) or not isinstance(self.physics_dt_s, (int, float))
                 or not math.isfinite(float(self.physics_dt_s)) or float(self.physics_dt_s) != 0.002):
             raise ValueError("F06 PickCube physics_dt_s is fixed at 0.002 seconds")
