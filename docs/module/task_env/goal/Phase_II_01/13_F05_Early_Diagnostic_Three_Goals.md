@@ -1,6 +1,6 @@
 # 新F05提前诊断实施：三个长期Goal
 
-> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window002的实际物理响应门未通过。window003已完成公开桥接静态调查；当前安装未发现同一Isaac Sim App的受支持mimic setter桥接。正式N2未启动；等待维护者确认同App公开C++ API或重新冻结provider范围。累计额度规则与两次失败提问规则按16.3执行。**
+> **状态：DG01/DG02有界接收、R3对照PARTIAL保持。诊断04 window002的实际物理响应门未通过。window003在既有Isaac Native-I/O owner中加入公开 `flush_changes()` 候选，但attempt003被0.25秒采样间隔watchdog在python_bootstrap阶段中止；没有新的物理门验证。正式N2未启动，等待维护者决定是否修整采样器后重试。累计额度与重复失败规则按16.3执行。**
 > 本页是该诊断方向的当前编排入口，与[11](11_F05_F07_Multi_Asset_Solver_Recovery_Plan.md)、[12](12_F05_F07_Execution_Playbook.md)及每次冻结执行包共同使用。只更新执行方式，完整required物理语义与最终三cell目标保留。
 
 ## 1. 授权、历史与真实起点
@@ -265,7 +265,7 @@ window002输出HEAD `1d71aeab84a6fa576265e0cba33b886b9d83326f`，Sol复核为`F0
 
 <a id="f05-diagnostic04-window003-public-bridge-research"></a>
 
-### 16.4 window003公开桥接调查结果（2026-11-01；等待同App API/范围裁定）
+### 16.4 window003公开桥接调查结果（2026-11-01；静态调查记录）
 
 window003输入`develop-full@04278d9376901b9d2b01e3131c0891f64afe82d9`及只读GeoPhys候选`a9e4c4850bd225f5929e74831ac282b18ff517ce`通过冻结包哈希核验；Core tracked tree干净，原有无关untracked文档未改。完整结果、API指纹、官方链接、问题和窗口账本见ignored [window003公开桥接调查收据](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/public_bridge_research.md)。
 
@@ -273,4 +273,18 @@ window003输入`develop-full@04278d9376901b9d2b01e3131c0891f64afe82d9`及只读G
 
 NVIDIA [PhysX公开C++ API](https://nvidia-omniverse.github.io/PhysX/physx/5.6.0/_api_build/classPxArticulationMimicJoint.html)确实提供`PxArticulationMimicJoint::setNaturalFrequency`和`setDampingRatio`，并说明新值用于下一仿真步。[OVPhysX公开C/C++互操作](https://nvidia-omniverse.github.io/PhysX/ovphysx/latest/tutorials/physx_interop.html)也提供借用PhysX对象指针及同构建匹配头文件；但[OVPhysX官方说明](https://github.com/NVIDIA-Omniverse/PhysX/blob/main/ovphysx/README.md)将其界定为不依赖Omniverse Kit的独立运行库，概览标明其自带静态PhysX runtime，而[开发指南](https://nvidia-omniverse.github.io/PhysX/ovphysx/0.6.4/developer_guide.html)说明原始指针互操作只在C/C++暴露、Python绑定不提供。因此OVPhysX不能充当当前Isaac Sim App内同一个PhysX对象的桥；移到OVPhysX会成为另一provider/runtime范围，不能记作DG03 Isaac cell通过。
 
-结论为`KIT_SAME_INSTANCE_PUBLIC_MIMIC_BRIDGE_NOT_IDENTIFIED`，不是证明bridge不存在，也不是新的物理门失败。DG03生产准入继续fail closed；同一物理响应门累计实际失败仍为2次，新epoch失败0次。本窗口未启动Isaac/Kit、没有native启动/physics step、没有software tests；N2的6,400步/2,400秒保留事实不变，也不作为本policy下的新N1余额门。下一步需维护者给出/确认当前Isaac Sim 6.2/Kit 110.4同App公开C++取对象API及匹配SDK接口，或明确批准将诊断改为独立OVPhysX provider并另冻验收；在此之前不写第二Runtime、不下载/安装SDK、不启动同门native。F06仍仅准备入口，F07和Qualification未启动。
+静态调查阶段的结论为`KIT_SAME_INSTANCE_PUBLIC_MIMIC_BRIDGE_NOT_IDENTIFIED`，不是证明bridge不存在，也不是新的物理门失败。当时未找到mimic专用setter/对象指针入口；随后发现并验证计划的公开缓冲刷新候选及N1 watchdog停点记在[16.5节](#f05-diagnostic04-window003-flush-watchdog)。本节只保留调查阶段的事实和边界。
+
+<a id="f05-diagnostic04-window003-flush-watchdog"></a>
+
+### 16.5 window003公开flush候选与N1资源停点（2026-11-01）
+
+维护者随后要求实施最新Goal。基于安装版 `omni.physx` 110.4.4 的公开 `IPhysxSimulation.flush_changes()`，在既有 `IsaacSimNativeRuntimeIOV1.advance()` 中加入“mimic属性公开写入/读回后、物理step前调用公开flush”的有界候选，并将调用记录到既有source-tendon子步收据。它只假设PhysX listener会处理其支持的缓冲更新，不是mimic setter、借用C++ joint handle或solver消费证据。新增正例/缺失接口fail-closed回归与配对物理检测器选择集共4/4通过；两个受影响文件`py_compile`及`git diff --check`通过。
+
+Core实现/测试本地提交为`c1677f2f`（`feat(task-env): flush DG03 PhysX buffered changes`）；提交保留候选的未验证边界，生产准入未打开。
+
+最终冻结attempt003计划SHA `3093875b950638b0e7b290213964392e8112f69f4496af467b4f6c4d2745e2d2`，有限上限282 attempted steps、130秒worker wall，含同App source_dynamic/fixed_endpoint_ablation两组40步、双向force clamp、0.1秒采样、0.25秒最大间隔、RAM/VRAM/RSS/disk/log、CPU affinity、共享锁及进程组清退保护。计划与资源预检通过。原正式N2 6,400步/2,400秒记录保持；window003新规则不把此历史预留当N1余额门。
+
+N1 attempt003于Kit启动后被采样watchdog中止：一段采样间隔 `0.465757s > 0.25s`，worker以 `-15`退出，worker进度仍为`python_bootstrap`且step计数不精确。supervisor因此按本run最大282步保守扣账，native wall `9.668580638s`；**没有到达物理响应检测器，不是本epoch的物理门失败**。采样期间最低MemAvailable `7,907,774,464B`、GPU free `6,959,988,736B`、disk free `523,118,284,800B`，最高PG RSS `3,889,307,648B`；CPU affinity为worker `[0,1,2]`、supervisor `[3]`，进程组报告91个OS线程。峰值线程数已原样记录；affinity限制CPU可运行槽位，但是否满足“最多4 CPU threads”的意图需要复核。进程组消失且独立非阻塞probe确认shared lock释放。详细receipt、日志、postrun检查、失败扣账及可恢复状态见ignored [window003资源停点证据](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/n1_flush_candidate001_postrun_resource_check.json)和[累计ledger](../../../../../workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f05_diagnostic04/window_003/run_ledger.json)。
+
+维护者已授权继续实现，但本次资源watchdog异常按冻结prompt停止后续native并等待明确答复：建议在不放宽0.25秒上限下改进/测量采样器，然后冻结一次有界重试；也可停在`PARTIAL`并转Sol复核。window002两次实际物理响应失败保留；window003该decision epoch实际物理失败仍为0，额外的采样watchdog门目前失败1次。Formal N2、独立H5冷读和三路线矩阵仍受live物理门条件约束；F06仅入口准备，F06/F07和Qualification未运行。
