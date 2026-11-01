@@ -706,7 +706,7 @@ class IsaacSimNativeRuntimeIOV1:
             if self._dg04_native:
                 from .leaf_control import compile_isaac_native_mimic_position_receipt_v1
 
-                witness = self._verify_dg04_public_drives(UsdPhysics)
+                witness = self._verify_public_drives(route='dg04')
                 self.drive_receipt = compile_isaac_native_mimic_position_receipt_v1(
                     execution=self._execution, source=self._source,
                     native_metadata=self._metadata,
@@ -722,7 +722,7 @@ class IsaacSimNativeRuntimeIOV1:
             elif self._f06_pickcube:
                 from .leaf_control import compile_isaac_native_mimic_position_receipt_v1
 
-                witness = self._verify_f06_public_drives(UsdPhysics)
+                witness = self._verify_public_drives(route='f06')
                 self.drive_receipt = compile_isaac_native_mimic_position_receipt_v1(
                     execution=self._execution, source=self._source,
                     native_metadata=self._metadata,
@@ -1089,157 +1089,109 @@ class IsaacSimNativeRuntimeIOV1:
             'runtime_stage_mutated': True,
         }
 
-    def _verify_f06_public_drives(self, UsdPhysics) -> dict[str, object]:
-        """Bind the F06 5 N PickCube hand profile to composed and public views."""
-        if not self._f06_pickcube or self._stage is None or self._f06_native_mimic_receipt is None:
-            raise RuntimeError('F06 source-bound mimic/drive profile was not initialized')
-        authored = []
-        for prim in self._stage.Traverse():
-            for schema in prim.GetAppliedSchemas():
-                if str(schema).startswith('PhysicsDriveAPI:'):
-                    authored.append((str(prim.GetPath()), str(prim.GetName()), str(schema)))
-        expected = {f'joint{index}': 'PhysicsDriveAPI:angular' for index in range(1, 8)}
-        expected['finger_joint1'] = 'PhysicsDriveAPI:linear'
-        if len(authored) != 8 or {name: schema for _path, name, schema in authored} != expected:
-            raise ValueError('F06 composed stage must contain seven Arm drives and one source-bounded leader drive')
-        stiffness_tensor, damping_tensor = self._articulation.get_dof_gains()
-        stiffness = _tensor_rows(stiffness_tensor, width=len(self._dof_names), label='F06 public stiffness')[0]
-        damping = _tensor_rows(damping_tensor, width=len(self._dof_names), label='F06 public damping')[0]
-        effort_rows = self._articulation.get_dof_max_efforts().numpy().tolist()
-        if effort_rows and not isinstance(effort_rows[0], (tuple, list)):
-            effort_rows = [effort_rows]
-        if not effort_rows or len(effort_rows[0]) != len(self._dof_names):
-            raise ValueError('F06 public maximum-effort view has unexpected shape')
-        max_effort = tuple(float(value) for value in effort_rows[0])
-        drive_rows = self._articulation.get_dof_drive_types()
-        if not drive_rows or len(drive_rows[0]) != len(self._dof_names):
-            raise ValueError('F06 public drive-type view has unexpected shape')
-        drive_types = tuple(None if value is None else str(value).lower() for value in drive_rows[0])
-        arm_expected = {
-            'joint1': (4500.0, 450.0), 'joint2': (4500.0, 450.0),
-            'joint3': (3500.0, 350.0), 'joint4': (3500.0, 350.0),
-            'joint5': (2000.0, 200.0), 'joint6': (2000.0, 200.0),
-            'joint7': (2000.0, 200.0),
-        }
-        values = {}
-        for native_name, index in self._dof_index.items():
-            actual = (stiffness[index], damping[index], max_effort[index], drive_types[index])
-            if native_name in arm_expected:
-                wanted = (*arm_expected[native_name], 250.0, 'force')
-                if (any(not math.isclose(actual[i], wanted[i], rel_tol=0.0, abs_tol=1e-4)
-                        for i in range(3)) or actual[3] != wanted[3]):
-                    raise ValueError(f'F06 public Arm drive differs from its exact USD profile: {native_name}={actual!r}')
-            elif native_name == 'finger_joint1':
-                wanted = (5000.0, 120.0, 5.0, 'force')
-                if (any(not math.isclose(actual[i], wanted[i], rel_tol=0.0, abs_tol=1e-4)
-                        for i in range(3)) or actual[3] != wanted[3]):
-                    raise ValueError(f'F06 PickCube leader drive differs from the source-bound 5 N profile: {actual!r}')
-            elif (not math.isclose(actual[0], 0.0, rel_tol=0.0, abs_tol=1e-8)
-                    or not math.isclose(actual[1], 0.0, rel_tol=0.0, abs_tol=1e-8)
-                    or actual[3] not in (None, 'none')):
-                raise ValueError(f'F06 mimic follower has a duplicate articulation drive: {actual!r}')
-            values[native_name] = {
-                'stiffness': actual[0], 'damping': actual[1],
-                'max_effort': actual[2], 'drive_type': actual[3],
+    def _verify_public_drives(self, *, route: str) -> dict[str, object]:
+        """Check the shared seven-arm/one-leader surface against its exact profile."""
+        if route == 'f06':
+            if (not self._f06_pickcube or self._stage is None
+                    or self._f06_native_mimic_receipt is None):
+                raise RuntimeError('F06 source-bound mimic/drive profile was not initialized')
+            label = 'F06'
+            schema_version = 'isaac-f06-pickcube-native-mimic-drive-witness-v1'
+            arm_expected = {
+                'joint1': (4500.0, 450.0, 250.0),
+                'joint2': (4500.0, 450.0, 250.0),
+                'joint3': (3500.0, 350.0, 250.0),
+                'joint4': (3500.0, 350.0, 250.0),
+                'joint5': (2000.0, 200.0, 250.0),
+                'joint6': (2000.0, 200.0, 250.0),
+                'joint7': (2000.0, 200.0, 250.0),
             }
-        witness = {
-            'schema_version': 'isaac-f06-pickcube-native-mimic-drive-witness-v1',
-            'native_dof_order': list(self._dof_names),
-            'active_drive_dofs': [f'joint{index}' for index in range(1, 8)] + ['finger_joint1'],
-            'passive_mimic_dof': 'finger_joint2',
-            'leader_stiffness_N_m': 5000.0,
-            'leader_damping_N_s_m': 120.0,
-            'leader_max_effort_N': 5.0,
-            'leader_drive_type': 'force',
-            'follower_stiffness_N_m': 0.0,
-            'follower_damping_N_s_m': 0.0,
-            'follower_drive_type': 'none',
-            'mimic_api': 'PhysxMimicJointAPI:transX',
-            'drive_api': 'PhysicsDriveAPI:linear',
-            'mimic_reference_joint': 'finger_joint1',
-            'mimic_follower_joint': 'finger_joint2',
-            'mimic_gearing': 1.0,
-            'mimic_offset_m': 0.0,
-            'mimic_natural_frequency_hz': 25.0,
-            'mimic_damping_ratio': 1.0,
-            'passive_mimic_constraint_authored': True,
-            'public_consumers': values,
-            'authored_drive_apis': [
-                {'path': path, 'joint': name, 'api': schema}
-                for path, name, schema in sorted(authored)
-            ],
-        }
-        return witness
+            leader_expected = (5000.0, 120.0, 5.0)
+        elif route == 'dg04':
+            if (not self._dg04_native or self._stage is None
+                    or self._dg04_native_mimic_receipt is None):
+                raise RuntimeError('DG04 stage mimic/drive profile was not initialized before public view checks')
+            label = 'DG04'
+            schema_version = 'isaac-dg04-native-mimic-drive-witness-v1'
+            # Keep the source-derived Menagerie actuator force limits distinct
+            # from F06's task-specific 250 N arm limits.
+            arm_expected = {
+                'joint1': (4500.0, 450.0, 87.0),
+                'joint2': (4500.0, 450.0, 87.0),
+                'joint3': (3500.0, 350.0, 87.0),
+                'joint4': (3500.0, 350.0, 87.0),
+                'joint5': (2000.0, 200.0, 12.0),
+                'joint6': (2000.0, 200.0, 12.0),
+                'joint7': (2000.0, 200.0, 12.0),
+            }
+            leader_expected = (2000.0, 100.0, 100.0)
+        else:
+            raise ValueError(f'unsupported Isaac public-drive route: {route!r}')
 
-    def _verify_dg04_public_drives(self, UsdPhysics) -> dict[str, object]:
-        """Verify the 7-arm + one-leader drive surface through public USD/Articulation reads."""
-        if self._dg04_native_mimic_receipt is None:
-            raise RuntimeError('DG04 stage mimic/drive profile was not initialized before public view checks')
         authored = []
         for prim in self._stage.Traverse():
             for schema in prim.GetAppliedSchemas():
                 if str(schema).startswith('PhysicsDriveAPI:'):
                     authored.append((str(prim.GetPath()), str(prim.GetName()), str(schema)))
-        expected = {f'joint{index}': 'PhysicsDriveAPI:angular' for index in range(1, 8)}
-        expected['finger_joint1'] = 'PhysicsDriveAPI:linear'
-        if (len(authored) != 8
-                or {name: schema for _path, name, schema in authored} != expected):
-            raise ValueError('DG04 composed stage must expose exactly seven Arm drives and one leader-finger drive')
+        expected_apis = {f'joint{index}': 'PhysicsDriveAPI:angular' for index in range(1, 8)}
+        expected_apis['finger_joint1'] = 'PhysicsDriveAPI:linear'
+        authored_apis = {name: schema for _path, name, schema in authored}
+        if len(authored) != 8 or authored_apis != expected_apis:
+            raise ValueError(
+                f'{label} composed stage must expose seven Arm drives and one leader-finger drive'
+            )
+
         stiffness_tensor, damping_tensor = self._articulation.get_dof_gains()
-        stiffness = _tensor_rows(stiffness_tensor, width=len(self._dof_names), label='DG04 public stiffness')[0]
-        damping = _tensor_rows(damping_tensor, width=len(self._dof_names), label='DG04 public damping')[0]
+        stiffness = _tensor_rows(
+            stiffness_tensor, width=len(self._dof_names), label=f'{label} public stiffness',
+        )[0]
+        damping = _tensor_rows(
+            damping_tensor, width=len(self._dof_names), label=f'{label} public damping',
+        )[0]
         effort_rows = self._articulation.get_dof_max_efforts().numpy().tolist()
         if effort_rows and not isinstance(effort_rows[0], (tuple, list)):
             effort_rows = [effort_rows]
         if not effort_rows or len(effort_rows[0]) != len(self._dof_names):
-            raise ValueError('DG04 public maximum-effort view has unexpected shape')
+            raise ValueError(f'{label} public maximum-effort view has unexpected shape')
         max_effort = tuple(float(value) for value in effort_rows[0])
         drive_rows = self._articulation.get_dof_drive_types()
         if not drive_rows or len(drive_rows[0]) != len(self._dof_names):
-            raise ValueError('DG04 public drive-type view has unexpected shape')
+            raise ValueError(f'{label} public drive-type view has unexpected shape')
         drive_types = tuple(None if value is None else str(value).lower() for value in drive_rows[0])
+
         values = {}
-        # These are the exact frozen Menagerie MJCF position-actuator gains
-        # already carried by the source-bound Core drive receipt. Isaac's
-        # public articulation gain units remain N*m/rad for the Arm joints;
-        # do not convert them to a degree-based profile here.
-        arm_expected = {
-            'joint1': (4500.0, 450.0, 87.0),
-            'joint2': (4500.0, 450.0, 87.0),
-            'joint3': (3500.0, 350.0, 87.0),
-            'joint4': (3500.0, 350.0, 87.0),
-            'joint5': (2000.0, 200.0, 12.0),
-            'joint6': (2000.0, 200.0, 12.0),
-            'joint7': (2000.0, 200.0, 12.0),
-        }
         for native_name, index in self._dof_index.items():
             actual = (stiffness[index], damping[index], max_effort[index], drive_types[index])
             if native_name in arm_expected:
                 wanted = (*arm_expected[native_name], 'force')
                 if (any(not math.isclose(actual[i], wanted[i], rel_tol=0.0, abs_tol=1e-4)
                         for i in range(3)) or actual[3] != wanted[3]):
-                    raise ValueError(f'DG04 reused source Arm drive differs from the frozen USD: {native_name}={actual!r}')
+                    raise ValueError(
+                        f'{label} public Arm drive differs from its exact profile: '
+                        f'{native_name}={actual!r}'
+                    )
             elif native_name == 'finger_joint1':
-                wanted = (2000.0, 100.0, 100.0, 'force')
+                wanted = (*leader_expected, 'force')
                 if (any(not math.isclose(actual[i], wanted[i], rel_tol=0.0, abs_tol=1e-4)
                         for i in range(3)) or actual[3] != wanted[3]):
-                    raise ValueError(f'DG04 active leader drive differs from the fixed native profile: {actual!r}')
+                    raise ValueError(f'{label} active leader drive differs from its exact profile: {actual!r}')
             elif (not math.isclose(actual[0], 0.0, rel_tol=0.0, abs_tol=1e-8)
                     or not math.isclose(actual[1], 0.0, rel_tol=0.0, abs_tol=1e-8)
                     or actual[3] not in (None, 'none')):
-                raise ValueError(f'DG04 mimic follower has a duplicate articulation drive: {actual!r}')
+                raise ValueError(f'{label} mimic follower has a duplicate articulation drive: {actual!r}')
             values[native_name] = {
                 'stiffness': actual[0], 'damping': actual[1],
                 'max_effort': actual[2], 'drive_type': actual[3],
             }
-        witness = {
-            'schema_version': 'isaac-dg04-native-mimic-drive-witness-v1',
+
+        return {
+            'schema_version': schema_version,
             'native_dof_order': list(self._dof_names),
             'active_drive_dofs': [f'joint{index}' for index in range(1, 8)] + ['finger_joint1'],
             'passive_mimic_dof': 'finger_joint2',
-            'leader_stiffness_N_m': 2000.0,
-            'leader_damping_N_s_m': 100.0,
-            'leader_max_effort_N': 100.0,
+            'leader_stiffness_N_m': leader_expected[0],
+            'leader_damping_N_s_m': leader_expected[1],
+            'leader_max_effort_N': leader_expected[2],
             'leader_drive_type': 'force',
             'follower_stiffness_N_m': 0.0,
             'follower_damping_N_s_m': 0.0,
@@ -1259,7 +1211,6 @@ class IsaacSimNativeRuntimeIOV1:
                 for path, name, schema in sorted(authored)
             ],
         }
-        return witness
 
     def _verify_f06_pickcube_mimic(self, PhysxSchema, UsdPhysics) -> None:
         """Verify the locally authored F06 Panda source relation and 5 N leader drive."""

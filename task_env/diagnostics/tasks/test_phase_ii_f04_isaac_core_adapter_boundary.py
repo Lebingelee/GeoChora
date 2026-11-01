@@ -13,6 +13,87 @@ from task_env.tasks.reference_env import SelectedReferenceEnv
 
 
 
+@pytest.mark.parametrize(
+    ('route', 'arm_effort', 'leader', 'schema'),
+    [
+        ('f06', (250.0,) * 7, (5000.0, 120.0, 5.0),
+         'isaac-f06-pickcube-native-mimic-drive-witness-v1'),
+        ('dg04', (87.0,) * 4 + (12.0,) * 3, (2000.0, 100.0, 100.0),
+         'isaac-dg04-native-mimic-drive-witness-v1'),
+    ],
+)
+def test_shared_isaac_public_drive_check_keeps_route_specific_limits(
+    route, arm_effort, leader, schema,
+):
+    from task_env.runtime.sessions.isaac_native_io import IsaacSimNativeRuntimeIOV1
+
+    class Array(list):
+        def tolist(self):
+            return list(self)
+
+    class Tensor:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def numpy(self):
+            return Array(self.rows)
+
+    class Prim:
+        def __init__(self, name, api):
+            self.name, self.api = name, api
+
+        def GetPath(self):
+            return f'/World/Robot/{self.name}'
+
+        def GetName(self):
+            return self.name
+
+        def GetAppliedSchemas(self):
+            return (self.api,)
+
+    names = tuple([f'joint{i}' for i in range(1, 8)] + ['finger_joint1', 'finger_joint2'])
+    arm_gains = {
+        'joint1': (4500.0, 450.0), 'joint2': (4500.0, 450.0),
+        'joint3': (3500.0, 350.0), 'joint4': (3500.0, 350.0),
+        'joint5': (2000.0, 200.0), 'joint6': (2000.0, 200.0),
+        'joint7': (2000.0, 200.0),
+    }
+    gains = [arm_gains[name] for name in names[:7]]
+    stiffness = [row[0] for row in gains] + [leader[0], 0.0]
+    damping = [row[1] for row in gains] + [leader[1], 0.0]
+    efforts = list(arm_effort) + [leader[2], 0.0]
+    drive_types = ['force'] * 8 + [None]
+    io = object.__new__(IsaacSimNativeRuntimeIOV1)
+    io._f06_pickcube = route == 'f06'
+    io._f06_native_mimic_receipt = object() if route == 'f06' else None
+    io._dg04_native = route == 'dg04'
+    io._dg04_native_mimic_receipt = object() if route == 'dg04' else None
+    io._dof_names = names
+    io._dof_index = {name: index for index, name in enumerate(names)}
+    io._stage = type('Stage', (), {'Traverse': lambda _self: [
+        Prim(name, 'PhysicsDriveAPI:linear' if name == 'finger_joint1'
+             else 'PhysicsDriveAPI:angular')
+        for name in names[:8]
+    ]})()
+    io._articulation = type('Articulation', (), {
+        'get_dof_gains': lambda _self: (Tensor([stiffness]), Tensor([damping])),
+        'get_dof_max_efforts': lambda _self: Tensor([efforts]),
+        'get_dof_drive_types': lambda _self: [drive_types],
+    })()
+
+    witness = io._verify_public_drives(route=route)
+    assert witness['schema_version'] == schema
+    assert witness['leader_max_effort_N'] == leader[2]
+    assert witness['public_consumers']['joint7']['max_effort'] == arm_effort[-1]
+    assert witness['public_consumers']['finger_joint1']['max_effort'] == leader[2]
+
+    bad_stiffness = list(stiffness)
+    bad_stiffness[io._dof_index['finger_joint1']] += 1.0
+    io._articulation.get_dof_gains = lambda: (Tensor([bad_stiffness]), Tensor([damping]))
+    with pytest.raises(ValueError, match='leader drive'):
+        io._verify_public_drives(route=route)
+
+
 def test_environment_close_closes_session_then_process_runtime_owner_once():
     class Session:
         def __init__(self):
