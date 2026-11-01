@@ -551,38 +551,12 @@ class F05Dg04IsaacNativeCandidateInputV1:
             self.kinematics_source_sha256, self.task_scene_recipe_sha256,
             self.action_config,
         ).validate()
-
-        from task_env.assembly.usd_delivery import _canonical_hash
-        options = {
-            'f05_goal': 'DG04',
-            'lowering': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
-            'delivery_manifest_sha256': _F05_ISAAC_USD_DELIVERY_MANIFEST_SHA256,
-            'task_scene_recipe_sha256': F05_DG01_RECIPE_SHA256,
-        }
+        self.execution.validate()
         if (self.execution.physics_provider, self.execution.physics_backend,
                 self.execution.physics_device, self.execution.physics_profile,
                 self.execution.determinism_mode) != (
                 'isaacsim', 'cuda', 'cuda:0', F05_DG04_ISAAC_NATIVE_PROFILE, 'best_effort'):
             raise ValueError('DG04 requires its exact versioned Isaac CUDA/native-mimic profile')
-        source = self.runtime_source
-        if (source.scene_source.representation.options_sha256 != _canonical_hash(options)
-                or source.scene_source.representation.provider != 'isaacsim'
-                or source.scene_source.representation.provider_build_identity != 'isaacsim-6.2.0.0'
-                or source.scene_source.representation.representation_format != 'usd'
-                or source.scene_source.representation.runtime_admitted is not False
-                or source.scene_source.loaded_delivery.manifest_bytes_sha256
-                    != _F05_ISAAC_USD_DELIVERY_MANIFEST_SHA256
-                or source.scene_source.loaded_delivery.delivery_sha256
-                    != _F05_ISAAC_USD_DELIVERY_IDENTITY_SHA256
-                or source.scene_source.loaded_delivery.closure_sha256
-                    != _F05_ISAAC_USD_DELIVERY_CLOSURE_SHA256):
-            raise ValueError('DG04 native profile does not bind the exact locally validated source delivery')
-        if (not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str
-                or hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest()
-                    != self.kinematics_source_sha256
-                or self.kinematics_source_sha256
-                    != '96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273'):
-            raise ValueError('DG04 source-calibrated kinematics bytes/hash mismatch')
 
 
 def build_f05_dg04_isaac_native_candidate(
