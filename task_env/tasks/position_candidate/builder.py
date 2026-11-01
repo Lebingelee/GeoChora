@@ -177,101 +177,6 @@ class F04PositionCandidateInputV1:
 
 
 @dataclass(frozen=True)
-class F05PositionCandidateInputV1:
-    """Explicit F05 source/control S1 input bound to public GeoPhys host metadata."""
-
-    schema_version: str
-    task_source: TaskSourceV1
-    artifact: TaskArtifactV1
-    runtime_source: UsdRuntimeSourceV1
-    execution: ExecutionSpecV1
-    reset_plan: EpisodeResetPlanV1
-    kinematics_source_xml: str
-    kinematics_source_sha256: str
-    host_model_producer_identity: GeoPhysHostModelProducerIdentityV1
-    native_drive_receipt: GeoPhysUsdPositionDriveReceiptV1
-
-    def validate(self):
-        if self.schema_version != 'f05-position-candidate-input-v1':
-            raise ValueError('unsupported F05 Position candidate input schema')
-        if (type(self.task_source) is not TaskSourceV1
-                or type(self.artifact) is not TaskArtifactV1
-                or type(self.runtime_source) is not UsdRuntimeSourceV1
-                or type(self.execution) is not ExecutionSpecV1
-                or type(self.reset_plan) is not EpisodeResetPlanV1
-                or type(self.host_model_producer_identity) is not GeoPhysHostModelProducerIdentityV1
-                or type(self.native_drive_receipt) is not GeoPhysUsdPositionDriveReceiptV1):
-            raise TypeError('F05 Position input requires exact versioned Core/source/drive contracts')
-        self.runtime_source.validate()
-        self.artifact.validate()
-        self.execution.validate()
-        self.reset_plan.validate()
-        if (self.runtime_source.task_artifact.identity_hash != self.artifact.identity_hash
-                or self.runtime_source.scene_definition.identity_hash != self.artifact.scene_identity_hash
-                or self.runtime_source.scene_source.task_source_identity_sha256 != self.task_source.identity_hash
-                or self.runtime_source.scene_source.scene_identity_sha256 != self.runtime_source.scene_definition.identity_hash
-                or self.task_source.scene_ref != self.runtime_source.scene_definition.scene_id
-                or self.task_source.task_id != self.artifact.task_id
-                or self.task_source.version != self.artifact.artifact_version
-                or self.reset_plan.role_binding.task_source_identity_hash != self.task_source.identity_hash
-                or self.reset_plan.role_binding.scene_identity_hash != self.runtime_source.scene_definition.identity_hash
-                or self.reset_plan.reset_sample.task_artifact_hash != self.artifact.identity_hash):
-            raise ValueError('F05 source/TaskSource/Artifact/reset identities disagree')
-        if (self.execution.physics_provider, self.execution.physics_backend,
-                self.execution.physics_device, self.execution.physics_profile,
-                self.execution.determinism_mode) != (
-                'geophys', 'cpu', 'cpu', 'geophys-usd-position-f05-s1-v1', 'best_effort'):
-            raise ValueError('F05 S1 requires the exact provider-free GeoPhys CPU execution identity')
-        renderer = self.execution.render_default
-        if (renderer.provider, renderer.backend, renderer.profile, renderer.device,
-                self.execution.camera_overrides) != ('none', 'cpu', 'none', None, ()):
-            raise ValueError('F05 S1 is state-only and does not admit renderer or camera overrides')
-        representation = self.runtime_source.scene_source.representation
-        delivery = self.runtime_source.scene_source.loaded_delivery.delivery
-        if (representation.provider, representation.provider_build_identity,
-                representation.representation_format, representation.runtime_admitted,
-                self.runtime_source.scene_source.source_verified,
-                self.runtime_source.scene_source.locally_validated,
-                delivery.provenance_kind) != (
-                'geophys', self.host_model_producer_identity.requested_target_build_identity,
-                'usd', False, False, True, 'local-validated'):
-            raise ValueError('F05 S1 source is outside the frozen locally validated GeoPhys USD input')
-        producer = self.host_model_producer_identity
-        producer.validate_current_tree()
-        from task_env.assembly.usd_delivery import resolve_provider_representation
-        expected_representation = resolve_provider_representation(
-            self.runtime_source.scene_source.loaded_delivery,
-            provider='geophys',
-            provider_build_identity=producer.requested_target_build_identity,
-            options={
-                'f05_attempt': '002',
-                'lowering': 'public-host-model-s1-v1',
-                'host_model_producer_identity_sha256': producer.identity_sha256,
-            },
-        )
-        if expected_representation.identity_hash != representation.identity_hash:
-            raise ValueError('F05 representation options do not bind the actual host-model producer identity')
-        receipt = self.native_drive_receipt
-        if (receipt.provenance_kind, receipt.scene_identity_sha256,
-                receipt.source_closure_sha256, receipt.execution_identity_sha256,
-                receipt.provider_build_identity, receipt.physics_profile,
-                receipt.backend, receipt.device, receipt.determinism_mode,
-                receipt.host_model_producer_identity_sha256,
-                receipt.writer_id) != (
-                'synthetic_fixture', self.runtime_source.scene_definition.identity_hash,
-                self.runtime_source.source_closure_digest, self.execution.identity_hash,
-                representation.provider_build_identity, self.execution.physics_profile,
-                self.execution.physics_backend, self.execution.physics_device,
-                self.execution.determinism_mode, producer.identity_sha256,
-                'panda-main/position-servo-v1'):
-            raise ValueError('F05 model-bound drive receipt does not bind exact source/execution/control identity')
-        if not self.kinematics_source_xml or type(self.kinematics_source_xml) is not str:
-            raise ValueError('F05 Position S1 requires source-calibrated kinematics bytes')
-        if hashlib.sha256(self.kinematics_source_xml.encode()).hexdigest() != self.kinematics_source_sha256:
-            raise ValueError('F05 source-calibrated kinematics hash mismatch')
-
-
-@dataclass(frozen=True)
 class F05NativePositionCandidateInputV1:
     """One exact F05 Menagerie/GeoPhys native cell with deferred model receipt."""
 
@@ -790,7 +695,6 @@ def _versioned_position_candidate_kind(input_v1):
         return None
     kinds = {
         F04PositionCandidateInputV1: 'f04',
-        F05PositionCandidateInputV1: 'f05',
         F05NativePositionCandidateInputV1: 'f05_native',
         F05Dg02GeoPhysUsdCandidateInputV1: 'dg02_geophys',
         F05Dg04IsaacNativeCandidateInputV1: 'dg04_isaac_native',
@@ -801,16 +705,16 @@ def _versioned_position_candidate_kind(input_v1):
         raise TypeError('versioned Position value requires an exact supported candidate input') from error
 
 
-def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1, *, horizon=8,
+def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F05NativePositionCandidateInputV1 | F05Dg02GeoPhysUsdCandidateInputV1 | F05Dg04IsaacNativeCandidateInputV1, *, horizon=8,
                                        environment_type=SelectedReferenceEnv,
                                        camera_observation_config=None,
                                        controller_config=None):
     """Build through the existing binding and SelectedReferenceEnv owners."""
     if type(input_v1) not in (F04PositionCandidateInputV1,
-                              F05PositionCandidateInputV1, F05NativePositionCandidateInputV1,
+                              F05NativePositionCandidateInputV1,
                               F05Dg02GeoPhysUsdCandidateInputV1,
                               F05Dg04IsaacNativeCandidateInputV1):
-        raise TypeError('versioned Position candidate requires an exact F04/F05/DG02/DG04 input contract')
+        raise TypeError('versioned Position candidate requires an exact F04/F05-native/DG02/DG04 input contract')
     input_v1.validate()
     if type(input_v1) is F05NativePositionCandidateInputV1:
         _validate_f05_native_position_action_config(controller_config)
@@ -901,15 +805,12 @@ def build_versioned_position_candidate(input_v1: F04PositionCandidateInputV1 | F
                 'execution_identity_sha256': input_v1.execution.identity_hash,
                 'arm_tracking_method': arm_tracking_method,
             },
-            'source_revision': ('F04-versioned-usd-native-candidate-v1'
-                                if type(input_v1) is F04PositionCandidateInputV1
-                                else 'F05-versioned-geophys-usd-native-v1'
-                                if type(input_v1) is F05NativePositionCandidateInputV1
-                                else 'F05-DG02-source-preserving-geophys-usd-core-v1'
-                                if type(input_v1) is F05Dg02GeoPhysUsdCandidateInputV1
-                                else 'F05-DG04-native-physx-mimic-core-v1'
-                                if type(input_v1) is F05Dg04IsaacNativeCandidateInputV1
-                                else 'F05-versioned-geophys-usd-synthetic-s1-v1'),
+            'source_revision': {
+                F04PositionCandidateInputV1: 'F04-versioned-usd-native-candidate-v1',
+                F05NativePositionCandidateInputV1: 'F05-versioned-geophys-usd-native-v1',
+                F05Dg02GeoPhysUsdCandidateInputV1: 'F05-DG02-source-preserving-geophys-usd-core-v1',
+                F05Dg04IsaacNativeCandidateInputV1: 'F05-DG04-native-physx-mimic-core-v1',
+            }[type(input_v1)],
             'source_sha256': {
                 'source_closure': source.source_closure_digest,
                 'kinematics_source': input_v1.kinematics_source_sha256,
@@ -1085,7 +986,7 @@ def build_position_candidate(workspace: Path | str, *, provider: str, horizon: i
 
 __all__ = [
     'F04PositionCandidateInputV1',
-    'F05PositionCandidateInputV1', 'F05NativePositionCandidateInputV1',
+    'F05NativePositionCandidateInputV1',
     'POSITION_CANDIDATE_SEED',
     'POSITION_CANDIDATE_TASK_ID', 'POSITION_CANDIDATE_VERSION',
     'build_position_candidate',

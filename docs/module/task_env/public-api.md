@@ -899,6 +899,27 @@ new provider admission, general Attachment support or Qualification.
 
 <a id="f05-attempt001-source-control-result"></a>
 
+<a id="f-cleanup-f05-retained-route-2026-11-02"></a>
+
+## Current F05 route after F convergence cleanup (2026-11-02)
+
+The old `F05PositionCandidateInputV1` synthetic Core S1 route, its private
+Native-I/O scope, and its S1-only H5 reader/test bundle have been retired. The
+bounded Menagerie USD / GeoPhys CPU route remains represented by the exact
+`F05NativePositionCandidateInputV1`; the existing Position builder and
+`make_env('panda-position-servo-candidate-v1', config={'versioned_input': ...})`
+continue to own construction. Its native adapter consumes the public USD
+importer result and binds the actual host-model producer identity. Generic
+unbound or locally unverified USD inputs still fail closed. The retained
+independent affine-force oracle now runs with the native candidate’s public
+model mapping in `test_phase_ii_f05_geophys_native_adapter.py`.
+
+The retired synthetic S1's bounded acceptance remains historical evidence; this
+cleanup does not replace or promote that decision. No native physics was run
+for this cleanup slice, and it grants no new provider capability or
+Qualification. The later bounded native cell and its scope remain documented
+under [F05 attempt003](#f05-attempt003-menagerie-geophys-cpu-native-cell).
+
 ## F05 attempt001: USD source/control result (partial; pending Sol review)
 
 F05 attempt001 exercised the existing versioned Position-candidate and `SelectedReferenceEnv` Core route with a lowest-level synthetic `NativeRuntimeIOV1` replacement. The Menagerie local-validated USD reached GeoPhys public import and host rigid-model lowering through an isolated candidate provider tree; two same-Env synthetic episodes were recorded to closed H5 files and independently read back. This is bounded S1 evidence only.
