@@ -281,6 +281,114 @@ def _pose_from_view(view) -> tuple[tuple[float, float, float], tuple[float, floa
     return p, q
 
 
+def _nearest_rigid_body_ancestor(prim, rigid_body_api):
+    """Find the nearest public rigid-body owner above a fixed frame prim."""
+    ancestor = prim.GetParent()
+    while ancestor and ancestor.IsValid():
+        if ancestor.HasAPI(rigid_body_api):
+            return ancestor
+        ancestor = ancestor.GetParent()
+    return None
+
+
+def _static_frame_local_pose(frame_prim, rigid_body_prim, UsdGeom):
+    """Read a rigid frame's fixed local pose below its moving rigid-body owner.
+
+    XformPrim reads authored USD transforms; it does not read the live pose of
+    a non-root articulation link from PhysX. For a fixed frame nested below a
+    public RigidPrim, keep the USD-authored local transform and compose it with
+    the RigidPrim tensor pose at each state boundary.
+    """
+    parent_path = str(rigid_body_prim.GetPath())
+    frame_path = str(frame_prim.GetPath())
+    if not frame_path.startswith(parent_path.rstrip("/") + "/"):
+        raise ValueError("rigid-body frame source must be a descendant of its live pose owner")
+
+    cursor = frame_prim
+    while str(cursor.GetPath()) != parent_path:
+        if not cursor or not cursor.IsValid():
+            raise ValueError("rigid-body frame source lost its declared ancestor")
+        xformable = UsdGeom.Xformable(cursor)
+        if not xformable or xformable.GetResetXformStack():
+            raise ValueError("rigid-body child frame may not reset its USD transform stack")
+        if any(op.GetAttr().GetNumTimeSamples() for op in xformable.GetOrderedXformOps()):
+            raise ValueError("rigid-body child frame must have a static authored USD transform")
+        cursor = cursor.GetParent()
+
+    cache = UsdGeom.XformCache()
+    frame_world = cache.GetLocalToWorldTransform(frame_prim)
+    body_world = cache.GetLocalToWorldTransform(rigid_body_prim)
+    local = frame_world * body_world.GetInverse()
+    basis = tuple(
+        tuple(float(local[row][column]) for column in range(3))
+        for row in range(3)
+    )
+    for row in range(3):
+        for other in range(3):
+            dot = sum(basis[row][axis] * basis[other][axis] for axis in range(3))
+            expected = 1.0 if row == other else 0.0
+            if not math.isclose(dot, expected, rel_tol=0.0, abs_tol=1e-6):
+                raise ValueError("rigid-body child frame transform must be unit-scale and shear-free")
+    determinant = (
+        basis[0][0] * (basis[1][1] * basis[2][2] - basis[1][2] * basis[2][1])
+        - basis[0][1] * (basis[1][0] * basis[2][2] - basis[1][2] * basis[2][0])
+        + basis[0][2] * (basis[1][0] * basis[2][1] - basis[1][1] * basis[2][0])
+    )
+    if not math.isclose(determinant, 1.0, rel_tol=0.0, abs_tol=1e-6):
+        raise ValueError("rigid-body child frame transform must preserve handedness")
+    position = tuple(float(value) for value in local.ExtractTranslation())
+    quaternion = local.ExtractRotationQuat()
+    orientation = (
+        float(quaternion.GetReal()),
+        *(float(value) for value in quaternion.GetImaginary()),
+    )
+    return PoseWorld(position, orientation)
+
+
+def _compose_world_pose(parent_position, parent_orientation_wxyz,
+                        local_position, local_orientation_wxyz):
+    """Compose a fixed child-frame pose with a live public rigid-body pose."""
+    parent_position = tuple(float(value) for value in parent_position)
+    local_position = tuple(float(value) for value in local_position)
+    if len(parent_position) != 3 or len(local_position) != 3:
+        raise ValueError("rigid-body and child-frame positions must have width three")
+    if any(not math.isfinite(value) for value in (*parent_position, *local_position)):
+        raise ValueError("rigid-body and child-frame positions must be finite")
+
+    def normalize(quaternion):
+        values = tuple(float(value) for value in quaternion)
+        if len(values) != 4 or any(not math.isfinite(value) for value in values):
+            raise ValueError("rigid-body and child-frame orientations must be finite wxyz quaternions")
+        norm = math.sqrt(sum(value * value for value in values))
+        if norm <= 1e-12:
+            raise ValueError("rigid-body and child-frame orientations cannot be zero")
+        return tuple(value / norm for value in values)
+
+    parent_q = normalize(parent_orientation_wxyz)
+    local_q = normalize(local_orientation_wxyz)
+    w, x, y, z = parent_q
+    vx, vy, vz = local_position
+    # Rotate with q * (0, v) * conjugate(q), without a SciPy dependency.
+    tx = 2.0 * (y * vz - z * vy)
+    ty = 2.0 * (z * vx - x * vz)
+    tz = 2.0 * (x * vy - y * vx)
+    rotated = (
+        vx + w * tx + (y * tz - z * ty),
+        vy + w * ty + (z * tx - x * tz),
+        vz + w * tz + (x * ty - y * tx),
+    )
+    world_position = tuple(parent_position[index] + rotated[index] for index in range(3))
+
+    lw, lx, ly, lz = local_q
+    world_orientation = normalize((
+        w * lw - x * lx - y * ly - z * lz,
+        w * lx + x * lw + y * lz - z * ly,
+        w * ly - x * lz + y * lw + z * lx,
+        w * lz + x * ly - y * lx + z * lw,
+    ))
+    return world_position, world_orientation
+
+
 def _body_local_com_offset_from_public_tensor_pose(com_position_body_local_m) -> tuple[float, float, float]:
     """Validate the Tensor RigidPrim COM translation, which is body-local in Isaac 6.2."""
     if len(com_position_body_local_m) != 3:
@@ -343,6 +451,8 @@ class IsaacSimNativeRuntimeIOV1:
         self._articulation = None
         self._body_views: dict[str, Any] = {}
         self._frame_views: dict[str, Any] = {}
+        self._frame_local_poses: dict[str, PoseWorld] = {}
+        self._frame_pose_readback_receipts: dict[str, dict[str, object]] = {}
         self._free_views: dict[str, Any] = {}
         self._dof_names: tuple[str, ...] = ()
         self._dof_index: dict[str, int] = {}
@@ -466,15 +576,51 @@ class IsaacSimNativeRuntimeIOV1:
                     else:
                         self._body_views[path] = RigidPrim(path)
                 self._frame_views[semantic] = self._body_views[path]
+                self._frame_pose_readback_receipts[semantic] = {
+                    "mode": "rigid_body_public_world_pose",
+                    "frame_path": path,
+                    "rigid_body_path": path,
+                }
             for semantic, native in self._source.frames.items():
                 path = _native_prim_path(native, entry_prim)
                 if path not in self._frame_views:
                     prim = self._stage.GetPrimAtPath(path)
                     if not prim or not prim.IsValid():
                         raise ValueError(f"USD RuntimeSource Frame binding is not a composed prim: {path}")
-                    self._frame_views[semantic] = (
-                        RigidPrim(path) if prim.HasAPI(UsdPhysics.RigidBodyAPI) else XformPrim(path)
+                    if prim.HasAPI(UsdPhysics.RigidBodyAPI):
+                        self._frame_views[semantic] = RigidPrim(path)
+                        self._frame_pose_readback_receipts[semantic] = {
+                            "mode": "rigid_body_public_world_pose",
+                            "frame_path": path,
+                            "rigid_body_path": path,
+                        }
+                        continue
+                    rigid_ancestor = _nearest_rigid_body_ancestor(
+                        prim, UsdPhysics.RigidBodyAPI,
                     )
+                    if rigid_ancestor is None:
+                        self._frame_views[semantic] = XformPrim(path)
+                        self._frame_pose_readback_receipts[semantic] = {
+                            "mode": "public_xform_world_pose",
+                            "frame_path": path,
+                            "rigid_body_path": None,
+                        }
+                        continue
+                    rigid_path = str(rigid_ancestor.GetPath())
+                    rigid_view = self._body_views.get(rigid_path)
+                    if rigid_view is None:
+                        rigid_view = RigidPrim(rigid_path)
+                        self._body_views[rigid_path] = rigid_view
+                    local_pose = _static_frame_local_pose(prim, rigid_ancestor, UsdGeom)
+                    self._frame_views[semantic] = rigid_view
+                    self._frame_local_poses[semantic] = local_pose
+                    self._frame_pose_readback_receipts[semantic] = {
+                        "mode": "rigid_body_tensor_pose_plus_static_local_frame",
+                        "frame_path": path,
+                        "rigid_body_path": rigid_path,
+                        "local_position_m": list(local_pose.position),
+                        "local_orientation_wxyz": list(local_pose.quaternion_wxyz),
+                    }
             for semantic in self._source.free_joints:
                 body_path = _native_prim_path(self._source.bodies[semantic], entry_prim)
                 self._free_views[semantic] = self._body_views[body_path]
@@ -555,6 +701,10 @@ class IsaacSimNativeRuntimeIOV1:
                 "physics_time_s": bootstrap_time,
                 "physics_dt_s": float(self._artifact.timebase.physics_dt),
                 "application_updates": 2,
+                "frame_pose_readback_bindings": {
+                    key: dict(value)
+                    for key, value in sorted(self._frame_pose_readback_receipts.items())
+                },
                 "mapped_floating_body_paths": sorted(
                     _native_prim_path(self._source.bodies[semantic], entry_prim)
                     for semantic in self._source.free_joints
@@ -646,6 +796,8 @@ class IsaacSimNativeRuntimeIOV1:
             primary.__traceback__ = None
             self._free_views.clear()
             self._frame_views.clear()
+            self._frame_local_poses.clear()
+            self._frame_pose_readback_receipts.clear()
             self._body_views.clear()
             self._articulation = None
             self._physics_scene = None
@@ -1629,6 +1781,11 @@ class IsaacSimNativeRuntimeIOV1:
         frame_poses = {}
         for semantic, view in self._frame_views.items():
             p, q_wxyz = _pose_from_view(view)
+            local_pose = self._frame_local_poses.get(semantic)
+            if local_pose is not None:
+                p, q_wxyz = _compose_world_pose(
+                    p, q_wxyz, local_pose.position, local_pose.quaternion_wxyz,
+                )
             frame_poses[semantic] = PoseWorld(p, q_wxyz)
         free_readbacks = {}
         for semantic, view in self._free_views.items():
@@ -2021,6 +2178,8 @@ class IsaacSimNativeRuntimeIOV1:
             primary = error
         self._free_views.clear()
         self._frame_views.clear()
+        self._frame_local_poses.clear()
+        self._frame_pose_readback_receipts.clear()
         self._body_views.clear()
         self._articulation = None
         self._physics_scene = None

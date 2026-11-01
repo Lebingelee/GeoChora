@@ -112,6 +112,7 @@ def test_native_adapter_read_views_preserves_public_local_com_and_com_twist():
         joints={}, frames={}, free_joints={"cube": "cube-root"},
     )
     adapter._frame_views = {}
+    adapter._frame_local_poses = {}
     adapter._free_views = {"cube": PublicRigidPrim()}
     body_frame = FrameReference("cube", "body")
     adapter._artifact = SimpleNamespace(legacy_frame_bindings={"cube": body_frame})
@@ -136,6 +137,82 @@ def test_native_adapter_read_views_preserves_public_local_com_and_com_twist():
     )
     assert linear_local == pytest.approx((0.74, -0.6, 0.6), abs=1e-12)
     assert angular_local == pytest.approx((0.0, 0.0, 2.0), abs=1e-12)
+
+
+def test_isaac_frame_readback_composes_live_rigid_pose_with_static_child_offset():
+    from types import SimpleNamespace
+
+    from task_env.runtime.sessions.isaac_native_io import (
+        IsaacSimNativeRuntimeIOV1,
+        _compose_world_pose,
+        _nearest_rigid_body_ancestor,
+    )
+
+    half = 2 ** -0.5
+    position, orientation = _compose_world_pose(
+        (1.0, 2.0, 3.0), (half, 0.0, 0.0, half),
+        (0.1, 0.0, 0.0584), (half, half, 0.0, 0.0),
+    )
+    assert position == pytest.approx((1.0, 2.1, 3.0584), abs=1e-12)
+    assert orientation == pytest.approx((0.5, 0.5, 0.5, 0.5), abs=1e-12)
+
+    rigid_api = object()
+
+    class Prim:
+        def __init__(self, parent=None, *, rigid=False):
+            self.parent = parent
+            self.rigid = rigid
+
+        def GetParent(self):
+            return self.parent
+
+        def IsValid(self):
+            return True
+
+        def HasAPI(self, api):
+            return api is rigid_api and self.rigid
+
+    link = Prim(rigid=True)
+    hand = Prim(link, rigid=True)
+    frame = Prim(hand)
+    assert _nearest_rigid_body_ancestor(frame, rigid_api) is hand
+    assert _nearest_rigid_body_ancestor(Prim(), rigid_api) is None
+
+    class Tensor:
+        def __init__(self, value):
+            self.value = value
+
+        def numpy(self):
+            import numpy as np
+            return np.asarray(self.value)
+
+    class ParentRigidBodyView:
+        def get_world_poses(self):
+            return Tensor([[1.0, 2.0, 3.0]]), Tensor([[half, 0.0, 0.0, half]])
+
+    adapter = object.__new__(IsaacSimNativeRuntimeIOV1)
+    adapter._articulation = SimpleNamespace(
+        get_dof_positions=lambda: Tensor([[]]),
+        get_dof_velocities=lambda: Tensor([[]]),
+    )
+    adapter._dof_names = ()
+    adapter._dof_index = {}
+    adapter._source = SimpleNamespace(joints={}, frames={})
+    adapter._frame_views = {"panda-v1/ee": ParentRigidBodyView()}
+    adapter._frame_local_poses = {
+        "panda-v1/ee": SimpleNamespace(
+            position=(0.1, 0.0, 0.0584),
+            quaternion_wxyz=(half, half, 0.0, 0.0),
+        ),
+    }
+    adapter._free_views = {}
+
+    joints, velocities, frames, free = adapter._read_views()
+    assert joints == velocities == free == {}
+    assert frames["panda-v1/ee"].position == pytest.approx((1.0, 2.1, 3.0584), abs=1e-12)
+    assert frames["panda-v1/ee"].quaternion_wxyz == pytest.approx(
+        (0.5, 0.5, 0.5, 0.5), abs=1e-12,
+    )
 
 
 def test_isaac_app_task_thread_count_obeys_f04_resource_bound():
@@ -536,6 +613,7 @@ def test_isaac_native_reset_refreshes_public_kinematics_before_read_without_step
     # Production creates body-backed frame views from RuntimeSource.bodies;
     # this official candidate has no extra Xform-only RuntimeSource.frames.
     adapter._frame_views = {name: FrameView() for name in source.bodies}
+    adapter._frame_local_poses = {}
 
     targets = tuple(
         (index, native_name, float(sample.joint_position[semantic_by_native[native_name]]))
