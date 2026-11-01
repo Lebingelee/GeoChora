@@ -79,13 +79,6 @@ def _a_upstream_pose_replay_joint_limit_tolerances(
     }
 
 
-def _controller_hold_policy(controller):
-    operational = getattr(controller, 'operational_config', None)
-    if operational is not None:
-        return operational.hold_policy
-    return controller.config.hold_policy
-
-
 def _make_candidate_controller(
     *, execution_profile: str, task_uid: str,
     arm_resolver_identity: str | None,
@@ -1196,7 +1189,7 @@ def build_libero_selected_candidate(
             'schema_version': 'libero-world-pose-canonical-v1',
             'interpreted_values': values_tuple,
             'controller_identity': env.controller.identity,
-            'hold_policy': _controller_hold_policy(env.controller),
+            'hold_policy': env.controller.operational_config.hold_policy,
             'arm_target_schema_version': arm_target.schema_version,
             'arm_target_source_xml_sha256': arm_target.source_xml_sha256,
             'arm_target_controller_identity': arm_target.controller_identity,
@@ -1387,7 +1380,7 @@ def build_libero_selected_candidate(
                 'integrator': source.config.runtime.integrator,
                 'controller_profile_id': env.controller.profile_id,
                 'controller_identity': env.controller.identity,
-                    'hold_policy': _controller_hold_policy(env.controller),
+                'hold_policy': env.controller.operational_config.hold_policy,
             },
             'control_plan': env.controller.identity_mapping(),
             'panda_gripper_action_profile': env.value.get('panda_gripper_delta_replay_profile_id'),
