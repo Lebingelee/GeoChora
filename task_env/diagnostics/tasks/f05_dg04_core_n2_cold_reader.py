@@ -553,13 +553,16 @@ def _bound_errors(bundle: dict) -> list[dict]:
                 reference_position = float(app.get("reference_position_m", math.nan))
                 follower_position = float(app.get("follower_position_m", math.nan))
                 reference_target = float(app.get("reference_target_m", math.nan))
+                applied_opening = float(payload.get("gripper_servo_opening_m", math.nan))
                 effort = float(app.get("reference_effort_N", math.nan))
                 cap = float(app.get("maximum_effort_N", math.nan))
                 _check(math.isfinite(relation) and math.isclose(relation, follower_position - reference_position, abs_tol=1e-7)
                        and abs(relation) <= oracle["gripper_native_adaptation"]["joint_relation_abs_error_max_m"]
-                       and math.isclose(reference_target, float(phase["opening_m"]) / 2.0, abs_tol=1e-7)
+                       and math.isfinite(applied_opening)
+                       and 0.0 <= applied_opening <= float(oracle["gripper_opening_range_m"])
+                       and math.isclose(reference_target, applied_opening / 2.0, rel_tol=0.0, abs_tol=1e-7)
                        and math.isfinite(effort) and abs(effort) <= cap + 1e-6 and cap == 100.0,
-                       "native_mimic_gate", f"episode {episode_index} substep {expected_index} relation/effort cap failed")
+                       "native_mimic_gate", f"episode {episode_index} substep {expected_index} physical coupling/force/applied target gate failed")
                 raw_count = contact.get("raw_contact_count")
                 actor_paths = contact.get("raw_contact_actor_paths", [])
                 magnitudes = contact.get("raw_contact_normal_forces_N", [])
