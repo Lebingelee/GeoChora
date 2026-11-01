@@ -55,6 +55,85 @@ def _prepare_output_directory(output: Path):
     return output
 
 
+def _install_action_trace(env, path: Path):
+    """Capture the public expert proposal and state around each step attempt."""
+    capture = {'attempted': 0, 'completed': 0, 'rows': []}
+    original_step = env._step
+
+    def pose(state, name):
+        value = getattr(state, 'pose_world', {}).get(name)
+        if value is None:
+            return None
+        return {'position_m': list(value.position), 'quaternion_wxyz': list(value.quaternion_wxyz)}
+
+    def controller_diagnostics():
+        controller = getattr(env, 'controller', None)
+        value = getattr(controller, 'last_arm_diagnostics', None)
+        return dict(value) if isinstance(value, dict) else None
+
+    def arm_state(state, field):
+        values = getattr(state, field, {})
+        return {f'panda-v1/joint{i}': float(values[f'panda-v1/joint{i}'])
+                for i in range(1, 8) if f'panda-v1/joint{i}' in values}
+
+    def write_trace():
+        _write(path, {
+            'schema_version': 'harness-builtin-pickcube-action-trace-v1',
+            'provider': env.provider, 'seed': getattr(getattr(env, 'sample', None), 'task_seed', None),
+            'attempted_actions': capture['attempted'], 'completed_transitions': capture['completed'],
+            'rows': capture['rows'],
+        })
+
+    def observed_step(action, *, proposal=None, observer_solution=None):
+        capture['attempted'] += 1
+        state = env.state
+        row = {
+            'attempt': capture['attempted'],
+            'control_step_before': int(state.control_step),
+            'simulation_time_before_s': float(state.simulation_time),
+            'proposal_stage': getattr(proposal, 'stage', None),
+            'planned_tcp_pose': list(map(float, action[:7])) if len(action) >= 7 else list(map(float, action)),
+            'gripper_request': float(action[7]) if len(action) >= 8 else None,
+            'eef_pose_before': pose(state, 'panda-v1/ee'),
+            'cube_pose_before': pose(state, 'cube-v1'),
+            'arm_joint_position_before_rad': arm_state(state, 'joint_position'),
+            'arm_joint_velocity_before_rad_s': arm_state(state, 'joint_velocity'),
+            'task_metrics_before': dict(getattr(env, 'info', {}).get('task_metrics', {})),
+        }
+        try:
+            result = original_step(action, proposal=proposal, observer_solution=observer_solution)
+        except BaseException as error:
+            row.update(error={'type': type(error).__name__, 'message': str(error)})
+            fault = getattr(env, 'execution_fault', None)
+            row['execution_fault'] = fault.to_mapping() if hasattr(fault, 'to_mapping') else None
+            row['control_step_after'] = int(env.state.control_step)
+            row['simulation_time_after_s'] = float(env.state.simulation_time)
+            row['eef_pose_after'] = pose(env.state, 'panda-v1/ee')
+            row['cube_pose_after'] = pose(env.state, 'cube-v1')
+            row['arm_joint_position_after_rad'] = arm_state(env.state, 'joint_position')
+            row['arm_joint_velocity_after_rad_s'] = arm_state(env.state, 'joint_velocity')
+            row['controller_diagnostics'] = controller_diagnostics()
+            capture['rows'].append(row)
+            write_trace()
+            raise
+        capture['completed'] += 1
+        row['control_step_after'] = int(env.state.control_step)
+        row['simulation_time_after_s'] = float(env.state.simulation_time)
+        row['eef_pose_after'] = pose(env.state, 'panda-v1/ee')
+        row['cube_pose_after'] = pose(env.state, 'cube-v1')
+        row['arm_joint_position_after_rad'] = arm_state(env.state, 'joint_position')
+        row['arm_joint_velocity_after_rad_s'] = arm_state(env.state, 'joint_velocity')
+        row['controller_diagnostics'] = controller_diagnostics()
+        row['task_metrics_after'] = dict(getattr(env, 'info', {}).get('task_metrics', {}))
+        capture['rows'].append(row)
+        if capture['attempted'] % 5 == 0:
+            write_trace()
+        return result
+
+    env._step = observed_step
+    return capture, write_trace
+
+
 def run_one(spec, catalog, scope, *, seed: int, output: Path):
     from examples._common import run_expert
     from task_env.trajectory.canonical.h5 import load as load_canonical
@@ -80,6 +159,8 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         'qualification': False,
     }
     env = None
+    action_trace = None
+    write_action_trace = None
     recording_started = False
     h5 = output / 'episode.h5'
     try:
@@ -115,6 +196,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         row['solution_identity'] = env.solution.identity
         row['controller_identity'] = env.controller.identity
         row['provider_materialization_id'] = env.session.provider_materialization_id
+        action_trace, write_action_trace = _install_action_trace(env, output / 'step_trace.json')
         env.start_recording(h5)
         recording_started = True
         episode = run_expert(
@@ -151,6 +233,15 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
         if fault is not None:
             row['execution_fault'] = fault.to_mapping() if hasattr(fault, 'to_mapping') else str(fault)
     finally:
+        if write_action_trace is not None:
+            try:
+                write_action_trace()
+            except BaseException as error:
+                row['errors'].append({'phase': 'action-trace', 'type': type(error).__name__, 'message': str(error)})
+        if action_trace is not None:
+            row['solution_action_attempt_count'] = action_trace['attempted']
+            row['solution_action_completed_count'] = action_trace['completed']
+            row['action_trace'] = 'step_trace.json'
         if env is not None:
             if recording_started:
                 try:

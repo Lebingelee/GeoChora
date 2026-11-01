@@ -47,6 +47,15 @@ EEF = "panda-v1/ee"
 FINGERS = ("panda-v1/finger_joint1", "panda-v1/finger_joint2")
 TASK_CONFIGURATION_KEYS = ("recipe", "environment")
 PICKCUBE_CONTROLLER_PROFILES = {"r1", "r3_continuous_v1"}
+PICKCUBE_R3_CONTINUOUS_PROFILE_V1 = {
+    "schema_version": "pick-cube-r3-continuous-profile-v1",
+    # The existing R3 default is 2 rad/s. On the identical seed-31 PickCube
+    # action trace, the stable R1 route reached 3.714 rad/s while R3's offline
+    # replay clipped its resolved-rate command repeatedly during approach.
+    # Give this task's existing R3 controller enough rate to track that route;
+    # this changes neither its controller implementation nor task recipe.
+    "joint_velocity_limit_rad_s": 4.0,
+}
 
 
 def _configuration() -> dict:
@@ -405,6 +414,9 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
         dynamic_profile, profile_source = _r3_dynamic_profile()
         controller = ProductionCanonicalPandaControllerR3.from_source(
             artifact, source, profile=dynamic_profile,
+            joint_velocity_limit_rad_s=(
+                PICKCUBE_R3_CONTINUOUS_PROFILE_V1["joint_velocity_limit_rad_s"]
+            ),
         )
     solution = PickCubeReadinessSolution(config=readiness)
     root = Path(__file__).resolve().parents[3]
@@ -428,6 +440,7 @@ def build_reference(*, backend="cpu", include_solution=True, controller_profile=
     }
     if controller_profile != "r1":
         resolved["controller_profile"] = controller_profile
+        resolved["task_controller_profile"] = dict(PICKCUBE_R3_CONTINUOUS_PROFILE_V1)
         resolved["resolved_controller_profile"] = controller.rate_profile_mapping()
     return {
         "construction_id": recipe["construction_id"], "artifact": artifact, "source": source,

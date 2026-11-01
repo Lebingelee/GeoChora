@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import subprocess
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -133,3 +135,41 @@ def test_worker_accepts_supervisor_created_output_dir_but_rejects_other_data(tmp
     (output / 'episode.h5').touch()
     with pytest.raises(FileExistsError, match='already contains data'):
         _prepare_output_directory(output)
+
+
+def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
+    from builtin_example_worker import _install_action_trace
+
+    pose = SimpleNamespace(position=(0.1, 0.2, 0.3), quaternion_wxyz=(1.0, 0.0, 0.0, 0.0))
+    state = SimpleNamespace(control_step=7, simulation_time=0.07,
+                            pose_world={'panda-v1/ee': pose, 'cube-v1': pose})
+    env = SimpleNamespace(provider='mujoco', sample=SimpleNamespace(task_seed=31), state=state,
+                          info={'task_metrics': {'task_success': False}}, execution_fault=None)
+
+    def fail_step(action, *, proposal=None, observer_solution=None):
+        raise RuntimeError('diagnostic interval failure')
+
+    env._step = fail_step
+    capture, _write_trace = _install_action_trace(env, tmp_path / 'step_trace.json')
+    proposal = SimpleNamespace(stage='approach')
+    with pytest.raises(RuntimeError, match='diagnostic interval failure'):
+        env._step([0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0, 0.04], proposal=proposal)
+    trace = json.loads((tmp_path / 'step_trace.json').read_text())
+    assert capture['attempted'] == 1 and capture['completed'] == 0
+    assert trace['rows'][0]['control_step_before'] == 7
+    assert trace['rows'][0]['planned_tcp_pose'] == [0.2, 0.3, 0.4, 1.0, 0.0, 0.0, 0.0]
+    assert trace['rows'][0]['error']['message'] == 'diagnostic interval failure'
+
+
+def test_pickcube_r3_profile_is_task_versioned_and_records_rate_bound():
+    from task_env.tasks.pick_cube.task import build_reference
+
+    built = build_reference(controller_profile='r3_continuous_v1')
+    task_profile = built['resolved_configuration']['task_controller_profile']
+    controller_profile = built['controller'].rate_profile_mapping()
+    assert task_profile == {
+        'schema_version': 'pick-cube-r3-continuous-profile-v1',
+        'joint_velocity_limit_rad_s': 4.0,
+    }
+    assert controller_profile['joint_velocity_limit_rad_s'] == 4.0
+    assert built['resolved_configuration']['controller_profile'] == 'r3_continuous_v1'

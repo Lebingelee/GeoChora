@@ -48,7 +48,10 @@ def main(argv=None) -> int:
               "env_id": ENV_ID, "provider": args.provider, "backend": "cpu", "device": "cpu",
               "controller_profile": args.controller_profile, "seed": args.seed,
               "horizon": args.horizon, "recording_path": str(recording),
-              "capability_intersection": "selected PickCube P1.6, scalar CPU, existing task-owned R3/ReadinessSolution"}
+              "capability_intersection": (
+                  f"selected PickCube P1.6, scalar CPU, existing task-owned "
+                  f"{args.controller_profile}/ReadinessSolution"
+              )}
     construction_succeeded = reset_succeeded = finalize_succeeded = close_succeeded = False
     episode = None
     try:
