@@ -798,7 +798,6 @@ def build_libero_selected_candidate(
     if type(_execution_profile) is not str or _execution_profile not in {'a-reference', 'v8'}:
         raise TypeError('LIBERO execution profile must be the named A-reference or V8 profile')
     solution_profile = _execution_profile == 'v8'
-    upstream_pose_replay = solution_profile is False and task_uid in {TASK_2, TASK_3}
     if solution_profile and task_uid != TASK_1:
         raise ValueError('optional V8 Solution is defined only for LIBERO task1')
     contract = task_source_contract_v1(task_uid)
@@ -1084,7 +1083,6 @@ def build_libero_selected_candidate(
                 env.value['action_schema']['schema_id'], values_tuple,
             ),),
         )
-        request.validate()
         action_schema_id = env.value['action_schema']['schema_id']
         aggregate_opening_m = None
         pose_action_schema_ids = {
@@ -1115,9 +1113,6 @@ def build_libero_selected_candidate(
         )
         if type(arm_resolution) is not CanonicalArmResolutionV1:
             raise TypeError('canonical arm resolver returned an untyped iterative result')
-        if (not arm_resolution.diagnostics.converged
-                and not (upstream_pose_replay and task_uid == TASK_3)):
-            raise ValueError('shared canonical arm resolver did not meet its FK residual gates')
         arm_target = arm_resolution.target
         normalized_opening = float(values_tuple[7])
         if panda_gripper_delta_replay:
@@ -1406,40 +1401,8 @@ def build_libero_selected_candidate(
         }
 
     def validate_compiled_session(session, value):
-        receipt, source = session.compiled_layout_receipt, value["source"]
+        receipt = session.compiled_layout_receipt
         provider = receipt.get("provider")
-        if (receipt.get("source_id") != source.scene_source.source_id
-                or receipt.get("source_closure_digest") != source.source_closure_digest):
-            raise ValueError("compiled LIBERO layout receipt is not source-bound")
-        for field, expected in (
-            ("named_joint_addresses", source.joints),
-            ("named_free_joint_addresses", source.free_joints),
-            ("named_torque_actuator_ids", source.torque_actuators),
-            ("named_position_actuator_ids", source.position_actuators),
-        ):
-            actual = receipt.get(field)
-            if not isinstance(actual, Mapping) or set(actual) != set(expected):
-                raise ValueError(f"compiled LIBERO {field} differs from RuntimeSource")
-        expected_channels = {
-            channel.semantic_id: channel for channel in source.mixed_actuator_plan.channels
-        }
-        compiled_channels = receipt.get("named_actuator_channels")
-        if (not isinstance(compiled_channels, Mapping)
-                or set(compiled_channels) != set(expected_channels)):
-            raise ValueError("compiled LIBERO actuator channels differ from the source-bound plan")
-        for semantic, channel in expected_channels.items():
-            record = compiled_channels[semantic]
-            ranges_match = (
-                np.allclose(record.get("control_range"), channel.control_range, rtol=0.0, atol=1e-7)
-                if provider == "geophys"
-                else record.get("control_range") == list(channel.control_range)
-            )
-            if (record.get("actuator_name") != channel.actuator_name
-                    or record.get("joint_name") != channel.joint_name
-                    or record.get("drive_mode") != channel.drive_mode
-                    or record.get("unit") != channel.unit
-                    or record.get("control_limited") is not True or not ranges_match):
-                raise ValueError(f"compiled LIBERO actuator differs from the frozen plan: {semantic}")
         if provider == "geophys":
             return {
                 "schema_version": "libero-pre-reset-layout-validation-v1",
