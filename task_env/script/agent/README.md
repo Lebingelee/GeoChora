@@ -56,6 +56,8 @@ runtime.
 | `construction_ledger.py` | Hash-bound per-round contexts, v0 compatibility, owner-repair continuation, five-round budget and escalation |
 | `oracle_candidate.py` | Existing recorder, completion check and independent H5 inspection |
 | `judge_package.py` | Portable evidence index and pending-only verification |
+| `builtin_example_schema.py` / `harness_compiler.compile_builtin_pickcube_example` | Versioned built-in PickCube example input; delegates to the public Core UID and never creates a CandidateSpec |
+| `builtin_example_validation.py` / `builtin_example_worker.py` | Bounded fixed-seed runtime example, existing Core Recorder H5, identity/finite/T+1 readback and separate task/runtime outcome facts |
 
 Passing feasibility rows use `harness-feasibility-completion-v1`. The probe,
 construction ledger and pending Judge verifier require raw task/expert outcome,
@@ -104,10 +106,51 @@ importer contract. The tool does not invent missing upstream assets.
 
 This is COMPOSE_EXISTING on the selected canonical-v0 Panda/PickCube route;
 `ReferenceTaskBinding` remains an internal integration seam for maintainer review.
-It does not replace the public task factory or implement vNext/Isaac support.
+The strict `pick-lift-v0` candidate path is unchanged. The separate
+`harness-builtin-pickcube-example-v1` mode below composes the same public task
+factory and does not create a candidate, Oracle, or Judge package.
 Only the `pick-lift-v0` table + one box-collision object template is implemented:
 fixed z, 0.002 × 5 timebase, no extra fixtures, lift goal at most 0.105 m.
 Reach/grasp values are diagnostics; lift is the sole success predicate.
+
+### Built-in PickCube example mode
+
+The built-in mode accepts only the public UID
+`pick-cube-p16-reference-v1`, existing `r3_continuous_v1`, seeds 31/32/33,
+1000 control ticks, and the task recipe's 0.002 s × 5 timebase. The compiler
+delegates construction, reset sampling, evaluation, solution, controller and
+recording to the existing Core PickCube owners. The current CPU routes are
+MuJoCo and GeoPhys. Catalog entries for Isaac Sim, Genesis and SAPIEN are
+requested routes with `runtime_tested: false` until exact source/runtime
+execution is implemented and verified; presence in the catalog is not runtime
+admission. Example Task/Expert failure is reported separately from a runtime
+fault. It cannot enter the strict 20-seed candidate/Oracle/Judge path.
+
+Generate a fresh catalog after each Core commit, then run the three fixed seeds
+for one provider:
+
+```sh
+CORE=/absolute/path/to/GeoChora
+PY=/path/to/python-3.12-with-geochora-dependencies
+RT="$CORE/task_env/script/agent"
+OUT="$CORE/workspace/harness/pickcube-example/mujoco"
+export PYTHONPATH="$CORE/GeoPhys/src:$CORE"
+"$PY" "$RT/catalog_query.py" --core-repo "$CORE" --providers mujoco geophys \
+  --output "$OUT/catalog.json"
+"$PY" "$RT/builtin_example_validation.py" \
+  --spec "$CORE/examples/tasks/pick_cube_harness.json" \
+  --provider mujoco --catalog "$OUT/catalog.json" \
+  --working-tree-scope "$CORE/examples/tasks/pick_cube_harness_working_tree_scope.json" \
+  --output-dir "$OUT/runs"
+```
+
+Use `--provider geophys` for the other CPU route. A clean checkout can use the
+checked-in empty working-tree scope. A Goal run with one unrelated untracked
+file must supply a separate versioned scope pinning its exact path and SHA-256;
+tracked changes remain rejected. The legacy strict catalog validator still
+requires a fully clean checkout. Each example episode holds the shared native
+lock through worker process-group exit and writes a separate run receipt and
+canonical H5.
 
 A passing probe covers its declared seeds only. Preserve execution faults and
 sampling-distribution revisions for Human review. Recording/storage validity is

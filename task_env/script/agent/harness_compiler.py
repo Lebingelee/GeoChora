@@ -39,6 +39,134 @@ class CompiledTask:
             {'uid':self.artifact.task_id,'binding':self.binding,'__init__':initialize})
 
 
+@dataclass(frozen=True)
+class CompiledBuiltinPickCubeExampleV1:
+    """Harness construction receipt for the selected Core-owned PickCube task."""
+
+    spec: object
+    artifact_hash: str
+    construction_id: str
+    recipe_identity: str
+    controller_identity: str
+    solution_identity: str
+    source_revision: str
+    source_sha256: dict
+    runtime_source_id: str
+    runtime_source_sha256: str
+    working_tree_scope: dict
+    repo_dirty: bool
+
+    def make_env(self):
+        # Keep construction on the public Core factory; Harness does not own a
+        # parallel task factory or binding implementation.
+        from task_env import make_env
+        return make_env(self.spec.task_uid, config={
+            'provider': self.spec.provider,
+            'backend': self.spec.backend,
+            'horizon': self.spec.horizon_control_ticks,
+            'controller_profile': self.spec.controller_profile,
+        })
+
+
+def _example_working_tree_context(core_repo, scope):
+    """Require tracked-clean Core and only the exact byte-pinned untracked set."""
+    import hashlib
+    import subprocess
+    from pathlib import Path
+
+    repo = Path(core_repo).resolve()
+    porcelain = subprocess.check_output(
+        ['git', '-C', str(repo), 'status', '--porcelain=v1', '--untracked-files=all'],
+        text=True,
+    )
+    rows = []
+    for line in porcelain.splitlines():
+        if not line.startswith('?? '):
+            raise ValueError(f'built-in example requires a tracked-clean Core checkout: {line!r}')
+        rows.append(line[3:])
+    actual_paths = sorted(rows)
+    expected = dict(scope.expected_untracked)
+    if actual_paths != sorted(expected):
+        raise ValueError(f'untracked paths differ from the versioned example allowlist: {actual_paths!r}')
+    measured = []
+    for relative in actual_paths:
+        path = (repo / relative).resolve(strict=True)
+        if not path.is_relative_to(repo):
+            raise ValueError('expected untracked path escapes the Core checkout')
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != expected[relative]:
+            raise ValueError(f'expected untracked file hash changed: {relative}')
+        measured.append({'path': relative, 'sha256': digest})
+    return {
+        'schema_version': scope.schema_version,
+        'tracked_clean': True,
+        'repo_dirty': bool(porcelain),
+        'expected_untracked': measured,
+    }
+
+
+def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
+    """Compile the F06 versioned example without touching strict CandidateSpec.
+
+    The current Core PickCube owner binds MJCF sources to MuJoCo and GeoPhys.
+    Isaac is deliberately not treated as an available generic provider; it is
+    admitted here only after the exact F06 source/profile consumer is added.
+    """
+    from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
+    from catalog_query import core_context
+
+    if type(spec) is not BuiltinPickCubeExampleV1:
+        raise TypeError('compile_builtin_pickcube_example requires the exact versioned F06 example spec')
+    if type(working_tree_scope) is not ExampleWorkingTreeScopeV1:
+        raise TypeError('built-in example requires an exact versioned working-tree scope')
+    if catalog.get('schema_version') != 'harness-catalog-v0':
+        raise ValueError('built-in example requires the current Harness catalog schema')
+    context = core_context(catalog['core_repo'])
+    if context['core_repo'] != str(Path(catalog['core_repo']).resolve()):
+        raise ValueError('catalog Core root is not canonical')
+    if catalog.get('core_commit') != context['core_commit']:
+        raise ValueError('catalog is stale for the currently imported Core commit')
+    tree = _example_working_tree_context(context['core_repo'], working_tree_scope)
+    actual_dirty = bool(__import__('subprocess').check_output(
+        ['git', '-C', context['core_repo'], 'status', '--porcelain'], text=True,
+    ))
+    if bool(catalog.get('core_dirty')) != actual_dirty:
+        raise ValueError('catalog repo_dirty fact differs from the measured checkout')
+    record = catalog.get('builtin_examples', {}).get('pickcube-harness-example-v1')
+    if not isinstance(record, dict) or record.get('task_uid') != spec.task_uid:
+        raise ValueError('catalog does not expose the exact built-in PickCube example')
+    if spec.provider not in ('mujoco', 'geophys'):
+        raise ValueError(
+            f'{spec.provider} F06 runtime route is not yet admitted by the built-in Core PickCube owner'
+        )
+    if spec.task_uid not in catalog.get('env_uids', ()):
+        raise ValueError('selected public PickCube UID is absent from the current Core registry')
+    provider_row = catalog.get('providers', {}).get(spec.provider)
+    if not isinstance(provider_row, dict) or provider_row.get('available') is not True:
+        raise ValueError(f'{spec.provider} provider manifest is unavailable in this catalog')
+    from task_env.tasks.pick_cube.task import build_reference
+    value = build_reference(backend='cpu', controller_profile=spec.controller_profile)
+    artifact = value['artifact']
+    if artifact.task_id != 'pick-cube-v1' or artifact.timebase.physics_dt != spec.physics_dt_s \
+            or artifact.timebase.control_substeps != spec.control_substeps:
+        raise ValueError('built-in PickCube recipe or timebase differs from the F06 example contract')
+    source = value['source']
+    return CompiledBuiltinPickCubeExampleV1(
+        spec=spec,
+        artifact_hash=artifact.identity_hash,
+        construction_id=value['construction_id'],
+        recipe_identity=value['recipe_identity'],
+        controller_identity=value['controller'].identity,
+        solution_identity=value['solution_identity'],
+        source_revision=value['source_revision'],
+        source_sha256=dict(value['source_sha256']),
+        runtime_source_id=source.scene_source.source_id,
+        runtime_source_sha256=hashlib.sha256(source.scene_source.xml.encode()).hexdigest(),
+        working_tree_scope=tree,
+        repo_dirty=actual_dirty,
+    )
+
+
 def evaluate_lift(state, semantics):
     """Task-local lift predicate over public canonical state, not Core evaluator override.
 

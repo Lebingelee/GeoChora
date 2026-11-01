@@ -153,6 +153,32 @@ def build_catalog(core_repo, asset_bundle=None, providers=None, *, asset_deliver
         'success_config':{'lift_height_m':.10,'reach_distance_m':.09,'gripper_closed_opening_m':.045},
         'timebase_config':{'physics_dt':.002,'control_substeps':5},
         'required_capabilities':sorted(base.required_capabilities.names),'horizon':6000}
+    # The selected PickCube task is a built-in Core owner, not a synthetic
+    # external asset. Keep its example contract separate from the strict
+    # pick-lift-v0 CandidateSpec / 20-seed Oracle path.
+    from task_env.tasks.pick_cube.task import REFERENCE_ENV_ID
+    result['builtin_examples'] = {
+        'pickcube-harness-example-v1': {
+            'schema_version': 'harness-builtin-example-catalog-v1',
+            'task_uid': REFERENCE_ENV_ID,
+            'task_owner': 'task_env/tasks/pick_cube/',
+            'construction': 'public_make_env_to_selected_reference_env',
+            'solution_owner': 'task_env/tasks/pick_cube/solution.py',
+            'controller_profile': 'r3_continuous_v1',
+            'timebase': {'physics_dt_s': 0.002, 'control_substeps': 5},
+            'default_horizon_control_ticks': 1000,
+            'seed_set': [31, 32, 33],
+            'strict_candidate_oracle_judge_unchanged': True,
+            'provider_routes': {
+                'mujoco': {'backend': 'cpu', 'device': 'cpu', 'runtime_tested': False},
+                'geophys': {'backend': 'cpu', 'device': 'cpu', 'runtime_tested': False},
+                'isaacsim': {'backend': 'cuda', 'device': 'cuda:0', 'runtime_tested': False},
+                'genesis': {'backend': 'cpu', 'device': 'cpu', 'optional': True, 'runtime_tested': False},
+                'sapien': {'backend': 'cpu', 'device': 'cpu', 'optional': True, 'runtime_tested': False},
+            },
+            'qualification': False,
+        },
+    }
     if asset_bundle is not None:attach_asset_bundle(result,asset_bundle)
     for delivery_path in asset_deliveries or ():
         attach_asset_delivery(
