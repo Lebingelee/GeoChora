@@ -21,6 +21,19 @@ ISAAC_ROOT = CORE / "workspace/environments/isaacsim-6.2.0"
 CORE_SITE = Path("/home/lly/miniconda3/envs/geochora/lib/python3.12/site-packages")
 
 
+def _python_dependency_setup() -> None:
+    if Path(sys.executable).resolve() != (ISAAC_ROOT / "bin/python").resolve():
+        raise RuntimeError("DG04 formal N2 must use the pinned Isaac Sim 6.2 interpreter")
+    if os.environ.get("PYTHONPATH"):
+        raise RuntimeError("DG04 formal N2 requires inherited PYTHONPATH to be unset")
+    if str(CORE) not in sys.path:
+        sys.path.insert(0, str(CORE))
+    if str(CORE_SITE) not in sys.path:
+        # Isaac site-packages stays first; Core's existing environment supplies
+        # pure-Python dependencies such as Gymnasium and HDF5.
+        sys.path.append(str(CORE_SITE))
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -370,6 +383,7 @@ def main() -> int:
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--counter", type=Path, required=True)
     args = parser.parse_args()
+    _python_dependency_setup()
     from task_env.diagnostics.tasks.f05_dg04_native_mimic_core_n1 import _terminate_worker
 
     try:
