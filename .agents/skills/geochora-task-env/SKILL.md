@@ -181,6 +181,32 @@ H5/witness/receipt durability, and preserves the actual result code. Do not desc
 successful natural interpreter/Kit teardown. Preserve attempt003's five `-11` exits and all other
 historical failures; at F04 closeout, F05 had not yet started. See the [attempt004 record](../../../docs/module/task_env/goal/Phase_II_01/10_Checkpoint_Recovery_and_Provider_Asset_Harness_Plan.md#f04-attempt004-controlled-exit-two-source-closure).
 
+### Isaac Kit worker `-11` exit recovery (F04 attempt004 precedent)
+
+On POSIX, parent-observed return code `-11` means the worker died from signal 11. Read the parent
+supervisor receipt together with the producer's `normal_close` and App-close receipts: `normal_close`
+and a successful independent H5 read establish that the task and files completed, but they do not
+make the process exit successful. First rule out a supervisor timeout, TERM/KILL, incomplete process
+group shutdown, and a held native lock. Keep the raw `-11` and classify the worker as failed unless a
+separately verified controlled terminal boundary was part of that run.
+
+F04 attempt003 had five `-11` exits. Attempt004 reused the earlier F01 terminal-worker pattern after
+explicit public `SimulationApp.close()`: retain the closed App wrapper in the process owner, finish
+and durably flush/fsync H5, witness and aggregate receipts, then flush standard streams and call
+`os._exit(int(exit_code))` only at the outermost isolated worker boundary. Derive `exit_code` from
+the real application result, so task, App-close, finalization or receipt-write failures remain
+nonzero; never unconditionally map shutdown to zero. The parent must observe that code, worker-group
+exit, released lock and successful independent cold reads. This avoids a failing CPython/Kit natural
+finalization path; it does not repair or qualify natural interpreter/Kit teardown. F04's prior
+investigation did not obtain a native stack, so do not claim a specific SDK destructor as proven.
+
+Keep `os._exit` out of `Env.close()`, `Session.close()`, adapter close and the reusable App owner:
+those owners must return control to the calling process. Before a native rerun, exercise the terminal
+boundary in provider-free child-process scenarios for success, App-close failure, worker/finalizer
+failure and receipt-write failure; verify exact parent-observed exit codes and parent survival. A
+past F04 acceptance does not retroactively pass current F06/F04 runs that reported `-11`; preserve
+those failures and require a budget that explicitly covers any rerun.
+
 R01c adds `task_env.assembly.project_logical_assembly_source(root, scene,
 child_assemblies, source_receipts=None)`. It always reruns the R01b resolver
 from current inputs, then associates each expanded leaf with one existing
