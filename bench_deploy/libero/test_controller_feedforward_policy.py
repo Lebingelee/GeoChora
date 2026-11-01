@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -14,6 +15,13 @@ from bench_deploy.libero.source_gravity import (
     SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
     SOURCE_OPERATIONAL_SPACE_PROFILE_V2,
 )
+from bench_deploy.libero.selected_candidate import (
+    PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+    PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
+    _make_candidate_controller,
+    _panda_gripper_aggregate_opening_m,
+)
+from bench_deploy.libero.task_contracts import TASK_3
 
 
 def _assert_identity_hash(controller):
@@ -83,3 +91,54 @@ def test_v1_and_v2_source_state_profiles_remain_separate():
     assert LiberoMixedControllerV4()._source_state_contract() == (
         "libero-source-operational-space-state-v1", SOURCE_OPERATIONAL_SPACE_PROFILE_V1,
     )
+
+
+def test_task23_upstream_replay_uses_reference_v6_osc_without_planner_twist():
+    controller = _make_candidate_controller(
+        solution_rim_profile=False,
+        solution_profile=False,
+        upstream_pose_replay=True,
+        task_uid=TASK_3,
+        arm_resolver_identity=None,
+    )
+    initial_joint_position = {f"joint{i}": i / 10 for i in range(1, 8)}
+    controller.reset(SimpleNamespace(
+        joint_position=initial_joint_position,
+        joint_velocity={name: 0.0 for name in initial_joint_position},
+        control_step=0,
+        simulation_time=0.0,
+    ))
+    identity = controller.identity_mapping()
+    reference, provenance = controller._nullspace_reference(
+        np.zeros(7), np.ones(7),
+    )
+
+    assert isinstance(controller, LiberoMixedControllerV6)
+    assert not isinstance(controller, LiberoMixedControllerV7)
+    assert identity["algorithm"] == "robosuite_osc_pose_uncoupled_lambda_and_qfrc_bias_v1"
+    assert identity["gravity_feedforward_source"] == "qfrc_bias_arm_Nm"
+    assert "desired_twist_source" not in identity
+    assert identity["control_frequency_hz"] == 20
+    assert identity["physics_dt_s"] == 0.002
+    assert identity["control_substeps"] == 25
+    assert identity["hold_policy"] == "torque_recomputed_each_physics_substep_v1"
+    assert provenance == "reset_initial_joint_v1"
+    assert np.array_equal(reference, np.asarray(list(initial_joint_position.values())))
+    assert controller._allow_unconverged_arm_resolution is True
+    _assert_identity_hash(controller)
+
+
+def test_panda_gripper_replay_v1_preserves_exact_endpoints_and_v2_is_opt_in():
+    assert PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID == "robosuite-panda-gripper-delta-v1"
+    assert PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID == (
+        "robosuite-panda-gripper-delta-endpoint-guard-v2"
+    )
+    assert PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID != PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID
+    assert _panda_gripper_aggregate_opening_m(-1.0) == 0.0
+    assert _panda_gripper_aggregate_opening_m(1.0) == 0.08
+    assert _panda_gripper_aggregate_opening_m(
+        -1.0, PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
+    ) == 0.0005
+    assert _panda_gripper_aggregate_opening_m(
+        1.0, PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
+    ) == 0.0795

@@ -221,16 +221,22 @@ class _GeoPhysSession(_SessionValues):
         positions = np.array(initial.qpos, copy=True)
         velocities = np.zeros_like(initial.qvel)
         targets = np.array(initial.ctrl, copy=True)
+        # ResetSample v0 deliberately has no velocity or fixture-pose fields:
+        # its contract is zero velocities and no sampled fixture transform.
+        # ResetSampleV1 is validated above and supplies these fields explicitly.
+        joint_velocities = getattr(sample, 'joint_velocity', {})
+        free_joint_velocities = getattr(sample, 'free_joint_velocity', {})
+        fixture_pose_world = getattr(sample, 'fixture_pose_world', {})
         if self._mixed_actuator_plan is not None:
             targets[:] = 0.0
         for name, value in sample.joint_position.items():
             positions[self._joint_addresses[name][0]] = value
-            velocities[self._joint_addresses[name][1]] = sample.joint_velocity[name]
+            velocities[self._joint_addresses[name][1]] = joint_velocities.get(name, 0.0)
         for name, requested in sample.poses_world.items():
             address = self._free_addresses[name][0]
             positions[address:address+7] = (*requested.position, *requested.quaternion_wxyz)
             dof = self._free_addresses[name][1]
-            velocities[dof:dof + 6] = sample.free_joint_velocity[name]
+            velocities[dof:dof + 6] = free_joint_velocities.get(name, (0.0,) * 6)
         for name, actuator in self._target_actuators.items():
             targets[actuator] = sample.joint_position[name]
         for name, actuator in self._position_actuators.items():
@@ -247,7 +253,7 @@ class _GeoPhysSession(_SessionValues):
                     np.asarray(value.position, dtype=np.float32),
                     np.asarray(value.quaternion_wxyz, dtype=np.float32),
                 )
-                for name, value in sample.fixture_pose_world.items()
+                for name, value in fixture_pose_world.items()
             })
         if force_measurement is not None:
             if not force_measurement.valid or force_measurement.phase != 'reset_forward':

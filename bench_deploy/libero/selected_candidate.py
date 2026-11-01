@@ -56,10 +56,19 @@ from .model_profile import (
 
 PROFILE_ID = 'libero-spatial-bowl-to-plate-mixed-v1'
 CONTROLLER_PROFILE_ID = 'libero-spatial-bowl-to-plate-joint-space-pd-v6'
-PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID = 'robosuite-panda-gripper-delta-endpoint-guard-v2'
+PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID = 'robosuite-panda-gripper-delta-v1'
+PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID = 'robosuite-panda-gripper-delta-endpoint-guard-v2'
+PANDA_GRIPPER_DELTA_PROFILE_IDS = frozenset({
+    PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+    PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID,
+})
 PANDA_GRIPPER_DELTA_ACTION_SCHEMA_ID = 'libero-world-pose-wxyz-panda-gripper-delta-v1'
 _PANDA_GRIPPER_DELTA_PER_SUBSTEP = 0.01
 _PANDA_GRIPPER_ENDPOINT_MARGIN_M = 5.0e-4
+
+
+def _is_panda_gripper_delta_profile(profile_id) -> bool:
+    return profile_id in PANDA_GRIPPER_DELTA_PROFILE_IDS
 
 
 def _controller_hold_policy(controller):
@@ -67,6 +76,29 @@ def _controller_hold_policy(controller):
     if operational is not None:
         return operational.hold_policy
     return controller.config.hold_policy
+
+
+def _make_candidate_controller(
+    *, solution_rim_profile: bool, solution_profile: bool,
+    upstream_pose_replay: bool, task_uid: str,
+    arm_resolver_identity: str | None,
+    nullspace_reference_joint_position_rad=None,
+):
+    """Choose the existing controller owned by the selected task profile."""
+    if solution_rim_profile:
+        return LiberoMixedControllerV7(arm_resolver_identity=arm_resolver_identity)
+    if upstream_pose_replay:
+        # Task 3's auxiliary IK seed may remain nonconverged and is logged per action.
+        return LiberoMixedControllerV6(
+            arm_resolver_identity=arm_resolver_identity,
+            allow_unconverged_arm_resolution=(task_uid == TASK_3),
+        )
+    if solution_profile:
+        return LiberoMixedControllerV6(
+            arm_resolver_identity=arm_resolver_identity,
+            nullspace_reference_joint_position_rad=nullspace_reference_joint_position_rad,
+        )
+    return LiberoMixedControllerV1()
 
 
 def _panda_gripper_action_after_substep(current_action: float, action: float) -> float:
@@ -81,15 +113,21 @@ def _panda_gripper_action_after_substep(current_action: float, action: float) ->
     ))
 
 
-def _panda_gripper_aggregate_opening_m(current_action: float) -> float:
-    """Map PandaGripper state to opening with a small joint-limit endpoint margin."""
+def _panda_gripper_aggregate_opening_m(
+    current_action: float,
+    profile_id: str = PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+) -> float:
+    """Map robosuite PandaGripper state to its versioned opening profile."""
     current_action = float(current_action)
     if not np.isfinite(current_action) or not -1.0 <= current_action <= 1.0:
         raise ValueError('PandaGripper current_action must lie in [-1,1]')
+    if profile_id not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
+        raise ValueError('unsupported PandaGripper delta replay profile')
     opening = 0.04 * (1.0 + current_action)
+    margin = (_PANDA_GRIPPER_ENDPOINT_MARGIN_M
+              if profile_id == PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID else 0.0)
     return float(np.clip(
-        opening, _PANDA_GRIPPER_ENDPOINT_MARGIN_M,
-        0.08 - _PANDA_GRIPPER_ENDPOINT_MARGIN_M,
+        opening, margin, 0.08 - margin,
     ))
 
 
@@ -416,6 +454,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
                         task_uid: str = TASK_1,
                         upstream_pose_replay: bool = False,
                         panda_gripper_delta_replay: bool = False,
+                        panda_gripper_delta_replay_profile_id: str | None = None,
                         official_nullspace_reference_joint_position_rad=None,
                         official_compiled_mujoco_profile_v1=None):
     solution_v6 = solution_profile == 'v6'
@@ -429,6 +468,13 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
         raise TypeError('upstream pose replay selector must be bool')
     if upstream_pose_replay and (task_uid == TASK_1 or solution_profile):
         raise ValueError('upstream task2/3 pose replay is a diagnostic profile separate from task1 Solution')
+    if panda_gripper_delta_replay:
+        if panda_gripper_delta_replay_profile_id is None:
+            panda_gripper_delta_replay_profile_id = PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+        if panda_gripper_delta_replay_profile_id not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
+            raise ValueError('unsupported PandaGripper delta replay profile')
+    elif panda_gripper_delta_replay_profile_id is not None:
+        raise ValueError('PandaGripper delta profile identity requires delta replay to be enabled')
     official_nullspace_reference = None
     if official_nullspace_reference_joint_position_rad is not None:
         if not panda_gripper_delta_replay:
@@ -645,24 +691,14 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
             orientation_tolerance_rad=arm_resolver_orientation_tolerance_rad,
         )
     )
-    if solution_rim_profile:
-        controller = LiberoMixedControllerV7(
-            arm_resolver_identity=arm_resolver_identity,
-        )
-    elif upstream_pose_replay:
-        # Task 3's absolute world-pose OSC uses the reset nullspace reference;
-        # its auxiliary IK seed may remain nonconverged and is logged per action.
-        controller = LiberoMixedControllerV7(
-            arm_resolver_identity=arm_resolver_identity,
-            allow_unconverged_arm_resolution=(task_uid == TASK_3),
-        )
-    elif solution_profile:
-        controller = LiberoMixedControllerV6(
-            arm_resolver_identity=arm_resolver_identity,
-            nullspace_reference_joint_position_rad=official_nullspace_reference,
-        )
-    else:
-        controller = LiberoMixedControllerV1()
+    controller = _make_candidate_controller(
+        solution_rim_profile=solution_rim_profile,
+        solution_profile=solution_profile,
+        upstream_pose_replay=upstream_pose_replay,
+        task_uid=task_uid,
+        arm_resolver_identity=arm_resolver_identity,
+        nullspace_reference_joint_position_rad=official_nullspace_reference,
+    )
     expected_controller_profile = (
         (LiberoMixedControllerV7.profile_id if solution_rim_profile
          else (
@@ -670,7 +706,7 @@ def _build_fixed_source(*, xml_path: Path, xml_bytes_override: bytes | None,
              if official_nullspace_reference is not None
              else LiberoMixedControllerV6.profile_id
         )) if solution_profile else
-        LiberoMixedControllerV7.profile_id if upstream_pose_replay else CONTROLLER_PROFILE_ID
+        LiberoMixedControllerV6.profile_id if upstream_pose_replay else CONTROLLER_PROFILE_ID
     )
     if controller.profile_id != expected_controller_profile:
         raise ValueError('LIBERO task-local controller profile changed')
@@ -867,6 +903,7 @@ def build_libero_selected_candidate(
     _solution_profile: bool = False,
     _upstream_pose_replay: bool = False,
     _panda_gripper_delta_replay: bool = False,
+    _panda_gripper_delta_profile_id: str | None = None,
     _official_nullspace_reference_joint_position_rad=None,
     _official_compiled_mujoco_profile_v1=None,
 ):
@@ -888,6 +925,13 @@ def build_libero_selected_candidate(
         raise TypeError('PandaGripper delta replay selector must be bool')
     if _panda_gripper_delta_replay and not pose_action_profile:
         raise ValueError('PandaGripper delta replay requires a task-local pose-action route')
+    if _panda_gripper_delta_replay:
+        if _panda_gripper_delta_profile_id is None:
+            _panda_gripper_delta_profile_id = PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+        if _panda_gripper_delta_profile_id not in PANDA_GRIPPER_DELTA_PROFILE_IDS:
+            raise ValueError('unsupported PandaGripper delta replay profile')
+    elif _panda_gripper_delta_profile_id is not None:
+        raise ValueError('PandaGripper delta profile identity requires delta replay to be enabled')
     if (_official_nullspace_reference_joint_position_rad is not None
             and not _panda_gripper_delta_replay):
         raise ValueError('official robosuite nullspace reference is restricted to the frozen PandaGripper replay profile')
@@ -1042,6 +1086,7 @@ def build_libero_selected_candidate(
                 task_uid=task_uid,
                 upstream_pose_replay=_upstream_pose_replay,
                 panda_gripper_delta_replay=_panda_gripper_delta_replay,
+                panda_gripper_delta_replay_profile_id=_panda_gripper_delta_profile_id,
                 official_nullspace_reference_joint_position_rad=(
                     _official_nullspace_reference_joint_position_rad
                 ),
@@ -1055,22 +1100,16 @@ def build_libero_selected_candidate(
                 del value_cache[provider]
                 raise ValueError('caller composed MJCF SHA differs from the frozen composition plan')
         value = dict(value_cache[provider])
-        if _upstream_pose_replay or _solution_profile in ('v6', 'v7', 'v8'):
-            value['controller'] = LiberoMixedControllerV7(
-                arm_resolver_identity=value['arm_resolver_identity'],
-                allow_unconverged_arm_resolution=(
-                    _upstream_pose_replay and task_uid == TASK_3
-                ),
-            )
-        elif _solution_profile:
-            value['controller'] = LiberoMixedControllerV6(
-                arm_resolver_identity=value['arm_resolver_identity'],
-                nullspace_reference_joint_position_rad=(
-                    value['official_nullspace_reference_joint_position_rad']
-                ),
-            )
-        else:
-            value['controller'] = LiberoMixedControllerV1()
+        value['controller'] = _make_candidate_controller(
+            solution_rim_profile=_solution_profile in ('v6', 'v7', 'v8'),
+            solution_profile=bool(_solution_profile),
+            upstream_pose_replay=_upstream_pose_replay,
+            task_uid=task_uid,
+            arm_resolver_identity=value['arm_resolver_identity'],
+            nullspace_reference_joint_position_rad=(
+                value['official_nullspace_reference_joint_position_rad']
+            ),
+        )
         value['controller'].plan_identity_hash = value['source'].mixed_actuator_plan.identity_hash
         value['reset_realizations'] = reset_receipts
         if pose_action_profile:
@@ -1085,7 +1124,7 @@ def build_libero_selected_candidate(
                 )
         if pose_action_profile:
             value['panda_gripper_delta_replay_profile_id'] = (
-                PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+                _panda_gripper_delta_profile_id
                 if _panda_gripper_delta_replay else None
             )
             if _panda_gripper_delta_replay:
@@ -1112,7 +1151,9 @@ def build_libero_selected_candidate(
                 'dimension': len(components), 'components': components,
                 'gripper_profile_id': value['panda_gripper_delta_replay_profile_id'],
                 'gripper_endpoint_margin_m': (
-                    _PANDA_GRIPPER_ENDPOINT_MARGIN_M if _panda_gripper_delta_replay else None
+                    (_PANDA_GRIPPER_ENDPOINT_MARGIN_M
+                     if _panda_gripper_delta_profile_id == PANDA_GRIPPER_ENDPOINT_GUARD_PROFILE_ID
+                     else 0.0) if _panda_gripper_delta_replay else None
                 ),
                 'arm_resolver_orientation_tolerance_rad': (
                     value['arm_resolver_orientation_tolerance_rad']
@@ -1291,7 +1332,8 @@ def build_libero_selected_candidate(
             arm_target = arm_resolution.target
             normalized_opening = float(values_tuple[7])
             if panda_gripper_delta_replay:
-                if env.value.get('panda_gripper_delta_replay_profile_id') != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+                gripper_profile_id = env.value.get('panda_gripper_delta_replay_profile_id')
+                if not _is_panda_gripper_delta_profile(gripper_profile_id):
                     raise RuntimeError('PandaGripper delta action schema has no matching task adapter')
                 gripper_state = env.value.get('panda_gripper_delta_replay_state')
                 if (not isinstance(gripper_state, dict)
@@ -1311,10 +1353,13 @@ def build_libero_selected_candidate(
                     )
                     action_trace.append(final_gripper_action)
                     opening_trace.append(
-                        _panda_gripper_aggregate_opening_m(final_gripper_action)
+                        _panda_gripper_aggregate_opening_m(
+                            final_gripper_action, gripper_profile_id,
+                        )
                     )
                 aggregate_opening_m = opening_trace[0]
                 panda_gripper_context = {
+                    'profile_id': gripper_profile_id,
                     'action_scalar': normalized_opening,
                     'current_action_before': current_gripper_action,
                     'action_trace_after_substeps': tuple(action_trace[1:]),
@@ -1322,7 +1367,7 @@ def build_libero_selected_candidate(
                     'current_action_after': final_gripper_action,
                 }
                 canonical_gripper_fields = {
-                    'gripper_profile_id': PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+                    'gripper_profile_id': gripper_profile_id,
                     'gripper_action_scalar': normalized_opening,
                     'gripper_current_action_before': current_gripper_action,
                     'gripper_current_action_after_first_substep': first_gripper_action,
@@ -1391,7 +1436,7 @@ def build_libero_selected_candidate(
                 canonical_action['controller_receipt'] = {
                     **dict(canonical_action['controller_receipt']),
                     'panda_gripper_action_v1': {
-                        'profile_id': PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+                        'profile_id': panda_gripper_context['profile_id'],
                         'substep_index': 0,
                         'current_action': first_action,
                         'aggregate_opening_m': aggregate_opening_m,
@@ -1469,7 +1514,7 @@ def build_libero_selected_candidate(
             receipt = {
                 **dict(receipt),
                 'panda_gripper_action_v1': {
-                    'profile_id': PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID,
+                    'profile_id': panda_gripper_context['profile_id'],
                     'substep_index': substep_index,
                     'current_action': current_action,
                     'aggregate_opening_m': opening_m,
@@ -1566,7 +1611,9 @@ def build_libero_selected_candidate(
     def observe_mixed_control(env, state):
         result = (observe_selected_reference_v1(env, state) if task_uid == TASK_1
                   else observe_task23_reference_v1(env, state))
-        if env.value.get('panda_gripper_delta_replay_profile_id') == PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+        if _is_panda_gripper_delta_profile(
+            env.value.get('panda_gripper_delta_replay_profile_id'),
+        ):
             gripper_state = env.value['panda_gripper_delta_replay_state']
             if state.control_step == 0:
                 gripper_state.update({
@@ -1768,7 +1815,9 @@ def build_libero_selected_candidate(
             raise ValueError('compiled LIBERO layout receipt is not source-bound')
         compiled_options = getattr(session, 'compiled_model_options_receipt_v1', None)
         expected_profile = value.get('official_compiled_mujoco_profile_v1')
-        if value.get('panda_gripper_delta_replay_profile_id') == PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+        if _is_panda_gripper_delta_profile(
+            value.get('panda_gripper_delta_replay_profile_id'),
+        ):
             if not isinstance(compiled_options, Mapping):
                 raise ValueError('PandaGripper replay requires the public compiled MuJoCo options receipt')
             if (compiled_options.get('schema_version') != 'compiled-model-options-v1'
@@ -1821,7 +1870,9 @@ def build_libero_selected_candidate(
         }
 
     def validate_post_reset_compiled_session(session, value):
-        if value.get('panda_gripper_delta_replay_profile_id') != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID:
+        if not _is_panda_gripper_delta_profile(
+            value.get('panda_gripper_delta_replay_profile_id'),
+        ):
             return None
         if session.compiled_layout_receipt.get('provider') == 'geophys':
             return {
@@ -2020,14 +2071,16 @@ def build_libero_solution_candidate(
         raise ValueError('LIBERO task Solution horizon must be in [1,1000]')
     if solution_version not in {'v5', 'v6', 'v7', 'v8'}:
         raise ValueError('LIBERO task Solution version must be v5, v6, v7 or v8')
-    if gripper_action_profile not in (None, PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID):
+    if gripper_action_profile is not None and not _is_panda_gripper_delta_profile(
+        gripper_action_profile,
+    ):
         raise ValueError('unsupported LIBERO task gripper action profile')
     if (official_controller_initial_joint_reference_rad is not None
-            and (gripper_action_profile != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+            and (not _is_panda_gripper_delta_profile(gripper_action_profile)
                  or solution_version != 'v5')):
         raise ValueError('official robosuite nullspace reference is available only for the V5 PandaGripper replay profile')
     if (official_compiled_mujoco_profile_v1 is not None
-            and (gripper_action_profile != PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID
+            and (not _is_panda_gripper_delta_profile(gripper_action_profile)
                  or solution_version != 'v5')):
         raise ValueError('official compiled MuJoCo profile is available only for the V5 PandaGripper replay profile')
     return build_libero_selected_candidate(
@@ -2035,7 +2088,8 @@ def build_libero_solution_candidate(
         composition_plan_path=composition_plan_path, install_root=install_root,
         init_path=init_path, horizon=horizon, provider=provider,
         _solution_profile=solution_version if solution_version in {'v6', 'v7', 'v8'} else True,
-        _panda_gripper_delta_replay=(gripper_action_profile == PANDA_GRIPPER_DELTA_REPLAY_PROFILE_ID),
+        _panda_gripper_delta_replay=_is_panda_gripper_delta_profile(gripper_action_profile),
+        _panda_gripper_delta_profile_id=gripper_action_profile,
         _official_nullspace_reference_joint_position_rad=(
             official_controller_initial_joint_reference_rad
         ),

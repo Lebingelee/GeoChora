@@ -949,12 +949,14 @@ class LiberoMixedControllerV6(LiberoMixedControllerV4):
 
     def __init__(self, operational_config: LiberoOperationalSpaceConfigV2 | None = None,
                  gravity_bias_model=None, *, arm_resolver_identity: str | None = None,
-                 nullspace_reference_joint_position_rad=None):
+                 nullspace_reference_joint_position_rad=None,
+                 allow_unconverged_arm_resolution: bool = False):
         super().__init__(
             operational_config=operational_config,
             gravity_bias_model=gravity_bias_model,
             arm_resolver_identity=arm_resolver_identity,
             nullspace_reference_joint_position_rad=nullspace_reference_joint_position_rad,
+            allow_unconverged_arm_resolution=allow_unconverged_arm_resolution,
         )
         self.profile_id = (
             self.OFFICIAL_REFERENCE_PROFILE_ID
