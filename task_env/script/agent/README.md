@@ -137,12 +137,15 @@ and the task recipe's 0.002 s × 5 timebase. The checked-in example defaults to
 1000 control ticks; a versioned run spec may choose a horizon from 1 through
 1000 for a bounded smoke without changing that default. The compiler
 delegates construction, reset sampling, evaluation, solution, controller and
-recording to the existing Core PickCube owners. The current CPU routes are
-MuJoCo and GeoPhys. Catalog entries for Isaac Sim, Genesis and SAPIEN are
-requested routes with `runtime_tested: false` until exact source/runtime
-execution is implemented and verified; presence in the catalog is not runtime
-admission. Example Task/Expert failure is reported separately from a runtime
-fault. It cannot enter the strict 20-seed candidate/Oracle/Judge path.
+recording to the existing Core PickCube owners. The exact F06 built-in example
+has bounded runtime evidence across MuJoCo CPU, GeoPhys CPU and Isaac Sim GPU
+PhysX: 9/9 runs were runtime-valid with independent cold reads, while 0/9
+solved the Task. This is limited to the frozen source, example, controller and
+provider profiles; it does not grant generic provider admission or
+Qualification. Optional Genesis/SAPIEN routes remain unverified, and catalog
+presence alone is not runtime admission. Example Task/Expert failure is
+reported separately from a runtime fault. This example cannot enter the strict
+20-seed candidate/Oracle/Judge path.
 
 For the F06 Isaac USD source rebuild, invoke the source file directly so
 `--help` does not import Core or start Isaac. The build runs under Isaac's
