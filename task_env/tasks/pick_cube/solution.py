@@ -27,6 +27,9 @@ from ...objects.pick_cube import CUBE_HALF_SIZE
 
 
 _ABOVE_CLEARANCE = 0.12
+# Keep the approach above the existing hover pose while traversing laterally.
+# The final hover/grasp poses and task geometry remain unchanged.
+_APPROACH_CLEARANCE = 0.10
 # Nominal EE-site clearance above the cube top for this PickCube expert.
 # The current hand/knuckle proxy needs about 17.6 mm in a downward grasp;
 # 20 mm leaves a small geometry margin, not contact-precision qualification.
@@ -324,14 +327,42 @@ class PickCubeSolution:
     def _plan_move_above(self, observation, info: Mapping[str, object]) -> SegmentPlan:
         del info
         start = self._ee_pose(observation)
+        cube = self._cube_position(observation)
         target = start.copy()
-        target[:3] = self._cube_position(observation) + np.array(
+        target[:3] = cube + np.array(
             [0.0, 0.0, CUBE_HALF_SIZE + _ABOVE_CLEARANCE], dtype=np.float32
         )
-        return SegmentPlan(
-            actions=self._planner.plan_to_pose(
-                current_pose=start, goal_pose=target, gripper=1.0, settle_steps=0
+        clear = start.copy()
+        clear[2] = max(
+            float(start[2]), float(target[2]) + _APPROACH_CLEARANCE,
+        )
+        transit = clear.copy()
+        transit[:2] = target[:2]
+        action_segments = (
+            self._planner.plan_translation_only(
+                current_pose=start,
+                target_position=clear[:3],
+                gripper=1.0,
+                settle_steps=0,
             ),
+            self._planner.plan_translation_only(
+                current_pose=clear,
+                target_position=transit[:3],
+                gripper=1.0,
+                settle_steps=0,
+            ),
+            self._planner.plan_translation_only(
+                current_pose=transit,
+                target_position=target[:3],
+                gripper=1.0,
+                settle_steps=0,
+            ),
+        )
+        actions = np.concatenate(
+            [segment for segment in action_segments if len(segment)], axis=0,
+        )
+        return SegmentPlan(
+            actions=actions,
             target_pose=target,
         )
 
