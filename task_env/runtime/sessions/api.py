@@ -481,6 +481,23 @@ def _session_admission_input_route(input_v1) -> str | None:
     raise TypeError('Session admission requires one exact supported task runtime input')
 
 
+def _close_failed_native_materialization(
+        error, native_io, *, io_label, runtime_owner_label=None):
+    if native_io is None:
+        return
+    cleanup_steps = [('close', io_label)]
+    if runtime_owner_label is not None:
+        cleanup_steps.append(('close_runtime_owner', runtime_owner_label))
+    for method_name, label in cleanup_steps:
+        try:
+            getattr(native_io, method_name)()
+        except BaseException as cleanup_error:
+            error.add_note(
+                f'{label} cleanup after Core admission failure also failed: '
+                f'{type(cleanup_error).__name__}: {cleanup_error}'
+            )
+
+
 def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpec | ExecutionSpecV1, *, source: RuntimeSource | UsdRuntimeSourceV1,
                 manifest: ProviderCapabilityManifest | None = None,
                 _materialization_authority=None, _diagnostic_profile=None,
@@ -525,20 +542,11 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 getattr(native_io, 'drive_receipt', None),
             )
         except BaseException as materialization_error:
-            try:
-                native_io.close()
-            except BaseException as cleanup_error:
-                materialization_error.add_note(
-                    'F06 Isaac native-I/O cleanup after Core admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
-            try:
-                native_io.close_runtime_owner()
-            except BaseException as cleanup_error:
-                materialization_error.add_note(
-                    'F06 Isaac App owner cleanup after Core admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
+            _close_failed_native_materialization(
+                materialization_error, native_io,
+                io_label='F06 Isaac native-I/O',
+                runtime_owner_label='F06 Isaac App owner',
+            )
             raise
         session._declared_execution_spec_v1 = declared_execution
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
@@ -600,21 +608,10 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 artifact, declared_execution, source, native_io, receipt,
             )
         except BaseException as materialization_error:
-            try:
-                native_io.close()
-            except BaseException as cleanup_error:
-                materialization_error.add_note(
-                    'DG04 native-I/O cleanup after Core admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
-            if scope is None:
-                try:
-                    native_io.close_runtime_owner()
-                except BaseException as cleanup_error:
-                    materialization_error.add_note(
-                        'DG04 Isaac App owner cleanup after Core admission failure also failed: '
-                        f'{type(cleanup_error).__name__}: {cleanup_error}'
-                    )
+            _close_failed_native_materialization(
+                materialization_error, native_io, io_label='DG04 native-I/O',
+                runtime_owner_label='DG04 Isaac App owner' if scope is None else None,
+            )
             raise
         session._declared_execution_spec_v1 = declared_execution
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
@@ -649,13 +646,9 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 artifact, declared_execution, source, native_io, receipt,
             )
         except BaseException as materialization_error:
-            try:
-                native_io.close()
-            except BaseException as cleanup_error:
-                materialization_error.add_note(
-                    'DG02 native-I/O cleanup after Core admission failure also failed: '
-                    f'{type(cleanup_error).__name__}: {cleanup_error}'
-                )
+            _close_failed_native_materialization(
+                materialization_error, native_io, io_label='DG02 native-I/O',
+            )
             raise
         session._declared_execution_spec_v1 = declared_execution
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
@@ -693,13 +686,9 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                     native_io.drive_receipt,
                 )
             except BaseException as materialization_error:
-                try:
-                    native_io.close()
-                except BaseException as cleanup_error:
-                    materialization_error.add_note(
-                        'F05 GeoPhys native-I/O cleanup after Core admission failure also failed: '
-                        f'{type(cleanup_error).__name__}: {cleanup_error}'
-                    )
+                _close_failed_native_materialization(
+                    materialization_error, native_io, io_label='F05 GeoPhys native-I/O',
+                )
                 raise
             session._declared_execution_spec_v1 = declared_execution
             session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
@@ -723,21 +712,10 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 artifact, declared_execution, source, native_io, drive_receipt=None,
             )
         except BaseException as materialization_error:
-            if native_io is not None:
-                try:
-                    native_io.close()
-                except BaseException as cleanup_error:
-                    materialization_error.add_note(
-                        'Isaac native-I/O cleanup after Core admission failure also failed: '
-                        f'{type(cleanup_error).__name__}: {cleanup_error}'
-                    )
-                try:
-                    native_io.close_runtime_owner()
-                except BaseException as cleanup_error:
-                    materialization_error.add_note(
-                        'Isaac App owner cleanup after Core admission failure also failed: '
-                        f'{type(cleanup_error).__name__}: {cleanup_error}'
-                    )
+            _close_failed_native_materialization(
+                materialization_error, native_io, io_label='Isaac native-I/O',
+                runtime_owner_label='Isaac App owner',
+            )
             raise
         session._declared_execution_spec_v1 = declared_execution
         session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
