@@ -25,9 +25,16 @@ def _spec(**changes):
         'provider': 'mujoco', 'backend': 'cpu', 'device': 'cpu',
         'controller_profile': 'r3_continuous_v1', 'seeds': [31, 32, 33],
         'horizon_control_ticks': 1000, 'physics_dt_s': 0.002, 'control_substeps': 5,
+        'source_delivery_manifest': None,
     }
     value.update(changes)
     return BuiltinPickCubeExampleV1.from_dict(value)
+
+
+def _artifact():
+    from task_env.tasks.pick_cube.task import build_artifact
+
+    return build_artifact()
 
 
 def test_builtin_example_schema_pins_uid_profile_seed_set_and_timebase():
@@ -44,6 +51,20 @@ def test_builtin_example_schema_pins_uid_profile_seed_set_and_timebase():
     ):
         with pytest.raises(ValueError):
             _spec(**changes)
+    with pytest.raises(ValueError, match='source delivery manifest'):
+        _spec(provider='isaacsim', backend='cuda', device='cuda:0')
+    isaac = _spec(
+        provider='isaacsim', backend='cuda', device='cuda:0',
+        source_delivery_manifest='/frozen/pickcube/delivery_manifest.json',
+    )
+    assert isaac.provider == 'isaacsim'
+
+
+def test_repository_harness_spec_is_complete_for_versioned_builtin_schema():
+    path = Path(__file__).resolve().parents[3] / 'examples/tasks/pick_cube_harness.json'
+    spec = BuiltinPickCubeExampleV1.load(path)
+    assert spec.provider == 'mujoco'
+    assert spec.source_delivery_manifest is None
 
 
 def test_working_tree_scope_requires_exact_sorted_byte_pins():
@@ -104,24 +125,72 @@ def test_compiler_uses_builtin_catalog_but_preserves_candidate_spec():
         CandidateSpec.from_dict(spec.to_dict())
 
 
-def test_compiler_does_not_claim_isaac_before_exact_core_route_exists():
+def test_compiler_admits_only_the_catalogued_exact_isaac_route():
     import harness_compiler
 
-    spec = _spec(provider='isaacsim', backend='cuda', device='cuda:0')
+    spec = _spec(provider='isaacsim', backend='cuda', device='cuda:0',
+                 source_delivery_manifest='/frozen/pickcube/delivery_manifest.json')
     scope = ExampleWorkingTreeScopeV1('harness-example-working-tree-scope-v1', ())
     catalog = {
         'schema_version': 'harness-catalog-v0', 'core_repo': '/tmp/core',
         'core_commit': 'commit', 'core_dirty': False,
-        'builtin_examples': {'pickcube-harness-example-v1': {'task_uid': spec.task_uid}},
+        'builtin_examples': {'pickcube-harness-example-v1': {
+            'task_uid': spec.task_uid,
+            'provider_routes': {'isaacsim': {
+                'backend': 'cuda', 'device': 'cuda:0', 'runtime_tested': False,
+            }},
+        }},
         'env_uids': [spec.task_uid], 'providers': {},
     }
     with patch.object(harness_compiler, '_example_working_tree_context', return_value={
         'schema_version': scope.schema_version, 'tracked_clean': True,
         'repo_dirty': False, 'expected_untracked': [],
     }), patch('catalog_query.core_context', return_value={'core_repo': '/tmp/core', 'core_commit': 'commit', 'core_dirty': False}), \
-         patch.object(subprocess, 'check_output', return_value=''):
-        with pytest.raises(ValueError, match='not yet admitted'):
-            harness_compiler.compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
+         patch.object(subprocess, 'check_output', return_value=''), \
+         patch('task_env.tasks.pick_cube.task.build_isaac_reference', return_value={
+             'artifact': _artifact(), 'construction_id': 'f06', 'recipe_identity': 'a' * 64,
+             'controller': SimpleNamespace(identity='b' * 64),
+             'solution_identity': 'c' * 64, 'source_revision': 'commit',
+             'source_sha256': {'task_env/tasks/pick_cube/isaac.py': 'd' * 64},
+             'source': SimpleNamespace(scene_source=SimpleNamespace(source_id='f06-source', xml='f06')),
+         }):
+        compiled = harness_compiler.compile_builtin_pickcube_example(
+            spec, catalog, working_tree_scope=scope,
+        )
+        assert compiled.runtime_source_id == 'f06-source'
+
+
+def test_validation_supervises_the_compiled_isaac_route_after_static_compile(tmp_path):
+    import builtin_example_validation
+
+    spec = _spec(
+        provider='isaacsim', backend='cuda', device='cuda:0',
+        source_delivery_manifest='/frozen/pickcube/delivery_manifest.json',
+    )
+    spec_path = tmp_path / 'spec.json'
+    spec_path.write_text(json.dumps(spec.to_dict()))
+    scope = ExampleWorkingTreeScopeV1('harness-example-working-tree-scope-v1', ())
+    scope_path = tmp_path / 'scope.json'
+    scope_path.write_text(json.dumps(scope.to_dict()))
+    catalog_path = tmp_path / 'catalog.json'
+    catalog_path.write_text('{}')
+    compiled = SimpleNamespace(
+        artifact_hash='a' * 64, construction_id='f06', recipe_identity='b' * 64,
+        controller_identity='c' * 64, solution_identity='d' * 64,
+        source_revision='commit', runtime_source_id='source',
+        runtime_source_sha256='e' * 64,
+        working_tree_scope={'expected_untracked': []}, repo_dirty=False,
+    )
+    row = {'seed': 31, 'provider': 'isaacsim', 'status': 'RUNTIME_VALID',
+           'runtime_valid': True, 'task_outcome': 'TASK_OR_EXPERT_FAILURE_REPORTED'}
+    with patch('harness_compiler.compile_builtin_pickcube_example', return_value=compiled), \
+         patch.object(builtin_example_validation, '_run_one', return_value=row):
+        result = builtin_example_validation.validate_provider(
+            spec_path, catalog_path, scope_path, tmp_path / 'result', only_seed=31,
+        )
+    assert result['provider'] == 'isaacsim'
+    assert result['disposition'] == 'PREFLIGHT'
+    assert result['runtime_valid_count'] == 1
 
 
 def test_worker_accepts_supervisor_created_output_dir_but_rejects_other_data(tmp_path):
@@ -131,10 +200,21 @@ def test_worker_accepts_supervisor_created_output_dir_but_rejects_other_data(tmp
     output.mkdir()
     (output / 'worker.stdout.log').touch()
     (output / 'worker.stderr.log').touch()
+    (output / 'run_plan.json').write_text('{}')
+    (output / 'run_preflight.json').write_text('{}')
     assert _prepare_output_directory(output) == output.resolve()
     (output / 'episode.h5').touch()
     with pytest.raises(FileExistsError, match='already contains data'):
         _prepare_output_directory(output)
+
+
+def test_isaac_worker_uses_controlled_process_exit_after_receipt():
+    from builtin_example_worker import _terminate_isaac_worker
+
+    with patch('builtin_example_worker.os._exit', side_effect=RuntimeError('exit boundary')) as exit_call:
+        with pytest.raises(RuntimeError, match='exit boundary'):
+            _terminate_isaac_worker(7)
+    exit_call.assert_called_once_with(7)
 
 
 def test_worker_counts_core_planned_actions_from_loaded_canonical_trajectory():

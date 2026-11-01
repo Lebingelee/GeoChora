@@ -32,10 +32,19 @@ class PandaTcpProfileV1(Contract):
         if self.schema_version != 'panda-tcp-profile-v1':
             raise ValueError('unsupported Panda TCP profile schema')
         entity_id, separator, suffix = self.tcp_id.partition('/')
-        if not separator or not entity_id or suffix != 'hand-origin-tcp-v1' or not self.hand_frame_id:
+        if not separator or not entity_id or not self.hand_frame_id:
             raise ValueError('unsupported Panda TCP identity/frame')
-        if tuple(self.position_m) != (0.0, 0.0, 0.0) or tuple(self.quaternion_wxyz) != (1.0, 0.0, 0.0, 0.0):
-            raise ValueError('hand-origin TCP v1 is the identity transform from hand')
+        if suffix == 'hand-origin-tcp-v1':
+            if (tuple(self.position_m) != (0.0, 0.0, 0.0)
+                    or tuple(self.quaternion_wxyz) != (1.0, 0.0, 0.0, 0.0)):
+                raise ValueError('hand-origin TCP v1 is the identity transform from hand')
+        elif suffix == 'pickcube-ee-offset-v1':
+            if (entity_id != 'panda-v1' or self.hand_frame_id != 'hand'
+                    or tuple(self.position_m) != (0.0, 0.0, 0.0584)
+                    or tuple(self.quaternion_wxyz) != (1.0, 0.0, 0.0, 0.0)):
+                raise ValueError('PickCube TCP v1 is the exact +58.4 mm hand-local USD frame')
+        else:
+            raise ValueError('unsupported Panda TCP identity/frame')
 
     @property
     def identity_hash(self):
@@ -54,6 +63,10 @@ class PandaTcpProfileV1(Contract):
 PANDA_HAND_ORIGIN_TCP_V1 = PandaTcpProfileV1(
     'panda-tcp-profile-v1', 'panda-main/hand-origin-tcp-v1', 'hand',
     (0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 0.0),
+)
+PANDA_PICKCUBE_EE_TCP_V1 = PandaTcpProfileV1(
+    'panda-tcp-profile-v1', 'panda-v1/pickcube-ee-offset-v1', 'hand',
+    (0.0, 0.0, 0.0584), (1.0, 0.0, 0.0, 0.0),
 )
 
 

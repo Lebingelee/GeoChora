@@ -33,6 +33,7 @@ F05_DG02_GEOPHYS_USD_PROFILE = 'geophys-usd-position-f05-dg02-core-v1'
 F05_DG01_MUJOCO_PROFILE = 'mujoco-mjcf-f05-dg01-core-v1'
 F05_DG03_ISAAC_USD_PROFILE = 'isaac-gpu-physx-f05-dg03-usd-v1'
 F05_DG04_ISAAC_NATIVE_PROFILE = 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
+F06_PICKCUBE_ISAAC_PROFILE = 'isaac-gpu-physx-pickcube-f06-v1'
 _F04_OFFICIAL_PANDA_SOURCE_REFERENCE = (
     'https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.2/Isaac/'
     'Robots_Multiphysics/FrankaRobotics/FrankaPanda/franka/franka.usda'
@@ -484,6 +485,38 @@ def _validate_f05_dg04_isaac_native_input(input_v1, artifact, execution, source)
         raise ValueError('DG04 Core cell is state-only and does not admit a renderer')
 
 
+def _validate_f06_pickcube_isaac_input(input_v1, artifact, execution, source) -> None:
+    """Admit the exact locally validated PickCube desktop USD F06 input."""
+    from ...tasks.pick_cube.isaac import (
+        ISAAC_PROFILE_V1, PickCubeIsaacRuntimeInputV1,
+    )
+
+    if type(input_v1) is not PickCubeIsaacRuntimeInputV1:
+        raise TypeError('F06 Isaac materialization requires its exact PickCube RuntimeInputV1')
+    input_v1.validate()
+    if (artifact is not input_v1.artifact or source is not input_v1.runtime_source
+            or type(execution) is not ExecutionSpecV1
+            or execution.identity_hash != input_v1.execution.identity_hash):
+        raise ValueError('F06 materialization differs from its exact Task/Scene/Execution identities')
+    if (execution.physics_provider, execution.physics_backend, execution.physics_device,
+            execution.physics_profile, execution.determinism_mode) != (
+            'isaacsim', 'cuda', 'cuda:0', ISAAC_PROFILE_V1, 'best_effort'):
+        raise ValueError('unsupported F06 PickCube Isaac CUDA/PhysX execution intersection')
+    representation = source.scene_source.representation
+    if (representation.provider, representation.provider_build_identity,
+            representation.representation_format, representation.runtime_admitted,
+            representation.source_verified, source.scene_source.locally_validated,
+            source.scene_source.source_verified) != (
+            'isaacsim', 'isaacsim-6.2.0.0', 'usd', False, False, True, False):
+        raise ValueError('F06 admission requires its exact locally validated non-upstream USD')
+    if (source.scene_source.loaded_delivery.manifest_bytes_sha256
+            != input_v1.delivery_manifest_sha256
+            or dict(source.joints) != dict(source.joint_targets)):
+        raise ValueError('F06 delivery or exact PickCube source Joint identity changed')
+    if execution.render_default.provider != 'none' or execution.camera_overrides:
+        raise ValueError('F06 Core cell is state-only and does not admit a renderer')
+
+
 def _f05_dg03_isaac_capability_manifest(artifact, *, synthetic_s1=False):
     from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
 
@@ -529,6 +562,23 @@ def _f05_dg04_isaac_capability_manifest(artifact, *, synthetic_s1=False):
     )
 
 
+def _f06_pickcube_isaac_capability_manifest(artifact):
+    from ...artifacts import CapabilityClaim, ProviderCapabilityManifest
+    from ...tasks.pick_cube.isaac import ISAAC_PROFILE_V1
+
+    names = sorted(set(artifact.required_capabilities.names) | {
+        'articulated_robot', 'joint_position_actuation', 'joint_state_query',
+        'body_pose_query', 'frame_pose_query', 'free_body',
+    })
+    return ProviderCapabilityManifest(
+        'provider-capability-v0', 'isaacsim', '6.2.0.0',
+        'f06-pickcube-desktop-native-mimic-v1', 'cuda', ISAAC_PROFILE_V1,
+        'none', 'best_effort',
+        tuple(CapabilityClaim(name, 'implemented', 'F06-exact-PickCube-desktop-source-bound-cell')
+              for name in names),
+        ('rgb_camera', 'depth_camera', 'contact_detection', 'contact_impulse'),
+        'bounded F06 PickCube Isaac desktop cell; no provider-wide qualification',
+    )
 def _validate_f05_dg01_mujoco_source(artifact, execution, source) -> None:
     """Admit only the exact source-bound DG01 Menagerie MJCF/Core route."""
     from ...tasks.position_candidate.builder import F05Dg01MujocoCandidateInputV1
@@ -682,12 +732,60 @@ def materialize(artifact: TaskArtifact | TaskArtifactV1, execution: ExecutionSpe
                 _materialization_authority=None, _diagnostic_profile=None,
                 _f05_native_input=None, _f05_dg02_geophys_input=None,
                 _f05_dg03_isaac_input=None, _f05_dg04_isaac_native_input=None,
-                _f05_dg01_mujoco_input=None) -> RuntimeSession:
+                _f05_dg01_mujoco_input=None, _f06_pickcube_isaac_input=None) -> RuntimeSession:
     if not isinstance(artifact, (TaskArtifact, TaskArtifactV1)):
         raise TypeError('materialize requires TaskArtifact v0 or v1')
     if isinstance(artifact, TaskArtifactV1):
         artifact.validate()
     declared_execution = execution
+    if (_f06_pickcube_isaac_input is not None
+            or (type(execution) is ExecutionSpecV1
+                and execution.physics_profile == F06_PICKCUBE_ISAAC_PROFILE)):
+        if _f06_pickcube_isaac_input is None:
+            raise ValueError('F06 PickCube Isaac profile requires its exact versioned input')
+        _validate_f06_pickcube_isaac_input(
+            _f06_pickcube_isaac_input, artifact, declared_execution, source,
+        )
+        expected_manifest = _f06_pickcube_isaac_capability_manifest(artifact)
+        if (manifest is None or manifest.identity_hash != expected_manifest.identity_hash
+                or _materialization_authority is not None or _diagnostic_profile is not None):
+            raise ValueError('F06 exact admission requires the Core-generated source-bound manifest only')
+        projected_execution = ExecutionSpec(
+            'isaacsim', F06_PICKCUBE_ISAAC_PROFILE, 'none', 'cuda',
+            declared_execution.provider_seed, 'best_effort',
+        )
+        admit_capabilities(artifact.required_capabilities, manifest, projected_execution)
+        from .isaac_native_io import create_isaac_native_runtime_io
+
+        native_io = create_isaac_native_runtime_io(
+            artifact, declared_execution, source,
+            f06_pickcube_input=_f06_pickcube_isaac_input,
+        )
+        from .native_io import UsdCoreRuntimeSession
+        try:
+            session = UsdCoreRuntimeSession(
+                artifact, declared_execution, source, native_io,
+                getattr(native_io, 'drive_receipt', None),
+            )
+        except BaseException as materialization_error:
+            try:
+                native_io.close()
+            except BaseException as cleanup_error:
+                materialization_error.add_note(
+                    'F06 Isaac native-I/O cleanup after Core admission failure also failed: '
+                    f'{type(cleanup_error).__name__}: {cleanup_error}'
+                )
+            try:
+                native_io.close_runtime_owner()
+            except BaseException as cleanup_error:
+                materialization_error.add_note(
+                    'F06 Isaac App owner cleanup after Core admission failure also failed: '
+                    f'{type(cleanup_error).__name__}: {cleanup_error}'
+                )
+            raise
+        session._declared_execution_spec_v1 = declared_execution
+        session._declared_execution_spec_v1_identity_sha256 = declared_execution.identity_hash
+        return session
     if (_f05_dg04_isaac_native_input is not None
             or (type(execution) is ExecutionSpecV1
                 and execution.physics_profile == F05_DG04_ISAAC_NATIVE_PROFILE)):

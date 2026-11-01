@@ -109,6 +109,7 @@ class ReferenceTaskBinding:
     validate_external_solution: Callable | None = None
     runtime_episode_identity: bool = False
     build_gripper_cadence_diagnostic: Callable | None = None
+    build_seeded: Callable | None = None
 
     def __post_init__(self):
         if self.interval_mode not in {"grouped", "native"}:
@@ -295,6 +296,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg03-usd-v1'),
                 ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-f05-dg04-native-mimic-v1'),
                 ('mujoco', 'cpu', 'cpu', 'strict', 'mujoco-mjcf-f05-dg01-core-v1'),
+                ('isaacsim', 'cuda', 'cuda:0', 'best_effort', 'isaac-gpu-physx-pickcube-f06-v1'),
             }
             if execution_route not in allowed_versioned_routes:
                 raise ValueError('versioned Position construction has an unsupported provider execution route')
@@ -304,7 +306,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     and (provider not in {'geophys', 'mujoco'} or backend != 'cpu')):
                 raise ValueError('selected reference currently admits GeoPhys/MuJoCo scalar CPU only')
             self._diagnostic_profile = None
-            build_value = lambda: self.binding.build(provider)
+            if self.binding.build_seeded is not None:
+                build_value = lambda: self.binding.build_seeded(provider, backend, 31, horizon)
+            else:
+                build_value = lambda: self.binding.build(provider)
         else:
             if (provider != 'geophys' or backend not in {'cpu', 'cuda'}
                     or type(_diagnostic_gripper_control_hz) is not int
@@ -565,7 +570,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             # reconstruction-before-seed-validation lifecycle below.
             seed = self.binding.reset_seed(seed)
             reset_plan = self.value.get('reset_plan')
-            if reset_plan is None or seed != reset_plan.reset_sample.task_seed:
+            if reset_plan is None:
+                raise ValueError('PositionServoV1 selected route requires an EpisodeResetPlan')
+            if (self.binding.build_seeded is None
+                    and seed != reset_plan.reset_sample.task_seed):
                 raise ValueError('PositionServoV1 reset seed must match its fixed EpisodeResetPlan')
         if self.recorder is not None and not getattr(self.recorder, 'frozen', getattr(self.recorder, '_frozen', False)):
             raise RuntimeError('finalize current recording before reset')
@@ -583,6 +591,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._published_position_obs = None
             self._published_position_info = None
             self._published_position_evaluation = None
+            self.last_position_transition = None
         self._stopped = True
         previous_session, self.session = self.session, None
         previous_session_close_attempted = False
@@ -601,8 +610,14 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     external_solution is None,
                 )
             else:
-                self.value = (self.binding.build_external(self.provider)
-                              if external_solution is not None else self.binding.build(self.provider))
+                if external_solution is not None:
+                    self.value = self.binding.build_external(self.provider)
+                elif self.binding.build_seeded is not None:
+                    self.value = self.binding.build_seeded(
+                        self.provider, self.backend, seed, self.horizon,
+                    )
+                else:
+                    self.value = self.binding.build(self.provider)
             if self.value['artifact'] != self.artifact:
                 raise ValueError('selected Artifact changed between construction and reset')
             if external_solution is not None:
@@ -627,8 +642,22 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if versioned_execution is not None:
                 from ..artifacts import ExecutionSpecV1
                 if (type(versioned_execution) is not ExecutionSpecV1
-                        or self._declared_execution_spec_v1 is None
-                        or versioned_execution.identity_hash != self._declared_execution_spec_v1.identity_hash):
+                        or self._declared_execution_spec_v1 is None):
+                    raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
+                f06_input = self.value.get('f06_pickcube_isaac_input')
+                if f06_input is not None:
+                    declared = self._declared_execution_spec_v1
+                    if ((versioned_execution.physics_provider, versioned_execution.physics_backend,
+                         versioned_execution.physics_device, versioned_execution.physics_profile,
+                         versioned_execution.determinism_mode, versioned_execution.render_default,
+                         versioned_execution.camera_overrides, versioned_execution.provider_seed)
+                            != (declared.physics_provider, declared.physics_backend,
+                                declared.physics_device, declared.physics_profile,
+                                declared.determinism_mode, declared.render_default,
+                                declared.camera_overrides, seed)
+                            or f06_input.reset_plan.reset_sample.task_seed != seed):
+                        raise ValueError('F06 seeded rebuild changed its exact route or requested seed')
+                elif versioned_execution.identity_hash != self._declared_execution_spec_v1.identity_hash:
                     raise ValueError('SelectedReferenceEnv rebuild changed its declared ExecutionSpecV1')
                 self.execution = versioned_execution
             else:
@@ -700,7 +729,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 else:
                     self.session = materialize_control(
                         self.artifact, self.execution, source=self.value['source'],
-                        binding=ControlBinding('panda-main/gripper', .08),
+                        binding=ControlBinding(
+                            ('panda-v1/gripper' if self.value.get('f06_pickcube_isaac_input') is not None
+                             else 'panda-main/gripper'), .08,
+                        ),
                         controller_binding_plan=self.position_plan,
                         controller_profile=self.position_profiles,
                         f05_native_input=self.value.get('f05_native_position_input'),
@@ -708,6 +740,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                         f05_dg03_isaac_input=self.value.get('f05_dg03_isaac_input'),
                         f05_dg04_isaac_native_input=self.value.get('f05_dg04_isaac_native_input'),
                         f05_dg01_mujoco_input=self.value.get('f05_dg01_mujoco_input'),
+                        f06_pickcube_isaac_input=self.value.get('f06_pickcube_isaac_input'),
                     )
             else:
                 self.position_profile = False
@@ -755,6 +788,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             if self.position_profile:
                 self._position_reset_info = self._position_record_reset_info()
                 self.info.update(self._position_reset_info)
+                if self.value.get('f06_pickcube_isaac_input') is not None:
+                    self._publish_pickcube_position_execution_info(self.info)
                 if previous_episode_end is not None:
                     self.info['previous_episode_end_v1'] = previous_episode_end.to_mapping()
             if self.state.control_step != 0 or self.state.simulation_time != 0:
@@ -816,6 +851,29 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
     def expert_execution_info(self):
         """Return the required, validated R1 readiness at the current boundary."""
+        if (getattr(self, 'position_profile', False)
+                and self.value.get('f06_pickcube_isaac_input') is not None):
+            from .pick_cube.solution import PickCubePositionExecutionInfoV1
+
+            positions = self.state.joint_position
+            velocities = self.state.joint_velocity
+            measured = float(sum(
+                float(positions[f'panda-v1/finger_joint{index}']) for index in (1, 2)
+            ))
+            measured_speed = float(sum(
+                abs(float(velocities[f'panda-v1/finger_joint{index}'])) for index in (1, 2)
+            ))
+            target = measured
+            if self.last_position_transition is not None:
+                row = self.last_position_transition
+                target = float(row[1].target.gripper.opening_m)
+            ready = bool(target <= 0.045 and measured <= 0.045 and measured_speed <= 0.005)
+            result = PickCubePositionExecutionInfoV1(
+                'pickcube-position-execution-info-v1', int(self.state.control_step),
+                float(self.state.simulation_time), measured, measured_speed, target, ready,
+            )
+            result.validate()
+            return result
         if (getattr(self, 'state', None) is None or getattr(self, 'feedback', None) is None
                 or getattr(self, 'position_profile', False)):
             raise StageUnavailableError('R1 execution readiness is unavailable on this selected route')
@@ -825,6 +883,10 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         )
         result.validate()
         return result
+
+    def _publish_pickcube_position_execution_info(self, info):
+        value = self.expert_execution_info()
+        info['pickcube_position_execution_info_v1'] = value.to_mapping()
 
     # Kept for existing in-module callers while public callers use the named
     # expert_execution_info() contract.
@@ -1547,7 +1609,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             structured_control=control,
         )
 
-    def _step_position_profile(self, request):
+    def _step_position_profile(self, request, *, proposal=None, observer_solution=None):
         """Run one source-bound Position interval through the selected lifecycle latch."""
         if self._execution_fault is not None:
             fault = self._execution_fault
@@ -1563,6 +1625,12 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             self._stopped = True
             raise RuntimeError('reset required or PositionServoV1 horizon is exhausted')
         from ..runtime.sessions.control import execute_position_control_interval
+        from ..controllers.canonical.contracts import StructuredActionRequestV1
+        if isinstance(request, StructuredActionRequestV1):
+            from ..runtime.sessions.control import prepare_structured_action
+            prepare_structured_action(self.position_plan, request)
+        elif proposal is not None:
+            raise TypeError('PositionServoV1 expert requires a StructuredActionRequestV1')
 
         before_state = self.state
         interval_attempted = False
@@ -1603,10 +1671,28 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             terminated = bool(self.evaluation.failure)
             truncated = self.state.control_step >= self.horizon
             self._stopped = bool(terminated or truncated)
-            self._episode_mode = 'external'
+            self._episode_mode = 'expert' if proposal is not None else 'external'
             self._last_position_terminated = terminated
             self._last_position_truncated = truncated
             self._last_position_request = request
+            if self.value.get('f06_pickcube_isaac_input') is not None:
+                self._publish_pickcube_position_execution_info(self.info)
+            if proposal is not None:
+                phase = 'position_solution_observation'
+                solution_owner = self.solution if observer_solution is None else observer_solution
+                extra = self.binding.observe_expert_kwargs(self, None)
+                solution_owner.observe(
+                    self.obs, self.evaluation.reward, terminated, truncated, self.info, **extra,
+                )
+                if hasattr(solution_owner, 'outcome_report'):
+                    self.info.update(solution_owner.outcome_report())
+                self.info.update(
+                    selected_policy_execution_complete=bool(solution_owner.done),
+                    selected_policy_execution_failed=bool(solution_owner.failed),
+                    expert_failure_reason=solution_owner.failure_reason,
+                )
+                self._stopped = bool(solution_owner.done or solution_owner.failed
+                                     or terminated or truncated)
             if self.recorder is not None:
                 phase = 'record_position_transition'
                 record_append_attempted = True
@@ -1677,12 +1763,15 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             )
         if self._stopped or self._episode_mode in {'external', 'external_solution'}:
             raise RuntimeError('reset required; external and expert execution cannot be mixed')
-        if self.solution is None or getattr(self, 'position_profile', False):
+        if self.solution is None:
             raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
         self._episode_mode = 'expert'
         if self.solution.done or self.solution.failed:
             raise RuntimeError('expert already stopped')
-        if hasattr(self.solution, 'readiness_config'):
+        if getattr(self, 'position_profile', False):
+            if self.value.get('f06_pickcube_isaac_input') is None:
+                raise RuntimeError('selected PositionServoV1 profile does not provide expert execution')
+        elif hasattr(self.solution, 'readiness_config'):
             try:
                 self._require_published_execution_info()
             except BaseException as error:
@@ -1702,6 +1791,36 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     if callable(add_note):
                         add_note(f'expert abort after proposal failure also failed: {abort_error!r}')
             raise
+        if getattr(self, 'position_profile', False):
+            from ..controllers.canonical.contracts import (
+                ControlGroupActionV1, StructuredActionRequestV1,
+            )
+
+            vector = np.asarray(proposal.action, dtype=float)
+            if vector.shape != (8,) or not np.isfinite(vector).all():
+                error = ValueError('F06 Position expert requires a finite eight-dimensional planned action')
+                self._latch_fault('expert_action_validation', error, before_state=self.state)
+                raise error
+            profile = self.position_profiles[0]
+            schema_id = profile.controller_binding().action_schema.schema_id
+            request = StructuredActionRequestV1(
+                'structured-action-request-v1', self.position_scene.identity_hash,
+                self.position_plan.identity_hash,
+                (
+                    ControlGroupActionV1(
+                        'control-group-action-v1', profile.entity_id, 'arm', schema_id,
+                        tuple(float(value) for value in vector[:7]),
+                    ),
+                    ControlGroupActionV1(
+                        'control-group-action-v1', profile.entity_id, 'gripper', schema_id,
+                        (float(vector[7]),),
+                    ),
+                ),
+            )
+            request.validate()
+            return self._step_position_profile(
+                request, proposal=proposal, observer_solution=self.solution,
+            )
         return self._step(proposal.action, proposal=proposal, observer_solution=self.solution)
 
     def _step(self, action, *, proposal=None, observer_solution=None):
@@ -3096,6 +3215,25 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'force_feedback': 'not_consumed',
             },
         }
+        f06_input = self.value.get('f06_pickcube_isaac_input')
+        if f06_input is not None:
+            native_io = getattr(self.session, '_native_io', None)
+            native_metadata = getattr(native_io, '_metadata', None)
+            bootstrap = dict(native_io.bootstrap_receipt())
+            env_metadata['reference_profile'].update({
+                'provider': 'isaacsim', 'provider_version': 'isaacsim-6.2.0.0',
+                'provider_build_identity': getattr(
+                    native_metadata, 'provider_build_identity', 'isaacsim-6.2.0.0',
+                ),
+                'backend': 'cuda', 'device': 'cuda:0',
+                'determinism_mode': 'best_effort',
+                'execution_identity_sha256': f06_input.execution.identity_hash,
+                'source_id': self.value['source'].source_id,
+                'delivery_manifest_sha256': f06_input.delivery_manifest_sha256,
+                'native_public_bootstrap_receipt': bootstrap,
+                'solution_identity': self._active_solution_identity(),
+                'tcp_semantic_frame': 'panda-v1/ee',
+            })
         universal_components = tuple(action_schema.components)
         if self.dual_entity_position:
             universal_components = action_components
@@ -3108,7 +3246,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             'env_metadata': env_metadata,
             'universal_action_schema': universal_schema,
             'resolved_config': {
-                'provider': self.provider, 'backend': 'cpu', 'horizon': self.horizon,
+                'provider': self.provider, 'backend': self.backend, 'horizon': self.horizon,
                 'controller_profile': profile.profile_id,
                 **({'camera_observation': self.camera_observation_config.to_mapping()}
                    if self.camera_observation_config is not None else {}),
@@ -3140,8 +3278,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
 
         schema = self.controller.controller_binding().action_schema
         groups = {(group.entity_id, group.group_id): group for group in request.groups}
-        arm = groups[('panda-main', 'arm')]
-        gripper = groups[('panda-main', 'gripper')]
+        entity_id = self.controller.entity_id
+        arm = groups[(entity_id, 'arm')]
+        gripper = groups[(entity_id, 'gripper')]
         action_values = np.asarray((*arm.values, *gripper.values), dtype=np.float32)
         target_payload = target.target.to_mapping()
         target_hash = target.target.identity_hash
@@ -3185,7 +3324,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         f05_dg02_input = self.value.get('f05_dg02_geophys_input')
         if (f03_input is not None or f04_input is not None or f05_input is not None
                 or f05_dg02_input is not None
-                or self.value.get('f05_dg04_isaac_native_input') is not None):
+                or self.value.get('f05_dg04_isaac_native_input') is not None
+                or self.value.get('f06_pickcube_isaac_input') is not None):
             native_ack = getattr(self.session, '_last_native_position_ack', None)
             native_advances = getattr(self.session, '_last_interval_advances', ())
             advance_attempts = getattr(self.session, '_last_interval_advance_attempts', None)
@@ -3195,7 +3335,8 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['native_interval_advance_receipts_v1'] = list(native_advances)
             applied_payload['native_interval_advance_attempts'] = advance_attempts
             if (f04_input is not None or f05_input is not None or f05_dg02_input is not None
-                    or self.value.get('f05_dg04_isaac_native_input') is not None):
+                    or self.value.get('f05_dg04_isaac_native_input') is not None
+                    or self.value.get('f06_pickcube_isaac_input') is not None):
                 native_io = getattr(self.session, '_native_io', None)
                 provenance = getattr(native_io, 'execution_provenance_kind', None)
                 if provenance == 'native_runtime':
@@ -3233,9 +3374,9 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 'action_schema_id': schema.schema_id,
                 'components': tuple(schema.components),
                 'groups': (
-                    {'entity_id': 'panda-main', 'group_id': 'arm',
+                    {'entity_id': entity_id, 'group_id': 'arm',
                      'action_components': tuple(schema.components[:7])},
-                    {'entity_id': 'panda-main', 'group_id': 'gripper',
+                    {'entity_id': entity_id, 'group_id': 'gripper',
                      'action_components': (schema.components[7],)},
                 ),
                 'requested_action': canonical.requested.to_mapping(),

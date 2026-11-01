@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 from dataclasses import replace
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,23 @@ CORE = Path(__file__).resolve().parents[3]
 LOCK = CORE / 'workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/shared_native_execution.lock'
 CPU_PYTHON = Path('/home/lly/miniconda3/envs/geochora/bin/python')
 ISAAC_PYTHON = CORE / 'workspace/environments/isaacsim-6.2.0/bin/python'
+MAX_WORKER_LOG_BYTES = 64 * 1024**2
+MAX_RUN_EVIDENCE_BYTES = 2 * 1024**3
+
+
+def _write_json(path, value):
+    path = Path(path)
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + '\n')
+    temporary.replace(path)
+
+
+def _sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _directory_bytes(path):
+    return sum(item.stat().st_size for item in Path(path).rglob('*') if item.is_file())
 
 
 def _mem_available_bytes():
@@ -145,15 +163,58 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
     else:
         executable = CPU_PYTHON
         timeout_s = 420
+    spec = BuiltinPickCubeExampleV1.load(spec_path)
+    catalog = json.loads(Path(catalog_path).read_text())
+    scope = ExampleWorkingTreeScopeV1.load(scope_path)
+    plan = {
+        'schema_version': 'harness-builtin-pickcube-example-run-plan-v1',
+        'provider': provider, 'backend': spec.backend, 'device': spec.device,
+        'controller_profile': spec.controller_profile, 'seed': seed,
+        'horizon_control_ticks': spec.horizon_control_ticks,
+        'physics_dt_s': spec.physics_dt_s, 'control_substeps': spec.control_substeps,
+        'native_app_starts_upper_bound': 1 if provider == 'isaacsim' else 0,
+        'bootstrap_physics_steps_upper_bound': 10 if provider == 'isaacsim' else 0,
+        'physics_steps_upper_bound': (
+            spec.horizon_control_ticks * spec.control_substeps + 10
+            if provider == 'isaacsim' else spec.horizon_control_ticks * spec.control_substeps
+        ),
+        'watchdog_seconds': timeout_s,
+        'process_group_rss_limit_bytes': 10 * 1024**3,
+        'log_limit_bytes': MAX_WORKER_LOG_BYTES,
+        'run_evidence_limit_bytes': MAX_RUN_EVIDENCE_BYTES,
+        'core_commit': catalog.get('core_commit'),
+        'input_sha256': {
+            'spec': _sha256(spec_path), 'catalog': _sha256(catalog_path),
+            'working_tree_scope': _sha256(scope_path),
+        },
+        'expected_untracked': scope.to_dict()['expected_untracked'],
+        'worker_python': str(executable), 'output_dir': str(output.resolve()),
+    }
+    _write_json(output / 'run_plan.json', plan)
     if not executable.is_file():
+        _write_json(output / 'run_preflight.json', {
+            'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+            'status': 'NOT_RUN_DEPENDENCY', 'worker_python': str(executable),
+            'python_available': False,
+        })
         return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_DEPENDENCY',
                 'reason': f'Python runtime is absent: {executable}'}
     mem_start = _mem_available_bytes()
     gpu_start = _gpu_free_mib() if provider == 'isaacsim' else None
     if mem_start < 6 * 1024**3:
+        _write_json(output / 'run_preflight.json', {
+            'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+            'status': 'NOT_RUN_RESOURCE_GATE', 'mem_available_start_bytes': mem_start,
+            'gpu_free_start_mib': gpu_start, 'shared_native_lock_acquired': False,
+        })
         return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_RESOURCE_GATE',
                 'mem_available_bytes': mem_start, 'reason': 'less than 6 GiB available RAM'}
     if provider == 'isaacsim' and gpu_start < 5120:
+        _write_json(output / 'run_preflight.json', {
+            'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+            'status': 'NOT_RUN_RESOURCE_GATE', 'mem_available_start_bytes': mem_start,
+            'gpu_free_start_mib': gpu_start, 'shared_native_lock_acquired': False,
+        })
         return {'seed': seed, 'provider': provider, 'status': 'NOT_RUN_RESOURCE_GATE',
                 'gpu_free_mib': gpu_start, 'reason': 'less than 5120 MiB free GPU memory'}
     environment = os.environ.copy()
@@ -161,6 +222,18 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
     environment['PYTHONDONTWRITEBYTECODE'] = '1'
     if provider != 'isaacsim':
         environment['PYTHONPATH'] = f'{CORE / "GeoPhys/src"}:{CORE}'
+    else:
+        environment['PYTHONNOUSERSITE'] = '1'
+        environment.update({
+            'OMP_NUM_THREADS': '4', 'MKL_NUM_THREADS': '4',
+            'OPENBLAS_NUM_THREADS': '4', 'NUMEXPR_NUM_THREADS': '4',
+            'TOKENIZERS_PARALLELISM': 'false',
+        })
+        environment['GEOCHORA_CORE_SITE'] = subprocess.check_output(
+            [str(CPU_PYTHON), '-c',
+             'import sysconfig; print(sysconfig.get_paths()["purelib"])'],
+            cwd=CORE, text=True, timeout=10,
+        ).strip()
     command = [str(executable), str(Path(__file__).with_name('builtin_example_worker.py')),
                '--spec', str(spec_path), '--catalog', str(catalog_path),
                '--working-tree-scope', str(scope_path), '--seed', str(seed),
@@ -170,8 +243,19 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         try:
             fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            _write_json(output / 'run_preflight.json', {
+                'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+                'status': 'BLOCKED_NATIVE_LOCK', 'mem_available_start_bytes': mem_start,
+                'gpu_free_start_mib': gpu_start, 'shared_native_lock_acquired': False,
+            })
             return {'seed': seed, 'provider': provider, 'status': 'BLOCKED_NATIVE_LOCK',
                     'reason': 'another process owns the shared native execution lock'}
+        _write_json(output / 'run_preflight.json', {
+            'schema_version': 'harness-builtin-pickcube-example-preflight-v1',
+            'status': 'READY', 'mem_available_start_bytes': mem_start,
+            'gpu_free_start_mib': gpu_start, 'shared_native_lock_acquired': True,
+            'shared_native_lock_path': str(LOCK), 'cpu_affinity_slots': 4,
+        })
         with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
             process = subprocess.Popen(
                 command, cwd=CORE, env=environment, stdout=stdout, stderr=stderr,
@@ -208,6 +292,10 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
                     resource_violation = f'process-group RSS above 10 GiB: {rss}'
                 elif provider == 'isaacsim' and gpu_free < 256:
                     resource_violation = f'GPU free memory below 256 MiB: {gpu_free}'
+                elif stdout_path.stat().st_size + stderr_path.stat().st_size > MAX_WORKER_LOG_BYTES:
+                    resource_violation = 'worker stdout/stderr exceeded 64 MiB log budget'
+                elif _directory_bytes(output) > MAX_RUN_EVIDENCE_BYTES:
+                    resource_violation = 'run output exceeded 2 GiB evidence budget'
                 if resource_violation:
                     _kill_process_group(process, signal.SIGTERM)
                     try:
@@ -217,6 +305,7 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
                     break
                 time.sleep(1.0)
             returncode = process.wait()
+            worker_process_wall_s = time.perf_counter() - wall_start
         # The run lock is retained through direct worker exit and process-group
         # retirement so an abnormal Kit shutdown cannot overlap a new run.
         pg_alive = True
@@ -233,6 +322,11 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
             _kill_process_group(process, signal.SIGKILL)
             resource_violation = resource_violation or 'worker process group did not end after parent exit'
         fcntl.flock(lock_stream.fileno(), fcntl.LOCK_UN)
+    _write_json(output / 'lock_receipt.json', {
+        'schema_version': 'harness-builtin-pickcube-example-lock-receipt-v1',
+        'shared_native_lock_path': str(LOCK), 'released_after_worker_process_group_exit': not pg_alive,
+        'lock_held_for_worker': True,
+    })
     receipt_path = output / 'run.json'
     receipt = json.loads(receipt_path.read_text()) if receipt_path.is_file() else None
     cold_read = _cold_read_h5(output, receipt, provider=provider)
@@ -244,6 +338,9 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
         'resource_violation': resource_violation,
         'mem_available_start_bytes': mem_start, 'gpu_free_start_mib': gpu_start,
         'wall_time_s': time.perf_counter() - wall_start,
+        'worker_process_wall_s': worker_process_wall_s,
+        'worker_process_starts': 1,
+        'physics_steps_upper_bound': plan['physics_steps_upper_bound'],
         'worker_process_group_ended': not pg_alive,
         'run_receipt': str(receipt_path.relative_to(CORE)) if receipt else None,
         'run_receipt_sha256': __import__('hashlib').sha256(receipt_path.read_bytes()).hexdigest() if receipt else None,
@@ -257,7 +354,8 @@ def _run_one(spec_path, catalog_path, scope_path, seed, output, *, provider):
     }
 
 
-def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_seed=None, provider_override=None):
+def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_seed=None,
+                      provider_override=None, source_delivery_manifest=None):
     spec = BuiltinPickCubeExampleV1.load(spec_path)
     if provider_override is not None:
         route = {
@@ -265,11 +363,13 @@ def validate_provider(spec_path, catalog_path, scope_path, output_dir, *, only_s
             'isaacsim': ('cuda', 'cuda:0'), 'genesis': ('cpu', 'cpu'),
             'sapien': ('cpu', 'cpu'),
         }[provider_override]
-        spec = replace(spec, provider=provider_override, backend=route[0], device=route[1])
+        manifest = source_delivery_manifest if provider_override == 'isaacsim' else None
+        if provider_override == 'isaacsim' and manifest is None:
+            manifest = spec.source_delivery_manifest
+        spec = replace(spec, provider=provider_override, backend=route[0], device=route[1],
+                       source_delivery_manifest=manifest)
     scope = ExampleWorkingTreeScopeV1.load(scope_path)
     catalog = json.loads(Path(catalog_path).read_text())
-    if spec.provider == 'isaacsim':
-        raise ValueError('Isaac F06 runtime-to-PickCube source binding is not implemented yet')
     from harness_compiler import compile_builtin_pickcube_example
     compiled = compile_builtin_pickcube_example(spec, catalog, working_tree_scope=scope)
     output_dir = Path(output_dir).resolve()
@@ -331,11 +431,14 @@ def main(argv=None):
     parser.add_argument('--working-tree-scope', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--provider', choices=('mujoco', 'geophys', 'isaacsim', 'genesis', 'sapien'))
+    parser.add_argument('--source-delivery-manifest', type=Path,
+                        help='required exact F06 PickCube USD manifest for --provider isaacsim')
     parser.add_argument('--only-seed', type=int, choices=(31, 32, 33))
     args = parser.parse_args(argv)
     result = validate_provider(args.spec, args.catalog, args.working_tree_scope,
                                args.output_dir, only_seed=args.only_seed,
-                               provider_override=args.provider)
+                               provider_override=args.provider,
+                               source_delivery_manifest=args.source_delivery_manifest)
     print(json.dumps({'provider': result['provider'], 'disposition': result['disposition'],
                       'runtime_valid_count': result['runtime_valid_count'],
                       'task_solved_count': result['task_solved_count']}, sort_keys=True))

@@ -462,6 +462,22 @@ class NativeSourceTendonRuntimeIOV1(Protocol):
     ) -> NativeSourceTendonWriteAckV1: ...
 
 
+def _canonical_panda_entity_id(source: UsdRuntimeSourceV1) -> str:
+    """Resolve the one Panda semantic Entity from the exact nine-joint source map."""
+    expected = {f'joint{index}' for index in range(1, 8)} | {
+        'finger_joint1', 'finger_joint2',
+    }
+    candidates = set()
+    by_entity: dict[str, set[str]] = {}
+    for canonical in source.joints:
+        entity_id, joint_id = canonical.split('/', 1)
+        by_entity.setdefault(entity_id, set()).add(joint_id)
+    candidates = {entity for entity, joints in by_entity.items() if joints == expected}
+    if len(candidates) != 1:
+        raise ValueError('USD RuntimeSource must bind exactly one nine-DOF Panda semantic Entity')
+    return next(iter(candidates))
+
+
 class UsdCoreRuntimeSession(_SessionValues):
     """Shared Core session lifecycle backed only by the native-I/O port."""
 
@@ -508,7 +524,7 @@ class UsdCoreRuntimeSession(_SessionValues):
                 execution=execution, source=source,
                 scene_identity_sha256=source.scene_definition.identity_hash,
                 native_metadata=self._native_io_metadata,
-                writer_id='panda-main/position-servo-v1',
+                writer_id=f'{_canonical_panda_entity_id(source)}/position-servo-v1',
             )
             if execution_provenance == 'synthetic_fixture':
                 from dataclasses import replace
@@ -575,9 +591,10 @@ class UsdCoreRuntimeSession(_SessionValues):
         self._begin_reset()
         self._validate_sample(sample)
         self._assert_native_identity()
-        arm = {f'panda-main/joint{index}': sample.joint_position[f'panda-main/joint{index}']
+        robot_entity_id = _canonical_panda_entity_id(self._source)
+        arm = {f'{robot_entity_id}/joint{index}': sample.joint_position[f'{robot_entity_id}/joint{index}']
                for index in range(1, 8)}
-        opening = sum(sample.joint_position[f'panda-main/finger_joint{index}'] for index in (1, 2))
+        opening = sum(sample.joint_position[f'{robot_entity_id}/finger_joint{index}'] for index in (1, 2))
         if type(self._drive_receipt).__name__ == 'IsaacSourceTendonDriveReceiptV1':
             targets = self._drive_receipt.arm_commands(arm)
         else:

@@ -13,5 +13,6 @@
   ],
   "horizon_control_ticks": 1000,
   "physics_dt_s": 0.002,
-  "control_substeps": 5
+  "control_substeps": 5,
+  "source_delivery_manifest": null
 }

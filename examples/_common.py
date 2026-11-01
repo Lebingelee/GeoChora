@@ -186,6 +186,10 @@ def load_recording_summary(path: Path) -> dict:
 
     with h5py.File(path, "r") as handle:
         canonical_outer = "numeric" in handle and "logical_json" in handle
+        generic_v3 = (
+            str(handle.attrs.get("schema_id", "")) == "task-env-h5"
+            and str(handle.attrs.get("schema_version", "")) == "v3"
+        )
     if canonical_outer:
         from task_env.trajectory.canonical.h5 import load
 
@@ -194,6 +198,39 @@ def load_recording_summary(path: Path) -> dict:
         boundaries = len(trajectory.boundaries)
         metadata = trajectory.metadata.to_mapping()
         schema = trajectory.schema_version
+    elif generic_v3:
+        from task_env.recorders import load_structured_control_records_h5
+
+        trajectory = load_structured_control_records_h5(path)
+        transitions = trajectory["transition_count"]
+        boundaries = trajectory["observation_count"]
+        profile = trajectory["env_meta"].get("reference_profile", {})
+        valid_counts = boundaries == transitions + 1
+        source_present = bool(
+            isinstance(profile, dict) and profile.get("source_id")
+            and profile.get("source_closure_digest")
+        )
+        provider_present = bool(
+            isinstance(profile, dict) and profile.get("provider")
+            and profile.get("provider_build_identity")
+        )
+        return {
+            "schema": "task-env-h5/v3",
+            "transitions": transitions,
+            "boundaries": boundaries,
+            "t_plus_one_valid": valid_counts,
+            "task_artifact_sha256": profile.get("task_artifact_identity_hash"),
+            "controller_identity": profile.get("controller_identity"),
+            "expert_identity": profile.get("solution_identity"),
+            "provider_provenance_present": provider_present,
+            "source_provenance_present": source_present,
+            "source_revision": None,
+            "resolved_configuration_identity": profile.get("execution_identity_sha256"),
+            "source_file_sha256_count": 0,
+            "storage_roundtrip": "PASS" if valid_counts else "FAIL",
+            "qualification": "NOT_ASSESSED",
+            "D0": "NOT_ASSESSED",
+        }
     else:
         from task_env.trajectory.canonical.execution import load
 

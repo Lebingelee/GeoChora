@@ -5,9 +5,20 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
+import sys
 import time
 import traceback
+
+_CORE_ROOT = Path(__file__).resolve().parents[3]
+if str(_CORE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CORE_ROOT))
+_CORE_SITE = os.environ.get('GEOCHORA_CORE_SITE')
+if _CORE_SITE and Path(_CORE_SITE).is_dir() and _CORE_SITE not in sys.path:
+    # Keep Isaac's native packages first; use the frozen Core environment only
+    # for Python dependencies that the Isaac distribution does not ship.
+    sys.path.append(_CORE_SITE)
 
 from builtin_example_schema import BuiltinPickCubeExampleV1, ExampleWorkingTreeScopeV1
 from catalog_query import core_context
@@ -50,11 +61,99 @@ def _planned_action_count(trajectory):
     return sum(1 for transition in transitions if transition.planned_action is True)
 
 
+def _read_f06_position_h5(path: Path, output: Path, row: dict) -> dict:
+    """Validate the existing generic-v3 Position recorder and planned-action trace."""
+    import h5py
+    import numpy as np
+    from task_env.recorders import load_structured_control_records_h5
+
+    generic = load_structured_control_records_h5(path)
+    transition_count = generic['transition_count']
+    observation_count = generic['observation_count']
+    profile = generic['env_meta'].get('reference_profile', {})
+    if not isinstance(profile, dict):
+        raise ValueError('F06 v3 H5 has no Position source-profile metadata')
+    expected_profile = {
+        'provider': 'isaacsim', 'backend': 'cuda', 'device': 'cuda:0',
+        'determinism_mode': 'best_effort',
+        'task_artifact_identity_hash': row.get('artifact_sha256'),
+        'controller_identity': row.get('controller_identity'),
+        'solution_identity': row.get('solution_identity'),
+        'source_id': row.get('runtime_source_id'),
+    }
+    for key, expected in expected_profile.items():
+        if profile.get(key) != expected:
+            raise ValueError(f'F06 v3 H5 source profile differs at {key}')
+    if (not profile.get('source_closure_digest')
+            or profile.get('delivery_manifest_sha256') != row.get('source_delivery_manifest_sha256')):
+        raise ValueError('F06 v3 H5 omits its pinned source closure or delivery manifest identity')
+    bootstrap = profile.get('native_public_bootstrap_receipt')
+    if not isinstance(bootstrap, dict) or bootstrap.get('schema_version') != 'isaac-public-physics-bootstrap-v1':
+        raise ValueError('F06 v3 H5 omits the public Isaac bootstrap counter receipt')
+    before, after, bootstrap_steps = (
+        bootstrap.get('step_index_before'), bootstrap.get('step_index_after'),
+        bootstrap.get('physics_steps'),
+    )
+    dt = bootstrap.get('physics_dt_s')
+    bootstrap_time = bootstrap.get('physics_time_s')
+    if (any(type(value) is not int or value < 0 for value in (before, after, bootstrap_steps))
+            or after - before != bootstrap_steps or type(dt) not in (int, float)
+            or type(bootstrap_time) not in (int, float)
+            or not np.isfinite((dt, bootstrap_time)).all()
+            or dt != row['physics_dt_s'] or bootstrap_steps > 10
+            or not np.isclose(bootstrap_time, bootstrap_steps * dt, rtol=0.0, atol=1e-8)):
+        raise ValueError('F06 public Isaac bootstrap counters/time exceed or differ from the run plan')
+    shapes = {}
+    with h5py.File(path, 'r') as handle:
+        def inspect_dataset(name, value):
+            if isinstance(value, h5py.Dataset):
+                data = value[...]
+                if data.dtype.kind in 'fc' and not np.isfinite(data).all():
+                    raise ValueError(f'F06 H5 numeric field {name} contains nonfinite values')
+                if data.dtype.kind in 'biufc':
+                    shapes[name] = list(data.shape)
+        handle.visititems(inspect_dataset)
+    trace = json.loads((output / 'step_trace.json').read_text())
+    trace_rows = trace.get('rows', [])
+    if len(trace_rows) != transition_count or trace.get('completed_transitions') != transition_count:
+        raise ValueError('F06 action trace does not cover every finalized Position transition')
+    expected_control_dt = row['physics_dt_s'] * row['control_substeps']
+    if any(not np.isclose(
+            float(item.get('simulation_time_after_s')) - float(item.get('simulation_time_before_s')),
+            expected_control_dt, rtol=0.0, atol=1e-7,
+    ) for item in trace_rows):
+        raise ValueError('F06 Position trace interval clocks differ from the frozen physics/control timebase')
+    controls = generic['structured_controls']
+    planned_rows = [item for item in trace_rows
+                    if item.get('planned_action') is True and item.get('readiness_hold') is not True]
+    planning_count = len(planned_rows)
+    if planning_count <= 0:
+        raise ValueError('F06 episode contains no non-hold Core-planned action')
+    for index, (control, trace_row) in enumerate(zip(controls, trace_rows, strict=True)):
+        if control is None:
+            raise ValueError(f'F06 H5 transition {index} has no structured control record')
+        request_values = tuple(value for group in control.request.groups for value in group.values)
+        observed_values = tuple(trace_row.get('planned_action_values', ()))
+        if (len(request_values) != 8 or len(observed_values) != 8
+                or not np.allclose(request_values, observed_values, rtol=0.0, atol=1e-7)):
+            raise ValueError(f'F06 H5 transition {index} differs from its Core solution proposal trace')
+    return {
+        'transition_count': transition_count,
+        'observation_count': observation_count,
+        'planning_action_count': planning_count,
+        'profile': profile,
+        'bootstrap_steps': bootstrap_steps,
+        'completed_interval_physics_steps': transition_count * row['control_substeps'],
+        'native_steps_measured_completed': bootstrap_steps + transition_count * row['control_substeps'],
+        'numeric_shapes': shapes,
+    }
+
+
 def _prepare_output_directory(output: Path):
     output = output.resolve()
     if output.exists():
         unexpected = {path.name for path in output.iterdir()} - {
-            'worker.stdout.log', 'worker.stderr.log',
+            'worker.stdout.log', 'worker.stderr.log', 'run_plan.json', 'run_preflight.json',
         }
         if unexpected:
             raise FileExistsError(f'worker output directory already contains data: {sorted(unexpected)}')
@@ -63,10 +162,24 @@ def _prepare_output_directory(output: Path):
     return output
 
 
+def _terminate_isaac_worker(exit_code: int) -> None:
+    """Leave the isolated Kit process after its durable run receipt is written."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (OSError, ValueError):
+            pass
+    os._exit(int(exit_code))
+
+
 def _install_action_trace(env, path: Path):
     """Capture the public expert proposal and state around each step attempt."""
     capture = {'attempted': 0, 'completed': 0, 'rows': []}
-    original_step = env._step
+    position_route = (
+        bool(getattr(env, 'position_profile', False))
+        and getattr(env, 'value', {}).get('f06_pickcube_isaac_input') is not None
+    )
+    original_step = env._step_position_profile if position_route else env._step
 
     def pose(state, name):
         value = getattr(state, 'pose_world', {}).get(name)
@@ -95,13 +208,27 @@ def _install_action_trace(env, path: Path):
     def observed_step(action, *, proposal=None, observer_solution=None):
         capture['attempted'] += 1
         state = env.state
+        if position_route:
+            groups = {(group.entity_id, group.group_id): group for group in action.groups}
+            entity_id = env.position_profiles[0].entity_id
+            values = tuple(float(value) for value in (
+                *groups[(entity_id, 'arm')].values,
+                *groups[(entity_id, 'gripper')].values,
+            ))
+        else:
+            values = tuple(float(value) for value in action)
+        proposal_diagnostics = dict(getattr(proposal, 'diagnostics', {}))
         row = {
             'attempt': capture['attempted'],
             'control_step_before': int(state.control_step),
             'simulation_time_before_s': float(state.simulation_time),
             'proposal_stage': getattr(proposal, 'stage', None),
-            'planned_tcp_pose': list(map(float, action[:7])) if len(action) >= 7 else list(map(float, action)),
-            'gripper_request': float(action[7]) if len(action) >= 8 else None,
+            'proposal_diagnostics': proposal_diagnostics,
+            'planned_action': proposal is not None,
+            'readiness_hold': proposal_diagnostics.get('readiness_hold') is True,
+            'planned_action_values': list(values),
+            'planned_tcp_pose': list(values[:7]),
+            'gripper_request': values[7] if len(values) >= 8 else None,
             'eef_pose_before': pose(state, 'panda-v1/ee'),
             'cube_pose_before': pose(state, 'cube-v1'),
             'arm_joint_position_before_rad': arm_state(state, 'joint_position'),
@@ -138,7 +265,10 @@ def _install_action_trace(env, path: Path):
             write_trace()
         return result
 
-    env._step = observed_step
+    if position_route:
+        env._step_position_profile = observed_step
+    else:
+        env._step = observed_step
     return capture, write_trace
 
 
@@ -185,6 +315,9 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                    recipe_identity=compiled.recipe_identity,
                    source_revision=compiled.source_revision,
                    source_sha256=compiled.source_sha256,
+                   source_delivery_manifest_sha256=compiled.source_sha256.get(
+                       'f06_delivery_manifest_sha256'
+                   ),
                    runtime_source_id=compiled.runtime_source_id,
                    runtime_source_sha256=compiled.runtime_source_sha256,
                    working_tree_scope=compiled.working_tree_scope,
@@ -262,36 +395,59 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                                       'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))})
     if h5.is_file():
         try:
-            trajectory = load_canonical(h5)
-            shapes = _numeric_check(trajectory)
-            transition_count = len(trajectory.transitions)
-            observation_count = len(trajectory.boundaries)
-            row['planning_action_count'] = _planned_action_count(trajectory)
-            metadata = trajectory.metadata.to_mapping()
-            if observation_count != transition_count + 1:
-                raise ValueError('canonical trajectory does not satisfy T+1')
-            if metadata.get('task_artifact_hash') != row.get('artifact_sha256'):
-                raise ValueError('H5 TaskArtifact identity differs from compiled built-in task')
-            if metadata.get('controller_identity') != row.get('controller_identity'):
-                raise ValueError('H5 controller identity differs from executed controller')
-            if metadata.get('expert_identity') != row.get('solution_identity'):
-                raise ValueError('H5 solution identity differs from executed solution')
-            if [item.requested_action for item in trajectory.transitions] and row['planning_action_count'] == 0:
-                # Canonical requested actions alone can be caller supplied;
-                # planned_action is the Core proposal provenance gate.
-                raise ValueError('no Core solution-planned action was recorded')
-            row['recording'] = {
-                'path': h5.name, 'sha256': hashlib.sha256(h5.read_bytes()).hexdigest(),
-                'bytes': h5.stat().st_size, 'schema': 'canonical-v0',
-                'transitions': transition_count, 'observations': observation_count,
-                't_plus_one_valid': observation_count == transition_count + 1,
-                'numeric_shapes': shapes,
-                'provider_build': metadata.get('provider_provenance'),
-                'source_provenance': metadata.get('source_provenance'),
-                'controller_identity': metadata.get('controller_identity'),
-                'solution_identity': metadata.get('expert_identity'),
-            }
-            row['producer_readback'] = 'same-process-canonical-reader-pass'
+            if spec.provider == 'isaacsim':
+                readback = _read_f06_position_h5(h5, output, row)
+                row['planning_action_count'] = readback['planning_action_count']
+                row['native_bootstrap_steps'] = readback['bootstrap_steps']
+                row['native_completed_interval_steps'] = readback['completed_interval_physics_steps']
+                row['native_steps_measured_completed'] = readback['native_steps_measured_completed']
+                profile = readback['profile']
+                transition_count = readback['transition_count']
+                observation_count = readback['observation_count']
+                row['recording'] = {
+                    'path': h5.name, 'sha256': hashlib.sha256(h5.read_bytes()).hexdigest(),
+                    'bytes': h5.stat().st_size, 'schema': 'task-env-h5/v3',
+                    'transitions': transition_count, 'observations': observation_count,
+                    't_plus_one_valid': observation_count == transition_count + 1,
+                    'numeric_shapes': readback['numeric_shapes'],
+                    'provider_build': profile.get('provider_build_identity'),
+                    'source_provenance': {
+                        'source_id': profile.get('source_id'),
+                        'source_closure_digest': profile.get('source_closure_digest'),
+                    },
+                    'controller_identity': profile.get('controller_identity'),
+                    'solution_identity': profile.get('solution_identity'),
+                }
+                row['producer_readback'] = 'same-process-structured-control-v3-reader-pass'
+            else:
+                trajectory = load_canonical(h5)
+                shapes = _numeric_check(trajectory)
+                transition_count = len(trajectory.transitions)
+                observation_count = len(trajectory.boundaries)
+                row['planning_action_count'] = _planned_action_count(trajectory)
+                metadata = trajectory.metadata.to_mapping()
+                if observation_count != transition_count + 1:
+                    raise ValueError('canonical trajectory does not satisfy T+1')
+                if metadata.get('task_artifact_hash') != row.get('artifact_sha256'):
+                    raise ValueError('H5 TaskArtifact identity differs from compiled built-in task')
+                if metadata.get('controller_identity') != row.get('controller_identity'):
+                    raise ValueError('H5 controller identity differs from executed controller')
+                if metadata.get('expert_identity') != row.get('solution_identity'):
+                    raise ValueError('H5 solution identity differs from executed solution')
+                if [item.requested_action for item in trajectory.transitions] and row['planning_action_count'] == 0:
+                    raise ValueError('no Core solution-planned action was recorded')
+                row['recording'] = {
+                    'path': h5.name, 'sha256': hashlib.sha256(h5.read_bytes()).hexdigest(),
+                    'bytes': h5.stat().st_size, 'schema': 'canonical-v0',
+                    'transitions': transition_count, 'observations': observation_count,
+                    't_plus_one_valid': observation_count == transition_count + 1,
+                    'numeric_shapes': shapes,
+                    'provider_build': metadata.get('provider_provenance'),
+                    'source_provenance': metadata.get('source_provenance'),
+                    'controller_identity': metadata.get('controller_identity'),
+                    'solution_identity': metadata.get('expert_identity'),
+                }
+                row['producer_readback'] = 'same-process-canonical-reader-pass'
         except BaseException as error:
             row['errors'].append({'phase': 'h5-readback', 'type': type(error).__name__, 'message': str(error),
                                   'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))})
@@ -329,7 +485,10 @@ def main(argv=None):
     print(json.dumps({'seed': row['seed'], 'provider': row['provider'],
                       'status': row['status'], 'task_outcome': row['task_outcome'],
                       'errors': row['errors']}, sort_keys=True), flush=True)
-    return 0 if row['runtime_valid'] else 1
+    exit_code = 0 if row['runtime_valid'] else 1
+    if spec.provider == 'isaacsim':
+        _terminate_isaac_worker(exit_code)
+    return exit_code
 
 
 if __name__ == '__main__':

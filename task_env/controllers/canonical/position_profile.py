@@ -111,6 +111,7 @@ class PandaPositionServoProfileV1:
         nullspace_reference_gain=0.0, pose_target_method='achieved_state_dls_v1',
         arm_target_limits=None, arm_target_limit_source='kinematics_model_v1',
         arm_tracking_method='canonical_position_v1', arm_tracking_profile=None,
+        arm_joint_velocity_limit_rad_s=2.0,
     ):
         self.artifact = artifact
         self.source = source
@@ -185,6 +186,7 @@ class PandaPositionServoProfileV1:
                 model, artifact_hash=artifact.identity_hash, config=config,
                 control_dt=artifact.timebase.control_dt,
                 profile=self.arm_tracking_profile,
+                joint_velocity_limit_rad_s=arm_joint_velocity_limit_rad_s,
             )
         elif arm_tracking_profile is not None:
             raise ValueError('R3 physical profile is only accepted with production_r3_continuous_v1')
@@ -309,7 +311,9 @@ class PandaPositionServoProfileV1:
                         nullspace_reference_gain=0.0,
                         pose_target_method='achieved_state_dls_v1',
                         arm_tracking_method='canonical_position_v1',
-                        arm_tracking_profile=None):
+                        arm_tracking_profile=None, entity_id='panda-main',
+                        hand_frame_id='hand', tcp_profile=None,
+                        arm_joint_velocity_limit_rad_s=2.0):
         """Bind the existing Position math to one versioned USD source.
 
         ``kinematics_source_xml`` must be locally calibrated to the selected
@@ -349,8 +353,9 @@ class PandaPositionServoProfileV1:
                     'isaac-gpu-physx-f04-position-v1',
                     'geophys-usd-position-f05-native-v1',
                     'isaac-gpu-physx-f05-dg03-usd-v1',
-                    'isaac-gpu-physx-f05-dg04-native-mimic-v1'}:
-                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG03 or DG04 profile')
+                    'isaac-gpu-physx-f05-dg04-native-mimic-v1',
+                    'isaac-gpu-physx-pickcube-f06-v1'}:
+                raise ValueError('deferred native receipt requires an exact admitted F04, F05, DG03, DG04 or F06 profile')
         elif (native_drive_receipt.scene_identity_sha256,
               native_drive_receipt.source_closure_sha256,
               native_drive_receipt.execution_identity_sha256,
@@ -364,7 +369,9 @@ class PandaPositionServoProfileV1:
               execution.physics_backend, execution.physics_device,
               execution.determinism_mode):
             raise ValueError('named DOF receipt does not bind the exact USD Scene/source closure')
-        expected_joint_bindings = dict(_EXPECTED_JOINT_BINDINGS)
+        expected_joint_bindings = {
+            f'{entity_id}/{joint_id}': joint_id for joint_id in _JOINT_IDS
+        }
         if set(source.joints) != set(expected_joint_bindings):
             raise ValueError('PositionServoV1 USD source must bind exactly seven Arm and two finger Joints')
         if native_drive_receipt is None:
@@ -393,21 +400,37 @@ class PandaPositionServoProfileV1:
                 raise ValueError('DG03 source Joint names differ from its model-bound source tendon receipt')
             if dict(source.joint_targets) != target_by_joint:
                 raise ValueError('PositionServoV1 USD target map differs from named DOF receipt')
-        hand_binding = source.bodies.get('panda-main/hand')
-        if type(hand_binding) is not str or not hand_binding.strip():
-            raise ValueError('PositionServoV1 USD hand state requires an explicit source Frame binding')
-        if (type(native_drive_receipt) is IsaacNamedPositionDriveReceiptV1
-                and hand_binding != 'hand'):
-            raise ValueError('synthetic Position USD hand state must retain its exact F03 hand mapping')
+        f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+        if f06_pickcube:
+            if (entity_id != 'panda-v1' or hand_frame_id != 'ee'
+                    or source.frames.get('panda-v1/ee') != (
+                        '/F06Scene/panda/Geometry/link0/link1/link2/link3/link4/'
+                        'link5/link6/link7/hand/ee'
+                    ) or native_drive_receipt is not None):
+                raise ValueError('F06 Position requires its exact typed PickCube TCP Frame and deferred native receipt')
+        else:
+            hand_binding = source.bodies.get(f'{entity_id}/hand')
+            if type(hand_binding) is not str or not hand_binding.strip():
+                raise ValueError('PositionServoV1 USD hand state requires an explicit source Frame binding')
+            if (type(native_drive_receipt) is IsaacNamedPositionDriveReceiptV1
+                    and hand_binding != 'hand'):
+                raise ValueError('synthetic Position USD hand state must retain its exact F03 hand mapping')
         if type(kinematics_source_xml) is not str or not kinematics_source_xml.strip():
             raise ValueError('PositionServoV1 requires a nonempty source-calibrated kinematics description')
         config = config or ActionConfig()
         if not isinstance(config, ActionConfig):
             raise TypeError('PositionServoV1 requires the existing ActionConfig')
         from .kinematics import PandaKinematics
-        model = PandaKinematics(kinematics_source_xml, tcp_profile=PANDA_HAND_ORIGIN_TCP_V1)
+        if f06_pickcube:
+            from .kinematics import PANDA_PICKCUBE_EE_TCP_V1
+            tcp_profile = PANDA_PICKCUBE_EE_TCP_V1 if tcp_profile is None else tcp_profile
+        else:
+            if tcp_profile is not None and tcp_profile != PANDA_HAND_ORIGIN_TCP_V1:
+                raise ValueError('non-F06 USD Position routes retain the hand-origin TCP')
+            tcp_profile = PANDA_HAND_ORIGIN_TCP_V1
+        model = PandaKinematics(kinematics_source_xml, tcp_profile=tcp_profile)
         arm_targets = {
-            f'panda-main/joint{index}': target_by_joint[f'panda-main/joint{index}']
+            f'{entity_id}/joint{index}': target_by_joint[f'{entity_id}/joint{index}']
             for index in range(1, 8)
         }
         arm_target_limits = None
@@ -428,7 +451,7 @@ class PandaPositionServoProfileV1:
             limits = []
             for index in range(1, 8):
                 row = drive_by_joint[f'joint{index}']
-                if row.native_dof_name != arm_targets[f'panda-main/joint{index}']:
+                if row.native_dof_name != arm_targets[f'{entity_id}/joint{index}']:
                     raise ValueError('DG02 native arm target mapping differs from its bound drive receipt')
                 lower = max(float(model.limits[index - 1, 0]), float(row.lower_limit))
                 upper = min(float(model.limits[index - 1, 1]), float(row.upper_limit))
@@ -447,6 +470,9 @@ class PandaPositionServoProfileV1:
             arm_target_limit_source=arm_target_limit_source,
             arm_tracking_method=arm_tracking_method,
             arm_tracking_profile=arm_tracking_profile,
+            arm_joint_velocity_limit_rad_s=arm_joint_velocity_limit_rad_s,
+            entity_id=entity_id, hand_frame_id=hand_frame_id,
+            tcp_profile=tcp_profile,
         )
 
     @classmethod

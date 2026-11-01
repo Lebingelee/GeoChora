@@ -10,10 +10,16 @@ the repository has no editable-install metadata, so set `PYTHONPATH` explicitly.
 ```bash
 PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --seed 31
 PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19
+PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json
 ```
 
-The task examples require an explicit `geophys` or `mujoco` provider and use
-CPU. PickCube selects `pick-cube-p16-reference-v1`; NutAssembly selects
+PickCube selects `pick-cube-p16-reference-v1`; MuJoCo and GeoPhys use CPU.
+Isaac uses the versioned F06 USD delivery, CUDA PhysX and the supervised
+Harness worker; provide its exact delivery manifest explicitly. That route
+uses the same public `make_env` and PickCube task owner and does not apply the
+CPU process `RLIMIT_AS` option. Genesis/SAPIEN remain optional catalog entries;
+this task binding reports them unsupported until their existing dependency and
+capability intersections are ready. NutAssembly selects
 `nut-assembly-outcome-reference-v1` and advances only through guarded
 `step_expert()`. Both report task success separately from expert completion.
 NutAssembly must complete its planned stages and retreat to return success; a
@@ -32,6 +38,7 @@ runtime imports.
 | Workflow | Command | Current scope and result |
 | --- | --- | --- |
 | Scalar task construction and expert rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider mujoco --seed 31` | Selected PickCube P1.6 expert, scalar CPU; bounded MuJoCo example completed successfully. |
+| F06 PickCube on Isaac Sim | `PYTHONPATH=GeoPhys/src:. python examples/tasks/pick_cube.py --provider isaacsim --seed 31 --horizon 1000 --source-delivery-manifest workspace/maintenance/phase_ii_01_sol_luna_handoff_20261023_001/f06_001/isaac_usd_v2/delivery_manifest.json` | The built-in Harness compiles the exact locally validated PickCube USD delivery and supervises one CUDA PhysX episode; result is runtime evidence only, with task outcome reported separately. |
 | Guarded task rollout | `PYTHONPATH=GeoPhys/src:. python examples/tasks/nut_assembly.py --provider geophys --seed 19` | This CLI uses the retained `step_expert()` path; incomplete route exits nonzero. Separately, the task-owned external Solution has bounded MuJoCo CPU S2/S3 and a diagnostic GeoPhys CPU/CUDA × 100/500 Hz S2/S3 comparison. The GeoPhys matrix deliberately reads the public host snapshot each native step and does not grant general capability; see the [C05c comparison](../docs/module/task_env/goal/Phase_II/C_Development_Record.md#c05c). |
 | Canonical expert recording | `PYTHONPATH=GeoPhys/src:. python examples/recording/record_expert.py --env-id pick-cube-p16-reference-v1 --provider mujoco --seed 31 --output workspace/examples/pickcube-mujoco.h5` | Requires a fresh output path; finalizes the existing canonical H5 recorder and checks transitions, T+1 boundaries, provenance, and storage roundtrip. |
 | Offline H5 inspection | `PYTHONPATH=GeoPhys/src:. python examples/recording/inspect_h5.py --input workspace/examples/pickcube-mujoco.h5` | Reads the existing canonical schema and validates logical/numeric integrity and T+1 boundaries. It does not replay the task or claim D0. |

@@ -407,12 +407,17 @@ class IsaacNativeMimicPositionDriveReceiptV1:
             (self.execution_identity_sha256, 'ExecutionSpec'),
         ):
             _sha(value, label)
+        f06_profile = self.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+        expected_profile = (
+            'isaac-gpu-physx-pickcube-f06-v1' if f06_profile
+            else 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
+        )
         if (self.provider_build_identity, self.physics_profile, self.backend,
                 self.device, self.determinism_mode, self.physics_dt_s,
                 self.control_substeps) != (
-                'isaacsim-6.2.0.0', 'isaac-gpu-physx-f05-dg04-native-mimic-v1',
+                'isaacsim-6.2.0.0', expected_profile,
                 'cuda', 'cuda:0', 'best_effort', 0.002, 5):
-            raise ValueError('DG04 receipt differs from the fixed Isaac 6.2 CUDA PhysX profile')
+            raise ValueError('native mimic receipt differs from its fixed Isaac 6.2 CUDA PhysX profile')
         _stable_identity(self.writer_id, 'writer ID')
         names = tuple(self.native_dof_names)
         expected_names = {f'joint{index}' for index in range(1, 8)} | {
@@ -432,9 +437,16 @@ class IsaacNativeMimicPositionDriveReceiptV1:
         object.__setattr__(self, 'native_dof_names', names)
         object.__setattr__(self, 'native_position_limits', MappingProxyType(limits))
         rows = tuple(self.drives)
+        entities = {row.canonical_joint.entity_id for row in rows}
+        if len(entities) != 1:
+            raise ValueError('native mimic receipt must bind one canonical Panda Entity')
+        entity_id = next(iter(entities))
+        expected_entity_id = 'panda-v1' if f06_profile else 'panda-main'
+        if entity_id != expected_entity_id:
+            raise ValueError('native mimic receipt canonical Panda identity differs from its admitted profile')
         expected_driven_joints = {
-            JointReference('panda-main', f'joint{index}') for index in range(1, 8)
-        } | {JointReference('panda-main', 'finger_joint1')}
+            JointReference(entity_id, f'joint{index}') for index in range(1, 8)
+        } | {JointReference(entity_id, 'finger_joint1')}
         if (len(rows) != 8 or any(type(row) is not IsaacNamedPositionDriveV1 for row in rows)
                 or {row.canonical_joint for row in rows} != expected_driven_joints):
             raise ValueError('DG04 drive receipt must contain seven Arm drives and one leading-finger drive')
@@ -445,21 +457,26 @@ class IsaacNativeMimicPositionDriveReceiptV1:
             raise ValueError('DG04 active drive index/unit/limit differs from public articulation metadata')
         if len({row.native_dof_index for row in rows}) != 8:
             raise ValueError('DG04 active drive indices must be unique')
+        expected_gripper_profile = (
+            (5000.0, 120.0, 5.0) if f06_profile else (2000.0, 100.0, 100.0)
+        )
         if (self.mimic_follower_joint, self.mimic_reference_joint,
                 float(self.mimic_gearing), float(self.mimic_offset_m),
                 float(self.mimic_natural_frequency_hz), float(self.mimic_damping_ratio),
                 float(self.gripper_drive_stiffness_N_m), float(self.gripper_drive_damping_N_s_m),
                 float(self.gripper_force_limit_N), self.native_mimic_api, self.native_drive_api) != (
                 'finger_joint2', 'finger_joint1', 1.0, 0.0, 25.0, 1.0,
-                2000.0, 100.0, 100.0,
+                *expected_gripper_profile,
                 'PhysxMimicJointAPI:transX', 'PhysicsDriveAPI:linear'):
-            raise ValueError('DG04 receipt differs from its explicitly versioned native mimic adaptation')
-        if (self.gripper_force_limit_N != 100.0
+            raise ValueError('native mimic receipt differs from its explicitly versioned drive adaptation')
+        expected_finger_high = 0.04 if f06_profile else 0.04
+        expected_force = 5.0 if f06_profile else 100.0
+        if (self.gripper_force_limit_N != expected_force
                 or limits['finger_joint1'][0] > 2e-9
-                or limits['finger_joint1'][1] < 0.04 - 2e-9
+                or limits['finger_joint1'][1] < expected_finger_high - 2e-9
                 or limits['finger_joint2'][0] > 2e-9
-                or limits['finger_joint2'][1] < 0.04 - 2e-9):
-            raise ValueError('DG04 native hand profile cannot represent the frozen 0–0.08 m opening/100 N cap')
+                or limits['finger_joint2'][1] < expected_finger_high - 2e-9):
+            raise ValueError('native hand profile cannot represent its exact admitted opening/force-cap contract')
 
     @property
     def native_dof_count(self) -> int:
@@ -1018,10 +1035,11 @@ class GeoPhysUsdSourceActuationReceiptV2:
         if requested_opening > max_common_opening + 2e-9:
             raise ValueError('Hand opening target exceeds a source finger-joint limit')
         half = min(requested_opening / 2.0, min(finger_upper))
-        positions = {JointReference('panda-main', name.split('/', 1)[1]): float(value)
+        entity_id = self.drives[0].canonical_joint.entity_id
+        positions = {JointReference(entity_id, name.split('/', 1)[1]): float(value)
                      for name, value in arm_position.items()}
-        positions[JointReference('panda-main', 'finger_joint1')] = half
-        positions[JointReference('panda-main', 'finger_joint2')] = half
+        positions[JointReference(entity_id, 'finger_joint1')] = half
+        positions[JointReference(entity_id, 'finger_joint2')] = half
         result = []
         for row in self.drives:
             target = positions[row.canonical_joint]
@@ -1196,19 +1214,24 @@ def compile_isaac_native_mimic_position_receipt_v1(
     source.validate()
     execution.validate()
     native_metadata.validate_binding(source.task_artifact, execution, source)
+    f06_profile = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+    expected_profile = (
+        'isaac-gpu-physx-pickcube-f06-v1' if f06_profile
+        else 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
+    )
     if (execution.physics_provider, execution.physics_backend, execution.physics_device,
             execution.determinism_mode, execution.physics_profile) != (
-            'isaacsim', 'cuda', 'cuda:0', 'best_effort',
-            'isaac-gpu-physx-f05-dg04-native-mimic-v1'):
-        raise ValueError('DG04 receipt compiler refuses a different Isaac execution profile')
+            'isaacsim', 'cuda', 'cuda:0', 'best_effort', expected_profile):
+        raise ValueError('native mimic receipt compiler refuses a different Isaac execution profile')
     if (native_metadata.provider_build_identity, native_metadata.physics_provider,
             native_metadata.backend, native_metadata.device, native_metadata.determinism_mode) != (
             'isaacsim-6.2.0.0', 'isaacsim', 'cuda', 'cuda:0', 'best_effort'):
         raise ValueError('DG04 receipt compiler refuses a different public Isaac build/device')
+    expected_entity = 'panda-v1' if f06_profile else 'panda-main'
     expected_targets = {
-        **{f'panda-main/joint{index}': f'joint{index}' for index in range(1, 8)},
-        'panda-main/finger_joint1': 'finger_joint1',
-        'panda-main/finger_joint2': 'finger_joint2',
+        **{f'{expected_entity}/joint{index}': f'joint{index}' for index in range(1, 8)},
+        f'{expected_entity}/finger_joint1': 'finger_joint1',
+        f'{expected_entity}/finger_joint2': 'finger_joint2',
     }
     if dict(source.joint_targets) != expected_targets or dict(source.joints) != expected_targets:
         raise ValueError('DG04 source joint map differs from its exact nine-DOF Menagerie map')
@@ -1216,12 +1239,15 @@ def compile_isaac_native_mimic_position_receipt_v1(
         raise TypeError('DG04 receipt requires the exact public native drive/mimic witness')
     expected_active = [f'joint{index}' for index in range(1, 8)] + ['finger_joint1']
     expected_witness = {
-        'schema_version': 'isaac-dg04-native-mimic-drive-witness-v1',
+        'schema_version': (
+            'isaac-f06-pickcube-native-mimic-drive-witness-v1' if f06_profile
+            else 'isaac-dg04-native-mimic-drive-witness-v1'
+        ),
         'active_drive_dofs': expected_active,
         'passive_mimic_dof': 'finger_joint2',
-        'leader_stiffness_N_m': 2000.0,
-        'leader_damping_N_s_m': 100.0,
-        'leader_max_effort_N': 100.0,
+        'leader_stiffness_N_m': 5000.0 if f06_profile else 2000.0,
+        'leader_damping_N_s_m': 120.0 if f06_profile else 100.0,
+        'leader_max_effort_N': 5.0 if f06_profile else 100.0,
         'leader_drive_type': 'force',
         'follower_stiffness_N_m': 0.0,
         'follower_damping_N_s_m': 0.0,
@@ -1265,6 +1291,9 @@ def compile_isaac_native_mimic_position_receipt_v1(
         execution.determinism_mode, float(source.task_artifact.timebase.physics_dt),
         int(source.task_artifact.timebase.control_substeps), writer_id,
         tuple(native_metadata.native_dof_names), limits, tuple(drives),
+        gripper_drive_stiffness_N_m=5000.0 if f06_profile else 2000.0,
+        gripper_drive_damping_N_s_m=120.0 if f06_profile else 100.0,
+        gripper_force_limit_N=5.0 if f06_profile else 100.0,
     )
 
 

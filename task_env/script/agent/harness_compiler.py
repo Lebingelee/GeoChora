@@ -65,6 +65,8 @@ class CompiledBuiltinPickCubeExampleV1:
             'backend': self.spec.backend,
             'horizon': self.spec.horizon_control_ticks,
             'controller_profile': self.spec.controller_profile,
+            **({'source_delivery_manifest': self.spec.source_delivery_manifest}
+               if self.spec.source_delivery_manifest is not None else {}),
         })
 
 
@@ -135,17 +137,27 @@ def compile_builtin_pickcube_example(spec, catalog, *, working_tree_scope):
     record = catalog.get('builtin_examples', {}).get('pickcube-harness-example-v1')
     if not isinstance(record, dict) or record.get('task_uid') != spec.task_uid:
         raise ValueError('catalog does not expose the exact built-in PickCube example')
-    if spec.provider not in ('mujoco', 'geophys'):
-        raise ValueError(
-            f'{spec.provider} F06 runtime route is not yet admitted by the built-in Core PickCube owner'
-        )
+    if spec.provider not in ('mujoco', 'geophys', 'isaacsim'):
+        raise ValueError(f'{spec.provider} is optional and not admitted by the F06 primary route compiler')
     if spec.task_uid not in catalog.get('env_uids', ()):
         raise ValueError('selected public PickCube UID is absent from the current Core registry')
-    provider_row = catalog.get('providers', {}).get(spec.provider)
-    if not isinstance(provider_row, dict) or provider_row.get('available') is not True:
-        raise ValueError(f'{spec.provider} provider manifest is unavailable in this catalog')
-    from task_env.tasks.pick_cube.task import build_reference
-    value = build_reference(backend='cpu', controller_profile=spec.controller_profile)
+    if spec.provider != 'isaacsim':
+        provider_row = catalog.get('providers', {}).get(spec.provider)
+        if not isinstance(provider_row, dict) or provider_row.get('available') is not True:
+            raise ValueError(f'{spec.provider} provider manifest is unavailable in this catalog')
+        from task_env.tasks.pick_cube.task import build_reference
+        value = build_reference(backend='cpu', controller_profile=spec.controller_profile)
+    else:
+        route = record.get('provider_routes', {}).get('isaacsim')
+        if (not isinstance(route, dict) or route.get('backend') != 'cuda'
+                or route.get('device') != 'cuda:0' or route.get('runtime_tested') not in (False, True)):
+            raise ValueError('catalog does not expose the exact F06 Isaac execution intersection')
+        from task_env.tasks.pick_cube.task import build_isaac_reference
+        value = build_isaac_reference(
+            delivery_manifest=spec.source_delivery_manifest,
+            task_seed=spec.seeds[0], horizon=spec.horizon_control_ticks,
+            controller_profile=spec.controller_profile,
+        )
     artifact = value['artifact']
     if artifact.task_id != 'pick-cube-v1' or artifact.timebase.physics_dt != spec.physics_dt_s \
             or artifact.timebase.control_substeps != spec.control_substeps:

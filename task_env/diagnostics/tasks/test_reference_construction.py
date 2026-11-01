@@ -313,7 +313,7 @@ def test_pickcube_historical_modules_and_gym_entrypoint_are_explicitly_retired()
     from task_env.diagnostics.historical_tasks import make_historical_env
     task_dir = ROOT / 'task_env/tasks/pick_cube'
     assert sorted(path.name for path in task_dir.iterdir() if path.is_file()) == [
-        '__init__.py', 'config.yaml', 'solution.py', 'task.py',
+        '__init__.py', 'config.yaml', 'isaac.py', 'solution.py', 'task.py',
     ]
     for module in (
         'task_env.tasks.pick_cube.artifact',

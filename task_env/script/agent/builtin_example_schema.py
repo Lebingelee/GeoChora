@@ -30,6 +30,7 @@ class BuiltinPickCubeExampleV1:
     horizon_control_ticks: int
     physics_dt_s: float
     control_substeps: int
+    source_delivery_manifest: str | None = None
 
     def __post_init__(self):
         if self.schema_version != "harness-builtin-pickcube-example-v1":
@@ -49,6 +50,12 @@ class BuiltinPickCubeExampleV1:
             raise ValueError("provider/backend/device must match an exact built-in route")
         if self.controller_profile != "r3_continuous_v1":
             raise ValueError("F06 requires the existing explicit r3_continuous_v1 profile")
+        if self.provider == "isaacsim":
+            if (type(self.source_delivery_manifest) is not str
+                    or not self.source_delivery_manifest.strip()):
+                raise ValueError("F06 Isaac requires an explicit source delivery manifest path")
+        elif self.source_delivery_manifest is not None:
+            raise ValueError("source_delivery_manifest is admitted only for the exact Isaac route")
         if (not isinstance(self.seeds, (tuple, list)) or tuple(self.seeds) != (31, 32, 33)):
             raise ValueError("F06 example runs the fixed seed set 31/32/33")
         if type(self.horizon_control_ticks) is not int or self.horizon_control_ticks != 1000:

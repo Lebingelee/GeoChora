@@ -21,6 +21,7 @@ import numpy as np
 
 from ...planners import AbsolutePosePlanner, AbsolutePosePlannerConfig, ExpertAction
 from ...planners.completion import StageCompletionPolicy, ExpertExecutionInfo
+from ...artifacts.contracts import Contract
 from ...controllers.canonical.contracts import digest
 from ...objects.pick_cube import CUBE_HALF_SIZE
 
@@ -513,8 +514,9 @@ class PickCubeReadinessSolution(PickCubeSolution):
         })
 
     def _execution(self, execution_info, *, reset=False):
-        if not isinstance(execution_info, ExpertExecutionInfo):
-            raise TypeError("ExpertExecutionInfo required separately from task metrics")
+        if not isinstance(execution_info, (ExpertExecutionInfo, PickCubePositionExecutionInfoV1)):
+            raise TypeError("a validated task execution-boundary value is required separately from task metrics")
+        execution_info.validate()
         if not reset:
             if execution_info.control_step != self._boundary_step + 1:
                 raise ValueError("stale/skipped execution boundary")
@@ -579,7 +581,11 @@ class PickCubeReadinessSolution(PickCubeSolution):
         policy = self.readiness_config.policies[self._segment_index]
         plan = self._segments[self._segment_index].plan
         exhausted = self._action_index >= len(plan.actions)
-        ready = policy.evaluate(self._ee_pose(observation), plan.target_pose, info, execution_info)
+        if (policy.kind == "gripper_ready"
+                and isinstance(execution_info, PickCubePositionExecutionInfoV1)):
+            ready = execution_info.close_ready
+        else:
+            ready = policy.evaluate(self._ee_pose(observation), plan.target_pose, info, execution_info)
         if policy.kind == "task_outcome" and ready:
             self.completion_events.append({
                 "stage": self.stage, "control_step": self._boundary_step,
@@ -606,3 +612,37 @@ class PickCubeReadinessSolution(PickCubeSolution):
 
 
 __all__ += ["PickCubeReadinessConfig", "PickCubeReadinessSolution"]
+
+
+@dataclass(frozen=True)
+class PickCubePositionExecutionInfoV1(Contract):
+    """Force-free gripper readiness from measured joint position and velocity."""
+
+    schema_version: str
+    control_step: int
+    simulation_time: float
+    measured_opening_m: float
+    measured_opening_velocity_m_s: float
+    target_opening_m: float
+    close_ready: bool
+
+    def validate(self):
+        if self.schema_version != "pickcube-position-execution-info-v1":
+            raise ValueError("unsupported PickCube Position execution info")
+        values = (self.simulation_time, self.measured_opening_m,
+                  self.measured_opening_velocity_m_s, self.target_opening_m)
+        if (type(self.control_step) is not int or self.control_step < 0
+                or any(not np.isfinite(float(value)) for value in values)
+                or self.simulation_time < 0 or self.measured_opening_m < 0
+                or not 0 <= self.target_opening_m <= 0.08):
+            raise ValueError("invalid PickCube Position execution boundary or gripper readback")
+        expected = bool(
+            self.target_opening_m <= 0.045
+            and self.measured_opening_m <= 0.045
+            and abs(self.measured_opening_velocity_m_s) <= 0.005
+        )
+        if type(self.close_ready) is not bool or self.close_ready != expected:
+            raise ValueError("PickCube close readiness must follow measured position/velocity only")
+
+
+__all__ += ["PickCubePositionExecutionInfoV1"]

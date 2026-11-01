@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import time
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPOSITORY_ROOT) not in sys.path:
@@ -20,16 +21,68 @@ from examples._common import (
 ENV_ID = "pick-cube-p16-reference-v1"
 
 
+def _run_isaac_harness(args):
+    if args.controller_profile != "r3_continuous_v1":
+        raise ValueError("the F06 Isaac Harness route is frozen to r3_continuous_v1")
+    if args.horizon != 1000 or args.seed not in (31, 32, 33):
+        raise ValueError("the F06 Isaac Harness route requires horizon 1000 and seed 31/32/33")
+    if args.source_delivery_manifest is None:
+        raise ValueError("--source-delivery-manifest is required for the F06 Isaac route")
+    if args.recording is not None:
+        raise ValueError("Isaac H5 is written inside the supervised run directory; use --harness-output-dir")
+
+    run_root = (args.harness_output_dir.expanduser().resolve() if args.harness_output_dir else
+                (_REPOSITORY_ROOT / "workspace/examples/pick_cube"
+                 / f"f06-isaac-seed{args.seed}-{time.time_ns()}").resolve())
+    run_root.mkdir(parents=True, exist_ok=False)
+    inputs = run_root / "inputs"
+    inputs.mkdir()
+
+    agent_dir = _REPOSITORY_ROOT / "task_env/script/agent"
+    if str(agent_dir) not in sys.path:
+        sys.path.insert(0, str(agent_dir))
+    from builtin_example_schema import BuiltinPickCubeExampleV1
+    from builtin_example_validation import validate_provider
+    from catalog_query import build_catalog
+
+    spec_data = json.loads((_REPOSITORY_ROOT / "examples/tasks/pick_cube_harness.json").read_text())
+    spec_data.update({
+        "provider": "isaacsim", "backend": "cuda", "device": "cuda:0",
+        "controller_profile": args.controller_profile,
+        "source_delivery_manifest": str(args.source_delivery_manifest.expanduser().resolve()),
+    })
+    spec_path = inputs / "example_spec.json"
+    spec_path.write_text(json.dumps(BuiltinPickCubeExampleV1.from_dict(spec_data).to_dict(),
+                                    indent=2, ensure_ascii=False) + "\n")
+    catalog = build_catalog(str(_REPOSITORY_ROOT), providers=("geophys", "mujoco"))
+    catalog_path = inputs / "catalog.json"
+    catalog_path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + "\n")
+    scope_path = _REPOSITORY_ROOT / "examples/tasks/pick_cube_harness_working_tree_scope.json"
+    result = validate_provider(
+        spec_path, catalog_path, scope_path, run_root / "result",
+        only_seed=args.seed,
+    )
+    print(json.dumps({"provider": result["provider"], "seed": args.seed,
+                      "disposition": result["disposition"],
+                      "runtime_valid_count": result["runtime_valid_count"],
+                      "output_dir": str(run_root / "result")}, sort_keys=True))
+    return 0 if result["disposition"] in ("PASS", "PREFLIGHT") else 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provider", choices=("geophys", "mujoco"), required=True,
-                        help="real CPU provider; Isaac uses the versioned Harness native-worker route")
+    parser.add_argument("--provider", choices=("geophys", "mujoco", "isaacsim"), required=True,
+                        help="MuJoCo/GeoPhys CPU, or the supervised F06 Isaac Harness route")
     parser.add_argument("--seed", type=int, default=31)
     parser.add_argument("--horizon", type=int, default=1000)
     parser.add_argument("--controller-profile", choices=("r1", "r3_continuous_v1"),
                         default="r3_continuous_v1")
     parser.add_argument("--recording", type=Path,
                         help="canonical H5 output; default workspace/examples/pick_cube/<provider>-<seed>.h5")
+    parser.add_argument("--source-delivery-manifest", type=Path,
+                        help="exact versioned F06 PickCube USD manifest for Isaac Sim")
+    parser.add_argument("--harness-output-dir", type=Path,
+                        help="fresh supervised Harness output directory for Isaac Sim")
     parser.add_argument("--time-limit-s", type=int, default=420)
     parser.add_argument(
         "--address-space-limit-mb", "--memory-limit-mb", dest="memory_limit_mb",
@@ -39,6 +92,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if not 1 <= args.horizon <= 6000:
         parser.error("--horizon must be in [1, 6000]")
+    if args.provider == "isaacsim":
+        try:
+            return _run_isaac_harness(args)
+        except (ValueError, FileExistsError) as error:
+            parser.error(str(error))
 
     bootstrap_imports()
     env = None

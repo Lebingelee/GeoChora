@@ -1,4 +1,13 @@
 {
   "schema_version": "harness-example-working-tree-scope-v1",
-  "expected_untracked": []
+  "expected_untracked": [
+    {
+      "path": "MUJOCO_LOG.TXT",
+      "sha256": "dfb37ada202855d609f9e210cf79b287de78f2ded70e704ceeb544d17bf7ad4b"
+    },
+    {
+      "path": "docs/maintenance/20261030_runtime_route_diagnostic_handoff.md",
+      "sha256": "18cc56c7f0ffbcb947db4bd8725279489171efbee8f08b28603b79c47f509d61"
+    }
+  ]
 }

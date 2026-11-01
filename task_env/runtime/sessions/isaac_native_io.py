@@ -284,7 +284,7 @@ class IsaacSimNativeRuntimeIOV1:
     def __init__(self, artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                  source: UsdRuntimeSourceV1, lease: UsdSnapshotLeaseV1,
                  app_owner: IsaacSimAppOwnerV1, *, dg03_input=None,
-                 dg04_native_input=None):
+                 dg04_native_input=None, f06_pickcube_input=None):
         if type(artifact) is not TaskArtifactV1 or type(execution) is not ExecutionSpecV1:
             raise TypeError("Isaac native I/O requires exact TaskArtifactV1 and ExecutionSpecV1")
         if type(source) is not UsdRuntimeSourceV1 or type(lease) is not UsdSnapshotLeaseV1:
@@ -295,10 +295,15 @@ class IsaacSimNativeRuntimeIOV1:
         self._dg03 = execution.physics_profile == 'isaac-gpu-physx-f05-dg03-usd-v1'
         self._dg04_native_input = dg04_native_input
         self._dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
+        self._f06_pickcube_input = f06_pickcube_input
+        self._f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
         if self._dg03 != (dg03_input is not None):
             raise ValueError('DG03 Isaac I/O requires its exact candidate input and profile together')
         if self._dg04_native != (dg04_native_input is not None) or self._dg03 and self._dg04_native:
             raise ValueError('DG04 Isaac I/O requires its exact native candidate/profile alone')
+        if self._f06_pickcube != (f06_pickcube_input is not None) or sum((
+                self._dg03, self._dg04_native, self._f06_pickcube)) > 1:
+            raise ValueError('F06 Isaac I/O requires its exact PickCube input/profile alone')
         self._closed = False
         self._runtime_owner_closed = False
         self._context = None
@@ -322,6 +327,7 @@ class IsaacSimNativeRuntimeIOV1:
         self._dg03_mimic_frequency_attribute = None
         self._dg03_mimic_damping_attribute = None
         self._dg04_native_mimic_receipt = None
+        self._f06_native_mimic_receipt = None
         self._last_native_mimic_target = None
         self._source_tendon_target = None
         self._open_public_runtime()
@@ -339,7 +345,8 @@ class IsaacSimNativeRuntimeIOV1:
             if not torch.cuda.is_available() or torch.cuda.current_device() != 0:
                 raise RuntimeError("F04 requires CUDA device 0; CPU fallback is not admitted")
             expected_profile = (
-                'isaac-gpu-physx-f05-dg04-native-mimic-v1' if self._dg04_native
+                'isaac-gpu-physx-pickcube-f06-v1' if self._f06_pickcube
+                else 'isaac-gpu-physx-f05-dg04-native-mimic-v1' if self._dg04_native
                 else 'isaac-gpu-physx-f05-dg03-usd-v1' if self._dg03
                 else 'isaac-gpu-physx-f04-position-v1'
             )
@@ -383,6 +390,9 @@ class IsaacSimNativeRuntimeIOV1:
             elif self._dg04_native:
                 self._dg04_native_input.validate()
                 self._verify_dg04_native_mimic(PhysxSchema, UsdPhysics)
+            elif self._f06_pickcube:
+                self._f06_pickcube_input.validate()
+                self._verify_f06_pickcube_mimic(PhysxSchema, UsdPhysics)
 
             authored_scenes = [p for p in self._stage.Traverse() if p.IsA(UsdPhysics.Scene)]
             if len(authored_scenes) != 1:
@@ -581,6 +591,19 @@ class IsaacSimNativeRuntimeIOV1:
                 self._bootstrap_receipt['source_scene_witness'] = (
                     self._verify_dg03_public_scene(UsdGeom, UsdPhysics)
                 )
+            elif self._f06_pickcube:
+                from .leaf_control import compile_isaac_native_mimic_position_receipt_v1
+
+                witness = self._verify_f06_public_drives(UsdPhysics)
+                self.drive_receipt = compile_isaac_native_mimic_position_receipt_v1(
+                    execution=self._execution, source=self._source,
+                    native_metadata=self._metadata,
+                    writer_id='panda-v1/position-servo-v1',
+                    native_drive_witness=witness,
+                    provenance_kind='native_runtime',
+                )
+                self._bootstrap_receipt['native_mimic_drive_witness'] = witness
+                self._bootstrap_receipt['native_adaptation_receipt'] = self.drive_receipt.to_mapping()
             self._manager = SimulationManager
         except BaseException as primary:
             import gc
@@ -1028,6 +1051,88 @@ class IsaacSimNativeRuntimeIOV1:
             'runtime_stage_mutated': True,
         }
 
+    def _verify_f06_public_drives(self, UsdPhysics) -> dict[str, object]:
+        """Bind the F06 5 N PickCube hand profile to composed and public views."""
+        if not self._f06_pickcube or self._stage is None or self._f06_native_mimic_receipt is None:
+            raise RuntimeError('F06 source-bound mimic/drive profile was not initialized')
+        authored = []
+        for prim in self._stage.Traverse():
+            for schema in prim.GetAppliedSchemas():
+                if str(schema).startswith('PhysicsDriveAPI:'):
+                    authored.append((str(prim.GetPath()), str(prim.GetName()), str(schema)))
+        expected = {f'joint{index}': 'PhysicsDriveAPI:angular' for index in range(1, 8)}
+        expected['finger_joint1'] = 'PhysicsDriveAPI:linear'
+        if len(authored) != 8 or {name: schema for _path, name, schema in authored} != expected:
+            raise ValueError('F06 composed stage must contain seven Arm drives and one source-bounded leader drive')
+        stiffness_tensor, damping_tensor = self._articulation.get_dof_gains()
+        stiffness = _tensor_rows(stiffness_tensor, width=len(self._dof_names), label='F06 public stiffness')[0]
+        damping = _tensor_rows(damping_tensor, width=len(self._dof_names), label='F06 public damping')[0]
+        effort_rows = self._articulation.get_dof_max_efforts().numpy().tolist()
+        if effort_rows and not isinstance(effort_rows[0], (tuple, list)):
+            effort_rows = [effort_rows]
+        if not effort_rows or len(effort_rows[0]) != len(self._dof_names):
+            raise ValueError('F06 public maximum-effort view has unexpected shape')
+        max_effort = tuple(float(value) for value in effort_rows[0])
+        drive_rows = self._articulation.get_dof_drive_types()
+        if not drive_rows or len(drive_rows[0]) != len(self._dof_names):
+            raise ValueError('F06 public drive-type view has unexpected shape')
+        drive_types = tuple(None if value is None else str(value).lower() for value in drive_rows[0])
+        arm_expected = {
+            'joint1': (4500.0, 450.0), 'joint2': (4500.0, 450.0),
+            'joint3': (3500.0, 350.0), 'joint4': (3500.0, 350.0),
+            'joint5': (2000.0, 200.0), 'joint6': (2000.0, 200.0),
+            'joint7': (2000.0, 200.0),
+        }
+        values = {}
+        for native_name, index in self._dof_index.items():
+            actual = (stiffness[index], damping[index], max_effort[index], drive_types[index])
+            if native_name in arm_expected:
+                wanted = (*arm_expected[native_name], 250.0, 'force')
+                if (any(not math.isclose(actual[i], wanted[i], rel_tol=0.0, abs_tol=1e-4)
+                        for i in range(3)) or actual[3] != wanted[3]):
+                    raise ValueError(f'F06 public Arm drive differs from its exact USD profile: {native_name}={actual!r}')
+            elif native_name == 'finger_joint1':
+                wanted = (5000.0, 120.0, 5.0, 'force')
+                if (any(not math.isclose(actual[i], wanted[i], rel_tol=0.0, abs_tol=1e-4)
+                        for i in range(3)) or actual[3] != wanted[3]):
+                    raise ValueError(f'F06 PickCube leader drive differs from the source-bound 5 N profile: {actual!r}')
+            elif (not math.isclose(actual[0], 0.0, rel_tol=0.0, abs_tol=1e-8)
+                    or not math.isclose(actual[1], 0.0, rel_tol=0.0, abs_tol=1e-8)
+                    or actual[3] not in (None, 'none')):
+                raise ValueError(f'F06 mimic follower has a duplicate articulation drive: {actual!r}')
+            values[native_name] = {
+                'stiffness': actual[0], 'damping': actual[1],
+                'max_effort': actual[2], 'drive_type': actual[3],
+            }
+        witness = {
+            'schema_version': 'isaac-f06-pickcube-native-mimic-drive-witness-v1',
+            'native_dof_order': list(self._dof_names),
+            'active_drive_dofs': [f'joint{index}' for index in range(1, 8)] + ['finger_joint1'],
+            'passive_mimic_dof': 'finger_joint2',
+            'leader_stiffness_N_m': 5000.0,
+            'leader_damping_N_s_m': 120.0,
+            'leader_max_effort_N': 5.0,
+            'leader_drive_type': 'force',
+            'follower_stiffness_N_m': 0.0,
+            'follower_damping_N_s_m': 0.0,
+            'follower_drive_type': 'none',
+            'mimic_api': 'PhysxMimicJointAPI:transX',
+            'drive_api': 'PhysicsDriveAPI:linear',
+            'mimic_reference_joint': 'finger_joint1',
+            'mimic_follower_joint': 'finger_joint2',
+            'mimic_gearing': 1.0,
+            'mimic_offset_m': 0.0,
+            'mimic_natural_frequency_hz': 25.0,
+            'mimic_damping_ratio': 1.0,
+            'passive_mimic_constraint_authored': True,
+            'public_consumers': values,
+            'authored_drive_apis': [
+                {'path': path, 'joint': name, 'api': schema}
+                for path, name, schema in sorted(authored)
+            ],
+        }
+        return witness
+
     def _verify_dg04_public_drives(self, UsdPhysics) -> dict[str, object]:
         """Verify the 7-arm + one-leader drive surface through public USD/Articulation reads."""
         if self._dg04_native_mimic_receipt is None:
@@ -1117,6 +1222,77 @@ class IsaacSimNativeRuntimeIOV1:
             ],
         }
         return witness
+
+    def _verify_f06_pickcube_mimic(self, PhysxSchema, UsdPhysics) -> None:
+        """Verify the locally authored F06 Panda source relation and 5 N leader drive."""
+        if not self._f06_pickcube or self._stage is None:
+            raise RuntimeError('F06 mimic verification requires its exact composed USD stage')
+        import xml.etree.ElementTree as ET
+
+        expected_native = ('finger_joint1', 'finger_joint2')
+        if {self._source.joints.get(f'panda-v1/{name}') for name in expected_native} != set(expected_native):
+            raise ValueError('F06 RuntimeSource does not bind the exact Panda finger Joint pair')
+        source_xml = self._source.scene_source.loaded_delivery.source_input_bytes.get('panda.xml')
+        if type(source_xml) is not bytes:
+            raise ValueError('F06 source delivery omits the original Panda XML bytes')
+        root = ET.fromstring(source_xml)
+        equalities = root.findall('./equality/joint')
+        if len(equalities) != 1:
+            raise ValueError('F06 Panda source must contain exactly one finger equality')
+        equality = equalities[0]
+        polycoef = tuple(float(value) for value in equality.get('polycoef', '0 1 0 0 0').split())
+        if ((equality.get('joint1'), equality.get('joint2'), equality.get('active', 'true'))
+                != ('finger_joint1', 'finger_joint2', 'true')
+                or polycoef != (0.0, 1.0, 0.0, 0.0, 0.0)):
+            raise ValueError('F06 source must retain its exact active affine finger relation')
+        matches = {name: [] for name in expected_native}
+        for prim in self._stage.Traverse():
+            if prim.GetName() in matches and prim.IsA(UsdPhysics.PrismaticJoint):
+                matches[prim.GetName()].append(prim)
+        if any(len(rows) != 1 for rows in matches.values()):
+            raise ValueError('F06 USD must compose exactly one public prismatic prim per Panda finger Joint')
+        reference, follower = matches['finger_joint1'][0], matches['finger_joint2'][0]
+        if not follower.HasAPI(PhysxSchema.PhysxMimicJointAPI, 'transX'):
+            raise ValueError('F06 USD source-derived PhysxMimicJointAPI is absent')
+        relationship = follower.GetRelationship('physxMimicJoint:transX:referenceJoint')
+        if not relationship or relationship.GetTargets() != [reference.GetPath()]:
+            raise ValueError('F06 mimic reference differs from the exact source finger equality')
+        for name, expected in (('gearing', 1.0), ('offset', 0.0)):
+            attribute = follower.GetAttribute(f'physxMimicJoint:transX:{name}')
+            if not attribute or not attribute.IsValid() or not math.isclose(
+                    float(attribute.Get()), expected, rel_tol=0.0, abs_tol=1e-6):
+                raise ValueError(f'F06 authored mimic {name} differs from its source relation')
+        frequency_attr = follower.GetAttribute('physxMimicJoint:transX:naturalFrequency')
+        damping_attr = follower.GetAttribute('physxMimicJoint:transX:dampingRatio')
+        if not frequency_attr or not frequency_attr.IsValid() or not damping_attr or not damping_attr.IsValid():
+            raise ValueError('F06 mimic source omits its native PhysX frequency/damping attributes')
+        if (frequency_attr.Set(25.0) is False or damping_attr.Set(1.0) is False
+                or not math.isclose(float(frequency_attr.Get()), 25.0, rel_tol=0.0, abs_tol=1e-6)
+                or not math.isclose(float(damping_attr.Get()), 1.0, rel_tol=0.0, abs_tol=1e-6)):
+            raise ValueError('F06 native PhysX mimic profile could not be authored/read back')
+        if not reference.HasAPI(UsdPhysics.DriveAPI, 'linear'):
+            raise ValueError('F06 source-bound leader DriveAPI is absent from the desktop USD')
+        drive = UsdPhysics.DriveAPI(reference, 'linear')
+        if (str(drive.GetTypeAttr().Get()) != 'force'
+                or not math.isclose(float(drive.GetStiffnessAttr().Get()), 5000.0, rel_tol=0.0, abs_tol=1e-6)
+                or not math.isclose(float(drive.GetDampingAttr().Get()), 120.0, rel_tol=0.0, abs_tol=1e-6)
+                or not math.isclose(float(drive.GetMaxForceAttr().Get()), 5.0, rel_tol=0.0, abs_tol=1e-6)):
+            raise ValueError('F06 USD leader DriveAPI differs from its exact 5000/120/5N source adapter')
+        self._f06_native_mimic_receipt = {
+            'schema_version': 'isaac-f06-pickcube-native-mimic-stage-receipt-v1',
+            'source_xml_sha256': hashlib.sha256(source_xml).hexdigest(),
+            'source_polycoef': polycoef,
+            'follower_path': str(follower.GetPath()),
+            'reference_path': str(reference.GetPath()),
+            'native_mimic_api': 'PhysxMimicJointAPI:transX',
+            'mimic_frequency_hz': float(frequency_attr.Get()),
+            'mimic_damping_ratio': float(damping_attr.Get()),
+            'leader_drive_api': 'PhysicsDriveAPI:linear',
+            'leader_stiffness_N_m': float(drive.GetStiffnessAttr().Get()),
+            'leader_damping_N_s_m': float(drive.GetDampingAttr().Get()),
+            'leader_max_force_N': float(drive.GetMaxForceAttr().Get()),
+            'runtime_stage_mutated_for_native_mimic_profile': True,
+        }
 
     def _verify_dg03_mimic(self, PhysxSchema, UsdPhysics) -> None:
         """Bind and initialize the public mimic properties from the exact source equality."""
@@ -1270,6 +1446,7 @@ class IsaacSimNativeRuntimeIOV1:
         # established the DG03 profile flag.
         dg03 = getattr(self, "_dg03", False)
         dg04_native = getattr(self, "_dg04_native", False)
+        f06_pickcube = getattr(self, "_f06_pickcube", False)
         if dg03:
             expected_arm_names = {f'joint{index}' for index in range(1, 8)}
             valid_targets = (
@@ -1278,7 +1455,7 @@ class IsaacSimNativeRuntimeIOV1:
                 and len({item[0] for item in expected_targets}) == 7
                 and all(item[0] == self._dof_index.get(item[1]) for item in expected_targets)
             )
-        elif dg04_native:
+        elif dg04_native or f06_pickcube:
             expected_active_names = {f'joint{index}' for index in range(1, 8)} | {'finger_joint1'}
             valid_targets = (
                 len(expected_targets) == 8
@@ -1335,7 +1512,7 @@ class IsaacSimNativeRuntimeIOV1:
                     'actuator_name': 'actuator8', 'control_value': float(min(255.0, max(0.0, ctrl))),
                     'scalar_force_limit_N': 100.0,
                 }
-            elif dg04_native:
+            elif dg04_native or f06_pickcube:
                 self._articulation.set_dof_position_targets(
                     [item[2] for item in expected_targets],
                     dof_indices=[int(item[0]) for item in expected_targets],
@@ -1344,17 +1521,24 @@ class IsaacSimNativeRuntimeIOV1:
                     self._articulation.get_dof_position_targets(
                         dof_indices=[int(item[0]) for item in expected_targets],
                     ),
-                    width=8, label='DG04 reset active position-target readback',
+                    width=8, label=('F06' if f06_pickcube else 'DG04')
+                    + ' reset active position-target readback',
                 )[0]
                 if any(not math.isclose(actual, item[2], rel_tol=0.0, abs_tol=1e-6)
                        for actual, item in zip(target_readback, expected_targets, strict=True)):
-                    raise ValueError('DG04 public reset target readback differs from the native-adaptation target')
+                    raise ValueError('native mimic reset target readback differs from the source-bound adaptation')
                 leader_index = self._dof_index['finger_joint1']
                 self._articulation.set_dof_efforts([0.0], dof_indices=[leader_index])
+                finger_entity = next(
+                    name.split('/', 1)[0] for name in sample.joint_position
+                    if name.endswith('/finger_joint1')
+                )
                 self._last_native_mimic_target = {
                     'target_identity_sha256': None,
                     'drive_receipt_identity_sha256': self.drive_receipt.identity_sha256,
-                    'reference_target_m': float(sample.joint_position['panda-main/finger_joint1']),
+                    'reference_target_m': float(
+                        sample.joint_position[f'{finger_entity}/finger_joint1']
+                    ),
                 }
             else:
                 self._articulation.set_dof_position_targets([item[2] for item in expected_targets])
@@ -1457,6 +1641,8 @@ class IsaacSimNativeRuntimeIOV1:
         if self._closed:
             raise RuntimeError("Isaac native I/O is closed")
         ordered = tuple(sorted(targets))
+        f06_pickcube = getattr(self, "_f06_pickcube", False)
+        dg04_native = getattr(self, "_dg04_native", False)
         if self._dg03:
             valid_targets = (
                 len(ordered) == 7
@@ -1464,7 +1650,7 @@ class IsaacSimNativeRuntimeIOV1:
                 and len({item[0] for item in ordered}) == 7
                 and all(item[0] == self._dof_index.get(item[1]) for item in ordered)
             )
-        elif self._dg04_native:
+        elif dg04_native or f06_pickcube:
             expected_active_names = {f'joint{index}' for index in range(1, 8)} | {'finger_joint1'}
             valid_targets = (
                 len(ordered) == 8
@@ -1488,8 +1674,8 @@ class IsaacSimNativeRuntimeIOV1:
             )
             self._sync()
             applied_values = tuple(float(item[2]) for item in ordered)
-            if self._dg03 or self._dg04_native:
-                label = 'DG03' if self._dg03 else 'DG04'
+            if self._dg03 or dg04_native or f06_pickcube:
+                label = 'DG03' if self._dg03 else 'F06' if f06_pickcube else 'DG04'
                 target_readback = _tensor_rows(
                     self._articulation.get_dof_position_targets(
                         dof_indices=[int(item[0]) for item in ordered],
@@ -1500,7 +1686,7 @@ class IsaacSimNativeRuntimeIOV1:
                        for actual, item in zip(target_readback, ordered, strict=True)):
                     raise ValueError(f'{label} public Articulation position-target readback differs from its admitted target')
                 applied_values = tuple(float(value) for value in target_readback)
-            if self._dg04_native:
+            if dg04_native or f06_pickcube:
                 leader_index = next(index for index, item in enumerate(ordered)
                                     if item[1] == 'finger_joint1')
                 self._last_native_mimic_target = {
@@ -1684,7 +1870,7 @@ class IsaacSimNativeRuntimeIOV1:
                 contact_witness = self._read_dg03_contact_witness()
                 if tendon_application is not None:
                     tendon_application['public_contact_witness'] = contact_witness
-            elif self._dg04_native:
+            elif self._dg04_native or self._f06_pickcube:
                 target = self._last_native_mimic_target
                 if (not isinstance(target, dict)
                         or target.get('drive_receipt_identity_sha256') != self.drive_receipt.identity_sha256
@@ -1709,7 +1895,10 @@ class IsaacSimNativeRuntimeIOV1:
                 follower_velocity = float(qd[follower_index])
                 native_adaptation_application = {
                     'schema_version': 'native-physx-mimic-substep-application-v1',
-                    'profile_id': 'isaacsim-6.2-physx-native-mimic-leader-drive-v1',
+                    'profile_id': (
+                        'isaacsim-6.2-pickcube-physx-mimic-5n-v1' if self._f06_pickcube
+                        else 'isaacsim-6.2-physx-native-mimic-leader-drive-v1'
+                    ),
                     'provenance_kind': 'native_runtime',
                     'drive_receipt_identity_sha256': self.drive_receipt.identity_sha256,
                     'target_identity_sha256': target['target_identity_sha256'],
@@ -1723,13 +1912,16 @@ class IsaacSimNativeRuntimeIOV1:
                     'relation_error_m': follower_position - reference_position,
                     'reference_target_m': float(target['reference_target_m']),
                     'reference_effort_N': float(applied_effort),
-                    'maximum_effort_N': 100.0,
+                    'maximum_effort_N': 5.0 if self._f06_pickcube else 100.0,
                     'public_effort_api': 'Articulation.get_dof_projected_joint_forces',
                     'effort_measurement_semantics': 'projected_active_joint_force',
                     'native_mimic_api': 'PhysxMimicJointAPI:transX',
                     'native_drive_api': 'PhysicsDriveAPI:linear',
-                    'public_contact_witness': self._read_dg03_contact_witness(),
                 }
+                if self._dg04_native:
+                    native_adaptation_application['public_contact_witness'] = (
+                        self._read_dg03_contact_witness()
+                    )
         except BaseException as error:
             error.add_note(
                 f"one native physics step was attempted; pre-step counter={before!r}; "
@@ -1803,13 +1995,16 @@ class IsaacSimNativeRuntimeIOV1:
 
 def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: ExecutionSpecV1,
                                   source: UsdRuntimeSourceV1, *, dg03_input=None,
-                                  dg04_native_input=None):
+                                  dg04_native_input=None, f06_pickcube_input=None):
     """Create the production adapter only after Core source verification."""
     source.assert_fresh()
     dg03 = execution.physics_profile == 'isaac-gpu-physx-f05-dg03-usd-v1'
     dg04_native = execution.physics_profile == 'isaac-gpu-physx-f05-dg04-native-mimic-v1'
-    if dg03 != (dg03_input is not None) or dg04_native != (dg04_native_input is not None) or (dg03 and dg04_native):
-        raise ValueError('DG03 Isaac native adapter requires its exact candidate input and profile together')
+    f06_pickcube = execution.physics_profile == 'isaac-gpu-physx-pickcube-f06-v1'
+    if (dg03 != (dg03_input is not None) or dg04_native != (dg04_native_input is not None)
+            or f06_pickcube != (f06_pickcube_input is not None)
+            or sum((dg03, dg04_native, f06_pickcube)) > 1):
+        raise ValueError('Isaac native adapter requires exactly one versioned input/profile pair')
     if not (source.scene_source.source_verified or source.scene_source.locally_validated):
         raise ValueError("Isaac Core adapter requires an upstream-validated or exact locally validated USD delivery")
     if source.scene_source.representation.provider != "isaacsim":
@@ -1833,12 +2028,23 @@ def create_isaac_native_runtime_io(artifact: TaskArtifactV1, execution: Executio
                 or dg04_native_input.execution.identity_hash != execution.identity_hash
                 or dg04_native_input.runtime_source is not source):
             raise ValueError('DG04 Isaac adapter candidate differs from the exact artifact/execution/source')
+    if f06_pickcube:
+        from ...tasks.pick_cube.isaac import PickCubeIsaacRuntimeInputV1
+
+        if type(f06_pickcube_input) is not PickCubeIsaacRuntimeInputV1:
+            raise TypeError('F06 Isaac adapter requires exact PickCubeIsaacRuntimeInputV1')
+        f06_pickcube_input.validate()
+        if (f06_pickcube_input.artifact is not artifact
+                or f06_pickcube_input.execution.identity_hash != execution.identity_hash
+                or f06_pickcube_input.runtime_source is not source):
+            raise ValueError('F06 Isaac adapter input differs from the exact artifact/execution/source')
     owner = _process_app_owner()
     lease = source.scene_source.acquire_snapshot()
     try:
         return IsaacSimNativeRuntimeIOV1(
             artifact, execution, source, lease, owner,
             dg03_input=dg03_input, dg04_native_input=dg04_native_input,
+            f06_pickcube_input=f06_pickcube_input,
         )
     except BaseException as primary:
         # Constructor cleanup owns the lease/App when startup begins; this is
