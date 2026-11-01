@@ -291,12 +291,13 @@ def run(plan_path: Path, sidecar: Path, receipt_path: Path, counter_path: Path) 
     )
     from task_env.tasks.position_candidate.builder import build_f05_dg04_isaac_native_candidate
     from task_env.tasks.reference_env import SelectedReferenceEnv
-    from isaacsim.core.simulation_manager import SimulationManager
 
     started = time.monotonic()
     app_owner = _process_app_owner()
     app_owner.open()
     pxr_identity = _validate_loaded_pxr_paths()
+    from isaacsim.core.simulation_manager import SimulationManager
+
     bootstrap_steps_after_app_open = int(SimulationManager.get_num_physics_steps())
     input_v1, candidate = build_f05_dg04_isaac_native_candidate(
         plan["source"]["delivery_manifest"]["path"], horizon=300,
