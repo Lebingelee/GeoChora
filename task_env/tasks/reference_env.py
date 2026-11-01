@@ -2856,7 +2856,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 },
             }
 
-        f03_input = self.value.get('f03_position_input')
         versioned_position_input = self.value.get('versioned_position_input')
         versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
         f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
@@ -2870,21 +2869,20 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         f05_native_core_route = f05_native_route or f05_dg02_route or f05_dg04_route
         f05_route = f05_input is not None or f05_native_core_route
         f05_host_model_route = f05_route and not f05_dg04_route
-        if f03_input is not None or f04_input is not None or f05_route:
+        if f04_input is not None or f05_route:
             f04_route = f04_input is not None
             versioned_input = (
                 f05_dg04_input if f05_dg04_route else
                 f05_dg02_input if f05_dg02_route else
                 f05_native_input if f05_native_route else
-                f05_input if f05_route else f04_input if f04_route else f03_input
+                f05_input if f05_route else f04_input
             )
             source = self.value['source']
             source_scene = source.scene_source
             loaded = source_scene.loaded_delivery
             delivery = loaded.delivery
             representation = source_scene.representation
-            drive_receipt = (getattr(self.session, '_drive_receipt', None)
-                             if f04_route or f05_route else self.value['native_drive_receipt'])
+            drive_receipt = getattr(self.session, '_drive_receipt', None)
             native_metadata = self.session._native_io_metadata
             reset_receipt = self.session._reset_write_receipt
             if reset_receipt is None:
@@ -2912,8 +2910,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'f05-dg02-geophys-usd-core-position-native-profile-v1' if f05_dg02_route else
                     'f05-geophys-core-position-native-profile-v1' if f05_native else
                     'f04-core-position-synthetic-io-s1-profile-v1' if f04_route else
-                    'f05-geophys-position-synthetic-io-s1-profile-v1' if f05_route else
-                    'f03-core-call-chain-recording-profile-v1'
+                    'f05-geophys-position-synthetic-io-s1-profile-v1'
                 ),
                 'profile_id': (
                     'f04-isaac-panda-position-native-v1' if f04_native else
@@ -2921,8 +2918,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                     'geophys-usd-position-f05-dg02-core-v1' if f05_dg02_route else
                     'geophys-usd-position-f05-native-v1' if f05_native else
                     'f04-local-source-synthetic-io-s1-v1' if f04_route else
-                    'f05-geophys-usd-position-synthetic-io-s1-v1' if f05_route else
-                    'f03-versioned-usd-position-synthetic-s1-v1'
+                    'f05-geophys-usd-position-synthetic-io-s1-v1'
                 ),
                 'provenance_kind': 'native_runtime' if f04_native or f05_native else 'synthetic_fixture',
                 'runtime_admitted': bool(f04_native or f05_native),
@@ -3058,7 +3054,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                                 if f04_route else 'f05-dg02-geophys-usd-core-position-action-v1'
                                 if f05_dg02_route else 'f05-dg04-isaac-native-mimic-position-action-v1'
                                 if f05_dg04_route else 'f05-geophys-native-position-action-v1'
-                                if f05_native else 'f03-core-call-chain-position-action-v1'),
+                                if f05_native else 'f05-geophys-usd-position-synthetic-s1-action-v1'),
                     'dimension': len(action_components), 'components': action_components,
                 },
                 'resolved_config': {
@@ -3333,7 +3329,6 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
         target_payload = target.target.to_mapping()
         target_hash = target.target.identity_hash
         applied_payload = applied.to_mapping()
-        f03_input = self.value.get('f03_position_input')
         versioned_position_input = self.value.get('versioned_position_input')
         versioned_input_kind = _versioned_position_input_kind(versioned_position_input)
         f04_input = versioned_position_input if versioned_input_kind == 'f04' else None
@@ -3372,7 +3367,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
             applied_payload['mujoco_interval_advance_receipts_v1'] = [dict(item) for item in advances]
             applied_payload['mujoco_interval_advance_attempts'] = int(advance_attempts)
         f05_dg02_input = versioned_position_input if versioned_input_kind == 'dg02_geophys' else None
-        if (f03_input is not None or f04_input is not None or f05_input is not None
+        if (f04_input is not None or f05_input is not None
                 or f05_dg02_input is not None
                 or versioned_input_kind == 'dg04_isaac_native'
                 or self.value.get('f06_pickcube_isaac_input') is not None):
