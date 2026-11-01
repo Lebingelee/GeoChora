@@ -16,7 +16,7 @@ from uuid import uuid4
 import numpy as np
 from gymnasium.spaces import Box, Dict
 
-from ..artifacts import ExecutionSpec
+from ..artifacts import CanonicalStateView, ExecutionSpec
 from ..controllers.canonical.contracts import RequestedAction, digest
 from ..environment.protocols import TaskEnvironmentComponent
 from ..environment.types import ExecutionFaultV1, StageUnavailableError, attach_execution_fault
@@ -88,6 +88,19 @@ def _position_frame_bindings_from_artifact(artifact, source):
             raise ValueError('Position RuntimeSource semantic lacks an exact Artifact FrameReference')
         bindings[semantic] = reference
     return bindings
+
+
+def _position_task_evaluation_state(state, adapted):
+    """Merge Position publication fields into the existing v0 task-state contract."""
+    return CanonicalStateView(
+        schema_version='canonical-state-v0',
+        convention=state.convention,
+        control_step=state.control_step,
+        simulation_time=state.simulation_time,
+        joint_position={**state.joint_position, **adapted.joint_position},
+        joint_velocity={**state.joint_velocity, **adapted.joint_velocity},
+        pose_world={**state.pose_world, **adapted.pose_world},
+    )
 
 
 def _artifact_for_reset(current_artifact, rebuilt_value):
@@ -1037,13 +1050,7 @@ class SelectedReferenceEnv(TaskEnvironmentComponent):
                 ee = ee_value
             else:
                 adapted = self.controller._adapt_publication(self.typed_state)
-                evaluation_state = SimpleNamespace(
-                    control_step=state.control_step,
-                    simulation_time=state.simulation_time,
-                    joint_position={**state.joint_position, **adapted.joint_position},
-                    joint_velocity=state.joint_velocity,
-                    pose_world={**state.pose_world, **adapted.pose_world},
-                )
+                evaluation_state = _position_task_evaluation_state(state, adapted)
                 evaluation = self.binding.evaluate(evaluation_state, self.artifact.semantics)
                 ee = adapted.pose_world['panda-v1/ee']
         else:

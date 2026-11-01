@@ -102,6 +102,38 @@ def test_f06_isaac_native_mimic_reset_commands_use_pickcube_entity_identity():
         raise AssertionError('F06 receipt accepted DG04 canonical entity names')
 
 
+def test_pickcube_position_evaluation_projection_remains_canonical_state_v0():
+    from types import SimpleNamespace
+
+    from task_env.artifacts import CanonicalStateView, PoseWorld
+    from task_env.tasks.pick_cube.task import evaluate
+    from task_env.tasks.reference_env import _position_task_evaluation_state
+
+    entity = 'panda-v1'
+    names = tuple(f'{entity}/joint{index}' for index in range(1, 8)) + (
+        f'{entity}/finger_joint1', f'{entity}/finger_joint2',
+    )
+    positions = {name: 0.0 for name in names}
+    velocities = {name: 0.0 for name in names}
+    cube = PoseWorld((0.55, 0.0, 0.49), (1.0, 0.0, 0.0, 0.0))
+    ee = PoseWorld((0.50, 0.0, 0.50), (1.0, 0.0, 0.0, 0.0))
+    state = CanonicalStateView(
+        'canonical-state-v0', 'SI_right_handed_z_up_wxyz', 0, 0.0,
+        positions, velocities, {'cube-v1': cube},
+    )
+    adapted = SimpleNamespace(
+        joint_position=positions, joint_velocity=velocities,
+        pose_world={f'{entity}/ee': ee},
+    )
+
+    projected = _position_task_evaluation_state(state, adapted)
+    result = evaluate(projected, build_artifact().semantics)
+
+    assert isinstance(projected, CanonicalStateView)
+    assert projected.pose_world[f'{entity}/ee'] == ee
+    assert result.metrics['cube_x'] == cube.position[0]
+
+
 def test_f06_external_binding_constructs_only_the_solution_free_source_once():
     from unittest.mock import patch
 

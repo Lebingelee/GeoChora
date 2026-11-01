@@ -599,6 +599,7 @@ class PandaPositionServoProfileV1:
             **{joint_id: ('prismatic', 'meter') for joint_id in self.finger_joint_ids},
         }
         joint_position = {}
+        joint_velocity = {}
         for joint_id, value in joints.items():
             definition = definitions.get((self.entity_id, joint_id))
             if definition is None:
@@ -608,7 +609,10 @@ class PandaPositionServoProfileV1:
                 raise ValueError(f'PositionServoV1 Joint {joint_id!r} has unexpected unit/coordinate')
             if len(value.position) != 1 or not math.isfinite(value.position[0]):
                 raise ValueError(f'PositionServoV1 Joint {joint_id!r} is not a finite scalar')
+            if len(value.velocity) != 1 or not math.isfinite(value.velocity[0]):
+                raise ValueError(f'PositionServoV1 Joint {joint_id!r} velocity is not a finite scalar')
             joint_position[self._algorithm_joint_by_id[joint_id]] = float(value.position[0])
+            joint_velocity[self._algorithm_joint_by_id[joint_id]] = float(value.velocity[0])
 
         hand_values = [
             value for value in view.frames
@@ -625,6 +629,7 @@ class PandaPositionServoProfileV1:
         state = SimpleNamespace(
             control_step=view.boundary.control_step,
             joint_position=joint_position,
+            joint_velocity=joint_velocity,
             pose_world={'panda-v1/ee': frame.pose_world},
         )
         return state
