@@ -137,6 +137,19 @@ def test_worker_accepts_supervisor_created_output_dir_but_rejects_other_data(tmp
         _prepare_output_directory(output)
 
 
+def test_worker_counts_core_planned_actions_from_loaded_canonical_trajectory():
+    from builtin_example_worker import _planned_action_count
+
+    trajectory = SimpleNamespace(transitions=(
+        SimpleNamespace(planned_action=True),
+        SimpleNamespace(planned_action=False),
+        SimpleNamespace(planned_action=True),
+    ))
+
+    assert _planned_action_count(trajectory) == 2
+    assert _planned_action_count(SimpleNamespace(transitions=())) == 0
+
+
 def test_worker_action_trace_records_failed_proposal_boundary(tmp_path):
     from builtin_example_worker import _install_action_trace
 

@@ -42,6 +42,14 @@ def _numeric_check(trajectory):
     return {name: list(value.shape) for name, value in arrays(trajectory).items()}
 
 
+def _planned_action_count(trajectory):
+    """Count Core-planned transitions from the loaded canonical trajectory."""
+    transitions = getattr(trajectory, 'transitions', None)
+    if transitions is None:
+        raise TypeError('canonical trajectory transitions are required')
+    return sum(1 for transition in transitions if transition.planned_action is True)
+
+
 def _prepare_output_directory(output: Path):
     output = output.resolve()
     if output.exists():
@@ -210,11 +218,6 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
             solution_failed=episode['solution_failed'], terminated=episode['terminated'],
             truncated=episode['truncated'], executed_transition_count=episode['transitions'],
         )
-        trajectory_live = getattr(env.recorder, 'value', None)
-        transitions_live = getattr(trajectory_live, 'transitions', ()) if trajectory_live is not None else ()
-        row['planning_action_count'] = sum(
-            bool(getattr(transition, 'planned_action', False)) for transition in transitions_live
-        )
         reason = episode.get('failure_reason') or (
             'task_success' if episode.get('task_success') else 'task_or_expert_incomplete'
         )
@@ -263,6 +266,7 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
             shapes = _numeric_check(trajectory)
             transition_count = len(trajectory.transitions)
             observation_count = len(trajectory.boundaries)
+            row['planning_action_count'] = _planned_action_count(trajectory)
             metadata = trajectory.metadata.to_mapping()
             if observation_count != transition_count + 1:
                 raise ValueError('canonical trajectory does not satisfy T+1')
@@ -288,7 +292,6 @@ def run_one(spec, catalog, scope, *, seed: int, output: Path):
                 'solution_identity': metadata.get('expert_identity'),
             }
             row['producer_readback'] = 'same-process-canonical-reader-pass'
-            row['planning_action_count'] = sum(transition.planned_action for transition in trajectory.transitions)
         except BaseException as error:
             row['errors'].append({'phase': 'h5-readback', 'type': type(error).__name__, 'message': str(error),
                                   'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))})
