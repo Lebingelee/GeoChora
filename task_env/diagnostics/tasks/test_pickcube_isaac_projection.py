@@ -276,6 +276,23 @@ def test_f06_reset_materializes_the_exact_rebuilt_runtime_input_artifact():
     assert observed['artifact'] is runtime_input.artifact
 
 
+def test_f06_gripper_readback_failure_reports_exact_boundary_values():
+    from task_env.tasks.pick_cube.solution import PickCubePositionExecutionInfoV1
+
+    with pytest.raises(ValueError) as error:
+        PickCubePositionExecutionInfoV1(
+            'pickcube-position-execution-info-v1', 52, 0.52,
+            -0.001, 0.2, 0.0, False,
+        )
+
+    message = str(error.value)
+    assert 'control_step=52' in message
+    assert 'simulation_time=0.52' in message
+    assert 'measured_opening_m=-0.001' in message
+    assert 'measured_opening_velocity_m_s=0.2' in message
+    assert 'target_opening_m=0.0' in message
+
+
 def test_f06_native_mimic_receipt_uses_task_scoped_five_newton_contract():
     from task_env.runtime.sessions.native_io import NativeAdvanceReceiptV1
 

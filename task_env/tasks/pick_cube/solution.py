@@ -666,7 +666,14 @@ class PickCubePositionExecutionInfoV1(Contract):
                 or any(not np.isfinite(float(value)) for value in values)
                 or self.simulation_time < 0 or self.measured_opening_m < 0
                 or not 0 <= self.target_opening_m <= 0.08):
-            raise ValueError("invalid PickCube Position execution boundary or gripper readback")
+            raise ValueError(
+                "invalid PickCube Position execution boundary or gripper readback "
+                f"(control_step={self.control_step!r}, "
+                f"simulation_time={self.simulation_time!r}, "
+                f"measured_opening_m={self.measured_opening_m!r}, "
+                f"measured_opening_velocity_m_s={self.measured_opening_velocity_m_s!r}, "
+                f"target_opening_m={self.target_opening_m!r})"
+            )
         expected = bool(
             self.target_opening_m <= 0.045
             and self.measured_opening_m <= 0.045
